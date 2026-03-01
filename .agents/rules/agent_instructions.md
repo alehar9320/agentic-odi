@@ -32,3 +32,12 @@ This file provides system instructions and guardrails for any AI agents (or LLMs
 ### 4. General Philosophy
 - **Separation of Concerns**: Isolate the ODI data logic/retrieval from the MCP server tooling logic.
 - **Agentic Purpose**: Remember that the tools being built are meant to be consumed by autonomous agents. Design tool interfaces that are intuitive for an LLM to call and interpret.
+
+### 5. Testing Strategy (FastMCP)
+- **First-Class Documentation**: Treat tests as living documentation that demonstrate how features work while protecting against regressions.
+- **Speed & Isolation**: Tests must be fast (< 1s) and self-contained. Use `@pytest.mark.integration` or `@pytest.mark.client_process` for slower, integration, or resource-dependent tests.
+- **Structure**: Mirror the application code structure in the `tests/` directory (e.g., `src/fastmcp/server/auth.py` -> `tests/server/test_auth.py`).
+- **Atomic Tests**: Each test must verify exactly one specific behavior with clear intent in test names and assertions. Avoid multi-behavior tests.
+- **In-Memory Testing (Preferred)**: Favor testing functionality deterministically by passing the `FastMCP` server directly into the `Client(server)` instance. This runs in-memory without network overhead for deterministic and lightning-fast execution.
+- **Transport Testing (When Needed)**: For HTTP/SSE network transport tests, prefer the isolated in-process `fastmcp.utilities.tests.run_server_async(server)` context manager over subprocess testing (which uses `run_server_in_process` and is slower to debug).
+- **Data Assertions**: Utilize `inline-snapshot` (`snapshot()`) for assessing complex data structures like tool API JSON schemas or expected responses.
