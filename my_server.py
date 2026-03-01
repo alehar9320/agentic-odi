@@ -1,5 +1,5 @@
 import uuid
-from typing import Dict, List, Optional
+from typing import Dict, Optional
 from pydantic import BaseModel, Field
 from fastmcp import FastMCP
 

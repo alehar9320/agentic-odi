@@ -25,7 +25,7 @@ def is_port_in_use(port: int) -> bool:
 def start_server() -> subprocess.Popen:
     if is_port_in_use(MCP_PORT):
         print(f"Error: Port {MCP_PORT} is already in use.")
-        print(f"Please stop any process running on this port and try again.")
+        print("Please stop any process running on this port and try again.")
         sys.exit(1)
         
     print(f"Starting MCP server on http://localhost:{MCP_PORT}/mcp ...")
@@ -78,7 +78,7 @@ def main():
         time.sleep(2)
         client = start_client()
 
-        print(f"\nBoth processes are running.")
+        print("\nBoth processes are running.")
         print(f"MCP Server  -> http://localhost:{MCP_PORT}/mcp")
         print(f"Streamlit   -> http://localhost:{CLIENT_PORT}")
         print("\nPress Ctrl+C to stop both.\n")

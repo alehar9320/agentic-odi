@@ -67,6 +67,22 @@ Tests use **pytest** with **pytest-asyncio** (strict mode) and run entirely in-m
 python -m pytest tests/ -v
 ```
 
+### 🧹 Linting, formatting & type checks (CI parity)
+
+The CI pipeline runs several quality checks. You can mirror them locally with:
+
+```bash
+# Ruff lint and formatting checks
+uv run ruff check .
+uv run ruff format --check .
+
+# Type checking
+uv run mypy .
+
+# Security scanning
+uv run bandit -r .
+```
+
 | File | What it covers |
 |---|---|
 | `tests/test_odi.py` | Full ODI workflow (add job → steps → outcomes → retrieval) + capabilities tool |
