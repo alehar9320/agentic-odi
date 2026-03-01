@@ -59,6 +59,28 @@ streamlit run my_client.py
 
 Type `/dev` in the AI assistant to trigger the full automated workflow: it will start both processes, open the browser, send a test message, and report the results.
 
+## 🧪 Testing
+
+Tests use **pytest** with **pytest-asyncio** (strict mode) and run entirely in-memory — no running server required.
+
+```bash
+python -m pytest tests/ -v
+```
+
+| File | What it covers |
+|---|---|
+| `tests/test_odi.py` | Full ODI workflow (add job → steps → outcomes → retrieval) + capabilities tool |
+| `tests/test_tools.py` | Tool response-shape contract for `add_job` |
+
+**Conventions:**
+- All test files are named `test_*.py` under `tests/`.
+- Every async test is decorated with `@pytest.mark.asyncio`.
+- A `reset_db` autouse fixture clears in-memory state before each test — always include it.
+- Use `Client(mcp)` directly (no HTTP server needed) for fast, isolated tests.
+
+> [!TIP]
+> Type `/test` in the AI assistant to have the agent run all tests and report the results automatically.
+
 ## ☁️ Deployment
 
 The server is deployed via **[Horizon Prefect](https://www.prefect.io/horizon)**, Prefect's managed infrastructure for hosting MCP-compatible agents.
