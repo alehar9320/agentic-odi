@@ -55,6 +55,67 @@ python my_server.py
 streamlit run my_client.py
 ```
 
+### Local tools-capable LLM backend (for MCP testing)
+
+To exercise real tool-calling end-to-end against the MCP server, you need a local LLM backend that:
+
+- Exposes an **OpenAI-compatible Chat Completions API** (for example, `/v1/chat/completions`), and
+- Supports OpenAI-style **`tools` / `tool_calls`**.
+
+A simple fully local option is [`llama-cpp-python`](https://github.com/abetlen/llama-cpp-python), which can run a quantized model on your machine and expose an OpenAI-compatible server.
+
+1. **Install a local LLM server**
+
+   Install `llama-cpp-python` in your environment (see its README for platform-specific build notes):
+
+   ```bash
+   pip install llama-cpp-python
+   ```
+
+2. **Download a small tools-capable model**
+
+   Download a small GGUF model that supports function/tool calling (for example, a 7B function-calling variant from Hugging Face) and note its path, e.g. `C:\models\local-tools-model.gguf`.
+
+3. **Start the OpenAI-compatible server**
+
+   Start the server and give the model a friendly alias that matches the default used by `my_client.py`:
+
+   ```bash
+   python -m llama_cpp.server \
+     --model "C:\models\local-tools-model.gguf" \
+     --model_alias local-tools-model \
+     --host 127.0.0.1 --port 8001 \
+     --chat_format openai
+   ```
+
+   This exposes an OpenAI-style API at `http://127.0.0.1:8001/v1`.
+
+4. **Point the Streamlit client at the local server**
+
+   `my_client.py` reads defaults from environment variables (with sensible fallbacks):
+
+   - `AGENTIC_ODI_BASE_URL` (default: `http://localhost:8001/v1`)
+   - `AGENTIC_ODI_API_KEY` (default: `local`)
+   - `AGENTIC_ODI_MODEL` (default: `local-tools-model`)
+   - `AGENTIC_ODI_MCP_URL` (default: `http://localhost:8000/mcp`)
+
+   You can either set these in your shell or adjust them in the Streamlit sidebar under **“LLM Configuration”**.
+
+5. **Verify tool-calling against the MCP server**
+
+   - (Optional) Before starting the UI, you can quickly verify that the LLM backend is reachable:
+
+     ```bash
+     curl http://127.0.0.1:8001/v1/models
+     ```
+
+     If this request fails, fix your local LLM server configuration before debugging the MCP client/server.
+
+   - Start the MCP server and Streamlit UI (either via `python run.py` or the split-terminal commands above).
+   - In the browser UI, ask the assistant something that should use ODI tools, for example: “Help me define a new Job-to-be-Done and add it to your ODI repository.”
+   - You should see the assistant briefly display that it is calling tools (for example, `add_job`, `get_jobs`, etc.) and then respond with grounded ODI guidance, confirming that the local LLM, MCP server, and client wiring all work together.
+   - If the LLM backend is unreachable or misconfigured, the UI will show a clear error banner indicating that the backend at your configured **Base URL** could not be reached, along with details from the underlying error. Use that message together with the steps above to fix your local LLM setup.
+
 #### 🤖 Agent-driven testing
 
 Type `/dev` in the AI assistant to trigger the full automated workflow: it will start both processes, open the browser, send a test message, and report the results.
@@ -81,7 +142,38 @@ uv run mypy .
 
 # Security scanning
 uv run bandit -r .
+
+# Tests (same as CI)
+uv run python -m pytest tests/ -v
 ```
+
+To run these automatically before each commit, you can enable the bundled pre-commit hooks:
+
+```bash
+uv pip install pre-commit
+pre-commit install
+```
+
+After this, `ruff` and `ruff-format` will run on staged files whenever you commit. You can also trigger them manually with:
+
+```bash
+pre-commit run --all-files
+```
+
+### 🧼 Developer workflow for formatting
+
+- **When editing Python files**, either:
+  - Rely on the **pre-commit hooks** above (recommended), or
+  - Run Ruff formatting directly before pushing:
+
+    ```bash
+    uv run ruff format .
+    ```
+
+- **CI behavior**:
+  - CI runs `uv run ruff check .` to lint without modifying files.
+  - CI runs `uv run ruff format --check .` to *verify* formatting only.
+  - If CI fails on formatting, run `uv run ruff format .` locally, commit the changes, and push again.
 
 | File | What it covers |
 |---|---|

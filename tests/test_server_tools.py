@@ -65,6 +65,67 @@ async def test_get_job_not_found_returns_error_message():
 
 
 @pytest.mark.asyncio
+async def test_add_outcome_job_not_found_returns_error():
+    async with Client(mcp) as client:
+        random_id = str(uuid4())
+        res = await client.call_tool(
+            "add_outcome",
+            {
+                "job_id": random_id,
+                "statement": "Some outcome",
+                "importance": 5.0,
+                "satisfaction": 3.0,
+            },
+        )
+        text = res.content[0].text
+        assert text == f"Error: Job with ID {random_id} not found."
+
+
+@pytest.mark.asyncio
+async def test_get_job_map_job_not_found_returns_error():
+    async with Client(mcp) as client:
+        random_id = str(uuid4())
+        res = await client.call_tool("get_job_map", {"job_id": random_id})
+        text = res.content[0].text
+        assert text == f"Error: Job with ID {random_id} not found."
+
+
+@pytest.mark.asyncio
+async def test_get_outcomes_job_not_found_returns_error():
+    async with Client(mcp) as client:
+        random_id = str(uuid4())
+        res = await client.call_tool("get_outcomes", {"job_id": random_id})
+        text = res.content[0].text
+        assert text == f"Error: Job with ID {random_id} not found."
+
+
+@pytest.mark.asyncio
+async def test_add_outcome_without_both_scores_sets_no_opportunity_score():
+    async with Client(mcp) as client:
+        # First create a job
+        create_res = await client.call_tool("add_job", {"name": "Job", "description": "Desc"})
+        job_id = _extract_id(create_res.content[0].text)
+        assert job_id is not None
+
+        # Add an outcome with only importance provided
+        outcome_res = await client.call_tool(
+            "add_outcome",
+            {
+                "job_id": job_id,
+                "statement": "Outcome without full scores",
+                "importance": 7.0,
+            },
+        )
+        outcome_text = outcome_res.content[0].text
+        assert "Outcome created successfully" in outcome_text
+
+        match = re.search(r"({.*})", outcome_text, re.DOTALL)
+        outcome_data = json.loads(match.group(1)) if match else {}
+
+        assert outcome_data.get("opportunity_score") is None
+
+
+@pytest.mark.asyncio
 async def test_get_odi_framework_guidelines_includes_expected_sections():
     async with Client(mcp) as client:
         res = await client.call_tool("get_odi_framework_guidelines", {})
@@ -86,4 +147,3 @@ async def test_greet_returns_expected_message():
         res = await client.call_tool("greet", {"name": name})
         text = res.content[0].text
         assert text == f"Hello, {name}!"
-

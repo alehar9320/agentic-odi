@@ -1,14 +1,7 @@
 import pytest
 from fastmcp import Client
-from my_server import mcp, jobs_db, steps_db, outcomes_db
 
-
-@pytest.fixture(autouse=True)
-def reset_db():
-    """Reset the in-memory databases before each test."""
-    jobs_db.clear()
-    steps_db.clear()
-    outcomes_db.clear()
+from my_server import mcp
 
 
 @pytest.mark.asyncio

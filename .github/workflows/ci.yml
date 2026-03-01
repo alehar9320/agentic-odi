@@ -27,10 +27,12 @@ jobs:
         run: |
           uv pip install -r requirements.txt
 
-      - name: Run Ruff Check
+      - name: Run Ruff Lint (no formatting)
+        # Lint Python files without changing them
         run: uv run ruff check .
 
-      - name: Run Ruff Format Check
+      - name: Verify Ruff Formatting (no auto-fix)
+        # Verify formatting only; run `uv run ruff format .` locally to fix before pushing
         run: uv run ruff format --check .
 
       - name: Run Mypy

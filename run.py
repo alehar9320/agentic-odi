@@ -18,31 +18,45 @@ PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
 MCP_PORT = 8000
 CLIENT_PORT = 8501
 
+
 def is_port_in_use(port: int) -> bool:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        return s.connect_ex(('localhost', port)) == 0
+        return s.connect_ex(("localhost", port)) == 0
+
 
 def start_server() -> subprocess.Popen:
     if is_port_in_use(MCP_PORT):
         print(f"Error: Port {MCP_PORT} is already in use.")
         print("Please stop any process running on this port and try again.")
         sys.exit(1)
-        
+
     print(f"Starting MCP server on http://localhost:{MCP_PORT}/mcp ...")
     return subprocess.Popen(
         [sys.executable, "my_server.py"],
         cwd=PROJECT_DIR,
     )
 
+
 def start_client() -> subprocess.Popen:
     if is_port_in_use(CLIENT_PORT):
-        print(f"Warning: Port {CLIENT_PORT} is already in use. Streamlit might choose another port.")
-        
+        print(
+            f"Warning: Port {CLIENT_PORT} is already in use. Streamlit might choose another port."
+        )
+
     print(f"Starting Streamlit client on http://localhost:{CLIENT_PORT} ...")
     return subprocess.Popen(
-        ["streamlit", "run", "my_client.py", "--server.headless", "true", "--server.port", str(CLIENT_PORT)],
+        [
+            "streamlit",
+            "run",
+            "my_client.py",
+            "--server.headless",
+            "true",
+            "--server.port",
+            str(CLIENT_PORT),
+        ],
         cwd=PROJECT_DIR,
     )
+
 
 def main():
     server = None
@@ -54,7 +68,7 @@ def main():
             client.terminate()
         if server:
             server.terminate()
-        
+
         try:
             if client:
                 client.wait(timeout=5)
@@ -65,7 +79,7 @@ def main():
                 client.kill()
             if server:
                 server.kill()
-        
+
         print("✅ All processes stopped.")
         sys.exit(0)
 
@@ -97,11 +111,12 @@ def main():
                 break
 
             time.sleep(1)
-            
+
     except Exception as e:
         print(f"\nError: {e}")
     finally:
         shutdown()
+
 
 if __name__ == "__main__":
     main()
