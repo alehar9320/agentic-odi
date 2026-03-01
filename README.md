@@ -22,27 +22,63 @@ This repository serves as an initial sandbox for understanding server-client MCP
 
 ### Prerequisites
 
-You will need Python 3.10+ and the `fastmcp` package (along with an ASGI server like `uvicorn` and an HTTP client like `httpx`).
+Python 3.10+ and the following packages:
 
 ```bash
-pip install fastmcp uvicorn httpx
+pip install fastmcp uvicorn httpx streamlit openai
 ```
 
 ### Running the Environment
 
-You'll need two terminal windows to witness the MCP architecture in action.
+#### ⚡ One-command launch (recommended)
 
-1. **Start the MCP Server:**
-   This starts the context provider on `http://localhost:8000`.
-   ```bash
-   python my_server.py
-   ```
+`run.py` starts both the MCP server and the Streamlit UI concurrently. Press **Ctrl+C** to stop both.
 
-2. **Run the MCP Client:**
-   In a separate terminal, execute the client to request execution and context from the server.
-   ```bash
-   python my_client.py
-   ```
+```bash
+python run.py
+```
+
+| Service | URL |
+|---|---|
+| MCP Server | http://localhost:8000/mcp |
+| Streamlit Chat UI | http://localhost:8501 |
+
+#### 🔧 Manual split-terminal (alternative)
+
+Open two terminals and run each process separately:
+
+```bash
+# Terminal 1 — MCP server
+python my_server.py
+
+# Terminal 2 — Streamlit chat UI
+streamlit run my_client.py
+```
+
+#### 🤖 Agent-driven testing
+
+Type `/dev` in the AI assistant to trigger the full automated workflow: it will start both processes, open the browser, send a test message, and report the results.
+
+## ☁️ Deployment
+
+The server is deployed via **[Horizon Prefect](https://www.prefect.io/horizon)**, Prefect's managed infrastructure for hosting MCP-compatible agents.
+
+### 🧪 Test Chat (UI)
+
+Interact with the deployed agent directly in your browser:
+
+> **[https://horizon.prefect.io/alhase/servers/agentic-odi/chat](https://horizon.prefect.io/alhase/servers/agentic-odi/chat)**
+
+### 🔌 MCP Server Endpoint
+
+Integrate via the MCP protocol at:
+
+> **[https://agentic-odi.fastmcp.app/mcp](https://agentic-odi.fastmcp.app/mcp)**
+
+> [!IMPORTANT]
+> **Authentication is required** to access the MCP server endpoint. Please reach out to the maintainers to obtain the necessary credentials before connecting a client.
+
+---
 
 ## 🗺️ Roadmap & Next Steps
 
