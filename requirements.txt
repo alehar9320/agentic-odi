@@ -1,0 +1,10 @@
+fastmcp
+uvicorn
+httpx
+streamlit
+openai
+pytest
+pytest-asyncio
+ruff
+mypy
+bandit
