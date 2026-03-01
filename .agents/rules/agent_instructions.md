@@ -129,8 +129,38 @@ These are absolute constraints the agent must respect:
 - **MCP Framework**: `fastmcp` (Server and Client)
 - **ASGI Server**: `uvicorn`
 - **HTTP Client**: `httpx`
+- **UI / Chat Client**: `streamlit`
+- **LLM Client**: `openai` (OpenAI-compatible, used with Ollama locally)
 - **Concurrency**: `asyncio`
 - **Data Modeling / Validation**: `pydantic`
+
+---
+
+## 📄 README Maintenance Guardrail
+
+`README.md` is the **primary human-facing source of truth** for this project. The agent MUST keep it current at all times.
+
+### When to update README.md
+
+Update `README.md` whenever any of the following change:
+
+| Change type | README section to update |
+|---|---|
+| New or removed Python file | **Code Overview** |
+| New dependency added (`pip install ...`) | **Prerequisites** |
+| New way to run the project | **Running the Environment** |
+| New MCP tool or capability | **Code Overview** / relevant section |
+| New workflow or agent instruction | **Getting Started → Agent-driven testing** |
+| Deployment URL or cloud setup changes | **Deployment** |
+| Roadmap item completed or added | **Roadmap & Next Steps** |
+
+### Rules
+
+- ✅ **Update README in the same task** as the change that triggered it — never defer to a follow-up.
+- ✅ **Keep the "Running the Environment" section accurate**: always reflect `python run.py` as the recommended launch command.
+- ✅ **Keep Prerequisites up to date**: add any new `pip install` dependency immediately.
+- ✅ **Mark Roadmap items `[x]` when completed** — do not leave stale unchecked items.
+- ❌ **Never leave README in a stale state** where documented commands or files no longer match the codebase.
 
 ---
 
