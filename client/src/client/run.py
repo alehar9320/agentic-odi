@@ -1,22 +1,24 @@
 """
-run.py — Local dev launcher for Agentic ODI
-Starts the FastMCP server (my_server.py) and the Streamlit client (my_client.py)
-concurrently. Shutting down this script (Ctrl+C) terminates both processes.
+run.py — Local dev launcher for Agentic ODI.
+
+Starts the FastMCP server (``python -m server``) and the Streamlit client
+(``client/app.py``) concurrently. Shutting down this script (Ctrl+C) terminates
+both processes.
 
 Usage:
-    python run.py
+    python -m client.run
 """
 
-import subprocess
-import sys
 import os
-import time
 import signal
 import socket
+import subprocess
+import sys
+import time
 
-PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
 MCP_PORT = 8000
 CLIENT_PORT = 8501
+CLIENT_APP = os.path.join(os.path.dirname(os.path.abspath(__file__)), "app.py")
 
 
 def is_port_in_use(port: int) -> bool:
@@ -31,10 +33,7 @@ def start_server() -> subprocess.Popen:
         sys.exit(1)
 
     print(f"Starting MCP server on http://localhost:{MCP_PORT}/mcp ...")
-    return subprocess.Popen(
-        [sys.executable, "my_server.py"],
-        cwd=PROJECT_DIR,
-    )
+    return subprocess.Popen([sys.executable, "-m", "server"])
 
 
 def start_client() -> subprocess.Popen:
@@ -46,19 +45,20 @@ def start_client() -> subprocess.Popen:
     print(f"Starting Streamlit client on http://localhost:{CLIENT_PORT} ...")
     return subprocess.Popen(
         [
+            sys.executable,
+            "-m",
             "streamlit",
             "run",
-            "my_client.py",
+            CLIENT_APP,
             "--server.headless",
             "true",
             "--server.port",
             str(CLIENT_PORT),
-        ],
-        cwd=PROJECT_DIR,
+        ]
     )
 
 
-def main():
+def main() -> None:
     server = None
     client = None
 
@@ -112,7 +112,7 @@ def main():
 
             time.sleep(1)
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"\nError: {e}")
     finally:
         shutdown()

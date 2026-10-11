@@ -20,12 +20,8 @@ jobs:
       - name: Set up Python
         run: uv python install 3.11
 
-      - name: Create virtual environment
-        run: uv venv
-
       - name: Install dependencies
-        run: |
-          uv pip install -r requirements.txt
+        run: uv sync --all-packages --locked
 
       - name: Run Ruff Lint (no formatting)
         # Lint Python files without changing them
@@ -35,11 +31,23 @@ jobs:
         # Verify formatting only; run `uv run ruff format .` locally to fix before pushing
         run: uv run ruff format --check .
 
-      - name: Run Mypy
-        run: uv run mypy .
+      - name: Run Mypy (server)
+        run: uv run --directory server mypy .
+
+      - name: Run Mypy (client)
+        run: uv run --directory client mypy .
+
+      - name: Run Mypy (cli)
+        run: uv run --directory cli mypy .
 
       - name: Run Bandit
-        run: uv run bandit -r .
+        run: uv run bandit -c pyproject.toml -r cli/src client/src server/src
 
-      - name: Run Tests
-        run: uv run python -m pytest tests/ -v
+      - name: Run Server Tests
+        run: uv run --directory server pytest
+
+      - name: Run Client Tests
+        run: uv run --directory client pytest
+
+      - name: Run CLI Tests
+        run: uv run --directory cli pytest

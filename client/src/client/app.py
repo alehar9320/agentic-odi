@@ -1,9 +1,10 @@
-import streamlit as st
 import asyncio
 import json
 import os
-from openai import AsyncOpenAI
+
+import streamlit as st
 from fastmcp import Client
+from openai import AsyncOpenAI
 
 st.set_page_config(page_title="Agentic ODI Chat", page_icon="🚀", layout="wide")
 
@@ -137,9 +138,7 @@ async def handle_user_input(user_inp: str, system_prompt: str):
                     "function": {
                         "name": tool.name,
                         "description": tool.description,
-                        "parameters": tool.parameters
-                        if hasattr(tool, "parameters")
-                        else tool.inputSchema,
+                        "parameters": tool.input_schema,
                     },
                 }
             )
@@ -187,8 +186,8 @@ async def handle_user_input(user_inp: str, system_prompt: str):
                 try:
                     tool_result = await mcp_client.call_tool(func_name, func_args)
                     result_str = str(tool_result)
-                except Exception as e:
-                    result_str = f"Error calling {func_name}: {str(e)}"
+                except Exception as e:  # noqa: BLE001
+                    result_str = f"Error calling {func_name}: {e}"
 
                 messages.append(
                     {

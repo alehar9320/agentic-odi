@@ -1,7 +1,7 @@
 import uuid
-from typing import Dict, Optional
-from pydantic import BaseModel, Field
+
 from fastmcp import FastMCP
+from pydantic import BaseModel, Field
 
 mcp = FastMCP("Agentic ODI Server")
 
@@ -36,7 +36,7 @@ def odi_assistant_prompt() -> str:
 class Job(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     name: str = Field(..., description="The name of the Job-to-be-Done")
-    description: Optional[str] = Field(None, description="Detailed description of the Job")
+    description: str | None = Field(None, description="Detailed description of the Job")
 
 
 class Step(BaseModel):
@@ -49,32 +49,30 @@ class Step(BaseModel):
 class Outcome(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     job_id: str = Field(..., description="The ID of the Job this outcome relates to")
-    step_id: Optional[str] = Field(None, description="The ID of the specific Step, if applicable")
+    step_id: str | None = Field(None, description="The ID of the specific Step, if applicable")
     statement: str = Field(
         ..., description="The desired outcome statement (e.g., 'Minimize the time it takes to...')"
     )
-    importance: Optional[float] = Field(
-        None, ge=1.0, le=10.0, description="Importance score (1-10)"
-    )
-    satisfaction: Optional[float] = Field(
+    importance: float | None = Field(None, ge=1.0, le=10.0, description="Importance score (1-10)")
+    satisfaction: float | None = Field(
         None, ge=1.0, le=10.0, description="Current satisfaction score (1-10)"
     )
-    opportunity_score: Optional[float] = Field(
+    opportunity_score: float | None = Field(
         None, description="Opportunity score (Importance + max(Importance - Satisfaction, 0))"
     )
 
 
 # --- In-Memory Storage ---
 # For sandbox testing. In production, connect to a rigorous database.
-jobs_db: Dict[str, Job] = {}
-steps_db: Dict[str, Step] = {}
-outcomes_db: Dict[str, Outcome] = {}
+jobs_db: dict[str, Job] = {}
+steps_db: dict[str, Step] = {}
+outcomes_db: dict[str, Outcome] = {}
 
 # --- MCP Tools ---
 
 
 @mcp.tool
-def add_job(name: str, description: Optional[str] = None) -> str:
+def add_job(name: str, description: str | None = None) -> str:
     """Add a new Job-to-be-Done to the ODI repository."""
     job = Job(name=name, description=description)
     jobs_db[job.id] = job
@@ -119,9 +117,9 @@ def get_job_map(job_id: str) -> str:
 def add_outcome(
     job_id: str,
     statement: str,
-    step_id: Optional[str] = None,
-    importance: Optional[float] = None,
-    satisfaction: Optional[float] = None,
+    step_id: str | None = None,
+    importance: float | None = None,
+    satisfaction: float | None = None,
 ) -> str:
     """Add a Desired Outcome to a Job, optionally calculating the Opportunity Score."""
     if job_id not in jobs_db:
@@ -208,5 +206,9 @@ def greet(name: str) -> str:
     return f"Hello, {name}!"
 
 
-if __name__ == "__main__":
+def main() -> None:
     mcp.run(transport="http", port=8000)
+
+
+if __name__ == "__main__":
+    main()

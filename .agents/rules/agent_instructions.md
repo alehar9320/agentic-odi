@@ -157,7 +157,7 @@ Update `README.md` whenever any of the following change:
 ### Rules
 
 - ✅ **Update README in the same task** as the change that triggered it — never defer to a follow-up.
-- ✅ **Keep the "Running the Environment" section accurate**: always reflect `python run.py` as the recommended launch command.
+- ✅ **Keep the "Running the Environment" section accurate**: always reflect `python -m client.run` as the recommended launch command.
 - ✅ **Keep Prerequisites up to date**: add any new `pip install` dependency immediately.
 - ✅ **Mark Roadmap items `[x]` when completed** — do not leave stale unchecked items.
 - ❌ **Never leave README in a stale state** where documented commands or files no longer match the codebase.
@@ -174,7 +174,7 @@ Update `README.md` whenever any of the following change:
 - **Tool Creation**: 
   - Register tools on the server using the `@mcp.tool` decorator.
   - **CRITICAL**: Provide comprehensive docstrings and strict Python type hints for every tool parameter. Explain exactly what the tool does and what data it expects, as this metadata is fed directly to the LLM for tool discovery.
-  - **Capability Synchronization**: Whenever you add, modify, or remove an MCP tool in `my_server.py`, you **MUST** simultaneously update the `get_capabilities` tool's human-readable return string to ensure the capability set exactly matches the code.
+  - **Capability Synchronization**: Whenever you add, modify, or remove an MCP tool in `server/src/server/server.py`, you **MUST** simultaneously update the `get_capabilities` tool's human-readable return string to ensure the capability set exactly matches the code.
 
 ### 2. Async / Client Practices
 - Use `asyncio` for client execution and IO-bound tool operations.
@@ -191,7 +191,7 @@ Update `README.md` whenever any of the following change:
 ### 5. Testing Strategy (FastMCP)
 - **First-Class Documentation**: Treat tests as living documentation that demonstrate how features work while protecting against regressions.
 - **Speed & Isolation**: Tests must be fast (< 1s) and self-contained. Use `@pytest.mark.integration` or `@pytest.mark.client_process` for slower, integration, or resource-dependent tests.
-- **Structure**: Mirror the application code structure in the `tests/` directory (e.g., `src/fastmcp/server/auth.py` -> `tests/server/test_auth.py`).
+- **Structure**: This repo is a uv workspace. Mirror each project's code structure in its own `tests/` directory (e.g., `server/src/server/server.py` -> `server/tests/test_server_tools.py`).
 - **Atomic Tests**: Each test must verify exactly one specific behavior with clear intent in test names and assertions. Avoid multi-behavior tests.
 - **In-Memory Testing (Preferred)**: Favor testing functionality deterministically by passing the `FastMCP` server directly into the `Client(server)` instance. This runs in-memory without network overhead for deterministic and lightning-fast execution.
 - **Transport Testing (When Needed)**: For HTTP/SSE network transport tests, prefer the isolated in-process `fastmcp.utilities.tests.run_server_async(server)` context manager over subprocess testing (which uses `run_server_in_process` and is slower to debug).

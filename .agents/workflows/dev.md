@@ -14,7 +14,7 @@ Use this workflow whenever the user asks to:
 1. **Start the server** — Launch the FastMCP server as a background process.
 
 ```
-python my_server.py
+python -m server
 ```
 
 Run with `WaitMsBeforeAsync: 2000` so the server has time to bind port 8000 before continuing.
@@ -25,7 +25,7 @@ Save the CommandId as `SERVER_CMD`.
 3. **Start the Streamlit client** — Launch the UI as a background process.
 
 ```
-streamlit run my_client.py --server.headless true
+streamlit run client/src/client/app.py --server.headless true
 ```
 
 Run with `WaitMsBeforeAsync: 3000`. Save the CommandId as `CLIENT_CMD`.
@@ -47,5 +47,5 @@ Run with `WaitMsBeforeAsync: 3000`. Save the CommandId as `CLIENT_CMD`.
 
 - The MCP server runs on `http://localhost:8000/mcp`
 - The Streamlit UI runs on `http://localhost:8501`
-- All commands should be run from the project root: `c:\GIT repositories\agentic-odi`
+- All commands should be run from the project root (the `agentic-odi` workspace root).
 - The default LLM in the sidebar points to Ollama (`http://localhost:11434/v1`). If Ollama is not running, the chat won't complete but the UI will still load.

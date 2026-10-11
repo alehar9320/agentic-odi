@@ -5,7 +5,7 @@ from uuid import uuid4
 import pytest
 from fastmcp import Client
 
-from my_server import mcp
+from server import mcp
 
 
 def _extract_id(result_text: str) -> str | None:
