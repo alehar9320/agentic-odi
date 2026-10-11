@@ -1,5 +1,7 @@
 # Agentic ODI 🚀
 
+[![CI](https://github.com/alehar9320/agentic-odi/actions/workflows/ci.yml/badge.svg)](https://github.com/alehar9320/agentic-odi/actions/workflows/ci.yml)
+
 > **Experimental test to learn and evaluate the feasibility of utilizing Model Context Protocol (MCP) for Outcome-Driven Innovation (ODI) specifications.**
 
 ## 🌟 The Vision: Context-Aware Innovation
@@ -143,7 +145,7 @@ Type `/dev` in the AI assistant to trigger the full automated workflow: it will 
 
 ## 🧪 Testing
 
-Tests use **pytest** with **pytest-asyncio** (strict mode) and run entirely in-memory — no running server required. Each project owns its tests:
+Tests use **pytest** with **pytest-asyncio** (strict mode) and run entirely in-memory — no running server required. Each project owns its tests. CI runs the suite on Python **3.10, 3.11, and 3.12** and stores a coverage report as a build artifact:
 
 ```bash
 uv run --directory server pytest

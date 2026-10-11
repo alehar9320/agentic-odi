@@ -1,0 +1,26 @@
+name: Setup Agentic ODI workspace
+description: Check out the repo, install uv and Python, and sync the workspace with pinned dependencies.
+
+inputs:
+  python-version:
+    description: Python version to install and use.
+    required: false
+    default: "3.11"
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/checkout@v4
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v5
+      with:
+        enable-cache: true
+
+    - name: Set up Python
+      run: uv python install ${{ inputs.python-version }}
+      shell: bash
+
+    - name: Install dependencies
+      run: uv sync --all-packages --locked
+      shell: bash

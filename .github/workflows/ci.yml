@@ -2,34 +2,40 @@ name: CI
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
 
 jobs:
-  lint-and-test:
+  lint:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
 
-      - name: Install uv
-        uses: astral-sh/setup-uv@v5
-        with:
-          enable-cache: true
-
-      - name: Set up Python
-        run: uv python install 3.11
-
-      - name: Install dependencies
-        run: uv sync --all-packages --locked
-
-      - name: Run Ruff Lint (no formatting)
-        # Lint Python files without changing them
+      - name: Run Ruff Lint (no auto-fix)
         run: uv run ruff check .
 
       - name: Verify Ruff Formatting (no auto-fix)
-        # Verify formatting only; run `uv run ruff format .` locally to fix before pushing
         run: uv run ruff format --check .
+
+  typecheck:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: ./.github/actions/setup
 
       - name: Run Mypy (server)
         run: uv run --directory server mypy .
@@ -40,14 +46,118 @@ jobs:
       - name: Run Mypy (cli)
         run: uv run --directory cli mypy .
 
+  security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: ./.github/actions/setup
+
       - name: Run Bandit
         run: uv run bandit -c pyproject.toml -r cli/src client/src server/src
 
-      - name: Run Server Tests
-        run: uv run --directory server pytest
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+    steps:
+      - uses: ./.github/actions/setup
+        with:
+          python-version: ${{ matrix.python-version }}
 
-      - name: Run Client Tests
-        run: uv run --directory client pytest
+      - name: Pytest (server)
+        run: uv run --directory server pytest --cov=server --cov-report=term-missing
+        env:
+          COVERAGE_FILE: ${{ github.workspace }}/.coverage.server
 
-      - name: Run CLI Tests
-        run: uv run --directory cli pytest
+      - name: Pytest (client)
+        run: uv run --directory client pytest --cov=client --cov-report=term-missing
+        env:
+          COVERAGE_FILE: ${{ github.workspace }}/.coverage.client
+
+      - name: Pytest (cli)
+        run: uv run --directory cli pytest --cov=cli --cov-report=term-missing
+        env:
+          COVERAGE_FILE: ${{ github.workspace }}/.coverage.cli
+
+      - name: Combine and report coverage
+        run: |
+          unset COVERAGE_FILE
+          uv run coverage combine \
+            "${{ github.workspace }}/.coverage.server" \
+            "${{ github.workspace }}/.coverage.client" \
+            "${{ github.workspace }}/.coverage.cli"
+          uv run coverage xml -o "${{ github.workspace }}/coverage.xml"
+          uv run coverage report
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ matrix.python-version }}
+          path: coverage.xml
+          if-no-files-found: error
+
+  smoke:
+    runs-on: ubuntu-latest
+    needs: [lint, typecheck, security, test]
+    timeout-minutes: 15
+    steps:
+      - uses: ./.github/actions/setup
+
+      - name: CLI reports a version
+        run: |
+          version="$(uv run python -m cli --version)"
+          [ -n "$version" ]
+          echo "OK: $version"
+
+      - name: MCP server boots and serves /mcp
+        run: |
+          uv run python -m server > /tmp/server.log 2>&1 &
+          SERVER_PID=$!
+          probe() {
+            curl -sfX POST http://localhost:8000/mcp \
+              -H 'Content-Type: application/json' \
+              -d '{"jsonrpc":"2.0","method":"initialize","id":1,"params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"ci","version":"1"}}}' \
+              -o /dev/null
+          }
+          ok=0
+          for _ in $(seq 1 30); do
+            if probe; then ok=1; break; fi
+            sleep 1
+          done
+          kill "$SERVER_PID" 2>/dev/null || true
+          wait "$SERVER_PID" 2>/dev/null || true
+          if [ "$ok" -ne 1 ]; then
+            echo "MCP server did not respond on :8000/mcp"
+            cat /tmp/server.log
+            exit 1
+          fi
+          echo "OK: MCP server responded with 200"
+
+      - name: python -m client.run brings up both services and stops cleanly
+        run: |
+          uv run python -m client.run > /tmp/clientrun.log 2>&1 &
+          RUN_PID=$!
+          probe() {
+            curl -sf -o /dev/null http://localhost:8501 &&
+              curl -sfX POST http://localhost:8000/mcp \
+                -H 'Content-Type: application/json' \
+                -d '{"jsonrpc":"2.0","method":"initialize","id":1,"params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"ci","version":"1"}}}' \
+                -o /dev/null
+          }
+          ok=0
+          for _ in $(seq 1 60); do
+            if probe; then ok=1; break; fi
+            sleep 1
+          done
+          if [ "$ok" -ne 1 ]; then
+            echo "client.run did not bring up both services"
+            cat /tmp/clientrun.log
+            kill "$RUN_PID" 2>/dev/null || true
+            exit 1
+          fi
+          kill -INT "$RUN_PID"
+          wait "$RUN_PID"
+          echo "OK: both services stopped cleanly"

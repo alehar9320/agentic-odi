@@ -12,7 +12,7 @@ Usage:
 import os
 import signal
 import socket
-import subprocess
+import subprocess  # nosec B404 - launches only fixed child commands (see B603 notes)
 import sys
 import time
 
@@ -33,7 +33,8 @@ def start_server() -> subprocess.Popen:
         sys.exit(1)
 
     print(f"Starting MCP server on http://localhost:{MCP_PORT}/mcp ...")
-    return subprocess.Popen([sys.executable, "-m", "server"])
+    # Fixed command, no shell, no untrusted input.
+    return subprocess.Popen([sys.executable, "-m", "server"])  # nosec B603
 
 
 def start_client() -> subprocess.Popen:
@@ -43,7 +44,8 @@ def start_client() -> subprocess.Popen:
         )
 
     print(f"Starting Streamlit client on http://localhost:{CLIENT_PORT} ...")
-    return subprocess.Popen(
+    # Fixed command, no shell, no untrusted input.
+    return subprocess.Popen(  # nosec B603
         [
             sys.executable,
             "-m",
