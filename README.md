@@ -153,6 +153,10 @@ uv run --directory client pytest
 uv run --directory cli pytest
 ```
 
+### 🧠 Agent session tracking
+
+Agent sessions are captured with the [Entire](https://docs.entire.io/overview) CLI. The repository integration lives in `.entire/settings.json`, `.cursor/hooks.json`, and `.opencode/plugins/entire.ts`. Run `entire status` to confirm it is enabled and `entire checkpoint list` to inspect captured checkpoints.
+
 ### 🧹 Linting, formatting & type checks (CI parity)
 
 The CI pipeline runs several quality checks. You can mirror them locally with:
