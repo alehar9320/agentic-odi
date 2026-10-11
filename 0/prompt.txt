@@ -1,0 +1,5 @@
+Install github cli so that gh can be run from command line
+
+---
+
+validate checkpoint
