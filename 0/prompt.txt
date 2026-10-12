@@ -1,0 +1,1 @@
+User wants only PM skills installed. Minimal plan: options (copy 69 skills flat to .opencode/skills/ OR git submodule under .opencode/pm-skills + add skills.paths to opencode.json). Recommend simplest. Ask: vendor copy vs submodule, all 9 plugins vs subset, include commands? No bidirectional sync. subagent_type: "explore"
