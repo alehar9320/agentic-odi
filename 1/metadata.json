@@ -1,0 +1,81 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M4V90558APM33W5H0CA62W97",
+  "session_id": "ses_ece9d4bc1ffeIOpXhpC3Gtn37q",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-13T18:39:51.683476698Z",
+  "branch": "main",
+  "checkpoints_count": 2,
+  "save_step_count": 2,
+  "files_touched": [
+    "README.md",
+    "cli/pyproject.toml",
+    "cli/src/cli/cli.py",
+    "server/src/server/__init__.py",
+    "server/src/server/server.py",
+    "server/tests/conftest.py",
+    "uv.lock"
+  ],
+  "agent": "OpenCode",
+  "model": "big-pickle",
+  "turn_id": "c9c9cf724c2d",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 2070097,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 20854831,
+    "output_tokens": 54978,
+    "api_call_count": 225
+  },
+  "session_metrics": {
+    "turn_count": 8
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-10-13T18:39:51.562045936Z",
+    "agent_lines": 0,
+    "agent_removed": 0,
+    "human_added": 644,
+    "human_modified": 9,
+    "human_removed": 0,
+    "total_committed": 644,
+    "total_lines_changed": 653,
+    "agent_percentage": 0,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 765,
+      "user_lines_removed": 5,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        "README.md": 3,
+        "README.md.bak": 261,
+        "cli/pyproject.toml": 1,
+        "cli/src/cli/cli.py": 5,
+        "cli/src/cli/outcomes.py": 166,
+        "cli/tests/test_outcomes_cli.py": 65,
+        "server/src/server/__init__.py": 2,
+        "server/src/server/server.py": 150,
+        "server/tests/conftest.py": 2,
+        "server/tests/test_customer_outcomes.py": 105,
+        "uv.lock": 5
+      },
+      "user_removed_per_file": {
+        "README.md": 1,
+        "server/src/server/__init__.py": 1,
+        "server/src/server/server.py": 1,
+        "server/tests/conftest.py": 1,
+        "uv.lock": 1
+      }
+    },
+    {
+      "checkpoint_number": 3,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 765,
+      "agent_lines_removed": 5
+    }
+  ]
+}
