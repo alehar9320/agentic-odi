@@ -55,11 +55,15 @@ name = "agentic-odi-cli"
 version = "0.1.0"
 source = { editable = "cli" }
 dependencies = [
+    { name = "fastmcp" },
     { name = "typer" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "typer" }]
+requires-dist = [
+    { name = "fastmcp" },
+    { name = "typer" },
+]
 
 [[package]]
 name = "agentic-odi-client"

@@ -2,6 +2,8 @@
 
 import typer
 
+from cli.outcomes import outcomes_app
+
 __version__ = "0.1.0"
 
 app = typer.Typer(
@@ -28,3 +30,6 @@ def main(
     ),
 ) -> None:
     """Agentic ODI command-line interface."""
+
+
+app.add_typer(outcomes_app, name="outcomes", help="Manage Customer Outcome entities.")

@@ -20,7 +20,7 @@ This repository serves as an initial sandbox for understanding server-client MCP
 
 This repository is a [uv workspace](https://docs.astral.sh/uv/concepts/projects/workspaces/) made up of three installable projects, each with its own `pyproject.toml`, `src/` layout, and tests:
 
-- **`server/`** (`agentic-odi-server`): A foundational MCP Server exposing an HTTP transport layer. Currently, it hosts a simple `greet` tool to validate the end-to-end MCP wiring. In the future, this will host tools to fetch *Job Steps*, *Desired Outcomes*, and *Opportunity Configs*.
+- **`server/`** (`agentic-odi-server`): A foundational MCP Server exposing an HTTP transport layer. It hosts tools for Jobs, Steps, Desired Outcomes, and Customer Outcomes (linking customer value to business value) with ODI opportunity-score computation.
 - **`client/`** (`agentic-odi-client`): A Python-based agent client that communicates with the MCP server, executing tool calls over the active connection. It also hosts `run.py`, the local dev launcher that starts the server and the Streamlit UI together.
 - **`cli/`** (`agentic-odi-cli`): A [`Typer`](https://github.com/fastapi/typer)-based command-line interface. It provides a non-MCP entry point for interacting with Agentic ODI, initially exposing `--version` and `--help`, and will grow to cover dataset operations.
 
@@ -51,6 +51,30 @@ python -m cli             # show help when no command is given
 ```
 
 A console script is also installed, so `agentic-odi --version` works the same way.
+
+#### Manage Customer Outcomes
+
+Manage Customer Outcomes (linking customer value to business value) via the CLI. The CLI acts as an MCP client, so the server must be running (`python -m server`):
+
+```bash
+# Add a Customer Outcome
+agentic-odi outcomes add --job-id <job-id>   --direction minimize --unit "time" --object "to resolve setup errors"   --statement "Minimize the time to resolve environment setup errors when onboarding"   --importance 8.8 --satisfaction 3.2   --category cost_reduction   --business-statement "Saves engineering hours and reduces early churn"
+
+# List outcomes (optionally filtered)
+agentic-odi outcomes list
+agentic-odi outcomes list --job-id <job-id>
+
+# Get, update, delete
+agentic-odi outcomes get <outcome-id>
+agentic-odi outcomes update <outcome-id> --importance 9.0
+agentic-odi outcomes delete <outcome-id> --yes
+
+# Compute ODI Opportunity Score
+agentic-odi outcomes score 8 2
+```
+
+Set `AGENTIC_ODI_MCP_URL` to point to a non-default server if needed.
+
 
 
 #### ⚡ One-command launch (recommended)
@@ -211,10 +235,12 @@ pre-commit run --all-files
 | File | What it covers |
 |---|---|
 | `server/tests/test_odi.py` | Full ODI workflow (add job → steps → outcomes → retrieval) + capabilities tool |
+| `server/tests/test_customer_outcomes.py` | Customer Outcomes CRUD, filtering, computed opportunity scores, and tool validation |
 | `server/tests/test_server_tools.py` | Error handling and retrieval for the MCP tools |
 | `server/tests/test_tools.py` | Tool response-shape contract for `add_job` |
 | `client/tests/test_run.py` | Dev launcher helpers (port checks) |
 | `cli/tests/test_cli.py` | CLI `--version` and `--help` behavior |
+| `cli/tests/test_outcomes_cli.py` | Customer Outcomes CLI subcommands with MCP stub |
 
 **Conventions:**
 - Test files live under each project's `tests/` directory and are named `test_*.py`.
@@ -251,7 +277,7 @@ Integrate via the MCP protocol at:
 As we validate the feasibility of this architecture, our next milestones include:
 
 - [ ] **ODI Schema Definition**: Define standardized Pydantic models for *Jobs*, *Steps*, and *Outcomes*.
-- [ ] **CLI Dataset Commands**: Extend `cli/` so the ODI dataset can be created, queried, and scored from the terminal, in addition to the current MCP path.
+- [x] **CLI Dataset Commands**: Extend `cli/` so the ODI dataset can be created, queried, and scored from the terminal, in addition to the current MCP path.
 - [ ] **Context Tooling**: Replace the dummy `greet` tool with capabilities like `get_job_map(job_id)` or `evaluate_outcome(statement)`.
 - [ ] **Data Persistence Layer**: Connect the fastmcp server to a lightweight vector or relational database containing actual user research data.
 - [ ] **Agentic Integration**: Hook the client up to an LLM (e.g., via LangChain or standard OpenAI clients) so the LLM can *discover* the ODI tools and intelligently request customer insights when ideating features.

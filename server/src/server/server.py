@@ -1,9 +1,35 @@
 import uuid
+from enum import StrEnum
 
 from fastmcp import FastMCP
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, computed_field
 
 mcp = FastMCP("Agentic ODI Server")
+
+
+# --- Enums and Computation ---
+
+
+class Direction(StrEnum):
+    MINIMIZE = "minimize"
+    MAXIMIZE = "maximize"
+
+
+class BusinessImpactCategory(StrEnum):
+    REVENUE_GROWTH = "revenue_growth"
+    COST_REDUCTION = "cost_reduction"
+    RETENTION = "retention"
+    RISK_MITIGATION = "risk_mitigation"
+    OPERATIONAL_EFFICIENCY = "operational_efficiency"
+    COMPLIANCE = "compliance"
+    BRAND_REPUTATION = "brand_reputation"
+    OTHER = "other"
+
+
+def compute_opportunity_score(importance: float, satisfaction: float) -> float:
+    """ODI Opportunity Score = importance + max(importance - satisfaction, 0)."""
+    return float(importance + max(importance - satisfaction, 0.0))
+
 
 # --- ODI System Prompt ---
 # This prompt initializes any client AI agent connecting to this server
@@ -62,11 +88,61 @@ class Outcome(BaseModel):
     )
 
 
+class ValueMetric(BaseModel):
+    """A single measurable dimension of value."""
+
+    name: str
+    direction: Direction
+    unit_of_measure: str
+    importance: float = Field(ge=1.0, le=10.0)
+    satisfaction: float = Field(ge=1.0, le=10.0)
+
+    @computed_field
+    @property
+    def opportunity_score(self) -> float:
+        return compute_opportunity_score(self.importance, self.satisfaction)
+
+
+class CustomerValue(BaseModel):
+    direction: Direction
+    unit_of_measure: str
+    object_of_control: str
+    contextual_clarifier: str | None = None
+    statement: str
+    importance: float = Field(ge=1.0, le=10.0)
+    satisfaction: float = Field(ge=1.0, le=10.0)
+    value_metrics: list[ValueMetric] = Field(default_factory=list)
+
+    @computed_field
+    @property
+    def opportunity_score(self) -> float:
+        return compute_opportunity_score(self.importance, self.satisfaction)
+
+
+class BusinessValue(BaseModel):
+    category: BusinessImpactCategory
+    statement: str
+    detail: str | None = None
+    estimated_annual_value: float | None = Field(default=None, ge=0.0)
+    confidence: float | None = Field(default=None, ge=0.0, le=1.0)
+
+
+class CustomerOutcome(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    job_id: str = Field(..., description="The ID of the Job this outcome relates to")
+    step_id: str | None = Field(
+        default=None, description="The ID of the specific Step, if applicable"
+    )
+    customer_value: CustomerValue
+    business_value: BusinessValue
+
+
 # --- In-Memory Storage ---
 # For sandbox testing. In production, connect to a rigorous database.
 jobs_db: dict[str, Job] = {}
 steps_db: dict[str, Step] = {}
 outcomes_db: dict[str, Outcome] = {}
+customer_outcomes_db: dict[str, CustomerOutcome] = {}
 
 # --- MCP Tools ---
 
@@ -142,6 +218,120 @@ def add_outcome(
 
 
 @mcp.tool
+def add_customer_outcome(
+    job_id: str,
+    customer_value: CustomerValue,
+    business_value: BusinessValue,
+    step_id: str | None = None,
+) -> str:
+    """Add a new Customer Outcome capturing both customer and business value."""
+    if job_id not in jobs_db:
+        return f"Error: Job with ID {job_id} not found."
+    outcome = CustomerOutcome(
+        job_id=job_id,
+        step_id=step_id,
+        customer_value=customer_value,
+        business_value=business_value,
+    )
+    customer_outcomes_db[outcome.id] = outcome
+    return f"Customer outcome created successfully: {outcome.model_dump_json()}"
+
+
+@mcp.tool
+def get_customer_outcome(outcome_id: str) -> str:
+    """Retrieve a specific Customer Outcome by ID."""
+    if outcome_id not in customer_outcomes_db:
+        return f"Error: Customer outcome with ID {outcome_id} not found."
+    return customer_outcomes_db[outcome_id].model_dump_json()
+
+
+@mcp.tool
+def list_customer_outcomes(job_id: str | None = None) -> str:
+    """List all Customer Outcomes, optionally filtered by job."""
+    rows = [o for o in customer_outcomes_db.values() if job_id is None or o.job_id == job_id]
+    return f"[{', '.join(o.model_dump_json() for o in rows)}]"
+
+
+@mcp.tool
+def update_customer_outcome(
+    outcome_id: str,
+    customer_value: CustomerValue | None = None,
+    business_value: BusinessValue | None = None,
+    step_id: str | None = None,
+    direction: Direction | None = None,
+    unit_of_measure: str | None = None,
+    object_of_control: str | None = None,
+    contextual_clarifier: str | None = None,
+    statement: str | None = None,
+    importance: float | None = None,
+    satisfaction: float | None = None,
+    category: BusinessImpactCategory | None = None,
+    business_statement: str | None = None,
+    detail: str | None = None,
+    estimated_annual_value: float | None = None,
+    confidence: float | None = None,
+) -> str:
+    """Update an existing Customer Outcome (merges partial fields)."""
+    if outcome_id not in customer_outcomes_db:
+        return f"Error: Customer outcome with ID {outcome_id} not found."
+    outcome = customer_outcomes_db[outcome_id]
+    if customer_value is not None:
+        outcome.customer_value = customer_value
+    else:
+        cv_data = outcome.customer_value.model_dump()
+        if direction is not None:
+            cv_data["direction"] = direction
+        if unit_of_measure is not None:
+            cv_data["unit_of_measure"] = unit_of_measure
+        if object_of_control is not None:
+            cv_data["object_of_control"] = object_of_control
+        if contextual_clarifier is not None or "contextual_clarifier" in cv_data:
+            cv_data["contextual_clarifier"] = contextual_clarifier
+        if statement is not None:
+            cv_data["statement"] = statement
+        if importance is not None:
+            cv_data["importance"] = importance
+        if satisfaction is not None:
+            cv_data["satisfaction"] = satisfaction
+        outcome.customer_value = CustomerValue.model_validate(cv_data)
+    if business_value is not None:
+        outcome.business_value = business_value
+    else:
+        bv_data = outcome.business_value.model_dump()
+        if category is not None:
+            bv_data["category"] = category
+        if business_statement is not None:
+            bv_data["statement"] = business_statement
+        if detail is not None or "detail" in bv_data:
+            bv_data["detail"] = detail
+        if estimated_annual_value is not None or "estimated_annual_value" in bv_data:
+            bv_data["estimated_annual_value"] = estimated_annual_value
+        if confidence is not None or "confidence" in bv_data:
+            bv_data["confidence"] = confidence
+        outcome.business_value = BusinessValue.model_validate(bv_data)
+    if step_id is not None:
+        outcome.step_id = step_id
+    return f"Customer outcome updated successfully: {outcome.model_dump_json()}"
+
+
+@mcp.tool
+def delete_customer_outcome(outcome_id: str) -> str:
+    """Delete a Customer Outcome by ID."""
+    if outcome_id not in customer_outcomes_db:
+        return f"Error: Customer outcome with ID {outcome_id} not found."
+    del customer_outcomes_db[outcome_id]
+    return f"Customer outcome {outcome_id} deleted successfully."
+
+
+@mcp.tool
+def compute_opportunity(importance: float, satisfaction: float) -> str:
+    """Compute ODI Opportunity Score: importance + max(importance - satisfaction, 0)."""
+    if not (1.0 <= importance <= 10.0 and 1.0 <= satisfaction <= 10.0):
+        return "Error: importance and satisfaction must be between 1 and 10."
+    return f"Opportunity Score = {compute_opportunity_score(importance, satisfaction):.2f}"
+
+
+@mcp.tool
 def get_outcomes(job_id: str) -> str:
     """Retrieve all Desired Outcomes for a specific Job."""
     if job_id not in jobs_db:
@@ -195,6 +385,7 @@ def get_capabilities() -> str:
         "🎯 **Manage Jobs-to-be-Done (JTBD)**: Add, list, and retrieve Jobs.\n"
         "🗺️ **Build Job Maps**: Break down a Job into ordered Steps.\n"
         "📊 **Track Desired Outcomes**: Record outcomes with importance/satisfaction scores and calculate Opportunity Scores.\n"
+        "💼 **Manage Customer Outcomes**: Add, list, get, update, and delete Customer Outcomes linking customer value and business value.\n"
         "📖 **ODI Framework Guidelines**: Call `get_odi_framework_guidelines` to see which tool to use at each ODI stage.\n\n"
         "💡 **Tip**: Ask me to 'get started' and I will guide you step-by-step through the ODI process from intent to opportunity scoring!"
     )
