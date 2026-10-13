@@ -1,0 +1,12 @@
+Extend CLI and MCP to support Customer Outcome entities with both customerValue and businessValue per the provided example. Design:
+1. Pydantic models (server) to validate CustomerOutcome with Direction, BusinessImpactCategory enums, nested structures, opportunityScore computed/validated? ODI: Opportunity Score = Importance + Max(Importance - Satisfaction, 0). Include this computation logic.
+2. MCP server tools: CRUD-like (add_customer_outcome, get_customer_outcome, list_customer_outcomes, update_customer_outcome, delete_customer_outcome). Also maybe compute_opportunity? Keep in-memory state consistent with existing ODI pattern (reset_db fixture).
+3. CLI: subcommands under `agentic-odi outcomes` or similar to input/output/list. Mirror CLI style (Typer). 
+4. Follow existing conventions: server models in server/src/server/, tools registered with @mcp.tool, CLI in cli/src/cli/, tests under respective tests/ dirs.
+5. Integration with existing Job/Step/Outcome? Current server has Outcome model (from ODI guardrails context in repo, but need to inspect actual server models). Check server code first for existing schema.
+
+But we're in plan mode (read-only). So first explore existing server models and CLI structure, then propose plan. But explore agent can do that. 
+
+Include: where files go, data model (Python), MCP tool signatures/docstrings, CLI commands, tests to write, backward compatibility considerations.
+
+Return comprehensive plan. subagent_type: "explore"
