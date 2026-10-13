@@ -1,0 +1,89 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M4VDYAHE6CFYJ2GFJ3B5CEKK",
+  "session_id": "ses_ece9d4bc1ffeIOpXhpC3Gtn37q",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-13T20:06:42.389391294Z",
+  "branch": "main",
+  "checkpoints_count": 2,
+  "files_touched": [
+    "cli/src/cli/backend.py",
+    "cli/src/cli/cli.py",
+    "cli/src/cli/outcomes.py",
+    "cli/src/cli/version.py",
+    "core/pyproject.toml",
+    "core/src/core/__init__.py",
+    "core/src/core/intent_store.py",
+    "core/src/core/messages.py",
+    "core/src/core/models.py",
+    "core/src/core/repository.py",
+    "core/src/core/services.py",
+    "core/src/core/sqlite_repository.py",
+    "local_server/pyproject.toml",
+    "local_server/src/local_server/__init__.py",
+    "local_server/src/local_server/app.py",
+    "local_server/src/local_server/main.py",
+    "local_server/tests/test_api.py",
+    "mcp_server/pyproject.toml",
+    "mcp_server/src/mcp_server/__init__.py",
+    "mcp_server/src/mcp_server/__main__.py",
+    "mcp_server/src/mcp_server/mcp_server.py",
+    "mcp_server/tests/conftest.py",
+    "mcp_server/tests/test_customer_outcomes.py",
+    "mcp_server/tests/test_odi.py",
+    "mcp_server/tests/test_server_tools.py",
+    "mcp_server/tests/test_tools.py",
+    "server/pyproject.toml",
+    "server/src/server/__init__.py",
+    "server/src/server/__main__.py",
+    "server/src/server/server.py",
+    "server/tests/conftest.py",
+    "server/tests/test_customer_outcomes.py",
+    "server/tests/test_odi.py",
+    "server/tests/test_server_tools.py",
+    "server/tests/test_tools.py",
+    "uv.lock"
+  ],
+  "agent": "OpenCode",
+  "model": "big-pickle",
+  "turn_id": "8ea1687a3172",
+  "checkpoint_transcript_start": 236,
+  "transcript_lines_at_start": 236,
+  "compact_transcript_start": 236,
+  "token_usage": {
+    "input_tokens": 1210803,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 9657584,
+    "output_tokens": 30775,
+    "api_call_count": 185
+  },
+  "session_metrics": {
+    "turn_count": 10
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-10-13T20:06:42.210798594Z",
+    "agent_lines": 1379,
+    "agent_removed": 919,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 1379,
+    "total_lines_changed": 2298,
+    "agent_percentage": 100,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 181,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        "core/pyproject.toml": 26,
+        "core/src/core/__init__.py": 52,
+        "core/src/core/models.py": 103
+      }
+    }
+  ]
+}
