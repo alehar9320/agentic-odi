@@ -1,0 +1,17 @@
+User wants: instead of MCP doing everything, set up local DB engine + local server; CLI can talk directly to DB like MCP. Also rename current server to mcp_server. 
+
+Explore current codebase:
+- Current server/ is FastMCP HTTP server. Has Pydantic models, in-memory dicts (jobs_db, steps_db, outcomes_db, customer_outcomes_db), tools. CLI already talks via MCP client.
+- Need to refactor: extract core domain/models/storage to a shared package (e.g. core/ or inside server_common/src)? So both mcp_server and local_server can import same models + DB implementation. 
+- Local DB engine: could be SQLite (with SQLAlchemy/aiosqlite) or keep JSON/in-memory but shared? Or just provide a proper DB abstraction (repository pattern). Also support in-memory for tests.
+- Local server: REST API or FastAPI (so CLI can call HTTP like MCP, or use SDK). Or in-process Python API? CLI currently uses fastmcp.Client to talk HTTP; for "CLI can communicate directly with database" maybe CLI imports core DB directly? But also "local server" is mentioned.
+
+Plan must cover:
+- Rename server/ -> mcp_server/ (update pyproject, imports, workspace members).
+- Create core/ (shared models, DB abstraction, repositories/services) or put in common lib; both servers use it.
+- Create local_server/ (e.g. FastAPI) exposing same semantics.
+- Refactor CLI: support both modes? Or switch CLI to talk to local DB directly (in-process) OR talk to local_server HTTP. User says "CLI can communicate directly with the database, just like the MCP" — ambiguous. But need concrete, safe plan.
+- Update tests, README, workspace (pyproject.toml), CI (mypy/pytest per project).
+- Migration strategy for existing tests.
+
+Return plan with file moves, new packages, API boundaries, minimal diffs. subagent_type: explore
