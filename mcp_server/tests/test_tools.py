@@ -1,7 +1,7 @@
 import pytest
 from fastmcp import Client
 
-from server import mcp
+from mcp_server import mcp
 
 
 @pytest.mark.asyncio

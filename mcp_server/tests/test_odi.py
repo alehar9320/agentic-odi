@@ -4,7 +4,7 @@ import re
 import pytest
 from fastmcp import Client
 
-from server import jobs_db, mcp
+from mcp_server import jobs_db, mcp
 
 
 def extract_id(result_str):

@@ -81,7 +81,7 @@ def add(
     }
     if step_id:
         args["step_id"] = step_id
-    typer.echo(_call_mcp("add_customer_outcome", args, mcp_url))
+    from cli.backend import get_backend; typer.echo(get_backend("mcp", mcp_url=mcp_url).call("add_customer_outcome", args))
 
 
 @outcomes_app.command("get")
@@ -90,7 +90,7 @@ def get(
     mcp_url: str = typer.Option(default=MCP_URL_DEFAULT, help="MCP server URL"),
 ) -> None:
     """Get a Customer Outcome by ID."""
-    typer.echo(_call_mcp("get_customer_outcome", {"outcome_id": outcome_id}, mcp_url))
+    from cli.backend import get_backend; typer.echo(get_backend("mcp", mcp_url=mcp_url).call("get_customer_outcome", {"outcome_id": outcome_id}))
 
 
 @outcomes_app.command("list")
@@ -102,7 +102,7 @@ def list_outcomes(
     args: dict[str, Any] = {}
     if job_id:
         args["job_id"] = job_id
-    typer.echo(_call_mcp("list_customer_outcomes", args, mcp_url))
+    from cli.backend import get_backend; typer.echo(get_backend("mcp", mcp_url=mcp_url).call("list_customer_outcomes", args))
 
 
 @outcomes_app.command("update")
@@ -151,7 +151,7 @@ def update(
         args["estimated_annual_value"] = estimated_annual_value
     if confidence is not None:
         args["confidence"] = confidence
-    typer.echo(_call_mcp("update_customer_outcome", args, mcp_url))
+    from cli.backend import get_backend; typer.echo(get_backend("mcp", mcp_url=mcp_url).call("update_customer_outcome", args))
 
 
 @outcomes_app.command("delete")
@@ -165,7 +165,7 @@ def delete(
         confirm = typer.confirm(f"Delete customer outcome {outcome_id}?")
         if not confirm:
             raise typer.Exit()
-    typer.echo(_call_mcp("delete_customer_outcome", {"outcome_id": outcome_id}, mcp_url))
+    from cli.backend import get_backend; typer.echo(get_backend("mcp", mcp_url=mcp_url).call("delete_customer_outcome", {"outcome_id": outcome_id}))
 
 
 @outcomes_app.command("score")

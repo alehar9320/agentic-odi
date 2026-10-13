@@ -20,7 +20,6 @@ members = [
     "agentic-odi",
     "agentic-odi-cli",
     "agentic-odi-client",
-    "agentic-odi-server",
 ]
 
 [[package]]
@@ -80,21 +79,6 @@ requires-dist = [
     { name = "fastmcp" },
     { name = "openai" },
     { name = "streamlit" },
-]
-
-[[package]]
-name = "agentic-odi-server"
-version = "0.1.0"
-source = { editable = "server" }
-dependencies = [
-    { name = "fastmcp" },
-    { name = "pydantic" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "fastmcp" },
-    { name = "pydantic" },
 ]
 
 [[package]]

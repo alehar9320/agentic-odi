@@ -5,7 +5,7 @@ from typing import Any
 
 import pytest
 
-from server import customer_outcomes_db, jobs_db, outcomes_db, steps_db
+from mcp_server import customer_outcomes_db, jobs_db, outcomes_db, steps_db
 
 
 @pytest.fixture(autouse=True)

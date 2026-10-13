@@ -5,7 +5,7 @@ import json
 import pytest
 from fastmcp import Client
 
-from server.server import mcp
+from mcp_server.mcp_server import mcp
 
 
 @pytest.mark.asyncio

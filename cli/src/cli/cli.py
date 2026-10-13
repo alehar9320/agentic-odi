@@ -1,35 +1,34 @@
-"""Agentic ODI command-line interface."""
+"""Main CLI entry point."""
 
 import typer
 
 from cli.outcomes import outcomes_app
-
-__version__ = "0.1.0"
+from cli.version import __version__
 
 app = typer.Typer(
-    name="agentic-odi",
-    help="Agentic ODI command-line interface.",
-    no_args_is_help=True,
+    name="agentic-odi-cli",
+    help="Agentic ODI CLI - Tool for managing Jobs-to-be-Done (JTBD) and ODI workflows.",
 )
+
+app.add_typer(outcomes_app, name="outcomes", help="Manage Customer Outcomes")
 
 
 def _version_callback(value: bool) -> None:
     if value:
-        typer.echo(f"agentic-odi {__version__}")
+        typer.echo(__version__)
         raise typer.Exit()
 
 
 @app.callback()
-def main(
-    version: bool = typer.Option(
-        None,
-        "--version",
-        callback=_version_callback,
-        is_eager=True,
-        help="Show the version and exit.",
-    ),
-) -> None:
-    """Agentic ODI command-line interface."""
+def main(version: bool = typer.Option(False, "--version", callback=_version_callback, help="Show version")) -> None:  # noqa: B008
+    pass
 
 
-app.add_typer(outcomes_app, name="outcomes", help="Manage Customer Outcome entities.")
+@app.command()
+def version_cmd() -> None:
+    """Show CLI version."""
+    typer.echo(__version__)
+
+
+if __name__ == "__main__":
+    app()
