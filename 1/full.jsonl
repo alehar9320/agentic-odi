@@ -21,11 +21,11 @@
     },
     "cost": 0,
     "tokens": {
-      "input": 15636,
-      "output": 5955,
+      "input": 18789,
+      "output": 7146,
       "reasoning": 42,
       "cache": {
-        "read": 228736,
+        "read": 383104,
         "write": 0
       }
     },
@@ -38,7 +38,7 @@
     ],
     "time": {
       "created": 1792000576359,
-      "updated": 1792000681416
+      "updated": 1792000906514
     }
   },
   "messages": [
@@ -1338,6 +1338,612 @@
           "id": "prt_13b9073f7001zdGo7ZMEVECzV0",
           "sessionID": "ses_ec4713498ffe0y77zgtcbPbMWI",
           "messageID": "msg_13b9065c50012Lgirp1nZjyZSr"
+        }
+      ]
+    },
+    {
+      "info": {
+        "role": "user",
+        "time": {
+          "created": 1792000853637
+        },
+        "agent": "general",
+        "model": {
+          "providerID": "opencode",
+          "modelID": "big-pickle"
+        },
+        "summary": {
+          "diffs": []
+        },
+        "id": "msg_13b930683001Hd7mfP8E5ncx7D",
+        "sessionID": "ses_ec4713498ffe0y77zgtcbPbMWI"
+      },
+      "parts": [
+        {
+          "type": "text",
+          "text": "Review found one Important issue to fix.\n\n## Issue\n`connectors/tests/test_models.py:1` → `ruff check connectors/` exits 1 with:\n`test_models.py:1:1: I001 [*] Import block is un-sorted or un-formatted`\nCause: the plan-mandated verbatim test lacks the blank line ruff's isort wants between `import pytest` (third-party) and `from connectors import ...` (first-party).\n\n## Fix (minimal, semantics-preserving)\nInsert exactly one blank line after `import pytest` so the import block becomes:\n```python\nimport pytest\n\nfrom connectors import ConnectorConfig, McpConnectorSettings\nfrom connectors.errors import UnknownConnectorKindError\n```\nDo not change anything else in the file.\n\n## Verify\nRun from /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module:\n- `uv run ruff check connectors/ --output-format=concise` → expect exit 0, no violations\n- `uv run --directory connectors pytest tests/test_models.py -v` → expect 4 passed\n\n## Commit\nCreate a NEW commit (do not amend) on branch `mcp-connector-module`:\n`git add connectors/tests/test_models.py && git commit -m \"test(connectors): fix import ordering so lint passes\"`\n\n## Do not dispatch subagents.\n\n## Report\nAppend a short \"## Fix round 1\" section to:\n/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-3-report.md\nwith the commands and outputs.\n\nThen reply with ONLY: Status; commit SHA + subject; the two command results (ruff exit code, pytest count).",
+          "id": "prt_13b930687001CCmjfG2Nc4CYZW",
+          "sessionID": "ses_ec4713498ffe0y77zgtcbPbMWI",
+          "messageID": "msg_13b930683001Hd7mfP8E5ncx7D"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_13b930683001Hd7mfP8E5ncx7D",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 25714,
+          "input": 681,
+          "output": 201,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 24832
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792000854638,
+          "completed": 1792000858307
+        },
+        "finish": "tool-calls",
+        "id": "msg_13b930a6e001Xab6HuU3LXic6l",
+        "sessionID": "ses_ec4713498ffe0y77zgtcbPbMWI"
+      },
+      "parts": [
+        {
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-start",
+          "id": "prt_13b9312f10018ucH5fzbzZHK0b",
+          "sessionID": "ses_ec4713498ffe0y77zgtcbPbMWI",
+          "messageID": "msg_13b930a6e001Xab6HuU3LXic6l"
+        },
+        {
+          "type": "text",
+          "text": "Let me make the edit. Note ruff check should run from root with `connectors/` path. The pyproject for ruff is in connectors/. Let me check.\n\nThe command `uv run ruff check connectors/` from worktree root — will uv find the connectors pyproject? It's a uv workspace? Let me just do it.</think>",
+          "time": {
+            "start": 1792000856821,
+            "end": 1792000858231
+          },
+          "id": "prt_13b9312f5001aTOxsKn4qYa3pt",
+          "sessionID": "ses_ec4713498ffe0y77zgtcbPbMWI",
+          "messageID": "msg_13b930a6e001Xab6HuU3LXic6l"
+        },
+        {
+          "type": "tool",
+          "tool": "edit",
+          "callID": "call_3c8f0160aca04856829099f2",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors/tests/test_models.py",
+              "oldString": "import pytest\nfrom connectors import ConnectorConfig, McpConnectorSettings",
+              "newString": "import pytest\n\nfrom connectors import ConnectorConfig, McpConnectorSettings"
+            },
+            "output": "Edit applied successfully.",
+            "metadata": {
+              "diagnostics": {},
+              "diff": "Index: /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors/tests/test_models.py\n===================================================================\n--- /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors/tests/test_models.py\n+++ /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors/tests/test_models.py\n@@ -1,5 +1,6 @@\n import pytest\n+\n from connectors import ConnectorConfig, McpConnectorSettings\n from connectors.errors import UnknownConnectorKindError\n \n \n",
+              "filediff": {
+                "file": "/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors/tests/test_models.py",
+                "patch": "Index: /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors/tests/test_models.py\n===================================================================\n--- /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors/tests/test_models.py\n+++ /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors/tests/test_models.py\n@@ -1,5 +1,6 @@\n import pytest\n+\n from connectors import ConnectorConfig, McpConnectorSettings\n from connectors.errors import UnknownConnectorKindError\n \n \n",
+                "additions": 1,
+                "deletions": 0
+              },
+              "truncated": false
+            },
+            "title": ".worktrees/mcp-connector-module/connectors/tests/test_models.py",
+            "time": {
+              "start": 1792000858183,
+              "end": 1792000858195
+            }
+          },
+          "id": "prt_13b931842001XlPAqZ4OqEhLyc",
+          "sessionID": "ses_ec4713498ffe0y77zgtcbPbMWI",
+          "messageID": "msg_13b930a6e001Xab6HuU3LXic6l"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-finish",
+          "tokens": {
+            "total": 25714,
+            "input": 681,
+            "output": 201,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 24832
+            }
+          },
+          "cost": 0,
+          "id": "prt_13b93189e001cRNXq63K51SXrZ",
+          "sessionID": "ses_ec4713498ffe0y77zgtcbPbMWI",
+          "messageID": "msg_13b930a6e001Xab6HuU3LXic6l"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_13b930683001Hd7mfP8E5ncx7D",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 25848,
+          "input": 385,
+          "output": 119,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 25344
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792000858311,
+          "completed": 1792000860092
+        },
+        "finish": "tool-calls",
+        "id": "msg_13b9318c7001IYoVLp1GCdI0R1",
+        "sessionID": "ses_ec4713498ffe0y77zgtcbPbMWI"
+      },
+      "parts": [
+        {
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-start",
+          "id": "prt_13b931b3e001DQU2bgj4KVyBkG",
+          "sessionID": "ses_ec4713498ffe0y77zgtcbPbMWI",
+          "messageID": "msg_13b9318c7001IYoVLp1GCdI0R1"
+        },
+        {
+          "type": "text",
+          "text": "</think>",
+          "time": {
+            "start": 1792000858946,
+            "end": 1792000859499
+          },
+          "id": "prt_13b931b42001Z6mWsxNwFiWSKv",
+          "sessionID": "ses_ec4713498ffe0y77zgtcbPbMWI",
+          "messageID": "msg_13b9318c7001IYoVLp1GCdI0R1"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "call_4e168988ffd14bcab0c9a9c0",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "uv run ruff check connectors/ --output-format=concise; echo \"ruff exit: $?\"; uv run --directory connectors pytest tests/test_models.py -v 2>&1 | tail -8",
+              "workdir": "/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module"
+            },
+            "output": "All checks passed!\nruff exit: 0\ncollecting ... collected 4 items\n\ntests/test_models.py::test_mcp_settings_parse_url_and_tools PASSED       [ 25%]\ntests/test_models.py::test_mcp_settings_default_tools_empty PASSED       [ 50%]\ntests/test_models.py::test_mcp_settings_returns_typed_settings PASSED    [ 75%]\ntests/test_models.py::test_unknown_kind_raises_clear_error PASSED        [100%]\n\n============================== 4 passed in 0.09s ===============================\n",
+            "metadata": {
+              "output": "All checks passed!\nruff exit: 0\ncollecting ... collected 4 items\n\ntests/test_models.py::test_mcp_settings_parse_url_and_tools PASSED       [ 25%]\ntests/test_models.py::test_mcp_settings_default_tools_empty PASSED       [ 50%]\ntests/test_models.py::test_mcp_settings_returns_typed_settings PASSED    [ 75%]\ntests/test_models.py::test_unknown_kind_raises_clear_error PASSED        [100%]\n\n============================== 4 passed in 0.09s ===============================\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "uv run ruff check connectors/ --output-format=concise; echo \"ruff exit: $?\"; uv run --directory connectors pytest tests/test_models.py -v 2>&1 | tail -8",
+            "time": {
+              "start": 1792000859485,
+              "end": 1792000860008
+            }
+          },
+          "id": "prt_13b931d52001QJo8U8wL36n1c0",
+          "sessionID": "ses_ec4713498ffe0y77zgtcbPbMWI",
+          "messageID": "msg_13b9318c7001IYoVLp1GCdI0R1"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-finish",
+          "tokens": {
+            "total": 25848,
+            "input": 385,
+            "output": 119,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 25344
+            }
+          },
+          "cost": 0,
+          "id": "prt_13b931f8b0017bsE9hSk3HA7yT",
+          "sessionID": "ses_ec4713498ffe0y77zgtcbPbMWI",
+          "messageID": "msg_13b9318c7001IYoVLp1GCdI0R1"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_13b930683001Hd7mfP8E5ncx7D",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 26108,
+          "input": 385,
+          "output": 123,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 25600
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792000860097,
+          "completed": 1792000900643
+        },
+        "finish": "tool-calls",
+        "id": "msg_13b931fc1001EllUe76s2sD5uY",
+        "sessionID": "ses_ec4713498ffe0y77zgtcbPbMWI"
+      },
+      "parts": [
+        {
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-start",
+          "id": "prt_13b93245a0019331aW2HxhCwIK",
+          "sessionID": "ses_ec4713498ffe0y77zgtcbPbMWI",
+          "messageID": "msg_13b931fc1001EllUe76s2sD5uY"
+        },
+        {
+          "type": "text",
+          "text": "</think>Both pass. Commit.",
+          "time": {
+            "start": 1792000861277,
+            "end": 1792000861909
+          },
+          "id": "prt_13b93245d001kIA6S8Aznnb1K0",
+          "sessionID": "ses_ec4713498ffe0y77zgtcbPbMWI",
+          "messageID": "msg_13b931fc1001EllUe76s2sD5uY"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "call_e36b561dd0c5421a87c77f26",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "git add connectors/tests/test_models.py && git commit -m \"test(connectors): fix import ordering so lint passes\" 2>&1; echo \"---\"; git log --oneline -2",
+              "workdir": "/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module"
+            },
+            "output": "[mcp-connector-module 23a8535] test(connectors): fix import ordering so lint passes\n 1 file changed, 1 insertion(+)\n---\n23a8535 test(connectors): fix import ordering so lint passes\na66137c feat(connectors): add shared models, Connector protocol, and errors\n",
+            "metadata": {
+              "output": "[mcp-connector-module 23a8535] test(connectors): fix import ordering so lint passes\n 1 file changed, 1 insertion(+)\n---\n23a8535 test(connectors): fix import ordering so lint passes\na66137c feat(connectors): add shared models, Connector protocol, and errors\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "git add connectors/tests/test_models.py && git commit -m \"test(connectors): fix import ordering so lint passes\" 2>&1; echo \"---\"; git log --oneline -2",
+            "time": {
+              "start": 1792000861902,
+              "end": 1792000900500
+            }
+          },
+          "id": "prt_13b9326c7001z50LlSwa762zIR",
+          "sessionID": "ses_ec4713498ffe0y77zgtcbPbMWI",
+          "messageID": "msg_13b931fc1001EllUe76s2sD5uY"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-finish",
+          "tokens": {
+            "total": 26108,
+            "input": 385,
+            "output": 123,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 25600
+            }
+          },
+          "cost": 0,
+          "id": "prt_13b93bddd0011pKtUMYerzkXLG",
+          "sessionID": "ses_ec4713498ffe0y77zgtcbPbMWI",
+          "messageID": "msg_13b931fc1001EllUe76s2sD5uY"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_13b930683001Hd7mfP8E5ncx7D",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 26294,
+          "input": 336,
+          "output": 102,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 25856
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792000900654,
+          "completed": 1792000902386
+        },
+        "finish": "tool-calls",
+        "id": "msg_13b93be2e001kavausQmCRQwuN",
+        "sessionID": "ses_ec4713498ffe0y77zgtcbPbMWI"
+      },
+      "parts": [
+        {
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-start",
+          "id": "prt_13b93c283001Eh2L8gyBeWF76I",
+          "sessionID": "ses_ec4713498ffe0y77zgtcbPbMWI",
+          "messageID": "msg_13b93be2e001kavausQmCRQwuN"
+        },
+        {
+          "type": "text",
+          "text": "</think>",
+          "time": {
+            "start": 1792000901766,
+            "end": 1792000902156
+          },
+          "id": "prt_13b93c286001adAfVBiZZyq9of",
+          "sessionID": "ses_ec4713498ffe0y77zgtcbPbMWI",
+          "messageID": "msg_13b93be2e001kavausQmCRQwuN"
+        },
+        {
+          "type": "tool",
+          "tool": "read",
+          "callID": "call_886490ea0fe84869ad1e2703",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-3-report.md",
+              "offset": 80
+            },
+            "output": "<path>/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-3-report.md</path>\n<type>file</type>\n<content>\n80: - Smoke checks:\n81:   - `UnknownConnectorKindError` message = `unknown connector kind 'rest'; known kinds: mcp`;\n82:     `isinstance(e, RegistryError)` is `True`; `e.name == \"rest\"` (so Task 5's\n83:     `pytest.raises(RegistryError)` and `\"rest\" in str(exc)` both hold).\n84:   - `Connector._is_runtime_protocol is True`; a conforming fake is\n85:     `isinstance(..., Connector) == True`, `object()` is `False`.\n86: - `ruff check tests` reports `I001` on `test_models.py` (wants a blank line between the\n87:   third-party `import pytest` and the first-party `connectors` imports). Left as-is because\n88:   the brief mandates the test be written verbatim; the source package is clean.\n89: \n90: ## Concerns\n91: \n92: - `KNOWN_CONNECTOR_KINDS` is a hardcoded module constant (`(\"mcp\",)`). If later tasks add\n93:   connector kinds, the \"known kinds\" list in `UnknownConnectorKindError` will need to be\n94:   kept in sync (or the registry should own the list).\n95: - `ConnectorConfig.mcp_settings()` uses `self.kind` as the `name` argument to\n96:   `UnknownConnectorKindError` (clarification used `self.name?`); using `self.kind` is what\n97:   makes the test's `\"rest\" in str(exc)` assertion pass and is the \"offending kind\".\n\n(End of file - total 97 lines)\n</content>",
+            "metadata": {
+              "preview": "- Smoke checks:\n  - `UnknownConnectorKindError` message = `unknown connector kind 'rest'; known kinds: mcp`;\n    `isinstance(e, RegistryError)` is `True`; `e.name == \"rest\"` (so Task 5's\n    `pytest.raises(RegistryError)` and `\"rest\" in str(exc)` both hold).\n  - `Connector._is_runtime_protocol is True`; a conforming fake is\n    `isinstance(..., Connector) == True`, `object()` is `False`.\n- `ruff check tests` reports `I001` on `test_models.py` (wants a blank line between the\n  third-party `import pytest` and the first-party `connectors` imports). Left as-is because\n  the brief mandates the test be written verbatim; the source package is clean.\n\n## Concerns\n\n- `KNOWN_CONNECTOR_KINDS` is a hardcoded module constant (`(\"mcp\",)`). If later tasks add\n  connector kinds, the \"known kinds\" list in `UnknownConnectorKindError` will need to be\n  kept in sync (or the registry should own the list).\n- `ConnectorConfig.mcp_settings()` uses `self.kind` as the `name` argument to\n  `UnknownConnectorKindError` (clarification used `self.name?`); using `self.kind` is what\n  makes the test's `\"rest\" in str(exc)` assertion pass and is the \"offending kind\".",
+              "truncated": false,
+              "loaded": [],
+              "display": {
+                "type": "file",
+                "path": "/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-3-report.md",
+                "text": "- Smoke checks:\n  - `UnknownConnectorKindError` message = `unknown connector kind 'rest'; known kinds: mcp`;\n    `isinstance(e, RegistryError)` is `True`; `e.name == \"rest\"` (so Task 5's\n    `pytest.raises(RegistryError)` and `\"rest\" in str(exc)` both hold).\n  - `Connector._is_runtime_protocol is True`; a conforming fake is\n    `isinstance(..., Connector) == True`, `object()` is `False`.\n- `ruff check tests` reports `I001` on `test_models.py` (wants a blank line between the\n  third-party `import pytest` and the first-party `connectors` imports). Left as-is because\n  the brief mandates the test be written verbatim; the source package is clean.\n\n## Concerns\n\n- `KNOWN_CONNECTOR_KINDS` is a hardcoded module constant (`(\"mcp\",)`). If later tasks add\n  connector kinds, the \"known kinds\" list in `UnknownConnectorKindError` will need to be\n  kept in sync (or the registry should own the list).\n- `ConnectorConfig.mcp_settings()` uses `self.kind` as the `name` argument to\n  `UnknownConnectorKindError` (clarification used `self.name?`); using `self.kind` is what\n  makes the test's `\"rest\" in str(exc)` assertion pass and is the \"offending kind\".",
+                "lineStart": 80,
+                "lineEnd": 97,
+                "totalLines": 97,
+                "truncated": false
+              }
+            },
+            "title": ".worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-3-report.md",
+            "time": {
+              "start": 1792000902141,
+              "end": 1792000902238
+            }
+          },
+          "id": "prt_13b93c3f0001V2iT3112oX3W2J",
+          "sessionID": "ses_ec4713498ffe0y77zgtcbPbMWI",
+          "messageID": "msg_13b93be2e001kavausQmCRQwuN"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-finish",
+          "tokens": {
+            "total": 26294,
+            "input": 336,
+            "output": 102,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 25856
+            }
+          },
+          "cost": 0,
+          "id": "prt_13b93c4a5001aIPRhs3DglP8RN",
+          "sessionID": "ses_ec4713498ffe0y77zgtcbPbMWI",
+          "messageID": "msg_13b93be2e001kavausQmCRQwuN"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_13b930683001Hd7mfP8E5ncx7D",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 27339,
+          "input": 636,
+          "output": 591,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 26112
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792000902399,
+          "completed": 1792000906484
+        },
+        "finish": "tool-calls",
+        "id": "msg_13b93c4ff001g3QiyPNqLwpSz1",
+        "sessionID": "ses_ec4713498ffe0y77zgtcbPbMWI"
+      },
+      "parts": [
+        {
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-start",
+          "id": "prt_13b93c8c7001jAZdWxRx1IFzvb",
+          "sessionID": "ses_ec4713498ffe0y77zgtcbPbMWI",
+          "messageID": "msg_13b93c4ff001g3QiyPNqLwpSz1"
+        },
+        {
+          "type": "text",
+          "text": "</think>",
+          "time": {
+            "start": 1792000903370,
+            "end": 1792000906221
+          },
+          "id": "prt_13b93c8ca001aDvk7j0IK9iBVd",
+          "sessionID": "ses_ec4713498ffe0y77zgtcbPbMWI",
+          "messageID": "msg_13b93c4ff001g3QiyPNqLwpSz1"
+        },
+        {
+          "type": "tool",
+          "tool": "edit",
+          "callID": "call_3124fb4a7a2a4783bddd0b57",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-3-report.md",
+              "oldString": "- `ConnectorConfig.mcp_settings()` uses `self.kind` as the `name` argument to\n  `UnknownConnectorKindError` (clarification used `self.name?`); using `self.kind` is what\n  makes the test's `\"rest\" in str(exc)` assertion pass and is the \"offending kind\".",
+              "newString": "- `ConnectorConfig.mcp_settings()` uses `self.kind` as the `name` argument to\n  `UnknownConnectorKindError` (clarification used `self.name?`); using `self.kind` is what\n  makes the test's `\"rest\" in str(exc)` assertion pass and is the \"offending kind\".\n\n## Fix round 1\n\nReview found one Important issue: `ruff check connectors/` exited 1 with\n`test_models.py:1:1: I001 Import block is un-sorted or un-formatted`, because the\nverbatim test had no blank line between the third-party `import pytest` and the\nfirst-party `connectors` imports. Fix: inserted exactly one blank line after\n`import pytest`; no other change to the test.\n\nCommands run from `/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module`:\n\n`uv run ruff check connectors/ --output-format=concise`\n```\nAll checks passed!\nruff exit: 0\n```\n\n`uv run --directory connectors pytest tests/test_models.py -v`\n```\ncollected 4 items\ntests/test_models.py::test_mcp_settings_parse_url_and_tools PASSED       [ 25%]\ntests/test_models.py::test_mcp_settings_default_tools_empty PASSED       [ 50%]\ntests/test_models.py::test_mcp_settings_returns_typed_settings PASSED    [ 75%]\ntests/test_models.py::test_unknown_kind_raises_clear_error PASSED        [100%]\n============================== 4 passed in 0.09s ===============================\n```\n\nCommit: `23a8535 test(connectors): fix import ordering so lint passes`\n(prev commit `a66137c feat(connectors): add shared models, Connector protocol, and errors`)."
+            },
+            "output": "Edit applied successfully.",
+            "metadata": {
+              "diagnostics": {},
+              "diff": "Index: /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-3-report.md\n===================================================================\n--- /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-3-report.md\n+++ /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-3-report.md\n@@ -94,4 +94,33 @@\n   kept in sync (or the registry should own the list).\n - `ConnectorConfig.mcp_settings()` uses `self.kind` as the `name` argument to\n   `UnknownConnectorKindError` (clarification used `self.name?`); using `self.kind` is what\n   makes the test's `\"rest\" in str(exc)` assertion pass and is the \"offending kind\".\n+\n+## Fix round 1\n+\n+Review found one Important issue: `ruff check connectors/` exited 1 with\n+`test_models.py:1:1: I001 Import block is un-sorted or un-formatted`, because the\n+verbatim test had no blank line between the third-party `import pytest` and the\n+first-party `connectors` imports. Fix: inserted exactly one blank line after\n+`import pytest`; no other change to the test.\n+\n+Commands run from `/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module`:\n+\n+`uv run ruff check connectors/ --output-format=concise`\n+```\n+All checks passed!\n+ruff exit: 0\n+```\n+\n+`uv run --directory connectors pytest tests/test_models.py -v`\n+```\n+collected 4 items\n+tests/test_models.py::test_mcp_settings_parse_url_and_tools PASSED       [ 25%]\n+tests/test_models.py::test_mcp_settings_default_tools_empty PASSED       [ 50%]\n+tests/test_models.py::test_mcp_settings_returns_typed_settings PASSED    [ 75%]\n+tests/test_models.py::test_unknown_kind_raises_clear_error PASSED        [100%]\n+============================== 4 passed in 0.09s ===============================\n+```\n+\n+Commit: `23a8535 test(connectors): fix import ordering so lint passes`\n+(prev commit `a66137c feat(connectors): add shared models, Connector protocol, and errors`).\n",
+              "filediff": {
+                "file": "/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-3-report.md",
+                "patch": "Index: /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-3-report.md\n===================================================================\n--- /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-3-report.md\n+++ /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-3-report.md\n@@ -94,4 +94,33 @@\n   kept in sync (or the registry should own the list).\n - `ConnectorConfig.mcp_settings()` uses `self.kind` as the `name` argument to\n   `UnknownConnectorKindError` (clarification used `self.name?`); using `self.kind` is what\n   makes the test's `\"rest\" in str(exc)` assertion pass and is the \"offending kind\".\n+\n+## Fix round 1\n+\n+Review found one Important issue: `ruff check connectors/` exited 1 with\n+`test_models.py:1:1: I001 Import block is un-sorted or un-formatted`, because the\n+verbatim test had no blank line between the third-party `import pytest` and the\n+first-party `connectors` imports. Fix: inserted exactly one blank line after\n+`import pytest`; no other change to the test.\n+\n+Commands run from `/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module`:\n+\n+`uv run ruff check connectors/ --output-format=concise`\n+```\n+All checks passed!\n+ruff exit: 0\n+```\n+\n+`uv run --directory connectors pytest tests/test_models.py -v`\n+```\n+collected 4 items\n+tests/test_models.py::test_mcp_settings_parse_url_and_tools PASSED       [ 25%]\n+tests/test_models.py::test_mcp_settings_default_tools_empty PASSED       [ 50%]\n+tests/test_models.py::test_mcp_settings_returns_typed_settings PASSED    [ 75%]\n+tests/test_models.py::test_unknown_kind_raises_clear_error PASSED        [100%]\n+============================== 4 passed in 0.09s ===============================\n+```\n+\n+Commit: `23a8535 test(connectors): fix import ordering so lint passes`\n+(prev commit `a66137c feat(connectors): add shared models, Connector protocol, and errors`).\n",
+                "additions": 29,
+                "deletions": 0
+              },
+              "truncated": false
+            },
+            "title": ".worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-3-report.md",
+            "time": {
+              "start": 1792000906212,
+              "end": 1792000906255
+            }
+          },
+          "id": "prt_13b93d3d4001zb3z9KrdhJ5nNu",
+          "sessionID": "ses_ec4713498ffe0y77zgtcbPbMWI",
+          "messageID": "msg_13b93c4ff001g3QiyPNqLwpSz1"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-finish",
+          "tokens": {
+            "total": 27339,
+            "input": 636,
+            "output": 591,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 26112
+            }
+          },
+          "cost": 0,
+          "id": "prt_13b93d49c001BFBNha1ABtnO7W",
+          "sessionID": "ses_ec4713498ffe0y77zgtcbPbMWI",
+          "messageID": "msg_13b93c4ff001g3QiyPNqLwpSz1"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_13b930683001Hd7mfP8E5ncx7D",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 27409,
+          "input": 730,
+          "output": 55,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 26624
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792000906492,
+          "completed": 1792000907780
+        },
+        "finish": "stop",
+        "id": "msg_13b93d4fb001Y77S3mja3kytV3",
+        "sessionID": "ses_ec4713498ffe0y77zgtcbPbMWI"
+      },
+      "parts": [
+        {
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-start",
+          "id": "prt_13b93d779001Ct0opEMw6RIZAO",
+          "sessionID": "ses_ec4713498ffe0y77zgtcbPbMWI",
+          "messageID": "msg_13b93d4fb001Y77S3mja3kytV3"
+        },
+        {
+          "type": "text",
+          "text": "</think>Status: Complete. Fix applied, committed in new commit (not amended).\nCommit: `23a8535` test(connectors): fix import ordering so lint passes\nRuff: exit 0, \"All checks passed!\"\nPytest: 4 passed",
+          "time": {
+            "start": 1792000907132,
+            "end": 1792000907715
+          },
+          "id": "prt_13b93d77c001oXZxYqOEF59QUZ",
+          "sessionID": "ses_ec4713498ffe0y77zgtcbPbMWI",
+          "messageID": "msg_13b93d4fb001Y77S3mja3kytV3"
+        },
+        {
+          "reason": "stop",
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-finish",
+          "tokens": {
+            "total": 27409,
+            "input": 730,
+            "output": 55,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 26624
+            }
+          },
+          "cost": 0,
+          "id": "prt_13b93d9e2001R8McliMd79zcts",
+          "sessionID": "ses_ec4713498ffe0y77zgtcbPbMWI",
+          "messageID": "msg_13b93d4fb001Y77S3mja3kytV3"
         }
       ]
     }
