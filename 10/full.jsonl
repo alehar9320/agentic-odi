@@ -1,0 +1,399 @@
+{
+  "info": {
+    "id": "ses_ec4721925ffexUpPUNE6iUk3mJ",
+    "slug": "calm-falcon",
+    "projectID": "e4fe19106d06261ebfed21a0e3ba06559abf1100",
+    "directory": "/home/alexa/repos/agentic-odi",
+    "path": "",
+    "parentID": "ses_ec492423bffeG7aFTE5YTPUIJO",
+    "title": "Review Task 2 (spec + quality) (@general subagent)",
+    "agent": "general",
+    "model": {
+      "id": "big-pickle",
+      "providerID": "opencode",
+      "variant": "default"
+    },
+    "version": "1.18.35",
+    "summary": {
+      "additions": 0,
+      "deletions": 0,
+      "files": 0
+    },
+    "cost": 0,
+    "tokens": {
+      "input": 17353,
+      "output": 817,
+      "reasoning": 840,
+      "cache": {
+        "read": 33995,
+        "write": 0
+      }
+    },
+    "permission": [
+      {
+        "permission": "task",
+        "pattern": "*",
+        "action": "deny"
+      }
+    ],
+    "time": {
+      "created": 1792000517850,
+      "updated": 1792000528899
+    }
+  },
+  "messages": [
+    {
+      "info": {
+        "role": "user",
+        "time": {
+          "created": 1792000517869
+        },
+        "agent": "general",
+        "model": {
+          "providerID": "opencode",
+          "modelID": "big-pickle"
+        },
+        "summary": {
+          "diffs": []
+        },
+        "id": "msg_13b8de6eb001SkmOItVcSc4ITB",
+        "sessionID": "ses_ec4721925ffexUpPUNE6iUk3mJ"
+      },
+      "parts": [
+        {
+          "type": "text",
+          "text": "You are reviewing one task's implementation: first whether it matches its requirements, then whether it is well-built. Task-scoped gate, not a merge review.\n\n## Working directory\n/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module\n\n## What Was Requested\nRead the task brief: /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-2-brief.md\n\nGlobal constraints that bind this task:\n- Each workspace package keeps its own `pyproject.toml`, `src/` layout, and `tests/`.\n- Per-package ruff `target-version = \"py311\"`, `line-length = 100`, lint `select = [\"E4\",\"E7\",\"E9\",\"F\",\"I\",\"UP\",\"B\",\"BLE\"]`; mypy `python_version = \"3.11\"`, `ignore_missing_imports = true`.\n- The `connectors` package has NO workspace dependencies → it must NOT have a `[tool.uv.sources]` block.\n- `connectors/src/connectors/__init__.py` is a module docstring ONLY (no exports yet).\n\n## What the Implementer Claims They Built\nRead the implementer's report: /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-2-report.md\n\n## Diff Under Review\n**Base:** e17dc6dad4276b07c13f4db4374bf7882f3fe66b\n**Head:** 5b190137b222d02d01b8758225120f2171427e46\n**Diff file:** /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/review-e17dc6d..5b19013.diff\n\nRead the diff file once (commit list, stat summary, full diff with context). Do not re-run git commands or crawl the codebase. Read-only review: do not mutate the working tree, index, HEAD, or branch state.\n\n## You Do Not Dispatch Subagents\nDo all review yourself.\n\n## Do Not Trust the Report\nVerify claims against the diff.\n\n## Tests\nThe implementer already ran the verification. Do not re-run the suite. Run a focused check only if a specific doubt arises.\n\n## Part 1: Spec Compliance\nVerify file by file against the brief:\n- `connectors/pyproject.toml` matches the brief's template exactly (name `agentic-odi-connectors`, deps `[\"fastmcp\",\"pydantic\"]`, hatchling build, packages `[\"src/connectors\"]`, ruff/mypy config, and `[tool.pytest.ini_options] asyncio_mode = \"strict\"`). It must NOT contain `[tool.uv.sources]`.\n- `connectors/src/connectors/__init__.py` exists and is a docstring only.\n- root `pyproject.toml` members include `connectors`.\n- `uv.lock` lists `agentic-odi-connectors`.\nFlag Missing / Extra / Misunderstood. Report ⚠️ for anything unverifiable from the diff.\n\n## Part 2: Code Quality\nStructure, one responsibility per file, config correctness. Cite file:line.\n\n## Calibration\nActual severity. Minor = polish. Acknowledge what's done well.\n\n## Output Format\n### Spec Compliance\n- ✅/❌ [file:line]\n- ⚠️ Cannot verify: [...]\n### Strengths\n### Issues\n#### Critical / Important / Minor\n(file:line, what's wrong, why, how to fix)\n### Assessment\n**Task quality:** Approved | Needs fixes\n**Reasoning:** [1-2 sentences]\n\nYour final message IS the report — begin with the spec-compliance verdict; no preamble.",
+          "id": "prt_13b8de6f4001zH637GV1EPynC9",
+          "sessionID": "ses_ec4721925ffexUpPUNE6iUk3mJ",
+          "messageID": "msg_13b8de6eb001SkmOItVcSc4ITB"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_13b8de6eb001SkmOItVcSc4ITB",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 14819,
+          "input": 12585,
+          "output": 74,
+          "reasoning": 165,
+          "cache": {
+            "write": 0,
+            "read": 1995
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792000518475,
+          "completed": 1792000526321
+        },
+        "finish": "tool-calls",
+        "id": "msg_13b8de94b001zLoipHbkbkMa65",
+        "sessionID": "ses_ec4721925ffexUpPUNE6iUk3mJ"
+      },
+      "parts": [
+        {
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-start",
+          "id": "prt_13b8e01fa001z3hROl2EvJDxzq",
+          "sessionID": "ses_ec4721925ffexUpPUNE6iUk3mJ",
+          "messageID": "msg_13b8de94b001zLoipHbkbkMa65"
+        },
+        {
+          "type": "text",
+          "text": "I'll review the task implementation against the requirements and assess code quality.\n\n",
+          "time": {
+            "start": 1792000524797,
+            "end": 1792000526192
+          },
+          "id": "prt_13b8e01fd001xgJDmhtjWpe037",
+          "sessionID": "ses_ec4721925ffexUpPUNE6iUk3mJ",
+          "messageID": "msg_13b8de94b001zLoipHbkbkMa65"
+        },
+        {
+          "type": "tool",
+          "tool": "read",
+          "callID": "3912fb5d-d9d2-492d-8ac5-da317f590cc4",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-2-brief.md"
+            },
+            "output": "<path>/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-2-brief.md</path>\n<type>file</type>\n<content>\n1: ### Task 2: Scaffold the `connectors` package and register it\n2: \n3: **Files:**\n4: - Create: `connectors/pyproject.toml`\n5: - Create: `connectors/src/connectors/__init__.py`\n6: - Modify: `pyproject.toml` (add member)\n7: - Regenerate: `uv.lock`\n8: \n9: **Interfaces:**\n10: - Produces: importable `connectors` module and a synced workspace including it.\n11: \n12: - [ ] **Step 1: Write `connectors/pyproject.toml`**\n13: \n14: Copy the `core` package's structure verbatim, changing name/description/deps:\n15: \n16: ```toml\n17: [project]\n18: name = \"agentic-odi-connectors\"\n19: version = \"0.1.0\"\n20: description = \"Pluggable external-integration connectors for Agentic ODI (MCP client).\"\n21: requires-python = \">=3.10\"\n22: dependencies = [\"fastmcp\", \"pydantic\"]\n23: \n24: [build-system]\n25: requires = [\"hatchling\"]\n26: build-backend = \"hatchling.build\"\n27: \n28: [tool.hatch.build.targets.wheel]\n29: packages = [\"src/connectors\"]\n30: \n31: [tool.ruff]\n32: line-length = 100\n33: target-version = \"py311\"\n34: \n35: [tool.ruff.lint]\n36: select = [\"E4\", \"E7\", \"E9\", \"F\", \"I\", \"UP\", \"B\", \"BLE\"]\n37: \n38: [tool.mypy]\n39: python_version = \"3.11\"\n40: ignore_missing_imports = true\n41: \n42: [tool.pytest.ini_options]\n43: asyncio_mode = \"strict\"\n44: ```\n45: \n46: - [ ] **Step 2: Create the package init**\n47: \n48: `connectors/src/connectors/__init__.py`: module docstring only (exports added in Task 3).\n49: \n50: - [ ] **Step 3: Register the member**\n51: \n52: Add `\"connectors\"` to `members` in root `pyproject.toml`.\n53: \n54: - [ ] **Step 4: Lock + sync**\n55: \n56: Run: `uv lock && uv sync --all-packages`\n57: Expected: succeeds; `uv.lock` lists `agentic-odi-connectors`.\n58: \n59: - [ ] **Step 5: Verify import**\n60: \n61: Run: `uv run --directory connectors python -c \"import connectors; print(connectors.__doc__)\"`\n62: Expected: prints the docstring, exit 0.\n63: \n64: - [ ] **Step 6: Commit**\n65: \n66: ```bash\n67: git add connectors/pyproject.toml connectors/src/connectors/__init__.py pyproject.toml uv.lock\n68: git commit -m \"feat(connectors): scaffold agentic-odi-connectors workspace package\"\n69: ```\n70: \n71: ---\n72: \n\n(End of file - total 72 lines)\n</content>",
+            "metadata": {
+              "preview": "### Task 2: Scaffold the `connectors` package and register it\n\n**Files:**\n- Create: `connectors/pyproject.toml`\n- Create: `connectors/src/connectors/__init__.py`\n- Modify: `pyproject.toml` (add member)\n- Regenerate: `uv.lock`\n\n**Interfaces:**\n- Produces: importable `connectors` module and a synced workspace including it.\n\n- [ ] **Step 1: Write `connectors/pyproject.toml`**\n\nCopy the `core` package's structure verbatim, changing name/description/deps:\n\n```toml\n[project]\nname = \"agentic-odi-connectors\"\nversion = \"0.1.0\"\ndescription = \"Pluggable external-integration connectors for Agentic ODI (MCP client).\"",
+              "truncated": false,
+              "loaded": [],
+              "display": {
+                "type": "file",
+                "path": "/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-2-brief.md",
+                "text": "### Task 2: Scaffold the `connectors` package and register it\n\n**Files:**\n- Create: `connectors/pyproject.toml`\n- Create: `connectors/src/connectors/__init__.py`\n- Modify: `pyproject.toml` (add member)\n- Regenerate: `uv.lock`\n\n**Interfaces:**\n- Produces: importable `connectors` module and a synced workspace including it.\n\n- [ ] **Step 1: Write `connectors/pyproject.toml`**\n\nCopy the `core` package's structure verbatim, changing name/description/deps:\n\n```toml\n[project]\nname = \"agentic-odi-connectors\"\nversion = \"0.1.0\"\ndescription = \"Pluggable external-integration connectors for Agentic ODI (MCP client).\"\nrequires-python = \">=3.10\"\ndependencies = [\"fastmcp\", \"pydantic\"]\n\n[build-system]\nrequires = [\"hatchling\"]\nbuild-backend = \"hatchling.build\"\n\n[tool.hatch.build.targets.wheel]\npackages = [\"src/connectors\"]\n\n[tool.ruff]\nline-length = 100\ntarget-version = \"py311\"\n\n[tool.ruff.lint]\nselect = [\"E4\", \"E7\", \"E9\", \"F\", \"I\", \"UP\", \"B\", \"BLE\"]\n\n[tool.mypy]\npython_version = \"3.11\"\nignore_missing_imports = true\n\n[tool.pytest.ini_options]\nasyncio_mode = \"strict\"\n```\n\n- [ ] **Step 2: Create the package init**\n\n`connectors/src/connectors/__init__.py`: module docstring only (exports added in Task 3).\n\n- [ ] **Step 3: Register the member**\n\nAdd `\"connectors\"` to `members` in root `pyproject.toml`.\n\n- [ ] **Step 4: Lock + sync**\n\nRun: `uv lock && uv sync --all-packages`\nExpected: succeeds; `uv.lock` lists `agentic-odi-connectors`.\n\n- [ ] **Step 5: Verify import**\n\nRun: `uv run --directory connectors python -c \"import connectors; print(connectors.__doc__)\"`\nExpected: prints the docstring, exit 0.\n\n- [ ] **Step 6: Commit**\n\n```bash\ngit add connectors/pyproject.toml connectors/src/connectors/__init__.py pyproject.toml uv.lock\ngit commit -m \"feat(connectors): scaffold agentic-odi-connectors workspace package\"\n```\n\n---\n",
+                "lineStart": 1,
+                "lineEnd": 72,
+                "totalLines": 72,
+                "truncated": false
+              }
+            },
+            "title": ".worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-2-brief.md",
+            "time": {
+              "start": 1792000526190,
+              "end": 1792000526207
+            }
+          },
+          "id": "prt_13b8e0767001FlU5n2nVZUWvL0",
+          "sessionID": "ses_ec4721925ffexUpPUNE6iUk3mJ",
+          "messageID": "msg_13b8de94b001zLoipHbkbkMa65"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-finish",
+          "tokens": {
+            "total": 14819,
+            "input": 12585,
+            "output": 74,
+            "reasoning": 165,
+            "cache": {
+              "write": 0,
+              "read": 1995
+            }
+          },
+          "cost": 0,
+          "id": "prt_13b8e07b8001DvgZd4SsfJyrlx",
+          "sessionID": "ses_ec4721925ffexUpPUNE6iUk3mJ",
+          "messageID": "msg_13b8de94b001zLoipHbkbkMa65"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_13b8de6eb001SkmOItVcSc4ITB",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 17133,
+          "input": 1850,
+          "output": 179,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 15104
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792000526327,
+          "completed": 1792000528891
+        },
+        "finish": "tool-calls",
+        "id": "msg_13b8e07f7001vHlnDyw2Z0GaVO",
+        "sessionID": "ses_ec4721925ffexUpPUNE6iUk3mJ"
+      },
+      "parts": [
+        {
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-start",
+          "id": "prt_13b8e0e9e001Mq3Or5U0MGpCvD",
+          "sessionID": "ses_ec4721925ffexUpPUNE6iUk3mJ",
+          "messageID": "msg_13b8e07f7001vHlnDyw2Z0GaVO"
+        },
+        {
+          "type": "text",
+          "text": "I'll read the implementer's report and the diff.",
+          "time": {
+            "start": 1792000528119,
+            "end": 1792000528762
+          },
+          "id": "prt_13b8e0ef7001vtH9gSrPMlplXV",
+          "sessionID": "ses_ec4721925ffexUpPUNE6iUk3mJ",
+          "messageID": "msg_13b8e07f7001vHlnDyw2Z0GaVO"
+        },
+        {
+          "type": "tool",
+          "tool": "read",
+          "callID": "call_00_ntey9hnbxo69fpxkila5o7sx",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-2-report.md"
+            },
+            "output": "<path>/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-2-report.md</path>\n<type>file</type>\n<content>\n1: # Task 2 Report — Scaffold the `connectors` package and register it\n2: \n3: ## Status: DONE\n4: \n5: ## What I implemented\n6: - Created `connectors/pyproject.toml` exactly per Step 1 of the brief (`agentic-odi-connectors`, deps `fastmcp` + `pydantic`, hatchling build, ruff/mypy/pytest config). No `[tool.uv.sources]` block (package has no workspace deps).\n7: - Created `connectors/src/connectors/__init__.py` containing a module docstring only:\n8:   `\"\"\"Pluggable external-integration connectors for Agentic ODI (MCP client).\"\"\"`\n9: - Registered `\"connectors\"` in `members` of the root `pyproject.toml` (`[tool.uv.workspace]`), inserted alphabetically between `client` and `core`.\n10: - Regenerated `uv.lock` via `uv lock && uv sync --all-packages`.\n11: \n12: ## Exact commands run and results\n13: 1. `uv lock && uv sync --all-packages` (workdir = worktree root)\n14:    - Output: `Resolved 141 packages`, `Added agentic-odi-connectors v0.1.0`, built + installed `agentic-odi-connectors==0.1.0`. Exit 0.\n15: 2. `uv run --directory connectors python -c \"import connectors; print(connectors.__doc__)\"`\n16:    - Output: `Pluggable external-integration connectors for Agentic ODI (MCP client).`\n17:    - Exit 0. ✅ (Step 5 verified)\n18: 3. `grep agentic-odi-connectors uv.lock` → present in `[manifest] members` (line 23) and as a `[[package]]` (line 91). ✅\n19: 4. Commit:\n20:    ```\n21:    git add connectors/pyproject.toml connectors/src/connectors/__init__.py pyproject.toml uv.lock\n22:    git commit -m \"feat(connectors): scaffold agentic-odi-connectors workspace package\"\n23:    ```\n24: \n25: ## Files changed\n26: | File | Change |\n27: |------|--------|\n28: | `connectors/pyproject.toml` | new (27 lines) |\n29: | `connectors/src/connectors/__init__.py` | new (1 line docstring) |\n30: | `pyproject.toml` | modified `members` |\n31: | `uv.lock` | regenerated: manifest member + package entry (+16 lines) |\n32: \n33: Commit: `5b19013 feat(connectors): scaffold agentic-odi-connectors workspace package` (4 files, +45/-1).\n34: \n35: ## Self-review findings\n36: - `connectors/pyproject.toml` matches the brief verbatim, including the `[tool.pytest.ini_options] asyncio_mode = \"strict\"` block required for Step 5.\n37: - `__init__.py` is docstring-only (no exports), as required for Task 3 to add them.\n38: - No `[tool.uv.sources]` added, per context note.\n39: - Root `members` edit is a minimal one-token insertion; ordering remains alphabetical.\n40: - `uv.lock` diff is scoped to the new package only (no unrelated dependency churn) — lock was already consistent with Task 1.\n41: - `connectors/src/connectors/__pycache__/` generated by the import check is git-ignored (verified with `git check-ignore`), so it was not staged.\n42: \n43: ## Concerns\n44: - The commit picked up an `Entire-Checkpoint:` trailer from a repo git hook. This appears to be standard tooling behavior in this repo; no action taken.\n45: - An untracked `docs/superpowers/` directory exists in the worktree (the plan/task docs). It was not created by this task and was intentionally left unstaged; it is outside Task 2's file scope.\n\n(End of file - total 45 lines)\n</content>",
+            "metadata": {
+              "preview": "# Task 2 Report — Scaffold the `connectors` package and register it\n\n## Status: DONE\n\n## What I implemented\n- Created `connectors/pyproject.toml` exactly per Step 1 of the brief (`agentic-odi-connectors`, deps `fastmcp` + `pydantic`, hatchling build, ruff/mypy/pytest config). No `[tool.uv.sources]` block (package has no workspace deps).\n- Created `connectors/src/connectors/__init__.py` containing a module docstring only:\n  `\"\"\"Pluggable external-integration connectors for Agentic ODI (MCP client).\"\"\"`\n- Registered `\"connectors\"` in `members` of the root `pyproject.toml` (`[tool.uv.workspace]`), inserted alphabetically between `client` and `core`.\n- Regenerated `uv.lock` via `uv lock && uv sync --all-packages`.\n\n## Exact commands run and results\n1. `uv lock && uv sync --all-packages` (workdir = worktree root)\n   - Output: `Resolved 141 packages`, `Added agentic-odi-connectors v0.1.0`, built + installed `agentic-odi-connectors==0.1.0`. Exit 0.\n2. `uv run --directory connectors python -c \"import connectors; print(connectors.__doc__)\"`\n   - Output: `Pluggable external-integration connectors for Agentic ODI (MCP client).`\n   - Exit 0. ✅ (Step 5 verified)\n3. `grep agentic-odi-connectors uv.lock` → present in `[manifest] members` (line 23) and as a `[[package]]` (line 91). ✅\n4. Commit:\n   ```",
+              "truncated": false,
+              "loaded": [],
+              "display": {
+                "type": "file",
+                "path": "/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-2-report.md",
+                "text": "# Task 2 Report — Scaffold the `connectors` package and register it\n\n## Status: DONE\n\n## What I implemented\n- Created `connectors/pyproject.toml` exactly per Step 1 of the brief (`agentic-odi-connectors`, deps `fastmcp` + `pydantic`, hatchling build, ruff/mypy/pytest config). No `[tool.uv.sources]` block (package has no workspace deps).\n- Created `connectors/src/connectors/__init__.py` containing a module docstring only:\n  `\"\"\"Pluggable external-integration connectors for Agentic ODI (MCP client).\"\"\"`\n- Registered `\"connectors\"` in `members` of the root `pyproject.toml` (`[tool.uv.workspace]`), inserted alphabetically between `client` and `core`.\n- Regenerated `uv.lock` via `uv lock && uv sync --all-packages`.\n\n## Exact commands run and results\n1. `uv lock && uv sync --all-packages` (workdir = worktree root)\n   - Output: `Resolved 141 packages`, `Added agentic-odi-connectors v0.1.0`, built + installed `agentic-odi-connectors==0.1.0`. Exit 0.\n2. `uv run --directory connectors python -c \"import connectors; print(connectors.__doc__)\"`\n   - Output: `Pluggable external-integration connectors for Agentic ODI (MCP client).`\n   - Exit 0. ✅ (Step 5 verified)\n3. `grep agentic-odi-connectors uv.lock` → present in `[manifest] members` (line 23) and as a `[[package]]` (line 91). ✅\n4. Commit:\n   ```\n   git add connectors/pyproject.toml connectors/src/connectors/__init__.py pyproject.toml uv.lock\n   git commit -m \"feat(connectors): scaffold agentic-odi-connectors workspace package\"\n   ```\n\n## Files changed\n| File | Change |\n|------|--------|\n| `connectors/pyproject.toml` | new (27 lines) |\n| `connectors/src/connectors/__init__.py` | new (1 line docstring) |\n| `pyproject.toml` | modified `members` |\n| `uv.lock` | regenerated: manifest member + package entry (+16 lines) |\n\nCommit: `5b19013 feat(connectors): scaffold agentic-odi-connectors workspace package` (4 files, +45/-1).\n\n## Self-review findings\n- `connectors/pyproject.toml` matches the brief verbatim, including the `[tool.pytest.ini_options] asyncio_mode = \"strict\"` block required for Step 5.\n- `__init__.py` is docstring-only (no exports), as required for Task 3 to add them.\n- No `[tool.uv.sources]` added, per context note.\n- Root `members` edit is a minimal one-token insertion; ordering remains alphabetical.\n- `uv.lock` diff is scoped to the new package only (no unrelated dependency churn) — lock was already consistent with Task 1.\n- `connectors/src/connectors/__pycache__/` generated by the import check is git-ignored (verified with `git check-ignore`), so it was not staged.\n\n## Concerns\n- The commit picked up an `Entire-Checkpoint:` trailer from a repo git hook. This appears to be standard tooling behavior in this repo; no action taken.\n- An untracked `docs/superpowers/` directory exists in the worktree (the plan/task docs). It was not created by this task and was intentionally left unstaged; it is outside Task 2's file scope.",
+                "lineStart": 1,
+                "lineEnd": 45,
+                "totalLines": 45,
+                "truncated": false
+              }
+            },
+            "title": ".worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-2-report.md",
+            "time": {
+              "start": 1792000528437,
+              "end": 1792000528455
+            }
+          },
+          "id": "prt_13b8e0f47001HW5EtiTDtE3ZjN",
+          "sessionID": "ses_ec4721925ffexUpPUNE6iUk3mJ",
+          "messageID": "msg_13b8e07f7001vHlnDyw2Z0GaVO"
+        },
+        {
+          "type": "tool",
+          "tool": "read",
+          "callID": "call_01_t4m8wu10i0rmqxr3f44ltclx",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/review-e17dc6d..5b19013.diff"
+            },
+            "output": "<path>/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/review-e17dc6d..5b19013.diff</path>\n<type>file</type>\n<content>\n1: # Review package: e17dc6dad4276b07c13f4db4374bf7882f3fe66b..HEAD\n2: \n3: ## Commits\n4: 5b19013 feat(connectors): scaffold agentic-odi-connectors workspace package\n5: \n6: ## Files changed\n7:  connectors/pyproject.toml             | 27 +++++++++++++++++++++++++++\n8:  connectors/src/connectors/__init__.py |  1 +\n9:  pyproject.toml                        |  2 +-\n10:  uv.lock                               | 16 ++++++++++++++++\n11:  4 files changed, 45 insertions(+), 1 deletion(-)\n12: \n13: ## Diff\n14: diff --git a/connectors/pyproject.toml b/connectors/pyproject.toml\n15: new file mode 100644\n16: index 0000000..bc7a818\n17: --- /dev/null\n18: +++ b/connectors/pyproject.toml\n19: @@ -0,0 +1,27 @@\n20: +[project]\n21: +name = \"agentic-odi-connectors\"\n22: +version = \"0.1.0\"\n23: +description = \"Pluggable external-integration connectors for Agentic ODI (MCP client).\"\n24: +requires-python = \">=3.10\"\n25: +dependencies = [\"fastmcp\", \"pydantic\"]\n26: +\n27: +[build-system]\n28: +requires = [\"hatchling\"]\n29: +build-backend = \"hatchling.build\"\n30: +\n31: +[tool.hatch.build.targets.wheel]\n32: +packages = [\"src/connectors\"]\n33: +\n34: +[tool.ruff]\n35: +line-length = 100\n36: +target-version = \"py311\"\n37: +\n38: +[tool.ruff.lint]\n39: +select = [\"E4\", \"E7\", \"E9\", \"F\", \"I\", \"UP\", \"B\", \"BLE\"]\n40: +\n41: +[tool.mypy]\n42: +python_version = \"3.11\"\n43: +ignore_missing_imports = true\n44: +\n45: +[tool.pytest.ini_options]\n46: +asyncio_mode = \"strict\"\n47: diff --git a/connectors/src/connectors/__init__.py b/connectors/src/connectors/__init__.py\n48: new file mode 100644\n49: index 0000000..dafc82c\n50: --- /dev/null\n51: +++ b/connectors/src/connectors/__init__.py\n52: @@ -0,0 +1 @@\n53: +\"\"\"Pluggable external-integration connectors for Agentic ODI (MCP client).\"\"\"\n54: diff --git a/pyproject.toml b/pyproject.toml\n55: index e32e00b..495c3ba 100644\n56: --- a/pyproject.toml\n57: +++ b/pyproject.toml\n58: @@ -1,21 +1,21 @@\n59:  [project]\n60:  name = \"agentic-odi\"\n61:  version = \"0.1.0\"\n62:  description = \"Outcome-Driven Innovation (ODI): an MCP server, chat client, and CLI.\"\n63:  requires-python = \">=3.10\"\n64:  \n65:  [tool.uv]\n66:  package = false\n67:  \n68:  [tool.uv.workspace]\n69: -members = [\"cli\", \"client\", \"core\", \"local_server\", \"mcp_server\"]\n70: +members = [\"cli\", \"client\", \"connectors\", \"core\", \"local_server\", \"mcp_server\"]\n71:  \n72:  [dependency-groups]\n73:  dev = [\n74:      \"bandit==1.9.4\",\n75:      \"mypy==2.4.0\",\n76:      \"pytest==9.1.1\",\n77:      \"pytest-asyncio==1.4.0\",\n78:      \"pytest-cov==7.1.0\",\n79:      \"ruff==0.17.0\",\n80:  ]\n81: diff --git a/uv.lock b/uv.lock\n82: index 91929ed..3b735c2 100644\n83: --- a/uv.lock\n84: +++ b/uv.lock\n85: @@ -13,20 +13,21 @@ resolution-markers = [\n86:      \"python_full_version == '3.11.*' and sys_platform == 'emscripten'\",\n87:      \"python_full_version == '3.11.*' and sys_platform != 'emscripten' and sys_platform != 'win32'\",\n88:      \"python_full_version < '3.11'\",\n89:  ]\n90:  \n91:  [manifest]\n92:  members = [\n93:      \"agentic-odi\",\n94:      \"agentic-odi-cli\",\n95:      \"agentic-odi-client\",\n96: +    \"agentic-odi-connectors\",\n97:      \"agentic-odi-core\",\n98:      \"agentic-odi-local-server\",\n99:      \"agentic-odi-mcp-server\",\n100:  ]\n101:  \n102:  [[package]]\n103:  name = \"agentic-odi\"\n104:  version = \"0.1.0\"\n105:  source = { virtual = \".\" }\n106:  \n107: @@ -79,20 +80,35 @@ dependencies = [\n108:      { name = \"streamlit\" },\n109:  ]\n110:  \n111:  [package.metadata]\n112:  requires-dist = [\n113:      { name = \"fastmcp\" },\n114:      { name = \"openai\" },\n115:      { name = \"streamlit\" },\n116:  ]\n117:  \n118: +[[package]]\n119: +name = \"agentic-odi-connectors\"\n120: +version = \"0.1.0\"\n121: +source = { editable = \"connectors\" }\n122: +dependencies = [\n123: +    { name = \"fastmcp\" },\n124: +    { name = \"pydantic\" },\n125: +]\n126: +\n127: +[package.metadata]\n128: +requires-dist = [\n129: +    { name = \"fastmcp\" },\n130: +    { name = \"pydantic\" },\n131: +]\n132: +\n133:  [[package]]\n134:  name = \"agentic-odi-core\"\n135:  version = \"0.1.0\"\n136:  source = { editable = \"core\" }\n137:  dependencies = [\n138:      { name = \"pydantic\" },\n139:  ]\n140:  \n141:  [package.metadata]\n142:  requires-dist = [{ name = \"pydantic\" }]\n\n(End of file - total 142 lines)\n</content>",
+            "metadata": {
+              "preview": "# Review package: e17dc6dad4276b07c13f4db4374bf7882f3fe66b..HEAD\n\n## Commits\n5b19013 feat(connectors): scaffold agentic-odi-connectors workspace package\n\n## Files changed\n connectors/pyproject.toml             | 27 +++++++++++++++++++++++++++\n connectors/src/connectors/__init__.py |  1 +\n pyproject.toml                        |  2 +-\n uv.lock                               | 16 ++++++++++++++++\n 4 files changed, 45 insertions(+), 1 deletion(-)\n\n## Diff\ndiff --git a/connectors/pyproject.toml b/connectors/pyproject.toml\nnew file mode 100644\nindex 0000000..bc7a818\n--- /dev/null\n+++ b/connectors/pyproject.toml\n@@ -0,0 +1,27 @@\n+[project]",
+              "truncated": false,
+              "loaded": [],
+              "display": {
+                "type": "file",
+                "path": "/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/review-e17dc6d..5b19013.diff",
+                "text": "# Review package: e17dc6dad4276b07c13f4db4374bf7882f3fe66b..HEAD\n\n## Commits\n5b19013 feat(connectors): scaffold agentic-odi-connectors workspace package\n\n## Files changed\n connectors/pyproject.toml             | 27 +++++++++++++++++++++++++++\n connectors/src/connectors/__init__.py |  1 +\n pyproject.toml                        |  2 +-\n uv.lock                               | 16 ++++++++++++++++\n 4 files changed, 45 insertions(+), 1 deletion(-)\n\n## Diff\ndiff --git a/connectors/pyproject.toml b/connectors/pyproject.toml\nnew file mode 100644\nindex 0000000..bc7a818\n--- /dev/null\n+++ b/connectors/pyproject.toml\n@@ -0,0 +1,27 @@\n+[project]\n+name = \"agentic-odi-connectors\"\n+version = \"0.1.0\"\n+description = \"Pluggable external-integration connectors for Agentic ODI (MCP client).\"\n+requires-python = \">=3.10\"\n+dependencies = [\"fastmcp\", \"pydantic\"]\n+\n+[build-system]\n+requires = [\"hatchling\"]\n+build-backend = \"hatchling.build\"\n+\n+[tool.hatch.build.targets.wheel]\n+packages = [\"src/connectors\"]\n+\n+[tool.ruff]\n+line-length = 100\n+target-version = \"py311\"\n+\n+[tool.ruff.lint]\n+select = [\"E4\", \"E7\", \"E9\", \"F\", \"I\", \"UP\", \"B\", \"BLE\"]\n+\n+[tool.mypy]\n+python_version = \"3.11\"\n+ignore_missing_imports = true\n+\n+[tool.pytest.ini_options]\n+asyncio_mode = \"strict\"\ndiff --git a/connectors/src/connectors/__init__.py b/connectors/src/connectors/__init__.py\nnew file mode 100644\nindex 0000000..dafc82c\n--- /dev/null\n+++ b/connectors/src/connectors/__init__.py\n@@ -0,0 +1 @@\n+\"\"\"Pluggable external-integration connectors for Agentic ODI (MCP client).\"\"\"\ndiff --git a/pyproject.toml b/pyproject.toml\nindex e32e00b..495c3ba 100644\n--- a/pyproject.toml\n+++ b/pyproject.toml\n@@ -1,21 +1,21 @@\n [project]\n name = \"agentic-odi\"\n version = \"0.1.0\"\n description = \"Outcome-Driven Innovation (ODI): an MCP server, chat client, and CLI.\"\n requires-python = \">=3.10\"\n \n [tool.uv]\n package = false\n \n [tool.uv.workspace]\n-members = [\"cli\", \"client\", \"core\", \"local_server\", \"mcp_server\"]\n+members = [\"cli\", \"client\", \"connectors\", \"core\", \"local_server\", \"mcp_server\"]\n \n [dependency-groups]\n dev = [\n     \"bandit==1.9.4\",\n     \"mypy==2.4.0\",\n     \"pytest==9.1.1\",\n     \"pytest-asyncio==1.4.0\",\n     \"pytest-cov==7.1.0\",\n     \"ruff==0.17.0\",\n ]\ndiff --git a/uv.lock b/uv.lock\nindex 91929ed..3b735c2 100644\n--- a/uv.lock\n+++ b/uv.lock\n@@ -13,20 +13,21 @@ resolution-markers = [\n     \"python_full_version == '3.11.*' and sys_platform == 'emscripten'\",\n     \"python_full_version == '3.11.*' and sys_platform != 'emscripten' and sys_platform != 'win32'\",\n     \"python_full_version < '3.11'\",\n ]\n \n [manifest]\n members = [\n     \"agentic-odi\",\n     \"agentic-odi-cli\",\n     \"agentic-odi-client\",\n+    \"agentic-odi-connectors\",\n     \"agentic-odi-core\",\n     \"agentic-odi-local-server\",\n     \"agentic-odi-mcp-server\",\n ]\n \n [[package]]\n name = \"agentic-odi\"\n version = \"0.1.0\"\n source = { virtual = \".\" }\n \n@@ -79,20 +80,35 @@ dependencies = [\n     { name = \"streamlit\" },\n ]\n \n [package.metadata]\n requires-dist = [\n     { name = \"fastmcp\" },\n     { name = \"openai\" },\n     { name = \"streamlit\" },\n ]\n \n+[[package]]\n+name = \"agentic-odi-connectors\"\n+version = \"0.1.0\"\n+source = { editable = \"connectors\" }\n+dependencies = [\n+    { name = \"fastmcp\" },\n+    { name = \"pydantic\" },\n+]\n+\n+[package.metadata]\n+requires-dist = [\n+    { name = \"fastmcp\" },\n+    { name = \"pydantic\" },\n+]\n+\n [[package]]\n name = \"agentic-odi-core\"\n version = \"0.1.0\"\n source = { editable = \"core\" }\n dependencies = [\n     { name = \"pydantic\" },\n ]\n \n [package.metadata]\n requires-dist = [{ name = \"pydantic\" }]",
+                "lineStart": 1,
+                "lineEnd": 142,
+                "totalLines": 142,
+                "truncated": false
+              }
+            },
+            "title": ".worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/review-e17dc6d..5b19013.diff",
+            "time": {
+              "start": 1792000528758,
+              "end": 1792000528793
+            }
+          },
+          "id": "prt_13b8e1039001xdXeXrVzzbEr3T",
+          "sessionID": "ses_ec4721925ffexUpPUNE6iUk3mJ",
+          "messageID": "msg_13b8e07f7001vHlnDyw2Z0GaVO"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-finish",
+          "tokens": {
+            "total": 17133,
+            "input": 1850,
+            "output": 179,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 15104
+            }
+          },
+          "cost": 0,
+          "id": "prt_13b8e11d2001E41IsS261w4Yet",
+          "sessionID": "ses_ec4721925ffexUpPUNE6iUk3mJ",
+          "messageID": "msg_13b8e07f7001vHlnDyw2Z0GaVO"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_13b8de6eb001SkmOItVcSc4ITB",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 21053,
+          "input": 2918,
+          "output": 564,
+          "reasoning": 675,
+          "cache": {
+            "write": 0,
+            "read": 16896
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792000528896,
+          "completed": 1792000538745
+        },
+        "finish": "stop",
+        "id": "msg_13b8e1200001xfQRzQIqhQdx97",
+        "sessionID": "ses_ec4721925ffexUpPUNE6iUk3mJ"
+      },
+      "parts": [
+        {
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-start",
+          "id": "prt_13b8e1a92001tdcFdMNtkMbN7L",
+          "sessionID": "ses_ec4721925ffexUpPUNE6iUk3mJ",
+          "messageID": "msg_13b8e1200001xfQRzQIqhQdx97"
+        },
+        {
+          "type": "reasoning",
+          "text": "Let me verify against the brief.\n\nThe brief spec for `connectors/pyproject.toml`:\n- name = \"agentic-odi-connectors\" ✅ (line 21)\n- version = \"0.1.0\" ✅\n- description ✅\n- requires-python = \">=3.10\" ✅\n- dependencies = [\"fastmcp\", \"pydantic\"] ✅\n- build-system hatchling ✅\n- packages = [\"src/connectors\"] ✅\n- ruff line-length 100, target-version py311 ✅\n- ruff lint select ✅\n- mypy ✅\n- pytest asyncio_mode strict ✅\n- No [tool.uv.sources] ✅\n\n__init__.py docstring only ✅\n\nroot pyproject.toml members include connectors ✅ (alphabetical between client and core)\n\nuv.lock lists agentic-odi-connectors ✅ manifest member and package entry.\n\nAll spec items match. Let me double-check the ordering. members = [\"cli\", \"client\", \"connectors\", \"core\", \"local_server\", \"mcp_server\"]. Alphabetical: cli, client, connectors, core... \"client\" < \"connectors\"? c-l-i vs c-o-n: 'l' < 'o', yes client before connectors. \"connectors\" vs \"core\": c-o-n vs c-o-r, 'n' < 'r', yes. Correct.\n\nNow let me verify the global constraint: ruff select includes \"I\" — yes it does in diff. Good.\n\nWait — the global constraints mention ruff `select = [\"E4\",\"E7\",\"E9\",\"F\",\"I\",\"UP\",\"B\",\"BLE\"]`. The brief also. Matches.\n\nNow, one thing to note: the `connectors/pyproject.toml` has `[tool.pytest.ini_options] asyncio_mode = \"strict\"` but does it need pytest-asyncio? That's a dev dependency in root. Not the task's concern.\n\nLet me verify the brief's mention: \"Copy the core package's structure verbatim\". I could check core/pyproject.toml but the brief template is explicit and diff matches. No need to crawl.\n\nIs there any concern? The `requires-python = \">=3.10\"` but ruff/mypy target py311. That's per brief and global constraints, consistent.\n\nPotential issue: pydantic dependency — uv.lock shows deps fastmcp and pydantic, matching. Good.\n\nEverything matches exactly. Task quality approved.\n\nLet me note: I shouldn't re-run git. But verifying the __init__.py is docstring only - from diff line 53, single line docstring. ✅\n\nNothing extra added. Only 4 files. Good.\n\nOne minor thing: report says uv.lock +16 lines. Diff shows the package block plus manifest member. Let me count: manifest +1 line, package block added. Yes fine.\n\nAssessment approved. No issues. Maybe mention as minor: nothing.\n\nActually, let me think whether there's any real concern. The `connectors` package has dep `pydantic` but is it actually used? Task 3 will add exports. Not relevant.\n\nEverything clean. Approved.",
+          "time": {
+            "start": 1792000531180,
+            "end": 1792000535496
+          },
+          "id": "prt_13b8e1aec001bGmwi9FLggsYXh",
+          "sessionID": "ses_ec4721925ffexUpPUNE6iUk3mJ",
+          "messageID": "msg_13b8e1200001xfQRzQIqhQdx97"
+        },
+        {
+          "type": "text",
+          "text": "### Spec Compliance\n- ✅ `connectors/pyproject.toml` — name `agentic-odi-connectors`, version, description, `requires-python = \">=3.10\"`, `deps = [\"fastmcp\",\"pydantic\"]` all match brief (diff:20-25).\n- ✅ Hatchling build + `packages = [\"src/connectors\"]` (diff:27-32).\n- ✅ Per-package ruff `line-length = 100`, `target-version = \"py311\"`, `select = [\"E4\",\"E7\",\"E9\",\"F\",\"I\",\"UP\",\"B\",\"BLE\"]` (diff:34-39).\n- ✅ mypy `python_version = \"3.11\"`, `ignore_missing_imports = true` (diff:41-43).\n- ✅ `[tool.pytest.ini_options] asyncio_mode = \"strict\"` (diff:45-46).\n- ✅ No `[tool.uv.sources]` block present (diff:19-46).\n- ✅ `connectors/src/connectors/__init__.py` exists and is a single docstring, no exports (diff:52-53).\n- ✅ Root `pyproject.toml` members include `\"connectors\"`, correctly alphabetical between `client` and `core` (diff:70).\n- ✅ `uv.lock` lists `agentic-odi-connectors` in `[manifest] members` (diff:96) and as a `[[package]]` with `editable = \"connectors\"` and deps `fastmcp`/`pydantic` (diff:118-131).\n- ⚠️ Cannot verify: exact byte-for-byte match with `core/pyproject.toml` structure — the brief supplies an explicit template and the diff matches it verbatim, so this is non-blocking.\n\nNo Missing / Extra / Misunderstood items found.\n\n### Strengths\n- Diff is tightly scoped to the 4 files in the brief; no unrelated dependency churn in `uv.lock`.\n- Alpha-ordering preserved in gridlock `members` and lock manifest.\n- Correctly omitted `[tool.uv.sources]`, honoring the \"no workspace deps\" constraint.\n\n### Issues\n#### Critical\nNone.\n#### Important\nNone.\n#### Minor\nNone.\n\n### Assessment\n**Task quality:** Approved\n**Reasoning:** Every file matches the brief's template exactly, constraints are respected (no `[tool.uv.sources]`, docstring-only init, correct member registration), and `uv.lock` reflects the new editable package with no incidental changes.",
+          "time": {
+            "start": 1792000535499,
+            "end": 1792000538599
+          },
+          "id": "prt_13b8e2bcb001reu6mLnXtZTlzM",
+          "sessionID": "ses_ec4721925ffexUpPUNE6iUk3mJ",
+          "messageID": "msg_13b8e1200001xfQRzQIqhQdx97"
+        },
+        {
+          "reason": "stop",
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-finish",
+          "tokens": {
+            "total": 21053,
+            "input": 2918,
+            "output": 564,
+            "reasoning": 675,
+            "cache": {
+              "write": 0,
+              "read": 16896
+            }
+          },
+          "cost": 0,
+          "id": "prt_13b8e37fc001vXQpxusxlF37dy",
+          "sessionID": "ses_ec4721925ffexUpPUNE6iUk3mJ",
+          "messageID": "msg_13b8e1200001xfQRzQIqhQdx97"
+        }
+      ]
+    }
+  ]
+}
