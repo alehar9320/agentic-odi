@@ -1,0 +1,52 @@
+You are implementing Task 5: JSON connection registry (plus the `build_connector` kind dispatcher).
+
+## Working directory (IMPORTANT)
+Work ONLY inside this git worktree on branch `mcp-connector-module`:
+  /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module
+Do not touch /home/alexa/repos/agentic-odi (the main checkout).
+
+## Task Description
+Read your task brief FIRST — it is your requirements, with the exact test code to use:
+  /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-5-brief.md
+
+## Context
+Already present: `models.py` (`ConnectorConfig(name, kind="mcp", enabled=True, settings={})`, `mcp_settings()`), `errors.py` (`RegistryError` base; `UnknownConnectorKindError`, `DuplicateConnectorError`, `ConnectorNotFoundError` all subclass it), `sink.py` (`IngestSink`). Follow TDD.
+
+## Requirements (from the brief)
+`connectors/src/connectors/registry.py`:
+- `ConnectorRegistry(path: str | Path | None = None)`; default path = `Path.cwd() / ".agentic-odi" / "connectors.json"`.
+- `list() -> list[ConnectorConfig]` → `[]` if the file is absent.
+- `get(name) -> ConnectorConfig` → raises `ConnectorNotFoundError`.
+- `add(config) -> None` → raises `DuplicateConnectorError` on a name clash; persists immediately.
+- `save(configs) -> None` → creates parent dirs; writes `{"connectors": [ ... ]}`; make it atomic (write temp file in the same dir, then `os.replace`).
+- Malformed JSON (or otherwise unparseable/validation-failing file) → raise `RegistryError` with the file path in the message. Never leak a raw `json.JSONDecodeError`.
+- Validate the file shape with a Pydantic wrapper model (e.g. `BaseModel` with `connectors: list[ConnectorConfig]`) so bad shapes become `RegistryError`, not raw `ValidationError`.
+- `build_connector(config, sink, client_factory=None) -> Connector` dispatcher: for `kind == "mcp"`, do a **deferred** import `from connectors.mcp import MCPClientConnector` and return `MCPClientConnector(config, sink, client_factory=client_factory)`. For any other kind, raise `UnknownConnectorKindError(config.kind)`. NOTE: `connectors/mcp.py` does not exist yet — it is created in Task 6 — but no test in this task exercises the `mcp` branch, so the deferred import must simply not execute here. Do not create `mcp.py`.
+- Re-export `ConnectorRegistry` and `build_connector` from `connectors/__init__.py` (add to `__all__`) so `from connectors import ConnectorRegistry` works and `from connectors.registry import build_connector` works.
+
+## Formatting requirement (IMPORTANT — CI gate)
+Repo CI runs `uv run ruff check .` and `uv run ruff format --check .`. The plan's test snippet is NOT format-clean. Before committing run:
+  `uv run ruff format connectors/ && uv run ruff check connectors/ --fix`
+then confirm `uv run ruff check connectors/` exits 0. Do not change test behavior while formatting.
+
+## Environment facts (verified)
+- Python 3.12 via gitignored `.python-version`; shared root `.venv`; use `uv run --directory connectors pytest ...`.
+- A git hook appends an `Entire-Checkpoint` trailer to commits — expected; keep the brief's subject line.
+
+## Before you begin
+Ask if anything is unclear. Otherwise implement exactly the brief's interface.
+
+## Your job
+1. TDD per the brief (RED then GREEN; expect 7 passed).
+2. Format + lint connectors clean.
+3. Commit with the brief's message.
+4. Self-review, then report.
+
+## You do NOT dispatch subagents. Do all work yourself.
+
+## Report format
+Write your full report to:
+  /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-5-report.md
+Include: what you implemented; **TDD Evidence** (RED and GREEN commands + outputs); files changed; ruff format/check results; self-review; concerns.
+
+Then reply with ONLY (under 15 lines): Status; commit SHA + subject; one-line test summary; ruff status; concerns; report path.
