@@ -1,0 +1,63 @@
+You are implementing Task 8: Reconcile pre-existing ruff lint and format debt.
+
+## Working directory (IMPORTANT)
+Work ONLY inside this git worktree on branch `mcp-connector-module`:
+  /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module
+Do not touch /home/alexa/repos/agentic-odi (the main checkout).
+
+## Task Description
+Read your task brief FIRST:
+  /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-8-brief.md
+(Note: the Files list says the root exclude is "see Step 4" but after a step reorder it is now **Step 3**. Follow the step order in the brief's body.)
+
+## Why
+CI's `lint` job runs exactly `uv run ruff check .` and `uv run ruff format --check .`. Both are RED at the current base because of pre-existing violations/dirt from the earlier refactor. Make them pass with **no behavior change**.
+
+## Strict ordering (important)
+1. **First** add the root exclude (Step 3) so a global `ruff format .` does not rewrite the untracked plan Markdown:
+   In root `pyproject.toml` add:
+   ```toml
+   [tool.ruff]
+   extend-exclude = ["docs"]
+   ```
+   (Place it sensibly; do not disturb existing tables. If a root `[tool.ruff]` already exists, merge.)
+2. Then `uv run ruff check . --fix` (Step 1).
+3. Then hand-resolve the remainder (Step 2), then `uv run ruff format .` (Step 4).
+
+## Rules to resolve (match existing conventions)
+- `I001`/`F401`/`F841`: auto-fixed by `--fix`. **After** the fix, inspect each removed import to confirm it was genuinely unused (not an intentional re-export, e.g. in an `__init__.py`). If any removal would break a re-export, restore it with `# noqa: F401`. Known removals: `core/sqlite_repository.py` (`json`), `local_server/app.py` (`HTTPException`, `InMemoryRepository`), `mcp_server/mcp_server.py` (`uuid`, `BusinessImpactCategory`, `JobNotFoundError`, `job_not_found`). For the `F841` `service` variable in `local_server/app.py`, remove it only after confirming the assignment has no side effect; otherwise keep with `# noqa: F841`.
+- `E702` (semicolons) in `cli/src/cli/outcomes.py`: split into separate statements.
+- `B008` (`typer.Option` in defaults) in `cli/src/cli/outcomes.py`: add `# noqa: B008` (matches `cli/src/cli/cli.py`).
+- `BLE001` in `cli/src/cli/backend.py`, `core/src/core/sqlite_repository.py`, `mcp_server/src/mcp_server/mcp_server.py`: add `# noqa: BLE001` where the broad catch is intentional (matches convention); narrow only if trivially safe.
+- `UP042` in `core/src/core/models.py` (`Direction(str, Enum)`, `BusinessImpactCategory(str, Enum)`): **keep `(str, Enum)`**, add `# noqa: UP042` (do NOT convert to `StrEnum`; Python 3.10 compatibility).
+
+## Verify (Step 5)
+From the worktree root, ALL must pass:
+```
+uv run ruff check .                 # exit 0
+uv run ruff format --check .        # exit 0
+uv run --directory core pytest
+uv run --directory mcp_server pytest
+uv run --directory local_server pytest
+uv run --directory cli pytest
+uv run --directory client pytest
+uv run --directory connectors pytest
+```
+If any test fails, the change was not behavior-preserving — fix it.
+
+## Commit (Step 6)
+`git add -A && git commit -m "chore: reconcile pre-existing ruff lint and format debt"`
+(Including `-A` will also stage the modified plan doc if present under `docs/` — do NOT commit the untracked `docs/` plan; if `git add -A` stages `docs/`, unstage it with `git restore --staged docs/` before committing so only code/config changes are committed. Confirm with `git status` before committing.)
+
+## Environment facts (verified)
+- Python 3.12 via gitignored `.python-version`; shared root `.venv`.
+- A git hook appends an `Entire-Checkpoint` trailer — expected; keep the subject line above.
+
+## You do NOT dispatch subagents. Do all work yourself.
+
+## Report format
+Write your full report to:
+  /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-8-report.md
+Include: the exact before/after of `ruff check .` and `ruff format --check .`; per-file changes and why; confirmation no behavior change (test results); what got staged/committed; concerns.
+
+Then reply with ONLY (under 18 lines): Status; commit SHA + subject; `ruff check .` result; `ruff format --check .` result; test summary per package; concerns; report path.
