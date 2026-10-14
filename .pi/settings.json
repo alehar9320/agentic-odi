@@ -1,0 +1,7 @@
+{
+  "packages": [
+    {
+      "source": "git:github.com/obra/superpowers"
+    }
+  ]
+}

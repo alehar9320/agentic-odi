@@ -217,6 +217,24 @@ After this, `ruff` and `ruff-format` will run on staged files whenever you commi
 pre-commit run --all-files
 ```
 
+### 🧠 Superpowers with Pi
+
+This project includes [Superpowers](https://github.com/obra/superpowers) as a [Pi package](https://pi.dev/docs/packages). When using [Pi](https://pi.dev) with this project, Superpowers skills and extensions are automatically loaded.
+
+To enable:
+
+1. Install Pi: `curl -fsSL https://pi.dev/install.sh | sh`
+2. Trust the project (first time only): `pi config --local --approve`
+3. Start Pi: `pi`
+
+The `.pi/settings.json` declares the Superpowers package. Pi will clone it and load:
+
+- **Extension**: `superpowers.ts` — injects the `using-superpowers` bootstrap at session startup and after compaction
+- **Skills**: 12 Superpowers skills (TDD, subagent-driven-development, systematic-debugging, etc.)
+
+> [!NOTE]
+> Superpowers is also available for OpenCode via the plugin in `opencode.json`. The Pi package provides native Pi integration without needing the OpenCode compatibility layer.
+
 ### 🧼 Developer workflow for formatting
 
 - **When editing Python files**, either:
