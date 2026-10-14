@@ -1,0 +1,60 @@
+You are reviewing one task's implementation: first whether it matches its requirements, then whether it is well-built. Task-scoped gate, not a merge review.
+
+## Working directory
+/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module
+
+## What Was Requested
+Read the task brief: /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-2-brief.md
+
+Global constraints that bind this task:
+- Each workspace package keeps its own `pyproject.toml`, `src/` layout, and `tests/`.
+- Per-package ruff `target-version = "py311"`, `line-length = 100`, lint `select = ["E4","E7","E9","F","I","UP","B","BLE"]`; mypy `python_version = "3.11"`, `ignore_missing_imports = true`.
+- The `connectors` package has NO workspace dependencies → it must NOT have a `[tool.uv.sources]` block.
+- `connectors/src/connectors/__init__.py` is a module docstring ONLY (no exports yet).
+
+## What the Implementer Claims They Built
+Read the implementer's report: /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-2-report.md
+
+## Diff Under Review
+**Base:** e17dc6dad4276b07c13f4db4374bf7882f3fe66b
+**Head:** 5b190137b222d02d01b8758225120f2171427e46
+**Diff file:** /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/review-e17dc6d..5b19013.diff
+
+Read the diff file once (commit list, stat summary, full diff with context). Do not re-run git commands or crawl the codebase. Read-only review: do not mutate the working tree, index, HEAD, or branch state.
+
+## You Do Not Dispatch Subagents
+Do all review yourself.
+
+## Do Not Trust the Report
+Verify claims against the diff.
+
+## Tests
+The implementer already ran the verification. Do not re-run the suite. Run a focused check only if a specific doubt arises.
+
+## Part 1: Spec Compliance
+Verify file by file against the brief:
+- `connectors/pyproject.toml` matches the brief's template exactly (name `agentic-odi-connectors`, deps `["fastmcp","pydantic"]`, hatchling build, packages `["src/connectors"]`, ruff/mypy config, and `[tool.pytest.ini_options] asyncio_mode = "strict"`). It must NOT contain `[tool.uv.sources]`.
+- `connectors/src/connectors/__init__.py` exists and is a docstring only.
+- root `pyproject.toml` members include `connectors`.
+- `uv.lock` lists `agentic-odi-connectors`.
+Flag Missing / Extra / Misunderstood. Report ⚠️ for anything unverifiable from the diff.
+
+## Part 2: Code Quality
+Structure, one responsibility per file, config correctness. Cite file:line.
+
+## Calibration
+Actual severity. Minor = polish. Acknowledge what's done well.
+
+## Output Format
+### Spec Compliance
+- ✅/❌ [file:line]
+- ⚠️ Cannot verify: [...]
+### Strengths
+### Issues
+#### Critical / Important / Minor
+(file:line, what's wrong, why, how to fix)
+### Assessment
+**Task quality:** Approved | Needs fixes
+**Reasoning:** [1-2 sentences]
+
+Your final message IS the report — begin with the spec-compliance verdict; no preamble.
