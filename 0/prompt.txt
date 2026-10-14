@@ -1,0 +1,64 @@
+You are reviewing one task's implementation: first whether it matches its requirements, then whether it is well-built. Task-scoped gate, not a merge review.
+
+## Working directory
+/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module
+
+## What Was Requested
+Read the task brief: /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-7-brief.md
+
+Global constraints:
+- `cli` must lint clean under its own ruff config for the files this task adds; CI runs repo-wide `ruff check .` / `ruff format --check .` (pre-existing cli debt in `backend.py`/`outcomes.py` is explicitly out of scope and owned by Task 8).
+- `cli/pyproject.toml` must add `agentic-odi-connectors` to `dependencies` and a `[tool.uv.sources]` `agentic-odi-connectors = { workspace = true }` entry; `agentic-odi-core` source must remain.
+- Patch seam: tests patch `cli.connectors.build_connector`, so it must be imported at module level in `cli/src/cli/connectors.py`.
+- Unknown name / duplicate / health-failure must exit non-zero with a clean message (no raw traceback).
+
+## What the Implementer Claims They Built
+Read the implementer's report: /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-7-report.md
+
+## Diff Under Review
+**Base:** 7f1410c80023415e05915c66ea2d90295cd6b31d
+**Head:** e049313cceb6c7ba7abe2adbcbf5e1df59f9bc04
+**Diff file:** /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/review-7f1410c..e049313.diff
+
+Read the diff file once. Do not re-run git commands or crawl the codebase. Read-only review: do not mutate anything.
+
+## You Do Not Dispatch Subagents. Do all review yourself.
+
+## Do Not Trust the Report. Verify claims against the diff.
+
+## Tests
+Do not re-run the suite. Run ONLY this to confirm the NEW files lint/format clean (ignore pre-existing cli debt):
+  `cd /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module && uv run ruff check cli/src/cli/connectors.py cli/src/cli/cli.py cli/tests/test_connectors_cli.py --output-format=concise; uv run ruff format --check cli/src/cli/connectors.py cli/src/cli/cli.py cli/tests/test_connectors_cli.py`
+Report exit codes + output.
+
+## Part 1: Spec Compliance
+- `connectors_app` with subcommands `list`, `add mcp`, `health`, `ingest`; `--config` default None on each.
+- `list` prints `name\tkind\tenabled` or `No connectors configured.`
+- `add mcp` persists `settings={"url":..., "tools":[...]}`; duplicate → exit 1 + message.
+- `health` uses `asyncio.run(...health())`, prints ok/detail, exit 1 when not ok.
+- `ingest` uses `asyncio.run(...ingest())`, prints record/error counts, `--dump PATH` dumps.
+- module-level `build_connector` import; `_registry(config_path)` / `_sink()` seams.
+- `cli.py` registers the sub-app as name `connectors`.
+- `cli/pyproject.toml` dep + uv source; `uv.lock` updated; `agentic-odi-core` source retained.
+- Tests cover: help lists subcommands; add-then-list roundtrip; empty list; health ok (patched); health failure exit 1; ingest (patched).
+Flag Missing / Extra / Misunderstood. Report ⚠️ for anything unverifiable.
+
+## Part 2: Code Quality
+Typer usage, exit-code handling (`typer.Exit`), error messages, no raw traceback on unknown name/malformed registry, seam design, typing, structure. Cite file:line.
+
+## Calibration
+Actual severity. Minor = polish. Acknowledge what's done well.
+
+## Output Format
+### Spec Compliance
+- ✅/❌ [file:line]
+- ⚠️ Cannot verify: [...]
+### Strengths
+### Issues
+#### Critical / Important / Minor
+(file:line, what's wrong, why, how to fix)
+### Assessment
+**Task quality:** Approved | Needs fixes
+**Reasoning:** [1-2 sentences]
+
+Your final message IS the report — begin with the spec-compliance verdict; no preamble.
