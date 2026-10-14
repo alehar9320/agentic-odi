@@ -1,0 +1,63 @@
+You are reviewing one task's implementation: first whether it matches its requirements, then whether it is well-built. Task-scoped gate, not a merge review.
+
+## Working directory
+/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module
+
+## What Was Requested
+Read the task brief: /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-8-brief.md
+
+The goal is to make CI's `lint` job green WITHOUT behavior change:
+- `uv run ruff check .` → exit 0
+- `uv run ruff format --check .` → exit 0
+Rules: auto-fix I001/F401/F841; manual E702 (split semicolons), B008 (`# noqa: B008`), BLE001 (`# noqa: BLE001` where intentional), UP042 (keep `(str, Enum)` + `# noqa: UP042`, do NOT use StrEnum). Root `pyproject.toml` must add `[tool.ruff] extend-exclude = ["docs"]`. The untracked `docs/` plan must NOT be committed.
+
+## What the Implementer Claims They Built
+Read the implementer's report: /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-8-report.md
+
+## Diff Under Review
+**Base:** e049313cceb6c7ba7abe2adbcbf5e1df59f9bc04
+**Head:** f0c4e3794eef178edf5d91e4ed6dd9c12da81b57
+**Diff file:** /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/review-e049313..f0c4e37.diff
+
+Read the diff file once. Do not re-run git commands or crawl the codebase. Read-only review: do not mutate anything.
+
+## You Do Not Dispatch Subagents. Do all review yourself.
+
+## Do Not Trust the Report. Verify claims against the diff.
+
+## Tests
+The implementer already ran the suite. Do not re-run it. Run ONLY these to independently confirm the CI lint gate is green:
+  `cd /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module && uv run ruff check . --output-format=concise; echo "CHECK=$?"; uv run ruff format --check . >/dev/null; echo "FORMAT=$?"`
+Report the exit codes.
+
+## Part 1: Spec Compliance / Behavior Preservation (the core risk)
+This task's correctness = "no behavior change". Examine every hunk and confirm each change is behavior-preserving:
+- Removed `F401` imports: confirm each was genuinely unused (not a re-export, not used implicitly). Explicitly check `mcp_server/src/mcp_server/__init__.py` — did the change alter `__all__`/re-exports? (There is a 9-line change there; make sure no public re-export was dropped.)
+- `F841` `service` in `local_server/app.py`: was the assignment removed, or kept with noqa? If a constructor with possible side effects was removed, flag it.
+- `E702` semicolon splits in `cli/src/cli/outcomes.py`: confirm statements are identical, just on separate lines.
+- `B008`/`BLE001`/`UP042` noqa additions: confirm the underlying code is unchanged (only comments added) and `(str, Enum)` is retained.
+- `ruff format` hunks: pure whitespace/line-wrap only?
+- root `pyproject.toml`: `extend-exclude = ["docs"]` added correctly.
+Flag any hunk that is NOT provably behavior-preserving as Critical/Important.
+
+## Part 2: Quality
+Are the noqa comments justified/not over-broad? Any unintended file touched? Cite file:line.
+
+## Calibration
+Actual severity. Minor = polish. Acknowledge what's done well.
+
+## Output Format
+### Spec Compliance
+- ✅/❌ [file:line]
+- ⚠️ Cannot verify: [...]
+### Behavior preservation
+per-file verdict
+### Strengths
+### Issues
+#### Critical / Important / Minor
+(file:line, what's wrong, why, how to fix)
+### Assessment
+**Task quality:** Approved | Needs fixes
+**Reasoning:** [1-2 sentences]
+
+Your final message IS the report — begin with the spec-compliance verdict; no preamble.
