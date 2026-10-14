@@ -1,0 +1,70 @@
+You are reviewing one task's implementation: first whether it matches its requirements, then whether it is well-built. Task-scoped gate, not a merge review.
+
+## Working directory
+/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module
+
+## What Was Requested
+Read the task brief: /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-6-brief.md
+
+Global constraints:
+- connectors modules AND tests must lint clean under select ["E4","E7","E9","F","I","UP","B","BLE"] and be `ruff format`-clean.
+- Do NOT use the low-level `mcp` SDK; use `fastmcp.Client` inside `async with`; HTTP transport.
+- Ingest must NOT write to any ODI store; only the package's in-memory sink.
+- Async tests use `@pytest.mark.asyncio` (strict mode); no network in the default suite.
+
+Plan Review Focus items that THIS task must satisfy:
+1. A resource read raises mid-ingest → the returned batch still contains the already-read records PLUS an error string (not an exception).
+2. A name in `settings.tools` that does not exist on the server → error collected, batch still returned.
+3. Server exposes zero tools/resources → one `catalog` record with empty lists, no crash.
+5. Health probe against an unreachable/timing-out server → `HealthStatus(ok=False)` and returns promptly.
+
+## What the Implementer Claims They Built
+Read the implementer's report: /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-6-report.md
+
+## Diff Under Review
+**Base:** fad34364d4e2cb71bb531e271a1e3fcff61df0df
+**Head:** ad92100987a99a512fda34ca01dea837c17f57f0
+**Diff file:** /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/review-fad3436..ad92100.diff
+
+Read the diff file once (commit list, stat summary, full diff with context). Do not re-run git commands or crawl the codebase. Read-only review: do not mutate the working tree, index, HEAD, or branch state.
+
+## You Do Not Dispatch Subagents. Do all review yourself.
+
+## Do Not Trust the Report. Verify claims against the diff.
+
+## Tests
+The implementer already ran pytest. Do not re-run the full suite. You MAY run these to confirm the package is clean and to inspect the real fastmcp types if needed:
+  `cd /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module && uv run ruff check connectors/ --output-format=concise; uv run ruff format --check connectors/`
+Report exit codes + output.
+
+## Part 1: Spec Compliance
+Verify:
+- `MCPClientConnector` signature/defaults; `kind="mcp"`; `name`; `settings=config.mcp_settings()`.
+- `health()` returns ok=True with a detail containing tool count; catches Exception → ok=False detail=str(exc); does not raise.
+- `ingest()`: catalog record (content JSON of tool+resource NAMES; raw holds full names+uris); one `resource` record per content block using `.text`; one `tool_result` record per configured tool with content text else `str(result.data)`; per-item failures → `errors` with the item name, batch still returned; batch appended to sink then returned.
+- `MCPClientConnector` re-exported from `connectors/__init__.py`.
+- Tests cover: health ok; full ingest (catalog+resource+tool_result, contents match, no errors); no tools configured → no tool_result; unknown tool → error + catalog still present; dead server → ok=False + "timed out".
+Assess the 5 Review Focus items above against the code and tests — call out any that are NOT actually covered.
+Flag Missing / Extra / Misunderstood. Report ⚠️ for anything unverifiable.
+
+## Part 2: Code Quality
+Correctness of async usage, resource/tool result parsing (matches installed fastmcp 4.1.0?), error isolation per item, no broad-catch swallowing that hides bugs, typing, structure. Cite file:line.
+
+## Calibration
+Actual severity. Minor = polish. Acknowledge what's done well.
+
+## Output Format
+### Spec Compliance
+- ✅/❌ [file:line]
+- ⚠️ Cannot verify: [...]
+### Review Focus coverage
+1/2/3/5 → covered? (file:line)
+### Strengths
+### Issues
+#### Critical / Important / Minor
+(file:line, what's wrong, why, how to fix)
+### Assessment
+**Task quality:** Approved | Needs fixes
+**Reasoning:** [1-2 sentences]
+
+Your final message IS the report — begin with the spec-compliance verdict; no preamble.
