@@ -1,0 +1,36 @@
+You are implementing Task 2: Scaffold the `connectors` package and register it.
+
+## Working directory (IMPORTANT)
+Work ONLY inside this git worktree on branch `mcp-connector-module`:
+  /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module
+Do not touch /home/alexa/repos/agentic-odi (the main checkout). Use the `workdir` parameter (or absolute paths) for every command.
+
+## Task Description
+Read your task brief FIRST — it is your requirements, with the exact values to use verbatim:
+  /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-2-brief.md
+
+## Context
+Task 1 (already committed) repaired the uv workspace so members `cli, client, core, local_server, mcp_server` build and test. This task adds the new `agentic-odi-connectors` workspace package (empty for now — code lands in later tasks) and registers it as a member. The package `agentic-odi-connectors` has NO workspace dependencies, so it does NOT need a `[tool.uv.sources]` block (do not add one).
+
+## Environment facts (verified)
+- Python pinned to 3.12 via gitignored `.python-version`; shared root `.venv` exists; `uv lock && uv sync --all-packages` works from cache (add `--offline` only if the network is unavailable).
+- Commit on branch `mcp-connector-module`, never `main`.
+
+## Before you begin
+Ask if anything in the brief is unclear. Otherwise implement it exactly.
+
+## Your job
+1. Implement exactly what the brief specifies (Steps 1–6). Keep the `__init__.py` to a module docstring only — no exports yet.
+2. Run the Step 5 verification and confirm it prints the docstring with exit 0.
+3. Commit with the message in Step 6.
+4. Self-review your diff, then report.
+
+## You do NOT dispatch subagents
+Do all work yourself. Never spawn a subagent.
+
+## Report format
+Write your full report to:
+  /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-2-report.md
+Include: what you implemented; exact commands run and results; files changed; self-review findings; concerns.
+
+Then reply with ONLY (under 15 lines): Status (DONE|DONE_WITH_CONCERNS|BLOCKED|NEEDS_CONTEXT); commits (short SHA + subject); one-line test summary; concerns; the report file path.
