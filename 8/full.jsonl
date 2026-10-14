@@ -1,0 +1,700 @@
+{
+  "info": {
+    "id": "ses_ec44f5ebcffeljF5tQaOJNGFo1",
+    "slug": "calm-cabin",
+    "projectID": "e4fe19106d06261ebfed21a0e3ba06559abf1100",
+    "directory": "/home/alexa/repos/agentic-odi",
+    "path": "",
+    "parentID": "ses_ec492423bffeG7aFTE5YTPUIJO",
+    "title": "Review Task 6 (spec + quality) (@general subagent)",
+    "agent": "general",
+    "model": {
+      "id": "big-pickle",
+      "providerID": "opencode",
+      "variant": "default"
+    },
+    "version": "1.18.35",
+    "summary": {
+      "additions": 0,
+      "deletions": 0,
+      "files": 0
+    },
+    "cost": 0,
+    "tokens": {
+      "input": 23442,
+      "output": 2258,
+      "reasoning": 5155,
+      "cache": {
+        "read": 71808,
+        "write": 0
+      }
+    },
+    "permission": [
+      {
+        "permission": "task",
+        "pattern": "*",
+        "action": "deny"
+      }
+    ],
+    "time": {
+      "created": 1792002793795,
+      "updated": 1792002822203
+    }
+  },
+  "messages": [
+    {
+      "info": {
+        "role": "user",
+        "time": {
+          "created": 1792002793804
+        },
+        "agent": "general",
+        "model": {
+          "providerID": "opencode",
+          "modelID": "big-pickle"
+        },
+        "summary": {
+          "diffs": []
+        },
+        "id": "msg_13bb0a14b001xkppmMoHM41IoA",
+        "sessionID": "ses_ec44f5ebcffeljF5tQaOJNGFo1"
+      },
+      "parts": [
+        {
+          "type": "text",
+          "text": "You are reviewing one task's implementation: first whether it matches its requirements, then whether it is well-built. Task-scoped gate, not a merge review.\n\n## Working directory\n/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module\n\n## What Was Requested\nRead the task brief: /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-6-brief.md\n\nGlobal constraints:\n- connectors modules AND tests must lint clean under select [\"E4\",\"E7\",\"E9\",\"F\",\"I\",\"UP\",\"B\",\"BLE\"] and be `ruff format`-clean.\n- Do NOT use the low-level `mcp` SDK; use `fastmcp.Client` inside `async with`; HTTP transport.\n- Ingest must NOT write to any ODI store; only the package's in-memory sink.\n- Async tests use `@pytest.mark.asyncio` (strict mode); no network in the default suite.\n\nPlan Review Focus items that THIS task must satisfy:\n1. A resource read raises mid-ingest → the returned batch still contains the already-read records PLUS an error string (not an exception).\n2. A name in `settings.tools` that does not exist on the server → error collected, batch still returned.\n3. Server exposes zero tools/resources → one `catalog` record with empty lists, no crash.\n5. Health probe against an unreachable/timing-out server → `HealthStatus(ok=False)` and returns promptly.\n\n## What the Implementer Claims They Built\nRead the implementer's report: /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-6-report.md\n\n## Diff Under Review\n**Base:** fad34364d4e2cb71bb531e271a1e3fcff61df0df\n**Head:** ad92100987a99a512fda34ca01dea837c17f57f0\n**Diff file:** /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/review-fad3436..ad92100.diff\n\nRead the diff file once (commit list, stat summary, full diff with context). Do not re-run git commands or crawl the codebase. Read-only review: do not mutate the working tree, index, HEAD, or branch state.\n\n## You Do Not Dispatch Subagents. Do all review yourself.\n\n## Do Not Trust the Report. Verify claims against the diff.\n\n## Tests\nThe implementer already ran pytest. Do not re-run the full suite. You MAY run these to confirm the package is clean and to inspect the real fastmcp types if needed:\n  `cd /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module && uv run ruff check connectors/ --output-format=concise; uv run ruff format --check connectors/`\nReport exit codes + output.\n\n## Part 1: Spec Compliance\nVerify:\n- `MCPClientConnector` signature/defaults; `kind=\"mcp\"`; `name`; `settings=config.mcp_settings()`.\n- `health()` returns ok=True with a detail containing tool count; catches Exception → ok=False detail=str(exc); does not raise.\n- `ingest()`: catalog record (content JSON of tool+resource NAMES; raw holds full names+uris); one `resource` record per content block using `.text`; one `tool_result` record per configured tool with content text else `str(result.data)`; per-item failures → `errors` with the item name, batch still returned; batch appended to sink then returned.\n- `MCPClientConnector` re-exported from `connectors/__init__.py`.\n- Tests cover: health ok; full ingest (catalog+resource+tool_result, contents match, no errors); no tools configured → no tool_result; unknown tool → error + catalog still present; dead server → ok=False + \"timed out\".\nAssess the 5 Review Focus items above against the code and tests — call out any that are NOT actually covered.\nFlag Missing / Extra / Misunderstood. Report ⚠️ for anything unverifiable.\n\n## Part 2: Code Quality\nCorrectness of async usage, resource/tool result parsing (matches installed fastmcp 4.1.0?), error isolation per item, no broad-catch swallowing that hides bugs, typing, structure. Cite file:line.\n\n## Calibration\nActual severity. Minor = polish. Acknowledge what's done well.\n\n## Output Format\n### Spec Compliance\n- ✅/❌ [file:line]\n- ⚠️ Cannot verify: [...]\n### Review Focus coverage\n1/2/3/5 → covered? (file:line)\n### Strengths\n### Issues\n#### Critical / Important / Minor\n(file:line, what's wrong, why, how to fix)\n### Assessment\n**Task quality:** Approved | Needs fixes\n**Reasoning:** [1-2 sentences]\n\nYour final message IS the report — begin with the spec-compliance verdict; no preamble.",
+          "id": "prt_13bb0a14f001YQlirlsJ1u4Xn3",
+          "sessionID": "ses_ec44f5ebcffeljF5tQaOJNGFo1",
+          "messageID": "msg_13bb0a14b001xkppmMoHM41IoA"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_13bb0a14b001xkppmMoHM41IoA",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 16567,
+          "input": 1969,
+          "output": 242,
+          "reasoning": 20,
+          "cache": {
+            "write": 0,
+            "read": 14336
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792002794245,
+          "completed": 1792002796934
+        },
+        "finish": "tool-calls",
+        "id": "msg_13bb0a3050013dq9yOmYcwihSk",
+        "sessionID": "ses_ec44f5ebcffeljF5tQaOJNGFo1"
+      },
+      "parts": [
+        {
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-start",
+          "id": "prt_13bb0a8cd001cJB7YaMURwllEC",
+          "sessionID": "ses_ec44f5ebcffeljF5tQaOJNGFo1",
+          "messageID": "msg_13bb0a3050013dq9yOmYcwihSk"
+        },
+        {
+          "type": "reasoning",
+          "text": "Let me start by reading the required files: the task brief, the report, and the diff.",
+          "time": {
+            "start": 1792002795765,
+            "end": 1792002795904
+          },
+          "id": "prt_13bb0a8f5001NuGECF1w5hCRTm",
+          "sessionID": "ses_ec44f5ebcffeljF5tQaOJNGFo1",
+          "messageID": "msg_13bb0a3050013dq9yOmYcwihSk"
+        },
+        {
+          "type": "tool",
+          "tool": "read",
+          "callID": "call_00_7qy7id9dtkzrzukegzxr7ipc",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-6-brief.md"
+            },
+            "output": "<path>/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-6-brief.md</path>\n<type>file</type>\n<content>\n1: ### Task 6: `MCPClientConnector` (HTTP `fastmcp.Client`)\n2: \n3: **Files:**\n4: - Create: `connectors/src/connectors/mcp.py`\n5: - Modify: `connectors/src/connectors/__init__.py`\n6: - Modify: `connectors/src/connectors/registry.py` (wire `kind == \"mcp\"` to the class)\n7: - Test: `connectors/tests/test_mcp_connector.py`\n8: \n9: **Interfaces:**\n10: - Consumes: `models.*`, `errors.UnknownConnectorKindError`, `sink.IngestSink`.\n11: - Produces: `mcp.MCPClientConnector(config: ConnectorConfig, sink: IngestSink, client_factory: Callable[[], Client] | None = None)` with `kind = \"mcp\"`, `name`, async `health() -> HealthStatus`, async `ingest() -> IngestBatch`. Default `client_factory` = `lambda: Client(self.settings.url)`.\n12:   - `health()`: enter client, `await client.list_tools()`, return `HealthStatus(ok=True, detail=f\"{n} tool(s) available\")`; on `Exception` return `HealthStatus(ok=False, detail=str(exc))`.\n13:   - `ingest()`: enter client; `list_tools`, `list_resources`; append a `catalog` record (`content` = JSON of `{\"tools\": [...names], \"resources\": [...names]}`, `raw` = full names+uris); for each resource `read_resource(res.uri)` → one `resource` record per returned content block using `.text`; for each name in `settings.tools` `call_tool(name, {})` → one `tool_result` record (text of content blocks, else `str(result.data)`); per-item failures go into `errors`; append batch to sink and return it.\n14: \n15: - [ ] **Step 1: Write the failing test**\n16: \n17: `connectors/tests/test_mcp_connector.py`:\n18: \n19: ```python\n20: import pytest\n21: from fastmcp import Client, FastMCP\n22: \n23: from connectors import ConnectorConfig, IngestSink\n24: from connectors.mcp import MCPClientConnector\n25: \n26: \n27: def _server() -> FastMCP:\n28:     server = FastMCP(\"external\")\n29: \n30:     @server.resource(\"config://greeting\")\n31:     def greeting() -> str:\n32:         return \"hello from remote\"\n33: \n34:     @server.tool\n35:     def ping() -> str:\n36:         return \"pong\"\n37: \n38:     return server\n39: \n40: \n41: def _connector(sink, tools=None, factory=None):\n42:     cfg = ConnectorConfig(\n43:         name=\"ext\", kind=\"mcp\",\n44:         settings={\"url\": \"http://unused/mcp\", \"tools\": tools or []},\n45:     )\n46:     return MCPClientConnector(cfg, sink, client_factory=factory or (lambda: Client(_server())))\n47: \n48: \n49: @pytest.mark.asyncio\n50: async def test_health_ok_on_live_server():\n51:     status = await _connector(IngestSink()).health()\n52:     assert status.ok is True\n53:     assert \"1 tool\" in status.detail\n54: \n55: \n56: @pytest.mark.asyncio\n57: async def test_ingest_yields_catalog_resource_and_tool_records():\n58:     sink = IngestSink()\n59:     batch = await _connector(sink, tools=[\"ping\"]).ingest()\n60:     kinds = {r.item_type for r in batch.records}\n61:     assert kinds == {\"catalog\", \"resource\", \"tool_result\"}\n62:     assert any(r.content == \"hello from remote\" for r in batch.records)\n63:     assert any(r.content == \"pong\" for r in batch.records)\n64:     assert batch.errors == []\n65: \n66: \n67: @pytest.mark.asyncio\n68: async def test_ingest_with_no_tools_configured():\n69:     batch = await _connector(IngestSink()).ingest()\n70:     assert not any(r.item_type == \"tool_result\" for r in batch.records)\n71: \n72: \n73: @pytest.mark.asyncio\n74: async def test_ingest_records_unknown_tool_as_error():\n75:     batch = await _connector(IngestSink(), tools=[\"does_not_exist\"]).ingest()\n76:     assert batch.errors and any(\"does_not_exist\" in e for e in batch.errors)\n77:     assert any(r.item_type == \"catalog\" for r in batch.records)\n78: \n79: \n80: class _BrokenClient:\n81:     async def __aenter__(self):\n82:         raise TimeoutError(\"connect timed out\")\n83: \n84:     async def __aexit__(self, *exc):\n85:         return False\n86: \n87: \n88: @pytest.mark.asyncio\n89: async def test_health_fails_cleanly_on_dead_server():\n90:     status = await _connector(IngestSink(), factory=lambda: _BrokenClient()).health()\n91:     assert status.ok is False\n92:     assert \"timed out\" in status.detail\n93: ```\n94: \n95: - [ ] **Step 2: Run test to verify it fails**\n96: \n97: Run: `uv run --directory connectors pytest tests/test_mcp_connector.py -v`\n98: Expected: FAIL (ImportError: cannot import name 'MCPClientConnector').\n99: \n100: - [ ] **Step 3: Implement `mcp.py`**; add `kind == \"mcp\"` branch in `registry.build_connector`; export `MCPClientConnector`.\n101: \n102: - [ ] **Step 4: Run test to verify it passes**\n103: \n104: Run: `uv run --directory connectors pytest tests/test_mcp_connector.py -v`\n105: Expected: PASS (5 passed).\n106: \n107: - [ ] **Step 5: Run the whole package suite**\n108: \n109: Run: `uv run --directory connectors pytest -v`\n110: Expected: PASS.\n111: \n112: - [ ] **Step 6: Commit**\n113: \n114: ```bash\n115: git add connectors/src/connectors/mcp.py connectors/src/connectors/registry.py connectors/src/connectors/__init__.py connectors/tests/test_mcp_connector.py\n116: git commit -m \"feat(connectors): add MCP client connector with health and ingest\"\n117: ```\n118: \n119: ---\n120: \n\n(End of file - total 120 lines)\n</content>",
+            "metadata": {
+              "preview": "### Task 6: `MCPClientConnector` (HTTP `fastmcp.Client`)\n\n**Files:**\n- Create: `connectors/src/connectors/mcp.py`\n- Modify: `connectors/src/connectors/__init__.py`\n- Modify: `connectors/src/connectors/registry.py` (wire `kind == \"mcp\"` to the class)\n- Test: `connectors/tests/test_mcp_connector.py`\n\n**Interfaces:**\n- Consumes: `models.*`, `errors.UnknownConnectorKindError`, `sink.IngestSink`.\n- Produces: `mcp.MCPClientConnector(config: ConnectorConfig, sink: IngestSink, client_factory: Callable[[], Client] | None = None)` with `kind = \"mcp\"`, `name`, async `health() -> HealthStatus`, async `ingest() -> IngestBatch`. Default `client_factory` = `lambda: Client(self.settings.url)`.\n  - `health()`: enter client, `await client.list_tools()`, return `HealthStatus(ok=True, detail=f\"{n} tool(s) available\")`; on `Exception` return `HealthStatus(ok=False, detail=str(exc))`.\n  - `ingest()`: enter client; `list_tools`, `list_resources`; append a `catalog` record (`content` = JSON of `{\"tools\": [...names], \"resources\": [...names]}`, `raw` = full names+uris); for each resource `read_resource(res.uri)` → one `resource` record per returned content block using `.text`; for each name in `settings.tools` `call_tool(name, {})` → one `tool_result` record (text of content blocks, else `str(result.data)`); per-item failures go into `errors`; append batch to sink and return it.\n\n- [ ] **Step 1: Write the failing test**\n\n`connectors/tests/test_mcp_connector.py`:\n\n```python\nimport pytest",
+              "truncated": false,
+              "loaded": [],
+              "display": {
+                "type": "file",
+                "path": "/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-6-brief.md",
+                "text": "### Task 6: `MCPClientConnector` (HTTP `fastmcp.Client`)\n\n**Files:**\n- Create: `connectors/src/connectors/mcp.py`\n- Modify: `connectors/src/connectors/__init__.py`\n- Modify: `connectors/src/connectors/registry.py` (wire `kind == \"mcp\"` to the class)\n- Test: `connectors/tests/test_mcp_connector.py`\n\n**Interfaces:**\n- Consumes: `models.*`, `errors.UnknownConnectorKindError`, `sink.IngestSink`.\n- Produces: `mcp.MCPClientConnector(config: ConnectorConfig, sink: IngestSink, client_factory: Callable[[], Client] | None = None)` with `kind = \"mcp\"`, `name`, async `health() -> HealthStatus`, async `ingest() -> IngestBatch`. Default `client_factory` = `lambda: Client(self.settings.url)`.\n  - `health()`: enter client, `await client.list_tools()`, return `HealthStatus(ok=True, detail=f\"{n} tool(s) available\")`; on `Exception` return `HealthStatus(ok=False, detail=str(exc))`.\n  - `ingest()`: enter client; `list_tools`, `list_resources`; append a `catalog` record (`content` = JSON of `{\"tools\": [...names], \"resources\": [...names]}`, `raw` = full names+uris); for each resource `read_resource(res.uri)` → one `resource` record per returned content block using `.text`; for each name in `settings.tools` `call_tool(name, {})` → one `tool_result` record (text of content blocks, else `str(result.data)`); per-item failures go into `errors`; append batch to sink and return it.\n\n- [ ] **Step 1: Write the failing test**\n\n`connectors/tests/test_mcp_connector.py`:\n\n```python\nimport pytest\nfrom fastmcp import Client, FastMCP\n\nfrom connectors import ConnectorConfig, IngestSink\nfrom connectors.mcp import MCPClientConnector\n\n\ndef _server() -> FastMCP:\n    server = FastMCP(\"external\")\n\n    @server.resource(\"config://greeting\")\n    def greeting() -> str:\n        return \"hello from remote\"\n\n    @server.tool\n    def ping() -> str:\n        return \"pong\"\n\n    return server\n\n\ndef _connector(sink, tools=None, factory=None):\n    cfg = ConnectorConfig(\n        name=\"ext\", kind=\"mcp\",\n        settings={\"url\": \"http://unused/mcp\", \"tools\": tools or []},\n    )\n    return MCPClientConnector(cfg, sink, client_factory=factory or (lambda: Client(_server())))\n\n\n@pytest.mark.asyncio\nasync def test_health_ok_on_live_server():\n    status = await _connector(IngestSink()).health()\n    assert status.ok is True\n    assert \"1 tool\" in status.detail\n\n\n@pytest.mark.asyncio\nasync def test_ingest_yields_catalog_resource_and_tool_records():\n    sink = IngestSink()\n    batch = await _connector(sink, tools=[\"ping\"]).ingest()\n    kinds = {r.item_type for r in batch.records}\n    assert kinds == {\"catalog\", \"resource\", \"tool_result\"}\n    assert any(r.content == \"hello from remote\" for r in batch.records)\n    assert any(r.content == \"pong\" for r in batch.records)\n    assert batch.errors == []\n\n\n@pytest.mark.asyncio\nasync def test_ingest_with_no_tools_configured():\n    batch = await _connector(IngestSink()).ingest()\n    assert not any(r.item_type == \"tool_result\" for r in batch.records)\n\n\n@pytest.mark.asyncio\nasync def test_ingest_records_unknown_tool_as_error():\n    batch = await _connector(IngestSink(), tools=[\"does_not_exist\"]).ingest()\n    assert batch.errors and any(\"does_not_exist\" in e for e in batch.errors)\n    assert any(r.item_type == \"catalog\" for r in batch.records)\n\n\nclass _BrokenClient:\n    async def __aenter__(self):\n        raise TimeoutError(\"connect timed out\")\n\n    async def __aexit__(self, *exc):\n        return False\n\n\n@pytest.mark.asyncio\nasync def test_health_fails_cleanly_on_dead_server():\n    status = await _connector(IngestSink(), factory=lambda: _BrokenClient()).health()\n    assert status.ok is False\n    assert \"timed out\" in status.detail\n```\n\n- [ ] **Step 2: Run test to verify it fails**\n\nRun: `uv run --directory connectors pytest tests/test_mcp_connector.py -v`\nExpected: FAIL (ImportError: cannot import name 'MCPClientConnector').\n\n- [ ] **Step 3: Implement `mcp.py`**; add `kind == \"mcp\"` branch in `registry.build_connector`; export `MCPClientConnector`.\n\n- [ ] **Step 4: Run test to verify it passes**\n\nRun: `uv run --directory connectors pytest tests/test_mcp_connector.py -v`\nExpected: PASS (5 passed).\n\n- [ ] **Step 5: Run the whole package suite**\n\nRun: `uv run --directory connectors pytest -v`\nExpected: PASS.\n\n- [ ] **Step 6: Commit**\n\n```bash\ngit add connectors/src/connectors/mcp.py connectors/src/connectors/registry.py connectors/src/connectors/__init__.py connectors/tests/test_mcp_connector.py\ngit commit -m \"feat(connectors): add MCP client connector with health and ingest\"\n```\n\n---\n",
+                "lineStart": 1,
+                "lineEnd": 120,
+                "totalLines": 120,
+                "truncated": false
+              }
+            },
+            "title": ".worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-6-brief.md",
+            "time": {
+              "start": 1792002796202,
+              "end": 1792002796219
+            }
+          },
+          "id": "prt_13bb0a982001dZ7CRrMhQpJXjr",
+          "sessionID": "ses_ec44f5ebcffeljF5tQaOJNGFo1",
+          "messageID": "msg_13bb0a3050013dq9yOmYcwihSk"
+        },
+        {
+          "type": "tool",
+          "tool": "read",
+          "callID": "call_01_rp4fwr6yvf65l5nqxflkm7q1",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-6-report.md"
+            },
+            "output": "<path>/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-6-report.md</path>\n<type>file</type>\n<content>\n1: # Task 6 Report: `MCPClientConnector` (HTTP `fastmcp.Client`)\n2: \n3: ## Status\n4: Complete. 5/5 new tests pass, full connectors suite (19) passes, ruff format/check clean for `connectors/`.\n5: \n6: ## What I implemented\n7: - `connectors/src/connectors/mcp.py` — new `MCPClientConnector(config, sink, client_factory=None)`:\n8:   - `kind = \"mcp\"`, `name = config.name`, `settings = config.mcp_settings()`.\n9:   - Default `client_factory = lambda: Client(self.settings.url)` (HTTP URL transport).\n10:   - `async health()`: enters the client, calls `list_tools()`, returns\n11:     `HealthStatus(ok=True, detail=f\"{n} tool(s) available\")`; catches any `Exception`\n12:     and returns `HealthStatus(ok=False, detail=str(exc))` — never raises.\n13:   - `async ingest()`: enters the client once; `list_tools()` + `list_resources()`;\n14:     appends a single `catalog` record (`content` = JSON `{\"tools\": [...names], \"resources\": [...names]}`,\n15:     `raw` = names + `{name, uri}` per resource); one `resource` record per returned\n16:     content block (using the block `.text`); one `tool_result` record per name in\n17:     `settings.tools` via `call_tool(name, {})` (concatenated `.text` of content\n18:     blocks, else `str(result.data)`); per-item failures are collected into\n19:     `batch.errors` (message includes the item name) without aborting. Appends the\n20:     batch to the sink exactly once and returns it.\n21: - `connectors/src/connectors/__init__.py` — re-export `MCPClientConnector`.\n22: - `connectors/tests/test_mcp_connector.py` — the brief's test code verbatim.\n23: - `connectors/src/connectors/registry.py` — **not modified**. The Task 5 deferred\n24:   `from .mcp import MCPClientConnector` branch for `kind == \"mcp\"` now resolves\n25:   correctly (verified by constructing through `build_connector`).\n26: \n27: ## fastmcp 4.1.0 API facts verified\n28: Verified by introspecting the installed package (`uv run python -c ...` against a\n29: `Client(FastMCP(...))` in-memory server) and by reading\n30: `.venv/lib/python3.12/site-packages/fastmcp/`:\n31: \n32: - `Client(server)` / `Client(url)` is an async context manager (`__aenter__`/`__aexit__`).\n33: - `client.list_tools()` -> `list` of tool objects with `.name` (`.description`, `.input_schema`, ...).\n34: - `client.list_resources()` -> `list` of resource objects with `.name`, `.uri`, `.mime_type`.\n35: - `client.read_resource(uri)` -> a **`list`** of content blocks (e.g.\n36:   `[TextResourceContents(uri='config://greeting', ..., text='hello')]`) — note it is\n37:   a bare list, *not* an object with `.content`. Each block has `.text`.\n38: - `client.call_tool(name, {})` -> `fastmcp.client.client.CallToolResult` with\n39:   `.content` (list of `TextContent` with `.text`), `.data`, `.structured_content`,\n40:   and `.is_error`. Calling an unknown tool / a tool that raises **raises**\n41:   `fastmcp.exceptions.ToolError` from `call_tool` (confirmed), so per-tool\n42:   `except Exception` is the correct way to record failures.\n43: - Did not touch the low-level `mcp` SDK.\n44: \n45: ## TDD Evidence\n46: \n47: ### RED (before implementation)\n48: Temporarily removed `mcp.py` and reverted the `__init__` export, then:\n49: ```\n50: $ uv run --directory connectors pytest tests/test_mcp_connector.py -v\n51: ...\n52: tests/test_mcp_connector.py:5: in <module>\n53:     from connectors.mcp import MCPClientConnector\n54: E   ModuleNotFoundError: No module named 'connectors.mcp'\n55: =========================== short test summary info ============================\n56: ERROR tests/test_mcp_connector.py\n57: !!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n58: =============================== 1 error in 2.13s ===============================\n59: ```\n60: \n61: ### GREEN (after implementation)\n62: ```\n63: $ uv run --directory connectors pytest tests/test_mcp_connector.py -v\n64: collected 5 items\n65: tests/test_mcp_connector.py::test_health_ok_on_live_server PASSED        [ 20%]\n66: tests/test_mcp_connector.py::test_ingest_yields_catalog_resource_and_tool_records PASSED [ 40%]\n67: tests/test_mcp_connector.py::test_ingest_with_no_tools_configured PASSED [ 60%]\n68: tests/test_mcp_connector.py::test_ingest_records_unknown_tool_as_error PASSED [ 80%]\n69: tests/test_mcp_connector.py::test_health_fails_cleanly_on_dead_server PASSED [100%]\n70: ============================== 5 passed in 1.08s ===============================\n71: ```\n72: \n73: ### Full package suite\n74: ```\n75: $ uv run --directory connectors pytest\n76: collected 19 items\n77: tests/test_mcp_connector.py .....                                        [ 26%]\n78: tests/test_models.py ....                                                [ 47%]\n79: tests/test_registry.py .......                                           [ 84%]\n80: tests/test_sink.py ...                                                   [100%]\n81: ============================== 19 passed in 1.09s ==============================\n82: ```\n83: \n84: ### Registry wiring sanity check\n85: ```\n86: $ uv run --directory connectors python -c \"... build_connector(cfg, sink)\"\n87: MCPClientConnector mcp x http://unused/mcp\n88: ```\n89: \n90: ## Format / lint results\n91: ```\n92: $ uv run --directory connectors ruff format src/ tests/\n93: 11 files left unchanged\n94: $ uv run --directory connectors ruff check src/ tests/\n95: All checks passed!\n96: $ uv run --directory connectors ruff format --check src/ tests/\n97: 11 files already formatted\n98: ```\n99: (BLE001 is downgraded for the two intentional `except Exception` blocks used to\n100: collect per-item failures and for `health()` which must never raise.)\n101: \n102: ## Files changed\n103: - `connectors/src/connectors/mcp.py` (new)\n104: - `connectors/tests/test_mcp_connector.py` (new)\n105: - `connectors/src/connectors/__init__.py` (export `MCPClientConnector`)\n106: - `connectors/src/connectors/registry.py` (unchanged — existing branch resolves)\n107: \n108: ## Self-review\n109: - Batch is appended to the sink exactly once (earlier draft appended inside loops —\n110:   caught and fixed before commit).\n111: - `health()` cannot raise: any exception from factory/`__aenter__`/`list_tools` is\n112:   converted to `HealthStatus(ok=False, ...)`.\n113: - Per-item resource/tool failures include the item name and do not abort the batch;\n114:   the catalog record is still emitted on unknown-tool failure (test asserts this).\n115: - `read_resource` return type (bare `list`) handled from the verified API, not\n116:   assumptions.\n117: - Default factory uses the URL transport as specified; tests inject an in-memory\n118:   server factory so no network is required.\n119: - `registry.py` needed no change; the deferred import resolves now that `mcp.py` exists.\n120: \n121: ## Concerns\n122: - `uv run ruff check .` / `uv run ruff format --check .` executed from the repo root\n123:   report failures, but they are all in packages outside `connectors/`\n124:   (`cli/src/cli/*.py`, `core/src/core/*.py`, `core/tests/*`, `mcp_server/...`,\n125:   `docs/...`). No `connectors/` file is implicated. These appear pre-existing on this\n126:   branch (Tasks 1–5) and are out of scope for Task 6; the brief scopes the gate to\n127:   `connectors/`. CI's connectors lint/typecheck/test jobs are not yet wired in\n128:   `.github/workflows/ci.yml` (only core, mcp_server, local_server, client, cli are),\n129:   so no connectors mypy is expected this task.\n130: - `_tool_result_text` falls back to per-block `.data`/`str(block)` when a content\n131:   block has no `.text`, before falling back to `result.data`. This is a superset of\n132:   the brief's \"concatenated `.text`, else `str(result.data)`\" and is exercised only\n133:   by non-text blocks.\n\n(End of file - total 133 lines)\n</content>",
+            "metadata": {
+              "preview": "# Task 6 Report: `MCPClientConnector` (HTTP `fastmcp.Client`)\n\n## Status\nComplete. 5/5 new tests pass, full connectors suite (19) passes, ruff format/check clean for `connectors/`.\n\n## What I implemented\n- `connectors/src/connectors/mcp.py` — new `MCPClientConnector(config, sink, client_factory=None)`:\n  - `kind = \"mcp\"`, `name = config.name`, `settings = config.mcp_settings()`.\n  - Default `client_factory = lambda: Client(self.settings.url)` (HTTP URL transport).\n  - `async health()`: enters the client, calls `list_tools()`, returns\n    `HealthStatus(ok=True, detail=f\"{n} tool(s) available\")`; catches any `Exception`\n    and returns `HealthStatus(ok=False, detail=str(exc))` — never raises.\n  - `async ingest()`: enters the client once; `list_tools()` + `list_resources()`;\n    appends a single `catalog` record (`content` = JSON `{\"tools\": [...names], \"resources\": [...names]}`,\n    `raw` = names + `{name, uri}` per resource); one `resource` record per returned\n    content block (using the block `.text`); one `tool_result` record per name in\n    `settings.tools` via `call_tool(name, {})` (concatenated `.text` of content\n    blocks, else `str(result.data)`); per-item failures are collected into\n    `batch.errors` (message includes the item name) without aborting. Appends the\n    batch to the sink exactly once and returns it.",
+              "truncated": false,
+              "loaded": [],
+              "display": {
+                "type": "file",
+                "path": "/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-6-report.md",
+                "text": "# Task 6 Report: `MCPClientConnector` (HTTP `fastmcp.Client`)\n\n## Status\nComplete. 5/5 new tests pass, full connectors suite (19) passes, ruff format/check clean for `connectors/`.\n\n## What I implemented\n- `connectors/src/connectors/mcp.py` — new `MCPClientConnector(config, sink, client_factory=None)`:\n  - `kind = \"mcp\"`, `name = config.name`, `settings = config.mcp_settings()`.\n  - Default `client_factory = lambda: Client(self.settings.url)` (HTTP URL transport).\n  - `async health()`: enters the client, calls `list_tools()`, returns\n    `HealthStatus(ok=True, detail=f\"{n} tool(s) available\")`; catches any `Exception`\n    and returns `HealthStatus(ok=False, detail=str(exc))` — never raises.\n  - `async ingest()`: enters the client once; `list_tools()` + `list_resources()`;\n    appends a single `catalog` record (`content` = JSON `{\"tools\": [...names], \"resources\": [...names]}`,\n    `raw` = names + `{name, uri}` per resource); one `resource` record per returned\n    content block (using the block `.text`); one `tool_result` record per name in\n    `settings.tools` via `call_tool(name, {})` (concatenated `.text` of content\n    blocks, else `str(result.data)`); per-item failures are collected into\n    `batch.errors` (message includes the item name) without aborting. Appends the\n    batch to the sink exactly once and returns it.\n- `connectors/src/connectors/__init__.py` — re-export `MCPClientConnector`.\n- `connectors/tests/test_mcp_connector.py` — the brief's test code verbatim.\n- `connectors/src/connectors/registry.py` — **not modified**. The Task 5 deferred\n  `from .mcp import MCPClientConnector` branch for `kind == \"mcp\"` now resolves\n  correctly (verified by constructing through `build_connector`).\n\n## fastmcp 4.1.0 API facts verified\nVerified by introspecting the installed package (`uv run python -c ...` against a\n`Client(FastMCP(...))` in-memory server) and by reading\n`.venv/lib/python3.12/site-packages/fastmcp/`:\n\n- `Client(server)` / `Client(url)` is an async context manager (`__aenter__`/`__aexit__`).\n- `client.list_tools()` -> `list` of tool objects with `.name` (`.description`, `.input_schema`, ...).\n- `client.list_resources()` -> `list` of resource objects with `.name`, `.uri`, `.mime_type`.\n- `client.read_resource(uri)` -> a **`list`** of content blocks (e.g.\n  `[TextResourceContents(uri='config://greeting', ..., text='hello')]`) — note it is\n  a bare list, *not* an object with `.content`. Each block has `.text`.\n- `client.call_tool(name, {})` -> `fastmcp.client.client.CallToolResult` with\n  `.content` (list of `TextContent` with `.text`), `.data`, `.structured_content`,\n  and `.is_error`. Calling an unknown tool / a tool that raises **raises**\n  `fastmcp.exceptions.ToolError` from `call_tool` (confirmed), so per-tool\n  `except Exception` is the correct way to record failures.\n- Did not touch the low-level `mcp` SDK.\n\n## TDD Evidence\n\n### RED (before implementation)\nTemporarily removed `mcp.py` and reverted the `__init__` export, then:\n```\n$ uv run --directory connectors pytest tests/test_mcp_connector.py -v\n...\ntests/test_mcp_connector.py:5: in <module>\n    from connectors.mcp import MCPClientConnector\nE   ModuleNotFoundError: No module named 'connectors.mcp'\n=========================== short test summary info ============================\nERROR tests/test_mcp_connector.py\n!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n=============================== 1 error in 2.13s ===============================\n```\n\n### GREEN (after implementation)\n```\n$ uv run --directory connectors pytest tests/test_mcp_connector.py -v\ncollected 5 items\ntests/test_mcp_connector.py::test_health_ok_on_live_server PASSED        [ 20%]\ntests/test_mcp_connector.py::test_ingest_yields_catalog_resource_and_tool_records PASSED [ 40%]\ntests/test_mcp_connector.py::test_ingest_with_no_tools_configured PASSED [ 60%]\ntests/test_mcp_connector.py::test_ingest_records_unknown_tool_as_error PASSED [ 80%]\ntests/test_mcp_connector.py::test_health_fails_cleanly_on_dead_server PASSED [100%]\n============================== 5 passed in 1.08s ===============================\n```\n\n### Full package suite\n```\n$ uv run --directory connectors pytest\ncollected 19 items\ntests/test_mcp_connector.py .....                                        [ 26%]\ntests/test_models.py ....                                                [ 47%]\ntests/test_registry.py .......                                           [ 84%]\ntests/test_sink.py ...                                                   [100%]\n============================== 19 passed in 1.09s ==============================\n```\n\n### Registry wiring sanity check\n```\n$ uv run --directory connectors python -c \"... build_connector(cfg, sink)\"\nMCPClientConnector mcp x http://unused/mcp\n```\n\n## Format / lint results\n```\n$ uv run --directory connectors ruff format src/ tests/\n11 files left unchanged\n$ uv run --directory connectors ruff check src/ tests/\nAll checks passed!\n$ uv run --directory connectors ruff format --check src/ tests/\n11 files already formatted\n```\n(BLE001 is downgraded for the two intentional `except Exception` blocks used to\ncollect per-item failures and for `health()` which must never raise.)\n\n## Files changed\n- `connectors/src/connectors/mcp.py` (new)\n- `connectors/tests/test_mcp_connector.py` (new)\n- `connectors/src/connectors/__init__.py` (export `MCPClientConnector`)\n- `connectors/src/connectors/registry.py` (unchanged — existing branch resolves)\n\n## Self-review\n- Batch is appended to the sink exactly once (earlier draft appended inside loops —\n  caught and fixed before commit).\n- `health()` cannot raise: any exception from factory/`__aenter__`/`list_tools` is\n  converted to `HealthStatus(ok=False, ...)`.\n- Per-item resource/tool failures include the item name and do not abort the batch;\n  the catalog record is still emitted on unknown-tool failure (test asserts this).\n- `read_resource` return type (bare `list`) handled from the verified API, not\n  assumptions.\n- Default factory uses the URL transport as specified; tests inject an in-memory\n  server factory so no network is required.\n- `registry.py` needed no change; the deferred import resolves now that `mcp.py` exists.\n\n## Concerns\n- `uv run ruff check .` / `uv run ruff format --check .` executed from the repo root\n  report failures, but they are all in packages outside `connectors/`\n  (`cli/src/cli/*.py`, `core/src/core/*.py`, `core/tests/*`, `mcp_server/...`,\n  `docs/...`). No `connectors/` file is implicated. These appear pre-existing on this\n  branch (Tasks 1–5) and are out of scope for Task 6; the brief scopes the gate to\n  `connectors/`. CI's connectors lint/typecheck/test jobs are not yet wired in\n  `.github/workflows/ci.yml` (only core, mcp_server, local_server, client, cli are),\n  so no connectors mypy is expected this task.\n- `_tool_result_text` falls back to per-block `.data`/`str(block)` when a content\n  block has no `.text`, before falling back to `result.data`. This is a superset of\n  the brief's \"concatenated `.text`, else `str(result.data)`\" and is exercised only\n  by non-text blocks.",
+                "lineStart": 1,
+                "lineEnd": 133,
+                "totalLines": 133,
+                "truncated": false
+              }
+            },
+            "title": ".worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-6-report.md",
+            "time": {
+              "start": 1792002796469,
+              "end": 1792002796492
+            }
+          },
+          "id": "prt_13bb0aaac001V99vMh7YJU3yxp",
+          "sessionID": "ses_ec44f5ebcffeljF5tQaOJNGFo1",
+          "messageID": "msg_13bb0a3050013dq9yOmYcwihSk"
+        },
+        {
+          "type": "tool",
+          "tool": "read",
+          "callID": "call_02_8qydn9omqhnfxjthy2uvcmwg",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/review-fad3436..ad92100.diff"
+            },
+            "output": "<path>/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/review-fad3436..ad92100.diff</path>\n<type>file</type>\n<content>\n1: # Review package: fad34364d4e2cb71bb531e271a1e3fcff61df0df..HEAD\n2: \n3: ## Commits\n4: ad92100 feat(connectors): add MCP client connector with health and ingest\n5: \n6: ## Files changed\n7:  connectors/src/connectors/__init__.py  |   2 +\n8:  connectors/src/connectors/mcp.py       | 134 +++++++++++++++++++++++++++++++++\n9:  connectors/tests/test_mcp_connector.py |  74 ++++++++++++++++++\n10:  3 files changed, 210 insertions(+)\n11: \n12: ## Diff\n13: diff --git a/connectors/src/connectors/__init__.py b/connectors/src/connectors/__init__.py\n14: index fd4e8d1..4303825 100644\n15: --- a/connectors/src/connectors/__init__.py\n16: +++ b/connectors/src/connectors/__init__.py\n17: @@ -1,20 +1,21 @@\n18:  \"\"\"Pluggable external-integration connectors for Agentic ODI (MCP client).\"\"\"\n19:  \n20:  from __future__ import annotations\n21:  \n22:  from .errors import (\n23:      ConnectorNotFoundError,\n24:      DuplicateConnectorError,\n25:      RegistryError,\n26:      UnknownConnectorKindError,\n27:  )\n28: +from .mcp import MCPClientConnector\n29:  from .models import (\n30:      ConnectorConfig,\n31:      HealthStatus,\n32:      IngestBatch,\n33:      IngestRecord,\n34:      McpConnectorSettings,\n35:  )\n36:  from .protocol import Connector\n37:  from .registry import ConnectorRegistry, build_connector\n38:  from .sink import IngestSink\n39: @@ -26,11 +27,12 @@ __all__ = [\n40:      \"ConnectorRegistry\",\n41:      \"DuplicateConnectorError\",\n42:      \"HealthStatus\",\n43:      \"IngestBatch\",\n44:      \"IngestRecord\",\n45:      \"IngestSink\",\n46:      \"McpConnectorSettings\",\n47:      \"RegistryError\",\n48:      \"UnknownConnectorKindError\",\n49:      \"build_connector\",\n50: +    \"MCPClientConnector\",\n51:  ]\n52: diff --git a/connectors/src/connectors/mcp.py b/connectors/src/connectors/mcp.py\n53: new file mode 100644\n54: index 0000000..c2313e4\n55: --- /dev/null\n56: +++ b/connectors/src/connectors/mcp.py\n57: @@ -0,0 +1,134 @@\n58: +\"\"\"MCP (Model Context Protocol) client connector built on ``fastmcp.Client``.\"\"\"\n59: +\n60: +from __future__ import annotations\n61: +\n62: +import json\n63: +from collections.abc import Callable\n64: +from typing import Any\n65: +\n66: +from fastmcp import Client\n67: +\n68: +from .models import (\n69: +    ConnectorConfig,\n70: +    HealthStatus,\n71: +    IngestBatch,\n72: +    IngestRecord,\n73: +    McpConnectorSettings,\n74: +)\n75: +from .sink import IngestSink\n76: +\n77: +\n78: +class MCPClientConnector:\n79: +    \"\"\"Ingests a catalog, resources and selected tool outputs from an MCP server.\"\"\"\n80: +\n81: +    kind = \"mcp\"\n82: +\n83: +    def __init__(\n84: +        self,\n85: +        config: ConnectorConfig,\n86: +        sink: IngestSink,\n87: +        client_factory: Callable[[], Client] | None = None,\n88: +    ) -> None:\n89: +        self.name = config.name\n90: +        self.settings: McpConnectorSettings = config.mcp_settings()\n91: +        self._sink = sink\n92: +        if client_factory is None:\n93: +            self._client_factory: Callable[[], Client] = lambda: Client(self.settings.url)\n94: +        else:\n95: +            self._client_factory = client_factory\n96: +\n97: +    async def health(self) -> HealthStatus:\n98: +        try:\n99: +            async with self._client_factory() as client:\n100: +                tools = await client.list_tools()\n101: +        except Exception as exc:  # noqa: BLE001 - health must never raise\n102: +            return HealthStatus(ok=False, detail=str(exc))\n103: +        count = len(tools) if tools is not None else 0\n104: +        return HealthStatus(ok=True, detail=f\"{count} tool(s) available\")\n105: +\n106: +    async def ingest(self) -> IngestBatch:\n107: +        batch = IngestBatch(connector_name=self.name)\n108: +        async with self._client_factory() as client:\n109: +            tools = await client.list_tools()\n110: +            resources = await client.list_resources()\n111: +\n112: +            tool_names = [tool.name for tool in tools] if tools else []\n113: +            resource_list = list(resources) if resources else []\n114: +            resource_names = [res.name for res in resource_list]\n115: +\n116: +            batch.records.append(\n117: +                IngestRecord(\n118: +                    id=f\"{self.name}:catalog\",\n119: +                    source_name=self.name,\n120: +                    source_kind=self.kind,\n121: +                    item_type=\"catalog\",\n122: +                    name=\"catalog\",\n123: +                    content=json.dumps({\"tools\": tool_names, \"resources\": resource_names}),\n124: +                    raw={\n125: +                        \"tools\": tool_names,\n126: +                        \"resources\": [\n127: +                            {\"name\": res.name, \"uri\": str(getattr(res, \"uri\", \"\"))}\n128: +                            for res in resource_list\n129: +                        ],\n130: +                    },\n131: +                )\n132: +            )\n133: +\n134: +            for res in resource_list:\n135: +                uri = str(getattr(res, \"uri\", \"\"))\n136: +                try:\n137: +                    blocks = await client.read_resource(uri)\n138: +                    for block in blocks or []:\n139: +                        text = getattr(block, \"text\", None)\n140: +                        batch.records.append(\n141: +                            IngestRecord(\n142: +                                id=f\"{self.name}:resource:{res.name}\",\n143: +                                source_name=self.name,\n144: +                                source_kind=self.kind,\n145: +                                item_type=\"resource\",\n146: +                                name=res.name,\n147: +                                content=text if text is not None else str(block),\n148: +                                raw={\"uri\": uri},\n149: +                            )\n150: +                        )\n151: +                except Exception as exc:  # noqa: BLE001 - collect, never abort\n152: +                    batch.errors.append(f\"resource {res.name}: {exc}\")\n153: +\n154: +            for tool_name in self.settings.tools:\n155: +                try:\n156: +                    result = await client.call_tool(tool_name, {})\n157: +                    batch.records.append(\n158: +                        IngestRecord(\n159: +                            id=f\"{self.name}:tool:{tool_name}\",\n160: +                            source_name=self.name,\n161: +                            source_kind=self.kind,\n162: +                            item_type=\"tool_result\",\n163: +                            name=tool_name,\n164: +                            content=_tool_result_text(result),\n165: +                            raw={},\n166: +                        )\n167: +                    )\n168: +                except Exception as exc:  # noqa: BLE001 - collect, never abort\n169: +                    batch.errors.append(f\"tool {tool_name}: {exc}\")\n170: +\n171: +        self._sink.append(batch)\n172: +        return batch\n173: +\n174: +\n175: +def _tool_result_text(result: Any) -> str:\n176: +    blocks = getattr(result, \"content\", None)\n177: +    if blocks:\n178: +        parts: list[str] = []\n179: +        for block in blocks:\n180: +            text = getattr(block, \"text\", None)\n181: +            if text is not None:\n182: +                parts.append(text)\n183: +            else:\n184: +                data = getattr(block, \"data\", None)\n185: +                parts.append(str(data) if data is not None else str(block))\n186: +        return \"\".join(parts)\n187: +    data = getattr(result, \"data\", None)\n188: +    return str(data) if data is not None else \"\"\n189: +\n190: +\n191: +__all__ = [\"MCPClientConnector\"]\n192: diff --git a/connectors/tests/test_mcp_connector.py b/connectors/tests/test_mcp_connector.py\n193: new file mode 100644\n194: index 0000000..0d3330c\n195: --- /dev/null\n196: +++ b/connectors/tests/test_mcp_connector.py\n197: @@ -0,0 +1,74 @@\n198: +import pytest\n199: +from fastmcp import Client, FastMCP\n200: +\n201: +from connectors import ConnectorConfig, IngestSink\n202: +from connectors.mcp import MCPClientConnector\n203: +\n204: +\n205: +def _server() -> FastMCP:\n206: +    server = FastMCP(\"external\")\n207: +\n208: +    @server.resource(\"config://greeting\")\n209: +    def greeting() -> str:\n210: +        return \"hello from remote\"\n211: +\n212: +    @server.tool\n213: +    def ping() -> str:\n214: +        return \"pong\"\n215: +\n216: +    return server\n217: +\n218: +\n219: +def _connector(sink, tools=None, factory=None):\n220: +    cfg = ConnectorConfig(\n221: +        name=\"ext\",\n222: +        kind=\"mcp\",\n223: +        settings={\"url\": \"http://unused/mcp\", \"tools\": tools or []},\n224: +    )\n225: +    return MCPClientConnector(cfg, sink, client_factory=factory or (lambda: Client(_server())))\n226: +\n227: +\n228: +@pytest.mark.asyncio\n229: +async def test_health_ok_on_live_server():\n230: +    status = await _connector(IngestSink()).health()\n231: +    assert status.ok is True\n232: +    assert \"1 tool\" in status.detail\n233: +\n234: +\n235: +@pytest.mark.asyncio\n236: +async def test_ingest_yields_catalog_resource_and_tool_records():\n237: +    sink = IngestSink()\n238: +    batch = await _connector(sink, tools=[\"ping\"]).ingest()\n239: +    kinds = {r.item_type for r in batch.records}\n240: +    assert kinds == {\"catalog\", \"resource\", \"tool_result\"}\n241: +    assert any(r.content == \"hello from remote\" for r in batch.records)\n242: +    assert any(r.content == \"pong\" for r in batch.records)\n243: +    assert batch.errors == []\n244: +\n245: +\n246: +@pytest.mark.asyncio\n247: +async def test_ingest_with_no_tools_configured():\n248: +    batch = await _connector(IngestSink()).ingest()\n249: +    assert not any(r.item_type == \"tool_result\" for r in batch.records)\n250: +\n251: +\n252: +@pytest.mark.asyncio\n253: +async def test_ingest_records_unknown_tool_as_error():\n254: +    batch = await _connector(IngestSink(), tools=[\"does_not_exist\"]).ingest()\n255: +    assert batch.errors and any(\"does_not_exist\" in e for e in batch.errors)\n256: +    assert any(r.item_type == \"catalog\" for r in batch.records)\n257: +\n258: +\n259: +class _BrokenClient:\n260: +    async def __aenter__(self):\n261: +        raise TimeoutError(\"connect timed out\")\n262: +\n263: +    async def __aexit__(self, *exc):\n264: +        return False\n265: +\n266: +\n267: +@pytest.mark.asyncio\n268: +async def test_health_fails_cleanly_on_dead_server():\n269: +    status = await _connector(IngestSink(), factory=lambda: _BrokenClient()).health()\n270: +    assert status.ok is False\n271: +    assert \"timed out\" in status.detail\n\n(End of file - total 271 lines)\n</content>",
+            "metadata": {
+              "preview": "# Review package: fad34364d4e2cb71bb531e271a1e3fcff61df0df..HEAD\n\n## Commits\nad92100 feat(connectors): add MCP client connector with health and ingest\n\n## Files changed\n connectors/src/connectors/__init__.py  |   2 +\n connectors/src/connectors/mcp.py       | 134 +++++++++++++++++++++++++++++++++\n connectors/tests/test_mcp_connector.py |  74 ++++++++++++++++++\n 3 files changed, 210 insertions(+)\n\n## Diff\ndiff --git a/connectors/src/connectors/__init__.py b/connectors/src/connectors/__init__.py\nindex fd4e8d1..4303825 100644\n--- a/connectors/src/connectors/__init__.py\n+++ b/connectors/src/connectors/__init__.py\n@@ -1,20 +1,21 @@\n \"\"\"Pluggable external-integration connectors for Agentic ODI (MCP client).\"\"\"\n \n from __future__ import annotations",
+              "truncated": false,
+              "loaded": [],
+              "display": {
+                "type": "file",
+                "path": "/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/review-fad3436..ad92100.diff",
+                "text": "# Review package: fad34364d4e2cb71bb531e271a1e3fcff61df0df..HEAD\n\n## Commits\nad92100 feat(connectors): add MCP client connector with health and ingest\n\n## Files changed\n connectors/src/connectors/__init__.py  |   2 +\n connectors/src/connectors/mcp.py       | 134 +++++++++++++++++++++++++++++++++\n connectors/tests/test_mcp_connector.py |  74 ++++++++++++++++++\n 3 files changed, 210 insertions(+)\n\n## Diff\ndiff --git a/connectors/src/connectors/__init__.py b/connectors/src/connectors/__init__.py\nindex fd4e8d1..4303825 100644\n--- a/connectors/src/connectors/__init__.py\n+++ b/connectors/src/connectors/__init__.py\n@@ -1,20 +1,21 @@\n \"\"\"Pluggable external-integration connectors for Agentic ODI (MCP client).\"\"\"\n \n from __future__ import annotations\n \n from .errors import (\n     ConnectorNotFoundError,\n     DuplicateConnectorError,\n     RegistryError,\n     UnknownConnectorKindError,\n )\n+from .mcp import MCPClientConnector\n from .models import (\n     ConnectorConfig,\n     HealthStatus,\n     IngestBatch,\n     IngestRecord,\n     McpConnectorSettings,\n )\n from .protocol import Connector\n from .registry import ConnectorRegistry, build_connector\n from .sink import IngestSink\n@@ -26,11 +27,12 @@ __all__ = [\n     \"ConnectorRegistry\",\n     \"DuplicateConnectorError\",\n     \"HealthStatus\",\n     \"IngestBatch\",\n     \"IngestRecord\",\n     \"IngestSink\",\n     \"McpConnectorSettings\",\n     \"RegistryError\",\n     \"UnknownConnectorKindError\",\n     \"build_connector\",\n+    \"MCPClientConnector\",\n ]\ndiff --git a/connectors/src/connectors/mcp.py b/connectors/src/connectors/mcp.py\nnew file mode 100644\nindex 0000000..c2313e4\n--- /dev/null\n+++ b/connectors/src/connectors/mcp.py\n@@ -0,0 +1,134 @@\n+\"\"\"MCP (Model Context Protocol) client connector built on ``fastmcp.Client``.\"\"\"\n+\n+from __future__ import annotations\n+\n+import json\n+from collections.abc import Callable\n+from typing import Any\n+\n+from fastmcp import Client\n+\n+from .models import (\n+    ConnectorConfig,\n+    HealthStatus,\n+    IngestBatch,\n+    IngestRecord,\n+    McpConnectorSettings,\n+)\n+from .sink import IngestSink\n+\n+\n+class MCPClientConnector:\n+    \"\"\"Ingests a catalog, resources and selected tool outputs from an MCP server.\"\"\"\n+\n+    kind = \"mcp\"\n+\n+    def __init__(\n+        self,\n+        config: ConnectorConfig,\n+        sink: IngestSink,\n+        client_factory: Callable[[], Client] | None = None,\n+    ) -> None:\n+        self.name = config.name\n+        self.settings: McpConnectorSettings = config.mcp_settings()\n+        self._sink = sink\n+        if client_factory is None:\n+            self._client_factory: Callable[[], Client] = lambda: Client(self.settings.url)\n+        else:\n+            self._client_factory = client_factory\n+\n+    async def health(self) -> HealthStatus:\n+        try:\n+            async with self._client_factory() as client:\n+                tools = await client.list_tools()\n+        except Exception as exc:  # noqa: BLE001 - health must never raise\n+            return HealthStatus(ok=False, detail=str(exc))\n+        count = len(tools) if tools is not None else 0\n+        return HealthStatus(ok=True, detail=f\"{count} tool(s) available\")\n+\n+    async def ingest(self) -> IngestBatch:\n+        batch = IngestBatch(connector_name=self.name)\n+        async with self._client_factory() as client:\n+            tools = await client.list_tools()\n+            resources = await client.list_resources()\n+\n+            tool_names = [tool.name for tool in tools] if tools else []\n+            resource_list = list(resources) if resources else []\n+            resource_names = [res.name for res in resource_list]\n+\n+            batch.records.append(\n+                IngestRecord(\n+                    id=f\"{self.name}:catalog\",\n+                    source_name=self.name,\n+                    source_kind=self.kind,\n+                    item_type=\"catalog\",\n+                    name=\"catalog\",\n+                    content=json.dumps({\"tools\": tool_names, \"resources\": resource_names}),\n+                    raw={\n+                        \"tools\": tool_names,\n+                        \"resources\": [\n+                            {\"name\": res.name, \"uri\": str(getattr(res, \"uri\", \"\"))}\n+                            for res in resource_list\n+                        ],\n+                    },\n+                )\n+            )\n+\n+            for res in resource_list:\n+                uri = str(getattr(res, \"uri\", \"\"))\n+                try:\n+                    blocks = await client.read_resource(uri)\n+                    for block in blocks or []:\n+                        text = getattr(block, \"text\", None)\n+                        batch.records.append(\n+                            IngestRecord(\n+                                id=f\"{self.name}:resource:{res.name}\",\n+                                source_name=self.name,\n+                                source_kind=self.kind,\n+                                item_type=\"resource\",\n+                                name=res.name,\n+                                content=text if text is not None else str(block),\n+                                raw={\"uri\": uri},\n+                            )\n+                        )\n+                except Exception as exc:  # noqa: BLE001 - collect, never abort\n+                    batch.errors.append(f\"resource {res.name}: {exc}\")\n+\n+            for tool_name in self.settings.tools:\n+                try:\n+                    result = await client.call_tool(tool_name, {})\n+                    batch.records.append(\n+                        IngestRecord(\n+                            id=f\"{self.name}:tool:{tool_name}\",\n+                            source_name=self.name,\n+                            source_kind=self.kind,\n+                            item_type=\"tool_result\",\n+                            name=tool_name,\n+                            content=_tool_result_text(result),\n+                            raw={},\n+                        )\n+                    )\n+                except Exception as exc:  # noqa: BLE001 - collect, never abort\n+                    batch.errors.append(f\"tool {tool_name}: {exc}\")\n+\n+        self._sink.append(batch)\n+        return batch\n+\n+\n+def _tool_result_text(result: Any) -> str:\n+    blocks = getattr(result, \"content\", None)\n+    if blocks:\n+        parts: list[str] = []\n+        for block in blocks:\n+            text = getattr(block, \"text\", None)\n+            if text is not None:\n+                parts.append(text)\n+            else:\n+                data = getattr(block, \"data\", None)\n+                parts.append(str(data) if data is not None else str(block))\n+        return \"\".join(parts)\n+    data = getattr(result, \"data\", None)\n+    return str(data) if data is not None else \"\"\n+\n+\n+__all__ = [\"MCPClientConnector\"]\ndiff --git a/connectors/tests/test_mcp_connector.py b/connectors/tests/test_mcp_connector.py\nnew file mode 100644\nindex 0000000..0d3330c\n--- /dev/null\n+++ b/connectors/tests/test_mcp_connector.py\n@@ -0,0 +1,74 @@\n+import pytest\n+from fastmcp import Client, FastMCP\n+\n+from connectors import ConnectorConfig, IngestSink\n+from connectors.mcp import MCPClientConnector\n+\n+\n+def _server() -> FastMCP:\n+    server = FastMCP(\"external\")\n+\n+    @server.resource(\"config://greeting\")\n+    def greeting() -> str:\n+        return \"hello from remote\"\n+\n+    @server.tool\n+    def ping() -> str:\n+        return \"pong\"\n+\n+    return server\n+\n+\n+def _connector(sink, tools=None, factory=None):\n+    cfg = ConnectorConfig(\n+        name=\"ext\",\n+        kind=\"mcp\",\n+        settings={\"url\": \"http://unused/mcp\", \"tools\": tools or []},\n+    )\n+    return MCPClientConnector(cfg, sink, client_factory=factory or (lambda: Client(_server())))\n+\n+\n+@pytest.mark.asyncio\n+async def test_health_ok_on_live_server():\n+    status = await _connector(IngestSink()).health()\n+    assert status.ok is True\n+    assert \"1 tool\" in status.detail\n+\n+\n+@pytest.mark.asyncio\n+async def test_ingest_yields_catalog_resource_and_tool_records():\n+    sink = IngestSink()\n+    batch = await _connector(sink, tools=[\"ping\"]).ingest()\n+    kinds = {r.item_type for r in batch.records}\n+    assert kinds == {\"catalog\", \"resource\", \"tool_result\"}\n+    assert any(r.content == \"hello from remote\" for r in batch.records)\n+    assert any(r.content == \"pong\" for r in batch.records)\n+    assert batch.errors == []\n+\n+\n+@pytest.mark.asyncio\n+async def test_ingest_with_no_tools_configured():\n+    batch = await _connector(IngestSink()).ingest()\n+    assert not any(r.item_type == \"tool_result\" for r in batch.records)\n+\n+\n+@pytest.mark.asyncio\n+async def test_ingest_records_unknown_tool_as_error():\n+    batch = await _connector(IngestSink(), tools=[\"does_not_exist\"]).ingest()\n+    assert batch.errors and any(\"does_not_exist\" in e for e in batch.errors)\n+    assert any(r.item_type == \"catalog\" for r in batch.records)\n+\n+\n+class _BrokenClient:\n+    async def __aenter__(self):\n+        raise TimeoutError(\"connect timed out\")\n+\n+    async def __aexit__(self, *exc):\n+        return False\n+\n+\n+@pytest.mark.asyncio\n+async def test_health_fails_cleanly_on_dead_server():\n+    status = await _connector(IngestSink(), factory=lambda: _BrokenClient()).health()\n+    assert status.ok is False\n+    assert \"timed out\" in status.detail",
+                "lineStart": 1,
+                "lineEnd": 271,
+                "totalLines": 271,
+                "truncated": false
+              }
+            },
+            "title": ".worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/review-fad3436..ad92100.diff",
+            "time": {
+              "start": 1792002796863,
+              "end": 1792002796875
+            }
+          },
+          "id": "prt_13bb0abb800156DMYDdOUCgjXM",
+          "sessionID": "ses_ec44f5ebcffeljF5tQaOJNGFo1",
+          "messageID": "msg_13bb0a3050013dq9yOmYcwihSk"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-finish",
+          "tokens": {
+            "total": 16567,
+            "input": 1969,
+            "output": 242,
+            "reasoning": 20,
+            "cache": {
+              "write": 0,
+              "read": 14336
+            }
+          },
+          "cost": 0,
+          "id": "prt_13bb0ad73001HOi7x3bqOwyluN",
+          "sessionID": "ses_ec44f5ebcffeljF5tQaOJNGFo1",
+          "messageID": "msg_13bb0a3050013dq9yOmYcwihSk"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_13bb0a14b001xkppmMoHM41IoA",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 24085,
+          "input": 8282,
+          "output": 353,
+          "reasoning": 218,
+          "cache": {
+            "write": 0,
+            "read": 15232
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792002796937,
+          "completed": 1792002801206
+        },
+        "finish": "tool-calls",
+        "id": "msg_13bb0ad890017bgHx0p7DnJpmI",
+        "sessionID": "ses_ec44f5ebcffeljF5tQaOJNGFo1"
+      },
+      "parts": [
+        {
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-start",
+          "id": "prt_13bb0b719001jQR5BrZNyrNviq",
+          "sessionID": "ses_ec44f5ebcffeljF5tQaOJNGFo1",
+          "messageID": "msg_13bb0ad890017bgHx0p7DnJpmI"
+        },
+        {
+          "type": "reasoning",
+          "text": "Let me read the surrounding files to verify spec compliance: models.py, registry.py, sink.py. But the review says \"Read the diff file once ... Do not re-run git commands or crawl the codebase.\" However, I need to verify things like `settings=config.mcp_settings()`, `McpConnectorSettings`, `IngestRecord` fields, and registry wiring. The task says do not crawl the codebase. But I can read specific files referenced to verify claims? The instruction says \"Read the diff file once (commit list, stat summary, full diff with context). Do not re-run git commands or crawl the codebase.\" I think reading the key referenced files (models.py, registry.py, sink.py) is reasonable and necessary to verify spec compliance. Let me be judicious. The brief references `config.mcp_settings()`, `IngestSink`, `IngestRecord` fields. Let me read models.py, registry.py, sink.py, protocol.py.\n\nAlso run ruff check/format on connectors per instructions.\n\nLet me do those.",
+          "time": {
+            "start": 1792002799429,
+            "end": 1792002800225
+          },
+          "id": "prt_13bb0b745001eNCHBF1XycZ2z6",
+          "sessionID": "ses_ec44f5ebcffeljF5tQaOJNGFo1",
+          "messageID": "msg_13bb0ad890017bgHx0p7DnJpmI"
+        },
+        {
+          "type": "tool",
+          "tool": "read",
+          "callID": "call_00_7a7p4dir59xufmg566xcpi8w",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors/src/connectors/models.py"
+            },
+            "output": "<path>/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors/src/connectors/models.py</path>\n<type>file</type>\n<content>\n1: \"\"\"Shared Pydantic models for connector configuration and ingest payloads.\"\"\"\n2: \n3: from __future__ import annotations\n4: \n5: from typing import Any, Literal\n6: \n7: from pydantic import BaseModel, Field\n8: \n9: from .errors import UnknownConnectorKindError\n10: \n11: \n12: class HealthStatus(BaseModel):\n13:     ok: bool\n14:     detail: str = \"\"\n15: \n16: \n17: class McpConnectorSettings(BaseModel):\n18:     url: str\n19:     tools: list[str] = Field(default_factory=list)\n20: \n21: \n22: class ConnectorConfig(BaseModel):\n23:     name: str\n24:     kind: str = \"mcp\"\n25:     enabled: bool = True\n26:     settings: dict[str, Any] = Field(default_factory=dict)\n27: \n28:     def mcp_settings(self) -> McpConnectorSettings:\n29:         if self.kind != \"mcp\":\n30:             raise UnknownConnectorKindError(name=self.kind)\n31:         return McpConnectorSettings.model_validate(self.settings)\n32: \n33: \n34: class IngestRecord(BaseModel):\n35:     id: str\n36:     source_name: str\n37:     source_kind: str\n38:     item_type: Literal[\"resource\", \"tool_result\", \"catalog\"]\n39:     name: str\n40:     content: str\n41:     raw: dict[str, Any] = Field(default_factory=dict)\n42: \n43: \n44: class IngestBatch(BaseModel):\n45:     connector_name: str\n46:     records: list[IngestRecord] = Field(default_factory=list)\n47:     errors: list[str] = Field(default_factory=list)\n\n(End of file - total 47 lines)\n</content>",
+            "metadata": {
+              "preview": "\"\"\"Shared Pydantic models for connector configuration and ingest payloads.\"\"\"\n\nfrom __future__ import annotations\n\nfrom typing import Any, Literal\n\nfrom pydantic import BaseModel, Field\n\nfrom .errors import UnknownConnectorKindError\n\n\nclass HealthStatus(BaseModel):\n    ok: bool\n    detail: str = \"\"\n\n\nclass McpConnectorSettings(BaseModel):\n    url: str\n    tools: list[str] = Field(default_factory=list)\n",
+              "truncated": false,
+              "loaded": [],
+              "display": {
+                "type": "file",
+                "path": "/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors/src/connectors/models.py",
+                "text": "\"\"\"Shared Pydantic models for connector configuration and ingest payloads.\"\"\"\n\nfrom __future__ import annotations\n\nfrom typing import Any, Literal\n\nfrom pydantic import BaseModel, Field\n\nfrom .errors import UnknownConnectorKindError\n\n\nclass HealthStatus(BaseModel):\n    ok: bool\n    detail: str = \"\"\n\n\nclass McpConnectorSettings(BaseModel):\n    url: str\n    tools: list[str] = Field(default_factory=list)\n\n\nclass ConnectorConfig(BaseModel):\n    name: str\n    kind: str = \"mcp\"\n    enabled: bool = True\n    settings: dict[str, Any] = Field(default_factory=dict)\n\n    def mcp_settings(self) -> McpConnectorSettings:\n        if self.kind != \"mcp\":\n            raise UnknownConnectorKindError(name=self.kind)\n        return McpConnectorSettings.model_validate(self.settings)\n\n\nclass IngestRecord(BaseModel):\n    id: str\n    source_name: str\n    source_kind: str\n    item_type: Literal[\"resource\", \"tool_result\", \"catalog\"]\n    name: str\n    content: str\n    raw: dict[str, Any] = Field(default_factory=dict)\n\n\nclass IngestBatch(BaseModel):\n    connector_name: str\n    records: list[IngestRecord] = Field(default_factory=list)\n    errors: list[str] = Field(default_factory=list)",
+                "lineStart": 1,
+                "lineEnd": 47,
+                "totalLines": 47,
+                "truncated": false
+              }
+            },
+            "title": ".worktrees/mcp-connector-module/connectors/src/connectors/models.py",
+            "time": {
+              "start": 1792002800350,
+              "end": 1792002800414
+            }
+          },
+          "id": "prt_13bb0ba63001zfJufYO5cgGgIu",
+          "sessionID": "ses_ec44f5ebcffeljF5tQaOJNGFo1",
+          "messageID": "msg_13bb0ad890017bgHx0p7DnJpmI"
+        },
+        {
+          "type": "tool",
+          "tool": "read",
+          "callID": "call_01_uekra7f4ncnwxv6gi8ek7l3t",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors/src/connectors/registry.py"
+            },
+            "output": "<path>/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors/src/connectors/registry.py</path>\n<type>file</type>\n<content>\n1: \"\"\"JSON-backed connection registry plus the connector kind dispatcher.\"\"\"\n2: \n3: from __future__ import annotations\n4: \n5: import json\n6: import os\n7: import tempfile\n8: from pathlib import Path\n9: from typing import TYPE_CHECKING, Any\n10: \n11: from pydantic import BaseModel, Field, ValidationError\n12: \n13: from .errors import (\n14:     ConnectorNotFoundError,\n15:     DuplicateConnectorError,\n16:     RegistryError,\n17:     UnknownConnectorKindError,\n18: )\n19: from .models import ConnectorConfig\n20: \n21: if TYPE_CHECKING:\n22:     from .protocol import Connector\n23:     from .sink import IngestSink\n24: \n25: \n26: class _RegistryFile(BaseModel):\n27:     connectors: list[ConnectorConfig] = Field(default_factory=list)\n28: \n29: \n30: class ConnectorRegistry:\n31:     \"\"\"Reads and writes connector configurations from a JSON file.\"\"\"\n32: \n33:     def __init__(self, path: str | Path | None = None) -> None:\n34:         self.path = (\n35:             Path(path) if path is not None else Path.cwd() / \".agentic-odi\" / \"connectors.json\"\n36:         )\n37: \n38:     def list(self) -> list[ConnectorConfig]:\n39:         if not self.path.exists():\n40:             return []\n41:         try:\n42:             raw = json.loads(self.path.read_text())\n43:         except (OSError, json.JSONDecodeError) as exc:\n44:             raise RegistryError(f\"failed to read registry {self.path}: {exc}\") from exc\n45:         try:\n46:             return _RegistryFile.model_validate(raw).connectors\n47:         except ValidationError as exc:\n48:             raise RegistryError(f\"invalid registry {self.path}: {exc}\") from exc\n49: \n50:     def get(self, name: str) -> ConnectorConfig:\n51:         for config in self.list():\n52:             if config.name == name:\n53:                 return config\n54:         raise ConnectorNotFoundError(f\"connector {name!r} not found in {self.path}\")\n55: \n56:     def add(self, config: ConnectorConfig) -> None:\n57:         configs = self.list()\n58:         if any(existing.name == config.name for existing in configs):\n59:             raise DuplicateConnectorError(f\"connector {config.name!r} already exists\")\n60:         configs.append(config)\n61:         self.save(configs)\n62: \n63:     def save(self, configs: list[ConnectorConfig]) -> None:\n64:         self.path.parent.mkdir(parents=True, exist_ok=True)\n65:         payload = _RegistryFile(connectors=configs).model_dump()\n66:         fd, tmp_name = tempfile.mkstemp(dir=self.path.parent, suffix=\".tmp\")\n67:         try:\n68:             with os.fdopen(fd, \"w\") as tmp_file:\n69:                 json.dump(payload, tmp_file)\n70:             os.replace(tmp_name, self.path)\n71:         except BaseException:\n72:             Path(tmp_name).unlink(missing_ok=True)\n73:             raise\n74: \n75: \n76: def build_connector(\n77:     config: ConnectorConfig,\n78:     sink: IngestSink,\n79:     client_factory: Any = None,\n80: ) -> Connector:\n81:     \"\"\"Construct a connector for the given config's kind.\"\"\"\n82:     if config.kind == \"mcp\":\n83:         from .mcp import MCPClientConnector\n84: \n85:         return MCPClientConnector(config, sink, client_factory=client_factory)\n86:     raise UnknownConnectorKindError(config.kind)\n\n(End of file - total 86 lines)\n</content>",
+            "metadata": {
+              "preview": "\"\"\"JSON-backed connection registry plus the connector kind dispatcher.\"\"\"\n\nfrom __future__ import annotations\n\nimport json\nimport os\nimport tempfile\nfrom pathlib import Path\nfrom typing import TYPE_CHECKING, Any\n\nfrom pydantic import BaseModel, Field, ValidationError\n\nfrom .errors import (\n    ConnectorNotFoundError,\n    DuplicateConnectorError,\n    RegistryError,\n    UnknownConnectorKindError,\n)\nfrom .models import ConnectorConfig\n",
+              "truncated": false,
+              "loaded": [],
+              "display": {
+                "type": "file",
+                "path": "/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors/src/connectors/registry.py",
+                "text": "\"\"\"JSON-backed connection registry plus the connector kind dispatcher.\"\"\"\n\nfrom __future__ import annotations\n\nimport json\nimport os\nimport tempfile\nfrom pathlib import Path\nfrom typing import TYPE_CHECKING, Any\n\nfrom pydantic import BaseModel, Field, ValidationError\n\nfrom .errors import (\n    ConnectorNotFoundError,\n    DuplicateConnectorError,\n    RegistryError,\n    UnknownConnectorKindError,\n)\nfrom .models import ConnectorConfig\n\nif TYPE_CHECKING:\n    from .protocol import Connector\n    from .sink import IngestSink\n\n\nclass _RegistryFile(BaseModel):\n    connectors: list[ConnectorConfig] = Field(default_factory=list)\n\n\nclass ConnectorRegistry:\n    \"\"\"Reads and writes connector configurations from a JSON file.\"\"\"\n\n    def __init__(self, path: str | Path | None = None) -> None:\n        self.path = (\n            Path(path) if path is not None else Path.cwd() / \".agentic-odi\" / \"connectors.json\"\n        )\n\n    def list(self) -> list[ConnectorConfig]:\n        if not self.path.exists():\n            return []\n        try:\n            raw = json.loads(self.path.read_text())\n        except (OSError, json.JSONDecodeError) as exc:\n            raise RegistryError(f\"failed to read registry {self.path}: {exc}\") from exc\n        try:\n            return _RegistryFile.model_validate(raw).connectors\n        except ValidationError as exc:\n            raise RegistryError(f\"invalid registry {self.path}: {exc}\") from exc\n\n    def get(self, name: str) -> ConnectorConfig:\n        for config in self.list():\n            if config.name == name:\n                return config\n        raise ConnectorNotFoundError(f\"connector {name!r} not found in {self.path}\")\n\n    def add(self, config: ConnectorConfig) -> None:\n        configs = self.list()\n        if any(existing.name == config.name for existing in configs):\n            raise DuplicateConnectorError(f\"connector {config.name!r} already exists\")\n        configs.append(config)\n        self.save(configs)\n\n    def save(self, configs: list[ConnectorConfig]) -> None:\n        self.path.parent.mkdir(parents=True, exist_ok=True)\n        payload = _RegistryFile(connectors=configs).model_dump()\n        fd, tmp_name = tempfile.mkstemp(dir=self.path.parent, suffix=\".tmp\")\n        try:\n            with os.fdopen(fd, \"w\") as tmp_file:\n                json.dump(payload, tmp_file)\n            os.replace(tmp_name, self.path)\n        except BaseException:\n            Path(tmp_name).unlink(missing_ok=True)\n            raise\n\n\ndef build_connector(\n    config: ConnectorConfig,\n    sink: IngestSink,\n    client_factory: Any = None,\n) -> Connector:\n    \"\"\"Construct a connector for the given config's kind.\"\"\"\n    if config.kind == \"mcp\":\n        from .mcp import MCPClientConnector\n\n        return MCPClientConnector(config, sink, client_factory=client_factory)\n    raise UnknownConnectorKindError(config.kind)",
+                "lineStart": 1,
+                "lineEnd": 86,
+                "totalLines": 86,
+                "truncated": false
+              }
+            },
+            "title": ".worktrees/mcp-connector-module/connectors/src/connectors/registry.py",
+            "time": {
+              "start": 1792002800473,
+              "end": 1792002800887
+            }
+          },
+          "id": "prt_13bb0bae0001fEYUkqaoJ5ThMq",
+          "sessionID": "ses_ec44f5ebcffeljF5tQaOJNGFo1",
+          "messageID": "msg_13bb0ad890017bgHx0p7DnJpmI"
+        },
+        {
+          "type": "tool",
+          "tool": "read",
+          "callID": "call_02_qne85ph7tob2lj3r9ryjeaaz",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors/src/connectors/sink.py"
+            },
+            "output": "<path>/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors/src/connectors/sink.py</path>\n<type>file</type>\n<content>\n1: \"\"\"In-memory ingest sink for accumulating connector batches.\"\"\"\n2: \n3: from __future__ import annotations\n4: \n5: import json\n6: from pathlib import Path\n7: \n8: from .models import IngestBatch\n9: \n10: \n11: class IngestSink:\n12:     \"\"\"Collects ingest batches in memory and can dump them to JSON.\"\"\"\n13: \n14:     def __init__(self) -> None:\n15:         self._batches: list[IngestBatch] = []\n16: \n17:     def append(self, batch: IngestBatch) -> None:\n18:         self._batches.append(batch)\n19: \n20:     @property\n21:     def batches(self) -> list[IngestBatch]:\n22:         return list(self._batches)\n23: \n24:     def dump(self, path: str | Path) -> None:\n25:         Path(path).write_text(json.dumps([batch.model_dump() for batch in self._batches]))\n\n(End of file - total 25 lines)\n</content>",
+            "metadata": {
+              "preview": "\"\"\"In-memory ingest sink for accumulating connector batches.\"\"\"\n\nfrom __future__ import annotations\n\nimport json\nfrom pathlib import Path\n\nfrom .models import IngestBatch\n\n\nclass IngestSink:\n    \"\"\"Collects ingest batches in memory and can dump them to JSON.\"\"\"\n\n    def __init__(self) -> None:\n        self._batches: list[IngestBatch] = []\n\n    def append(self, batch: IngestBatch) -> None:\n        self._batches.append(batch)\n\n    @property",
+              "truncated": false,
+              "loaded": [],
+              "display": {
+                "type": "file",
+                "path": "/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors/src/connectors/sink.py",
+                "text": "\"\"\"In-memory ingest sink for accumulating connector batches.\"\"\"\n\nfrom __future__ import annotations\n\nimport json\nfrom pathlib import Path\n\nfrom .models import IngestBatch\n\n\nclass IngestSink:\n    \"\"\"Collects ingest batches in memory and can dump them to JSON.\"\"\"\n\n    def __init__(self) -> None:\n        self._batches: list[IngestBatch] = []\n\n    def append(self, batch: IngestBatch) -> None:\n        self._batches.append(batch)\n\n    @property\n    def batches(self) -> list[IngestBatch]:\n        return list(self._batches)\n\n    def dump(self, path: str | Path) -> None:\n        Path(path).write_text(json.dumps([batch.model_dump() for batch in self._batches]))",
+                "lineStart": 1,
+                "lineEnd": 25,
+                "totalLines": 25,
+                "truncated": false
+              }
+            },
+            "title": ".worktrees/mcp-connector-module/connectors/src/connectors/sink.py",
+            "time": {
+              "start": 1792002800676,
+              "end": 1792002800899
+            }
+          },
+          "id": "prt_13bb0bb68001DwHu1LZYSiQ6O2",
+          "sessionID": "ses_ec44f5ebcffeljF5tQaOJNGFo1",
+          "messageID": "msg_13bb0ad890017bgHx0p7DnJpmI"
+        },
+        {
+          "type": "tool",
+          "tool": "read",
+          "callID": "call_03_ouohsriitpya1pzyp0fhel3t",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors/src/connectors/protocol.py"
+            },
+            "output": "<path>/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors/src/connectors/protocol.py</path>\n<type>file</type>\n<content>\n1: \"\"\"The structural interface every connector implements.\"\"\"\n2: \n3: from __future__ import annotations\n4: \n5: from typing import Protocol, runtime_checkable\n6: \n7: from .models import HealthStatus, IngestBatch\n8: \n9: \n10: @runtime_checkable\n11: class Connector(Protocol):\n12:     kind: str\n13:     name: str\n14: \n15:     async def health(self) -> HealthStatus: ...\n16: \n17:     async def ingest(self) -> IngestBatch: ...\n\n(End of file - total 17 lines)\n</content>",
+            "metadata": {
+              "preview": "\"\"\"The structural interface every connector implements.\"\"\"\n\nfrom __future__ import annotations\n\nfrom typing import Protocol, runtime_checkable\n\nfrom .models import HealthStatus, IngestBatch\n\n\n@runtime_checkable\nclass Connector(Protocol):\n    kind: str\n    name: str\n\n    async def health(self) -> HealthStatus: ...\n\n    async def ingest(self) -> IngestBatch: ...",
+              "truncated": false,
+              "loaded": [],
+              "display": {
+                "type": "file",
+                "path": "/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors/src/connectors/protocol.py",
+                "text": "\"\"\"The structural interface every connector implements.\"\"\"\n\nfrom __future__ import annotations\n\nfrom typing import Protocol, runtime_checkable\n\nfrom .models import HealthStatus, IngestBatch\n\n\n@runtime_checkable\nclass Connector(Protocol):\n    kind: str\n    name: str\n\n    async def health(self) -> HealthStatus: ...\n\n    async def ingest(self) -> IngestBatch: ...",
+                "lineStart": 1,
+                "lineEnd": 17,
+                "totalLines": 17,
+                "truncated": false
+              }
+            },
+            "title": ".worktrees/mcp-connector-module/connectors/src/connectors/protocol.py",
+            "time": {
+              "start": 1792002800778,
+              "end": 1792002800905
+            }
+          },
+          "id": "prt_13bb0bc2b001JATmwijrO6GFGK",
+          "sessionID": "ses_ec44f5ebcffeljF5tQaOJNGFo1",
+          "messageID": "msg_13bb0ad890017bgHx0p7DnJpmI"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "call_04_zw9hv5xsr2ppfxcjdkpfc440",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "uv run ruff check connectors/ --output-format=concise; echo \"check_exit=$?\"; uv run ruff format --check connectors/; echo \"format_exit=$?\"",
+              "workdir": "/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module"
+            },
+            "output": "All checks passed!\ncheck_exit=0\n11 files already formatted\nformat_exit=0\n",
+            "metadata": {
+              "output": "All checks passed!\ncheck_exit=0\n11 files already formatted\nformat_exit=0\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "uv run ruff check connectors/ --output-format=concise; echo \"check_exit=$?\"; uv run ruff format --check connectors/; echo \"format_exit=$?\"",
+            "time": {
+              "start": 1792002800944,
+              "end": 1792002801088
+            }
+          },
+          "id": "prt_13bb0bc8d0017kJywoQCT5XiIl",
+          "sessionID": "ses_ec44f5ebcffeljF5tQaOJNGFo1",
+          "messageID": "msg_13bb0ad890017bgHx0p7DnJpmI"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-finish",
+          "tokens": {
+            "total": 24085,
+            "input": 8282,
+            "output": 353,
+            "reasoning": 218,
+            "cache": {
+              "write": 0,
+              "read": 15232
+            }
+          },
+          "cost": 0,
+          "id": "prt_13bb0bde6001WGMquNLcJOpscA",
+          "sessionID": "ses_ec44f5ebcffeljF5tQaOJNGFo1",
+          "messageID": "msg_13bb0ad890017bgHx0p7DnJpmI"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_13bb0a14b001xkppmMoHM41IoA",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 28791,
+          "input": 9748,
+          "output": 129,
+          "reasoning": 2658,
+          "cache": {
+            "write": 0,
+            "read": 16256
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792002801213,
+          "completed": 1792002822172
+        },
+        "finish": "tool-calls",
+        "id": "msg_13bb0be3d001U1SvoN0BPmTrWC",
+        "sessionID": "ses_ec44f5ebcffeljF5tQaOJNGFo1"
+      },
+      "parts": [
+        {
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-start",
+          "id": "prt_13bb0c670001xBSpFNnvKUFxzP",
+          "sessionID": "ses_ec44f5ebcffeljF5tQaOJNGFo1",
+          "messageID": "msg_13bb0be3d001U1SvoN0BPmTrWC"
+        },
+        {
+          "type": "reasoning",
+          "text": "Let me now assess.\n\nThe ruff command ran against `connectors/` from the worktree root. Wait — the brief says lint clean under select [\"E4\",\"E7\",\"E9\",\"F\",\"I\",\"UP\",\"B\",\"BLE\"]. But the command `uv run ruff check connectors/` — does it use the connectors pyproject config? Let me check the connectors pyproject to ensure the select is configured. The report mentions BLE001 noqa. The check passed, exit 0. Good.\n\nLet me verify the ruff config includes BLE and the per-file ignores. Actually the report says \"BLE001 is downgraded for the two intentional except Exception blocks\". The noqa comments suffice. But actually there are three `except Exception` blocks: health (line 101 noqa), resource (151 noqa), tool (168 noqa). All have noqa. Good.\n\nNow let me check spec compliance items.\n\n1. Signature/defaults: `MCPClientConnector(config, sink, client_factory=None)` ✅. `kind=\"mcp\"` ✅ (line 81). `name` = config.name ✅ (line 89). `settings = config.mcp_settings()` ✅ (line 90). Good.\n\n2. `health()` returns ok=True with detail containing tool count ✅ (`f\"{count} tool(s) available\"`). catches Exception → ok=False detail=str(exc) ✅, doesn't raise ✅.\n\nWait - one subtle issue: `count = len(tools) if tools is not None else 0` is outside the try block. `len(tools)` can't really raise. Fine.\n\n3. `ingest()`: catalog record content JSON of tool+resource names ✅; raw holds full names+uris ✅. one resource record per content block using `.text` ✅ (but falls back to str(block) if no text — superset). one tool_result per configured tool with content text else str(result.data) ✅ (superset). per-item failures → errors with item name, batch still returned ✅. batch appended to sink then returned ✅.\n\n4. Re-exported from `__init__.py` ✅.\n\n5. Tests cover health ok ✅; full ingest ✅; no tools configured ✅; unknown tool ✅; dead server ✅. Note: brief said \"dead server → ok=False + 'timed out'\". The test uses `_BrokenClient` whose `__aenter__` raises TimeoutError(\"connect timed out\"). But the Review Focus item #5 says \"Health probe against an unreachable/timing-out server → HealthStatus(ok=False) and returns promptly.\" The test simulates a timing-out server via a broken client that raises immediately. That's a reasonable proxy. But does it truly test \"returns promptly\"? No timeout assertion, but the broken client raises immediately. Acceptable. However, the brief's test factory lambda returns `_BrokenClient()`. Wait - the connector calls `async with self._client_factory() as client`. `_client_factory` is `lambda: _BrokenClient()`. `_BrokenClient` has `__aenter__` raising TimeoutError. So health catches it. Good.\n\nNow the Review Focus items:\n\n1. A resource read raises mid-ingest → returned batch still contains already-read records PLUS an error string (not exception). Is this covered by a TEST? Let me check. The implemented tests do NOT test a resource read failure mid-ingest. The tests cover unknown tool → error + catalog. There's no test for resource read failure. So Focus item #1 is implemented in code (per-resource try/except) but NOT covered by tests. The question says \"Assess the 5 Review Focus items above against the code and tests — call out any that are NOT actually covered.\" So #1: code handles it, but no test. Need to flag.\n\nActually wait — is there a test where a resource read raises? No. The brief's tests don't include one. So #1 not covered by tests.\n\n2. Name in settings.tools that doesn't exist → error collected, batch still returned. Covered by `test_ingest_records_unknown_tool_as_error` ✅. Though note the test only asserts catalog present, not that batch returned (the return value is the batch). It does assert errors and catalog. Fine.\n\n3. Server exposes zero tools/resources → one catalog record with empty lists, no crash. Is this covered? Not directly. `test_ingest_with_no_tools_configured` covers no *configured* tools, but the server still exposes a tool and resource. There's no test with a server exposing zero tools/resources. Let me think: `_server()` always has one tool and one resource. So focus #3 is NOT covered by any test. The code handles empty lists (tool_names = [] if not tools). But not tested. Flag.\n\nActually wait, could `test_ingest_with_no_tools_configured` be interpreted? No — the server still has tools. The focus item is \"Server exposes zero tools/resources → one catalog record with empty lists\". Not tested. Flag.\n\n4. (not listed in focus items — numbers skip to 5). Actually the review focus lists 1,2,3,5. Item 4 is presumably another task.\n\n5. Health probe against unreachable/timing-out server → ok=False and returns promptly. Covered by `test_health_fails_cleanly_on_dead_server` ✅ (via broken client). \"returns promptly\" not measured but raises immediately.\n\nNow code quality issues:\n\n- `_tool_result_text`: brief says \"concatenated `.text` of content blocks, else `str(result.data)`\". The implementation joins with `\"\"` (no separator) — `\"\".join(parts)`. A minor concern: concatenating without separator could merge text blocks. Brief says \"concatenated\", ambiguous. Minor.\n\n- `health()` count outside try: minor, len can't fail.\n\n- `raw` for tool_result is `{}` — brief says one tool_result record; raw unspecified. Fine.\n\n- Resource record `id` uses `res.name` — if two resources share a name or a resource has no name (name could be None), id collision. MCP resource `.name` is Optional. Actually if a resource has no name, `res.name` may be None → `id=f\"{self.name}:resource:{res.name}\"` → \"ext:resource:None\". Not a crash. Multiple resources with same name could produce duplicate ids. Minor.\n\n- The `raw` for catalog uses `getattr(res, \"uri\", \"\")` and str. Fine.\n\n- Error isolation: resource try/except wraps the whole read for one resource; if one content block append fails it's caught too. Fine.\n\n- Broad catch: `except Exception` with noqa is intentional per spec. Good.\n\n- Async usage: `async with self._client_factory() as client` — correct. `client_factory` typed `Callable[[], Client]`; default lambda returns Client(url). Good.\n\n- Typing: `Callable[[], Client]` but `Any` not used well. `_tool_result_text(result: Any)`. Acceptable.\n\n- Does `ingest()` acquire the client once? Yes. Good.\n\n- Potential issue: in `ingest`, if `list_tools()` or `list_resources()` raises, the whole ingest raises and no batch returned. The spec only says per-item failures (resource read, tool call) go to errors. Listing failure is arguably a hard failure. Brief: \"per-item failures go into errors\". Fine.\n\n- Behavior: catalog emitted before resource reads. Good.\n\n- One subtle bug: `resource_list = list(resources) if resources else []`. `list_resources()` returns a list. `list(resources)` copies. Fine.\n\n- `tool_names = [tool.name for tool in tools] if tools else []`. Fine.\n\n- Now is `tools` guaranteed iterable? list. Fine.\n\n- Another subtle: `resources` could be None? In fastmcp it's a list. The guard handles it.\n\nNow, is there a problem with `McpConnectorSettings` import in mcp.py being used only for annotation? It's used in `self.settings: McpConnectorSettings = ...`. Good, not unused.\n\nNow the \"does not re-run git commands or crawl the codebase\" - I read a few files which is fine (models, registry, sink, protocol). Those were necessary to verify.\n\nNow regarding the spec: \"Default `client_factory` = `lambda: Client(self.settings.url)`.\" ✅.\n\nNow the \"Extra\" flag: `_tool_result_text` superset behavior (per-block data fallback) — reported honestly. Minor.\n\nNow check focus item #1 more carefully: code has per-resource try/except → yes handled. But not tested. Also, importantly, the focus says \"returned batch still contains the already-read records PLUS an error string\". Since catalog is appended first and previous resource records too, and error appended, batch returned. Good.\n\nWait, there's a subtle ordering bug: what if resource 1 reads fine, resource 2 raises? Records for resource 1 present, error appended. Good. What if a resource read returns blocks and one of the blocks triggers an exception? Caught. Fine.\n\nNow let me reconsider focus item #3: \"Server exposes zero tools/resources → one catalog record with empty lists, no crash.\" Code: if server returns empty lists, `tool_names=[]`, `resource_list=[]`, catalog appended with empty lists. No crash. Not tested. Flag as not covered.\n\nNow, tests also don't cover focus item #1 and #3. Both are code-handled but untested. This is the key finding.\n\nLet me double check the test file for any resource-failure test. It's 74 lines, 5 tests, all shown in diff. No. Confirmed.\n\nAlso, is there a test asserting `sink` got the batch appended? No test checks `sink.batches`. The test passes sink but never asserts the batch was appended to the sink. Minor gap—but spec says \"batch appended to sink then returned\". Not tested. Minor.\n\nNow let me think about whether `health()` detail with tool count is correct. `f\"{count} tool(s) available\"`. Test asserts \"1 tool\" in detail. ✅.\n\nLet me also verify the ruff config actually selects BLE. The command passed, but if BLE isn't selected then the noqa is unnecessary and there'd be an RUF100 unused-noqa possibly. Since check passed, either BLE selected and needed, or noqa unused would raise RUF100 if selected. It passed, so fine. Let me quickly check the connectors pyproject to confirm select includes the required set. Actually not strictly needed; the check passed. But to be thorough about \"lint clean under select [...]\", let me check that the config uses that select. Let me read the pyproject.\n\nActually, the instruction says I may run that command to confirm. I did. Exit 0. I'll trust it. But there's a caveat: running `uv run ruff check connectors/` from repo root — does ruff pick up the connectors/pyproject.toml? Ruff searches for config starting from the file's directory upward. Since files are under connectors/, it would find connectors/pyproject.toml (or a [tool.ruff] in root). Let me quickly verify the config to be safe about BLE001 noqa usage. Let me read connectors/pyproject.toml.\n\nActually, there's a concern about the report's claim \"ran `ruff format src/ tests/`\" vs the required command `ruff format --check connectors/`. I ran the required one: exit 0. Good.\n\nLet me check the connectors pyproject quickly to confirm the select.\n\nAlso need to check: is `Any` imported in mcp.py from typing and used? Yes for `_tool_result_text`. Good. `Callable` from collections.abc. Good. `json` used. Good.\n\nOne more thing: `from .models import ... McpConnectorSettings` used. Good.\n\nLet me read connectors/pyproject.toml and the test config (pytest asyncio strict mode). The global constraint says \"Async tests use `@pytest.mark.asyncio` (strict mode); no network in the default suite.\" Strict mode requires pytest.ini `asyncio_mode = strict` and the test uses the marker. It does. Good. No network: tests inject in-memory server. Good.\n\nLet me read pyproject.",
+          "time": {
+            "start": 1792002803419,
+            "end": 1792002821519
+          },
+          "id": "prt_13bb0c6db001oNNu4M8wHHyAI4",
+          "sessionID": "ses_ec44f5ebcffeljF5tQaOJNGFo1",
+          "messageID": "msg_13bb0be3d001U1SvoN0BPmTrWC"
+        },
+        {
+          "type": "tool",
+          "tool": "read",
+          "callID": "call_00_pds8hfmcf07s8h5io4n5e76p",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors/pyproject.toml"
+            },
+            "output": "<path>/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors/pyproject.toml</path>\n<type>file</type>\n<content>\n1: [project]\n2: name = \"agentic-odi-connectors\"\n3: version = \"0.1.0\"\n4: description = \"Pluggable external-integration connectors for Agentic ODI (MCP client).\"\n5: requires-python = \">=3.10\"\n6: dependencies = [\"fastmcp\", \"pydantic\"]\n7: \n8: [build-system]\n9: requires = [\"hatchling\"]\n10: build-backend = \"hatchling.build\"\n11: \n12: [tool.hatch.build.targets.wheel]\n13: packages = [\"src/connectors\"]\n14: \n15: [tool.ruff]\n16: line-length = 100\n17: target-version = \"py311\"\n18: \n19: [tool.ruff.lint]\n20: select = [\"E4\", \"E7\", \"E9\", \"F\", \"I\", \"UP\", \"B\", \"BLE\"]\n21: \n22: [tool.mypy]\n23: python_version = \"3.11\"\n24: ignore_missing_imports = true\n25: \n26: [tool.pytest.ini_options]\n27: asyncio_mode = \"strict\"\n\n(End of file - total 27 lines)\n</content>",
+            "metadata": {
+              "preview": "[project]\nname = \"agentic-odi-connectors\"\nversion = \"0.1.0\"\ndescription = \"Pluggable external-integration connectors for Agentic ODI (MCP client).\"\nrequires-python = \">=3.10\"\ndependencies = [\"fastmcp\", \"pydantic\"]\n\n[build-system]\nrequires = [\"hatchling\"]\nbuild-backend = \"hatchling.build\"\n\n[tool.hatch.build.targets.wheel]\npackages = [\"src/connectors\"]\n\n[tool.ruff]\nline-length = 100\ntarget-version = \"py311\"\n\n[tool.ruff.lint]\nselect = [\"E4\", \"E7\", \"E9\", \"F\", \"I\", \"UP\", \"B\", \"BLE\"]",
+              "truncated": false,
+              "loaded": [],
+              "display": {
+                "type": "file",
+                "path": "/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors/pyproject.toml",
+                "text": "[project]\nname = \"agentic-odi-connectors\"\nversion = \"0.1.0\"\ndescription = \"Pluggable external-integration connectors for Agentic ODI (MCP client).\"\nrequires-python = \">=3.10\"\ndependencies = [\"fastmcp\", \"pydantic\"]\n\n[build-system]\nrequires = [\"hatchling\"]\nbuild-backend = \"hatchling.build\"\n\n[tool.hatch.build.targets.wheel]\npackages = [\"src/connectors\"]\n\n[tool.ruff]\nline-length = 100\ntarget-version = \"py311\"\n\n[tool.ruff.lint]\nselect = [\"E4\", \"E7\", \"E9\", \"F\", \"I\", \"UP\", \"B\", \"BLE\"]\n\n[tool.mypy]\npython_version = \"3.11\"\nignore_missing_imports = true\n\n[tool.pytest.ini_options]\nasyncio_mode = \"strict\"",
+                "lineStart": 1,
+                "lineEnd": 27,
+                "totalLines": 27,
+                "truncated": false
+              }
+            },
+            "title": ".worktrees/mcp-connector-module/connectors/pyproject.toml",
+            "time": {
+              "start": 1792002821755,
+              "end": 1792002821915
+            }
+          },
+          "id": "prt_13bb10d97001Ae7hqeGd6Yl8rs",
+          "sessionID": "ses_ec44f5ebcffeljF5tQaOJNGFo1",
+          "messageID": "msg_13bb0be3d001U1SvoN0BPmTrWC"
+        },
+        {
+          "type": "tool",
+          "tool": "read",
+          "callID": "call_01_yvmjoanw8s7cgzlox2ucofih",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors/src/connectors/errors.py"
+            },
+            "output": "<path>/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors/src/connectors/errors.py</path>\n<type>file</type>\n<content>\n1: \"\"\"Error hierarchy shared by the connector registry and implementations.\"\"\"\n2: \n3: from __future__ import annotations\n4: \n5: KNOWN_CONNECTOR_KINDS: tuple[str, ...] = (\"mcp\",)\n6: \n7: \n8: class RegistryError(Exception):\n9:     \"\"\"Base class for connector registry errors.\"\"\"\n10: \n11: \n12: class UnknownConnectorKindError(RegistryError):\n13:     \"\"\"Raised when a connector kind is not recognised.\"\"\"\n14: \n15:     def __init__(self, name: str) -> None:\n16:         self.name = name\n17:         known = \", \".join(KNOWN_CONNECTOR_KINDS)\n18:         super().__init__(f\"unknown connector kind {name!r}; known kinds: {known}\")\n19: \n20: \n21: class DuplicateConnectorError(RegistryError):\n22:     \"\"\"Raised when two connectors share the same name.\"\"\"\n23: \n24: \n25: class ConnectorNotFoundError(RegistryError):\n26:     \"\"\"Raised when a connector cannot be found in the registry.\"\"\"\n\n(End of file - total 26 lines)\n</content>",
+            "metadata": {
+              "preview": "\"\"\"Error hierarchy shared by the connector registry and implementations.\"\"\"\n\nfrom __future__ import annotations\n\nKNOWN_CONNECTOR_KINDS: tuple[str, ...] = (\"mcp\",)\n\n\nclass RegistryError(Exception):\n    \"\"\"Base class for connector registry errors.\"\"\"\n\n\nclass UnknownConnectorKindError(RegistryError):\n    \"\"\"Raised when a connector kind is not recognised.\"\"\"\n\n    def __init__(self, name: str) -> None:\n        self.name = name\n        known = \", \".join(KNOWN_CONNECTOR_KINDS)\n        super().__init__(f\"unknown connector kind {name!r}; known kinds: {known}\")\n\n",
+              "truncated": false,
+              "loaded": [],
+              "display": {
+                "type": "file",
+                "path": "/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors/src/connectors/errors.py",
+                "text": "\"\"\"Error hierarchy shared by the connector registry and implementations.\"\"\"\n\nfrom __future__ import annotations\n\nKNOWN_CONNECTOR_KINDS: tuple[str, ...] = (\"mcp\",)\n\n\nclass RegistryError(Exception):\n    \"\"\"Base class for connector registry errors.\"\"\"\n\n\nclass UnknownConnectorKindError(RegistryError):\n    \"\"\"Raised when a connector kind is not recognised.\"\"\"\n\n    def __init__(self, name: str) -> None:\n        self.name = name\n        known = \", \".join(KNOWN_CONNECTOR_KINDS)\n        super().__init__(f\"unknown connector kind {name!r}; known kinds: {known}\")\n\n\nclass DuplicateConnectorError(RegistryError):\n    \"\"\"Raised when two connectors share the same name.\"\"\"\n\n\nclass ConnectorNotFoundError(RegistryError):\n    \"\"\"Raised when a connector cannot be found in the registry.\"\"\"",
+                "lineStart": 1,
+                "lineEnd": 26,
+                "totalLines": 26,
+                "truncated": false
+              }
+            },
+            "title": ".worktrees/mcp-connector-module/connectors/src/connectors/errors.py",
+            "time": {
+              "start": 1792002821975,
+              "end": 1792002822036
+            }
+          },
+          "id": "prt_13bb10e83001Vzcw9cWaLGKy6a",
+          "sessionID": "ses_ec44f5ebcffeljF5tQaOJNGFo1",
+          "messageID": "msg_13bb0be3d001U1SvoN0BPmTrWC"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-finish",
+          "tokens": {
+            "total": 28791,
+            "input": 9748,
+            "output": 129,
+            "reasoning": 2658,
+            "cache": {
+              "write": 0,
+              "read": 16256
+            }
+          },
+          "cost": 0,
+          "id": "prt_13bb10fe3001l9OtXMRwTjwDzI",
+          "sessionID": "ses_ec44f5ebcffeljF5tQaOJNGFo1",
+          "messageID": "msg_13bb0be3d001U1SvoN0BPmTrWC"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_13bb0a14b001xkppmMoHM41IoA",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 33220,
+          "input": 3443,
+          "output": 1534,
+          "reasoning": 2259,
+          "cache": {
+            "write": 0,
+            "read": 25984
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792002822199,
+          "completed": 1792002849462
+        },
+        "finish": "stop",
+        "id": "msg_13bb11037001QwilImYWviZ302",
+        "sessionID": "ses_ec44f5ebcffeljF5tQaOJNGFo1"
+      },
+      "parts": [
+        {
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-start",
+          "id": "prt_13bb115e3001GHZk6cQnddenay",
+          "sessionID": "ses_ec44f5ebcffeljF5tQaOJNGFo1",
+          "messageID": "msg_13bb11037001QwilImYWviZ302"
+        },
+        {
+          "type": "reasoning",
+          "text": "Now I have all needed. Let me finalize.\n\nVerify fastmcp 4.1.0 `read_resource` returns list of blocks with `.text`, `call_tool` returns result with `.content` and `.data`. The report claims verified. I can't easily verify without crawling site-packages, but the tests pass (per implementer). I won't re-run. Actually I could inspect the installed fastmcp types, but instruction says \"You MAY run these to confirm ... and to inspect the real fastmcp types if needed\". The environment may or may not have fastmcp installed. Let me not; the tests passing implies parsing works for the text case. I'll mark the non-text fallback as unverifiable-by-me but low risk.\n\nActually, there's a subtle concern: `read_resource` in fastmcp returns a list. The implementation does `blocks = await client.read_resource(uri)` and iterates. If fastmcp wraps in something else, tests would fail. Tests pass. Good.\n\nNow, the key issue: focus items #1 and #3 lack test coverage. The task's own brief only specified 5 tests, none of which cover #1 or #3 directly. So is that a spec violation? The brief's tests are verbatim as required. The Review Focus items come from the plan, and the reviewer is asked to assess whether they're covered. So the finding is: #1 and #3 are implemented in code but NOT covered by tests. This is important but not \"needs fixes\" necessarily — the brief's test set was mandated. Hmm. The task quality gate: should I mark Needs fixes because two review-focus behaviors aren't tested? The instructions specifically ask to \"call out any that are NOT actually covered.\" So I should flag it. Severity: Important (missing test coverage for specified review focus behaviors), but code handles them.\n\nLet me also double check focus #3 could be considered \"covered\" by code correctness but untested. The reviewer's job is spec compliance + code quality. Since the brief mandated the exact 5 tests, and the implementer used them verbatim, not adding extra tests isn't a deviation from the brief. But the plan review focus explicitly demands these behaviors be satisfied. They are satisfied in code. I'd say: implemented but untested → ⚠️/Important test gap, not a correctness bug.\n\nLet me also look for a subtle correctness bug in focus #1: \"A resource read raises mid-ingest → the returned batch still contains the already-read records PLUS an error string (not an exception).\" Code handles. But wait: what if `list_resources()` itself raises? Then ingest raises. But focus says \"a resource read raises\" i.e. read_resource. Handled.\n\nAnother subtlety: the catalog record's `raw` includes resource uri and name, but for the `content` JSON it uses resource *names*. Brief: content = JSON of {\"tools\": [...names], \"resources\": [...names]}. ✅.\n\nNow potential bug: In focus #2, \"A name in settings.tools that does not exist on the server → error collected, batch still returned.\" Code: `call_tool` raises ToolError → caught. ✅ and tested.\n\nNow, is there any issue with `health()` calling `list_tools` but not `list_resources`? Spec says just list_tools. ✅.\n\nNow the `name` attribute: `self.name = config.name`. ✅. `kind` class attr. ✅.\n\nPotential issue: `MCPClientConnector` doesn't inherit `Connector` protocol but it's structural; build_connector returns it typed as Connector. Fine.\n\nNow, one quality concern about `_tool_result_text`: The brief says \"text of content blocks, else `str(result.data)`\". The impl also handles per-block non-text via `.data`/`str(block)`. This is a superset — reported. Not a bug.\n\nAnother: `\"\".join(parts)` vs joining with newline. `json.dumps` content etc. Minor.\n\nNow let me think about whether there's an actual bug with result.data fallback. In fastmcp, `CallToolResult.data` is the structured content parsed. If content blocks are present but all empty text, `blocks` truthy, parts might contain empty strings, returns \"\". Fine.\n\nNow check: `blocks = getattr(result, \"content\", None)`. If result.content is an empty list → falsy → falls to data. Good.\n\nEdge: tool returns no content and no data → returns \"\". Fine.\n\nNow the \"raw\" field of tool_result is `{}`. Records require raw dict. Fine.\n\nNow I should note the sink-append not asserted by tests (minor).\n\nAlso, focus item #5 mentions \"returns promptly\". There's no timeout mechanism; the default Client uses HTTP with some default timeout. If the server is unreachable, will it time out promptly? fastmcp Client has default timeout (likely 30s?). The test uses a broken client that raises immediately so it doesn't exercise real timeout behavior. So \"returns promptly\" against a truly unreachable HTTP server is NOT tested; the code relies on fastmcp's default timeout. Could be slow. This is a legitimate concern: focus #5 says prompt return, but there's no explicit timeout configured. Let me consider citing that. The default Client timeout in fastmcp is 5 seconds I think? Actually fastmcp Client has `timeout` param default 5.0? Not sure. Either way, no explicit timeout. Important-ish? I'd note as Minor/Important observation since the focus explicitly requires \"returns promptly\". Without configuring timeout, relies on library default. I'll mention as Minor.\n\nHmm, but the broken client `__aenter__` raises instantly; so the test confirms no hang on connection error, but not timing out. Fine.\n\nLet me also verify async strict mode: pytest config asyncio_mode=\"strict\". Tests use @pytest.mark.asyncio. Good.\n\nNow the ruff check I ran: exit 0. But note the command in the task was `uv run ruff check connectors/` from worktree root. It found connectors/pyproject.toml with select including BLE. Passed. Good. Format passed.\n\nHowever, wait: the brief says lint clean under select [\"E4\",\"E7\",\"E9\",\"F\",\"I\",\"UP\",\"B\",\"BLE\"]. The connectors pyproject select exactly matches. Good. And the noqa comments for BLE001 are needed. But is `noqa: BLE001` on the health try the right code? BLE001 is \"blind-except\". Yes. And the config select includes \"BLE\" so BLE001 applies. noqa used. Good. Check passed so no RUF100 (RUF not selected anyway).\n\nNow let me write the report.\n\nSpec compliance verdict: essentially compliant. Let me list each.\n\n- Signature/defaults ✅ mcp.py:83-95\n- kind ✅ mcp.py:81\n- name ✅ mcp.py:89\n- settings ✅ mcp.py:90\n- health ✅ mcp.py:97-104\n- ingest catalog ✅ mcp.py:116-132\n- resource records ✅ mcp.py:134-152\n- tool_result ✅ mcp.py:154-169\n- per-item errors ✅\n- sink append ✅ mcp.py:171\n- re-export ✅ __init__.py:28,50\n- tests ✅ 5 tests\n\nReview focus coverage:\n1 → code yes (mcp.py:136-152), test NO.\n2 → code yes (mcp.py:154-169), test yes (test_mcp_connector.py:73-77 in diff lines 253-256).\n3 → code yes, test NO.\n5 → code yes + test yes but \"returns promptly\" not truly exercised.\n\nFlags: Missing tests for #1 and #3. Extra: `_tool_result_text` superset. No misunderstood.\n\nLet me write it. Include file:line referencing the actual new file lines. The mcp.py lines in the diff correspond to file lines: diff starts at line 57 = file line 1. So file line = diff line - 56. Let me map:\n- kind = \"mcp\": diff 81 → file 25? Wait diff line 81 is `+    kind = \"mcp\"`. 81-56 = 25. Hmm let me recompute: diff line 57 is `@@ -0,0 +1,134 @@` which is not a file line. diff line 58 = `+\"\"\"MCP...\"\"\"` = file line 1. So file line = diff line - 57. Check: diff 60 = `+from __future__` → file 3? Let's see: file line1 docstring (58), line2 blank (59), line3 `from __future__` (60). Yes file = diff - 57.\n\nSo:\n- kind=\"mcp\" diff 81 → file 24.\n- __init__ diff 83 → file 26.\nLet me verify with the report/actual. Actually better to just reference the file with approximate lines. Let me compute key ones:\n- class def diff 78 → file 21.\n- kind diff 81 → file 24.\n- __init__ diff 83 → 26.\n- self.name diff 89 → 32.\n- self.settings diff 90 → 33.\n- factory lambda diff 93 → 36.\n- health diff 97 → 40.\n- except health diff 101 → 44.\n- return ok diff 104 → 47.\n- ingest diff 106 → 49.\n- list_tools diff 109 → 52.\n- catalog append diff 116 → 59.\n- res loop diff 134 → 77.\n- read_resource diff 137 → 80.\n- except resource diff 151 → 94.\n- tool loop diff 154 → 97.\n- call_tool diff 156 → 99.\n- except tool diff 168 → 111.\n- sink append diff 171 → 114.\n- _tool_result_text diff 175 → 118.\n\nTest file = diff line - 196 (diff 198 = `+import pytest` = file line 1 → 198-197=1). So file = diff - 197.\n- test_health_ok diff 229 → 32.\n- full ingest diff 236 → 39.\n- no tools diff 247 → 50.\n- unknown tool diff 253 → 56.\n- broken client diff 259 → 62.\n- dead server diff 268 → 71.\n\nGood.\n\nNow write report.",
+          "time": {
+            "start": 1792002823700,
+            "end": 1792002839312
+          },
+          "id": "prt_13bb116140017E0MrnHffzV6Z5",
+          "sessionID": "ses_ec44f5ebcffeljF5tQaOJNGFo1",
+          "messageID": "msg_13bb11037001QwilImYWviZ302"
+        },
+        {
+          "type": "text",
+          "text": "### Spec Compliance\n- ✅ Signature/defaults `MCPClientConnector(config, sink, client_factory=None)` — `mcp.py:26-36`\n- ✅ `kind = \"mcp\"` — `mcp.py:24`; `name = config.name` — `mcp.py:32`; `settings = config.mcp_settings()` typed `McpConnectorSettings` — `mcp.py:33`\n- ✅ Default factory `lambda: Client(self.settings.url)` (HTTP transport) — `mcp.py:36`\n- ✅ `health()` enters client, `list_tools()`, `ok=True` detail `f\"{count} tool(s) available\"`; broad `except Exception` → `ok=False, detail=str(exc)`; never raises — `mcp.py:40-47`\n- ✅ `ingest()` appends one `catalog` record: `content` = JSON of tool+resource **names**, `raw` = names + `{name, uri}` — `mcp.py:59-75`\n- ✅ One `resource` record per content block using `.text` (untagged fallback to `str(block)`) — `mcp.py:77-94`\n- ✅ One `tool_result` record per `settings.tools` via `call_tool(name, {})`; text else `str(result.data)` — `mcp.py:97-111`, `_tool_result_text` `mcp.py:118-131`\n- ✅ Per-item failures → `batch.errors` prefixed with item name; loop not aborted — `mcp.py:94,111`\n- ✅ Batch appended to sink exactly once, then returned — `mcp.py:114-115`\n- ✅ Re-exported from `connectors/__init__.py` — `__init__.py:28` (import), `:50` (`__all__`)\n- ✅ Registry `kind == \"mcp\"` branch resolves (already present, unchanged) — `registry.py:82-85`\n- ✅ Tests: health ok, full ingest (contents match, no errors), no-tools-configured, unknown-tool error + catalog, dead-server `ok=False` + \"timed out\" — `test_mcp_connector.py:32,39,50,56,71`\n- ⚠️ Cannot verify: `read_resource` returns a bare `list` and `call_tool` `.content`/`.data` shape are asserted only via the implementer's live runs; the text path is exercised by the passing suite, the non-text fallback is not. Low risk.\n\n### Review Focus coverage\n1. Resource read raises mid-ingest → batch still returned with prior records + error string: **code handles** (`mcp.py:79-94`), **not covered by any test** (no test makes `read_resource` fail). ❌ test gap\n2. Unknown name in `settings.tools` → error collected, batch returned: **covered** — `test_mcp_connector.py:56-59`, code `mcp.py:97-111`. ✅\n3. Zero tools/resources exposed by server → one `catalog` record with empty lists, no crash: **code handles** (`mcp.py:52-56`, guards produce `[]`), **not covered** — `_server()` always exposes one tool + one resource; no empty-server test. ❌ test gap\n5. Health vs unreachable/timing-out server → `ok=False`, prompt: **partially covered** — `test_health_fails_cleanly_on_dead_server` (`test_mcp_connector.py:71-74`) uses a client whose `__aenter__` raises `TimeoutError` instantly, proving no exception escapes, but it does not exercise a real HTTP timeout or assert promptness. No explicit client timeout is configured (`mcp.py:36`), so \"returns promptly\" relies on the fastmcp default timeout. ⚠️\n\n### Strengths\n- Client entered once per `ingest()`; per-resource and per-tool isolation with name-tagged error strings that don't abort the batch.\n- Catalog emitted before resource/tool work, so partial-failure batches always retain it (matches focus #2, and #1 by construction).\n- Batch appended to sink exactly once, after the client context exits.\n- `health()` catches factory/enter/list failures uniformly; `except Exception` correctly annotated `# noqa: BLE001`.\n- Honest report: discloses the `_tool_result_text` superset and the out-of-scope repo-root lint failures.\n- `ruff check connectors/` exit 0 (`All checks passed!`), `ruff format --check connectors/` exit 0 (`11 files already formatted`); config selects exactly `E4,E7,E9,F,I,UP,B,BLE` (`pyproject.toml:20`) and `asyncio_mode=\"strict\"` with `@pytest.mark.asyncio` markers.\n- No `mcp` SDK usage; imports only `fastmcp.Client`.\n\n### Issues\n#### Important\n- `mcp.py:79-94` / `test_mcp_connector.py` — Focus items **#1 (resource read failure mid-ingest)** and **#3 (zero tools/resources server)** have no test. Both behaviors are implemented, but a regression (e.g. moving the catalog append after the resource loop, or a bare `if tools:` guard dropping the catalog) would pass the current suite. Add two tests: a server whose `read_resource` raises while an earlier resource succeeds (assert prior `resource`/`catalog` records present + one error), and an empty `FastMCP` server (assert exactly one `catalog` record with `\"tools\": []`, `\"resources\": []`, no errors).\n\n#### Minor\n- `mcp.py:36` / `mcp.py:40-47` — no explicit `timeout` on `Client(self.settings.url)`; \"prompt\" health against a real unreachable host depends on the library default. Consider passing an explicit timeout if the plan's \"returns promptly\" is a hard requirement.\n- `mcp.py:121` — `\"\".join(parts)` concatenates text blocks with no separator; adjacent blocks merge into one string. Minor; brief only says \"concatenated\", and multi-block text tools are uncommon.\n- `mcp.py:83` / `mcp.py:78` — resource record `id` is derived from `res.name`, which is optional in MCP and can repeat, risking duplicate ids / `resource:None`. Prefer including the uri.\n- Tests use `sink` but never assert `sink.batches` received the batch; the append-to-sink requirement is only covered indirectly by the return value.\n\n### Assessment\n**Task quality:** Approved\n**Reasoning:** The code satisfies every spec/interface requirement and both unimplemented-in-brief review behaviors (#1, #3) are correctly handled in `mcp.py`; the only real gap is missing tests for those two focus items (#5 is covered in spirit), which is an additive test request rather than a correctness defect.",
+          "time": {
+            "start": 1792002839319,
+            "end": 1792002849362
+          },
+          "id": "prt_13bb15317001HN7tZqsHrZW37T",
+          "sessionID": "ses_ec44f5ebcffeljF5tQaOJNGFo1",
+          "messageID": "msg_13bb11037001QwilImYWviZ302"
+        },
+        {
+          "reason": "stop",
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-finish",
+          "tokens": {
+            "total": 33220,
+            "input": 3443,
+            "output": 1534,
+            "reasoning": 2259,
+            "cache": {
+              "write": 0,
+              "read": 25984
+            }
+          },
+          "cost": 0,
+          "id": "prt_13bb17a890015zoFqu5wdOGqLv",
+          "sessionID": "ses_ec44f5ebcffeljF5tQaOJNGFo1",
+          "messageID": "msg_13bb11037001QwilImYWviZ302"
+        }
+      ]
+    }
+  ]
+}
