@@ -3,7 +3,7 @@
   "checkpoint_id": "01M4XT7WGBCR28C7264BZVCRS8",
   "session_id": "ses_ec46727a4ffeOR7FD5j1QJ3OXq",
   "strategy": "manual-commit",
-  "created_at": "2026-10-14T18:20:07.572351953Z",
+  "created_at": "2026-10-14T18:21:51.319870451Z",
   "branch": "mcp-connector-module",
   "checkpoints_count": 1,
   "files_touched": [
@@ -14,19 +14,21 @@
   "agent": "OpenCode",
   "model": "big-pickle",
   "turn_id": "e5f86f76088d",
-  "compact_transcript_start": 0,
+  "checkpoint_transcript_start": 4,
+  "transcript_lines_at_start": 4,
+  "compact_transcript_start": 4,
   "token_usage": {
-    "input_tokens": 5073,
+    "input_tokens": 0,
     "cache_creation_tokens": 0,
-    "cache_read_tokens": 50688,
-    "output_tokens": 1018,
-    "api_call_count": 3
+    "cache_read_tokens": 0,
+    "output_tokens": 0,
+    "api_call_count": 0
   },
   "session_metrics": {
     "turn_count": 1
   },
   "initial_attribution": {
-    "calculated_at": "2026-10-14T18:20:07.563460425Z",
+    "calculated_at": "2026-10-14T18:21:51.313364377Z",
     "agent_lines": 0,
     "agent_removed": 0,
     "human_added": 179,
