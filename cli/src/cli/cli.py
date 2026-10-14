@@ -20,7 +20,11 @@ def _version_callback(value: bool) -> None:
 
 
 @app.callback()
-def main(version: bool = typer.Option(False, "--version", callback=_version_callback, help="Show version")) -> None:  # noqa: B008
+def main(
+    version: bool = typer.Option(
+        False, "--version", callback=_version_callback, help="Show version"
+    ),
+) -> None:  # noqa: B008
     pass
 
 

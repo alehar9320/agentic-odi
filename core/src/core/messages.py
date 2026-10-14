@@ -36,8 +36,10 @@ Follow this sequence when guiding a user through the ODI process:
 ### General Rule
 Never skip stages. Always confirm the user has a Job defined (Stage 1) before capturing Outcomes (Stage 2), and always capture Outcomes (Stage 2) before building the Job Map (Stage 4)."""
 
+
 def get_odi_framework_guidelines() -> str:
     return ODI_FRAMEWORK_GUIDELINES
+
 
 CAPABILITIES = """Here is what I can help you with as your Agentic ODI assistant:
 
@@ -52,6 +54,7 @@ CAPABILITIES = """Here is what I can help you with as your Agentic ODI assistant
 
 def job_not_found(job_id: str) -> str:
     return f"Job not found: {job_id}"
+
 
 def customer_outcome_not_found(outcome_id: str) -> str:
     return f"Customer outcome not found: {outcome_id}"

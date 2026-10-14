@@ -9,6 +9,9 @@ dependencies = [
     "agentic-odi-core",
 ]
 
+[tool.uv.sources]
+agentic-odi-core = { workspace = true }
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
@@ -18,13 +21,13 @@ packages = ["src/mcp_server"]
 
 [tool.ruff]
 line-length = 100
-target-version = "py311"
+target-version = "py310"
 
 [tool.ruff.lint]
 select = ["E4", "E7", "E9", "F", "I", "UP", "B", "BLE"]
 
 [tool.mypy]
-python_version = "3.11"
+python_version = "3.10"
 ignore_missing_imports = true
 
 [project.scripts]

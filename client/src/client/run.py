@@ -1,7 +1,7 @@
 """
 run.py — Local dev launcher for Agentic ODI.
 
-Starts the FastMCP server (``python -m server``) and the Streamlit client
+Starts the FastMCP server (``python -m mcp_server``) and the Streamlit client
 (``client/app.py``) concurrently. Shutting down this script (Ctrl+C) terminates
 both processes.
 
@@ -34,7 +34,7 @@ def start_server() -> subprocess.Popen:
 
     print(f"Starting MCP server on http://localhost:{MCP_PORT}/mcp ...")
     # Fixed command, no shell, no untrusted input.
-    return subprocess.Popen([sys.executable, "-m", "server"])  # nosec B603
+    return subprocess.Popen([sys.executable, "-m", "mcp_server"])  # nosec B603
 
 
 def start_client() -> subprocess.Popen:

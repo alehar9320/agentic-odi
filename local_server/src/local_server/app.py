@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-from fastapi import FastAPI, HTTPException
-
 from core import ODIService
-from core.repository import InMemoryRepository, Repository
+from core.repository import Repository
 from core.sqlite_repository import SQLiteRepository
+from fastapi import FastAPI
 
 
 def create_app(repo: Repository | None = None) -> FastAPI:
@@ -14,6 +13,7 @@ def create_app(repo: Repository | None = None) -> FastAPI:
         repo = SQLiteRepository()
     service = ODIService(repo)
     app = FastAPI(title="Agentic ODI Local Server")
+    app.state.service = service
 
     @app.get("/health")
     def health() -> dict:
