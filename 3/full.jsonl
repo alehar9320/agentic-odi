@@ -1,0 +1,406 @@
+{
+  "info": {
+    "id": "ses_ec428bdf5ffeicW1pOqU3ALQaw",
+    "slug": "mighty-planet",
+    "projectID": "e4fe19106d06261ebfed21a0e3ba06559abf1100",
+    "directory": "/home/alexa/repos/agentic-odi",
+    "path": "",
+    "parentID": "ses_ec492423bffeG7aFTE5YTPUIJO",
+    "title": "Review Task 8 (lint debt cleanup) (@general subagent)",
+    "agent": "general",
+    "model": {
+      "id": "big-pickle",
+      "providerID": "opencode",
+      "variant": "default"
+    },
+    "version": "1.18.35",
+    "summary": {
+      "additions": 0,
+      "deletions": 0,
+      "files": 0
+    },
+    "cost": 0,
+    "tokens": {
+      "input": 42605,
+      "output": 1137,
+      "reasoning": 1196,
+      "cache": {
+        "read": 31741,
+        "write": 0
+      }
+    },
+    "permission": [
+      {
+        "permission": "task",
+        "pattern": "*",
+        "action": "deny"
+      }
+    ],
+    "time": {
+      "created": 1792005325322,
+      "updated": 1792005348292
+    }
+  },
+  "messages": [
+    {
+      "info": {
+        "role": "user",
+        "time": {
+          "created": 1792005325375
+        },
+        "agent": "general",
+        "model": {
+          "providerID": "opencode",
+          "modelID": "big-pickle"
+        },
+        "summary": {
+          "diffs": []
+        },
+        "id": "msg_13bd7423c0011eYRj50L3HvXaT",
+        "sessionID": "ses_ec428bdf5ffeicW1pOqU3ALQaw"
+      },
+      "parts": [
+        {
+          "type": "text",
+          "text": "You are reviewing one task's implementation: first whether it matches its requirements, then whether it is well-built. Task-scoped gate, not a merge review.\n\n## Working directory\n/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module\n\n## What Was Requested\nRead the task brief: /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-8-brief.md\n\nThe goal is to make CI's `lint` job green WITHOUT behavior change:\n- `uv run ruff check .` → exit 0\n- `uv run ruff format --check .` → exit 0\nRules: auto-fix I001/F401/F841; manual E702 (split semicolons), B008 (`# noqa: B008`), BLE001 (`# noqa: BLE001` where intentional), UP042 (keep `(str, Enum)` + `# noqa: UP042`, do NOT use StrEnum). Root `pyproject.toml` must add `[tool.ruff] extend-exclude = [\"docs\"]`. The untracked `docs/` plan must NOT be committed.\n\n## What the Implementer Claims They Built\nRead the implementer's report: /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-8-report.md\n\n## Diff Under Review\n**Base:** e049313cceb6c7ba7abe2adbcbf5e1df59f9bc04\n**Head:** f0c4e3794eef178edf5d91e4ed6dd9c12da81b57\n**Diff file:** /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/review-e049313..f0c4e37.diff\n\nRead the diff file once. Do not re-run git commands or crawl the codebase. Read-only review: do not mutate anything.\n\n## You Do Not Dispatch Subagents. Do all review yourself.\n\n## Do Not Trust the Report. Verify claims against the diff.\n\n## Tests\nThe implementer already ran the suite. Do not re-run it. Run ONLY these to independently confirm the CI lint gate is green:\n  `cd /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module && uv run ruff check . --output-format=concise; echo \"CHECK=$?\"; uv run ruff format --check . >/dev/null; echo \"FORMAT=$?\"`\nReport the exit codes.\n\n## Part 1: Spec Compliance / Behavior Preservation (the core risk)\nThis task's correctness = \"no behavior change\". Examine every hunk and confirm each change is behavior-preserving:\n- Removed `F401` imports: confirm each was genuinely unused (not a re-export, not used implicitly). Explicitly check `mcp_server/src/mcp_server/__init__.py` — did the change alter `__all__`/re-exports? (There is a 9-line change there; make sure no public re-export was dropped.)\n- `F841` `service` in `local_server/app.py`: was the assignment removed, or kept with noqa? If a constructor with possible side effects was removed, flag it.\n- `E702` semicolon splits in `cli/src/cli/outcomes.py`: confirm statements are identical, just on separate lines.\n- `B008`/`BLE001`/`UP042` noqa additions: confirm the underlying code is unchanged (only comments added) and `(str, Enum)` is retained.\n- `ruff format` hunks: pure whitespace/line-wrap only?\n- root `pyproject.toml`: `extend-exclude = [\"docs\"]` added correctly.\nFlag any hunk that is NOT provably behavior-preserving as Critical/Important.\n\n## Part 2: Quality\nAre the noqa comments justified/not over-broad? Any unintended file touched? Cite file:line.\n\n## Calibration\nActual severity. Minor = polish. Acknowledge what's done well.\n\n## Output Format\n### Spec Compliance\n- ✅/❌ [file:line]\n- ⚠️ Cannot verify: [...]\n### Behavior preservation\nper-file verdict\n### Strengths\n### Issues\n#### Critical / Important / Minor\n(file:line, what's wrong, why, how to fix)\n### Assessment\n**Task quality:** Approved | Needs fixes\n**Reasoning:** [1-2 sentences]\n\nYour final message IS the report — begin with the spec-compliance verdict; no preamble.",
+          "id": "prt_13bd74249001tMCebCvpGJECby",
+          "sessionID": "ses_ec428bdf5ffeicW1pOqU3ALQaw",
+          "messageID": "msg_13bd7423c0011eYRj50L3HvXaT"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_13bd7423c0011eYRj50L3HvXaT",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 15419,
+          "input": 14667,
+          "output": 80,
+          "reasoning": 599,
+          "cache": {
+            "write": 0,
+            "read": 73
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792005326015,
+          "completed": 1792005342922
+        },
+        "finish": "tool-calls",
+        "id": "msg_13bd744bf001XedDMsA682ygfh",
+        "sessionID": "ses_ec428bdf5ffeicW1pOqU3ALQaw"
+      },
+      "parts": [
+        {
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-start",
+          "id": "prt_13bd78670001s0Ek5c2ahWbwZy",
+          "sessionID": "ses_ec428bdf5ffeicW1pOqU3ALQaw",
+          "messageID": "msg_13bd744bf001XedDMsA682ygfh"
+        },
+        {
+          "type": "tool",
+          "tool": "read",
+          "callID": "62d2a34c-4a30-4a7c-a8ed-166b9eaba47c",
+          "state": {
+            "status": "error",
+            "input": {
+              "filePath": "/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/review-e049313..f0c4e37.diff",
+              "offset": "1.0",
+              "limit": "1000.0"
+            },
+            "error": "The read tool was called with invalid arguments: SchemaError(Expected number | undefined, got \"1.0\"\n  at [\"offset\"]).\nPlease rewrite the input so it satisfies the expected schema.",
+            "time": {
+              "start": 1792005342851,
+              "end": 1792005342854
+            }
+          },
+          "id": "prt_13bd78674001srujGw8fcSh8xS",
+          "sessionID": "ses_ec428bdf5ffeicW1pOqU3ALQaw",
+          "messageID": "msg_13bd744bf001XedDMsA682ygfh"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-finish",
+          "tokens": {
+            "total": 15419,
+            "input": 14667,
+            "output": 80,
+            "reasoning": 599,
+            "cache": {
+              "write": 0,
+              "read": 73
+            }
+          },
+          "cost": 0,
+          "id": "prt_13bd786960011Sxhunbb4zJobz",
+          "sessionID": "ses_ec428bdf5ffeicW1pOqU3ALQaw",
+          "messageID": "msg_13bd744bf001XedDMsA682ygfh"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_13bd7423c0011eYRj50L3HvXaT",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 14932,
+          "input": 119,
+          "output": 71,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 14742
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792005342927,
+          "completed": 1792005345229
+        },
+        "finish": "tool-calls",
+        "id": "msg_13bd786cf001SyTvpXR5zzanHS",
+        "sessionID": "ses_ec428bdf5ffeicW1pOqU3ALQaw"
+      },
+      "parts": [
+        {
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-start",
+          "id": "prt_13bd78f44001qk1hmh0LC54dxV",
+          "sessionID": "ses_ec428bdf5ffeicW1pOqU3ALQaw",
+          "messageID": "msg_13bd786cf001SyTvpXR5zzanHS"
+        },
+        {
+          "type": "tool",
+          "tool": "read",
+          "callID": "a653a8c0-fdd8-4a89-ab84-f5836ca6f6c4",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/review-e049313..f0c4e37.diff",
+              "offset": 1,
+              "limit": 1000
+            },
+            "output": "<path>/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/review-e049313..f0c4e37.diff</path>\n<type>file</type>\n<content>\n1: # Review package: e049313cceb6c7ba7abe2adbcbf5e1df59f9bc04..HEAD\n2: \n3: ## Commits\n4: f0c4e37 chore: reconcile pre-existing ruff lint and format debt\n5: \n6: ## Files changed\n7:  cli/src/cli/backend.py                  | 10 ++++++----\n8:  cli/src/cli/outcomes.py                 | 34 ++++++++++++++++++++++++---------\n9:  core/src/core/messages.py               |  3 +++\n10:  core/src/core/models.py                 |  8 +++++---\n11:  core/src/core/sqlite_repository.py      |  9 +++++----\n12:  core/tests/test_core_import.py          |  1 +\n13:  local_server/src/local_server/app.py    |  7 +++----\n14:  local_server/tests/test_api.py          |  2 +-\n15:  mcp_server/src/mcp_server/__init__.py   |  9 ++++++++-\n16:  mcp_server/src/mcp_server/mcp_server.py | 19 ++++++------------\n17:  pyproject.toml                          |  3 +++\n18:  11 files changed, 66 insertions(+), 39 deletions(-)\n19: \n20: ## Diff\n21: diff --git a/cli/src/cli/backend.py b/cli/src/cli/backend.py\n22: index f9a2484..8750d44 100644\n23: --- a/cli/src/cli/backend.py\n24: +++ b/cli/src/cli/backend.py\n25: @@ -28,38 +28,38 @@ class LocalBackend(Backend):\n26:                  job_id=args[\"job_id\"],\n27:                  customer_value=args[\"customer_value\"],\n28:                  business_value=args[\"business_value\"],\n29:                  step_id=args.get(\"step_id\"),\n30:              )\n31:              return f\"Customer outcome created successfully: {co.model_dump_json()}\"\n32:          if tool_name == \"get_customer_outcome\":\n33:              try:\n34:                  co = self.service.get_customer_outcome(args[\"outcome_id\"])\n35:                  return co.model_dump_json()\n36: -            except Exception as e:\n37: +            except Exception as e:  # noqa: BLE001\n38:                  return str(e)\n39:          if tool_name == \"list_customer_outcomes\":\n40:              cos = self.service.list_customer_outcomes(args.get(\"job_id\"))\n41:              import json\n42:  \n43:              return json.dumps([c.model_dump() for c in cos])\n44:          if tool_name == \"update_customer_outcome\":\n45:              try:\n46:                  co = self.service.update_customer_outcome(args[\"outcome_id\"], args)\n47:                  return f\"Customer outcome updated successfully: {co.model_dump_json()}\"\n48: -            except Exception as e:\n49: +            except Exception as e:  # noqa: BLE001\n50:                  return str(e)\n51:          if tool_name == \"delete_customer_outcome\":\n52:              try:\n53:                  self.service.delete_customer_outcome(args[\"outcome_id\"])\n54:                  return f\"Customer outcome deleted successfully: {args['outcome_id']}\"\n55: -            except Exception as e:\n56: +            except Exception as e:  # noqa: BLE001\n57:                  return str(e)\n58:          if tool_name == \"compute_opportunity\":\n59:              score = self.service.compute_opportunity(args[\"importance\"], args[\"satisfaction\"])\n60:              return f\"Opportunity score: {score:.2f}\"\n61:          raise NotImplementedError(f\"Unknown tool: {tool_name}\")\n62:  \n63:  \n64:  class MCPBackend(Backend):\n65:      def __init__(self, mcp_url: str) -> None:\n66:          self.mcp_url = mcp_url\n67: @@ -71,12 +71,14 @@ class MCPBackend(Backend):\n68:  \n69:  \n70:  def get_backend(\n71:      backend: str | None = None, db_path: str | None = None, mcp_url: str | None = None\n72:  ) -> Backend:\n73:      if backend is None:\n74:          backend = os.environ.get(\"AGENTIC_ODI_BACKEND\", \"local\")\n75:      if backend == \"local\":\n76:          return LocalBackend(db_path=db_path)\n77:      if backend == \"mcp\":\n78: -        return MCPBackend(mcp_url or os.environ.get(\"AGENTIC_ODI_MCP_URL\", \"http://localhost:8000/mcp\"))\n79: +        return MCPBackend(\n80: +            mcp_url or os.environ.get(\"AGENTIC_ODI_MCP_URL\", \"http://localhost:8000/mcp\")\n81: +        )\n82:      raise ValueError(f\"Unknown backend: {backend}\")\n83: diff --git a/cli/src/cli/outcomes.py b/cli/src/cli/outcomes.py\n84: index eb6f94b..45ec50c 100644\n85: --- a/cli/src/cli/outcomes.py\n86: +++ b/cli/src/cli/outcomes.py\n87: @@ -40,27 +40,27 @@ def _call_mcp(tool: str, args: dict[str, Any], mcp_url: str = MCP_URL_DEFAULT) -\n88:      try:\n89:          return asyncio.run(_run())\n90:      except Exception as exc:  # noqa: BLE001\n91:          typer.echo(f\"Error: could not reach MCP server at {mcp_url}: {exc}\", err=True)\n92:          raise typer.Exit(code=1) from exc\n93:  \n94:  \n95:  @outcomes_app.command(\"add\")\n96:  def add(\n97:      job_id: str = typer.Option(..., help=\"Job ID the outcome belongs to\"),\n98: -    direction: DirectionOption = typer.Option(..., help=\"minimize | maximize\"),\n99: +    direction: DirectionOption = typer.Option(..., help=\"minimize | maximize\"),  # noqa: B008\n100:      unit_of_measure: str = typer.Option(..., \"--unit\"),\n101:      object_of_control: str = typer.Option(..., \"--object\"),\n102:      statement: str = typer.Option(..., help=\"Full outcome statement\"),\n103:      importance: float = typer.Option(..., min=1.0, max=10.0),\n104:      satisfaction: float = typer.Option(..., min=1.0, max=10.0),\n105: -    category: CategoryOption = typer.Option(..., help=\"Business impact category\"),\n106: +    category: CategoryOption = typer.Option(..., help=\"Business impact category\"),  # noqa: B008\n107:      business_statement: str = typer.Option(..., help=\"Business value statement\"),\n108:      contextual_clarifier: str | None = typer.Option(default=None),\n109:      step_id: str | None = typer.Option(default=None),\n110:      mcp_url: str = typer.Option(default=MCP_URL_DEFAULT, help=\"MCP server URL\"),\n111:  ) -> None:\n112:      \"\"\"Add a Customer Outcome with customer and business value.\"\"\"\n113:      customer_value = {\n114:          \"direction\": direction.value,\n115:          \"unit_of_measure\": unit_of_measure,\n116:          \"object_of_control\": object_of_control,\n117: @@ -74,55 +74,63 @@ def add(\n118:          \"category\": category.value,\n119:          \"statement\": business_statement,\n120:      }\n121:      args: dict[str, Any] = {\n122:          \"job_id\": job_id,\n123:          \"customer_value\": customer_value,\n124:          \"business_value\": business_value,\n125:      }\n126:      if step_id:\n127:          args[\"step_id\"] = step_id\n128: -    from cli.backend import get_backend; typer.echo(get_backend(\"mcp\", mcp_url=mcp_url).call(\"add_customer_outcome\", args))\n129: +    from cli.backend import get_backend\n130: +\n131: +    typer.echo(get_backend(\"mcp\", mcp_url=mcp_url).call(\"add_customer_outcome\", args))\n132:  \n133:  \n134:  @outcomes_app.command(\"get\")\n135:  def get(\n136:      outcome_id: str = typer.Argument(...),\n137:      mcp_url: str = typer.Option(default=MCP_URL_DEFAULT, help=\"MCP server URL\"),\n138:  ) -> None:\n139:      \"\"\"Get a Customer Outcome by ID.\"\"\"\n140: -    from cli.backend import get_backend; typer.echo(get_backend(\"mcp\", mcp_url=mcp_url).call(\"get_customer_outcome\", {\"outcome_id\": outcome_id}))\n141: +    from cli.backend import get_backend\n142: +\n143: +    typer.echo(\n144: +        get_backend(\"mcp\", mcp_url=mcp_url).call(\"get_customer_outcome\", {\"outcome_id\": outcome_id})\n145: +    )\n146:  \n147:  \n148:  @outcomes_app.command(\"list\")\n149:  def list_outcomes(\n150:      job_id: str | None = typer.Option(default=None, help=\"Filter by job ID\"),\n151:      mcp_url: str = typer.Option(default=MCP_URL_DEFAULT, help=\"MCP server URL\"),\n152:  ) -> None:\n153:      \"\"\"List Customer Outcomes.\"\"\"\n154:      args: dict[str, Any] = {}\n155:      if job_id:\n156:          args[\"job_id\"] = job_id\n157: -    from cli.backend import get_backend; typer.echo(get_backend(\"mcp\", mcp_url=mcp_url).call(\"list_customer_outcomes\", args))\n158: +    from cli.backend import get_backend\n159: +\n160: +    typer.echo(get_backend(\"mcp\", mcp_url=mcp_url).call(\"list_customer_outcomes\", args))\n161:  \n162:  \n163:  @outcomes_app.command(\"update\")\n164:  def update(\n165:      outcome_id: str = typer.Argument(...),\n166:      importance: float | None = typer.Option(default=None, min=1.0, max=10.0),\n167:      satisfaction: float | None = typer.Option(default=None, min=1.0, max=10.0),\n168: -    direction: DirectionOption | None = typer.Option(default=None),\n169: +    direction: DirectionOption | None = typer.Option(default=None),  # noqa: B008\n170:      unit_of_measure: str | None = typer.Option(default=None, help=\"Unit of measure\"),\n171:      object_of_control: str | None = typer.Option(default=None, help=\"Object of control\"),\n172:      contextual_clarifier: str | None = typer.Option(default=None),\n173:      statement: str | None = typer.Option(default=None),\n174: -    category: CategoryOption | None = typer.Option(default=None),\n175: +    category: CategoryOption | None = typer.Option(default=None),  # noqa: B008\n176:      business_statement: str | None = typer.Option(default=None),\n177:      detail: str | None = typer.Option(default=None),\n178:      estimated_annual_value: float | None = typer.Option(default=None),\n179:      confidence: float | None = typer.Option(default=None),\n180:      step_id: str | None = typer.Option(default=None),\n181:      mcp_url: str = typer.Option(default=MCP_URL_DEFAULT, help=\"MCP server URL\"),\n182:  ) -> None:\n183:      \"\"\"Update a Customer Outcome.\"\"\"\n184:      args: dict[str, Any] = {\"outcome_id\": outcome_id}\n185:      if step_id is not None:\n186: @@ -144,35 +152,43 @@ def update(\n187:      if category is not None:\n188:          args[\"category\"] = category.value\n189:      if business_statement is not None:\n190:          args[\"business_statement\"] = business_statement\n191:      if detail is not None:\n192:          args[\"detail\"] = detail\n193:      if estimated_annual_value is not None:\n194:          args[\"estimated_annual_value\"] = estimated_annual_value\n195:      if confidence is not None:\n196:          args[\"confidence\"] = confidence\n197: -    from cli.backend import get_backend; typer.echo(get_backend(\"mcp\", mcp_url=mcp_url).call(\"update_customer_outcome\", args))\n198: +    from cli.backend import get_backend\n199: +\n200: +    typer.echo(get_backend(\"mcp\", mcp_url=mcp_url).call(\"update_customer_outcome\", args))\n201:  \n202:  \n203:  @outcomes_app.command(\"delete\")\n204:  def delete(\n205:      outcome_id: str = typer.Argument(...),\n206:      yes: bool = typer.Option(False, \"--yes\", \"-y\", help=\"Skip confirmation\"),\n207:      mcp_url: str = typer.Option(default=MCP_URL_DEFAULT, help=\"MCP server URL\"),\n208:  ) -> None:\n209:      \"\"\"Delete a Customer Outcome.\"\"\"\n210:      if not yes:\n211:          confirm = typer.confirm(f\"Delete customer outcome {outcome_id}?\")\n212:          if not confirm:\n213:              raise typer.Exit()\n214: -    from cli.backend import get_backend; typer.echo(get_backend(\"mcp\", mcp_url=mcp_url).call(\"delete_customer_outcome\", {\"outcome_id\": outcome_id}))\n215: +    from cli.backend import get_backend\n216: +\n217: +    typer.echo(\n218: +        get_backend(\"mcp\", mcp_url=mcp_url).call(\n219: +            \"delete_customer_outcome\", {\"outcome_id\": outcome_id}\n220: +        )\n221: +    )\n222:  \n223:  \n224:  @outcomes_app.command(\"score\")\n225:  def score(\n226:      importance: float = typer.Argument(..., min=1.0, max=10.0),\n227:      satisfaction: float = typer.Argument(..., min=1.0, max=10.0),\n228:      mcp_url: str = typer.Option(default=MCP_URL_DEFAULT, help=\"MCP server URL\"),\n229:  ) -> None:\n230:      \"\"\"Compute ODI Opportunity Score.\"\"\"\n231:      typer.echo(\n232: diff --git a/core/src/core/messages.py b/core/src/core/messages.py\n233: index f8c885d..93eb16d 100644\n234: --- a/core/src/core/messages.py\n235: +++ b/core/src/core/messages.py\n236: @@ -29,29 +29,32 @@ Follow this sequence when guiding a user through the ODI process:\n237:  ### Stage 4: Build the Job Map\n238:  - **When**: After key outcomes are captured. Use to organize the job execution context.\n239:  - **Ask the user**: 'What are the key phases or steps the customer takes when doing this job?'\n240:  - **Tools to use**:\n241:    - `add_step(job_id, name, order)` — Add each chronological step.\n242:    - `get_job_map(job_id)` — View the complete ordered job map.\n243:  \n244:  ### General Rule\n245:  Never skip stages. Always confirm the user has a Job defined (Stage 1) before capturing Outcomes (Stage 2), and always capture Outcomes (Stage 2) before building the Job Map (Stage 4).\"\"\"\n246:  \n247: +\n248:  def get_odi_framework_guidelines() -> str:\n249:      return ODI_FRAMEWORK_GUIDELINES\n250:  \n251: +\n252:  CAPABILITIES = \"\"\"Here is what I can help you with as your Agentic ODI assistant:\n253:  \n254:  🎯 **Manage Jobs-to-be-Done (JTBD)**: Add, list, and retrieve Jobs.\n255:  🗺️ **Build Job Maps**: Break down a Job into ordered Steps.\n256:  📊 **Track Desired Outcomes**: Record outcomes with importance/satisfaction scores and calculate Opportunity Scores.\n257:  📊 **Customer Outcomes**: Manage ODI-aligned customer outcomes with customer value, business value, and opportunity scoring.\n258:  📖 **ODI Framework Guidelines**: Call `get_odi_framework_guidelines()` to see which tool to use at each ODI stage.\n259:  \n260:  💡 **Tip**: Ask me to 'get started' and I will guide you step-by-step through the ODI process from intent to opportunity scoring!\"\"\"\n261:  \n262:  \n263:  def job_not_found(job_id: str) -> str:\n264:      return f\"Job not found: {job_id}\"\n265:  \n266: +\n267:  def customer_outcome_not_found(outcome_id: str) -> str:\n268:      return f\"Customer outcome not found: {outcome_id}\"\n269: diff --git a/core/src/core/models.py b/core/src/core/models.py\n270: index 77d802b..582ccce 100644\n271: --- a/core/src/core/models.py\n272: +++ b/core/src/core/models.py\n273: @@ -1,26 +1,26 @@\n274:  \"\"\"Core domain models for Agentic ODI.\"\"\"\n275:  \n276:  from __future__ import annotations\n277:  \n278:  import uuid\n279:  from enum import Enum\n280:  \n281:  from pydantic import BaseModel, Field, computed_field\n282:  \n283:  \n284: -class Direction(str, Enum):\n285: +class Direction(str, Enum):  # noqa: UP042\n286:      MINIMIZE = \"minimize\"\n287:      MAXIMIZE = \"maximize\"\n288:  \n289:  \n290: -class BusinessImpactCategory(str, Enum):\n291: +class BusinessImpactCategory(str, Enum):  # noqa: UP042\n292:      REVENUE_GROWTH = \"revenue_growth\"\n293:      COST_REDUCTION = \"cost_reduction\"\n294:      RETENTION = \"retention\"\n295:      RISK_MITIGATION = \"risk_mitigation\"\n296:      OPERATIONAL_EFFICIENCY = \"operational_efficiency\"\n297:      COMPLIANCE = \"compliance\"\n298:      BRAND_REPUTATION = \"brand_reputation\"\n299:      OTHER = \"other\"\n300:  \n301:  \n302: @@ -91,18 +91,20 @@ class BusinessValue(BaseModel):\n303:      category: BusinessImpactCategory\n304:      statement: str\n305:      detail: str | None = None\n306:      estimated_annual_value: float | None = Field(default=None, ge=0.0)\n307:      confidence: float | None = Field(default=None, ge=0.0, le=1.0)\n308:  \n309:  \n310:  class CustomerOutcome(BaseModel):\n311:      id: str = Field(default_factory=lambda: str(uuid.uuid4()))\n312:      job_id: str = Field(..., description=\"The ID of the Job this outcome relates to\")\n313: -    step_id: str | None = Field(default=None, description=\"The ID of the specific Step, if applicable\")\n314: +    step_id: str | None = Field(\n315: +        default=None, description=\"The ID of the specific Step, if applicable\"\n316: +    )\n317:      customer_value: CustomerValue\n318:      business_value: BusinessValue\n319:  \n320:      @computed_field\n321:      @property\n322:      def opportunity_score(self) -> float:\n323:          return self.customer_value.opportunity_score\n324: diff --git a/core/src/core/sqlite_repository.py b/core/src/core/sqlite_repository.py\n325: index 62e8ef5..4d49722 100644\n326: --- a/core/src/core/sqlite_repository.py\n327: +++ b/core/src/core/sqlite_repository.py\n328: @@ -1,15 +1,14 @@\n329:  \"\"\"SQLite-backed repository using append-only IntentStore for events/audit.\"\"\"\n330:  \n331:  from __future__ import annotations\n332:  \n333: -import json\n334:  import os\n335:  from typing import Any\n336:  \n337:  from core.intent_store import IntentStore\n338:  from core.models import CustomerOutcome, Job, Outcome, Step\n339:  from core.repository import Repository\n340:  \n341:  \n342:  class SQLiteRepository(Repository):\n343:      def __init__(self, db_path: str | None = None) -> None:\n344: @@ -38,21 +37,21 @@ class SQLiteRepository(Repository):\n345:              elif et == \"CUSTOMER_OUTCOME_CREATED\":\n346:                  self.customer_outcomes[p[\"id\"]] = CustomerOutcome.model_validate(p)\n347:              elif et == \"CUSTOMER_OUTCOME_UPDATED\":\n348:                  cid = p[\"id\"]\n349:                  co = self.customer_outcomes.get(cid)\n350:                  if co is not None:\n351:                      current = co.model_dump(exclude_unset=True)\n352:                      current.update(p.get(\"updates\", {}))\n353:                      try:\n354:                          self.customer_outcomes[cid] = co.model_validate(current)\n355: -                    except Exception:\n356: +                    except Exception:  # noqa: BLE001\n357:                          pass\n358:              elif et == \"CUSTOMER_OUTCOME_DELETED\":\n359:                  cid = p[\"id\"]\n360:                  self.customer_outcomes.pop(cid, None)\n361:          # also snapshot jobs/steps/outcomes? we emitted above\n362:  \n363:      def add_job(self, job: Job) -> Job:\n364:          self.store.append(\"JOB_CREATED\", job.model_dump())\n365:          self.jobs[job.id] = job\n366:          return job\n367: @@ -88,29 +87,31 @@ class SQLiteRepository(Repository):\n368:          return co\n369:  \n370:      def get_customer_outcome(self, outcome_id: str) -> CustomerOutcome | None:\n371:          return self.customer_outcomes.get(outcome_id)\n372:  \n373:      def list_customer_outcomes(self, job_id: str | None = None) -> list[CustomerOutcome]:\n374:          if job_id is None:\n375:              return list(self.customer_outcomes.values())\n376:          return [co for co in self.customer_outcomes.values() if co.job_id == job_id]\n377:  \n378: -    def update_customer_outcome(self, outcome_id: str, updates: dict[str, Any]) -> CustomerOutcome | None:\n379: +    def update_customer_outcome(\n380: +        self, outcome_id: str, updates: dict[str, Any]\n381: +    ) -> CustomerOutcome | None:\n382:          co = self.customer_outcomes.get(outcome_id)\n383:          if not co:\n384:              return None\n385:          current = co.model_dump(exclude_unset=True)\n386:          current.update(updates)\n387:          try:\n388:              new_co = co.model_validate(current)\n389: -        except Exception:\n390: +        except Exception:  # noqa: BLE001\n391:              return None\n392:          self.store.append(\"CUSTOMER_OUTCOME_UPDATED\", {\"id\": outcome_id, \"updates\": updates})\n393:          self.customer_outcomes[outcome_id] = new_co\n394:          return new_co\n395:  \n396:      def delete_customer_outcome(self, outcome_id: str) -> bool:\n397:          if outcome_id in self.customer_outcomes:\n398:              self.store.append(\"CUSTOMER_OUTCOME_DELETED\", {\"id\": outcome_id})\n399:              del self.customer_outcomes[outcome_id]\n400:              return True\n401: diff --git a/core/tests/test_core_import.py b/core/tests/test_core_import.py\n402: index 576ae24..2570a70 100644\n403: --- a/core/tests/test_core_import.py\n404: +++ b/core/tests/test_core_import.py\n405: @@ -1,3 +1,4 @@\n406:  def test_core_exports_service():\n407:      import core\n408: +\n409:      assert hasattr(core, \"ODIService\")\n410: diff --git a/local_server/src/local_server/app.py b/local_server/src/local_server/app.py\n411: index acedb5e..81e271c 100644\n412: --- a/local_server/src/local_server/app.py\n413: +++ b/local_server/src/local_server/app.py\n414: @@ -1,25 +1,24 @@\n415:  \"\"\"FastAPI app for local server.\"\"\"\n416:  \n417:  from __future__ import annotations\n418:  \n419: -from fastapi import FastAPI, HTTPException\n420: -\n421:  from core import ODIService\n422: -from core.repository import InMemoryRepository, Repository\n423: +from core.repository import Repository\n424:  from core.sqlite_repository import SQLiteRepository\n425: +from fastapi import FastAPI\n426:  \n427:  \n428:  def create_app(repo: Repository | None = None) -> FastAPI:\n429:      if repo is None:\n430:          repo = SQLiteRepository()\n431: -    service = ODIService(repo)\n432: +    ODIService(repo)\n433:      app = FastAPI(title=\"Agentic ODI Local Server\")\n434:  \n435:      @app.get(\"/health\")\n436:      def health() -> dict:\n437:          return {\"status\": \"ok\"}\n438:  \n439:      @app.get(\"/capabilities\")\n440:      def capabilities() -> dict:\n441:          return {\"capabilities\": \"local\"}\n442:  \n443: diff --git a/local_server/tests/test_api.py b/local_server/tests/test_api.py\n444: index 2dada98..436804b 100644\n445: --- a/local_server/tests/test_api.py\n446: +++ b/local_server/tests/test_api.py\n447: @@ -1,12 +1,12 @@\n448: +from core.repository import InMemoryRepository\n449:  from fastapi.testclient import TestClient\n450:  \n451: -from core.repository import InMemoryRepository\n452:  from local_server.app import create_app\n453:  \n454:  \n455:  def test_health():\n456:      app = create_app(InMemoryRepository())\n457:      client = TestClient(app)\n458:      r = client.get(\"/health\")\n459:      assert r.status_code == 200\n460:      assert r.json()[\"status\"] == \"ok\"\n461: diff --git a/mcp_server/src/mcp_server/__init__.py b/mcp_server/src/mcp_server/__init__.py\n462: index 6efbc1e..40bb6ae 100644\n463: --- a/mcp_server/src/mcp_server/__init__.py\n464: +++ b/mcp_server/src/mcp_server/__init__.py\n465: @@ -2,11 +2,18 @@\n466:  \n467:  from mcp_server.mcp_server import (\n468:      compute_opportunity,\n469:      customer_outcomes_db,\n470:      jobs_db,\n471:      mcp,\n472:      outcomes_db,\n473:      steps_db,\n474:  )\n475:  \n476: -__all__ = [\"compute_opportunity\", \"customer_outcomes_db\", \"jobs_db\", \"mcp\", \"outcomes_db\", \"steps_db\"]\n477: +__all__ = [\n478: +    \"compute_opportunity\",\n479: +    \"customer_outcomes_db\",\n480: +    \"jobs_db\",\n481: +    \"mcp\",\n482: +    \"outcomes_db\",\n483: +    \"steps_db\",\n484: +]\n485: diff --git a/mcp_server/src/mcp_server/mcp_server.py b/mcp_server/src/mcp_server/mcp_server.py\n486: index de2995b..0d254d5 100644\n487: --- a/mcp_server/src/mcp_server/mcp_server.py\n488: +++ b/mcp_server/src/mcp_server/mcp_server.py\n489: @@ -1,36 +1,29 @@\n490:  \"\"\"Agentic ODI MCP Server (FastMCP).\"\"\"\n491:  \n492:  import json\n493: -import uuid\n494:  from typing import Any\n495:  \n496: -from fastmcp import FastMCP\n497: -\n498:  from core import (\n499:      CAPABILITIES,\n500: -    BusinessImpactCategory,\n501: -    CustomerOutcomeNotFoundError,\n502: -    JobNotFoundError,\n503: -    ODIService,\n504:      ODI_ASSISTANT_PROMPT,\n505:      ODI_FRAMEWORK_GUIDELINES,\n506: +    CustomerOutcomeNotFoundError,\n507: +    ODIService,\n508:      ValueOutOfRangeError,\n509:      compute_opportunity_score,\n510:  )\n511:  from core import (\n512:      customer_outcome_not_found as _cust_not_found,\n513:  )\n514: -from core import (\n515: -    job_not_found as _job_not_found,\n516: -)\n517:  from core.repository import InMemoryRepository\n518: +from fastmcp import FastMCP\n519:  \n520:  mcp = FastMCP(\"Agentic ODI\")\n521:  \n522:  _repo = InMemoryRepository()\n523:  service = ODIService(_repo)\n524:  \n525:  jobs_db = _repo.jobs\n526:  steps_db = _repo.steps\n527:  outcomes_db = _repo.outcomes\n528:  customer_outcomes_db = _repo.customer_outcomes\n529: @@ -119,21 +112,21 @@ def add_customer_outcome(\n530:      job = service.get_job(job_id)\n531:      if not job:\n532:          return f\"Error: Job with ID {job_id} not found.\"\n533:      try:\n534:          co = service.add_customer_outcome(\n535:              job_id=job_id,\n536:              customer_value=customer_value,\n537:              business_value=business_value,\n538:              step_id=step_id,\n539:          )\n540: -    except Exception as e:\n541: +    except Exception as e:  # noqa: BLE001\n542:          return f\"Error: {e}\"\n543:      return f\"Customer outcome created successfully: {co.model_dump_json()}\"\n544:  \n545:  \n546:  @mcp.tool\n547:  def get_customer_outcome(outcome_id: str) -> str:\n548:      try:\n549:          co = service.get_customer_outcome(outcome_id)\n550:      except CustomerOutcomeNotFoundError:\n551:          return _cust_not_found(outcome_id)\n552: @@ -193,41 +186,41 @@ def update_customer_outcome(\n553:          bv_d[\"detail\"] = detail\n554:      if estimated_annual_value is not None:\n555:          bv_d[\"estimated_annual_value\"] = estimated_annual_value\n556:      if confidence is not None:\n557:          bv_d[\"confidence\"] = confidence\n558:      updates[\"business_value\"] = bv_d\n559:      if step_id is not None:\n560:          updates[\"step_id\"] = step_id\n561:      try:\n562:          co2 = service.update_customer_outcome(outcome_id, updates)\n563: -    except Exception:\n564: +    except Exception:  # noqa: BLE001\n565:          return _cust_not_found(outcome_id)\n566:      return f\"Customer outcome updated successfully: {co2.model_dump_json()}\"\n567:  \n568:  \n569:  @mcp.tool\n570:  def delete_customer_outcome(outcome_id: str) -> str:\n571:      try:\n572:          service.delete_customer_outcome(outcome_id)\n573:      except CustomerOutcomeNotFoundError:\n574:          return _cust_not_found(outcome_id)\n575:      return f\"Customer outcome deleted successfully: {outcome_id}\"\n576:  \n577:  \n578:  @mcp.tool\n579:  def compute_opportunity(importance: float, satisfaction: float) -> str:\n580:      try:\n581:          if not (1.0 <= importance <= 10.0) or not (1.0 <= satisfaction <= 10.0):\n582:              return \"Error: importance and satisfaction must be between 1.0 and 10.0\"\n583:          score = compute_opportunity_score(importance, satisfaction)\n584: -    except Exception as e:\n585: +    except Exception as e:  # noqa: BLE001\n586:          return f\"Error: {e}\"\n587:      return f\"Opportunity score: {score:.2f}\"\n588:  \n589:  \n590:  @mcp.tool\n591:  def get_odi_framework_guidelines() -> str:\n592:      return ODI_FRAMEWORK_GUIDELINES\n593:  \n594:  \n595:  @mcp.tool\n596: diff --git a/pyproject.toml b/pyproject.toml\n597: index 495c3ba..65492e2 100644\n598: --- a/pyproject.toml\n599: +++ b/pyproject.toml\n600: @@ -15,10 +15,13 @@ dev = [\n601:      \"bandit==1.9.4\",\n602:      \"mypy==2.4.0\",\n603:      \"pytest==9.1.1\",\n604:      \"pytest-asyncio==1.4.0\",\n605:      \"pytest-cov==7.1.0\",\n606:      \"ruff==0.17.0\",\n607:  ]\n608:  \n609:  [tool.bandit]\n610:  exclude_dirs = [\".venv\", \"tests\"]\n611: +\n612: +[tool.ruff]\n613: +extend-exclude = [\"docs\"]\n\n(End of file - total 613 lines)\n</content>",
+            "metadata": {
+              "preview": "# Review package: e049313cceb6c7ba7abe2adbcbf5e1df59f9bc04..HEAD\n\n## Commits\nf0c4e37 chore: reconcile pre-existing ruff lint and format debt\n\n## Files changed\n cli/src/cli/backend.py                  | 10 ++++++----\n cli/src/cli/outcomes.py                 | 34 ++++++++++++++++++++++++---------\n core/src/core/messages.py               |  3 +++\n core/src/core/models.py                 |  8 +++++---\n core/src/core/sqlite_repository.py      |  9 +++++----\n core/tests/test_core_import.py          |  1 +\n local_server/src/local_server/app.py    |  7 +++----\n local_server/tests/test_api.py          |  2 +-\n mcp_server/src/mcp_server/__init__.py   |  9 ++++++++-\n mcp_server/src/mcp_server/mcp_server.py | 19 ++++++------------\n pyproject.toml                          |  3 +++\n 11 files changed, 66 insertions(+), 39 deletions(-)\n\n## Diff",
+              "truncated": false,
+              "loaded": [],
+              "display": {
+                "type": "file",
+                "path": "/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/review-e049313..f0c4e37.diff",
+                "text": "# Review package: e049313cceb6c7ba7abe2adbcbf5e1df59f9bc04..HEAD\n\n## Commits\nf0c4e37 chore: reconcile pre-existing ruff lint and format debt\n\n## Files changed\n cli/src/cli/backend.py                  | 10 ++++++----\n cli/src/cli/outcomes.py                 | 34 ++++++++++++++++++++++++---------\n core/src/core/messages.py               |  3 +++\n core/src/core/models.py                 |  8 +++++---\n core/src/core/sqlite_repository.py      |  9 +++++----\n core/tests/test_core_import.py          |  1 +\n local_server/src/local_server/app.py    |  7 +++----\n local_server/tests/test_api.py          |  2 +-\n mcp_server/src/mcp_server/__init__.py   |  9 ++++++++-\n mcp_server/src/mcp_server/mcp_server.py | 19 ++++++------------\n pyproject.toml                          |  3 +++\n 11 files changed, 66 insertions(+), 39 deletions(-)\n\n## Diff\ndiff --git a/cli/src/cli/backend.py b/cli/src/cli/backend.py\nindex f9a2484..8750d44 100644\n--- a/cli/src/cli/backend.py\n+++ b/cli/src/cli/backend.py\n@@ -28,38 +28,38 @@ class LocalBackend(Backend):\n                 job_id=args[\"job_id\"],\n                 customer_value=args[\"customer_value\"],\n                 business_value=args[\"business_value\"],\n                 step_id=args.get(\"step_id\"),\n             )\n             return f\"Customer outcome created successfully: {co.model_dump_json()}\"\n         if tool_name == \"get_customer_outcome\":\n             try:\n                 co = self.service.get_customer_outcome(args[\"outcome_id\"])\n                 return co.model_dump_json()\n-            except Exception as e:\n+            except Exception as e:  # noqa: BLE001\n                 return str(e)\n         if tool_name == \"list_customer_outcomes\":\n             cos = self.service.list_customer_outcomes(args.get(\"job_id\"))\n             import json\n \n             return json.dumps([c.model_dump() for c in cos])\n         if tool_name == \"update_customer_outcome\":\n             try:\n                 co = self.service.update_customer_outcome(args[\"outcome_id\"], args)\n                 return f\"Customer outcome updated successfully: {co.model_dump_json()}\"\n-            except Exception as e:\n+            except Exception as e:  # noqa: BLE001\n                 return str(e)\n         if tool_name == \"delete_customer_outcome\":\n             try:\n                 self.service.delete_customer_outcome(args[\"outcome_id\"])\n                 return f\"Customer outcome deleted successfully: {args['outcome_id']}\"\n-            except Exception as e:\n+            except Exception as e:  # noqa: BLE001\n                 return str(e)\n         if tool_name == \"compute_opportunity\":\n             score = self.service.compute_opportunity(args[\"importance\"], args[\"satisfaction\"])\n             return f\"Opportunity score: {score:.2f}\"\n         raise NotImplementedError(f\"Unknown tool: {tool_name}\")\n \n \n class MCPBackend(Backend):\n     def __init__(self, mcp_url: str) -> None:\n         self.mcp_url = mcp_url\n@@ -71,12 +71,14 @@ class MCPBackend(Backend):\n \n \n def get_backend(\n     backend: str | None = None, db_path: str | None = None, mcp_url: str | None = None\n ) -> Backend:\n     if backend is None:\n         backend = os.environ.get(\"AGENTIC_ODI_BACKEND\", \"local\")\n     if backend == \"local\":\n         return LocalBackend(db_path=db_path)\n     if backend == \"mcp\":\n-        return MCPBackend(mcp_url or os.environ.get(\"AGENTIC_ODI_MCP_URL\", \"http://localhost:8000/mcp\"))\n+        return MCPBackend(\n+            mcp_url or os.environ.get(\"AGENTIC_ODI_MCP_URL\", \"http://localhost:8000/mcp\")\n+        )\n     raise ValueError(f\"Unknown backend: {backend}\")\ndiff --git a/cli/src/cli/outcomes.py b/cli/src/cli/outcomes.py\nindex eb6f94b..45ec50c 100644\n--- a/cli/src/cli/outcomes.py\n+++ b/cli/src/cli/outcomes.py\n@@ -40,27 +40,27 @@ def _call_mcp(tool: str, args: dict[str, Any], mcp_url: str = MCP_URL_DEFAULT) -\n     try:\n         return asyncio.run(_run())\n     except Exception as exc:  # noqa: BLE001\n         typer.echo(f\"Error: could not reach MCP server at {mcp_url}: {exc}\", err=True)\n         raise typer.Exit(code=1) from exc\n \n \n @outcomes_app.command(\"add\")\n def add(\n     job_id: str = typer.Option(..., help=\"Job ID the outcome belongs to\"),\n-    direction: DirectionOption = typer.Option(..., help=\"minimize | maximize\"),\n+    direction: DirectionOption = typer.Option(..., help=\"minimize | maximize\"),  # noqa: B008\n     unit_of_measure: str = typer.Option(..., \"--unit\"),\n     object_of_control: str = typer.Option(..., \"--object\"),\n     statement: str = typer.Option(..., help=\"Full outcome statement\"),\n     importance: float = typer.Option(..., min=1.0, max=10.0),\n     satisfaction: float = typer.Option(..., min=1.0, max=10.0),\n-    category: CategoryOption = typer.Option(..., help=\"Business impact category\"),\n+    category: CategoryOption = typer.Option(..., help=\"Business impact category\"),  # noqa: B008\n     business_statement: str = typer.Option(..., help=\"Business value statement\"),\n     contextual_clarifier: str | None = typer.Option(default=None),\n     step_id: str | None = typer.Option(default=None),\n     mcp_url: str = typer.Option(default=MCP_URL_DEFAULT, help=\"MCP server URL\"),\n ) -> None:\n     \"\"\"Add a Customer Outcome with customer and business value.\"\"\"\n     customer_value = {\n         \"direction\": direction.value,\n         \"unit_of_measure\": unit_of_measure,\n         \"object_of_control\": object_of_control,\n@@ -74,55 +74,63 @@ def add(\n         \"category\": category.value,\n         \"statement\": business_statement,\n     }\n     args: dict[str, Any] = {\n         \"job_id\": job_id,\n         \"customer_value\": customer_value,\n         \"business_value\": business_value,\n     }\n     if step_id:\n         args[\"step_id\"] = step_id\n-    from cli.backend import get_backend; typer.echo(get_backend(\"mcp\", mcp_url=mcp_url).call(\"add_customer_outcome\", args))\n+    from cli.backend import get_backend\n+\n+    typer.echo(get_backend(\"mcp\", mcp_url=mcp_url).call(\"add_customer_outcome\", args))\n \n \n @outcomes_app.command(\"get\")\n def get(\n     outcome_id: str = typer.Argument(...),\n     mcp_url: str = typer.Option(default=MCP_URL_DEFAULT, help=\"MCP server URL\"),\n ) -> None:\n     \"\"\"Get a Customer Outcome by ID.\"\"\"\n-    from cli.backend import get_backend; typer.echo(get_backend(\"mcp\", mcp_url=mcp_url).call(\"get_customer_outcome\", {\"outcome_id\": outcome_id}))\n+    from cli.backend import get_backend\n+\n+    typer.echo(\n+        get_backend(\"mcp\", mcp_url=mcp_url).call(\"get_customer_outcome\", {\"outcome_id\": outcome_id})\n+    )\n \n \n @outcomes_app.command(\"list\")\n def list_outcomes(\n     job_id: str | None = typer.Option(default=None, help=\"Filter by job ID\"),\n     mcp_url: str = typer.Option(default=MCP_URL_DEFAULT, help=\"MCP server URL\"),\n ) -> None:\n     \"\"\"List Customer Outcomes.\"\"\"\n     args: dict[str, Any] = {}\n     if job_id:\n         args[\"job_id\"] = job_id\n-    from cli.backend import get_backend; typer.echo(get_backend(\"mcp\", mcp_url=mcp_url).call(\"list_customer_outcomes\", args))\n+    from cli.backend import get_backend\n+\n+    typer.echo(get_backend(\"mcp\", mcp_url=mcp_url).call(\"list_customer_outcomes\", args))\n \n \n @outcomes_app.command(\"update\")\n def update(\n     outcome_id: str = typer.Argument(...),\n     importance: float | None = typer.Option(default=None, min=1.0, max=10.0),\n     satisfaction: float | None = typer.Option(default=None, min=1.0, max=10.0),\n-    direction: DirectionOption | None = typer.Option(default=None),\n+    direction: DirectionOption | None = typer.Option(default=None),  # noqa: B008\n     unit_of_measure: str | None = typer.Option(default=None, help=\"Unit of measure\"),\n     object_of_control: str | None = typer.Option(default=None, help=\"Object of control\"),\n     contextual_clarifier: str | None = typer.Option(default=None),\n     statement: str | None = typer.Option(default=None),\n-    category: CategoryOption | None = typer.Option(default=None),\n+    category: CategoryOption | None = typer.Option(default=None),  # noqa: B008\n     business_statement: str | None = typer.Option(default=None),\n     detail: str | None = typer.Option(default=None),\n     estimated_annual_value: float | None = typer.Option(default=None),\n     confidence: float | None = typer.Option(default=None),\n     step_id: str | None = typer.Option(default=None),\n     mcp_url: str = typer.Option(default=MCP_URL_DEFAULT, help=\"MCP server URL\"),\n ) -> None:\n     \"\"\"Update a Customer Outcome.\"\"\"\n     args: dict[str, Any] = {\"outcome_id\": outcome_id}\n     if step_id is not None:\n@@ -144,35 +152,43 @@ def update(\n     if category is not None:\n         args[\"category\"] = category.value\n     if business_statement is not None:\n         args[\"business_statement\"] = business_statement\n     if detail is not None:\n         args[\"detail\"] = detail\n     if estimated_annual_value is not None:\n         args[\"estimated_annual_value\"] = estimated_annual_value\n     if confidence is not None:\n         args[\"confidence\"] = confidence\n-    from cli.backend import get_backend; typer.echo(get_backend(\"mcp\", mcp_url=mcp_url).call(\"update_customer_outcome\", args))\n+    from cli.backend import get_backend\n+\n+    typer.echo(get_backend(\"mcp\", mcp_url=mcp_url).call(\"update_customer_outcome\", args))\n \n \n @outcomes_app.command(\"delete\")\n def delete(\n     outcome_id: str = typer.Argument(...),\n     yes: bool = typer.Option(False, \"--yes\", \"-y\", help=\"Skip confirmation\"),\n     mcp_url: str = typer.Option(default=MCP_URL_DEFAULT, help=\"MCP server URL\"),\n ) -> None:\n     \"\"\"Delete a Customer Outcome.\"\"\"\n     if not yes:\n         confirm = typer.confirm(f\"Delete customer outcome {outcome_id}?\")\n         if not confirm:\n             raise typer.Exit()\n-    from cli.backend import get_backend; typer.echo(get_backend(\"mcp\", mcp_url=mcp_url).call(\"delete_customer_outcome\", {\"outcome_id\": outcome_id}))\n+    from cli.backend import get_backend\n+\n+    typer.echo(\n+        get_backend(\"mcp\", mcp_url=mcp_url).call(\n+            \"delete_customer_outcome\", {\"outcome_id\": outcome_id}\n+        )\n+    )\n \n \n @outcomes_app.command(\"score\")\n def score(\n     importance: float = typer.Argument(..., min=1.0, max=10.0),\n     satisfaction: float = typer.Argument(..., min=1.0, max=10.0),\n     mcp_url: str = typer.Option(default=MCP_URL_DEFAULT, help=\"MCP server URL\"),\n ) -> None:\n     \"\"\"Compute ODI Opportunity Score.\"\"\"\n     typer.echo(\ndiff --git a/core/src/core/messages.py b/core/src/core/messages.py\nindex f8c885d..93eb16d 100644\n--- a/core/src/core/messages.py\n+++ b/core/src/core/messages.py\n@@ -29,29 +29,32 @@ Follow this sequence when guiding a user through the ODI process:\n ### Stage 4: Build the Job Map\n - **When**: After key outcomes are captured. Use to organize the job execution context.\n - **Ask the user**: 'What are the key phases or steps the customer takes when doing this job?'\n - **Tools to use**:\n   - `add_step(job_id, name, order)` — Add each chronological step.\n   - `get_job_map(job_id)` — View the complete ordered job map.\n \n ### General Rule\n Never skip stages. Always confirm the user has a Job defined (Stage 1) before capturing Outcomes (Stage 2), and always capture Outcomes (Stage 2) before building the Job Map (Stage 4).\"\"\"\n \n+\n def get_odi_framework_guidelines() -> str:\n     return ODI_FRAMEWORK_GUIDELINES\n \n+\n CAPABILITIES = \"\"\"Here is what I can help you with as your Agentic ODI assistant:\n \n 🎯 **Manage Jobs-to-be-Done (JTBD)**: Add, list, and retrieve Jobs.\n 🗺️ **Build Job Maps**: Break down a Job into ordered Steps.\n 📊 **Track Desired Outcomes**: Record outcomes with importance/satisfaction scores and calculate Opportunity Scores.\n 📊 **Customer Outcomes**: Manage ODI-aligned customer outcomes with customer value, business value, and opportunity scoring.\n 📖 **ODI Framework Guidelines**: Call `get_odi_framework_guidelines()` to see which tool to use at each ODI stage.\n \n 💡 **Tip**: Ask me to 'get started' and I will guide you step-by-step through the ODI process from intent to opportunity scoring!\"\"\"\n \n \n def job_not_found(job_id: str) -> str:\n     return f\"Job not found: {job_id}\"\n \n+\n def customer_outcome_not_found(outcome_id: str) -> str:\n     return f\"Customer outcome not found: {outcome_id}\"\ndiff --git a/core/src/core/models.py b/core/src/core/models.py\nindex 77d802b..582ccce 100644\n--- a/core/src/core/models.py\n+++ b/core/src/core/models.py\n@@ -1,26 +1,26 @@\n \"\"\"Core domain models for Agentic ODI.\"\"\"\n \n from __future__ import annotations\n \n import uuid\n from enum import Enum\n \n from pydantic import BaseModel, Field, computed_field\n \n \n-class Direction(str, Enum):\n+class Direction(str, Enum):  # noqa: UP042\n     MINIMIZE = \"minimize\"\n     MAXIMIZE = \"maximize\"\n \n \n-class BusinessImpactCategory(str, Enum):\n+class BusinessImpactCategory(str, Enum):  # noqa: UP042\n     REVENUE_GROWTH = \"revenue_growth\"\n     COST_REDUCTION = \"cost_reduction\"\n     RETENTION = \"retention\"\n     RISK_MITIGATION = \"risk_mitigation\"\n     OPERATIONAL_EFFICIENCY = \"operational_efficiency\"\n     COMPLIANCE = \"compliance\"\n     BRAND_REPUTATION = \"brand_reputation\"\n     OTHER = \"other\"\n \n \n@@ -91,18 +91,20 @@ class BusinessValue(BaseModel):\n     category: BusinessImpactCategory\n     statement: str\n     detail: str | None = None\n     estimated_annual_value: float | None = Field(default=None, ge=0.0)\n     confidence: float | None = Field(default=None, ge=0.0, le=1.0)\n \n \n class CustomerOutcome(BaseModel):\n     id: str = Field(default_factory=lambda: str(uuid.uuid4()))\n     job_id: str = Field(..., description=\"The ID of the Job this outcome relates to\")\n-    step_id: str | None = Field(default=None, description=\"The ID of the specific Step, if applicable\")\n+    step_id: str | None = Field(\n+        default=None, description=\"The ID of the specific Step, if applicable\"\n+    )\n     customer_value: CustomerValue\n     business_value: BusinessValue\n \n     @computed_field\n     @property\n     def opportunity_score(self) -> float:\n         return self.customer_value.opportunity_score\ndiff --git a/core/src/core/sqlite_repository.py b/core/src/core/sqlite_repository.py\nindex 62e8ef5..4d49722 100644\n--- a/core/src/core/sqlite_repository.py\n+++ b/core/src/core/sqlite_repository.py\n@@ -1,15 +1,14 @@\n \"\"\"SQLite-backed repository using append-only IntentStore for events/audit.\"\"\"\n \n from __future__ import annotations\n \n-import json\n import os\n from typing import Any\n \n from core.intent_store import IntentStore\n from core.models import CustomerOutcome, Job, Outcome, Step\n from core.repository import Repository\n \n \n class SQLiteRepository(Repository):\n     def __init__(self, db_path: str | None = None) -> None:\n@@ -38,21 +37,21 @@ class SQLiteRepository(Repository):\n             elif et == \"CUSTOMER_OUTCOME_CREATED\":\n                 self.customer_outcomes[p[\"id\"]] = CustomerOutcome.model_validate(p)\n             elif et == \"CUSTOMER_OUTCOME_UPDATED\":\n                 cid = p[\"id\"]\n                 co = self.customer_outcomes.get(cid)\n                 if co is not None:\n                     current = co.model_dump(exclude_unset=True)\n                     current.update(p.get(\"updates\", {}))\n                     try:\n                         self.customer_outcomes[cid] = co.model_validate(current)\n-                    except Exception:\n+                    except Exception:  # noqa: BLE001\n                         pass\n             elif et == \"CUSTOMER_OUTCOME_DELETED\":\n                 cid = p[\"id\"]\n                 self.customer_outcomes.pop(cid, None)\n         # also snapshot jobs/steps/outcomes? we emitted above\n \n     def add_job(self, job: Job) -> Job:\n         self.store.append(\"JOB_CREATED\", job.model_dump())\n         self.jobs[job.id] = job\n         return job\n@@ -88,29 +87,31 @@ class SQLiteRepository(Repository):\n         return co\n \n     def get_customer_outcome(self, outcome_id: str) -> CustomerOutcome | None:\n         return self.customer_outcomes.get(outcome_id)\n \n     def list_customer_outcomes(self, job_id: str | None = None) -> list[CustomerOutcome]:\n         if job_id is None:\n             return list(self.customer_outcomes.values())\n         return [co for co in self.customer_outcomes.values() if co.job_id == job_id]\n \n-    def update_customer_outcome(self, outcome_id: str, updates: dict[str, Any]) -> CustomerOutcome | None:\n+    def update_customer_outcome(\n+        self, outcome_id: str, updates: dict[str, Any]\n+    ) -> CustomerOutcome | None:\n         co = self.customer_outcomes.get(outcome_id)\n         if not co:\n             return None\n         current = co.model_dump(exclude_unset=True)\n         current.update(updates)\n         try:\n             new_co = co.model_validate(current)\n-        except Exception:\n+        except Exception:  # noqa: BLE001\n             return None\n         self.store.append(\"CUSTOMER_OUTCOME_UPDATED\", {\"id\": outcome_id, \"updates\": updates})\n         self.customer_outcomes[outcome_id] = new_co\n         return new_co\n \n     def delete_customer_outcome(self, outcome_id: str) -> bool:\n         if outcome_id in self.customer_outcomes:\n             self.store.append(\"CUSTOMER_OUTCOME_DELETED\", {\"id\": outcome_id})\n             del self.customer_outcomes[outcome_id]\n             return True\ndiff --git a/core/tests/test_core_import.py b/core/tests/test_core_import.py\nindex 576ae24..2570a70 100644\n--- a/core/tests/test_core_import.py\n+++ b/core/tests/test_core_import.py\n@@ -1,3 +1,4 @@\n def test_core_exports_service():\n     import core\n+\n     assert hasattr(core, \"ODIService\")\ndiff --git a/local_server/src/local_server/app.py b/local_server/src/local_server/app.py\nindex acedb5e..81e271c 100644\n--- a/local_server/src/local_server/app.py\n+++ b/local_server/src/local_server/app.py\n@@ -1,25 +1,24 @@\n \"\"\"FastAPI app for local server.\"\"\"\n \n from __future__ import annotations\n \n-from fastapi import FastAPI, HTTPException\n-\n from core import ODIService\n-from core.repository import InMemoryRepository, Repository\n+from core.repository import Repository\n from core.sqlite_repository import SQLiteRepository\n+from fastapi import FastAPI\n \n \n def create_app(repo: Repository | None = None) -> FastAPI:\n     if repo is None:\n         repo = SQLiteRepository()\n-    service = ODIService(repo)\n+    ODIService(repo)\n     app = FastAPI(title=\"Agentic ODI Local Server\")\n \n     @app.get(\"/health\")\n     def health() -> dict:\n         return {\"status\": \"ok\"}\n \n     @app.get(\"/capabilities\")\n     def capabilities() -> dict:\n         return {\"capabilities\": \"local\"}\n \ndiff --git a/local_server/tests/test_api.py b/local_server/tests/test_api.py\nindex 2dada98..436804b 100644\n--- a/local_server/tests/test_api.py\n+++ b/local_server/tests/test_api.py\n@@ -1,12 +1,12 @@\n+from core.repository import InMemoryRepository\n from fastapi.testclient import TestClient\n \n-from core.repository import InMemoryRepository\n from local_server.app import create_app\n \n \n def test_health():\n     app = create_app(InMemoryRepository())\n     client = TestClient(app)\n     r = client.get(\"/health\")\n     assert r.status_code == 200\n     assert r.json()[\"status\"] == \"ok\"\ndiff --git a/mcp_server/src/mcp_server/__init__.py b/mcp_server/src/mcp_server/__init__.py\nindex 6efbc1e..40bb6ae 100644\n--- a/mcp_server/src/mcp_server/__init__.py\n+++ b/mcp_server/src/mcp_server/__init__.py\n@@ -2,11 +2,18 @@\n \n from mcp_server.mcp_server import (\n     compute_opportunity,\n     customer_outcomes_db,\n     jobs_db,\n     mcp,\n     outcomes_db,\n     steps_db,\n )\n \n-__all__ = [\"compute_opportunity\", \"customer_outcomes_db\", \"jobs_db\", \"mcp\", \"outcomes_db\", \"steps_db\"]\n+__all__ = [\n+    \"compute_opportunity\",\n+    \"customer_outcomes_db\",\n+    \"jobs_db\",\n+    \"mcp\",\n+    \"outcomes_db\",\n+    \"steps_db\",\n+]\ndiff --git a/mcp_server/src/mcp_server/mcp_server.py b/mcp_server/src/mcp_server/mcp_server.py\nindex de2995b..0d254d5 100644\n--- a/mcp_server/src/mcp_server/mcp_server.py\n+++ b/mcp_server/src/mcp_server/mcp_server.py\n@@ -1,36 +1,29 @@\n \"\"\"Agentic ODI MCP Server (FastMCP).\"\"\"\n \n import json\n-import uuid\n from typing import Any\n \n-from fastmcp import FastMCP\n-\n from core import (\n     CAPABILITIES,\n-    BusinessImpactCategory,\n-    CustomerOutcomeNotFoundError,\n-    JobNotFoundError,\n-    ODIService,\n     ODI_ASSISTANT_PROMPT,\n     ODI_FRAMEWORK_GUIDELINES,\n+    CustomerOutcomeNotFoundError,\n+    ODIService,\n     ValueOutOfRangeError,\n     compute_opportunity_score,\n )\n from core import (\n     customer_outcome_not_found as _cust_not_found,\n )\n-from core import (\n-    job_not_found as _job_not_found,\n-)\n from core.repository import InMemoryRepository\n+from fastmcp import FastMCP\n \n mcp = FastMCP(\"Agentic ODI\")\n \n _repo = InMemoryRepository()\n service = ODIService(_repo)\n \n jobs_db = _repo.jobs\n steps_db = _repo.steps\n outcomes_db = _repo.outcomes\n customer_outcomes_db = _repo.customer_outcomes\n@@ -119,21 +112,21 @@ def add_customer_outcome(\n     job = service.get_job(job_id)\n     if not job:\n         return f\"Error: Job with ID {job_id} not found.\"\n     try:\n         co = service.add_customer_outcome(\n             job_id=job_id,\n             customer_value=customer_value,\n             business_value=business_value,\n             step_id=step_id,\n         )\n-    except Exception as e:\n+    except Exception as e:  # noqa: BLE001\n         return f\"Error: {e}\"\n     return f\"Customer outcome created successfully: {co.model_dump_json()}\"\n \n \n @mcp.tool\n def get_customer_outcome(outcome_id: str) -> str:\n     try:\n         co = service.get_customer_outcome(outcome_id)\n     except CustomerOutcomeNotFoundError:\n         return _cust_not_found(outcome_id)\n@@ -193,41 +186,41 @@ def update_customer_outcome(\n         bv_d[\"detail\"] = detail\n     if estimated_annual_value is not None:\n         bv_d[\"estimated_annual_value\"] = estimated_annual_value\n     if confidence is not None:\n         bv_d[\"confidence\"] = confidence\n     updates[\"business_value\"] = bv_d\n     if step_id is not None:\n         updates[\"step_id\"] = step_id\n     try:\n         co2 = service.update_customer_outcome(outcome_id, updates)\n-    except Exception:\n+    except Exception:  # noqa: BLE001\n         return _cust_not_found(outcome_id)\n     return f\"Customer outcome updated successfully: {co2.model_dump_json()}\"\n \n \n @mcp.tool\n def delete_customer_outcome(outcome_id: str) -> str:\n     try:\n         service.delete_customer_outcome(outcome_id)\n     except CustomerOutcomeNotFoundError:\n         return _cust_not_found(outcome_id)\n     return f\"Customer outcome deleted successfully: {outcome_id}\"\n \n \n @mcp.tool\n def compute_opportunity(importance: float, satisfaction: float) -> str:\n     try:\n         if not (1.0 <= importance <= 10.0) or not (1.0 <= satisfaction <= 10.0):\n             return \"Error: importance and satisfaction must be between 1.0 and 10.0\"\n         score = compute_opportunity_score(importance, satisfaction)\n-    except Exception as e:\n+    except Exception as e:  # noqa: BLE001\n         return f\"Error: {e}\"\n     return f\"Opportunity score: {score:.2f}\"\n \n \n @mcp.tool\n def get_odi_framework_guidelines() -> str:\n     return ODI_FRAMEWORK_GUIDELINES\n \n \n @mcp.tool\ndiff --git a/pyproject.toml b/pyproject.toml\nindex 495c3ba..65492e2 100644\n--- a/pyproject.toml\n+++ b/pyproject.toml\n@@ -15,10 +15,13 @@ dev = [\n     \"bandit==1.9.4\",\n     \"mypy==2.4.0\",\n     \"pytest==9.1.1\",\n     \"pytest-asyncio==1.4.0\",\n     \"pytest-cov==7.1.0\",\n     \"ruff==0.17.0\",\n ]\n \n [tool.bandit]\n exclude_dirs = [\".venv\", \"tests\"]\n+\n+[tool.ruff]\n+extend-exclude = [\"docs\"]",
+                "lineStart": 1,
+                "lineEnd": 613,
+                "totalLines": 613,
+                "truncated": false
+              }
+            },
+            "title": ".worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/review-e049313..f0c4e37.diff",
+            "time": {
+              "start": 1792005345101,
+              "end": 1792005345116
+            }
+          },
+          "id": "prt_13bd78f47001oU6Igr4bTC1FTd",
+          "sessionID": "ses_ec428bdf5ffeicW1pOqU3ALQaw",
+          "messageID": "msg_13bd786cf001SyTvpXR5zzanHS"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-finish",
+          "tokens": {
+            "total": 14932,
+            "input": 119,
+            "output": 71,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 14742
+            }
+          },
+          "cost": 0,
+          "id": "prt_13bd78fab001a8v2zjmILpp0Lq",
+          "sessionID": "ses_ec428bdf5ffeicW1pOqU3ALQaw",
+          "messageID": "msg_13bd786cf001SyTvpXR5zzanHS"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_13bd7423c0011eYRj50L3HvXaT",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 22398,
+          "input": 7396,
+          "output": 71,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 14931
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792005345234,
+          "completed": 1792005348268
+        },
+        "finish": "tool-calls",
+        "id": "msg_13bd78fd2001wxc3fSyMDVpIzU",
+        "sessionID": "ses_ec428bdf5ffeicW1pOqU3ALQaw"
+      },
+      "parts": [
+        {
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-start",
+          "id": "prt_13bd79af7001htx4MH6q3CZG1k",
+          "sessionID": "ses_ec428bdf5ffeicW1pOqU3ALQaw",
+          "messageID": "msg_13bd78fd2001wxc3fSyMDVpIzU"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "fa76f3db-01ff-47b8-8311-841018d811f0",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "cd /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module && uv run ruff check . --output-format=concise; echo \"CHECK=$?\"; uv run ruff format --check . >/dev/null; echo \"FORMAT=$?\""
+            },
+            "output": "All checks passed!\nCHECK=0\nFORMAT=0\n",
+            "metadata": {
+              "output": "All checks passed!\nCHECK=0\nFORMAT=0\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "cd /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module && uv run ruff check . --output-format=concise; echo \"CHECK=$?\"; uv run ruff format --check . >/dev/null; echo \"FORMAT=$?\"",
+            "time": {
+              "start": 1792005348097,
+              "end": 1792005348196
+            }
+          },
+          "id": "prt_13bd79af9001w7Dprw68bHsFPK",
+          "sessionID": "ses_ec428bdf5ffeicW1pOqU3ALQaw",
+          "messageID": "msg_13bd78fd2001wxc3fSyMDVpIzU"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-finish",
+          "tokens": {
+            "total": 22398,
+            "input": 7396,
+            "output": 71,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 14931
+            }
+          },
+          "cost": 0,
+          "id": "prt_13bd79b720016J8Ce5z32lk76T",
+          "sessionID": "ses_ec428bdf5ffeicW1pOqU3ALQaw",
+          "messageID": "msg_13bd78fd2001wxc3fSyMDVpIzU"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_13bd7423c0011eYRj50L3HvXaT",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 23930,
+          "input": 20423,
+          "output": 915,
+          "reasoning": 597,
+          "cache": {
+            "write": 0,
+            "read": 1995
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792005348274,
+          "completed": 1792005391278
+        },
+        "finish": "stop",
+        "id": "msg_13bd79bb2001BEbhvAzk0kFgKK",
+        "sessionID": "ses_ec428bdf5ffeicW1pOqU3ALQaw"
+      },
+      "parts": [
+        {
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-start",
+          "id": "prt_13bd7d8060019WnatrxByc5oBn",
+          "sessionID": "ses_ec428bdf5ffeicW1pOqU3ALQaw",
+          "messageID": "msg_13bd79bb2001BEbhvAzk0kFgKK"
+        },
+        {
+          "type": "text",
+          "text": "### Spec Compliance\n- ✅ pyproject.toml:3 — `[tool.ruff] extend-exclude = [\"docs\"]` added correctly.\n- ✅ cli/src/cli/backend.py:37,49,56 — `BLE001` noqa added to intentionally-broad exception handlers; code unchanged.\n- ✅ cli/src/cli/outcomes.py:102,109,172,178 — `B008` noqa added to `typer.Option(...)` defaults (Direction/Category); signatures unchanged.\n- ✅ cli/src/cli/outcomes.py:129,131; 140–145; 157,160; 197–200; 214–221 — E702 semicolons split into separate statements (identical behavior).\n- ✅ core/src/core/models.py:287,294 — `(str, Enum)` retained with `# noqa: UP042`.\n- ✅ core/src/core/messages.py:250,252,267 — formatting only (no behavior change).\n- ✅ core/src/core/sqlite_repository.py:358,392 — `BLE001` noqa on bare-except fallback paths; logic unchanged.\n- ✅ core/src/core/sqlite_repository.py:7 — removed unused `json` import (F401).\n- ✅ core/tests/test_core_import.py:409 — formatting only.\n- ✅ local_server/src/local_server/app.py:25,27,35 — removed unused imports (`FastAPI.HTTPException`, `InMemoryRepository` F401); removed unused `service = ODIService(repo)` assignment (F841) while still constructing `ODIService(repo)` (no behavior change).\n- ✅ local_server/tests/test_api.py:451 — import reorder only (format).\n- ✅ mcp_server/src/mcp_server/__init__.py:480–487 — `__all__` reformatted across multiple lines; all symbols preserved (no re-export dropped).\n- ✅ mcp_server/src/mcp_server/mcp_server.py:14,20,32,544,567,587 — removed unused imports (`uuid`, `BusinessImpactCategory`, `JobNotFoundError`, `_job_not_found`) (F401); added `BLE001` noqa on broad exception catches where intentional; import reorder (I001).\n- ✅ `docs/` — not modified/committed (only tracked files changed).\n\n### Behavior preservation\n- **cli/src/cli/backend.py:** No logic changes; only comments/formatting. Verdict: ✅ behavior-preserving.\n- **cli/src/cli/outcomes.py:** All semicolon splits produce identical call chains; Option signatures unchanged. Verdict: ✅ behavior-preserving.\n- **core/src/core/messages.py:** Pure whitespace/newlines. Verdict: ✅ behavior-preserving.\n- **core/src/core/models.py:** Enum declarations unchanged; only noqa and wrapping. Verdict: ✅ behavior-preserving.\n- **core/src/core/sqlite_repository.py:** Unused import removed; exception handling behavior unchanged (still swallows on model_validate fallback). Verdict: ✅ behavior-preserving.\n- **core/tests/test_core_import.py:** No-op. Verdict: ✅ behavior-preserving.\n- **local_server/src/local_server/app.py:** Removed unused assignment `service` but `ODIService(repo)` is still instantiated (constructor side effects unchanged). Removed unused imports. Verdict: ✅ behavior-preserving (no public API change).\n- **local_server/tests/test_api.py:** Import order only. Verdict: ✅ behavior-preserving.\n- **mcp_server/src/mcp_server/__init__.py:** `__all__` content identical (just line-wrapped). Public re-exports unchanged. Verdict: ✅ behavior-preserving.\n- **mcp_server/src/mcp_server/mcp_server.py:** Dead imports removed; try/except semantics unchanged (still return error strings). Verdict: ✅ behavior-preserving.\n\n### Strengths\n- Strictly scoped to lint fixes; no functional code modified.\n- Correctly handled the specific rules (kept `(str, Enum)` + `UP042`, added targeted noqas, split semicolons, excluded docs in pyproject).\n- `__init__.py` reformat preserved all exports (critical).\n- F841 fixed by removing unused assignment while preserving constructor call.\n\n### Issues\n#### Critical / Important / Minor\n- None identified.\n\n### Assessment\n**Task quality:** Approved\n**Reasoning:** Spec compliance is complete and every hunk is provably behavior-preserving. Lint checks pass (ruff check 0, ruff format --check 0).",
+          "time": {
+            "start": 1792005363720,
+            "end": 1792005391114
+          },
+          "id": "prt_13bd7d80800101x0HCVi9Nh5H7",
+          "sessionID": "ses_ec428bdf5ffeicW1pOqU3ALQaw",
+          "messageID": "msg_13bd79bb2001BEbhvAzk0kFgKK"
+        },
+        {
+          "reason": "stop",
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-finish",
+          "tokens": {
+            "total": 23930,
+            "input": 20423,
+            "output": 915,
+            "reasoning": 597,
+            "cache": {
+              "write": 0,
+              "read": 1995
+            }
+          },
+          "cost": 0,
+          "id": "prt_13bd84380001y3ZrFoZgqo52cW",
+          "sessionID": "ses_ec428bdf5ffeicW1pOqU3ALQaw",
+          "messageID": "msg_13bd79bb2001BEbhvAzk0kFgKK"
+        }
+      ]
+    }
+  ]
+}
