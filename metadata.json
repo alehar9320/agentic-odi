@@ -3,7 +3,7 @@
   "checkpoint_id": "01M4XWMK8C9DKJRNE8RJ5BAEDK",
   "strategy": "manual-commit",
   "branch": "mcp-connector-module",
-  "checkpoints_count": 3,
+  "checkpoints_count": 4,
   "files_touched": [
     "cli/pyproject.toml",
     "cli/src/cli/cli.py",
@@ -32,6 +32,13 @@
       "compact_transcript": "/2/transcript.jsonl",
       "content_hash": "/2/content_hash.txt",
       "prompt": "/2/prompt.txt"
+    },
+    {
+      "metadata": "/3/metadata.json",
+      "transcript": "/3/full.jsonl",
+      "compact_transcript": "/3/transcript.jsonl",
+      "content_hash": "/3/content_hash.txt",
+      "prompt": ""
     }
   ],
   "token_usage": {
