@@ -58,6 +58,7 @@ name = "agentic-odi-cli"
 version = "0.1.0"
 source = { editable = "cli" }
 dependencies = [
+    { name = "agentic-odi-connectors" },
     { name = "agentic-odi-core" },
     { name = "fastmcp" },
     { name = "typer" },
@@ -65,6 +66,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "agentic-odi-connectors", editable = "connectors" },
     { name = "agentic-odi-core", editable = "core" },
     { name = "fastmcp" },
     { name = "typer" },
