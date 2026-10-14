@@ -18,7 +18,7 @@ This repository serves as an initial sandbox for understanding server-client MCP
 
 ### Code Overview
 
-This repository is a [uv workspace](https://docs.astral.sh/uv/concepts/projects/workspaces/) made up of three installable projects, each with its own `pyproject.toml`, `src/` layout, and tests:
+This repository is a [uv workspace](https://docs.astral.sh/uv/concepts/projects/workspaces/) made up of six installable packages, each with its own `pyproject.toml`, `src/` layout, and tests:
 
 - **`core/`** (`agentic-odi-core`): Core domain models, repository abstractions, and the event-sourced IntentStore for Jobs, Steps, Outcomes, and Customer Outcomes with ODI opportunity-score computation.
 - **`mcp_server/`** (`agentic-odi-mcp-server`): FastMCP-based MCP server exposing ODI tools and resources over HTTP. Hosts tools for Jobs, Steps, Desired Outcomes, and Customer Outcomes.
@@ -31,19 +31,19 @@ This repository is a [uv workspace](https://docs.astral.sh/uv/concepts/projects/
 
 ### Prerequisites
 
-Python 3.10+ and [`uv`](https://docs.astral.sh/uv/). Install the whole workspace (all three projects plus dev tooling):
+Python 3.10+ and [`uv`](https://docs.astral.sh/uv/). Install the whole workspace (all packages plus dev tooling):
 
 ```bash
 uv sync --all-packages
 ```
 
-This creates a `.venv` and installs `agentic-odi-server`, `agentic-odi-client`, and `agentic-odi-cli` in editable mode.
+This creates a `.venv` and installs `agentic-odi-core`, `agentic-odi-mcp-server`, `agentic-odi-local-server`, `agentic-odi-client`, `agentic-odi-cli`, and `agentic-odi-connectors` in editable mode.
 
 ### Running the Environment
 
 #### 🧰 Command-line interface (CLI)
 
-Agentic ODI ships a [`Typer`](https://github.com/fastapi/typer)-based CLI so you can interact with the project directly from your terminal — no MCP client or chat UI required. Today it provides version and help information; over time it will expose commands for working with the ODI dataset (Jobs, Steps, and Outcomes), giving you a scriptable, automation-friendly alternative to the MCP/chat path.
+Agentic ODI ships a [`Typer`](https://github.com/fastapi/typer)-based CLI so you can interact with the project directly from your terminal — no MCP client or chat UI required. Today it provides version/help plus commands for Customer Outcomes (`agentic-odi outcomes ...`) and external MCP connectors (`agentic-odi connectors ...`), giving you a scriptable, automation-friendly alternative to the MCP/chat path.
 
 Launch it with:
 
