@@ -3,7 +3,7 @@
   "checkpoint_id": "01M4XZK8QS8T5HSP0HE56Y2V8N",
   "strategy": "manual-commit",
   "branch": "mcp-connector-module",
-  "checkpoints_count": 15,
+  "checkpoints_count": 16,
   "files_touched": [
     "README.md"
   ],
@@ -111,6 +111,13 @@
       "transcript": "/14/full.jsonl",
       "compact_transcript": "/14/transcript.jsonl",
       "content_hash": "/14/content_hash.txt",
+      "prompt": ""
+    },
+    {
+      "metadata": "/15/metadata.json",
+      "transcript": "/15/full.jsonl",
+      "compact_transcript": "/15/transcript.jsonl",
+      "content_hash": "/15/content_hash.txt",
       "prompt": ""
     }
   ],
