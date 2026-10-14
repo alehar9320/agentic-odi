@@ -31,7 +31,7 @@ This repository is a [uv workspace](https://docs.astral.sh/uv/concepts/projects/
 
 ### Prerequisites
 
-Python 3.10+ and [`uv`](https://docs.astral.sh/uv/). Install the whole workspace (all packages plus dev tooling):
+Python 3.11+ and [`uv`](https://docs.astral.sh/uv/). Install the whole workspace (all packages plus dev tooling):
 
 ```bash
 uv sync --all-packages
@@ -191,7 +191,7 @@ Type `/dev` in the AI assistant to trigger the full automated workflow: it will 
 
 ## 🧪 Testing
 
-Tests use **pytest** with **pytest-asyncio** (strict mode) and run entirely in-memory — no running server required. Each project owns its tests. CI runs the suite on Python **3.10, 3.11, and 3.12** and stores a coverage report as a build artifact:
+Tests use **pytest** with **pytest-asyncio** (strict mode) and run entirely in-memory — no running server required. Each project owns its tests. CI runs the suite on Python **3.11 and 3.12** and stores a coverage report as a build artifact:
 
 ```bash
 uv run --directory core pytest

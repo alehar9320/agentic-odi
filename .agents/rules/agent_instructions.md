@@ -125,7 +125,7 @@ These are absolute constraints the agent must respect:
 ---
 
 ## 🛠 Technology Stack & Tools
-- **Language**: Python 3.10+
+- **Language**: Python 3.11+
 - **MCP Framework**: `fastmcp` (Server and Client)
 - **ASGI Server**: `uvicorn`
 - **HTTP Client**: `httpx`

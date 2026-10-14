@@ -2,7 +2,7 @@
 name = "agentic-odi"
 version = "0.1.0"
 description = "Outcome-Driven Innovation (ODI): an MCP server, chat client, and CLI."
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 
 [tool.uv]
 package = false
