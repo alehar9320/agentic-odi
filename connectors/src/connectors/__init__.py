@@ -8,6 +8,7 @@ from .errors import (
     RegistryError,
     UnknownConnectorKindError,
 )
+from .mcp import MCPClientConnector
 from .models import (
     ConnectorConfig,
     HealthStatus,
@@ -33,4 +34,5 @@ __all__ = [
     "RegistryError",
     "UnknownConnectorKindError",
     "build_connector",
+    "MCPClientConnector",
 ]
