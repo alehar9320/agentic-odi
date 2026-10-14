@@ -1,0 +1,35 @@
+You are performing a FINAL whole-branch review before merging an implementation branch. Do NOT modify any files. Assess the branch as a cohesive whole (cross-task integration), not task-by-task.
+
+## Repo/worktree
+- Worktree: `/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module` (branch `mcp-connector-module`)
+- Base: `ea545d1b5b119aef5206c474ebc7efb1f31b1ab7`
+- HEAD: `25f508ee...` (12 commits; run `git rev-parse HEAD` for the exact sha)
+- Whole-branch diff: `/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/review-ea545d1..25f508e.diff`
+
+## Context / governing docs
+- Plan (authoritative spec): `/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/docs/superpowers/plans/2026-10-14-mcp-connector-module.md`
+- SDD ledger incl. all controller rulings: `/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/progress.md`
+
+## What the branch does
+Adds an `agentic-odi-connectors` uv-workspace package (pluggable `Connector` protocol + HTTP `fastmcp` MCP-client connector + in-memory ingest sink + JSON registry) and exposes it via the Typer CLI; first repairs a half-finished workspace refactor (`ea545d1`) so the full CI gate is green.
+
+## Review focus (things per-task reviews could miss)
+1. **Integration across tasks**: Do `models`/`protocol`/`errors`/`sink`/`registry`/`mcp`/CLI compose correctly end-to-end? Any interface drift between what one task produced and another consumed (method names, field names, exception types)?
+2. **Spec coverage**: Walk the plan's "Spec coverage" + "Review Focus" sections and confirm each is satisfied by the code/tests. Name anything in scope that is missing or only partially done.
+3. **Error semantics**: unknown connector kind, malformed registry file, missing file, dead MCP server, unknown tool, resource-read failure — are these handled and tested consistently with the plan?
+4. **CLI wiring**: `agentic-odi connectors list|add mcp|health|ingest` and `--config` default `.agentic-odi/connectors.json`; does the CLI actually work end-to-end with the registry/connector?
+5. **CI wiring**: the full CI-equivalent must be green locally. Verify by running (from worktree root):
+   `uv run ruff check .` ; `uv run ruff format --check .` ; `uv run --directory <pkg> mypy .` for core,mcp_server,local_server,cli,client,connectors ; `uv run bandit -c pyproject.toml -r cli/src client/src core/src local_server/src mcp_server/src connectors/src` ; `uv run --directory <pkg> pytest` for all six. Report each result.
+6. **Known deferred item R4** (in the ledger): CI `test` matrix includes Python 3.10 but `cli/outcomes.py` uses `enum.StrEnum` (3.11+) while `requires-python >=3.10`. Confirm whether this is a real latent CI failure and whether it predates this branch. This is deferred/known — report it but do not treat it as a branch defect.
+7. **Hygiene**: any leftover temp files, unintended changes, dead code, or secrets in the diff?
+
+Note: an untracked `docs/` directory holds the plan file — ignore it; do not modify or delete anything.
+
+## Report format (ONLY this)
+Verdict: APPROVED or CHANGES-REQUESTED
+- **Blocking findings** (Critical/Important): file:line, issue, why it matters, suggested fix.
+- **Non-blocking (Minor/deferrable)**: brief list.
+- **Spec coverage table**: each in-scope item → done/partial/missing.
+- **Verification results**: the command outcomes from focus item 5.
+- **R4**: confirm/quash and whether it predates the branch.
+Be concise and precise. Do not invent issues.
