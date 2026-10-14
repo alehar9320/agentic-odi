@@ -1,0 +1,54 @@
+You are implementing Task 1: Reconcile workspace, lockfile, and CI to real packages (prerequisite).
+
+## Working directory (IMPORTANT)
+Work ONLY inside this git worktree on branch `mcp-connector-module`:
+  /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module
+Do not touch /home/alexa/repos/agentic-odi (the main checkout). Use the `workdir` parameter (or absolute paths) for every command.
+
+## Task Description
+Read your task brief FIRST — it is your requirements, with the exact values to use verbatim:
+  /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-1-brief.md
+
+## Context
+This repo is a `uv` workspace that was half-refactored: a `server/` package was renamed/split into `core/`, `mcp_server/`, and `local_server/`, but the root workspace members, per-package dependency wiring, CI, dependabot, and `client.run` still reference the deleted `server` package. Nothing else can build or be tested until this is fixed. This task is pure reconciliation — no new features.
+
+## Environment facts (verified)
+- Python is pinned to 3.12 via a gitignored `.python-version` at the worktree root; the shared root `.venv` already exists and `uv sync --all-packages` works from the local cache. If a plain `uv lock`/`uv sync` ever needs the network, you may add `--offline` (the cache is complete for this project).
+- Baseline is knowingly broken: `uv run --directory core/mcp_server/local_server pytest` currently fails because those dirs are not workspace members. That is expected and is exactly what this task fixes.
+- The `cli` test suite has 2 tests failing with `ModuleNotFoundError: No module named 'core'`; these will pass once `agentic-odi-core` is declared and installed (Part of your fix).
+- Do NOT commit to `main`. Commit on the current branch `mcp-connector-module`.
+
+## Before you begin
+If anything in the brief is unclear, ask now. Otherwise implement it exactly.
+
+## Your job
+1. Implement exactly what the brief specifies (Steps 1–7). Follow it verbatim — do not add unrelated cleanup or refactors.
+2. Run the verification commands in Step 6 and confirm they pass. `core` will now have exactly one test (Step 3) so pytest will not exit 5.
+3. Commit with the message given in Step 7.
+4. Self-review your diff (completeness, YAGNI, correctness) and fix anything you find.
+5. Report back.
+
+## You do NOT dispatch subagents
+Do all work yourself. Never spawn a subagent to implement or review. Review is the controller's job after you report.
+
+## Global constraints (bind this task)
+- Do not change ODI domain logic, models, or the packages' APIs.
+- Keep each package's existing ruff/mypy config unchanged.
+- `requirements`: after your change, `uv run --directory <pkg> pytest` must work for `core`, `mcp_server`, `local_server`, `cli`, `client` using the shared workspace venv.
+
+## When in over your head
+If you hit something the brief does not anticipate, STOP and report status BLOCKED or NEEDS_CONTEXT with specifics — do not guess.
+
+## Report format
+Write your full report to:
+  /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-1-report.md
+Include: what you implemented; exact commands run and their results (test output); files changed; self-review findings; any concerns.
+
+Then reply with ONLY (under 15 lines):
+- Status: DONE | DONE_WITH_CONCERNS | BLOCKED | NEEDS_CONTEXT
+- Commits created (short SHA + subject)
+- One-line test summary
+- Concerns, if any
+- The report file path
+
+If BLOCKED/NEEDS_CONTEXT, put the specifics in this final message.
