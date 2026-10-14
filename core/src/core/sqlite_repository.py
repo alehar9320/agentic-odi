@@ -44,7 +44,7 @@ class SQLiteRepository(Repository):
                     current.update(p.get("updates", {}))
                     try:
                         self.customer_outcomes[cid] = co.model_validate(current)
-                    except Exception:  # noqa: BLE001
+                    except Exception:  # noqa: BLE001  # nosec B110
                         pass
             elif et == "CUSTOMER_OUTCOME_DELETED":
                 cid = p["id"]

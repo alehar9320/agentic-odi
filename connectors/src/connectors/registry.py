@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import builtins
 import json
 import os
 import tempfile
@@ -60,7 +61,7 @@ class ConnectorRegistry:
         configs.append(config)
         self.save(configs)
 
-    def save(self, configs: list[ConnectorConfig]) -> None:
+    def save(self, configs: builtins.list[ConnectorConfig]) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         payload = _RegistryFile(connectors=configs).model_dump()
         fd, tmp_name = tempfile.mkstemp(dir=self.path.parent, suffix=".tmp")

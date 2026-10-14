@@ -20,9 +20,12 @@ This repository serves as an initial sandbox for understanding server-client MCP
 
 This repository is a [uv workspace](https://docs.astral.sh/uv/concepts/projects/workspaces/) made up of three installable projects, each with its own `pyproject.toml`, `src/` layout, and tests:
 
-- **`server/`** (`agentic-odi-server`): A foundational MCP Server exposing an HTTP transport layer. It hosts tools for Jobs, Steps, Desired Outcomes, and Customer Outcomes (linking customer value to business value) with ODI opportunity-score computation.
+- **`core/`** (`agentic-odi-core`): Core domain models, repository abstractions, and the event-sourced IntentStore for Jobs, Steps, Outcomes, and Customer Outcomes with ODI opportunity-score computation.
+- **`mcp_server/`** (`agentic-odi-mcp-server`): FastMCP-based MCP server exposing ODI tools and resources over HTTP. Hosts tools for Jobs, Steps, Desired Outcomes, and Customer Outcomes.
+- **`local_server/`** (`agentic-odi-local-server`): Local, in-process adapter used by CLI to act as an MCP client while using the same repository layer.
+- **`cli/`** (`agentic-odi-cli`): A [`Typer`](https://github.com/fastapi/typer)-based command-line interface. It provides a non-MCP entry point for interacting with Agentic ODI and also wraps the MCP server for certain operations.
 - **`client/`** (`agentic-odi-client`): A Python-based agent client that communicates with the MCP server, executing tool calls over the active connection. It also hosts `run.py`, the local dev launcher that starts the server and the Streamlit UI together.
-- **`cli/`** (`agentic-odi-cli`): A [`Typer`](https://github.com/fastapi/typer)-based command-line interface. It provides a non-MCP entry point for interacting with Agentic ODI, initially exposing `--version` and `--help`, and will grow to cover dataset operations.
+- **`connectors/`** (`agentic-odi-connectors`): Pluggable external integrations (ingest connectors). The first connector is an HTTP MCP **client** that can ingest resources from external MCP servers into the ODI store.
 
 ## 🚀 Getting Started
 
@@ -54,7 +57,7 @@ A console script is also installed, so `agentic-odi --version` works the same wa
 
 #### Manage Customer Outcomes
 
-Manage Customer Outcomes (linking customer value to business value) via the CLI. The CLI acts as an MCP client, so the server must be running (`python -m server`):
+Manage Customer Outcomes (linking customer value to business value) via the CLI. The CLI acts as an MCP client, so the server must be running (`python -m mcp_server`):
 
 ```bash
 # Add a Customer Outcome
@@ -74,6 +77,25 @@ agentic-odi outcomes score 8 2
 ```
 
 Set `AGENTIC_ODI_MCP_URL` to point to a non-default server if needed.
+
+### External connectors (MCP ingest)
+
+The `connectors/` package enables ingesting external resources via MCP. Configure connectors via `--config` (default: `.agentic-odi/connectors.json`).
+
+```bash
+# List configured connectors
+agentic-odi connectors list
+agentic-odi connectors list --config /path/to/connectors.json
+
+# Add an HTTP MCP connector
+agentic-odi connectors add mcp --name my-connector --url http://localhost:9000/mcp
+
+# Check connector health
+agentic-odi connectors health --name my-connector
+
+# Ingest resources from the connector into the local store (idempotent by URI)
+agentic-odi connectors ingest --name my-connector
+```
 
 
 
@@ -96,7 +118,7 @@ Open two terminals and run each process separately:
 
 ```bash
 # Terminal 1 — MCP server
-python -m server
+python -m mcp_server
 
 # Terminal 2 — Streamlit chat UI
 streamlit run client/src/client/app.py
@@ -172,9 +194,12 @@ Type `/dev` in the AI assistant to trigger the full automated workflow: it will 
 Tests use **pytest** with **pytest-asyncio** (strict mode) and run entirely in-memory — no running server required. Each project owns its tests. CI runs the suite on Python **3.10, 3.11, and 3.12** and stores a coverage report as a build artifact:
 
 ```bash
-uv run --directory server pytest
+uv run --directory core pytest
+uv run --directory mcp_server pytest
+uv run --directory local_server pytest
 uv run --directory client pytest
 uv run --directory cli pytest
+uv run --directory connectors pytest
 ```
 
 ### 🧠 Agent session tracking
@@ -191,17 +216,23 @@ uv run ruff check .
 uv run ruff format --check .
 
 # Type checking (run per project so each project's config applies)
-uv run --directory server mypy .
+uv run --directory core mypy .
+uv run --directory mcp_server mypy .
+uv run --directory local_server mypy .
 uv run --directory client mypy .
 uv run --directory cli mypy .
+uv run --directory connectors mypy .
 
 # Security scanning
-uv run bandit -c pyproject.toml -r cli/src client/src server/src
+uv run bandit -c pyproject.toml -r cli/src client/src core/src local_server/src mcp_server/src connectors/src
 
 # Tests (same as CI)
-uv run --directory server pytest
+uv run --directory core pytest
+uv run --directory mcp_server pytest
+uv run --directory local_server pytest
 uv run --directory client pytest
 uv run --directory cli pytest
+uv run --directory connectors pytest
 ```
 
 To run these automatically before each commit, you can enable the bundled pre-commit hooks:
@@ -234,13 +265,18 @@ pre-commit run --all-files
 
 | File | What it covers |
 |---|---|
-| `server/tests/test_odi.py` | Full ODI workflow (add job → steps → outcomes → retrieval) + capabilities tool |
-| `server/tests/test_customer_outcomes.py` | Customer Outcomes CRUD, filtering, computed opportunity scores, and tool validation |
-| `server/tests/test_server_tools.py` | Error handling and retrieval for the MCP tools |
-| `server/tests/test_tools.py` | Tool response-shape contract for `add_job` |
+| `mcp_server/tests/test_odi.py` | Full ODI workflow (add job → steps → outcomes → retrieval) + capabilities tool |
+| `mcp_server/tests/test_customer_outcomes.py` | Customer Outcomes CRUD, filtering, computed opportunity scores, and tool validation |
+| `mcp_server/tests/test_server_tools.py` | Error handling and retrieval for the MCP tools |
+| `mcp_server/tests/test_tools.py` | Tool response-shape contract for `add_job` |
 | `client/tests/test_run.py` | Dev launcher helpers (port checks) |
 | `cli/tests/test_cli.py` | CLI `--version` and `--help` behavior |
 | `cli/tests/test_outcomes_cli.py` | Customer Outcomes CLI subcommands with MCP stub |
+| `cli/tests/test_connectors_cli.py` | `connectors` CLI subcommands (`list`, `add mcp`, `health`, `ingest`) with a stubbed client factory |
+| `connectors/tests/test_models.py` | `ConnectorConfig` validation and MCP settings parsing |
+| `connectors/tests/test_registry.py` | JSON registry load/save, duplicate/missing handling, malformed file errors |
+| `connectors/tests/test_sink.py` | `IngestSink` append/batches/dump and idempotency by URI |
+| `connectors/tests/test_mcp_connector.py` | `MCPClientConnector` against an in-memory `fastmcp.Client(server)` (health, catalog, ingest) |
 
 **Conventions:**
 - Test files live under each project's `tests/` directory and are named `test_*.py`.
@@ -278,6 +314,7 @@ As we validate the feasibility of this architecture, our next milestones include
 
 - [ ] **ODI Schema Definition**: Define standardized Pydantic models for *Jobs*, *Steps*, and *Outcomes*.
 - [x] **CLI Dataset Commands**: Extend `cli/` so the ODI dataset can be created, queried, and scored from the terminal, in addition to the current MCP path.
+- [x] **Generic Integrations (External Data Connectors)**: Pluggable `connectors/` package with an HTTP MCP **client** connector (`agentic-odi connectors list|add mcp|health|ingest`); more kinds to follow.
 - [ ] **Context Tooling**: Replace the dummy `greet` tool with capabilities like `get_job_map(job_id)` or `evaluate_outcome(statement)`.
 - [ ] **Data Persistence Layer**: Connect the fastmcp server to a lightweight vector or relational database containing actual user research data.
 - [ ] **Agentic Integration**: Hook the client up to an LLM (e.g., via LangChain or standard OpenAI clients) so the LLM can *discover* the ODI tools and intelligently request customer insights when ideating features.

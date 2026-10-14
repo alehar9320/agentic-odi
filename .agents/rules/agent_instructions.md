@@ -174,7 +174,7 @@ Update `README.md` whenever any of the following change:
 - **Tool Creation**: 
   - Register tools on the server using the `@mcp.tool` decorator.
   - **CRITICAL**: Provide comprehensive docstrings and strict Python type hints for every tool parameter. Explain exactly what the tool does and what data it expects, as this metadata is fed directly to the LLM for tool discovery.
-  - **Capability Synchronization**: Whenever you add, modify, or remove an MCP tool in `server/src/server/server.py`, you **MUST** simultaneously update the `get_capabilities` tool's human-readable return string to ensure the capability set exactly matches the code.
+  - **Capability Synchronization**: Whenever you add, modify, or remove an MCP tool in `mcp_server/src/mcp_server/mcp_server.py`, you **MUST** simultaneously update the `get_capabilities` tool's human-readable return string to ensure the capability set exactly matches the code.
 
 ### 2. Async / Client Practices
 - Use `asyncio` for client execution and IO-bound tool operations.
@@ -191,8 +191,14 @@ Update `README.md` whenever any of the following change:
 ### 5. Testing Strategy (FastMCP)
 - **First-Class Documentation**: Treat tests as living documentation that demonstrate how features work while protecting against regressions.
 - **Speed & Isolation**: Tests must be fast (< 1s) and self-contained. Use `@pytest.mark.integration` or `@pytest.mark.client_process` for slower, integration, or resource-dependent tests.
-- **Structure**: This repo is a uv workspace. Mirror each project's code structure in its own `tests/` directory (e.g., `server/src/server/server.py` -> `server/tests/test_server_tools.py`).
+- **Structure**: This repo is a uv workspace. Mirror each project's code structure in its own `tests/` directory (e.g., `mcp_server/src/mcp_server/mcp_server.py` -> `mcp_server/tests/test_server_tools.py`).
 - **Atomic Tests**: Each test must verify exactly one specific behavior with clear intent in test names and assertions. Avoid multi-behavior tests.
 - **In-Memory Testing (Preferred)**: Favor testing functionality deterministically by passing the `FastMCP` server directly into the `Client(server)` instance. This runs in-memory without network overhead for deterministic and lightning-fast execution.
 - **Transport Testing (When Needed)**: For HTTP/SSE network transport tests, prefer the isolated in-process `fastmcp.utilities.tests.run_server_async(server)` context manager over subprocess testing (which uses `run_server_in_process` and is slower to debug).
 - **Data Assertions**: Utilize `inline-snapshot` (`snapshot()`) for assessing complex data structures like tool API JSON schemas or expected responses.
+
+### 6. External Connectors Package (`connectors/`)
+- **Purpose**: The `connectors/` package (`agentic-odi-connectors`) provides pluggable external integrations that pull data into the ODI store. It is an MCP **client** of external MCP servers — the inverse of the ODI MCP server, which exposes ODI data.
+- **Transport**: The first connector kind (`mcp`) connects over HTTP using [`fastmcp.Client`](https://github.com/jlowin/fastmcp). New connector kinds are registered through the registry dispatcher (`build_connector`).
+- **Testing**: Follow the in-memory testing strategy — pass an in-memory `Client(server)` (or inject a `client_factory`) so connector tests run deterministically without network access.
+- **Error Handling**: Unknown connector kinds and malformed configuration must fail clearly with a descriptive error (`UnknownConnectorKindError`, `RegistryError`) rather than silently doing nothing.

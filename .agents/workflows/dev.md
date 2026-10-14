@@ -14,7 +14,7 @@ Use this workflow whenever the user asks to:
 1. **Start the server** — Launch the FastMCP server as a background process.
 
 ```
-python -m server
+python -m mcp_server
 ```
 
 Run with `WaitMsBeforeAsync: 2000` so the server has time to bind port 8000 before continuing.
