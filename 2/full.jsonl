@@ -1,0 +1,526 @@
+{
+  "info": {
+    "id": "ses_ec4582547ffekgZBH0VmVxj1XK",
+    "slug": "silent-nebula",
+    "projectID": "e4fe19106d06261ebfed21a0e3ba06559abf1100",
+    "directory": "/home/alexa/repos/agentic-odi",
+    "path": "",
+    "parentID": "ses_ec492423bffeG7aFTE5YTPUIJO",
+    "title": "Review Task 5 (spec + quality) (@general subagent)",
+    "agent": "general",
+    "model": {
+      "id": "big-pickle",
+      "providerID": "opencode",
+      "variant": "default"
+    },
+    "version": "1.18.35",
+    "summary": {
+      "additions": 0,
+      "deletions": 0,
+      "files": 0
+    },
+    "cost": 0,
+    "tokens": {
+      "input": 17983,
+      "output": 1738,
+      "reasoning": 6126,
+      "cache": {
+        "read": 44800,
+        "write": 0
+      }
+    },
+    "permission": [
+      {
+        "permission": "task",
+        "pattern": "*",
+        "action": "deny"
+      }
+    ],
+    "time": {
+      "created": 1792002218680,
+      "updated": 1792002227605
+    }
+  },
+  "messages": [
+    {
+      "info": {
+        "role": "user",
+        "time": {
+          "created": 1792002218693
+        },
+        "agent": "general",
+        "model": {
+          "providerID": "opencode",
+          "modelID": "big-pickle"
+        },
+        "summary": {
+          "diffs": []
+        },
+        "id": "msg_13ba7dac3001HnQl7exYWG5ztz",
+        "sessionID": "ses_ec4582547ffekgZBH0VmVxj1XK"
+      },
+      "parts": [
+        {
+          "type": "text",
+          "text": "You are reviewing one task's implementation: first whether it matches its requirements, then whether it is well-built. Task-scoped gate, not a merge review.\n\n## Working directory\n/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module\n\n## What Was Requested\nRead the task brief: /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-5-brief.md\n\nGlobal constraints that bind this task:\n- connectors package modules AND tests must lint clean under select [\"E4\",\"E7\",\"E9\",\"F\",\"I\",\"UP\",\"B\",\"BLE\"] and be `ruff format`-clean.\n- `ConnectorRegistry(path)` default path = `Path.cwd()/\".agentic-odi\"/\"connectors.json\"`.\n- `list()` returns `[]` when file absent; `get` raises `ConnectorNotFoundError`; `add` raises `DuplicateConnectorError` and persists immediately; `save` creates parent dirs and writes `{\"connectors\":[...]}`; malformed JSON → `RegistryError` with the path in the message (never a raw `json.JSONDecodeError`/`ValidationError`).\n- `build_connector(config, sink, client_factory=None) -> Connector`: `kind==\"mcp\"` → deferred import of `MCPClientConnector` (mcp.py is intentionally created in Task 6, so the import must be lazy and unexecuted here); any other kind → `UnknownConnectorKindError(config.kind)`.\n- Re-export `ConnectorRegistry` and `build_connector` from `connectors/__init__.py`.\n\n## What the Implementer Claims They Built\nRead the implementer's report: /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-5-report.md\nNote: the implementer says they used a relative deferred import (`.mcp`) rather than the brief's absolute prose — assess whether that is correct.\n\n## Diff Under Review\n**Base:** c6c3a69166444fcbe6562ca356fdd576999824ac\n**Head:** fad34364d4e2cb71bb531e271a1e3fcff61df0df\n**Diff file:** /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/review-c6c3a69..fad3436.diff\n\nRead the diff file once (commit list, stat summary, full diff with context). Do not re-run git commands or crawl the codebase. Read-only review: do not mutate the working tree, index, HEAD, or branch state.\n\n## You Do Not Dispatch Subagents. Do all review yourself.\n\n## Do Not Trust the Report. Verify claims against the diff.\n\n## Tests\nThe implementer already ran pytest. Do not re-run the suite. Run ONLY these commands to confirm package lint/format clean and that an unexpected mcp import is NOT triggered:\n  `cd /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module && uv run ruff check connectors/ --output-format=concise; uv run ruff format --check connectors/`\nReport exit codes + output.\n\n## Part 1: Spec Compliance\nVerify each method's behavior, the error types raised, the malformed-JSON → RegistryError-with-path behavior, the atomic save, the deferred import (is it truly only executed on the `mcp` branch?), and the re-exports. Also confirm the `{\"connectors\": [...]}` file shape and that the test file covers: roundtrip, cross-instance persistence, missing-file empty, duplicate rejected, unknown-name raises, malformed JSON raises RegistryError, unknown kind rejected.\nFlag Missing / Extra / Misunderstood. Report ⚠️ for anything unverifiable from the diff.\n\n## Part 2: Code Quality\nCorrectness (esp. atomic save write-temp-then-os.replace; parent dir creation; does `add` reject duplicates case-sensitively/appropriately?), error-message content, typing, structure. Cite file:line.\n\n## Calibration\nActual severity. Minor = polish. Acknowledge what's done well.\n\n## Output Format\n### Spec Compliance\n- ✅/❌ [file:line]\n- ⚠️ Cannot verify: [...]\n### Strengths\n### Issues\n#### Critical / Important / Minor\n(file:line, what's wrong, why, how to fix)\n### Assessment\n**Task quality:** Approved | Needs fixes\n**Reasoning:** [1-2 sentences]\n\nYour final message IS the report — begin with the spec-compliance verdict; no preamble.",
+          "id": "prt_13ba7dacb001q6L0K5HzR1nZft",
+          "sessionID": "ses_ec4582547ffekgZBH0VmVxj1XK",
+          "messageID": "msg_13ba7dac3001HnQl7exYWG5ztz"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_13ba7dac3001HnQl7exYWG5ztz",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 16480,
+          "input": 1882,
+          "output": 245,
+          "reasoning": 17,
+          "cache": {
+            "write": 0,
+            "read": 14336
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792002219280,
+          "completed": 1792002222181
+        },
+        "finish": "tool-calls",
+        "id": "msg_13ba7dd10001usF5MuofwFWH54",
+        "sessionID": "ses_ec4582547ffekgZBH0VmVxj1XK"
+      },
+      "parts": [
+        {
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-start",
+          "id": "prt_13ba7e3fd0014aiA4TaWdOqK8R",
+          "sessionID": "ses_ec4582547ffekgZBH0VmVxj1XK",
+          "messageID": "msg_13ba7dd10001usF5MuofwFWH54"
+        },
+        {
+          "type": "reasoning",
+          "text": "Let me start by reading the task brief, the report, and the diff file.",
+          "time": {
+            "start": 1792002221056,
+            "end": 1792002221159
+          },
+          "id": "prt_13ba7e4000012WEhjnmTcJWjvi",
+          "sessionID": "ses_ec4582547ffekgZBH0VmVxj1XK",
+          "messageID": "msg_13ba7dd10001usF5MuofwFWH54"
+        },
+        {
+          "type": "tool",
+          "tool": "read",
+          "callID": "call_00_3au30qtqov64h64eugushaih",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-5-brief.md"
+            },
+            "output": "<path>/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-5-brief.md</path>\n<type>file</type>\n<content>\n1: ### Task 5: JSON connection registry\n2: \n3: **Files:**\n4: - Create: `connectors/src/connectors/registry.py`\n5: - Modify: `connectors/src/connectors/__init__.py`\n6: - Test: `connectors/tests/test_registry.py`\n7: \n8: **Interfaces:**\n9: - Consumes: `models.ConnectorConfig`, `errors.*`.\n10: - Produces: `registry.ConnectorRegistry(path: str | Path | None = None)`:\n11:   - default `path` = `Path.cwd() / \".agentic-odi\" / \"connectors.json\"`\n12:   - `list() -> list[ConnectorConfig]` (returns `[]` when the file is absent)\n13:   - `get(name: str) -> ConnectorConfig` (raises `ConnectorNotFoundError`)\n14:   - `add(config: ConnectorConfig) -> None` (raises `DuplicateConnectorError`; persists immediately)\n15:   - `save(configs: list[ConnectorConfig]) -> None` (creates parent dirs; writes `{\"connectors\": [ ... ]}`)\n16:   - malformed JSON → raises `RegistryError` with the path in the message\n17: - Produces: `registry.build_connector(config, sink, client_factory=None) -> Connector` dispatcher; unknown kind → `UnknownConnectorKindError`. `MCPClientConnector` import is deferred inside this function (added in Task 6).\n18: \n19: - [ ] **Step 1: Write the failing test**\n20: \n21: `connectors/tests/test_registry.py`:\n22: \n23: ```python\n24: import pytest\n25: from connectors import ConnectorConfig, ConnectorRegistry\n26: from connectors.errors import (\n27:     ConnectorNotFoundError, DuplicateConnectorError, RegistryError,\n28: )\n29: \n30: \n31: def _reg(tmp_path):\n32:     return ConnectorRegistry(path=tmp_path / \"connectors.json\")\n33: \n34: \n35: def test_add_then_list_roundtrips(tmp_path):\n36:     reg = _reg(tmp_path)\n37:     reg.add(ConnectorConfig(name=\"gong\", kind=\"mcp\", settings={\"url\": \"http://h/mcp\"}))\n38:     assert [c.name for c in reg.list()] == [\"gong\"]\n39: \n40: \n41: def test_config_persists_across_instances(tmp_path):\n42:     p = tmp_path / \"connectors.json\"\n43:     ConnectorRegistry(path=p).add(ConnectorConfig(name=\"a\", settings={\"url\": \"http://h/mcp\"}))\n44:     assert ConnectorRegistry(path=p).get(\"a\").settings[\"url\"] == \"http://h/mcp\"\n45: \n46: \n47: def test_list_missing_file_returns_empty(tmp_path):\n48:     assert _reg(tmp_path).list() == []\n49: \n50: \n51: def test_duplicate_name_rejected(tmp_path):\n52:     reg = _reg(tmp_path)\n53:     reg.add(ConnectorConfig(name=\"a\", settings={\"url\": \"http://h/mcp\"}))\n54:     with pytest.raises(DuplicateConnectorError):\n55:         reg.add(ConnectorConfig(name=\"a\", settings={\"url\": \"http://h/mcp\"}))\n56: \n57: \n58: def test_get_unknown_name_raises(tmp_path):\n59:     with pytest.raises(ConnectorNotFoundError):\n60:         _reg(tmp_path).get(\"nope\")\n61: \n62: \n63: def test_malformed_json_raises_registry_error(tmp_path):\n64:     p = tmp_path / \"connectors.json\"\n65:     p.write_text(\"{not json\")\n66:     with pytest.raises(RegistryError):\n67:         ConnectorRegistry(path=p).list()\n68: \n69: \n70: def test_build_connector_rejects_unknown_kind(tmp_path):\n71:     from connectors import IngestSink\n72:     from connectors.errors import UnknownConnectorKindError\n73:     from connectors.registry import build_connector\n74:     cfg = ConnectorConfig(name=\"x\", kind=\"rest\", settings={})\n75:     with pytest.raises(UnknownConnectorKindError):\n76:         build_connector(cfg, IngestSink())\n77: ```\n78: \n79: - [ ] **Step 2: Run test to verify it fails**\n80: \n81: Run: `uv run --directory connectors pytest tests/test_registry.py -v`\n82: Expected: FAIL (ImportError).\n83: \n84: - [ ] **Step 3: Implement `registry.py`** with Pydantic `RootModel`/`BaseModel` wrapper for `{\"connectors\": [...]}` validation, atomic `save`, and the `build_connector` dispatcher. Export `ConnectorRegistry` and `build_connector`.\n85: \n86: - [ ] **Step 4: Run test to verify it passes**\n87: \n88: Run: `uv run --directory connectors pytest tests/test_registry.py -v`\n89: Expected: PASS (7 passed).\n90: \n91: - [ ] **Step 5: Commit**\n92: \n93: ```bash\n94: git add connectors/src/connectors/registry.py connectors/src/connectors/__init__.py connectors/tests/test_registry.py\n95: git commit -m \"feat(connectors): add JSON connection registry and kind dispatcher\"\n96: ```\n97: \n98: ---\n99: \n\n(End of file - total 99 lines)\n</content>",
+            "metadata": {
+              "preview": "### Task 5: JSON connection registry\n\n**Files:**\n- Create: `connectors/src/connectors/registry.py`\n- Modify: `connectors/src/connectors/__init__.py`\n- Test: `connectors/tests/test_registry.py`\n\n**Interfaces:**\n- Consumes: `models.ConnectorConfig`, `errors.*`.\n- Produces: `registry.ConnectorRegistry(path: str | Path | None = None)`:\n  - default `path` = `Path.cwd() / \".agentic-odi\" / \"connectors.json\"`\n  - `list() -> list[ConnectorConfig]` (returns `[]` when the file is absent)\n  - `get(name: str) -> ConnectorConfig` (raises `ConnectorNotFoundError`)\n  - `add(config: ConnectorConfig) -> None` (raises `DuplicateConnectorError`; persists immediately)\n  - `save(configs: list[ConnectorConfig]) -> None` (creates parent dirs; writes `{\"connectors\": [ ... ]}`)\n  - malformed JSON → raises `RegistryError` with the path in the message\n- Produces: `registry.build_connector(config, sink, client_factory=None) -> Connector` dispatcher; unknown kind → `UnknownConnectorKindError`. `MCPClientConnector` import is deferred inside this function (added in Task 6).\n\n- [ ] **Step 1: Write the failing test**\n",
+              "truncated": false,
+              "loaded": [],
+              "display": {
+                "type": "file",
+                "path": "/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-5-brief.md",
+                "text": "### Task 5: JSON connection registry\n\n**Files:**\n- Create: `connectors/src/connectors/registry.py`\n- Modify: `connectors/src/connectors/__init__.py`\n- Test: `connectors/tests/test_registry.py`\n\n**Interfaces:**\n- Consumes: `models.ConnectorConfig`, `errors.*`.\n- Produces: `registry.ConnectorRegistry(path: str | Path | None = None)`:\n  - default `path` = `Path.cwd() / \".agentic-odi\" / \"connectors.json\"`\n  - `list() -> list[ConnectorConfig]` (returns `[]` when the file is absent)\n  - `get(name: str) -> ConnectorConfig` (raises `ConnectorNotFoundError`)\n  - `add(config: ConnectorConfig) -> None` (raises `DuplicateConnectorError`; persists immediately)\n  - `save(configs: list[ConnectorConfig]) -> None` (creates parent dirs; writes `{\"connectors\": [ ... ]}`)\n  - malformed JSON → raises `RegistryError` with the path in the message\n- Produces: `registry.build_connector(config, sink, client_factory=None) -> Connector` dispatcher; unknown kind → `UnknownConnectorKindError`. `MCPClientConnector` import is deferred inside this function (added in Task 6).\n\n- [ ] **Step 1: Write the failing test**\n\n`connectors/tests/test_registry.py`:\n\n```python\nimport pytest\nfrom connectors import ConnectorConfig, ConnectorRegistry\nfrom connectors.errors import (\n    ConnectorNotFoundError, DuplicateConnectorError, RegistryError,\n)\n\n\ndef _reg(tmp_path):\n    return ConnectorRegistry(path=tmp_path / \"connectors.json\")\n\n\ndef test_add_then_list_roundtrips(tmp_path):\n    reg = _reg(tmp_path)\n    reg.add(ConnectorConfig(name=\"gong\", kind=\"mcp\", settings={\"url\": \"http://h/mcp\"}))\n    assert [c.name for c in reg.list()] == [\"gong\"]\n\n\ndef test_config_persists_across_instances(tmp_path):\n    p = tmp_path / \"connectors.json\"\n    ConnectorRegistry(path=p).add(ConnectorConfig(name=\"a\", settings={\"url\": \"http://h/mcp\"}))\n    assert ConnectorRegistry(path=p).get(\"a\").settings[\"url\"] == \"http://h/mcp\"\n\n\ndef test_list_missing_file_returns_empty(tmp_path):\n    assert _reg(tmp_path).list() == []\n\n\ndef test_duplicate_name_rejected(tmp_path):\n    reg = _reg(tmp_path)\n    reg.add(ConnectorConfig(name=\"a\", settings={\"url\": \"http://h/mcp\"}))\n    with pytest.raises(DuplicateConnectorError):\n        reg.add(ConnectorConfig(name=\"a\", settings={\"url\": \"http://h/mcp\"}))\n\n\ndef test_get_unknown_name_raises(tmp_path):\n    with pytest.raises(ConnectorNotFoundError):\n        _reg(tmp_path).get(\"nope\")\n\n\ndef test_malformed_json_raises_registry_error(tmp_path):\n    p = tmp_path / \"connectors.json\"\n    p.write_text(\"{not json\")\n    with pytest.raises(RegistryError):\n        ConnectorRegistry(path=p).list()\n\n\ndef test_build_connector_rejects_unknown_kind(tmp_path):\n    from connectors import IngestSink\n    from connectors.errors import UnknownConnectorKindError\n    from connectors.registry import build_connector\n    cfg = ConnectorConfig(name=\"x\", kind=\"rest\", settings={})\n    with pytest.raises(UnknownConnectorKindError):\n        build_connector(cfg, IngestSink())\n```\n\n- [ ] **Step 2: Run test to verify it fails**\n\nRun: `uv run --directory connectors pytest tests/test_registry.py -v`\nExpected: FAIL (ImportError).\n\n- [ ] **Step 3: Implement `registry.py`** with Pydantic `RootModel`/`BaseModel` wrapper for `{\"connectors\": [...]}` validation, atomic `save`, and the `build_connector` dispatcher. Export `ConnectorRegistry` and `build_connector`.\n\n- [ ] **Step 4: Run test to verify it passes**\n\nRun: `uv run --directory connectors pytest tests/test_registry.py -v`\nExpected: PASS (7 passed).\n\n- [ ] **Step 5: Commit**\n\n```bash\ngit add connectors/src/connectors/registry.py connectors/src/connectors/__init__.py connectors/tests/test_registry.py\ngit commit -m \"feat(connectors): add JSON connection registry and kind dispatcher\"\n```\n\n---\n",
+                "lineStart": 1,
+                "lineEnd": 99,
+                "totalLines": 99,
+                "truncated": false
+              }
+            },
+            "title": ".worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-5-brief.md",
+            "time": {
+              "start": 1792002221468,
+              "end": 1792002221489
+            }
+          },
+          "id": "prt_13ba7e4690012fB9Wbh3CLKwSr",
+          "sessionID": "ses_ec4582547ffekgZBH0VmVxj1XK",
+          "messageID": "msg_13ba7dd10001usF5MuofwFWH54"
+        },
+        {
+          "type": "tool",
+          "tool": "read",
+          "callID": "call_01_oontzhmviksdx6a4cgi0n8og",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-5-report.md"
+            },
+            "output": "<path>/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-5-report.md</path>\n<type>file</type>\n<content>\n1: # Task 5 Report: JSON connection registry + `build_connector` kind dispatcher\n2: \n3: ## Status\n4: Complete. All 7 new tests pass; `connectors/` is ruff-clean (format + check). Committed.\n5: \n6: - Commit: `fad34364d4e2cb71bb531e271a1e3fcff61df0df`\n7: - Subject: `feat(connectors): add JSON connection registry and kind dispatcher`\n8: - Branch/worktree: `mcp-connector-module` @ `/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module`\n9: \n10: ## What I implemented\n11: \n12: ### `connectors/src/connectors/registry.py` (new)\n13: - `ConnectorRegistry(path: str | Path | None = None)` — default path evaluated at\n14:   construction time as `Path.cwd() / \".agentic-odi\" / \"connectors.json\"`.\n15: - `list() -> list[ConnectorConfig]` — returns `[]` when the file is absent; otherwise parses\n16:   and validates the file.\n17: - `get(name) -> ConnectorConfig` — linear lookup; raises `ConnectorNotFoundError` when absent.\n18: - `add(config) -> None` — rejects name clashes with `DuplicateConnectorError`, then appends and\n19:   persists immediately via `save()`.\n20: - `save(configs) -> None` — creates parent dirs, writes `{\"connectors\": [...]}` atomically:\n21:   `tempfile.mkstemp(dir=self.path.parent)` → `json.dump` → `os.replace(tmp, self.path)`. Temp\n22:   file is unlinked on any failure before re-raising.\n23: - Error normalization: `json.JSONDecodeError` / `OSError` and Pydantic `ValidationError` are\n24:   both wrapped in `RegistryError` whose message contains the registry path. No raw\n25:   `JSONDecodeError` or `ValidationError` leaks.\n26: - File-shape validation via a Pydantic wrapper model `_RegistryFile(BaseModel)` with\n27:   `connectors: list[ConnectorConfig]`.\n28: - `build_connector(config, sink, client_factory=None) -> Connector` — dispatcher. For\n29:   `kind == \"mcp\"` performs a **deferred** import of `MCPClientConnector` inside the function and\n30:   returns `MCPClientConnector(config, sink, client_factory=client_factory)`. Any other kind\n31:   raises `UnknownConnectorKindError(config.kind)`. `mcp.py` was NOT created.\n32: \n33: ### `connectors/src/connectors/__init__.py` (modified)\n34: - Re-exports `ConnectorRegistry` and `build_connector`; both added to `__all__`. Verified\n35:   `from connectors import ConnectorRegistry` and `from connectors.registry import build_connector`.\n36: \n37: ### `connectors/tests/test_registry.py` (new)\n38: - The brief's 7 tests used verbatim (only auto-formatted by ruff).\n39: \n40: ## TDD Evidence\n41: \n42: ### RED — `uv run --directory connectors pytest tests/test_registry.py -v`\n43: ```\n44: collecting ... collected 0 items / 1 error\n45: ==================================== ERRORS ====================================\n46: ___________________ ERROR collecting tests/test_registry.py ____________________\n47: ImportError while importing test module '.../tests/test_registry.py'.\n48: tests/test_registry.py:2: in <module>\n49:     from connectors import ConnectorConfig, ConnectorRegistry\n50: E   ImportError: cannot import name 'ConnectorRegistry' from 'connectors'\n51: =========================== short test summary info ============================\n52: ERROR tests/test_registry.py\n53: !!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n54: =============================== 1 error in 0.20s ===============================\n55: ```\n56: \n57: ### GREEN — `uv run --directory connectors pytest tests/test_registry.py -v`\n58: ```\n59: collected 7 items\n60: \n61: tests/test_registry.py::test_add_then_list_roundtrips PASSED             [ 14%]\n62: tests/test_registry.py::test_config_persists_across_instances PASSED     [ 28%]\n63: tests/test_registry.py::test_list_missing_file_returns_empty PASSED      [ 42%]\n64: tests/test_registry.py::test_duplicate_name_rejected PASSED              [ 57%]\n65: tests/test_registry.py::test_get_unknown_name_raises PASSED              [ 71%]\n66: tests/test_registry.py::test_malformed_json_raises_registry_error PASSED [ 85%]\n67: tests/test_registry.py::test_build_connector_rejects_unknown_kind PASSED [100%]\n68: \n69: ============================== 7 passed in 0.15s ===============================\n70: ```\n71: \n72: ### Full connectors suite — `uv run --directory connectors pytest tests/ -q`\n73: ```\n74: ..............                                                           [100%]\n75: 14 passed in 0.12s\n76: ```\n77: \n78: ## Ruff format/check results\n79: Commands (scoped to connectors, per the brief):\n80: ```\n81: uv run ruff format connectors/        -> 1 file reformatted, 8 files left unchanged\n82: uv run ruff check connectors/ --fix   -> Found 1 error (1 fixed, 0 remaining).\n83: uv run ruff check connectors/         -> All checks passed!\n84: uv run ruff format --check connectors/-> 9 files already formatted (exit 0)\n85: ```\n86: The reformatted file is `tests/test_registry.py` (the brief's import list was collapsed onto\n87: multiple lines); no test behavior changed. The `--fix` resolved an import-sorting (`I001`) issue\n88: in `test_registry.py`.\n89: \n90: ### Note on repo-wide `ruff format --check .`\n91: Running `uv run ruff format --check .` reports 9 files \"would be reformatted\", but all are in\n92: `cli/` (`cli/backend.py`, `cli/cli.py`, `cli/outcomes.py`, ...) and are **pre-existing,\n93: unmodified** files (`git diff --name-only` shows only `connectors/src/connectors/__init__.py`).\n94: This condition exists independently of this task; I did not touch those files. `connectors/`\n95: is fully clean.\n96: \n97: ## Files changed\n98: ```\n99: connectors/src/connectors/registry.py   | new\n100: connectors/src/connectors/__init__.py   | +3\n101: connectors/tests/test_registry.py       | new\n102: ```\n103: Stat: `3 files changed, 146 insertions(+)`.\n104: \n105: ## Self-review\n106: - Every required interface is present with the exact signatures from the brief.\n107: - `list()` on an absent file returns `[]` without attempting a read.\n108: - Malformed JSON and wrong-shape JSON both surface as `RegistryError` with the path in the\n109:   message (the malformed case is directly tested; the shape case is handled by wrapping\n110:   `ValidationError`).\n111: - Atomicity: temp file created in the same directory as the target, then `os.replace`\n112:   (atomic on POSIX); cleanup on failure. Parent dirs created before writing.\n113: - Dispatcher uses a function-local deferred import, so the non-existent `mcp.py` is never\n114:   imported by any test in this task. The `rest` kind correctly raises\n115:   `UnknownConnectorKindError`.\n116: - Pipeline ran RED → GREEN → format/lint clean → commit, with the brief's subject line. The\n117:   `Entire-Checkpoint` trailer is present.\n118: - I amended the task commit once (pre-push, local) to move the default-path evaluation from\n119:   module import time to construction time, so the default tracks `Path.cwd()` at the moment a\n120:   registry is created, matching the brief's `Path.cwd() / ...` wording. Tests re-run green\n121:   afterwards.\n122: \n123: ## Concerns\n124: 1. **Permissions of the written file.** `tempfile.mkstemp` creates the temp file with mode\n125:    `0600`, so after `os.replace` the registry file inherits `0600` rather than the usual\n126:    `umask`-derived `0644`. Functionally correct and arguably more private, but different from a\n127:    plain `write_text`. Not covered by the brief/tests; can add an explicit `os.chmod` if a\n128:    specific mode is required.\n129: 2. **Relative vs. absolute deferred import.** The brief's prose shows\n130:    `from connectors.mcp import MCPClientConnector`; I used the relative `from .mcp import\n131:    MCPClientConnector` to match the existing source modules' import style. Semantically\n132:    identical (resolves to the same `connectors.mcp` module/object) and not exercised in this\n133:    task. Easy to switch to absolute if Task 6's tests assume a specific spelling.\n134: 3. **Pre-existing repo-wide format failures in `cli/`** noted above — outside this task's scope,\n135:    but if repo CI truly runs `ruff format --check .` over the whole tree, it will fail for\n136:    reasons unrelated to Task 5.\n\n(End of file - total 136 lines)\n</content>",
+            "metadata": {
+              "preview": "# Task 5 Report: JSON connection registry + `build_connector` kind dispatcher\n\n## Status\nComplete. All 7 new tests pass; `connectors/` is ruff-clean (format + check). Committed.\n\n- Commit: `fad34364d4e2cb71bb531e271a1e3fcff61df0df`\n- Subject: `feat(connectors): add JSON connection registry and kind dispatcher`\n- Branch/worktree: `mcp-connector-module` @ `/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module`\n\n## What I implemented\n\n### `connectors/src/connectors/registry.py` (new)\n- `ConnectorRegistry(path: str | Path | None = None)` — default path evaluated at\n  construction time as `Path.cwd() / \".agentic-odi\" / \"connectors.json\"`.\n- `list() -> list[ConnectorConfig]` — returns `[]` when the file is absent; otherwise parses\n  and validates the file.\n- `get(name) -> ConnectorConfig` — linear lookup; raises `ConnectorNotFoundError` when absent.\n- `add(config) -> None` — rejects name clashes with `DuplicateConnectorError`, then appends and\n  persists immediately via `save()`.\n- `save(configs) -> None` — creates parent dirs, writes `{\"connectors\": [...]}` atomically:",
+              "truncated": false,
+              "loaded": [],
+              "display": {
+                "type": "file",
+                "path": "/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-5-report.md",
+                "text": "# Task 5 Report: JSON connection registry + `build_connector` kind dispatcher\n\n## Status\nComplete. All 7 new tests pass; `connectors/` is ruff-clean (format + check). Committed.\n\n- Commit: `fad34364d4e2cb71bb531e271a1e3fcff61df0df`\n- Subject: `feat(connectors): add JSON connection registry and kind dispatcher`\n- Branch/worktree: `mcp-connector-module` @ `/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module`\n\n## What I implemented\n\n### `connectors/src/connectors/registry.py` (new)\n- `ConnectorRegistry(path: str | Path | None = None)` — default path evaluated at\n  construction time as `Path.cwd() / \".agentic-odi\" / \"connectors.json\"`.\n- `list() -> list[ConnectorConfig]` — returns `[]` when the file is absent; otherwise parses\n  and validates the file.\n- `get(name) -> ConnectorConfig` — linear lookup; raises `ConnectorNotFoundError` when absent.\n- `add(config) -> None` — rejects name clashes with `DuplicateConnectorError`, then appends and\n  persists immediately via `save()`.\n- `save(configs) -> None` — creates parent dirs, writes `{\"connectors\": [...]}` atomically:\n  `tempfile.mkstemp(dir=self.path.parent)` → `json.dump` → `os.replace(tmp, self.path)`. Temp\n  file is unlinked on any failure before re-raising.\n- Error normalization: `json.JSONDecodeError` / `OSError` and Pydantic `ValidationError` are\n  both wrapped in `RegistryError` whose message contains the registry path. No raw\n  `JSONDecodeError` or `ValidationError` leaks.\n- File-shape validation via a Pydantic wrapper model `_RegistryFile(BaseModel)` with\n  `connectors: list[ConnectorConfig]`.\n- `build_connector(config, sink, client_factory=None) -> Connector` — dispatcher. For\n  `kind == \"mcp\"` performs a **deferred** import of `MCPClientConnector` inside the function and\n  returns `MCPClientConnector(config, sink, client_factory=client_factory)`. Any other kind\n  raises `UnknownConnectorKindError(config.kind)`. `mcp.py` was NOT created.\n\n### `connectors/src/connectors/__init__.py` (modified)\n- Re-exports `ConnectorRegistry` and `build_connector`; both added to `__all__`. Verified\n  `from connectors import ConnectorRegistry` and `from connectors.registry import build_connector`.\n\n### `connectors/tests/test_registry.py` (new)\n- The brief's 7 tests used verbatim (only auto-formatted by ruff).\n\n## TDD Evidence\n\n### RED — `uv run --directory connectors pytest tests/test_registry.py -v`\n```\ncollecting ... collected 0 items / 1 error\n==================================== ERRORS ====================================\n___________________ ERROR collecting tests/test_registry.py ____________________\nImportError while importing test module '.../tests/test_registry.py'.\ntests/test_registry.py:2: in <module>\n    from connectors import ConnectorConfig, ConnectorRegistry\nE   ImportError: cannot import name 'ConnectorRegistry' from 'connectors'\n=========================== short test summary info ============================\nERROR tests/test_registry.py\n!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n=============================== 1 error in 0.20s ===============================\n```\n\n### GREEN — `uv run --directory connectors pytest tests/test_registry.py -v`\n```\ncollected 7 items\n\ntests/test_registry.py::test_add_then_list_roundtrips PASSED             [ 14%]\ntests/test_registry.py::test_config_persists_across_instances PASSED     [ 28%]\ntests/test_registry.py::test_list_missing_file_returns_empty PASSED      [ 42%]\ntests/test_registry.py::test_duplicate_name_rejected PASSED              [ 57%]\ntests/test_registry.py::test_get_unknown_name_raises PASSED              [ 71%]\ntests/test_registry.py::test_malformed_json_raises_registry_error PASSED [ 85%]\ntests/test_registry.py::test_build_connector_rejects_unknown_kind PASSED [100%]\n\n============================== 7 passed in 0.15s ===============================\n```\n\n### Full connectors suite — `uv run --directory connectors pytest tests/ -q`\n```\n..............                                                           [100%]\n14 passed in 0.12s\n```\n\n## Ruff format/check results\nCommands (scoped to connectors, per the brief):\n```\nuv run ruff format connectors/        -> 1 file reformatted, 8 files left unchanged\nuv run ruff check connectors/ --fix   -> Found 1 error (1 fixed, 0 remaining).\nuv run ruff check connectors/         -> All checks passed!\nuv run ruff format --check connectors/-> 9 files already formatted (exit 0)\n```\nThe reformatted file is `tests/test_registry.py` (the brief's import list was collapsed onto\nmultiple lines); no test behavior changed. The `--fix` resolved an import-sorting (`I001`) issue\nin `test_registry.py`.\n\n### Note on repo-wide `ruff format --check .`\nRunning `uv run ruff format --check .` reports 9 files \"would be reformatted\", but all are in\n`cli/` (`cli/backend.py`, `cli/cli.py`, `cli/outcomes.py`, ...) and are **pre-existing,\nunmodified** files (`git diff --name-only` shows only `connectors/src/connectors/__init__.py`).\nThis condition exists independently of this task; I did not touch those files. `connectors/`\nis fully clean.\n\n## Files changed\n```\nconnectors/src/connectors/registry.py   | new\nconnectors/src/connectors/__init__.py   | +3\nconnectors/tests/test_registry.py       | new\n```\nStat: `3 files changed, 146 insertions(+)`.\n\n## Self-review\n- Every required interface is present with the exact signatures from the brief.\n- `list()` on an absent file returns `[]` without attempting a read.\n- Malformed JSON and wrong-shape JSON both surface as `RegistryError` with the path in the\n  message (the malformed case is directly tested; the shape case is handled by wrapping\n  `ValidationError`).\n- Atomicity: temp file created in the same directory as the target, then `os.replace`\n  (atomic on POSIX); cleanup on failure. Parent dirs created before writing.\n- Dispatcher uses a function-local deferred import, so the non-existent `mcp.py` is never\n  imported by any test in this task. The `rest` kind correctly raises\n  `UnknownConnectorKindError`.\n- Pipeline ran RED → GREEN → format/lint clean → commit, with the brief's subject line. The\n  `Entire-Checkpoint` trailer is present.\n- I amended the task commit once (pre-push, local) to move the default-path evaluation from\n  module import time to construction time, so the default tracks `Path.cwd()` at the moment a\n  registry is created, matching the brief's `Path.cwd() / ...` wording. Tests re-run green\n  afterwards.\n\n## Concerns\n1. **Permissions of the written file.** `tempfile.mkstemp` creates the temp file with mode\n   `0600`, so after `os.replace` the registry file inherits `0600` rather than the usual\n   `umask`-derived `0644`. Functionally correct and arguably more private, but different from a\n   plain `write_text`. Not covered by the brief/tests; can add an explicit `os.chmod` if a\n   specific mode is required.\n2. **Relative vs. absolute deferred import.** The brief's prose shows\n   `from connectors.mcp import MCPClientConnector`; I used the relative `from .mcp import\n   MCPClientConnector` to match the existing source modules' import style. Semantically\n   identical (resolves to the same `connectors.mcp` module/object) and not exercised in this\n   task. Easy to switch to absolute if Task 6's tests assume a specific spelling.\n3. **Pre-existing repo-wide format failures in `cli/`** noted above — outside this task's scope,\n   but if repo CI truly runs `ruff format --check .` over the whole tree, it will fail for\n   reasons unrelated to Task 5.",
+                "lineStart": 1,
+                "lineEnd": 136,
+                "totalLines": 136,
+                "truncated": false
+              }
+            },
+            "title": ".worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-5-report.md",
+            "time": {
+              "start": 1792002221746,
+              "end": 1792002221777
+            }
+          },
+          "id": "prt_13ba7e59f001Fswgulr270pWBu",
+          "sessionID": "ses_ec4582547ffekgZBH0VmVxj1XK",
+          "messageID": "msg_13ba7dd10001usF5MuofwFWH54"
+        },
+        {
+          "type": "tool",
+          "tool": "read",
+          "callID": "call_02_1xpnquhzhtnbdwfu11euj23z",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/review-c6c3a69..fad3436.diff"
+            },
+            "output": "<path>/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/review-c6c3a69..fad3436.diff</path>\n<type>file</type>\n<content>\n1: # Review package: c6c3a69166444fcbe6562ca356fdd576999824ac..HEAD\n2: \n3: ## Commits\n4: fad3436 feat(connectors): add JSON connection registry and kind dispatcher\n5: \n6: ## Files changed\n7:  connectors/src/connectors/__init__.py |  3 ++\n8:  connectors/src/connectors/registry.py | 86 +++++++++++++++++++++++++++++++++++\n9:  connectors/tests/test_registry.py     | 57 +++++++++++++++++++++++\n10:  3 files changed, 146 insertions(+)\n11: \n12: ## Diff\n13: diff --git a/connectors/src/connectors/__init__.py b/connectors/src/connectors/__init__.py\n14: index 8029107..fd4e8d1 100644\n15: --- a/connectors/src/connectors/__init__.py\n16: +++ b/connectors/src/connectors/__init__.py\n17: @@ -9,25 +9,28 @@ from .errors import (\n18:      UnknownConnectorKindError,\n19:  )\n20:  from .models import (\n21:      ConnectorConfig,\n22:      HealthStatus,\n23:      IngestBatch,\n24:      IngestRecord,\n25:      McpConnectorSettings,\n26:  )\n27:  from .protocol import Connector\n28: +from .registry import ConnectorRegistry, build_connector\n29:  from .sink import IngestSink\n30:  \n31:  __all__ = [\n32:      \"Connector\",\n33:      \"ConnectorConfig\",\n34:      \"ConnectorNotFoundError\",\n35: +    \"ConnectorRegistry\",\n36:      \"DuplicateConnectorError\",\n37:      \"HealthStatus\",\n38:      \"IngestBatch\",\n39:      \"IngestRecord\",\n40:      \"IngestSink\",\n41:      \"McpConnectorSettings\",\n42:      \"RegistryError\",\n43:      \"UnknownConnectorKindError\",\n44: +    \"build_connector\",\n45:  ]\n46: diff --git a/connectors/src/connectors/registry.py b/connectors/src/connectors/registry.py\n47: new file mode 100644\n48: index 0000000..d9f4c0f\n49: --- /dev/null\n50: +++ b/connectors/src/connectors/registry.py\n51: @@ -0,0 +1,86 @@\n52: +\"\"\"JSON-backed connection registry plus the connector kind dispatcher.\"\"\"\n53: +\n54: +from __future__ import annotations\n55: +\n56: +import json\n57: +import os\n58: +import tempfile\n59: +from pathlib import Path\n60: +from typing import TYPE_CHECKING, Any\n61: +\n62: +from pydantic import BaseModel, Field, ValidationError\n63: +\n64: +from .errors import (\n65: +    ConnectorNotFoundError,\n66: +    DuplicateConnectorError,\n67: +    RegistryError,\n68: +    UnknownConnectorKindError,\n69: +)\n70: +from .models import ConnectorConfig\n71: +\n72: +if TYPE_CHECKING:\n73: +    from .protocol import Connector\n74: +    from .sink import IngestSink\n75: +\n76: +\n77: +class _RegistryFile(BaseModel):\n78: +    connectors: list[ConnectorConfig] = Field(default_factory=list)\n79: +\n80: +\n81: +class ConnectorRegistry:\n82: +    \"\"\"Reads and writes connector configurations from a JSON file.\"\"\"\n83: +\n84: +    def __init__(self, path: str | Path | None = None) -> None:\n85: +        self.path = (\n86: +            Path(path) if path is not None else Path.cwd() / \".agentic-odi\" / \"connectors.json\"\n87: +        )\n88: +\n89: +    def list(self) -> list[ConnectorConfig]:\n90: +        if not self.path.exists():\n91: +            return []\n92: +        try:\n93: +            raw = json.loads(self.path.read_text())\n94: +        except (OSError, json.JSONDecodeError) as exc:\n95: +            raise RegistryError(f\"failed to read registry {self.path}: {exc}\") from exc\n96: +        try:\n97: +            return _RegistryFile.model_validate(raw).connectors\n98: +        except ValidationError as exc:\n99: +            raise RegistryError(f\"invalid registry {self.path}: {exc}\") from exc\n100: +\n101: +    def get(self, name: str) -> ConnectorConfig:\n102: +        for config in self.list():\n103: +            if config.name == name:\n104: +                return config\n105: +        raise ConnectorNotFoundError(f\"connector {name!r} not found in {self.path}\")\n106: +\n107: +    def add(self, config: ConnectorConfig) -> None:\n108: +        configs = self.list()\n109: +        if any(existing.name == config.name for existing in configs):\n110: +            raise DuplicateConnectorError(f\"connector {config.name!r} already exists\")\n111: +        configs.append(config)\n112: +        self.save(configs)\n113: +\n114: +    def save(self, configs: list[ConnectorConfig]) -> None:\n115: +        self.path.parent.mkdir(parents=True, exist_ok=True)\n116: +        payload = _RegistryFile(connectors=configs).model_dump()\n117: +        fd, tmp_name = tempfile.mkstemp(dir=self.path.parent, suffix=\".tmp\")\n118: +        try:\n119: +            with os.fdopen(fd, \"w\") as tmp_file:\n120: +                json.dump(payload, tmp_file)\n121: +            os.replace(tmp_name, self.path)\n122: +        except BaseException:\n123: +            Path(tmp_name).unlink(missing_ok=True)\n124: +            raise\n125: +\n126: +\n127: +def build_connector(\n128: +    config: ConnectorConfig,\n129: +    sink: IngestSink,\n130: +    client_factory: Any = None,\n131: +) -> Connector:\n132: +    \"\"\"Construct a connector for the given config's kind.\"\"\"\n133: +    if config.kind == \"mcp\":\n134: +        from .mcp import MCPClientConnector\n135: +\n136: +        return MCPClientConnector(config, sink, client_factory=client_factory)\n137: +    raise UnknownConnectorKindError(config.kind)\n138: diff --git a/connectors/tests/test_registry.py b/connectors/tests/test_registry.py\n139: new file mode 100644\n140: index 0000000..152b729\n141: --- /dev/null\n142: +++ b/connectors/tests/test_registry.py\n143: @@ -0,0 +1,57 @@\n144: +import pytest\n145: +\n146: +from connectors import ConnectorConfig, ConnectorRegistry\n147: +from connectors.errors import (\n148: +    ConnectorNotFoundError,\n149: +    DuplicateConnectorError,\n150: +    RegistryError,\n151: +)\n152: +\n153: +\n154: +def _reg(tmp_path):\n155: +    return ConnectorRegistry(path=tmp_path / \"connectors.json\")\n156: +\n157: +\n158: +def test_add_then_list_roundtrips(tmp_path):\n159: +    reg = _reg(tmp_path)\n160: +    reg.add(ConnectorConfig(name=\"gong\", kind=\"mcp\", settings={\"url\": \"http://h/mcp\"}))\n161: +    assert [c.name for c in reg.list()] == [\"gong\"]\n162: +\n163: +\n164: +def test_config_persists_across_instances(tmp_path):\n165: +    p = tmp_path / \"connectors.json\"\n166: +    ConnectorRegistry(path=p).add(ConnectorConfig(name=\"a\", settings={\"url\": \"http://h/mcp\"}))\n167: +    assert ConnectorRegistry(path=p).get(\"a\").settings[\"url\"] == \"http://h/mcp\"\n168: +\n169: +\n170: +def test_list_missing_file_returns_empty(tmp_path):\n171: +    assert _reg(tmp_path).list() == []\n172: +\n173: +\n174: +def test_duplicate_name_rejected(tmp_path):\n175: +    reg = _reg(tmp_path)\n176: +    reg.add(ConnectorConfig(name=\"a\", settings={\"url\": \"http://h/mcp\"}))\n177: +    with pytest.raises(DuplicateConnectorError):\n178: +        reg.add(ConnectorConfig(name=\"a\", settings={\"url\": \"http://h/mcp\"}))\n179: +\n180: +\n181: +def test_get_unknown_name_raises(tmp_path):\n182: +    with pytest.raises(ConnectorNotFoundError):\n183: +        _reg(tmp_path).get(\"nope\")\n184: +\n185: +\n186: +def test_malformed_json_raises_registry_error(tmp_path):\n187: +    p = tmp_path / \"connectors.json\"\n188: +    p.write_text(\"{not json\")\n189: +    with pytest.raises(RegistryError):\n190: +        ConnectorRegistry(path=p).list()\n191: +\n192: +\n193: +def test_build_connector_rejects_unknown_kind(tmp_path):\n194: +    from connectors import IngestSink\n195: +    from connectors.errors import UnknownConnectorKindError\n196: +    from connectors.registry import build_connector\n197: +\n198: +    cfg = ConnectorConfig(name=\"x\", kind=\"rest\", settings={})\n199: +    with pytest.raises(UnknownConnectorKindError):\n200: +        build_connector(cfg, IngestSink())\n\n(End of file - total 200 lines)\n</content>",
+            "metadata": {
+              "preview": "# Review package: c6c3a69166444fcbe6562ca356fdd576999824ac..HEAD\n\n## Commits\nfad3436 feat(connectors): add JSON connection registry and kind dispatcher\n\n## Files changed\n connectors/src/connectors/__init__.py |  3 ++\n connectors/src/connectors/registry.py | 86 +++++++++++++++++++++++++++++++++++\n connectors/tests/test_registry.py     | 57 +++++++++++++++++++++++\n 3 files changed, 146 insertions(+)\n\n## Diff\ndiff --git a/connectors/src/connectors/__init__.py b/connectors/src/connectors/__init__.py\nindex 8029107..fd4e8d1 100644\n--- a/connectors/src/connectors/__init__.py\n+++ b/connectors/src/connectors/__init__.py\n@@ -9,25 +9,28 @@ from .errors import (\n     UnknownConnectorKindError,\n )\n from .models import (",
+              "truncated": false,
+              "loaded": [],
+              "display": {
+                "type": "file",
+                "path": "/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/review-c6c3a69..fad3436.diff",
+                "text": "# Review package: c6c3a69166444fcbe6562ca356fdd576999824ac..HEAD\n\n## Commits\nfad3436 feat(connectors): add JSON connection registry and kind dispatcher\n\n## Files changed\n connectors/src/connectors/__init__.py |  3 ++\n connectors/src/connectors/registry.py | 86 +++++++++++++++++++++++++++++++++++\n connectors/tests/test_registry.py     | 57 +++++++++++++++++++++++\n 3 files changed, 146 insertions(+)\n\n## Diff\ndiff --git a/connectors/src/connectors/__init__.py b/connectors/src/connectors/__init__.py\nindex 8029107..fd4e8d1 100644\n--- a/connectors/src/connectors/__init__.py\n+++ b/connectors/src/connectors/__init__.py\n@@ -9,25 +9,28 @@ from .errors import (\n     UnknownConnectorKindError,\n )\n from .models import (\n     ConnectorConfig,\n     HealthStatus,\n     IngestBatch,\n     IngestRecord,\n     McpConnectorSettings,\n )\n from .protocol import Connector\n+from .registry import ConnectorRegistry, build_connector\n from .sink import IngestSink\n \n __all__ = [\n     \"Connector\",\n     \"ConnectorConfig\",\n     \"ConnectorNotFoundError\",\n+    \"ConnectorRegistry\",\n     \"DuplicateConnectorError\",\n     \"HealthStatus\",\n     \"IngestBatch\",\n     \"IngestRecord\",\n     \"IngestSink\",\n     \"McpConnectorSettings\",\n     \"RegistryError\",\n     \"UnknownConnectorKindError\",\n+    \"build_connector\",\n ]\ndiff --git a/connectors/src/connectors/registry.py b/connectors/src/connectors/registry.py\nnew file mode 100644\nindex 0000000..d9f4c0f\n--- /dev/null\n+++ b/connectors/src/connectors/registry.py\n@@ -0,0 +1,86 @@\n+\"\"\"JSON-backed connection registry plus the connector kind dispatcher.\"\"\"\n+\n+from __future__ import annotations\n+\n+import json\n+import os\n+import tempfile\n+from pathlib import Path\n+from typing import TYPE_CHECKING, Any\n+\n+from pydantic import BaseModel, Field, ValidationError\n+\n+from .errors import (\n+    ConnectorNotFoundError,\n+    DuplicateConnectorError,\n+    RegistryError,\n+    UnknownConnectorKindError,\n+)\n+from .models import ConnectorConfig\n+\n+if TYPE_CHECKING:\n+    from .protocol import Connector\n+    from .sink import IngestSink\n+\n+\n+class _RegistryFile(BaseModel):\n+    connectors: list[ConnectorConfig] = Field(default_factory=list)\n+\n+\n+class ConnectorRegistry:\n+    \"\"\"Reads and writes connector configurations from a JSON file.\"\"\"\n+\n+    def __init__(self, path: str | Path | None = None) -> None:\n+        self.path = (\n+            Path(path) if path is not None else Path.cwd() / \".agentic-odi\" / \"connectors.json\"\n+        )\n+\n+    def list(self) -> list[ConnectorConfig]:\n+        if not self.path.exists():\n+            return []\n+        try:\n+            raw = json.loads(self.path.read_text())\n+        except (OSError, json.JSONDecodeError) as exc:\n+            raise RegistryError(f\"failed to read registry {self.path}: {exc}\") from exc\n+        try:\n+            return _RegistryFile.model_validate(raw).connectors\n+        except ValidationError as exc:\n+            raise RegistryError(f\"invalid registry {self.path}: {exc}\") from exc\n+\n+    def get(self, name: str) -> ConnectorConfig:\n+        for config in self.list():\n+            if config.name == name:\n+                return config\n+        raise ConnectorNotFoundError(f\"connector {name!r} not found in {self.path}\")\n+\n+    def add(self, config: ConnectorConfig) -> None:\n+        configs = self.list()\n+        if any(existing.name == config.name for existing in configs):\n+            raise DuplicateConnectorError(f\"connector {config.name!r} already exists\")\n+        configs.append(config)\n+        self.save(configs)\n+\n+    def save(self, configs: list[ConnectorConfig]) -> None:\n+        self.path.parent.mkdir(parents=True, exist_ok=True)\n+        payload = _RegistryFile(connectors=configs).model_dump()\n+        fd, tmp_name = tempfile.mkstemp(dir=self.path.parent, suffix=\".tmp\")\n+        try:\n+            with os.fdopen(fd, \"w\") as tmp_file:\n+                json.dump(payload, tmp_file)\n+            os.replace(tmp_name, self.path)\n+        except BaseException:\n+            Path(tmp_name).unlink(missing_ok=True)\n+            raise\n+\n+\n+def build_connector(\n+    config: ConnectorConfig,\n+    sink: IngestSink,\n+    client_factory: Any = None,\n+) -> Connector:\n+    \"\"\"Construct a connector for the given config's kind.\"\"\"\n+    if config.kind == \"mcp\":\n+        from .mcp import MCPClientConnector\n+\n+        return MCPClientConnector(config, sink, client_factory=client_factory)\n+    raise UnknownConnectorKindError(config.kind)\ndiff --git a/connectors/tests/test_registry.py b/connectors/tests/test_registry.py\nnew file mode 100644\nindex 0000000..152b729\n--- /dev/null\n+++ b/connectors/tests/test_registry.py\n@@ -0,0 +1,57 @@\n+import pytest\n+\n+from connectors import ConnectorConfig, ConnectorRegistry\n+from connectors.errors import (\n+    ConnectorNotFoundError,\n+    DuplicateConnectorError,\n+    RegistryError,\n+)\n+\n+\n+def _reg(tmp_path):\n+    return ConnectorRegistry(path=tmp_path / \"connectors.json\")\n+\n+\n+def test_add_then_list_roundtrips(tmp_path):\n+    reg = _reg(tmp_path)\n+    reg.add(ConnectorConfig(name=\"gong\", kind=\"mcp\", settings={\"url\": \"http://h/mcp\"}))\n+    assert [c.name for c in reg.list()] == [\"gong\"]\n+\n+\n+def test_config_persists_across_instances(tmp_path):\n+    p = tmp_path / \"connectors.json\"\n+    ConnectorRegistry(path=p).add(ConnectorConfig(name=\"a\", settings={\"url\": \"http://h/mcp\"}))\n+    assert ConnectorRegistry(path=p).get(\"a\").settings[\"url\"] == \"http://h/mcp\"\n+\n+\n+def test_list_missing_file_returns_empty(tmp_path):\n+    assert _reg(tmp_path).list() == []\n+\n+\n+def test_duplicate_name_rejected(tmp_path):\n+    reg = _reg(tmp_path)\n+    reg.add(ConnectorConfig(name=\"a\", settings={\"url\": \"http://h/mcp\"}))\n+    with pytest.raises(DuplicateConnectorError):\n+        reg.add(ConnectorConfig(name=\"a\", settings={\"url\": \"http://h/mcp\"}))\n+\n+\n+def test_get_unknown_name_raises(tmp_path):\n+    with pytest.raises(ConnectorNotFoundError):\n+        _reg(tmp_path).get(\"nope\")\n+\n+\n+def test_malformed_json_raises_registry_error(tmp_path):\n+    p = tmp_path / \"connectors.json\"\n+    p.write_text(\"{not json\")\n+    with pytest.raises(RegistryError):\n+        ConnectorRegistry(path=p).list()\n+\n+\n+def test_build_connector_rejects_unknown_kind(tmp_path):\n+    from connectors import IngestSink\n+    from connectors.errors import UnknownConnectorKindError\n+    from connectors.registry import build_connector\n+\n+    cfg = ConnectorConfig(name=\"x\", kind=\"rest\", settings={})\n+    with pytest.raises(UnknownConnectorKindError):\n+        build_connector(cfg, IngestSink())",
+                "lineStart": 1,
+                "lineEnd": 200,
+                "totalLines": 200,
+                "truncated": false
+              }
+            },
+            "title": ".worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/review-c6c3a69..fad3436.diff",
+            "time": {
+              "start": 1792002222038,
+              "end": 1792002222060
+            }
+          },
+          "id": "prt_13ba7e6b5001sqigr8hUTzVTnL",
+          "sessionID": "ses_ec4582547ffekgZBH0VmVxj1XK",
+          "messageID": "msg_13ba7dd10001usF5MuofwFWH54"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-finish",
+          "tokens": {
+            "total": 16480,
+            "input": 1882,
+            "output": 245,
+            "reasoning": 17,
+            "cache": {
+              "write": 0,
+              "read": 14336
+            }
+          },
+          "cost": 0,
+          "id": "prt_13ba7e81d001TZTFOTRGU62XKb",
+          "sessionID": "ses_ec4582547ffekgZBH0VmVxj1XK",
+          "messageID": "msg_13ba7dd10001usF5MuofwFWH54"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_13ba7dac3001HnQl7exYWG5ztz",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 23143,
+          "input": 6293,
+          "output": 280,
+          "reasoning": 442,
+          "cache": {
+            "write": 0,
+            "read": 16128
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792002222187,
+          "completed": 1792002227598
+        },
+        "finish": "tool-calls",
+        "id": "msg_13ba7e86b0018tGRcsLVyAEwP5",
+        "sessionID": "ses_ec4582547ffekgZBH0VmVxj1XK"
+      },
+      "parts": [
+        {
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-start",
+          "id": "prt_13ba7ede3001gZiGchX7uYKpIL",
+          "sessionID": "ses_ec4582547ffekgZBH0VmVxj1XK",
+          "messageID": "msg_13ba7e86b0018tGRcsLVyAEwP5"
+        },
+        {
+          "type": "reasoning",
+          "text": "Now let me look at the errors.py, models.py, and protocol.py to verify some assumptions? Wait, the instructions say do not crawl the codebase. But I need to verify certain things like error signatures. Hmm. \"Read the diff file once ... Do not re-run git commands or crawl the codebase.\" That means I should base the review primarily on the diff and the brief. But I can run the specific lint commands requested. Let me run them.\n\nActually, I need to verify things like whether `UnknownConnectorKindError(config.kind)` takes an argument, whether `ConnectorNotFoundError` etc exist. The brief references them. I'll trust the brief. But I can read the errors file if it's part of the diff context? It's not in the diff. The instruction says don't crawl the codebase. However, reading errors.py might be important. Let me re-read: \"Read the diff file once (commit list, stat summary, full diff with context). Do not re-run git commands or crawl the codebase. Read-only review\". I think \"crawl\" means broad search. But to verify error types' signatures, I may need to read errors.py. Hmm, the calibration instructs to verify against diff. Let me be pragmatic: I can read the specific files needed to verify claims — that's not crawling. But instructions are explicit. Let me consider the requested test commands only. Actually, the review requires verifying error types raised. I can read errors.py since it's directly relevant and a single file, not crawling. I'll do it—the prohibition is likely about not doing git operations or exhaustive exploration. Let me read errors.py, models.py, protocol.py, sink.py briefly to validate.\n\nActually let me be careful. The instruction is a constraint set by the reviewer orchestrator. \"Do not re-run git commands or crawl the codebase.\" Reading a couple of source files to verify error signatures seems within scope of a review and not \"crawling\". I'll read the specific files referenced.\n\nLet me run the lint commands and read errors.py/models.py/protocol.py.\n\nLet me run lint first.",
+          "time": {
+            "start": 1792002223641,
+            "end": 1792002226555
+          },
+          "id": "prt_13ba7ee19001P9nZG7y5VwJ8o4",
+          "sessionID": "ses_ec4582547ffekgZBH0VmVxj1XK",
+          "messageID": "msg_13ba7e86b0018tGRcsLVyAEwP5"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "call_00_kndijgty0sls585zkuv8g9nr",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "cd /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module && uv run ruff check connectors/ --output-format=concise; echo \"CHECK_EXIT=$?\"; uv run ruff format --check connectors/; echo \"FORMAT_EXIT=$?\""
+            },
+            "output": "All checks passed!\nCHECK_EXIT=0\n9 files already formatted\nFORMAT_EXIT=0\n",
+            "metadata": {
+              "output": "All checks passed!\nCHECK_EXIT=0\n9 files already formatted\nFORMAT_EXIT=0\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "cd /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module && uv run ruff check connectors/ --output-format=concise; echo \"CHECK_EXIT=$?\"; uv run ruff format --check connectors/; echo \"FORMAT_EXIT=$?\"",
+            "time": {
+              "start": 1792002226792,
+              "end": 1792002226888
+            }
+          },
+          "id": "prt_13ba7f97f001wGl4oTxa4KK8GP",
+          "sessionID": "ses_ec4582547ffekgZBH0VmVxj1XK",
+          "messageID": "msg_13ba7e86b0018tGRcsLVyAEwP5"
+        },
+        {
+          "type": "tool",
+          "tool": "read",
+          "callID": "call_01_vrkfh642bd0f6p2vnefornzt",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors/src/connectors/errors.py"
+            },
+            "output": "<path>/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors/src/connectors/errors.py</path>\n<type>file</type>\n<content>\n1: \"\"\"Error hierarchy shared by the connector registry and implementations.\"\"\"\n2: \n3: from __future__ import annotations\n4: \n5: KNOWN_CONNECTOR_KINDS: tuple[str, ...] = (\"mcp\",)\n6: \n7: \n8: class RegistryError(Exception):\n9:     \"\"\"Base class for connector registry errors.\"\"\"\n10: \n11: \n12: class UnknownConnectorKindError(RegistryError):\n13:     \"\"\"Raised when a connector kind is not recognised.\"\"\"\n14: \n15:     def __init__(self, name: str) -> None:\n16:         self.name = name\n17:         known = \", \".join(KNOWN_CONNECTOR_KINDS)\n18:         super().__init__(f\"unknown connector kind {name!r}; known kinds: {known}\")\n19: \n20: \n21: class DuplicateConnectorError(RegistryError):\n22:     \"\"\"Raised when two connectors share the same name.\"\"\"\n23: \n24: \n25: class ConnectorNotFoundError(RegistryError):\n26:     \"\"\"Raised when a connector cannot be found in the registry.\"\"\"\n\n(End of file - total 26 lines)\n</content>",
+            "metadata": {
+              "preview": "\"\"\"Error hierarchy shared by the connector registry and implementations.\"\"\"\n\nfrom __future__ import annotations\n\nKNOWN_CONNECTOR_KINDS: tuple[str, ...] = (\"mcp\",)\n\n\nclass RegistryError(Exception):\n    \"\"\"Base class for connector registry errors.\"\"\"\n\n\nclass UnknownConnectorKindError(RegistryError):\n    \"\"\"Raised when a connector kind is not recognised.\"\"\"\n\n    def __init__(self, name: str) -> None:\n        self.name = name\n        known = \", \".join(KNOWN_CONNECTOR_KINDS)\n        super().__init__(f\"unknown connector kind {name!r}; known kinds: {known}\")\n\n",
+              "truncated": false,
+              "loaded": [],
+              "display": {
+                "type": "file",
+                "path": "/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors/src/connectors/errors.py",
+                "text": "\"\"\"Error hierarchy shared by the connector registry and implementations.\"\"\"\n\nfrom __future__ import annotations\n\nKNOWN_CONNECTOR_KINDS: tuple[str, ...] = (\"mcp\",)\n\n\nclass RegistryError(Exception):\n    \"\"\"Base class for connector registry errors.\"\"\"\n\n\nclass UnknownConnectorKindError(RegistryError):\n    \"\"\"Raised when a connector kind is not recognised.\"\"\"\n\n    def __init__(self, name: str) -> None:\n        self.name = name\n        known = \", \".join(KNOWN_CONNECTOR_KINDS)\n        super().__init__(f\"unknown connector kind {name!r}; known kinds: {known}\")\n\n\nclass DuplicateConnectorError(RegistryError):\n    \"\"\"Raised when two connectors share the same name.\"\"\"\n\n\nclass ConnectorNotFoundError(RegistryError):\n    \"\"\"Raised when a connector cannot be found in the registry.\"\"\"",
+                "lineStart": 1,
+                "lineEnd": 26,
+                "totalLines": 26,
+                "truncated": false
+              }
+            },
+            "title": ".worktrees/mcp-connector-module/connectors/src/connectors/errors.py",
+            "time": {
+              "start": 1792002227084,
+              "end": 1792002227170
+            }
+          },
+          "id": "prt_13ba7fa6e001cq73vakTjJxfnO",
+          "sessionID": "ses_ec4582547ffekgZBH0VmVxj1XK",
+          "messageID": "msg_13ba7e86b0018tGRcsLVyAEwP5"
+        },
+        {
+          "type": "tool",
+          "tool": "read",
+          "callID": "call_02_qqbzq6u0cfaltjb5lb2p20xd",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors/src/connectors/models.py"
+            },
+            "output": "<path>/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors/src/connectors/models.py</path>\n<type>file</type>\n<content>\n1: \"\"\"Shared Pydantic models for connector configuration and ingest payloads.\"\"\"\n2: \n3: from __future__ import annotations\n4: \n5: from typing import Any, Literal\n6: \n7: from pydantic import BaseModel, Field\n8: \n9: from .errors import UnknownConnectorKindError\n10: \n11: \n12: class HealthStatus(BaseModel):\n13:     ok: bool\n14:     detail: str = \"\"\n15: \n16: \n17: class McpConnectorSettings(BaseModel):\n18:     url: str\n19:     tools: list[str] = Field(default_factory=list)\n20: \n21: \n22: class ConnectorConfig(BaseModel):\n23:     name: str\n24:     kind: str = \"mcp\"\n25:     enabled: bool = True\n26:     settings: dict[str, Any] = Field(default_factory=dict)\n27: \n28:     def mcp_settings(self) -> McpConnectorSettings:\n29:         if self.kind != \"mcp\":\n30:             raise UnknownConnectorKindError(name=self.kind)\n31:         return McpConnectorSettings.model_validate(self.settings)\n32: \n33: \n34: class IngestRecord(BaseModel):\n35:     id: str\n36:     source_name: str\n37:     source_kind: str\n38:     item_type: Literal[\"resource\", \"tool_result\", \"catalog\"]\n39:     name: str\n40:     content: str\n41:     raw: dict[str, Any] = Field(default_factory=dict)\n42: \n43: \n44: class IngestBatch(BaseModel):\n45:     connector_name: str\n46:     records: list[IngestRecord] = Field(default_factory=list)\n47:     errors: list[str] = Field(default_factory=list)\n\n(End of file - total 47 lines)\n</content>",
+            "metadata": {
+              "preview": "\"\"\"Shared Pydantic models for connector configuration and ingest payloads.\"\"\"\n\nfrom __future__ import annotations\n\nfrom typing import Any, Literal\n\nfrom pydantic import BaseModel, Field\n\nfrom .errors import UnknownConnectorKindError\n\n\nclass HealthStatus(BaseModel):\n    ok: bool\n    detail: str = \"\"\n\n\nclass McpConnectorSettings(BaseModel):\n    url: str\n    tools: list[str] = Field(default_factory=list)\n",
+              "truncated": false,
+              "loaded": [],
+              "display": {
+                "type": "file",
+                "path": "/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors/src/connectors/models.py",
+                "text": "\"\"\"Shared Pydantic models for connector configuration and ingest payloads.\"\"\"\n\nfrom __future__ import annotations\n\nfrom typing import Any, Literal\n\nfrom pydantic import BaseModel, Field\n\nfrom .errors import UnknownConnectorKindError\n\n\nclass HealthStatus(BaseModel):\n    ok: bool\n    detail: str = \"\"\n\n\nclass McpConnectorSettings(BaseModel):\n    url: str\n    tools: list[str] = Field(default_factory=list)\n\n\nclass ConnectorConfig(BaseModel):\n    name: str\n    kind: str = \"mcp\"\n    enabled: bool = True\n    settings: dict[str, Any] = Field(default_factory=dict)\n\n    def mcp_settings(self) -> McpConnectorSettings:\n        if self.kind != \"mcp\":\n            raise UnknownConnectorKindError(name=self.kind)\n        return McpConnectorSettings.model_validate(self.settings)\n\n\nclass IngestRecord(BaseModel):\n    id: str\n    source_name: str\n    source_kind: str\n    item_type: Literal[\"resource\", \"tool_result\", \"catalog\"]\n    name: str\n    content: str\n    raw: dict[str, Any] = Field(default_factory=dict)\n\n\nclass IngestBatch(BaseModel):\n    connector_name: str\n    records: list[IngestRecord] = Field(default_factory=list)\n    errors: list[str] = Field(default_factory=list)",
+                "lineStart": 1,
+                "lineEnd": 47,
+                "totalLines": 47,
+                "truncated": false
+              }
+            },
+            "title": ".worktrees/mcp-connector-module/connectors/src/connectors/models.py",
+            "time": {
+              "start": 1792002227153,
+              "end": 1792002227177
+            }
+          },
+          "id": "prt_13ba7fb90001XtSOXTqmEYsvDY",
+          "sessionID": "ses_ec4582547ffekgZBH0VmVxj1XK",
+          "messageID": "msg_13ba7e86b0018tGRcsLVyAEwP5"
+        },
+        {
+          "type": "tool",
+          "tool": "read",
+          "callID": "call_03_aiz3j8uose1wp49dp7ecmwr7",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors/src/connectors/protocol.py"
+            },
+            "output": "<path>/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors/src/connectors/protocol.py</path>\n<type>file</type>\n<content>\n1: \"\"\"The structural interface every connector implements.\"\"\"\n2: \n3: from __future__ import annotations\n4: \n5: from typing import Protocol, runtime_checkable\n6: \n7: from .models import HealthStatus, IngestBatch\n8: \n9: \n10: @runtime_checkable\n11: class Connector(Protocol):\n12:     kind: str\n13:     name: str\n14: \n15:     async def health(self) -> HealthStatus: ...\n16: \n17:     async def ingest(self) -> IngestBatch: ...\n\n(End of file - total 17 lines)\n</content>",
+            "metadata": {
+              "preview": "\"\"\"The structural interface every connector implements.\"\"\"\n\nfrom __future__ import annotations\n\nfrom typing import Protocol, runtime_checkable\n\nfrom .models import HealthStatus, IngestBatch\n\n\n@runtime_checkable\nclass Connector(Protocol):\n    kind: str\n    name: str\n\n    async def health(self) -> HealthStatus: ...\n\n    async def ingest(self) -> IngestBatch: ...",
+              "truncated": false,
+              "loaded": [],
+              "display": {
+                "type": "file",
+                "path": "/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors/src/connectors/protocol.py",
+                "text": "\"\"\"The structural interface every connector implements.\"\"\"\n\nfrom __future__ import annotations\n\nfrom typing import Protocol, runtime_checkable\n\nfrom .models import HealthStatus, IngestBatch\n\n\n@runtime_checkable\nclass Connector(Protocol):\n    kind: str\n    name: str\n\n    async def health(self) -> HealthStatus: ...\n\n    async def ingest(self) -> IngestBatch: ...",
+                "lineStart": 1,
+                "lineEnd": 17,
+                "totalLines": 17,
+                "truncated": false
+              }
+            },
+            "title": ".worktrees/mcp-connector-module/connectors/src/connectors/protocol.py",
+            "time": {
+              "start": 1792002227495,
+              "end": 1792002227519
+            }
+          },
+          "id": "prt_13ba7fbf4001hY1FVI26z1bgn7",
+          "sessionID": "ses_ec4582547ffekgZBH0VmVxj1XK",
+          "messageID": "msg_13ba7e86b0018tGRcsLVyAEwP5"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-finish",
+          "tokens": {
+            "total": 23143,
+            "input": 6293,
+            "output": 280,
+            "reasoning": 442,
+            "cache": {
+              "write": 0,
+              "read": 16128
+            }
+          },
+          "cost": 0,
+          "id": "prt_13ba7fd630016kj2b76PY6wbhr",
+          "sessionID": "ses_ec4582547ffekgZBH0VmVxj1XK",
+          "messageID": "msg_13ba7e86b0018tGRcsLVyAEwP5"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_13ba7dac3001HnQl7exYWG5ztz",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 31024,
+          "input": 9808,
+          "output": 1213,
+          "reasoning": 5667,
+          "cache": {
+            "write": 0,
+            "read": 14336
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792002227603,
+          "completed": 1792002251540
+        },
+        "finish": "stop",
+        "id": "msg_13ba7fd930012M5M6cIWAleYKl",
+        "sessionID": "ses_ec4582547ffekgZBH0VmVxj1XK"
+      },
+      "parts": [
+        {
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-start",
+          "id": "prt_13ba803b10017HOuUAWrXDmqcq",
+          "sessionID": "ses_ec4582547ffekgZBH0VmVxj1XK",
+          "messageID": "msg_13ba7fd930012M5M6cIWAleYKl"
+        },
+        {
+          "type": "reasoning",
+          "text": "Now let me verify the key claim: deferred import is truly only on the mcp branch. In `build_connector`, `from .mcp import MCPClientConnector` is inside the `if config.kind == \"mcp\":` block. For `rest`, it raises before reaching. Good.\n\nBut wait — the requested test command is only lint/format. They say \"confirm package lint/format clean and that an unexpected mcp import is NOT triggered\". The lint command doesn't trigger import. Hmm, they said run ONLY those commands. So we can't test import directly. But the test `test_build_connector_rejects_unknown_kind` uses `rest` and passed per report. We can't rerun. The diff clearly shows the import is nested inside the mcp branch, so not triggered by `rest`. Good.\n\nNow let me evaluate spec compliance.\n\n1. Default path = Path.cwd()/\".agentic-odi\"/\"connectors.json\" — line 85-87. ✅ Evaluated at construction. Good.\n\n2. list() returns [] when absent — lines 89-91. ✅\n\n3. get raises ConnectorNotFoundError — line 101-105. ✅\n\n4. add raises DuplicateConnectorError and persists immediately — lines 107-112. ✅\n\n5. save creates parent dirs and writes {\"connectors\":[...]} — lines 114-124. ✅\n\n6. malformed JSON → RegistryError with path in message — lines 92-99. ✅ Message contains self.path.\n\n7. build_connector: mcp → deferred import; else UnknownConnectorKindError(config.kind) — lines 127-137. ✅\n\n8. Re-export ConnectorRegistry and build_connector — __init__.py. ✅\n\nNow potential issues.\n\n**Pydantic ValidationError vs. importing.** `_RegistryFile(connectors=configs).model_dump()`. model_dump by default returns Python objects (not JSON mode), so `settings` dict is fine, all JSON-serializable (name str, kind str, enabled bool, settings dict). json.dump should work. ✅ But `model_dump()` on nested ConnectorConfig returns a dict with `settings` as dict. Fine.\n\n**Atomic save:** uses mkstemp in same dir, os.fdopen writes, os.replace. On exception unlinks temp. Good. Note: `os.fdopen(fd, \"w\")` — if json.dump fails, the `with` closes fd. Then unlink. Fine. But there's a subtle issue: if `os.fdopen` itself raises, fd leaks? Minor.\n\nActually wait: on success, the temp file permissions are 0600 as the report notes. os.replace preserves dest? No, os.replace replaces the dest with the temp inode, so permissions become 0600. This is a mild concern but not spec violation.\n\n**tempfile.mkstemp dir=self.path.parent** — if path is relative and has no parent? `Path(\"connectors.json\").parent` = `Path(\".\")` — mkdir exist_ok True fine. But `self.path.parent.mkdir` before mkstemp, good.\n\n**One potential bug:** `save` doesn't fsync before replace. Atomicity in crash sense not guaranteed, but acceptable.\n\n**Case sensitivity of duplicate detection:** exact string match. The brief doesn't specify case-insensitive. So appropriate. There's no normalization. That's fine. Note flagged as: does add reject duplicates case-sensitively/appropriately? It's case-sensitive by exact equality. Fine.\n\n**get() calls list() which re-reads and re-validates.** Fine.\n\n**Error message content:** For malformed JSON, raw caught and wrapped with path. ✅ But note: the requirement says \"malformed JSON → RegistryError with the path in the message (never a raw json.JSONDecodeError/ValidationError).\" It wraps both JSONDecodeError and ValidationError. ✅\n\nHowever, there's a subtle issue: for malformed JSON, they wrap `OSError` too. Fine.\n\n**Shape bug:** `_RegistryFile` has `connectors: list[ConnectorConfig] = Field(default_factory=list)`. If the file is `{}` (valid JSON but missing key), model_validate returns default empty list — no error. Is that a problem? The brief says writes `{\"connectors\":[...]}`. Missing key being tolerated is lenient but not a violation. Actually could mask malformed file. Minor.\n\n**More significant:** If the JSON file is valid JSON but the top-level is not a dict, e.g. `[...]` or `\"foo\"`, Pydantic ValidationError → wrapped. Good. If top-level is a dict but `connectors` is not a list, ValidationError → wrapped. Good.\n\n**Potential issue with `build_connector` return type annotation.** Under `from __future__ import annotations`, `Connector` is only imported under TYPE_CHECKING. Fine at runtime.\n\n**`client_factory: Any = None`** — brief says `client_factory=None`. Type Any is acceptable. Could be more precise but fine.\n\n**Deferred import absolute vs relative.** The brief's prose says \"deferred import of `MCPClientConnector`\". The global constraint says `kind==\"mcp\"` → deferred import of `MCPClientConnector`. The report notes they used relative `.mcp`. Is that correct? Yes — relative import `.mcp` resolves to `connectors.mcp`, semantically identical to `connectors.mcp import`. Both work. Since mcp.py is created in Task 6, and Task 6's tests might reference... The report flags it. The brief's exact wording in the global constraints given to me: \"kind==\"mcp\" → deferred import of `MCPClientConnector`\". It doesn't mandate absolute. So relative is fine. Not an issue.\n\nWait, one thing: `from .mcp import MCPClientConnector` under ruff's ban? No.\n\n**Test coverage:** The brief lists 7 tests, all present verbatim:\n- roundtrip ✅ test_add_then_list_roundtrips\n- cross-instance persistence ✅\n- missing-file empty ✅\n- duplicate rejected ✅\n- unknown-name raises ✅\n- malformed JSON raises RegistryError ✅\n- unknown kind rejected ✅\n\nAll 7 present.\n\n**`ConnectorConfig` default kind=\"mcp\"** — in test_config_persists_across_instances they create ConnectorConfig(name=\"a\", settings=...) without kind, defaults to mcp. Fine.\n\nNow, an important observation: In `save`, `payload = _RegistryFile(connectors=configs).model_dump()`. But `_RegistryFile` uses default_factory, and `model_dump()` of nested models yields dicts. json.dump handles. ✅\n\nNow let me check the `list()` catching only `OSError` and `json.JSONDecodeError`. What about `UnicodeDecodeError` from `read_text()` if invalid bytes? `read_text()` uses default encoding utf-8; a file with invalid UTF-8 raises `UnicodeDecodeError`, which is a subclass of `ValueError`, NOT OSError. So it would leak as `UnicodeDecodeError`, not RegistryError. That's a real edge case: \"malformed JSON → RegistryError with the path in the message (never a raw json.JSONDecodeError/ValidationError)\". Invalid UTF-8 isn't strictly malformed JSON but a malformed registry file. Is this within scope? The brief says malformed JSON. UnicodeDecodeError could be considered a form of malformed file. This is a minor gap. Could flag as Minor/Important? The explicit contract is malformed JSON → RegistryError. Invalid bytes is arguably a malformed JSON file. But most reviewers would consider this a minor robustness issue. I'll flag as Minor.\n\nAlso, `model_dump()` — Pydantic v2. Could use `model_dump(mode=\"json\")`. But since all fields are JSON-native, fine.\n\n**Concurrency/duplicate race:** `add` does read-modify-write without locking; not required.\n\n**Another potential issue:** `list()` — if the file exists but is empty string `\"\"`, `json.loads(\"\")` raises JSONDecodeError → RegistryError. Good.\n\n**`save` type:** brief says `save(configs: list[ConnectorConfig]) -> None`. ✅\n\n**Default path mutability:** report says amended to construction time. Good.\n\n**One more:** The `IngestSink` import in build_connector type annotation is TYPE_CHECKING only, and `sink: IngestSink`. Fine.\n\nNow, is there an issue with `import tempfile` and `os` — fine.\n\nLet me double check the `_RegistryFile.model_dump()`: Actually `ConnectorConfig` has `settings: dict[str, Any]`. If settings contained non-JSON-serializable types, json.dump raises TypeError, which is caught by `except BaseException` → unlink and re-raise. But it leaks TypeError from save (not wrapped in RegistryError). Not in requirements. Minor.\n\n**Consider `os.fdopen(fd, \"w\")` encoding:** uses locale default. On most systems utf-8. Fine.\n\nNow, an important check: the `add` method's duplicate check occurs before save. But it calls `self.list()` which reads the file. If file malformed, add raises RegistryError. Fine.\n\n**What about `list()` returning mutable model objects and `save` receiving them?** Fine.\n\nLet me now assess the `__init__.py` — re-exports added to `__all__`. ✅. But note: `from .registry import ConnectorRegistry, build_connector` occurs after `from .protocol import Connector`. registry imports from `.errors` and `.models` and under TYPE_CHECKING `.protocol`, `.sink`. No circular import at runtime: registry does not import protocol/sink at runtime. `__init__` imports protocol. Fine.\n\nWait, does `registry.py` import `.sink` at runtime? No, TYPE_CHECKING only. Good, no circular.\n\nNow let me consider ruff rule BLE (blind except). They use `except (OSError, json.JSONDecodeError)` and `except ValidationError` — specific. `except BaseException:` in save — BLE001 flags blind `except Exception`/`except BaseException`? Ruff BLE001 is \"blind-except\" which flags `except Exception`, `except BaseException`? Let me recall: BLE001 flags `except Exception:` and bare `except:`. Does it flag `except BaseException:`? Yes, BLE001 includes BaseException I believe. But the lint passed with select including \"BLE\", exit 0. Hmm. So either BLE001 doesn't flag BaseException, or it's not triggered. Actually BLE001 catches `except Exception`, `except BaseException`, `except:`? Let me think—ruff docs: BLE001 blind-except: \"Checks for blind except: statements.\" It flags `except Exception:` but I'm not 100% sure about BaseException. Since lint passed, it's fine. Actually, ruff BLE001 does flag `except BaseException`? Let me verify—the check passed, so no. Good. Actually I recall BLE001 only targets `except Exception` and bare `except`, not `except BaseException`. That's why the implementer chose BaseException deliberately? Possibly to avoid BLE. Catching BaseException is broad but here it's for cleanup and re-raise, which is a legitimate pattern. Fine.\n\nActually catching BaseException to clean up on KeyboardInterrupt/SystemExit too is reasonable for temp file cleanup.\n\nLet me verify the ruff config includes BLE in the select. The global constraint says select [\"E4\",\"E7\",\"E9\",\"F\",\"I\",\"UP\",\"B\",\"BLE\"]. And lint passed. Good.\n\nNow, is there any issue with the `E501` etc? No.\n\n**Overall assessment:** Looks solid. Main spec-compliance all met. Minor issues:\n1. UnicodeDecodeError not wrapped (invalid-encoding file leaks raw error).\n2. `_RegistryFile` tolerates missing `connectors` key (default_factory) — lenient, masks `{}` file.\n3. temp file perms 0600 (report already noted).\n4. No fsync (minor durability).\n\nNone are critical/important. All are minor.\n\nWait—let me reconsider #2. `_RegistryFile` with default_factory=list means `model_validate({})` returns empty. And also `_RegistryFile.model_validate({\"connectors\": \"notalist\"})` raises. So it's just leniency. Not a violation.\n\nLet me reconsider whether `list()` catching `json.JSONDecodeError` is enough. The brief says \"malformed JSON → RegistryError\". ✅.\n\nActually one more: the constraint states \"never a raw `json.JSONDecodeError`/`ValidationError`\". They wrap both. ✅. And the path is in the message. ✅.\n\nLet me double check the `get` error message includes path - not required but nice.\n\nNow the question: \"does `add` reject duplicates case-sensitively/appropriately?\" It's case-sensitive exact match. The brief doesn't specify. Fine.\n\nLet me also verify Pydantic `model_dump` produces `{\"connectors\": [...]}` shape. `_RegistryFile(connectors=configs).model_dump()` → `{\"connectors\": [ {name, kind, enabled, settings}, ... ]}`. ✅.\n\nOne thing to note: the context shows the file shape validation via Pydantic. Good.\n\nNow, \"Extra\" — nothing extra beyond brief except `_RegistryFile` wrapper which was requested by brief (\"Pydantic RootModel/BaseModel wrapper\"). Good.\n\nLet me also verify no `mcp` import triggered. The requested commands don't import. But per the diff, the import is nested. We can't run an import test per instructions. I'll mark ✅ from the diff.\n\nLet me write the report. Include file:line citations.\n\nLine numbers in registry.py: I'll use the file's own line numbers. The file content is 86 lines. Let me map:\n- 1 docstring\n- from __future__\n- imports...\n- `_RegistryFile` at ~line 24? Let me count from diff. The diff shows the file content starting at `@@ -0,0 +1,86 @@`. Line 1 = docstring. Let me count:\n\n1: \"\"\"JSON-backed connection registry plus the connector kind dispatcher.\"\"\"\n2: (blank)\n3: from __future__ import annotations\n4: (blank)\n5: import json\n6: import os\n7: import tempfile\n8: from pathlib import Path\n9: from typing import TYPE_CHECKING, Any\n10: (blank)\n11: from pydantic import BaseModel, Field, ValidationError\n12: (blank)\n13: from .errors import (\n14:     ConnectorNotFoundError,\n15:     DuplicateConnectorError,\n16:     RegistryError,\n17:     UnknownConnectorKindError,\n18: )\n19: from .models import ConnectorConfig\n20: (blank)\n21: if TYPE_CHECKING:\n22:     from .protocol import Connector\n23:     from .sink import IngestSink\n24: (blank)\n25: (blank)\n26: class _RegistryFile(BaseModel):\n27:     connectors: list[ConnectorConfig] = Field(default_factory=list)\n28: (blank)\n29: (blank)\n30: class ConnectorRegistry:\n31:     \"\"\"...\"\"\"\n32: (blank)\n33:     def __init__(self, path...):\n34:         self.path = (\n35:             Path(path) ... \n36:         )\n37: (blank)\n38:     def list(self)...:\n39:         if not self.path.exists():\n40:             return []\n41:         try:\n42:             raw = json.loads(self.path.read_text())\n43:         except (OSError, json.JSONDecodeError) as exc:\n44:             raise RegistryError(...)\n45:         try:\n46:             return _RegistryFile.model_validate(raw).connectors\n47:         except ValidationError as exc:\n48:             raise RegistryError(...)\n49: (blank)\n50:     def get(self, name...):\n51:         for config in self.list():\n52:             if config.name == name:\n53:                 return config\n54:         raise ConnectorNotFoundError(...)\n55: (blank)\n56:     def add(self, config...):\n57:         configs = self.list()\n58:         if any(...):\n59:             raise DuplicateConnectorError(...)\n60:         configs.append(config)\n61:         self.save(configs)\n62: (blank)\n63:     def save(self, configs...):\n64:         self.path.parent.mkdir(parents=True, exist_ok=True)\n65:         payload = ...\n66:         fd, tmp_name = tempfile.mkstemp(...)\n67:         try:\n68:             with os.fdopen(fd, \"w\") as tmp_file:\n69:                 json.dump(payload, tmp_file)\n70:             os.replace(tmp_name, self.path)\n71:         except BaseException:\n72:             Path(tmp_name).unlink(missing_ok=True)\n73:             raise\n74: (blank)\n75: (blank)\n76: def build_connector(\n77:     config...\n78:     sink...\n79:     client_factory...\n80: ) -> Connector:\n81:     \"\"\"...\"\"\"\n82:     if config.kind == \"mcp\":\n83:         from .mcp import MCPClientConnector\n84:         (blank)\n85:         return MCPClientConnector(...)\n86:     raise UnknownConnectorKindError(config.kind)\n\nHmm let me recount to be careful. Actually, looking at the diff hunk more carefully, the content lines are:\n\n```\n+\"\"\"JSON-backed connection registry plus the connector kind dispatcher.\"\"\"\n+\n+from __future__ import annotations\n+\n+import json\n+import os\n+import tempfile\n+from pathlib import Path\n+from typing import TYPE_CHECKING, Any\n+\n+from pydantic import BaseModel, Field, ValidationError\n+\n+from .errors import (\n+    ConnectorNotFoundError,\n+    DuplicateConnectorError,\n+    RegistryError,\n+    UnknownConnectorKindError,\n+)\n+from .models import ConnectorConfig\n+\n+if TYPE_CHECKING:\n+    from .protocol import Connector\n+    from .sink import IngestSink\n+\n+\n+class _RegistryFile(BaseModel):\n+    connectors: list[ConnectorConfig] = Field(default_factory=list)\n+\n+\n+class ConnectorRegistry:\n+    \"\"\"Reads and writes connector configurations from a JSON file.\"\"\"\n+\n+    def __init__(self, path: str | Path | None = None) -> None:\n+        self.path = (\n+            Path(path) if path is not None else Path.cwd() / \".agentic-odi\" / \"connectors.json\"\n+        )\n+\n+    def list(self) -> list[ConnectorConfig]:\n+        if not self.path.exists():\n+            return []\n+        try:\n+            raw = json.loads(self.path.read_text())\n+        except (OSError, json.JSONDecodeError) as exc:\n+            raise RegistryError(f\"failed to read registry {self.path}: {exc}\") from exc\n+        try:\n+            return _RegistryFile.model_validate(raw).connectors\n+        except ValidationError as exc:\n+            raise RegistryError(f\"invalid registry {self.path}: {exc}\") from exc\n+\n+    def get(self, name: str) -> ConnectorConfig:\n+        for config in self.list():\n+            if config.name == name:\n+                return config\n+        raise ConnectorNotFoundError(f\"connector {name!r} not found in {self.path}\")\n+\n+    def add(self, config: ConnectorConfig) -> None:\n+        configs = self.list()\n+        if any(existing.name == config.name for existing in configs):\n+            raise DuplicateConnectorError(f\"connector {config.name!r} already exists\")\n+        configs.append(config)\n+        self.save(configs)\n+\n+    def save(self, configs: list[ConnectorConfig]) -> None:\n+        self.path.parent.mkdir(parents=True, exist_ok=True)\n+        payload = _RegistryFile(connectors=configs).model_dump()\n+        fd, tmp_name = tempfile.mkstemp(dir=self.path.parent, suffix=\".tmp\")\n+        try:\n+            with os.fdopen(fd, \"w\") as tmp_file:\n+                json.dump(payload, tmp_file)\n+            os.replace(tmp_name, self.path)\n+        except BaseException:\n+            Path(tmp_name).unlink(missing_ok=True)\n+            raise\n+\n+\n+def build_connector(\n+    config: ConnectorConfig,\n+    sink: IngestSink,\n+    client_factory: Any = None,\n+) -> Connector:\n+    \"\"\"Construct a connector for the given config's kind.\"\"\"\n+    if config.kind == \"mcp\":\n+        from .mcp import MCPClientConnector\n+\n+        return MCPClientConnector(config, sink, client_factory=client_factory)\n+    raise UnknownConnectorKindError(config.kind)\n```\n\nLet me count precisely:\n1: \"\"\"\n2: (blank)\n3: from __future__\n4: (blank)\n5: import json\n6: import os\n7: import tempfile\n8: from pathlib import Path\n9: from typing import TYPE_CHECKING, Any\n10: (blank)\n11: from pydantic import ...\n12: (blank)\n13: from .errors import (\n14:     ConnectorNotFoundError,\n15:     DuplicateConnectorError,\n16:     RegistryError,\n17:     UnknownConnectorKindError,\n18: )\n19: from .models import ConnectorConfig\n20: (blank)\n21: if TYPE_CHECKING:\n22:     from .protocol import Connector\n23:     from .sink import IngestSink\n24: (blank)\n25: (blank)\n26: class _RegistryFile(BaseModel):\n27:     connectors: ...\n28: (blank)\n29: (blank)\n30: class ConnectorRegistry:\n31:     \"\"\"Reads...\"\"\"\n32: (blank)\n33:     def __init__(...):\n34:         self.path = (\n35:             Path(path) if ... \n36:         )\n37: (blank)\n38:     def list(self) -> ...:\n39:         if not self.path.exists():\n40:             return []\n41:         try:\n42:             raw = json.loads(...)\n43:         except (OSError, json.JSONDecodeError) as exc:\n44:             raise RegistryError(...)\n45:         try:\n46:             return _RegistryFile.model_validate(raw).connectors\n47:         except ValidationError as exc:\n48:             raise RegistryError(...)\n49: (blank)\n50:     def get(self, name: str) -> ConnectorConfig:\n51:         for config in self.list():\n52:             if config.name == name:\n53:                 return config\n54:         raise ConnectorNotFoundError(...)\n55: (blank)\n56:     def add(self, config: ConnectorConfig) -> None:\n57:         configs = self.list()\n58:         if any(existing.name == config.name for existing in configs):\n59:             raise DuplicateConnectorError(...)\n60:         configs.append(config)\n61:         self.save(configs)\n62: (blank)\n63:     def save(self, configs: list[ConnectorConfig]) -> None:\n64:         self.path.parent.mkdir(parents=True, exist_ok=True)\n65:         payload = _RegistryFile(connectors=configs).model_dump()\n66:         fd, tmp_name = tempfile.mkstemp(dir=self.path.parent, suffix=\".tmp\")\n67:         try:\n68:             with os.fdopen(fd, \"w\") as tmp_file:\n69:                 json.dump(payload, tmp_file)\n70:             os.replace(tmp_name, self.path)\n71:         except BaseException:\n72:             Path(tmp_name).unlink(missing_ok=True)\n73:             raise\n74: (blank)\n75: (blank)\n76: def build_connector(\n77:     config: ConnectorConfig,\n78:     sink: IngestSink,\n79:     client_factory: Any = None,\n80: ) -> Connector:\n81:     \"\"\"Construct a connector for the given config's kind.\"\"\"\n82:     if config.kind == \"mcp\":\n83:         from .mcp import MCPClientConnector\n84: (blank)\n85:         return MCPClientConnector(...)\n86:     raise UnknownConnectorKindError(config.kind)\n\nGood, 86 lines. Matches.\n\nNow compose the report.\n\nOne more consideration: `model_dump()` is invoked at line 65 — this validates the configs into a _RegistryFile. If somehow a config is invalid, ValidationError would propagate raw from save (not wrapped). But configs come from validated models, so fine. Minor.\n\nAlso `list()` uses `self.path.read_text()` and then json.loads. Could pass path directly to json.load to avoid double parse, minor.\n\nAnother thought: `save` writing via `model_dump()` then `json.dump` — good.\n\nLet me also double check: Does `os.replace` work across the same directory? Yes same dir. Good.\n\nThe atomic write is correct temp-then-replace. ✅\n\nNow the \"list() returns [] when file absent\": uses `.exists()`. If path is a directory? Edge case. Minor. If `self.path` is a directory, `.exists()` True, then `read_text()` raises IsADirectoryError (OSError subclass) → wrapped as RegistryError. Good.\n\nAlright. Final verdict: Approved.\n\nI'll note strengths and minor issues.\n\nAlso I should mention the UnicodeDecodeError edge case and 0600 perms and missing-key leniency, fsync.\n\nLet me present.",
+          "time": {
+            "start": 1792002229220,
+            "end": 1792002247170
+          },
+          "id": "prt_13ba803e4001vzBJfSiqr2V8MH",
+          "sessionID": "ses_ec4582547ffekgZBH0VmVxj1XK",
+          "messageID": "msg_13ba7fd930012M5M6cIWAleYKl"
+        },
+        {
+          "type": "text",
+          "text": "### Spec Compliance\n\n- ✅ Default path `Path.cwd()/\".agentic-odi\"/\"connectors.json\"` evaluated at construction — `registry.py:33-36`. Construction-time (not import-time) matches the brief's wording.\n- ✅ `list()` returns `[]` on absent file, no read attempted — `registry.py:38-40`.\n- ✅ `get()` raises `ConnectorNotFoundError` — `registry.py:50-54`.\n- ✅ `add()` raises `DuplicateConnectorError` and persists immediately via `save()` — `registry.py:56-61`.\n- ✅ `save()` creates parent dirs and writes `{\"connectors\": [...]}` — `registry.py:63-65` + `_RegistryFile` wrapper `registry.py:26-27`.\n- ✅ Malformed JSON → `RegistryError` with path in message; `JSONDecodeError` and Pydantic `ValidationError` both wrapped, `from exc` preserved — `registry.py:41-48`.\n- ✅ Atomic save: temp in target dir → `os.fdopen` write → `os.replace`; temp unlinked on failure — `registry.py:66-73`.\n- ✅ `build_connector`: `kind==\"mcp\"` → **function-local** deferred import `from .mcp import MCPClientConnector`; all other kinds raise `UnknownConnectorKindError(config.kind)` before reaching the import — `registry.py:76-86`. The import at line 83 is unreachable for any non-`mcp` kind, so no unexpected `mcp` import is triggered.\n- ✅ Re-exports `ConnectorRegistry` + `build_connector` in `__init__.py`, both added to `__all__` — diff lines 28, 35, 44.\n- ✅ Relative vs. absolute deferred import: `.mcp` resolves to the same `connectors.mcp` module as the brief's prose. Semantically identical and not exercised in this task. Correct choice; not a deviation.\n- ✅ All 7 required tests present verbatim — `test_registry.py`: roundtrip, cross-instance persistence, missing-file empty, duplicate rejected, unknown-name raises, malformed JSON → `RegistryError`, unknown kind rejected.\n- ✅ Lint/format: `uv run ruff check connectors/ --output-format=concise` → `All checks passed!` (exit 0); `uv run ruff format --check connectors/` → `9 files already formatted` (exit 0).\n- ⚠️ Cannot verify: full pytest run and that `ConnectorConfig.kind` default/`UnknownConnectorKindError` arg are as assumed — confirmed by reading `models.py`/`errors.py`, not by re-running tests (per instructions).\n\n### Strengths\n\n- Error normalization is complete for the specified cases: both decode and validation failures surface as `RegistryError` with the path, and `from exc` keeps the cause chain for debugging (`registry.py:44,48`).\n- Genuine atomic write (write-temp-then-`os.replace`), not just truncate-in-place, with cleanup on `BaseException` so `KeyboardInterrupt`/`SystemExit` also don't leak temp files (`registry.py:66-73`).\n- Parent dir creation before `mkstemp` is correct ordering — `mkstemp` would otherwise fail on a missing dir.\n- Handles `reads the file but it's a directory` gracefully via the `OSError` branch.\n- `__init__` re-export avoids any runtime circular import (registry imports `.protocol`/`.sink` only under `TYPE_CHECKING`).\n\n### Issues\n\n#### Critical\nNone.\n\n#### Important\nNone.\n\n#### Minor\n- `registry.py:42` — `read_text()` can raise `UnicodeDecodeError` (subclass of `ValueError`, not `OSError`) on a non-UTF-8 file, which would leak raw instead of becoming `RegistryError`. If \"malformed registry file\" should always normalize, catch `ValueError` too or use `errors=\"replace\"`. Not tested by the brief, so low impact.\n- `registry.py:26-27` — `connectors` has `default_factory=list`, so `model_validate({})` silently yields an empty registry instead of flagging a wrong-shape file. Lenient, not a spec violation, but weakens shape validation for the `{}` case.\n- `registry.py:65` — `model_dump()` (Python mode) then `json.dump`; if a future `settings` value were non-JSON-serializable, `TypeError` would escape `save()` unwrapped (caught only for cleanup). Fine today since settings is `dict[str, Any]` from JSON input.\n- `registry.py:66-70` — no `fsync` before `os.replace`; atomicity against process crash is fine, but not durability-crash-safe. `mkstemp` yields `0600`, so the replaced file is `0600` post-`os.replace` (implementer already flagged in report). Acceptable; note if a specific mode is required.\n- `registry.py:58` — duplicate detection is exact case-sensitive string equality. Appropriate given the brief specifies no normalization; worth noting only if case-insensitive names are later desired.\n\n### Assessment\n**Task quality:** Approved\n**Reasoning:** Every required interface, error type, the path-in-message normalization, the atomic save, the file shape, the deferred import, the re-exports, and all 7 tests are present and verified against the diff; lint/format are clean and the only findings are minor robustness polish.",
+          "time": {
+            "start": 1792002247177,
+            "end": 1792002251471
+          },
+          "id": "prt_13ba84a09001OJ5cDW3ceJkwx0",
+          "sessionID": "ses_ec4582547ffekgZBH0VmVxj1XK",
+          "messageID": "msg_13ba7fd930012M5M6cIWAleYKl"
+        },
+        {
+          "reason": "stop",
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-finish",
+          "tokens": {
+            "total": 31024,
+            "input": 9808,
+            "output": 1213,
+            "reasoning": 5667,
+            "cache": {
+              "write": 0,
+              "read": 14336
+            }
+          },
+          "cost": 0,
+          "id": "prt_13ba85aef001QpylmgHi9CavIF",
+          "sessionID": "ses_ec4582547ffekgZBH0VmVxj1XK",
+          "messageID": "msg_13ba7fd930012M5M6cIWAleYKl"
+        }
+      ]
+    }
+  ]
+}
