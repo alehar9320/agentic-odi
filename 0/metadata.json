@@ -1,0 +1,52 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M4XTY5W7QX0YCJ474FFYKZDF",
+  "session_id": "ses_ec4582547ffekgZBH0VmVxj1XK",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-14T18:31:58.32964491Z",
+  "branch": "mcp-connector-module",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "connectors/src/connectors/__init__.py",
+    "connectors/src/connectors/mcp.py",
+    "connectors/tests/test_mcp_connector.py"
+  ],
+  "agent": "OpenCode",
+  "model": "big-pickle",
+  "turn_id": "d0f89f31ed88",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 17983,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 44800,
+    "output_tokens": 1738,
+    "api_call_count": 3
+  },
+  "session_metrics": {
+    "turn_count": 1
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-10-14T18:31:58.322733855Z",
+    "agent_lines": 0,
+    "agent_removed": 0,
+    "human_added": 246,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 246,
+    "total_lines_changed": 246,
+    "agent_percentage": 0,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 755,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        "docs/superpowers/plans/2026-10-14-mcp-connector-module.md": 755
+      }
+    }
+  ]
+}
