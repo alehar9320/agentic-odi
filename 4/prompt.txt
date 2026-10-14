@@ -1,0 +1,58 @@
+You are implementing Task 6: `MCPClientConnector` (HTTP `fastmcp.Client`).
+
+## Working directory (IMPORTANT)
+Work ONLY inside this git worktree on branch `mcp-connector-module`:
+  /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module
+Do not touch /home/alexa/repos/agentic-odi (the main checkout).
+
+## Task Description
+Read your task brief FIRST — it is your requirements, with the exact test code to use:
+  /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-6-brief.md
+
+## Context
+Already present in `connectors`: `models.py` (`ConnectorConfig` with `mcp_settings() -> McpConnectorSettings(url, tools)`, `HealthStatus(ok, detail)`, `IngestRecord(id, source_name, source_kind, item_type, name, content, raw)`, `IngestBatch(connector_name, records, errors)`), `errors.py`, `protocol.py` (`Connector`), `sink.py` (`IngestSink.append`), and `registry.py`.
+**Important:** Task 5 already implemented `registry.build_connector` with a deferred `from .mcp import MCPClientConnector` branch for `kind == "mcp"`. In this task, `mcp.py` comes into existence — verify the existing branch now resolves correctly; modify `registry.py` only if something is actually wrong.
+
+## Requirements (from the brief)
+`connectors/src/connectors/mcp.py` — class `MCPClientConnector(config: ConnectorConfig, sink: IngestSink, client_factory: Callable[[], Client] | None = None)`:
+- `kind = "mcp"`, `name` = config.name, `settings` = `config.mcp_settings()`.
+- Default `client_factory` = `lambda: Client(self.settings.url)` (HTTP URL transport).
+- `async health() -> HealthStatus`: `async with self._client_factory() as client:` → `await client.list_tools()` → `HealthStatus(ok=True, detail=f"{len(tools)} tool(s) available")`; on ANY `Exception` → `HealthStatus(ok=False, detail=str(exc))`. Must return promptly and not raise.
+- `async ingest() -> IngestBatch`: `async with ... as client:` → `list_tools`, `list_resources`; build and append a `catalog` `IngestRecord` whose `content` is JSON of `{"tools": [names], "resources": [names]}` and `raw` holds the full names+uris; for each resource `read_resource(res.uri)` produce ONE `resource` record per returned content block using the block's `.text`; for each name in `settings.tools` call `call_tool(name, {})` producing ONE `tool_result` record (concatenated `.text` of content blocks, else `str(result.data)`). Per-item failures must be collected into `batch.errors` (include the item name) WITHOUT aborting the batch. Append the batch to `self.sink` and return it.
+- Re-export `MCPClientConnector` from `connectors/__init__.py`.
+
+## CRITICAL: fastmcp 4.1.0 API accuracy
+The exact attribute names for tools/resources/read_resource/call_tool results matter and are version-specific. **Introspect the installed `fastmcp` package before coding** (e.g. `uv run python -c "import fastmcp, inspect; ..."`, or read the installed source under `.venv/lib/python3.12/site-packages/fastmcp/`). Confirm:
+- `Client` construction (HTTP url vs in-memory server), async context manager, `list_tools()`/`list_resources()` return item `.name`/`.uri`.
+- What `read_resource(uri)` returns (content block type + `.text`).
+- What `call_tool(name, args)` returns (`.content` blocks' `.text`, `.data`, and `is_error`).
+Implement against the real installed API, not assumptions. Do NOT reach for the low-level `mcp` SDK (brief forbids it).
+
+## Formatting requirement (IMPORTANT — CI gate)
+Repo CI runs `uv run ruff check .` and `uv run ruff format --check .`. The plan's test snippet is NOT format-clean. Before committing run:
+  `uv run ruff format connectors/ && uv run ruff check connectors/ --fix`
+then confirm `uv run ruff check connectors/` exits 0.
+
+## Environment facts (verified)
+- Python 3.12 via gitignored `.python-version`; shared root `.venv`; use `uv run --directory connectors pytest ...`.
+- connectors uses `asyncio_mode = "strict"`; the tests already use `@pytest.mark.asyncio`.
+- No network in the default suite — the tests use an in-memory `Client(FastMCP(...))`.
+- A git hook appends an `Entire-Checkpoint` trailer to commits — expected; keep the brief's subject line.
+
+## Before you begin
+Ask if anything is unclear. Otherwise implement exactly the brief's interface.
+
+## Your job
+1. TDD per the brief (RED then GREEN; expect 5 passed for test_mcp_connector.py, then the full connectors suite passes).
+2. Format + lint connectors clean.
+3. Commit with the brief's message.
+4. Self-review, then report.
+
+## You do NOT dispatch subagents. Do all work yourself.
+
+## Report format
+Write your full report to:
+  /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-6-report.md
+Include: what you implemented; the fastmcp API facts you verified (and how); **TDD Evidence** (RED and GREEN commands + outputs); files changed; ruff format/check results; self-review; concerns.
+
+Then reply with ONLY (under 15 lines): Status; commit SHA + subject; one-line test summary (counts); ruff status; concerns; report path.
