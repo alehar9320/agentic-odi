@@ -1,3 +1,5 @@
+from types import SimpleNamespace
+
 import pytest
 from fastmcp import Client, FastMCP
 
@@ -72,3 +74,50 @@ async def test_health_fails_cleanly_on_dead_server():
     status = await _connector(IngestSink(), factory=lambda: _BrokenClient()).health()
     assert status.ok is False
     assert "timed out" in status.detail
+
+
+class _PartialReadClient:
+    """Fake client where one resource read fails and another succeeds."""
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *exc):
+        return False
+
+    async def list_tools(self):
+        return []
+
+    async def list_resources(self):
+        return [
+            SimpleNamespace(name="broken", uri="config://broken"),
+            SimpleNamespace(name="good", uri="config://good"),
+        ]
+
+    async def read_resource(self, uri):
+        if uri == "config://broken":
+            raise RuntimeError("resource read blew up")
+        return [SimpleNamespace(text="good payload")]
+
+
+@pytest.mark.asyncio
+async def test_ingest_survives_resource_read_failure():
+    batch = await _connector(IngestSink(), factory=lambda: _PartialReadClient()).ingest()
+
+    kinds = [r.item_type for r in batch.records]
+    assert "catalog" in kinds
+    assert any(
+        r.item_type == "resource" and r.name == "good" and r.content == "good payload"
+        for r in batch.records
+    )
+    assert batch.errors and any("broken" in e for e in batch.errors)
+
+
+@pytest.mark.asyncio
+async def test_ingest_empty_server_yields_only_catalog():
+    batch = await _connector(IngestSink(), factory=lambda: Client(FastMCP("empty"))).ingest()
+
+    assert [r.item_type for r in batch.records] == ["catalog"]
+    catalog = batch.records[0]
+    assert catalog.content == '{"tools": [], "resources": []}'
+    assert batch.errors == []
