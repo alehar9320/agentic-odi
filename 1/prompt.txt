@@ -1,0 +1,24 @@
+You are performing a SCOPED code re-review of a small follow-up fix commit. Do NOT modify any files. Verify ONLY that the fix resolves the reported finding and introduces nothing new.
+
+Worktree: `/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module`
+Delta diff (exclusive..inclusive): `/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/review-f110aa2..25f508e.diff`
+BASE=f110aa2, HEAD=25f508e (a single README-only commit, subject "docs: correct README package overview and CLI description").
+
+## The finding this fix must resolve
+The prior review returned CHANGES-REQUESTED with one Important finding:
+> `README.md:21,34,40` — "Code Overview" lists six packages but surrounding stale three-project text remained: line 21 "three installable projects"; line 34 "(all three projects plus dev tooling)"; line 40 "installs `agentic-odi-server`, `agentic-odi-client`, and `agentic-odi-cli` in editable mode" (names a removed package `agentic-odi-server`).
+Also a deferrable Minor: line 46 CLI description was stale ("Today it provides version and help information; over time it will expose commands...").
+
+## What to verify
+1. Read the delta diff and the current `README.md` around the edited lines.
+2. Confirm the three Important items are corrected and no longer contradict the six-package overview (no remaining `three projects`, no `agentic-odi-server` reference).
+3. Confirm the edit is accurate against the actual workspace packages (root `pyproject.toml` members) and the actual CLI sub-apps (check `cli/src/cli/cli.py` for the registered sub-apps, e.g. `outcomes`, `connectors`).
+4. Confirm nothing else changed in the commit and nothing regressed.
+5. Confirm the README still passes `uv run ruff format --check README.md` and `uv run ruff check .` (you may run these; they are fast/offline).
+
+Note: an untracked `docs/` directory holds a plan file — ignore it; do not modify or delete anything.
+
+## Report format (ONLY this)
+Verdict: APPROVED or CHANGES-REQUESTED
+- Findings: severity, file:line, issue, suggested fix (if any).
+- If APPROVED, state plainly that the finding is resolved and no new issues were introduced. Be concise.
