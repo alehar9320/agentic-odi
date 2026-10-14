@@ -3,7 +3,7 @@
   "checkpoint_id": "01M4Y1SXTPG9AVC2HK3NKFKDPS",
   "strategy": "manual-commit",
   "branch": "mcp-connector-module",
-  "checkpoints_count": 12,
+  "checkpoints_count": 13,
   "files_touched": [
     ".github/workflows/ci.yml",
     "README.md",
@@ -100,6 +100,13 @@
       "compact_transcript": "/11/transcript.jsonl",
       "content_hash": "/11/content_hash.txt",
       "prompt": ""
+    },
+    {
+      "metadata": "/12/metadata.json",
+      "transcript": "/12/full.jsonl",
+      "compact_transcript": "/12/transcript.jsonl",
+      "content_hash": "/12/content_hash.txt",
+      "prompt": "/12/prompt.txt"
     }
   ],
   "token_usage": {
