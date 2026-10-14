@@ -16,12 +16,14 @@ from .models import (
     McpConnectorSettings,
 )
 from .protocol import Connector
+from .registry import ConnectorRegistry, build_connector
 from .sink import IngestSink
 
 __all__ = [
     "Connector",
     "ConnectorConfig",
     "ConnectorNotFoundError",
+    "ConnectorRegistry",
     "DuplicateConnectorError",
     "HealthStatus",
     "IngestBatch",
@@ -30,4 +32,5 @@ __all__ = [
     "McpConnectorSettings",
     "RegistryError",
     "UnknownConnectorKindError",
+    "build_connector",
 ]
