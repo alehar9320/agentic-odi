@@ -18,31 +18,32 @@ This repository serves as an initial sandbox for understanding server-client MCP
 
 ### Code Overview
 
-This repository is a [uv workspace](https://docs.astral.sh/uv/concepts/projects/workspaces/) made up of five installable projects, each with its own `pyproject.toml`, `src/` layout, and tests:
+This repository is a [uv workspace](https://docs.astral.sh/uv/concepts/projects/workspaces/) made up of six installable projects, each with its own `pyproject.toml`, `src/` layout, and tests:
 
 - **`core/`** (`agentic-odi-core`): Domain models, the `ODIService` business-logic layer, and repository implementations (in-memory and SQLite), including ODI opportunity-score computation.
 - **`mcp_server/`** (`agentic-odi-mcp-server`): A foundational MCP Server exposing an HTTP transport layer. It hosts tools for Jobs, Steps, Desired Outcomes, and Customer Outcomes (linking customer value to business value).
 - **`local_server/`** (`agentic-odi-local-server`): A local FastAPI server that talks to the repository directly (no MCP transport).
-- **`client/`** (`agentic-odi-client`): A Python-based agent client that communicates with the MCP server, executing tool calls over the active connection. It also hosts `run.py`, the local dev launcher that starts the server and the Streamlit UI together.
-- **`cli/`** (`agentic-odi-cli`): A [`Typer`](https://github.com/fastapi/typer)-based command-line interface. It provides a non-MCP entry point for interacting with Agentic ODI, initially exposing `--version` and `--help`, and will grow to cover dataset operations.
+- **`client/`** (`agentic-odi-client`): **The Living Studio** — a spatial, conversational GUI for Outcome-Driven Innovation. Provides an interactive Opportunity Landscape, Universal Job Map, WYSIWYG Impact Simulation, and Causal Lineage inspection, paired with an autonomous conversational agent connected to the MCP server. It also hosts `run.py`, the local dev launcher that starts the server and the Studio UI together.
+- **`cli/`** (`agentic-odi-cli`): A [`Typer`](https://github.com/fastapi/typer)-based command-line interface. It provides version/help plus `outcomes` and `connectors` commands.
+- **`connectors/`** (`agentic-odi-connectors`): Pluggable external integrations. The first kind is an **MCP client connector** that connects to a remote MCP server over HTTP, checks health, and ingests tools/resources into a local ingest sink. Additional kinds (REST, webhooks, and so on) can register against the same protocol later.
 
 ## 🚀 Getting Started
 
 ### Prerequisites
 
-Python 3.10+ and [`uv`](https://docs.astral.sh/uv/). Install the whole workspace (all five projects plus dev tooling):
+Python 3.10+ and [`uv`](https://docs.astral.sh/uv/). Install the whole workspace (all six projects plus dev tooling):
 
 ```bash
 uv sync --all-packages
 ```
 
-This creates a `.venv` and installs `agentic-odi-core`, `agentic-odi-mcp-server`, `agentic-odi-local-server`, `agentic-odi-client`, and `agentic-odi-cli` in editable mode.
+This creates a `.venv` and installs `agentic-odi-core`, `agentic-odi-mcp-server`, `agentic-odi-local-server`, `agentic-odi-client`, `agentic-odi-cli`, and `agentic-odi-connectors` in editable mode.
 
 ### Running the Environment
 
 #### 🧰 Command-line interface (CLI)
 
-Agentic ODI ships a [`Typer`](https://github.com/fastapi/typer)-based CLI so you can interact with the project directly from your terminal — no MCP client or chat UI required. Today it provides version and help information; over time it will expose commands for working with the ODI dataset (Jobs, Steps, and Outcomes), giving you a scriptable, automation-friendly alternative to the MCP/chat path.
+Agentic ODI ships a [`Typer`](https://github.com/fastapi/typer)-based CLI so you can interact with the project directly from your terminal — no chat UI required. It provides version and help information plus commands for connecting to external systems. Over time it will also expose commands for working with the ODI dataset (Jobs, Steps, and Outcomes).
 
 Launch it with:
 
@@ -77,6 +78,18 @@ agentic-odi outcomes score 8 2
 
 Set `AGENTIC_ODI_MCP_URL` to point to a non-default server if needed.
 
+#### External connectors (MCP ingest)
+
+Connectors are named integrations stored in `.agentic-odi/connectors.json` (or a path you pass with `--config` / `AGENTIC_ODI_CONNECTORS_FILE`). The first kind is `mcp`: Agentic ODI acts as an MCP **client** and pulls catalog, resources, and optional tool results from an external MCP **server**.
+
+```bash
+python -m cli connectors add mcp --name gong --url http://localhost:9000/mcp --tool latest_quote
+python -m cli connectors list
+python -m cli connectors health --name gong
+python -m cli connectors ingest --name gong
+```
+
+Ingested records are normalized (`catalog`, `resource`, `tool_result`) and appended to the in-process ingest sink. They are not written into the ODI jobs/outcomes store.
 
 
 #### ⚡ One-command launch (recommended)
@@ -90,7 +103,7 @@ python -m client.run
 | Service | URL |
 |---|---|
 | MCP Server | http://localhost:8000/mcp |
-| Streamlit Chat UI | http://localhost:8501 |
+| The Living Studio UI | http://localhost:8501 |
 
 #### 🔧 Manual split-terminal (alternative)
 
@@ -179,6 +192,7 @@ uv run --directory mcp_server pytest
 uv run --directory local_server pytest
 uv run --directory client pytest
 uv run --directory cli pytest
+uv run --directory connectors pytest
 ```
 
 ### 🧠 Agent session tracking
@@ -200,9 +214,10 @@ uv run --directory mcp_server mypy .
 uv run --directory local_server mypy .
 uv run --directory client mypy .
 uv run --directory cli mypy .
+uv run --directory connectors mypy .
 
 # Security scanning
-uv run bandit -c pyproject.toml -r core/src mcp_server/src local_server/src cli/src client/src
+uv run bandit -c pyproject.toml -r core/src mcp_server/src local_server/src cli/src client/src connectors/src
 
 # Tests (same as CI)
 uv run --directory core pytest
@@ -210,6 +225,7 @@ uv run --directory mcp_server pytest
 uv run --directory local_server pytest
 uv run --directory client pytest
 uv run --directory cli pytest
+uv run --directory connectors pytest
 ```
 
 To run these automatically before each commit, you can enable the bundled pre-commit hooks:
@@ -270,6 +286,9 @@ The `.pi/settings.json` declares the Superpowers package. Pi will clone it and l
 | `client/tests/test_run.py` | Dev launcher helpers (port checks) |
 | `cli/tests/test_cli.py` | CLI `--version` and `--help` behavior |
 | `cli/tests/test_outcomes_cli.py` | Customer Outcomes CLI subcommands with MCP stub |
+| `cli/tests/test_connectors_cli.py` | CLI `connectors` add/list/health/ingest adapter |
+| `connectors/tests/test_registry.py` | JSON connector registry persist/load and kind checks |
+| `connectors/tests/test_mcp_connector.py` | In-memory FastMCP health and ingest records |
 
 **Conventions:**
 - Test files live under each project's `tests/` directory and are named `test_*.py`.
@@ -305,6 +324,9 @@ Integrate via the MCP protocol at:
 
 As we validate the feasibility of this architecture, our next milestones include:
 
+- [x] **External MCP client connector**: Pluggable connectors package with an HTTP MCP ingest client, CLI adapter, and in-memory tests.
+- [ ] **Map ingested evidence onto ODI artifacts**: Turn connector records into jobs, outcomes, or evidence without mixing connector plumbing into the ODI store.
+- [ ] **Additional connector kinds**: REST/webhooks and similar integrations implementing the same `Connector` protocol.
 - [ ] **ODI Schema Definition**: Define standardized Pydantic models for *Jobs*, *Steps*, and *Outcomes*.
 - [x] **CLI Dataset Commands**: Extend `cli/` so the ODI dataset can be created, queried, and scored from the terminal, in addition to the current MCP path.
 - [ ] **Context Tooling**: Replace the dummy `greet` tool with capabilities like `get_job_map(job_id)` or `evaluate_outcome(statement)`.

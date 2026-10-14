@@ -187,11 +187,13 @@ Update `README.md` whenever any of the following change:
 ### 4. General Philosophy
 - **Separation of Concerns**: Isolate the ODI data logic/retrieval from the MCP server tooling logic.
 - **Agentic Purpose**: Remember that the tools being built are meant to be consumed by autonomous agents. Design tool interfaces that are intuitive for an LLM to call and interpret.
+- **External connectors**: Integrations live in the `connectors/` workspace package. New kinds implement `connectors.protocol.Connector` and register via `register_kind`. Do not write ingested records into `jobs_db` / outcomes unless a later mapping task says so.
+- **MCP client vs ODI server**: The ODI FastMCP **server** exposes product tools. The MCP **client connector** uses `fastmcp.Client` over HTTP to ingest data from *external* MCP servers. Prefer in-memory `Client(server)` tests for that connector, same as server tests.
 
 ### 5. Testing Strategy (FastMCP)
 - **First-Class Documentation**: Treat tests as living documentation that demonstrate how features work while protecting against regressions.
 - **Speed & Isolation**: Tests must be fast (< 1s) and self-contained. Use `@pytest.mark.integration` or `@pytest.mark.client_process` for slower, integration, or resource-dependent tests.
-- **Structure**: This repo is a uv workspace. Mirror each project's code structure in its own `tests/` directory (e.g., `mcp_server/src/mcp_server/mcp_server.py` -> `mcp_server/tests/test_server_tools.py`).
+- **Structure**: This repo is a uv workspace. Mirror each project's code structure in its own `tests/` directory (e.g., `mcp_server/src/mcp_server/mcp_server.py` -> `mcp_server/tests/test_server_tools.py`, `connectors/src/connectors/mcp/connector.py` -> `connectors/tests/test_mcp_connector.py`).
 - **Atomic Tests**: Each test must verify exactly one specific behavior with clear intent in test names and assertions. Avoid multi-behavior tests.
 - **In-Memory Testing (Preferred)**: Favor testing functionality deterministically by passing the `FastMCP` server directly into the `Client(server)` instance. This runs in-memory without network overhead for deterministic and lightning-fast execution.
 - **Transport Testing (When Needed)**: For HTTP/SSE network transport tests, prefer the isolated in-process `fastmcp.utilities.tests.run_server_async(server)` context manager over subprocess testing (which uses `run_server_in_process` and is slower to debug).
