@@ -1,0 +1,48 @@
+You are implementing Task 4: In-memory ingest sink.
+
+## Working directory (IMPORTANT)
+Work ONLY inside this git worktree on branch `mcp-connector-module`:
+  /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module
+Do not touch /home/alexa/repos/agentic-odi (the main checkout).
+
+## Task Description
+Read your task brief FIRST — it is your requirements, with the exact test code to use:
+  /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-4-brief.md
+
+## Context
+The `agentic-odi-connectors` package already has `errors.py`, `models.py`, `protocol.py` and an `__init__.py` that re-exports them (Task 3). `IngestBatch`/`IngestRecord` already exist in `models.py` and are exported. This task adds an in-memory sink. Follow TDD: write the failing test first, run to see RED, implement, run to see GREEN.
+
+## Requirements
+- `connectors/src/connectors/sink.py` defines `IngestSink` with:
+  - `append(batch: IngestBatch) -> None`
+  - property `batches -> list[IngestBatch]` returning a COPY (so callers cannot mutate internal state)
+  - `dump(path: str | Path) -> None` writing a JSON array of each `batch.model_dump()`
+- Re-export `IngestSink` from `connectors/__init__.py` (add to `__all__`) so `from connectors import IngestSink` works.
+- Create `connectors/tests/test_sink.py` using the brief's test code as the starting point.
+
+## Formatting requirement (IMPORTANT — CI gate)
+Repo CI runs `uv run ruff check .` and `uv run ruff format --check .`. The plan's test snippet is NOT format-clean. Before committing, run:
+  `cd /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module && uv run ruff format connectors/ && uv run ruff check connectors/ --fix`
+Then confirm `uv run ruff check connectors/` exits 0. Do NOT change test behavior while formatting; the formatting tool will reflow the long `IngestRecord(...)` call and add the blank line in the import block.
+
+## Environment facts (verified)
+- Python 3.12 via gitignored `.python-version`; shared root `.venv`; use `uv run --directory connectors pytest ...`.
+- A git hook appends an `Entire-Checkpoint` trailer to commits — expected; keep the subject line from the brief.
+
+## Before you begin
+Ask if anything is unclear. Otherwise implement exactly the brief's interface.
+
+## Your job
+1. TDD per the brief (RED then GREEN).
+2. Format + lint connectors clean.
+3. Commit with the brief's message.
+4. Self-review, then report.
+
+## You do NOT dispatch subagents. Do all work yourself.
+
+## Report format
+Write your full report to:
+  /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-4-report.md
+Include: what you implemented; **TDD Evidence** (RED and GREEN commands + outputs); files changed; ruff format/check results; self-review; concerns.
+
+Then reply with ONLY (under 15 lines): Status; commit SHA + subject; one-line test summary; ruff status; concerns; report path.
