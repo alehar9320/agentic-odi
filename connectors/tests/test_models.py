@@ -1,4 +1,5 @@
 import pytest
+
 from connectors import ConnectorConfig, McpConnectorSettings
 from connectors.errors import UnknownConnectorKindError
 
