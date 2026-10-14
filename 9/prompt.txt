@@ -1,0 +1,61 @@
+You are implementing Task 7: Typer `connectors` CLI adapter.
+
+## Working directory (IMPORTANT)
+Work ONLY inside this git worktree on branch `mcp-connector-module`:
+  /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module
+Do not touch /home/alexa/repos/agentic-odi (the main checkout).
+
+## Task Description
+Read your task brief FIRST — it is your requirements, with the exact test code to use:
+  /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-7-brief.md
+
+## Context
+`connectors` package is complete: exported public API includes `ConnectorRegistry`, `build_connector`, `ConnectorConfig`, `IngestSink`, `HealthStatus`, `IngestBatch`. The existing CLI is a Typer app in `cli/src/cli/cli.py`. Follow TDD.
+
+## Requirements (from the brief)
+- New `cli/src/cli/connectors.py`:
+  - module-level seam `_registry(config_path: str | None) -> ConnectorRegistry` (when `config_path` is None, rely on the registry default; else pass it).
+  - module-level seam `_sink() -> IngestSink`.
+  - import `build_connector` at MODULE level (`from connectors import build_connector`) so tests can patch `cli.connectors.build_connector`.
+  - `connectors_app = typer.Typer(...)` with subcommands:
+    - `list`: prints `name\tkind\tenabled` per connector, or `No connectors configured.` when empty. Accepts `--config`.
+    - `add mcp --name NAME --url URL [--tool NAME ...]`: persists a `ConnectorConfig(name, kind="mcp", settings={"url": url, "tools": tools})`; on `DuplicateConnectorError` print a message and exit code 1.
+    - `health --name NAME`: `asyncio.run(build_connector(config, _sink()).health())`; print `ok` and `detail`; exit 1 when `not ok`.
+    - `ingest --name NAME [--dump PATH]`: `asyncio.run(...ingest())`; print record/error counts; when `--dump` given, call `sink.dump(path)`.
+  - All commands accept `--config PATH` (default `None`).
+- `cli/src/cli/cli.py`: register `app.add_typer(connectors_app, name="connectors", help="Manage external data connectors")`.
+- `cli/pyproject.toml`: add `"agentic-odi-connectors"` to `dependencies` AND add `agentic-odi-connectors = { workspace = true }` under `[tool.uv.sources]`; then run `uv lock && uv sync --all-packages` from the worktree root. (The existing `agentic-odi-core` source entry must remain.)
+
+## Notes / gotchas
+- `list` output must contain `gong` after an add (test). Keep the tab-separated format stated in the brief.
+- Unknown connector name on `health`/`ingest` should surface the `ConnectorNotFoundError` as a clean message + non-zero exit (do not let a raw traceback escape).
+- Use `typer.echo` for output. Existing CLI style is in `cli/src/cli/cli.py` — match it (including `# noqa: B008` on `typer.Option` defaults if needed).
+- `asyncio.run(...)` is correct here (CLI is sync).
+
+## Formatting requirement (IMPORTANT — CI gate)
+Repo CI runs `uv run ruff check .` and `uv run ruff format --check .`. The plan's test snippet is NOT format-clean. Before committing run:
+  `uv run ruff format cli/ src 2>/dev/null; uv run ruff format cli/ && uv run ruff check cli/ --fix`
+then confirm `uv run ruff check cli/` exits 0.
+
+## Environment facts (verified)
+- Python 3.12 via gitignored `.python-version`; shared root `.venv`; use `uv run --directory cli pytest ...`.
+- A git hook appends an `Entire-Checkpoint` trailer to commits — expected; keep the brief's subject line.
+
+## Before you begin
+Ask if anything is unclear. Otherwise implement exactly the brief's interface.
+
+## Your job
+1. TDD per the brief (RED then GREEN; expect 6 passed for test_connectors_cli.py, then full cli suite passes).
+2. Add dependency + re-lock (`uv lock && uv sync --all-packages`).
+3. Format + lint cli clean.
+4. Commit with the brief's message (include `uv.lock`).
+5. Self-review, then report.
+
+## You do NOT dispatch subagents. Do all work yourself.
+
+## Report format
+Write your full report to:
+  /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-7-report.md
+Include: what you implemented; **TDD Evidence** (RED and GREEN commands + outputs); the `uv lock` result; files changed; full cli suite result; ruff format/check results; self-review; concerns.
+
+Then reply with ONLY (under 15 lines): Status; commit SHA + subject; test counts (new + full cli suite); `uv lock` status; ruff status; concerns; report path.
