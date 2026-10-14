@@ -1,0 +1,1749 @@
+{
+  "info": {
+    "id": "ses_ec46912b5ffe460FpNsm8DQ4Hl",
+    "slug": "nimble-harbor",
+    "projectID": "e4fe19106d06261ebfed21a0e3ba06559abf1100",
+    "directory": "/home/alexa/repos/agentic-odi",
+    "path": "",
+    "parentID": "ses_ec492423bffeG7aFTE5YTPUIJO",
+    "title": "Implement Task 4: in-memory ingest sink (@general subagent)",
+    "agent": "general",
+    "model": {
+      "id": "big-pickle",
+      "providerID": "opencode",
+      "variant": "default"
+    },
+    "version": "1.18.35",
+    "summary": {
+      "additions": 0,
+      "deletions": 0,
+      "files": 0
+    },
+    "cost": 0,
+    "tokens": {
+      "input": 15771,
+      "output": 3156,
+      "reasoning": 417,
+      "cache": {
+        "read": 317056,
+        "write": 0
+      }
+    },
+    "permission": [
+      {
+        "permission": "task",
+        "pattern": "*",
+        "action": "deny"
+      }
+    ],
+    "time": {
+      "created": 1792001109322,
+      "updated": 1792001212580
+    }
+  },
+  "messages": [
+    {
+      "info": {
+        "role": "user",
+        "time": {
+          "created": 1792001109350
+        },
+        "agent": "general",
+        "model": {
+          "providerID": "opencode",
+          "modelID": "big-pickle"
+        },
+        "summary": {
+          "diffs": []
+        },
+        "id": "msg_13b96ed64001OLx6pBmtri7yUl",
+        "sessionID": "ses_ec46912b5ffe460FpNsm8DQ4Hl"
+      },
+      "parts": [
+        {
+          "type": "text",
+          "text": "You are implementing Task 4: In-memory ingest sink.\n\n## Working directory (IMPORTANT)\nWork ONLY inside this git worktree on branch `mcp-connector-module`:\n  /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module\nDo not touch /home/alexa/repos/agentic-odi (the main checkout).\n\n## Task Description\nRead your task brief FIRST — it is your requirements, with the exact test code to use:\n  /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-4-brief.md\n\n## Context\nThe `agentic-odi-connectors` package already has `errors.py`, `models.py`, `protocol.py` and an `__init__.py` that re-exports them (Task 3). `IngestBatch`/`IngestRecord` already exist in `models.py` and are exported. This task adds an in-memory sink. Follow TDD: write the failing test first, run to see RED, implement, run to see GREEN.\n\n## Requirements\n- `connectors/src/connectors/sink.py` defines `IngestSink` with:\n  - `append(batch: IngestBatch) -> None`\n  - property `batches -> list[IngestBatch]` returning a COPY (so callers cannot mutate internal state)\n  - `dump(path: str | Path) -> None` writing a JSON array of each `batch.model_dump()`\n- Re-export `IngestSink` from `connectors/__init__.py` (add to `__all__`) so `from connectors import IngestSink` works.\n- Create `connectors/tests/test_sink.py` using the brief's test code as the starting point.\n\n## Formatting requirement (IMPORTANT — CI gate)\nRepo CI runs `uv run ruff check .` and `uv run ruff format --check .`. The plan's test snippet is NOT format-clean. Before committing, run:\n  `cd /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module && uv run ruff format connectors/ && uv run ruff check connectors/ --fix`\nThen confirm `uv run ruff check connectors/` exits 0. Do NOT change test behavior while formatting; the formatting tool will reflow the long `IngestRecord(...)` call and add the blank line in the import block.\n\n## Environment facts (verified)\n- Python 3.12 via gitignored `.python-version`; shared root `.venv`; use `uv run --directory connectors pytest ...`.\n- A git hook appends an `Entire-Checkpoint` trailer to commits — expected; keep the subject line from the brief.\n\n## Before you begin\nAsk if anything is unclear. Otherwise implement exactly the brief's interface.\n\n## Your job\n1. TDD per the brief (RED then GREEN).\n2. Format + lint connectors clean.\n3. Commit with the brief's message.\n4. Self-review, then report.\n\n## You do NOT dispatch subagents. Do all work yourself.\n\n## Report format\nWrite your full report to:\n  /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-4-report.md\nInclude: what you implemented; **TDD Evidence** (RED and GREEN commands + outputs); files changed; ruff format/check results; self-review; concerns.\n\nThen reply with ONLY (under 15 lines): Status; commit SHA + subject; one-line test summary; ruff status; concerns; report path.",
+          "id": "prt_13b96ed74001CGTjmPfHD04Hzu",
+          "sessionID": "ses_ec46912b5ffe460FpNsm8DQ4Hl",
+          "messageID": "msg_13b96ed64001OLx6pBmtri7yUl"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_13b96ed64001OLx6pBmtri7yUl",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 16058,
+          "input": 1627,
+          "output": 86,
+          "reasoning": 9,
+          "cache": {
+            "write": 0,
+            "read": 14336
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792001110014,
+          "completed": 1792001114260
+        },
+        "finish": "tool-calls",
+        "id": "msg_13b96effe001rEqTe0K1cajSNW",
+        "sessionID": "ses_ec46912b5ffe460FpNsm8DQ4Hl"
+      },
+      "parts": [
+        {
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-start",
+          "id": "prt_13b96fe8c001dCeej5hQ0ypdTB",
+          "sessionID": "ses_ec46912b5ffe460FpNsm8DQ4Hl",
+          "messageID": "msg_13b96effe001rEqTe0K1cajSNW"
+        },
+        {
+          "type": "reasoning",
+          "text": "Let me start by reading the task brief.",
+          "time": {
+            "start": 1792001113788,
+            "end": 1792001113863
+          },
+          "id": "prt_13b96febc001R5yAkDTi2lwOOj",
+          "sessionID": "ses_ec46912b5ffe460FpNsm8DQ4Hl",
+          "messageID": "msg_13b96effe001rEqTe0K1cajSNW"
+        },
+        {
+          "type": "tool",
+          "tool": "read",
+          "callID": "call_00_8vpk90ijwe3zgltx41ik3r9d",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-4-brief.md"
+            },
+            "output": "<path>/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-4-brief.md</path>\n<type>file</type>\n<content>\n1: ### Task 4: In-memory ingest sink\n2: \n3: **Files:**\n4: - Create: `connectors/src/connectors/sink.py`\n5: - Modify: `connectors/src/connectors/__init__.py`\n6: - Test: `connectors/tests/test_sink.py`\n7: \n8: **Interfaces:**\n9: - Consumes: `models.IngestBatch`, `models.IngestRecord`.\n10: - Produces: `sink.IngestSink` with `append(batch: IngestBatch) -> None`, property `batches -> list[IngestBatch]` (returns a copy), and `dump(path: str | Path) -> None` (writes JSON array of `batch.model_dump()`).\n11: \n12: - [ ] **Step 1: Write the failing test**\n13: \n14: `connectors/tests/test_sink.py`:\n15: \n16: ```python\n17: import json\n18: from connectors import IngestBatch, IngestRecord, IngestSink\n19: \n20: \n21: def _batch(name: str) -> IngestBatch:\n22:     return IngestBatch(\n23:         connector_name=name,\n24:         records=[\n25:             IngestRecord(\n26:                 id=\"1\", source_name=name, source_kind=\"mcp\",\n27:                 item_type=\"catalog\", name=\"catalog\", content=\"{}\", raw={},\n28:             )\n29:         ],\n30:         errors=[],\n31:     )\n32: \n33: \n34: def test_append_accumulates_batches():\n35:     sink = IngestSink()\n36:     sink.append(_batch(\"a\"))\n37:     sink.append(_batch(\"b\"))\n38:     assert [b.connector_name for b in sink.batches] == [\"a\", \"b\"]\n39: \n40: \n41: def test_records_keep_source_identity():\n42:     sink = IngestSink()\n43:     sink.append(_batch(\"gong\"))\n44:     rec = sink.batches[0].records[0]\n45:     assert rec.source_name == \"gong\" and rec.source_kind == \"mcp\"\n46: \n47: \n48: def test_dump_writes_json(tmp_path):\n49:     sink = IngestSink()\n50:     sink.append(_batch(\"a\"))\n51:     out = tmp_path / \"dump.json\"\n52:     sink.dump(out)\n53:     assert json.loads(out.read_text())[0][\"connector_name\"] == \"a\"\n54: ```\n55: \n56: - [ ] **Step 2: Run test to verify it fails**\n57: \n58: Run: `uv run --directory connectors pytest tests/test_sink.py -v`\n59: Expected: FAIL (ImportError: cannot import name 'IngestSink').\n60: \n61: - [ ] **Step 3: Implement `IngestSink`** in `sink.py`; export from `__init__.py`.\n62: \n63: - [ ] **Step 4: Run test to verify it passes**\n64: \n65: Run: `uv run --directory connectors pytest tests/test_sink.py -v`\n66: Expected: PASS (3 passed).\n67: \n68: - [ ] **Step 5: Commit**\n69: \n70: ```bash\n71: git add connectors/src/connectors/sink.py connectors/src/connectors/__init__.py connectors/tests/test_sink.py\n72: git commit -m \"feat(connectors): add in-memory ingest sink\"\n73: ```\n74: \n75: ---\n76: \n\n(End of file - total 76 lines)\n</content>",
+            "metadata": {
+              "preview": "### Task 4: In-memory ingest sink\n\n**Files:**\n- Create: `connectors/src/connectors/sink.py`\n- Modify: `connectors/src/connectors/__init__.py`\n- Test: `connectors/tests/test_sink.py`\n\n**Interfaces:**\n- Consumes: `models.IngestBatch`, `models.IngestRecord`.\n- Produces: `sink.IngestSink` with `append(batch: IngestBatch) -> None`, property `batches -> list[IngestBatch]` (returns a copy), and `dump(path: str | Path) -> None` (writes JSON array of `batch.model_dump()`).\n\n- [ ] **Step 1: Write the failing test**\n\n`connectors/tests/test_sink.py`:\n\n```python\nimport json\nfrom connectors import IngestBatch, IngestRecord, IngestSink\n\n",
+              "truncated": false,
+              "loaded": [],
+              "display": {
+                "type": "file",
+                "path": "/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-4-brief.md",
+                "text": "### Task 4: In-memory ingest sink\n\n**Files:**\n- Create: `connectors/src/connectors/sink.py`\n- Modify: `connectors/src/connectors/__init__.py`\n- Test: `connectors/tests/test_sink.py`\n\n**Interfaces:**\n- Consumes: `models.IngestBatch`, `models.IngestRecord`.\n- Produces: `sink.IngestSink` with `append(batch: IngestBatch) -> None`, property `batches -> list[IngestBatch]` (returns a copy), and `dump(path: str | Path) -> None` (writes JSON array of `batch.model_dump()`).\n\n- [ ] **Step 1: Write the failing test**\n\n`connectors/tests/test_sink.py`:\n\n```python\nimport json\nfrom connectors import IngestBatch, IngestRecord, IngestSink\n\n\ndef _batch(name: str) -> IngestBatch:\n    return IngestBatch(\n        connector_name=name,\n        records=[\n            IngestRecord(\n                id=\"1\", source_name=name, source_kind=\"mcp\",\n                item_type=\"catalog\", name=\"catalog\", content=\"{}\", raw={},\n            )\n        ],\n        errors=[],\n    )\n\n\ndef test_append_accumulates_batches():\n    sink = IngestSink()\n    sink.append(_batch(\"a\"))\n    sink.append(_batch(\"b\"))\n    assert [b.connector_name for b in sink.batches] == [\"a\", \"b\"]\n\n\ndef test_records_keep_source_identity():\n    sink = IngestSink()\n    sink.append(_batch(\"gong\"))\n    rec = sink.batches[0].records[0]\n    assert rec.source_name == \"gong\" and rec.source_kind == \"mcp\"\n\n\ndef test_dump_writes_json(tmp_path):\n    sink = IngestSink()\n    sink.append(_batch(\"a\"))\n    out = tmp_path / \"dump.json\"\n    sink.dump(out)\n    assert json.loads(out.read_text())[0][\"connector_name\"] == \"a\"\n```\n\n- [ ] **Step 2: Run test to verify it fails**\n\nRun: `uv run --directory connectors pytest tests/test_sink.py -v`\nExpected: FAIL (ImportError: cannot import name 'IngestSink').\n\n- [ ] **Step 3: Implement `IngestSink`** in `sink.py`; export from `__init__.py`.\n\n- [ ] **Step 4: Run test to verify it passes**\n\nRun: `uv run --directory connectors pytest tests/test_sink.py -v`\nExpected: PASS (3 passed).\n\n- [ ] **Step 5: Commit**\n\n```bash\ngit add connectors/src/connectors/sink.py connectors/src/connectors/__init__.py connectors/tests/test_sink.py\ngit commit -m \"feat(connectors): add in-memory ingest sink\"\n```\n\n---\n",
+                "lineStart": 1,
+                "lineEnd": 76,
+                "totalLines": 76,
+                "truncated": false
+              }
+            },
+            "title": ".worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-4-brief.md",
+            "time": {
+              "start": 1792001114104,
+              "end": 1792001114165
+            }
+          },
+          "id": "prt_13b96ff0b001ISna1eFDt2uZqU",
+          "sessionID": "ses_ec46912b5ffe460FpNsm8DQ4Hl",
+          "messageID": "msg_13b96effe001rEqTe0K1cajSNW"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-finish",
+          "tokens": {
+            "total": 16058,
+            "input": 1627,
+            "output": 86,
+            "reasoning": 9,
+            "cache": {
+              "write": 0,
+              "read": 14336
+            }
+          },
+          "cost": 0,
+          "id": "prt_13b97005c001lRqQeQmPVB0OJw",
+          "sessionID": "ses_ec46912b5ffe460FpNsm8DQ4Hl",
+          "messageID": "msg_13b96effe001rEqTe0K1cajSNW"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_13b96ed64001OLx6pBmtri7yUl",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 17092,
+          "input": 1849,
+          "output": 131,
+          "reasoning": 8,
+          "cache": {
+            "write": 0,
+            "read": 15104
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792001114265,
+          "completed": 1792001116455
+        },
+        "finish": "tool-calls",
+        "id": "msg_13b970098001f1993gN8ULYSf6",
+        "sessionID": "ses_ec46912b5ffe460FpNsm8DQ4Hl"
+      },
+      "parts": [
+        {
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-start",
+          "id": "prt_13b970767001GXGEm7glhTKDMO",
+          "sessionID": "ses_ec46912b5ffe460FpNsm8DQ4Hl",
+          "messageID": "msg_13b970098001f1993gN8ULYSf6"
+        },
+        {
+          "type": "reasoning",
+          "text": "Let me look at the existing structure.",
+          "time": {
+            "start": 1792001116050,
+            "end": 1792001116084
+          },
+          "id": "prt_13b9707920014WrOF46yvFzTvJ",
+          "sessionID": "ses_ec46912b5ffe460FpNsm8DQ4Hl",
+          "messageID": "msg_13b970098001f1993gN8ULYSf6"
+        },
+        {
+          "type": "tool",
+          "tool": "read",
+          "callID": "call_00_mfoqjcbfes49midekjhj92du",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors/src/connectors/__init__.py"
+            },
+            "output": "<path>/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors/src/connectors/__init__.py</path>\n<type>file</type>\n<content>\n1: \"\"\"Pluggable external-integration connectors for Agentic ODI (MCP client).\"\"\"\n2: \n3: from __future__ import annotations\n4: \n5: from .errors import (\n6:     ConnectorNotFoundError,\n7:     DuplicateConnectorError,\n8:     RegistryError,\n9:     UnknownConnectorKindError,\n10: )\n11: from .models import (\n12:     ConnectorConfig,\n13:     HealthStatus,\n14:     IngestBatch,\n15:     IngestRecord,\n16:     McpConnectorSettings,\n17: )\n18: from .protocol import Connector\n19: \n20: __all__ = [\n21:     \"Connector\",\n22:     \"ConnectorConfig\",\n23:     \"ConnectorNotFoundError\",\n24:     \"DuplicateConnectorError\",\n25:     \"HealthStatus\",\n26:     \"IngestBatch\",\n27:     \"IngestRecord\",\n28:     \"McpConnectorSettings\",\n29:     \"RegistryError\",\n30:     \"UnknownConnectorKindError\",\n31: ]\n\n(End of file - total 31 lines)\n</content>",
+            "metadata": {
+              "preview": "\"\"\"Pluggable external-integration connectors for Agentic ODI (MCP client).\"\"\"\n\nfrom __future__ import annotations\n\nfrom .errors import (\n    ConnectorNotFoundError,\n    DuplicateConnectorError,\n    RegistryError,\n    UnknownConnectorKindError,\n)\nfrom .models import (\n    ConnectorConfig,\n    HealthStatus,\n    IngestBatch,\n    IngestRecord,\n    McpConnectorSettings,\n)\nfrom .protocol import Connector\n\n__all__ = [",
+              "truncated": false,
+              "loaded": [],
+              "display": {
+                "type": "file",
+                "path": "/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors/src/connectors/__init__.py",
+                "text": "\"\"\"Pluggable external-integration connectors for Agentic ODI (MCP client).\"\"\"\n\nfrom __future__ import annotations\n\nfrom .errors import (\n    ConnectorNotFoundError,\n    DuplicateConnectorError,\n    RegistryError,\n    UnknownConnectorKindError,\n)\nfrom .models import (\n    ConnectorConfig,\n    HealthStatus,\n    IngestBatch,\n    IngestRecord,\n    McpConnectorSettings,\n)\nfrom .protocol import Connector\n\n__all__ = [\n    \"Connector\",\n    \"ConnectorConfig\",\n    \"ConnectorNotFoundError\",\n    \"DuplicateConnectorError\",\n    \"HealthStatus\",\n    \"IngestBatch\",\n    \"IngestRecord\",\n    \"McpConnectorSettings\",\n    \"RegistryError\",\n    \"UnknownConnectorKindError\",\n]",
+                "lineStart": 1,
+                "lineEnd": 31,
+                "totalLines": 31,
+                "truncated": false
+              }
+            },
+            "title": ".worktrees/mcp-connector-module/connectors/src/connectors/__init__.py",
+            "time": {
+              "start": 1792001116222,
+              "end": 1792001116239
+            }
+          },
+          "id": "prt_13b9707b8001GJQGkbVP02Xz3V",
+          "sessionID": "ses_ec46912b5ffe460FpNsm8DQ4Hl",
+          "messageID": "msg_13b970098001f1993gN8ULYSf6"
+        },
+        {
+          "type": "tool",
+          "tool": "read",
+          "callID": "call_01_vz0z020hc6dln5bgtrmasnpt",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors/src/connectors/models.py"
+            },
+            "output": "<path>/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors/src/connectors/models.py</path>\n<type>file</type>\n<content>\n1: \"\"\"Shared Pydantic models for connector configuration and ingest payloads.\"\"\"\n2: \n3: from __future__ import annotations\n4: \n5: from typing import Any, Literal\n6: \n7: from pydantic import BaseModel, Field\n8: \n9: from .errors import UnknownConnectorKindError\n10: \n11: \n12: class HealthStatus(BaseModel):\n13:     ok: bool\n14:     detail: str = \"\"\n15: \n16: \n17: class McpConnectorSettings(BaseModel):\n18:     url: str\n19:     tools: list[str] = Field(default_factory=list)\n20: \n21: \n22: class ConnectorConfig(BaseModel):\n23:     name: str\n24:     kind: str = \"mcp\"\n25:     enabled: bool = True\n26:     settings: dict[str, Any] = Field(default_factory=dict)\n27: \n28:     def mcp_settings(self) -> McpConnectorSettings:\n29:         if self.kind != \"mcp\":\n30:             raise UnknownConnectorKindError(name=self.kind)\n31:         return McpConnectorSettings.model_validate(self.settings)\n32: \n33: \n34: class IngestRecord(BaseModel):\n35:     id: str\n36:     source_name: str\n37:     source_kind: str\n38:     item_type: Literal[\"resource\", \"tool_result\", \"catalog\"]\n39:     name: str\n40:     content: str\n41:     raw: dict[str, Any] = Field(default_factory=dict)\n42: \n43: \n44: class IngestBatch(BaseModel):\n45:     connector_name: str\n46:     records: list[IngestRecord] = Field(default_factory=list)\n47:     errors: list[str] = Field(default_factory=list)\n\n(End of file - total 47 lines)\n</content>",
+            "metadata": {
+              "preview": "\"\"\"Shared Pydantic models for connector configuration and ingest payloads.\"\"\"\n\nfrom __future__ import annotations\n\nfrom typing import Any, Literal\n\nfrom pydantic import BaseModel, Field\n\nfrom .errors import UnknownConnectorKindError\n\n\nclass HealthStatus(BaseModel):\n    ok: bool\n    detail: str = \"\"\n\n\nclass McpConnectorSettings(BaseModel):\n    url: str\n    tools: list[str] = Field(default_factory=list)\n",
+              "truncated": false,
+              "loaded": [],
+              "display": {
+                "type": "file",
+                "path": "/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors/src/connectors/models.py",
+                "text": "\"\"\"Shared Pydantic models for connector configuration and ingest payloads.\"\"\"\n\nfrom __future__ import annotations\n\nfrom typing import Any, Literal\n\nfrom pydantic import BaseModel, Field\n\nfrom .errors import UnknownConnectorKindError\n\n\nclass HealthStatus(BaseModel):\n    ok: bool\n    detail: str = \"\"\n\n\nclass McpConnectorSettings(BaseModel):\n    url: str\n    tools: list[str] = Field(default_factory=list)\n\n\nclass ConnectorConfig(BaseModel):\n    name: str\n    kind: str = \"mcp\"\n    enabled: bool = True\n    settings: dict[str, Any] = Field(default_factory=dict)\n\n    def mcp_settings(self) -> McpConnectorSettings:\n        if self.kind != \"mcp\":\n            raise UnknownConnectorKindError(name=self.kind)\n        return McpConnectorSettings.model_validate(self.settings)\n\n\nclass IngestRecord(BaseModel):\n    id: str\n    source_name: str\n    source_kind: str\n    item_type: Literal[\"resource\", \"tool_result\", \"catalog\"]\n    name: str\n    content: str\n    raw: dict[str, Any] = Field(default_factory=dict)\n\n\nclass IngestBatch(BaseModel):\n    connector_name: str\n    records: list[IngestRecord] = Field(default_factory=list)\n    errors: list[str] = Field(default_factory=list)",
+                "lineStart": 1,
+                "lineEnd": 47,
+                "totalLines": 47,
+                "truncated": false
+              }
+            },
+            "title": ".worktrees/mcp-connector-module/connectors/src/connectors/models.py",
+            "time": {
+              "start": 1792001116308,
+              "end": 1792001116330
+            }
+          },
+          "id": "prt_13b970841001pUaRWg8O6EtmHs",
+          "sessionID": "ses_ec46912b5ffe460FpNsm8DQ4Hl",
+          "messageID": "msg_13b970098001f1993gN8ULYSf6"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-finish",
+          "tokens": {
+            "total": 17092,
+            "input": 1849,
+            "output": 131,
+            "reasoning": 8,
+            "cache": {
+              "write": 0,
+              "read": 15104
+            }
+          },
+          "cost": 0,
+          "id": "prt_13b9708f4001qtBNbJdD2KxISO",
+          "sessionID": "ses_ec46912b5ffe460FpNsm8DQ4Hl",
+          "messageID": "msg_13b970098001f1993gN8ULYSf6"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_13b96ed64001OLx6pBmtri7yUl",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 17967,
+          "input": 1993,
+          "output": 91,
+          "reasoning": 11,
+          "cache": {
+            "write": 0,
+            "read": 15872
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792001116459,
+          "completed": 1792001118744
+        },
+        "finish": "tool-calls",
+        "id": "msg_13b97092b001z6ykZLaZgPAlZC",
+        "sessionID": "ses_ec46912b5ffe460FpNsm8DQ4Hl"
+      },
+      "parts": [
+        {
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-start",
+          "id": "prt_13b970ff7001gC3lI6n03Pyw1Z",
+          "sessionID": "ses_ec46912b5ffe460FpNsm8DQ4Hl",
+          "messageID": "msg_13b97092b001z6ykZLaZgPAlZC"
+        },
+        {
+          "type": "reasoning",
+          "text": "Now let me check the tests directory and git status.",
+          "time": {
+            "start": 1792001118242,
+            "end": 1792001118291
+          },
+          "id": "prt_13b971022001PlBWVu4Xc0ci95",
+          "sessionID": "ses_ec46912b5ffe460FpNsm8DQ4Hl",
+          "messageID": "msg_13b97092b001z6ykZLaZgPAlZC"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "call_00_ic4egwqamk1w6o686fktsvcd",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "ls connectors/tests/ && git status --short && git branch --show-current",
+              "workdir": "/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module"
+            },
+            "output": "__pycache__\ntest_models.py\n?? docs/\nmcp-connector-module\n",
+            "metadata": {
+              "output": "__pycache__\ntest_models.py\n?? docs/\nmcp-connector-module\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "ls connectors/tests/ && git status --short && git branch --show-current",
+            "time": {
+              "start": 1792001118584,
+              "end": 1792001118621
+            }
+          },
+          "id": "prt_13b971057001IiUm7brTqyWMbY",
+          "sessionID": "ses_ec46912b5ffe460FpNsm8DQ4Hl",
+          "messageID": "msg_13b97092b001z6ykZLaZgPAlZC"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-finish",
+          "tokens": {
+            "total": 17967,
+            "input": 1993,
+            "output": 91,
+            "reasoning": 11,
+            "cache": {
+              "write": 0,
+              "read": 15872
+            }
+          },
+          "cost": 0,
+          "id": "prt_13b9711db001QmGCddukGgOL0d",
+          "sessionID": "ses_ec46912b5ffe460FpNsm8DQ4Hl",
+          "messageID": "msg_13b97092b001z6ykZLaZgPAlZC"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_13b96ed64001OLx6pBmtri7yUl",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 18450,
+          "input": 207,
+          "output": 362,
+          "reasoning": 89,
+          "cache": {
+            "write": 0,
+            "read": 17792
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792001118751,
+          "completed": 1792001123584
+        },
+        "finish": "tool-calls",
+        "id": "msg_13b97121f001LC37SfVynGVHTI",
+        "sessionID": "ses_ec46912b5ffe460FpNsm8DQ4Hl"
+      },
+      "parts": [
+        {
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-start",
+          "id": "prt_13b971c28001HKRyXD4g1xlfYj",
+          "sessionID": "ses_ec46912b5ffe460FpNsm8DQ4Hl",
+          "messageID": "msg_13b97121f001LC37SfVynGVHTI"
+        },
+        {
+          "type": "reasoning",
+          "text": "Let me check pyproject for ruff config and the test_models file for conventions. Actually let me just proceed.\n\nStep 1: write test. But it needs a blank line after import and formatting. Let me write the test as given, then format later. Actually let me write it already format-clean? The brief says format tool will reflow. Let me write exactly as brief to demonstrate RED, then format. Let's write.",
+          "time": {
+            "start": 1792001121383,
+            "end": 1792001122004
+          },
+          "id": "prt_13b971c67001QRDkZRWgP92pwK",
+          "sessionID": "ses_ec46912b5ffe460FpNsm8DQ4Hl",
+          "messageID": "msg_13b97121f001LC37SfVynGVHTI"
+        },
+        {
+          "type": "tool",
+          "tool": "write",
+          "callID": "call_00_y3w5c1kn6d9tvqe7jqhg8ody",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors/tests/test_sink.py",
+              "content": "import json\nfrom connectors import IngestBatch, IngestRecord, IngestSink\n\n\ndef _batch(name: str) -> IngestBatch:\n    return IngestBatch(\n        connector_name=name,\n        records=[\n            IngestRecord(\n                id=\"1\", source_name=name, source_kind=\"mcp\",\n                item_type=\"catalog\", name=\"catalog\", content=\"{}\", raw={},\n            )\n        ],\n        errors=[],\n    )\n\n\ndef test_append_accumulates_batches():\n    sink = IngestSink()\n    sink.append(_batch(\"a\"))\n    sink.append(_batch(\"b\"))\n    assert [b.connector_name for b in sink.batches] == [\"a\", \"b\"]\n\n\ndef test_records_keep_source_identity():\n    sink = IngestSink()\n    sink.append(_batch(\"gong\"))\n    rec = sink.batches[0].records[0]\n    assert rec.source_name == \"gong\" and rec.source_kind == \"mcp\"\n\n\ndef test_dump_writes_json(tmp_path):\n    sink = IngestSink()\n    sink.append(_batch(\"a\"))\n    out = tmp_path / \"dump.json\"\n    sink.dump(out)\n    assert json.loads(out.read_text())[0][\"connector_name\"] == \"a\"\n"
+            },
+            "output": "Wrote file successfully.",
+            "metadata": {
+              "diagnostics": {},
+              "filepath": "/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors/tests/test_sink.py",
+              "exists": false,
+              "truncated": false
+            },
+            "title": ".worktrees/mcp-connector-module/connectors/tests/test_sink.py",
+            "time": {
+              "start": 1792001123410,
+              "end": 1792001123434
+            }
+          },
+          "id": "prt_13b971ed7001LxpEAqX4H8lUiI",
+          "sessionID": "ses_ec46912b5ffe460FpNsm8DQ4Hl",
+          "messageID": "msg_13b97121f001LC37SfVynGVHTI"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-finish",
+          "tokens": {
+            "total": 18450,
+            "input": 207,
+            "output": 362,
+            "reasoning": 89,
+            "cache": {
+              "write": 0,
+              "read": 17792
+            }
+          },
+          "cost": 0,
+          "id": "prt_13b9724c7001t00S22qhaSGpeN",
+          "sessionID": "ses_ec46912b5ffe460FpNsm8DQ4Hl",
+          "messageID": "msg_13b97121f001LC37SfVynGVHTI"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_13b96ed64001OLx6pBmtri7yUl",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 18562,
+          "input": 546,
+          "output": 96,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 17920
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792001123591,
+          "completed": 1792001126638
+        },
+        "finish": "tool-calls",
+        "id": "msg_13b972507001JoUKs77fCLw2JX",
+        "sessionID": "ses_ec46912b5ffe460FpNsm8DQ4Hl"
+      },
+      "parts": [
+        {
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-start",
+          "id": "prt_13b972c7c001OVSWbFIK2Sb7dN",
+          "sessionID": "ses_ec46912b5ffe460FpNsm8DQ4Hl",
+          "messageID": "msg_13b972507001JoUKs77fCLw2JX"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "call_00_sec2acuv1x01nl01cvsotrnk",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "uv run --directory connectors pytest tests/test_sink.py -v 2>&1 | tail -20",
+              "workdir": "/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module"
+            },
+            "output": "configfile: pyproject.toml\nplugins: platformdirs-4.13.0, cov-7.1.0, asyncio-1.4.0, anyio-4.15.1\nasyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function\ncollecting ... collected 0 items / 1 error\n\n==================================== ERRORS ====================================\n_____________________ ERROR collecting tests/test_sink.py ______________________\nImportError while importing test module '/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors/tests/test_sink.py'.\nHint: make sure your test modules/packages have valid Python names.\nTraceback:\n/home/alexa/.local/share/uv/python/cpython-3.12.15-linux-x86_64-gnu/lib/python3.12/importlib/__init__.py:90: in import_module\n    return _bootstrap._gcd_import(name[level:], package, level)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntests/test_sink.py:2: in <module>\n    from connectors import IngestBatch, IngestRecord, IngestSink\nE   ImportError: cannot import name 'IngestSink' from 'connectors' (/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors/src/connectors/__init__.py)\n=========================== short test summary info ============================\nERROR tests/test_sink.py\n!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n=============================== 1 error in 0.22s ===============================\n",
+            "metadata": {
+              "output": "configfile: pyproject.toml\nplugins: platformdirs-4.13.0, cov-7.1.0, asyncio-1.4.0, anyio-4.15.1\nasyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function\ncollecting ... collected 0 items / 1 error\n\n==================================== ERRORS ====================================\n_____________________ ERROR collecting tests/test_sink.py ______________________\nImportError while importing test module '/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors/tests/test_sink.py'.\nHint: make sure your test modules/packages have valid Python names.\nTraceback:\n/home/alexa/.local/share/uv/python/cpython-3.12.15-linux-x86_64-gnu/lib/python3.12/importlib/__init__.py:90: in import_module\n    return _bootstrap._gcd_import(name[level:], package, level)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntests/test_sink.py:2: in <module>\n    from connectors import IngestBatch, IngestRecord, IngestSink\nE   ImportError: cannot import name 'IngestSink' from 'connectors' (/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors/src/connectors/__init__.py)\n=========================== short test summary info ============================\nERROR tests/test_sink.py\n!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n=============================== 1 error in 0.22s ===============================\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "uv run --directory connectors pytest tests/test_sink.py -v 2>&1 | tail -20",
+            "time": {
+              "start": 1792001125940,
+              "end": 1792001126561
+            }
+          },
+          "id": "prt_13b972cca001FIcUbj6ZgMZUL8",
+          "sessionID": "ses_ec46912b5ffe460FpNsm8DQ4Hl",
+          "messageID": "msg_13b972507001JoUKs77fCLw2JX"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-finish",
+          "tokens": {
+            "total": 18562,
+            "input": 546,
+            "output": 96,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 17920
+            }
+          },
+          "cost": 0,
+          "id": "prt_13b9730c2001RTz6fUoEF8fv3G",
+          "sessionID": "ses_ec46912b5ffe460FpNsm8DQ4Hl",
+          "messageID": "msg_13b972507001JoUKs77fCLw2JX"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_13b96ed64001OLx6pBmtri7yUl",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 19224,
+          "input": 2059,
+          "output": 261,
+          "reasoning": 8,
+          "cache": {
+            "write": 0,
+            "read": 16896
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792001126643,
+          "completed": 1792001129690
+        },
+        "finish": "tool-calls",
+        "id": "msg_13b9730f3001OeOWcaclCUB5ZR",
+        "sessionID": "ses_ec46912b5ffe460FpNsm8DQ4Hl"
+      },
+      "parts": [
+        {
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-start",
+          "id": "prt_13b9739d0001NcIN5FZm9LGtn2",
+          "sessionID": "ses_ec46912b5ffe460FpNsm8DQ4Hl",
+          "messageID": "msg_13b9730f3001OeOWcaclCUB5ZR"
+        },
+        {
+          "type": "reasoning",
+          "text": "RED confirmed. Now implement sink.py.",
+          "time": {
+            "start": 1792001128957,
+            "end": 1792001128982
+          },
+          "id": "prt_13b9739fd001uI6SOTT1ABq6Ne",
+          "sessionID": "ses_ec46912b5ffe460FpNsm8DQ4Hl",
+          "messageID": "msg_13b9730f3001OeOWcaclCUB5ZR"
+        },
+        {
+          "type": "text",
+          "text": "RED confirmed. Now the implementation.",
+          "time": {
+            "start": 1792001128985,
+            "end": 1792001129581
+          },
+          "id": "prt_13b973a19001MMyoUJjaOPqkul",
+          "sessionID": "ses_ec46912b5ffe460FpNsm8DQ4Hl",
+          "messageID": "msg_13b9730f3001OeOWcaclCUB5ZR"
+        },
+        {
+          "type": "tool",
+          "tool": "write",
+          "callID": "call_00_qo1det6ujyfoyzqwvz8wo98o",
+          "state": {
+            "status": "completed",
+            "input": {
+              "content": "\"\"\"In-memory ingest sink for accumulating connector batches.\"\"\"\n\nfrom __future__ import annotations\n\nimport json\nfrom pathlib import Path\n\nfrom .models import IngestBatch\n\n\nclass IngestSink:\n    \"\"\"Collects ingest batches in memory and can dump them to JSON.\"\"\"\n\n    def __init__(self) -> None:\n        self._batches: list[IngestBatch] = []\n\n    def append(self, batch: IngestBatch) -> None:\n        self._batches.append(batch)\n\n    @property\n    def batches(self) -> list[IngestBatch]:\n        return list(self._batches)\n\n    def dump(self, path: str | Path) -> None:\n        Path(path).write_text(\n            json.dumps([batch.model_dump() for batch in self._batches])\n        )\n",
+              "filePath": "/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors/src/connectors/sink.py"
+            },
+            "output": "Wrote file successfully.",
+            "metadata": {
+              "diagnostics": {},
+              "filepath": "/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors/src/connectors/sink.py",
+              "exists": false,
+              "truncated": false
+            },
+            "title": ".worktrees/mcp-connector-module/connectors/src/connectors/sink.py",
+            "time": {
+              "start": 1792001129552,
+              "end": 1792001129557
+            }
+          },
+          "id": "prt_13b973a3a001Az5aysBi8vo26G",
+          "sessionID": "ses_ec46912b5ffe460FpNsm8DQ4Hl",
+          "messageID": "msg_13b9730f3001OeOWcaclCUB5ZR"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-finish",
+          "tokens": {
+            "total": 19224,
+            "input": 2059,
+            "output": 261,
+            "reasoning": 8,
+            "cache": {
+              "write": 0,
+              "read": 16896
+            }
+          },
+          "cost": 0,
+          "id": "prt_13b973ca3001Ryy910rQO1vIEB",
+          "sessionID": "ses_ec46912b5ffe460FpNsm8DQ4Hl",
+          "messageID": "msg_13b9730f3001OeOWcaclCUB5ZR"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_13b96ed64001OLx6pBmtri7yUl",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 19378,
+          "input": 808,
+          "output": 138,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 18432
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792001129694,
+          "completed": 1792001132163
+        },
+        "finish": "tool-calls",
+        "id": "msg_13b973cde001y7gapPdb7Xs2yW",
+        "sessionID": "ses_ec46912b5ffe460FpNsm8DQ4Hl"
+      },
+      "parts": [
+        {
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-start",
+          "id": "prt_13b97437f001HDnprend9g9KfZ",
+          "sessionID": "ses_ec46912b5ffe460FpNsm8DQ4Hl",
+          "messageID": "msg_13b973cde001y7gapPdb7Xs2yW"
+        },
+        {
+          "type": "tool",
+          "tool": "edit",
+          "callID": "call_00_89q6364vng1jueq09hc3e2vj",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors/src/connectors/__init__.py",
+              "oldString": "from .protocol import Connector\n\n__all__ = [",
+              "newString": "from .protocol import Connector\nfrom .sink import IngestSink\n\n__all__ = ["
+            },
+            "output": "Edit applied successfully.",
+            "metadata": {
+              "diagnostics": {},
+              "diff": "Index: /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors/src/connectors/__init__.py\n===================================================================\n--- /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors/src/connectors/__init__.py\n+++ /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors/src/connectors/__init__.py\n@@ -15,8 +15,9 @@\n     IngestRecord,\n     McpConnectorSettings,\n )\n from .protocol import Connector\n+from .sink import IngestSink\n \n __all__ = [\n     \"Connector\",\n     \"ConnectorConfig\",\n",
+              "filediff": {
+                "file": "/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors/src/connectors/__init__.py",
+                "patch": "Index: /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors/src/connectors/__init__.py\n===================================================================\n--- /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors/src/connectors/__init__.py\n+++ /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors/src/connectors/__init__.py\n@@ -15,8 +15,9 @@\n     IngestRecord,\n     McpConnectorSettings,\n )\n from .protocol import Connector\n+from .sink import IngestSink\n \n __all__ = [\n     \"Connector\",\n     \"ConnectorConfig\",\n",
+                "additions": 1,
+                "deletions": 0
+              },
+              "truncated": false
+            },
+            "title": ".worktrees/mcp-connector-module/connectors/src/connectors/__init__.py",
+            "time": {
+              "start": 1792001132000,
+              "end": 1792001132027
+            }
+          },
+          "id": "prt_13b9743c6001osgFswXyLySllN",
+          "sessionID": "ses_ec46912b5ffe460FpNsm8DQ4Hl",
+          "messageID": "msg_13b973cde001y7gapPdb7Xs2yW"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-finish",
+          "tokens": {
+            "total": 19378,
+            "input": 808,
+            "output": 138,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 18432
+            }
+          },
+          "cost": 0,
+          "id": "prt_13b974658001ODlxdAapMKo1w4",
+          "sessionID": "ses_ec46912b5ffe460FpNsm8DQ4Hl",
+          "messageID": "msg_13b973cde001y7gapPdb7Xs2yW"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_13b96ed64001OLx6pBmtri7yUl",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 19532,
+          "input": 193,
+          "output": 139,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 19200
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792001132172,
+          "completed": 1792001134456
+        },
+        "finish": "tool-calls",
+        "id": "msg_13b97468c0010aivie8YZ1fiEK",
+        "sessionID": "ses_ec46912b5ffe460FpNsm8DQ4Hl"
+      },
+      "parts": [
+        {
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-start",
+          "id": "prt_13b974cfb001yl68Emw4cjDPrx",
+          "sessionID": "ses_ec46912b5ffe460FpNsm8DQ4Hl",
+          "messageID": "msg_13b97468c0010aivie8YZ1fiEK"
+        },
+        {
+          "type": "tool",
+          "tool": "edit",
+          "callID": "call_00_ig9cvvxao4ff84ek7wx44xqu",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors/src/connectors/__init__.py",
+              "newString": "    \"IngestRecord\",\n    \"IngestSink\",\n    \"McpConnectorSettings\",",
+              "oldString": "    \"IngestRecord\",\n    \"McpConnectorSettings\","
+            },
+            "output": "Edit applied successfully.",
+            "metadata": {
+              "diagnostics": {},
+              "diff": "Index: /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors/src/connectors/__init__.py\n===================================================================\n--- /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors/src/connectors/__init__.py\n+++ /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors/src/connectors/__init__.py\n@@ -25,8 +25,9 @@\n     \"DuplicateConnectorError\",\n     \"HealthStatus\",\n     \"IngestBatch\",\n     \"IngestRecord\",\n+    \"IngestSink\",\n     \"McpConnectorSettings\",\n     \"RegistryError\",\n     \"UnknownConnectorKindError\",\n ]\n",
+              "filediff": {
+                "file": "/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors/src/connectors/__init__.py",
+                "patch": "Index: /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors/src/connectors/__init__.py\n===================================================================\n--- /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors/src/connectors/__init__.py\n+++ /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors/src/connectors/__init__.py\n@@ -25,8 +25,9 @@\n     \"DuplicateConnectorError\",\n     \"HealthStatus\",\n     \"IngestBatch\",\n     \"IngestRecord\",\n+    \"IngestSink\",\n     \"McpConnectorSettings\",\n     \"RegistryError\",\n     \"UnknownConnectorKindError\",\n ]\n",
+                "additions": 1,
+                "deletions": 0
+              },
+              "truncated": false
+            },
+            "title": ".worktrees/mcp-connector-module/connectors/src/connectors/__init__.py",
+            "time": {
+              "start": 1792001134347,
+              "end": 1792001134359
+            }
+          },
+          "id": "prt_13b974d3c0014pSZWGbPLAlr83",
+          "sessionID": "ses_ec46912b5ffe460FpNsm8DQ4Hl",
+          "messageID": "msg_13b97468c0010aivie8YZ1fiEK"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-finish",
+          "tokens": {
+            "total": 19532,
+            "input": 193,
+            "output": 139,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 19200
+            }
+          },
+          "cost": 0,
+          "id": "prt_13b974f4e001YO1Nw55mvAppqW",
+          "sessionID": "ses_ec46912b5ffe460FpNsm8DQ4Hl",
+          "messageID": "msg_13b97468c0010aivie8YZ1fiEK"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_13b96ed64001OLx6pBmtri7yUl",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 19643,
+          "input": 219,
+          "output": 96,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 19328
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792001134461,
+          "completed": 1792001137191
+        },
+        "finish": "tool-calls",
+        "id": "msg_13b974f7d0010qyLUJa5QFdd0Q",
+        "sessionID": "ses_ec46912b5ffe460FpNsm8DQ4Hl"
+      },
+      "parts": [
+        {
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-start",
+          "id": "prt_13b97562c001wKULaTUUedUIhg",
+          "sessionID": "ses_ec46912b5ffe460FpNsm8DQ4Hl",
+          "messageID": "msg_13b974f7d0010qyLUJa5QFdd0Q"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "call_00_q3oppno8r7ggcqf65hpnxamc",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "uv run --directory connectors pytest tests/test_sink.py -v 2>&1 | tail -15",
+              "workdir": "/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module"
+            },
+            "output": "============================= test session starts ==============================\nplatform linux -- Python 3.12.15, pytest-9.1.1, pluggy-1.6.0 -- /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.venv/bin/python\ncachedir: .pytest_cache\nrootdir: /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors\nconfigfile: pyproject.toml\nplugins: platformdirs-4.13.0, cov-7.1.0, asyncio-1.4.0, anyio-4.15.1\nasyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function\ncollecting ... collected 3 items\n\ntests/test_sink.py::test_append_accumulates_batches PASSED               [ 33%]\ntests/test_sink.py::test_records_keep_source_identity PASSED             [ 66%]\ntests/test_sink.py::test_dump_writes_json PASSED                         [100%]\n\n============================== 3 passed in 0.12s ===============================\n",
+            "metadata": {
+              "output": "============================= test session starts ==============================\nplatform linux -- Python 3.12.15, pytest-9.1.1, pluggy-1.6.0 -- /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.venv/bin/python\ncachedir: .pytest_cache\nrootdir: /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors\nconfigfile: pyproject.toml\nplugins: platformdirs-4.13.0, cov-7.1.0, asyncio-1.4.0, anyio-4.15.1\nasyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function\ncollecting ... collected 3 items\n\ntests/test_sink.py::test_append_accumulates_batches PASSED               [ 33%]\ntests/test_sink.py::test_records_keep_source_identity PASSED             [ 66%]\ntests/test_sink.py::test_dump_writes_json PASSED                         [100%]\n\n============================== 3 passed in 0.12s ===============================\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "uv run --directory connectors pytest tests/test_sink.py -v 2>&1 | tail -15",
+            "time": {
+              "start": 1792001136552,
+              "end": 1792001137129
+            }
+          },
+          "id": "prt_13b975681001379SP5QaTds0mI",
+          "sessionID": "ses_ec46912b5ffe460FpNsm8DQ4Hl",
+          "messageID": "msg_13b974f7d0010qyLUJa5QFdd0Q"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-finish",
+          "tokens": {
+            "total": 19643,
+            "input": 219,
+            "output": 96,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 19328
+            }
+          },
+          "cost": 0,
+          "id": "prt_13b9759f7001dkcYVcgczxWr7j",
+          "sessionID": "ses_ec46912b5ffe460FpNsm8DQ4Hl",
+          "messageID": "msg_13b974f7d0010qyLUJa5QFdd0Q"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_13b96ed64001OLx6pBmtri7yUl",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 20051,
+          "input": 989,
+          "output": 118,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 18944
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792001137195,
+          "completed": 1792001139639
+        },
+        "finish": "tool-calls",
+        "id": "msg_13b975a2b0018tqcWaV6TfNSdl",
+        "sessionID": "ses_ec46912b5ffe460FpNsm8DQ4Hl"
+      },
+      "parts": [
+        {
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-start",
+          "id": "prt_13b9761ac001zBke68HNb0Hdde",
+          "sessionID": "ses_ec46912b5ffe460FpNsm8DQ4Hl",
+          "messageID": "msg_13b975a2b0018tqcWaV6TfNSdl"
+        },
+        {
+          "type": "text",
+          "text": "GREEN. Now format + lint.",
+          "time": {
+            "start": 1792001139165,
+            "end": 1792001139404
+          },
+          "id": "prt_13b9761dd001AYF6FmgG7v3y3L",
+          "sessionID": "ses_ec46912b5ffe460FpNsm8DQ4Hl",
+          "messageID": "msg_13b975a2b0018tqcWaV6TfNSdl"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "call_00_y06sjgmq4qv93s19odi3yw6f",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "uv run ruff format connectors/ && uv run ruff check connectors/ --fix && echo \"---CHECK---\" && uv run ruff check connectors/ && echo \"EXIT=$?\"",
+              "workdir": "/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module"
+            },
+            "output": "2 files reformatted, 5 files left unchanged\nFound 1 error (1 fixed, 0 remaining).\n---CHECK---\nAll checks passed!\nEXIT=0\n",
+            "metadata": {
+              "output": "2 files reformatted, 5 files left unchanged\nFound 1 error (1 fixed, 0 remaining).\n---CHECK---\nAll checks passed!\nEXIT=0\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "uv run ruff format connectors/ && uv run ruff check connectors/ --fix && echo \"---CHECK---\" && uv run ruff check connectors/ && echo \"EXIT=$?\"",
+            "time": {
+              "start": 1792001139398,
+              "end": 1792001139526
+            }
+          },
+          "id": "prt_13b9761e00014AZD012lE3ihJV",
+          "sessionID": "ses_ec46912b5ffe460FpNsm8DQ4Hl",
+          "messageID": "msg_13b975a2b0018tqcWaV6TfNSdl"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-finish",
+          "tokens": {
+            "total": 20051,
+            "input": 989,
+            "output": 118,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 18944
+            }
+          },
+          "cost": 0,
+          "id": "prt_13b97636f001oT6ysPOH5cBWqM",
+          "sessionID": "ses_ec46912b5ffe460FpNsm8DQ4Hl",
+          "messageID": "msg_13b975a2b0018tqcWaV6TfNSdl"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_13b96ed64001OLx6pBmtri7yUl",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 20219,
+          "input": 642,
+          "output": 101,
+          "reasoning": 20,
+          "cache": {
+            "write": 0,
+            "read": 19456
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792001139645,
+          "completed": 1792001142582
+        },
+        "finish": "tool-calls",
+        "id": "msg_13b9763bd001881XtwjdMWtese",
+        "sessionID": "ses_ec46912b5ffe460FpNsm8DQ4Hl"
+      },
+      "parts": [
+        {
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-start",
+          "id": "prt_13b976a9b0019qjDcsDlE9yLZn",
+          "sessionID": "ses_ec46912b5ffe460FpNsm8DQ4Hl",
+          "messageID": "msg_13b9763bd001881XtwjdMWtese"
+        },
+        {
+          "type": "reasoning",
+          "text": "Let me check the formatted test file and the fixed error. Also verify tests still pass after formatting.",
+          "time": {
+            "start": 1792001141434,
+            "end": 1792001141482
+          },
+          "id": "prt_13b976aba001iSVaNqVgWgxkhD",
+          "sessionID": "ses_ec46912b5ffe460FpNsm8DQ4Hl",
+          "messageID": "msg_13b9763bd001881XtwjdMWtese"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "call_00_t6yu63nvriw23mozufr4xi86",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "uv run --directory connectors pytest tests/test_sink.py -q 2>&1 | tail -4 && git diff --stat",
+              "workdir": "/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module"
+            },
+            "output": "...                                                                      [100%]\n3 passed in 0.13s\n connectors/src/connectors/__init__.py | 2 ++\n 1 file changed, 2 insertions(+)\n",
+            "metadata": {
+              "output": "...                                                                      [100%]\n3 passed in 0.13s\n connectors/src/connectors/__init__.py | 2 ++\n 1 file changed, 2 insertions(+)\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "uv run --directory connectors pytest tests/test_sink.py -q 2>&1 | tail -4 && git diff --stat",
+            "time": {
+              "start": 1792001141813,
+              "end": 1792001142450
+            }
+          },
+          "id": "prt_13b976aed001cMwE2OZ7l3cWrT",
+          "sessionID": "ses_ec46912b5ffe460FpNsm8DQ4Hl",
+          "messageID": "msg_13b9763bd001881XtwjdMWtese"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-finish",
+          "tokens": {
+            "total": 20219,
+            "input": 642,
+            "output": 101,
+            "reasoning": 20,
+            "cache": {
+              "write": 0,
+              "read": 19456
+            }
+          },
+          "cost": 0,
+          "id": "prt_13b976ee2001wQOM0bjX3XXZsl",
+          "sessionID": "ses_ec46912b5ffe460FpNsm8DQ4Hl",
+          "messageID": "msg_13b9763bd001881XtwjdMWtese"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_13b96ed64001OLx6pBmtri7yUl",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 20361,
+          "input": 177,
+          "output": 69,
+          "reasoning": 19,
+          "cache": {
+            "write": 0,
+            "read": 20096
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792001142587,
+          "completed": 1792001144918
+        },
+        "finish": "tool-calls",
+        "id": "msg_13b976f3b001xq4BRA1SuQl4Dv",
+        "sessionID": "ses_ec46912b5ffe460FpNsm8DQ4Hl"
+      },
+      "parts": [
+        {
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-start",
+          "id": "prt_13b97763e001eSQcfybGH0qIMe",
+          "sessionID": "ses_ec46912b5ffe460FpNsm8DQ4Hl",
+          "messageID": "msg_13b976f3b001xq4BRA1SuQl4Dv"
+        },
+        {
+          "type": "reasoning",
+          "text": "Let me view the formatted test to confirm the blank line was added. Let me read it.",
+          "time": {
+            "start": 1792001144439,
+            "end": 1792001144559
+          },
+          "id": "prt_13b977677001ntDZPqaGo5Y6Ef",
+          "sessionID": "ses_ec46912b5ffe460FpNsm8DQ4Hl",
+          "messageID": "msg_13b976f3b001xq4BRA1SuQl4Dv"
+        },
+        {
+          "type": "tool",
+          "tool": "read",
+          "callID": "call_00_0y3gumnbaeld3ped655deffb",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors/tests/test_sink.py"
+            },
+            "output": "<path>/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors/tests/test_sink.py</path>\n<type>file</type>\n<content>\n1: import json\n2: \n3: from connectors import IngestBatch, IngestRecord, IngestSink\n4: \n5: \n6: def _batch(name: str) -> IngestBatch:\n7:     return IngestBatch(\n8:         connector_name=name,\n9:         records=[\n10:             IngestRecord(\n11:                 id=\"1\",\n12:                 source_name=name,\n13:                 source_kind=\"mcp\",\n14:                 item_type=\"catalog\",\n15:                 name=\"catalog\",\n16:                 content=\"{}\",\n17:                 raw={},\n18:             )\n19:         ],\n20:         errors=[],\n21:     )\n22: \n23: \n24: def test_append_accumulates_batches():\n25:     sink = IngestSink()\n26:     sink.append(_batch(\"a\"))\n27:     sink.append(_batch(\"b\"))\n28:     assert [b.connector_name for b in sink.batches] == [\"a\", \"b\"]\n29: \n30: \n31: def test_records_keep_source_identity():\n32:     sink = IngestSink()\n33:     sink.append(_batch(\"gong\"))\n34:     rec = sink.batches[0].records[0]\n35:     assert rec.source_name == \"gong\" and rec.source_kind == \"mcp\"\n36: \n37: \n38: def test_dump_writes_json(tmp_path):\n39:     sink = IngestSink()\n40:     sink.append(_batch(\"a\"))\n41:     out = tmp_path / \"dump.json\"\n42:     sink.dump(out)\n43:     assert json.loads(out.read_text())[0][\"connector_name\"] == \"a\"\n\n(End of file - total 43 lines)\n</content>",
+            "metadata": {
+              "preview": "import json\n\nfrom connectors import IngestBatch, IngestRecord, IngestSink\n\n\ndef _batch(name: str) -> IngestBatch:\n    return IngestBatch(\n        connector_name=name,\n        records=[\n            IngestRecord(\n                id=\"1\",\n                source_name=name,\n                source_kind=\"mcp\",\n                item_type=\"catalog\",\n                name=\"catalog\",\n                content=\"{}\",\n                raw={},\n            )\n        ],\n        errors=[],",
+              "truncated": false,
+              "loaded": [],
+              "display": {
+                "type": "file",
+                "path": "/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors/tests/test_sink.py",
+                "text": "import json\n\nfrom connectors import IngestBatch, IngestRecord, IngestSink\n\n\ndef _batch(name: str) -> IngestBatch:\n    return IngestBatch(\n        connector_name=name,\n        records=[\n            IngestRecord(\n                id=\"1\",\n                source_name=name,\n                source_kind=\"mcp\",\n                item_type=\"catalog\",\n                name=\"catalog\",\n                content=\"{}\",\n                raw={},\n            )\n        ],\n        errors=[],\n    )\n\n\ndef test_append_accumulates_batches():\n    sink = IngestSink()\n    sink.append(_batch(\"a\"))\n    sink.append(_batch(\"b\"))\n    assert [b.connector_name for b in sink.batches] == [\"a\", \"b\"]\n\n\ndef test_records_keep_source_identity():\n    sink = IngestSink()\n    sink.append(_batch(\"gong\"))\n    rec = sink.batches[0].records[0]\n    assert rec.source_name == \"gong\" and rec.source_kind == \"mcp\"\n\n\ndef test_dump_writes_json(tmp_path):\n    sink = IngestSink()\n    sink.append(_batch(\"a\"))\n    out = tmp_path / \"dump.json\"\n    sink.dump(out)\n    assert json.loads(out.read_text())[0][\"connector_name\"] == \"a\"",
+                "lineStart": 1,
+                "lineEnd": 43,
+                "totalLines": 43,
+                "truncated": false
+              }
+            },
+            "title": ".worktrees/mcp-connector-module/connectors/tests/test_sink.py",
+            "time": {
+              "start": 1792001144808,
+              "end": 1792001144827
+            }
+          },
+          "id": "prt_13b9776f2001I3etdDQyX5lpLU",
+          "sessionID": "ses_ec46912b5ffe460FpNsm8DQ4Hl",
+          "messageID": "msg_13b976f3b001xq4BRA1SuQl4Dv"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-finish",
+          "tokens": {
+            "total": 20361,
+            "input": 177,
+            "output": 69,
+            "reasoning": 19,
+            "cache": {
+              "write": 0,
+              "read": 20096
+            }
+          },
+          "cost": 0,
+          "id": "prt_13b977831001QKgVzDUbJ7W0JH",
+          "sessionID": "ses_ec46912b5ffe460FpNsm8DQ4Hl",
+          "messageID": "msg_13b976f3b001xq4BRA1SuQl4Dv"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_13b96ed64001OLx6pBmtri7yUl",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 20983,
+          "input": 583,
+          "output": 92,
+          "reasoning": 84,
+          "cache": {
+            "write": 0,
+            "read": 20224
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792001144922,
+          "completed": 1792001147777
+        },
+        "finish": "tool-calls",
+        "id": "msg_13b97785a001dQwD3PfC3fC5A4",
+        "sessionID": "ses_ec46912b5ffe460FpNsm8DQ4Hl"
+      },
+      "parts": [
+        {
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-start",
+          "id": "prt_13b977fba001oCDm8N0q6F1253",
+          "sessionID": "ses_ec46912b5ffe460FpNsm8DQ4Hl",
+          "messageID": "msg_13b97785a001dQwD3PfC3fC5A4"
+        },
+        {
+          "type": "reasoning",
+          "text": "Wait, git diff --stat only showed __init__.py changed because sink.py and test_sink.py are untracked. Let me check git status. Also, the \"1 error fixed\" — what was it? Probably import sorting in __init__.py or test file. Let me check git diff on __init__.py. Actually the test file had E402? No. Let me run git status.",
+          "time": {
+            "start": 1792001146871,
+            "end": 1792001147367
+          },
+          "id": "prt_13b977ff7001unUPCSXtw6RliY",
+          "sessionID": "ses_ec46912b5ffe460FpNsm8DQ4Hl",
+          "messageID": "msg_13b97785a001dQwD3PfC3fC5A4"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "call_00_3qyofoz2ci4ph9xsi26tda1m",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "git status --short && git diff connectors/src/connectors/__init__.py",
+              "workdir": "/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module"
+            },
+            "output": " M connectors/src/connectors/__init__.py\n?? connectors/src/connectors/sink.py\n?? connectors/tests/test_sink.py\n?? docs/\ndiff --git a/connectors/src/connectors/__init__.py b/connectors/src/connectors/__init__.py\nindex ccfb6e8..8029107 100644\n--- a/connectors/src/connectors/__init__.py\n+++ b/connectors/src/connectors/__init__.py\n@@ -16,6 +16,7 @@ from .models import (\n     McpConnectorSettings,\n )\n from .protocol import Connector\n+from .sink import IngestSink\n \n __all__ = [\n     \"Connector\",\n@@ -25,6 +26,7 @@ __all__ = [\n     \"HealthStatus\",\n     \"IngestBatch\",\n     \"IngestRecord\",\n+    \"IngestSink\",\n     \"McpConnectorSettings\",\n     \"RegistryError\",\n     \"UnknownConnectorKindError\",\n",
+            "metadata": {
+              "output": " M connectors/src/connectors/__init__.py\n?? connectors/src/connectors/sink.py\n?? connectors/tests/test_sink.py\n?? docs/\ndiff --git a/connectors/src/connectors/__init__.py b/connectors/src/connectors/__init__.py\nindex ccfb6e8..8029107 100644\n--- a/connectors/src/connectors/__init__.py\n+++ b/connectors/src/connectors/__init__.py\n@@ -16,6 +16,7 @@ from .models import (\n     McpConnectorSettings,\n )\n from .protocol import Connector\n+from .sink import IngestSink\n \n __all__ = [\n     \"Connector\",\n@@ -25,6 +26,7 @@ __all__ = [\n     \"HealthStatus\",\n     \"IngestBatch\",\n     \"IngestRecord\",\n+    \"IngestSink\",\n     \"McpConnectorSettings\",\n     \"RegistryError\",\n     \"UnknownConnectorKindError\",\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "git status --short && git diff connectors/src/connectors/__init__.py",
+            "time": {
+              "start": 1792001147643,
+              "end": 1792001147665
+            }
+          },
+          "id": "prt_13b9781e90015g1xpgDUQpItx5",
+          "sessionID": "ses_ec46912b5ffe460FpNsm8DQ4Hl",
+          "messageID": "msg_13b97785a001dQwD3PfC3fC5A4"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-finish",
+          "tokens": {
+            "total": 20983,
+            "input": 583,
+            "output": 92,
+            "reasoning": 84,
+            "cache": {
+              "write": 0,
+              "read": 20224
+            }
+          },
+          "cost": 0,
+          "id": "prt_13b97835a0015CeIQnyoq0WMT4",
+          "sessionID": "ses_ec46912b5ffe460FpNsm8DQ4Hl",
+          "messageID": "msg_13b97785a001dQwD3PfC3fC5A4"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_13b96ed64001OLx6pBmtri7yUl",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 21450,
+          "input": 481,
+          "output": 135,
+          "reasoning": 98,
+          "cache": {
+            "write": 0,
+            "read": 20736
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792001147803,
+          "completed": 1792001203548
+        },
+        "finish": "tool-calls",
+        "id": "msg_13b97839b001WWs5Ey8jhJU38m",
+        "sessionID": "ses_ec46912b5ffe460FpNsm8DQ4Hl"
+      },
+      "parts": [
+        {
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-start",
+          "id": "prt_13b978a2e001OUn4gVhuEmOzq6",
+          "sessionID": "ses_ec46912b5ffe460FpNsm8DQ4Hl",
+          "messageID": "msg_13b97839b001WWs5Ey8jhJU38m"
+        },
+        {
+          "type": "reasoning",
+          "text": "The docs/ untracked is from a previous task, not mine. Don't add it.\n\nLet me self-review. The `batches` property returns a copy. Test doesn't verify immutability of the returned list, but requirement says copy. Good.\n\n`dump` writes JSON array. Good.\n\nConcern: `append` appends the same object reference, not a copy — but that's fine per spec.\n\nNow commit with the exact files. Let me commit.",
+          "time": {
+            "start": 1792001149555,
+            "end": 1792001150193
+          },
+          "id": "prt_13b978a7300174l4q9RldbR1Ww",
+          "sessionID": "ses_ec46912b5ffe460FpNsm8DQ4Hl",
+          "messageID": "msg_13b97839b001WWs5Ey8jhJU38m"
+        },
+        {
+          "type": "text",
+          "text": "Self-review complete. Committing.",
+          "time": {
+            "start": 1792001150203,
+            "end": 1792001150963
+          },
+          "id": "prt_13b978cfb001VIDDeYKMHsbBoA",
+          "sessionID": "ses_ec46912b5ffe460FpNsm8DQ4Hl",
+          "messageID": "msg_13b97839b001WWs5Ey8jhJU38m"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "call_00_kvbo340ehi4g6wa28976bx8p",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "git add connectors/src/connectors/sink.py connectors/src/connectors/__init__.py connectors/tests/test_sink.py && git commit -m \"feat(connectors): add in-memory ingest sink\" 2>&1 | tail -8",
+              "workdir": "/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module"
+            },
+            "output": "[mcp-connector-module c6c3a69] feat(connectors): add in-memory ingest sink\n 3 files changed, 70 insertions(+)\n create mode 100644 connectors/src/connectors/sink.py\n create mode 100644 connectors/tests/test_sink.py\n",
+            "metadata": {
+              "output": "[mcp-connector-module c6c3a69] feat(connectors): add in-memory ingest sink\n 3 files changed, 70 insertions(+)\n create mode 100644 connectors/src/connectors/sink.py\n create mode 100644 connectors/tests/test_sink.py\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "git add connectors/src/connectors/sink.py connectors/src/connectors/__init__.py connectors/tests/test_sink.py && git commit -m \"feat(connectors): add in-memory ingest sink\" 2>&1 | tail -8",
+            "time": {
+              "start": 1792001150953,
+              "end": 1792001203457
+            }
+          },
+          "id": "prt_13b978d7f001ddXTa576EPqEB2",
+          "sessionID": "ses_ec46912b5ffe460FpNsm8DQ4Hl",
+          "messageID": "msg_13b97839b001WWs5Ey8jhJU38m"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-finish",
+          "tokens": {
+            "total": 21450,
+            "input": 481,
+            "output": 135,
+            "reasoning": 98,
+            "cache": {
+              "write": 0,
+              "read": 20736
+            }
+          },
+          "cost": 0,
+          "id": "prt_13b985d35001eUsr14vcOlpeae",
+          "sessionID": "ses_ec46912b5ffe460FpNsm8DQ4Hl",
+          "messageID": "msg_13b97839b001WWs5Ey8jhJU38m"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_13b96ed64001OLx6pBmtri7yUl",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 21702,
+          "input": 406,
+          "output": 118,
+          "reasoning": 58,
+          "cache": {
+            "write": 0,
+            "read": 21120
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792001203558,
+          "completed": 1792001207355
+        },
+        "finish": "tool-calls",
+        "id": "msg_13b985d66001GA1EHX1ajMIpIr",
+        "sessionID": "ses_ec46912b5ffe460FpNsm8DQ4Hl"
+      },
+      "parts": [
+        {
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-start",
+          "id": "prt_13b98655c001wgZDZVpE92rWct",
+          "sessionID": "ses_ec46912b5ffe460FpNsm8DQ4Hl",
+          "messageID": "msg_13b985d66001GA1EHX1ajMIpIr"
+        },
+        {
+          "type": "reasoning",
+          "text": "Wait, 70 insertions for 3 files. sink.py ~25, test ~43, __init__ 2 = ~70. Good.\n\nLet me verify the commit has the Entire-Checkpoint trailer and get full SHA. Also run full connectors test suite to be safe.",
+          "time": {
+            "start": 1792001205656,
+            "end": 1792001206148
+          },
+          "id": "prt_13b986598001xv6yDbwMcSdgnj",
+          "sessionID": "ses_ec46912b5ffe460FpNsm8DQ4Hl",
+          "messageID": "msg_13b985d66001GA1EHX1ajMIpIr"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "call_00_kohd8n1x7cvc62ewuhamq7kz",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "git log -1 --format='%H%n%s%n%b' && echo \"---FULL SUITE---\" && uv run --directory connectors pytest -q 2>&1 | tail -3",
+              "workdir": "/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module"
+            },
+            "output": "c6c3a69166444fcbe6562ca356fdd576999824ac\nfeat(connectors): add in-memory ingest sink\nEntire-Checkpoint: 01M4XSF4P9XDPKSZ5S6FACYA5F\n\n---FULL SUITE---\n.......                                                                  [100%]\n7 passed in 0.15s\n",
+            "metadata": {
+              "output": "c6c3a69166444fcbe6562ca356fdd576999824ac\nfeat(connectors): add in-memory ingest sink\nEntire-Checkpoint: 01M4XSF4P9XDPKSZ5S6FACYA5F\n\n---FULL SUITE---\n.......                                                                  [100%]\n7 passed in 0.15s\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "git log -1 --format='%H%n%s%n%b' && echo \"---FULL SUITE---\" && uv run --directory connectors pytest -q 2>&1 | tail -3",
+            "time": {
+              "start": 1792001206638,
+              "end": 1792001207290
+            }
+          },
+          "id": "prt_13b98679e001NiE59pnF10oEbT",
+          "sessionID": "ses_ec46912b5ffe460FpNsm8DQ4Hl",
+          "messageID": "msg_13b985d66001GA1EHX1ajMIpIr"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-finish",
+          "tokens": {
+            "total": 21702,
+            "input": 406,
+            "output": 118,
+            "reasoning": 58,
+            "cache": {
+              "write": 0,
+              "read": 21120
+            }
+          },
+          "cost": 0,
+          "id": "prt_13b986c0e001yvpv0TXf2rI23X",
+          "sessionID": "ses_ec46912b5ffe460FpNsm8DQ4Hl",
+          "messageID": "msg_13b985d66001GA1EHX1ajMIpIr"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_13b96ed64001OLx6pBmtri7yUl",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 22778,
+          "input": 1958,
+          "output": 967,
+          "reasoning": 13,
+          "cache": {
+            "write": 0,
+            "read": 19840
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792001207361,
+          "completed": 1792001212572
+        },
+        "finish": "tool-calls",
+        "id": "msg_13b986c41001SEfJ2vohItvui8",
+        "sessionID": "ses_ec46912b5ffe460FpNsm8DQ4Hl"
+      },
+      "parts": [
+        {
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-start",
+          "id": "prt_13b9874970013xvkx73gAg5vby",
+          "sessionID": "ses_ec46912b5ffe460FpNsm8DQ4Hl",
+          "messageID": "msg_13b986c41001SEfJ2vohItvui8"
+        },
+        {
+          "type": "reasoning",
+          "text": "Now write the report. Let me write to the report path.",
+          "time": {
+            "start": 1792001209530,
+            "end": 1792001209583
+          },
+          "id": "prt_13b9874ba001R075wUqcSKwavL",
+          "sessionID": "ses_ec46912b5ffe460FpNsm8DQ4Hl",
+          "messageID": "msg_13b986c41001SEfJ2vohItvui8"
+        },
+        {
+          "type": "tool",
+          "tool": "write",
+          "callID": "call_00_0w2tcns84zsy6bzcycj28i15",
+          "state": {
+            "status": "completed",
+            "input": {
+              "content": "# Task 4 Report: In-memory ingest sink\n\n## Summary\nImplemented `IngestSink` in `connectors/src/connectors/sink.py` and re-exported it from\n`connectors/__init__.py`. Added `connectors/tests/test_sink.py` using the brief's test code.\n\n## What I implemented\n- `IngestSink`:\n  - `append(batch: IngestBatch) -> None` — accumulates batches.\n  - `batches -> list[IngestBatch]` property — returns `list(self._batches)`, a copy, so\n    callers cannot mutate internal state.\n  - `dump(path: str | Path) -> None` — writes a JSON array of `batch.model_dump()`.\n- `__init__.py`: imported `IngestSink` and added `\"IngestSink\"` to `__all__` (alphabetical\n  position between `IngestRecord` and `McpConnectorSettings`), so `from connectors import IngestSink` works.\n\n## TDD Evidence\n\n### RED\nCommand: `uv run --directory connectors pytest tests/test_sink.py -v`\nOutput (tail):\n```\ntests/test_sink.py:2: in <module>\n    from connectors import IngestBatch, IngestRecord, IngestSink\nE   ImportError: cannot import name 'IngestSink' from 'connectors' (...)\n=========================== short test summary info ============================\nERROR tests/test_sink.py\n!!!!!!!!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!!!!!!!!!\n=============================== 1 error in 0.22s ==============================\n```\n\n### GREEN\nCommand: `uv run --directory connectors pytest tests/test_sink.py -v`\nOutput (tail):\n```\ntests/test_sink.py::test_append_accumulates_batches PASSED               [ 33%]\ntests/test_sink.py::test_records_keep_source_identity PASSED             [ 66%]\ntests/test_sink.py::test_dump_writes_json PASSED                         [100%]\n============================== 3 passed in 0.12s ==============================\n```\n\nFull suite after formatting: `uv run --directory connectors pytest -q` -> `7 passed in 0.15s`.\n\n## Files changed\n- Create: `connectors/src/connectors/sink.py`\n- Modify: `connectors/src/connectors/__init__.py`\n- Create: `connectors/tests/test_sink.py`\n\n## Ruff format/check results\nRan per instructions:\n```\nuv run ruff format connectors/          # 2 files reformatted, 5 files left unchanged\nuv run ruff check connectors/ --fix     # Found 1 error (1 fixed, 0 remaining)\nuv run ruff check connectors/           # All checks passed!   EXIT=0\n```\nThe formatter reflowed the long `IngestRecord(...)` call in the test and inserted the blank\nline after `import json`. The `--fix` resolved an import-sorting issue in `__init__.py`.\nTest behavior was not changed; tests still pass.\n\n## Self-review\n- Interface matches the brief exactly: `append`, copy-returning `batches` property, `dump`.\n- `batches` returns a new list each call; verified by reading `list(self._batches)`.\n- `dump` serializes each batch with `model_dump()` (Pydantic) and writes via `Path.write_text`.\n- `from connectors import IngestSink` works (exercised by the test import).\n- Only the three intended files were staged; untracked `docs/` (from a prior task) was left alone.\n- Commit subject matches the brief.\n\n## Concerns\n- `append` stores the batch object by reference rather than a defensive copy; the brief does\n  not require copying on append, only a copy on read via `batches`. Noted for future tasks.\n- `dump` writes non-atomically and does not create parent directories; acceptable for an\n  in-memory/testing sink.\n",
+              "filePath": "/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-4-report.md"
+            },
+            "output": "Wrote file successfully.",
+            "metadata": {
+              "diagnostics": {},
+              "filepath": "/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-4-report.md",
+              "exists": false,
+              "truncated": false
+            },
+            "title": ".worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-4-report.md",
+            "time": {
+              "start": 1792001212453,
+              "end": 1792001212467
+            }
+          },
+          "id": "prt_13b9874f1001Et1PKgoHF7rFge",
+          "sessionID": "ses_ec46912b5ffe460FpNsm8DQ4Hl",
+          "messageID": "msg_13b986c41001SEfJ2vohItvui8"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-finish",
+          "tokens": {
+            "total": 22778,
+            "input": 1958,
+            "output": 967,
+            "reasoning": 13,
+            "cache": {
+              "write": 0,
+              "read": 19840
+            }
+          },
+          "cost": 0,
+          "id": "prt_13b988064001MWn90PDW5L70AJ",
+          "sessionID": "ses_ec46912b5ffe460FpNsm8DQ4Hl",
+          "messageID": "msg_13b986c41001SEfJ2vohItvui8"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_13b96ed64001OLx6pBmtri7yUl",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 22950,
+          "input": 1034,
+          "output": 156,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 21760
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792001212578,
+          "completed": 1792001214898
+        },
+        "finish": "stop",
+        "id": "msg_13b9880a2001PixHZBuGSeTnMr",
+        "sessionID": "ses_ec46912b5ffe460FpNsm8DQ4Hl"
+      },
+      "parts": [
+        {
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-start",
+          "id": "prt_13b9887630011O5CgSI9vjG9rX",
+          "sessionID": "ses_ec46912b5ffe460FpNsm8DQ4Hl",
+          "messageID": "msg_13b9880a2001PixHZBuGSeTnMr"
+        },
+        {
+          "type": "text",
+          "text": "Status: Complete.\nCommit: `c6c3a69` — feat(connectors): add in-memory ingest sink\nTests: 3/3 test_sink pass (RED ImportError -> GREEN); full connectors suite 7 passed.\nRuff: `ruff format` reformatted 2 files; `ruff check connectors/` exits 0 (All checks passed).\nConcerns: `append` stores by reference; `dump` non-atomic/no parent dir creation (per brief, acceptable).\nReport: `/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-4-report.md`",
+          "time": {
+            "start": 1792001214355,
+            "end": 1792001214772
+          },
+          "id": "prt_13b9887930015hVdzb1aiupD6W",
+          "sessionID": "ses_ec46912b5ffe460FpNsm8DQ4Hl",
+          "messageID": "msg_13b9880a2001PixHZBuGSeTnMr"
+        },
+        {
+          "reason": "stop",
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-finish",
+          "tokens": {
+            "total": 22950,
+            "input": 1034,
+            "output": 156,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 21760
+            }
+          },
+          "cost": 0,
+          "id": "prt_13b988972001enzKvSObQnS5gU",
+          "sessionID": "ses_ec46912b5ffe460FpNsm8DQ4Hl",
+          "messageID": "msg_13b9880a2001PixHZBuGSeTnMr"
+        }
+      ]
+    }
+  ]
+}
