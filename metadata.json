@@ -3,7 +3,7 @@
   "checkpoint_id": "01M4XWMK8C9DKJRNE8RJ5BAEDK",
   "strategy": "manual-commit",
   "branch": "mcp-connector-module",
-  "checkpoints_count": 2,
+  "checkpoints_count": 3,
   "files_touched": [
     "cli/pyproject.toml",
     "cli/src/cli/cli.py",
@@ -25,13 +25,20 @@
       "compact_transcript": "/1/transcript.jsonl",
       "content_hash": "/1/content_hash.txt",
       "prompt": ""
+    },
+    {
+      "metadata": "/2/metadata.json",
+      "transcript": "/2/full.jsonl",
+      "compact_transcript": "/2/transcript.jsonl",
+      "content_hash": "/2/content_hash.txt",
+      "prompt": "/2/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 7413,
+    "input_tokens": 13354,
     "cache_creation_tokens": 0,
-    "cache_read_tokens": 108800,
-    "output_tokens": 2320,
-    "api_call_count": 6
+    "cache_read_tokens": 639744,
+    "output_tokens": 4765,
+    "api_call_count": 17
   }
 }
