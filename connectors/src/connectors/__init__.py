@@ -16,6 +16,7 @@ from .models import (
     McpConnectorSettings,
 )
 from .protocol import Connector
+from .sink import IngestSink
 
 __all__ = [
     "Connector",
@@ -25,6 +26,7 @@ __all__ = [
     "HealthStatus",
     "IngestBatch",
     "IngestRecord",
+    "IngestSink",
     "McpConnectorSettings",
     "RegistryError",
     "UnknownConnectorKindError",
