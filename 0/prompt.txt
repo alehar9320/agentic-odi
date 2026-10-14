@@ -1,0 +1,45 @@
+You are a code reviewer performing a focused review of ONE task's changes in a uv-workspace Python repo. Do NOT modify any files. Produce a verdict.
+
+## Repo/worktree
+- Worktree: `/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module` (branch `mcp-connector-module`)
+- BASE (exclusive): `f0c4e3794eef178edf5d91e4ed6dd9c12da81b57`
+- HEAD (inclusive): `f110aa26d0ddab23568b572c22c080d2f8effd44`
+- Review diff (base..head, 1 commit): `/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/review-f0c4e37..f110aa2.diff`
+
+## Task under review
+Task 9: "Wire connectors into CI, make the full CI gate green, and update docs."
+- Task brief (authoritative spec for this task): `/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-9-brief.md`
+- Implementer report: `/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-9-report.md`
+- Full plan (Task 9 section): `/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/docs/superpowers/plans/2026-10-14-mcp-connector-module.md`
+
+Read the diff, the brief, the plan Task 9 section, and the report. Also read the actual post-change files in the worktree when the diff context is insufficient.
+
+## What this task must do (spec)
+Step 0 (behavior-preserving residual CI fixes):
+  (a) `connectors/src/connectors/registry.py` — fix mypy `[valid-type]` where method `list` shadows the builtin in `save`'s annotation `configs: list[ConnectorConfig]`. Must NOT rename the public `list` method. Acceptable fixes: `import builtins` + `builtins.list[...]`, or a module-level alias used consistently.
+  (b) `core/src/core/models.py` — add `# type: ignore[prop-decorator]` on each of the three `@computed_field` lines (paired with `@property`).
+  (c) `core/src/core/sqlite_repository.py` — append `# nosec B110` to the `except Exception:` line, after the existing `# noqa: BLE001`.
+Step 1 (CI): `typecheck` adds `uv run --directory connectors mypy .`; `security` adds `connectors/src` to bandit paths; `test` adds a `Pytest (connectors)` step using `--cov=connectors` and `COVERAGE_FILE=.coverage.connectors`, AND adds `${{ github.workspace }}/.coverage.connectors` to the `coverage combine` command.
+Step 2 (README): accurate package overview incl. `connectors/`; a CLI "External connectors (MCP ingest)" subsection for `agentic-odi connectors list|add mcp|health|ingest` and `--config` default `.agentic-odi/connectors.json`; testing-table rows for connectors + cli connectors tests; roadmap item; `python -m server` → `python -m mcp_server`.
+Step 3 (`.agents/rules/agent_instructions.md`): short "External connectors package" subsection; fix stale `server/src/server/server.py` path references → `mcp_server/src/mcp_server/mcp_server.py`.
+Step 3b (`.agents/workflows/dev.md`, `test.md`): replace residual `server` package references with `mcp_server`.
+
+## Critical review questions
+1. Do the Step-0 code fixes truly preserve behavior and actually resolve the mypy/bandit failures (not suppress unrelated things or hide real issues)? Is the registry fix consistent (e.g., alias applied everywhere the shadowed `list[...]` annotation appears) and does it keep the public `list` method intact?
+2. Is the CI wiring correct and self-consistent — especially: does the new coverage file name match what's passed to `coverage combine`; is the connectors pytest step wired into the same job that runs `coverage combine`; are paths correct for the repo layout?
+3. Are the docs accurate (no remaining stale `server` refs; claims match the actual code/CLI)?
+4. Any unintended file changes, leftover temp files, or scope creep beyond the 8 intended files?
+5. Does anything in the diff risk breaking one of the six packages' tests, ruff, mypy, or bandit?
+
+You may run verification commands if useful (they are fast and offline):
+- `uv run ruff check .` and `uv run ruff format --check .` (from worktree root)
+- `uv run --directory connectors mypy .`, `uv run --directory core mypy .`
+- `uv run bandit -c pyproject.toml -r connectors/src core/src ...`
+Note: `docs/` is an untracked directory holding the plan; ignore it (do not delete or modify anything).
+
+## Reporting format (return ONLY this)
+Verdict: APPROVED or CHANGES-REQUESTED
+- For each finding: severity (Critical / Important / Minor), file:line, what's wrong, why it matters, and a concrete suggested fix.
+- Separate "Minor (deferrable)" findings.
+- If APPROVED with only Minor findings, say so explicitly.
+- Do not invent issues; if the change is correct, say so plainly. Be concise.
