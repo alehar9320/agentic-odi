@@ -1,0 +1,70 @@
+You are reviewing one task's implementation: first whether it matches its requirements, then whether it is well-built. This is a task-scoped gate, not a merge review — a broad whole-branch review happens separately after all tasks are complete.
+
+## Working directory
+/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module
+
+## What Was Requested
+Read the task brief: /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-1-brief.md
+
+Global constraints from the spec/design that bind this task:
+- Each workspace package keeps its own `pyproject.toml`, `src/` layout, and `tests/`.
+- Per-package ruff `target-version = "py311"`, `line-length = 100`, lint `select = ["E4","E7","E9","F","I","UP","B","BLE"]`; mypy `python_version = "3.11"`, `ignore_missing_imports = true`.
+- This task is pure reconciliation: no changes to ODI domain logic, models, or package public APIs.
+- After the task, `uv run --directory <pkg> pytest` must work for `core`, `mcp_server`, `local_server`, `cli`, `client` using the shared workspace venv.
+- `uv lock` must produce a lockfile whose manifest includes `agentic-odi-core`, `agentic-odi-mcp-server`, `agentic-odi-local-server`.
+
+## What the Implementer Claims They Built
+Read the implementer's report: /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-1-report.md
+
+## Diff Under Review
+**Base:** ea545d1b5b119aef5206c474ebc7efb1f31b1ab7
+**Head:** e17dc6dad4276b07c13f4db4374bf7882f3fe66b
+**Diff file:** /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/review-ea545d1..e17dc6d.diff
+
+Read the diff file once — it contains the commit list, a stat summary, and the full diff with surrounding context. Do not re-run git commands. Do not crawl the broader codebase. Inspect code outside the diff only to evaluate a concrete risk you can name.
+
+Your review is read-only. Do not mutate the working tree, index, HEAD, or branch state.
+
+## You Do Not Dispatch Subagents
+Do all review yourself. Never spawn a subagent or another reviewer.
+
+## Do Not Trust the Report
+Treat the report as unverified claims. Verify against the diff. A stated rationale never downgrades a finding's severity.
+
+## Tests
+The implementer already ran the tests and reported results. Do not re-run the whole suite. Run a focused test only if reading the code raises a specific doubt no existing run answers. Warnings/noise in reported output are findings.
+
+## Part 1: Spec Compliance
+Compare the diff against the brief, file by file. Every listed file must have its corresponding hunk. In particular verify:
+- root `pyproject.toml` members now include `core`, `local_server`, `mcp_server` (and no longer a nonexistent `server`).
+- `[tool.uv.sources]` with `agentic-odi-core = { workspace = true }` present in `cli`, `mcp_server`, `local_server`.
+- `cli` depends on `agentic-odi-core`.
+- `core/tests/test_core_import.py` created.
+- `.github/workflows/ci.yml`: no remaining `--directory server`, `server/src`, `cov=server`, or `python -m server`; the test job covers core/mcp_server/local_server with matching coverage files combined.
+- `client/src/client/run.py`: `-m server` → `-m mcp_server` (and docstring updated).
+- `.github/dependabot.yml`: `/server` → `/mcp_server`.
+Flag Missing / Extra / Misunderstood. If a requirement cannot be verified from the diff, report it as a ⚠️ item.
+
+## Part 2: Code Quality
+Clean separation, proper error handling, DRY, edge cases; tests verify real behavior; each file one clear responsibility; did the change grow files unreasonably. Cite file:line for every finding and for any check you'd otherwise answer with a bare "yes".
+
+## Calibration
+Categorize by actual severity. Important = cannot be trusted until fixed. "Coverage could be broader"/polish = Minor. The brief's own mandates are not exempt: if a mandated thing is a defect, report it as Important, labeled plan-mandated. Acknowledge what was done well.
+
+## Output Format
+### Spec Compliance
+- ✅/❌ [details with file:line]
+- ⚠️ Cannot verify from diff: [items + what the controller should check]
+
+### Strengths
+### Issues
+#### Critical (Must Fix)
+#### Important (Should Fix)
+#### Minor (Nice to Have)
+For each: file:line, what's wrong, why it matters, how to fix.
+
+### Assessment
+**Task quality:** Approved | Needs fixes
+**Reasoning:** [1-2 sentences]
+
+Your final message IS the report — begin directly with the spec-compliance verdict; no preamble.
