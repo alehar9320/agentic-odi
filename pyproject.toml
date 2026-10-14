@@ -8,7 +8,7 @@ requires-python = ">=3.10"
 package = false
 
 [tool.uv.workspace]
-members = ["cli", "client", "core", "local_server", "mcp_server"]
+members = ["cli", "client", "connectors", "core", "local_server", "mcp_server"]
 
 [dependency-groups]
 dev = [
