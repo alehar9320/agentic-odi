@@ -21,11 +21,11 @@
     },
     "cost": 0,
     "tokens": {
-      "input": 167843,
-      "output": 13068,
+      "input": 173784,
+      "output": 15513,
       "reasoning": 1473,
       "cache": {
-        "read": 1895542,
+        "read": 2426486,
         "write": 0
       }
     },
@@ -38,7 +38,7 @@
     ],
     "time": {
       "created": 1792002294837,
-      "updated": 1792002768460
+      "updated": 1792003001685
     }
   },
   "messages": [
@@ -6476,6 +6476,1089 @@
           "id": "prt_13bb05156001ss05iM71KoxTRQ",
           "sessionID": "ses_ec456fbcaffezN8503uAMfBudV",
           "messageID": "msg_13bb03e4a001k6j5wPxu015pGG"
+        }
+      ]
+    },
+    {
+      "info": {
+        "role": "user",
+        "time": {
+          "created": 1792002887021
+        },
+        "agent": "general",
+        "model": {
+          "providerID": "opencode",
+          "modelID": "big-pickle"
+        },
+        "summary": {
+          "diffs": []
+        },
+        "id": "msg_13bb20d6c001EoG5HRwXasc96Z",
+        "sessionID": "ses_ec456fbcaffezN8503uAMfBudV"
+      },
+      "parts": [
+        {
+          "type": "text",
+          "text": "Review found one Important gap: two plan Review Focus behaviors are implemented but untested. Add tests only (do not change `mcp.py` unless a test exposes a real bug).\n\n## Gap 1 — resource read failure mid-ingest (Review Focus #1)\nAdd a test proving: when reading one resource raises but another resource reads fine, `ingest()` still returns a batch containing (a) the `catalog` record, (b) the successfully-read `resource` record, and (c) at least one entry in `batch.errors` naming the failing resource. The batch must NOT raise.\n\nPreferred approach: a fake client via `client_factory` (mirroring the existing `_BrokenClient` pattern in the test file) whose async context manager exposes `list_tools()`, `list_resources()`, and `read_resource(uri)` where one URI raises `RuntimeError(...)` and another returns a content block with `.text`. Use lightweight objects (e.g. `types.SimpleNamespace`) for tools/resources/blocks so it stays deterministic and network-free. If you can instead make a real in-memory `FastMCP` server raise on a resource read and get a deterministic exception, verify that empirically first; otherwise use the fake.\n\n## Gap 2 — truly empty server (Review Focus #3)\nAdd a test with an empty `FastMCP(\"empty\")` server (NO tools, NO resources). `ingest()` must produce exactly ONE `catalog` record whose `content` JSON has `\"tools\": []` and `\"resources\": []`, with `batch.errors == []`, and must not crash.\n\n## Constraints\n- Follow existing test style in `connectors/tests/test_mcp_connector.py` (module-level `_server()`/`_connector()` helpers; `@pytest.mark.asyncio`; strict asyncio mode).\n- Do NOT modify `mcp.py` unless a test reveals an actual defect; if it does, report exactly what and why.\n- Format + lint clean: `uv run ruff format connectors/ && uv run ruff check connectors/ --fix`, then confirm `uv run ruff check connectors/` exits 0.\n\n## Verify\n- `uv run --directory connectors pytest tests/test_mcp_connector.py -v` → now 7 passed\n- `uv run --directory connectors pytest -q` → full connectors suite passes (was 19)\n\n## Commit\nNew commit (do not amend) on branch `mcp-connector-module`:\n`git add connectors/tests/test_mcp_connector.py && git commit -m \"test(connectors): cover resource-read failure and empty-server ingest\"`\n\n## Do not dispatch subagents.\n\n## Report\nAppend a \"## Fix round 1\" section to:\n/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-6-report.md\nwith the commands/outputs and whether any `mcp.py` change was needed.\n\nThen reply with ONLY: Status; commit SHA + subject; test counts; ruff status; whether mcp.py changed (yes/no + why).",
+          "id": "prt_13bb20d6f001JCPYbPpaa67Fld",
+          "sessionID": "ses_ec456fbcaffezN8503uAMfBudV",
+          "messageID": "msg_13bb20d6c001EoG5HRwXasc96Z"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_13bb20d6c001EoG5HRwXasc96Z",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 46612,
+          "input": 948,
+          "output": 96,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 45568
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792002888408,
+          "completed": 1792002892757
+        },
+        "finish": "tool-calls",
+        "id": "msg_13bb212d8001sJ909n6qeCTEzU",
+        "sessionID": "ses_ec456fbcaffezN8503uAMfBudV"
+      },
+      "parts": [
+        {
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-start",
+          "id": "prt_13bb221e1001FI9G8bhrIEsQWY",
+          "sessionID": "ses_ec456fbcaffezN8503uAMfBudV",
+          "messageID": "msg_13bb212d8001sJ909n6qeCTEzU"
+        },
+        {
+          "type": "text",
+          "text": "Let me look at the existing test file and add the two tests. Let me first read the current test file.</think>",
+          "time": {
+            "start": 1792002892260,
+            "end": 1792002892649
+          },
+          "id": "prt_13bb221e40016Q6OHI70BZv92r",
+          "sessionID": "ses_ec456fbcaffezN8503uAMfBudV",
+          "messageID": "msg_13bb212d8001sJ909n6qeCTEzU"
+        },
+        {
+          "type": "tool",
+          "tool": "read",
+          "callID": "call_6b41248bc94e457e8554a84a",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors/tests/test_mcp_connector.py"
+            },
+            "output": "<path>/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors/tests/test_mcp_connector.py</path>\n<type>file</type>\n<content>\n1: import pytest\n2: from fastmcp import Client, FastMCP\n3: \n4: from connectors import ConnectorConfig, IngestSink\n5: from connectors.mcp import MCPClientConnector\n6: \n7: \n8: def _server() -> FastMCP:\n9:     server = FastMCP(\"external\")\n10: \n11:     @server.resource(\"config://greeting\")\n12:     def greeting() -> str:\n13:         return \"hello from remote\"\n14: \n15:     @server.tool\n16:     def ping() -> str:\n17:         return \"pong\"\n18: \n19:     return server\n20: \n21: \n22: def _connector(sink, tools=None, factory=None):\n23:     cfg = ConnectorConfig(\n24:         name=\"ext\",\n25:         kind=\"mcp\",\n26:         settings={\"url\": \"http://unused/mcp\", \"tools\": tools or []},\n27:     )\n28:     return MCPClientConnector(cfg, sink, client_factory=factory or (lambda: Client(_server())))\n29: \n30: \n31: @pytest.mark.asyncio\n32: async def test_health_ok_on_live_server():\n33:     status = await _connector(IngestSink()).health()\n34:     assert status.ok is True\n35:     assert \"1 tool\" in status.detail\n36: \n37: \n38: @pytest.mark.asyncio\n39: async def test_ingest_yields_catalog_resource_and_tool_records():\n40:     sink = IngestSink()\n41:     batch = await _connector(sink, tools=[\"ping\"]).ingest()\n42:     kinds = {r.item_type for r in batch.records}\n43:     assert kinds == {\"catalog\", \"resource\", \"tool_result\"}\n44:     assert any(r.content == \"hello from remote\" for r in batch.records)\n45:     assert any(r.content == \"pong\" for r in batch.records)\n46:     assert batch.errors == []\n47: \n48: \n49: @pytest.mark.asyncio\n50: async def test_ingest_with_no_tools_configured():\n51:     batch = await _connector(IngestSink()).ingest()\n52:     assert not any(r.item_type == \"tool_result\" for r in batch.records)\n53: \n54: \n55: @pytest.mark.asyncio\n56: async def test_ingest_records_unknown_tool_as_error():\n57:     batch = await _connector(IngestSink(), tools=[\"does_not_exist\"]).ingest()\n58:     assert batch.errors and any(\"does_not_exist\" in e for e in batch.errors)\n59:     assert any(r.item_type == \"catalog\" for r in batch.records)\n60: \n61: \n62: class _BrokenClient:\n63:     async def __aenter__(self):\n64:         raise TimeoutError(\"connect timed out\")\n65: \n66:     async def __aexit__(self, *exc):\n67:         return False\n68: \n69: \n70: @pytest.mark.asyncio\n71: async def test_health_fails_cleanly_on_dead_server():\n72:     status = await _connector(IngestSink(), factory=lambda: _BrokenClient()).health()\n73:     assert status.ok is False\n74:     assert \"timed out\" in status.detail\n\n(End of file - total 74 lines)\n</content>",
+            "metadata": {
+              "preview": "import pytest\nfrom fastmcp import Client, FastMCP\n\nfrom connectors import ConnectorConfig, IngestSink\nfrom connectors.mcp import MCPClientConnector\n\n\ndef _server() -> FastMCP:\n    server = FastMCP(\"external\")\n\n    @server.resource(\"config://greeting\")\n    def greeting() -> str:\n        return \"hello from remote\"\n\n    @server.tool\n    def ping() -> str:\n        return \"pong\"\n\n    return server\n",
+              "truncated": false,
+              "loaded": [],
+              "display": {
+                "type": "file",
+                "path": "/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors/tests/test_mcp_connector.py",
+                "text": "import pytest\nfrom fastmcp import Client, FastMCP\n\nfrom connectors import ConnectorConfig, IngestSink\nfrom connectors.mcp import MCPClientConnector\n\n\ndef _server() -> FastMCP:\n    server = FastMCP(\"external\")\n\n    @server.resource(\"config://greeting\")\n    def greeting() -> str:\n        return \"hello from remote\"\n\n    @server.tool\n    def ping() -> str:\n        return \"pong\"\n\n    return server\n\n\ndef _connector(sink, tools=None, factory=None):\n    cfg = ConnectorConfig(\n        name=\"ext\",\n        kind=\"mcp\",\n        settings={\"url\": \"http://unused/mcp\", \"tools\": tools or []},\n    )\n    return MCPClientConnector(cfg, sink, client_factory=factory or (lambda: Client(_server())))\n\n\n@pytest.mark.asyncio\nasync def test_health_ok_on_live_server():\n    status = await _connector(IngestSink()).health()\n    assert status.ok is True\n    assert \"1 tool\" in status.detail\n\n\n@pytest.mark.asyncio\nasync def test_ingest_yields_catalog_resource_and_tool_records():\n    sink = IngestSink()\n    batch = await _connector(sink, tools=[\"ping\"]).ingest()\n    kinds = {r.item_type for r in batch.records}\n    assert kinds == {\"catalog\", \"resource\", \"tool_result\"}\n    assert any(r.content == \"hello from remote\" for r in batch.records)\n    assert any(r.content == \"pong\" for r in batch.records)\n    assert batch.errors == []\n\n\n@pytest.mark.asyncio\nasync def test_ingest_with_no_tools_configured():\n    batch = await _connector(IngestSink()).ingest()\n    assert not any(r.item_type == \"tool_result\" for r in batch.records)\n\n\n@pytest.mark.asyncio\nasync def test_ingest_records_unknown_tool_as_error():\n    batch = await _connector(IngestSink(), tools=[\"does_not_exist\"]).ingest()\n    assert batch.errors and any(\"does_not_exist\" in e for e in batch.errors)\n    assert any(r.item_type == \"catalog\" for r in batch.records)\n\n\nclass _BrokenClient:\n    async def __aenter__(self):\n        raise TimeoutError(\"connect timed out\")\n\n    async def __aexit__(self, *exc):\n        return False\n\n\n@pytest.mark.asyncio\nasync def test_health_fails_cleanly_on_dead_server():\n    status = await _connector(IngestSink(), factory=lambda: _BrokenClient()).health()\n    assert status.ok is False\n    assert \"timed out\" in status.detail",
+                "lineStart": 1,
+                "lineEnd": 74,
+                "totalLines": 74,
+                "truncated": false
+              }
+            },
+            "title": ".worktrees/mcp-connector-module/connectors/tests/test_mcp_connector.py",
+            "time": {
+              "start": 1792002892611,
+              "end": 1792002892664
+            }
+          },
+          "id": "prt_13bb2233b0017QiukONek50R9Y",
+          "sessionID": "ses_ec456fbcaffezN8503uAMfBudV",
+          "messageID": "msg_13bb212d8001sJ909n6qeCTEzU"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-finish",
+          "tokens": {
+            "total": 46612,
+            "input": 948,
+            "output": 96,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 45568
+            }
+          },
+          "cost": 0,
+          "id": "prt_13bb2239c001E14xpOcigKOwTi",
+          "sessionID": "ses_ec456fbcaffezN8503uAMfBudV",
+          "messageID": "msg_13bb212d8001sJ909n6qeCTEzU"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_13bb20d6c001EoG5HRwXasc96Z",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 47772,
+          "input": 1122,
+          "output": 314,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 46336
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792002892769,
+          "completed": 1792002895653
+        },
+        "finish": "tool-calls",
+        "id": "msg_13bb223e1001FEbMws5ajFMv2n",
+        "sessionID": "ses_ec456fbcaffezN8503uAMfBudV"
+      },
+      "parts": [
+        {
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-start",
+          "id": "prt_13bb22700001x2WHekPCtQ4VPj",
+          "sessionID": "ses_ec456fbcaffezN8503uAMfBudV",
+          "messageID": "msg_13bb223e1001FEbMws5ajFMv2n"
+        },
+        {
+          "type": "text",
+          "text": "Let me add the two tests. I need a fake client exposing list_tools, list_resources, read_resource. Use SimpleNamespace for tools/resources/blocks.\n\nFor Gap 1: two resources, one raises. list_resources returns two items with name and uri. read_resource raises for one URI, returns list with a block (.text) for the other.\n\nFor Gap 2: empty FastMCP server — just use `Client(FastMCP(\"empty\"))`.\n\nLet me write. Need import `types`.\n\nAlso verify read_resource blocks: list of objects with `.text`. Use SimpleNamespace(text=...).\n\nLet me append tests.</think>",
+          "time": {
+            "start": 1792002893571,
+            "end": 1792002895544
+          },
+          "id": "prt_13bb22703001KuMhHJWPMHryhg",
+          "sessionID": "ses_ec456fbcaffezN8503uAMfBudV",
+          "messageID": "msg_13bb223e1001FEbMws5ajFMv2n"
+        },
+        {
+          "type": "tool",
+          "tool": "edit",
+          "callID": "call_ad9f417cf35f41d1851c430c",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors/tests/test_mcp_connector.py",
+              "oldString": "import pytest\nfrom fastmcp import Client, FastMCP\n\nfrom connectors import ConnectorConfig, IngestSink\nfrom connectors.mcp import MCPClientConnector",
+              "newString": "from types import SimpleNamespace\n\nimport pytest\nfrom fastmcp import Client, FastMCP\n\nfrom connectors import ConnectorConfig, IngestSink\nfrom connectors.mcp import MCPClientConnector"
+            },
+            "output": "Edit applied successfully.",
+            "metadata": {
+              "diagnostics": {},
+              "diff": "Index: /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors/tests/test_mcp_connector.py\n===================================================================\n--- /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors/tests/test_mcp_connector.py\n+++ /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors/tests/test_mcp_connector.py\n@@ -1,4 +1,6 @@\n+from types import SimpleNamespace\n+\n import pytest\n from fastmcp import Client, FastMCP\n \n from connectors import ConnectorConfig, IngestSink\n",
+              "filediff": {
+                "file": "/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors/tests/test_mcp_connector.py",
+                "patch": "Index: /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors/tests/test_mcp_connector.py\n===================================================================\n--- /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors/tests/test_mcp_connector.py\n+++ /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors/tests/test_mcp_connector.py\n@@ -1,4 +1,6 @@\n+from types import SimpleNamespace\n+\n import pytest\n from fastmcp import Client, FastMCP\n \n from connectors import ConnectorConfig, IngestSink\n",
+                "additions": 2,
+                "deletions": 0
+              },
+              "truncated": false
+            },
+            "title": ".worktrees/mcp-connector-module/connectors/tests/test_mcp_connector.py",
+            "time": {
+              "start": 1792002895538,
+              "end": 1792002895558
+            }
+          },
+          "id": "prt_13bb22eaa001WXT0Dc6A54jf1i",
+          "sessionID": "ses_ec456fbcaffezN8503uAMfBudV",
+          "messageID": "msg_13bb223e1001FEbMws5ajFMv2n"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-finish",
+          "tokens": {
+            "total": 47772,
+            "input": 1122,
+            "output": 314,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 46336
+            }
+          },
+          "cost": 0,
+          "id": "prt_13bb22efd001ava97toY7dTYfL",
+          "sessionID": "ses_ec456fbcaffezN8503uAMfBudV",
+          "messageID": "msg_13bb223e1001FEbMws5ajFMv2n"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_13bb20d6c001EoG5HRwXasc96Z",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 48383,
+          "input": 427,
+          "output": 596,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 47360
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792002895662,
+          "completed": 1792002901236
+        },
+        "finish": "tool-calls",
+        "id": "msg_13bb22f2e001CiyUuo6Sg21w9C",
+        "sessionID": "ses_ec456fbcaffezN8503uAMfBudV"
+      },
+      "parts": [
+        {
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-start",
+          "id": "prt_13bb23767001QBDeu8wRVRDYvL",
+          "sessionID": "ses_ec456fbcaffezN8503uAMfBudV",
+          "messageID": "msg_13bb22f2e001CiyUuo6Sg21w9C"
+        },
+        {
+          "type": "text",
+          "text": "</think>",
+          "time": {
+            "start": 1792002897770,
+            "end": 1792002901087
+          },
+          "id": "prt_13bb2376a001GO01NnGqyIvMC1",
+          "sessionID": "ses_ec456fbcaffezN8503uAMfBudV",
+          "messageID": "msg_13bb22f2e001CiyUuo6Sg21w9C"
+        },
+        {
+          "type": "tool",
+          "tool": "edit",
+          "callID": "call_4c015813286b4b34af181b38",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors/tests/test_mcp_connector.py",
+              "oldString": "@pytest.mark.asyncio\nasync def test_health_fails_cleanly_on_dead_server():\n    status = await _connector(IngestSink(), factory=lambda: _BrokenClient()).health()\n    assert status.ok is False\n    assert \"timed out\" in status.detail",
+              "newString": "@pytest.mark.asyncio\nasync def test_health_fails_cleanly_on_dead_server():\n    status = await _connector(IngestSink(), factory=lambda: _BrokenClient()).health()\n    assert status.ok is False\n    assert \"timed out\" in status.detail\n\n\nclass _PartialReadClient:\n    \"\"\"Fake client where one resource read fails and another succeeds.\"\"\"\n\n    async def __aenter__(self):\n        return self\n\n    async def __aexit__(self, *exc):\n        return False\n\n    async def list_tools(self):\n        return []\n\n    async def list_resources(self):\n        return [\n            SimpleNamespace(name=\"broken\", uri=\"config://broken\"),\n            SimpleNamespace(name=\"good\", uri=\"config://good\"),\n        ]\n\n    async def read_resource(self, uri):\n        if uri == \"config://broken\":\n            raise RuntimeError(\"resource read blew up\")\n        return [SimpleNamespace(text=\"good payload\")]\n\n\n@pytest.mark.asyncio\nasync def test_ingest_survives_resource_read_failure():\n    batch = await _connector(IngestSink(), factory=lambda: _PartialReadClient()).ingest()\n\n    kinds = [r.item_type for r in batch.records]\n    assert \"catalog\" in kinds\n    assert any(\n        r.item_type == \"resource\" and r.name == \"good\" and r.content == \"good payload\"\n        for r in batch.records\n    )\n    assert batch.errors and any(\"broken\" in e for e in batch.errors)\n\n\n@pytest.mark.asyncio\nasync def test_ingest_empty_server_yields_only_catalog():\n    batch = await _connector(\n        IngestSink(), factory=lambda: Client(FastMCP(\"empty\"))\n    ).ingest()\n\n    assert [r.item_type for r in batch.records] == [\"catalog\"]\n    catalog = batch.records[0]\n    assert catalog.content == '{\"tools\": [], \"resources\": []}'\n    assert batch.errors == []"
+            },
+            "output": "Edit applied successfully.",
+            "metadata": {
+              "diagnostics": {},
+              "diff": "Index: /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors/tests/test_mcp_connector.py\n===================================================================\n--- /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors/tests/test_mcp_connector.py\n+++ /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors/tests/test_mcp_connector.py\n@@ -73,4 +73,53 @@\n async def test_health_fails_cleanly_on_dead_server():\n     status = await _connector(IngestSink(), factory=lambda: _BrokenClient()).health()\n     assert status.ok is False\n     assert \"timed out\" in status.detail\n+\n+\n+class _PartialReadClient:\n+    \"\"\"Fake client where one resource read fails and another succeeds.\"\"\"\n+\n+    async def __aenter__(self):\n+        return self\n+\n+    async def __aexit__(self, *exc):\n+        return False\n+\n+    async def list_tools(self):\n+        return []\n+\n+    async def list_resources(self):\n+        return [\n+            SimpleNamespace(name=\"broken\", uri=\"config://broken\"),\n+            SimpleNamespace(name=\"good\", uri=\"config://good\"),\n+        ]\n+\n+    async def read_resource(self, uri):\n+        if uri == \"config://broken\":\n+            raise RuntimeError(\"resource read blew up\")\n+        return [SimpleNamespace(text=\"good payload\")]\n+\n+\n+@pytest.mark.asyncio\n+async def test_ingest_survives_resource_read_failure():\n+    batch = await _connector(IngestSink(), factory=lambda: _PartialReadClient()).ingest()\n+\n+    kinds = [r.item_type for r in batch.records]\n+    assert \"catalog\" in kinds\n+    assert any(\n+        r.item_type == \"resource\" and r.name == \"good\" and r.content == \"good payload\"\n+        for r in batch.records\n+    )\n+    assert batch.errors and any(\"broken\" in e for e in batch.errors)\n+\n+\n+@pytest.mark.asyncio\n+async def test_ingest_empty_server_yields_only_catalog():\n+    batch = await _connector(\n+        IngestSink(), factory=lambda: Client(FastMCP(\"empty\"))\n+    ).ingest()\n+\n+    assert [r.item_type for r in batch.records] == [\"catalog\"]\n+    catalog = batch.records[0]\n+    assert catalog.content == '{\"tools\": [], \"resources\": []}'\n+    assert batch.errors == []\n",
+              "filediff": {
+                "file": "/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors/tests/test_mcp_connector.py",
+                "patch": "Index: /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors/tests/test_mcp_connector.py\n===================================================================\n--- /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors/tests/test_mcp_connector.py\n+++ /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors/tests/test_mcp_connector.py\n@@ -73,4 +73,53 @@\n async def test_health_fails_cleanly_on_dead_server():\n     status = await _connector(IngestSink(), factory=lambda: _BrokenClient()).health()\n     assert status.ok is False\n     assert \"timed out\" in status.detail\n+\n+\n+class _PartialReadClient:\n+    \"\"\"Fake client where one resource read fails and another succeeds.\"\"\"\n+\n+    async def __aenter__(self):\n+        return self\n+\n+    async def __aexit__(self, *exc):\n+        return False\n+\n+    async def list_tools(self):\n+        return []\n+\n+    async def list_resources(self):\n+        return [\n+            SimpleNamespace(name=\"broken\", uri=\"config://broken\"),\n+            SimpleNamespace(name=\"good\", uri=\"config://good\"),\n+        ]\n+\n+    async def read_resource(self, uri):\n+        if uri == \"config://broken\":\n+            raise RuntimeError(\"resource read blew up\")\n+        return [SimpleNamespace(text=\"good payload\")]\n+\n+\n+@pytest.mark.asyncio\n+async def test_ingest_survives_resource_read_failure():\n+    batch = await _connector(IngestSink(), factory=lambda: _PartialReadClient()).ingest()\n+\n+    kinds = [r.item_type for r in batch.records]\n+    assert \"catalog\" in kinds\n+    assert any(\n+        r.item_type == \"resource\" and r.name == \"good\" and r.content == \"good payload\"\n+        for r in batch.records\n+    )\n+    assert batch.errors and any(\"broken\" in e for e in batch.errors)\n+\n+\n+@pytest.mark.asyncio\n+async def test_ingest_empty_server_yields_only_catalog():\n+    batch = await _connector(\n+        IngestSink(), factory=lambda: Client(FastMCP(\"empty\"))\n+    ).ingest()\n+\n+    assert [r.item_type for r in batch.records] == [\"catalog\"]\n+    catalog = batch.records[0]\n+    assert catalog.content == '{\"tools\": [], \"resources\": []}'\n+    assert batch.errors == []\n",
+                "additions": 49,
+                "deletions": 0
+              },
+              "truncated": false
+            },
+            "title": ".worktrees/mcp-connector-module/connectors/tests/test_mcp_connector.py",
+            "time": {
+              "start": 1792002901034,
+              "end": 1792002901053
+            }
+          },
+          "id": "prt_13bb24422001hVN5Q19K3PSw1w",
+          "sessionID": "ses_ec456fbcaffezN8503uAMfBudV",
+          "messageID": "msg_13bb22f2e001CiyUuo6Sg21w9C"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-finish",
+          "tokens": {
+            "total": 48383,
+            "input": 427,
+            "output": 596,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 47360
+            }
+          },
+          "cost": 0,
+          "id": "prt_13bb244b8001ezdVtMINxZIJVg",
+          "sessionID": "ses_ec456fbcaffezN8503uAMfBudV",
+          "messageID": "msg_13bb22f2e001CiyUuo6Sg21w9C"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_13bb20d6c001EoG5HRwXasc96Z",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 48531,
+          "input": 782,
+          "output": 133,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 47616
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792002901248,
+          "completed": 1792002907664
+        },
+        "finish": "tool-calls",
+        "id": "msg_13bb245000013TnVkE0muLypsk",
+        "sessionID": "ses_ec456fbcaffezN8503uAMfBudV"
+      },
+      "parts": [
+        {
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-start",
+          "id": "prt_13bb24bee0019j1t4z7f2HkE4d",
+          "sessionID": "ses_ec456fbcaffezN8503uAMfBudV",
+          "messageID": "msg_13bb245000013TnVkE0muLypsk"
+        },
+        {
+          "type": "text",
+          "text": "Wait, the catalog content JSON: `json.dumps({\"tools\": [], \"resources\": []})` yields `'{\"tools\": [], \"resources\": []}'`. Good.\n\nNow run the test file. Expect 7 passed.</think>",
+          "time": {
+            "start": 1792002903026,
+            "end": 1792002905224
+          },
+          "id": "prt_13bb24bf20014azrCkE34QCK2R",
+          "sessionID": "ses_ec456fbcaffezN8503uAMfBudV",
+          "messageID": "msg_13bb245000013TnVkE0muLypsk"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "call_20302f5eed1540b18af2a2df",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "cd /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module && uv run --directory connectors pytest tests/test_mcp_connector.py -v 2>&1 | tail -18"
+            },
+            "output": "============================= test session starts ==============================\nplatform linux -- Python 3.12.15, pytest-9.1.1, pluggy-1.6.0 -- /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.venv/bin/python\ncachedir: .pytest_cache\nrootdir: /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors\nconfigfile: pyproject.toml\nplugins: platformdirs-4.13.0, cov-7.1.0, asyncio-1.4.0, anyio-4.15.1\nasyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function\ncollecting ... collected 7 items\n\ntests/test_mcp_connector.py::test_health_ok_on_live_server PASSED        [ 14%]\ntests/test_mcp_connector.py::test_ingest_yields_catalog_resource_and_tool_records PASSED [ 28%]\ntests/test_mcp_connector.py::test_ingest_with_no_tools_configured PASSED [ 42%]\ntests/test_mcp_connector.py::test_ingest_records_unknown_tool_as_error PASSED [ 57%]\ntests/test_mcp_connector.py::test_health_fails_cleanly_on_dead_server PASSED [ 71%]\ntests/test_mcp_connector.py::test_ingest_survives_resource_read_failure PASSED [ 85%]\ntests/test_mcp_connector.py::test_ingest_empty_server_yields_only_catalog PASSED [100%]\n\n============================== 7 passed in 1.54s ===============================\n",
+            "metadata": {
+              "output": "============================= test session starts ==============================\nplatform linux -- Python 3.12.15, pytest-9.1.1, pluggy-1.6.0 -- /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.venv/bin/python\ncachedir: .pytest_cache\nrootdir: /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/connectors\nconfigfile: pyproject.toml\nplugins: platformdirs-4.13.0, cov-7.1.0, asyncio-1.4.0, anyio-4.15.1\nasyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function\ncollecting ... collected 7 items\n\ntests/test_mcp_connector.py::test_health_ok_on_live_server PASSED        [ 14%]\ntests/test_mcp_connector.py::test_ingest_yields_catalog_resource_and_tool_records PASSED [ 28%]\ntests/test_mcp_connector.py::test_ingest_with_no_tools_configured PASSED [ 42%]\ntests/test_mcp_connector.py::test_ingest_records_unknown_tool_as_error PASSED [ 57%]\ntests/test_mcp_connector.py::test_health_fails_cleanly_on_dead_server PASSED [ 71%]\ntests/test_mcp_connector.py::test_ingest_survives_resource_read_failure PASSED [ 85%]\ntests/test_mcp_connector.py::test_ingest_empty_server_yields_only_catalog PASSED [100%]\n\n============================== 7 passed in 1.54s ===============================\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "cd /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module && uv run --directory connectors pytest tests/test_mcp_connector.py -v 2>&1 | tail -18",
+            "time": {
+              "start": 1792002905184,
+              "end": 1792002907564
+            }
+          },
+          "id": "prt_13bb25457001X2P11tNGEKJjfu",
+          "sessionID": "ses_ec456fbcaffezN8503uAMfBudV",
+          "messageID": "msg_13bb245000013TnVkE0muLypsk"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-finish",
+          "tokens": {
+            "total": 48531,
+            "input": 782,
+            "output": 133,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 47616
+            }
+          },
+          "cost": 0,
+          "id": "prt_13bb25dd8001v3AVRajWg2qjUK",
+          "sessionID": "ses_ec456fbcaffezN8503uAMfBudV",
+          "messageID": "msg_13bb245000013TnVkE0muLypsk"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_13bb20d6c001EoG5HRwXasc96Z",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 49107,
+          "input": 567,
+          "output": 156,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 48384
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792002907673,
+          "completed": 1792002912704
+        },
+        "finish": "tool-calls",
+        "id": "msg_13bb25e19001jLYPgB4jkuDv83",
+        "sessionID": "ses_ec456fbcaffezN8503uAMfBudV"
+      },
+      "parts": [
+        {
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-start",
+          "id": "prt_13bb26489001OcA1n2mVILaBvx",
+          "sessionID": "ses_ec456fbcaffezN8503uAMfBudV",
+          "messageID": "msg_13bb25e19001jLYPgB4jkuDv83"
+        },
+        {
+          "type": "text",
+          "text": "7 passed. No mcp.py change needed. Now let me verify the empty server catalog content JSON formatting matches exactly. It passed, so good.\n\nLet me run full suite and format/lint.</think>",
+          "time": {
+            "start": 1792002909325,
+            "end": 1792002910197
+          },
+          "id": "prt_13bb2648d001smge303XUCpCCl",
+          "sessionID": "ses_ec456fbcaffezN8503uAMfBudV",
+          "messageID": "msg_13bb25e19001jLYPgB4jkuDv83"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "call_4c7514320c3e40d0b0817454",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "cd /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module && uv run --directory connectors ruff format src/ tests/ && uv run --directory connectors ruff check src/ tests/ --fix && uv run --directory connectors ruff check src/ tests/ && uv run --directory connectors pytest -q 2>&1 | tail -8"
+            },
+            "output": "1 file reformatted, 10 files left unchanged\nAll checks passed!\nAll checks passed!\n.....................                                                    [100%]\n21 passed in 1.52s\n",
+            "metadata": {
+              "output": "1 file reformatted, 10 files left unchanged\nAll checks passed!\nAll checks passed!\n.....................                                                    [100%]\n21 passed in 1.52s\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "cd /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module && uv run --directory connectors ruff format src/ tests/ && uv run --directory connectors ruff check src/ tests/ --fix && uv run --directory connectors ruff check src/ tests/ && uv run --directory connectors pytest -q 2>&1 | tail -8",
+            "time": {
+              "start": 1792002910150,
+              "end": 1792002912645
+            }
+          },
+          "id": "prt_13bb267bb001MlxUx5Ht4Lwpaf",
+          "sessionID": "ses_ec456fbcaffezN8503uAMfBudV",
+          "messageID": "msg_13bb25e19001jLYPgB4jkuDv83"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-finish",
+          "tokens": {
+            "total": 49107,
+            "input": 567,
+            "output": 156,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 48384
+            }
+          },
+          "cost": 0,
+          "id": "prt_13bb2719f001zcbbNeq33b76aW",
+          "sessionID": "ses_ec456fbcaffezN8503uAMfBudV",
+          "messageID": "msg_13bb25e19001jLYPgB4jkuDv83"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_13bb20d6c001EoG5HRwXasc96Z",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 49276,
+          "input": 257,
+          "output": 123,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 48896
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792002912714,
+          "completed": 1792002917803
+        },
+        "finish": "tool-calls",
+        "id": "msg_13bb271ca001yJAOyUAQAoURb1",
+        "sessionID": "ses_ec456fbcaffezN8503uAMfBudV"
+      },
+      "parts": [
+        {
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-start",
+          "id": "prt_13bb27a58001imGbpbnUH0A0nk",
+          "sessionID": "ses_ec456fbcaffezN8503uAMfBudV",
+          "messageID": "msg_13bb271ca001yJAOyUAQAoURb1"
+        },
+        {
+          "type": "text",
+          "text": "</think>Ruff reformatted the test file. Let me re-run the focused test to confirm still 7 passed after formatting.",
+          "time": {
+            "start": 1792002914908,
+            "end": 1792002915468
+          },
+          "id": "prt_13bb27a5c0019TaPyMX0XTsb7Y",
+          "sessionID": "ses_ec456fbcaffezN8503uAMfBudV",
+          "messageID": "msg_13bb271ca001yJAOyUAQAoURb1"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "call_8bd0aa5bb90c49fea9193e61",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "cd /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module && uv run --directory connectors pytest tests/test_mcp_connector.py -q 2>&1 | tail -4 && uv run --directory connectors ruff format --check src/ tests/"
+            },
+            "output": ".......                                                                  [100%]\n7 passed in 1.48s\n11 files already formatted\n",
+            "metadata": {
+              "output": ".......                                                                  [100%]\n7 passed in 1.48s\n11 files already formatted\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "cd /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module && uv run --directory connectors pytest tests/test_mcp_connector.py -q 2>&1 | tail -4 && uv run --directory connectors ruff format --check src/ tests/",
+            "time": {
+              "start": 1792002915424,
+              "end": 1792002917700
+            }
+          },
+          "id": "prt_13bb27c5a001zVLIdbZmVLWoiJ",
+          "sessionID": "ses_ec456fbcaffezN8503uAMfBudV",
+          "messageID": "msg_13bb271ca001yJAOyUAQAoURb1"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-finish",
+          "tokens": {
+            "total": 49276,
+            "input": 257,
+            "output": 123,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 48896
+            }
+          },
+          "cost": 0,
+          "id": "prt_13bb28579001I1nOGvgMFvdPFz",
+          "sessionID": "ses_ec456fbcaffezN8503uAMfBudV",
+          "messageID": "msg_13bb271ca001yJAOyUAQAoURb1"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_13bb20d6c001EoG5HRwXasc96Z",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 49411,
+          "input": 157,
+          "output": 102,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 49152
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792002917811,
+          "completed": 1792002993450
+        },
+        "finish": "tool-calls",
+        "id": "msg_13bb285b3001eBQxm6icO7dRxn",
+        "sessionID": "ses_ec456fbcaffezN8503uAMfBudV"
+      },
+      "parts": [
+        {
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-start",
+          "id": "prt_13bb28c1c001ACOdGwCOebquZv",
+          "sessionID": "ses_ec456fbcaffezN8503uAMfBudV",
+          "messageID": "msg_13bb285b3001eBQxm6icO7dRxn"
+        },
+        {
+          "type": "text",
+          "text": "</think>",
+          "time": {
+            "start": 1792002919460,
+            "end": 1792002920242
+          },
+          "id": "prt_13bb28c24001Rk8jqeXEWVnEoF",
+          "sessionID": "ses_ec456fbcaffezN8503uAMfBudV",
+          "messageID": "msg_13bb285b3001eBQxm6icO7dRxn"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "call_04e3fb3b6088437ca3549437",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "cd /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module && git add connectors/tests/test_mcp_connector.py && git commit -m \"test(connectors): cover resource-read failure and empty-server ingest\" 2>&1 | tail -6"
+            },
+            "output": "[mcp-connector-module 7f1410c] test(connectors): cover resource-read failure and empty-server ingest\n 1 file changed, 49 insertions(+)\n",
+            "metadata": {
+              "output": "[mcp-connector-module 7f1410c] test(connectors): cover resource-read failure and empty-server ingest\n 1 file changed, 49 insertions(+)\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "cd /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module && git add connectors/tests/test_mcp_connector.py && git commit -m \"test(connectors): cover resource-read failure and empty-server ingest\" 2>&1 | tail -6",
+            "time": {
+              "start": 1792002920222,
+              "end": 1792002993304
+            }
+          },
+          "id": "prt_13bb28f0a0011baj5E5T7lbR2M",
+          "sessionID": "ses_ec456fbcaffezN8503uAMfBudV",
+          "messageID": "msg_13bb285b3001eBQxm6icO7dRxn"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-finish",
+          "tokens": {
+            "total": 49411,
+            "input": 157,
+            "output": 102,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 49152
+            }
+          },
+          "cost": 0,
+          "id": "prt_13bb3acfe0018Pu4QXvFfdyKDy",
+          "sessionID": "ses_ec456fbcaffezN8503uAMfBudV",
+          "messageID": "msg_13bb285b3001eBQxm6icO7dRxn"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_13bb20d6c001EoG5HRwXasc96Z",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 49544,
+          "input": 310,
+          "output": 82,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 49152
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792002993473,
+          "completed": 1792002994805
+        },
+        "finish": "tool-calls",
+        "id": "msg_13bb3ad410012MHZBqpwVnLflf",
+        "sessionID": "ses_ec456fbcaffezN8503uAMfBudV"
+      },
+      "parts": [
+        {
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-start",
+          "id": "prt_13bb3b05b001Hrkf4cUgd0QARo",
+          "sessionID": "ses_ec456fbcaffezN8503uAMfBudV",
+          "messageID": "msg_13bb3ad410012MHZBqpwVnLflf"
+        },
+        {
+          "type": "text",
+          "text": "</think>",
+          "time": {
+            "start": 1792002994272,
+            "end": 1792002994698
+          },
+          "id": "prt_13bb3b060001A5gROINpd4QTt3",
+          "sessionID": "ses_ec456fbcaffezN8503uAMfBudV",
+          "messageID": "msg_13bb3ad410012MHZBqpwVnLflf"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "call_c06b797c362a4eb8a5dd9798",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "cd /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module && git log -1 --format='%H%n%s' && git status --short connectors/"
+            },
+            "output": "7f1410c80023415e05915c66ea2d90295cd6b31d\ntest(connectors): cover resource-read failure and empty-server ingest\n",
+            "metadata": {
+              "output": "7f1410c80023415e05915c66ea2d90295cd6b31d\ntest(connectors): cover resource-read failure and empty-server ingest\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "cd /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module && git log -1 --format='%H%n%s' && git status --short connectors/",
+            "time": {
+              "start": 1792002994661,
+              "end": 1792002994679
+            }
+          },
+          "id": "prt_13bb3b1db001FXchlYBbjfcd1h",
+          "sessionID": "ses_ec456fbcaffezN8503uAMfBudV",
+          "messageID": "msg_13bb3ad410012MHZBqpwVnLflf"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-finish",
+          "tokens": {
+            "total": 49544,
+            "input": 310,
+            "output": 82,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 49152
+            }
+          },
+          "cost": 0,
+          "id": "prt_13bb3b24d001ac0iRiwHAfyUXf",
+          "sessionID": "ses_ec456fbcaffezN8503uAMfBudV",
+          "messageID": "msg_13bb3ad410012MHZBqpwVnLflf"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_13bb20d6c001EoG5HRwXasc96Z",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 49690,
+          "input": 186,
+          "output": 96,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 49408
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792002994816,
+          "completed": 1792002996062
+        },
+        "finish": "tool-calls",
+        "id": "msg_13bb3b280001gqUyR8VMnQbeAH",
+        "sessionID": "ses_ec456fbcaffezN8503uAMfBudV"
+      },
+      "parts": [
+        {
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-start",
+          "id": "prt_13bb3b532001QmiYBoAUK8DqJN",
+          "sessionID": "ses_ec456fbcaffezN8503uAMfBudV",
+          "messageID": "msg_13bb3b280001gqUyR8VMnQbeAH"
+        },
+        {
+          "type": "text",
+          "text": "</think>Now append the fix round report.",
+          "time": {
+            "start": 1792002995509,
+            "end": 1792002995968
+          },
+          "id": "prt_13bb3b535001PPoXaeH1BnOdmX",
+          "sessionID": "ses_ec456fbcaffezN8503uAMfBudV",
+          "messageID": "msg_13bb3b280001gqUyR8VMnQbeAH"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "call_2f693423a05346e59f6436ac",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "cd /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module && tail -5 .superpowers/sdd/2026-10-14-mcp-connector-module/task-6-report.md"
+            },
+            "output": "  so no connectors mypy is expected this task.\n- `_tool_result_text` falls back to per-block `.data`/`str(block)` when a content\n  block has no `.text`, before falling back to `result.data`. This is a superset of\n  the brief's \"concatenated `.text`, else `str(result.data)`\" and is exercised only\n  by non-text blocks.\n",
+            "metadata": {
+              "output": "  so no connectors mypy is expected this task.\n- `_tool_result_text` falls back to per-block `.data`/`str(block)` when a content\n  block has no `.text`, before falling back to `result.data`. This is a superset of\n  the brief's \"concatenated `.text`, else `str(result.data)`\" and is exercised only\n  by non-text blocks.\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "cd /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module && tail -5 .superpowers/sdd/2026-10-14-mcp-connector-module/task-6-report.md",
+            "time": {
+              "start": 1792002995955,
+              "end": 1792002995974
+            }
+          },
+          "id": "prt_13bb3b6eb001F8eniTIqmgm83q",
+          "sessionID": "ses_ec456fbcaffezN8503uAMfBudV",
+          "messageID": "msg_13bb3b280001gqUyR8VMnQbeAH"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-finish",
+          "tokens": {
+            "total": 49690,
+            "input": 186,
+            "output": 96,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 49408
+            }
+          },
+          "cost": 0,
+          "id": "prt_13bb3b740001nhP163oZiWIGZz",
+          "sessionID": "ses_ec456fbcaffezN8503uAMfBudV",
+          "messageID": "msg_13bb3b280001gqUyR8VMnQbeAH"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_13bb20d6c001EoG5HRwXasc96Z",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 50454,
+          "input": 381,
+          "output": 665,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 49408
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792002996092,
+          "completed": 1792003001677
+        },
+        "finish": "tool-calls",
+        "id": "msg_13bb3b77c001Tz64p9X1JQTmxL",
+        "sessionID": "ses_ec456fbcaffezN8503uAMfBudV"
+      },
+      "parts": [
+        {
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-start",
+          "id": "prt_13bb3ba52001BeqcWFUmf6S9wm",
+          "sessionID": "ses_ec456fbcaffezN8503uAMfBudV",
+          "messageID": "msg_13bb3b77c001Tz64p9X1JQTmxL"
+        },
+        {
+          "type": "text",
+          "text": "</think>",
+          "time": {
+            "start": 1792002996821,
+            "end": 1792003001587
+          },
+          "id": "prt_13bb3ba55001PUZ0pAZ3A135WU",
+          "sessionID": "ses_ec456fbcaffezN8503uAMfBudV",
+          "messageID": "msg_13bb3b77c001Tz64p9X1JQTmxL"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "call_7b50797aa3384d42a30c99b5",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "cat >> /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-6-report.md << 'EOF'\n\n## Fix round 1\nAdded two tests (tests only; `mcp.py` unchanged) to cover two previously untested\nReview Focus behaviors.\n\n### Gap 1 — resource read failure mid-ingest\nAdded `_PartialReadClient` (mirrors the existing `_BrokenClient` fake) exposing\n`list_tools()`/`list_resources()` via `types.SimpleNamespace` items and a\n`read_resource(uri)` that raises `RuntimeError(\"resource read blew up\")` for\n`config://broken` and returns `[SimpleNamespace(text=\"good payload\")]` for\n`config://good`. New test `test_ingest_survives_resource_read_failure` asserts the\nbatch (does not raise) contains the `catalog` record, the successful `good`\n`resource` record, and an error entry naming `broken`.\n\n### Gap 2 — truly empty server\nNew test `test_ingest_empty_server_yields_only_catalog` uses an empty\n`Client(FastMCP(\"empty\"))` (no tools, no resources) and asserts exactly one\n`catalog` record with `content == '{\"tools\": [], \"resources\": []}'` and\n`batch.errors == []`.\n\n### Commands / outputs\n```\n$ uv run --directory connectors pytest tests/test_mcp_connector.py -v\ncollected 7 items\n... test_health_ok_on_live_server PASSED\n... test_ingest_yields_catalog_resource_and_tool_records PASSED\n... test_ingest_with_no_tools_configured PASSED\n... test_ingest_records_unknown_tool_as_error PASSED\n... test_health_fails_cleanly_on_dead_server PASSED\n... test_ingest_survives_resource_read_failure PASSED\n... test_ingest_empty_server_yields_only_catalog PASSED\n============================== 7 passed in 1.54s ===============================\n\n$ uv run --directory connectors pytest -q\n.....................                                                    [100%]\n21 passed in 1.52s\n\n$ uv run --directory connectors ruff format src/ tests/\n1 file reformatted, 10 files left unchanged\n$ uv run --directory connectors ruff check src/ tests/ --fix\nAll checks passed!\n$ uv run --directory connectors ruff check src/ tests/\nAll checks passed!\n$ uv run --directory connectors ruff format --check src/ tests/\n11 files already formatted\n```\n\n### mcp.py change needed?\nNo. Both tests passed against the existing implementation on the first run, so no\n`mcp.py` change was required (the per-resource `except Exception` path and the\nempty-server catalog path were already correct).\nEOF\n"
+            },
+            "output": "(no output)",
+            "metadata": {
+              "output": "(no output)",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "cat >> /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-6-report.md << 'EOF'\n\n## Fix round 1\nAdded two tests (tests only; `mcp.py` unchanged) to cover two previously untested\nReview Focus behaviors.\n\n### Gap 1 — resource read failure mid-ingest\nAdded `_PartialReadClient` (mirrors the existing `_BrokenClient` fake) exposing\n`list_tools()`/`list_resources()` via `types.SimpleNamespace` items and a\n`read_resource(uri)` that raises `RuntimeError(\"resource read blew up\")` for\n`config://broken` and returns `[SimpleNamespace(text=\"good payload\")]` for\n`config://good`. New test `test_ingest_survives_resource_read_failure` asserts the\nbatch (does not raise) contains the `catalog` record, the successful `good`\n`resource` record, and an error entry naming `broken`.\n\n### Gap 2 — truly empty server\nNew test `test_ingest_empty_server_yields_only_catalog` uses an empty\n`Client(FastMCP(\"empty\"))` (no tools, no resources) and asserts exactly one\n`catalog` record with `content == '{\"tools\": [], \"resources\": []}'` and\n`batch.errors == []`.\n\n### Commands / outputs\n```\n$ uv run --directory connectors pytest tests/test_mcp_connector.py -v\ncollected 7 items\n... test_health_ok_on_live_server PASSED\n... test_ingest_yields_catalog_resource_and_tool_records PASSED\n... test_ingest_with_no_tools_configured PASSED\n... test_ingest_records_unknown_tool_as_error PASSED\n... test_health_fails_cleanly_on_dead_server PASSED\n... test_ingest_survives_resource_read_failure PASSED\n... test_ingest_empty_server_yields_only_catalog PASSED\n============================== 7 passed in 1.54s ===============================\n\n$ uv run --directory connectors pytest -q\n.....................                                                    [100%]\n21 passed in 1.52s\n\n$ uv run --directory connectors ruff format src/ tests/\n1 file reformatted, 10 files left unchanged\n$ uv run --directory connectors ruff check src/ tests/ --fix\nAll checks passed!\n$ uv run --directory connectors ruff check src/ tests/\nAll checks passed!\n$ uv run --directory connectors ruff format --check src/ tests/\n11 files already formatted\n```\n\n### mcp.py change needed?\nNo. Both tests passed against the existing implementation on the first run, so no\n`mcp.py` change was required (the per-resource `except Exception` path and the\nempty-server catalog path were already correct).\nEOF\n",
+            "time": {
+              "start": 1792003001580,
+              "end": 1792003001605
+            }
+          },
+          "id": "prt_13bb3cce5001Ko0Lk5UAPkKpaU",
+          "sessionID": "ses_ec456fbcaffezN8503uAMfBudV",
+          "messageID": "msg_13bb3b77c001Tz64p9X1JQTmxL"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-finish",
+          "tokens": {
+            "total": 50454,
+            "input": 381,
+            "output": 665,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 49408
+            }
+          },
+          "cost": 0,
+          "id": "prt_13bb3cd290011o9uTy6kF5Kh7U",
+          "sessionID": "ses_ec456fbcaffezN8503uAMfBudV",
+          "messageID": "msg_13bb3b77c001Tz64p9X1JQTmxL"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_13bb20d6c001EoG5HRwXasc96Z",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 50550,
+          "input": 804,
+          "output": 82,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 49664
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792003001684,
+          "completed": 1792003006800
+        },
+        "finish": "stop",
+        "id": "msg_13bb3cd54001c1T5LrLjY55nyL",
+        "sessionID": "ses_ec456fbcaffezN8503uAMfBudV"
+      },
+      "parts": [
+        {
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-start",
+          "id": "prt_13bb3dd68001axjzfs5a9RMzqE",
+          "sessionID": "ses_ec456fbcaffezN8503uAMfBudV",
+          "messageID": "msg_13bb3cd54001c1T5LrLjY55nyL"
+        },
+        {
+          "type": "text",
+          "text": "</think>Status: Complete.\nCommit: `7f1410c` — test(connectors): cover resource-read failure and empty-server ingest\nTests: 7 passed in test_mcp_connector.py; full suite 21 passed.\nRuff: format/check clean (11 files formatted, all checks passed).\nmcp.py changed: No — both new tests passed against the existing implementation.",
+          "time": {
+            "start": 1792003005803,
+            "end": 1792003006742
+          },
+          "id": "prt_13bb3dd6b001eXRkBNNdtwRNcD",
+          "sessionID": "ses_ec456fbcaffezN8503uAMfBudV",
+          "messageID": "msg_13bb3cd54001c1T5LrLjY55nyL"
+        },
+        {
+          "reason": "stop",
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-finish",
+          "tokens": {
+            "total": 50550,
+            "input": 804,
+            "output": 82,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 49664
+            }
+          },
+          "cost": 0,
+          "id": "prt_13bb3e137001SpMbXKFceVdrOa",
+          "sessionID": "ses_ec456fbcaffezN8503uAMfBudV",
+          "messageID": "msg_13bb3cd54001c1T5LrLjY55nyL"
         }
       ]
     }
