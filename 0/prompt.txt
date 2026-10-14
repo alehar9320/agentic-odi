@@ -1,0 +1,64 @@
+You are reviewing one task's implementation: first whether it matches its requirements, then whether it is well-built. Task-scoped gate, not a merge review.
+
+## Working directory
+/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module
+
+## What Was Requested
+Read the task brief: /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-3-brief.md
+
+Global constraints that bind this task:
+- Each workspace package keeps its own `pyproject.toml`, `src/` layout, and `tests/`.
+- Per-package ruff `target-version = "py311"`, `line-length = 100`, lint `select = ["E4","E7","E9","F","I","UP","B","BLE"]`; mypy `python_version = "3.11"`, `ignore_missing_imports = true`.
+- The connectors package's own modules must lint clean under that select set.
+
+Ambiguity resolution applied by the orchestrator (the brief's error-hierarchy phrasing was ambiguous): `RegistryError(Exception)` is the base; `UnknownConnectorKindError`, `DuplicateConnectorError`, and `ConnectorNotFoundError` all subclass `RegistryError`. `UnknownConnectorKindError` takes `name: str` and its message names the offending kind + known kinds.
+
+## What the Implementer Claims They Built
+Read the implementer's report: /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-3-report.md
+
+## Diff Under Review
+**Base:** 5b190137b222d02d01b8758225120f2171427e46
+**Head:** a66137c65eb1f8e6499caf00b1fc0b3ca9e830a7
+**Diff file:** /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/review-5b19013..a66137c.diff
+
+Read the diff file once (commit list, stat summary, full diff with context). Do not re-run git commands or crawl the codebase. Read-only review: do not mutate the working tree, index, HEAD, or branch state.
+
+## You Do Not Dispatch Subagents
+Do all review yourself.
+
+## Do Not Trust the Report
+Verify claims against the diff. In particular, confirm the TDD sequence is credible and that the test file matches the brief's test code.
+
+## Tests
+The implementer already ran the verification. Do not re-run the pytest suite. IMPORTANT: run this one command because the plan requires the connectors package to lint clean and the implementer flagged a possible issue:
+  `cd /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module && uv run ruff check connectors/ --output-format=concise`
+Report exactly what it prints (exit code + any violations). Do not attempt to fix anything.
+
+## Part 1: Spec Compliance
+Verify file by file against the brief:
+- `errors.py`: RegistryError base + three subclasses per the ambiguity resolution; `UnknownConnectorKindError.name`; message contains offending kind.
+- `models.py`: HealthStatus, McpConnectorSettings(url, tools=[]), ConnectorConfig(name, kind="mcp", enabled=True, settings={}) with `mcp_settings()` raising UnknownConnectorKindError when kind != "mcp"; IngestRecord with item_type Literal["resource","tool_result","catalog"]; IngestBatch.
+- `protocol.py`: `@runtime_checkable` Protocol `Connector` with `kind: str`, `name: str`, async `health`/`ingest` stubs.
+- `__init__.py`: re-exports public names (test imports `ConnectorConfig`, `McpConnectorSettings` from `connectors`).
+- `connectors/tests/test_models.py`: matches the brief's test verbatim (or note deviations).
+Flag Missing / Extra / Misunderstood. Report ⚠️ for anything unverifiable from the diff.
+
+## Part 2: Code Quality
+Correctness, structure, one responsibility per file, typing. Cite file:line. Explicitly assess whether connectors lint is clean per the command above.
+
+## Calibration
+Actual severity. Minor = polish. Acknowledge what's done well.
+
+## Output Format
+### Spec Compliance
+- ✅/❌ [file:line]
+- ⚠️ Cannot verify: [...]
+### Strengths
+### Issues
+#### Critical / Important / Minor
+(file:line, what's wrong, why, how to fix)
+### Assessment
+**Task quality:** Approved | Needs fixes
+**Reasoning:** [1-2 sentences]
+
+Your final message IS the report — begin with the spec-compliance verdict; no preamble.
