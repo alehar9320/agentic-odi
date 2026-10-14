@@ -174,7 +174,7 @@ Update `README.md` whenever any of the following change:
 - **Tool Creation**: 
   - Register tools on the server using the `@mcp.tool` decorator.
   - **CRITICAL**: Provide comprehensive docstrings and strict Python type hints for every tool parameter. Explain exactly what the tool does and what data it expects, as this metadata is fed directly to the LLM for tool discovery.
-  - **Capability Synchronization**: Whenever you add, modify, or remove an MCP tool in `server/src/server/server.py`, you **MUST** simultaneously update the `get_capabilities` tool's human-readable return string to ensure the capability set exactly matches the code.
+  - **Capability Synchronization**: Whenever you add, modify, or remove an MCP tool in `mcp_server/src/mcp_server/mcp_server.py`, you **MUST** simultaneously update the `get_capabilities` tool's human-readable return string to ensure the capability set exactly matches the code.
 
 ### 2. Async / Client Practices
 - Use `asyncio` for client execution and IO-bound tool operations.
@@ -191,7 +191,7 @@ Update `README.md` whenever any of the following change:
 ### 5. Testing Strategy (FastMCP)
 - **First-Class Documentation**: Treat tests as living documentation that demonstrate how features work while protecting against regressions.
 - **Speed & Isolation**: Tests must be fast (< 1s) and self-contained. Use `@pytest.mark.integration` or `@pytest.mark.client_process` for slower, integration, or resource-dependent tests.
-- **Structure**: This repo is a uv workspace. Mirror each project's code structure in its own `tests/` directory (e.g., `server/src/server/server.py` -> `server/tests/test_server_tools.py`).
+- **Structure**: This repo is a uv workspace. Mirror each project's code structure in its own `tests/` directory (e.g., `mcp_server/src/mcp_server/mcp_server.py` -> `mcp_server/tests/test_server_tools.py`).
 - **Atomic Tests**: Each test must verify exactly one specific behavior with clear intent in test names and assertions. Avoid multi-behavior tests.
 - **In-Memory Testing (Preferred)**: Favor testing functionality deterministically by passing the `FastMCP` server directly into the `Client(server)` instance. This runs in-memory without network overhead for deterministic and lightning-fast execution.
 - **Transport Testing (When Needed)**: For HTTP/SSE network transport tests, prefer the isolated in-process `fastmcp.utilities.tests.run_server_async(server)` context manager over subprocess testing (which uses `run_server_in_process` and is slower to debug).

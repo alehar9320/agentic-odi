@@ -18,9 +18,11 @@ This repository serves as an initial sandbox for understanding server-client MCP
 
 ### Code Overview
 
-This repository is a [uv workspace](https://docs.astral.sh/uv/concepts/projects/workspaces/) made up of three installable projects, each with its own `pyproject.toml`, `src/` layout, and tests:
+This repository is a [uv workspace](https://docs.astral.sh/uv/concepts/projects/workspaces/) made up of five installable projects, each with its own `pyproject.toml`, `src/` layout, and tests:
 
-- **`server/`** (`agentic-odi-server`): A foundational MCP Server exposing an HTTP transport layer. It hosts tools for Jobs, Steps, Desired Outcomes, and Customer Outcomes (linking customer value to business value) with ODI opportunity-score computation.
+- **`core/`** (`agentic-odi-core`): Domain models, the `ODIService` business-logic layer, and repository implementations (in-memory and SQLite), including ODI opportunity-score computation.
+- **`mcp_server/`** (`agentic-odi-mcp-server`): A foundational MCP Server exposing an HTTP transport layer. It hosts tools for Jobs, Steps, Desired Outcomes, and Customer Outcomes (linking customer value to business value).
+- **`local_server/`** (`agentic-odi-local-server`): A local FastAPI server that talks to the repository directly (no MCP transport).
 - **`client/`** (`agentic-odi-client`): A Python-based agent client that communicates with the MCP server, executing tool calls over the active connection. It also hosts `run.py`, the local dev launcher that starts the server and the Streamlit UI together.
 - **`cli/`** (`agentic-odi-cli`): A [`Typer`](https://github.com/fastapi/typer)-based command-line interface. It provides a non-MCP entry point for interacting with Agentic ODI, initially exposing `--version` and `--help`, and will grow to cover dataset operations.
 
@@ -28,13 +30,13 @@ This repository is a [uv workspace](https://docs.astral.sh/uv/concepts/projects/
 
 ### Prerequisites
 
-Python 3.10+ and [`uv`](https://docs.astral.sh/uv/). Install the whole workspace (all three projects plus dev tooling):
+Python 3.10+ and [`uv`](https://docs.astral.sh/uv/). Install the whole workspace (all five projects plus dev tooling):
 
 ```bash
 uv sync --all-packages
 ```
 
-This creates a `.venv` and installs `agentic-odi-server`, `agentic-odi-client`, and `agentic-odi-cli` in editable mode.
+This creates a `.venv` and installs `agentic-odi-core`, `agentic-odi-mcp-server`, `agentic-odi-local-server`, `agentic-odi-client`, and `agentic-odi-cli` in editable mode.
 
 ### Running the Environment
 
@@ -54,7 +56,7 @@ A console script is also installed, so `agentic-odi --version` works the same wa
 
 #### Manage Customer Outcomes
 
-Manage Customer Outcomes (linking customer value to business value) via the CLI. The CLI acts as an MCP client, so the server must be running (`python -m server`):
+Manage Customer Outcomes (linking customer value to business value) via the CLI. The CLI acts as an MCP client, so the server must be running (`python -m mcp_server`):
 
 ```bash
 # Add a Customer Outcome
@@ -96,7 +98,7 @@ Open two terminals and run each process separately:
 
 ```bash
 # Terminal 1 — MCP server
-python -m server
+python -m mcp_server
 
 # Terminal 2 — Streamlit chat UI
 streamlit run client/src/client/app.py
@@ -172,7 +174,9 @@ Type `/dev` in the AI assistant to trigger the full automated workflow: it will 
 Tests use **pytest** with **pytest-asyncio** (strict mode) and run entirely in-memory — no running server required. Each project owns its tests. CI runs the suite on Python **3.10, 3.11, and 3.12** and stores a coverage report as a build artifact:
 
 ```bash
-uv run --directory server pytest
+uv run --directory core pytest
+uv run --directory mcp_server pytest
+uv run --directory local_server pytest
 uv run --directory client pytest
 uv run --directory cli pytest
 ```
@@ -191,15 +195,19 @@ uv run ruff check .
 uv run ruff format --check .
 
 # Type checking (run per project so each project's config applies)
-uv run --directory server mypy .
+uv run --directory core mypy .
+uv run --directory mcp_server mypy .
+uv run --directory local_server mypy .
 uv run --directory client mypy .
 uv run --directory cli mypy .
 
 # Security scanning
-uv run bandit -c pyproject.toml -r cli/src client/src server/src
+uv run bandit -c pyproject.toml -r core/src mcp_server/src local_server/src cli/src client/src
 
 # Tests (same as CI)
-uv run --directory server pytest
+uv run --directory core pytest
+uv run --directory mcp_server pytest
+uv run --directory local_server pytest
 uv run --directory client pytest
 uv run --directory cli pytest
 ```
@@ -234,10 +242,13 @@ pre-commit run --all-files
 
 | File | What it covers |
 |---|---|
-| `server/tests/test_odi.py` | Full ODI workflow (add job → steps → outcomes → retrieval) + capabilities tool |
-| `server/tests/test_customer_outcomes.py` | Customer Outcomes CRUD, filtering, computed opportunity scores, and tool validation |
-| `server/tests/test_server_tools.py` | Error handling and retrieval for the MCP tools |
-| `server/tests/test_tools.py` | Tool response-shape contract for `add_job` |
+| `core/tests/test_models.py` | Domain models and ODI opportunity-score computation |
+| `core/tests/test_service.py` | `ODIService` jobs/steps/outcomes and Customer Outcome CRUD |
+| `mcp_server/tests/test_odi.py` | Full ODI workflow (add job → steps → outcomes → retrieval) + capabilities tool |
+| `mcp_server/tests/test_customer_outcomes.py` | Customer Outcomes CRUD, filtering, computed opportunity scores, and tool validation |
+| `mcp_server/tests/test_server_tools.py` | Error handling and retrieval for the MCP tools |
+| `mcp_server/tests/test_tools.py` | Tool response-shape contract for `add_job` |
+| `local_server/tests/test_api.py` | Local FastAPI health endpoint |
 | `client/tests/test_run.py` | Dev launcher helpers (port checks) |
 | `cli/tests/test_cli.py` | CLI `--version` and `--help` behavior |
 | `cli/tests/test_outcomes_cli.py` | Customer Outcomes CLI subcommands with MCP stub |

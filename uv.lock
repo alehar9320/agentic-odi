@@ -20,6 +20,9 @@ members = [
     "agentic-odi",
     "agentic-odi-cli",
     "agentic-odi-client",
+    "agentic-odi-core",
+    "agentic-odi-local-server",
+    "agentic-odi-mcp-server",
 ]
 
 [[package]]
@@ -54,12 +57,14 @@ name = "agentic-odi-cli"
 version = "0.1.0"
 source = { editable = "cli" }
 dependencies = [
+    { name = "agentic-odi-core" },
     { name = "fastmcp" },
     { name = "typer" },
 ]
 
 [package.metadata]
 requires-dist = [
+    { name = "agentic-odi-core", editable = "core" },
     { name = "fastmcp" },
     { name = "typer" },
 ]
@@ -79,6 +84,51 @@ requires-dist = [
     { name = "fastmcp" },
     { name = "openai" },
     { name = "streamlit" },
+]
+
+[[package]]
+name = "agentic-odi-core"
+version = "0.1.0"
+source = { editable = "core" }
+dependencies = [
+    { name = "pydantic" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "pydantic" }]
+
+[[package]]
+name = "agentic-odi-local-server"
+version = "0.1.0"
+source = { editable = "local_server" }
+dependencies = [
+    { name = "agentic-odi-core" },
+    { name = "fastapi" },
+    { name = "uvicorn" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "agentic-odi-core", editable = "core" },
+    { name = "fastapi" },
+    { name = "uvicorn" },
+]
+
+[[package]]
+name = "agentic-odi-mcp-server"
+version = "0.1.0"
+source = { editable = "mcp_server" }
+dependencies = [
+    { name = "agentic-odi-core" },
+    { name = "fastmcp" },
+    { name = "pydantic" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "agentic-odi-core", editable = "core" },
+    { name = "fastmcp" },
+    { name = "pydantic" },
 ]
 
 [[package]]
@@ -1047,6 +1097,23 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/50/79/66800aadf48771f6b62f7eb014e352e5d06856655206165d775e675a02c9/exceptiongroup-1.3.1.tar.gz", hash = "sha256:8b412432c6055b0b7d14c310000ae93352ed6754f70fa8f7c34141f91c4e3219", size = 30371, upload-time = "2025-11-21T23:01:54.787Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/8a/0e/97c33bf5009bdbac74fd2beace167cab3f978feb69cc36f1ef79360d6c4e/exceptiongroup-1.3.1-py3-none-any.whl", hash = "sha256:a7a39a3bd276781e98394987d3a5701d0c4edffb633bb7a5144577f82c773598", size = 16740, upload-time = "2025-11-21T23:01:53.443Z" },
+]
+
+[[package]]
+name = "fastapi"
+version = "0.143.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "annotated-doc" },
+    { name = "opentelemetry-api" },
+    { name = "pydantic" },
+    { name = "starlette" },
+    { name = "typing-extensions" },
+    { name = "typing-inspection" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/96/16/52ca959230f9820660fd822f488f883d7dc42310716b4cc6d2a944835dcd/fastapi-0.143.1.tar.gz", hash = "sha256:4cafaab64df8534758bf0fce61947f5e27e6cd512798ccbbaad5425086c3b664", size = 469025, upload-time = "2026-10-14T12:53:09.448Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/ca/73/30ee3dd8f26fd385e451bbded9e1b54766a277db588e70154dd894f4b698/fastapi-0.143.1-py3-none-any.whl", hash = "sha256:687beb445804e4c4dbe2a76fd83c25e9b973ac48c267defb86f791e099baecc4", size = 144682, upload-time = "2026-10-14T12:53:07.69Z" },
 ]
 
 [[package]]

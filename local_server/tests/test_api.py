@@ -1,6 +1,6 @@
+from core.repository import InMemoryRepository
 from fastapi.testclient import TestClient
 
-from core.repository import InMemoryRepository
 from local_server.app import create_app
 
 
