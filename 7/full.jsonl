@@ -1,0 +1,354 @@
+{
+  "info": {
+    "id": "ses_ec46dd290ffesSUCeuq6xmGxaL",
+    "slug": "nimble-forest",
+    "projectID": "e4fe19106d06261ebfed21a0e3ba06559abf1100",
+    "directory": "/home/alexa/repos/agentic-odi",
+    "path": "",
+    "parentID": "ses_ec492423bffeG7aFTE5YTPUIJO",
+    "title": "Review Task 3 (spec + quality) (@general subagent)",
+    "agent": "general",
+    "model": {
+      "id": "big-pickle",
+      "providerID": "opencode",
+      "variant": "default"
+    },
+    "version": "1.18.35",
+    "summary": {
+      "additions": 0,
+      "deletions": 0,
+      "files": 0
+    },
+    "cost": 0,
+    "tokens": {
+      "input": 7632,
+      "output": 1367,
+      "reasoning": 2931,
+      "cache": {
+        "read": 30208,
+        "write": 0
+      }
+    },
+    "permission": [
+      {
+        "permission": "task",
+        "pattern": "*",
+        "action": "deny"
+      }
+    ],
+    "time": {
+      "created": 1792000798063,
+      "updated": 1792000802305
+    }
+  },
+  "messages": [
+    {
+      "info": {
+        "role": "user",
+        "time": {
+          "created": 1792000798100
+        },
+        "agent": "general",
+        "model": {
+          "providerID": "opencode",
+          "modelID": "big-pickle"
+        },
+        "summary": {
+          "diffs": []
+        },
+        "id": "msg_13b922d89001b6Gukrr4XB2VYb",
+        "sessionID": "ses_ec46dd290ffesSUCeuq6xmGxaL"
+      },
+      "parts": [
+        {
+          "type": "text",
+          "text": "You are reviewing one task's implementation: first whether it matches its requirements, then whether it is well-built. Task-scoped gate, not a merge review.\n\n## Working directory\n/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module\n\n## What Was Requested\nRead the task brief: /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-3-brief.md\n\nGlobal constraints that bind this task:\n- Each workspace package keeps its own `pyproject.toml`, `src/` layout, and `tests/`.\n- Per-package ruff `target-version = \"py311\"`, `line-length = 100`, lint `select = [\"E4\",\"E7\",\"E9\",\"F\",\"I\",\"UP\",\"B\",\"BLE\"]`; mypy `python_version = \"3.11\"`, `ignore_missing_imports = true`.\n- The connectors package's own modules must lint clean under that select set.\n\nAmbiguity resolution applied by the orchestrator (the brief's error-hierarchy phrasing was ambiguous): `RegistryError(Exception)` is the base; `UnknownConnectorKindError`, `DuplicateConnectorError`, and `ConnectorNotFoundError` all subclass `RegistryError`. `UnknownConnectorKindError` takes `name: str` and its message names the offending kind + known kinds.\n\n## What the Implementer Claims They Built\nRead the implementer's report: /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-3-report.md\n\n## Diff Under Review\n**Base:** 5b190137b222d02d01b8758225120f2171427e46\n**Head:** a66137c65eb1f8e6499caf00b1fc0b3ca9e830a7\n**Diff file:** /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/review-5b19013..a66137c.diff\n\nRead the diff file once (commit list, stat summary, full diff with context). Do not re-run git commands or crawl the codebase. Read-only review: do not mutate the working tree, index, HEAD, or branch state.\n\n## You Do Not Dispatch Subagents\nDo all review yourself.\n\n## Do Not Trust the Report\nVerify claims against the diff. In particular, confirm the TDD sequence is credible and that the test file matches the brief's test code.\n\n## Tests\nThe implementer already ran the verification. Do not re-run the pytest suite. IMPORTANT: run this one command because the plan requires the connectors package to lint clean and the implementer flagged a possible issue:\n  `cd /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module && uv run ruff check connectors/ --output-format=concise`\nReport exactly what it prints (exit code + any violations). Do not attempt to fix anything.\n\n## Part 1: Spec Compliance\nVerify file by file against the brief:\n- `errors.py`: RegistryError base + three subclasses per the ambiguity resolution; `UnknownConnectorKindError.name`; message contains offending kind.\n- `models.py`: HealthStatus, McpConnectorSettings(url, tools=[]), ConnectorConfig(name, kind=\"mcp\", enabled=True, settings={}) with `mcp_settings()` raising UnknownConnectorKindError when kind != \"mcp\"; IngestRecord with item_type Literal[\"resource\",\"tool_result\",\"catalog\"]; IngestBatch.\n- `protocol.py`: `@runtime_checkable` Protocol `Connector` with `kind: str`, `name: str`, async `health`/`ingest` stubs.\n- `__init__.py`: re-exports public names (test imports `ConnectorConfig`, `McpConnectorSettings` from `connectors`).\n- `connectors/tests/test_models.py`: matches the brief's test verbatim (or note deviations).\nFlag Missing / Extra / Misunderstood. Report ⚠️ for anything unverifiable from the diff.\n\n## Part 2: Code Quality\nCorrectness, structure, one responsibility per file, typing. Cite file:line. Explicitly assess whether connectors lint is clean per the command above.\n\n## Calibration\nActual severity. Minor = polish. Acknowledge what's done well.\n\n## Output Format\n### Spec Compliance\n- ✅/❌ [file:line]\n- ⚠️ Cannot verify: [...]\n### Strengths\n### Issues\n#### Critical / Important / Minor\n(file:line, what's wrong, why, how to fix)\n### Assessment\n**Task quality:** Approved | Needs fixes\n**Reasoning:** [1-2 sentences]\n\nYour final message IS the report — begin with the spec-compliance verdict; no preamble.",
+          "id": "prt_13b922da8001H57QkWGns7rBfX",
+          "sessionID": "ses_ec46dd290ffesSUCeuq6xmGxaL",
+          "messageID": "msg_13b922d89001b6Gukrr4XB2VYb"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_13b922d89001b6Gukrr4XB2VYb",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 16642,
+          "input": 1145,
+          "output": 355,
+          "reasoning": 38,
+          "cache": {
+            "write": 0,
+            "read": 15104
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792000798832,
+          "completed": 1792000802296
+        },
+        "finish": "tool-calls",
+        "id": "msg_13b923070001cryzXy2d7B0j8P",
+        "sessionID": "ses_ec46dd290ffesSUCeuq6xmGxaL"
+      },
+      "parts": [
+        {
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-start",
+          "id": "prt_13b923819001vEqb3pzLpQuy0V",
+          "sessionID": "ses_ec46dd290ffesSUCeuq6xmGxaL",
+          "messageID": "msg_13b923070001cryzXy2d7B0j8P"
+        },
+        {
+          "type": "reasoning",
+          "text": "Let me start by reading the required files. I'll read the task brief, the implementer's report, and the diff file, plus run the lint command. Let me batch these.",
+          "time": {
+            "start": 1792000800849,
+            "end": 1792000800952
+          },
+          "id": "prt_13b923851001OiYuDuRnVw72RT",
+          "sessionID": "ses_ec46dd290ffesSUCeuq6xmGxaL",
+          "messageID": "msg_13b923070001cryzXy2d7B0j8P"
+        },
+        {
+          "type": "tool",
+          "tool": "read",
+          "callID": "call_00_7gpft9djdat7nzlbbie52570",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-3-brief.md"
+            },
+            "output": "<path>/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-3-brief.md</path>\n<type>file</type>\n<content>\n1: ### Task 3: Shared models, `Connector` protocol, and errors\n2: \n3: **Files:**\n4: - Create: `connectors/src/connectors/errors.py`\n5: - Create: `connectors/src/connectors/models.py`\n6: - Create: `connectors/src/connectors/protocol.py`\n7: - Modify: `connectors/src/connectors/__init__.py`\n8: - Test: `connectors/tests/test_models.py`\n9: \n10: **Interfaces:**\n11: - Produces:\n12:   - `errors.UnknownConnectorKindError`, `errors.DuplicateConnectorError`, `errors.ConnectorNotFoundError`, `errors.RegistryError` (base `Exception` subclass for the latter three; `UnknownConnectorKindError.name: str`).\n13:   - `models.HealthStatus(ok: bool, detail: str = \"\")`\n14:   - `models.McpConnectorSettings(url: str, tools: list[str] = [])`\n15:   - `models.ConnectorConfig(name: str, kind: str = \"mcp\", enabled: bool = True, settings: dict[str, Any] = {})` with method `mcp_settings() -> McpConnectorSettings` (raises `UnknownConnectorKindError` when `kind != \"mcp\"`).\n16:   - `models.IngestRecord(id: str, source_name: str, source_kind: str, item_type: Literal[\"resource\",\"tool_result\",\"catalog\"], name: str, content: str, raw: dict[str, Any] = {})`\n17:   - `models.IngestBatch(connector_name: str, records: list[IngestRecord] = [], errors: list[str] = [])`\n18:   - `protocol.Connector` — a `@runtime_checkable` `Protocol` with attrs `kind: str`, `name: str` and async methods `health(self) -> HealthStatus`, `ingest(self) -> IngestBatch`.\n19: - `__init__.py` re-exports the above.\n20: \n21: - [ ] **Step 1: Write the failing test**\n22: \n23: `connectors/tests/test_models.py`:\n24: \n25: ```python\n26: import pytest\n27: from connectors import ConnectorConfig, McpConnectorSettings\n28: from connectors.errors import UnknownConnectorKindError\n29: \n30: \n31: def test_mcp_settings_parse_url_and_tools():\n32:     s = McpConnectorSettings.model_validate({\"url\": \"http://h/mcp\", \"tools\": [\"a\"]})\n33:     assert s.url == \"http://h/mcp\" and s.tools == [\"a\"]\n34: \n35: \n36: def test_mcp_settings_default_tools_empty():\n37:     assert McpConnectorSettings(url=\"http://h/mcp\").tools == []\n38: \n39: \n40: def test_mcp_settings_returns_typed_settings():\n41:     cfg = ConnectorConfig(name=\"x\", kind=\"mcp\", settings={\"url\": \"http://h/mcp\"})\n42:     assert cfg.mcp_settings().url == \"http://h/mcp\"\n43: \n44: \n45: def test_unknown_kind_raises_clear_error():\n46:     cfg = ConnectorConfig(name=\"x\", kind=\"rest\", settings={})\n47:     with pytest.raises(UnknownConnectorKindError) as ei:\n48:         cfg.mcp_settings()\n49:     assert \"rest\" in str(ei.value)\n50: ```\n51: \n52: - [ ] **Step 2: Run test to verify it fails**\n53: \n54: Run: `uv run --directory connectors pytest tests/test_models.py -v`\n55: Expected: FAIL (ImportError: cannot import name 'ConnectorConfig').\n56: \n57: - [ ] **Step 3: Implement `errors.py`, `models.py`, `protocol.py`, exports**\n58: \n59: Use `pydantic.BaseModel`; `mcp_settings()` dispatches on `self.kind`; `UnknownConnectorKindError` message names the offending kind and the known kinds. `Connector` is a `typing.Protocol` decorated `@runtime_checkable` with `async def` stubs (`...`). Re-export all public names from `__init__.py`.\n60: \n61: - [ ] **Step 4: Run test to verify it passes**\n62: \n63: Run: `uv run --directory connectors pytest tests/test_models.py -v`\n64: Expected: PASS (4 passed).\n65: \n66: - [ ] **Step 5: Commit**\n67: \n68: ```bash\n69: git add connectors/src/connectors connectors/tests/test_models.py\n70: git commit -m \"feat(connectors): add shared models, Connector protocol, and errors\"\n71: ```\n72: \n73: ---\n74: \n\n(End of file - total 74 lines)\n</content>",
+            "metadata": {
+              "preview": "### Task 3: Shared models, `Connector` protocol, and errors\n\n**Files:**\n- Create: `connectors/src/connectors/errors.py`\n- Create: `connectors/src/connectors/models.py`\n- Create: `connectors/src/connectors/protocol.py`\n- Modify: `connectors/src/connectors/__init__.py`\n- Test: `connectors/tests/test_models.py`\n\n**Interfaces:**\n- Produces:\n  - `errors.UnknownConnectorKindError`, `errors.DuplicateConnectorError`, `errors.ConnectorNotFoundError`, `errors.RegistryError` (base `Exception` subclass for the latter three; `UnknownConnectorKindError.name: str`).\n  - `models.HealthStatus(ok: bool, detail: str = \"\")`\n  - `models.McpConnectorSettings(url: str, tools: list[str] = [])`\n  - `models.ConnectorConfig(name: str, kind: str = \"mcp\", enabled: bool = True, settings: dict[str, Any] = {})` with method `mcp_settings() -> McpConnectorSettings` (raises `UnknownConnectorKindError` when `kind != \"mcp\"`).\n  - `models.IngestRecord(id: str, source_name: str, source_kind: str, item_type: Literal[\"resource\",\"tool_result\",\"catalog\"], name: str, content: str, raw: dict[str, Any] = {})`\n  - `models.IngestBatch(connector_name: str, records: list[IngestRecord] = [], errors: list[str] = [])`\n  - `protocol.Connector` — a `@runtime_checkable` `Protocol` with attrs `kind: str`, `name: str` and async methods `health(self) -> HealthStatus`, `ingest(self) -> IngestBatch`.\n- `__init__.py` re-exports the above.\n",
+              "truncated": false,
+              "loaded": [],
+              "display": {
+                "type": "file",
+                "path": "/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-3-brief.md",
+                "text": "### Task 3: Shared models, `Connector` protocol, and errors\n\n**Files:**\n- Create: `connectors/src/connectors/errors.py`\n- Create: `connectors/src/connectors/models.py`\n- Create: `connectors/src/connectors/protocol.py`\n- Modify: `connectors/src/connectors/__init__.py`\n- Test: `connectors/tests/test_models.py`\n\n**Interfaces:**\n- Produces:\n  - `errors.UnknownConnectorKindError`, `errors.DuplicateConnectorError`, `errors.ConnectorNotFoundError`, `errors.RegistryError` (base `Exception` subclass for the latter three; `UnknownConnectorKindError.name: str`).\n  - `models.HealthStatus(ok: bool, detail: str = \"\")`\n  - `models.McpConnectorSettings(url: str, tools: list[str] = [])`\n  - `models.ConnectorConfig(name: str, kind: str = \"mcp\", enabled: bool = True, settings: dict[str, Any] = {})` with method `mcp_settings() -> McpConnectorSettings` (raises `UnknownConnectorKindError` when `kind != \"mcp\"`).\n  - `models.IngestRecord(id: str, source_name: str, source_kind: str, item_type: Literal[\"resource\",\"tool_result\",\"catalog\"], name: str, content: str, raw: dict[str, Any] = {})`\n  - `models.IngestBatch(connector_name: str, records: list[IngestRecord] = [], errors: list[str] = [])`\n  - `protocol.Connector` — a `@runtime_checkable` `Protocol` with attrs `kind: str`, `name: str` and async methods `health(self) -> HealthStatus`, `ingest(self) -> IngestBatch`.\n- `__init__.py` re-exports the above.\n\n- [ ] **Step 1: Write the failing test**\n\n`connectors/tests/test_models.py`:\n\n```python\nimport pytest\nfrom connectors import ConnectorConfig, McpConnectorSettings\nfrom connectors.errors import UnknownConnectorKindError\n\n\ndef test_mcp_settings_parse_url_and_tools():\n    s = McpConnectorSettings.model_validate({\"url\": \"http://h/mcp\", \"tools\": [\"a\"]})\n    assert s.url == \"http://h/mcp\" and s.tools == [\"a\"]\n\n\ndef test_mcp_settings_default_tools_empty():\n    assert McpConnectorSettings(url=\"http://h/mcp\").tools == []\n\n\ndef test_mcp_settings_returns_typed_settings():\n    cfg = ConnectorConfig(name=\"x\", kind=\"mcp\", settings={\"url\": \"http://h/mcp\"})\n    assert cfg.mcp_settings().url == \"http://h/mcp\"\n\n\ndef test_unknown_kind_raises_clear_error():\n    cfg = ConnectorConfig(name=\"x\", kind=\"rest\", settings={})\n    with pytest.raises(UnknownConnectorKindError) as ei:\n        cfg.mcp_settings()\n    assert \"rest\" in str(ei.value)\n```\n\n- [ ] **Step 2: Run test to verify it fails**\n\nRun: `uv run --directory connectors pytest tests/test_models.py -v`\nExpected: FAIL (ImportError: cannot import name 'ConnectorConfig').\n\n- [ ] **Step 3: Implement `errors.py`, `models.py`, `protocol.py`, exports**\n\nUse `pydantic.BaseModel`; `mcp_settings()` dispatches on `self.kind`; `UnknownConnectorKindError` message names the offending kind and the known kinds. `Connector` is a `typing.Protocol` decorated `@runtime_checkable` with `async def` stubs (`...`). Re-export all public names from `__init__.py`.\n\n- [ ] **Step 4: Run test to verify it passes**\n\nRun: `uv run --directory connectors pytest tests/test_models.py -v`\nExpected: PASS (4 passed).\n\n- [ ] **Step 5: Commit**\n\n```bash\ngit add connectors/src/connectors connectors/tests/test_models.py\ngit commit -m \"feat(connectors): add shared models, Connector protocol, and errors\"\n```\n\n---\n",
+                "lineStart": 1,
+                "lineEnd": 74,
+                "totalLines": 74,
+                "truncated": false
+              }
+            },
+            "title": ".worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-3-brief.md",
+            "time": {
+              "start": 1792000801303,
+              "end": 1792000801458
+            }
+          },
+          "id": "prt_13b9238bb001JnOXVk0BaeIR5R",
+          "sessionID": "ses_ec46dd290ffesSUCeuq6xmGxaL",
+          "messageID": "msg_13b923070001cryzXy2d7B0j8P"
+        },
+        {
+          "type": "tool",
+          "tool": "read",
+          "callID": "call_01_5ao9jpy6zkre2c8otx6z9niy",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-3-report.md"
+            },
+            "output": "<path>/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-3-report.md</path>\n<type>file</type>\n<content>\n1: # Task 3 Report: Shared models, `Connector` protocol, and errors\n2: \n3: **Branch:** `mcp-connector-module`\n4: **Commit:** `a66137c` — `feat(connectors): add shared models, Connector protocol, and errors`\n5: \n6: ## What I implemented\n7: \n8: - `connectors/src/connectors/errors.py`\n9:   - `RegistryError(Exception)` base class.\n10:   - `UnknownConnectorKindError(RegistryError)`: `__init__(self, name: str)` stores `self.name` and\n11:     message `unknown connector kind '<name>'; known kinds: mcp`.\n12:   - `DuplicateConnectorError(RegistryError)`, `ConnectorNotFoundError(RegistryError)`.\n13:   - `KNOWN_CONNECTOR_KINDS = (\"mcp\",)` constant for the message.\n14: - `connectors/src/connectors/models.py` (Pydantic `BaseModel`s)\n15:   - `HealthStatus(ok: bool, detail: str = \"\")`\n16:   - `McpConnectorSettings(url: str, tools: list[str] = [])`\n17:   - `ConnectorConfig(name, kind=\"mcp\", enabled=True, settings={})` with\n18:     `mcp_settings()` dispatching on `self.kind`; raises\n19:     `UnknownConnectorKindError(name=self.kind)` when `kind != \"mcp\"`, otherwise\n20:     `McpConnectorSettings.model_validate(self.settings)`.\n21:   - `IngestRecord(id, source_name, source_kind, item_type: Literal[\"resource\",\"tool_result\",\"catalog\"], name, content, raw={})`\n22:   - `IngestBatch(connector_name, records=[], errors=[])`\n23:   - Mutable defaults use `Field(default_factory=...)` (Pydantic-safe equivalent of the brief's `= []`/`= {}`).\n24: - `connectors/src/connectors/protocol.py`\n25:   - `@runtime_checkable Connector(Protocol)` with `kind: str`, `name: str`,\n26:     `async def health() -> HealthStatus`, `async def ingest() -> IngestBatch`.\n27: - `connectors/src/connectors/__init__.py`\n28:   - Re-exports models, `Connector`, and all four error classes; declares `__all__`.\n29: - `connectors/tests/test_models.py` — the brief's test, copied verbatim.\n30: \n31: ## TDD Evidence\n32: \n33: ### RED\n34: \n35: Command: `uv run --directory connectors pytest tests/test_models.py -v`\n36: \n37: ```\n38: collecting ... collected 0 items / 1 error\n39: ==================================== ERRORS ====================================\n40: ____________________ ERROR collecting tests/test_models.py _____________________\n41: ImportError while importing test module '.../connectors/tests/test_models.py'.\n42: tests/test_models.py:2: in <module>\n43:     from connectors import ConnectorConfig, McpConnectorSettings\n44: E   ImportError: cannot import name 'ConnectorConfig' from 'connectors'\n45: !!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n46: 1 error in 0.14s\n47: ```\n48: \n49: Why expected: the test imports `ConnectorConfig`/`McpConnectorSettings` from `connectors`,\n50: but `__init__.py` was still a docstring only, so collection fails with `ImportError` —\n51: exactly the failure the brief predicts.\n52: \n53: ### GREEN\n54: \n55: Command: `uv run --directory connectors pytest tests/test_models.py -v`\n56: \n57: ```\n58: collected 4 items\n59: tests/test_models.py::test_mcp_settings_parse_url_and_tools PASSED       [ 25%]\n60: tests/test_models.py::test_mcp_settings_default_tools_empty PASSED       [ 50%]\n61: tests/test_models.py::test_mcp_settings_returns_typed_settings PASSED    [ 75%]\n62: tests/test_models.py::test_unknown_kind_raises_clear_error PASSED        [100%]\n63: ============================== 4 passed in 0.10s ===============================\n64: ```\n65: \n66: ## Files changed\n67: \n68: ```\n69: connectors/src/connectors/__init__.py      (modified)\n70: connectors/src/connectors/errors.py        (new)\n71: connectors/src/connectors/models.py        (new)\n72: connectors/src/connectors/protocol.py      (new)\n73: connectors/tests/test_models.py            (new)\n74: ```\n75: \n76: ## Self-review findings\n77: \n78: - `uv run --directory connectors ruff check src` → clean (source package passes).\n79: - `uv run --directory connectors mypy src` → `Success: no issues found in 4 source files`.\n80: - Smoke checks:\n81:   - `UnknownConnectorKindError` message = `unknown connector kind 'rest'; known kinds: mcp`;\n82:     `isinstance(e, RegistryError)` is `True`; `e.name == \"rest\"` (so Task 5's\n83:     `pytest.raises(RegistryError)` and `\"rest\" in str(exc)` both hold).\n84:   - `Connector._is_runtime_protocol is True`; a conforming fake is\n85:     `isinstance(..., Connector) == True`, `object()` is `False`.\n86: - `ruff check tests` reports `I001` on `test_models.py` (wants a blank line between the\n87:   third-party `import pytest` and the first-party `connectors` imports). Left as-is because\n88:   the brief mandates the test be written verbatim; the source package is clean.\n89: \n90: ## Concerns\n91: \n92: - `KNOWN_CONNECTOR_KINDS` is a hardcoded module constant (`(\"mcp\",)`). If later tasks add\n93:   connector kinds, the \"known kinds\" list in `UnknownConnectorKindError` will need to be\n94:   kept in sync (or the registry should own the list).\n95: - `ConnectorConfig.mcp_settings()` uses `self.kind` as the `name` argument to\n96:   `UnknownConnectorKindError` (clarification used `self.name?`); using `self.kind` is what\n97:   makes the test's `\"rest\" in str(exc)` assertion pass and is the \"offending kind\".\n\n(End of file - total 97 lines)\n</content>",
+            "metadata": {
+              "preview": "# Task 3 Report: Shared models, `Connector` protocol, and errors\n\n**Branch:** `mcp-connector-module`\n**Commit:** `a66137c` — `feat(connectors): add shared models, Connector protocol, and errors`\n\n## What I implemented\n\n- `connectors/src/connectors/errors.py`\n  - `RegistryError(Exception)` base class.\n  - `UnknownConnectorKindError(RegistryError)`: `__init__(self, name: str)` stores `self.name` and\n    message `unknown connector kind '<name>'; known kinds: mcp`.\n  - `DuplicateConnectorError(RegistryError)`, `ConnectorNotFoundError(RegistryError)`.\n  - `KNOWN_CONNECTOR_KINDS = (\"mcp\",)` constant for the message.\n- `connectors/src/connectors/models.py` (Pydantic `BaseModel`s)\n  - `HealthStatus(ok: bool, detail: str = \"\")`\n  - `McpConnectorSettings(url: str, tools: list[str] = [])`\n  - `ConnectorConfig(name, kind=\"mcp\", enabled=True, settings={})` with\n    `mcp_settings()` dispatching on `self.kind`; raises\n    `UnknownConnectorKindError(name=self.kind)` when `kind != \"mcp\"`, otherwise\n    `McpConnectorSettings.model_validate(self.settings)`.",
+              "truncated": false,
+              "loaded": [],
+              "display": {
+                "type": "file",
+                "path": "/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-3-report.md",
+                "text": "# Task 3 Report: Shared models, `Connector` protocol, and errors\n\n**Branch:** `mcp-connector-module`\n**Commit:** `a66137c` — `feat(connectors): add shared models, Connector protocol, and errors`\n\n## What I implemented\n\n- `connectors/src/connectors/errors.py`\n  - `RegistryError(Exception)` base class.\n  - `UnknownConnectorKindError(RegistryError)`: `__init__(self, name: str)` stores `self.name` and\n    message `unknown connector kind '<name>'; known kinds: mcp`.\n  - `DuplicateConnectorError(RegistryError)`, `ConnectorNotFoundError(RegistryError)`.\n  - `KNOWN_CONNECTOR_KINDS = (\"mcp\",)` constant for the message.\n- `connectors/src/connectors/models.py` (Pydantic `BaseModel`s)\n  - `HealthStatus(ok: bool, detail: str = \"\")`\n  - `McpConnectorSettings(url: str, tools: list[str] = [])`\n  - `ConnectorConfig(name, kind=\"mcp\", enabled=True, settings={})` with\n    `mcp_settings()` dispatching on `self.kind`; raises\n    `UnknownConnectorKindError(name=self.kind)` when `kind != \"mcp\"`, otherwise\n    `McpConnectorSettings.model_validate(self.settings)`.\n  - `IngestRecord(id, source_name, source_kind, item_type: Literal[\"resource\",\"tool_result\",\"catalog\"], name, content, raw={})`\n  - `IngestBatch(connector_name, records=[], errors=[])`\n  - Mutable defaults use `Field(default_factory=...)` (Pydantic-safe equivalent of the brief's `= []`/`= {}`).\n- `connectors/src/connectors/protocol.py`\n  - `@runtime_checkable Connector(Protocol)` with `kind: str`, `name: str`,\n    `async def health() -> HealthStatus`, `async def ingest() -> IngestBatch`.\n- `connectors/src/connectors/__init__.py`\n  - Re-exports models, `Connector`, and all four error classes; declares `__all__`.\n- `connectors/tests/test_models.py` — the brief's test, copied verbatim.\n\n## TDD Evidence\n\n### RED\n\nCommand: `uv run --directory connectors pytest tests/test_models.py -v`\n\n```\ncollecting ... collected 0 items / 1 error\n==================================== ERRORS ====================================\n____________________ ERROR collecting tests/test_models.py _____________________\nImportError while importing test module '.../connectors/tests/test_models.py'.\ntests/test_models.py:2: in <module>\n    from connectors import ConnectorConfig, McpConnectorSettings\nE   ImportError: cannot import name 'ConnectorConfig' from 'connectors'\n!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n1 error in 0.14s\n```\n\nWhy expected: the test imports `ConnectorConfig`/`McpConnectorSettings` from `connectors`,\nbut `__init__.py` was still a docstring only, so collection fails with `ImportError` —\nexactly the failure the brief predicts.\n\n### GREEN\n\nCommand: `uv run --directory connectors pytest tests/test_models.py -v`\n\n```\ncollected 4 items\ntests/test_models.py::test_mcp_settings_parse_url_and_tools PASSED       [ 25%]\ntests/test_models.py::test_mcp_settings_default_tools_empty PASSED       [ 50%]\ntests/test_models.py::test_mcp_settings_returns_typed_settings PASSED    [ 75%]\ntests/test_models.py::test_unknown_kind_raises_clear_error PASSED        [100%]\n============================== 4 passed in 0.10s ===============================\n```\n\n## Files changed\n\n```\nconnectors/src/connectors/__init__.py      (modified)\nconnectors/src/connectors/errors.py        (new)\nconnectors/src/connectors/models.py        (new)\nconnectors/src/connectors/protocol.py      (new)\nconnectors/tests/test_models.py            (new)\n```\n\n## Self-review findings\n\n- `uv run --directory connectors ruff check src` → clean (source package passes).\n- `uv run --directory connectors mypy src` → `Success: no issues found in 4 source files`.\n- Smoke checks:\n  - `UnknownConnectorKindError` message = `unknown connector kind 'rest'; known kinds: mcp`;\n    `isinstance(e, RegistryError)` is `True`; `e.name == \"rest\"` (so Task 5's\n    `pytest.raises(RegistryError)` and `\"rest\" in str(exc)` both hold).\n  - `Connector._is_runtime_protocol is True`; a conforming fake is\n    `isinstance(..., Connector) == True`, `object()` is `False`.\n- `ruff check tests` reports `I001` on `test_models.py` (wants a blank line between the\n  third-party `import pytest` and the first-party `connectors` imports). Left as-is because\n  the brief mandates the test be written verbatim; the source package is clean.\n\n## Concerns\n\n- `KNOWN_CONNECTOR_KINDS` is a hardcoded module constant (`(\"mcp\",)`). If later tasks add\n  connector kinds, the \"known kinds\" list in `UnknownConnectorKindError` will need to be\n  kept in sync (or the registry should own the list).\n- `ConnectorConfig.mcp_settings()` uses `self.kind` as the `name` argument to\n  `UnknownConnectorKindError` (clarification used `self.name?`); using `self.kind` is what\n  makes the test's `\"rest\" in str(exc)` assertion pass and is the \"offending kind\".",
+                "lineStart": 1,
+                "lineEnd": 97,
+                "totalLines": 97,
+                "truncated": false
+              }
+            },
+            "title": ".worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-3-report.md",
+            "time": {
+              "start": 1792000801536,
+              "end": 1792000801616
+            }
+          },
+          "id": "prt_13b923a1b001ZR3aDcigDBgwrj",
+          "sessionID": "ses_ec46dd290ffesSUCeuq6xmGxaL",
+          "messageID": "msg_13b923070001cryzXy2d7B0j8P"
+        },
+        {
+          "type": "tool",
+          "tool": "read",
+          "callID": "call_02_ct3vs1l1w1mizhryvevx5kn6",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/review-5b19013..a66137c.diff"
+            },
+            "output": "<path>/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/review-5b19013..a66137c.diff</path>\n<type>file</type>\n<content>\n1: # Review package: 5b190137b222d02d01b8758225120f2171427e46..a66137c65eb1f8e6499caf00b1fc0b3ca9e830a7\n2: \n3: ## Commits\n4: a66137c feat(connectors): add shared models, Connector protocol, and errors\n5: \n6: ## Files changed\n7:  connectors/src/connectors/__init__.py | 30 ++++++++++++++++++++++\n8:  connectors/src/connectors/errors.py   | 26 +++++++++++++++++++\n9:  connectors/src/connectors/models.py   | 47 +++++++++++++++++++++++++++++++++++\n10:  connectors/src/connectors/protocol.py | 17 +++++++++++++\n11:  connectors/tests/test_models.py       | 24 ++++++++++++++++++\n12:  5 files changed, 144 insertions(+)\n13: \n14: ## Diff\n15: diff --git a/connectors/src/connectors/__init__.py b/connectors/src/connectors/__init__.py\n16: index dafc82c..ccfb6e8 100644\n17: --- a/connectors/src/connectors/__init__.py\n18: +++ b/connectors/src/connectors/__init__.py\n19: @@ -1 +1,31 @@\n20:  \"\"\"Pluggable external-integration connectors for Agentic ODI (MCP client).\"\"\"\n21: +\n22: +from __future__ import annotations\n23: +\n24: +from .errors import (\n25: +    ConnectorNotFoundError,\n26: +    DuplicateConnectorError,\n27: +    RegistryError,\n28: +    UnknownConnectorKindError,\n29: +)\n30: +from .models import (\n31: +    ConnectorConfig,\n32: +    HealthStatus,\n33: +    IngestBatch,\n34: +    IngestRecord,\n35: +    McpConnectorSettings,\n36: +)\n37: +from .protocol import Connector\n38: +\n39: +__all__ = [\n40: +    \"Connector\",\n41: +    \"ConnectorConfig\",\n42: +    \"ConnectorNotFoundError\",\n43: +    \"DuplicateConnectorError\",\n44: +    \"HealthStatus\",\n45: +    \"IngestBatch\",\n46: +    \"IngestRecord\",\n47: +    \"McpConnectorSettings\",\n48: +    \"RegistryError\",\n49: +    \"UnknownConnectorKindError\",\n50: +]\n51: diff --git a/connectors/src/connectors/errors.py b/connectors/src/connectors/errors.py\n52: new file mode 100644\n53: index 0000000..7cebc17\n54: --- /dev/null\n55: +++ b/connectors/src/connectors/errors.py\n56: @@ -0,0 +1,26 @@\n57: +\"\"\"Error hierarchy shared by the connector registry and implementations.\"\"\"\n58: +\n59: +from __future__ import annotations\n60: +\n61: +KNOWN_CONNECTOR_KINDS: tuple[str, ...] = (\"mcp\",)\n62: +\n63: +\n64: +class RegistryError(Exception):\n65: +    \"\"\"Base class for connector registry errors.\"\"\"\n66: +\n67: +\n68: +class UnknownConnectorKindError(RegistryError):\n69: +    \"\"\"Raised when a connector kind is not recognised.\"\"\"\n70: +\n71: +    def __init__(self, name: str) -> None:\n72: +        self.name = name\n73: +        known = \", \".join(KNOWN_CONNECTOR_KINDS)\n74: +        super().__init__(f\"unknown connector kind {name!r}; known kinds: {known}\")\n75: +\n76: +\n77: +class DuplicateConnectorError(RegistryError):\n78: +    \"\"\"Raised when two connectors share the same name.\"\"\"\n79: +\n80: +\n81: +class ConnectorNotFoundError(RegistryError):\n82: +    \"\"\"Raised when a connector cannot be found in the registry.\"\"\"\n83: diff --git a/connectors/src/connectors/models.py b/connectors/src/connectors/models.py\n84: new file mode 100644\n85: index 0000000..7df79fd\n86: --- /dev/null\n87: +++ b/connectors/src/connectors/models.py\n88: @@ -0,0 +1,47 @@\n89: +\"\"\"Shared Pydantic models for connector configuration and ingest payloads.\"\"\"\n90: +\n91: +from __future__ import annotations\n92: +\n93: +from typing import Any, Literal\n94: +\n95: +from pydantic import BaseModel, Field\n96: +\n97: +from .errors import UnknownConnectorKindError\n98: +\n99: +\n100: +class HealthStatus(BaseModel):\n101: +    ok: bool\n102: +    detail: str = \"\"\n103: +\n104: +\n105: +class McpConnectorSettings(BaseModel):\n106: +    url: str\n107: +    tools: list[str] = Field(default_factory=list)\n108: +\n109: +\n110: +class ConnectorConfig(BaseModel):\n111: +    name: str\n112: +    kind: str = \"mcp\"\n113: +    enabled: bool = True\n114: +    settings: dict[str, Any] = Field(default_factory=dict)\n115: +\n116: +    def mcp_settings(self) -> McpConnectorSettings:\n117: +        if self.kind != \"mcp\":\n118: +            raise UnknownConnectorKindError(name=self.kind)\n119: +        return McpConnectorSettings.model_validate(self.settings)\n120: +\n121: +\n122: +class IngestRecord(BaseModel):\n123: +    id: str\n124: +    source_name: str\n125: +    source_kind: str\n126: +    item_type: Literal[\"resource\", \"tool_result\", \"catalog\"]\n127: +    name: str\n128: +    content: str\n129: +    raw: dict[str, Any] = Field(default_factory=dict)\n130: +\n131: +\n132: +class IngestBatch(BaseModel):\n133: +    connector_name: str\n134: +    records: list[IngestRecord] = Field(default_factory=list)\n135: +    errors: list[str] = Field(default_factory=list)\n136: diff --git a/connectors/src/connectors/protocol.py b/connectors/src/connectors/protocol.py\n137: new file mode 100644\n138: index 0000000..8cfe088\n139: --- /dev/null\n140: +++ b/connectors/src/connectors/protocol.py\n141: @@ -0,0 +1,17 @@\n142: +\"\"\"The structural interface every connector implements.\"\"\"\n143: +\n144: +from __future__ import annotations\n145: +\n146: +from typing import Protocol, runtime_checkable\n147: +\n148: +from .models import HealthStatus, IngestBatch\n149: +\n150: +\n151: +@runtime_checkable\n152: +class Connector(Protocol):\n153: +    kind: str\n154: +    name: str\n155: +\n156: +    async def health(self) -> HealthStatus: ...\n157: +\n158: +    async def ingest(self) -> IngestBatch: ...\n159: diff --git a/connectors/tests/test_models.py b/connectors/tests/test_models.py\n160: new file mode 100644\n161: index 0000000..7de7eb4\n162: --- /dev/null\n163: +++ b/connectors/tests/test_models.py\n164: @@ -0,0 +1,24 @@\n165: +import pytest\n166: +from connectors import ConnectorConfig, McpConnectorSettings\n167: +from connectors.errors import UnknownConnectorKindError\n168: +\n169: +\n170: +def test_mcp_settings_parse_url_and_tools():\n171: +    s = McpConnectorSettings.model_validate({\"url\": \"http://h/mcp\", \"tools\": [\"a\"]})\n172: +    assert s.url == \"http://h/mcp\" and s.tools == [\"a\"]\n173: +\n174: +\n175: +def test_mcp_settings_default_tools_empty():\n176: +    assert McpConnectorSettings(url=\"http://h/mcp\").tools == []\n177: +\n178: +\n179: +def test_mcp_settings_returns_typed_settings():\n180: +    cfg = ConnectorConfig(name=\"x\", kind=\"mcp\", settings={\"url\": \"http://h/mcp\"})\n181: +    assert cfg.mcp_settings().url == \"http://h/mcp\"\n182: +\n183: +\n184: +def test_unknown_kind_raises_clear_error():\n185: +    cfg = ConnectorConfig(name=\"x\", kind=\"rest\", settings={})\n186: +    with pytest.raises(UnknownConnectorKindError) as ei:\n187: +        cfg.mcp_settings()\n188: +    assert \"rest\" in str(ei.value)\n\n(End of file - total 188 lines)\n</content>",
+            "metadata": {
+              "preview": "# Review package: 5b190137b222d02d01b8758225120f2171427e46..a66137c65eb1f8e6499caf00b1fc0b3ca9e830a7\n\n## Commits\na66137c feat(connectors): add shared models, Connector protocol, and errors\n\n## Files changed\n connectors/src/connectors/__init__.py | 30 ++++++++++++++++++++++\n connectors/src/connectors/errors.py   | 26 +++++++++++++++++++\n connectors/src/connectors/models.py   | 47 +++++++++++++++++++++++++++++++++++\n connectors/src/connectors/protocol.py | 17 +++++++++++++\n connectors/tests/test_models.py       | 24 ++++++++++++++++++\n 5 files changed, 144 insertions(+)\n\n## Diff\ndiff --git a/connectors/src/connectors/__init__.py b/connectors/src/connectors/__init__.py\nindex dafc82c..ccfb6e8 100644\n--- a/connectors/src/connectors/__init__.py\n+++ b/connectors/src/connectors/__init__.py\n@@ -1 +1,31 @@\n \"\"\"Pluggable external-integration connectors for Agentic ODI (MCP client).\"\"\"",
+              "truncated": false,
+              "loaded": [],
+              "display": {
+                "type": "file",
+                "path": "/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/review-5b19013..a66137c.diff",
+                "text": "# Review package: 5b190137b222d02d01b8758225120f2171427e46..a66137c65eb1f8e6499caf00b1fc0b3ca9e830a7\n\n## Commits\na66137c feat(connectors): add shared models, Connector protocol, and errors\n\n## Files changed\n connectors/src/connectors/__init__.py | 30 ++++++++++++++++++++++\n connectors/src/connectors/errors.py   | 26 +++++++++++++++++++\n connectors/src/connectors/models.py   | 47 +++++++++++++++++++++++++++++++++++\n connectors/src/connectors/protocol.py | 17 +++++++++++++\n connectors/tests/test_models.py       | 24 ++++++++++++++++++\n 5 files changed, 144 insertions(+)\n\n## Diff\ndiff --git a/connectors/src/connectors/__init__.py b/connectors/src/connectors/__init__.py\nindex dafc82c..ccfb6e8 100644\n--- a/connectors/src/connectors/__init__.py\n+++ b/connectors/src/connectors/__init__.py\n@@ -1 +1,31 @@\n \"\"\"Pluggable external-integration connectors for Agentic ODI (MCP client).\"\"\"\n+\n+from __future__ import annotations\n+\n+from .errors import (\n+    ConnectorNotFoundError,\n+    DuplicateConnectorError,\n+    RegistryError,\n+    UnknownConnectorKindError,\n+)\n+from .models import (\n+    ConnectorConfig,\n+    HealthStatus,\n+    IngestBatch,\n+    IngestRecord,\n+    McpConnectorSettings,\n+)\n+from .protocol import Connector\n+\n+__all__ = [\n+    \"Connector\",\n+    \"ConnectorConfig\",\n+    \"ConnectorNotFoundError\",\n+    \"DuplicateConnectorError\",\n+    \"HealthStatus\",\n+    \"IngestBatch\",\n+    \"IngestRecord\",\n+    \"McpConnectorSettings\",\n+    \"RegistryError\",\n+    \"UnknownConnectorKindError\",\n+]\ndiff --git a/connectors/src/connectors/errors.py b/connectors/src/connectors/errors.py\nnew file mode 100644\nindex 0000000..7cebc17\n--- /dev/null\n+++ b/connectors/src/connectors/errors.py\n@@ -0,0 +1,26 @@\n+\"\"\"Error hierarchy shared by the connector registry and implementations.\"\"\"\n+\n+from __future__ import annotations\n+\n+KNOWN_CONNECTOR_KINDS: tuple[str, ...] = (\"mcp\",)\n+\n+\n+class RegistryError(Exception):\n+    \"\"\"Base class for connector registry errors.\"\"\"\n+\n+\n+class UnknownConnectorKindError(RegistryError):\n+    \"\"\"Raised when a connector kind is not recognised.\"\"\"\n+\n+    def __init__(self, name: str) -> None:\n+        self.name = name\n+        known = \", \".join(KNOWN_CONNECTOR_KINDS)\n+        super().__init__(f\"unknown connector kind {name!r}; known kinds: {known}\")\n+\n+\n+class DuplicateConnectorError(RegistryError):\n+    \"\"\"Raised when two connectors share the same name.\"\"\"\n+\n+\n+class ConnectorNotFoundError(RegistryError):\n+    \"\"\"Raised when a connector cannot be found in the registry.\"\"\"\ndiff --git a/connectors/src/connectors/models.py b/connectors/src/connectors/models.py\nnew file mode 100644\nindex 0000000..7df79fd\n--- /dev/null\n+++ b/connectors/src/connectors/models.py\n@@ -0,0 +1,47 @@\n+\"\"\"Shared Pydantic models for connector configuration and ingest payloads.\"\"\"\n+\n+from __future__ import annotations\n+\n+from typing import Any, Literal\n+\n+from pydantic import BaseModel, Field\n+\n+from .errors import UnknownConnectorKindError\n+\n+\n+class HealthStatus(BaseModel):\n+    ok: bool\n+    detail: str = \"\"\n+\n+\n+class McpConnectorSettings(BaseModel):\n+    url: str\n+    tools: list[str] = Field(default_factory=list)\n+\n+\n+class ConnectorConfig(BaseModel):\n+    name: str\n+    kind: str = \"mcp\"\n+    enabled: bool = True\n+    settings: dict[str, Any] = Field(default_factory=dict)\n+\n+    def mcp_settings(self) -> McpConnectorSettings:\n+        if self.kind != \"mcp\":\n+            raise UnknownConnectorKindError(name=self.kind)\n+        return McpConnectorSettings.model_validate(self.settings)\n+\n+\n+class IngestRecord(BaseModel):\n+    id: str\n+    source_name: str\n+    source_kind: str\n+    item_type: Literal[\"resource\", \"tool_result\", \"catalog\"]\n+    name: str\n+    content: str\n+    raw: dict[str, Any] = Field(default_factory=dict)\n+\n+\n+class IngestBatch(BaseModel):\n+    connector_name: str\n+    records: list[IngestRecord] = Field(default_factory=list)\n+    errors: list[str] = Field(default_factory=list)\ndiff --git a/connectors/src/connectors/protocol.py b/connectors/src/connectors/protocol.py\nnew file mode 100644\nindex 0000000..8cfe088\n--- /dev/null\n+++ b/connectors/src/connectors/protocol.py\n@@ -0,0 +1,17 @@\n+\"\"\"The structural interface every connector implements.\"\"\"\n+\n+from __future__ import annotations\n+\n+from typing import Protocol, runtime_checkable\n+\n+from .models import HealthStatus, IngestBatch\n+\n+\n+@runtime_checkable\n+class Connector(Protocol):\n+    kind: str\n+    name: str\n+\n+    async def health(self) -> HealthStatus: ...\n+\n+    async def ingest(self) -> IngestBatch: ...\ndiff --git a/connectors/tests/test_models.py b/connectors/tests/test_models.py\nnew file mode 100644\nindex 0000000..7de7eb4\n--- /dev/null\n+++ b/connectors/tests/test_models.py\n@@ -0,0 +1,24 @@\n+import pytest\n+from connectors import ConnectorConfig, McpConnectorSettings\n+from connectors.errors import UnknownConnectorKindError\n+\n+\n+def test_mcp_settings_parse_url_and_tools():\n+    s = McpConnectorSettings.model_validate({\"url\": \"http://h/mcp\", \"tools\": [\"a\"]})\n+    assert s.url == \"http://h/mcp\" and s.tools == [\"a\"]\n+\n+\n+def test_mcp_settings_default_tools_empty():\n+    assert McpConnectorSettings(url=\"http://h/mcp\").tools == []\n+\n+\n+def test_mcp_settings_returns_typed_settings():\n+    cfg = ConnectorConfig(name=\"x\", kind=\"mcp\", settings={\"url\": \"http://h/mcp\"})\n+    assert cfg.mcp_settings().url == \"http://h/mcp\"\n+\n+\n+def test_unknown_kind_raises_clear_error():\n+    cfg = ConnectorConfig(name=\"x\", kind=\"rest\", settings={})\n+    with pytest.raises(UnknownConnectorKindError) as ei:\n+        cfg.mcp_settings()\n+    assert \"rest\" in str(ei.value)",
+                "lineStart": 1,
+                "lineEnd": 188,
+                "totalLines": 188,
+                "truncated": false
+              }
+            },
+            "title": ".worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/review-5b19013..a66137c.diff",
+            "time": {
+              "start": 1792000801762,
+              "end": 1792000801846
+            }
+          },
+          "id": "prt_13b923b09001W8ufrD6Os2SjiP",
+          "sessionID": "ses_ec46dd290ffesSUCeuq6xmGxaL",
+          "messageID": "msg_13b923070001cryzXy2d7B0j8P"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "call_03_fcppfin6i8f5ex5uf08lyvnz",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "cd /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module && uv run ruff check connectors/ --output-format=concise; echo \"EXIT: $?\"",
+              "workdir": "/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module"
+            },
+            "output": "connectors/tests/test_models.py:1:1: I001 [*] Import block is un-sorted or un-formatted\nFound 1 error.\n[*] 1 fixable with `--fix`.\nEXIT: 1\n",
+            "metadata": {
+              "output": "connectors/tests/test_models.py:1:1: I001 [*] Import block is un-sorted or un-formatted\nFound 1 error.\n[*] 1 fixable with `--fix`.\nEXIT: 1\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "cd /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module && uv run ruff check connectors/ --output-format=concise; echo \"EXIT: $?\"",
+            "time": {
+              "start": 1792000802134,
+              "end": 1792000802207
+            }
+          },
+          "id": "prt_13b923bf3001nfWtBOzAXgj6Ww",
+          "sessionID": "ses_ec46dd290ffesSUCeuq6xmGxaL",
+          "messageID": "msg_13b923070001cryzXy2d7B0j8P"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-finish",
+          "tokens": {
+            "total": 16642,
+            "input": 1145,
+            "output": 355,
+            "reasoning": 38,
+            "cache": {
+              "write": 0,
+              "read": 15104
+            }
+          },
+          "cost": 0,
+          "id": "prt_13b923db5001XF9lOdKV0nJrnE",
+          "sessionID": "ses_ec46dd290ffesSUCeuq6xmGxaL",
+          "messageID": "msg_13b923070001cryzXy2d7B0j8P"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_13b922d89001b6Gukrr4XB2VYb",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 25496,
+          "input": 6487,
+          "output": 1012,
+          "reasoning": 2893,
+          "cache": {
+            "write": 0,
+            "read": 15104
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792000802302,
+          "completed": 1792000830754
+        },
+        "finish": "stop",
+        "id": "msg_13b923dfe0013L1cJ4VT6hwcW6",
+        "sessionID": "ses_ec46dd290ffesSUCeuq6xmGxaL"
+      },
+      "parts": [
+        {
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-start",
+          "id": "prt_13b92444e001nu607VjDE9bYep",
+          "sessionID": "ses_ec46dd290ffesSUCeuq6xmGxaL",
+          "messageID": "msg_13b923dfe0013L1cJ4VT6hwcW6"
+        },
+        {
+          "type": "reasoning",
+          "text": "Let me analyze everything.\n\nThe lint command is `ruff check connectors/` and it found I001 in `connectors/tests/test_models.py:1:1`. The implementer claimed the source package was clean but tests had I001. The global constraint says \"The connectors package's own modules must lint clean under that select set.\" The command runs `connectors/` which includes tests. So there's a violation.\n\nWait, but the test file is mandated verbatim by the brief. The brief's test code is exactly as shown. So the I001 is caused by the brief's verbatim test. This is a tension: following the brief verbatim causes lint violation.\n\nLet me think. The global constraint says \"The connectors package's own modules must lint clean under that select set.\" The implementer's report says they were told to write test verbatim, so left as-is. But the task's explicit instruction to me says run `ruff check connectors/` because plan requires connectors package to lint clean and implementer flagged possible issue. The result is a violation.\n\nSo this is an issue — but it's caused by the brief mandating the test verbatim. Interesting. The brief instructs the test must be verbatim. Actually wait, line 86: the report says ruff check tests reports I001... Left as-is because brief mandates test written verbatim.\n\nHmm. Is the test actually verbatim? Let me compare. Brief lines 25-50 vs diff lines 165-188. They look identical. Yes verbatim.\n\nSo the I001 is unavoidable if following the brief. But the constraint requires lint clean. The right fix per ruff is to add a blank line between `import pytest` and `from connectors import ...`. This is a trivial, semantically-neutral change. But the brief said verbatim. This is a genuine conflict.\n\nActually, is the whole `connectors/` lint \"clean\" requirement about source modules? The constraint says \"The connectors package's own modules must lint clean under that select set.\" Tests are part of the package. The command given explicitly checks `connectors/`. So we report the violation.\n\nNow let me assess severity. This is an Important issue perhaps, because the plan explicitly required lint clean and the command fails. But it's arguably caused by brief's verbatim mandate, not a defect in the implementation's judgment. I'd flag it as Important (fails an explicit acceptance criterion) but note the tension. Actually maybe the correct resolution: the test file wasn't listed in the constraint? Let me re-read: \"The connectors package's own modules must lint clean under that select set.\" Modules — could mean source modules. But then the orchestrator explicitly told me to run `ruff check connectors/` because plan requires connectors package to lint clean. So the acceptance is `ruff check connectors/` exits 0. It doesn't. So fail.\n\nNow spec compliance:\n\nerrors.py: RegistryError base ✅; three subclasses ✅; UnknownConnectorKindError.name ✅ (line 72); message contains offending kind ✅ (`unknown connector kind {name!r}`). Note the ambiguity resolution says \"`UnknownConnectorKindError` takes `name: str` and its message names the offending kind + known kinds.\" ✅.\n\nmodels.py: HealthStatus ✅, McpConnectorSettings(url, tools=[]) ✅ (default_factory list, semantically equivalent), ConnectorConfig ✅ with kind default \"mcp\", enabled True, settings {} ✅, mcp_settings() raising UnknownConnectorKindError when kind != \"mcp\" ✅. IngestRecord with item_type Literal ✅. IngestBatch ✅.\n\nprotocol.py: @runtime_checkable Protocol Connector with kind: str, name: str, async health/ingest stubs ✅.\n\n__init__.py re-exports ✅. Test imports ConnectorConfig, McpConnectorSettings from connectors ✅.\n\nconnectors/tests/test_models.py matches brief verbatim ✅.\n\nNow let me think about correctness subtleties.\n\nOne potential issue: `ConnectorConfig.mcp_settings()` calls `McpConnectorSettings.model_validate(self.settings)`. If `self.settings` is empty `{}` and kind is \"mcp\", it would raise a pydantic ValidationError because url is required. That's fine/expected.\n\nAnother: `Todo`? No.\n\nProtocol: `async def health(self) -> HealthStatus: ...` — the brief says `health(self)`. In protocol, self is implicit. Fine.\n\nThe `from __future__ import annotations` in protocol.py — with runtime_checkable Protocol, runtime_checkable checks only presence of methods/attrs, not types, so annotations as strings fine.\n\nPotential mypy issue? report claims mypy clean.\n\nNow, is there any concern that `UnknownConnectorKindError.__init__` doesn't pass through? Fine.\n\nBLE lint (blind except) not triggered.\n\nNow, one thing: the brief says the error message \"names the offending kind and the known kinds\". The KNOWN_CONNECTOR_KINDS is a hardcoded constant. Fine for now.\n\nLet me consider potential issue with the diff: the git stat says inserts 144. Fine.\n\nLet me double check test file matches brief exactly, including trailing. Brief:\n```\nimport pytest\nfrom connectors import ConnectorConfig, McpConnectorSettings\nfrom connectors.errors import UnknownConnectorKindError\n...\n```\nDiff matches. The blank lines: two blank lines between functions. Yes.\n\nNow, the I001 issue. Let me think about whether ruff's isort considers `connectors` first-party. If `connectors` is first-party, then it wants a blank line between third-party (pytest) and first-party (connectors). The fix would insert a blank line after `import pytest`. That would change the test file from verbatim. But semantically harmless.\n\nNow, is the lint requirement part of the task? Global constraint: \"The connectors package's own modules must lint clean under that select set.\" The task-specific instruction to me says the plan requires the connectors package to lint clean and to run the command. So failing this is a real deviation. Severity: Important? It's an explicit acceptance criterion failing. But the root cause is the brief conflict. I'll mark it Important, and note that it can be fixed by adding a blank line (a 1-char/blank-line change) which is still arguably within the brief's intent. Actually, the implementer explicitly flagged it. \n\nHmm, but let me consider whether the reviewers/orchestrator consider this a \"task quality\" blocker. The brief mandated verbatim test, and ruff select includes \"I\" (isort). The test code as given is not isort-clean. This is a brief inconsistency. The implementer chose the brief verbatim over lint. Given the global constraint explicitly says lint clean, and the orchestrator flagged it, I'd say Needs fixes — trivial fix.\n\nBut wait — let me reconsider. The exact constraint wording: \"The connectors package's own modules must lint clean under that select set.\" \"modules\" might deliberately exclude tests. But then why would the orchestrator tell me to run `ruff check connectors/`? Because \"the plan requires the connectors package to lint clean.\" The command output shows a violation. So per the command, not clean.\n\nI'll report it as Important with the nuance. Let me decide overall: Approved or Needs fixes? The functional implementation is fully correct and matches spec. The only issue is a lint violation in the test file that's mandated verbatim by the brief. \n\nHmm. Since the explicit acceptance criterion (lint clean) fails, and the instruction emphasized it, I lean \"Needs fixes\" — but the fix conflicts with \"verbatim.\" This is a judgment call. Given calibration \"minor = polish,\" a lint error is not just polish because it fails a stated gate. But the gate conflict is with another stated gate. \n\nLet me weigh: The task's own Step 4 is \"test passes\" — it does. The global constraint lint clean — fails only on the test file. The implemented *source* modules lint clean. I think the fair verdict: Needs fixes, with the note that the fix is adding one blank line to the test file (deviation from verbatim is trivial and preserves semantics). Alternatively Approved with a noted caveat.\n\nGiven the reviewer instructions explicitly say \"report exactly what it prints\" for this command and \"the plan requires the connectors package to lint clean,\" I believe they want me to catch this. The correct verdict is Needs fixes (trivial). But I should be careful: is the failing lint something the implementer could fix without violating the brief? The brief's verbatim test code lacks the blank line. Adding a blank line deviates from \"verbatim.\" So there's a genuine conflict. The right resolution is likely: the fix goes in the test file. Since the brief's test is the thing that violates, and the global constraint is binding (\"must lint clean\"), I'd recommend fixing the test file.\n\nActually, let me reconsider the scope. The task says: \"Global constraints that bind this task: ... The connectors package's own modules must lint clean under that select set.\" The tests directory might be considered part of \"connectors package's own modules\"? Tests are typically not \"modules\" of the package in the src layout sense. Hmm, but `ruff check connectors/` checks everything under it.\n\nI'll present the facts clearly and mark it Important, verdict Needs fixes. Actually, let me think about what's most defensible. The evidence command returns exit 1 with one violation. The instruction says report it. If I say Approved, I'm excusing a failing gate. If I say Needs fixes, I'm flagging a one-line fix. I'll go with Needs fixes but be precise that it's the test file (not the source), and it stems from the brief/constraint conflict.\n\nHmm, wait. Let me reconsider once more. The implementer's concern is legitimate and they explicitly called it out. The orchestrator in the review prompt says \"the implementer flagged a possible issue.\" This suggests they want us to confirm. Confirmed. \n\nLet me think about whether \"Needs fixes\" is too harsh given the brief conflict. The verdict should reflect the task. A one-line lint fix is needed for the gate. I'll go Needs fixes.\n\nActually, let me reconsider the possibility that `ruff check connectors/` picks up config from the root or the connectors package. The command run from worktree root: `cd worktree && uv run ruff check connectors/`. It found I001. So the config in effect selects I. Good.\n\nLet me also verify there are no other issues:\n\n- `errors.py` has no `__all__` but that's fine.\n- `models.py` uses `Field(default_factory=list)` — good, avoids mutable default aliasing. Pydantic actually handles mutable defaults by deep-copying, but default_factory is cleaner. Good.\n- `protocol.py`: `async def health(self) -> HealthStatus: ...` — one-liner body. Fine.\n\nPotential subtle: The `Connector` Protocol's `ingest` signature in the brief is `ingest(self) -> IngestBatch`. So no args. Real connectors likely need an argument, but brief specifies it. Match.\n\n- `__init__.py` re-exports and `__all__` ✅.\n\nExtra: `KNOWN_CONNECTOR_KINDS` constant — extra but reasonable, not a violation.\n\nStrengths: clean separation, correct hierarchy, runtime_checkable, default_factory, __all__, report transparent about lint.\n\nLet me also note: `mcp_settings()` calls `UnknownConnectorKindError(name=self.kind)`. Ambiguity resolution said error takes `name: str`; the report notes the clarification used `self.name?`. But the resolution says \"its message names the offending kind.\" Using self.kind is correct for the offending kind. Good. Though one could argue the attribute `name` semantically holds the kind, which is slightly confusing naming, but matches resolution (\"UnknownConnectorKindError takes name: str\"). Fine.\n\nNow write the report.\n\nLet me cite line numbers from diff.\n\nErrors:\n- errors.py:64 RegistryError\n- errors.py:68 UnknownConnectorKindError\n- errors.py:71-74 name + message\n- errors.py:77 DuplicateConnectorError\n- errors.py:81 ConnectorNotFoundError\n\nModels:\n- models.py:100 HealthStatus\n- models.py:105 McpConnectorSettings\n- models.py:110 ConnectorConfig\n- models.py:116-119 mcp_settings\n- models.py:122 IngestRecord\n- models.py:132 IngestBatch\n\nProtocol:\n- protocol.py:151-158\n\nInit:\n- __init__.py:24-50\n\nTest:\n- test_models.py:1-24\n\nNow the lint violation: test_models.py:1:1 I001.\n\nAlso note: report line 86-88 describes the issue but the source claim. The report says \"ruff check tests reports I001\" — confirmed by my run which checks connectors/ and finds it in tests.\n\nNow write concise report. This is a review report, can be longer than 4 lines (user asked for detailed format).\n\nLet me draft.\n\nOne more check: the brief test imports `from connectors import ConnectorConfig, McpConnectorSettings`. The `__init__` imports these from `.models`. ✅. But note `McpConnectorSettings` is used in test and exported. ✅.\n\nAlso confirm the test matches verbatim — including no trailing content. Yes.\n\nLet me also double-check whether the `I001` target could be auto-fixable and whether there might be additional hidden violations if fixed (like a second sorting issue). Report says 1 fixable. Only one.\n\nI'll produce final report.",
+          "time": {
+            "start": 1792000803962,
+            "end": 1792000824646
+          },
+          "id": "prt_13b92447a001vH4NGFafGc3BTI",
+          "sessionID": "ses_ec46dd290ffesSUCeuq6xmGxaL",
+          "messageID": "msg_13b923dfe0013L1cJ4VT6hwcW6"
+        },
+        {
+          "type": "text",
+          "text": "### Spec Compliance\n- ✅ `errors.py`: `RegistryError(Exception)` base (errors.py:64); `UnknownConnectorKindError` (errors.py:68), `DuplicateConnectorError` (errors.py:77), `ConnectorNotFoundError` (errors.py:81) all subclass it. `UnknownConnectorKindError.__init__(self, name: str)` stores `self.name` and message `unknown connector kind 'rest'; known kinds: mcp` names the offending kind + known kinds (errors.py:71-74). Matches the ambiguity resolution.\n- ✅ `models.py`: `HealthStatus(ok, detail=\"\")` (models.py:100); `McpConnectorSettings(url, tools=[])` (models.py:105); `ConnectorConfig(name, kind=\"mcp\", enabled=True, settings={})` (models.py:110) with `mcp_settings()` raising `UnknownConnectorKindError(name=self.kind)` when `kind != \"mcp\"` (models.py:116-119); `IngestRecord` with `item_type: Literal[\"resource\",\"tool_result\",\"catalog\"]` (models.py:122-129); `IngestBatch(connector_name, records=[], errors=[])` (models.py:132-135).\n- ✅ `protocol.py`: `@runtime_checkable` `Connector(Protocol)` with `kind: str`, `name: str`, `async health()`/`async ingest()` stubs (protocol.py:151-158).\n- ✅ `__init__.py`: re-exports `ConnectorConfig`, `McpConnectorSettings`, `Connector`, and the four errors with `__all__` (init:24-50); test's `from connectors import ConnectorConfig, McpConnectorSettings` resolves.\n- ✅ `connectors/tests/test_models.py`: matches the brief's test code exactly (test_models.py:1-24) — byte-for-byte verbatim, no deviations.\n- ⚠️ Cannot verify from diff: brief Step 2/4 pytest runs (RED ImportError, GREEN 4 passed). Report is internally consistent and the code would produce those outcomes, but I did not re-run pytest per instructions.\n\n### Strengths\n- Clean one-responsibility split: errors / models / protocol, no cross-contamination.\n- Mutables use `Field(default_factory=...)` instead of bare `= []`/`= {}` — a correct pydantic-safe realization of the brief's signatures; avoids shared-default aliasing.\n- `~/.is_runtime_checkable` protocol is correctly structured; report's smoke evidence (`object()` not isinstance) is credible.\n- Report is honest: it explicitly self-flags the test-file lint deviation rather than hiding it.\n\n### Issues\n#### Important\n- `connectors/tests/test_models.py:1` — `ruff check connectors/` exits **1** with `test_models.py:1:1: I001 [*] Import block is un-sorted or un-formatted` (1 fixable). This violates the binding global constraint (\"connectors package's own modules must lint clean under `select=[\"...\",\"I\",...]`\"), and the plan's own accept command fails. Root cause is a brief/constraint conflict: the brief mandates the test be copied verbatim, but that verbatim text lacks the blank line ruff's isort wants between `import pytest` (third-party) and `from connectors ...` (first-party). Fix: insert one blank line after `import pytest` in `test_models.py` (semantics-preserving; the only practical way to satisfy both the \"lint clean\" gate and the brief's intent). Source modules themselves are clean — the violation is confined to the test file.\n\n#### Minor\n- `errors.py:61` `KNOWN_CONNECTOR_KINDS = (\"mcp\",)` is a hardcoded duplicate of the kind set also encoded in `ConnectorConfig.kind`. Acceptable now, but it will silently drift when Task 5 / later kinds land; the registry should eventually own this list (implementer already notes this).\n- `models.py:118` passes `self.kind` as the `name` argument to `UnknownConnectorKindError`, so the error's `.name` holds a *kind*, not a connector *name* — slightly confusing naming, but it is what makes `\"rest\" in str(exc)` pass and matches the stated resolution.\n\n### Assessment\n**Task quality:** Needs fixes\n**Reasoning:** Spec compliance is fully met and the implementation is correct and well-structured; the only blocker is that the plan's own lint gate (`ruff check connectors/`) fails with `I001` on the verbatim-mandated test file, fixable by one blank line.",
+          "time": {
+            "start": 1792000824655,
+            "end": 1792000830625
+          },
+          "id": "prt_13b92954f001KONSDzQPC9oIl9",
+          "sessionID": "ses_ec46dd290ffesSUCeuq6xmGxaL",
+          "messageID": "msg_13b923dfe0013L1cJ4VT6hwcW6"
+        },
+        {
+          "reason": "stop",
+          "snapshot": "3e8146ac67e42d6bd85530126873c559ac0e18a7",
+          "type": "step-finish",
+          "tokens": {
+            "total": 25496,
+            "input": 6487,
+            "output": 1012,
+            "reasoning": 2893,
+            "cache": {
+              "write": 0,
+              "read": 15104
+            }
+          },
+          "cost": 0,
+          "id": "prt_13b92acc3001V8PJL6ctyYmaj1",
+          "sessionID": "ses_ec46dd290ffesSUCeuq6xmGxaL",
+          "messageID": "msg_13b923dfe0013L1cJ4VT6hwcW6"
+        }
+      ]
+    }
+  ]
+}
