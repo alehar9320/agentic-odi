@@ -27,6 +27,9 @@ select = ["E4", "E7", "E9", "F", "I", "UP", "B", "BLE"]
 python_version = "3.11"
 ignore_missing_imports = true
 
+[tool.uv.sources]
+agentic-odi-core = { workspace = true }
+
 [project.scripts]
 agentic-odi-server = "mcp_server.mcp_server:main"
 agentic-odi-mcp-server = "mcp_server.mcp_server:main"

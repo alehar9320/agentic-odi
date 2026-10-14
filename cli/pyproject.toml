@@ -6,7 +6,11 @@ requires-python = ">=3.10"
 dependencies = [
     "typer",
     "fastmcp",
+    "agentic-odi-core",
 ]
+
+[tool.uv.sources]
+agentic-odi-core = { workspace = true }
 
 [project.scripts]
 agentic-odi = "cli.cli:app"
