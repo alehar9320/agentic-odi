@@ -22,3 +22,6 @@ dev = [
 
 [tool.bandit]
 exclude_dirs = [".venv", "tests"]
+
+[tool.ruff]
+extend-exclude = ["docs"]

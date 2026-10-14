@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import os
 from typing import Any
 
@@ -45,7 +44,7 @@ class SQLiteRepository(Repository):
                     current.update(p.get("updates", {}))
                     try:
                         self.customer_outcomes[cid] = co.model_validate(current)
-                    except Exception:
+                    except Exception:  # noqa: BLE001
                         pass
             elif et == "CUSTOMER_OUTCOME_DELETED":
                 cid = p["id"]
@@ -95,7 +94,9 @@ class SQLiteRepository(Repository):
             return list(self.customer_outcomes.values())
         return [co for co in self.customer_outcomes.values() if co.job_id == job_id]
 
-    def update_customer_outcome(self, outcome_id: str, updates: dict[str, Any]) -> CustomerOutcome | None:
+    def update_customer_outcome(
+        self, outcome_id: str, updates: dict[str, Any]
+    ) -> CustomerOutcome | None:
         co = self.customer_outcomes.get(outcome_id)
         if not co:
             return None
@@ -103,7 +104,7 @@ class SQLiteRepository(Repository):
         current.update(updates)
         try:
             new_co = co.model_validate(current)
-        except Exception:
+        except Exception:  # noqa: BLE001
             return None
         self.store.append("CUSTOMER_OUTCOME_UPDATED", {"id": outcome_id, "updates": updates})
         self.customer_outcomes[outcome_id] = new_co

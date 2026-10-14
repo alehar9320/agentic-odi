@@ -8,12 +8,12 @@ from enum import Enum
 from pydantic import BaseModel, Field, computed_field
 
 
-class Direction(str, Enum):
+class Direction(str, Enum):  # noqa: UP042
     MINIMIZE = "minimize"
     MAXIMIZE = "maximize"
 
 
-class BusinessImpactCategory(str, Enum):
+class BusinessImpactCategory(str, Enum):  # noqa: UP042
     REVENUE_GROWTH = "revenue_growth"
     COST_REDUCTION = "cost_reduction"
     RETENTION = "retention"
@@ -98,7 +98,9 @@ class BusinessValue(BaseModel):
 class CustomerOutcome(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     job_id: str = Field(..., description="The ID of the Job this outcome relates to")
-    step_id: str | None = Field(default=None, description="The ID of the specific Step, if applicable")
+    step_id: str | None = Field(
+        default=None, description="The ID of the specific Step, if applicable"
+    )
     customer_value: CustomerValue
     business_value: BusinessValue
 

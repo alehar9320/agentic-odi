@@ -47,13 +47,13 @@ def _call_mcp(tool: str, args: dict[str, Any], mcp_url: str = MCP_URL_DEFAULT) -
 @outcomes_app.command("add")
 def add(
     job_id: str = typer.Option(..., help="Job ID the outcome belongs to"),
-    direction: DirectionOption = typer.Option(..., help="minimize | maximize"),
+    direction: DirectionOption = typer.Option(..., help="minimize | maximize"),  # noqa: B008
     unit_of_measure: str = typer.Option(..., "--unit"),
     object_of_control: str = typer.Option(..., "--object"),
     statement: str = typer.Option(..., help="Full outcome statement"),
     importance: float = typer.Option(..., min=1.0, max=10.0),
     satisfaction: float = typer.Option(..., min=1.0, max=10.0),
-    category: CategoryOption = typer.Option(..., help="Business impact category"),
+    category: CategoryOption = typer.Option(..., help="Business impact category"),  # noqa: B008
     business_statement: str = typer.Option(..., help="Business value statement"),
     contextual_clarifier: str | None = typer.Option(default=None),
     step_id: str | None = typer.Option(default=None),
@@ -81,7 +81,9 @@ def add(
     }
     if step_id:
         args["step_id"] = step_id
-    from cli.backend import get_backend; typer.echo(get_backend("mcp", mcp_url=mcp_url).call("add_customer_outcome", args))
+    from cli.backend import get_backend
+
+    typer.echo(get_backend("mcp", mcp_url=mcp_url).call("add_customer_outcome", args))
 
 
 @outcomes_app.command("get")
@@ -90,7 +92,11 @@ def get(
     mcp_url: str = typer.Option(default=MCP_URL_DEFAULT, help="MCP server URL"),
 ) -> None:
     """Get a Customer Outcome by ID."""
-    from cli.backend import get_backend; typer.echo(get_backend("mcp", mcp_url=mcp_url).call("get_customer_outcome", {"outcome_id": outcome_id}))
+    from cli.backend import get_backend
+
+    typer.echo(
+        get_backend("mcp", mcp_url=mcp_url).call("get_customer_outcome", {"outcome_id": outcome_id})
+    )
 
 
 @outcomes_app.command("list")
@@ -102,7 +108,9 @@ def list_outcomes(
     args: dict[str, Any] = {}
     if job_id:
         args["job_id"] = job_id
-    from cli.backend import get_backend; typer.echo(get_backend("mcp", mcp_url=mcp_url).call("list_customer_outcomes", args))
+    from cli.backend import get_backend
+
+    typer.echo(get_backend("mcp", mcp_url=mcp_url).call("list_customer_outcomes", args))
 
 
 @outcomes_app.command("update")
@@ -110,12 +118,12 @@ def update(
     outcome_id: str = typer.Argument(...),
     importance: float | None = typer.Option(default=None, min=1.0, max=10.0),
     satisfaction: float | None = typer.Option(default=None, min=1.0, max=10.0),
-    direction: DirectionOption | None = typer.Option(default=None),
+    direction: DirectionOption | None = typer.Option(default=None),  # noqa: B008
     unit_of_measure: str | None = typer.Option(default=None, help="Unit of measure"),
     object_of_control: str | None = typer.Option(default=None, help="Object of control"),
     contextual_clarifier: str | None = typer.Option(default=None),
     statement: str | None = typer.Option(default=None),
-    category: CategoryOption | None = typer.Option(default=None),
+    category: CategoryOption | None = typer.Option(default=None),  # noqa: B008
     business_statement: str | None = typer.Option(default=None),
     detail: str | None = typer.Option(default=None),
     estimated_annual_value: float | None = typer.Option(default=None),
@@ -151,7 +159,9 @@ def update(
         args["estimated_annual_value"] = estimated_annual_value
     if confidence is not None:
         args["confidence"] = confidence
-    from cli.backend import get_backend; typer.echo(get_backend("mcp", mcp_url=mcp_url).call("update_customer_outcome", args))
+    from cli.backend import get_backend
+
+    typer.echo(get_backend("mcp", mcp_url=mcp_url).call("update_customer_outcome", args))
 
 
 @outcomes_app.command("delete")
@@ -165,7 +175,13 @@ def delete(
         confirm = typer.confirm(f"Delete customer outcome {outcome_id}?")
         if not confirm:
             raise typer.Exit()
-    from cli.backend import get_backend; typer.echo(get_backend("mcp", mcp_url=mcp_url).call("delete_customer_outcome", {"outcome_id": outcome_id}))
+    from cli.backend import get_backend
+
+    typer.echo(
+        get_backend("mcp", mcp_url=mcp_url).call(
+            "delete_customer_outcome", {"outcome_id": outcome_id}
+        )
+    )
 
 
 @outcomes_app.command("score")
