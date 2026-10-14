@@ -1,0 +1,31 @@
+Scoped re-review of a fix round. Only judge the delta diff — do not re-review the whole task.
+
+## Working directory
+/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module
+
+## Original gap being fixed
+Two plan Review Focus behaviors were implemented but untested: (1) a resource read failing mid-ingest still returns a batch with prior records + an error; (3) a truly empty server (no tools/resources) yields exactly one `catalog` record with empty lists and no errors.
+
+## Delta Under Review
+**Base:** ad92100987a99a512fda34ca01dea837c17f57f0
+**Head:** 7f1410c  (read the exact SHA from git log if needed)
+**Diff file:** /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/review-ad92100..7f1410c.diff
+
+Read the diff file. Read-only review: do not mutate anything.
+
+## Checks
+1. Does the delta add ONLY tests (no `mcp.py`/source change)? Confirm.
+2. Does the resource-read-failure test actually exercise the connector's per-item error handling (i.e., one resource read raises, another succeeds, and it asserts catalog + successful resource record + a naming error, without raising)?
+3. Does the empty-server test assert exactly one catalog record with `{"tools": [], "resources": []}` and `errors == []`?
+4. Any test smell: order dependence, network access, non-determinism, or assertions that would pass even if the behavior regressed?
+5. Run ONLY: `cd /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module && uv run --directory connectors pytest tests/test_mcp_connector.py -q` and report the result.
+
+## Output Format
+### Verdict
+Resolved | Not resolved
+### Reasoning
+[1-3 sentences]
+### New issues (if any)
+(file:line, severity, how to fix)
+
+Your final message IS the report; no preamble.
