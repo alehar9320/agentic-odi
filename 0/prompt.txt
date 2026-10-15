@@ -1,0 +1,51 @@
+You are implementing Task 3: Shared models, `Connector` protocol, and errors.
+
+## Working directory (IMPORTANT)
+Work ONLY inside this git worktree on branch `mcp-connector-module`:
+  /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module
+Do not touch /home/alexa/repos/agentic-odi (the main checkout).
+
+## Task Description
+Read your task brief FIRST — it is your requirements, with the exact values and test code to use verbatim:
+  /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-3-brief.md
+
+## Context
+The `agentic-odi-connectors` package was scaffolded in Task 2 (`connectors/src/connectors/__init__.py` is currently a docstring only). This task adds the shared foundation that Tasks 4–7 build on: Pydantic models, a `Connector` Protocol, and an error hierarchy. Follow TDD exactly as the brief lays out (write the failing test first, run it to see it fail, implement, run it to see it pass).
+
+## Clarification (resolves an ambiguity in the brief)
+The error hierarchy line in the brief is ambiguous. Use THIS interpretation:
+- `RegistryError(Exception)` is the base class.
+- `UnknownConnectorKindError(RegistryError)` — constructor takes `name: str` (exposes `self.name`), and its message names the offending kind AND the known kinds (e.g. `unknown connector kind 'rest'; known kinds: mcp`). It must contain the offending kind string so `"rest" in str(exc)` holds.
+- `DuplicateConnectorError(RegistryError)`.
+- `ConnectorNotFoundError(RegistryError)`.
+This makes Task 5's `pytest.raises(RegistryError)` on malformed JSON valid while also letting `UnknownConnectorKindError` be caught specifically.
+
+Other spec points to honor:
+- `ConnectorConfig.mcp_settings()` parses `self.settings` into `McpConnectorSettings` and raises `UnknownConnectorKindError(name=self.name?)` — the message must name the kind. (Choose a sensible constructor call consistent with the class signature.)
+- `McpConnectorSettings` fields: `url: str`, `tools: list[str] = []`.
+- `IngestRecord.item_type` is `Literal["resource","tool_result","catalog"]`.
+- `Connector` is a `@runtime_checkable` `typing.Protocol` with `kind: str`, `name: str`, `async def health(self) -> HealthStatus: ...`, `async def ingest(self) -> IngestBatch: ...`.
+- Re-export all public names (models, `Connector`, and the error classes) from `connectors/__init__.py` so tests can `from connectors import ...`.
+
+## Environment facts (verified)
+- Python pinned to 3.12 (gitignored `.python-version`); shared root `.venv` exists; `uv run --directory connectors pytest ...` uses it.
+- Commit on branch `mcp-connector-module`, never `main`.
+- A git hook appends an `Entire-Checkpoint` trailer to commits — that is expected; keep the subject line as specified in the brief.
+
+## Before you begin
+Ask if anything is unclear. Otherwise implement exactly.
+
+## Your job
+1. Follow the brief's TDD steps. Write `connectors/tests/test_models.py` exactly as given; run it and capture the RED failure; implement `errors.py`, `models.py`, `protocol.py`, and `__init__.py` exports; run the test and capture GREEN.
+2. Commit with the brief's message.
+3. Self-review, then report.
+
+## You do NOT dispatch subagents
+Do all work yourself. Never spawn a subagent.
+
+## Report format
+Write your full report to:
+  /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-3-report.md
+Include: what you implemented; **TDD Evidence** (RED: command + failing output + why expected; GREEN: command + passing output); files changed; self-review findings; concerns.
+
+Then reply with ONLY (under 15 lines): Status; commits (short SHA + subject); one-line test summary; concerns; the report file path.
