@@ -1,0 +1,25 @@
+Advise on how to best make the CLI into a bundled artifact that can easily be installed with curl and that can update itself when a new version becomes available. Ultimately, we'll likely also need to improve git tags through ci to make this work.
+
+---
+
+It should be a fully self-contained binary, similaly to other state-of-the-art CLI experiences
+
+---
+
+All OS supported
+
+---
+
+Can we do a combination? It's best if it updates itself automatically, but it should albe be possible to user-invoke?
+
+---
+
+1. Near-instant startup is key for a world-class ux. 2. Code signing we leave for later. 3. OK that background auto-update is on by default. 4. Binary size, you choose based on what gives best user experience. Do what Steve Jobs would have mandated. Furthermore, for versioning, it'd be cool if semver could be primary used versioning but that we also have datetime versioning as secondary, so we have a ref to when it was released also. When we bundle the file, it'd also be cool if we may have 'odi' as the short-form name, secondarily 'odipm' and possibly 'odi-cli' as the longer form.
+
+---
+
+Let's go!
+
+---
+
+Let's go. sub-agent-driven sounds good to me.
