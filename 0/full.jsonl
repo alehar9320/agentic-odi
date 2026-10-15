@@ -19,17 +19,17 @@
     },
     "cost": 0,
     "tokens": {
-      "input": 66241,
-      "output": 7357,
+      "input": 72729,
+      "output": 10754,
       "reasoning": 515,
       "cache": {
-        "read": 223936,
+        "read": 254656,
         "write": 0
       }
     },
     "time": {
       "created": 1792094135621,
-      "updated": 1792094754552
+      "updated": 1792095470343
     }
   },
   "messages": [
@@ -1238,6 +1238,104 @@
           "id": "prt_1412cb62a0013MUlPloz5PGvlR",
           "sessionID": "ses_ebedd9abaffesSyRWO5QAiMN5F",
           "messageID": "msg_1412bd6f40021BJLEJARJZ6oVB"
+        }
+      ]
+    },
+    {
+      "info": {
+        "role": "user",
+        "time": {
+          "created": 1792095468680
+        },
+        "agent": "plan",
+        "model": {
+          "providerID": "opencode",
+          "modelID": "big-pickle"
+        },
+        "summary": {
+          "diffs": []
+        },
+        "id": "msg_14136bc88001vZksbohUgwj9eM",
+        "sessionID": "ses_ebedd9abaffesSyRWO5QAiMN5F"
+      },
+      "parts": [
+        {
+          "type": "text",
+          "text": "1. Near-instant startup is key for a world-class ux. 2. Code signing we leave for later. 3. OK that background auto-update is on by default. 4. Binary size, you choose based on what gives best user experience. Do what Steve Jobs would have mandated. Furthermore, for versioning, it'd be cool if semver could be primary used versioning but that we also have datetime versioning as secondary, so we have a ref to when it was released also. When we bundle the file, it'd also be cool if we may have 'odi' as the short-form name, secondarily 'odipm' and possibly 'odi-cli' as the longer form.",
+          "id": "prt_14136bc92001ifhNiXAQUmL42U",
+          "sessionID": "ses_ebedd9abaffesSyRWO5QAiMN5F",
+          "messageID": "msg_14136bc88001vZksbohUgwj9eM"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_14136bc88001vZksbohUgwj9eM",
+        "role": "assistant",
+        "mode": "plan",
+        "agent": "plan",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 40605,
+          "input": 6488,
+          "output": 3397,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 30720
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792095470134,
+          "completed": 1792095513579
+        },
+        "finish": "stop",
+        "id": "msg_14136c236002LvpvXsY1zyb0ZI",
+        "sessionID": "ses_ebedd9abaffesSyRWO5QAiMN5F"
+      },
+      "parts": [
+        {
+          "snapshot": "6f33dd66391a776c2d4ee39c5d22f8734949f3de",
+          "type": "step-start",
+          "id": "prt_14136dafd001ChTzcMZ7Ky7w5Z",
+          "sessionID": "ses_ebedd9abaffesSyRWO5QAiMN5F",
+          "messageID": "msg_14136c236002LvpvXsY1zyb0ZI"
+        },
+        {
+          "type": "text",
+          "text": "Decisions:\n1. Near-instant startup → `--onedir` bundle shipped as archive. This is the key: PyInstaller onedir has fast startup (no extraction). So ship a `.tar.gz` (unix) / `.zip` (windows) containing the app dir; install.sh extracts to `~/.local/share/agentic-odi` or similar, symlinks/copies launcher to bin. Actually for near-instant AND single file... trade-off. onedir = directory of files, not a single file. But we can ship as a compressed archive (single downloadable artifact), extract on install. Update = download archive, extract to versioned dir, flip a symlink atomically. That's the nix/rustup style layout.\n\nAlternative for near-instant single file: `--onefile` still extracts. PyInstaller's newer versions cache? No. Nuitka onefile also extracts. So onedir is the answer for speed.\n\nDesign: install layout:\n```\n~/.local/share/agentic-odi/versions/<version>/   (extracted bundle)\n~/.local/share/agentic-odi/current -> versions/<version>  (symlink)\n~/.local/bin/odi -> ~/.local/share/agentic-odi/current/odi  (symlink)\n```\nAtomic update: extract new version, then atomically re-point `current` symlink. Downloads are archives per platform.\n\n2. No signing for now.\n\n3. Auto-update on by default (applies next run).\n\n4. Binary size — \"Do what Steve Jobs would have mandated\" → prioritize UX. Steve Jobs would want it to just work, be small, fast, elegant. So lazy-import fastmcp and make `--backend mcp` optional? But that could break MCP backend in the binary. Hmm. Best UX: everything just works. But size... Jobs would ship a polished, small, fast product. I think the right call: keep full functionality working, but engineer it for a lean binary where possible (lazy imports, exclusions), and accept a larger macOS/Windows binary rather than ship a crippled one. Actually Jobs would cut features the user doesn't need. But `--backend mcp` is a real feature. I'll recommend: keep full functionality, optimize size (strip, exclude unused, lazy import fastmcp so PyInstaller can better tree-shake — though PyInstaller includes static imports anywhere). \n\nLet me think: can we exclude fastmcp and make mcp backend load it dynamically at runtime? If fastmcp is NOT bundled, `--backend mcp` fails in the binary. Not acceptable for \"just works.\"\n\nAlternative: ship two things? No, complexity.\n\nI'll recommend: bundle everything so all features work (Jobs: it just works), optimize the bundle (strip debug symbols, exclude unused stdlib, UPX only if no AV issues — actually UPX causes AV false positives, avoid). Prioritize size second to correctness. I'll state my call clearly.\n\nActually, re-reading: \"Binary size, you choose based on what gives best user experience.\" So I decide. I'll say: full functionality bundled; no UPX; measure; if size is egregious, revisit lazy fastmcp. Since startup speed is onedir, size matters less than onefile because no extraction. Good.\n\nNow versioning: semver primary + datetime secondary. E.g. version `0.1.0` plus release timestamp `20261015T2113Z`. Display: `odi --version` → `0.1.0 (2026-10-15)`. And maybe tags like `v0.1.0` with release date metadata. Or CalVer-style fallback. The user wants \"a ref to when it was released also.\" So embed both; tag remains semver `vX.Y.Z`.\n\nNaming: binary/short-form `odi`? Wait, `odi` is also the project (Outcome-Driven Innovation). They want short-form `odi`, secondary `odipm`, longer `odi-cli`. Hmm, \"secondarily 'odipm'\". So provide multiple command names / aliases:\n- Primary command: `odi`\n- Aliases (symlinks or console scripts): `odipm`, `odi-cli`\n- Also keep existing `agentic-odi` for backward compat.\n\nSo install.sh creates symlinks `odi`, `odipm`, `odi-cli`, `agentic-odi` → the binary. The archive's executable is `odi` (on Windows `odi.exe`), and we ship copies/symlinks for others. On Windows, symlinks are awkward → ship copies or a launcher. Note.\n\nLet me now also reflect: onedir + multiple names. The executable inside the onedir bundle is named `odi`. install.sh symlinks. Windows: create `odi.exe`, `odipm.exe`, `odi-cli.exe` copies (or a tiny launcher). Simpler: build the PyInstaller executable named `odi`, and also rename copies.\n\nNow, I should also decide the update for onedir: since it's onedir, the update downloads the archive for the new version, extracts to `versions/<new>`, verifies checksums, atomically repoints `current`. Background thread can do it. Applies next run. \n\nConcurrency: multiple invocations updating simultaneously → use a lockfile.\n\nNow I have enough. The user is in plan mode, read-only. I should present the updated plan reflecting the decisions and then likely this is the final plan. The brainstorming skill would have me write a design doc and then use writing-plans — but plan mode forbids writes. The system reminder says I must not make edits. So I present the plan and note next steps.\n\nI should keep this reasonably concise but comprehensive. Let me present the refined plan.\n\nLet me also address a subtlety: near-instant startup with onedir — for macOS we typically ship a `.app` or a directory; for a CLI, a directory with the executable + `_internal/` works. Distribution archive: `odi-<version>-<os>-<arch>.tar.gz` (unix) / `odi-<version>-windows-x86_64.zip`.\n\nInstall layout & PATH. Good.\n\nShould I ask any more questions? Maybe confirm naming priority: is `odi` primary even though `agentic-odi` and the PyPI-ish name exist? They said short-form `odi`, secondary `odipm`, longer `odi-cli`. And keep `agentic-odi`? I'll assume keep for back-compat and mention it. I could ask one clarifying question, but they've given clear direction. I'll state assumptions and offer to adjust.\n\nAlso versioning datetime secondary: decide tag format. I'll propose tag = `v<semver>` (e.g. `v0.1.0`) and embed `release_date` (UTC ISO-8601) + `build` metadata; `--version` shows `0.1.0 (2026-10-15)`. Also maybe include date in asset names? No, keep asset names clean.\n\nLet me write the final plan. I'll structure it as the design/plan. Since plan mode wants a plan, present it.\n\nI'll present and then ask for final approval to implement (once out of plan mode). Given the HARD-GATE, get approval.\n\nLet me write concisely with the key sections: decisions locked, architecture, install layout, update flow, versioning & naming, CI/tagging, phases, remaining assumptions.\n\nAlso I realize I should double check: does GitHub have ubuntu arm64 runners now? Yes, `ubuntu-24.04-arm` (public preview → GA in 2025). Good.\n\nmacOS Intel runner: `macos-13` is the last x86_64; GitHub has begun deprecating macos-13. Alternative: `macos-14` is arm64 only; x86_64 can be cross-built? PyInstaller can't cross-compile. Hmm. This is a real concern for macos-x86_64. Options: use `macos-13` while available, or build x86_64 under Rosetta on arm64 runner (possible with PyInstaller? Running an x86_64 python under Rosetta on arm64 runner can produce x86_64 binaries). I'll flag this as a known wrinkle. Given date 2026, macos-13 may be retired. I'll note: may need Rosetta-based build on macos-14 for x86_64, or drop Intel Mac. Ask? I'll flag as risk/decision.\n\nActually let me include it as a flagged item rather than a blocking question.\n\nLet me write.</think>Locked in. Here's the revised plan reflecting your calls.\n\n## Decisions (as I read them)\n\n1. **Near-instant startup → `--onedir` PyInstaller bundle, shipped as an archive.** This is the only way to get instant startup — `--onefile` re-extracts to temp on every run. We give up \"one literal file\" and instead download one archive that installs into a versioned directory (this is what `rustup`/`deno`/`nix` do).\n2. **No code signing for now** (document macOS Gatekeeper / Windows SmartScreen workarounds in the README).\n3. **Background auto-update ON by default**, applies on next run; opt-out via flag/env.\n4. **Size = full functionality, optimized.** My call (Steve-Jobs style): *it just works* beats *small*. Bundle everything so `--backend mcp` works out of the box; optimize via strip/exclusions; **no UPX** (triggers AV false positives). Since onedir has no extraction cost, size is a download-time concern only. If post-measurement it's egregious, we revisit a lazy `fastmcp` import — but only if it doesn't break the MCP backend.\n\nPlus: **semver primary + release datetime secondary**, and **`odi` primary / `odipm` / `odi-cli` aliases**.\n\n## Install layout (versioned, atomic updates)\n\n```\n~/.local/share/agentic-odi/\n  versions/0.1.0/            <- extracted onedir bundle (odi + _internal/)\n  versions/0.2.0/\n  current -> versions/0.2.0  <- atomic symlink flip = the update\n~/.local/bin/\n  odi     -> ../share/agentic-odi/current/odi\n  odipm   -> ../share/agentic-odi/current/odi\n  odi-cli -> ../share/agentic-odi/current/odi\n  agentic-odi -> (kept for backward compat)\n~/.config/agentic-odi/update.json   <- last-check timestamp + state\n```\n\n- **Update = download new archive → verify SHA-256 → extract to `versions/<new>` → atomically re-point `current`.** Never touches the running process. Rollback is trivial (re-point `current`).\n- `~/.local/bin` overridable via `AGENTIC_ODI_INSTALL_DIR`.\n- **Windows:** no symlinks — install to `%LOCALAPPDATA%\\agentic-odi`, ship `odi.exe` plus `odipm.exe`/`odi-cli.exe`/`agentic-odi.exe` copies; update via a deferred helper so the running `.exe` can be swapped.\n\n## Versioning & naming\n\n- **Tag = `v<semver>`** (e.g. `v0.1.0`) — the primary version.\n- Embed **both**: `VERSION=0.1.0` and `RELEASE_DATE=2026-10-15T21:13:00Z` (UTC), injected at build time from the tag/commit date into a generated `_build_info.py`.\n- `odi --version` → `0.1.0 (2026-10-15)`; `odi --version --verbose` → adds commit SHA, build date, target triple. Updater compares semver; the date is the human \"when released\" reference.\n\n## Update flow (both paths)\n\n- **Auto:** on launch, at most one check / 24h (cached). If newer: background download + verify + extract to `versions/<new>`, flip `current`, print `Updated to vX.Y.Z — takes effect next run`. Suppressed when not a frozen build, `AGENTIC_ODI_NO_UPDATE=1`, `--no-update`, non-interactive, or lockfile held.\n- **Explicit:** `odi update [--check] [--force] [--version X.Y.Z] [--now]` (`--now` re-execs into the new version).\n\n## CI / tagging pipeline\n\n- **release-please** (Conventional Commits) → keeps a release PR → merge creates tag `vX.Y.Z` + GitHub Release.\n- Tag triggers `release.yml` matrix → builds onedir archives + `checksums.txt` → uploads to the Release.\n\n| Runner | Target |\n|---|---|\n| `ubuntu-latest` | linux-x86_64 |\n| `ubuntu-24.04-arm` | linux-arm64 |\n| `macos-14` | macos-arm64 |\n| `macos-13` (or Rosetta on 14) | macos-x86_64 |\n| `windows-latest` | windows-x86_64 |\n\nAssets: `odi_<version>_<os>_<arch>.tar.gz` (unix) / `.zip` (windows), plus `checksums.txt`, `install.sh`, `install.ps1`.\n\n## Phasing\n\n1. **Spike (highest risk):** PyInstaller `--onedir` bundle the CLI on Linux → run `--version`/`--help`/`outcomes add`. Confirms `pydantic-core` + `fastmcp` bundle cleanly.\n2. `_build_info.py` (semver + release date injection) + `cli/update.py` (semver compare, OS/arch→asset resolution, checksum verify, cache, lock, atomic current-flip) with unit tests + `update` command + startup hook.\n3. `install.sh` / `install.ps1` with alias symlinks + PATH/completions.\n4. release-please config + `release.yml` matrix + checksums.\n5. README install/update section + end-to-end test installing the binary from a real tagged Release.\n\n## Flagged wrinkles (won't block, but heads-up)\n\n- **macOS Intel** builds: `macos-13` (last x86_64 runner) is being retired; the fallback is an x86_64 build under Rosetta on `macos-14`. May force a \"drop Intel Mac\" decision later.\n- **Self-update inside `~/.local/share`** assumes a writable home; unter writable installs (`/usr/local/bin`) auto-update is disabled and only the install script manages it.\n- Auto-update must no-op gracefully when offline (never block a command on the network).\n\n## Assumptions to confirm\n\n1. Keep `agentic-odi` as an alias alongside `odi`/`odipm`/`odi-cli` (backward compat), yes?\n2. Release assets live on **GitHub Releases** (`alehar9320/agentic-odi`) for now — no vanity domain yet?\n3. release-please with a **single root component** (one product version for the whole repo), not per-package versions?\n\nIf those three are fine, this shape is approved and — once you take me out of plan mode — I'll write the design doc to `docs/superpowers/specs/` and then produce the implementation plan (starting with the Phase 1 spike).",
+          "time": {
+            "start": 1792095476482,
+            "end": 1792095513264
+          },
+          "id": "prt_14136db02001SKw9UZyM6we8IQ",
+          "sessionID": "ses_ebedd9abaffesSyRWO5QAiMN5F",
+          "messageID": "msg_14136c236002LvpvXsY1zyb0ZI"
+        },
+        {
+          "reason": "stop",
+          "snapshot": "6f33dd66391a776c2d4ee39c5d22f8734949f3de",
+          "type": "step-finish",
+          "tokens": {
+            "total": 40605,
+            "input": 6488,
+            "output": 3397,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 30720
+            }
+          },
+          "cost": 0,
+          "id": "prt_141376b56001O1lVGOOCRi6QbH",
+          "sessionID": "ses_ebedd9abaffesSyRWO5QAiMN5F",
+          "messageID": "msg_14136c236002LvpvXsY1zyb0ZI"
         }
       ]
     }
