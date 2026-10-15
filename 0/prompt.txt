@@ -1,0 +1,44 @@
+You are implementing Task 2: Path resolution module.
+
+## Task Description
+
+Read your task brief first — it is your requirements, with the exact values to use verbatim:
+/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/.superpowers/sdd/2026-10-15-cli-bundled-distribution-and-self-update/task-2-brief.md
+
+## Context
+
+This is part of a plan to make the `agentic-odi` CLI a self-contained, self-updating binary. This task adds `cli/src/cli/paths.py`, XDG-aware resolution of the install root, bin dir, config dir, versions dir, the `current` symlink, the state file, plus `is_frozen()` and `is_writable_dir()`. Later tasks (update engine, installers) consume these names.
+
+## Environment (important)
+
+- Work from: /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution
+- Use `UV_PYTHON=3.11` for all `uv` commands (uv's default 3.15 breaks the workspace sync).
+- Run tests with: `UV_PYTHON=3.11 uv run --directory cli pytest tests/test_paths.py -v`
+- The workspace is already synced.
+
+## Interfaces from earlier tasks
+
+- Task 1 added `cli/src/cli/_build_info.py` and rewrote `cli/src/cli/version.py` (`build_summary()`, `verbose_summary()`). Not needed by this task, but don't break them.
+
+## Notes / ambiguity resolution
+
+- Your brief gives the required function names and the resolution order for each path. Implement exactly those names: `install_root`, `bin_dir`, `config_dir`, `versions_dir`, `current_link`, `state_file`, `is_frozen`, `is_writable_dir`.
+- Tests are POSIX-only (they monkeypatch `HOME`/`XDG_*`); still implement the Windows branches (`%LOCALAPPDATA%` / `%APPDATA%`) since the design requires all-OS support. The `is_writable_dir` test is skipped on win32.
+- Do not add new dependencies (no `platformdirs`) — hand-roll the XDG resolution with `os.environ`/`Path.home()`.
+
+## Your Job
+
+Follow the brief's steps in order (TDD). Commit with the message given in the brief.
+
+## You Do Not Dispatch Subagents
+
+Do all of this task's work yourself. Never spawn a subagent, and never spawn a reviewer — review is the controller's job after you report.
+
+## Report Format
+
+Write your full report to:
+/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/.superpowers/sdd/2026-10-15-cli-bundled-distribution-and-self-update/task-2-report.md
+
+Include: what you implemented, what you tested + results, TDD evidence (RED command/output, GREEN command/output), files changed, self-review findings, concerns.
+
+Then reply with ONLY (under 15 lines): Status (DONE | DONE_WITH_CONCERNS | BLOCKED | NEEDS_CONTEXT), commits (short SHA + subject), one-line test summary, concerns, report file path.
