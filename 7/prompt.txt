@@ -1,0 +1,1 @@
+Advise on how to best make the CLI into a bundled artifact that can easily be installed with curl and that can update itself when a new version becomes available. Ultimately, we'll likely also need to improve git tags through ci to make this work.
