@@ -1,0 +1,36 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M50KE4CMW4GRHGMP7CHFKF9A",
+  "session_id": "ses_ebf6bd831ffe9tDPErTclMDXE2",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-15T20:18:38.056656929Z",
+  "branch": "topic/living-studio-tauri",
+  "checkpoints_count": 3,
+  "save_step_count": 1,
+  "files_touched": [],
+  "agent": "OpenCode",
+  "model": "big-pickle",
+  "turn_id": "5785efad0e65",
+  "checkpoint_transcript_start": 48,
+  "transcript_lines_at_start": 48,
+  "compact_transcript_start": 48,
+  "token_usage": {
+    "input_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 0,
+    "output_tokens": 0,
+    "api_call_count": 0
+  },
+  "session_metrics": {
+    "turn_count": 3
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0
+    }
+  ]
+}
