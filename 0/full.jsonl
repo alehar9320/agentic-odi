@@ -1,0 +1,608 @@
+{
+  "info": {
+    "id": "ses_ebea3ee1effe3cjVtpd2L3Kej6",
+    "slug": "happy-squid",
+    "projectID": "e4fe19106d06261ebfed21a0e3ba06559abf1100",
+    "directory": "/home/alexa/repos/agentic-odi",
+    "path": "",
+    "parentID": "ses_ebedd9abaffesSyRWO5QAiMN5F",
+    "title": "Review Task 1 (spec + quality) (@general subagent)",
+    "agent": "general",
+    "model": {
+      "id": "big-pickle",
+      "providerID": "opencode",
+      "variant": "default"
+    },
+    "version": "1.18.35",
+    "summary": {
+      "additions": 0,
+      "deletions": 0,
+      "files": 0
+    },
+    "cost": 0,
+    "tokens": {
+      "input": 25959,
+      "output": 2617,
+      "reasoning": 4146,
+      "cache": {
+        "read": 73984,
+        "write": 0
+      }
+    },
+    "permission": [
+      {
+        "permission": "task",
+        "pattern": "*",
+        "action": "deny"
+      }
+    ],
+    "time": {
+      "created": 1792097915361,
+      "updated": 1792098253524
+    }
+  },
+  "messages": [
+    {
+      "info": {
+        "role": "user",
+        "time": {
+          "created": 1792097915374
+        },
+        "agent": "general",
+        "model": {
+          "providerID": "opencode",
+          "modelID": "big-pickle"
+        },
+        "summary": {
+          "diffs": [
+            {
+              "file": "docs/superpowers/plans/2026-10-15-cli-odi-entity-parity.md",
+              "patch": "Index: docs/superpowers/plans/2026-10-15-cli-odi-entity-parity.md\n===================================================================\n--- docs/superpowers/plans/2026-10-15-cli-odi-entity-parity.md\t\n+++ docs/superpowers/plans/2026-10-15-cli-odi-entity-parity.md\t\n@@ -0,0 +1,949 @@\n+# CLI ODI Entity Parity & Shared Store Implementation Plan\n+\n+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.\n+\n+**Goal:** Give the `agentic-odi` CLI full create/read/update/delete access to every ODI entity (Job, Step, Desired Outcome, Customer Outcome incl. `value_metrics`), matching the MCP tool surface, backed by one persistent SQLite store shared by the CLI and the MCP server.\n+\n+**Architecture:** Extend the `core` repository/service layers with CRUD + cascade delete + FK validation for `Job`/`Step`/`Outcome`. Make `SQLiteRepository` read-through (replays new events before reads) so concurrent processes converge. Add a `build_repository()` factory. The MCP server selects that factory instead of `InMemoryRepository`. The CLI gains a global `--backend/--db/--mcp-url` resolved through a shared `Backend` abstraction, plus new command groups whose names reserve `outcomes` for the desired-outcome entity.\n+\n+**Tech Stack:** Python 3.10+, Typer, Pydantic v2, FastMCP, SQLite (`IntentStore` append-only event log, WAL), pytest/pytest-asyncio, ruff, mypy.\n+\n+**Spec:** `docs/superpowers/specs/2026-10-15-cli-odi-entity-parity-design.md`\n+\n+## Global Constraints\n+\n+- Python `>=3.10`; every project targets `py310`, ruff line-length 100.\n+- Ruff select: `[\"E4\", \"E7\", \"E9\", \"F\", \"I\", \"UP\", \"B\", \"BLE\"]`.\n+- Opportunity Score formula: `importance + max(importance - satisfaction, 0)` — reuse `compute_opportunity_score`.\n+- `importance`/`satisfaction` valid range is `1.0`–`10.0`.\n+- Store path env var: `AGENTIC_ODI_DB`; default `~/.agentic-odi/odi.db`; value `:memory:` means in-memory.\n+- CLI backend env var: `AGENTIC_ODI_BACKEND`; default `local`.\n+- Command vocabulary: `jobs`, `steps`, `outcomes` (Desired Outcome), `customer-outcomes` (Customer Outcome), top-level `score`.\n+- No CLI alias preserving the old `outcomes` = Customer Outcome meaning.\n+- Deleting a Job cascades to its Steps, Outcomes, Customer Outcomes; deleting a Step cascades to Outcomes/Customer Outcomes bound to it. Creating a Step/Outcome/Customer Outcome under an unknown `job_id`/`step_id` is rejected.\n+- Updates use the `is not None` sentinel convention: a field is never cleared by passing null; `job_id` is immutable.\n+- Tests must never touch the real `~/.agentic-odi/odi.db`.\n+- Run all tests via `uv run --directory <pkg> pytest`; lint/type via the README commands.\n+\n+## Review Focus\n+\n+These are the failure modes most likely to bite a user; each has its test pinned in the owning task.\n+\n+1. **Concurrent writer visibility** — a CLI `local` write while the MCP server is running must be visible to the server's next read (Task 3, 5).\n+2. **Cascade delete replay** — deleting a Job then restarting must not resurrect its dependents; a cascaded id reads as not-found (Task 1, 3).\n+3. **Stored opportunity score on update** — updating only `importance` recomputes `opportunity_score`; clearing either score sets it to `None` (Task 2, 3).\n+4. **Bad CLI inputs** — unknown `--backend`, `--db` combined with `--backend mcp`, malformed `--value-metric` JSON, and out-of-range scores produce a clear error, never a traceback (Task 6, 7, 8, 9, 10).\n+5. **value_metrics semantics** — out-of-range or missing required metric fields are rejected; on update, supplying `--value-metric` replaces the whole list (Task 5, 10).\n+\n+---\n+\n+## File Structure\n+\n+**core/** (`agentic-odi-core`)\n+- `core/src/core/repository.py` — `Repository` protocol + `InMemoryRepository`; add get/update/delete for Job/Step/Outcome with cascade.\n+- `core/src/core/services.py` — `ODIService`; add CRUD methods, FK validation, errors.\n+- `core/src/core/sqlite_repository.py` — event apply refactor, read-through sync, locking, new events.\n+- `core/src/core/intent_store.py` — allow `check_same_thread=False`.\n+- `core/src/core/factory.py` (**new**) — `build_repository()`.\n+- `core/src/core/__init__.py` — export new symbols.\n+\n+**mcp_server/** (`agentic-odi-mcp-server`)\n+- `mcp_server/src/mcp_server/mcp_server.py` — select `build_repository()`; new CRUD tools; `value_metrics` on update.\n+- `mcp_server/tests/conftest.py` — force in-memory store.\n+\n+**cli/** (`agentic-odi-cli`)\n+- `cli/src/cli/backend.py` — full `LocalBackend` dispatch, `MCPBackend`, `_call_mcp`, `BackendConfig`, `resolve_backend`.\n+- `cli/src/cli/jobs.py` (**new**), `cli/src/cli/steps.py` (**new**), `cli/src/cli/outcomes.py` (rewrite = Desired Outcome), `cli/src/cli/customer_outcomes.py` (**new**, moved from outcomes.py), `cli/src/cli/cli.py` (mount + global options).\n+- `cli/tests/` — one test module per group + backend/persistence tests.\n+\n+**docs/** — `README.md` CLI section.\n+\n+---\n+\n+### Task 1: Core repository CRUD + cascade (in-memory)\n+\n+**Files:**\n+- Modify: `core/src/core/repository.py`\n+- Test: `core/tests/test_repository.py` (new)\n+\n+**Interfaces:**\n+- Consumes: `core.models.Job`, `Step`, `Outcome`, `CustomerOutcome`.\n+- Produces (on both `Repository` protocol and `InMemoryRepository`):\n+  - `get_step(step_id: str) -> Step | None`\n+  - `get_outcome(outcome_id: str) -> Outcome | None`\n+  - `update_job(job_id: str, updates: dict) -> Job | None`\n+  - `delete_job(job_id: str) -> bool`\n+  - `update_step(step_id: str, updates: dict) -> Step | None`\n+  - `delete_step(step_id: str) -> bool`\n+  - `update_outcome(outcome_id: str, updates: dict) -> Outcome | None`\n+  - `delete_outcome(outcome_id: str) -> bool`\n+\n+- [ ] **Step 1: Write the failing tests** in `core/tests/test_repository.py`\n+\n+```python\n+from core.models import Job, Outcome, Step\n+from core.repository import InMemoryRepository\n+\n+\n+def _repo_with_graph() -> InMemoryRepository:\n+    repo = InMemoryRepository()\n+    repo.add_job(Job(id=\"j1\", name=\"Job\"))\n+    repo.add_step(Step(id=\"s1\", job_id=\"j1\", name=\"Step\", order=1))\n+    repo.add_outcome(Outcome(id=\"o1\", job_id=\"j1\", step_id=\"s1\", statement=\"Min x\"))\n+    return repo\n+\n+\n+def test_get_step_and_get_outcome():\n+    repo = _repo_with_graph()\n+    assert repo.get_step(\"s1\").name == \"Step\"          # type: ignore[union-attr]\n+    assert repo.get_outcome(\"o1\").statement == \"Min x\"  # type: ignore[union-attr]\n+    assert repo.get_step(\"missing\") is None\n+\n+\n+def test_update_job_merges_and_returns_none_when_missing():\n+    repo = _repo_with_graph()\n+    updated = repo.update_job(\"j1\", {\"name\": \"Renamed\"})\n+    assert updated is not None and updated.name == \"Renamed\"\n+    assert repo.update_job(\"nope\", {\"name\": \"x\"}) is None\n+\n+\n+def test_delete_job_cascades_dependents():\n+    repo = _repo_with_graph()\n+    assert repo.delete_job(\"j1\") is True\n+    assert repo.get_job(\"j1\") is None\n+    assert repo.get_step(\"s1\") is None\n+    assert repo.get_outcome(\"o1\") is None\n+    assert repo.delete_job(\"j1\") is False\n+\n+\n+def test_delete_step_cascades_its_outcomes():\n+    repo = _repo_with_graph()\n+    repo.add_outcome(Outcome(id=\"o2\", job_id=\"j1\", statement=\"Unbound\"))\n+    assert repo.delete_step(\"s1\") is True\n+    assert repo.get_step(\"s1\") is None\n+    assert repo.get_outcome(\"o1\") is None\n+    assert repo.get_outcome(\"o2\") is not None\n+```\n+\n+- [ ] **Step 2: Run tests to verify they fail**\n+\n+Run: `uv run --directory core pytest tests/test_repository.py -v`\n+Expected: FAIL (`AttributeError: 'InMemoryRepository' object has no attribute 'get_step'`).\n+\n+- [ ] **Step 3: Add the methods to the `Repository` protocol and `InMemoryRepository`**\n+\n+Add the eight signatures from the Interfaces block to `Repository`. In `InMemoryRepository`, implement: getters via `self.steps.get` / `self.outcomes.get`; updates by merging `model_dump(exclude_unset=True)` with `updates` and re-validating (mirror `update_customer_outcome`); `delete_job` removes the job and every step/outcome/customer_outcome whose `job_id == job_id`; `delete_step` removes the step and every outcome/customer_outcome whose `step_id == step_id`; each delete returns `False` if the target id is absent.\n+\n+- [ ] **Step 4: Run tests to verify they pass**\n+\n+Run: `uv run --directory core pytest tests/test_repository.py -v`\n+Expected: PASS.\n+\n+- [ ] **Step 5: Commit**\n+\n+```bash\n+git add core/src/core/repository.py core/tests/test_repository.py\n+git commit -m \"feat(core): add job/step/outcome CRUD with cascade delete to repository\"\n+```\n+\n+---\n+\n+### Task 2: Core service CRUD, FK validation, score recompute\n+\n+**Files:**\n+- Modify: `core/src/core/services.py`, `core/src/core/__init__.py`\n+- Test: `core/tests/test_service.py`\n+\n+**Interfaces:**\n+- Consumes: Task 1 repository methods; `core.models.compute_opportunity_score`; `JobNotFoundError`.\n+- Produces:\n+  - Errors: `StepNotFoundError(step_id)`, `OutcomeNotFoundError(outcome_id)` (both exported from `core`).\n+  - `ODIService.get_step(step_id) -> Step | None`, `get_outcome(outcome_id) -> Outcome | None`\n+  - `ODIService.update_job(job_id, updates) -> Job`, `delete_job(job_id) -> None`\n+  - `ODIService.update_step(step_id, updates) -> Step`, `delete_step(step_id) -> None`\n+  - `ODIService.update_outcome(outcome_id, updates) -> Outcome`, `delete_outcome(outcome_id) -> None`\n+  - `add_step`, `add_outcome`, `add_customer_outcome` now raise `JobNotFoundError` for unknown `job_id` and `StepNotFoundError` for an unknown `step_id`.\n+\n+- [ ] **Step 1: Write the failing tests** (append to `core/tests/test_service.py`)\n+\n+```python\n+import pytest\n+\n+from core.services import JobNotFoundError, OutcomeNotFoundError, StepNotFoundError\n+\n+\n+def test_add_step_requires_existing_job(service):\n+    with pytest.raises(JobNotFoundError):\n+        service.add_step(\"missing\", \"Step\", order=1)\n+\n+\n+def test_add_outcome_requires_existing_job_and_step(service):\n+    job = service.add_job(\"J\")\n+    with pytest.raises(JobNotFoundError):\n+        service.add_outcome(\"missing\", \"Min x\")\n+    with pytest.raises(StepNotFoundError):\n+        service.add_outcome(job.id, \"Min x\", step_id=\"missing\")\n+\n+\n+def test_update_outcome_recomputes_opportunity_score(service):\n+    job = service.add_job(\"J\")\n+    outcome = service.add_outcome(job.id, \"Min x\", importance=5.0, satisfaction=5.0)\n+    assert outcome.opportunity_score == 5.0\n+    updated = service.update_outcome(outcome.id, {\"importance\": 8.0})\n+    assert updated.opportunity_score == 11.0\n+    cleared = service.update_outcome(outcome.id, {\"satisfaction\": None})\n+    assert cleared.opportunity_score is None\n+\n+\n+def test_job_crud_and_cascade(service):\n+    job = service.add_job(\"J\")\n+    service.add_step(job.id, \"Step\", order=1)\n+    assert service.update_job(job.id, {\"name\": \"Renamed\"}).name == \"Renamed\"\n+    assert service.get_step(service.get_job_map(job.id)[0].id) is not None\n+    service.delete_job(job.id)\n+    assert service.get_job(job.id) is None\n+    assert service.get_job_map(job.id) == []\n+    with pytest.raises(JobNotFoundError):\n+        service.delete_job(job.id)\n+\n+\n+def test_update_unknown_ids_raise(service):\n+    with pytest.raises(JobNotFoundError):\n+        service.update_job(\"missing\", {\"name\": \"x\"})\n+    with pytest.raises(StepNotFoundError):\n+        service.update_step(\"missing\", {\"name\": \"x\"})\n+    with pytest.raises(OutcomeNotFoundError):\n+        service.update_outcome(\"missing\", {\"statement\": \"x\"})\n+```\n+\n+- [ ] **Step 2: Run to verify failure**\n+\n+Run: `uv run --directory core pytest tests/test_service.py -v`\n+Expected: FAIL (`ImportError: cannot import name 'StepNotFoundError'`).\n+\n+- [ ] **Step 3: Implement in `services.py`**\n+\n+Add `StepNotFoundError`/`OutcomeNotFoundError` (mirroring `JobNotFoundError`). Add the get/update/delete methods. In `update_outcome`, fetch the existing outcome (raise `OutcomeNotFoundError` if absent), compute `importance`/`satisfaction` from `updates` falling back to the existing values, set `updates[\"opportunity_score\"] = compute_opportunity_score(imp, sat)` when both are non-null else `None`, then call `repo.update_outcome`. In `add_step`/`add_outcome`/`add_customer_outcome`, call `self.repo.get_job(job_id)` first and raise `JobNotFoundError` if missing; for `step_id`, call `self.repo.get_step(step_id)` and raise `StepNotFoundError` if missing. Export the two errors from `core/__init__.py` (and add to `__all__`).\n+\n+- [ ] **Step 4: Run to verify pass**\n+\n+Run: `uv run --directory core pytest tests/test_service.py -v`\n+Expected: PASS.\n+\n+- [ ] **Step 5: Commit**\n+\n+```bash\n+git add core/src/core/services.py core/src/core/__init__.py core/tests/test_service.py\n+git commit -m \"feat(core): add job/step/outcome service CRUD, FK validation, score recompute\"\n+```\n+\n+---\n+\n+### Task 3: SQLiteRepository read-through, locking, cascade events\n+\n+**Files:**\n+- Modify: `core/src/core/intent_store.py`, `core/src/core/sqlite_repository.py`\n+- Test: `core/tests/test_sqlite_repository.py` (new)\n+\n+**Interfaces:**\n+- Consumes: Task 1 methods (interface parity).\n+- Produces: `SQLiteRepository` implements all Task 1 methods, persists `JOB_UPDATED`/`JOB_DELETED`/`STEP_UPDATED`/`STEP_DELETED`/`OUTCOME_UPDATED`/`OUTCOME_DELETED` events, and re-reads new events before every read.\n+  - `IntentStore.__init__(self, db_path: str = \"intent_store.db\", check_same_thread: bool = True)`.\n+\n+- [ ] **Step 1: Write the failing tests** in `core/tests/test_sqlite_repository.py`\n+\n+```python\n+from core.models import Job, Outcome, Step\n+from core.sqlite_repository import SQLiteRepository\n+\n+\n+def test_round_trips_all_entity_types(tmp_path):\n+    db = str(tmp_path / \"odi.db\")\n+    repo = SQLiteRepository(db_path=db)\n+    repo.add_job(Job(id=\"j1\", name=\"Job\", description=\"d\"))\n+    repo.add_step(Step(id=\"s1\", job_id=\"j1\", name=\"Step\", order=1))\n+    repo.add_outcome(\n+        Outcome(id=\"o1\", job_id=\"j1\", step_id=\"s1\", statement=\"Min x\",\n+                importance=8.0, satisfaction=4.0, opportunity_score=12.0)\n+    )\n+\n+    reopened = SQLiteRepository(db_path=db)\n+    assert reopened.get_job(\"j1\").name == \"Job\"          # type: ignore[union-attr]\n+    assert reopened.get_step(\"s1\").order == 1            # type: ignore[union-attr]\n+    assert reopened.get_outcome(\"o1\").opportunity_score == 12.0  # type: ignore[union-attr]\n+\n+\n+def test_concurrent_writer_is_visible(tmp_path):\n+    db = str(tmp_path / \"odi.db\")\n+    reader = SQLiteRepository(db_path=db)\n+    writer = SQLiteRepository(db_path=db)\n+    writer.add_job(Job(id=\"j1\", name=\"Job\"))\n+    assert reader.get_job(\"j1\") is not None    # read-through sees the other connection's write\n+\n+\n+def test_delete_job_cascades_after_reopen(tmp_path):\n+    db = str(tmp_path / \"odi.db\")\n+    repo = SQLiteRepository(db_path=db)\n+    repo.add_job(Job(id=\"j1\", name=\"Job\"))\n+    repo.add_step(Step(id=\"s1\", job_id=\"j1\", name=\"Step\", order=1))\n+    repo.add_outcome(Outcome(id=\"o1\", job_id=\"j1\", step_id=\"s1\", statement=\"Min x\"))\n+    repo.delete_job(\"j1\")\n+\n+    reopened = SQLiteRepository(db_path=db)\n+    assert reopened.get_job(\"j1\") is None\n+    assert reopened.get_step(\"s1\") is None\n+    assert reopened.get_outcome(\"o1\") is None\n+\n+\n+def test_update_outcome_persists(tmp_path):\n+    db = str(tmp_path / \"odi.db\")\n+    repo = SQLiteRepository(db_path=db)\n+    repo.add_outcome(Outcome(id=\"o1\", job_id=\"j1\", statement=\"Min x\"))\n+    repo.update_outcome(\"o1\", {\"statement\": \"Max y\", \"opportunity_score\": 5.0})\n+    assert SQLiteRepository(db_path=db).get_outcome(\"o1\").statement == \"Max y\"  # type: ignore[union-attr]\n+```\n+\n+- [ ] **Step 2: Run to verify failure**\n+\n+Run: `uv run --directory core pytest tests/test_sqlite_repository.py -v`\n+Expected: FAIL on `test_concurrent_writer_is_visible` (reader's snapshot is stale) and missing `update_outcome`.\n+\n+- [ ] **Step 3: Implement**\n+\n+In `intent_store.py`, thread the `check_same_thread` flag into `sqlite3.connect`. In `sqlite_repository.py`: add `import threading`, `self._lock = threading.RLock()`; pass `check_same_thread=False` to `IntentStore`; set `self._last_event_id = 0` before load. Extract `_apply_event(self, ev: dict) -> None` from `_load_snapshot` covering all `*_CREATED`/`*_UPDATED`/`*_DELETED` events (created = `model_validate(p)`; updated = merge `p[\"updates\"]` into the current model, tolerate `ValidationError`; deleted = pop; `JOB_DELETED` also pops steps/outcomes/customer_outcomes with that `job_id`; `STEP_DELETED` also pops outcomes/customer_outcomes with that `step_id`). `_load_snapshot` builds empty dicts and calls `_apply_event` for each stream event, tracking `max(id)`. Add `_sync()` that reads the stream and applies events with `id > self._last_event_id`. Wrap every public read with `with self._lock: self._sync(); ...` and every write with `with self._lock: self.store.append(...); self._sync()` (single application path). Implement `get_step`/`get_outcome`/`update_job`/`delete_job`/`update_step`/`delete_step`/`update_outcome`/`delete_outcome` matching Task 1 semantics; `clear()` becomes lock-guarded `store.clear(); _load_snapshot()`.\n+\n+- [ ] **Step 4: Run to verify pass**\n+\n+Run: `uv run --directory core pytest tests/test_sqlite_repository.py -v`\n+Expected: PASS.\n+\n+- [ ] **Step 5: Commit**\n+\n+```bash\n+git add core/src/core/intent_store.py core/src/core/sqlite_repository.py core/tests/test_sqlite_repository.py\n+git commit -m \"feat(core): read-through SQLite repository with locking and cascade events\"\n+```\n+\n+---\n+\n+### Task 4: `build_repository` factory\n+\n+**Files:**\n+- Create: `core/src/core/factory.py`\n+- Modify: `core/src/core/__init__.py`\n+- Test: `core/tests/test_factory.py` (new)\n+\n+**Interfaces:**\n+- Consumes: `InMemoryRepository`, `SQLiteRepository`.\n+- Produces: `build_repository(db_path: str | None = None) -> Repository` — returns `InMemoryRepository` when the resolved path is `:memory:`, otherwise `SQLiteRepository(db_path=db_path)`. Resolution order: `db_path` arg, then `AGENTIC_ODI_DB`, then default.\n+\n+- [ ] **Step 1: Write the failing test** in `core/tests/test_factory.py`\n+\n+```python\n+import pytest\n+\n+from core import InMemoryRepository, build_repository\n+from core.sqlite_repository import SQLiteRepository\n+\n+\n+def test_memory_path_returns_in_memory(monkeypatch):\n+    monkeypatch.setenv(\"AGENTIC_ODI_DB\", \":memory:\")\n+    assert isinstance(build_repository(), InMemoryRepository)\n+\n+\n+def test_default_path_returns_sqlite(tmp_path, monkeypatch):\n+    monkeypatch.delenv(\"AGENTIC_ODI_DB\", raising=False)\n+    repo = build_repository(db_path=str(tmp_path / \"odi.db\"))\n+    assert isinstance(repo, SQLiteRepository)\n+```\n+\n+- [ ] **Step 2: Run to verify failure**\n+\n+Run: `uv run --directory core pytest tests/test_factory.py -v`\n+Expected: FAIL (`ImportError: cannot import name 'build_repository'`).\n+\n+- [ ] **Step 3: Implement `factory.py` and export**\n+\n+```python\n+\"\"\"Repository factory selecting a persistent or in-memory store.\"\"\"\n+from __future__ import annotations\n+\n+import os\n+\n+from core.repository import InMemoryRepository, Repository\n+from core.sqlite_repository import SQLiteRepository\n+\n+\n+def build_repository(db_path: str | None = None) -> Repository:\n+    path = db_path if db_path is not None else os.environ.get(\"AGENTIC_ODI_DB\")\n+    if path == \":memory:\":\n+        return InMemoryRepository()\n+    return SQLiteRepository(db_path=db_path)\n+```\n+\n+Add `build_repository` to `core/__init__.py` imports and `__all__`.\n+\n+- [ ] **Step 4: Run to verify pass**\n+\n+Run: `uv run --directory core pytest tests/test_factory.py -v`\n+Expected: PASS.\n+\n+- [ ] **Step 5: Commit**\n+\n+```bash\n+git add core/src/core/factory.py core/src/core/__init__.py core/tests/test_factory.py\n+git commit -m \"feat(core): add build_repository factory for shared store selection\"\n+```\n+\n+---\n+\n+### Task 5: MCP server — persistent store, CRUD parity, value_metrics\n+\n+**Files:**\n+- Modify: `mcp_server/src/mcp_server/mcp_server.py`, `mcp_server/tests/conftest.py`\n+- Test: `mcp_server/tests/test_parity.py` (new)\n+\n+**Interfaces:**\n+- Consumes: `core.build_repository`, `ODIService` methods/errors from Task 2.\n+- Produces (new MCP tools, string-returning like the existing ones):\n+  - `get_step(step_id)`, `get_outcome(outcome_id)`\n+  - `update_job(job_id, name=None, description=None)`, `delete_job(job_id)`\n+  - `update_step(step_id, name=None, order=None)`, `delete_step(step_id)`\n+  - `update_outcome(outcome_id, statement=None, importance=None, satisfaction=None, step_id=None)`, `delete_outcome(outcome_id)`\n+  - `update_customer_outcome(..., value_metrics: list[dict] | None = None)`\n+\n+- [ ] **Step 1: Set the test store to in-memory** in `mcp_server/tests/conftest.py`, before importing `mcp_server`\n+\n+```python\n+from __future__ import annotations\n+\n+import os\n+\n+os.environ[\"AGENTIC_ODI_DB\"] = \":memory:\"\n+\n+from collections.abc import Generator  # noqa: E402\n+from typing import Any  # noqa: E402\n+\n+import pytest  # noqa: E402\n+\n+from mcp_server import customer_outcomes_db, jobs_db, outcomes_db, steps_db  # noqa: E402\n+\n+\n+@pytest.fixture(autouse=True)\n+def reset_db() -> Generator[None, Any, None]:\n+    jobs_db.clear()\n+    steps_db.clear()\n+    outcomes_db.clear()\n+    customer_outcomes_db.clear()\n+    yield\n+```\n+\n+- [ ] **Step 2: Write the failing tests** in `mcp_server/tests/test_parity.py`\n+\n+```python\n+import json\n+\n+import pytest\n+from fastmcp import Client\n+\n+from mcp_server import mcp\n+\n+\n+async def _new_job(client) -> str:\n+    res = await client.call_tool(\"add_job\", {\"name\": \"J\"})\n+    return json.loads(res.content[0].text.split(\": \", 1)[1])[\"id\"]  # type: ignore[index]\n+\n+\n+@pytest.mark.asyncio\n+async def test_step_and_outcome_get_update_delete():\n+    async with Client(mcp) as client:\n+        job_id = await _new_job(client)\n+        step = await client.call_tool(\"add_step\", {\"job_id\": job_id, \"name\": \"S\", \"order\": 1})\n+        step_id = json.loads(step.content[0].text.split(\": \", 1)[1])[\"id\"]  # type: ignore[index]\n+\n+        got = await client.call_tool(\"get_step\", {\"step_id\": step_id})\n+        assert step_id in got.content[0].text  # type: ignore[index]\n+\n+        upd = await client.call_tool(\"update_step\", {\"step_id\": step_id, \"name\": \"S2\"})\n+        assert \"updated successfully\" in upd.content[0].text  # type: ignore[index]\n+\n+        out = await client.call_tool(\n+            \"add_outcome\", {\"job_id\": job_id, \"statement\": \"Min x\", \"importance\": 8, \"satisfaction\": 4}\n+        )\n+        outcome_id = json.loads(out.content[0].text.split(\": \", 1)[1])[\"id\"]  # type: ignore[index]\n+\n+        upd_o = await client.call_tool(\"update_outcome\", {\"outcome_id\": outcome_id, \"importance\": 9})\n+        assert \"updated successfully\" in upd_o.content[0].text  # type: ignore[index]\n+\n+        dele = await client.call_tool(\"delete_outcome\", {\"outcome_id\": outcome_id})\n+        assert \"deleted successfully\" in dele.content[0].text  # type: ignore[index]\n+\n+        assert \"deleted successfully\" in (await client.call_tool(\"delete_step\", {\"step_id\": step_id})).content[0].text  # type: ignore[index]\n+        assert \"deleted successfully\" in (await client.call_tool(\"delete_job\", {\"job_id\": job_id})).content[0].text  # type: ignore[index]\n+\n+\n+@pytest.mark.asyncio\n+async def test_update_customer_outcome_replaces_value_metrics():\n+    async with Client(mcp) as client:\n+        job_id = await _new_job(client)\n+        cv = {\"direction\": \"minimize\", \"unit_of_measure\": \"time\", \"object_of_control\": \"x\",\n+              \"statement\": \"Min x\", \"importance\": 5, \"satisfaction\": 5,\n+              \"value_metrics\": [{\"name\": \"m\", \"direction\": \"minimize\", \"unit_of_measure\": \"s\",\n+                                 \"importance\": 6, \"satisfaction\": 2}]}\n+        bv = {\"category\": \"cost_reduction\", \"statement\": \"Save\"}\n+        created = await client.call_tool(\n+            \"add_customer_outcome\", {\"job_id\": job_id, \"customer_value\": cv, \"business_value\": bv}\n+        )\n+        oid = json.loads(created.content[0].text.split(\": \", 1)[1])[\"id\"]  # type: ignore[index]\n+        upd = await client.call_tool(\n+            \"update_customer_outcome\",\n+            {\"outcome_id\": oid,\n+             \"value_metrics\": [{\"name\": \"m2\", \"direction\": \"maximize\", \"unit_of_measure\": \"s\",\n+                                \"importance\": 9, \"satisfaction\": 3}]},\n+        )\n+        assert '\"name\":\"m2\"' in upd.content[0].text  # type: ignore[index]\n+```\n+\n+- [ ] **Step 3: Run to verify failure**\n+\n+Run: `uv run --directory mcp_server pytest tests/test_parity.py -v`\n+Expected: FAIL (unknown tools / value_metrics ignored).\n+\n+- [ ] **Step 4: Implement in `mcp_server.py`**\n+\n+Replace `_repo = InMemoryRepository()` with `_repo = build_repository()` (import `build_repository` from `core`). Keep `jobs_db`/`steps_db`/`outcomes_db`/`customer_outcomes_db` = `_repo.*`. Add the new `@mcp.tool` functions from the Interfaces block, each returning `f\"... created/updated/deleted successfully: {model.model_dump_json()}\"` or a `not found` string (use `job_not_found` and add a step/outcome not-found message). In `update_customer_outcome`, add `value_metrics: list[dict] | None = None` and, when provided, set `cv_d[\"value_metrics\"] = value_metrics` before validation.\n+\n+- [ ] **Step 5: Run full MCP suite**\n+\n+Run: `uv run --directory mcp_server pytest -v`\n+Expected: PASS (existing + new).\n+\n+- [ ] **Step 6: Commit**\n+\n+```bash\n+git add mcp_server/src/mcp_server/mcp_server.py mcp_server/tests/conftest.py mcp_server/tests/test_parity.py\n+git commit -m \"feat(mcp): persistent shared store and CRUD tool parity incl. value_metrics\"\n+```\n+\n+---\n+\n+### Task 6: CLI backend abstraction + global options\n+\n+**Files:**\n+- Modify: `cli/src/cli/backend.py`\n+- Test: `cli/tests/test_backend.py` (new)\n+\n+**Interfaces:**\n+- Consumes: `core.ODIService`, `core.build_repository`/`SQLiteRepository`, errors.\n+- Produces:\n+  - `_call_mcp(tool: str, args: dict, mcp_url: str) -> str` (moved here from `outcomes.py`).\n+  - `LocalBackend(db_path: str | None = None).call(tool_name, args) -> str` handling every tool name in the mapping below.\n+  - `MCPBackend(mcp_url).call(...)` delegating to `_call_mcp`.\n+  - `BackendConfig` dataclass `(backend: str, db_path: str | None, mcp_url: str | None)` and `resolve_backend(config: BackendConfig) -> Backend` that warns to stderr when `db_path` is set with `backend == \"mcp\"`.\n+  - Tool-name map: `add_job`, `get_jobs`, `get_job`, `update_job`, `delete_job`, `add_step`, `get_job_map`, `get_step`, `update_step`, `delete_step`, `add_outcome`, `get_outcomes`, `get_outcome`, `update_outcome`, `delete_outcome`, plus the five `*_customer_outcome` names and `compute_opportunity`.\n+\n+- [ ] **Step 1: Write the failing tests** in `cli/tests/test_backend.py`\n+\n+```python\n+from cli.backend import BackendConfig, LocalBackend, resolve_backend\n+\n+\n+def test_local_backend_full_crud_round_trip(tmp_path):\n+    db = str(tmp_path / \"odi.db\")\n+    backend = LocalBackend(db_path=db)\n+    job_text = backend.call(\"add_job\", {\"name\": \"J\", \"description\": \"d\"})\n+    assert \"created successfully\" in job_text\n+    import json, re\n+\n+    job_id = json.loads(re.search(r\"({.*})\", job_text).group(1))[\"id\"]  # type: ignore[union-attr]\n+    backend.call(\"add_step\", {\"job_id\": job_id, \"name\": \"S\", \"order\": 1})\n+    backend.call(\"add_outcome\", {\"job_id\": job_id, \"statement\": \"Min x\",\n+                                 \"importance\": 8.0, \"satisfaction\": 4.0})\n+    listed = backend.call(\"get_outcomes\", {\"job_id\": job_id})\n+    assert \"Min x\" in listed\n+    assert json.loads(backend.call(\"get_jobs\", {}))[0][\"name\"] == \"J\"\n+\n+\n+def test_resolve_backend_warns_on_db_with_mcp(capsys):\n+    resolve_backend(BackendConfig(backend=\"mcp\", db_path=\"x.db\", mcp_url=\"http://x/mcp\"))\n+    assert \"ignored\" in capsys.readouterr().err.lower()\n+\n+\n+def test_resolve_backend_unknown_raises():\n+    import pytest\n+\n+    with pytest.raises(ValueError):\n+        resolve_backend(BackendConfig(backend=\"nope\", db_path=None, mcp_url=None))\n+```\n+\n+- [ ] **Step 2: Run to verify failure**\n+\n+Run: `uv run --directory cli pytest tests/test_backend.py -v`\n+Expected: FAIL (`ImportError: cannot import name 'BackendConfig'`).\n+\n+- [ ] **Step 3: Implement `backend.py`**\n+\n+Move `_call_mcp` here (same asyncio + `Client` logic and error handling). Build `LocalBackend.call` as a dispatch table over the tool names, each branch calling the corresponding `ODIService` method and formatting results the way the existing `add/update/delete/list` branches do (JSON for lists/gets, \"created/updated/deleted successfully\" for writes; catch not-found/value errors and return their message). Add `BackendConfig` and `resolve_backend` (uses `get_backend`); emit the mcp+db warning via `typer.echo(..., err=True)`.\n+\n+- [ ] **Step 4: Run to verify pass**\n+\n+Run: `uv run --directory cli pytest tests/test_backend.py -v`\n+Expected: PASS.\n+\n+- [ ] **Step 5: Commit**\n+\n+```bash\n+git add cli/src/cli/backend.py cli/tests/test_backend.py\n+git commit -m \"feat(cli): backend abstraction with full local tool dispatch and config resolution\"\n+```\n+\n+---\n+\n+### Task 7: CLI `jobs` group\n+\n+**Files:**\n+- Create: `cli/src/cli/jobs.py`\n+- Modify: `cli/src/cli/cli.py`\n+- Test: `cli/tests/test_jobs_cli.py` (new)\n+\n+**Interfaces:**\n+- Consumes: `resolve_backend`, `BackendConfig` (Task 6); the callback stores a `BackendConfig` on `ctx.obj`.\n+- Produces: `jobs_app` (Typer) with `add`, `list`, `get`, `update`, `delete`; mounted as `jobs`.\n+  - `add --name (required) [--description]`, `list`, `get JOB_ID`, `update JOB_ID [--name --description]`, `delete JOB_ID [-y/--yes]`.\n+\n+- [ ] **Step 1: Add the global callback + mount** in `cli/cli.py`, then write tests in `cli/tests/test_jobs_cli.py`\n+\n+```python\n+from typer.testing import CliRunner\n+\n+from cli.cli import app\n+\n+\n+def test_jobs_add_list_get_round_trip(tmp_path):\n+    db = str(tmp_path / \"odi.db\")\n+    runner = CliRunner()\n+    add = runner.invoke(app, [\"--db\", db, \"jobs\", \"add\", \"--name\", \"Onboard\"])\n+    assert add.exit_code == 0 and \"created successfully\" in add.output\n+    listed = runner.invoke(app, [\"--db\", db, \"jobs\", \"list\"])\n+    assert \"Onboard\" in listed.output\n+\n+\n+def test_jobs_get_unknown_reports_error(tmp_path):\n+    result = CliRunner().invoke(app, [\"--db\", str(tmp_path / \"odi.db\"), \"jobs\", \"get\", \"nope\"])\n+    assert result.exit_code == 0 and \"not found\" in result.output.lower()\n+```\n+\n+- [ ] **Step 2: Run to verify failure**\n+\n+Run: `uv run --directory cli pytest tests/test_jobs_cli.py -v`\n+Expected: FAIL (no `--db` option / no `jobs` command).\n+\n+- [ ] **Step 3: Implement**\n+\n+In `cli.py`: add `--backend`, `--db`, `--mcp-url` to `@app.callback()` (`main`), keep `--version`; set `ctx.obj = BackendConfig(...)`; mount `jobs_app`. In `jobs.py`: build `jobs_app = typer.Typer(help=\"Manage Jobs-to-be-Done.\")`, each command reads `ctx.obj`, calls the backend tool (`add_job`/`get_jobs`/`get_job`/`update_job`/`delete_job`), and echoes the result; `delete` prompts unless `-y`.\n+\n+- [ ] **Step 4: Run to verify pass**\n+\n+Run: `uv run --directory cli pytest tests/test_jobs_cli.py -v`\n+Expected: PASS.\n+\n+- [ ] **Step 5: Commit**\n+\n+```bash\n+git add cli/src/cli/jobs.py cli/src/cli/cli.py cli/tests/test_jobs_cli.py\n+git commit -m \"feat(cli): add jobs command group with global backend options\"\n+```\n+\n+---\n+\n+### Task 8: CLI `steps` group\n+\n+**Files:**\n+- Create: `cli/src/cli/steps.py`\n+- Modify: `cli/src/cli/cli.py`\n+- Test: `cli/tests/test_steps_cli.py` (new)\n+\n+**Interfaces:**\n+- Consumes: Task 6/7 infrastructure.\n+- Produces: `steps_app` mounted as `steps` with `add --job-id --name --order`, `list --job-id` (required, maps to `get_job_map`), `get STEP_ID`, `update STEP_ID [--name --order]`, `delete STEP_ID [-y]`.\n+\n+- [ ] **Step 1: Write the failing tests** in `cli/tests/test_steps_cli.py`\n+\n+```python\n+import json\n+import re\n+\n+from typer.testing import CliRunner\n+\n+from cli.cli import app\n+\n+\n+def _job_id(runner, db) -> str:\n+    out = runner.invoke(app, [\"--db\", db, \"jobs\", \"add\", \"--name\", \"J\"]).output\n+    return json.loads(re.search(r\"({.*})\", out).group(1))[\"id\"]  # type: ignore[union-attr]\n+\n+\n+def test_steps_add_and_list_job_map(tmp_path):\n+    db = str(tmp_path / \"odi.db\")\n+    runner = CliRunner()\n+    job_id = _job_id(runner, db)\n+    add = runner.invoke(app, [\"--db\", db, \"steps\", \"add\", \"--job-id\", job_id, \"--name\", \"S\", \"--order\", \"1\"])\n+    assert add.exit_code == 0 and \"created successfully\" in add.output\n+    listed = runner.invoke(app, [\"--db\", db, \"steps\", \"list\", \"--job-id\", job_id])\n+    assert \"S\" in listed.output\n+\n+\n+def test_steps_add_unknown_job_errors(tmp_path):\n+    result = CliRunner().invoke(\n+        app, [\"--db\", str(tmp_path / \"odi.db\"), \"steps\", \"add\", \"--job-id\", \"nope\", \"--name\", \"S\", \"--order\", \"1\"]\n+    )\n+    assert \"not found\" in result.output.lower()\n+```\n+\n+- [ ] **Step 2: Run to verify failure**\n+\n+Run: `uv run --directory cli pytest tests/test_steps_cli.py -v`\n+Expected: FAIL (no `steps` command).\n+\n+- [ ] **Step 3: Implement `steps.py`** mirroring `jobs.py`, mapping to `add_step`/`get_job_map`/`get_step`/`update_step`/`delete_step`. Mount in `cli.py`.\n+\n+- [ ] **Step 4: Run to verify pass**\n+\n+Run: `uv run --directory cli pytest tests/test_steps_cli.py -v`\n+Expected: PASS.\n+\n+- [ ] **Step 5: Commit**\n+\n+```bash\n+git add cli/src/cli/steps.py cli/src/cli/cli.py cli/tests/test_steps_cli.py\n+git commit -m \"feat(cli): add steps command group\"\n+```\n+\n+---\n+\n+### Task 9: CLI `outcomes` (Desired Outcome) group + top-level `score`\n+\n+**Files:**\n+- Rewrite: `cli/src/cli/outcomes.py`\n+- Modify: `cli/src/cli/cli.py`\n+- Test: `cli/tests/test_outcomes_cli.py` (rewrite)\n+\n+**Interfaces:**\n+- Consumes: Task 6/7 infrastructure.\n+- Produces: `outcomes_app` (now Desired Outcome) mounted as `outcomes` with `add --job-id --statement [--importance --satisfaction] [--step-id]`, `list --job-id (required) [--step-id]`, `get OUTCOME_ID`, `update OUTCOME_ID [--statement --importance --satisfaction --step-id]`, `delete OUTCOME_ID [-y]`; and a top-level `score IMPORTANCE SATISFACTION` command.\n+\n+- [ ] **Step 1: Write the failing tests** (replace `cli/tests/test_outcomes_cli.py`)\n+\n+```python\n+import json\n+import re\n+\n+from typer.testing import CliRunner\n+\n+from cli.cli import app\n+\n+\n+def _job_id(runner, db) -> str:\n+    out = runner.invoke(app, [\"--db\", db, \"jobs\", \"add\", \"--name\", \"J\"]).output\n+    return json.loads(re.search(r\"({.*})\", out).group(1))[\"id\"]  # type: ignore[union-attr]\n+\n+\n+def test_outcomes_add_computes_score(tmp_path):\n+    db = str(tmp_path / \"odi.db\")\n+    runner = CliRunner()\n+    job_id = _job_id(runner, db)\n+    add = runner.invoke(app, [\"--db\", db, \"outcomes\", \"add\", \"--job-id\", job_id,\n+                              \"--statement\", \"Min onboarding\", \"--importance\", \"8\", \"--satisfaction\", \"4\"])\n+    assert add.exit_code == 0 and \"12.0\" in add.output\n+    listed = runner.invoke(app, [\"--db\", db, \"outcomes\", \"list\", \"--job-id\", job_id])\n+    assert \"Min onboarding\" in listed.output\n+\n+\n+def test_score_command(tmp_path):\n+    result = CliRunner().invoke(app, [\"--db\", str(tmp_path / \"odi.db\"), \"score\", \"8\", \"2\"])\n+    assert result.exit_code == 0 and \"14.00\" in result.output\n+```\n+\n+- [ ] **Step 2: Run to verify failure**\n+\n+Run: `uv run --directory cli pytest tests/test_outcomes_cli.py -v`\n+Expected: FAIL (`outcomes add` still expects customer-value flags; no top-level `score`).\n+\n+- [ ] **Step 3: Implement** the desired-outcome `outcomes_app` and the top-level `score` command (using `compute_opportunity`). Keep the enum options for nothing here; specs are plain strings.\n+\n+- [ ] **Step 4: Run to verify pass**\n+\n+Run: `uv run --directory cli pytest tests/test_outcomes_cli.py -v`\n+Expected: PASS.\n+\n+- [ ] **Step 5: Commit**\n+\n+```bash\n+git add cli/src/cli/outcomes.py cli/src/cli/cli.py cli/tests/test_outcomes_cli.py\n+git commit -m \"feat(cli): desired-outcome group and top-level score command\"\n+```\n+\n+---\n+\n+### Task 10: CLI `customer-outcomes` group + `value_metrics`\n+\n+**Files:**\n+- Create: `cli/src/cli/customer_outcomes.py` (moved from the old `outcomes.py` implementation)\n+- Modify: `cli/src/cli/cli.py`\n+- Test: `cli/tests/test_customer_outcomes_cli.py` (new; supersedes old tests)\n+\n+**Interfaces:**\n+- Consumes: Task 6/7 infrastructure.\n+- Produces: `customer_outcomes_app` mounted as `customer-outcomes` with the former Customer Outcome CRUD (`add`, `list [--job-id]`, `get`, `update`, `delete`), plus a repeatable `--value-metric '<json>'` on `add` and `update` that parses to a list of `{name, direction, unit_of_measure, importance, satisfaction}` dicts; on `add` it is placed at `customer_value[\"value_metrics\"]`, on `update` it is passed as the top-level `value_metrics` argument.\n+\n+- [ ] **Step 1: Write the failing tests** in `cli/tests/test_customer_outcomes_cli.py`\n+\n+```python\n+from typer.testing import CliRunner\n+\n+from cli.cli import app\n+\n+\n+def test_customer_outcome_add_with_value_metrics(tmp_path):\n+    db = str(tmp_path / \"odi.db\")\n+    runner = CliRunner()\n+    runner.invoke(app, [\"--db\", db, \"jobs\", \"add\", \"--name\", \"J\"])\n+    import json\n+    job_id = json.loads(runner.invoke(app, [\"--db\", db, \"jobs\", \"list\"]).output)[0][\"id\"]\n+    metric = '{\"name\":\"m\",\"direction\":\"minimize\",\"unit_of_measure\":\"s\",\"importance\":6,\"satisfaction\":2}'\n+    result = runner.invoke(app, [\"--db\", db, \"customer-outcomes\", \"add\", \"--job-id\", job_id,\n+                                 \"--direction\", \"minimize\", \"--unit\", \"time\", \"--object\", \"x\",\n+                                 \"--statement\", \"Min x\", \"--importance\", \"8\", \"--satisfaction\", \"4\",\n+                                 \"--category\", \"cost_reduction\", \"--business-statement\", \"Save\",\n+                                 \"--value-metric\", metric])\n+    assert result.exit_code == 0 and '\"name\":\"m\"' in result.output\n+\n+\n+def test_customer_outcome_add_rejects_bad_metric_json(tmp_path):\n+    db = str(tmp_path / \"odi.db\")\n+    runner = CliRunner()\n+    runner.invoke(app, [\"--db\", db, \"jobs\", \"add\", \"--name\", \"J\"])\n+    import json\n+    job_id = json.loads(runner.invoke(app, [\"--db\", db, \"jobs\", \"list\"]).output)[0][\"id\"]\n+    result = runner.invoke(app, [\"--db\", db, \"customer-outcomes\", \"add\", \"--job-id\", job_id,\n+                                 \"--direction\", \"minimize\", \"--unit\", \"t\", \"--object\", \"x\",\n+                                 \"--statement\", \"s\", \"--importance\", \"8\", \"--satisfaction\", \"4\",\n+                                 \"--category\", \"cost_reduction\", \"--business-statement\", \"b\",\n+                                 \"--value-metric\", \"not-json\"])\n+    assert result.exit_code != 0 and \"value-metric\" in result.output.lower()\n+```\n+\n+- [ ] **Step 2: Run to verify failure**\n+\n+Run: `uv run --directory cli pytest tests/test_customer_outcomes_cli.py -v`\n+Expected: FAIL (no `customer-outcomes` command / no `--value-metric`).\n+\n+- [ ] **Step 3: Implement** by moving the previous `outcomes.py` Customer Outcome commands into `customer_outcomes.py`, renaming the group to `customer-outcomes`, and adding `--value-metric` (repeatable) parsed via `json.loads`; on parse/validation failure raise `typer.BadParameter` naming `value-metric`. Mount in `cli.py`. Delete the obsolete Customer Outcome tests that lived in the old `test_outcomes_cli.py`.\n+\n+- [ ] **Step 4: Run to verify pass**\n+\n+Run: `uv run --directory cli pytest tests/test_customer_outcomes_cli.py -v`\n+Expected: PASS.\n+\n+- [ ] **Step 5: Commit**\n+\n+```bash\n+git add cli/src/cli/customer_outcomes.py cli/src/cli/cli.py cli/tests/test_customer_outcomes_cli.py cli/tests/test_outcomes_cli.py\n+git commit -m \"feat(cli): customer-outcomes group with value_metrics input\"\n+```\n+\n+---\n+\n+### Task 11: Persistence acceptance test, README, full verification\n+\n+**Files:**\n+- Create: `cli/tests/test_persistence.py`\n+- Modify: `README.md`\n+- Test: the whole suite\n+\n+**Interfaces:**\n+- Consumes: everything above.\n+- Produces: the explicit \"successfully stored data types\" proof.\n+\n+- [ ] **Step 1: Write the acceptance test** in `cli/tests/test_persistence.py`\n+\n+```python\n+from cli.backend import LocalBackend\n+from core.sqlite_repository import SQLiteRepository\n+\n+\n+def test_every_entity_type_survives_reopen(tmp_path):\n+    db = str(tmp_path / \"odi.db\")\n+    backend = LocalBackend(db_path=db)\n+\n+    import json, re\n+\n+    def json_of(text: str) -> dict:\n+        return json.loads(re.search(r\"({.*})\", text).group(1))  # type: ignore[union-attr]\n+\n+    job_id = json_of(backend.call(\"add_job\", {\"name\": \"J\", \"description\": \"d\"}))[\"id\"]\n+    step_id = json_of(backend.call(\"add_step\", {\"job_id\": job_id, \"name\": \"S\", \"order\": 1}))[\"id\"]\n+    backend.call(\"add_outcome\", {\"job_id\": job_id, \"statement\": \"Min x\",\n+                                 \"importance\": 8.0, \"satisfaction\": 4.0, \"step_id\": step_id})\n+    backend.call(\"add_customer_outcome\", {\n+        \"job_id\": job_id,\n+        \"customer_value\": {\"direction\": \"minimize\", \"unit_of_measure\": \"time\",\n+                           \"object_of_control\": \"x\", \"statement\": \"Min x\",\n+                           \"importance\": 8.0, \"satisfaction\": 4.0,\n+                           \"value_metrics\": [{\"name\": \"m\", \"direction\": \"minimize\",\n+                                              \"unit_of_measure\": \"s\", \"importance\": 6.0,\n+                                              \"satisfaction\": 2.0}]},\n+        \"business_value\": {\"category\": \"cost_reduction\", \"statement\": \"Save\"},\n+    })\n+\n+    repo = SQLiteRepository(db_path=db)\n+    assert repo.get_job(job_id).name == \"J\"                       # type: ignore[union-attr]\n+    assert repo.get_step(step_id).order == 1                      # type: ignore[union-attr]\n+    outcome = repo.get_outcome(repo.get_outcomes(job_id)[0].id)\n+    assert outcome.opportunity_score == 12.0                      # type: ignore[union-attr]\n+    co = repo.list_customer_outcomes(job_id)[0]\n+    assert co.customer_value.value_metrics[0].opportunity_score == 10.0\n+```\n+\n+- [ ] **Step 2: Run it**\n+\n+Run: `uv run --directory cli pytest tests/test_persistence.py -v`\n+Expected: PASS.\n+\n+- [ ] **Step 3: Update `README.md`** — replace the \"Manage Customer Outcomes\" section with a \"CLI\" section documenting `jobs`, `steps`, `outcomes` (desired), `customer-outcomes`, top-level `score`, the global `--backend local|mcp`, `--db`, `AGENTIC_ODI_DB`, the shared-store behavior, and the breaking rename. Update the CLI bullet in \"Code Overview\".\n+\n+- [ ] **Step 4: Full verification**\n+\n+```bash\n+uv run ruff check .\n+uv run ruff format --check .\n+uv run --directory core mypy .\n+uv run --directory mcp_server mypy .\n+uv run --directory local_server mypy .\n+uv run --directory client mypy .\n+uv run --directory cli mypy .\n+uv run --directory connectors mypy .\n+uv run --directory core pytest\n+uv run --directory mcp_server pytest\n+uv run --directory local_server pytest\n+uv run --directory client pytest\n+uv run --directory cli pytest\n+uv run --directory connectors pytest\n+```\n+Expected: all green. If `ruff format --check` fails, run `uv run ruff format .` and re-check.\n+\n+- [ ] **Step 5: Commit**\n+\n+```bash\n+git add cli/tests/test_persistence.py README.md\n+git commit -m \"test(cli): prove all entity types persist; document new CLI surface\"\n+```\n+\n+---\n+\n+## Self-Review\n+\n+- **Spec coverage:** jobs/steps/outcomes/customer-outcomes CLI groups (Tasks 7–10) ✓; `value_metrics` input+output (Tasks 5, 10) ✓; shared persistent store + read-through (Tasks 3, 5) ✓; backend selection (Tasks 6, 7) ✓; full CRUD + MCP parity (Tasks 1, 2, 5, 7–10) ✓; cascade + FK validation (Tasks 1–3) ✓; the \"successfully stored data types\" acceptance test (Task 11) ✓; README + gates (Task 11) ✓.\n+- **Type consistency:** repository/service/MCP/CLI/backend all use the same tool names and method names (`get_step`, `update_outcome`, `delete_job`, …); `BackendConfig` fields (`backend`, `db_path`, `mcp_url`) are identical everywhere; `build_repository` signature stable across Tasks 4 and 5.\n+- **Review Focus:** each item (concurrent visibility, cascade replay, stored score on update, bad CLI inputs, value_metrics semantics) has a pinned test in Tasks 3/5/2/6–10/10 respectively.\n+- **Proportion:** bodies appear only where the signature + tests don't determine them (`build_repository`, `_apply_event`, the acceptance test); everything else is signatures + assertions.\n",
+              "additions": 949,
+              "deletions": 0,
+              "status": "added"
+            }
+          ]
+        },
+        "id": "msg_1415c11ed001RKzEKC6PctA6XH",
+        "sessionID": "ses_ebea3ee1effe3cjVtpd2L3Kej6"
+      },
+      "parts": [
+        {
+          "type": "text",
+          "text": "You are reviewing one task's implementation: first whether it matches its requirements, then whether it is well-built. This is a task-scoped gate, not a merge review — a broad whole-branch review happens separately after all tasks are complete.\n\n## What Was Requested\n\nRead the task brief: /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/.superpowers/sdd/2026-10-15-cli-bundled-distribution-and-self-update/task-1-brief.md\n\nGlobal constraints from the spec/design that bind this task:\n- Python >= 3.10; CLI package `agentic-odi-cli`, entry `cli.cli:app`.\n- Versioning: semver primary, release datetime secondary. Tag `v<semver>`; embed `VERSION` and `RELEASE_DATE_UTC`.\n- First released version is `0.1.0`.\n- `_build_info.py` committed holds dev defaults (`VERSION = \"0.1.0\"`, empty release date); the build step overwrites it later.\n- `odi --version` prints `0.1.0 (2026-10-15)` when a release date is set, else `0.1.0`.\n\n## What the Implementer Claims They Built\n\nRead the implementer's report: /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/.superpowers/sdd/2026-10-15-cli-bundled-distribution-and-self-update/task-1-report.md\n\n## Diff Under Review\n\nBase: aff60a46192387db8764444e6ac3b96a807d6b6b\nHead: c2fef5e3aa1e0dfc4a18d8afba4b19bca8c51538\nDiff file: /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/.superpowers/sdd/2026-10-15-cli-bundled-distribution-and-self-update/review-aff60a4..c2fef5e.diff\n\nRead the diff file once — it contains the commit list, a stat summary, and the full diff with surrounding context. Do not re-run git commands. Do not crawl the broader codebase; inspect outside the diff only for a concrete, named risk (one focused check per risk).\n\nYour review is read-only. Do not mutate the working tree, index, HEAD, or branch state.\n\n## You Do Not Dispatch Subagents\n\nDo all of this review yourself. Never spawn a subagent.\n\n## Do Not Trust the Report\n\nTreat the report as unverified claims; verify against the diff. A stated rationale never downgrades a finding.\n\n## Tests\n\nThe implementer already ran the tests and reported TDD evidence. Do not re-run the suite. Run a focused test only if reading raises a specific doubt no existing run answers. Warnings/noise in reported output are findings.\n\n## Part 1: Spec Compliance\nCompare the diff against the brief: Missing / Extra / Misunderstood. If a requirement cannot be verified from this diff alone, report it as a ⚠️ item.\n\n## Part 2: Code Quality\nClean separation, error handling, DRY, edge cases; tests verify real behavior; structure. Cite file:line for every finding.\n\n## Calibration\nCategorize by real severity (Critical/Important/Minor). If the plan/brief mandates something the rubric calls a defect, report it as Important, labeled plan-mandated. Acknowledge strengths before issues.\n\n## Output Format\n\n### Spec Compliance\n- ✅/❌ with file:line; ⚠️ items\n### Strengths\n### Issues\n#### Critical / #### Important / #### Minor\n### Assessment\n**Task quality:** Approved | Needs fixes\n**Reasoning:** 1-2 sentences\n\nYour final message is the report itself: begin directly with the spec-compliance verdict. No preamble.",
+          "id": "prt_1415c11f3001V5v76L27QiUEYd",
+          "sessionID": "ses_ebea3ee1effe3cjVtpd2L3Kej6",
+          "messageID": "msg_1415c11ed001RKzEKC6PctA6XH"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_1415c11ed001RKzEKC6PctA6XH",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 15691,
+          "input": 9653,
+          "output": 129,
+          "reasoning": 21,
+          "cache": {
+            "write": 0,
+            "read": 5888
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792097916556,
+          "completed": 1792097927772
+        },
+        "finish": "tool-calls",
+        "id": "msg_1415c168c001mhH4bemnRiPl0S",
+        "sessionID": "ses_ebea3ee1effe3cjVtpd2L3Kej6"
+      },
+      "parts": [
+        {
+          "snapshot": "044668b2406a508227b67496cd9b566db744cdf6",
+          "type": "step-start",
+          "id": "prt_1415c3c2c001LeagX7rjol5DXN",
+          "sessionID": "ses_ebea3ee1effe3cjVtpd2L3Kej6",
+          "messageID": "msg_1415c168c001mhH4bemnRiPl0S"
+        },
+        {
+          "type": "reasoning",
+          "text": "Let me start by reading the task brief, the implementer's report, and the diff file.",
+          "time": {
+            "start": 1792097926320,
+            "end": 1792097926506
+          },
+          "id": "prt_1415c3cb0001uQGkKaN6Rddmy4",
+          "sessionID": "ses_ebea3ee1effe3cjVtpd2L3Kej6",
+          "messageID": "msg_1415c168c001mhH4bemnRiPl0S"
+        },
+        {
+          "type": "tool",
+          "tool": "read",
+          "callID": "call_a9fa7ba2b21f49d89ceccd08",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/.superpowers/sdd/2026-10-15-cli-bundled-distribution-and-self-update/task-1-brief.md"
+            },
+            "output": "<path>/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/.superpowers/sdd/2026-10-15-cli-bundled-distribution-and-self-update/task-1-brief.md</path>\n<type>file</type>\n<content>\n1: ### Task 1: Build metadata + version display\n2: \n3: **Files:**\n4: - Create: `cli/src/cli/_build_info.py`\n5: - Modify: `cli/src/cli/version.py`\n6: - Modify: `cli/src/cli/cli.py` (`_version_callback`)\n7: - Test: `cli/tests/test_build_info.py`\n8: \n9: **Interfaces:**\n10: - Consumes: nothing.\n11: - Produces: `_build_info.VERSION: str`, `_build_info.RELEASE_DATE_UTC: str` (ISO-8601 `…Z` or `\"\"`), `_build_info.COMMIT: str`, `_build_info.TARGET: str`. `version.__version__: str`, `version.release_date: str | None`, `version.build_summary() -> str`, `version.verbose_summary() -> str`.\n12: \n13: - [ ] **Step 1: Write the failing test**\n14: \n15: ```python\n16: # cli/tests/test_build_info.py\n17: from cli import version\n18: \n19: \n20: def test_version_matches_build_info():\n21:     from cli import _build_info\n22: \n23:     assert version.__version__ == _build_info.VERSION\n24:     assert version.__version__ == \"0.1.0\"\n25: \n26: \n27: def test_build_summary_omits_date_when_empty(monkeypatch):\n28:     monkeypatch.setattr(version, \"RELEASE_DATE_UTC\", \"\")\n29:     assert version.build_summary() == \"0.1.0\"\n30: \n31: \n32: def test_build_summary_includes_date_when_set(monkeypatch):\n33:     monkeypatch.setattr(version, \"RELEASE_DATE_UTC\", \"2026-10-15T21:13:00Z\")\n34:     assert version.build_summary() == \"0.1.0 (2026-10-15)\"\n35: ```\n36: \n37: - [ ] **Step 2: Run test to verify it fails**\n38: \n39: Run: `uv run --directory cli pytest tests/test_build_info.py -v`\n40: Expected: FAIL (no module `cli._build_info` / no `build_summary`).\n41: \n42: - [ ] **Step 3: Create `_build_info.py` and rewrite `version.py`**\n43: \n44: `_build_info.py` (committed dev defaults; CI overwrites these values at build time):\n45: \n46: ```python\n47: VERSION = \"0.1.0\"\n48: RELEASE_DATE_UTC = \"\"\n49: COMMIT = \"dev\"\n50: TARGET = \"dev\"\n51: ```\n52: \n53: `version.py`:\n54: \n55: ```python\n56: from cli._build_info import COMMIT, RELEASE_DATE_UTC as _RELEASE_DATE_UTC, TARGET, VERSION\n57: \n58: __version__ = VERSION\n59: RELEASE_DATE_UTC = _RELEASE_DATE_UTC\n60: COMMIT = COMMIT\n61: TARGET = TARGET\n62: release_date = RELEASE_DATE_UTC or None\n63: \n64: \n65: def build_summary() -> str:\n66:     if RELEASE_DATE_UTC:\n67:         return f\"{VERSION} ({RELEASE_DATE_UTC[:10]})\"\n68:     return VERSION\n69: \n70: \n71: def verbose_summary() -> str:\n72:     return f\"{build_summary()}\\ncommit: {COMMIT}\\ntarget: {TARGET}\"\n73: ```\n74: \n75: - [ ] **Step 4: Point `--version` at the summary**\n76: \n77: In `cli/src/cli/cli.py`, change `_version_callback` to `typer.echo(version.build_summary())` (import `from cli import version`). Leave `__version__` imported for the existing test.\n78: \n79: - [ ] **Step 5: Run tests to verify they pass**\n80: \n81: Run: `uv run --directory cli pytest tests/test_build_info.py tests/test_cli.py -v`\n82: Expected: PASS.\n83: \n84: - [ ] **Step 6: Commit**\n85: \n86: ```bash\n87: git add cli/src/cli/_build_info.py cli/src/cli/version.py cli/src/cli/cli.py cli/tests/test_build_info.py\n88: git commit -m \"feat(cli): build metadata and version display\"\n89: ```\n90: \n91: ---\n92: \n\n(End of file - total 92 lines)\n</content>",
+            "metadata": {
+              "preview": "### Task 1: Build metadata + version display\n\n**Files:**\n- Create: `cli/src/cli/_build_info.py`\n- Modify: `cli/src/cli/version.py`\n- Modify: `cli/src/cli/cli.py` (`_version_callback`)\n- Test: `cli/tests/test_build_info.py`\n\n**Interfaces:**\n- Consumes: nothing.\n- Produces: `_build_info.VERSION: str`, `_build_info.RELEASE_DATE_UTC: str` (ISO-8601 `…Z` or `\"\"`), `_build_info.COMMIT: str`, `_build_info.TARGET: str`. `version.__version__: str`, `version.release_date: str | None`, `version.build_summary() -> str`, `version.verbose_summary() -> str`.\n\n- [ ] **Step 1: Write the failing test**\n\n```python\n# cli/tests/test_build_info.py\nfrom cli import version\n\n\ndef test_version_matches_build_info():",
+              "truncated": false,
+              "loaded": [],
+              "display": {
+                "type": "file",
+                "path": "/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/.superpowers/sdd/2026-10-15-cli-bundled-distribution-and-self-update/task-1-brief.md",
+                "text": "### Task 1: Build metadata + version display\n\n**Files:**\n- Create: `cli/src/cli/_build_info.py`\n- Modify: `cli/src/cli/version.py`\n- Modify: `cli/src/cli/cli.py` (`_version_callback`)\n- Test: `cli/tests/test_build_info.py`\n\n**Interfaces:**\n- Consumes: nothing.\n- Produces: `_build_info.VERSION: str`, `_build_info.RELEASE_DATE_UTC: str` (ISO-8601 `…Z` or `\"\"`), `_build_info.COMMIT: str`, `_build_info.TARGET: str`. `version.__version__: str`, `version.release_date: str | None`, `version.build_summary() -> str`, `version.verbose_summary() -> str`.\n\n- [ ] **Step 1: Write the failing test**\n\n```python\n# cli/tests/test_build_info.py\nfrom cli import version\n\n\ndef test_version_matches_build_info():\n    from cli import _build_info\n\n    assert version.__version__ == _build_info.VERSION\n    assert version.__version__ == \"0.1.0\"\n\n\ndef test_build_summary_omits_date_when_empty(monkeypatch):\n    monkeypatch.setattr(version, \"RELEASE_DATE_UTC\", \"\")\n    assert version.build_summary() == \"0.1.0\"\n\n\ndef test_build_summary_includes_date_when_set(monkeypatch):\n    monkeypatch.setattr(version, \"RELEASE_DATE_UTC\", \"2026-10-15T21:13:00Z\")\n    assert version.build_summary() == \"0.1.0 (2026-10-15)\"\n```\n\n- [ ] **Step 2: Run test to verify it fails**\n\nRun: `uv run --directory cli pytest tests/test_build_info.py -v`\nExpected: FAIL (no module `cli._build_info` / no `build_summary`).\n\n- [ ] **Step 3: Create `_build_info.py` and rewrite `version.py`**\n\n`_build_info.py` (committed dev defaults; CI overwrites these values at build time):\n\n```python\nVERSION = \"0.1.0\"\nRELEASE_DATE_UTC = \"\"\nCOMMIT = \"dev\"\nTARGET = \"dev\"\n```\n\n`version.py`:\n\n```python\nfrom cli._build_info import COMMIT, RELEASE_DATE_UTC as _RELEASE_DATE_UTC, TARGET, VERSION\n\n__version__ = VERSION\nRELEASE_DATE_UTC = _RELEASE_DATE_UTC\nCOMMIT = COMMIT\nTARGET = TARGET\nrelease_date = RELEASE_DATE_UTC or None\n\n\ndef build_summary() -> str:\n    if RELEASE_DATE_UTC:\n        return f\"{VERSION} ({RELEASE_DATE_UTC[:10]})\"\n    return VERSION\n\n\ndef verbose_summary() -> str:\n    return f\"{build_summary()}\\ncommit: {COMMIT}\\ntarget: {TARGET}\"\n```\n\n- [ ] **Step 4: Point `--version` at the summary**\n\nIn `cli/src/cli/cli.py`, change `_version_callback` to `typer.echo(version.build_summary())` (import `from cli import version`). Leave `__version__` imported for the existing test.\n\n- [ ] **Step 5: Run tests to verify they pass**\n\nRun: `uv run --directory cli pytest tests/test_build_info.py tests/test_cli.py -v`\nExpected: PASS.\n\n- [ ] **Step 6: Commit**\n\n```bash\ngit add cli/src/cli/_build_info.py cli/src/cli/version.py cli/src/cli/cli.py cli/tests/test_build_info.py\ngit commit -m \"feat(cli): build metadata and version display\"\n```\n\n---\n",
+                "lineStart": 1,
+                "lineEnd": 92,
+                "totalLines": 92,
+                "truncated": false
+              }
+            },
+            "title": ".worktrees/cli-bundled-distribution/.superpowers/sdd/2026-10-15-cli-bundled-distribution-and-self-update/task-1-brief.md",
+            "time": {
+              "start": 1792097927086,
+              "end": 1792097927113
+            }
+          },
+          "id": "prt_1415c3d7000172XuxivEPCo30h",
+          "sessionID": "ses_ebea3ee1effe3cjVtpd2L3Kej6",
+          "messageID": "msg_1415c168c001mhH4bemnRiPl0S"
+        },
+        {
+          "type": "tool",
+          "tool": "read",
+          "callID": "call_f4669114612c4a55ae86fa1d",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/.superpowers/sdd/2026-10-15-cli-bundled-distribution-and-self-update/task-1-report.md"
+            },
+            "output": "<path>/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/.superpowers/sdd/2026-10-15-cli-bundled-distribution-and-self-update/task-1-report.md</path>\n<type>file</type>\n<content>\n1: # Task 1 Report: Build metadata + version display\n2: \n3: ## What was implemented\n4: \n5: - **Created `cli/src/cli/_build_info.py`** with committed dev defaults exactly per brief: `VERSION = \"0.1.0\"`, `RELEASE_DATE_UTC = \"\"`, `COMMIT = \"dev\"`, `TARGET = \"dev\"`. No generation logic (later build task overwrites at build time).\n6: - **Rewrote `cli/src/cli/version.py`** to consume `_build_info`: exposes `__version__`, `RELEASE_DATE_UTC`, `COMMIT`, `TARGET`, `release_date` (`str | None`), `build_summary()` (appends ` (YYYY-MM-DD)` only when date is set), and `verbose_summary()` (summary + commit/target lines).\n7: - **Modified `cli/src/cli/cli.py`**: added `from cli import version` (kept `from cli.version import __version__` for the existing `test_cli.py` import); `_version_callback` now echoes `version.build_summary()` instead of bare `__version__`. `version_cmd` was left unchanged (brief only asked for `_version_callback`; in dev defaults `build_summary() == __version__ == \"0.1.0\"` so no behavior difference).\n8: \n9: ## TDD evidence\n10: \n11: ### RED\n12: \n13: Command: `UV_PYTHON=3.11 uv run --directory cli pytest tests/test_build_info.py -v`\n14: \n15: Result: **3 failed** — exactly as the brief predicted:\n16: - `test_version_matches_build_info` — `ImportError: cannot import name '_build_info' from 'cli'`\n17: - `test_build_summary_omits_date_when_empty` — `AttributeError: module 'cli.version' has no attribute 'RELEASE_DATE_UTC'`\n18: - `test_build_summary_includes_date_when_set` — same `AttributeError`\n19: \n20: ### GREEN\n21: \n22: Command: `UV_PYTHON=3.11 uv run --directory cli pytest tests/test_build_info.py tests/test_cli.py -v`\n23: \n24: Result: **5 passed** (3 new build-info tests + 2 existing CLI tests, including `test_version_flag_prints_version` which exercises the changed callback).\n25: \n26: Full-suite regression check: `UV_PYTHON=3.11 uv run --directory cli pytest -q` → **17 passed**.\n27: \n28: ## Files changed\n29: \n30: | File | Change |\n31: |---|---|\n32: | `cli/src/cli/_build_info.py` | created (dev defaults) |\n33: | `cli/src/cli/version.py` | rewritten: imports from `_build_info`, adds `build_summary`/`verbose_summary` |\n34: | `cli/src/cli/cli.py` | `_version_callback` → `typer.echo(version.build_summary())`; added `from cli import version` |\n35: | `cli/tests/test_build_info.py` | created (brief's 3 tests, verbatim) |\n36: \n37: ## Self-review findings\n38: \n39: - **Import sorting (ruff I001)**: `ruff check` flagged both `cli.py` (new `from cli import version` unsorted) and `version.py` (brief's single-line multi-import with alias). Ran `ruff check --fix` + `ruff format`; the fix split the `version.py` import into two lines (`COMMIT, TARGET, VERSION` + `RELEASE_DATE_UTC as _RELEASE_DATE_UTC`). Semantically identical to the brief's code; tests re-run green after the fix.\n40: - **Name-shadowing check**: `main()` in `cli.py` has a parameter named `version: bool` that shadows the `cli.version` module *inside `main` only*; `_version_callback` is a module-level function and resolves `version` to the module correctly. Confirmed by the passing `--version` test.\n41: - **`COMMIT = COMMIT` / `TARGET = TARGET`** in `version.py` are self-referential-looking but valid (imported names are bound before rebinding); taken verbatim from the brief.\n42: - Working tree was clean before starting; commit contains exactly the 4 intended files.\n43: \n44: ## Concerns\n45: \n46: - `version_cmd` (the `version` subcommand, `cli.py:35-37`) still echoes bare `__version__` while `--version` now echoes `build_summary()`. Once the build task writes a real `RELEASE_DATE_UTC`, `--version` and `version` will disagree. Out of scope per the brief, but later tasks (or a follow-up) may want `version_cmd` to use `build_summary()` too — or the plan may replace/remove that command.\n47: - `verbose_summary()` is produced but not yet surfaced by any command (per plan, later tasks consume it). Untested directly by the brief's tests; verified manually correct during review.\n\n(End of file - total 47 lines)\n</content>",
+            "metadata": {
+              "preview": "# Task 1 Report: Build metadata + version display\n\n## What was implemented\n\n- **Created `cli/src/cli/_build_info.py`** with committed dev defaults exactly per brief: `VERSION = \"0.1.0\"`, `RELEASE_DATE_UTC = \"\"`, `COMMIT = \"dev\"`, `TARGET = \"dev\"`. No generation logic (later build task overwrites at build time).\n- **Rewrote `cli/src/cli/version.py`** to consume `_build_info`: exposes `__version__`, `RELEASE_DATE_UTC`, `COMMIT`, `TARGET`, `release_date` (`str | None`), `build_summary()` (appends ` (YYYY-MM-DD)` only when date is set), and `verbose_summary()` (summary + commit/target lines).\n- **Modified `cli/src/cli/cli.py`**: added `from cli import version` (kept `from cli.version import __version__` for the existing `test_cli.py` import); `_version_callback` now echoes `version.build_summary()` instead of bare `__version__`. `version_cmd` was left unchanged (brief only asked for `_version_callback`; in dev defaults `build_summary() == __version__ == \"0.1.0\"` so no behavior difference).\n\n## TDD evidence\n\n### RED\n\nCommand: `UV_PYTHON=3.11 uv run --directory cli pytest tests/test_build_info.py -v`\n\nResult: **3 failed** — exactly as the brief predicted:\n- `test_version_matches_build_info` — `ImportError: cannot import name '_build_info' from 'cli'`\n- `test_build_summary_omits_date_when_empty` — `AttributeError: module 'cli.version' has no attribute 'RELEASE_DATE_UTC'`\n- `test_build_summary_includes_date_when_set` — same `AttributeError`\n\n### GREEN",
+              "truncated": false,
+              "loaded": [],
+              "display": {
+                "type": "file",
+                "path": "/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/.superpowers/sdd/2026-10-15-cli-bundled-distribution-and-self-update/task-1-report.md",
+                "text": "# Task 1 Report: Build metadata + version display\n\n## What was implemented\n\n- **Created `cli/src/cli/_build_info.py`** with committed dev defaults exactly per brief: `VERSION = \"0.1.0\"`, `RELEASE_DATE_UTC = \"\"`, `COMMIT = \"dev\"`, `TARGET = \"dev\"`. No generation logic (later build task overwrites at build time).\n- **Rewrote `cli/src/cli/version.py`** to consume `_build_info`: exposes `__version__`, `RELEASE_DATE_UTC`, `COMMIT`, `TARGET`, `release_date` (`str | None`), `build_summary()` (appends ` (YYYY-MM-DD)` only when date is set), and `verbose_summary()` (summary + commit/target lines).\n- **Modified `cli/src/cli/cli.py`**: added `from cli import version` (kept `from cli.version import __version__` for the existing `test_cli.py` import); `_version_callback` now echoes `version.build_summary()` instead of bare `__version__`. `version_cmd` was left unchanged (brief only asked for `_version_callback`; in dev defaults `build_summary() == __version__ == \"0.1.0\"` so no behavior difference).\n\n## TDD evidence\n\n### RED\n\nCommand: `UV_PYTHON=3.11 uv run --directory cli pytest tests/test_build_info.py -v`\n\nResult: **3 failed** — exactly as the brief predicted:\n- `test_version_matches_build_info` — `ImportError: cannot import name '_build_info' from 'cli'`\n- `test_build_summary_omits_date_when_empty` — `AttributeError: module 'cli.version' has no attribute 'RELEASE_DATE_UTC'`\n- `test_build_summary_includes_date_when_set` — same `AttributeError`\n\n### GREEN\n\nCommand: `UV_PYTHON=3.11 uv run --directory cli pytest tests/test_build_info.py tests/test_cli.py -v`\n\nResult: **5 passed** (3 new build-info tests + 2 existing CLI tests, including `test_version_flag_prints_version` which exercises the changed callback).\n\nFull-suite regression check: `UV_PYTHON=3.11 uv run --directory cli pytest -q` → **17 passed**.\n\n## Files changed\n\n| File | Change |\n|---|---|\n| `cli/src/cli/_build_info.py` | created (dev defaults) |\n| `cli/src/cli/version.py` | rewritten: imports from `_build_info`, adds `build_summary`/`verbose_summary` |\n| `cli/src/cli/cli.py` | `_version_callback` → `typer.echo(version.build_summary())`; added `from cli import version` |\n| `cli/tests/test_build_info.py` | created (brief's 3 tests, verbatim) |\n\n## Self-review findings\n\n- **Import sorting (ruff I001)**: `ruff check` flagged both `cli.py` (new `from cli import version` unsorted) and `version.py` (brief's single-line multi-import with alias). Ran `ruff check --fix` + `ruff format`; the fix split the `version.py` import into two lines (`COMMIT, TARGET, VERSION` + `RELEASE_DATE_UTC as _RELEASE_DATE_UTC`). Semantically identical to the brief's code; tests re-run green after the fix.\n- **Name-shadowing check**: `main()` in `cli.py` has a parameter named `version: bool` that shadows the `cli.version` module *inside `main` only*; `_version_callback` is a module-level function and resolves `version` to the module correctly. Confirmed by the passing `--version` test.\n- **`COMMIT = COMMIT` / `TARGET = TARGET`** in `version.py` are self-referential-looking but valid (imported names are bound before rebinding); taken verbatim from the brief.\n- Working tree was clean before starting; commit contains exactly the 4 intended files.\n\n## Concerns\n\n- `version_cmd` (the `version` subcommand, `cli.py:35-37`) still echoes bare `__version__` while `--version` now echoes `build_summary()`. Once the build task writes a real `RELEASE_DATE_UTC`, `--version` and `version` will disagree. Out of scope per the brief, but later tasks (or a follow-up) may want `version_cmd` to use `build_summary()` too — or the plan may replace/remove that command.\n- `verbose_summary()` is produced but not yet surfaced by any command (per plan, later tasks consume it). Untested directly by the brief's tests; verified manually correct during review.",
+                "lineStart": 1,
+                "lineEnd": 47,
+                "totalLines": 47,
+                "truncated": false
+              }
+            },
+            "title": ".worktrees/cli-bundled-distribution/.superpowers/sdd/2026-10-15-cli-bundled-distribution-and-self-update/task-1-report.md",
+            "time": {
+              "start": 1792097927541,
+              "end": 1792097927556
+            }
+          },
+          "id": "prt_1415c3fb5001wh5OWEmMati3Hb",
+          "sessionID": "ses_ebea3ee1effe3cjVtpd2L3Kej6",
+          "messageID": "msg_1415c168c001mhH4bemnRiPl0S"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "044668b2406a508227b67496cd9b566db744cdf6",
+          "type": "step-finish",
+          "tokens": {
+            "total": 15691,
+            "input": 9653,
+            "output": 129,
+            "reasoning": 21,
+            "cache": {
+              "write": 0,
+              "read": 5888
+            }
+          },
+          "cost": 0,
+          "id": "prt_1415c41ee001o7ePnDRO5k4BEY",
+          "sessionID": "ses_ebea3ee1effe3cjVtpd2L3Kej6",
+          "messageID": "msg_1415c168c001mhH4bemnRiPl0S"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_1415c11ed001RKzEKC6PctA6XH",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 18123,
+          "input": 2552,
+          "output": 74,
+          "reasoning": 9,
+          "cache": {
+            "write": 0,
+            "read": 15488
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792097927776,
+          "completed": 1792098111073
+        },
+        "finish": "tool-calls",
+        "id": "msg_1415c4260001335LU5CJfosjnU",
+        "sessionID": "ses_ebea3ee1effe3cjVtpd2L3Kej6"
+      },
+      "parts": [
+        {
+          "snapshot": "044668b2406a508227b67496cd9b566db744cdf6",
+          "type": "step-start",
+          "id": "prt_1415f08d8001XCOYgDhflHnv1I",
+          "sessionID": "ses_ebea3ee1effe3cjVtpd2L3Kej6",
+          "messageID": "msg_1415c4260001335LU5CJfosjnU"
+        },
+        {
+          "type": "reasoning",
+          "text": "Now let me read the diff file.",
+          "time": {
+            "start": 1792098109839,
+            "end": 1792098110101
+          },
+          "id": "prt_1415f098f001UdAkidcqFWJFlx",
+          "sessionID": "ses_ebea3ee1effe3cjVtpd2L3Kej6",
+          "messageID": "msg_1415c4260001335LU5CJfosjnU"
+        },
+        {
+          "type": "tool",
+          "tool": "read",
+          "callID": "call_5113a5fb915448d68d7084ee",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/.superpowers/sdd/2026-10-15-cli-bundled-distribution-and-self-update/review-aff60a4..c2fef5e.diff"
+            },
+            "output": "<path>/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/.superpowers/sdd/2026-10-15-cli-bundled-distribution-and-self-update/review-aff60a4..c2fef5e.diff</path>\n<type>file</type>\n<content>\n1: # Review package: aff60a4..HEAD\n2: \n3: ## Commits\n4: c2fef5e feat(cli): build metadata and version display\n5: \n6: ## Files changed\n7:  cli/src/cli/_build_info.py   |  4 ++++\n8:  cli/src/cli/cli.py           |  3 ++-\n9:  cli/src/cli/version.py       | 19 ++++++++++++++++++-\n10:  cli/tests/test_build_info.py | 18 ++++++++++++++++++\n11:  4 files changed, 42 insertions(+), 2 deletions(-)\n12: \n13: ## Diff\n14: diff --git a/cli/src/cli/_build_info.py b/cli/src/cli/_build_info.py\n15: new file mode 100644\n16: index 0000000..5a8d751\n17: --- /dev/null\n18: +++ b/cli/src/cli/_build_info.py\n19: @@ -0,0 +1,4 @@\n20: +VERSION = \"0.1.0\"\n21: +RELEASE_DATE_UTC = \"\"\n22: +COMMIT = \"dev\"\n23: +TARGET = \"dev\"\n24: diff --git a/cli/src/cli/cli.py b/cli/src/cli/cli.py\n25: index ad7caf6..dfe4900 100644\n26: --- a/cli/src/cli/cli.py\n27: +++ b/cli/src/cli/cli.py\n28: @@ -1,30 +1,31 @@\n29:  \"\"\"Main CLI entry point.\"\"\"\n30:  \n31:  import typer\n32:  \n33: +from cli import version\n34:  from cli.connectors import connectors_app\n35:  from cli.outcomes import outcomes_app\n36:  from cli.version import __version__\n37:  \n38:  app = typer.Typer(\n39:      name=\"agentic-odi-cli\",\n40:      help=\"Agentic ODI CLI - Tool for managing Jobs-to-be-Done (JTBD) and ODI workflows.\",\n41:  )\n42:  app.add_typer(connectors_app, name=\"connectors\")\n43:  \n44:  app.add_typer(outcomes_app, name=\"outcomes\", help=\"Manage Customer Outcomes\")\n45:  \n46:  \n47:  def _version_callback(value: bool) -> None:\n48:      if value:\n49: -        typer.echo(__version__)\n50: +        typer.echo(version.build_summary())\n51:          raise typer.Exit()\n52:  \n53:  \n54:  @app.callback()\n55:  def main(\n56:      version: bool = typer.Option(\n57:          False, \"--version\", callback=_version_callback, help=\"Show version\"\n58:      ),\n59:  ) -> None:  # noqa: B008\n60:      pass\n61: diff --git a/cli/src/cli/version.py b/cli/src/cli/version.py\n62: index e58a6ce..8dd31e2 100644\n63: --- a/cli/src/cli/version.py\n64: +++ b/cli/src/cli/version.py\n65: @@ -1,3 +1,20 @@\n66:  \"\"\"Version information.\"\"\"\n67:  \n68: -__version__ = \"0.1.0\"\n69: +from cli._build_info import COMMIT, TARGET, VERSION\n70: +from cli._build_info import RELEASE_DATE_UTC as _RELEASE_DATE_UTC\n71: +\n72: +__version__ = VERSION\n73: +RELEASE_DATE_UTC = _RELEASE_DATE_UTC\n74: +COMMIT = COMMIT\n75: +TARGET = TARGET\n76: +release_date = RELEASE_DATE_UTC or None\n77: +\n78: +\n79: +def build_summary() -> str:\n80: +    if RELEASE_DATE_UTC:\n81: +        return f\"{VERSION} ({RELEASE_DATE_UTC[:10]})\"\n82: +    return VERSION\n83: +\n84: +\n85: +def verbose_summary() -> str:\n86: +    return f\"{build_summary()}\\ncommit: {COMMIT}\\ntarget: {TARGET}\"\n87: diff --git a/cli/tests/test_build_info.py b/cli/tests/test_build_info.py\n88: new file mode 100644\n89: index 0000000..39b87db\n90: --- /dev/null\n91: +++ b/cli/tests/test_build_info.py\n92: @@ -0,0 +1,18 @@\n93: +from cli import version\n94: +\n95: +\n96: +def test_version_matches_build_info():\n97: +    from cli import _build_info\n98: +\n99: +    assert version.__version__ == _build_info.VERSION\n100: +    assert version.__version__ == \"0.1.0\"\n101: +\n102: +\n103: +def test_build_summary_omits_date_when_empty(monkeypatch):\n104: +    monkeypatch.setattr(version, \"RELEASE_DATE_UTC\", \"\")\n105: +    assert version.build_summary() == \"0.1.0\"\n106: +\n107: +\n108: +def test_build_summary_includes_date_when_set(monkeypatch):\n109: +    monkeypatch.setattr(version, \"RELEASE_DATE_UTC\", \"2026-10-15T21:13:00Z\")\n110: +    assert version.build_summary() == \"0.1.0 (2026-10-15)\"\n\n(End of file - total 110 lines)\n</content>",
+            "metadata": {
+              "preview": "# Review package: aff60a4..HEAD\n\n## Commits\nc2fef5e feat(cli): build metadata and version display\n\n## Files changed\n cli/src/cli/_build_info.py   |  4 ++++\n cli/src/cli/cli.py           |  3 ++-\n cli/src/cli/version.py       | 19 ++++++++++++++++++-\n cli/tests/test_build_info.py | 18 ++++++++++++++++++\n 4 files changed, 42 insertions(+), 2 deletions(-)\n\n## Diff\ndiff --git a/cli/src/cli/_build_info.py b/cli/src/cli/_build_info.py\nnew file mode 100644\nindex 0000000..5a8d751\n--- /dev/null\n+++ b/cli/src/cli/_build_info.py\n@@ -0,0 +1,4 @@\n+VERSION = \"0.1.0\"",
+              "truncated": false,
+              "loaded": [],
+              "display": {
+                "type": "file",
+                "path": "/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/.superpowers/sdd/2026-10-15-cli-bundled-distribution-and-self-update/review-aff60a4..c2fef5e.diff",
+                "text": "# Review package: aff60a4..HEAD\n\n## Commits\nc2fef5e feat(cli): build metadata and version display\n\n## Files changed\n cli/src/cli/_build_info.py   |  4 ++++\n cli/src/cli/cli.py           |  3 ++-\n cli/src/cli/version.py       | 19 ++++++++++++++++++-\n cli/tests/test_build_info.py | 18 ++++++++++++++++++\n 4 files changed, 42 insertions(+), 2 deletions(-)\n\n## Diff\ndiff --git a/cli/src/cli/_build_info.py b/cli/src/cli/_build_info.py\nnew file mode 100644\nindex 0000000..5a8d751\n--- /dev/null\n+++ b/cli/src/cli/_build_info.py\n@@ -0,0 +1,4 @@\n+VERSION = \"0.1.0\"\n+RELEASE_DATE_UTC = \"\"\n+COMMIT = \"dev\"\n+TARGET = \"dev\"\ndiff --git a/cli/src/cli/cli.py b/cli/src/cli/cli.py\nindex ad7caf6..dfe4900 100644\n--- a/cli/src/cli/cli.py\n+++ b/cli/src/cli/cli.py\n@@ -1,30 +1,31 @@\n \"\"\"Main CLI entry point.\"\"\"\n \n import typer\n \n+from cli import version\n from cli.connectors import connectors_app\n from cli.outcomes import outcomes_app\n from cli.version import __version__\n \n app = typer.Typer(\n     name=\"agentic-odi-cli\",\n     help=\"Agentic ODI CLI - Tool for managing Jobs-to-be-Done (JTBD) and ODI workflows.\",\n )\n app.add_typer(connectors_app, name=\"connectors\")\n \n app.add_typer(outcomes_app, name=\"outcomes\", help=\"Manage Customer Outcomes\")\n \n \n def _version_callback(value: bool) -> None:\n     if value:\n-        typer.echo(__version__)\n+        typer.echo(version.build_summary())\n         raise typer.Exit()\n \n \n @app.callback()\n def main(\n     version: bool = typer.Option(\n         False, \"--version\", callback=_version_callback, help=\"Show version\"\n     ),\n ) -> None:  # noqa: B008\n     pass\ndiff --git a/cli/src/cli/version.py b/cli/src/cli/version.py\nindex e58a6ce..8dd31e2 100644\n--- a/cli/src/cli/version.py\n+++ b/cli/src/cli/version.py\n@@ -1,3 +1,20 @@\n \"\"\"Version information.\"\"\"\n \n-__version__ = \"0.1.0\"\n+from cli._build_info import COMMIT, TARGET, VERSION\n+from cli._build_info import RELEASE_DATE_UTC as _RELEASE_DATE_UTC\n+\n+__version__ = VERSION\n+RELEASE_DATE_UTC = _RELEASE_DATE_UTC\n+COMMIT = COMMIT\n+TARGET = TARGET\n+release_date = RELEASE_DATE_UTC or None\n+\n+\n+def build_summary() -> str:\n+    if RELEASE_DATE_UTC:\n+        return f\"{VERSION} ({RELEASE_DATE_UTC[:10]})\"\n+    return VERSION\n+\n+\n+def verbose_summary() -> str:\n+    return f\"{build_summary()}\\ncommit: {COMMIT}\\ntarget: {TARGET}\"\ndiff --git a/cli/tests/test_build_info.py b/cli/tests/test_build_info.py\nnew file mode 100644\nindex 0000000..39b87db\n--- /dev/null\n+++ b/cli/tests/test_build_info.py\n@@ -0,0 +1,18 @@\n+from cli import version\n+\n+\n+def test_version_matches_build_info():\n+    from cli import _build_info\n+\n+    assert version.__version__ == _build_info.VERSION\n+    assert version.__version__ == \"0.1.0\"\n+\n+\n+def test_build_summary_omits_date_when_empty(monkeypatch):\n+    monkeypatch.setattr(version, \"RELEASE_DATE_UTC\", \"\")\n+    assert version.build_summary() == \"0.1.0\"\n+\n+\n+def test_build_summary_includes_date_when_set(monkeypatch):\n+    monkeypatch.setattr(version, \"RELEASE_DATE_UTC\", \"2026-10-15T21:13:00Z\")\n+    assert version.build_summary() == \"0.1.0 (2026-10-15)\"",
+                "lineStart": 1,
+                "lineEnd": 110,
+                "totalLines": 110,
+                "truncated": false
+              }
+            },
+            "title": ".worktrees/cli-bundled-distribution/.superpowers/sdd/2026-10-15-cli-bundled-distribution-and-self-update/review-aff60a4..c2fef5e.diff",
+            "time": {
+              "start": 1792098110820,
+              "end": 1792098110882
+            }
+          },
+          "id": "prt_1415f0a9a00184BVY6KLbSZWOE",
+          "sessionID": "ses_ebea3ee1effe3cjVtpd2L3Kej6",
+          "messageID": "msg_1415c4260001335LU5CJfosjnU"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "c8b3866bec05f70c6fa6c7c1ca7f07353f8062be",
+          "type": "step-finish",
+          "tokens": {
+            "total": 18123,
+            "input": 2552,
+            "output": 74,
+            "reasoning": 9,
+            "cache": {
+              "write": 0,
+              "read": 15488
+            }
+          },
+          "cost": 0,
+          "id": "prt_1415f0dec001mU8vW9ZUvzF19g",
+          "sessionID": "ses_ebea3ee1effe3cjVtpd2L3Kej6",
+          "messageID": "msg_1415c4260001335LU5CJfosjnU"
+        },
+        {
+          "type": "patch",
+          "hash": "044668b2406a508227b67496cd9b566db744cdf6",
+          "files": [
+            "/home/alexa/repos/agentic-odi/docs/superpowers/plans/2026-10-15-cli-odi-entity-parity.md"
+          ],
+          "id": "prt_1415f0e45001YBVNdQu4YJn7Lm",
+          "sessionID": "ses_ebea3ee1effe3cjVtpd2L3Kej6",
+          "messageID": "msg_1415c4260001335LU5CJfosjnU"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_1415c11ed001RKzEKC6PctA6XH",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 21505,
+          "input": 1551,
+          "output": 40,
+          "reasoning": 1930,
+          "cache": {
+            "write": 0,
+            "read": 17984
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792098111081,
+          "completed": 1792098180203
+        },
+        "finish": "tool-calls",
+        "id": "msg_1415f0e690012vPSClcDAxuVQQ",
+        "sessionID": "ses_ebea3ee1effe3cjVtpd2L3Kej6"
+      },
+      "parts": [
+        {
+          "snapshot": "c8b3866bec05f70c6fa6c7c1ca7f07353f8062be",
+          "type": "step-start",
+          "id": "prt_1415f5494001CtRXVd5FsUhZc9",
+          "sessionID": "ses_ebea3ee1effe3cjVtpd2L3Kej6",
+          "messageID": "msg_1415f0e690012vPSClcDAxuVQQ"
+        },
+        {
+          "type": "reasoning",
+          "text": "Let me analyze the diff against the brief.\n\n**Part 1: Spec Compliance**\n\nBrief requirements:\n1. Create `cli/src/cli/_build_info.py` — ✅ (diff lines 14-23)\n2. Modify `cli/src/cli/version.py` — ✅ (diff lines 61-86)\n3. Modify `cli/src/cli/cli.py` (`_version_callback`) — ✅ (diff lines 47-51)\n4. Test `cli/tests/test_build_info.py` — ✅ (diff lines 87-110)\n\nInterfaces:\n- `_build_info.VERSION: str` ✅\n- `_build_info.RELEASE_DATE_UTC: str` (ISO-8601 `…Z` or `\"\"`) ✅ — empty string default\n- `_build_info.COMMIT: str` ✅\n- `_build_info.TARGET: str` ✅\n- `version.__version__: str` ✅\n- `version.release_date: str | None` ✅ (line 76: `release_date = RELEASE_DATE_UTC or None`)\n- `version.build_summary() -> str` ✅\n- `version.verbose_summary() -> str` ✅\n\nGlobal constraints:\n- Python >= 3.10 — not visible in this diff (pyproject.toml change not in this task), can't verify from diff → ⚠️? Actually, this constraint is on the overall spec; this task doesn't touch pyproject. Probably not applicable to this task. Actually the brief for task 1 doesn't mention it. I'll note if relevant... It's a global constraint but not something this task modifies. Probably not worth flagging as ⚠️ since task brief doesn't require it. Hmm, but the instructions say \"Global constraints from the spec/design that bind this task\". Python >= 3.10 binds the code style (e.g., `str | None` usage works in 3.10). The code uses `str | None` in... actually no annotations in the diff except `-> str`. Fine.\n- CLI package `agentic-odi-cli`, entry `cli.cli:app` — visible in cli.py context: `app = typer.Typer(name=\"agentic-odi-cli\"...)`. Entry point itself is in pyproject (not in diff). ⚠️ maybe not needed — not modified by this task. The diff context shows `name=\"agentic-odi-cli\"` at line 39 of diff context. Not binding a change here.\n- Versioning: semver primary... `0.1.0` first version ✅\n- `_build_info.py` committed holds dev defaults (`VERSION = \"0.1.0\"`, empty release date); build step overwrites later ✅\n- `odi --version` prints `0.1.0 (2026-10-15)` when release date set, else `0.1.0` ✅ — `_version_callback` now calls `version.build_summary()`, and build_summary handles both cases with `RELEASE_DATE_UTC[:10]` giving `2026-10-15`.\n\nWait — one subtlety: `RELEASE_DATE_UTC[:10]` assumes ISO-8601 format starting with `YYYY-MM-DD`. For `\"2026-10-15T21:13:00Z\"`, `[:10]` = `2026-10-15`. ✅ Correct per test.\n\nTest file matches brief verbatim ✅ (diff lines 92-110 match brief lines 16-35).\n\nStep 4: change `_version_callback` to `typer.echo(version.build_summary())`, import `from cli import version`, leave `__version__` imported for existing test. ✅ — `from cli import version` added (diff line 33), `from cli.version import __version__` retained (diff line 36).\n\nReport claims about ruff fix: version.py import split into two lines — matches diff lines 69-70. Semantically identical to brief. That's fine; brief mandated single line but ruff auto-fixed. This is a trivial deviation, worth noting as compliant.\n\nOne thing: report says `version_cmd` was left unchanged. Let me check — the diff context doesn't show a `version_cmd`. The report mentions `version_cmd` at `cli.py:35-37` still echoes bare `__version__`. The diff hunk shows only up to line ~60 of cli.py. Hmm, actually the diff hunk header says `@@ -1,30 +1,31 @@` covering lines 1-30/1-31 of the file. The report says `version_cmd` is at cli.py:35-37 — outside the hunk. So there may be a `version` subcommand elsewhere in cli.py not shown in the diff. That's a concrete named risk raised by the report itself: inconsistency between `--version` and `version` subcommand once release date is set.\n\nShould I check it? The instructions: \"inspect outside the diff only for a concrete, named risk (one focused check per risk)\". The report names this risk: `version_cmd` still echoes bare `__version__`. Let me verify by reading cli.py around lines 30-45 in the worktree.\n\nAlso the global constraint says \"`odi --version` prints `0.1.0 (2026-10-15)`\" — that's `--version` flag, which is fixed. The `version` subcommand inconsistency is a potential Important/Minor issue.\n\nLet me do one focused check: read cli.py in the worktree head to see version_cmd.\n\nWait — is the worktree at head c2fef5e? The diff base..head; the working directory is /home/alexa/repos/agentic-odi but the worktree is at .worktrees/cli-bundled-distribution. I should read the file in the worktree. But is the worktree checked out at the head commit? Probably yes. Let me read cli/src/cli/cli.py from the worktree.\n\nAlso consider: does `_version_callback` shadow issue — `main(version: bool)` parameter shadows module `version` inside main only; callback is module-level. Correct as report says; test passes.\n\nPotential issue: monkeypatch in tests sets `version.RELEASE_DATE_UTC` but `build_summary` references module-global `RELEASE_DATE_UTC` — since `build_summary` is defined in `version` module and reads `RELEASE_DATE_UTC` from module globals, monkeypatch on `version.RELEASE_DATE_UTC` works. ✅ Also `VERSION` referenced — not patched but constant. Fine.\n\nEdge cases: `release_date` computed at import time as `RELEASE_DATE_UTC or None`. If build overwrites `_build_info.RELEASE_DATE_UTC` before import, fine. But if someone monkeypatches `version.RELEASE_DATE_UTC` later, `release_date` won't update — that's a minor design note, not a defect. Also `release_date` is never tested in the brief's tests — brief didn't require it. Interface says `version.release_date: str | None`. No test for it — minor.\n\nAlso `verbose_summary()` untested — brief's test file doesn't test it. Brief mandated exactly those 3 tests, so not a deviation. But quality-wise, untested public interface — Minor.\n\nAnother point: `COMMIT = COMMIT` / `TARGET = TARGET` — self-referential but valid; from the brief verbatim. Note: Actually is it valid? `from cli._build_info import COMMIT, TARGET, VERSION` binds COMMIT in module namespace. Then `COMMIT = COMMIT` rebinds same value. Valid. Fine.\n\nPotential circular import? `version.py` imports `cli._build_info`, `cli.py` imports `cli.version` and `cli.version` module. No cycle.\n\nLet me now check the `version_cmd` claim with one focused read of cli.py.\n\nAlso should I verify tests exist / claims? The instructions say don't re-run suite. The report claims 17 passed, 5 passed, etc. Warnings/noise in reported output are findings — the reported output shown is clean (no warnings mentioned).One more spec check: \"Tag `v<semver>`\" — not applicable to this task (build/release tasks later). \"embed `VERSION` and `RELEASE_DATE_UTC`\" — `_build_info.py` holds them ✅.\n\nTest file location: `cli/tests/test_build_info.py` ✅.\n\nLet me also double check that there's no `RELEASE_DATE_UTC` format validation — brief says ISO-8601 `…Z` or `\"\"`. Dev default is `\"\"` ✅. Format validation not required.\n\nNow, is `odi --version` the actual command? Entry `cli.cli:app` → console script presumably named `odi`. Not in this diff. Fine.\n\nLet me read cli.py from worktree for version_cmd.",
+          "time": {
+            "start": 1792098129213,
+            "end": 1792098179401
+          },
+          "id": "prt_1415f553c001R4wn487IwuRC1f",
+          "sessionID": "ses_ebea3ee1effe3cjVtpd2L3Kej6",
+          "messageID": "msg_1415f0e690012vPSClcDAxuVQQ"
+        },
+        {
+          "type": "tool",
+          "tool": "read",
+          "callID": "call_69ba33076d834eeebc4a386e",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/cli/src/cli/cli.py"
+            },
+            "output": "<path>/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/cli/src/cli/cli.py</path>\n<type>file</type>\n<content>\n1: \"\"\"Main CLI entry point.\"\"\"\n2: \n3: import typer\n4: \n5: from cli import version\n6: from cli.connectors import connectors_app\n7: from cli.outcomes import outcomes_app\n8: from cli.version import __version__\n9: \n10: app = typer.Typer(\n11:     name=\"agentic-odi-cli\",\n12:     help=\"Agentic ODI CLI - Tool for managing Jobs-to-be-Done (JTBD) and ODI workflows.\",\n13: )\n14: app.add_typer(connectors_app, name=\"connectors\")\n15: \n16: app.add_typer(outcomes_app, name=\"outcomes\", help=\"Manage Customer Outcomes\")\n17: \n18: \n19: def _version_callback(value: bool) -> None:\n20:     if value:\n21:         typer.echo(version.build_summary())\n22:         raise typer.Exit()\n23: \n24: \n25: @app.callback()\n26: def main(\n27:     version: bool = typer.Option(\n28:         False, \"--version\", callback=_version_callback, help=\"Show version\"\n29:     ),\n30: ) -> None:  # noqa: B008\n31:     pass\n32: \n33: \n34: @app.command()\n35: def version_cmd() -> None:\n36:     \"\"\"Show CLI version.\"\"\"\n37:     typer.echo(__version__)\n38: \n39: \n40: if __name__ == \"__main__\":\n41:     app()\n\n(End of file - total 41 lines)\n</content>",
+            "metadata": {
+              "preview": "\"\"\"Main CLI entry point.\"\"\"\n\nimport typer\n\nfrom cli import version\nfrom cli.connectors import connectors_app\nfrom cli.outcomes import outcomes_app\nfrom cli.version import __version__\n\napp = typer.Typer(\n    name=\"agentic-odi-cli\",\n    help=\"Agentic ODI CLI - Tool for managing Jobs-to-be-Done (JTBD) and ODI workflows.\",\n)\napp.add_typer(connectors_app, name=\"connectors\")\n\napp.add_typer(outcomes_app, name=\"outcomes\", help=\"Manage Customer Outcomes\")\n\n\ndef _version_callback(value: bool) -> None:\n    if value:",
+              "truncated": false,
+              "loaded": [],
+              "display": {
+                "type": "file",
+                "path": "/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/cli/src/cli/cli.py",
+                "text": "\"\"\"Main CLI entry point.\"\"\"\n\nimport typer\n\nfrom cli import version\nfrom cli.connectors import connectors_app\nfrom cli.outcomes import outcomes_app\nfrom cli.version import __version__\n\napp = typer.Typer(\n    name=\"agentic-odi-cli\",\n    help=\"Agentic ODI CLI - Tool for managing Jobs-to-be-Done (JTBD) and ODI workflows.\",\n)\napp.add_typer(connectors_app, name=\"connectors\")\n\napp.add_typer(outcomes_app, name=\"outcomes\", help=\"Manage Customer Outcomes\")\n\n\ndef _version_callback(value: bool) -> None:\n    if value:\n        typer.echo(version.build_summary())\n        raise typer.Exit()\n\n\n@app.callback()\ndef main(\n    version: bool = typer.Option(\n        False, \"--version\", callback=_version_callback, help=\"Show version\"\n    ),\n) -> None:  # noqa: B008\n    pass\n\n\n@app.command()\ndef version_cmd() -> None:\n    \"\"\"Show CLI version.\"\"\"\n    typer.echo(__version__)\n\n\nif __name__ == \"__main__\":\n    app()",
+                "lineStart": 1,
+                "lineEnd": 41,
+                "totalLines": 41,
+                "truncated": false
+              }
+            },
+            "title": ".worktrees/cli-bundled-distribution/cli/src/cli/cli.py",
+            "time": {
+              "start": 1792098179900,
+              "end": 1792098179956
+            }
+          },
+          "id": "prt_141601950001hWy8YWL17frN6O",
+          "sessionID": "ses_ebea3ee1effe3cjVtpd2L3Kej6",
+          "messageID": "msg_1415f0e690012vPSClcDAxuVQQ"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "c8b3866bec05f70c6fa6c7c1ca7f07353f8062be",
+          "type": "step-finish",
+          "tokens": {
+            "total": 21505,
+            "input": 1551,
+            "output": 40,
+            "reasoning": 1930,
+            "cache": {
+              "write": 0,
+              "read": 17984
+            }
+          },
+          "cost": 0,
+          "id": "prt_141601beb001cK7N7BcbGSnLkz",
+          "sessionID": "ses_ebea3ee1effe3cjVtpd2L3Kej6",
+          "messageID": "msg_1415f0e690012vPSClcDAxuVQQ"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_1415c11ed001RKzEKC6PctA6XH",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 24165,
+          "input": 2397,
+          "output": 62,
+          "reasoning": 2186,
+          "cache": {
+            "write": 0,
+            "read": 19520
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792098180212,
+          "completed": 1792098253510
+        },
+        "finish": "tool-calls",
+        "id": "msg_141601c73001wkmorThMwPJFUD",
+        "sessionID": "ses_ebea3ee1effe3cjVtpd2L3Kej6"
+      },
+      "parts": [
+        {
+          "snapshot": "c8b3866bec05f70c6fa6c7c1ca7f07353f8062be",
+          "type": "step-start",
+          "id": "prt_141602693001xOftUNedEtqmtO",
+          "sessionID": "ses_ebea3ee1effe3cjVtpd2L3Kej6",
+          "messageID": "msg_141601c73001wkmorThMwPJFUD"
+        },
+        {
+          "type": "reasoning",
+          "text": "Confirmed: `version_cmd` at cli/src/cli/cli.py:34-37 still echoes bare `__version__`. Once `RELEASE_DATE_UTC` is set by the build step, `odi --version` → `0.1.0 (2026-10-15)` but `odi version` → `0.1.0`. Inconsistency.\n\nIs this a finding against this task? The brief explicitly scoped Step 4 to `_version_callback` only (\"change `_version_callback`... Leave `__version__` imported for the existing test\"). The brief did not ask to change `version_cmd`. So this is plan-mandated scope — per calibration: \"If the plan/brief mandates something the rubric calls a defect, report it as Important, labeled plan-mandated.\" Hmm, but here the brief merely *omitted* changing version_cmd; it didn't mandate leaving it stale... Actually it did implicitly: Step 4 says only change `_version_callback`. The implementer flagged it in Concerns.\n\nSeverity: The spec global constraint says \"`odi --version` prints `0.1.0 (2026-10-15)` when a release date is set, else `0.1.0`\" — only about `--version`. The `version` subcommand behavior isn't specified in the constraints given. It becomes a user-visible inconsistency once release dates are set. I'd rate it Important (plan-mandated scope gap) or Minor? Let's think: is there a risk it's a spec violation? The provided global constraints don't mention `odi version` subcommand. The task brief explicitly scoped only `_version_callback`. Since this is a task-scoped gate and the brief deliberately scoped the change, I'd call this Important plan-mandated? Or Minor since out of scope?\n\nThe calibration says: \"If the plan/brief mandates something the rubric calls a defect, report it as Important, labeled plan-mandated.\" The brief mandates only changing `_version_callback`, leaving version_cmd stale creates a latent inconsistency that manifests after the build task. The implementer flagged it. I think \"Important, plan-mandated (scope)\" is right — it's a real user-facing inconsistency introduced by the feature (once dates are set), and later tasks may not fix it. Actually — is it introduced by this task? Before this task, `--version` and `version` both printed `0.1.0`, consistent. After this task (with release date set), they diverge. So yes, this task introduces the divergence. But the brief's scope caused it. Important, plan-mandated.\n\nHmm, but wait — could a later task fix version_cmd? The report says \"later tasks (or a follow-up) may want... or the plan may replace/remove that command.\" Unknown from this diff. As a task-scoped gate, I should flag it as Important with plan-mandated label, noting it may be addressed later.\n\nActually, let me reconsider severity. The gate is task-scoped; the brief explicitly limits changes. Flagging as Critical would be wrong. Important seems right per calibration guidance for plan-mandated defects. Alternatively Minor... The rubric likely calls duplicate/divergent version output a defect. I'll go with Important, plan-mandated.\n\nOther checks:\n\n1. Test quality: tests use monkeypatch on module attribute — tests real behavior of build_summary branches. ✅ The test for date-set verifies `[:10]` truncation. Good.\n\n2. `release_date` and `verbose_summary` untested — brief didn't include tests for them, but they're produced interfaces. Minor: `release_date` never tested (brief mandated interface `version.release_date: str | None`). Actually the brief's test file (Step 1) only has 3 tests, verbatim copied. So tests exactly per brief. Missing coverage of `release_date`/`verbose_summary` is plan-mandated (brief's test set). Report acknowledges verbose_summary untested. Minor.\n\n3. `release_date` staleness: computed at import; if `version.RELEASE_DATE_UTC` is monkeypatched (as tests do), `release_date` diverges. Not a real runtime issue since _build_info is overwritten pre-import at build time. Not worth flagging? It's a mild design smell but follows the brief verbatim. Skip or Minor.\n\n4. Import style in version.py: two-line import due to ruff — fine.\n\n5. `COMMIT = COMMIT` — self-assignment pattern; plan-mandated (verbatim from brief). Minor at most. Actually it's slightly confusing but harmless. The report flagged it. Could mention as Minor plan-mandated? The brief literally specifies those lines. I'd note it in Minor as stylistic, plan-mandated, or maybe skip. I'll mention briefly.\n\n6. `from cli.version import __version__` retained solely for existing test — the report says \"left for the existing test.\" Let me check: does test_cli.py import `__version__` from cli.cli? That's a named-ish risk: if test_cli imports from cli.version directly, then importing __version__ in cli.py would be unused → ruff F401 would flag. But ruff passed per report (only I001 flagged). Let me check test_cli.py to verify the claim that cli.py needs `__version__` for the existing test. One focused check.\n\nActually the claim \"Leave `__version__` imported for the existing test\" comes from the brief itself (Step 4). So the brief mandates it. If ruff passed with no F401, it means __version__ is used somewhere or noqa... Actually F401 for unused import — ruff would flag `from cli.version import __version__` if unused in cli.py. The report says ruff flagged only I001. Hmm, maybe test_cli.py does `from cli.cli import __version__`. Let me check test_cli.py — focused check on the report's claim.\n\nLet me also verify there isn't a `__all__` or usage. In cli.py shown above, `__version__` is used at line 37 in `version_cmd`. So it IS used — by version_cmd. Not just for test. OK, no F401. No need to check test_cli.py then? The brief said \"Leave `__version__` imported for the existing test\" — but actually it's used by version_cmd regardless. Fine, no check needed.\n\nWait, does test_cli.py import `__version__` from cli.cli? Let's do one quick check anyway? It's not a concrete risk — ruff passed per report, and usage exists at cli.py:37. Skip.\n\n7. Spec: \"`_build_info.py` committed holds dev defaults (`VERSION = \"0.1.0\"`, empty release date)\" ✅.\n\n8. `odi --version` behavior with empty date → `0.1.0` ✅ (build_summary returns VERSION).\n\n9. Missing: any validation that RELEASE_DATE_UTC format... not required.\n\n10. Python >= 3.10: code uses no 3.11+ features. `str | None` not used in diff actually (no annotation on release_date). Fine.\n\n11. Entry `cli.cli:app` — untouched, still present (cli.py:10 `app = typer.Typer`). ✅\n\nNow, are there any Critical issues? None.\n\nAny error handling concerns? build_summary/verbose_summary are pure string ops — no error handling needed.\n\nEdge case: `RELEASE_DATE_UTC[:10]` if a malformed date shorter than 10 chars, e.g. `\"2026\"` → prints `2026`. Trusts build input; brief specifies ISO-8601. Minor at most — I'd skip or note as trivial.\n\nEdge case: whitespace-only date string would be truthy → `\" \"` → `[:10]` printed. Trivial; spec says format is ISO or \"\". Skip.\n\nTest test_version_matches_build_info asserts `version.__version__ == \"0.1.0\"` — hardcodes first released version, matches global constraint ✅.\n\nOne more: does the test file get collected — `from cli import version` at module level; fine.\n\nLet me also consider: `version.py` module-level `RELEASE_DATE_UTC = _RELEASE_DATE_UTC` — if build task overwrites `_build_info.RELEASE_DATE_UTC`, version.py picks it up at import. ✅ ordering correct (build overwrites source file before install).\n\nPotential issue: the build step overwrites `_build_info.py` — but does anything regenerate/compile? Out of scope.\n\nAlso check: brief Step 6 commit — commit message `feat(cli): build metadata and version display` matches commit list `c2fef5e feat(cli): build metadata and version display` ✅. Files: 4 files changed matches brief's git add list ✅.\n\nSo spec compliance: all ✅, no❌, maybe ⚠️ for things not verifiable from diff: \n- `odi --version` end-to-end (console script name `odi` / entry point in pyproject) — not verifiable from this diff. The constraint \"`odi --version` prints...\" — the callback logic is verified; the entry name binding isn't in diff. I could mark ⚠️. Hmm. The task brief doesn't include pyproject changes, and the entry point presumably pre-exists. Is it worth a ⚠️? The instructions: \"If a requirement cannot be verified from this diff alone, report it as a ⚠️ item.\" The `odi` entry name is a global constraint. From this diff, I can verify callback → build_summary, but not that the console script is named `odi`. I could do a focused check of pyproject.toml (one focused check per risk). That's a legit named risk: does the entry point exist as `odi`? Let me check pyproject quickly.\n\nActually — is that a risk for THIS task? The global constraints \"bind this task\" per prompt. Entry `cli.cli:app` — verifying would be one grep. Let me do it to convert ⚠️ to ✅ or ❌.\n\nLet me grep pyproject in the worktree for `[project.scripts]`.",
+          "time": {
+            "start": 1792098183241,
+            "end": 1792098252382
+          },
+          "id": "prt_141602849001fnKnQsLLiudPTC",
+          "sessionID": "ses_ebea3ee1effe3cjVtpd2L3Kej6",
+          "messageID": "msg_141601c73001wkmorThMwPJFUD"
+        },
+        {
+          "type": "tool",
+          "tool": "grep",
+          "callID": "call_a0ac6254e75a4aeb98fea3c6",
+          "state": {
+            "status": "completed",
+            "input": {
+              "pattern": "scripts|odi\\s*=|requires-python",
+              "path": "/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/cli",
+              "include": "pyproject.toml"
+            },
+            "output": "Found 3 matches\n/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/cli/pyproject.toml:\n  Line 5: requires-python = \">=3.10\"\n\n  Line 17: [project.scripts]\n\n  Line 18: agentic-odi = \"cli.cli:app\"\n",
+            "metadata": {
+              "matches": 3,
+              "truncated": false
+            },
+            "title": "scripts|odi\\s*=|requires-python",
+            "time": {
+              "start": 1792098253323,
+              "end": 1792098253365
+            }
+          },
+          "id": "prt_141613665001H4OmhIIIFMOiew",
+          "sessionID": "ses_ebea3ee1effe3cjVtpd2L3Kej6",
+          "messageID": "msg_141601c73001wkmorThMwPJFUD"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "c8b3866bec05f70c6fa6c7c1ca7f07353f8062be",
+          "type": "step-finish",
+          "tokens": {
+            "total": 24165,
+            "input": 2397,
+            "output": 62,
+            "reasoning": 2186,
+            "cache": {
+              "write": 0,
+              "read": 19520
+            }
+          },
+          "cost": 0,
+          "id": "prt_141613a75001Zm1ixUeGOX8hgB",
+          "sessionID": "ses_ebea3ee1effe3cjVtpd2L3Kej6",
+          "messageID": "msg_141601c73001wkmorThMwPJFUD"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_1415c11ed001RKzEKC6PctA6XH",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 27222,
+          "input": 9806,
+          "output": 2312,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 15104
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792098253520,
+          "completed": 1792098282688
+        },
+        "finish": "stop",
+        "id": "msg_141613ad0001OIdcHj8OHhOZeH",
+        "sessionID": "ses_ebea3ee1effe3cjVtpd2L3Kej6"
+      },
+      "parts": [
+        {
+          "snapshot": "c8b3866bec05f70c6fa6c7c1ca7f07353f8062be",
+          "type": "step-start",
+          "id": "prt_1416146db001lqB38McwhipdRQ",
+          "sessionID": "ses_ebea3ee1effe3cjVtpd2L3Kej6",
+          "messageID": "msg_141613ad0001OIdcHj8OHhOZeH"
+        },
+        {
+          "type": "text",
+          "text": "Interesting! The entry point script is `agentic-odi = \"cli.cli:app\"`, not `odi = \"cli.cli:app\"`. The global constraint says CLI package `agentic-odi-cli`, entry `cli.cli:app`. And \"`odi --version` prints...\". Hmm, the spec says the command is `odi`? The constraint quoted: \"`odi --version` prints `0.1.0 (2026-10-15)`\". But pyproject has `agentic-odi`.\n\nWait — maybe there's a rename task later. Task 1 brief doesn't touch pyproject. The global constraint lists \"entry `cli.cli:app`\" which is satisfied. The command name `odi` — the pyproject currently names it `agentic-odi`. But this task doesn't touch pyproject, so it's not this task's responsibility. Also pyproject might be modified by a later task. Hmm. Should I flag it? The constraint says entry `cli.cli:app` ✅ (matches). The `odi` command naming isn't in this task's scope. I could note as ⚠️ (not verified / potential mismatch) but since the task brief doesn't touch it and later tasks likely handle packaging, I'll mention as ⚠️ low concern or note in issues.\n\nActually, wait. Is it possible the pyproject in worktree head is the same as base? The diff base..head only changes 4 files, so pyproject is unchanged. The `agentic-odi` script name vs `odi` in constraint. This might be a discrepancy in the overall spec, handled by a later packaging task. For task 1 scope, not applicable. I'll note as ⚠️ informational: entry point currently `agentic-odi`, spec text references `odi`; not in this task's diff (later task's concern). But careful: the stated constraint is \"CLI package `agentic-odi-cli`, entry `cli.cli:app`\" — satisfied. The `odi --version` is just how the spec writes invocations. So possibly `odi` is intended alias defined elsewhere or the spec is loose. I'll flag as a ⚠️ observation, low priority, not a task failure.\n\nHmm, requires-python = \">=3.10\" ✅ confirmed.\n\nNow let me finalize findings.\n\nSpec compliance:\n- ✅ `_build_info.py` created with dev defaults (diff lines 19-23)\n- ✅ `version.py` rewritten, exposes all required interfaces (diff lines 65-86)\n- ✅ `_version_callback` uses `build_summary()` (diff lines 47-51 / cli.py:19-22)\n- ✅ test file verbatim (diff lines 92-110)\n- ✅ `_build_info` dev defaults VERSION=\"0.1.0\", RELEASE_DATE_UTC=\"\" \n- ✅ `build_summary` returns `0.1.0 (YYYY-MM-DD)` when set, `0.1.0` when empty\n- ✅ requires-python >=3.10 (pyproject.toml:5), entry cli.cli:app (pyproject.toml:18)\n- ⚠️ `version` subcommand (`cli.py:34-37`) still prints bare `__version__` — divergence once release date set (plan-scoped)\n- ⚠️ console script name is `agentic-odi` (pyproject.toml:18), spec text refers to `odi`; not touched by this task.\n\nStrengths:\n- Faithful to brief; dev defaults exactly per spec.\n- Clean delegation: version.py single source of truth.\n- Tests exercise both branches via module-attribute monkeypatch; TDD evidence in report.\n- Report self-flagged the version_cmd divergence (honest).\n\nIssues:\n\nImportant:\n1. `version_cmd` divergence (cli.py:34-37) — plan-mandated scope. Once build sets RELEASE_DATE_UTC, `--version` and `version` disagree. Brief scoped only `_version_callback`, so labeled plan-mandated; implementer flagged. \n\nHmm, is this Important or Minor? I'll place Important, plan-mandated.\n\nMinor:\n1. `release_date` (version.py:76) not covered by tests, and computed once at import — monkeypatching RELEASE_DATE_UTC wouldn't update it; also untested. Brief's test set omitted it. Minor.\n2. `verbose_summary()` (version.py:85-86) untested. Minor. (report acknowledges)\n3. `COMMIT = COMMIT` / `TARGET = TARGET` self-reassignments (version.py:74-75) are confusing though valid; verbatim from brief. Minor/plan-mandated. Possibly fold.\n4. `RELEASE_DATE_UTC[:10]` trusts the format; malformed short strings produce truncated output silently. Very minor, spec guarantees ISO. Maybe skip. I'll include as Minor low.\n\nActually re: #4 — brief explicitly uses `RELEASE_DATE_UTC[:10]` verbatim. Plan-mandated. I'll keep it very brief or omit. I'll omit to reduce noise, or mention as minor. I'll mention briefly as minor since it's an edge case that the review rubric asks about edge cases.\n\nHmm, calibration: \"Categorize by real severity.\" The `[:10]` is fine for ISO-8601. Not a real defect. I'll omit.\n\nLet me consider whether there's an issue with `release_date = RELEASE_DATE_UTC or None`: for empty string → None ✅; for set → string. Fine.\n\nNo Critical issues.\n\nAssessment: Approved. The one Important issue is plan-mandated scope, acknowledged by the implementer, and doesn't block the task.\n\nWait — should the Important version_cmd issue make it \"Needs fixes\"? The task brief explicitly scoped the change, and the spec only mandates `odi --version`. The reviewer guidance: task-scoped gate. If plan mandates something rubric calls defect → Important, plan-mandated. It doesn't necessarily mean Needs fixes since it's out of task scope. I'll go Approved with the caveat that a later task must reconcile version_cmd.\n\nLet me write the report. Keep it structured per format. Concise but complete.</think>### Spec Compliance\n- ✅ `cli/src/cli/_build_info.py` created with committed dev defaults `VERSION = \"0.1.0\"`, `RELEASE_DATE_UTC = \"\"`, `COMMIT = \"dev\"`, `TARGET = \"dev\"` (diff L19–23; brief L46–51).\n- ✅ `cli/src/cli/version.py` exposes every required interface: `__version__`, `RELEASE_DATE_UTC`, `COMMIT`, `TARGET`, `release_date` (`str | None`), `build_summary()`, `verbose_summary()` (diff L69–86).\n- ✅ `build_summary()` returns `VERSION` when date empty, `f\"{VERSION} ({RELEASE_DATE_UTC[:10]})\"` when set (version.py:79–82) — matches the `0.1.0` / `0.1.0 (2026-10-15)` requirement.\n- ✅ `_version_callback` now echoes `version.build_summary()`, `from cli import version` added, `__version__` import retained for the existing test (diff L33–51).\n- ✅ `cli/tests/test_build_info.py` copied verbatim from brief L16–35 (diff L92–110).\n- ✅ Global constraints verified outside diff: `requires-python = \">=3.10\"` (pyproject.toml:5); entry `cli.cli:app` present (pyproject.toml:18). First version `0.1.0` asserted in test (test_build_info.py:7).\n- ✅ Commit `c2fef5e` message and file set match brief Step 6 exactly (diff L4–11).\n- ⚠️ `version` subcommand still prints bare `__version__` (cli.py:34–37) while `--version` prints `build_summary()`; they diverge once the build sets a release date. The brief scoped only `_version_callback`.\n- ⚠️ Console script is named `agentic-odi` (pyproject.toml:18), while the constraint text speaks of `odi --version`. Untouched by this task; likely a later packaging task's concern.\n\n### Strengths\n- Faithful, minimal implementation: dev defaults and helper code match the brief's intent, with `version.py` as the single source of truth for version/date/commit/target.\n- `libtests` exercise both real branches of `build_summary` via module-attribute monkeypatch, including the `[:10]` date truncation — genuine behavior, not tautology.\n- Report is honest and accurate: it self-flags the `version_cmd` divergence and the un-surfaced `verbose_summary`, both of which I confirmed.\n\n### Issues\n\n#### Critical\nNone.\n\n#### Important\n- **`version_cmd` diverges from `--version` once a release date is embedded** — cli.py:34–37 still echoes `__version__`. After the build step writes `RELEASE_DATE_UTC`, `odi --version` prints `0.1.0 (2026-10-15)` while `odi version` prints `0.1.0`, a user-visible inconsistency introduced by this change. **Plan-mandated**: brief Step 4 scopes the edit to `_version_callback` only. Does not block this task, but a later task must reconcile (or remove) `version_cmd`.\n\n#### Minor\n- `release_date` (version.py:76) is untested and frozen at import; monkeypatching or later rebinding `RELEASE_DATE_UTC` won't update it. Harmless for the intended build-time overwrite, but the interface is unverified. Brief's test set omits it.\n- `verbose_summary()` (version.py:85–86) has no test coverage despite being a produced interface (report acknowledges). Plan-mandated.\n- `COMMIT = COMMIT` / `TARGET = TARGET` (version.py:74–75) self-reassignments are valid but visually confusing; taken verbatim from brief L60–61. Plan-mandated.\n\n### Assessment\n**Task quality:** Approved\n**Reasoning:** The diff implements the brief exactly and satisfies the stated global constraints; the sole Important issue (`version_cmd` inconsistency) is explicitly out of this task's scope per the brief and already disclosed by the implementer, with no Critical or build-blocking defect.",
+          "time": {
+            "start": 1792098256608,
+            "end": 1792098282533
+          },
+          "id": "prt_1416146e0001ffpxhdm5MZurW6",
+          "sessionID": "ses_ebea3ee1effe3cjVtpd2L3Kej6",
+          "messageID": "msg_141613ad0001OIdcHj8OHhOZeH"
+        },
+        {
+          "reason": "stop",
+          "snapshot": "c8b3866bec05f70c6fa6c7c1ca7f07353f8062be",
+          "type": "step-finish",
+          "tokens": {
+            "total": 27222,
+            "input": 9806,
+            "output": 2312,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 15104
+            }
+          },
+          "cost": 0,
+          "id": "prt_14161ac62001e3Xar23iBtZkah",
+          "sessionID": "ses_ebea3ee1effe3cjVtpd2L3Kej6",
+          "messageID": "msg_141613ad0001OIdcHj8OHhOZeH"
+        }
+      ]
+    }
+  ]
+}
