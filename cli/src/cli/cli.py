@@ -2,6 +2,7 @@
 
 import typer
 
+from cli.connectors import connectors_app
 from cli.outcomes import outcomes_app
 from cli.version import __version__
 
@@ -11,6 +12,7 @@ app = typer.Typer(
 )
 
 app.add_typer(outcomes_app, name="outcomes", help="Manage Customer Outcomes")
+app.add_typer(connectors_app, name="connectors", help="Manage external data connectors")
 
 
 def _version_callback(value: bool) -> None:

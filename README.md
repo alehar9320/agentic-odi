@@ -18,31 +18,32 @@ This repository serves as an initial sandbox for understanding server-client MCP
 
 ### Code Overview
 
-This repository is a [uv workspace](https://docs.astral.sh/uv/concepts/projects/workspaces/) made up of five installable projects, each with its own `pyproject.toml`, `src/` layout, and tests:
+This repository is a [uv workspace](https://docs.astral.sh/uv/concepts/projects/workspaces/) made up of six installable packages, each with its own `pyproject.toml`, `src/` layout, and tests:
 
 - **`core/`** (`agentic-odi-core`): Domain models, the `ODIService` business-logic layer, and repository implementations (in-memory and SQLite), including ODI opportunity-score computation.
 - **`mcp_server/`** (`agentic-odi-mcp-server`): A foundational MCP Server exposing an HTTP transport layer. It hosts tools for Jobs, Steps, Desired Outcomes, and Customer Outcomes (linking customer value to business value).
 - **`local_server/`** (`agentic-odi-local-server`): A local FastAPI server that talks to the repository directly (no MCP transport).
+- **`cli/`** (`agentic-odi-cli`): A [`Typer`](https://github.com/fastapi/typer)-based command-line interface. It provides a non-MCP entry point for interacting with Agentic ODI and also wraps the MCP server for certain operations.
 - **`client/`** (`agentic-odi-client`): A Python-based agent client that communicates with the MCP server, executing tool calls over the active connection. It also hosts `run.py`, the local dev launcher that starts the server and the Streamlit UI together.
-- **`cli/`** (`agentic-odi-cli`): A [`Typer`](https://github.com/fastapi/typer)-based command-line interface. It provides a non-MCP entry point for interacting with Agentic ODI, initially exposing `--version` and `--help`, and will grow to cover dataset operations.
+- **`connectors/`** (`agentic-odi-connectors`): Pluggable external integrations (ingest connectors). The first connector is an HTTP MCP **client** that can ingest resources from external MCP servers into the ODI store.
 
 ## 🚀 Getting Started
 
 ### Prerequisites
 
-Python 3.10+ and [`uv`](https://docs.astral.sh/uv/). Install the whole workspace (all five projects plus dev tooling):
+Python 3.11+ and [`uv`](https://docs.astral.sh/uv/). Install the whole workspace (all packages plus dev tooling):
 
 ```bash
 uv sync --all-packages
 ```
 
-This creates a `.venv` and installs `agentic-odi-core`, `agentic-odi-mcp-server`, `agentic-odi-local-server`, `agentic-odi-client`, and `agentic-odi-cli` in editable mode.
+This creates a `.venv` and installs `agentic-odi-core`, `agentic-odi-mcp-server`, `agentic-odi-local-server`, `agentic-odi-client`, `agentic-odi-cli`, and `agentic-odi-connectors` in editable mode.
 
 ### Running the Environment
 
 #### 🧰 Command-line interface (CLI)
 
-Agentic ODI ships a [`Typer`](https://github.com/fastapi/typer)-based CLI so you can interact with the project directly from your terminal — no MCP client or chat UI required. Today it provides version and help information; over time it will expose commands for working with the ODI dataset (Jobs, Steps, and Outcomes), giving you a scriptable, automation-friendly alternative to the MCP/chat path.
+Agentic ODI ships a [`Typer`](https://github.com/fastapi/typer)-based CLI so you can interact with the project directly from your terminal — no MCP client or chat UI required. Today it provides version/help plus commands for Customer Outcomes (`agentic-odi outcomes ...`) and external MCP connectors (`agentic-odi connectors ...`), giving you a scriptable, automation-friendly alternative to the MCP/chat path.
 
 Launch it with:
 
@@ -76,6 +77,25 @@ agentic-odi outcomes score 8 2
 ```
 
 Set `AGENTIC_ODI_MCP_URL` to point to a non-default server if needed.
+
+### External connectors (MCP ingest)
+
+The `connectors/` package enables ingesting external resources via MCP. Configure connectors via `--config` (default: `.agentic-odi/connectors.json`).
+
+```bash
+# List configured connectors
+agentic-odi connectors list
+agentic-odi connectors list --config /path/to/connectors.json
+
+# Add an HTTP MCP connector
+agentic-odi connectors add mcp --name my-connector --url http://localhost:9000/mcp
+
+# Check connector health
+agentic-odi connectors health --name my-connector
+
+# Ingest resources from the connector into the local store (idempotent by URI)
+agentic-odi connectors ingest --name my-connector
+```
 
 
 
@@ -171,7 +191,7 @@ Type `/dev` in the AI assistant to trigger the full automated workflow: it will 
 
 ## 🧪 Testing
 
-Tests use **pytest** with **pytest-asyncio** (strict mode) and run entirely in-memory — no running server required. Each project owns its tests. CI runs the suite on Python **3.10, 3.11, and 3.12** and stores a coverage report as a build artifact:
+Tests use **pytest** with **pytest-asyncio** (strict mode) and run entirely in-memory — no running server required. Each project owns its tests. CI runs the suite on Python **3.11 and 3.12** and stores a coverage report as a build artifact:
 
 ```bash
 uv run --directory core pytest
@@ -179,6 +199,7 @@ uv run --directory mcp_server pytest
 uv run --directory local_server pytest
 uv run --directory client pytest
 uv run --directory cli pytest
+uv run --directory connectors pytest
 ```
 
 ### 🧠 Agent session tracking
@@ -200,9 +221,10 @@ uv run --directory mcp_server mypy .
 uv run --directory local_server mypy .
 uv run --directory client mypy .
 uv run --directory cli mypy .
+uv run --directory connectors mypy .
 
 # Security scanning
-uv run bandit -c pyproject.toml -r core/src mcp_server/src local_server/src cli/src client/src
+uv run bandit -c pyproject.toml -r cli/src client/src core/src local_server/src mcp_server/src connectors/src
 
 # Tests (same as CI)
 uv run --directory core pytest
@@ -210,6 +232,7 @@ uv run --directory mcp_server pytest
 uv run --directory local_server pytest
 uv run --directory client pytest
 uv run --directory cli pytest
+uv run --directory connectors pytest
 ```
 
 To run these automatically before each commit, you can enable the bundled pre-commit hooks:
@@ -270,6 +293,11 @@ The `.pi/settings.json` declares the Superpowers package. Pi will clone it and l
 | `client/tests/test_run.py` | Dev launcher helpers (port checks) |
 | `cli/tests/test_cli.py` | CLI `--version` and `--help` behavior |
 | `cli/tests/test_outcomes_cli.py` | Customer Outcomes CLI subcommands with MCP stub |
+| `cli/tests/test_connectors_cli.py` | `connectors` CLI subcommands (`list`, `add mcp`, `health`, `ingest`) with a stubbed client factory |
+| `connectors/tests/test_models.py` | `ConnectorConfig` validation and MCP settings parsing |
+| `connectors/tests/test_registry.py` | JSON registry load/save, duplicate/missing handling, malformed file errors |
+| `connectors/tests/test_sink.py` | `IngestSink` append/batches/dump and idempotency by URI |
+| `connectors/tests/test_mcp_connector.py` | `MCPClientConnector` against an in-memory `fastmcp.Client(server)` (health, catalog, ingest) |
 
 **Conventions:**
 - Test files live under each project's `tests/` directory and are named `test_*.py`.
@@ -307,6 +335,7 @@ As we validate the feasibility of this architecture, our next milestones include
 
 - [ ] **ODI Schema Definition**: Define standardized Pydantic models for *Jobs*, *Steps*, and *Outcomes*.
 - [x] **CLI Dataset Commands**: Extend `cli/` so the ODI dataset can be created, queried, and scored from the terminal, in addition to the current MCP path.
+- [x] **Generic Integrations (External Data Connectors)**: Pluggable `connectors/` package with an HTTP MCP **client** connector (`agentic-odi connectors list|add mcp|health|ingest`); more kinds to follow.
 - [ ] **Context Tooling**: Replace the dummy `greet` tool with capabilities like `get_job_map(job_id)` or `evaluate_outcome(statement)`.
 - [ ] **Data Persistence Layer**: Connect the fastmcp server to a lightweight vector or relational database containing actual user research data.
 - [ ] **Agentic Integration**: Hook the client up to an LLM (e.g., via LangChain or standard OpenAI clients) so the LLM can *discover* the ODI tools and intelligently request customer insights when ideating features.

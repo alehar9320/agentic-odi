@@ -2,18 +2,20 @@
 name = "agentic-odi-cli"
 version = "0.1.0"
 description = "Command-line interface for Agentic ODI."
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
     "typer",
     "fastmcp",
     "agentic-odi-core",
+    "agentic-odi-connectors",
 ]
-
-[project.scripts]
-agentic-odi = "cli.cli:app"
 
 [tool.uv.sources]
 agentic-odi-core = { workspace = true }
+agentic-odi-connectors = { workspace = true }
+
+[project.scripts]
+agentic-odi = "cli.cli:app"
 
 [build-system]
 requires = ["hatchling"]
@@ -24,11 +26,11 @@ packages = ["src/cli"]
 
 [tool.ruff]
 line-length = 100
-target-version = "py310"
+target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E4", "E7", "E9", "F", "I", "UP", "B", "BLE"]
 
 [tool.mypy]
-python_version = "3.10"
+python_version = "3.11"
 ignore_missing_imports = true

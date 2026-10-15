@@ -2,13 +2,13 @@
 name = "agentic-odi"
 version = "0.1.0"
 description = "Outcome-Driven Innovation (ODI): an MCP server, chat client, and CLI."
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 
 [tool.uv]
 package = false
 
 [tool.uv.workspace]
-members = ["cli", "client", "core", "mcp_server", "local_server"]
+members = ["cli", "client", "connectors", "core", "local_server", "mcp_server"]
 
 [dependency-groups]
 dev = [
@@ -22,3 +22,6 @@ dev = [
 
 [tool.bandit]
 exclude_dirs = [".venv", "tests"]
+
+[tool.ruff]
+extend-exclude = ["docs"]
