@@ -3,7 +3,7 @@
   "checkpoint_id": "01M509A3WZHB4A30BD8GH2QRHP",
   "strategy": "manual-commit",
   "branch": "mcp-connector-module",
-  "checkpoints_count": 1,
+  "checkpoints_count": 2,
   "files_touched": [
     "docs/superpowers/plans/2026-10-14-mcp-connector-module.md"
   ],
@@ -14,13 +14,20 @@
       "compact_transcript": "/0/transcript.jsonl",
       "content_hash": "/0/content_hash.txt",
       "prompt": "/0/prompt.txt"
+    },
+    {
+      "metadata": "/1/metadata.json",
+      "transcript": "/1/full.jsonl",
+      "compact_transcript": "/1/transcript.jsonl",
+      "content_hash": "/1/content_hash.txt",
+      "prompt": "/1/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 6619,
+    "input_tokens": 104858,
     "cache_creation_tokens": 0,
-    "cache_read_tokens": 94464,
-    "output_tokens": 931,
-    "api_call_count": 5
+    "cache_read_tokens": 773440,
+    "output_tokens": 7963,
+    "api_call_count": 25
   }
 }
