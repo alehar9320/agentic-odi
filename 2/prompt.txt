@@ -1,0 +1,13 @@
+Analyze the PDF concerning outcome-driven innovation and ensure that all entity types are supported by the CLI for data input and output, with successfully stored data types
+
+---
+
+Ultimately, I'm utilizing the CLI as a means of letting either myself as a Product Manager, or through an AI agent, input and output data relative to my product management domain. The objective is to get support on outcome-driven innovation. Ultimately, ensuring that I can think of outcomes, over solutions, and successfully deliver in my role, as per what outcomes the org. needs me to drive.
+
+---
+
+Yes, that's right.
+
+---
+
+1. Use what Steve Jobs would have demanded. 2. Yes, full parity. Also include value_metrics.

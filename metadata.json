@@ -3,7 +3,7 @@
   "checkpoint_id": "01M50NMW0BNHEXP5ZR41TBA4Q5",
   "strategy": "manual-commit",
   "branch": "feature/cli-bundled-distribution",
-  "checkpoints_count": 2,
+  "checkpoints_count": 6,
   "files_touched": [
     "cli/src/cli/_build_info.py",
     "cli/src/cli/cli.py",
@@ -24,13 +24,20 @@
       "compact_transcript": "/1/transcript.jsonl",
       "content_hash": "/1/content_hash.txt",
       "prompt": "/1/prompt.txt"
+    },
+    {
+      "metadata": "/2/metadata.json",
+      "transcript": "/2/full.jsonl",
+      "compact_transcript": "/2/transcript.jsonl",
+      "content_hash": "/2/content_hash.txt",
+      "prompt": "/2/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 123229,
+    "input_tokens": 269007,
     "cache_creation_tokens": 0,
-    "cache_read_tokens": 1114150,
-    "output_tokens": 16312,
-    "api_call_count": 65
+    "cache_read_tokens": 2229542,
+    "output_tokens": 41799,
+    "api_call_count": 91
   }
 }
