@@ -42,7 +42,7 @@
       "endpoints": [
         "https://github.com/alehar9320/agentic-odi/releases/latest/download/latest.json"
       ],
-      "pubkey": "PLACEHOLDER_PUBKEY_REPLACED_IN_TASK_7"
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEI4RDFFN0YwQ0ZDMENBNjQKUldSa3lzRFA4T2ZSdUhwMXM0K2gyM1ZGc2EvaHJqNDhkTkNYM1BkdU9XMXhWVk5RZXdqalZaTDcK"
     }
   }
 }
