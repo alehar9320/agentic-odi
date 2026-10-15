@@ -1,1 +1,1 @@
-With respect to best practice, update the README with elevated formatting and instruction, including shield badges, suitable to the project
+Ensure we push these changes. YOu can do this directly to main.
