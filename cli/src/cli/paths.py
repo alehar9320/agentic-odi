@@ -20,7 +20,7 @@ def install_root() -> Path:
         return Path(env_install).resolve()
 
     if sys.platform == "win32":
-        local_app_data = os.environ.get("LOCALAPPDATA") or os.environ.get("APPDATA")
+        local_app_data = os.environ.get("LOCALAPPDATA")
         if local_app_data:
             return Path(local_app_data) / "agentic-odi"
         return Path.home() / "AppData" / "Local" / "agentic-odi"
@@ -36,14 +36,9 @@ def bin_dir() -> Path:
     """Resolve the binary directory.
 
     Resolution order:
-    1. AGENTIC_ODI_BIN_DIR env var (if set in some contexts, but not specified in tests)
-    2. XDG_BIN_HOME (POSIX) or install_root()/bin (Windows fallback)
-    3. ~/.local/bin (POSIX fallback)
+    1. XDG_BIN_HOME (POSIX) or install_root()/bin (Windows)
+    2. ~/.local/bin (POSIX fallback)
     """
-    env_bin = os.environ.get("AGENTIC_ODI_BIN_DIR")
-    if env_bin:
-        return Path(env_bin).resolve()
-
     if sys.platform == "win32":
         return install_root() / "bin"
 
