@@ -1,0 +1,33 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M50J4VS282FPCMTNKQHVEM46",
+  "strategy": "manual-commit",
+  "branch": "main",
+  "checkpoints_count": 1,
+  "files_touched": [
+    ".worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-8-report.md",
+    ".worktrees/mcp-connector-module/cli/src/cli/backend.py",
+    ".worktrees/mcp-connector-module/cli/src/cli/outcomes.py",
+    ".worktrees/mcp-connector-module/core/src/core/models.py",
+    ".worktrees/mcp-connector-module/core/src/core/sqlite_repository.py",
+    ".worktrees/mcp-connector-module/local_server/src/local_server/app.py",
+    ".worktrees/mcp-connector-module/mcp_server/src/mcp_server/mcp_server.py",
+    ".worktrees/mcp-connector-module/pyproject.toml"
+  ],
+  "sessions": [
+    {
+      "metadata": "/0/metadata.json",
+      "transcript": "/0/full.jsonl",
+      "compact_transcript": "/0/transcript.jsonl",
+      "content_hash": "/0/content_hash.txt",
+      "prompt": "/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 0,
+    "output_tokens": 0,
+    "api_call_count": 0
+  }
+}
