@@ -25,8 +25,7 @@
   - [Command-Line Interface (CLI)](#-command-line-interface-cli)
   - [Manage Customer Outcomes](#-manage-customer-outcomes)
   - [External Connectors (MCP Ingest)](#-external-connectors-mcp-ingest)
-  - [One-Command Launch](#-one-command-launch-recommended)
-  - [Manual Split-Terminal](#-manual-split-terminal-alternative)
+  - [Living Studio Run Modes](#-living-studio-run-modes)
   - [Local Tools-Capable LLM Backend](#-local-tools-capable-llm-backend-for-mcp-testing)
   - [Agent-Driven Testing](#-agent-driven-testing)
 - [Linting, Formatting & Type Checks](#-linting-formatting--type-checks-ci-parity)
@@ -60,14 +59,15 @@ This repository serves as an initial sandbox for understanding server-client MCP
 
 ## 🧩 Code Overview
 
-This repository is a [uv workspace](https://docs.astral.sh/uv/concepts/projects/workspaces/) made up of **six** installable projects, each with its own `pyproject.toml`, `src/` layout, and tests:
+This repository is a [uv workspace](https://docs.astral.sh/uv/concepts/projects/workspaces/) made up of **six** installable Python projects plus the React `studio/` front end, each with its own build, tests, and layout:
 
 | Package | Description |
 |---|---|
 | **`core/`** (`agentic-odi-core`) | Domain models, the `ODIService` business-logic layer, and repository implementations (in-memory and SQLite), including ODI opportunity-score computation. |
 | **`mcp_server/`** (`agentic-odi-mcp-server`) | A foundational MCP Server exposing an HTTP transport layer. It hosts tools for Jobs, Steps, Desired Outcomes, and Customer Outcomes (linking customer value to business value). |
-| **`local_server/`** (`agentic-odi-local-server`) | A local FastAPI server that talks to the repository directly (no MCP transport). |
-| **`client/`** (`agentic-odi-client`) | **The Living Studio** — a spatial, conversational GUI for Outcome-Driven Innovation. Provides an interactive Opportunity Landscape, Universal Job Map, WYSIWYG Impact Simulation, and Causal Lineage inspection, paired with an autonomous conversational agent connected to the MCP server. It also hosts `run.py`, the local dev launcher that starts the server and the Studio UI together. |
+| **`local_server/`** (`agentic-odi-local-server`) | The FastAPI **Living Studio sidecar**. It talks to the MCP server on the client's behalf and serves the Studio API — configuration, health probes, canvas data, MCP mutations, and streaming (SSE) chat with the LLM tool-loop — plus the built SPA when `studio/dist` exists. |
+| **`client/`** (`agentic-odi-client`) | The local dev **launcher** (`run.py` / `python -m client.run`) that starts the MCP server and the Studio sidecar together. (Its former Streamlit UI has been replaced by the `studio/` SPA.) |
+| **`studio/`** (React + TypeScript + Vite) | **The Living Studio** front end — a spatial, conversational GUI for Outcome-Driven Innovation with an interactive Opportunity Landscape, Universal Job Map, WYSIWYG Impact Simulation, and Causal Lineage inspection, paired with an autonomous copilot. Ships as a browser SPA and as a **Tauri 2 desktop app** (`studio/src-tauri/`). |
 | **`cli/`** (`agentic-odi-cli`) | A [`Typer`](https://github.com/fastapi/typer)-based command-line interface. It provides version/help plus `outcomes` and `connectors` commands. |
 | **`connectors/`** (`agentic-odi-connectors`) | Pluggable external integrations. The first kind is an **MCP client connector** that connects to a remote MCP server over HTTP, checks health, and ingests tools/resources into a local ingest sink. Additional kinds (REST, webhooks, and so on) can register against the same protocol later. |
 
@@ -138,30 +138,138 @@ python -m cli connectors ingest --name gong
 
 Ingested records are normalized (`catalog`, `resource`, `tool_result`) and appended to the in-process ingest sink. They are not written into the ODI jobs/outcomes store.
 
-### ⚡ One-Command Launch (recommended)
+### ⚡ Living Studio Run Modes
 
-`python -m client.run` starts both the MCP server and the Studio UI concurrently. Press **Ctrl+C** to stop both.
+The Living Studio runs three ways. All of them serve the same SPA, which talks only to the sidecar on `http://127.0.0.1:8100` — the SPA never contacts MCP or the LLM directly.
+
+**Architecture**
+
+```text
+┌────────────────────────────┐  /api (JSON)  ┌───────────────────────────────┐
+│  Living Studio SPA         │ ────────────▶ │  local_server (sidecar)       │
+│  React + TS + Vite         │  /api/chat    │  FastAPI on 127.0.0.1:8100    │
+│  (browser or Tauri webview)│ ◀──────────── │  - config / health / canvas   │
+└────────────────────────────┘  SSE stream   │  - steps / outcomes (via MCP) │
+                                             │  - /api/chat (LLM tool-loop)  │
+                                             └───────────────┬───────────────┘
+                                                             │ MCP (HTTP)
+                                                             ▼
+                                             ┌───────────────────────────────┐
+                                             │  mcp_server  :8000/mcp        │
+                                             └───────────────────────────────┘
+                                                             ▲
+                                                             │ OpenAI-compatible
+                                             ┌───────────────┴───────────────┐
+                                             │  Your local LLM backend       │
+                                             └───────────────────────────────┘
+```
+
+**1. Web — production build (recommended for a quick look)**
 
 ```bash
-python -m client.run
+npm --prefix studio run build   # build the SPA into studio/dist
+python -m client.run            # starts MCP :8000 + sidecar :8100
 ```
 
 | Service | URL |
 |---|---|
 | MCP Server | http://localhost:8000/mcp |
-| The Living Studio UI | http://localhost:8501 |
+| Living Studio | http://127.0.0.1:8100 |
 
-### 🔧 Manual Split-Terminal (alternative)
-
-Open two terminals and run each process separately:
+**2. Web — dev with hot reload** (Vite proxies `/api` to the sidecar):
 
 ```bash
-# Terminal 1 — MCP server
-python -m mcp_server
-
-# Terminal 2 — Streamlit chat UI
-streamlit run client/src/client/app.py
+npm --prefix studio run dev:full   # MCP + sidecar + Vite together
+# open http://localhost:5173
 ```
+
+**3. Desktop — Tauri 2** (the app spawns the MCP server and sidecar itself):
+
+```bash
+npm --prefix studio run tauri dev     # dev window
+npm --prefix studio run tauri build   # bundles: .deb / .AppImage (Linux), .app / .dmg (macOS), .msi / .exe (Windows)
+```
+
+> [!NOTE]
+> **Tauri prerequisites.** The desktop build needs the WebKitGTK toolchain and Rust 1.90+. On Debian/Ubuntu:
+>
+> ```bash
+> sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential pkg-config curl wget file \
+>   libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev patchelf xdg-utils libfuse2t64
+> ```
+>
+> The Tauri CLI ships as the `@tauri-apps/cli` npm dev dependency (`npm --prefix studio run tauri`). The sidecar is launched with `uv run python -m …` from the repository root; if the app cannot locate the repo root, set `AGENTIC_ODI_REPO_ROOT`.
+
+#### 🔐 Desktop signing & updater secrets
+
+Self-updating and code signing are **env-driven**: if a secret is absent, an unsigned artifact is produced instead of failing. CI reads these from GitHub Actions secrets.
+
+| Secret | Purpose |
+|---|---|
+| `TAURI_SIGNING_PRIVATE_KEY` | Signs updater artifacts (`.sig`) and the `latest.json` manifest. A tagged release fails loudly without it. Generate with `npm --prefix studio run tauri signer generate`. |
+| `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | Password for the private key (optional when the key has none). |
+| `APPLE_CERTIFICATE` / `APPLE_CERTIFICATE_PASSWORD` | macOS Developer ID certificate (base64 `.p12`) and its password. |
+| `APPLE_SIGNING_IDENTITY` | macOS signing identity. |
+| `APPLE_ID` / `APPLE_PASSWORD` / `APPLE_TEAM_ID` | macOS notarization credentials. |
+| `WINDOWS_CERTIFICATE` / `WINDOWS_CERTIFICATE_PASSWORD` | Windows Authenticode PFX (base64) and its password; imported by CI and injected into the bundle config. |
+
+Releases are published by `.github/workflows/tauri-release.yml` when a `v*` tag is pushed. The desktop app checks for updates on startup and via **Settings → Check for updates**.
+
+#### 🔑 Managing the updater signing key
+
+The updater key pair authenticates release artifacts so an installed app can verify that an auto-update genuinely came from you. The **public** key is embedded in `studio/src-tauri/tauri.conf.json` (`plugins.updater.pubkey`) and is safe to commit. The **private** key must never be committed, logged, printed in CI, or attached to a build artifact.
+
+1. **Generate a key pair** (only if you need a new one). Leave `-p ""` for a passwordless key, or pass a password and remember it:
+
+   ```bash
+   npm --prefix studio run tauri signer generate -- -w ./living-studio.key -p "" -f
+   ```
+
+   This writes `living-studio.key` (private, `0600`) and `living-studio.key.pub` (public).
+
+2. **Paste the public key** into `studio/src-tauri/tauri.conf.json`:
+
+   ```jsonc
+   {
+     "plugins": {
+       "updater": {
+         "endpoints": ["https://github.com/alehar9320/agentic-odi/releases/latest/download/latest.json"],
+         "pubkey": "<contents of living-studio.key.pub>"
+       }
+     }
+   }
+   ```
+
+3. **Store the private key outside the repository** (the repo root is git-tracked; a sibling directory is not), with restricted permissions:
+
+   ```bash
+   mkdir -p ~/repos/agentic-odi-keys && chmod 700 ~/repos/agentic-odi-keys
+   mv living-studio.key ~/repos/agentic-odi-keys/
+   chmod 600 ~/repos/agentic-odi-keys/living-studio.key
+   ```
+
+   Move it to a long-term secret store (password manager, 1Password/Bitwarden/Vault, or a private encrypted backup) when you decide where that lives. Losing it means future releases can no longer be signed for existing installs.
+
+4. **Add the private key as a GitHub Actions secret** (Settings → Secrets and variables → Actions → New repository secret), or via the CLI:
+
+   ```bash
+   gh secret set TAURI_SIGNING_PRIVATE_KEY < ~/repos/agentic-odi-keys/living-studio.key
+   gh secret set TAURI_SIGNING_PRIVATE_KEY_PASSWORD --body ""   # only if you set a password
+   ```
+
+5. **Verify** the secrets exist (values are never displayed):
+
+   ```bash
+   gh secret list
+   ```
+
+6. **Rotate** by repeating steps 1–4, then publishing a release signed with the new key. Existing installs still verify against the public key compiled into their binary, so keep the old private key usable and publish the new public key ahead of the cut-over.
+
+> [!CAUTION]
+> If the private key leaks, treat auto-updates as compromised: generate a new pair, rotate the Actions secret, and publish a freshly signed release.
+
+> [!IMPORTANT]
+> **Migration note.** The Streamlit UI (`client/src/client/app.py`) has been removed. The Living Studio now lives in `studio/` (browser SPA + Tauri desktop app) and is served by the `local_server` sidecar on port **8100** (previously Streamlit's `8501`). Start everything with `python -m client.run`. All `AGENTIC_ODI_*` environment variable names, the demo dataset, and the ODI formulas are unchanged.
 
 ### 🧠 Local Tools-Capable LLM Backend (for MCP testing)
 
@@ -186,7 +294,7 @@ A simple fully local option is [`llama-cpp-python`](https://github.com/abetlen/l
 
 3. **Start the OpenAI-compatible server**
 
-   Start the server and give the model a friendly alias that matches the default used by the Streamlit client (`client/src/client/app.py`):
+   Start the server and give the model a friendly alias that matches the default used by the Living Studio sidecar:
 
    ```bash
    python -m llama_cpp.server \
@@ -198,9 +306,9 @@ A simple fully local option is [`llama-cpp-python`](https://github.com/abetlen/l
 
    This exposes an OpenAI-style API at `http://127.0.0.1:8001/v1`.
 
-4. **Configure the Streamlit client**
+4. **Point the Living Studio at the local server**
 
-   `client/src/client/app.py` reads the following environment variables (with sensible defaults):
+   The sidecar reads defaults from environment variables (with sensible fallbacks):
 
    | Variable | Default |
    |---|---|
@@ -209,7 +317,7 @@ A simple fully local option is [`llama-cpp-python`](https://github.com/abetlen/l
    | `AGENTIC_ODI_MCP_URL` | `http://localhost:8000/mcp` |
    | `AGENTIC_ODI_API_KEY` | `local` |
 
-   You can either set these in your shell or adjust them in the Streamlit sidebar under **"LLM Configuration"**.
+   You can either set these in your shell or adjust them in the Living Studio's **Settings** panel.
 
 5. **Verify tool-calling against the MCP server**
 
@@ -221,8 +329,8 @@ A simple fully local option is [`llama-cpp-python`](https://github.com/abetlen/l
 
      If this request fails, fix your local LLM server configuration before debugging the MCP client/server.
 
-   - Start the MCP server and Streamlit UI (either via `python -m client.run` or the split-terminal commands above).
-   - In the browser UI, ask the assistant something that should use ODI tools, for example: *"Help me define a new Job-to-be-Done and add it to your ODI repository."*
+   - Start the MCP server and the Living Studio (via `python -m client.run` or `npm --prefix studio run dev:full`).
+   - In the browser UI, ask the assistant something that should use ODI tools, for example: “Help me define a new Job-to-be-Done and add it to your ODI repository.”
    - You should see the assistant briefly display that it is calling tools (for example, `add_job`, `get_jobs`, etc.) and then respond with grounded ODI guidance, confirming that the local LLM, MCP server, and client wiring all work together.
    - If the LLM backend is unreachable or misconfigured, the UI will show a clear error banner indicating that the backend at your configured **Base URL** could not be reached, along with details from the underlying error. Use that message together with the steps above to fix your local LLM setup.
 
@@ -259,6 +367,18 @@ uv run --directory local_server pytest
 uv run --directory client pytest
 uv run --directory cli pytest
 uv run --directory connectors pytest
+```
+
+### 🖥️ Frontend & Desktop Checks (studio)
+
+The SPA and Tauri shell mirror their CI jobs locally:
+
+```bash
+npm --prefix studio run lint       # ESLint
+npm --prefix studio run typecheck  # tsc --noEmit
+npm --prefix studio test -- --run  # Vitest (run once)
+npm --prefix studio run build      # production build → studio/dist
+cd studio/src-tauri && cargo fmt --check && cargo clippy -- -D warnings && cargo check
 ```
 
 To run these automatically before each commit, enable the bundled pre-commit hooks:
@@ -300,7 +420,9 @@ uv run --directory connectors pytest
 | `mcp_server/tests/test_server_tools.py` | Error handling and retrieval for the MCP tools |
 | `mcp_server/tests/test_tools.py` | Tool response-shape contract for `add_job` |
 | `local_server/tests/test_api.py` | Local FastAPI health endpoint |
-| `client/tests/test_run.py` | Dev launcher helpers (port checks) |
+| `local_server/tests/test_studio_api.py` | Living Studio sidecar API (config, health, canvas, SSE chat, steps/outcomes) |
+| `client/tests/test_run.py` | Dev launcher helpers (port checks, mcp + sidecar commands) |
+| `studio/src/**/*.test.ts` | SPA units: ODI math, transport bridge, SSE parser, sidecar client |
 | `cli/tests/test_cli.py` | CLI `--version` and `--help` behavior |
 | `cli/tests/test_outcomes_cli.py` | Customer Outcomes CLI subcommands with MCP stub |
 | `cli/tests/test_connectors_cli.py` | CLI `connectors` add/list/health/ingest adapter |
