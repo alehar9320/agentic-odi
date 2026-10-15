@@ -1,0 +1,49 @@
+You are re-reviewing one task's fix round. A previous review produced findings; an implementer has attempted to fix them. Your job is to verdict each finding and inspect the fix diff — nothing else.
+
+## The Task
+
+Read the task brief: /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/.superpowers/sdd/2026-10-15-cli-bundled-distribution-and-self-update/task-1-brief.md
+
+## The Findings Under Verification
+
+1. Important (plan-mandated): `version_cmd` (cli/src/cli/cli.py) still echoed bare `__version__`, diverging from `--version`. Ruling: make it print `version.build_summary()`.
+2. Spec gap (ruled): `odi --version --verbose` must add commit SHA, build date, target — print `version.verbose_summary()`. Ruling: add a `--verbose` flag such that `--version --verbose` prints `verbose_summary()`; plain `--version` prints `build_summary()`.
+
+## The Fix
+
+Read the implementer's report (fix report appended at end): /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/.superpowers/sdd/2026-10-15-cli-bundled-distribution-and-self-update/task-1-report.md
+
+Fix base: c2fef5e3aa1e0dfc4a18d8afba4b19bca8c51538 (the head the previous review saw)
+Head: 22d11cc07f2519baf88b0903ccb5f96e3cb9eb32
+Diff file: /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/.superpowers/sdd/2026-10-15-cli-bundled-distribution-and-self-update/review-c2fef5e..22d11cc.diff
+
+Read the diff file once. Do not re-run git commands. Read-only; do not mutate the working tree, index, HEAD, or branch state.
+
+## You Do Not Dispatch Subagents
+
+Do all of this review yourself. Never spawn a subagent.
+
+## Scope
+
+Your scope is the findings list and the fix diff. Verdict every finding. Inspect the fix diff for new problems the fix itself introduced. Do NOT re-review code the fix did not touch. Out-of-scope observations go under "Out-of-Scope Observations", non-blocking.
+
+## Tests
+
+The implementer re-ran the covering tests and appended results to the report. Confirm the fix report names the covering tests and shows output; verify claims against the diff. Do not re-run the suite. Run a focused test only if reading raises a specific doubt.
+
+## Output Format
+
+Your final message is the report itself: begin directly with the first finding's verdict. No preamble.
+
+### Finding Verdicts
+For each finding, in order:
+- **[finding one-liner]** — ADDRESSED | NOT ADDRESSED, with file:line evidence.
+
+### New Breakage in the Fix Diff
+Anything the fix broke/introduced, with severity and file:line. "None" if clean.
+
+### Out-of-Scope Observations
+"None" if none.
+
+### Verdict
+**Fix round:** [All findings addressed, no new Critical/Important breakage | Findings remain open] — list open ones.
