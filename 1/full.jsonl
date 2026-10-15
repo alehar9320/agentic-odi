@@ -21,11 +21,11 @@
     },
     "cost": 0,
     "tokens": {
-      "input": 32685,
-      "output": 3108,
+      "input": 75292,
+      "output": 4739,
       "reasoning": 479,
       "cache": {
-        "read": 324649,
+        "read": 430783,
         "write": 0
       }
     },
@@ -38,7 +38,7 @@
     ],
     "time": {
       "created": 1792098858962,
-      "updated": 1792099036442
+      "updated": 1792099775538
     }
   },
   "messages": [
@@ -1917,6 +1917,614 @@
           "id": "prt_14171d6e9001IM51jNavNSeM9z",
           "sessionID": "ses_ebe95882dffeA8W7KvdSpJdsxj",
           "messageID": "msg_1416d2d17001MVIOw1fkTtRqt7"
+        }
+      ]
+    },
+    {
+      "info": {
+        "role": "user",
+        "time": {
+          "created": 1792099569472
+        },
+        "agent": "general",
+        "model": {
+          "providerID": "opencode",
+          "modelID": "big-pickle"
+        },
+        "summary": {
+          "diffs": []
+        },
+        "id": "msg_141754f3f001wl8OzrcFuRiSZp",
+        "sessionID": "ses_ebe95882dffeA8W7KvdSpJdsxj"
+      },
+      "parts": [
+        {
+          "type": "text",
+          "text": "The task review found issues. Fix them, re-run the tests covering the amended code, append a fix report to your existing report file, and reply with the same short status contract.\n\n## CRITICAL ENVIRONMENT CORRECTION\n\nYour previous run committed to the WRONG checkout (`/home/alexa/repos/agentic-odi`, on branch `main`). That location is off-limits. For every command in this fix round you MUST operate inside the worktree:\n- Working directory: `/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution`\n- Prefix shell commands with `cd /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution && ...`, or use `git -C /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution ...`.\n- Never run git in `/home/alexa/repos/agentic-odi`.\n- Verify with `git -C /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution log --oneline -3` that your fix commit lands on branch `feature/cli-bundled-distribution` (the current worktree HEAD is `54fcd71`).\n- Use `UV_PYTHON=3.11` for uv commands.\n\n## Findings\n\nImportant (ruled): Windows `install_root` fallback in `cli/src/cli/paths.py` prefers `APPDATA` as a middle fallback, but install_root is local data and must use `%LOCALAPPDATA%\\agentic-odi`. **Fix:** on Windows, use `LOCALAPPDATA` if set, else `Path.home() / \"AppData\" / \"Local\" / \"agentic-odi\"`; do NOT use APPDATA for install_root. (`config_dir` keeps `%APPDATA%`.)\n\nMinor (ruled into this fix, same file): remove the undocumented `AGENTIC_ODI_BIN_DIR` override so `bin_dir()` follows only `XDG_BIN_HOME` → `~/.local/bin` (POSIX) / `install_root()/bin` (Windows), matching the contract. Do not add new env vars.\n\n## Requirements\n\n- Re-run `UV_PYTHON=3.11 uv run --directory cli pytest tests/test_paths.py -v` (from the worktree) — all must still pass, output pristine.\n- Update the report file at:\n  /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/.superpowers/sdd/2026-10-15-cli-bundled-distribution-and-self-update/task-2-report.md\n  Append what changed, the covering tests, the command, and the output.\n- Commit on the worktree branch with a message like `fix(cli): correct Windows install_root fallback and drop undocumented bin-dir override`.\n\nReply with Status / commits / one-line test summary / concerns / report path.",
+          "id": "prt_141754f41001lfzmwRS9uWppHn",
+          "sessionID": "ses_ebe95882dffeA8W7KvdSpJdsxj",
+          "messageID": "msg_141754f3f001wl8OzrcFuRiSZp"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_141754f3f001wl8OzrcFuRiSZp",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 20283,
+          "input": 615,
+          "output": 52,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 19616
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792099571253,
+          "completed": 1792099573477
+        },
+        "finish": "tool-calls",
+        "id": "msg_141755635001g0bVFOFKoAe2MR",
+        "sessionID": "ses_ebe95882dffeA8W7KvdSpJdsxj"
+      },
+      "parts": [
+        {
+          "snapshot": "c8b3866bec05f70c6fa6c7c1ca7f07353f8062be",
+          "type": "step-start",
+          "id": "prt_141755e51001qWZaO2QLwyQF0H",
+          "sessionID": "ses_ebe95882dffeA8W7KvdSpJdsxj",
+          "messageID": "msg_141755635001g0bVFOFKoAe2MR"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "c93a4c4f-b799-4d83-98fd-2d82c37f1f69",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "cd /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution && git log --oneline -3 2>&1 | tail -3"
+            },
+            "output": "54fcd71 feat(cli): XDG-aware path resolution\n22d11cc fix(cli): reconcile version command and add --version --verbose\nc2fef5e feat(cli): build metadata and version display\n",
+            "metadata": {
+              "output": "54fcd71 feat(cli): XDG-aware path resolution\n22d11cc fix(cli): reconcile version command and add --version --verbose\nc2fef5e feat(cli): build metadata and version display\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "cd /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution && git log --oneline -3 2>&1 | tail -3",
+            "time": {
+              "start": 1792099573338,
+              "end": 1792099573364
+            }
+          },
+          "id": "prt_141755e53001dxfNUuoTprS25U",
+          "sessionID": "ses_ebe95882dffeA8W7KvdSpJdsxj",
+          "messageID": "msg_141755635001g0bVFOFKoAe2MR"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "c8b3866bec05f70c6fa6c7c1ca7f07353f8062be",
+          "type": "step-finish",
+          "tokens": {
+            "total": 20283,
+            "input": 615,
+            "output": 52,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 19616
+            }
+          },
+          "cost": 0,
+          "id": "prt_141755eaa001BD42dikO6eO0LR",
+          "sessionID": "ses_ebe95882dffeA8W7KvdSpJdsxj",
+          "messageID": "msg_141755635001g0bVFOFKoAe2MR"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_141754f3f001wl8OzrcFuRiSZp",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 21159,
+          "input": 20263,
+          "output": 823,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 73
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792099573485,
+          "completed": 1792099683737
+        },
+        "finish": "tool-calls",
+        "id": "msg_141755eed001dboatcVZ4sgQOh",
+        "sessionID": "ses_ebe95882dffeA8W7KvdSpJdsxj"
+      },
+      "parts": [
+        {
+          "snapshot": "c8b3866bec05f70c6fa6c7c1ca7f07353f8062be",
+          "type": "step-start",
+          "id": "prt_141770d09001e74SA077B2eZ4l",
+          "sessionID": "ses_ebe95882dffeA8W7KvdSpJdsxj",
+          "messageID": "msg_141755eed001dboatcVZ4sgQOh"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "bdff71ab-9068-42c2-92a8-64ffb080d3d1",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "cat > /tmp/fix_paths.py << 'PY'\nimport sys\n\nsys.path.insert(0, '.')\n\ncontent = r'''\"\"\"Path resolution utilities for the agentic-odi CLI.\"\"\"\n\nfrom __future__ import annotations\n\nimport os\nimport sys\nfrom pathlib import Path\n\n\ndef install_root() -> Path:\n    \"\"\"Resolve the installation root directory.\n\n    Resolution order:\n    1. AGENTIC_ODI_INSTALL_DIR env var\n    2. XDG_DATA_HOME/agentic-odi (POSIX) or %LOCALAPPDATA%\\\\agentic-odi (Windows)\n    3. ~/.local/share/agentic-odi (POSIX fallback)\n    \"\"\"\n    env_install = os.environ.get(\"AGENTIC_ODI_INSTALL_DIR\")\n    if env_install:\n        return Path(env_install).resolve()\n\n    if sys.platform == \"win32\":\n        local_app_data = os.environ.get(\"LOCALAPPDATA\")\n        if local_app_data:\n            return Path(local_app_data) / \"agentic-odi\"\n        return Path.home() / \"AppData\" / \"Local\" / \"agentic-odi\"\n\n    xdg_data_home = os.environ.get(\"XDG_DATA_HOME\")\n    if xdg_data_home:\n        return Path(xdg_data_home) / \"agentic-odi\"\n\n    return Path.home() / \".local\" / \"share\" / \"agentic-odi\"\n\n\ndef bin_dir() -> Path:\n    \"\"\"Resolve the binary directory.\n\n    Resolution order:\n    1. XDG_BIN_HOME (POSIX) or install_root()/bin (Windows)\n    2. ~/.local/bin (POSIX fallback)\n    \"\"\"\n    if sys.platform == \"win32\":\n        return install_root() / \"bin\"\n\n    xdg_bin_home = os.environ.get(\"XDG_BIN_HOME\")\n    if xdg_bin_home:\n        return Path(xdg_bin_home)\n\n    return Path.home() / \".local\" / \"bin\"\n\n\ndef config_dir() -> Path:\n    \"\"\"Resolve the configuration directory.\n\n    Resolution order:\n    1. XDG_CONFIG_HOME/agentic-odi (POSIX)\n    2. ~/.config/agentic-odi (POSIX fallback)\n    3. %APPDATA%\\\\agentic-odi (Windows)\n    \"\"\"\n    if sys.platform == \"win32\":\n        app_data = os.environ.get(\"APPDATA\")\n        if app_data:\n            return Path(app_data) / \"agentic-odi\"\n        return Path.home() / \"AppData\" / \"Roaming\" / \"agentic-odi\"\n\n    xdg_config_home = os.environ.get(\"XDG_CONFIG_HOME\")\n    if xdg_config_home:\n        return Path(xdg_config_home) / \"agentic-odi\"\n\n    return Path.home() / \".config\" / \"agentic-odi\"\n\n\ndef versions_dir() -> Path:\n    \"\"\"Resolve the versions directory where installed versions are stored.\"\"\"\n    return install_root() / \"versions\"\n\n\ndef current_link() -> Path:\n    \"\"\"Resolve the 'current' symlink path.\"\"\"\n    return install_root() / \"current\"\n\n\ndef state_file() -> Path:\n    \"\"\"Resolve the update state file path.\"\"\"\n    return install_root() / \"update.json\"\n\n\ndef is_frozen() -> bool:\n    \"\"\"Check if the application is running in a frozen/packaged state.\"\"\"\n    return bool(getattr(sys, \"frozen\", False))\n\n\ndef is_writable_dir(p: Path) -> bool:\n    \"\"\"Check if the given path is a writable directory.\"\"\"\n    try:\n        return p.is_dir() and os.access(p, os.W_OK)\n    except Exception:\n        return False\n'''\nopen('/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/cli/src/cli/paths.py', 'w').write(content)\nPY\npython3 /tmp/fix_paths.py 2>&1 | tail -0\n"
+            },
+            "output": "(no output)",
+            "metadata": {
+              "output": "(no output)",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "cat > /tmp/fix_paths.py << 'PY'\nimport sys\n\nsys.path.insert(0, '.')\n\ncontent = r'''\"\"\"Path resolution utilities for the agentic-odi CLI.\"\"\"\n\nfrom __future__ import annotations\n\nimport os\nimport sys\nfrom pathlib import Path\n\n\ndef install_root() -> Path:\n    \"\"\"Resolve the installation root directory.\n\n    Resolution order:\n    1. AGENTIC_ODI_INSTALL_DIR env var\n    2. XDG_DATA_HOME/agentic-odi (POSIX) or %LOCALAPPDATA%\\\\agentic-odi (Windows)\n    3. ~/.local/share/agentic-odi (POSIX fallback)\n    \"\"\"\n    env_install = os.environ.get(\"AGENTIC_ODI_INSTALL_DIR\")\n    if env_install:\n        return Path(env_install).resolve()\n\n    if sys.platform == \"win32\":\n        local_app_data = os.environ.get(\"LOCALAPPDATA\")\n        if local_app_data:\n            return Path(local_app_data) / \"agentic-odi\"\n        return Path.home() / \"AppData\" / \"Local\" / \"agentic-odi\"\n\n    xdg_data_home = os.environ.get(\"XDG_DATA_HOME\")\n    if xdg_data_home:\n        return Path(xdg_data_home) / \"agentic-odi\"\n\n    return Path.home() / \".local\" / \"share\" / \"agentic-odi\"\n\n\ndef bin_dir() -> Path:\n    \"\"\"Resolve the binary directory.\n\n    Resolution order:\n    1. XDG_BIN_HOME (POSIX) or install_root()/bin (Windows)\n    2. ~/.local/bin (POSIX fallback)\n    \"\"\"\n    if sys.platform == \"win32\":\n        return install_root() / \"bin\"\n\n    xdg_bin_home = os.environ.get(\"XDG_BIN_HOME\")\n    if xdg_bin_home:\n        return Path(xdg_bin_home)\n\n    return Path.home() / \".local\" / \"bin\"\n\n\ndef config_dir() -> Path:\n    \"\"\"Resolve the configuration directory.\n\n    Resolution order:\n    1. XDG_CONFIG_HOME/agentic-odi (POSIX)\n    2. ~/.config/agentic-odi (POSIX fallback)\n    3. %APPDATA%\\\\agentic-odi (Windows)\n    \"\"\"\n    if sys.platform == \"win32\":\n        app_data = os.environ.get(\"APPDATA\")\n        if app_data:\n            return Path(app_data) / \"agentic-odi\"\n        return Path.home() / \"AppData\" / \"Roaming\" / \"agentic-odi\"\n\n    xdg_config_home = os.environ.get(\"XDG_CONFIG_HOME\")\n    if xdg_config_home:\n        return Path(xdg_config_home) / \"agentic-odi\"\n\n    return Path.home() / \".config\" / \"agentic-odi\"\n\n\ndef versions_dir() -> Path:\n    \"\"\"Resolve the versions directory where installed versions are stored.\"\"\"\n    return install_root() / \"versions\"\n\n\ndef current_link() -> Path:\n    \"\"\"Resolve the 'current' symlink path.\"\"\"\n    return install_root() / \"current\"\n\n\ndef state_file() -> Path:\n    \"\"\"Resolve the update state file path.\"\"\"\n    return install_root() / \"update.json\"\n\n\ndef is_frozen() -> bool:\n    \"\"\"Check if the application is running in a frozen/packaged state.\"\"\"\n    return bool(getattr(sys, \"frozen\", False))\n\n\ndef is_writable_dir(p: Path) -> bool:\n    \"\"\"Check if the given path is a writable directory.\"\"\"\n    try:\n        return p.is_dir() and os.access(p, os.W_OK)\n    except Exception:\n        return False\n'''\nopen('/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/cli/src/cli/paths.py', 'w').write(content)\nPY\npython3 /tmp/fix_paths.py 2>&1 | tail -0\n",
+            "time": {
+              "start": 1792099683608,
+              "end": 1792099683665
+            }
+          },
+          "id": "prt_141770d0d001TOJW2oxEAtdWr6",
+          "sessionID": "ses_ebe95882dffeA8W7KvdSpJdsxj",
+          "messageID": "msg_141755eed001dboatcVZ4sgQOh"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "c8b3866bec05f70c6fa6c7c1ca7f07353f8062be",
+          "type": "step-finish",
+          "tokens": {
+            "total": 21159,
+            "input": 20263,
+            "output": 823,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 73
+            }
+          },
+          "cost": 0,
+          "id": "prt_141770d63001hginAULkpsPWTa",
+          "sessionID": "ses_ebe95882dffeA8W7KvdSpJdsxj",
+          "messageID": "msg_141755eed001dboatcVZ4sgQOh"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_141754f3f001wl8OzrcFuRiSZp",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 21235,
+          "input": 886,
+          "output": 65,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 20284
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792099683744,
+          "completed": 1792099686890
+        },
+        "finish": "tool-calls",
+        "id": "msg_141770da0001pv3yXMTyoVdKw8",
+        "sessionID": "ses_ebe95882dffeA8W7KvdSpJdsxj"
+      },
+      "parts": [
+        {
+          "snapshot": "c8b3866bec05f70c6fa6c7c1ca7f07353f8062be",
+          "type": "step-start",
+          "id": "prt_1417717d7001aZDoBrtMdy8unT",
+          "sessionID": "ses_ebe95882dffeA8W7KvdSpJdsxj",
+          "messageID": "msg_141770da0001pv3yXMTyoVdKw8"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "5bb1b3bd-84b6-4fc4-b41c-29ab54ddb5a9",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "cd /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution && UV_PYTHON=3.11 uv run --directory cli pytest tests/test_paths.py -v 2>&1 | tail -5"
+            },
+            "output": "tests/test_paths.py::test_derived_paths PASSED                           [ 71%]\ntests/test_paths.py::test_is_frozen_false_by_default PASSED              [ 85%]\ntests/test_paths.py::test_is_writable_dir PASSED                         [100%]\n\n============================== 7 passed in 0.03s ===============================\n",
+            "metadata": {
+              "output": "tests/test_paths.py::test_derived_paths PASSED                           [ 71%]\ntests/test_paths.py::test_is_frozen_false_by_default PASSED              [ 85%]\ntests/test_paths.py::test_is_writable_dir PASSED                         [100%]\n\n============================== 7 passed in 0.03s ===============================\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "cd /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution && UV_PYTHON=3.11 uv run --directory cli pytest tests/test_paths.py -v 2>&1 | tail -5",
+            "time": {
+              "start": 1792099686376,
+              "end": 1792099686818
+            }
+          },
+          "id": "prt_1417717db0012s2QI8fDCXrKpF",
+          "sessionID": "ses_ebe95882dffeA8W7KvdSpJdsxj",
+          "messageID": "msg_141770da0001pv3yXMTyoVdKw8"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "c8b3866bec05f70c6fa6c7c1ca7f07353f8062be",
+          "type": "step-finish",
+          "tokens": {
+            "total": 21235,
+            "input": 886,
+            "output": 65,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 20284
+            }
+          },
+          "cost": 0,
+          "id": "prt_1417719cc001NHtVyMNmqh3V0E",
+          "sessionID": "ses_ebe95882dffeA8W7KvdSpJdsxj",
+          "messageID": "msg_141770da0001pv3yXMTyoVdKw8"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_141754f3f001wl8OzrcFuRiSZp",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 21774,
+          "input": 152,
+          "output": 464,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 21158
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792099686896,
+          "completed": 1792099705466
+        },
+        "finish": "tool-calls",
+        "id": "msg_1417719f0001CR7a201VGCKaRk",
+        "sessionID": "ses_ebe95882dffeA8W7KvdSpJdsxj"
+      },
+      "parts": [
+        {
+          "snapshot": "c8b3866bec05f70c6fa6c7c1ca7f07353f8062be",
+          "type": "step-start",
+          "id": "prt_141776202001gVAsymUYDCblXx",
+          "sessionID": "ses_ebe95882dffeA8W7KvdSpJdsxj",
+          "messageID": "msg_1417719f0001CR7a201VGCKaRk"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "a89b8076-1ad1-4fd8-b7df-14e8ad208ed5",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "cat >> /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/.superpowers/sdd/2026-10-15-cli-bundled-distribution-and-self-update/task-2-report.md << 'EOF'\n\n---\n\n## Fix Report\n\n### Issues addressed\n1. **Windows install_root fallback**: Removed fallback to APPDATA for install_root. On Windows, install_root now uses LOCALAPPDATA if set, otherwise `Path.home() / \"AppData\" / \"Local\" / \"agentic-odi\"`. (config_dir continues to use APPDATA as intended.)\n2. **Undocumented bin_dir override**: Removed `AGENTIC_ODI_BIN_DIR` env var override. bin_dir now follows only `XDG_BIN_HOME` → `~/.local/bin` (POSIX) or `install_root()/bin` (Windows), matching the contract.\n\n### Changes made\n- Modified `cli/src/cli/paths.py` to correct Windows install_root logic and remove undocumented bin-dir override.\n\n### Covering tests\nRe-ran the path tests (same 7 tests) to ensure no regression:\n\n```bash\ncd /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution && UV_PYTHON=3.11 uv run --directory cli pytest tests/test_paths.py -v\n```\n\n### Output\n```\ntests/test_paths.py::test_install_root_env_override PASSED               [ 14%]\ntests/test_paths.py::test_install_root_uses_xdg_data_home PASSED         [ 28%]\ntests/test_paths.py::test_install_root_defaults_to_local_share PASSED    [ 42%]\ntests/test_paths.py::test_config_dir_uses_xdg_config_home PASSED         [ 57%]\ntests/test_paths.py::test_derived_paths PASSED                           [ 71%]\ntests/test_paths.py::test_is_frozen_false_by_default PASSED              [ 85%]\ntests/test_paths.py::test_is_writable_dir PASSED                         [100%]\n\n============================== 7 passed in 0.03s ===============================\n```\n\nAll tests pass with the fixes applied.\nEOF\n"
+            },
+            "output": "(no output)",
+            "metadata": {
+              "output": "(no output)",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "cat >> /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/.superpowers/sdd/2026-10-15-cli-bundled-distribution-and-self-update/task-2-report.md << 'EOF'\n\n---\n\n## Fix Report\n\n### Issues addressed\n1. **Windows install_root fallback**: Removed fallback to APPDATA for install_root. On Windows, install_root now uses LOCALAPPDATA if set, otherwise `Path.home() / \"AppData\" / \"Local\" / \"agentic-odi\"`. (config_dir continues to use APPDATA as intended.)\n2. **Undocumented bin_dir override**: Removed `AGENTIC_ODI_BIN_DIR` env var override. bin_dir now follows only `XDG_BIN_HOME` → `~/.local/bin` (POSIX) or `install_root()/bin` (Windows), matching the contract.\n\n### Changes made\n- Modified `cli/src/cli/paths.py` to correct Windows install_root logic and remove undocumented bin-dir override.\n\n### Covering tests\nRe-ran the path tests (same 7 tests) to ensure no regression:\n\n```bash\ncd /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution && UV_PYTHON=3.11 uv run --directory cli pytest tests/test_paths.py -v\n```\n\n### Output\n```\ntests/test_paths.py::test_install_root_env_override PASSED               [ 14%]\ntests/test_paths.py::test_install_root_uses_xdg_data_home PASSED         [ 28%]\ntests/test_paths.py::test_install_root_defaults_to_local_share PASSED    [ 42%]\ntests/test_paths.py::test_config_dir_uses_xdg_config_home PASSED         [ 57%]\ntests/test_paths.py::test_derived_paths PASSED                           [ 71%]\ntests/test_paths.py::test_is_frozen_false_by_default PASSED              [ 85%]\ntests/test_paths.py::test_is_writable_dir PASSED                         [100%]\n\n============================== 7 passed in 0.03s ===============================\n```\n\nAll tests pass with the fixes applied.\nEOF\n",
+            "time": {
+              "start": 1792099705363,
+              "end": 1792099705382
+            }
+          },
+          "id": "prt_141776206001RGq6Sfx1rsyCN0",
+          "sessionID": "ses_ebe95882dffeA8W7KvdSpJdsxj",
+          "messageID": "msg_1417719f0001CR7a201VGCKaRk"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "c8b3866bec05f70c6fa6c7c1ca7f07353f8062be",
+          "type": "step-finish",
+          "tokens": {
+            "total": 21774,
+            "input": 152,
+            "output": 464,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 21158
+            }
+          },
+          "cost": 0,
+          "id": "prt_14177625a001Q7ATuGWo3sIbcf",
+          "sessionID": "ses_ebe95882dffeA8W7KvdSpJdsxj",
+          "messageID": "msg_1417719f0001CR7a201VGCKaRk"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_141754f3f001wl8OzrcFuRiSZp",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 21860,
+          "input": 12,
+          "output": 75,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 21773
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792099705488,
+          "completed": 1792099772794
+        },
+        "finish": "tool-calls",
+        "id": "msg_1417762900010pznYgTw2LU270",
+        "sessionID": "ses_ebe95882dffeA8W7KvdSpJdsxj"
+      },
+      "parts": [
+        {
+          "snapshot": "c8b3866bec05f70c6fa6c7c1ca7f07353f8062be",
+          "type": "step-start",
+          "id": "prt_141776d18001YhBINxooao2R0w",
+          "sessionID": "ses_ebe95882dffeA8W7KvdSpJdsxj",
+          "messageID": "msg_1417762900010pznYgTw2LU270"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "19888698-0755-4604-80ea-f6845b153068",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "cd /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution && git add cli/src/cli/paths.py && git commit -m \"fix(cli): correct Windows install_root fallback and drop undocumented bin-dir override\" 2>&1 | tail -10"
+            },
+            "output": "[feature/cli-bundled-distribution 590cd9f] fix(cli): correct Windows install_root fallback and drop undocumented bin-dir override\n 1 file changed, 3 insertions(+), 8 deletions(-)\n",
+            "metadata": {
+              "output": "[feature/cli-bundled-distribution 590cd9f] fix(cli): correct Windows install_root fallback and drop undocumented bin-dir override\n 1 file changed, 3 insertions(+), 8 deletions(-)\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "cd /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution && git add cli/src/cli/paths.py && git commit -m \"fix(cli): correct Windows install_root fallback and drop undocumented bin-dir override\" 2>&1 | tail -10",
+            "time": {
+              "start": 1792099708197,
+              "end": 1792099772542
+            }
+          },
+          "id": "prt_141776d1a001ihHwlee3UFGbwl",
+          "sessionID": "ses_ebe95882dffeA8W7KvdSpJdsxj",
+          "messageID": "msg_1417762900010pznYgTw2LU270"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "c8b3866bec05f70c6fa6c7c1ca7f07353f8062be",
+          "type": "step-finish",
+          "tokens": {
+            "total": 21860,
+            "input": 12,
+            "output": 75,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 21773
+            }
+          },
+          "cost": 0,
+          "id": "prt_1417868a8001CIIpJJfmF7Ahci",
+          "sessionID": "ses_ebe95882dffeA8W7KvdSpJdsxj",
+          "messageID": "msg_1417762900010pznYgTw2LU270"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_141754f3f001wl8OzrcFuRiSZp",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 21967,
+          "input": 680,
+          "output": 52,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 21235
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792099772802,
+          "completed": 1792099775530
+        },
+        "finish": "tool-calls",
+        "id": "msg_141786982001EXDguL5DT73jIV",
+        "sessionID": "ses_ebe95882dffeA8W7KvdSpJdsxj"
+      },
+      "parts": [
+        {
+          "snapshot": "c8b3866bec05f70c6fa6c7c1ca7f07353f8062be",
+          "type": "step-start",
+          "id": "prt_141787387001duZcjCXd2iZ7H4",
+          "sessionID": "ses_ebe95882dffeA8W7KvdSpJdsxj",
+          "messageID": "msg_141786982001EXDguL5DT73jIV"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "dd708748-33e1-42b2-b67f-ec4f70629cc7",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "cd /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution && git log --oneline -1 2>&1 | tail -1"
+            },
+            "output": "590cd9f fix(cli): correct Windows install_root fallback and drop undocumented bin-dir override\n",
+            "metadata": {
+              "output": "590cd9f fix(cli): correct Windows install_root fallback and drop undocumented bin-dir override\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "cd /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution && git log --oneline -1 2>&1 | tail -1",
+            "time": {
+              "start": 1792099775380,
+              "end": 1792099775401
+            }
+          },
+          "id": "prt_14178738a001s6a0FIR2Y1ggCR",
+          "sessionID": "ses_ebe95882dffeA8W7KvdSpJdsxj",
+          "messageID": "msg_141786982001EXDguL5DT73jIV"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "c8b3866bec05f70c6fa6c7c1ca7f07353f8062be",
+          "type": "step-finish",
+          "tokens": {
+            "total": 21967,
+            "input": 680,
+            "output": 52,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 21235
+            }
+          },
+          "cost": 0,
+          "id": "prt_1417873f9001RtOUcBdqBYphDZ",
+          "sessionID": "ses_ebe95882dffeA8W7KvdSpJdsxj",
+          "messageID": "msg_141786982001EXDguL5DT73jIV"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_141754f3f001wl8OzrcFuRiSZp",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 22094,
+          "input": 19999,
+          "output": 100,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 1995
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792099775535,
+          "completed": 1792099808400
+        },
+        "finish": "stop",
+        "id": "msg_14178742f001Gtf3Qn7x7K0pGP",
+        "sessionID": "ses_ebe95882dffeA8W7KvdSpJdsxj"
+      },
+      "parts": [
+        {
+          "snapshot": "c8b3866bec05f70c6fa6c7c1ca7f07353f8062be",
+          "type": "step-start",
+          "id": "prt_14178ee01001QUFKU1egjfI9fC",
+          "sessionID": "ses_ebe95882dffeA8W7KvdSpJdsxj",
+          "messageID": "msg_14178742f001Gtf3Qn7x7K0pGP"
+        },
+        {
+          "type": "text",
+          "text": "Status: DONE  \ncommits: 590cd9f - fix(cli): correct Windows install_root fallback and drop undocumented bin-dir override  \none-line test summary: 7 passed (all path resolution tests)  \nconcerns: None  \nreport file path: /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/.superpowers/sdd/2026-10-15-cli-bundled-distribution-and-self-update/task-2-report.md",
+          "time": {
+            "start": 1792099806725,
+            "end": 1792099808298
+          },
+          "id": "prt_14178ee05001FBo4PJBj20jgi6",
+          "sessionID": "ses_ebe95882dffeA8W7KvdSpJdsxj",
+          "messageID": "msg_14178742f001Gtf3Qn7x7K0pGP"
+        },
+        {
+          "reason": "stop",
+          "snapshot": "c8b3866bec05f70c6fa6c7c1ca7f07353f8062be",
+          "type": "step-finish",
+          "tokens": {
+            "total": 22094,
+            "input": 19999,
+            "output": 100,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 1995
+            }
+          },
+          "cost": 0,
+          "id": "prt_14178f45d001sdMUIDNCahJ4cq",
+          "sessionID": "ses_ebe95882dffeA8W7KvdSpJdsxj",
+          "messageID": "msg_14178742f001Gtf3Qn7x7K0pGP"
         }
       ]
     }

@@ -1,0 +1,26 @@
+The task review found issues. Fix them, re-run the tests covering the amended code, append a fix report to your existing report file, and reply with the same short status contract.
+
+## CRITICAL ENVIRONMENT CORRECTION
+
+Your previous run committed to the WRONG checkout (`/home/alexa/repos/agentic-odi`, on branch `main`). That location is off-limits. For every command in this fix round you MUST operate inside the worktree:
+- Working directory: `/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution`
+- Prefix shell commands with `cd /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution && ...`, or use `git -C /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution ...`.
+- Never run git in `/home/alexa/repos/agentic-odi`.
+- Verify with `git -C /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution log --oneline -3` that your fix commit lands on branch `feature/cli-bundled-distribution` (the current worktree HEAD is `54fcd71`).
+- Use `UV_PYTHON=3.11` for uv commands.
+
+## Findings
+
+Important (ruled): Windows `install_root` fallback in `cli/src/cli/paths.py` prefers `APPDATA` as a middle fallback, but install_root is local data and must use `%LOCALAPPDATA%\agentic-odi`. **Fix:** on Windows, use `LOCALAPPDATA` if set, else `Path.home() / "AppData" / "Local" / "agentic-odi"`; do NOT use APPDATA for install_root. (`config_dir` keeps `%APPDATA%`.)
+
+Minor (ruled into this fix, same file): remove the undocumented `AGENTIC_ODI_BIN_DIR` override so `bin_dir()` follows only `XDG_BIN_HOME` → `~/.local/bin` (POSIX) / `install_root()/bin` (Windows), matching the contract. Do not add new env vars.
+
+## Requirements
+
+- Re-run `UV_PYTHON=3.11 uv run --directory cli pytest tests/test_paths.py -v` (from the worktree) — all must still pass, output pristine.
+- Update the report file at:
+  /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/.superpowers/sdd/2026-10-15-cli-bundled-distribution-and-self-update/task-2-report.md
+  Append what changed, the covering tests, the command, and the output.
+- Commit on the worktree branch with a message like `fix(cli): correct Windows install_root fallback and drop undocumented bin-dir override`.
+
+Reply with Status / commits / one-line test summary / concerns / report path.
