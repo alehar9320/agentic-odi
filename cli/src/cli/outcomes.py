@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import os
-from enum import StrEnum
+from enum import Enum
 from typing import Any
 
 import typer
@@ -15,12 +15,12 @@ MCP_URL_DEFAULT = os.getenv("AGENTIC_ODI_MCP_URL", "http://localhost:8000/mcp")
 outcomes_app = typer.Typer(help="Manage Customer Outcome entities.")
 
 
-class DirectionOption(StrEnum):
+class DirectionOption(str, Enum):
     MINIMIZE = "minimize"
     MAXIMIZE = "maximize"
 
 
-class CategoryOption(StrEnum):
+class CategoryOption(str, Enum):
     REVENUE_GROWTH = "revenue_growth"
     COST_REDUCTION = "cost_reduction"
     RETENTION = "retention"

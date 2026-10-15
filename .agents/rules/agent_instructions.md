@@ -125,7 +125,7 @@ These are absolute constraints the agent must respect:
 ---
 
 ## 🛠 Technology Stack & Tools
-- **Language**: Python 3.11+
+- **Language**: Python 3.10+
 - **MCP Framework**: `fastmcp` (Server and Client)
 - **ASGI Server**: `uvicorn`
 - **HTTP Client**: `httpx`
@@ -196,9 +196,3 @@ Update `README.md` whenever any of the following change:
 - **In-Memory Testing (Preferred)**: Favor testing functionality deterministically by passing the `FastMCP` server directly into the `Client(server)` instance. This runs in-memory without network overhead for deterministic and lightning-fast execution.
 - **Transport Testing (When Needed)**: For HTTP/SSE network transport tests, prefer the isolated in-process `fastmcp.utilities.tests.run_server_async(server)` context manager over subprocess testing (which uses `run_server_in_process` and is slower to debug).
 - **Data Assertions**: Utilize `inline-snapshot` (`snapshot()`) for assessing complex data structures like tool API JSON schemas or expected responses.
-
-### 6. External Connectors Package (`connectors/`)
-- **Purpose**: The `connectors/` package (`agentic-odi-connectors`) provides pluggable external integrations that pull data into the ODI store. It is an MCP **client** of external MCP servers — the inverse of the ODI MCP server, which exposes ODI data.
-- **Transport**: The first connector kind (`mcp`) connects over HTTP using [`fastmcp.Client`](https://github.com/jlowin/fastmcp). New connector kinds are registered through the registry dispatcher (`build_connector`).
-- **Testing**: Follow the in-memory testing strategy — pass an in-memory `Client(server)` (or inject a `client_factory`) so connector tests run deterministically without network access.
-- **Error Handling**: Unknown connector kinds and malformed configuration must fail clearly with a descriptive error (`UnknownConnectorKindError`, `RegistryError`) rather than silently doing nothing.

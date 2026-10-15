@@ -8,12 +8,12 @@ from enum import Enum
 from pydantic import BaseModel, Field, computed_field
 
 
-class Direction(str, Enum):  # noqa: UP042
+class Direction(str, Enum):
     MINIMIZE = "minimize"
     MAXIMIZE = "maximize"
 
 
-class BusinessImpactCategory(str, Enum):  # noqa: UP042
+class BusinessImpactCategory(str, Enum):
     REVENUE_GROWTH = "revenue_growth"
     COST_REDUCTION = "cost_reduction"
     RETENTION = "retention"

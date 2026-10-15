@@ -54,9 +54,6 @@ jobs:
       - name: Run Mypy (client)
         run: uv run --directory client mypy .
 
-      - name: Run Mypy (connectors)
-        run: uv run --directory connectors mypy .
-
   security:
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -65,7 +62,7 @@ jobs:
       - uses: ./.github/actions/setup
 
       - name: Run Bandit
-        run: uv run bandit -c pyproject.toml -r cli/src client/src core/src local_server/src mcp_server/src connectors/src
+        run: uv run bandit -c pyproject.toml -r core/src mcp_server/src local_server/src cli/src client/src
 
   test:
     runs-on: ubuntu-latest
@@ -73,7 +70,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.11", "3.12"]
+        python-version: ["3.10", "3.11", "3.12"]
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
@@ -105,11 +102,6 @@ jobs:
         env:
           COVERAGE_FILE: ${{ github.workspace }}/.coverage.client
 
-      - name: Pytest (connectors)
-        run: uv run --directory connectors pytest --cov=connectors --cov-report=term-missing
-        env:
-          COVERAGE_FILE: ${{ github.workspace }}/.coverage.connectors
-
       - name: Combine and report coverage
         run: |
           unset COVERAGE_FILE
@@ -118,8 +110,7 @@ jobs:
             "${{ github.workspace }}/.coverage.mcp_server" \
             "${{ github.workspace }}/.coverage.local_server" \
             "${{ github.workspace }}/.coverage.cli" \
-            "${{ github.workspace }}/.coverage.client" \
-            "${{ github.workspace }}/.coverage.connectors"
+            "${{ github.workspace }}/.coverage.client"
           uv run coverage xml -o "${{ github.workspace }}/coverage.xml"
           uv run coverage report
 
