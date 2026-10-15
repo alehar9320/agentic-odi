@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from core import ODIService
@@ -52,12 +53,12 @@ def create_app(repo: Repository | None = None) -> FastAPI:
 
     app.include_router(studio_router)
 
-    if SPA_DIST.is_dir():
+    if SPA_DIST.is_dir() and not os.getenv("AGENTIC_ODI_DISABLE_SPA"):
         assets_dir = SPA_DIST / "assets"
         if assets_dir.is_dir():
             app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
 
-        @app.get("/{full_path:path}")
+        @app.get("/{full_path:path}", response_model=None)
         def spa_fallback(full_path: str) -> FileResponse | JSONResponse:
             candidate = (SPA_DIST / full_path).resolve()
             if full_path and candidate.is_file() and candidate.is_relative_to(SPA_DIST.resolve()):
