@@ -1,0 +1,52 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M50FMBPZZVXN7QTSZ8RRGZHG",
+  "session_id": "ses_ebf6bd831ffe9tDPErTclMDXE2",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-15T19:12:15.465808743Z",
+  "branch": "main",
+  "checkpoints_count": 3,
+  "files_touched": [
+    "README.md"
+  ],
+  "agent": "OpenCode",
+  "model": "big-pickle",
+  "turn_id": "00435cd65973",
+  "checkpoint_transcript_start": 14,
+  "transcript_lines_at_start": 14,
+  "compact_transcript_start": 14,
+  "token_usage": {
+    "input_tokens": 333814,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 2078272,
+    "output_tokens": 22258,
+    "api_call_count": 25
+  },
+  "session_metrics": {
+    "turn_count": 3
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-10-15T19:12:15.404212593Z",
+    "agent_lines": 0,
+    "agent_removed": 0,
+    "human_added": 67,
+    "human_modified": 70,
+    "human_removed": 0,
+    "total_committed": 67,
+    "total_lines_changed": 137,
+    "agent_percentage": 0,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 208,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        ".opencode/plans/2026-10-15-living-studio-tauri-migration.md": 208
+      }
+    }
+  ]
+}
