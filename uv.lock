@@ -20,6 +20,7 @@ members = [
     "agentic-odi",
     "agentic-odi-cli",
     "agentic-odi-client",
+    "agentic-odi-connectors",
     "agentic-odi-core",
     "agentic-odi-local-server",
     "agentic-odi-mcp-server",
@@ -57,6 +58,7 @@ name = "agentic-odi-cli"
 version = "0.1.0"
 source = { editable = "cli" }
 dependencies = [
+    { name = "agentic-odi-connectors" },
     { name = "agentic-odi-core" },
     { name = "fastmcp" },
     { name = "typer" },
@@ -64,6 +66,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "agentic-odi-connectors", editable = "connectors" },
     { name = "agentic-odi-core", editable = "core" },
     { name = "fastmcp" },
     { name = "typer" },
@@ -84,6 +87,21 @@ requires-dist = [
     { name = "fastmcp" },
     { name = "openai" },
     { name = "streamlit" },
+]
+
+[[package]]
+name = "agentic-odi-connectors"
+version = "0.1.0"
+source = { editable = "connectors" }
+dependencies = [
+    { name = "fastmcp" },
+    { name = "pydantic" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "fastmcp" },
+    { name = "pydantic" },
 ]
 
 [[package]]

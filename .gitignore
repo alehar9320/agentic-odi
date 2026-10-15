@@ -113,6 +113,9 @@ celerybeat.pid
 # SageMath parsed files
 *.sage.py
 
+# Local connector registry and ingest artifacts
+.agentic-odi/
+
 # Environments
 .env
 .venv

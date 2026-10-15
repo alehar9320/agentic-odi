@@ -4,16 +4,18 @@ version = "0.1.0"
 description = "Command-line interface for Agentic ODI."
 requires-python = ">=3.10"
 dependencies = [
+    "agentic-odi-connectors",
     "typer",
     "fastmcp",
     "agentic-odi-core",
 ]
 
+[tool.uv.sources]
+agentic-odi-connectors = { workspace = true }
+agentic-odi-core = { workspace = true }
+
 [project.scripts]
 agentic-odi = "cli.cli:app"
-
-[tool.uv.sources]
-agentic-odi-core = { workspace = true }
 
 [build-system]
 requires = ["hatchling"]

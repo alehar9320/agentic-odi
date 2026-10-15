@@ -2,6 +2,7 @@
 
 import typer
 
+from cli.connectors import connectors_app
 from cli.outcomes import outcomes_app
 from cli.version import __version__
 
@@ -9,6 +10,7 @@ app = typer.Typer(
     name="agentic-odi-cli",
     help="Agentic ODI CLI - Tool for managing Jobs-to-be-Done (JTBD) and ODI workflows.",
 )
+app.add_typer(connectors_app, name="connectors")
 
 app.add_typer(outcomes_app, name="outcomes", help="Manage Customer Outcomes")
 
