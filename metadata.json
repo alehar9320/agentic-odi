@@ -1,0 +1,37 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M50MRXXC1DHAJ3M2XW3MR8AE",
+  "strategy": "manual-commit",
+  "branch": "main",
+  "checkpoints_count": 2,
+  "files_touched": [
+    ".worktrees/mcp-connector-module/.agents/rules/agent_instructions.md",
+    ".worktrees/mcp-connector-module/.github/workflows/ci.yml",
+    ".worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/progress.md",
+    ".worktrees/mcp-connector-module/README.md",
+    ".worktrees/mcp-connector-module/cli/pyproject.toml",
+    ".worktrees/mcp-connector-module/client/pyproject.toml",
+    ".worktrees/mcp-connector-module/connectors/pyproject.toml",
+    ".worktrees/mcp-connector-module/core/pyproject.toml",
+    ".worktrees/mcp-connector-module/docs/superpowers/plans/2026-10-14-mcp-connector-module.md",
+    ".worktrees/mcp-connector-module/local_server/pyproject.toml",
+    ".worktrees/mcp-connector-module/mcp_server/pyproject.toml",
+    ".worktrees/mcp-connector-module/pyproject.toml"
+  ],
+  "sessions": [
+    {
+      "metadata": "/0/metadata.json",
+      "transcript": "/0/full.jsonl",
+      "compact_transcript": "/0/transcript.jsonl",
+      "content_hash": "/0/content_hash.txt",
+      "prompt": "/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 851013,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 15734784,
+    "output_tokens": 171950,
+    "api_call_count": 184
+  }
+}
