@@ -1,0 +1,45 @@
+You are re-reviewing one task's fix round. Verdict each finding and inspect the fix diff — nothing else.
+
+## The Task
+
+Read the task brief: /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/.superpowers/sdd/2026-10-15-cli-bundled-distribution-and-self-update/task-2-brief.md
+
+## The Findings Under Verification
+
+1. Important: Windows `install_root` preferred `APPDATA` as a middle fallback. Ruling: use `LOCALAPPDATA` if set, else `Path.home()/"AppData"/"Local"/"agentic-odi"`; do NOT use APPDATA for install_root. (`config_dir` keeps `%APPDATA%`.)
+2. Minor (ruled into this fix): remove undocumented `AGENTIC_ODI_BIN_DIR`; `bin_dir()` follows only `XDG_BIN_HOME` → `~/.local/bin` (POSIX) / `install_root()/bin` (Windows).
+
+## The Fix
+
+Read the implementer's report (fix report appended at end): /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/.superpowers/sdd/2026-10-15-cli-bundled-distribution-and-self-update/task-2-report.md
+
+Fix base: 54fcd71996ee6966eb3f7b98b2d6e40f4ab457e8
+Head: 590cd9f
+Diff file: /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/.superpowers/sdd/2026-10-15-cli-bundled-distribution-and-self-update/review-54fcd71..590cd9f.diff
+
+Read the diff file once. Do not re-run git commands. Read-only; do not mutate the working tree, index, HEAD, or branch state.
+
+## You Do Not Dispatch Subagents
+
+Do all of this review yourself.
+
+## Scope
+
+Verdict every finding. Inspect the fix diff for new problems the fix introduced. Do NOT re-review untouched code. Out-of-scope observations are non-blocking.
+
+## Tests
+
+Confirm the fix report names the covering tests and shows output; verify against the diff. Do not re-run the suite. Run a focused test only if reading raises a specific doubt.
+
+## Output Format
+
+Begin directly with the first finding's verdict. No preamble.
+
+### Finding Verdicts
+- **[finding one-liner]** — ADDRESSED | NOT ADDRESSED, with file:line evidence.
+### New Breakage in the Fix Diff
+"None" if clean.
+### Out-of-Scope Observations
+"None" if none.
+### Verdict
+**Fix round:** [All findings addressed, no new Critical/Important breakage | Findings remain open] — list open ones.
