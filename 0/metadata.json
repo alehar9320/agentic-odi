@@ -1,0 +1,43 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M50D66XPHNR0CG3A5170P4WW",
+  "session_id": "ses_ebf6bd831ffe9tDPErTclMDXE2",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-15T18:29:26.949150324Z",
+  "branch": "topic/living-studio-gui",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "cli/src/cli/connectors.py",
+    "cli/tests/test_connectors_cli.py",
+    "client/src/client/app.py",
+    "connectors/src/connectors/mcp/connector.py",
+    "connectors/src/connectors/registry.py",
+    "connectors/tests/test_mcp_connector.py",
+    "connectors/tests/test_registry.py"
+  ],
+  "agent": "OpenCode",
+  "model": "",
+  "turn_id": "fe7f072178e8",
+  "checkpoint_transcript_start": 10,
+  "transcript_lines_at_start": 10,
+  "compact_transcript_start": 10,
+  "token_usage": {
+    "input_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 0,
+    "output_tokens": 0,
+    "api_call_count": 0
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-10-15T18:29:26.930525958Z",
+    "agent_lines": 0,
+    "agent_removed": 0,
+    "human_added": 1512,
+    "human_modified": 123,
+    "human_removed": 0,
+    "total_committed": 1512,
+    "total_lines_changed": 1635,
+    "agent_percentage": 0,
+    "metric_version": 2
+  }
+}
