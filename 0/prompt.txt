@@ -1,0 +1,35 @@
+You are fixing a documented review finding in a worktree. Make ONLY the edits below; do not touch any other files and do NOT delete anything.
+
+Repo worktree: `/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module`
+File to edit: `/home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/README.md`
+
+Context: the workspace was reconciled to six packages (`core`, `mcp_server`, `local_server`, `cli`, `client`, `connectors`) and `server` no longer exists, but the README prose still says "three projects" and names a removed package.
+
+Make exactly these four edits (use exact-string edits):
+
+1. Line 21 — change the phrase "made up of three installable projects" to "made up of six installable packages" (keep the rest of the sentence, including "each with its own `pyproject.toml`, `src/` layout, and tests:", unchanged).
+
+2. Line 34 — change "Install the whole workspace (all three projects plus dev tooling):" to "Install the whole workspace (all packages plus dev tooling):".
+
+3. Line 40 — replace the sentence "This creates a `.venv` and installs `agentic-odi-server`, `agentic-odi-client`, and `agentic-odi-cli` in editable mode." with:
+"This creates a `.venv` and installs `agentic-odi-core`, `agentic-odi-mcp-server`, `agentic-odi-local-server`, `agentic-odi-client`, `agentic-odi-cli`, and `agentic-odi-connectors` in editable mode."
+
+4. Line 46 — replace the stale sentence "Today it provides version and help information; over time it will expose commands for working with the ODI dataset (Jobs, Steps, and Outcomes), giving you a scriptable, automation-friendly alternative to the MCP/chat path." with:
+"Today it provides version/help plus commands for Customer Outcomes (`agentic-odi outcomes ...`) and external MCP connectors (`agentic-odi connectors ...`), giving you a scriptable, automation-friendly alternative to the MCP/chat path."
+
+Do not change any other wording. Do not touch the "connectors" section added earlier, the testing table, or the roadmap.
+
+After editing, run these and confirm they pass:
+- `uv run ruff format README.md` (README markdown code blocks are checked by ruff)
+- `uv run ruff format --check .` (must exit 0)
+- `uv run ruff check .` (must exit 0)
+
+Then commit ONLY README.md as a new commit (do NOT amend):
+```
+git add README.md
+git commit -m "docs: correct README package overview and CLI description"
+```
+
+IMPORTANT: there is an untracked `docs/` directory (it contains a plan file). Leave it alone — never `rm`, `git clean`, or stage it. If `git status` looks noisy because of it, ignore it.
+
+Report back: the new commit SHA (`git rev-parse HEAD`), the `git show --stat` for it, and the exit status of the three verification commands.
