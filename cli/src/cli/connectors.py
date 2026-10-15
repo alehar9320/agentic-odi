@@ -5,10 +5,8 @@ from __future__ import annotations
 import asyncio
 import os
 from pathlib import Path
-from typing import Optional
 
 import typer
-
 from connectors.factory import build_connector
 from connectors.models import ConnectorConfig
 from connectors.registry import (
@@ -49,10 +47,10 @@ ConfigOption = typer.Option(
 
 @connectors_app.command("list")
 def list_connectors(
-    config: Optional[Path] = ConfigOption,
+    config: Path | None = ConfigOption,
 ) -> None:
     """List configured external connectors."""
-    items = _registry(config).list()
+    items = _registry(config).list_all()
     if not items:
         typer.echo("No connectors configured.")
         return
@@ -65,13 +63,13 @@ def list_connectors(
 def add_connector(
     kind: str = typer.Argument(..., help="Connector kind (currently: mcp)."),
     name: str = typer.Option(..., "--name", help="Unique connector name."),
-    url: Optional[str] = typer.Option(None, "--url", help="MCP server URL (required for kind mcp)."),
-    tool: Optional[list[str]] = typer.Option(
+    url: str | None = typer.Option(None, "--url", help="MCP server URL (required for kind mcp)."),
+    tool: list[str] | None = typer.Option(  # noqa: B008
         None,
         "--tool",
         help="MCP tool to call during ingest. Repeatable.",
     ),
-    config: Optional[Path] = ConfigOption,
+    config: Path | None = ConfigOption,
 ) -> None:
     """Register a new external connector."""
     settings: dict[str, object] = {}
@@ -97,7 +95,7 @@ def add_connector(
 @connectors_app.command("health")
 def health_connector(
     name: str = typer.Option(..., "--name", help="Connector name."),
-    config: Optional[Path] = ConfigOption,
+    config: Path | None = ConfigOption,
 ) -> None:
     """Check whether a connector can reach its external system."""
     try:
@@ -115,7 +113,7 @@ def health_connector(
 @connectors_app.command("ingest")
 def ingest_connector(
     name: str = typer.Option(..., "--name", help="Connector name."),
-    config: Optional[Path] = ConfigOption,
+    config: Path | None = ConfigOption,
 ) -> None:
     """Ingest data from an external connector into the local ingest sink."""
     try:

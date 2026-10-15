@@ -61,7 +61,6 @@ class MCPClientConnector(Connector):
     async def health(self) -> HealthStatus:
         try:
             async with self._client() as client:
-                await client.ping()
                 tools = await client.list_tools()
                 resources = await client.list_resources()
             return HealthStatus(
@@ -72,7 +71,7 @@ class MCPClientConnector(Connector):
                     "resource_count": len(resources),
                 },
             )
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             return HealthStatus(ok=False, message=str(exc))
 
     async def ingest(self) -> IngestBatch:
@@ -112,7 +111,7 @@ class MCPClientConnector(Connector):
                                 raw={"uri": uri, "resource": _to_dict(resource)},
                             )
                         )
-                    except Exception as exc:
+                    except Exception as exc:  # noqa: BLE001
                         batch.errors.append(f"Failed to read resource {uri}: {exc}")
                 configured_tools = self.settings.tools
                 available = {str(getattr(tool, "name", "")) for tool in tools}
@@ -132,8 +131,8 @@ class MCPClientConnector(Connector):
                                 raw={"tool": tool_name, "result": _to_dict(result)},
                             )
                         )
-                    except Exception as exc:
+                    except Exception as exc:  # noqa: BLE001
                         batch.errors.append(f"Failed to call tool {tool_name}: {exc}")
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             batch.errors.append(str(exc))
         return batch

@@ -11,6 +11,7 @@ A spatial, conversational experience for Outcome-Driven Innovation:
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import os
 import socket
@@ -374,7 +375,7 @@ async def fetch_mcp_data(mcp_endpoint: str) -> dict[str, Any]:
     if not is_endpoint_reachable(mcp_endpoint, timeout=0.3):
         return {"jobs": DEMO_JOBS, "steps": DEMO_STEPS, "outcomes": DEMO_OUTCOMES}
 
-    try:
+    with contextlib.suppress(Exception):
         mcp_client = Client(mcp_endpoint)
         async with mcp_client:
             raw_jobs = await asyncio.wait_for(mcp_client.call_tool("get_jobs", {}), timeout=1.5)
@@ -389,28 +390,21 @@ async def fetch_mcp_data(mcp_endpoint: str) -> dict[str, Any]:
                 job_id = job.get("id")
                 if not job_id:
                     continue
-                try:
+                with contextlib.suppress(Exception):
                     raw_steps = await asyncio.wait_for(
                         mcp_client.call_tool("get_job_map", {"job_id": job_id}), timeout=1.0
                     )
                     parsed_steps = json.loads(str(raw_steps))
                     if isinstance(parsed_steps, list):
                         steps.extend(parsed_steps)
-                except Exception:  # noqa: BLE001
-                    pass
 
-                try:
+                with contextlib.suppress(Exception):
                     raw_outcomes = await asyncio.wait_for(
                         mcp_client.call_tool("get_outcomes", {"job_id": job_id}), timeout=1.0
                     )
                     parsed_outcomes = json.loads(str(raw_outcomes))
                     if isinstance(parsed_outcomes, list):
                         outcomes.extend(parsed_outcomes)
-                except Exception:  # noqa: BLE001
-                    pass
-
-    except Exception:  # noqa: BLE001
-        pass
 
     # If repository is empty, populate with seed prototype data
     if not jobs:

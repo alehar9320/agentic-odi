@@ -48,7 +48,7 @@ class ConnectorRegistry:
         connectors.append(config)
         self._save(connectors)
 
-    def list(self) -> list[ConnectorConfig]:
+    def list_all(self) -> list[ConnectorConfig]:
         return self._load()
 
     def get(self, name: str) -> ConnectorConfig:

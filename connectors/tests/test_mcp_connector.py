@@ -25,7 +25,7 @@ def _external_server() -> FastMCP:
 def _connector(**overrides: object) -> MCPClientConnector:
     settings = McpConnectorSettings(
         url="http://unused.example/mcp",
-        tools=list(overrides.pop("tools", [])),  # type: ignore[arg-type]
+        tools=list(overrides.pop("tools", [])),  # type: ignore[call-overload]
     )
     return MCPClientConnector(
         name="gong",

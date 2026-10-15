@@ -5,10 +5,10 @@ import re
 from pathlib import Path
 from unittest.mock import MagicMock
 
+from connectors.models import HealthStatus, IngestBatch, IngestRecord
 from typer.testing import CliRunner
 
 from cli.cli import app
-from connectors.models import HealthStatus, IngestBatch, IngestRecord
 
 ANSI_ESCAPE = re.compile(r"\x1b\[[0-9;]*m")
 runner = CliRunner()
@@ -134,9 +134,7 @@ def test_connectors_health_uses_built_connector(tmp_path: Path, monkeypatch) -> 
     )
     monkeypatch.setattr("cli.connectors.build_connector", lambda _config: _FakeConnector())
 
-    result = runner.invoke(
-        app, ["connectors", "health", "--name", "gong", "--config", str(config)]
-    )
+    result = runner.invoke(app, ["connectors", "health", "--name", "gong", "--config", str(config)])
 
     assert result.exit_code == 0
     assert "reachable" in _strip(result.output)
@@ -171,14 +169,10 @@ def test_connectors_ingest_appends_to_sink(tmp_path: Path, monkeypatch) -> None:
         ],
     )
     sink = MagicMock()
-    monkeypatch.setattr(
-        "cli.connectors.build_connector", lambda _config: _FakeConnector(batch)
-    )
+    monkeypatch.setattr("cli.connectors.build_connector", lambda _config: _FakeConnector(batch))
     monkeypatch.setattr("cli.connectors.get_default_sink", lambda: sink)
 
-    result = runner.invoke(
-        app, ["connectors", "ingest", "--name", "gong", "--config", str(config)]
-    )
+    result = runner.invoke(app, ["connectors", "ingest", "--name", "gong", "--config", str(config)])
 
     assert result.exit_code == 0
     sink.append.assert_called_once()

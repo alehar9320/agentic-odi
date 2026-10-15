@@ -25,7 +25,7 @@ def test_add_persists_connector(tmp_path: Path) -> None:
 
     registry.add(config)
 
-    stored = registry.list()
+    stored = registry.list_all()
     assert len(stored) == 1
     assert stored[0].name == "gong"
     assert stored[0].kind == "mcp"
@@ -41,7 +41,7 @@ def test_list_returns_added_connectors(tmp_path: Path) -> None:
         ConnectorConfig(name="two", kind="mcp", settings={"url": "http://localhost:2/mcp"})
     )
 
-    names = {item.name for item in registry.list()}
+    names = {item.name for item in registry.list_all()}
 
     assert names == {"one", "two"}
 
@@ -88,7 +88,7 @@ def test_load_roundtrip(tmp_path: Path) -> None:
     first.add(ConnectorConfig(name="gong", kind="mcp", settings={"url": "http://localhost:1/mcp"}))
 
     second = ConnectorRegistry(path)
-    loaded = second.list()
+    loaded = second.list_all()
 
     assert len(loaded) == 1
     assert loaded[0].name == "gong"
