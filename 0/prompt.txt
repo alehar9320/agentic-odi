@@ -1,0 +1,59 @@
+You are reviewing one task's implementation: first whether it matches its requirements, then whether it is well-built. This is a task-scoped gate, not a merge review.
+
+## What Was Requested
+
+Read the task brief: /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/.superpowers/sdd/2026-10-15-cli-bundled-distribution-and-self-update/task-2-brief.md
+
+Global constraints from the spec/design that bind this task:
+- Install layout under `~/.local/share/agentic-odi/` (`versions/<v>`, `current` symlink); config/state under `~/.config/agentic-odi/`; bin dir `~/.local/bin`. All overridable via XDG env vars; install root also via `AGENTIC_ODI_INSTALL_DIR`.
+- Must support all OSes (Linux/macOS/Windows); Windows uses `%LOCALAPPDATA%`/`%APPDATA%`.
+- No new dependencies (hand-rolled XDG resolution; no platformdirs).
+- Required names: `install_root`, `bin_dir`, `config_dir`, `versions_dir`, `current_link`, `state_file`, `is_frozen`, `is_writable_dir`.
+
+## What the Implementer Claims They Built
+
+Read the implementer's report: /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/.superpowers/sdd/2026-10-15-cli-bundled-distribution-and-self-update/task-2-report.md
+
+## Diff Under Review
+
+Base: 22d11cc07f2519baf88b0903ccb5f96e3cb9eb32
+Head: 54fcd71996ee6966eb3f7b98b2d6e40f4ab457e8
+Diff file: /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/.superpowers/sdd/2026-10-15-cli-bundled-distribution-and-self-update/review-22d11cc..54fcd71.diff
+
+Read the diff file once — it contains the commit list, a stat summary, and the full diff with surrounding context. Do not re-run git commands. Do not crawl the broader codebase; inspect outside the diff only for a concrete, named risk.
+
+Read-only review. Do not mutate the working tree, index, HEAD, or branch state.
+
+## You Do Not Dispatch Subagents
+
+Do all of this review yourself. Never spawn a subagent.
+
+## Do Not Trust the Report
+
+Treat the report as unverified claims; verify against the diff. A stated rationale never downgrades a finding.
+
+## Tests
+
+The implementer already ran the tests and reported TDD evidence. Do not re-run the suite. Run a focused test only if reading raises a specific doubt no existing run answers. Warnings/noise in reported output are findings.
+
+## Part 1: Spec Compliance
+Compare the diff against the brief: Missing / Extra / Misunderstood. If a requirement cannot be verified from this diff alone, report it as a ⚠️ item. Pay attention to the Windows branches and the exact resolution precedence (env override → XDG → default).
+
+## Part 2: Code Quality
+Clean separation, error handling, DRY, edge cases; tests verify real behavior; structure. Cite file:line for every finding.
+
+## Calibration
+Categorize by real severity (Critical/Important/Minor). If the plan/brief mandates something the rubric calls a defect, report it as Important, labeled plan-mandated. Acknowledge strengths before issues.
+
+## Output Format
+
+### Spec Compliance
+- ✅/❌ with file:line; ⚠️ items
+### Strengths
+### Issues
+#### Critical / #### Important / #### Minor
+### Assessment
+**Task quality:** Approved | Needs fixes
+**Reasoning:** 1-2 sentences
+
+Your final message is the report itself: begin directly with the spec-compliance verdict. No preamble.
