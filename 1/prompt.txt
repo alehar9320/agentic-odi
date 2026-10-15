@@ -1,0 +1,11 @@
+Explore the repository at /home/alexa/repos/agentic-odi (medium thoroughness). I need to understand its structure to plan a first-launch onboarding feature for a PM (product manager) agent CLI tool.
+
+Report back:
+1. What this project is (README summary), tech stack, how it's run (CLI? web? agent framework — e.g., opencode, claude code, custom?)
+2. Directory layout (top 2 levels)
+3. Any existing onboarding/setup/configuration flow — search for keywords like "onboard", "setup", "baseline", "first run", "wizard", "prompt for", "config"
+4. Where user context/preferences/profile is stored (config files, memory files, AGENTS.md, CLAUDE.md, .opencode/ etc.)
+5. Any PM skills/frameworks present (e.g., Paweł Huryn references, skills directories, prompts about product management)
+6. Any existing CLI entry points and how a "first launch" would be detected/hooked
+
+Return concise findings with file paths.
