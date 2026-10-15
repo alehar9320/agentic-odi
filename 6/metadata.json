@@ -1,0 +1,41 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M50Q5K16CBCFCK8TZR6THGJG",
+  "session_id": "ses_ebec66ddeffeNuKIbZ6Iv0482W",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-15T21:24:10.595184135Z",
+  "branch": "feature/cli-bundled-distribution",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "cli/src/cli/paths.py",
+    "cli/tests/test_paths.py"
+  ],
+  "agent": "OpenCode",
+  "model": "big-pickle",
+  "turn_id": "688d1d31af4c",
+  "checkpoint_transcript_start": 10,
+  "transcript_lines_at_start": 10,
+  "compact_transcript_start": 10,
+  "token_usage": {
+    "input_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 0,
+    "output_tokens": 0,
+    "api_call_count": 0
+  },
+  "session_metrics": {
+    "turn_count": 1
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-10-15T21:24:10.585259407Z",
+    "agent_lines": 0,
+    "agent_removed": 0,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 0,
+    "total_lines_changed": 0,
+    "agent_percentage": 0,
+    "metric_version": 2
+  }
+}
