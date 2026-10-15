@@ -1,0 +1,82 @@
+Open in new worktree a new feature branch that builds on topic/living-studio-gui, the objective is to do 1:1 conversion of existing functionality and migrate away from streamlit to new architecture, as per described in the following attachment. Assume that the topic branch which currently has merge conflicts, will have those resolved by that developer, so that this will build on the work in that branch. Thus, before we conclude, see if we may rebase the work successfully, as the developer of that topic branch has likely then succeeded on the rebase. Attachment: "Moving from **Tauri** to **Electron** in the future is surprisingly straightforward, provided you design your application cleanly from day one.
+
+Because both frameworks use standard web technologies (HTML/CSS/JS) for the frontend shell, **90% of your user interface and client-side code will not need to change at all**.
+
+Difficulty broken down by layer, alongside the architectural decisions needed now to ensure effortless migration later, includes:
+
+---
+
+### The Difficulty Breakdown (By Component)
+
+| Layer | Effort Level | What Changes / Needs Rewriting |
+| --- | --- | --- |
+| **Frontend UI (React/Vue/HTML)** | **Zero (0%)** | None. It renders inside Electron's Chromium runtime exactly as it did inside Tauri's webview. |
+| **Python AI Engine (Sidecar)** | **Very Low (5%)** | The Python script/executable running your LLM logic remains identical. Only the process-spawning script changes. |
+| **Inter-Process Communication (IPC)** | **Low to Moderate (15–20%)** | Tauri’s `invoke('command_name')` calls are replaced with Electron’s `ipcRenderer.invoke('channel_name')`. |
+| **Desktop Shell & System Integration** | **Moderate (20–30%)** | Native window configurations, system tray setup, and deep OS hooks move from Rust (`tauri.conf.json` / Rust code) to Node.js (`main.js`). |
+
+---
+
+### How to Build for Zero-Friction Migration Today
+
+If you adopt the **Sidecar Pattern** (where Python handles AI logic and the frontend handles the UI), the desktop shell acts merely as a lightweight wrapper.
+
+```
+                 YOUR DECOUPLED ARCHITECTURE
+                 
+  ┌───────────────────────────────────────────────────────┐
+  │                   Web Frontend UI                     │
+  │            (React, Vue, or Vanilla JS)                │
+  └──────────────────────────┬────────────────────────────┘
+                             │ Generic API Client Bridge
+                             ▼
+  ┌───────────────────────────────────────────────────────┐
+  │                 IPC / Transport Abstraction           │
+  │      if (Tauri) -> invoke()  |  if (Electron) -> ipc  │
+  └──────────────────────────┬────────────────────────────┘
+                             │ Local HTTP / WebSocket / Stdin
+                             ▼
+  ┌───────────────────────────────────────────────────────┐
+  │                Python Sidecar Process                 │
+  │           (LLMs, Agents, RAG, File Parsers)           │
+  └───────────────────────────────────────────────────────┘
+
+```
+
+#### 1. Abstract Your IPC / Window Calls
+
+Do not scatter `import { invoke } from '@tauri-apps/api/core'` throughout your UI components. Create a single adapter file (`desktopBridge.js`):
+
+```javascript
+// desktopBridge.js
+export const sendToBackend = async (action, data) => {
+  if (window.__TAURI_INTERNALS__) {
+    // Tauri IPC call
+    return await window.__TAURI__.invoke(action, data);
+  } else if (window.electronAPI) {
+    // Electron IPC call
+    return await window.electronAPI.invoke(action, data);
+  } else {
+    // Web fallback / Local dev HTTP call
+    return await fetch(`/api/${action}`, { method: 'POST', body: JSON.stringify(data) });
+  }
+};
+
+```
+
+#### 2. Communicate via WebSockets or Local HTTP (Recommended)
+
+Instead of using native IPC mechanisms (Tauri commands vs Electron `ipcRenderer`), have your desktop shell spin up the **Python Sidecar**, which hosts a tiny `FastAPI` server on a local loopback port (`127.0.0.1`).
+
+* If your frontend streams response tokens over standard WebSockets/HTTP directly to Python, **your app becomes completely agnostic to the desktop container shell**. Moving to Electron later will take less than a day.
+
+#### 3. Keep OS-Level Code Thin
+
+Avoid writing heavy custom Rust modules in Tauri unless strictly necessary. Rely on standard web APIs or hand off system-level tasks (such as file parsing, database access, or heavy computations) to your Python process.
+
+---
+
+### Summary Checklist
+
+* **Tauri to Electron:** Very Easy (Takes 1–2 days for a decoupled sidecar architecture).
+* **Biggest Risk:** Tight coupling between frontend UI components and Tauri-specific Rust APIs. Abstracting native calls through a bridge layer isolates this risk entirely. "
