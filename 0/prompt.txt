@@ -1,0 +1,13 @@
+Advise on how to best make the CLI into a bundled artifact that can easily be installed with curl and that can update itself when a new version becomes available. Ultimately, we'll likely also need to improve git tags through ci to make this work.
+
+---
+
+It should be a fully self-contained binary, similaly to other state-of-the-art CLI experiences
+
+---
+
+All OS supported
+
+---
+
+Can we do a combination? It's best if it updates itself automatically, but it should albe be possible to user-invoke?
