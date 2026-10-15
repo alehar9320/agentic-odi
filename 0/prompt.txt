@@ -1,0 +1,61 @@
+You are implementing Task 9: Wire connectors into CI, make the full CI gate green, and update docs.
+
+## Working directory (IMPORTANT)
+Work ONLY inside this git worktree on branch `mcp-connector-module`:
+  /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module
+Do not touch /home/alexa/repos/agentic-odi (the main checkout).
+
+## Task Description
+Read your task brief FIRST:
+  /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-9-brief.md
+
+## Step 0 is REQUIRED (verified fixes, behavior-preserving)
+- `connectors/src/connectors/registry.py` — mypy `[valid-type]` in `save`: method `list` shadows the builtin. Fix the annotation only (e.g. `import builtins` + `configs: builtins.list[ConnectorConfig]`, or a module-level alias). Do NOT rename the `list` method (public API). Keep behavior identical.
+- `core/src/core/models.py` — add `# type: ignore[prop-decorator]` to each of the three `@computed_field` lines (the ones directly above `@property`). Verified to make `uv run --directory core mypy .` pass.
+- `core/src/core/sqlite_repository.py` — on the `except Exception:` line that currently ends with `# noqa: BLE001`, append `  # nosec B110` so the line reads `except Exception:  # noqa: BLE001  # nosec B110`. Verified to satisfy both ruff and bandit.
+
+## Steps 1–3b
+- CI `.github/workflows/ci.yml`: add `uv run --directory connectors mypy .` to the `typecheck` job; add `connectors/src` to the bandit `security` command; add a `Pytest (connectors)` step (`uv run --directory connectors pytest --cov=connectors --cov-report=term-missing`, `COVERAGE_FILE: ${{ github.workspace }}/.coverage.connectors`) and add `"${{ github.workspace }}/.coverage.connectors"` to the `coverage combine` list.
+- `README.md`: read it first, then make the documented edits in Step 2 (Code Overview packages list incl. `connectors/`; a "External connectors (MCP ingest)" CLI subsection documenting `agentic-odi connectors list|add mcp|health|ingest` and the `--config` default `.agentic-odi/connectors.json`; Testing-table rows for `connectors/tests/*` and `cli/tests/test_connectors_cli.py`; Roadmap item; fix `python -m server` → `python -m mcp_server`).
+- `.agents/rules/agent_instructions.md`: add the "External connectors package" subsection; fix stale `server/src/server/server.py` → `mcp_server/src/mcp_server/mcp_server.py`.
+- `.agents/workflows/dev.md` and `.agents/workflows/test.md`: replace residual `server` package refs with `mcp_server`.
+
+## Step 4: FULL CI-equivalent — ALL must pass from the worktree root
+```
+uv run ruff check .
+uv run ruff format --check .
+uv run --directory core mypy .
+uv run --directory mcp_server mypy .
+uv run --directory local_server mypy .
+uv run --directory cli mypy .
+uv run --directory client mypy .
+uv run --directory connectors mypy .
+uv run bandit -c pyproject.toml -r cli/src client/src core/src local_server/src mcp_server/src connectors/src
+uv run --directory core pytest
+uv run --directory mcp_server pytest
+uv run --directory local_server pytest
+uv run --directory cli pytest
+uv run --directory client pytest
+uv run --directory connectors pytest
+```
+If any fails, fix it (behavior-preserving). Report the exact result of every command.
+
+## Step 5: Commit
+Stage exactly the paths listed in the brief (the 5 docs/CI files + the 3 code files from Step 0). Do NOT commit `docs/` (the untracked plan) — verify with `git status` and unstage docs/ if needed.
+Commit message: `ci+docs: wire connectors into CI and document the package`
+
+## Formatting
+After edits run `uv run ruff format .` and `uv run ruff check . --fix` if needed; ensure `uv run ruff check .` and `uv run ruff format --check .` both exit 0 (docs/ is excluded via root `[tool.ruff] extend-exclude`).
+
+## Environment facts (verified)
+- Python 3.12 via gitignored `.python-version`; shared root `.venv`.
+- A git hook appends an `Entire-Checkpoint` trailer — expected.
+
+## You do NOT dispatch subagents. Do all work yourself.
+
+## Report format
+Write your full report to:
+  /home/alexa/repos/agentic-odi/.worktrees/mcp-connector-module/.superpowers/sdd/2026-10-14-mcp-connector-module/task-9-report.md
+Include: Step 0 fixes (with before/after); CI diff summary; docs changes; **the full Step 4 command-by-command results**; commit contents; concerns.
+
+Then reply with ONLY (under 20 lines): Status; commit SHA + subject; each Step 4 command result (pass/fail); files committed; concerns; report path.
