@@ -1,13 +1,9 @@
 [project]
 name = "agentic-odi-client"
 version = "0.1.0"
-description = "Streamlit chat client and local dev launcher for Agentic ODI."
+description = "Local dev launcher for Agentic ODI (MCP server + Living Studio sidecar)."
 requires-python = ">=3.10"
-dependencies = [
-    "fastmcp",
-    "openai",
-    "streamlit",
-]
+dependencies = []
 
 [project.scripts]
 agentic-odi-dev = "client.run:main"
