@@ -19,17 +19,17 @@
     },
     "cost": 0,
     "tokens": {
-      "input": 44538,
-      "output": 1196,
-      "reasoning": 8670,
+      "input": 91975,
+      "output": 5468,
+      "reasoning": 16856,
       "cache": {
-        "read": 212544,
+        "read": 471936,
         "write": 0
       }
     },
     "time": {
       "created": 1792084813774,
-      "updated": 1792085171756
+      "updated": 1792089417232
     }
   },
   "messages": [
@@ -45,7 +45,22 @@
           "modelID": "big-pickle"
         },
         "summary": {
-          "diffs": []
+          "diffs": [
+            {
+              "file": ".cursor/plans/integrated-llm-launcher_d4075429.plan.md",
+              "patch": "Index: .cursor/plans/integrated-llm-launcher_d4075429.plan.md\n===================================================================\n--- .cursor/plans/integrated-llm-launcher_d4075429.plan.md\t\n+++ .cursor/plans/integrated-llm-launcher_d4075429.plan.md\t\n@@ -1,94 +0,0 @@\n----\n-name: integrated-llm-launcher\n-overview: Add an optional local LLM server launcher to run.py so that python run.py can start the MCP server, LLM server, and Streamlit client together for smoother local development.\n-todos:\n-  - id: llm-launcher-config\n-    content: Add environment-driven LLM launcher configuration (ports, model path, alias, chat format, tokenizer path) to run.py.\n-    status: pending\n-  - id: llm-launcher-startup\n-    content: Implement start_llm_server() in run.py to start the local llama-cpp-python server when AGENTIC_ODI_LLM_MODEL_PATH is set, with port checks and clear logging.\n-    status: pending\n-  - id: llm-launcher-lifecycle\n-    content: Integrate the LLM server process into run.py's main lifecycle and shutdown handling alongside MCP server and Streamlit client.\n-    status: pending\n-  - id: llm-launcher-doc-alignment\n-    content: Verify and, if needed later, adjust README/my_client.py documentation so env vars and defaults used by the LLM launcher align with the documented local dev flow.\n-    status: pending\n-isProject: false\n----\n-\n-## Goal\n-\n-Extend `run.py` so that, when configured via environment variables, it automatically starts a local tools-capable LLM server (e.g., `llama-cpp-python` OpenAI-compatible server) alongside the existing MCP server and Streamlit client. This should keep the default behavior simple while eliminating most “connection error” issues during local dev.\n-\n-## Architecture Overview\n-\n-```mermaid\n-flowchart LR\n-  dev[Developer] --> runPy[run.py]\n-  runPy --> mcpServer[my_server.py]\n-  runPy --> llmServer[llama_cpp.server]\n-  runPy --> streamlitClient[Streamlit my_client.py]\n-  streamlitClient --> llmServer\n-  streamlitClient --> mcpServer\n-```\n-\n-- `run.py` becomes the orchestrator for three processes: MCP server, optional LLM server, and Streamlit client.\n-- `my_client.py` continues to talk to the LLM server via `AGENTIC_ODI_BASE_URL` / sidebar config (defaulting to `http://localhost:8001/v1`).\n-\n-## Plan\n-\n-### 1. Define configuration and env vars for the LLM server\n-\n-- **File**: `[c:\\GIT repositories\\agentic-odi\\run.py](c:\\GIT repositories\\agentic-odi\\run.py)`.\n-- Introduce constants and environment-driven configuration:\n-  - `LLM_PORT` defaulting to `8001` (matching `my_client.py` and README).\n-  - Env vars:\n-    - `AGENTIC_ODI_LLM_MODEL_PATH` (required to enable LLM launcher).\n-    - Optional overrides:\n-      - `AGENTIC_ODI_LLM_MODEL_ALIAS` (default: `local-tools-model`).\n-      - `AGENTIC_ODI_LLM_CHAT_FORMAT` (default: `functionary-v2`).\n-      - `AGENTIC_ODI_LLM_TOKENIZER_PATH` (optional, for Functionary HF tokenizer path; if not set, default to the model directory).\n-- The presence of `AGENTIC_ODI_LLM_MODEL_PATH` acts as the feature toggle: if it’s unset/empty, `run.py` behaves exactly as today (MCP + Streamlit only).\n-\n-### 2. Add an LLM port check and launcher\n-\n-- **File**: `[c:\\GIT repositories\\agentic-odi\\run.py](c:\\GIT repositories\\agentic-odi\\run.py)`.\n-- Implement `start_llm_server()` mirroring `start_server()` / `start_client()`:\n-  - If `AGENTIC_ODI_LLM_MODEL_PATH` is unset, return `None` and print a short message stating that the LLM server is being skipped.\n-  - If set:\n-    - Check if `LLM_PORT` is already in use; if so, print a warning that an LLM server is already running on that port and **skip starting a new one**, returning `None` (or possibly attaching to that external process only logically).\n-    - Otherwise, construct a `subprocess.Popen` call to:\n-      - `python -m llama_cpp.server` (using `sys.executable` for portability).\n-      - With `--host 127.0.0.1 --port <LLM_PORT>`.\n-      - With `--model <AGENTIC_ODI_LLM_MODEL_PATH>`.\n-      - With `--model_alias <AGENTIC_ODI_LLM_MODEL_ALIAS>`.\n-      - With `--chat_format <AGENTIC_ODI_LLM_CHAT_FORMAT>`.\n-      - With `--hf_pretrained_model_name_or_path <AGENTIC_ODI_LLM_TOKENIZER_PATH or model_dir>`.\n-    - Print a clear message indicating the exact command (or key args) being run so devs can reproduce it manually if needed.\n-\n-### 3. Integrate LLM server into lifecycle and shutdown\n-\n-- **File**: `[c:\\GIT repositories\\agentic-odi\\run.py](c:\\GIT repositories\\agentic-odi\\run.py)`.\n-- In `main()`:\n-  - Add an `llm = None` variable alongside `server` and `client`.\n-  - Call `llm = start_llm_server()` **after** checking MCP port and before starting the Streamlit client (so the LLM is ready by the time the UI comes up), with a small `time.sleep` delay if needed.\n-  - Extend the `shutdown()` function to terminate and wait/kill the LLM process similarly to `server` and `client`:\n-    - `if llm: llm.terminate()`; then wait with timeout; on timeout, `llm.kill()`.\n-  - In the main monitoring loop, optionally check `llm.poll()` and log if the LLM server exits unexpectedly (but don’t necessarily break the loop unless you want `run.py` to stop when the LLM dies).\n-\n-### 4. Ensure configuration alignment with `my_client.py` and README\n-\n-- **Files**:\n-  - `[c:\\GIT repositories\\agentic-odi\\my_client.py](c:\\GIT repositories\\agentic-odi\\my_client.py)` (already defaulting to `http://localhost:8001/v1` and model `local-tools-model`).\n-  - `[c:\\GIT repositories\\agentic-odi\\README.md](c:\\GIT repositories\\agentic-odi\\README.md)` (already documents local tools-capable backend).\n-- Verify and, if necessary (in future steps), adjust docs so they mention:\n-  - That `python run.py` can start all three processes when `AGENTIC_ODI_LLM_MODEL_PATH` is set.\n-  - Which env vars control the LLM launcher and how they map to the defaults in `my_client.py`.\n-- The plan here is to **keep the code defaults and documentation consistent** so that anyone following the README gets a working `python run.py` experience without extra guesswork.\n-\n-### 5. Keep behavior safe and non-intrusive by default\n-\n-- Do not start any LLM server unless explicitly opted in via `AGENTIC_ODI_LLM_MODEL_PATH`.\n-- When enabled, be verbose but not noisy: log which model path, alias, and port are used.\n-- If the port is already occupied, **do not fail**; instead, assume the developer has an external LLM server and just print a clear message that the launcher is skipping startup.\n",
+              "additions": 0,
+              "deletions": 94,
+              "status": "deleted"
+            },
+            {
+              "file": ".opencode/plans/2026-10-15-living-studio-tauri-migration.md",
+              "patch": "Index: .opencode/plans/2026-10-15-living-studio-tauri-migration.md\n===================================================================\n--- .opencode/plans/2026-10-15-living-studio-tauri-migration.md\t\n+++ .opencode/plans/2026-10-15-living-studio-tauri-migration.md\t\n@@ -0,0 +1,134 @@\n+# Living Studio: Streamlit → Web SPA + Python Sidecar + Tauri Migration\n+\n+## Goal\n+\n+1:1 functional conversion of The Living Studio GUI (`client/src/client/app.py`, 1063 lines of Streamlit) to the decoupled sidecar architecture described in the Tauri→Electron migration attachment:\n+\n+- **Web Frontend UI** (React + TypeScript + Vite) — zero framework lock-in to the desktop shell\n+- **IPC/Transport abstraction** (`desktopBridge`) — Tauri invoke / Electron ipc / HTTP fallback\n+- **Python Sidecar** (FastAPI in `local_server`, loopback `127.0.0.1:8100`) — hosts MCP hydration, LLM health probes, and the chat tool-loop\n+- **Thin Tauri shell** (scaffolded now; Electron drops in later via the bridge)\n+\n+## User decisions (locked)\n+\n+| Decision | Choice |\n+|---|---|\n+| Frontend stack | React + TypeScript + Vite |\n+| Desktop shell scope | Also scaffold Tauri (Tauri 2) shell |\n+| Sidecar home | Extend `local_server` package |\n+| Old Streamlit app | Delete `client/src/client/app.py` on this branch |\n+\n+## Defaults I chose (object if any)\n+\n+- **Branch**: `topic/living-studio-tauri`, based on local `topic/living-studio-gui` (a645779 — already rebased cleanly onto main)\n+- **Worktree**: `.worktrees/living-studio-tauri` (repo convention; `.worktrees/` already excluded via `.git/info/exclude`)\n+- **Chat transport**: non-streaming `POST /api/chat` returning the full reply (matches Streamlit behavior; SSE streaming is a follow-up)\n+- **State management**: plain React context + hooks (no extra state library)\n+- **Ports**: MCP `8000` (unchanged), sidecar `8100` (existing local_server port), Vite dev `5173` proxying `/api` → `:8100`\n+- **Tauri sidecar spawn**: ~30 lines of Rust in `setup()` using `std::process::Command` (no plugin-shell) — stays within the attachment's \"keep OS-level code thin\" rule\n+\n+## Environment constraint (important)\n+\n+This machine has **no Rust toolchain and no webkit2gtk/gtk3 dev libs**, so the Tauri shell can be scaffolded and config-validated but **not compiled or run locally**. Delivery model:\n+\n+- Scaffold `studio/src-tauri/` fully (conf, Cargo.toml, capabilities, main.rs, placeholder icons)\n+- Static validation only (JSON schema check of `tauri.conf.json`, code review); compile/`tauri dev` deferred to a machine with `rustup` + `libwebkit2gtk-4.1-dev` + `libgtk-3-dev`\n+- README documents prerequisites; Rust CI job deferred (web-viewer libs heavy for CI) — SPA CI (lint/test/build) still added\n+- If you want, we can attempt `rustup` install during implementation (apt libs would need sudo)\n+\n+## Architecture\n+\n+```\n+┌────────────────────────────────────────────────────────┐\n+│  Tauri shell (src-tauri)  or  plain browser            │\n+│  ┌──────────────────────────────────────────────────┐  │\n+│  │ React SPA (studio/src)                           │  │\n+│  │  desktopBridge.ts: Tauri → Electron → fetch      │  │\n+│  └──────────────────────┬───────────────────────────┘  │\n+└─────────────────────────┼──────────────────────────────┘\n+                          │ HTTP /api/* (loopback)\n+┌─────────────────────────▼──────────────────────────────┐\n+│  Python sidecar: local_server (FastAPI, :8100)         │\n+│  studio/ module: health probes, MCP hydration + seed, │\n+│  chat tool-loop, add_step / add_outcome passthrough   │\n+│  also serves built SPA (studio/dist) at / in prod     │\n+└───────────┬──────────────────────────┬────────────────┘\n+            │ fastmcp (streamable HTTP) │ OpenAI-compatible\n+┌───────────▼───────────┐   ┌──────────▼──────────────┐\n+│ mcp_server :8000      │   │ LLM backend :8001       │\n+│ (unchanged)           │   │ (user-provided / none)  │\n+└───────────────────────┘   └─────────────────────────┘\n+```\n+\n+## Repo layout changes\n+\n+| Path | Action |\n+|---|---|\n+| `studio/` | **New** — Vite React TS app + `src-tauri/` Tauri 2 scaffold + `package.json` |\n+| `studio/src/bridge/desktopBridge.ts` | **New** — transport abstraction (Tauri/Electron/fetch) per attachment |\n+| `local_server/src/local_server/studio/` | **New** — ported logic: `seed.py` (DEMO data), `probes.py` (socket + LLM health), `mcp_data.py` (fetch_mcp_data), `chat.py` (SYSTEM_PROMPT + offline fallbacks + tool loop), `router.py` (FastAPI routes) |\n+| `local_server/pyproject.toml` | Add `fastmcp`, `openai` deps; `uv lock` update |\n+| `client/src/client/app.py` | **Delete** (Streamlit) |\n+| `client/src/client/run.py` | Update launcher: mcp_server + local_server (serve SPA), drop Streamlit |\n+| `client/pyproject.toml` | Drop `streamlit`, `fastmcp`, `openai` (launcher is stdlib-only) |\n+| `README.md` | Update architecture, run instructions (web + `tauri dev`), migration notes |\n+| `.github/workflows/ci.yml` | Add `studio` job (Node: lint, vitest, build); extend Python smoke with sidecar API checks |\n+| `local_server/tests/test_studio_api.py` | **New** — route tests via TestClient (mocked fastmcp/AsyncOpenAI) |\n+\n+## Sidecar API contract (ported 1:1 from app.py)\n+\n+| Endpoint | Ported behavior |\n+|---|---|\n+| `GET /api/config` | Env-derived defaults: `AGENTIC_ODI_BASE_URL/API_KEY/MODEL/MCP_URL` (same names as Streamlit) |\n+| `POST /api/health/llm` `{base_url, api_key, model}` | Socket probe (0.3s) → `AsyncOpenAI.models.list` (1.2s, `asyncio.wait_for`) → `{healthy, message}`; port `_classify_llm_error`; in-memory cache keyed by config (~30s TTL) to mirror Streamlit's per-config caching |\n+| `POST /api/health/mcp` `{mcp_url}` | Socket probe only → `{reachable}` (badge logic) |\n+| `GET /api/canvas?mcp_url=` | Port `fetch_mcp_data`: probe, `get_jobs` → per-job `get_job_map` + `get_outcomes` with timeouts; DEMO seed fallback → `{jobs, steps, outcomes, source: \"mcp\"\\|\"seed\"}` |\n+| `POST /api/chat` `{mcp_url, base_url, api_key, model, messages}` | Port `handle_user_input`: health-gated offline keyword fallbacks (guidelines/simulate/evidence/default) OR full MCP tool-loop (list_tools → completions w/ tools → execute calls → follow-up completion); returns `{reply, tool_calls, canvas_dirty}` |\n+| `POST /api/steps` | MCP `add_step` passthrough |\n+| `POST /api/outcomes` | MCP `add_outcome` passthrough |\n+| `GET /` | StaticFiles mount of `studio/dist` (conditional on dist existing) + index.html SPA fallback |\n+\n+History stays client-side in React state (mirrors `st.session_state.messages`).\n+\n+## Frontend parity map (acceptance checklist)\n+\n+1. Settings panel: 4 env-backed fields, Clear Chat, Sync Canvas, MCP sources list, About blurb\n+2. Status pills: 🟢 LLM Active / 🟡 Local Studio Mode; 🟢 FastMCP Connected / ⚡ Seed Prototype Ready\n+3. Progressive hydration: \"⚡ Syncing…\" → \"✨ Living Studio Canvas ready\" + **shimmer skeletons now actually rendered** during load (Streamlit helpers were dead code; SPA wires them for real)\n+4. Opportunity Landscape: 3 metrics; outcome cards pulse when score > 10; Inspect Trace / Simulate Bet (loads Impact tab target) / Ask Agent actions\n+5. Universal Job Map: ordered steps + Add Step form\n+6. WYSIWYG Impact: outcome select, bet input, BEFORE/AFTER panels, 3 metrics, Declare Intent → PDR draft via chat\n+7. Customer Evidence: two static signal boxes + Phase 2 caption\n+8. Direct Capture: job select, statement, importance/satisfaction sliders, live opportunity-score calc, submit\n+9. Chat copilot: 3 quick-intent pills, message bubbles, input, \"🛠️ Executing Causal Tools\" notice, canvas re-sync after tool writes, offline fallback replies\n+10. Dark-glass theme: port all CSS (radial bg, pills, cards, shimmer keyframes, fade-in) to `theme.css`\n+11. **Bug fixes** (flagged, intentional deviations): `pill_badge` literal-`if` f-string bug (app.py:732) and `{opp:.1f}` crash when `opp is None` — fix in SPA rendering\n+12. Desktop shell: Tauri window spawns sidecar processes on startup, tears down on exit; web mode unaffected\n+\n+## Implementation order\n+\n+1. **Worktree setup**: `git worktree add .worktrees/living-studio-tauri -b topic/living-studio-tauri topic/living-studio-gui`; `uv sync --all-packages`; baseline `pytest` (client + local_server) — confirm green on topic branch\n+2. **Sidecar**: port logic → `local_server/studio/`; add routes; tests (mock MCP/LLM); `uv add` deps + `uv lock`; mypy/ruff/bandit/pytest green\n+3. **Client cleanup**: delete `app.py`; rewrite `run.py` (mcp_server + local_server, print Studio URL `:8100`); trim deps; keep `test_run.py` green\n+4. **SPA**: scaffold Vite React TS in `studio/`; `desktopBridge` + typed API client; theme.css; all components per parity map; vitest+RTL tests for bridge fallback, opp-score calc, outcome-card pulse logic, offline fallback selection\n+5. **Tauri scaffold**: `src-tauri/` (conf w/ `beforeDevCommand` = concurrently runs mcp_server + local_server + vite; Rust spawn in prod; capabilities; placeholder icons); static validation\n+6. **CI**: `studio` job (setup-node 22, npm ci, lint, vitest, vite build); Python smoke: boot local_server, curl `/api/canvas`, `/api/health/mcp`\n+7. **Docs**: README rewrite (architecture diagram, quickstarts, Tauri prerequisites, migration note)\n+8. **Verification** (below)\n+\n+## Verification\n+\n+- Python: `uv run pytest` across workspace; ruff + mypy + bandit per CI parity\n+- Frontend: `npm run lint && npm test && npm run build` in `studio/`\n+- Manual parity: `python -m client.run` → walk the 12-point checklist against the running Streamlit app from git history if needed\n+- **Rebase checks (your explicit ask, run before concluding)**:\n+  1. `git merge-tree --write-tree main topic/living-studio-tauri` → expect clean (our branch is linear atop the already-rebased topic tip)\n+  2. `git rebase topic/living-studio-gui` → expect no-op\n+  3. Conflict-likelihood audit: we touch `client/`, `README.md`, `ci.yml`, `uv.lock`, `pyproject.toml` — the same files the topic commit touched; if the topic developer's final rebased tip (≠ local a645779) differs, recovery is `git rebase --onto <new-tip> a645779 topic/living-studio-tauri`; report findings and hotspots in the final summary\n+\n+## Out of scope / follow-ups\n+\n+- Electron shell (bridge is ready; <1–2 days per attachment once decided)\n+- Chat token streaming (SSE/WebSocket upgrade of `/api/chat`)\n+- Connectors Phase 2 evidence ingestion into the Evidence tab\n+- Tauri packaging/signing and Rust CI job\n",
+              "additions": 134,
+              "deletions": 0,
+              "status": "added"
+            }
+          ]
         },
         "id": "msg_140942815001L4WQWeneC5DQyA",
         "sessionID": "ses_ebf6bd831ffe9tDPErTclMDXE2"
@@ -1110,19 +1125,22 @@
         },
         "cost": 0,
         "tokens": {
-          "input": 0,
-          "output": 0,
-          "reasoning": 0,
+          "total": 57503,
+          "input": 4332,
+          "output": 766,
+          "reasoning": 629,
           "cache": {
-            "read": 0,
-            "write": 0
+            "write": 0,
+            "read": 51776
           }
         },
         "modelID": "big-pickle",
         "providerID": "opencode",
         "time": {
-          "created": 1792085171750
+          "created": 1792085171750,
+          "completed": 1792089068684
         },
+        "finish": "tool-calls",
         "id": "msg_140999e26001703wsn827sGTis",
         "sessionID": "ses_ebf6bd831ffe9tDPErTclMDXE2"
       },
@@ -1161,7 +1179,7 @@
           "tool": "question",
           "callID": "call_368189da529c43a7bb022f57",
           "state": {
-            "status": "running",
+            "status": "completed",
             "input": {
               "questions": [
                 {
@@ -1230,13 +1248,491 @@
                 }
               ]
             },
+            "output": "User has answered your questions: \"Which frontend stack should the SPA conversion use?\"=\"React + TypeScript + Vite (Recommended)\", \"How far should the desktop shell go in this branch?\"=\"Also scaffold Tauri shell\", \"Where should the Python sidecar API (ported chat tool-loop, MCP hydration, health probes) live?\"=\"Extend local_server package\", \"What should happen to the old Streamlit app on this branch?\"=\"Delete it (Recommended)\". You can now continue with the user's answers in mind.",
+            "metadata": {
+              "answers": [
+                [
+                  "React + TypeScript + Vite (Recommended)"
+                ],
+                [
+                  "Also scaffold Tauri shell"
+                ],
+                [
+                  "Extend local_server package"
+                ],
+                [
+                  "Delete it (Recommended)"
+                ]
+              ],
+              "truncated": false
+            },
+            "title": "Asked 4 questions",
             "time": {
-              "start": 1792085218429
+              "start": 1792085218429,
+              "end": 1792089068373
             }
           },
           "id": "prt_1409a1d0e001kyQzq1lAo79cUE",
           "sessionID": "ses_ebf6bd831ffe9tDPErTclMDXE2",
           "messageID": "msg_140999e26001703wsn827sGTis"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "0037d122d5bc1e2a10ee4c357faa98206abe8270",
+          "type": "step-finish",
+          "tokens": {
+            "total": 57503,
+            "input": 4332,
+            "output": 766,
+            "reasoning": 629,
+            "cache": {
+              "write": 0,
+              "read": 51776
+            }
+          },
+          "cost": 0,
+          "id": "prt_140d513a9001xuM7WOOKZ0WX1N",
+          "sessionID": "ses_ebf6bd831ffe9tDPErTclMDXE2",
+          "messageID": "msg_140999e26001703wsn827sGTis"
+        },
+        {
+          "type": "patch",
+          "hash": "6e3e60fd902710e886dc1a8cb6a9bf744416ab36",
+          "files": [
+            "/home/alexa/repos/agentic-odi/.cursor/plans/integrated-llm-launcher_d4075429.plan.md"
+          ],
+          "id": "prt_140d51485001Z6cnI36WMhvGdY",
+          "sessionID": "ses_ebf6bd831ffe9tDPErTclMDXE2",
+          "messageID": "msg_140999e26001703wsn827sGTis"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_140942815001L4WQWeneC5DQyA",
+        "role": "assistant",
+        "mode": "plan",
+        "agent": "plan",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 61085,
+          "input": 32144,
+          "output": 236,
+          "reasoning": 3233,
+          "cache": {
+            "write": 0,
+            "read": 25472
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792089068699,
+          "completed": 1792089192193
+        },
+        "finish": "tool-calls",
+        "id": "msg_140d5149b002rxbwbn0A0Nmm0Z",
+        "sessionID": "ses_ebf6bd831ffe9tDPErTclMDXE2"
+      },
+      "parts": [
+        {
+          "snapshot": "0037d122d5bc1e2a10ee4c357faa98206abe8270",
+          "type": "step-start",
+          "id": "prt_140d53243001aigQfndKlA6Yws",
+          "sessionID": "ses_ebf6bd831ffe9tDPErTclMDXE2",
+          "messageID": "msg_140d5149b002rxbwbn0A0Nmm0Z"
+        },
+        {
+          "type": "reasoning",
+          "text": "The user chose:\n1. React + TypeScript + Vite\n2. Also scaffold Tauri shell\n3. Extend local_server package\n4. Delete Streamlit app\n\nInteresting — they want the Tauri shell scaffolded now, and the sidecar in local_server. Let me think through implications:\n\n**Tauri shell scaffold**:\n- New `studio/` (or `desktop/`) directory with Tauri app: `src-tauri/` (Rust: tauri.conf.json, Cargo.toml, main.rs/lib.rs) + the web frontend as the Tauri webview frontend.\n- Tauri 2.x is current. Requires Rust toolchain — check if rustc/cargo available on this machine.\n- Per attachment: keep OS-level code thin; shell spawns Python sidecar (mcp_server + local_server) as child processes; frontend communicates via local HTTP/WS to sidecar, not via tauri invoke (bridge abstraction in place for future native calls).\n- tauri.conf.json: devUrl pointing to vite dev server, frontendDist to built SPA; beforeDevCommand/beforeBuildCommand; sidecar process management in Rust (tauri plugin-shell) or in JS via @tauri-apps/api process? In Tauri 2, external binaries: plugin-shell. Spawning python -m via shell plugin with args is doable (scope config). Alternative: launcher script that starts sidecar then `tauri dev`. Simpler for scaffold: document/run via `python -m client.run` style launcher that also can launch tauri; and tauri.conf uses externalBin? Keep thin: the Rust side spawns sidecar processes on setup using tauri-plugin-shell, or we keep process management in a small launcher. The attachment says keep OS code thin — spawning via plugin-shell from the frontend JS is fine.\n\nWhere does the frontend live relative to Tauri? Standard Tauri + Vite React app: one project `studio/` with `src/` (React) + `src-tauri/`. That's the Tauri convention (create-tauri-app layout).\n\nBut wait — should the SPA be inside `studio/` (Tauri project) while local_server serves the built dist for pure-web mode? Yes: `studio/dist` served by FastAPI StaticFiles for web mode; Tauri loads the same dist via frontendDist config in production, and devUrl for dev.\n\n**local_server extension**:\n- Add deps: fastmcp, openai (uv workspace lock update).\n- Port logic from app.py:\n  - `is_endpoint_reachable` (socket probe)\n  - LLM health check (AsyncOpenAI models.list, timeout 1.2s, classify errors)\n  - `fetch_mcp_data` with DEMO seed data + fallback  - chat handler: SYSTEM_PROMPT, offline keyword fallbacks, OpenAI tool loop with MCP tools, messages in request  - add_step / add_outcome passthroughs (or generic tool-call endpoint?)\n- API surface (FastAPI, loopback):\n  - GET /api/health/llm?base_url=&api_key=&model= → {healthy, message}\n  - GET /api/health/mcp?url= → {reachable: bool}\n  - GET /api/canvas?mcp_url= → {jobs, steps, outcomes, source: \"mcp\"|\"seed\"}\n  - POST /api/chat {mcp_url, base_url, api_key, model, messages:[{role,content}], user_input} → {reply, messages, tool_calls_executed: [...]} — or the sidecar maintains history? 1:1: Streamlit kept history in session_state client-side. SPA keeps history in React state and sends full history each time. Good stateless design.\n  - POST /api/steps {mcp_url, job_id, name, order}\n  - POST /api/outcomes {mcp_url, job_id, statement, importance, satisfaction}\n  - GET / (StaticFiles serving studio/dist) — with fallback to index.html\n- CORS: in dev, vite proxy /api → localhost:8502 (choose port; local_server currently used on8000? mcp is 8000; local_server main.py — check default port. Let me check local_server/main.py). Actually local_server currently has minimal routes /health /capabilities and its own entrypoint `agentic-odi-local-server`. Its port — need to check main.py.\n\nWait, but local_server currently is a separate \"direct DB\" server. We're now turning it into the studio sidecar (MCP-client based). The README describes local_server as \"talks to the repository directly (no MCP transport)\" — the new studio routes use MCP transport (fastmcp client to mcp_server). Slight identity tension but user chose extend local_server. Fine — the routes add MCP-based studio API alongside existing direct-repo routes. Port: keep whatever main.py uses, add /api/*.\n\n**client package after deletion**:\n- Delete app.py. run.py launcher updated: starts mcp_server (8000) + uvicorn local_server + optionally serves/opens. The `agentic-odi-dev` script: starts mcp_server + local_server; in dev also mention `npm run dev` in studio + tauri dev. Tests: test_run.py stays valid if is_port_in_use kept.\n- client pyproject: drop streamlit, fastmcp, openai? fastmcp/openai move to local_server deps. client keeps just launcher (no runtime deps?). Fine.\n\n**desktopBridge**: `studio/src/bridge/desktopBridge.ts` — sendToBackend(action, data): Tauri invoke (future commands) / electronAPI (future) / HTTP fetch to `/api/...` (current). All API calls go through it.\n\n**Tauri scaffold specifics** (Tauri 2):\n- `studio/src-tauri/`: Cargo.toml, tauri.conf.json, capabilities/default.json, src/main.rs, src/lib.rs, build.rs, icons/.\n- Rust code minimal: `tauri::Builder::default().plugin(tauri_plugin_shell::init()).run(...)`. Sidecar spawn: use tauri-plugin-shell from JS on app start (command: python launcher) OR document that dev uses `uv run python -m client.run` then `npm run tauri dev`. For scaffold simplicity + thinness: on production builds the shell spawns sidecar via plugin-shell `Command.create('sidecar', ...)`? External binaries in Tauri need externalBin bundling which requires packaging python — heavy. Realistic scaffold: Tauri dev mode loads SPA from vite; sidecar started by the existing `python -m client.run` launcher (which can now also offer `--with-gui` to open tauri?). Simplest coherent story:\n  - `python -m client.run` → mcp_server + local_server (serves SPA at :8501) — pure web mode\n  - `npm run tauri dev` (in studio/) → starts vite; beforeDevCommand could also start sidecar via a script; on sidecar readiness, window loads localhost:5173 which proxies /api to sidecar\n  - Production Tauri: window loads bundled dist; Rust setup hook spawns `python -m local_server.main` + `python -m mcp_server` via std Command (thin Rust, ~20 lines) — acceptable thinness.\n- Check cargo/rustc availability on machine. If missing, note install prerequisite (rustup). CI: tauri build in CI is heavy (webkit deps); keep CI to `cargo check` optional or skip Rust CI initially — keep scaffold out of CI Python job; add a minimal `studio` job: npm ci, tsc, vitest, vite build. Rust CI later when shell matures. Good scope control.\n\n**CI changes**:\n- Add Node setup (actions/setup-node@v4, node 22) job/step: `npm ci && npm run lint && npm run test && npm run build` in studio/.\n- Python: local_server mypy/bandit/pytest already covered by existing jobs (they run per-directory) — updated deps need uv.lock update.\n- uv sync --locked will need the lock updated with fastapi/fastmcp/openai in local_server.\n- Smoke: boot mcp_server + local_server, curl /api/canvas (with seed fallback), curl /, curl /api/health endpoints. Add to CI smoke section.\n\n**Parity checklist** (1:1 mapping table) — put in plan as acceptance criteria:\n1. Sidebar/settings: 4 config fields w/ env defaults (AGENTIC_ODI_BASE_URL, API_KEY, MODEL, MCP_URL) → Settings panel in SPA (localStorage persistence; sidecar also reads env for defaults via GET /api/config or embed defaults in index? Simpler: SPA hardcodes same env defaults? Env vars were read in Streamlit process. For parity, sidecar exposes GET /api/config returning env-derived defaults; SPA merges with localStorage.)\n2. Clear Chat / Sync Canvas buttons → toolbar actions (reset chat state / refetch canvas)\n3. Health badges: LLM Active vs Local Studio Mode; FastMCP Connected vs Seed Prototype Ready → GET /api/health/*4. Progressive hydration status (\"⚡ Syncing...\" → \"✨ Living Studio Canvas ready\") → loading state banner + skeletons (now actually visible)\n5. Metrics: Active Jobs / Underserved(>10) / Total Outcomes\n6. Outcome cards: pulse for >10, Inspect Trace (evidence), Simulate Bet (loads into Impact tab), Ask Agent (sends chat prompt)\n7. Job Map:8-phase steps list + Add Step form → POST /api/steps\n8. Impact tab: outcome select, bet input, before/after panels, metrics, Declare Intent → drafts PDR via chat\n9. Evidence tab: two static boxes + caption\n10. Direct Capture: job select, statement, sliders, live opp-score calc, submit → POST /api/outcomes\n11. Chat: quick pills (Define Job / Simulate Bet / Guidelines), history bubbles, input, offline fallback replies, live tool-loop with \"Executing Causal Tools\" notice, force refresh after tools\n12. Bug fixes (flagged): pill_badge f-string bug line 732 (`{opp:.1f} if opp else \"N/A\"` literal) and None-opp crash — fix in conversion.\n\n**Worktree setup**:\n- `.gitignore`: verify `.worktrees` ignored (grep found nothing; but status clean — check .git/info/exclude or global). Add `.worktrees/` to .gitignore if needed (commit needed — flag to user).\n- `git worktree add .worktrees/living-studio-web -b topic/living-studio-web topic/living-studio-gui`\n- Setup: uv sync --all-packages; npm install in studio/; rustup check.\n- Baseline: run pytest for workspace (or at least client+local_server), confirm green on topic branch.\n\n**Branch naming**: topic/living-studio-web? It includes Tauri shell — maybe `topic/living-studio-tauri`? The migration is \"streamlit → Living Studio web architecture with Tauri\". I'll propose `topic/living-studio-gui-v2`? Keep `topic/living-studio-web` — hmm the branch contains tauri scaffold too. `topic/living-studio-spa`? I'll go `topic/living-studio-tauri` since the headline deliverable includes Tauri. Actually the user's objective: \"1:1 conversion... migrate away from streamlit to new architecture as per attachment\" — attachment is about sidecar+bridge enabling Tauri→Electron. Branch name: `topic/living-studio-shell-migration`? Simpler: `topic/living-studio-tauri`. I'll propose that, noting rename easy.\n\n**Rebase verification before concluding** (user requirement):\n- Since we branch from local topic/living-studio-gui (already rebased on main), our branch is linear atop it.\n- Verification steps at end: (a) `git merge-tree --write-tree main topic/living-studio-tauri` → expect clean or only our-branch conflicts none; (b) `git rebase topic/living-studio-gui` → no-op; (c) simulate if topic dev force-pushes: create temp clone test — rebase our commits onto a rebuilt topic tip; since we branch from topic tip, any new topic tip requires `git rebase --onto <new-tip> <old-tip> topic/living-studio-tauri` and check for conflicts (only if topic developer changes files we touch: client/, local_server/, README, CI, pyproject, uv.lock — CI and lockfile are conflict-prone; report likelihood).\n- Also verify origin's stale conflicts: `git merge-tree origin/main origin/topic/living-studio-gui` exit 1 — developer needs rebase; local already shows resolved result exists (a645779).**Structure of implementation tasks** (for the plan):\n1. Worktree + branch setup, gitignore check, baseline tests\n2. local_server sidecar API: port logic from app.py; pytest (httpx TestClient; mock fastmcp/AsyncOpenAI); update pyproject deps; uv lock\n3. client cleanup: delete app.py, update run.py launcher (mcp_server + local_server), update README client sections, client pyproject deps trim; keep tests green\n4. studio/ SPA scaffold: Vite+React+TS, desktopBridge, api client, global CSS port of theme, components: SettingsPanel, StudioHeader, StatusPills, CanvasTabs (OpportunityLandscape, JobMap, ImpactSim, Evidence, DirectCapture), ChatCopilot, Skeleton loaders, state (React context or zustand? keep to React context/useReducer — no extra dep; or zustand for simplicity. Default: React context. Hmm, chat+canvas state — zustand is tiny and cleaner. I'll propose zustand, flagged as call.)\n5. Tauri scaffold in studio/src-tauri (Tauri 2, plugin-shell, capabilities), dev/build config wiring; sidecar spawn logic (thin Rust or launcher-driven)\n6. CI: studio job (node setup, lint/typecheck/test/build), local_server smoke additions; keep Python jobs green\n7. README updates: architecture diagram (attachment-style), run instructions (web mode + tauri dev), migration notes\n8. Verification: full pytest + ruff + mypy + bandit across workspace; npm test/build; manual parity walkthrough vs feature checklist; rebase checks (merge-tree vs main; rebase onto topic; --onto simulation)\n\nRust toolchain check — let me verify cargo availability now, and local_server/main.py port, and check .git/info/exclude for worktrees. Also check whether Tauri 2 needs webkit2gtk on Linux for cargo check — full `tauri dev` needs system libs; scaffold + cargo check may still need glib/gtk dev libs. If missing, note prerequisite. Let me check.",
+          "time": {
+            "start": 1792089076366,
+            "end": 1792089186696
+          },
+          "id": "prt_140d5328d001Ty8OvghCEGIyXL",
+          "sessionID": "ses_ebf6bd831ffe9tDPErTclMDXE2",
+          "messageID": "msg_140d5149b002rxbwbn0A0Nmm0Z"
+        },
+        {
+          "type": "text",
+          "text": "Good — React+TS+Vite, Tauri shell scaffold, sidecar in `local_server`, Streamlit deleted. Let me verify a few environment facts that affect the plan (Rust toolchain, local_server entrypoint/port, worktree ignore status).",
+          "time": {
+            "start": 1792089186705,
+            "end": 1792089191883
+          },
+          "id": "prt_140d6e191001LhPfe4pIYhR2kr",
+          "sessionID": "ses_ebf6bd831ffe9tDPErTclMDXE2",
+          "messageID": "msg_140d5149b002rxbwbn0A0Nmm0Z"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "call_538f7814d486410eab313978",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "which cargo rustc 2>/dev/null; cargo --version 2>/dev/null; rustc --version 2>/dev/null; pkg-config --exists webkit2gtk-4.1 && echo \"webkit2gtk OK\" || echo \"webkit2gtk MISSING\"; pkg-config --exists gtk+-3.0 && echo \"gtk3 OK\" || echo \"gtk3 MISSING\""
+            },
+            "output": "/bin/bash: line 1: pkg-config: command not found\nwebkit2gtk MISSING\n/bin/bash: line 1: pkg-config: command not found\ngtk3 MISSING\n",
+            "metadata": {
+              "output": "/bin/bash: line 1: pkg-config: command not found\nwebkit2gtk MISSING\n/bin/bash: line 1: pkg-config: command not found\ngtk3 MISSING\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "which cargo rustc 2>/dev/null; cargo --version 2>/dev/null; rustc --version 2>/dev/null; pkg-config --exists webkit2gtk-4.1 && echo \"webkit2gtk OK\" || echo \"webkit2gtk MISSING\"; pkg-config --exists gtk+-3.0 && echo \"gtk3 OK\" || echo \"gtk3 MISSING\"",
+            "time": {
+              "start": 1792089190214,
+              "end": 1792089192056
+            }
+          },
+          "id": "prt_140d6e8e10011tfZog4yTPO28K",
+          "sessionID": "ses_ebf6bd831ffe9tDPErTclMDXE2",
+          "messageID": "msg_140d5149b002rxbwbn0A0Nmm0Z"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "call_d640957659b647659098cb74",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "git show topic/living-studio-gui:local_server/src/local_server/main.py; echo ---; cat .git/info/exclude 2>/dev/null | tail -10; git config --get core.excludesFile; echo ---; git check-ignore -v .worktrees 2>&1; echo \"exit: $?\""
+            },
+            "output": "\"\"\"Main entry for local server.\"\"\"\n\nimport uvicorn\n\n\ndef main() -> None:\n    uvicorn.run(\"local_server.app:create_app\", factory=True, host=\"127.0.0.1\", port=8100)\n\n\nif __name__ == \"__main__\":\n    main()\n---\n# git ls-files --others --exclude-from=.git/info/exclude\n# Lines that start with '#' are comments.\n# For a project mostly in C, the following would be a good set of\n# exclude patterns (uncomment them if you want to use them):\n# *.[oa]\n# *~\n.worktrees/\n---\n.git/info/exclude:7:.worktrees/\t.worktrees\nexit: 0\n",
+            "metadata": {
+              "output": "\"\"\"Main entry for local server.\"\"\"\n\nimport uvicorn\n\n\ndef main() -> None:\n    uvicorn.run(\"local_server.app:create_app\", factory=True, host=\"127.0.0.1\", port=8100)\n\n\nif __name__ == \"__main__\":\n    main()\n---\n# git ls-files --others --exclude-from=.git/info/exclude\n# Lines that start with '#' are comments.\n# For a project mostly in C, the following would be a good set of\n# exclude patterns (uncomment them if you want to use them):\n# *.[oa]\n# *~\n.worktrees/\n---\n.git/info/exclude:7:.worktrees/\t.worktrees\nexit: 0\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "git show topic/living-studio-gui:local_server/src/local_server/main.py; echo ---; cat .git/info/exclude 2>/dev/null | tail -10; git config --get core.excludesFile; echo ---; git check-ignore -v .worktrees 2>&1; echo \"exit: $?\"",
+            "time": {
+              "start": 1792089191793,
+              "end": 1792089191845
+            }
+          },
+          "id": "prt_140d6efbf001Sgz7B7sKbTZZKq",
+          "sessionID": "ses_ebf6bd831ffe9tDPErTclMDXE2",
+          "messageID": "msg_140d5149b002rxbwbn0A0Nmm0Z"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "0037d122d5bc1e2a10ee4c357faa98206abe8270",
+          "type": "step-finish",
+          "tokens": {
+            "total": 61085,
+            "input": 32144,
+            "output": 236,
+            "reasoning": 3233,
+            "cache": {
+              "write": 0,
+              "read": 25472
+            }
+          },
+          "cost": 0,
+          "id": "prt_140d6f6a0001RShQsLQYTpuNKg",
+          "sessionID": "ses_ebf6bd831ffe9tDPErTclMDXE2",
+          "messageID": "msg_140d5149b002rxbwbn0A0Nmm0Z"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_140942815001L4WQWeneC5DQyA",
+        "role": "assistant",
+        "mode": "plan",
+        "agent": "plan",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 63303,
+          "input": 3675,
+          "output": 71,
+          "reasoning": 1957,
+          "cache": {
+            "write": 0,
+            "read": 57600
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792089192206,
+          "completed": 1792089258981
+        },
+        "finish": "tool-calls",
+        "id": "msg_140d6f70e002x4IB8g82r70l1Q",
+        "sessionID": "ses_ebf6bd831ffe9tDPErTclMDXE2"
+      },
+      "parts": [
+        {
+          "snapshot": "0037d122d5bc1e2a10ee4c357faa98206abe8270",
+          "type": "step-start",
+          "id": "prt_140d700c8001atQ7u1LV2J67vn",
+          "sessionID": "ses_ebf6bd831ffe9tDPErTclMDXE2",
+          "messageID": "msg_140d6f70e002x4IB8g82r70l1Q"
+        },
+        {
+          "type": "reasoning",
+          "text": "Findings:\n- No cargo/rustc installed, no pkg-config/webkit2gtk/gtk3. Tauri on this Linux machine cannot compile without installing rustup + system deps (libwebkit2gtk-4.1-dev, libgtk-3-dev, etc.). The Tauri scaffold will be written but `cargo check`/`tauri dev` can't run here unless the user installs prerequisites. Plan must flag this: scaffold code + config will be authored and reviewed statically; CI for Rust deferred; verification of Tauri shell limited to config validity (npm-side tauri CLI can validate conf?). `tauri build` in CI needs those libs too — defer. I'll note prerequisite install (rustup + apt packages) as an optional step the user can approve, or the scaffold is delivered un-compiled with clear README notes.\n- local_server runs on 127.0.0.1:8100 — good, sidecar port = 8100 (keep), SPA served there too in prod mode.\n- `.worktrees/` is ignored via `.git/info/exclude` (line 7) — gitignore hygiene already handled locally, no commit needed. But it's not in the committed .gitignore — for other clones it would matter; minor: could add to .gitignore as a nicety (requires commit — flag as optional).\n\nPort allocation:\n- MCP server: 8000 (unchanged)\n- Sidecar (local_server): 8100 (existing)\n- Vite dev: 5173 with proxy /api → 127.0.0.1:8100\n- Tauri dev: loads5173\n- SPA prod: served by local_server at 127.0.0.1:8100 (replaces streamlit 8501)\n\nChat streaming: default non-streaming POST /api/chat (1:1). \n\nAlso note: existing local_server tests (test_api.py) cover /health /capabilities — keep them; add studio route tests.\n\nMCP URL from browser perspective: browser never talks MCP; sidecar does. Config flow: GET /api/config (env defaults), SPA settings panel, per-request params to sidecar routes (mcp_url, base_url, api_key, model). Alternatively server-side env only — but Streamlit had editable sidebar inputs, so parity = editable in SPA, sent per request.\n\nbandit: local_server/src gets scanned already — fastmcp/openai usage fine (B404 subprocess not used there).\n\nmypy: local_server has mypy config; AsyncOpenAI/fastmcp ignore_missing_imports=true — fine.\n\nuv.lock: adding fastmcp+openai to local_server — client currently depends on them, so lock already contains them; adding to another workspace member just changes dependency graph — `uv sync --all-packages --locked` in CI requires lock updated via `uv lock` (or uv add). Note: `uv add --project local_server fastmcp openai` or edit pyproject + `uv lock`.\n\nVersion pinning: repo pins dev tools exactly; runtime deps unpinned (fastmcp, openai unpinned in client). Keep unpinned style.\n\nReact state: I said zustand vs context — pick zustand (tiny, standard). Actually to minimize deps, React context + useReducer is fine for this scale. I'll go zustand as \"my call\" noted in plan; or keep zero-dep context. Hmm — attachment emphasizes clean decoupling, not state lib. I'll use plain React context + hooks; fewer moving parts. Decide: zustand. No— keep it simple: React 18 + context. Chat messages array, canvas data, settings, ui state. Fine.\n\nTesting frontend: vitest + @testing-library/react for components/logic; keep light. Lint: eslint + typescript-eslint; format: prettier? Repo python uses ruff; for JS keep eslint minimal config. \n\nTauri scaffold details (Tauri 2.x):\n- studio/src-tauri/tauri.conf.json: productName \"Living Studio\", identifier com.agenticodi.livingstudio, build.beforeDevCommand \"npm run dev\", devUrl \"http://localhost:5173\", build.beforeBuildCommand \"npm run build\", frontendDist \"../dist\", app.windows[{title \"The Living Studio\", width 1440, height 900}], plugins.shell (allow spawn python? in capabilities).\n- Cargo.toml: tauri = \"2\", tauri-plugin-shell = \"2\", serde, serde_json.\n- main.rs/lib.rs: run(); plugin shell init.\n- Sidecar spawn: In production Tauri app, Rust `setup` spawns `python -m mcp_server` and `python -m local_server.main` as children (std::process::Command), kills on exit. That's ~30 lines Rust — \"thin\" per attachment. In dev, launcher script or beforeDevCommand script `scripts/dev-env.sh` starts both python processes + vite. Need process lifecycle: tauri dev kills beforeDevCommand child tree. Simplest robust: beforeDevCommand runs a shell script that starts mcp_server & local_server with trap/cleanup, backgrounded, then exec vite? Cleanup on tauri dev exit kills the script's children if they're in same process group — mostly works on Linux/mac; note Windows caveat (repo seems Linux/mac oriented; CI ubuntu). Acceptable for scaffold; document.\n- capabilities/default.json: core:default + shell:allow-spawn for python paths if JS-side spawn used. If Rust-side spawn, no shell plugin needed at all! Even thinner: no tauri-plugin-shell, Rust does Command::new(\"python\"). But then no shell plugin. However for dev on this machine, Rust can't compile anyway. Decision: Rust-side spawn via std::process::Command in setup() + kill on Drop/RunEvent::Exit. No extra plugins. Cleaner.\n- Icons: tauri needs icons; scaffold with default placeholder icons (generate minimal32x32.png etc. via script? can't run tauri icon without tooling... `npm run tauri icon` needs an input icon. I can generate simple PNGs with Python PIL? PIL may not be installed. Could write minimal valid PNGs via python zlib/struct stdlib. Or defer icons with a note that `npm run tauri icon path/to/icon.png` generates them; tauri.conf references icons — build fails without them but scaffold can include a tiny generated PNG. I'll plan: generate minimal placeholder icons via a small stdlib python script during implementation. Fine.)\n\nCI for studio: add job \"studio\" with setup-node@v4 (node 22, cache npm), npm ci, npm run lint, npm run test -- --run, npm run build. Upload nothing. Tauri/cargo: NOT in CI yet (needs webkit libs; defer) — note as follow-up.\n\nPython smoke additions: boot local_server, curl http://127.0.0.1:8100/api/health (new? existing /health), curl /api/canvas expecting seed fallback when mcp down, curl / (index.html requires built SPA in CI — either build SPA first in smoke job or make static mount optional if dist missing (skip mount + / returns404). Simpler: smoke in Python job only tests /api/*; SPA served-file check in studio job via preview server? Or local_server tests with TestClient for static. Keep: TestClient tests for API; static mount conditional on dist existing; CI smoke curls API endpoints only.\n\nrun.py launcher update: start mcp_server + local_server (uvicorn) — remove streamlit; print URLs: MCP 8000, Studio http://127.0.0.1:8100. Keep client package as launcher home (user chose local_server for API; launcher stays in client since `agentic-odi-dev` script lives there). client pyproject deps: drop streamlit/fastmcp/openai → empty deps? run.py uses only stdlib. Keep package for launcher + tests.\n\nREADME: update client/local_server descriptions, run instructions (web + tauri dev), architecture diagram per attachment, migration note.\n\nDesign doc: brainstorming skill says write design doc for project-size work + builder-check via subagent. Plan mode: I write the plan (plan file) — the plan will serve as the design. The brainstorming HARD-GATE: nothing built until partner approves full description — plan mode approval flow handles that (user approves plan). The skill wants docs/superpowers/specs design doc committed — but user asked for a plan; plan mode workflow takes precedence (user instructions > skills). I'll fold the design content into the plan file.\n\nNow write the plan file. Location: opencode plan file — the tool says \"Update the plan file using your file editing tools.\" Where is the plan file? Typically `.opencode/plans/...`? I don't have an explicit path. In opencode plan mode, plans usually go to a specific file path given in system prompt — not present here. I'll check .opencode dir for a plans folder convention.",
+          "time": {
+            "start": 1792089194775,
+            "end": 1792089258651
+          },
+          "id": "prt_140d70117001ROl11Xmvfphhnq",
+          "sessionID": "ses_ebf6bd831ffe9tDPErTclMDXE2",
+          "messageID": "msg_140d6f70e002x4IB8g82r70l1Q"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "call_0c90d318e56b4512bdd04ada",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "ls .opencode/ 2>/dev/null; ls .opencode/plans 2>/dev/null; find .opencode -maxdepth 2 -name \"*.md\" -not -path \"*/skills/*\" 2>/dev/null | head"
+            },
+            "output": "node_modules\npackage-lock.json\npackage.json\nplugins\nskills\n",
+            "metadata": {
+              "output": "node_modules\npackage-lock.json\npackage.json\nplugins\nskills\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "ls .opencode/ 2>/dev/null; ls .opencode/plans 2>/dev/null; find .opencode -maxdepth 2 -name \"*.md\" -not -path \"*/skills/*\" 2>/dev/null | head",
+            "time": {
+              "start": 1792089258800,
+              "end": 1792089258850
+            }
+          },
+          "id": "prt_140d7faa3001MgJhT4sQfsB23d",
+          "sessionID": "ses_ebf6bd831ffe9tDPErTclMDXE2",
+          "messageID": "msg_140d6f70e002x4IB8g82r70l1Q"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "0037d122d5bc1e2a10ee4c357faa98206abe8270",
+          "type": "step-finish",
+          "tokens": {
+            "total": 63303,
+            "input": 3675,
+            "output": 71,
+            "reasoning": 1957,
+            "cache": {
+              "write": 0,
+              "read": 57600
+            }
+          },
+          "cost": 0,
+          "id": "prt_140d7fbbe0012Ojl9mbnT2CRpz",
+          "sessionID": "ses_ebf6bd831ffe9tDPErTclMDXE2",
+          "messageID": "msg_140d6f70e002x4IB8g82r70l1Q"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_140942815001L4WQWeneC5DQyA",
+        "role": "assistant",
+        "mode": "plan",
+        "agent": "plan",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 68499,
+          "input": 2073,
+          "output": 2859,
+          "reasoning": 2319,
+          "cache": {
+            "write": 0,
+            "read": 61248
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792089258988,
+          "completed": 1792089417200
+        },
+        "finish": "tool-calls",
+        "id": "msg_140d7fbec001LWcZFwzOa6AXaI",
+        "sessionID": "ses_ebf6bd831ffe9tDPErTclMDXE2"
+      },
+      "parts": [
+        {
+          "snapshot": "0037d122d5bc1e2a10ee4c357faa98206abe8270",
+          "type": "step-start",
+          "id": "prt_140d82887001CN5y0ijyxAg7tw",
+          "sessionID": "ses_ebf6bd831ffe9tDPErTclMDXE2",
+          "messageID": "msg_140d7fbec001LWcZFwzOa6AXaI"
+        },
+        {
+          "type": "reasoning",
+          "text": "No plans directory convention visible. The plan-mode instruction says \"Update the plan file using your file editing tools\" — I'll create the plan at `.opencode/plans/2026-10-15-living-studio-tauri-migration.md`. That's a reasonable location.\n\nWait — but brainstorming skill's HARD-GATE says nothing gets built until approval, and for project-size work write a design doc. The plan file IS the deliverable of plan mode. Good.\n\nLet me also double check one thing: Tauri 2 current version and config schema — my knowledge: Tauri 2.0 stable since Oct 2024; in 2026 it's 2.x mature. v2 config: `$schema` optional, app.windows, build.beforeDevCommand etc. Fine.\n\nNow write the comprehensive plan file. Structure:\n\n1. Context & goals (why, 1:1 conversion, attachment architecture)\n2. Constraints & decisions (user's 4 answers + defaults I chose: non-streaming POST, branch name, zustand/context, ports)\n3. Architecture (diagram: Tauri shell / browser → desktopBridge → local_server FastAPI sidecar :8100 → mcp_server :8000 + LLM :8001)\n4. Repo layout changes (files added/removed/modified)\n5. API contract (exact endpoints + payloads)\n6. Frontend component map (parity checklist mapped to components)\n7. Implementation steps (ordered, with verification per step)\n8. Testing & CI\n9. Rebase verification procedure (user's explicit ask)\n10. Risks & prerequisites (Rust toolchain missing; webkit libs; uv lock; CI npm cache)\n11. Out of scope / follow-ups (Electron shell, chat streaming, connectors Phase 2, Rust CI)\n\nParity checklist as acceptance criteria — include the bug fixes (pill badge bug).\n\nState management decision: plain React context + hooks (no extra dep). Note it.\n\nSidecar spawn: Rust setup() std::process::Command spawn of python -m mcp_server and python -m local_server.main; needs python path — use `uv run` from repo root? In production bundling python is out of scope; scaffold targets dev machines: spawn via \"uv\" with args [\"run\",\"python\",\"-m\",\"mcp_server\"] with current_dir = repo root (from env or config). Document. Keep thin.\n\ndev script: studio/scripts/dev.sh? Or npm-run-all concurrently? Use a small node script or `concurrently` dev dep to run vite + (uv run python -m mcp_server) + (uv run python -m local_server.main). Actually for `tauri dev`, beforeDevCommand = \"npm run dev:full\" using `concurrently` (dev dep) to run mcp_server, local_server, vite. On tauri exit, concurrently kills all. Good, cross-platform-ish.\n\nFor pure web dev without tauri: `python -m client.run` (mcp + local_server serving dist) or `npm run dev` (vite only, assumes sidecar running). Provide both.\n\nStatic serving: local_server create_app mounts StaticFiles at \"/\" IF studio/dist exists (conditional mount), SPA fallback to index.html. In tests, no dist → skip mount.\n\nAPI key handling: pass per-request in body (not query) to avoid logs; fine.\n\nDetailed endpoint contract:\n\nGET /api/config → { defaults: { base_url, api_key, model_name, mcp_url } } from env AGENTIC_ODI_* (same env var names as Streamlit).\n\nGET /api/health/llm?base_url=&model= with api_key in header? For GET simplicity use POST /api/health/llm {base_url, api_key, model} → {healthy, message}. Socket probe + AsyncOpenAI models.list timeout 1.2s, classify errors — port _classify_llm_error.\n\nPOST /api/health/mcp {mcp_url} → {reachable} (socket probe only; matches is_endpoint_reachable badge logic).\n\nGET /api/canvas?mcp_url= → {jobs, steps, outcomes, source: \"mcp\"|\"seed\"} port fetch_mcp_data (probe 0.3s, call get_jobs, per-job get_job_map + get_outcomes with timeouts, seed fallback DEMO_* data). DEMO data moves to local_server (e.g., local_server/studio_seed.py or seeds.py).\n\nPOST /api/chat {mcp_url, base_url, api_key, model, messages:[{role,content}]} → {reply, tool_calls:[names], canvas_dirty: bool}. Port handle_user_input: offline fallback (llm unhealthy → keyword replies) — wait: offline fallback triggers on llm_health unhealthy. In stateless API, the chat route performs health check first (or probes reachability + models.list quickly) then decides fallback vs tool loop. Port _async_check_llm_health usage: quick check each chat call (cheap: socket probe; if reachable, models.list 1.2s — acceptable). Or client sends llm_healthy hint? Cleaner: server re-checks (socket probe only? Streamlit checked full models.list). 1:1: full check but it's per-message — Streamlit did it per config-change only (cached). Compromise: POST /api/chat does socket probe + models.list with cache keyed by config (in-memory TTL cache in sidecar, e.g., 30s) — good parity of feel. Note in plan.\n\nTool loop: list MCP tools → openai tools schema → completions → execute tool_calls via mcp → follow-up completions → return final content + executed tool names. Messages history from client. System prompt: local_server/studio module holds SYSTEM_PROMPT verbatim.\n\nPOST /api/steps {mcp_url, job_id, name, order} → MCP add_step result.\nPOST /api/outcomes {mcp_url, job_id, statement, importance, satisfaction} → MCP add_outcome result.\n\nFrontend component tree:\n\nstudio/src/\n- main.tsx, App.tsx\n- bridge/desktopBridge.ts (tauri | electron | fetch fallback)\n- api/studioApi.ts (typed client built on bridge)\n- state/StudioContext.tsx (settings, chat messages, canvas data, health, loading, pendingSimOutcome, activeTab)\n- styles/theme.css (ported CSS vars/animations: shimmer, fadeIn, pills, cards)\n- components/\n  - SettingsPanel.tsx (sidebar: 4 fields, Clear Chat, Sync Canvas, MCP sources list, About)\n  - StudioHeader.tsx (header + LLM/MCP pills)\n  - Skeletons.tsx (GhostMetrics, GhostCards, GhostSteps — now actually used)\n  - canvas/CanvasTabs.tsx\n  - canvas/OpportunityLandscape.tsx (metrics + OutcomeCard list)\n  - canvas/OutcomeCard.tsx (pulse, Inspect Trace / Simulate Bet / Ask Agent)\n  - canvas/JobMap.tsx (+ AddStepForm)\n  - canvas/ImpactSim.tsx (select, bet input, before/after, metrics, Declare Intent)\n  - canvas/EvidenceStream.tsx (static boxes)\n  - canvas/DirectCapture.tsx (form + live score)\n  - chat/ChatCopilot.tsx (quick pills, history, input, tool-call notices)\n- bridge/__tests__ + component tests with vitest+RTLstudio/src-tauri/ scaffold + Cargo.toml, tauri.conf.json, capabilities, main.rs with sidecar spawn.\n\nParity acceptance checklist: the 12 items listed earlier.\n\nCI job details:\n- studio: ubuntu-latest, setup-node node-version22 cache npm cache-dependency-path studio/package-lock.json, npm ci, npm run lint, npm run test -- --run, npm run build\n- Python smoke additions in existing job: after boot mcp_server (already exists), also boot local_server, curl /api/canvas (mcp up → source mcp or seed both fine; assert HTTP 200 + json keys), curl /api/health/mcp.\n\nuv.lock: `uv add -p local_server fastmcp openai` equivalent (edit pyproject + uv lock). client pyproject: remove streamlit/fastmcp/openai deps; uv lock again.\n\nBranch: topic/living-studio-tauri based on topic/living-studio-gui (local a645779).\n\nWorktree: .worktrees/living-studio-tauri.\n\nRebase verification (before conclude):\n1. `git merge-tree --write-tree main topic/living-studio-tauri` — expect exit 0 (clean) since linear atop rebased topic.\n2. `git rebase topic/living-studio-gui` — expect \"up to date\"/no-op.\n3. Simulate topic developer force-push: in /tmp clone, cherry-pick our commits onto a rebuilt topic tip? Practical version: `git rebase --onto topic/living-studio-gui a645779 topic/living-studio-tauri` is no-op; the meaningful test is if topic tip changes later — document command. Also test rebasing OUR branch onto origin/main directly? Not needed.\n Additional meaningful check: if the topic developer's rebase produces a DIFFERENT tree than local a645779 (e.g., different conflict resolutions in client/, README, CI, uv.lock), our branch may conflict on those files. Mitigation: our branch touches client (deletes app.py — conflict if they modified it), README, CI, uv.lock, pyproject. Note conflict hotspots + recovery command `git rebase --onto <new-topic-tip> a645779 topic/living-studio-tauri`.\n4. Report results at end.\n\nPrerequisites/risks:\n- Rust toolchain absent + webkit2gtk/gtk3 dev libs missing → Tauri scaffold authored but not compiled locally. Options: (a) user installs rustup + apt libs (I can run installers if approved), (b) scaffold delivered with CI deferred + README prerequisites section. Ask? I'll put in plan as a decision point: attempt install (needs sudo for apt) or scaffold-only. Default: scaffold-only, verify `cargo` later; validate tauri.conf.json JSON schema manually + `npx tauri` CLI version check works without compile? `npx tauri info` needs cargo. So static validation only.\n- npm registry access for deps install — presumably fine.\n- uv lock churn — minor.\n\nOut of scope: Electron shell (bridge ready), streaming chat (SSE later), connectors Phase 2 evidence ingestion, packaging/signing Tauri bundles, Rust CI.\n\nNow write the plan file. Keep it detailed but not bloated. Then present summary to user. Per plan mode: \"ask for their opinion\" — the plan is the artifact; user will approve/reject via plan flow.",
+          "time": {
+            "start": 1792089270511,
+            "end": 1792089343289
+          },
+          "id": "prt_140d828ef001UBUCiszhuAdtOw",
+          "sessionID": "ses_ebf6bd831ffe9tDPErTclMDXE2",
+          "messageID": "msg_140d7fbec001LWcZFwzOa6AXaI"
+        },
+        {
+          "type": "text",
+          "text": "All environment facts confirmed. Writing the plan now.",
+          "time": {
+            "start": 1792089343298,
+            "end": 1792089416662
+          },
+          "id": "prt_140d94542001DEjh5M8Hyxz4dT",
+          "sessionID": "ses_ebf6bd831ffe9tDPErTclMDXE2",
+          "messageID": "msg_140d7fbec001LWcZFwzOa6AXaI"
+        },
+        {
+          "type": "tool",
+          "tool": "write",
+          "callID": "call_b622511fc43e4f8ca50220da",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/home/alexa/repos/agentic-odi/.opencode/plans/2026-10-15-living-studio-tauri-migration.md",
+              "content": "# Living Studio: Streamlit → Web SPA + Python Sidecar + Tauri Migration\n\n## Goal\n\n1:1 functional conversion of The Living Studio GUI (`client/src/client/app.py`, 1063 lines of Streamlit) to the decoupled sidecar architecture described in the Tauri→Electron migration attachment:\n\n- **Web Frontend UI** (React + TypeScript + Vite) — zero framework lock-in to the desktop shell\n- **IPC/Transport abstraction** (`desktopBridge`) — Tauri invoke / Electron ipc / HTTP fallback\n- **Python Sidecar** (FastAPI in `local_server`, loopback `127.0.0.1:8100`) — hosts MCP hydration, LLM health probes, and the chat tool-loop\n- **Thin Tauri shell** (scaffolded now; Electron drops in later via the bridge)\n\n## User decisions (locked)\n\n| Decision | Choice |\n|---|---|\n| Frontend stack | React + TypeScript + Vite |\n| Desktop shell scope | Also scaffold Tauri (Tauri 2) shell |\n| Sidecar home | Extend `local_server` package |\n| Old Streamlit app | Delete `client/src/client/app.py` on this branch |\n\n## Defaults I chose (object if any)\n\n- **Branch**: `topic/living-studio-tauri`, based on local `topic/living-studio-gui` (a645779 — already rebased cleanly onto main)\n- **Worktree**: `.worktrees/living-studio-tauri` (repo convention; `.worktrees/` already excluded via `.git/info/exclude`)\n- **Chat transport**: non-streaming `POST /api/chat` returning the full reply (matches Streamlit behavior; SSE streaming is a follow-up)\n- **State management**: plain React context + hooks (no extra state library)\n- **Ports**: MCP `8000` (unchanged), sidecar `8100` (existing local_server port), Vite dev `5173` proxying `/api` → `:8100`\n- **Tauri sidecar spawn**: ~30 lines of Rust in `setup()` using `std::process::Command` (no plugin-shell) — stays within the attachment's \"keep OS-level code thin\" rule\n\n## Environment constraint (important)\n\nThis machine has **no Rust toolchain and no webkit2gtk/gtk3 dev libs**, so the Tauri shell can be scaffolded and config-validated but **not compiled or run locally**. Delivery model:\n\n- Scaffold `studio/src-tauri/` fully (conf, Cargo.toml, capabilities, main.rs, placeholder icons)\n- Static validation only (JSON schema check of `tauri.conf.json`, code review); compile/`tauri dev` deferred to a machine with `rustup` + `libwebkit2gtk-4.1-dev` + `libgtk-3-dev`\n- README documents prerequisites; Rust CI job deferred (web-viewer libs heavy for CI) — SPA CI (lint/test/build) still added\n- If you want, we can attempt `rustup` install during implementation (apt libs would need sudo)\n\n## Architecture\n\n```\n┌────────────────────────────────────────────────────────┐\n│  Tauri shell (src-tauri)  or  plain browser            │\n│  ┌──────────────────────────────────────────────────┐  │\n│  │ React SPA (studio/src)                           │  │\n│  │  desktopBridge.ts: Tauri → Electron → fetch      │  │\n│  └──────────────────────┬───────────────────────────┘  │\n└─────────────────────────┼──────────────────────────────┘\n                          │ HTTP /api/* (loopback)\n┌─────────────────────────▼──────────────────────────────┐\n│  Python sidecar: local_server (FastAPI, :8100)         │\n│  studio/ module: health probes, MCP hydration + seed, │\n│  chat tool-loop, add_step / add_outcome passthrough   │\n│  also serves built SPA (studio/dist) at / in prod     │\n└───────────┬──────────────────────────┬────────────────┘\n            │ fastmcp (streamable HTTP) │ OpenAI-compatible\n┌───────────▼───────────┐   ┌──────────▼──────────────┐\n│ mcp_server :8000      │   │ LLM backend :8001       │\n│ (unchanged)           │   │ (user-provided / none)  │\n└───────────────────────┘   └─────────────────────────┘\n```\n\n## Repo layout changes\n\n| Path | Action |\n|---|---|\n| `studio/` | **New** — Vite React TS app + `src-tauri/` Tauri 2 scaffold + `package.json` |\n| `studio/src/bridge/desktopBridge.ts` | **New** — transport abstraction (Tauri/Electron/fetch) per attachment |\n| `local_server/src/local_server/studio/` | **New** — ported logic: `seed.py` (DEMO data), `probes.py` (socket + LLM health), `mcp_data.py` (fetch_mcp_data), `chat.py` (SYSTEM_PROMPT + offline fallbacks + tool loop), `router.py` (FastAPI routes) |\n| `local_server/pyproject.toml` | Add `fastmcp`, `openai` deps; `uv lock` update |\n| `client/src/client/app.py` | **Delete** (Streamlit) |\n| `client/src/client/run.py` | Update launcher: mcp_server + local_server (serve SPA), drop Streamlit |\n| `client/pyproject.toml` | Drop `streamlit`, `fastmcp`, `openai` (launcher is stdlib-only) |\n| `README.md` | Update architecture, run instructions (web + `tauri dev`), migration notes |\n| `.github/workflows/ci.yml` | Add `studio` job (Node: lint, vitest, build); extend Python smoke with sidecar API checks |\n| `local_server/tests/test_studio_api.py` | **New** — route tests via TestClient (mocked fastmcp/AsyncOpenAI) |\n\n## Sidecar API contract (ported 1:1 from app.py)\n\n| Endpoint | Ported behavior |\n|---|---|\n| `GET /api/config` | Env-derived defaults: `AGENTIC_ODI_BASE_URL/API_KEY/MODEL/MCP_URL` (same names as Streamlit) |\n| `POST /api/health/llm` `{base_url, api_key, model}` | Socket probe (0.3s) → `AsyncOpenAI.models.list` (1.2s, `asyncio.wait_for`) → `{healthy, message}`; port `_classify_llm_error`; in-memory cache keyed by config (~30s TTL) to mirror Streamlit's per-config caching |\n| `POST /api/health/mcp` `{mcp_url}` | Socket probe only → `{reachable}` (badge logic) |\n| `GET /api/canvas?mcp_url=` | Port `fetch_mcp_data`: probe, `get_jobs` → per-job `get_job_map` + `get_outcomes` with timeouts; DEMO seed fallback → `{jobs, steps, outcomes, source: \"mcp\"\\|\"seed\"}` |\n| `POST /api/chat` `{mcp_url, base_url, api_key, model, messages}` | Port `handle_user_input`: health-gated offline keyword fallbacks (guidelines/simulate/evidence/default) OR full MCP tool-loop (list_tools → completions w/ tools → execute calls → follow-up completion); returns `{reply, tool_calls, canvas_dirty}` |\n| `POST /api/steps` | MCP `add_step` passthrough |\n| `POST /api/outcomes` | MCP `add_outcome` passthrough |\n| `GET /` | StaticFiles mount of `studio/dist` (conditional on dist existing) + index.html SPA fallback |\n\nHistory stays client-side in React state (mirrors `st.session_state.messages`).\n\n## Frontend parity map (acceptance checklist)\n\n1. Settings panel: 4 env-backed fields, Clear Chat, Sync Canvas, MCP sources list, About blurb\n2. Status pills: 🟢 LLM Active / 🟡 Local Studio Mode; 🟢 FastMCP Connected / ⚡ Seed Prototype Ready\n3. Progressive hydration: \"⚡ Syncing…\" → \"✨ Living Studio Canvas ready\" + **shimmer skeletons now actually rendered** during load (Streamlit helpers were dead code; SPA wires them for real)\n4. Opportunity Landscape: 3 metrics; outcome cards pulse when score > 10; Inspect Trace / Simulate Bet (loads Impact tab target) / Ask Agent actions\n5. Universal Job Map: ordered steps + Add Step form\n6. WYSIWYG Impact: outcome select, bet input, BEFORE/AFTER panels, 3 metrics, Declare Intent → PDR draft via chat\n7. Customer Evidence: two static signal boxes + Phase 2 caption\n8. Direct Capture: job select, statement, importance/satisfaction sliders, live opportunity-score calc, submit\n9. Chat copilot: 3 quick-intent pills, message bubbles, input, \"🛠️ Executing Causal Tools\" notice, canvas re-sync after tool writes, offline fallback replies\n10. Dark-glass theme: port all CSS (radial bg, pills, cards, shimmer keyframes, fade-in) to `theme.css`\n11. **Bug fixes** (flagged, intentional deviations): `pill_badge` literal-`if` f-string bug (app.py:732) and `{opp:.1f}` crash when `opp is None` — fix in SPA rendering\n12. Desktop shell: Tauri window spawns sidecar processes on startup, tears down on exit; web mode unaffected\n\n## Implementation order\n\n1. **Worktree setup**: `git worktree add .worktrees/living-studio-tauri -b topic/living-studio-tauri topic/living-studio-gui`; `uv sync --all-packages`; baseline `pytest` (client + local_server) — confirm green on topic branch\n2. **Sidecar**: port logic → `local_server/studio/`; add routes; tests (mock MCP/LLM); `uv add` deps + `uv lock`; mypy/ruff/bandit/pytest green\n3. **Client cleanup**: delete `app.py`; rewrite `run.py` (mcp_server + local_server, print Studio URL `:8100`); trim deps; keep `test_run.py` green\n4. **SPA**: scaffold Vite React TS in `studio/`; `desktopBridge` + typed API client; theme.css; all components per parity map; vitest+RTL tests for bridge fallback, opp-score calc, outcome-card pulse logic, offline fallback selection\n5. **Tauri scaffold**: `src-tauri/` (conf w/ `beforeDevCommand` = concurrently runs mcp_server + local_server + vite; Rust spawn in prod; capabilities; placeholder icons); static validation\n6. **CI**: `studio` job (setup-node 22, npm ci, lint, vitest, vite build); Python smoke: boot local_server, curl `/api/canvas`, `/api/health/mcp`\n7. **Docs**: README rewrite (architecture diagram, quickstarts, Tauri prerequisites, migration note)\n8. **Verification** (below)\n\n## Verification\n\n- Python: `uv run pytest` across workspace; ruff + mypy + bandit per CI parity\n- Frontend: `npm run lint && npm test && npm run build` in `studio/`\n- Manual parity: `python -m client.run` → walk the 12-point checklist against the running Streamlit app from git history if needed\n- **Rebase checks (your explicit ask, run before concluding)**:\n  1. `git merge-tree --write-tree main topic/living-studio-tauri` → expect clean (our branch is linear atop the already-rebased topic tip)\n  2. `git rebase topic/living-studio-gui` → expect no-op\n  3. Conflict-likelihood audit: we touch `client/`, `README.md`, `ci.yml`, `uv.lock`, `pyproject.toml` — the same files the topic commit touched; if the topic developer's final rebased tip (≠ local a645779) differs, recovery is `git rebase --onto <new-tip> a645779 topic/living-studio-tauri`; report findings and hotspots in the final summary\n\n## Out of scope / follow-ups\n\n- Electron shell (bridge is ready; <1–2 days per attachment once decided)\n- Chat token streaming (SSE/WebSocket upgrade of `/api/chat`)\n- Connectors Phase 2 evidence ingestion into the Evidence tab\n- Tauri packaging/signing and Rust CI job\n"
+            },
+            "output": "Wrote file successfully.",
+            "metadata": {
+              "diagnostics": {},
+              "filepath": "/home/alexa/repos/agentic-odi/.opencode/plans/2026-10-15-living-studio-tauri-migration.md",
+              "exists": false,
+              "truncated": false
+            },
+            "title": ".opencode/plans/2026-10-15-living-studio-tauri-migration.md",
+            "time": {
+              "start": 1792089416643,
+              "end": 1792089416698
+            }
+          },
+          "id": "prt_140d946ab001fszF8JFS4RSh9D",
+          "sessionID": "ses_ebf6bd831ffe9tDPErTclMDXE2",
+          "messageID": "msg_140d7fbec001LWcZFwzOa6AXaI"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "1e0cbbe96f26c533da92cbc9b1f4868457c063c1",
+          "type": "step-finish",
+          "tokens": {
+            "total": 68499,
+            "input": 2073,
+            "output": 2859,
+            "reasoning": 2319,
+            "cache": {
+              "write": 0,
+              "read": 61248
+            }
+          },
+          "cost": 0,
+          "id": "prt_140da65440011BKUwgHACMzQJT",
+          "sessionID": "ses_ebf6bd831ffe9tDPErTclMDXE2",
+          "messageID": "msg_140d7fbec001LWcZFwzOa6AXaI"
+        },
+        {
+          "type": "patch",
+          "hash": "0037d122d5bc1e2a10ee4c357faa98206abe8270",
+          "files": [
+            "/home/alexa/repos/agentic-odi/.opencode/plans/2026-10-15-living-studio-tauri-migration.md"
+          ],
+          "id": "prt_140da65e70018o6CA4vWKnA3RJ",
+          "sessionID": "ses_ebf6bd831ffe9tDPErTclMDXE2",
+          "messageID": "msg_140d7fbec001LWcZFwzOa6AXaI"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_140942815001L4WQWeneC5DQyA",
+        "role": "assistant",
+        "mode": "plan",
+        "agent": "plan",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 68897,
+          "input": 5213,
+          "output": 340,
+          "reasoning": 48,
+          "cache": {
+            "write": 0,
+            "read": 63296
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792089417219,
+          "completed": 1792089437407
+        },
+        "finish": "stop",
+        "id": "msg_140da66030023eNUXeDxdcdkmi",
+        "sessionID": "ses_ebf6bd831ffe9tDPErTclMDXE2"
+      },
+      "parts": [
+        {
+          "snapshot": "1e0cbbe96f26c533da92cbc9b1f4868457c063c1",
+          "type": "step-start",
+          "id": "prt_140da886f001Cumnl95gMdb0oJ",
+          "sessionID": "ses_ebf6bd831ffe9tDPErTclMDXE2",
+          "messageID": "msg_140da66030023eNUXeDxdcdkmi"
+        },
+        {
+          "type": "reasoning",
+          "text": "Now present the plan summary to the user concisely. Per plan mode workflow, I've written the plan; the user reviews and approves. Keep response short and highlight the key points + the rebase finding + the Rust constraint.",
+          "time": {
+            "start": 1792089426109,
+            "end": 1792089427645
+          },
+          "id": "prt_140da88bd001Zh6djaABye3Mg2",
+          "sessionID": "ses_ebf6bd831ffe9tDPErTclMDXE2",
+          "messageID": "msg_140da66030023eNUXeDxdcdkmi"
+        },
+        {
+          "type": "text",
+          "text": "Plan written to `.opencode/plans/2026-10-15-living-studio-tauri-migration.md`. Summary:\n\n**Setup**: Worktree `.worktrees/living-studio-tauri`, branch `topic/living-studio-tauri` from local `topic/living-studio-gui` (a645779 — already rebased cleanly onto main; only stale `origin/` ref conflicts, so your assumption holds).\n\n**Build**: React+TS+Vite SPA in `studio/` with `desktopBridge` (Tauri→Electron→fetch), sidecar API ported 1:1 into `local_server/studio/` (health probes, MCP hydration + seed fallback, chat tool-loop, add_step/outcome), Tauri 2 shell scaffold (thin Rust sidecar spawn), Streamlit `app.py` deleted, `run.py` launcher switched to mcp_server + local_server serving the SPA, CI gains a Node job + sidecar smoke checks.\n\n**Two flags**:\n1. No Rust toolchain/webkit libs on this machine — Tauri shell is scaffolded + statically validated, not compiled locally (prereqs documented; Rust CI deferred).\n2. End of branch: rebase verification via `merge-tree` vs main, no-op rebase onto topic, plus a conflict-hotspot audit (we touch the same files the topic commit does: client/, README, CI, uv.lock) with the `rebase --onto` recovery path documented.\n\nReview the plan file when ready — approve and I'll start with the worktree setup.",
+          "time": {
+            "start": 1792089427652,
+            "end": 1792089437154
+          },
+          "id": "prt_140da8ec4001E2sNF6e3syDCc0",
+          "sessionID": "ses_ebf6bd831ffe9tDPErTclMDXE2",
+          "messageID": "msg_140da66030023eNUXeDxdcdkmi"
+        },
+        {
+          "reason": "stop",
+          "snapshot": "1e0cbbe96f26c533da92cbc9b1f4868457c063c1",
+          "type": "step-finish",
+          "tokens": {
+            "total": 68897,
+            "input": 5213,
+            "output": 340,
+            "reasoning": 48,
+            "cache": {
+              "write": 0,
+              "read": 63296
+            }
+          },
+          "cost": 0,
+          "id": "prt_140dab469001YRXaJU2OBZROUM",
+          "sessionID": "ses_ebf6bd831ffe9tDPErTclMDXE2",
+          "messageID": "msg_140da66030023eNUXeDxdcdkmi"
         }
       ]
     }
