@@ -17,6 +17,7 @@ from core import (
 )
 from core.repository import InMemoryRepository
 from fastmcp import FastMCP
+from pydantic import ValidationError
 
 mcp = FastMCP("Agentic ODI")
 
@@ -119,7 +120,7 @@ def add_customer_outcome(
             business_value=business_value,
             step_id=step_id,
         )
-    except Exception as e:  # noqa: BLE001
+    except ValidationError as e:
         return f"Error: {e}"
     return f"Customer outcome created successfully: {co.model_dump_json()}"
 
@@ -193,8 +194,10 @@ def update_customer_outcome(
         updates["step_id"] = step_id
     try:
         co2 = service.update_customer_outcome(outcome_id, updates)
-    except Exception:  # noqa: BLE001
+    except CustomerOutcomeNotFoundError:
         return _cust_not_found(outcome_id)
+    except ValidationError as e:
+        return f"Error: {e}"
     return f"Customer outcome updated successfully: {co2.model_dump_json()}"
 
 
@@ -209,12 +212,9 @@ def delete_customer_outcome(outcome_id: str) -> str:
 
 @mcp.tool
 def compute_opportunity(importance: float, satisfaction: float) -> str:
-    try:
-        if not (1.0 <= importance <= 10.0) or not (1.0 <= satisfaction <= 10.0):
-            return "Error: importance and satisfaction must be between 1.0 and 10.0"
-        score = compute_opportunity_score(importance, satisfaction)
-    except Exception as e:  # noqa: BLE001
-        return f"Error: {e}"
+    if not (1.0 <= importance <= 10.0) or not (1.0 <= satisfaction <= 10.0):
+        return "Error: importance and satisfaction must be between 1.0 and 10.0"
+    score = compute_opportunity_score(importance, satisfaction)
     return f"Opportunity score: {score:.2f}"
 
 

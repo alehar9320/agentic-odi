@@ -11,8 +11,9 @@ from fastapi import FastAPI
 def create_app(repo: Repository | None = None) -> FastAPI:
     if repo is None:
         repo = SQLiteRepository()
-    ODIService(repo)
+    service = ODIService(repo)
     app = FastAPI(title="Agentic ODI Local Server")
+    app.state.service = service
 
     @app.get("/health")
     def health() -> dict:

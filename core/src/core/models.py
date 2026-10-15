@@ -65,7 +65,7 @@ class ValueMetric(BaseModel):
     importance: float = Field(ge=1.0, le=10.0)
     satisfaction: float = Field(ge=1.0, le=10.0)
 
-    @computed_field  # type: ignore[prop-decorator]
+    @computed_field
     @property
     def opportunity_score(self) -> float:
         return compute_opportunity_score(self.importance, self.satisfaction)
@@ -81,7 +81,7 @@ class CustomerValue(BaseModel):
     satisfaction: float = Field(ge=1.0, le=10.0)
     value_metrics: list[ValueMetric] = Field(default_factory=list)
 
-    @computed_field  # type: ignore[prop-decorator]
+    @computed_field
     @property
     def opportunity_score(self) -> float:
         return compute_opportunity_score(self.importance, self.satisfaction)
@@ -104,7 +104,7 @@ class CustomerOutcome(BaseModel):
     customer_value: CustomerValue
     business_value: BusinessValue
 
-    @computed_field  # type: ignore[prop-decorator]
+    @computed_field
     @property
     def opportunity_score(self) -> float:
         return self.customer_value.opportunity_score

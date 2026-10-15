@@ -48,11 +48,11 @@ jobs:
       - name: Run Mypy (local_server)
         run: uv run --directory local_server mypy .
 
-      - name: Run Mypy (client)
-        run: uv run --directory client mypy .
-
       - name: Run Mypy (cli)
         run: uv run --directory cli mypy .
+
+      - name: Run Mypy (client)
+        run: uv run --directory client mypy .
 
       - name: Run Mypy (connectors)
         run: uv run --directory connectors mypy .
@@ -95,15 +95,15 @@ jobs:
         env:
           COVERAGE_FILE: ${{ github.workspace }}/.coverage.local_server
 
-      - name: Pytest (client)
-        run: uv run --directory client pytest --cov=client --cov-report=term-missing
-        env:
-          COVERAGE_FILE: ${{ github.workspace }}/.coverage.client
-
       - name: Pytest (cli)
         run: uv run --directory cli pytest --cov=cli --cov-report=term-missing
         env:
           COVERAGE_FILE: ${{ github.workspace }}/.coverage.cli
+
+      - name: Pytest (client)
+        run: uv run --directory client pytest --cov=client --cov-report=term-missing
+        env:
+          COVERAGE_FILE: ${{ github.workspace }}/.coverage.client
 
       - name: Pytest (connectors)
         run: uv run --directory connectors pytest --cov=connectors --cov-report=term-missing
@@ -117,14 +117,14 @@ jobs:
             "${{ github.workspace }}/.coverage.core" \
             "${{ github.workspace }}/.coverage.mcp_server" \
             "${{ github.workspace }}/.coverage.local_server" \
-            "${{ github.workspace }}/.coverage.client" \
             "${{ github.workspace }}/.coverage.cli" \
+            "${{ github.workspace }}/.coverage.client" \
             "${{ github.workspace }}/.coverage.connectors"
           uv run coverage xml -o "${{ github.workspace }}/coverage.xml"
           uv run coverage report
 
       - name: Upload coverage report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-${{ matrix.python-version }}
           path: coverage.xml
@@ -146,7 +146,7 @@ jobs:
 
       - name: MCP server boots and serves /mcp
         run: |
-          uv run python -m mcp_server > /tmp/server.log 2>&1 &
+          uv run python -m mcp_server > /tmp/mcp_server.log 2>&1 &
           SERVER_PID=$!
           probe() {
             curl -sfX POST http://localhost:8000/mcp \
@@ -163,10 +163,10 @@ jobs:
           wait "$SERVER_PID" 2>/dev/null || true
           if [ "$ok" -ne 1 ]; then
             echo "MCP server did not respond on :8000/mcp"
-            cat /tmp/server.log
+            cat /tmp/mcp_server.log
             exit 1
           fi
-          echo "OK: MCP server responded with success"
+          echo "OK: MCP server responded with 200"
 
       - name: python -m client.run brings up both services and stops cleanly
         run: |
@@ -193,3 +193,21 @@ jobs:
           kill -INT "$RUN_PID"
           wait "$RUN_PID"
           echo "OK: both services stopped cleanly"
+
+  ci-green:
+    name: CI green
+    runs-on: ubuntu-latest
+    needs: [lint, typecheck, security, test, smoke]
+    if: always()
+    steps:
+      - name: Verify all required jobs succeeded
+        run: |
+          results='${{ join(needs.*.result, ' ') }}'
+          echo "Job results: $results"
+          for result in $results; do
+            if [ "$result" != "success" ]; then
+              echo "::error::A required job did not succeed ($results)"
+              exit 1
+            fi
+          done
+          echo "OK: all required jobs succeeded"

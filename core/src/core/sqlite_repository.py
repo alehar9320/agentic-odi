@@ -5,6 +5,8 @@ from __future__ import annotations
 import os
 from typing import Any
 
+from pydantic import ValidationError
+
 from core.intent_store import IntentStore
 from core.models import CustomerOutcome, Job, Outcome, Step
 from core.repository import Repository
@@ -44,7 +46,7 @@ class SQLiteRepository(Repository):
                     current.update(p.get("updates", {}))
                     try:
                         self.customer_outcomes[cid] = co.model_validate(current)
-                    except Exception:  # noqa: BLE001  # nosec B110
+                    except ValidationError:
                         pass
             elif et == "CUSTOMER_OUTCOME_DELETED":
                 cid = p["id"]
@@ -104,7 +106,7 @@ class SQLiteRepository(Repository):
         current.update(updates)
         try:
             new_co = co.model_validate(current)
-        except Exception:  # noqa: BLE001
+        except ValidationError:
             return None
         self.store.append("CUSTOMER_OUTCOME_UPDATED", {"id": outcome_id, "updates": updates})
         self.customer_outcomes[outcome_id] = new_co

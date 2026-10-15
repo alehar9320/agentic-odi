@@ -20,9 +20,9 @@ This repository serves as an initial sandbox for understanding server-client MCP
 
 This repository is a [uv workspace](https://docs.astral.sh/uv/concepts/projects/workspaces/) made up of six installable packages, each with its own `pyproject.toml`, `src/` layout, and tests:
 
-- **`core/`** (`agentic-odi-core`): Core domain models, repository abstractions, and the event-sourced IntentStore for Jobs, Steps, Outcomes, and Customer Outcomes with ODI opportunity-score computation.
-- **`mcp_server/`** (`agentic-odi-mcp-server`): FastMCP-based MCP server exposing ODI tools and resources over HTTP. Hosts tools for Jobs, Steps, Desired Outcomes, and Customer Outcomes.
-- **`local_server/`** (`agentic-odi-local-server`): Local, in-process adapter used by CLI to act as an MCP client while using the same repository layer.
+- **`core/`** (`agentic-odi-core`): Domain models, the `ODIService` business-logic layer, and repository implementations (in-memory and SQLite), including ODI opportunity-score computation.
+- **`mcp_server/`** (`agentic-odi-mcp-server`): A foundational MCP Server exposing an HTTP transport layer. It hosts tools for Jobs, Steps, Desired Outcomes, and Customer Outcomes (linking customer value to business value).
+- **`local_server/`** (`agentic-odi-local-server`): A local FastAPI server that talks to the repository directly (no MCP transport).
 - **`cli/`** (`agentic-odi-cli`): A [`Typer`](https://github.com/fastapi/typer)-based command-line interface. It provides a non-MCP entry point for interacting with Agentic ODI and also wraps the MCP server for certain operations.
 - **`client/`** (`agentic-odi-client`): A Python-based agent client that communicates with the MCP server, executing tool calls over the active connection. It also hosts `run.py`, the local dev launcher that starts the server and the Streamlit UI together.
 - **`connectors/`** (`agentic-odi-connectors`): Pluggable external integrations (ingest connectors). The first connector is an HTTP MCP **client** that can ingest resources from external MCP servers into the ODI store.
@@ -248,6 +248,24 @@ After this, `ruff` and `ruff-format` will run on staged files whenever you commi
 pre-commit run --all-files
 ```
 
+### 🧠 Superpowers with Pi
+
+This project includes [Superpowers](https://github.com/obra/superpowers) as a [Pi package](https://pi.dev/docs/packages). When using [Pi](https://pi.dev) with this project, Superpowers skills and extensions are automatically loaded.
+
+To enable:
+
+1. Install Pi: `curl -fsSL https://pi.dev/install.sh | sh`
+2. Trust the project (first time only): `pi config --local --approve`
+3. Start Pi: `pi`
+
+The `.pi/settings.json` declares the Superpowers package. Pi will clone it and load:
+
+- **Extension**: `superpowers.ts` — injects the `using-superpowers` bootstrap at session startup and after compaction
+- **Skills**: 12 Superpowers skills (TDD, subagent-driven-development, systematic-debugging, etc.)
+
+> [!NOTE]
+> Superpowers is also available for OpenCode via the plugin in `opencode.json`. The Pi package provides native Pi integration without needing the OpenCode compatibility layer.
+
 ### 🧼 Developer workflow for formatting
 
 - **When editing Python files**, either:
@@ -265,10 +283,13 @@ pre-commit run --all-files
 
 | File | What it covers |
 |---|---|
+| `core/tests/test_models.py` | Domain models and ODI opportunity-score computation |
+| `core/tests/test_service.py` | `ODIService` jobs/steps/outcomes and Customer Outcome CRUD |
 | `mcp_server/tests/test_odi.py` | Full ODI workflow (add job → steps → outcomes → retrieval) + capabilities tool |
 | `mcp_server/tests/test_customer_outcomes.py` | Customer Outcomes CRUD, filtering, computed opportunity scores, and tool validation |
 | `mcp_server/tests/test_server_tools.py` | Error handling and retrieval for the MCP tools |
 | `mcp_server/tests/test_tools.py` | Tool response-shape contract for `add_job` |
+| `local_server/tests/test_api.py` | Local FastAPI health endpoint |
 | `client/tests/test_run.py` | Dev launcher helpers (port checks) |
 | `cli/tests/test_cli.py` | CLI `--version` and `--help` behavior |
 | `cli/tests/test_outcomes_cli.py` | Customer Outcomes CLI subcommands with MCP stub |

@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 from abc import ABC, abstractmethod
 
-from core import ODIService
+from core import CustomerOutcomeNotFoundError, ODIService, ValueOutOfRangeError
 from core.repository import Repository
 from core.sqlite_repository import SQLiteRepository
 
@@ -35,7 +35,7 @@ class LocalBackend(Backend):
             try:
                 co = self.service.get_customer_outcome(args["outcome_id"])
                 return co.model_dump_json()
-            except Exception as e:  # noqa: BLE001
+            except CustomerOutcomeNotFoundError as e:
                 return str(e)
         if tool_name == "list_customer_outcomes":
             cos = self.service.list_customer_outcomes(args.get("job_id"))
@@ -46,13 +46,13 @@ class LocalBackend(Backend):
             try:
                 co = self.service.update_customer_outcome(args["outcome_id"], args)
                 return f"Customer outcome updated successfully: {co.model_dump_json()}"
-            except Exception as e:  # noqa: BLE001
+            except (CustomerOutcomeNotFoundError, ValueOutOfRangeError) as e:
                 return str(e)
         if tool_name == "delete_customer_outcome":
             try:
                 self.service.delete_customer_outcome(args["outcome_id"])
                 return f"Customer outcome deleted successfully: {args['outcome_id']}"
-            except Exception as e:  # noqa: BLE001
+            except CustomerOutcomeNotFoundError as e:
                 return str(e)
         if tool_name == "compute_opportunity":
             score = self.service.compute_opportunity(args["importance"], args["satisfaction"])

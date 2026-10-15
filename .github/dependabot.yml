@@ -24,6 +24,21 @@ updates:
       interval: weekly
 
   - package-ecosystem: pip
+    directory: /connectors
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: pip
+    directory: /core
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: pip
     directory: /mcp_server
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: pip
+    directory: /local_server
     schedule:
       interval: weekly
