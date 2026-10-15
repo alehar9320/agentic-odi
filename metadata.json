@@ -3,7 +3,7 @@
   "checkpoint_id": "01M50MHBVJ4HB54VWMF5F5BEJA",
   "strategy": "manual-commit",
   "branch": "topic/living-studio-tauri",
-  "checkpoints_count": 2,
+  "checkpoints_count": 3,
   "files_touched": [
     "README.md"
   ],
@@ -21,13 +21,20 @@
       "compact_transcript": "/1/transcript.jsonl",
       "content_hash": "/1/content_hash.txt",
       "prompt": ""
+    },
+    {
+      "metadata": "/2/metadata.json",
+      "transcript": "/2/full.jsonl",
+      "compact_transcript": "/2/transcript.jsonl",
+      "content_hash": "/2/content_hash.txt",
+      "prompt": "/2/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 49942,
+    "input_tokens": 1052800,
     "cache_creation_tokens": 0,
-    "cache_read_tokens": 189504,
-    "output_tokens": 1820,
-    "api_call_count": 9
+    "cache_read_tokens": 20871911,
+    "output_tokens": 157969,
+    "api_call_count": 271
   }
 }
