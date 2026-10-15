@@ -1,0 +1,101 @@
+{
+  "info": {
+    "id": "ses_ebf0827afffeAmyOD4NnZs3RUt",
+    "slug": "jolly-comet",
+    "projectID": "e4fe19106d06261ebfed21a0e3ba06559abf1100",
+    "directory": "/home/alexa/repos/agentic-odi",
+    "path": "",
+    "title": "New session - 2026-10-15T19:09:07.025Z",
+    "agent": "plan",
+    "model": {
+      "id": "big-pickle",
+      "providerID": "opencode"
+    },
+    "version": "1.18.35",
+    "summary": {
+      "additions": 0,
+      "deletions": 0,
+      "files": 0
+    },
+    "cost": 0,
+    "tokens": {
+      "input": 0,
+      "output": 0,
+      "reasoning": 0,
+      "cache": {
+        "read": 0,
+        "write": 0
+      }
+    },
+    "time": {
+      "created": 1792091347025,
+      "updated": 1792091349076
+    }
+  },
+  "messages": [
+    {
+      "info": {
+        "role": "user",
+        "time": {
+          "created": 1792091347197
+        },
+        "agent": "plan",
+        "model": {
+          "providerID": "opencode",
+          "modelID": "big-pickle"
+        },
+        "summary": {
+          "diffs": []
+        },
+        "id": "msg_140f7d8fd0010gxChz8NjNiyiv",
+        "sessionID": "ses_ebf0827afffeAmyOD4NnZs3RUt"
+      },
+      "parts": [
+        {
+          "type": "text",
+          "text": "cd ..",
+          "id": "prt_140f7d907001CuNbEuZ6kTS5tD",
+          "sessionID": "ses_ebf0827afffeAmyOD4NnZs3RUt",
+          "messageID": "msg_140f7d8fd0010gxChz8NjNiyiv"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_140f7d8fd0010gxChz8NjNiyiv",
+        "role": "assistant",
+        "mode": "plan",
+        "agent": "plan",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "input": 0,
+          "output": 0,
+          "reasoning": 0,
+          "cache": {
+            "read": 0,
+            "write": 0
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792091348626,
+          "completed": 1792091351468
+        },
+        "error": {
+          "name": "MessageAbortedError",
+          "data": {
+            "message": "Aborted"
+          }
+        },
+        "id": "msg_140f7de92001AzlKcjaySwtJ7N",
+        "sessionID": "ses_ebf0827afffeAmyOD4NnZs3RUt"
+      },
+      "parts": []
+    }
+  ]
+}
