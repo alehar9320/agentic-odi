@@ -2,6 +2,7 @@
 
 import typer
 
+from cli import version
 from cli.connectors import connectors_app
 from cli.outcomes import outcomes_app
 from cli.version import __version__
@@ -17,7 +18,7 @@ app.add_typer(outcomes_app, name="outcomes", help="Manage Customer Outcomes")
 
 def _version_callback(value: bool) -> None:
     if value:
-        typer.echo(__version__)
+        typer.echo(version.build_summary())
         raise typer.Exit()
 
 
