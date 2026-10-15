@@ -5,7 +5,7 @@ import typer
 from cli import version
 from cli.connectors import connectors_app
 from cli.outcomes import outcomes_app
-from cli.version import __version__
+from cli.version import __version__  # noqa: F401  (re-exported for tests)
 
 app = typer.Typer(
     name="agentic-odi-cli",
@@ -16,9 +16,12 @@ app.add_typer(connectors_app, name="connectors")
 app.add_typer(outcomes_app, name="outcomes", help="Manage Customer Outcomes")
 
 
-def _version_callback(value: bool) -> None:
+def _version_callback(ctx: typer.Context, value: bool) -> None:
     if value:
-        typer.echo(version.build_summary())
+        if ctx.params.get("verbose"):
+            typer.echo(version.verbose_summary())
+        else:
+            typer.echo(version.build_summary())
         raise typer.Exit()
 
 
@@ -27,14 +30,20 @@ def main(
     version: bool = typer.Option(
         False, "--version", callback=_version_callback, help="Show version"
     ),
+    verbose: bool = typer.Option(
+        False,
+        "--verbose",
+        is_eager=True,
+        help="Show verbose version information (with --version)",
+    ),
 ) -> None:  # noqa: B008
     pass
 
 
-@app.command()
+@app.command(name="version")
 def version_cmd() -> None:
     """Show CLI version."""
-    typer.echo(__version__)
+    typer.echo(version.build_summary())
 
 
 if __name__ == "__main__":
