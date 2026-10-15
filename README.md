@@ -1,37 +1,86 @@
-# Agentic ODI 🚀
+<div align="center">
+
+# Agentic ODI
 
 [![CI](https://github.com/alehar9320/agentic-odi/actions/workflows/ci.yml/badge.svg)](https://github.com/alehar9320/agentic-odi/actions/workflows/ci.yml)
+[![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
+[![uv](https://img.shields.io/badge/uv-managed-green)](https://docs.astral.sh/uv/)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+[![FastMCP](https://img.shields.io/badge/FastMCP-powered-orange)](https://github.com/jlowin/fastmcp)
+[![pytest](https://img.shields.io/badge/tests-pytest-blue)](https://pytest.org)
+[![MCP](https://img.shields.io/badge/Model%20Context%20Protocol-enabled-8A2BE2)](https://modelcontextprotocol.io)
 
 > **Experimental test to learn and evaluate the feasibility of utilizing Model Context Protocol (MCP) for Outcome-Driven Innovation (ODI) specifications.**
+
+</div>
+
+---
+
+## 📋 Table of Contents
+
+- [The Vision: Context-Aware Innovation](#-the-vision-context-aware-innovation)
+- [Current State (Experimental Testbed)](#-current-state-experimental-testbed)
+- [Code Overview](#-code-overview)
+- [Getting Started](#-getting-started)
+  - [Command-Line Interface (CLI)](#-command-line-interface-cli)
+  - [Manage Customer Outcomes](#-manage-customer-outcomes)
+  - [External Connectors (MCP Ingest)](#-external-connectors-mcp-ingest)
+  - [One-Command Launch](#-one-command-launch-recommended)
+  - [Manual Split-Terminal](#-manual-split-terminal-alternative)
+  - [Local Tools-Capable LLM Backend](#-local-tools-capable-llm-backend-for-mcp-testing)
+  - [Agent-Driven Testing](#-agent-driven-testing)
+- [Linting, Formatting & Type Checks](#-linting-formatting--type-checks-ci-parity)
+- [Testing](#-testing)
+  - [Test Coverage Map](#-test-coverage-map)
+  - [Agent Session Tracking](#-agent-session-tracking)
+- [Superpowers with Pi](#-superpowers-with-pi)
+  - [Developer Workflow for Formatting](#-developer-workflow-for-formatting)
+- [Deployment](#-deployment)
+- [Roadmap & Next Steps](#-roadmap--next-steps)
+- [Contributing](#-contributing)
+- [License](#-license)
+
+---
 
 ## 🌟 The Vision: Context-Aware Innovation
 
 **Outcome-Driven Innovation (ODI)**, built on the "Jobs-to-be-Done" theory, relies on deeply understanding customer needs, desired outcomes, and execution contexts. Historically, applying ODI requires meticulous research, structured data modeling, and rigorous analysis.
 
-**Model Context Protocol (MCP)** represents a paradigm shift in how AI systems consume and reason over external context. By adopting MCP, we can bridge the gap between static user research and dynamic, agentic AI. 
+**Model Context Protocol (MCP)** represents a paradigm shift in how AI systems consume and reason over external context. By adopting MCP, we can bridge the gap between static user research and dynamic, agentic AI.
 
 The vision for **Agentic ODI** is to build a unified, open protocol where LLMs and autonomous agents can natively query, understand, and reason over ODI data (Job Maps, Desired Outcomes, and Opportunity Scores) dynamically in real-time. Instead of feeding LLMs disconnected prompts, an MCP-powered ODI server will act as the "brain" of customer needs, allowing agents to invent, evaluate, and ideate solutions strictly anchored in verified user outcomes.
+
+---
 
 ## 🏗️ Current State (Experimental Testbed)
 
 This repository serves as an initial sandbox for understanding server-client MCP communication streams. We are utilizing [`FastMCP`](https://github.com/jlowin/fastmcp) to prototype HTTP-based context delivery.
 
-### Code Overview
+---
 
-This repository is a [uv workspace](https://docs.astral.sh/uv/concepts/projects/workspaces/) made up of six installable projects, each with its own `pyproject.toml`, `src/` layout, and tests:
+## 🧩 Code Overview
 
-- **`core/`** (`agentic-odi-core`): Domain models, the `ODIService` business-logic layer, and repository implementations (in-memory and SQLite), including ODI opportunity-score computation.
-- **`mcp_server/`** (`agentic-odi-mcp-server`): A foundational MCP Server exposing an HTTP transport layer. It hosts tools for Jobs, Steps, Desired Outcomes, and Customer Outcomes (linking customer value to business value).
-- **`local_server/`** (`agentic-odi-local-server`): A local FastAPI server that talks to the repository directly (no MCP transport).
-- **`client/`** (`agentic-odi-client`): **The Living Studio** — a spatial, conversational GUI for Outcome-Driven Innovation. Provides an interactive Opportunity Landscape, Universal Job Map, WYSIWYG Impact Simulation, and Causal Lineage inspection, paired with an autonomous conversational agent connected to the MCP server. It also hosts `run.py`, the local dev launcher that starts the server and the Studio UI together.
-- **`cli/`** (`agentic-odi-cli`): A [`Typer`](https://github.com/fastapi/typer)-based command-line interface. It provides version/help plus `outcomes` and `connectors` commands.
-- **`connectors/`** (`agentic-odi-connectors`): Pluggable external integrations. The first kind is an **MCP client connector** that connects to a remote MCP server over HTTP, checks health, and ingests tools/resources into a local ingest sink. Additional kinds (REST, webhooks, and so on) can register against the same protocol later.
+This repository is a [uv workspace](https://docs.astral.sh/uv/concepts/projects/workspaces/) made up of **six** installable projects, each with its own `pyproject.toml`, `src/` layout, and tests:
+
+| Package | Description |
+|---|---|
+| **`core/`** (`agentic-odi-core`) | Domain models, the `ODIService` business-logic layer, and repository implementations (in-memory and SQLite), including ODI opportunity-score computation. |
+| **`mcp_server/`** (`agentic-odi-mcp-server`) | A foundational MCP Server exposing an HTTP transport layer. It hosts tools for Jobs, Steps, Desired Outcomes, and Customer Outcomes (linking customer value to business value). |
+| **`local_server/`** (`agentic-odi-local-server`) | A local FastAPI server that talks to the repository directly (no MCP transport). |
+| **`client/`** (`agentic-odi-client`) | **The Living Studio** — a spatial, conversational GUI for Outcome-Driven Innovation. Provides an interactive Opportunity Landscape, Universal Job Map, WYSIWYG Impact Simulation, and Causal Lineage inspection, paired with an autonomous conversational agent connected to the MCP server. It also hosts `run.py`, the local dev launcher that starts the server and the Studio UI together. |
+| **`cli/`** (`agentic-odi-cli`) | A [`Typer`](https://github.com/fastapi/typer)-based command-line interface. It provides version/help plus `outcomes` and `connectors` commands. |
+| **`connectors/`** (`agentic-odi-connectors`) | Pluggable external integrations. The first kind is an **MCP client connector** that connects to a remote MCP server over HTTP, checks health, and ingests tools/resources into a local ingest sink. Additional kinds (REST, webhooks, and so on) can register against the same protocol later. |
+
+---
 
 ## 🚀 Getting Started
 
 ### Prerequisites
 
-Python 3.10+ and [`uv`](https://docs.astral.sh/uv/). Install the whole workspace (all six projects plus dev tooling):
+- **Python** 3.10+
+- [**uv**](https://docs.astral.sh/uv/) package manager
+
+Install the entire workspace (all six projects plus dev tooling):
 
 ```bash
 uv sync --all-packages
@@ -39,11 +88,9 @@ uv sync --all-packages
 
 This creates a `.venv` and installs `agentic-odi-core`, `agentic-odi-mcp-server`, `agentic-odi-local-server`, `agentic-odi-client`, `agentic-odi-cli`, and `agentic-odi-connectors` in editable mode.
 
-### Running the Environment
+### 💻 Command-Line Interface (CLI)
 
-#### 🧰 Command-line interface (CLI)
-
-Agentic ODI ships a [`Typer`](https://github.com/fastapi/typer)-based CLI so you can interact with the project directly from your terminal — no chat UI required. It provides version and help information plus commands for connecting to external systems. Over time it will also expose commands for working with the ODI dataset (Jobs, Steps, and Outcomes).
+The [`Typer`](https://github.com/fastapi/typer)-based CLI lets you interact with Agentic ODI directly from your terminal — no chat UI required. It provides version and help information plus commands for connecting to external systems. Over time it will also expose commands for working with the ODI dataset (Jobs, Steps, and Outcomes).
 
 Launch it with:
 
@@ -55,7 +102,7 @@ python -m cli             # show help when no command is given
 
 A console script is also installed, so `agentic-odi --version` works the same way.
 
-#### Manage Customer Outcomes
+### 🎯 Manage Customer Outcomes
 
 Manage Customer Outcomes (linking customer value to business value) via the CLI. The CLI acts as an MCP client, so the server must be running (`python -m mcp_server`):
 
@@ -78,7 +125,7 @@ agentic-odi outcomes score 8 2
 
 Set `AGENTIC_ODI_MCP_URL` to point to a non-default server if needed.
 
-#### External connectors (MCP ingest)
+### 🔌 External Connectors (MCP Ingest)
 
 Connectors are named integrations stored in `.agentic-odi/connectors.json` (or a path you pass with `--config` / `AGENTIC_ODI_CONNECTORS_FILE`). The first kind is `mcp`: Agentic ODI acts as an MCP **client** and pulls catalog, resources, and optional tool results from an external MCP **server**.
 
@@ -91,10 +138,9 @@ python -m cli connectors ingest --name gong
 
 Ingested records are normalized (`catalog`, `resource`, `tool_result`) and appended to the in-process ingest sink. They are not written into the ODI jobs/outcomes store.
 
+### ⚡ One-Command Launch (recommended)
 
-#### ⚡ One-command launch (recommended)
-
-`python -m client.run` starts both the MCP server and the Streamlit UI concurrently. Press **Ctrl+C** to stop both.
+`python -m client.run` starts both the MCP server and the Studio UI concurrently. Press **Ctrl+C** to stop both.
 
 ```bash
 python -m client.run
@@ -105,7 +151,7 @@ python -m client.run
 | MCP Server | http://localhost:8000/mcp |
 | The Living Studio UI | http://localhost:8501 |
 
-#### 🔧 Manual split-terminal (alternative)
+### 🔧 Manual Split-Terminal (alternative)
 
 Open two terminals and run each process separately:
 
@@ -117,7 +163,7 @@ python -m mcp_server
 streamlit run client/src/client/app.py
 ```
 
-### Local tools-capable LLM backend (for MCP testing)
+### 🧠 Local Tools-Capable LLM Backend (for MCP testing)
 
 To exercise real tool-calling end-to-end against the MCP server, you need a local LLM backend that:
 
@@ -152,20 +198,22 @@ A simple fully local option is [`llama-cpp-python`](https://github.com/abetlen/l
 
    This exposes an OpenAI-style API at `http://127.0.0.1:8001/v1`.
 
-4. **Point the Streamlit client at the local server**
+4. **Configure the Streamlit client**
 
-   `client/src/client/app.py` reads defaults from environment variables (with sensible fallbacks):
+   `client/src/client/app.py` reads the following environment variables (with sensible defaults):
 
-   - `AGENTIC_ODI_BASE_URL` (default: `http://localhost:8001/v1`)
-   - `AGENTIC_ODI_API_KEY` (default: `local`)
-   - `AGENTIC_ODI_MODEL` (default: `local-tools-model`)
-   - `AGENTIC_ODI_MCP_URL` (default: `http://localhost:8000/mcp`)
+   | Variable | Default |
+   |---|---|
+   | `AGENTIC_ODI_BASE_URL` | `http://localhost:8001/v1` |
+   | `AGENTIC_ODI_MODEL` | `local-tools-model` |
+   | `AGENTIC_ODI_MCP_URL` | `http://localhost:8000/mcp` |
+   | `AGENTIC_ODI_API_KEY` | `local` |
 
-   You can either set these in your shell or adjust them in the Streamlit sidebar under **“LLM Configuration”**.
+   You can either set these in your shell or adjust them in the Streamlit sidebar under **"LLM Configuration"**.
 
 5. **Verify tool-calling against the MCP server**
 
-   - (Optional) Before starting the UI, you can quickly verify that the LLM backend is reachable:
+   - (Optional) Before starting the UI, confirm the LLM backend is reachable:
 
      ```bash
      curl http://127.0.0.1:8001/v1/models
@@ -174,32 +222,17 @@ A simple fully local option is [`llama-cpp-python`](https://github.com/abetlen/l
      If this request fails, fix your local LLM server configuration before debugging the MCP client/server.
 
    - Start the MCP server and Streamlit UI (either via `python -m client.run` or the split-terminal commands above).
-   - In the browser UI, ask the assistant something that should use ODI tools, for example: “Help me define a new Job-to-be-Done and add it to your ODI repository.”
+   - In the browser UI, ask the assistant something that should use ODI tools, for example: *"Help me define a new Job-to-be-Done and add it to your ODI repository."*
    - You should see the assistant briefly display that it is calling tools (for example, `add_job`, `get_jobs`, etc.) and then respond with grounded ODI guidance, confirming that the local LLM, MCP server, and client wiring all work together.
    - If the LLM backend is unreachable or misconfigured, the UI will show a clear error banner indicating that the backend at your configured **Base URL** could not be reached, along with details from the underlying error. Use that message together with the steps above to fix your local LLM setup.
 
-#### 🤖 Agent-driven testing
+### 🤖 Agent-Driven Testing
 
 Type `/dev` in the AI assistant to trigger the full automated workflow: it will start both processes, open the browser, send a test message, and report the results.
 
-## 🧪 Testing
+---
 
-Tests use **pytest** with **pytest-asyncio** (strict mode) and run entirely in-memory — no running server required. Each project owns its tests. CI runs the suite on Python **3.10, 3.11, and 3.12** and stores a coverage report as a build artifact:
-
-```bash
-uv run --directory core pytest
-uv run --directory mcp_server pytest
-uv run --directory local_server pytest
-uv run --directory client pytest
-uv run --directory cli pytest
-uv run --directory connectors pytest
-```
-
-### 🧠 Agent session tracking
-
-Agent sessions are captured with the [Entire](https://docs.entire.io/overview) CLI. The repository integration lives in `.entire/settings.json`, `.cursor/hooks.json`, and `.opencode/plugins/entire.ts`. Run `entire status` to confirm it is enabled and `entire checkpoint list` to inspect captured checkpoints.
-
-### 🧹 Linting, formatting & type checks (CI parity)
+## 🧹 Linting, Formatting & Type Checks (CI parity)
 
 The CI pipeline runs several quality checks. You can mirror them locally with:
 
@@ -228,7 +261,7 @@ uv run --directory cli pytest
 uv run --directory connectors pytest
 ```
 
-To run these automatically before each commit, you can enable the bundled pre-commit hooks:
+To run these automatically before each commit, enable the bundled pre-commit hooks:
 
 ```bash
 uv tool install pre-commit
@@ -241,38 +274,22 @@ After this, `ruff` and `ruff-format` will run on staged files whenever you commi
 pre-commit run --all-files
 ```
 
-### 🧠 Superpowers with Pi
+---
 
-This project includes [Superpowers](https://github.com/obra/superpowers) as a [Pi package](https://pi.dev/docs/packages). When using [Pi](https://pi.dev) with this project, Superpowers skills and extensions are automatically loaded.
+## ✅ Testing
 
-To enable:
+Tests use **pytest** with **pytest-asyncio** (strict mode) and run entirely in-memory — no running server required. Each project owns its tests. CI runs the suite on Python **3.10, 3.11, and 3.12** and stores a coverage report as a build artifact:
 
-1. Install Pi: `curl -fsSL https://pi.dev/install.sh | sh`
-2. Trust the project (first time only): `pi config --local --approve`
-3. Start Pi: `pi`
+```bash
+uv run --directory core pytest
+uv run --directory mcp_server pytest
+uv run --directory local_server pytest
+uv run --directory client pytest
+uv run --directory cli pytest
+uv run --directory connectors pytest
+```
 
-The `.pi/settings.json` declares the Superpowers package. Pi will clone it and load:
-
-- **Extension**: `superpowers.ts` — injects the `using-superpowers` bootstrap at session startup and after compaction
-- **Skills**: 12 Superpowers skills (TDD, subagent-driven-development, systematic-debugging, etc.)
-
-> [!NOTE]
-> Superpowers is also available for OpenCode via the plugin in `opencode.json`. The Pi package provides native Pi integration without needing the OpenCode compatibility layer.
-
-### 🧼 Developer workflow for formatting
-
-- **When editing Python files**, either:
-  - Rely on the **pre-commit hooks** above (recommended), or
-  - Run Ruff formatting directly before pushing:
-
-    ```bash
-    uv run ruff format .
-    ```
-
-- **CI behavior**:
-  - CI runs `uv run ruff check .` to lint without modifying files.
-  - CI runs `uv run ruff format --check .` to *verify* formatting only.
-  - If CI fails on formatting, run `uv run ruff format .` locally, commit the changes, and push again.
+### 📊 Test Coverage Map
 
 | File | What it covers |
 |---|---|
@@ -291,6 +308,7 @@ The `.pi/settings.json` declares the Superpowers package. Pi will clone it and l
 | `connectors/tests/test_mcp_connector.py` | In-memory FastMCP health and ingest records |
 
 **Conventions:**
+
 - Test files live under each project's `tests/` directory and are named `test_*.py`.
 - Every async test is decorated with `@pytest.mark.asyncio`.
 - Use `Client(mcp)` directly (no HTTP server needed) for fast, isolated tests.
@@ -298,6 +316,47 @@ The `.pi/settings.json` declares the Superpowers package. Pi will clone it and l
 
 > [!TIP]
 > Type `/test` in the AI assistant to have the agent run all tests and report the results automatically.
+
+### 🧪 Agent Session Tracking
+
+Agent sessions are captured with the [Entire](https://docs.entire.io/overview) CLI. The repository integration lives in `.entire/settings.json`, `.cursor/hooks.json`, and `.opencode/plugins/entire.ts`. Run `entire status` to confirm it is enabled and `entire checkpoint list` to inspect captured checkpoints.
+
+---
+
+## 🤝 Superpowers with Pi
+
+This project includes [Superpowers](https://github.com/obra/superpowers) as a [Pi package](https://pi.dev/docs/packages). When using [Pi](https://pi.dev) with this project, Superpowers skills and extensions are automatically loaded.
+
+To enable:
+
+1. Install Pi: `curl -fsSL https://pi.dev/install.sh | sh`
+2. Trust the project (first time only): `pi config --local --approve`
+3. Start Pi: `pi`
+
+The `.pi/settings.json` declares the Superpowers package. Pi will clone it and load:
+
+- **Extension**: `superpowers.ts` — injects the `using-superpowers` bootstrap at session startup and after compaction
+- **Skills**: 12 Superpowers skills (TDD, subagent-driven-development, systematic-debugging, etc.)
+
+> [!NOTE]
+> Superpowers is also available for OpenCode via the plugin in `opencode.json`. The Pi package provides native Pi integration without needing the OpenCode compatibility layer.
+
+### 🧼 Developer Workflow for Formatting
+
+- **When editing Python files**, either:
+  - Rely on the **pre-commit hooks** above (recommended), or
+  - Run Ruff formatting directly before pushing:
+
+    ```bash
+    uv run ruff format .
+    ```
+
+- **CI behavior**:
+  - CI runs `uv run ruff check .` to lint without modifying files.
+  - CI runs `uv run ruff format --check .` to *verify* formatting only.
+  - If CI fails on formatting, run `uv run ruff format .` locally, commit the changes, and push again.
+
+---
 
 ## ☁️ Deployment
 
@@ -335,4 +394,20 @@ As we validate the feasibility of this architecture, our next milestones include
 
 ---
 
+## 🤝 Contributing
+
+Contributions are welcome! This project uses [Ruff](https://docs.astral.sh/ruff/) for linting and formatting and [pytest](https://pytest.org/) for tests. Please ensure any change passes the [lint, format, and test checks](#-linting-formatting--type-checks-ci-parity) before opening a pull request.
+
+---
+
+## 📄 License
+
+No license has been specified for this repository yet. Until one is added, all rights reserved by the maintainers. Please reach out before reuse or redistribution.
+
+---
+
+<div align="center">
+
 *Let's build AI that builds what people actually need.*
+
+</div>
