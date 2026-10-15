@@ -1,0 +1,43 @@
+You are implementing Task 1: Build metadata + version display.
+
+## Task Description
+
+Read your task brief first — it is your requirements, with the exact values to use verbatim:
+/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/.superpowers/sdd/2026-10-15-cli-bundled-distribution-and-self-update/task-1-brief.md
+
+## Context
+
+This is the first task of a plan that turns the `agentic-odi` CLI (a Python uv-workspace package at `cli/`) into a self-contained, self-updating binary. This task introduces build-time metadata (`_build_info.py`) and a version display that includes the release date. Later tasks consume `version.build_summary()`, `version.verbose_summary()`, and the `_build_info` values.
+
+## Environment (important)
+
+- Work from: /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution
+- Use `UV_PYTHON=3.11` for all `uv` commands — the uv default (3.15) breaks the workspace sync (pyarrow has no 3.15 wheel).
+- Run the CLI tests with: `UV_PYTHON=3.11 uv run --directory cli pytest tests/test_build_info.py tests/test_cli.py -v`
+- The workspace is already synced.
+
+## Interfaces from earlier tasks
+
+None — you are first. No earlier-task interfaces exist.
+
+## Notes / ambiguity resolution
+
+- The brief says to change `_version_callback` to echo `version.build_summary()` and keep `__version__` importable from `cli.cli` (an existing test does `from cli.cli import __version__, app`). Keep `from cli.version import __version__` in `cli.py` and add whatever import you need for the `version` module (e.g. `from cli import version`), avoiding a name clash.
+- The committed `_build_info.py` holds dev defaults (`VERSION = "0.1.0"`, empty date). A later build task overwrites it at build time; do not add generation logic here.
+
+## Your Job
+
+Follow the brief's steps in order (TDD: write the failing test, run it to confirm it fails, implement, run to confirm pass, commit). Commit with the message given in the brief.
+
+## You Do Not Dispatch Subagents
+
+Do all of this task's work yourself. Never spawn a subagent, and never spawn a reviewer — review is the controller's job after you report.
+
+## Report Format
+
+Write your full report to:
+/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/.superpowers/sdd/2026-10-15-cli-bundled-distribution-and-self-update/task-1-report.md
+
+Include: what you implemented, what you tested + results, TDD evidence (RED command/output/why, GREEN command/output), files changed, self-review findings, concerns.
+
+Then reply with ONLY (under 15 lines): Status (DONE | DONE_WITH_CONCERNS | BLOCKED | NEEDS_CONTEXT), commits (short SHA + subject), one-line test summary, concerns, report file path.

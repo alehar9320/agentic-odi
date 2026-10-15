@@ -1,0 +1,1945 @@
+{
+  "info": {
+    "id": "ses_ebea754beffefpYBZxy4G6Wv5e",
+    "slug": "curious-nebula",
+    "projectID": "e4fe19106d06261ebfed21a0e3ba06559abf1100",
+    "directory": "/home/alexa/repos/agentic-odi",
+    "path": "",
+    "parentID": "ses_ebedd9abaffesSyRWO5QAiMN5F",
+    "title": "Implement Task 1: build metadata (@general subagent)",
+    "agent": "general",
+    "model": {
+      "id": "big-pickle",
+      "providerID": "opencode",
+      "variant": "default"
+    },
+    "version": "1.18.35",
+    "summary": {
+      "additions": 0,
+      "deletions": 0,
+      "files": 0
+    },
+    "cost": 0,
+    "tokens": {
+      "input": 23490,
+      "output": 2967,
+      "reasoning": 1069,
+      "cache": {
+        "read": 310272,
+        "write": 0
+      }
+    },
+    "permission": [
+      {
+        "permission": "task",
+        "pattern": "*",
+        "action": "deny"
+      }
+    ],
+    "time": {
+      "created": 1792097692481,
+      "updated": 1792097888463
+    }
+  },
+  "messages": [
+    {
+      "info": {
+        "role": "user",
+        "time": {
+          "created": 1792097692521
+        },
+        "agent": "general",
+        "model": {
+          "providerID": "opencode",
+          "modelID": "big-pickle"
+        },
+        "summary": {
+          "diffs": [
+            {
+              "file": "docs/superpowers/specs/2026-10-15-cli-odi-entity-parity-design.md",
+              "patch": "Index: docs/superpowers/specs/2026-10-15-cli-odi-entity-parity-design.md\n===================================================================\n--- docs/superpowers/specs/2026-10-15-cli-odi-entity-parity-design.md\t\n+++ docs/superpowers/specs/2026-10-15-cli-odi-entity-parity-design.md\t\n@@ -1,173 +1,219 @@\n # CLI ODI Entity Parity & Shared Store — Design\n \n Date: 2026-10-15\n Status: Draft (design); builder check + implementation plan pending\n \n ## Intent and why\n \n A Product Manager (or an AI agent acting for them) should be able to run the\n **entire** Outcome-Driven Innovation loop from the `agentic-odi` CLI: capture\n Jobs, break them into Job-Map Steps, record Desired Outcomes with importance\n and satisfaction, compute Opportunity Scores, and link outcomes to business\n value via Customer Outcomes. Today the CLI only exposes Customer Outcomes, and\n it writes to the MCP server's **in-memory** repository, so nothing survives a\n restart and Jobs/Steps/Desired Outcomes are unreachable from the terminal at\n all.\n \n The objective is to help the PM **think in outcomes, not solutions**. The tool\n must make the framework's core concept — the desired outcome — the obvious\n center of gravity, and it must accumulate the PM's and the agent's thinking in\n one durable place.\n \n Two entry paths must converge on the same data:\n \n - the PM typing at the terminal (CLI, `local` backend), and\n - the AI agent calling tools over MCP (`mcp` server).\n \n ## Goals\n \n - CLI input and output (create, list, get, update, delete) for **every** ODI\n   entity the domain models: `Job`, `Step`, `Outcome` (desired outcome), and\n   `CustomerOutcome` (including nested `value_metrics`).\n - **Full parity** between the CLI and the MCP tool surface: anything a PM can\n   do by hand, the agent can do over MCP, and vice versa.\n - **One persistent store** shared by the CLI and the MCP server, so data\n   survives restarts and both paths see each other's writes.\n - Vocabulary a PM already holds: the word *outcome* means the framework's\n   desired outcome, with no second competing meaning.\n \n ## Non-goals\n \n - Replacing or redesigning the Streamlit \"Living Studio\" GUI.\n - Changing the ODI domain model itself (fields, scoring formula, enums).\n - The bundled-binary distribution and self-update work (see the separate\n   `2026-10-15-cli-bundled-distribution-design.md`); this design must not\n   conflict with it but does not implement it.\n - Multi-user auth, remote/hosted storage, or sync beyond a single local\n   SQLite file.\n \n ## Anti-goals (would make this a failure even if it \"works\")\n \n - A CLI that reports success while the agent (or a second terminal) can't see\n   the data, or loses it on restart.\n - Two commands whose names both suggest \"outcome\", forcing the user to\n   remember an internal distinction.\n - Breaking the live GUI/agent path silently.\n - A test suite that writes to the user's real `~/.agentic-odi/odi.db`.\n \n ## Constraints\n \n - Python 3.10+, `uv` workspace with six packages: `core`, `mcp_server`,\n   `local_server`, `client`, `cli`, `connectors`.\n - `core` already models `Job`, `Step`, `Outcome`, `CustomerOutcome`,\n   `CustomerValue`, `ValueMetric`, `BusinessValue` and computes the Opportunity\n   Score. `SQLiteRepository` already persists Job/Step/Outcome/CustomerOutcome\n   using an append-only `IntentStore` (SQLite, WAL).\n - The CLI is a Typer app; each entity lives in its own module and is mounted\n   in `cli/cli.py`.\n - Cross-process sharing must work while the long-running MCP server is up and\n   a short-lived CLI process writes concurrently (SQLite WAL allows this).\n - CI runs `ruff check`, `ruff format --check`, per-project `mypy`, per-project\n   `pytest`, and `bandit`.\n \n ## The how (decided with the human partner)\n \n ### Vocabulary / command surface\n \n Chosen per the \"one obvious meaning per word\" directive — the framework's\n central entity gets the plain word:\n \n | Concept | Model | CLI group |\n |---|---|---|\n | Job | `Job` | `jobs` |\n | Job-Map Step | `Step` | `steps` |\n | Desired Outcome | `Outcome` | `outcomes` |\n | Customer Outcome | `CustomerOutcome` | `customer-outcomes` |\n | Opportunity Score | `compute_opportunity_score` | top-level `score` |\n \n The existing `outcomes` group (today's Customer Outcome) is **renamed** to\n `customer-outcomes`, and `outcomes` is reassigned to the desired-outcome\n entity. This is a breaking change; the README and tests are updated in the\n same change. No ambiguous alias is provided.\n \n Every group gets full CRUD: `add`, `list`, `get <id>`, `update <id>`,\n `delete <id> [-y/--yes]`.\n \n ### value_metrics\n \n `ValueMetric` is nested in `CustomerValue` (inside `CustomerOutcome`); it is\n not a top-level entity and has no repository identity. It is exposed on\n `customer-outcomes`:\n \n - input: a repeatable `--value-metric '<json>'` option, each a JSON object with\n   `name`, `direction`, `unit_of_measure`, `importance`, `satisfaction`.\n - output: nested under `customer_value.value_metrics`, each with its computed\n   `opportunity_score`.\n \n This mirrors how MCP already accepts `customer_value` as a dict.\n \n ### Shared persistent store (decided)\n \n - Both the MCP server and the CLI `local` backend use `SQLiteRepository`\n   against the same path: `AGENTIC_ODI_DB`, defaulting to\n   `~/.agentic-odi/odi.db`.\n - The MCP server currently hardcodes `InMemoryRepository()`. It will instead\n   select its repository at startup via a `build_repository()` factory in\n   `core`: SQLite by default, with an explicit in-memory option\n   (e.g. `AGENTIC_ODI_DB=:memory:`) used by tests.\n - Because `SQLiteRepository` caches a materialized snapshot at construction and\n   never re-reads the file, a long-running server would miss writes made by a\n   short-lived CLI run. `SQLiteRepository` will become **read-through**: it\n   tracks the last applied event id and applies newly appended events before\n   reads, so concurrent processes converge without a restart. Event application\n   is refactored into a single `_apply_event` used by both initial load and\n   incremental sync.\n \n ### CLI backend selection (decided)\n \n - A global `--backend local|mcp` option plus the existing\n   `AGENTIC_ODI_BACKEND` env var, defaulting to `local` (matching the bundled\n   distribution design). `--db PATH` overrides the store path.\n - All entity commands route through `backend.get_backend(...)`. The `outcomes`\n   commands currently hardcode `mcp` and will be corrected.\n - `LocalBackend.call` implements every tool name; `MCPBackend.call` already\n   passes through to the server.\n \n ### Full parity (decided)\n \n The MCP server gains tools it lacks today so the agent matches the CLI:\n `get_step`, `get_outcome`, and `update`/`delete` for Job, Step, and Outcome.\n `update_customer_outcome` gains the ability to replace `value_metrics`.\n \n ## Verification / acceptance\n \n The explicit \"successfully stored data types\" criterion is tested by a\n round-trip: through `LocalBackend`, create each entity type (including nested\n `value_metrics`), then open a **fresh** `SQLiteRepository` on the same path and\n assert every field — including computed `opportunity_score` values — survives.\n \n Additional tests:\n \n - CLI input and output for each group (mirroring `cli/tests/test_outcomes_cli.py`).\n - Backend routing: default `local`, and `--backend mcp` still reaches the\n   MCP tool path.\n - Core service/repository CRUD for Job/Step/Outcome.\n - MCP tool parity for the new tools.\n - MCP test suite isolated from the real DB via the in-memory store option.\n \n Quality gates: `uv run ruff check .`, `uv run ruff format --check .`,\n per-project `uv run --directory <pkg> mypy .`, per-project\n `uv run --directory <pkg> pytest`, and\n `uv run bandit -c pyproject.toml -r core/src mcp_server/src ...`.\n \n+## Resolved during builder check (builder's calls unless marked)\n+\n+These were open after the first draft; a fresh builder review listed the\n+questions a planner would still have. The following are settled here.\n+\n+- **Opportunity score on `Outcome` update.** `opportunity_score` is a stored\n+  field. `update_outcome` recomputes it whenever `importance` and\n+  `satisfaction` are both present after the merge; if either is absent, the\n+  score is `None`. This mirrors `add_outcome` exactly.\n+- **Repository thread/process safety.** The read-through `SQLiteRepository`\n+  guards `_sync()` and all mutations with a re-entrant lock and opens its\n+  `IntentStore` connection with `check_same_thread=False`; WAL gives\n+  cross-process visibility. Every read syncs first under the lock.\n+- **`--db` vs backend.** `--db PATH` (and `AGENTIC_ODI_DB`) selects the store\n+  for the `local` backend only. With `--backend mcp` the **server** owns the\n+  store; a supplied `--db` is ignored with a warning. \"Shared store\" means the\n+  CLI's local process and the server resolve the same path from\n+  `AGENTIC_ODI_DB`/default, not that the CLI pushes a path to the server.\n+- **List/get surface (exact).**\n+  - `jobs list` → `get_jobs`; `jobs get <id>` → `get_job`.\n+  - `steps add` → `add_step`; `steps list --job-id` → `get_job_map`;\n+    `steps get <id>` → **new** `get_step`; `steps update|delete` → **new**\n+    tools.\n+  - `outcomes add` → `add_outcome`; `outcomes list --job-id [--step-id]` →\n+    `get_outcomes`; `outcomes get <id>` → **new** `get_outcome`;\n+    `outcomes update|delete` → **new** tools.\n+  - `customer-outcomes` keeps today's shape (`list` with optional job filter).\n+  - No job-optional `list_steps`/`list_outcomes` tools are added; Step and\n+    Desired Outcome are job-scoped.\n+- **Update mutability.** Updates follow the existing `is not None` sentinel\n+  convention: only explicitly provided fields change, and a field is never\n+  cleared by passing null. `job_id` is immutable after creation; `step_id`\n+  may be set but not cleared to null.\n+- **`score` command.** Top-level `score <importance> <satisfaction>` only\n+  (the old `outcomes score` is removed in the rename).\n+- **Test isolation for the MCP server.** `conftest.py` sets the in-memory\n+  store option before importing `mcp_server`, so the suite never touches the\n+  real `~/.agentic-odi/odi.db`.\n+\n+## Decided by the human partner\n+\n+- **Referential integrity: cascade delete + validate FKs.** Deleting a Job\n+  removes its Steps, Desired Outcomes, and Customer Outcomes (recursive, with\n+  confirmation or `--yes`). `add_step`, `add_outcome`, and\n+  `add_customer_outcome` reject an unknown `job_id`/`step_id` with a clear\n+  error. Repository delete events must encode the cascade so replay is\n+  deterministic.\n+\n ## Left to the builder\n \n - Exact `--value-metric` parsing/validation and error messages.\n-- Whether `score` is purely top-level or also mirrored as a subcommand.\n - Exact shape of the new repository methods and event names\n-  (`*_UPDATED`, `*_DELETED`) and how update/delete are validated.\n+  (`*_UPDATED`, `*_DELETED`).\n - Whether the CLI `local` and `mcp` backends share one code path for output\n   formatting.\n-- Whether `Agentic ODI` review of the rename needs a deprecation window\n-  (decision: no alias — one word, one meaning).\n-- Test fixture mechanics for forcing the MCP server's in-memory store.\n+- Whether the GUI/agent rename needs a deprecation window (decision: no\n+  alias — one word, one meaning).\n",
+              "additions": 51,
+              "deletions": 5,
+              "status": "modified"
+            }
+          ]
+        },
+        "id": "msg_14158ab60001sLbiZSZwzGFZOY",
+        "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e"
+      },
+      "parts": [
+        {
+          "type": "text",
+          "text": "You are implementing Task 1: Build metadata + version display.\n\n## Task Description\n\nRead your task brief first — it is your requirements, with the exact values to use verbatim:\n/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/.superpowers/sdd/2026-10-15-cli-bundled-distribution-and-self-update/task-1-brief.md\n\n## Context\n\nThis is the first task of a plan that turns the `agentic-odi` CLI (a Python uv-workspace package at `cli/`) into a self-contained, self-updating binary. This task introduces build-time metadata (`_build_info.py`) and a version display that includes the release date. Later tasks consume `version.build_summary()`, `version.verbose_summary()`, and the `_build_info` values.\n\n## Environment (important)\n\n- Work from: /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution\n- Use `UV_PYTHON=3.11` for all `uv` commands — the uv default (3.15) breaks the workspace sync (pyarrow has no 3.15 wheel).\n- Run the CLI tests with: `UV_PYTHON=3.11 uv run --directory cli pytest tests/test_build_info.py tests/test_cli.py -v`\n- The workspace is already synced.\n\n## Interfaces from earlier tasks\n\nNone — you are first. No earlier-task interfaces exist.\n\n## Notes / ambiguity resolution\n\n- The brief says to change `_version_callback` to echo `version.build_summary()` and keep `__version__` importable from `cli.cli` (an existing test does `from cli.cli import __version__, app`). Keep `from cli.version import __version__` in `cli.py` and add whatever import you need for the `version` module (e.g. `from cli import version`), avoiding a name clash.\n- The committed `_build_info.py` holds dev defaults (`VERSION = \"0.1.0\"`, empty date). A later build task overwrites it at build time; do not add generation logic here.\n\n## Your Job\n\nFollow the brief's steps in order (TDD: write the failing test, run it to confirm it fails, implement, run to confirm pass, commit). Commit with the message given in the brief.\n\n## You Do Not Dispatch Subagents\n\nDo all of this task's work yourself. Never spawn a subagent, and never spawn a reviewer — review is the controller's job after you report.\n\n## Report Format\n\nWrite your full report to:\n/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/.superpowers/sdd/2026-10-15-cli-bundled-distribution-and-self-update/task-1-report.md\n\nInclude: what you implemented, what you tested + results, TDD evidence (RED command/output/why, GREEN command/output), files changed, self-review findings, concerns.\n\nThen reply with ONLY (under 15 lines): Status (DONE | DONE_WITH_CONCERNS | BLOCKED | NEEDS_CONTEXT), commits (short SHA + subject), one-line test summary, concerns, report file path.",
+          "id": "prt_14158ab770017AN5qI62QLsIJc",
+          "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e",
+          "messageID": "msg_14158ab60001sLbiZSZwzGFZOY"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_14158ab60001sLbiZSZwzGFZOY",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 15428,
+          "input": 697,
+          "output": 66,
+          "reasoning": 9,
+          "cache": {
+            "write": 0,
+            "read": 14656
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792097694722,
+          "completed": 1792097698643
+        },
+        "finish": "tool-calls",
+        "id": "msg_14158b400001YYMfH1KQFQc5gN",
+        "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e"
+      },
+      "parts": [
+        {
+          "snapshot": "3d265993606d9ec85dfbd94a1179d367fe73d145",
+          "type": "step-start",
+          "id": "prt_14158bee10010FzAQpo1JsEwCP",
+          "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e",
+          "messageID": "msg_14158b400001YYMfH1KQFQc5gN"
+        },
+        {
+          "type": "reasoning",
+          "text": "Let me read the task brief first.",
+          "time": {
+            "start": 1792097697576,
+            "end": 1792097697696
+          },
+          "id": "prt_14158bf28001lE4OIhjSiu58F0",
+          "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e",
+          "messageID": "msg_14158b400001YYMfH1KQFQc5gN"
+        },
+        {
+          "type": "tool",
+          "tool": "read",
+          "callID": "call_d0d376e75dc64855a12407d4",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/.superpowers/sdd/2026-10-15-cli-bundled-distribution-and-self-update/task-1-brief.md"
+            },
+            "output": "<path>/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/.superpowers/sdd/2026-10-15-cli-bundled-distribution-and-self-update/task-1-brief.md</path>\n<type>file</type>\n<content>\n1: ### Task 1: Build metadata + version display\n2: \n3: **Files:**\n4: - Create: `cli/src/cli/_build_info.py`\n5: - Modify: `cli/src/cli/version.py`\n6: - Modify: `cli/src/cli/cli.py` (`_version_callback`)\n7: - Test: `cli/tests/test_build_info.py`\n8: \n9: **Interfaces:**\n10: - Consumes: nothing.\n11: - Produces: `_build_info.VERSION: str`, `_build_info.RELEASE_DATE_UTC: str` (ISO-8601 `…Z` or `\"\"`), `_build_info.COMMIT: str`, `_build_info.TARGET: str`. `version.__version__: str`, `version.release_date: str | None`, `version.build_summary() -> str`, `version.verbose_summary() -> str`.\n12: \n13: - [ ] **Step 1: Write the failing test**\n14: \n15: ```python\n16: # cli/tests/test_build_info.py\n17: from cli import version\n18: \n19: \n20: def test_version_matches_build_info():\n21:     from cli import _build_info\n22: \n23:     assert version.__version__ == _build_info.VERSION\n24:     assert version.__version__ == \"0.1.0\"\n25: \n26: \n27: def test_build_summary_omits_date_when_empty(monkeypatch):\n28:     monkeypatch.setattr(version, \"RELEASE_DATE_UTC\", \"\")\n29:     assert version.build_summary() == \"0.1.0\"\n30: \n31: \n32: def test_build_summary_includes_date_when_set(monkeypatch):\n33:     monkeypatch.setattr(version, \"RELEASE_DATE_UTC\", \"2026-10-15T21:13:00Z\")\n34:     assert version.build_summary() == \"0.1.0 (2026-10-15)\"\n35: ```\n36: \n37: - [ ] **Step 2: Run test to verify it fails**\n38: \n39: Run: `uv run --directory cli pytest tests/test_build_info.py -v`\n40: Expected: FAIL (no module `cli._build_info` / no `build_summary`).\n41: \n42: - [ ] **Step 3: Create `_build_info.py` and rewrite `version.py`**\n43: \n44: `_build_info.py` (committed dev defaults; CI overwrites these values at build time):\n45: \n46: ```python\n47: VERSION = \"0.1.0\"\n48: RELEASE_DATE_UTC = \"\"\n49: COMMIT = \"dev\"\n50: TARGET = \"dev\"\n51: ```\n52: \n53: `version.py`:\n54: \n55: ```python\n56: from cli._build_info import COMMIT, RELEASE_DATE_UTC as _RELEASE_DATE_UTC, TARGET, VERSION\n57: \n58: __version__ = VERSION\n59: RELEASE_DATE_UTC = _RELEASE_DATE_UTC\n60: COMMIT = COMMIT\n61: TARGET = TARGET\n62: release_date = RELEASE_DATE_UTC or None\n63: \n64: \n65: def build_summary() -> str:\n66:     if RELEASE_DATE_UTC:\n67:         return f\"{VERSION} ({RELEASE_DATE_UTC[:10]})\"\n68:     return VERSION\n69: \n70: \n71: def verbose_summary() -> str:\n72:     return f\"{build_summary()}\\ncommit: {COMMIT}\\ntarget: {TARGET}\"\n73: ```\n74: \n75: - [ ] **Step 4: Point `--version` at the summary**\n76: \n77: In `cli/src/cli/cli.py`, change `_version_callback` to `typer.echo(version.build_summary())` (import `from cli import version`). Leave `__version__` imported for the existing test.\n78: \n79: - [ ] **Step 5: Run tests to verify they pass**\n80: \n81: Run: `uv run --directory cli pytest tests/test_build_info.py tests/test_cli.py -v`\n82: Expected: PASS.\n83: \n84: - [ ] **Step 6: Commit**\n85: \n86: ```bash\n87: git add cli/src/cli/_build_info.py cli/src/cli/version.py cli/src/cli/cli.py cli/tests/test_build_info.py\n88: git commit -m \"feat(cli): build metadata and version display\"\n89: ```\n90: \n91: ---\n92: \n\n(End of file - total 92 lines)\n</content>",
+            "metadata": {
+              "preview": "### Task 1: Build metadata + version display\n\n**Files:**\n- Create: `cli/src/cli/_build_info.py`\n- Modify: `cli/src/cli/version.py`\n- Modify: `cli/src/cli/cli.py` (`_version_callback`)\n- Test: `cli/tests/test_build_info.py`\n\n**Interfaces:**\n- Consumes: nothing.\n- Produces: `_build_info.VERSION: str`, `_build_info.RELEASE_DATE_UTC: str` (ISO-8601 `…Z` or `\"\"`), `_build_info.COMMIT: str`, `_build_info.TARGET: str`. `version.__version__: str`, `version.release_date: str | None`, `version.build_summary() -> str`, `version.verbose_summary() -> str`.\n\n- [ ] **Step 1: Write the failing test**\n\n```python\n# cli/tests/test_build_info.py\nfrom cli import version\n\n\ndef test_version_matches_build_info():",
+              "truncated": false,
+              "loaded": [],
+              "display": {
+                "type": "file",
+                "path": "/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/.superpowers/sdd/2026-10-15-cli-bundled-distribution-and-self-update/task-1-brief.md",
+                "text": "### Task 1: Build metadata + version display\n\n**Files:**\n- Create: `cli/src/cli/_build_info.py`\n- Modify: `cli/src/cli/version.py`\n- Modify: `cli/src/cli/cli.py` (`_version_callback`)\n- Test: `cli/tests/test_build_info.py`\n\n**Interfaces:**\n- Consumes: nothing.\n- Produces: `_build_info.VERSION: str`, `_build_info.RELEASE_DATE_UTC: str` (ISO-8601 `…Z` or `\"\"`), `_build_info.COMMIT: str`, `_build_info.TARGET: str`. `version.__version__: str`, `version.release_date: str | None`, `version.build_summary() -> str`, `version.verbose_summary() -> str`.\n\n- [ ] **Step 1: Write the failing test**\n\n```python\n# cli/tests/test_build_info.py\nfrom cli import version\n\n\ndef test_version_matches_build_info():\n    from cli import _build_info\n\n    assert version.__version__ == _build_info.VERSION\n    assert version.__version__ == \"0.1.0\"\n\n\ndef test_build_summary_omits_date_when_empty(monkeypatch):\n    monkeypatch.setattr(version, \"RELEASE_DATE_UTC\", \"\")\n    assert version.build_summary() == \"0.1.0\"\n\n\ndef test_build_summary_includes_date_when_set(monkeypatch):\n    monkeypatch.setattr(version, \"RELEASE_DATE_UTC\", \"2026-10-15T21:13:00Z\")\n    assert version.build_summary() == \"0.1.0 (2026-10-15)\"\n```\n\n- [ ] **Step 2: Run test to verify it fails**\n\nRun: `uv run --directory cli pytest tests/test_build_info.py -v`\nExpected: FAIL (no module `cli._build_info` / no `build_summary`).\n\n- [ ] **Step 3: Create `_build_info.py` and rewrite `version.py`**\n\n`_build_info.py` (committed dev defaults; CI overwrites these values at build time):\n\n```python\nVERSION = \"0.1.0\"\nRELEASE_DATE_UTC = \"\"\nCOMMIT = \"dev\"\nTARGET = \"dev\"\n```\n\n`version.py`:\n\n```python\nfrom cli._build_info import COMMIT, RELEASE_DATE_UTC as _RELEASE_DATE_UTC, TARGET, VERSION\n\n__version__ = VERSION\nRELEASE_DATE_UTC = _RELEASE_DATE_UTC\nCOMMIT = COMMIT\nTARGET = TARGET\nrelease_date = RELEASE_DATE_UTC or None\n\n\ndef build_summary() -> str:\n    if RELEASE_DATE_UTC:\n        return f\"{VERSION} ({RELEASE_DATE_UTC[:10]})\"\n    return VERSION\n\n\ndef verbose_summary() -> str:\n    return f\"{build_summary()}\\ncommit: {COMMIT}\\ntarget: {TARGET}\"\n```\n\n- [ ] **Step 4: Point `--version` at the summary**\n\nIn `cli/src/cli/cli.py`, change `_version_callback` to `typer.echo(version.build_summary())` (import `from cli import version`). Leave `__version__` imported for the existing test.\n\n- [ ] **Step 5: Run tests to verify they pass**\n\nRun: `uv run --directory cli pytest tests/test_build_info.py tests/test_cli.py -v`\nExpected: PASS.\n\n- [ ] **Step 6: Commit**\n\n```bash\ngit add cli/src/cli/_build_info.py cli/src/cli/version.py cli/src/cli/cli.py cli/tests/test_build_info.py\ngit commit -m \"feat(cli): build metadata and version display\"\n```\n\n---\n",
+                "lineStart": 1,
+                "lineEnd": 92,
+                "totalLines": 92,
+                "truncated": false
+              }
+            },
+            "title": ".worktrees/cli-bundled-distribution/.superpowers/sdd/2026-10-15-cli-bundled-distribution-and-self-update/task-1-brief.md",
+            "time": {
+              "start": 1792097698119,
+              "end": 1792097698388
+            }
+          },
+          "id": "prt_14158bfa7001VNBqRD7GHScCWH",
+          "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e",
+          "messageID": "msg_14158b400001YYMfH1KQFQc5gN"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "3d265993606d9ec85dfbd94a1179d367fe73d145",
+          "type": "step-finish",
+          "tokens": {
+            "total": 15428,
+            "input": 697,
+            "output": 66,
+            "reasoning": 9,
+            "cache": {
+              "write": 0,
+              "read": 14656
+            }
+          },
+          "cost": 0,
+          "id": "prt_14158c2f0001CZ3P0K9mcJQgmB",
+          "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e",
+          "messageID": "msg_14158b400001YYMfH1KQFQc5gN"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_14158ab60001sLbiZSZwzGFZOY",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 16674,
+          "input": 1264,
+          "output": 92,
+          "reasoning": 22,
+          "cache": {
+            "write": 0,
+            "read": 15296
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792097698651,
+          "completed": 1792097704136
+        },
+        "finish": "tool-calls",
+        "id": "msg_14158c35b001TDL2Yy8nRgR29C",
+        "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e"
+      },
+      "parts": [
+        {
+          "snapshot": "3d265993606d9ec85dfbd94a1179d367fe73d145",
+          "type": "step-start",
+          "id": "prt_14158d2fa00114eU1DzFauXKSU",
+          "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e",
+          "messageID": "msg_14158c35b001TDL2Yy8nRgR29C"
+        },
+        {
+          "type": "reasoning",
+          "text": "Let me look at the current files: version.py, cli.py, tests, and check git status.",
+          "time": {
+            "start": 1792097702729,
+            "end": 1792097703043
+          },
+          "id": "prt_14158d349001XubH7Ii7g9z9tW",
+          "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e",
+          "messageID": "msg_14158c35b001TDL2Yy8nRgR29C"
+        },
+        {
+          "type": "tool",
+          "tool": "read",
+          "callID": "call_22b75fb9715f4bdba95cab53",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/cli/src/cli/version.py"
+            },
+            "output": "<path>/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/cli/src/cli/version.py</path>\n<type>file</type>\n<content>\n1: \"\"\"Version information.\"\"\"\n2: \n3: __version__ = \"0.1.0\"\n\n(End of file - total 3 lines)\n</content>",
+            "metadata": {
+              "preview": "\"\"\"Version information.\"\"\"\n\n__version__ = \"0.1.0\"",
+              "truncated": false,
+              "loaded": [],
+              "display": {
+                "type": "file",
+                "path": "/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/cli/src/cli/version.py",
+                "text": "\"\"\"Version information.\"\"\"\n\n__version__ = \"0.1.0\"",
+                "lineStart": 1,
+                "lineEnd": 3,
+                "totalLines": 3,
+                "truncated": false
+              }
+            },
+            "title": ".worktrees/cli-bundled-distribution/cli/src/cli/version.py",
+            "time": {
+              "start": 1792097703478,
+              "end": 1792097703687
+            }
+          },
+          "id": "prt_14158d490001HF3bs2KB5FWyXg",
+          "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e",
+          "messageID": "msg_14158c35b001TDL2Yy8nRgR29C"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "call_b767dd7082494c569619d533",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "git status && git log --oneline -5",
+              "workdir": "/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution"
+            },
+            "output": "On branch feature/cli-bundled-distribution\nnothing to commit, working tree clean\naff60a4 docs: add bundled CLI distribution design and implementation plan\n0d701a3 docs: elevate README with badges, TOC, and structured formatting\n102030a Merge pull request #3 from alehar9320/topic/living-studio-gui\nb9637d0 Merge pull request #6 from alehar9320/dependabot/github_actions/actions/checkout-7\n0f0300f fix(connectors): repair rebased branch so CI passes\n",
+            "metadata": {
+              "output": "On branch feature/cli-bundled-distribution\nnothing to commit, working tree clean\naff60a4 docs: add bundled CLI distribution design and implementation plan\n0d701a3 docs: elevate README with badges, TOC, and structured formatting\n102030a Merge pull request #3 from alehar9320/topic/living-studio-gui\nb9637d0 Merge pull request #6 from alehar9320/dependabot/github_actions/actions/checkout-7\n0f0300f fix(connectors): repair rebased branch so CI passes\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "git status && git log --oneline -5",
+            "time": {
+              "start": 1792097703822,
+              "end": 1792097703862
+            }
+          },
+          "id": "prt_14158d662001Hzgr7kFrQNn1g4",
+          "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e",
+          "messageID": "msg_14158c35b001TDL2Yy8nRgR29C"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "3d265993606d9ec85dfbd94a1179d367fe73d145",
+          "type": "step-finish",
+          "tokens": {
+            "total": 16674,
+            "input": 1264,
+            "output": 92,
+            "reasoning": 22,
+            "cache": {
+              "write": 0,
+              "read": 15296
+            }
+          },
+          "cost": 0,
+          "id": "prt_14158d86c001e6QV7jqhW26eKn",
+          "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e",
+          "messageID": "msg_14158c35b001TDL2Yy8nRgR29C"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_14158ab60001sLbiZSZwzGFZOY",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 16957,
+          "input": 378,
+          "output": 49,
+          "reasoning": 18,
+          "cache": {
+            "write": 0,
+            "read": 16512
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792097704143,
+          "completed": 1792097707496
+        },
+        "finish": "tool-calls",
+        "id": "msg_14158d8cf0019wbNxSC2gAKx4J",
+        "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e"
+      },
+      "parts": [
+        {
+          "snapshot": "3d265993606d9ec85dfbd94a1179d367fe73d145",
+          "type": "step-start",
+          "id": "prt_14158e27f001fW4o2b5TQ2AdbD",
+          "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e",
+          "messageID": "msg_14158d8cf0019wbNxSC2gAKx4J"
+        },
+        {
+          "type": "reasoning",
+          "text": "Now let's look at cli.py's _version_callback, and the existing tests.",
+          "time": {
+            "start": 1792097706687,
+            "end": 1792097706876
+          },
+          "id": "prt_14158e2bf001eBkR0yUyFAP0X7",
+          "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e",
+          "messageID": "msg_14158d8cf0019wbNxSC2gAKx4J"
+        },
+        {
+          "type": "tool",
+          "tool": "grep",
+          "callID": "call_b02cde4704464ba687f6b2c0",
+          "state": {
+            "status": "completed",
+            "input": {
+              "pattern": "_version_callback|__version__",
+              "path": "/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/cli"
+            },
+            "output": "Found 8 matches\n/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/cli/src/cli/version.py:\n  Line 3: __version__ = \"0.1.0\"\n\n\n/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/cli/src/cli/cli.py:\n  Line 7: from cli.version import __version__\n\n  Line 18: def _version_callback(value: bool) -> None:\n\n  Line 20:         typer.echo(__version__)\n\n  Line 27:         False, \"--version\", callback=_version_callback, help=\"Show version\"\n\n  Line 36:     typer.echo(__version__)\n\n\n/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/cli/tests/test_cli.py:\n  Line 5: from cli.cli import __version__, app\n\n  Line 19:     assert __version__ in _strip_ansi(result.output)\n",
+            "metadata": {
+              "matches": 8,
+              "truncated": false
+            },
+            "title": "_version_callback|__version__",
+            "time": {
+              "start": 1792097707248,
+              "end": 1792097707388
+            }
+          },
+          "id": "prt_14158e37f001V2OcC2R6b0qVLK",
+          "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e",
+          "messageID": "msg_14158d8cf0019wbNxSC2gAKx4J"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "3d265993606d9ec85dfbd94a1179d367fe73d145",
+          "type": "step-finish",
+          "tokens": {
+            "total": 16957,
+            "input": 378,
+            "output": 49,
+            "reasoning": 18,
+            "cache": {
+              "write": 0,
+              "read": 16512
+            }
+          },
+          "cost": 0,
+          "id": "prt_14158e590001wfYbGWglPDID6e",
+          "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e",
+          "messageID": "msg_14158d8cf0019wbNxSC2gAKx4J"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_14158ab60001sLbiZSZwzGFZOY",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 17292,
+          "input": 335,
+          "output": 78,
+          "reasoning": 47,
+          "cache": {
+            "write": 0,
+            "read": 16832
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792097707503,
+          "completed": 1792097713928
+        },
+        "finish": "tool-calls",
+        "id": "msg_14158e5ef001fRr3WZevQqxob0",
+        "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e"
+      },
+      "parts": [
+        {
+          "snapshot": "3d265993606d9ec85dfbd94a1179d367fe73d145",
+          "type": "step-start",
+          "id": "prt_14158f4ef001goqhX1ZB3W46RC",
+          "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e",
+          "messageID": "msg_14158e5ef001fRr3WZevQqxob0"
+        },
+        {
+          "type": "reasoning",
+          "text": "Let me read cli.py to understand context, particularly lines around _version_callback and line 36 (which also echoes `__version__` — but brief only says change `_version_callback`). Let me read the full file.",
+          "time": {
+            "start": 1792097711395,
+            "end": 1792097712729
+          },
+          "id": "prt_14158f523001uOKFBgjO8kpxE1",
+          "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e",
+          "messageID": "msg_14158e5ef001fRr3WZevQqxob0"
+        },
+        {
+          "type": "tool",
+          "tool": "read",
+          "callID": "call_16f41ab27af34665a07378a8",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/cli/src/cli/cli.py"
+            },
+            "output": "<path>/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/cli/src/cli/cli.py</path>\n<type>file</type>\n<content>\n1: \"\"\"Main CLI entry point.\"\"\"\n2: \n3: import typer\n4: \n5: from cli.connectors import connectors_app\n6: from cli.outcomes import outcomes_app\n7: from cli.version import __version__\n8: \n9: app = typer.Typer(\n10:     name=\"agentic-odi-cli\",\n11:     help=\"Agentic ODI CLI - Tool for managing Jobs-to-be-Done (JTBD) and ODI workflows.\",\n12: )\n13: app.add_typer(connectors_app, name=\"connectors\")\n14: \n15: app.add_typer(outcomes_app, name=\"outcomes\", help=\"Manage Customer Outcomes\")\n16: \n17: \n18: def _version_callback(value: bool) -> None:\n19:     if value:\n20:         typer.echo(__version__)\n21:         raise typer.Exit()\n22: \n23: \n24: @app.callback()\n25: def main(\n26:     version: bool = typer.Option(\n27:         False, \"--version\", callback=_version_callback, help=\"Show version\"\n28:     ),\n29: ) -> None:  # noqa: B008\n30:     pass\n31: \n32: \n33: @app.command()\n34: def version_cmd() -> None:\n35:     \"\"\"Show CLI version.\"\"\"\n36:     typer.echo(__version__)\n37: \n38: \n39: if __name__ == \"__main__\":\n40:     app()\n\n(End of file - total 40 lines)\n</content>",
+            "metadata": {
+              "preview": "\"\"\"Main CLI entry point.\"\"\"\n\nimport typer\n\nfrom cli.connectors import connectors_app\nfrom cli.outcomes import outcomes_app\nfrom cli.version import __version__\n\napp = typer.Typer(\n    name=\"agentic-odi-cli\",\n    help=\"Agentic ODI CLI - Tool for managing Jobs-to-be-Done (JTBD) and ODI workflows.\",\n)\napp.add_typer(connectors_app, name=\"connectors\")\n\napp.add_typer(outcomes_app, name=\"outcomes\", help=\"Manage Customer Outcomes\")\n\n\ndef _version_callback(value: bool) -> None:\n    if value:\n        typer.echo(__version__)",
+              "truncated": false,
+              "loaded": [],
+              "display": {
+                "type": "file",
+                "path": "/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/cli/src/cli/cli.py",
+                "text": "\"\"\"Main CLI entry point.\"\"\"\n\nimport typer\n\nfrom cli.connectors import connectors_app\nfrom cli.outcomes import outcomes_app\nfrom cli.version import __version__\n\napp = typer.Typer(\n    name=\"agentic-odi-cli\",\n    help=\"Agentic ODI CLI - Tool for managing Jobs-to-be-Done (JTBD) and ODI workflows.\",\n)\napp.add_typer(connectors_app, name=\"connectors\")\n\napp.add_typer(outcomes_app, name=\"outcomes\", help=\"Manage Customer Outcomes\")\n\n\ndef _version_callback(value: bool) -> None:\n    if value:\n        typer.echo(__version__)\n        raise typer.Exit()\n\n\n@app.callback()\ndef main(\n    version: bool = typer.Option(\n        False, \"--version\", callback=_version_callback, help=\"Show version\"\n    ),\n) -> None:  # noqa: B008\n    pass\n\n\n@app.command()\ndef version_cmd() -> None:\n    \"\"\"Show CLI version.\"\"\"\n    typer.echo(__version__)\n\n\nif __name__ == \"__main__\":\n    app()",
+                "lineStart": 1,
+                "lineEnd": 40,
+                "totalLines": 40,
+                "truncated": false
+              }
+            },
+            "title": ".worktrees/cli-bundled-distribution/cli/src/cli/cli.py",
+            "time": {
+              "start": 1792097713191,
+              "end": 1792097713320
+            }
+          },
+          "id": "prt_14158fa61001jnRVXoVYCTCU1C",
+          "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e",
+          "messageID": "msg_14158e5ef001fRr3WZevQqxob0"
+        },
+        {
+          "type": "tool",
+          "tool": "read",
+          "callID": "call_cad2af18106a42bb9c9d7ec2",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/cli/tests/test_cli.py"
+            },
+            "output": "<path>/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/cli/tests/test_cli.py</path>\n<type>file</type>\n<content>\n1: import re\n2: \n3: from typer.testing import CliRunner\n4: \n5: from cli.cli import __version__, app\n6: \n7: ANSI_ESCAPE = re.compile(r\"\\x1b\\[[0-9;]*m\")\n8: \n9: \n10: def _strip_ansi(text: str) -> str:\n11:     return ANSI_ESCAPE.sub(\"\", text)\n12: \n13: \n14: def test_version_flag_prints_version():\n15:     runner = CliRunner()\n16:     result = runner.invoke(app, [\"--version\"])\n17: \n18:     assert result.exit_code == 0\n19:     assert __version__ in _strip_ansi(result.output)\n20: \n21: \n22: def test_help_flag_shows_usage():\n23:     runner = CliRunner()\n24:     result = runner.invoke(app, [\"--help\"])\n25: \n26:     assert result.exit_code == 0\n27:     output = _strip_ansi(result.output)\n28:     assert \"Usage\" in output\n29:     assert \"--version\" in output\n\n(End of file - total 29 lines)\n</content>",
+            "metadata": {
+              "preview": "import re\n\nfrom typer.testing import CliRunner\n\nfrom cli.cli import __version__, app\n\nANSI_ESCAPE = re.compile(r\"\\x1b\\[[0-9;]*m\")\n\n\ndef _strip_ansi(text: str) -> str:\n    return ANSI_ESCAPE.sub(\"\", text)\n\n\ndef test_version_flag_prints_version():\n    runner = CliRunner()\n    result = runner.invoke(app, [\"--version\"])\n\n    assert result.exit_code == 0\n    assert __version__ in _strip_ansi(result.output)\n",
+              "truncated": false,
+              "loaded": [],
+              "display": {
+                "type": "file",
+                "path": "/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/cli/tests/test_cli.py",
+                "text": "import re\n\nfrom typer.testing import CliRunner\n\nfrom cli.cli import __version__, app\n\nANSI_ESCAPE = re.compile(r\"\\x1b\\[[0-9;]*m\")\n\n\ndef _strip_ansi(text: str) -> str:\n    return ANSI_ESCAPE.sub(\"\", text)\n\n\ndef test_version_flag_prints_version():\n    runner = CliRunner()\n    result = runner.invoke(app, [\"--version\"])\n\n    assert result.exit_code == 0\n    assert __version__ in _strip_ansi(result.output)\n\n\ndef test_help_flag_shows_usage():\n    runner = CliRunner()\n    result = runner.invoke(app, [\"--help\"])\n\n    assert result.exit_code == 0\n    output = _strip_ansi(result.output)\n    assert \"Usage\" in output\n    assert \"--version\" in output",
+                "lineStart": 1,
+                "lineEnd": 29,
+                "totalLines": 29,
+                "truncated": false
+              }
+            },
+            "title": ".worktrees/cli-bundled-distribution/cli/tests/test_cli.py",
+            "time": {
+              "start": 1792097713551,
+              "end": 1792097713667
+            }
+          },
+          "id": "prt_14158fc50001zuO0KyJkW4n071",
+          "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e",
+          "messageID": "msg_14158e5ef001fRr3WZevQqxob0"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "3d265993606d9ec85dfbd94a1179d367fe73d145",
+          "type": "step-finish",
+          "tokens": {
+            "total": 17292,
+            "input": 335,
+            "output": 78,
+            "reasoning": 47,
+            "cache": {
+              "write": 0,
+              "read": 16832
+            }
+          },
+          "cost": 0,
+          "id": "prt_14158fe6d001ZyKV92sp50ZZny",
+          "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e",
+          "messageID": "msg_14158e5ef001fRr3WZevQqxob0"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_14158ab60001sLbiZSZwzGFZOY",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 18308,
+          "input": 855,
+          "output": 219,
+          "reasoning": 82,
+          "cache": {
+            "write": 0,
+            "read": 17152
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792097713938,
+          "completed": 1792097721307
+        },
+        "finish": "tool-calls",
+        "id": "msg_14158ff12001ZRpq67sUAlwhCD",
+        "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e"
+      },
+      "parts": [
+        {
+          "snapshot": "3d265993606d9ec85dfbd94a1179d367fe73d145",
+          "type": "step-start",
+          "id": "prt_141590f4900146q96jSLCNg8Xi",
+          "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e",
+          "messageID": "msg_14158ff12001ZRpq67sUAlwhCD"
+        },
+        {
+          "type": "reasoning",
+          "text": "Note: there's also `version_cmd` echoing `__version__` — brief only says change `_version_callback`. I'll change only `_version_callback` per the brief (keep it minimal). Actually, should I change version_cmd too? The brief says only `_version_callback`. Keep scope tight — only `_version_callback`.\n\nStep 1: write failing test `cli/tests/test_build_info.py`.",
+          "time": {
+            "start": 1792097718173,
+            "end": 1792097719231
+          },
+          "id": "prt_141590f9d001OpXEK4OoahML4W",
+          "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e",
+          "messageID": "msg_14158ff12001ZRpq67sUAlwhCD"
+        },
+        {
+          "type": "text",
+          "text": "Step 1: write the failing test.",
+          "time": {
+            "start": 1792097719236,
+            "end": 1792097720926
+          },
+          "id": "prt_1415913c3001qmh306GMv5kwle",
+          "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e",
+          "messageID": "msg_14158ff12001ZRpq67sUAlwhCD"
+        },
+        {
+          "type": "tool",
+          "tool": "write",
+          "callID": "call_b14d0a03fc6a4bba90e30d99",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/cli/tests/test_build_info.py",
+              "content": "from cli import version\n\n\ndef test_version_matches_build_info():\n    from cli import _build_info\n\n    assert version.__version__ == _build_info.VERSION\n    assert version.__version__ == \"0.1.0\"\n\n\ndef test_build_summary_omits_date_when_empty(monkeypatch):\n    monkeypatch.setattr(version, \"RELEASE_DATE_UTC\", \"\")\n    assert version.build_summary() == \"0.1.0\"\n\n\ndef test_build_summary_includes_date_when_set(monkeypatch):\n    monkeypatch.setattr(version, \"RELEASE_DATE_UTC\", \"2026-10-15T21:13:00Z\")\n    assert version.build_summary() == \"0.1.0 (2026-10-15)\"\n"
+            },
+            "output": "Wrote file successfully.",
+            "metadata": {
+              "diagnostics": {},
+              "filepath": "/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/cli/tests/test_build_info.py",
+              "exists": false,
+              "truncated": false
+            },
+            "title": ".worktrees/cli-bundled-distribution/cli/tests/test_build_info.py",
+            "time": {
+              "start": 1792097720920,
+              "end": 1792097720952
+            }
+          },
+          "id": "prt_141591412001Hlr0roytDqn3oR",
+          "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e",
+          "messageID": "msg_14158ff12001ZRpq67sUAlwhCD"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "3d265993606d9ec85dfbd94a1179d367fe73d145",
+          "type": "step-finish",
+          "tokens": {
+            "total": 18308,
+            "input": 855,
+            "output": 219,
+            "reasoning": 82,
+            "cache": {
+              "write": 0,
+              "read": 17152
+            }
+          },
+          "cost": 0,
+          "id": "prt_141591b12001eBrYnCGw9cdJ2Z",
+          "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e",
+          "messageID": "msg_14158ff12001ZRpq67sUAlwhCD"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_14158ab60001sLbiZSZwzGFZOY",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 18418,
+          "input": 336,
+          "output": 85,
+          "reasoning": 13,
+          "cache": {
+            "write": 0,
+            "read": 17984
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792097721318,
+          "completed": 1792097727015
+        },
+        "finish": "tool-calls",
+        "id": "msg_141591be6001SWIn9xAZ0a85hW",
+        "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e"
+      },
+      "parts": [
+        {
+          "snapshot": "3d265993606d9ec85dfbd94a1179d367fe73d145",
+          "type": "step-start",
+          "id": "prt_141592966001o97Hb4fgiEfH9h",
+          "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e",
+          "messageID": "msg_141591be6001SWIn9xAZ0a85hW"
+        },
+        {
+          "type": "reasoning",
+          "text": "Step 2: run the test to verify it fails.",
+          "time": {
+            "start": 1792097724821,
+            "end": 1792097724904
+          },
+          "id": "prt_141592995001dLGpZdMnLx6Tyj",
+          "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e",
+          "messageID": "msg_141591be6001SWIn9xAZ0a85hW"
+        },
+        {
+          "type": "text",
+          "text": "Step 2: confirm RED.",
+          "time": {
+            "start": 1792097724908,
+            "end": 1792097725715
+          },
+          "id": "prt_1415929ec001VCNQAwj2ogsXAI",
+          "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e",
+          "messageID": "msg_141591be6001SWIn9xAZ0a85hW"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "call_8876aded4c0d411d8bd96df5",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "UV_PYTHON=3.11 uv run --directory cli pytest tests/test_build_info.py -v",
+              "workdir": "/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution",
+              "timeout": 180000
+            },
+            "output": "============================= test session starts ==============================\nplatform linux -- Python 3.11.17, pytest-9.1.1, pluggy-1.6.0 -- /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/.venv/bin/python\ncachedir: .pytest_cache\nrootdir: /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/cli\nconfigfile: pyproject.toml\nplugins: platformdirs-4.13.0, cov-7.1.0, asyncio-1.4.0, anyio-4.15.1\nasyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function\ncollecting ... collected 3 items\n\ntests/test_build_info.py::test_version_matches_build_info FAILED         [ 33%]\ntests/test_build_info.py::test_build_summary_omits_date_when_empty FAILED [ 66%]\ntests/test_build_info.py::test_build_summary_includes_date_when_set FAILED [100%]\n\n=================================== FAILURES ===================================\n_______________________ test_version_matches_build_info ________________________\n\n    def test_version_matches_build_info():\n>       from cli import _build_info\nE       ImportError: cannot import name '_build_info' from 'cli' (/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/cli/src/cli/__init__.py)\n\ntests/test_build_info.py:5: ImportError\n___________________ test_build_summary_omits_date_when_empty ___________________\n\nmonkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x73c588f84490>\n\n    def test_build_summary_omits_date_when_empty(monkeypatch):\n>       monkeypatch.setattr(version, \"RELEASE_DATE_UTC\", \"\")\nE       AttributeError: <module 'cli.version' from '/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/cli/src/cli/version.py'> has no attribute 'RELEASE_DATE_UTC'\n\ntests/test_build_info.py:12: AttributeError\n__________________ test_build_summary_includes_date_when_set ___________________\n\nmonkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x73c588f87910>\n\n    def test_build_summary_includes_date_when_set(monkeypatch):\n>       monkeypatch.setattr(version, \"RELEASE_DATE_UTC\", \"2026-10-15T21:13:00Z\")\nE       AttributeError: <module 'cli.version' from '/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/cli/src/cli/version.py'> has no attribute 'RELEASE_DATE_UTC'\n\ntests/test_build_info.py:17: AttributeError\n=========================== short test summary info ============================\nFAILED tests/test_build_info.py::test_version_matches_build_info - ImportErro...\nFAILED tests/test_build_info.py::test_build_summary_omits_date_when_empty - A...\nFAILED tests/test_build_info.py::test_build_summary_includes_date_when_set - ...\n============================== 3 failed in 0.15s ===============================\n",
+            "metadata": {
+              "output": "============================= test session starts ==============================\nplatform linux -- Python 3.11.17, pytest-9.1.1, pluggy-1.6.0 -- /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/.venv/bin/python\ncachedir: .pytest_cache\nrootdir: /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/cli\nconfigfile: pyproject.toml\nplugins: platformdirs-4.13.0, cov-7.1.0, asyncio-1.4.0, anyio-4.15.1\nasyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function\ncollecting ... collected 3 items\n\ntests/test_build_info.py::test_version_matches_build_info FAILED         [ 33%]\ntests/test_build_info.py::test_build_summary_omits_date_when_empty FAILED [ 66%]\ntests/test_build_info.py::test_build_summary_includes_date_when_set FAILED [100%]\n\n=================================== FAILURES ===================================\n_______________________ test_version_matches_build_info ________________________\n\n    def test_version_matches_build_info():\n>       from cli import _build_info\nE       ImportError: cannot import name '_build_info' from 'cli' (/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/cli/src/cli/__init__.py)\n\ntests/test_build_info.py:5: ImportError\n___________________ test_build_summary_omits_date_when_empty ___________________\n\nmonkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x73c588f84490>\n\n    def test_build_summary_omits_date_when_empty(monkeypatch):\n>       monkeypatch.setattr(version, \"RELEASE_DATE_UTC\", \"\")\nE       AttributeError: <module 'cli.version' from '/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/cli/src/cli/version.py'> has no attribute 'RELEASE_DATE_UTC'\n\ntests/test_build_info.py:12: AttributeError\n__________________ test_build_summary_includes_date_when_set ___________________\n\nmonkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x73c588f87910>\n\n    def test_build_summary_includes_date_when_set(monkeypatch):\n>       monkeypatch.setattr(version, \"RELEASE_DATE_UTC\", \"2026-10-15T21:13:00Z\")\nE       AttributeError: <module 'cli.version' from '/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/cli/src/cli/version.py'> has no attribute 'RELEASE_DATE_UTC'\n\ntests/test_build_info.py:17: AttributeError\n=========================== short test summary info ============================\nFAILED tests/test_build_info.py::test_version_matches_build_info - ImportErro...\nFAILED tests/test_build_info.py::test_build_summary_omits_date_when_empty - A...\nFAILED tests/test_build_info.py::test_build_summary_includes_date_when_set - ...\n============================== 3 failed in 0.15s ===============================\n",
+              "exit": 1,
+              "truncated": false
+            },
+            "title": "UV_PYTHON=3.11 uv run --directory cli pytest tests/test_build_info.py -v",
+            "time": {
+              "start": 1792097725696,
+              "end": 1792097726906
+            }
+          },
+          "id": "prt_141592ab6001AGSbMRnLdvUBb4",
+          "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e",
+          "messageID": "msg_141591be6001SWIn9xAZ0a85hW"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "692ad1adec582e9962c7c884d95506c2c6156e96",
+          "type": "step-finish",
+          "tokens": {
+            "total": 18418,
+            "input": 336,
+            "output": 85,
+            "reasoning": 13,
+            "cache": {
+              "write": 0,
+              "read": 17984
+            }
+          },
+          "cost": 0,
+          "id": "prt_1415931ec0012pkfOkVUllIzg3",
+          "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e",
+          "messageID": "msg_141591be6001SWIn9xAZ0a85hW"
+        },
+        {
+          "type": "patch",
+          "hash": "3d265993606d9ec85dfbd94a1179d367fe73d145",
+          "files": [
+            "/home/alexa/repos/agentic-odi/docs/superpowers/specs/2026-10-15-cli-odi-entity-parity-design.md"
+          ],
+          "id": "prt_141593223001tABT3TQTOC0EHq",
+          "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e",
+          "messageID": "msg_141591be6001SWIn9xAZ0a85hW"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_14158ab60001sLbiZSZwzGFZOY",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 19409,
+          "input": 793,
+          "output": 276,
+          "reasoning": 36,
+          "cache": {
+            "write": 0,
+            "read": 18304
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792097727025,
+          "completed": 1792097730932
+        },
+        "finish": "tool-calls",
+        "id": "msg_141593231001gN9vp0g194uei4",
+        "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e"
+      },
+      "parts": [
+        {
+          "snapshot": "692ad1adec582e9962c7c884d95506c2c6156e96",
+          "type": "step-start",
+          "id": "prt_1415938540017pUjIf7kisilL0",
+          "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e",
+          "messageID": "msg_141593231001gN9vp0g194uei4"
+        },
+        {
+          "type": "reasoning",
+          "text": "RED confirmed: 3 failed — no `_build_info`, no `RELEASE_DATE_UTC`.\n\nStep 3: create `_build_info.py` and rewrite `version.py`.",
+          "time": {
+            "start": 1792097728679,
+            "end": 1792097729036
+          },
+          "id": "prt_1415938a7001DfOhM1EpURBxTe",
+          "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e",
+          "messageID": "msg_141593231001gN9vp0g194uei4"
+        },
+        {
+          "type": "text",
+          "text": "RED confirmed (3 failed: missing `_build_info`, no `RELEASE_DATE_UTC`/`build_summary`). Step 3: implement.",
+          "time": {
+            "start": 1792097729040,
+            "end": 1792097730704
+          },
+          "id": "prt_141593a10001AC5A4X4iBCxeBZ",
+          "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e",
+          "messageID": "msg_141593231001gN9vp0g194uei4"
+        },
+        {
+          "type": "tool",
+          "tool": "write",
+          "callID": "call_ec59730012554a0ba1aa53ca",
+          "state": {
+            "status": "completed",
+            "input": {
+              "content": "VERSION = \"0.1.0\"\nRELEASE_DATE_UTC = \"\"\nCOMMIT = \"dev\"\nTARGET = \"dev\"\n",
+              "filePath": "/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/cli/src/cli/_build_info.py"
+            },
+            "output": "Wrote file successfully.",
+            "metadata": {
+              "diagnostics": {},
+              "filepath": "/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/cli/src/cli/_build_info.py",
+              "exists": false,
+              "truncated": false
+            },
+            "title": ".worktrees/cli-bundled-distribution/cli/src/cli/_build_info.py",
+            "time": {
+              "start": 1792097729789,
+              "end": 1792097729815
+            }
+          },
+          "id": "prt_141593af3001lr4wqbdSMv3UGs",
+          "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e",
+          "messageID": "msg_141593231001gN9vp0g194uei4"
+        },
+        {
+          "type": "tool",
+          "tool": "write",
+          "callID": "call_688b57c8753649a0b3539854",
+          "state": {
+            "status": "completed",
+            "input": {
+              "content": "\"\"\"Version information.\"\"\"\n\nfrom cli._build_info import COMMIT, RELEASE_DATE_UTC as _RELEASE_DATE_UTC, TARGET, VERSION\n\n__version__ = VERSION\nRELEASE_DATE_UTC = _RELEASE_DATE_UTC\nCOMMIT = COMMIT\nTARGET = TARGET\nrelease_date = RELEASE_DATE_UTC or None\n\n\ndef build_summary() -> str:\n    if RELEASE_DATE_UTC:\n        return f\"{VERSION} ({RELEASE_DATE_UTC[:10]})\"\n    return VERSION\n\n\ndef verbose_summary() -> str:\n    return f\"{build_summary()}\\ncommit: {COMMIT}\\ntarget: {TARGET}\"\n",
+              "filePath": "/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/cli/src/cli/version.py"
+            },
+            "output": "Wrote file successfully.",
+            "metadata": {
+              "diagnostics": {},
+              "filepath": "/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/cli/src/cli/version.py",
+              "exists": true,
+              "truncated": false
+            },
+            "title": ".worktrees/cli-bundled-distribution/cli/src/cli/version.py",
+            "time": {
+              "start": 1792097730698,
+              "end": 1792097730738
+            }
+          },
+          "id": "prt_141593d3c001XkTdICxGFTRrY1",
+          "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e",
+          "messageID": "msg_141593231001gN9vp0g194uei4"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "692ad1adec582e9962c7c884d95506c2c6156e96",
+          "type": "step-finish",
+          "tokens": {
+            "total": 19409,
+            "input": 793,
+            "output": 276,
+            "reasoning": 36,
+            "cache": {
+              "write": 0,
+              "read": 18304
+            }
+          },
+          "cost": 0,
+          "id": "prt_141594123001URF6fdWY9gEpoA",
+          "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e",
+          "messageID": "msg_141593231001gN9vp0g194uei4"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_14158ab60001sLbiZSZwzGFZOY",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 19641,
+          "input": 358,
+          "output": 88,
+          "reasoning": 123,
+          "cache": {
+            "write": 0,
+            "read": 19072
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792097730940,
+          "completed": 1792097736404
+        },
+        "finish": "tool-calls",
+        "id": "msg_14159417c001iZ7puVESXPzFC8",
+        "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e"
+      },
+      "parts": [
+        {
+          "snapshot": "692ad1adec582e9962c7c884d95506c2c6156e96",
+          "type": "step-start",
+          "id": "prt_1415949480016UgjFUr60H4QPJ",
+          "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e",
+          "messageID": "msg_14159417c001iZ7puVESXPzFC8"
+        },
+        {
+          "type": "reasoning",
+          "text": "Wait — in `version.py`, `from cli._build_info import COMMIT, ..., TARGET, VERSION` then `COMMIT = COMMIT` — that's a self-referential assignment which is fine (RHS evaluated before assignment; `COMMIT` at module level refers to the imported name). Actually `COMMIT = COMMIT` after import: the RHS `COMMIT` resolves to the imported global, which is fine. Same for `TARGET = TARGET`. This is the exact code from the brief, so keep it verbatim.\n\nNow Step 4: change `_version_callback` in cli.py.",
+          "time": {
+            "start": 1792097733018,
+            "end": 1792097735147
+          },
+          "id": "prt_14159499a001qHdZi1izccenPm",
+          "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e",
+          "messageID": "msg_14159417c001iZ7puVESXPzFC8"
+        },
+        {
+          "type": "text",
+          "text": "Step 4: point `--version` at the summary.",
+          "time": {
+            "start": 1792097735162,
+            "end": 1792097735970
+          },
+          "id": "prt_1415951fa001p3MkAciHsHKEc8",
+          "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e",
+          "messageID": "msg_14159417c001iZ7puVESXPzFC8"
+        },
+        {
+          "type": "tool",
+          "tool": "edit",
+          "callID": "call_2f747f88053849c6a42ad808",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/cli/src/cli/cli.py",
+              "oldString": "from cli.version import __version__",
+              "newString": "from cli import version\nfrom cli.version import __version__"
+            },
+            "output": "Edit applied successfully.",
+            "metadata": {
+              "diagnostics": {},
+              "diff": "Index: /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/cli/src/cli/cli.py\n===================================================================\n--- /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/cli/src/cli/cli.py\n+++ /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/cli/src/cli/cli.py\n@@ -3,8 +3,9 @@\n import typer\n \n from cli.connectors import connectors_app\n from cli.outcomes import outcomes_app\n+from cli import version\n from cli.version import __version__\n \n app = typer.Typer(\n     name=\"agentic-odi-cli\",\n",
+              "filediff": {
+                "file": "/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/cli/src/cli/cli.py",
+                "patch": "Index: /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/cli/src/cli/cli.py\n===================================================================\n--- /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/cli/src/cli/cli.py\n+++ /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/cli/src/cli/cli.py\n@@ -3,8 +3,9 @@\n import typer\n \n from cli.connectors import connectors_app\n from cli.outcomes import outcomes_app\n+from cli import version\n from cli.version import __version__\n \n app = typer.Typer(\n     name=\"agentic-odi-cli\",\n",
+                "additions": 1,
+                "deletions": 0
+              },
+              "truncated": false
+            },
+            "title": ".worktrees/cli-bundled-distribution/cli/src/cli/cli.py",
+            "time": {
+              "start": 1792097735961,
+              "end": 1792097736004
+            }
+          },
+          "id": "prt_14159520b0019IMN5i1boPE1pT",
+          "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e",
+          "messageID": "msg_14159417c001iZ7puVESXPzFC8"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "692ad1adec582e9962c7c884d95506c2c6156e96",
+          "type": "step-finish",
+          "tokens": {
+            "total": 19641,
+            "input": 358,
+            "output": 88,
+            "reasoning": 123,
+            "cache": {
+              "write": 0,
+              "read": 19072
+            }
+          },
+          "cost": 0,
+          "id": "prt_141595625001NUvnOgh6iLdAv2",
+          "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e",
+          "messageID": "msg_14159417c001iZ7puVESXPzFC8"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_14158ab60001sLbiZSZwzGFZOY",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 19880,
+          "input": 260,
+          "output": 111,
+          "reasoning": 117,
+          "cache": {
+            "write": 0,
+            "read": 19392
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792097736417,
+          "completed": 1792097747416
+        },
+        "finish": "tool-calls",
+        "id": "msg_1415956e100130KGQfcfvLG6o4",
+        "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e"
+      },
+      "parts": [
+        {
+          "snapshot": "692ad1adec582e9962c7c884d95506c2c6156e96",
+          "type": "step-start",
+          "id": "prt_14159626500117v9jwMW0TLrIA",
+          "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e",
+          "messageID": "msg_1415956e100130KGQfcfvLG6o4"
+        },
+        {
+          "type": "reasoning",
+          "text": "The import `from cli import version` and `from cli.version import __version__` — no name clash since `version` (module) and `__version__` are distinct names. But wait: `cli.py` has a parameter named `version: bool` in the `main` callback! The parameter `version` shadows the module `version` inside `main`, but `_version_callback` is a separate function at module level, so `version.build_summary()` inside `_version_callback` resolves to the module. That's fine.\n\nNow change the callback body.",
+          "time": {
+            "start": 1792097739463,
+            "end": 1792097741705
+          },
+          "id": "prt_1415962c7001Ipue8HurMsTVP0",
+          "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e",
+          "messageID": "msg_1415956e100130KGQfcfvLG6o4"
+        },
+        {
+          "type": "tool",
+          "tool": "edit",
+          "callID": "call_ebd66d41c39f4c5cbe895082",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/cli/src/cli/cli.py",
+              "newString": "def _version_callback(value: bool) -> None:\n    if value:\n        typer.echo(version.build_summary())\n        raise typer.Exit()",
+              "oldString": "def _version_callback(value: bool) -> None:\n    if value:\n        typer.echo(__version__)\n        raise typer.Exit()"
+            },
+            "output": "Edit applied successfully.",
+            "metadata": {
+              "diagnostics": {},
+              "diff": "Index: /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/cli/src/cli/cli.py\n===================================================================\n--- /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/cli/src/cli/cli.py\n+++ /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/cli/src/cli/cli.py\n@@ -17,9 +17,9 @@\n \n \n def _version_callback(value: bool) -> None:\n     if value:\n-        typer.echo(__version__)\n+        typer.echo(version.build_summary())\n         raise typer.Exit()\n \n \n @app.callback()\n",
+              "filediff": {
+                "file": "/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/cli/src/cli/cli.py",
+                "patch": "Index: /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/cli/src/cli/cli.py\n===================================================================\n--- /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/cli/src/cli/cli.py\n+++ /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/cli/src/cli/cli.py\n@@ -17,9 +17,9 @@\n \n \n def _version_callback(value: bool) -> None:\n     if value:\n-        typer.echo(__version__)\n+        typer.echo(version.build_summary())\n         raise typer.Exit()\n \n \n @app.callback()\n",
+                "additions": 1,
+                "deletions": 1
+              },
+              "truncated": false
+            },
+            "title": ".worktrees/cli-bundled-distribution/cli/src/cli/cli.py",
+            "time": {
+              "start": 1792097741875,
+              "end": 1792097741937
+            }
+          },
+          "id": "prt_141596b9c001zdRhf2oB5ZUGu7",
+          "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e",
+          "messageID": "msg_1415956e100130KGQfcfvLG6o4"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "692ad1adec582e9962c7c884d95506c2c6156e96",
+          "type": "step-finish",
+          "tokens": {
+            "total": 19880,
+            "input": 260,
+            "output": 111,
+            "reasoning": 117,
+            "cache": {
+              "write": 0,
+              "read": 19392
+            }
+          },
+          "cost": 0,
+          "id": "prt_14159705b001xIyIJ05iVGABqr",
+          "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e",
+          "messageID": "msg_1415956e100130KGQfcfvLG6o4"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_14158ab60001sLbiZSZwzGFZOY",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 20033,
+          "input": 14067,
+          "output": 89,
+          "reasoning": 53,
+          "cache": {
+            "write": 0,
+            "read": 5824
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792097747445,
+          "completed": 1792097761201
+        },
+        "finish": "tool-calls",
+        "id": "msg_1415981f5001h99ti4sDEBUgcR",
+        "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e"
+      },
+      "parts": [
+        {
+          "snapshot": "692ad1adec582e9962c7c884d95506c2c6156e96",
+          "type": "step-start",
+          "id": "prt_141598ffb0019dESiRuVE600Sc",
+          "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e",
+          "messageID": "msg_1415981f5001h99ti4sDEBUgcR"
+        },
+        {
+          "type": "reasoning",
+          "text": "The `main` callback has a parameter named `version: bool` which shadows the module inside `main` — but `_version_callback` is at module level and refers to the module. That's fine.\n\nStep 5: run tests to confirm GREEN.",
+          "time": {
+            "start": 1792097751040,
+            "end": 1792097752039
+          },
+          "id": "prt_141599000001xw3Tl2rGKFpeT3",
+          "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e",
+          "messageID": "msg_1415981f5001h99ti4sDEBUgcR"
+        },
+        {
+          "type": "text",
+          "text": "Step 5: confirm GREEN.",
+          "time": {
+            "start": 1792097752043,
+            "end": 1792097753683
+          },
+          "id": "prt_1415993eb001SFOudAbWalN9B1",
+          "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e",
+          "messageID": "msg_1415981f5001h99ti4sDEBUgcR"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "call_bd74ef229932402289c9b53f",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "UV_PYTHON=3.11 uv run --directory cli pytest tests/test_build_info.py tests/test_cli.py -v",
+              "timeout": 180000,
+              "workdir": "/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution"
+            },
+            "output": "============================= test session starts ==============================\nplatform linux -- Python 3.11.17, pytest-9.1.1, pluggy-1.6.0 -- /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/.venv/bin/python\ncachedir: .pytest_cache\nrootdir: /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/cli\nconfigfile: pyproject.toml\nplugins: platformdirs-4.13.0, cov-7.1.0, asyncio-1.4.0, anyio-4.15.1\nasyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function\ncollecting ... collected 5 items\n\ntests/test_build_info.py::test_version_matches_build_info PASSED         [ 20%]\ntests/test_build_info.py::test_build_summary_omits_date_when_empty PASSED [ 40%]\ntests/test_build_info.py::test_build_summary_includes_date_when_set PASSED [ 60%]\ntests/test_cli.py::test_version_flag_prints_version PASSED               [ 80%]\ntests/test_cli.py::test_help_flag_shows_usage PASSED                     [100%]\n\n============================== 5 passed in 5.44s ===============================\n",
+            "metadata": {
+              "output": "============================= test session starts ==============================\nplatform linux -- Python 3.11.17, pytest-9.1.1, pluggy-1.6.0 -- /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/.venv/bin/python\ncachedir: .pytest_cache\nrootdir: /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/cli\nconfigfile: pyproject.toml\nplugins: platformdirs-4.13.0, cov-7.1.0, asyncio-1.4.0, anyio-4.15.1\nasyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function\ncollecting ... collected 5 items\n\ntests/test_build_info.py::test_version_matches_build_info PASSED         [ 20%]\ntests/test_build_info.py::test_build_summary_omits_date_when_empty PASSED [ 40%]\ntests/test_build_info.py::test_build_summary_includes_date_when_set PASSED [ 60%]\ntests/test_cli.py::test_version_flag_prints_version PASSED               [ 80%]\ntests/test_cli.py::test_help_flag_shows_usage PASSED                     [100%]\n\n============================== 5 passed in 5.44s ===============================\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "UV_PYTHON=3.11 uv run --directory cli pytest tests/test_build_info.py tests/test_cli.py -v",
+            "time": {
+              "start": 1792097753665,
+              "end": 1792097761005
+            }
+          },
+          "id": "prt_1415994e8001wTOurt77kXZEyk",
+          "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e",
+          "messageID": "msg_1415981f5001h99ti4sDEBUgcR"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "692ad1adec582e9962c7c884d95506c2c6156e96",
+          "type": "step-finish",
+          "tokens": {
+            "total": 20033,
+            "input": 14067,
+            "output": 89,
+            "reasoning": 53,
+            "cache": {
+              "write": 0,
+              "read": 5824
+            }
+          },
+          "cost": 0,
+          "id": "prt_14159b769001RsJ3IKJQA3lgFA",
+          "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e",
+          "messageID": "msg_1415981f5001h99ti4sDEBUgcR"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_14158ab60001sLbiZSZwzGFZOY",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 20660,
+          "input": 492,
+          "output": 149,
+          "reasoning": 179,
+          "cache": {
+            "write": 0,
+            "read": 19840
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792097761219,
+          "completed": 1792097770526
+        },
+        "finish": "tool-calls",
+        "id": "msg_14159b7c3001gy59ut4wf3Gcwy",
+        "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e"
+      },
+      "parts": [
+        {
+          "snapshot": "692ad1adec582e9962c7c884d95506c2c6156e96",
+          "type": "step-start",
+          "id": "prt_14159c15e001SIdCTkMljf3okT",
+          "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e",
+          "messageID": "msg_14159b7c3001gy59ut4wf3Gcwy"
+        },
+        {
+          "type": "reasoning",
+          "text": "All 5 pass. Quick self-review before commit:\n\n1. `from cli import version` + `from cli.version import __version__` — the `main` callback has a parameter named `version: bool` which shadows the module inside `main`, but `_version_callback` is module-level and resolves `version.build_summary()` correctly. Verified by the passing test.\n\n2. `version.py` — the `COMMIT = COMMIT` / `TARGET = TARGET` lines from the brief: RHS resolves to the imported names. Slightly odd style but that's what the brief specifies verbatim, and tests pass.\n\n3. Ruff/lint — the repo may have lint config. Let me check if there's a lint command. The brief doesn't require it, but verification-before-completion and repo conventions suggest running lint. Let me check pyproject / ruff quickly.",
+          "time": {
+            "start": 1792097763781,
+            "end": 1792097767767
+          },
+          "id": "prt_14159c1c5001GRoHXgCirX6Gur",
+          "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e",
+          "messageID": "msg_14159b7c3001gy59ut4wf3Gcwy"
+        },
+        {
+          "type": "text",
+          "text": "All 5 pass. Quick lint check before committing:",
+          "time": {
+            "start": 1792097767772,
+            "end": 1792097770186
+          },
+          "id": "prt_14159d15c0019eY7bTNI9JZXUD",
+          "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e",
+          "messageID": "msg_14159b7c3001gy59ut4wf3Gcwy"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "call_01438f13806e4e1388368f88",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "UV_PYTHON=3.11 uv run --directory cli ruff check src/cli/_build_info.py src/cli/version.py src/cli/cli.py tests/test_build_info.py 2>&1; UV_PYTHON=3.11 uv run --directory cli ruff format --check src/cli/_build_info.py src/cli/version.py src/cli/cli.py tests/test_build_info.py 2>&1",
+              "timeout": 120000,
+              "workdir": "/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution"
+            },
+            "output": "I001 [*] Import block is un-sorted or un-formatted\n  --> src/cli/cli.py:3:1\n   |\n 1 |   \"\"\"Main CLI entry point.\"\"\"\n 2 |\n 3 | / import typer\n 4 | |\n 5 | | from cli.connectors import connectors_app\n 6 | | from cli.outcomes import outcomes_app\n 7 | | from cli import version\n 8 | | from cli.version import __version__\n   | |___________________________________^\n 9 |\n10 |   app = typer.Typer(\n   |\nhelp: Organize imports\n  |\n4 |\n5 + from cli import version\n6 | from cli.connectors import connectors_app\n7 | from cli.outcomes import outcomes_app\n  - from cli import version\n8 | from cli.version import __version__\n  |\n\nI001 [*] Import block is un-sorted or un-formatted\n --> src/cli/version.py:3:1\n  |\n1 | \"\"\"Version information.\"\"\"\n2 |\n3 | from cli._build_info import COMMIT, RELEASE_DATE_UTC as _RELEASE_DATE_UTC, TARGET, VERSION\n  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n4 |\n5 | __version__ = VERSION\n  |\nhelp: Organize imports\n  |\n2 |\n  - from cli._build_info import COMMIT, RELEASE_DATE_UTC as _RELEASE_DATE_UTC, TARGET, VERSION\n3 + from cli._build_info import COMMIT, TARGET, VERSION\n4 + from cli._build_info import RELEASE_DATE_UTC as _RELEASE_DATE_UTC\n5 |\n  |\n\nFound 2 errors.\n[*] 2 fixable with `--fix`.\n4 files already formatted\n",
+            "metadata": {
+              "output": "I001 [*] Import block is un-sorted or un-formatted\n  --> src/cli/cli.py:3:1\n   |\n 1 |   \"\"\"Main CLI entry point.\"\"\"\n 2 |\n 3 | / import typer\n 4 | |\n 5 | | from cli.connectors import connectors_app\n 6 | | from cli.outcomes import outcomes_app\n 7 | | from cli import version\n 8 | | from cli.version import __version__\n   | |___________________________________^\n 9 |\n10 |   app = typer.Typer(\n   |\nhelp: Organize imports\n  |\n4 |\n5 + from cli import version\n6 | from cli.connectors import connectors_app\n7 | from cli.outcomes import outcomes_app\n  - from cli import version\n8 | from cli.version import __version__\n  |\n\nI001 [*] Import block is un-sorted or un-formatted\n --> src/cli/version.py:3:1\n  |\n1 | \"\"\"Version information.\"\"\"\n2 |\n3 | from cli._build_info import COMMIT, RELEASE_DATE_UTC as _RELEASE_DATE_UTC, TARGET, VERSION\n  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n4 |\n5 | __version__ = VERSION\n  |\nhelp: Organize imports\n  |\n2 |\n  - from cli._build_info import COMMIT, RELEASE_DATE_UTC as _RELEASE_DATE_UTC, TARGET, VERSION\n3 + from cli._build_info import COMMIT, TARGET, VERSION\n4 + from cli._build_info import RELEASE_DATE_UTC as _RELEASE_DATE_UTC\n5 |\n  |\n\nFound 2 errors.\n[*] 2 fixable with `--fix`.\n4 files already formatted\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "UV_PYTHON=3.11 uv run --directory cli ruff check src/cli/_build_info.py src/cli/version.py src/cli/cli.py tests/test_build_info.py 2>&1; UV_PYTHON=3.11 uv run --directory cli ruff format --check src/cli/_build_info.py src/cli/version.py src/cli/cli.py tests/test_build_info.py 2>&1",
+            "time": {
+              "start": 1792097770168,
+              "end": 1792097770378
+            }
+          },
+          "id": "prt_14159d248001uVmUdDIC0EVti1",
+          "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e",
+          "messageID": "msg_14159b7c3001gy59ut4wf3Gcwy"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "692ad1adec582e9962c7c884d95506c2c6156e96",
+          "type": "step-finish",
+          "tokens": {
+            "total": 20660,
+            "input": 492,
+            "output": 149,
+            "reasoning": 179,
+            "cache": {
+              "write": 0,
+              "read": 19840
+            }
+          },
+          "cost": 0,
+          "id": "prt_14159dbc6001uLNZtmVppku0zx",
+          "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e",
+          "messageID": "msg_14159b7c3001gy59ut4wf3Gcwy"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_14158ab60001sLbiZSZwzGFZOY",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 21181,
+          "input": 750,
+          "output": 130,
+          "reasoning": 13,
+          "cache": {
+            "write": 0,
+            "read": 20288
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792097770536,
+          "completed": 1792097776253
+        },
+        "finish": "tool-calls",
+        "id": "msg_14159dc28001Upl5Xr2fpKXpCm",
+        "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e"
+      },
+      "parts": [
+        {
+          "snapshot": "692ad1adec582e9962c7c884d95506c2c6156e96",
+          "type": "step-start",
+          "id": "prt_14159e831001UYp4VwmdQ9fAzs",
+          "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e",
+          "messageID": "msg_14159dc28001Upl5Xr2fpKXpCm"
+        },
+        {
+          "type": "reasoning",
+          "text": "Fix the lint issues with `ruff check --fix`.",
+          "time": {
+            "start": 1792097773622,
+            "end": 1792097773633
+          },
+          "id": "prt_14159e836001kJ5XZv559qwZKv",
+          "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e",
+          "messageID": "msg_14159dc28001Upl5Xr2fpKXpCm"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "call_78ad6372b43444eb82a6d8d6",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "UV_PYTHON=3.11 uv run --directory cli ruff check --fix src/cli/_build_info.py src/cli/version.py src/cli/cli.py tests/test_build_info.py && UV_PYTHON=3.11 uv run --directory cli ruff format src/cli/_build_info.py src/cli/version.py src/cli/cli.py tests/test_build_info.py",
+              "timeout": 120000,
+              "workdir": "/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution"
+            },
+            "output": "Found 2 errors (2 fixed, 0 remaining).\n4 files left unchanged\n",
+            "metadata": {
+              "output": "Found 2 errors (2 fixed, 0 remaining).\n4 files left unchanged\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "UV_PYTHON=3.11 uv run --directory cli ruff check --fix src/cli/_build_info.py src/cli/version.py src/cli/cli.py tests/test_build_info.py && UV_PYTHON=3.11 uv run --directory cli ruff format src/cli/_build_info.py src/cli/version.py src/cli/cli.py tests/test_build_info.py",
+            "time": {
+              "start": 1792097775809,
+              "end": 1792097776000
+            }
+          },
+          "id": "prt_14159e847001JJ9rR5DcZxoigi",
+          "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e",
+          "messageID": "msg_14159dc28001Upl5Xr2fpKXpCm"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "692ad1adec582e9962c7c884d95506c2c6156e96",
+          "type": "step-finish",
+          "tokens": {
+            "total": 21181,
+            "input": 750,
+            "output": 130,
+            "reasoning": 13,
+            "cache": {
+              "write": 0,
+              "read": 20288
+            }
+          },
+          "cost": 0,
+          "id": "prt_14159f1ec001HN9EOhObu93jpZ",
+          "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e",
+          "messageID": "msg_14159dc28001Upl5Xr2fpKXpCm"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_14158ab60001sLbiZSZwzGFZOY",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 21320,
+          "input": 213,
+          "output": 96,
+          "reasoning": 19,
+          "cache": {
+            "write": 0,
+            "read": 20992
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792097776272,
+          "completed": 1792097785510
+        },
+        "finish": "tool-calls",
+        "id": "msg_14159f28f001Mc2WbgpoXy0o5v",
+        "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e"
+      },
+      "parts": [
+        {
+          "snapshot": "692ad1adec582e9962c7c884d95506c2c6156e96",
+          "type": "step-start",
+          "id": "prt_14159fdad001QKVJIW3ioNEBgK",
+          "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e",
+          "messageID": "msg_14159f28f001Mc2WbgpoXy0o5v"
+        },
+        {
+          "type": "reasoning",
+          "text": "Now let me verify the fixed files still pass tests, and check what ruff changed.",
+          "time": {
+            "start": 1792097779249,
+            "end": 1792097780062
+          },
+          "id": "prt_14159fe300013JrXpzOYXPVjfC",
+          "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e",
+          "messageID": "msg_14159f28f001Mc2WbgpoXy0o5v"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "call_92505b75e58d4d70ab97bc4a",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "git diff -- cli/src/cli/version.py cli/src/cli/cli.py && UV_PYTHON=3.11 uv run --directory cli pytest tests/test_build_info.py tests/test_cli.py -v",
+              "timeout": 180000,
+              "workdir": "/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution"
+            },
+            "output": "diff --git a/cli/src/cli/cli.py b/cli/src/cli/cli.py\nindex ad7caf6..dfe4900 100644\n--- a/cli/src/cli/cli.py\n+++ b/cli/src/cli/cli.py\n@@ -2,6 +2,7 @@\n \n import typer\n \n+from cli import version\n from cli.connectors import connectors_app\n from cli.outcomes import outcomes_app\n from cli.version import __version__\n@@ -17,7 +18,7 @@ app.add_typer(outcomes_app, name=\"outcomes\", help=\"Manage Customer Outcomes\")\n \n def _version_callback(value: bool) -> None:\n     if value:\n-        typer.echo(__version__)\n+        typer.echo(version.build_summary())\n         raise typer.Exit()\n \n \ndiff --git a/cli/src/cli/version.py b/cli/src/cli/version.py\nindex e58a6ce..8dd31e2 100644\n--- a/cli/src/cli/version.py\n+++ b/cli/src/cli/version.py\n@@ -1,3 +1,20 @@\n \"\"\"Version information.\"\"\"\n \n-__version__ = \"0.1.0\"\n+from cli._build_info import COMMIT, TARGET, VERSION\n+from cli._build_info import RELEASE_DATE_UTC as _RELEASE_DATE_UTC\n+\n+__version__ = VERSION\n+RELEASE_DATE_UTC = _RELEASE_DATE_UTC\n+COMMIT = COMMIT\n+TARGET = TARGET\n+release_date = RELEASE_DATE_UTC or None\n+\n+\n+def build_summary() -> str:\n+    if RELEASE_DATE_UTC:\n+        return f\"{VERSION} ({RELEASE_DATE_UTC[:10]})\"\n+    return VERSION\n+\n+\n+def verbose_summary() -> str:\n+    return f\"{build_summary()}\\ncommit: {COMMIT}\\ntarget: {TARGET}\"\n============================= test session starts ==============================\nplatform linux -- Python 3.11.17, pytest-9.1.1, pluggy-1.6.0 -- /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/.venv/bin/python\ncachedir: .pytest_cache\nrootdir: /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/cli\nconfigfile: pyproject.toml\nplugins: platformdirs-4.13.0, cov-7.1.0, asyncio-1.4.0, anyio-4.15.1\nasyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function\ncollecting ... collected 5 items\n\ntests/test_build_info.py::test_version_matches_build_info PASSED         [ 20%]\ntests/test_build_info.py::test_build_summary_omits_date_when_empty PASSED [ 40%]\ntests/test_build_info.py::test_build_summary_includes_date_when_set PASSED [ 60%]\ntests/test_cli.py::test_version_flag_prints_version PASSED               [ 80%]\ntests/test_cli.py::test_help_flag_shows_usage PASSED                     [100%]\n\n============================== 5 passed in 2.51s ===============================\n",
+            "metadata": {
+              "output": "diff --git a/cli/src/cli/cli.py b/cli/src/cli/cli.py\nindex ad7caf6..dfe4900 100644\n--- a/cli/src/cli/cli.py\n+++ b/cli/src/cli/cli.py\n@@ -2,6 +2,7 @@\n \n import typer\n \n+from cli import version\n from cli.connectors import connectors_app\n from cli.outcomes import outcomes_app\n from cli.version import __version__\n@@ -17,7 +18,7 @@ app.add_typer(outcomes_app, name=\"outcomes\", help=\"Manage Customer Outcomes\")\n \n def _version_callback(value: bool) -> None:\n     if value:\n-        typer.echo(__version__)\n+        typer.echo(version.build_summary())\n         raise typer.Exit()\n \n \ndiff --git a/cli/src/cli/version.py b/cli/src/cli/version.py\nindex e58a6ce..8dd31e2 100644\n--- a/cli/src/cli/version.py\n+++ b/cli/src/cli/version.py\n@@ -1,3 +1,20 @@\n \"\"\"Version information.\"\"\"\n \n-__version__ = \"0.1.0\"\n+from cli._build_info import COMMIT, TARGET, VERSION\n+from cli._build_info import RELEASE_DATE_UTC as _RELEASE_DATE_UTC\n+\n+__version__ = VERSION\n+RELEASE_DATE_UTC = _RELEASE_DATE_UTC\n+COMMIT = COMMIT\n+TARGET = TARGET\n+release_date = RELEASE_DATE_UTC or None\n+\n+\n+def build_summary() -> str:\n+    if RELEASE_DATE_UTC:\n+        return f\"{VERSION} ({RELEASE_DATE_UTC[:10]})\"\n+    return VERSION\n+\n+\n+def verbose_summary() -> str:\n+    return f\"{build_summary()}\\ncommit: {COMMIT}\\ntarget: {TARGET}\"\n============================= test session starts ==============================\nplatform linux -- Python 3.11.17, pytest-9.1.1, pluggy-1.6.0 -- /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/.venv/bin/python\ncachedir: .pytest_cache\nrootdir: /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/cli\nconfigfile: pyproject.toml\nplugins: platformdirs-4.13.0, cov-7.1.0, asyncio-1.4.0, anyio-4.15.1\nasyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function\ncollecting ... collected 5 items\n\ntests/test_build_info.py::test_version_matches_build_info PASSED         [ 20%]\ntests/test_build_info.py::test_build_summary_omits_date_when_empty PASSED [ 40%]\ntests/test_build_info.py::test_build_summary_includes_date_when_set PASSED [ 60%]\ntests/test_cli.py::test_version_flag_prints_version PASSED               [ 80%]\ntests/test_cli.py::test_help_flag_shows_usage PASSED                     [100%]\n\n============================== 5 passed in 2.51s ===============================\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "git diff -- cli/src/cli/version.py cli/src/cli/cli.py && UV_PYTHON=3.11 uv run --directory cli pytest tests/test_build_info.py tests/test_cli.py -v",
+            "time": {
+              "start": 1792097781549,
+              "end": 1792097785399
+            }
+          },
+          "id": "prt_1415a0163001wTjeu9ePBcUbU6",
+          "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e",
+          "messageID": "msg_14159f28f001Mc2WbgpoXy0o5v"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "692ad1adec582e9962c7c884d95506c2c6156e96",
+          "type": "step-finish",
+          "tokens": {
+            "total": 21320,
+            "input": 213,
+            "output": 96,
+            "reasoning": 19,
+            "cache": {
+              "write": 0,
+              "read": 20992
+            }
+          },
+          "cost": 0,
+          "id": "prt_1415a1650001zLxvlravAZGKHW",
+          "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e",
+          "messageID": "msg_14159f28f001Mc2WbgpoXy0o5v"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_14158ab60001sLbiZSZwzGFZOY",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 22394,
+          "input": 830,
+          "output": 100,
+          "reasoning": 280,
+          "cache": {
+            "write": 0,
+            "read": 21184
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792097785526,
+          "completed": 1792097801426
+        },
+        "finish": "tool-calls",
+        "id": "msg_1415a16b6001Cbh3S0BvhFQAY4",
+        "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e"
+      },
+      "parts": [
+        {
+          "snapshot": "692ad1adec582e9962c7c884d95506c2c6156e96",
+          "type": "step-start",
+          "id": "prt_1415a1d6e001Ag4zRhDA4HKVAV",
+          "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e",
+          "messageID": "msg_1415a16b6001Cbh3S0BvhFQAY4"
+        },
+        {
+          "type": "reasoning",
+          "text": "Everything passes after the lint fix. Note the ruff fix reformatted version.py imports from the brief's single-line version — semantically identical.\n\nOne thing to self-review: in `version.py`, `COMMIT = COMMIT` and `TARGET = TARGET` — the RHS resolves the imported name before rebinding. Fine.\n\nAlso `main()` in cli.py has a parameter named `version: bool` which shadows the module-level `from cli import version` inside `main`'s scope only — `_version_callback` is a separate function that resolves `version` at module level, so no clash. Tests confirm.\n\n`version_cmd` still echoes `__version__` (plain version) — the brief only asked to change `_version_callback`. Since dev default has no date, `version.build_summary() == \"0.1.0\" == __version__`, so no behavior difference in dev. Keep as-is (brief scope).\n\nAlso note: `from cli import version` in cli.py shadows nothing problematic — but wait, in `main(version: bool = ...)` the parameter shadows the module inside `main` only. Fine.\n\nNow run the full CLI test suite? The brief says run test_build_info.py and test_cli.py. Let me also quickly run the whole cli test suite to make sure nothing else broke (there could be other tests depending on version output).",
+          "time": {
+            "start": 1792097787423,
+            "end": 1792097795514
+          },
+          "id": "prt_1415a1e1f001CgnWtDfBG1qbPg",
+          "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e",
+          "messageID": "msg_1415a16b6001Cbh3S0BvhFQAY4"
+        },
+        {
+          "type": "text",
+          "text": "Let me also run the full CLI suite to make sure nothing else regressed, then commit:",
+          "time": {
+            "start": 1792097795519,
+            "end": 1792097796978
+          },
+          "id": "prt_1415a3dbf001LrzGOQu1UJLD0i",
+          "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e",
+          "messageID": "msg_1415a16b6001Cbh3S0BvhFQAY4"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "call_fc7f8654d8164e48b84e80b5",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "UV_PYTHON=3.11 uv run --directory cli pytest -q 2>&1 | tail -5",
+              "timeout": 300000,
+              "workdir": "/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution"
+            },
+            "output": ".................                                                        [100%]\n17 passed in 2.87s\n",
+            "metadata": {
+              "output": ".................                                                        [100%]\n17 passed in 2.87s\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "UV_PYTHON=3.11 uv run --directory cli pytest -q 2>&1 | tail -5",
+            "time": {
+              "start": 1792097796965,
+              "end": 1792097801184
+            }
+          },
+          "id": "prt_1415a3fc90010yG5F8QWSyhd7k",
+          "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e",
+          "messageID": "msg_1415a16b6001Cbh3S0BvhFQAY4"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "692ad1adec582e9962c7c884d95506c2c6156e96",
+          "type": "step-finish",
+          "tokens": {
+            "total": 22394,
+            "input": 830,
+            "output": 100,
+            "reasoning": 280,
+            "cache": {
+              "write": 0,
+              "read": 21184
+            }
+          },
+          "cost": 0,
+          "id": "prt_1415a5442001cw48BLN9MgH6a1",
+          "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e",
+          "messageID": "msg_1415a16b6001Cbh3S0BvhFQAY4"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_14158ab60001sLbiZSZwzGFZOY",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 22529,
+          "input": 469,
+          "output": 92,
+          "reasoning": 16,
+          "cache": {
+            "write": 0,
+            "read": 21952
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792097801440,
+          "completed": 1792097865259
+        },
+        "finish": "tool-calls",
+        "id": "msg_1415a54e0001Wqc03dAInkaBrN",
+        "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e"
+      },
+      "parts": [
+        {
+          "snapshot": "692ad1adec582e9962c7c884d95506c2c6156e96",
+          "type": "step-start",
+          "id": "prt_1415a5f1b0012s0vfN7dbWS6eR",
+          "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e",
+          "messageID": "msg_1415a54e0001Wqc03dAInkaBrN"
+        },
+        {
+          "type": "reasoning",
+          "text": "Full suite passes: 17 passed. Now commit per the brief.",
+          "time": {
+            "start": 1792097804068,
+            "end": 1792097804533
+          },
+          "id": "prt_1415a5f2400110TsQvnSiFrPA6",
+          "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e",
+          "messageID": "msg_1415a54e0001Wqc03dAInkaBrN"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "call_9ee30f8654604caab5569340",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "git add cli/src/cli/_build_info.py cli/src/cli/version.py cli/src/cli/cli.py cli/tests/test_build_info.py && git commit -m \"feat(cli): build metadata and version display\" && git log --oneline -2",
+              "workdir": "/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution"
+            },
+            "output": "[feature/cli-bundled-distribution c2fef5e] feat(cli): build metadata and version display\n 4 files changed, 42 insertions(+), 2 deletions(-)\n create mode 100644 cli/src/cli/_build_info.py\n create mode 100644 cli/tests/test_build_info.py\nc2fef5e feat(cli): build metadata and version display\naff60a4 docs: add bundled CLI distribution design and implementation plan\n",
+            "metadata": {
+              "output": "[feature/cli-bundled-distribution c2fef5e] feat(cli): build metadata and version display\n 4 files changed, 42 insertions(+), 2 deletions(-)\n create mode 100644 cli/src/cli/_build_info.py\n create mode 100644 cli/tests/test_build_info.py\nc2fef5e feat(cli): build metadata and version display\naff60a4 docs: add bundled CLI distribution design and implementation plan\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "git add cli/src/cli/_build_info.py cli/src/cli/version.py cli/src/cli/cli.py cli/tests/test_build_info.py && git commit -m \"feat(cli): build metadata and version display\" && git log --oneline -2",
+            "time": {
+              "start": 1792097806014,
+              "end": 1792097864783
+            }
+          },
+          "id": "prt_1415a60fa001nQch89w82MOw5O",
+          "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e",
+          "messageID": "msg_1415a54e0001Wqc03dAInkaBrN"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "044668b2406a508227b67496cd9b566db744cdf6",
+          "type": "step-finish",
+          "tokens": {
+            "total": 22529,
+            "input": 469,
+            "output": 92,
+            "reasoning": 16,
+            "cache": {
+              "write": 0,
+              "read": 21952
+            }
+          },
+          "cost": 0,
+          "id": "prt_1415b4cbb001oxUCW7CxJEA36z",
+          "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e",
+          "messageID": "msg_1415a54e0001Wqc03dAInkaBrN"
+        },
+        {
+          "type": "patch",
+          "hash": "692ad1adec582e9962c7c884d95506c2c6156e96",
+          "files": [
+            "/home/alexa/repos/agentic-odi/docs/superpowers/specs/2026-10-15-cli-odi-entity-parity-design.md"
+          ],
+          "id": "prt_1415b4e23001Bh3quOhvw612HF",
+          "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e",
+          "messageID": "msg_1415a54e0001Wqc03dAInkaBrN"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_14158ab60001sLbiZSZwzGFZOY",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 23733,
+          "input": 240,
+          "output": 1060,
+          "reasoning": 33,
+          "cache": {
+            "write": 0,
+            "read": 22400
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792097865284,
+          "completed": 1792097888437
+        },
+        "finish": "tool-calls",
+        "id": "msg_1415b4e44001DYvB37doLuuffs",
+        "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e"
+      },
+      "parts": [
+        {
+          "snapshot": "044668b2406a508227b67496cd9b566db744cdf6",
+          "type": "step-start",
+          "id": "prt_1415b54d10011Vwq4diU3pE8Hh",
+          "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e",
+          "messageID": "msg_1415b4e44001DYvB37doLuuffs"
+        },
+        {
+          "type": "reasoning",
+          "text": "Now write the report. Include: what implemented, what tested + results, TDD evidence (RED/GREEN), files changed, self-review findings, concerns.",
+          "time": {
+            "start": 1792097867057,
+            "end": 1792097867630
+          },
+          "id": "prt_1415b5531001L2QySG5BH34NYz",
+          "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e",
+          "messageID": "msg_1415b4e44001DYvB37doLuuffs"
+        },
+        {
+          "type": "tool",
+          "tool": "write",
+          "callID": "call_226813549b5647bf8a2d29f4",
+          "state": {
+            "status": "completed",
+            "input": {
+              "content": "# Task 1 Report: Build metadata + version display\n\n## What was implemented\n\n- **Created `cli/src/cli/_build_info.py`** with committed dev defaults exactly per brief: `VERSION = \"0.1.0\"`, `RELEASE_DATE_UTC = \"\"`, `COMMIT = \"dev\"`, `TARGET = \"dev\"`. No generation logic (later build task overwrites at build time).\n- **Rewrote `cli/src/cli/version.py`** to consume `_build_info`: exposes `__version__`, `RELEASE_DATE_UTC`, `COMMIT`, `TARGET`, `release_date` (`str | None`), `build_summary()` (appends ` (YYYY-MM-DD)` only when date is set), and `verbose_summary()` (summary + commit/target lines).\n- **Modified `cli/src/cli/cli.py`**: added `from cli import version` (kept `from cli.version import __version__` for the existing `test_cli.py` import); `_version_callback` now echoes `version.build_summary()` instead of bare `__version__`. `version_cmd` was left unchanged (brief only asked for `_version_callback`; in dev defaults `build_summary() == __version__ == \"0.1.0\"` so no behavior difference).\n\n## TDD evidence\n\n### RED\n\nCommand: `UV_PYTHON=3.11 uv run --directory cli pytest tests/test_build_info.py -v`\n\nResult: **3 failed** — exactly as the brief predicted:\n- `test_version_matches_build_info` — `ImportError: cannot import name '_build_info' from 'cli'`\n- `test_build_summary_omits_date_when_empty` — `AttributeError: module 'cli.version' has no attribute 'RELEASE_DATE_UTC'`\n- `test_build_summary_includes_date_when_set` — same `AttributeError`\n\n### GREEN\n\nCommand: `UV_PYTHON=3.11 uv run --directory cli pytest tests/test_build_info.py tests/test_cli.py -v`\n\nResult: **5 passed** (3 new build-info tests + 2 existing CLI tests, including `test_version_flag_prints_version` which exercises the changed callback).\n\nFull-suite regression check: `UV_PYTHON=3.11 uv run --directory cli pytest -q` → **17 passed**.\n\n## Files changed\n\n| File | Change |\n|---|---|\n| `cli/src/cli/_build_info.py` | created (dev defaults) |\n| `cli/src/cli/version.py` | rewritten: imports from `_build_info`, adds `build_summary`/`verbose_summary` |\n| `cli/src/cli/cli.py` | `_version_callback` → `typer.echo(version.build_summary())`; added `from cli import version` |\n| `cli/tests/test_build_info.py` | created (brief's 3 tests, verbatim) |\n\n## Self-review findings\n\n- **Import sorting (ruff I001)**: `ruff check` flagged both `cli.py` (new `from cli import version` unsorted) and `version.py` (brief's single-line multi-import with alias). Ran `ruff check --fix` + `ruff format`; the fix split the `version.py` import into two lines (`COMMIT, TARGET, VERSION` + `RELEASE_DATE_UTC as _RELEASE_DATE_UTC`). Semantically identical to the brief's code; tests re-run green after the fix.\n- **Name-shadowing check**: `main()` in `cli.py` has a parameter named `version: bool` that shadows the `cli.version` module *inside `main` only*; `_version_callback` is a module-level function and resolves `version` to the module correctly. Confirmed by the passing `--version` test.\n- **`COMMIT = COMMIT` / `TARGET = TARGET`** in `version.py` are self-referential-looking but valid (imported names are bound before rebinding); taken verbatim from the brief.\n- Working tree was clean before starting; commit contains exactly the 4 intended files.\n\n## Concerns\n\n- `version_cmd` (the `version` subcommand, `cli.py:35-37`) still echoes bare `__version__` while `--version` now echoes `build_summary()`. Once the build task writes a real `RELEASE_DATE_UTC`, `--version` and `version` will disagree. Out of scope per the brief, but later tasks (or a follow-up) may want `version_cmd` to use `build_summary()` too — or the plan may replace/remove that command.\n- `verbose_summary()` is produced but not yet surfaced by any command (per plan, later tasks consume it). Untested directly by the brief's tests; verified manually correct during review.\n",
+              "filePath": "/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/.superpowers/sdd/2026-10-15-cli-bundled-distribution-and-self-update/task-1-report.md"
+            },
+            "output": "Wrote file successfully.",
+            "metadata": {
+              "diagnostics": {},
+              "filepath": "/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/.superpowers/sdd/2026-10-15-cli-bundled-distribution-and-self-update/task-1-report.md",
+              "exists": false,
+              "truncated": false
+            },
+            "title": ".worktrees/cli-bundled-distribution/.superpowers/sdd/2026-10-15-cli-bundled-distribution-and-self-update/task-1-report.md",
+            "time": {
+              "start": 1792097888158,
+              "end": 1792097888180
+            }
+          },
+          "id": "prt_1415b5774001KHSI5Rs2yJmus9",
+          "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e",
+          "messageID": "msg_1415b4e44001DYvB37doLuuffs"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "044668b2406a508227b67496cd9b566db744cdf6",
+          "type": "step-finish",
+          "tokens": {
+            "total": 23733,
+            "input": 240,
+            "output": 1060,
+            "reasoning": 33,
+            "cache": {
+              "write": 0,
+              "read": 22400
+            }
+          },
+          "cost": 0,
+          "id": "prt_1415ba8120010VbQqPrcacQN67",
+          "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e",
+          "messageID": "msg_1415b4e44001DYvB37doLuuffs"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_14158ab60001sLbiZSZwzGFZOY",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 23941,
+          "input": 1153,
+          "output": 187,
+          "reasoning": 9,
+          "cache": {
+            "write": 0,
+            "read": 22592
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792097888458,
+          "completed": 1792097895085
+        },
+        "finish": "stop",
+        "id": "msg_1415ba8ca001HepqnYTVUj3Dbs",
+        "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e"
+      },
+      "parts": [
+        {
+          "snapshot": "044668b2406a508227b67496cd9b566db744cdf6",
+          "type": "step-start",
+          "id": "prt_1415bb0330012nNNL00M6fV4uh",
+          "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e",
+          "messageID": "msg_1415ba8ca001HepqnYTVUj3Dbs"
+        },
+        {
+          "type": "reasoning",
+          "text": "Report written. Now the short reply.",
+          "time": {
+            "start": 1792097890579,
+            "end": 1792097891097
+          },
+          "id": "prt_1415bb113001IJdFV2C7ygQuIj",
+          "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e",
+          "messageID": "msg_1415ba8ca001HepqnYTVUj3Dbs"
+        },
+        {
+          "type": "text",
+          "text": "Status: DONE\nCommits: `c2fef5e` feat(cli): build metadata and version display\nTests: RED (3 failed: missing `_build_info`/`RELEASE_DATE_UTC`) → GREEN (5/5 build-info + CLI tests pass); full suite 17/17 pass; ruff check/format clean.\nConcerns: `version_cmd` subcommand still echoes bare `__version__` while `--version` now uses `build_summary()` — will diverge once a real release date is baked in (left as-is per brief scope). `verbose_summary()` not surfaced/tested yet (later tasks consume it).\nReport: /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/.superpowers/sdd/2026-10-15-cli-bundled-distribution-and-self-update/task-1-report.md",
+          "time": {
+            "start": 1792097891100,
+            "end": 1792097894963
+          },
+          "id": "prt_1415bb31c001lUhLi0h7tRbI9c",
+          "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e",
+          "messageID": "msg_1415ba8ca001HepqnYTVUj3Dbs"
+        },
+        {
+          "reason": "stop",
+          "snapshot": "044668b2406a508227b67496cd9b566db744cdf6",
+          "type": "step-finish",
+          "tokens": {
+            "total": 23941,
+            "input": 1153,
+            "output": 187,
+            "reasoning": 9,
+            "cache": {
+              "write": 0,
+              "read": 22592
+            }
+          },
+          "cost": 0,
+          "id": "prt_1415bc292001V51A8EkeqTej6q",
+          "sessionID": "ses_ebea754beffefpYBZxy4G6Wv5e",
+          "messageID": "msg_1415ba8ca001HepqnYTVUj3Dbs"
+        }
+      ]
+    }
+  ]
+}
