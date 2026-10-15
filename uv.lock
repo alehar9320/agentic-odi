@@ -122,6 +122,8 @@ source = { editable = "local_server" }
 dependencies = [
     { name = "agentic-odi-core" },
     { name = "fastapi" },
+    { name = "fastmcp" },
+    { name = "openai" },
     { name = "uvicorn" },
 ]
 
@@ -129,6 +131,8 @@ dependencies = [
 requires-dist = [
     { name = "agentic-odi-core", editable = "core" },
     { name = "fastapi" },
+    { name = "fastmcp", specifier = ">=4.1.0" },
+    { name = "openai", specifier = ">=3.28.0" },
     { name = "uvicorn" },
 ]
 
