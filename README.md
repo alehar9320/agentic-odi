@@ -200,7 +200,7 @@ npm --prefix studio run tauri build   # bundles: .deb / .AppImage (Linux), .app 
 >
 > The Tauri CLI ships as the `@tauri-apps/cli` npm dev dependency (`npm --prefix studio run tauri`). The sidecar is launched with `uv run python -m …` from the repository root; if the app cannot locate the repo root, set `AGENTIC_ODI_REPO_ROOT`.
 
-##### 🔐 Desktop signing & updater secrets
+#### 🔐 Desktop signing & updater secrets
 
 Self-updating and code signing are **env-driven**: if a secret is absent, an unsigned artifact is produced instead of failing. CI reads these from GitHub Actions secrets.
 
@@ -214,6 +214,59 @@ Self-updating and code signing are **env-driven**: if a secret is absent, an uns
 | `WINDOWS_CERTIFICATE` / `WINDOWS_CERTIFICATE_PASSWORD` | Windows Authenticode PFX (base64) and its password; imported by CI and injected into the bundle config. |
 
 Releases are published by `.github/workflows/tauri-release.yml` when a `v*` tag is pushed. The desktop app checks for updates on startup and via **Settings → Check for updates**.
+
+#### 🔑 Managing the updater signing key
+
+The updater key pair authenticates release artifacts so an installed app can verify that an auto-update genuinely came from you. The **public** key is embedded in `studio/src-tauri/tauri.conf.json` (`plugins.updater.pubkey`) and is safe to commit. The **private** key must never be committed, logged, printed in CI, or attached to a build artifact.
+
+1. **Generate a key pair** (only if you need a new one). Leave `-p ""` for a passwordless key, or pass a password and remember it:
+
+   ```bash
+   npm --prefix studio run tauri signer generate -- -w ./living-studio.key -p "" -f
+   ```
+
+   This writes `living-studio.key` (private, `0600`) and `living-studio.key.pub` (public).
+
+2. **Paste the public key** into `studio/src-tauri/tauri.conf.json`:
+
+   ```jsonc
+   {
+     "plugins": {
+       "updater": {
+         "endpoints": ["https://github.com/alehar9320/agentic-odi/releases/latest/download/latest.json"],
+         "pubkey": "<contents of living-studio.key.pub>"
+       }
+     }
+   }
+   ```
+
+3. **Store the private key outside the repository** (the repo root is git-tracked; a sibling directory is not), with restricted permissions:
+
+   ```bash
+   mkdir -p ~/repos/agentic-odi-keys && chmod 700 ~/repos/agentic-odi-keys
+   mv living-studio.key ~/repos/agentic-odi-keys/
+   chmod 600 ~/repos/agentic-odi-keys/living-studio.key
+   ```
+
+   Move it to a long-term secret store (password manager, 1Password/Bitwarden/Vault, or a private encrypted backup) when you decide where that lives. Losing it means future releases can no longer be signed for existing installs.
+
+4. **Add the private key as a GitHub Actions secret** (Settings → Secrets and variables → Actions → New repository secret), or via the CLI:
+
+   ```bash
+   gh secret set TAURI_SIGNING_PRIVATE_KEY < ~/repos/agentic-odi-keys/living-studio.key
+   gh secret set TAURI_SIGNING_PRIVATE_KEY_PASSWORD --body ""   # only if you set a password
+   ```
+
+5. **Verify** the secrets exist (values are never displayed):
+
+   ```bash
+   gh secret list
+   ```
+
+6. **Rotate** by repeating steps 1–4, then publishing a release signed with the new key. Existing installs still verify against the public key compiled into their binary, so keep the old private key usable and publish the new public key ahead of the cut-over.
+
+> [!CAUTION]
+> If the private key leaks, treat auto-updates as compromised: generate a new pair, rotate the Actions secret, and publish a freshly signed release.
 
 > [!IMPORTANT]
 > **Migration note.** The Streamlit UI (`client/src/client/app.py`) has been removed. The Living Studio now lives in `studio/` (browser SPA + Tauri desktop app) and is served by the `local_server` sidecar on port **8100** (previously Streamlit's `8501`). Start everything with `python -m client.run`. All `AGENTIC_ODI_*` environment variable names, the demo dataset, and the ODI formulas are unchanged.
