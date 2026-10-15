@@ -3,7 +3,7 @@
   "checkpoint_id": "01M50A2BXQ9T5YP7XS9KS71P5T",
   "strategy": "manual-commit",
   "branch": "main",
-  "checkpoints_count": 2,
+  "checkpoints_count": 3,
   "files_touched": [
     ".github/dependabot.yml",
     ".github/workflows/ci.yml",
@@ -49,13 +49,20 @@
       "compact_transcript": "/1/transcript.jsonl",
       "content_hash": "/1/content_hash.txt",
       "prompt": "/1/prompt.txt"
+    },
+    {
+      "metadata": "/2/metadata.json",
+      "transcript": "/2/full.jsonl",
+      "compact_transcript": "/2/transcript.jsonl",
+      "content_hash": "/2/content_hash.txt",
+      "prompt": "/2/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 188559,
+    "input_tokens": 335173,
     "cache_creation_tokens": 0,
-    "cache_read_tokens": 7468992,
-    "output_tokens": 38677,
-    "api_call_count": 118
+    "cache_read_tokens": 13480896,
+    "output_tokens": 63176,
+    "api_call_count": 188
   }
 }
