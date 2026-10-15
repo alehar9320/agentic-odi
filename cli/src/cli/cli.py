@@ -2,7 +2,7 @@
 
 import typer
 
-from cli import version
+from cli import context, version
 from cli.connectors import connectors_app
 from cli.outcomes import outcomes_app
 from cli.version import __version__  # noqa: F401  (re-exported for tests)
@@ -36,8 +36,9 @@ def main(
         is_eager=True,
         help="Show verbose version information (with --version)",
     ),
+    backend: str | None = typer.Option(None, "--backend", help="Backend: local | mcp"),
 ) -> None:  # noqa: B008
-    pass
+    context.set_backend(backend)
 
 
 @app.command(name="version")

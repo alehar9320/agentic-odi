@@ -30,6 +30,8 @@ def test_outcomes_add_calls_mcp():
         result = runner.invoke(
             app,
             [
+                "--backend",
+                "mcp",
                 "outcomes",
                 "add",
                 "--job-id",
@@ -60,7 +62,7 @@ def test_score_calls_mcp():
     runner = CliRunner()
     with patch("cli.outcomes._call_mcp") as mock_call:
         mock_call.return_value = "Opportunity Score = 14.00"
-        result = runner.invoke(app, ["outcomes", "score", "8", "2"])
+        result = runner.invoke(app, ["--backend", "mcp", "outcomes", "score", "8", "2"])
     assert result.exit_code == 0
     mock_call.assert_called_once()
 
@@ -75,5 +77,5 @@ def test_outcomes_list_calls_mcp_with_args():
     runner = CliRunner()
     with patch("cli.outcomes._call_mcp") as mock_call:
         mock_call.return_value = "[]"
-        runner.invoke(app, ["outcomes", "list", "--job-id", "job-1"])
+        runner.invoke(app, ["--backend", "mcp", "outcomes", "list", "--job-id", "job-1"])
     mock_call.assert_called_once()
