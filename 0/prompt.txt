@@ -1,0 +1,60 @@
+You are implementing Task 1: Core repository CRUD + cascade (in-memory).
+
+## Task Description
+
+Read your task brief first — it is your requirements, with the exact values to use verbatim:
+/home/alexa/repos/agentic-odi/.superpowers/sdd/2026-10-15-cli-odi-entity-parity/task-1-brief.md
+
+## Context
+
+This is the first task of a plan that gives the `agentic-odi` CLI full CRUD over every ODI entity (Job, Step, Desired Outcome, Customer Outcome) backed by a shared persistent SQLite store. This task only adds the in-memory repository methods; the SQLite implementation comes in a later task, and the service layer that consumes these methods comes next.
+
+You are working in the `agentic-odi` uv workspace at /home/alexa/repos/agentic-odi, already checked out on branch `feature/cli-odi-entity-parity`. Do NOT switch branches. Do NOT commit to `main`.
+
+Relevant existing code you should match:
+- `core/src/core/repository.py` already defines the `Repository` Protocol and `InMemoryRepository` with `add_job`/`list_jobs`/`get_job`/`add_step`/`get_steps_for_job`/`add_outcome`/`get_outcomes`/`add_customer_outcome`/`get_customer_outcome`/`list_customer_outcomes`/`update_customer_outcome`/`delete_customer_outcome`/`clear`.
+- `update_customer_outcome` is the pattern to mirror for updates: `current = co.model_dump(exclude_unset=True); current.update(updates); new = co.model_validate(current)`.
+- Models are in `core/src/core/models.py`: `Job`, `Step` (has `job_id`, `name`, `order`), `Outcome` (has `job_id`, optional `step_id`, `statement`, optional scores), `CustomerOutcome` (has `job_id`, optional `step_id`).
+
+Follow the brief exactly. The `delete_job` cascade must remove the job plus every step/outcome/customer_outcome whose `job_id` matches. `delete_step` must remove the step plus every outcome/customer_outcome whose `step_id` matches. Each delete returns `False` when the target id is absent.
+
+## Global constraints that bind this task
+
+- Python `>=3.10`; ruff line-length 100; ruff select `["E4","E7","E9","F","I","UP","B","BLE"]`.
+- Add the eight new signatures to BOTH the `Repository` protocol and `InMemoryRepository`: `get_step`, `get_outcome`, `update_job`, `delete_job`, `update_step`, `delete_step`, `update_outcome`, `delete_outcome`.
+- Tests must never touch the real `~/.agentic-odi/odi.db` (this task uses no DB).
+- Run tests with: `uv run --directory core pytest tests/test_repository.py -v` (if uv ever tries to build `pyarrow`, prefix the command with `UV_PYTHON=3.11`; report it if it happens).
+
+## Before You Begin
+
+If anything is unclear, ask now.
+
+## Your Job
+
+Work from: /home/alexa/repos/agentic-odi
+
+1. Follow TDD exactly as the brief lays out: write the failing tests in `core/tests/test_repository.py` (new file), run them to confirm failure, implement, run to confirm pass.
+2. Before committing, run the whole core suite: `uv run --directory core pytest` — it must be green with pristine output.
+3. Commit exactly these two files with the brief's message:
+   `git add core/src/core/repository.py core/tests/test_repository.py`
+   `git commit -m "feat(core): add job/step/outcome CRUD with cascade delete to repository"`
+4. Self-review your diff with fresh eyes.
+5. Report back.
+
+## You Do Not Dispatch Subagents
+
+Do all of this task's work yourself. Never spawn a subagent, and never spawn a reviewer. Review is the controller's job.
+
+## Report Format
+
+Write your full report to:
+/home/alexa/repos/agentic-odi/.superpowers/sdd/2026-10-15-cli-odi-entity-parity/task-1-report.md
+
+Include: what you implemented; what you tested and the results; TDD evidence (RED command + failing output and why expected; GREEN command + passing output); files changed; self-review findings; any concerns.
+
+Then reply with ONLY (under 15 lines):
+- **Status:** DONE | DONE_WITH_CONCERNS | BLOCKED | NEEDS_CONTEXT
+- Commits created (short SHA + subject)
+- One-line test summary
+- Concerns, if any
+- The report file path
