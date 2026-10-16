@@ -1,0 +1,71 @@
+You are reviewing one task's implementation: first whether it matches its requirements, then whether it is well-built. This is a task-scoped gate, not a merge review.
+
+## What Was Requested
+
+Read the task brief: /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/.superpowers/sdd/2026-10-15-cli-bundled-distribution-and-self-update/task-6-brief.md
+
+## MANDATORY RULINGS (override the brief — treat as correct requirements)
+
+R1 — `--now` is POSIX-only: `os.execv(paths.current_link()/"odi")` only where `current` is a symlink; on Windows / non-symlink, print a "takes effect on next run" message and exit 0 (Task 4 ruling: Windows `current` is a marker file).
+R2 — Startup hook must print `Updated to vX.Y.Z — takes effect next run` when `maybe_auto_update` returns a non-None version, inside the same swallow-all try/except (spec line 155).
+R3 (implementer-flagged brief bug) — The brief step-3 ordering says to test `is_frozen()` BEFORE handling `--check`, but that fails the brief's own tests `test_update_check_up_to_date` / `test_update_check_available` (which don't patch `is_frozen`, so the real non-frozen value would print the source-install message instead of the check result). Therefore the correct order is: handle `--check` first, then the source-install (`not is_frozen`) guard for the apply path. Do NOT flag this inversion as a defect.
+
+## What the Implementer Claims They Built
+
+Read the implementer's report: /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/.superpowers/sdd/2026-10-15-cli-bundled-distribution-and-self-update/task-6-report.md
+
+## Diff Under Review
+
+Base: c89a84316536fe9ba7e9ae86f05d70276e267ad9
+Head: 6407d5d
+Diff file: /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/.superpowers/sdd/2026-10-15-cli-bundled-distribution-and-self-update/review-c89a843..6407d5d.diff
+
+Read the diff file once. Do not re-run git commands. Do not crawl the broader codebase; inspect outside the diff only for a concrete, named risk.
+
+Read-only review. Do not mutate the working tree, index, HEAD, or branch state.
+
+## You Do Not Dispatch Subagents
+
+Do all of this review yourself.
+
+## Do Not Trust the Report
+
+Verify claims against the diff. A stated rationale never downgrades a finding.
+
+## Tests
+
+The implementer already ran the tests. Do not re-run the suite. Run a focused test only if reading raises a specific doubt no existing run answers. Warnings/noise in reported output are findings.
+
+## Part 1: Spec Compliance
+Required:
+- Root command gains global `--no-update` bool option; when `not no_update`, spawn `update.maybe_auto_update(no_update=..., now=time.time())` in a `threading.Thread(daemon=True)`; never block; swallow exceptions; keep Task 3 `--backend` wiring intact.
+- `update_cmd(check=False, force=False, version=None, now=False)`:
+  - `--check`: `latest_release(__version__)` → print "up to date" (None) or `f"{latest} available"`; exit 0. (Order: check handled before the source-install guard — per R3.)
+  - source install (`not is_frozen()`): print message containing "source" / "not a bundled"; exit 0.
+  - apply: resolve target (`--version` or latest), download + `perform_update`, print `f"Updated to v{target}"`; `--now` execs per R1.
+- R1 and R2 honored.
+Verify each with file:line. Flag Missing / Extra / Misunderstood. ⚠️ for anything unverifiable from the diff.
+
+## Part 2: Code Quality
+Threading correctness (daemon, no shared-state races, Typer/CliRunner interaction), error handling, DRY, exit codes, structure; tests verify real behavior. Cite file:line. Probe specifically:
+- Does `maybe_auto_update` get called with the right args and only when allowed?
+- Is the swallow-all guarantee present in the thread body (R2)?
+- Does the source-install guard only apply to the apply path (not to `--check`)?
+- Any risk the daemon thread outlives the CliRunner test and calls a removed patch (reported concern), and is it mitigated/harmless?
+- Does `--now` avoid calling `os.execv` on Windows/non-symlink?
+
+## Calibration
+Categorize by real severity (Critical/Important/Minor). Plan-mandated defects → Important, labeled plan-mandated. Acknowledge strengths before issues.
+
+## Output Format
+
+### Spec Compliance
+- ✅/❌ with file:line; ⚠️ items
+### Strengths
+### Issues
+#### Critical / #### Important / #### Minor
+### Assessment
+**Task quality:** Approved | Needs fixes
+**Reasoning:** 1-2 sentences
+
+Your final message is the report itself: begin directly with the spec-compliance verdict. No preamble.
