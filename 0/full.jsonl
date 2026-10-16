@@ -21,11 +21,11 @@
     },
     "cost": 0,
     "tokens": {
-      "input": 21286,
-      "output": 1758,
-      "reasoning": 3144,
+      "input": 25947,
+      "output": 3769,
+      "reasoning": 3906,
       "cache": {
-        "read": 243008,
+        "read": 381696,
         "write": 0
       }
     },
@@ -38,7 +38,7 @@
     ],
     "time": {
       "created": 1792165131381,
-      "updated": 1792165281436
+      "updated": 1792165445695
     }
   },
   "messages": [
@@ -1570,19 +1570,22 @@
         },
         "cost": 0,
         "tokens": {
-          "input": 0,
-          "output": 0,
-          "reasoning": 0,
+          "total": 27341,
+          "input": 352,
+          "output": 124,
+          "reasoning": 113,
           "cache": {
-            "read": 0,
-            "write": 0
+            "write": 0,
+            "read": 26752
           }
         },
         "modelID": "big-pickle",
         "providerID": "opencode",
         "time": {
-          "created": 1792165281430
+          "created": 1792165281430,
+          "completed": 1792165388702
         },
+        "finish": "tool-calls",
         "id": "msg_1455ffe960014Eik6O6kCBXUUA",
         "sessionID": "ses_ebaa24b8affez4C6RHAyM4bED5"
       },
@@ -1621,21 +1624,441 @@
           "tool": "bash",
           "callID": "call_936e3cebc60140acbfb9c504",
           "state": {
-            "metadata": {
-              "output": ""
-            },
-            "status": "running",
+            "status": "completed",
             "input": {
               "command": "git add core/src/core/factory.py core/src/core/__init__.py core/tests/test_factory.py && git commit -m \"feat(core): add build_repository factory for shared store selection\" && git log --oneline -2 && git show --stat --oneline HEAD",
               "workdir": "/home/alexa/repos/agentic-odi"
             },
+            "output": "[feature/cli-odi-entity-parity 95dd576] feat(core): add build_repository factory for shared store selection\n 3 files changed, 64 insertions(+)\n create mode 100644 core/src/core/factory.py\n create mode 100644 core/tests/test_factory.py\n95dd576 feat(core): add build_repository factory for shared store selection\n5f84f98 feat(core): read-through SQLite repository with locking and cascade events\n95dd576 feat(core): add build_repository factory for shared store selection\n core/src/core/__init__.py  |  2 ++\n core/src/core/factory.py   | 23 +++++++++++++++++++++++\n core/tests/test_factory.py | 39 +++++++++++++++++++++++++++++++++++++++\n 3 files changed, 64 insertions(+)\n",
+            "metadata": {
+              "output": "[feature/cli-odi-entity-parity 95dd576] feat(core): add build_repository factory for shared store selection\n 3 files changed, 64 insertions(+)\n create mode 100644 core/src/core/factory.py\n create mode 100644 core/tests/test_factory.py\n95dd576 feat(core): add build_repository factory for shared store selection\n5f84f98 feat(core): read-through SQLite repository with locking and cascade events\n95dd576 feat(core): add build_repository factory for shared store selection\n core/src/core/__init__.py  |  2 ++\n core/src/core/factory.py   | 23 +++++++++++++++++++++++\n core/tests/test_factory.py | 39 +++++++++++++++++++++++++++++++++++++++\n 3 files changed, 64 insertions(+)\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "git add core/src/core/factory.py core/src/core/__init__.py core/tests/test_factory.py && git commit -m \"feat(core): add build_repository factory for shared store selection\" && git log --oneline -2 && git show --stat --oneline HEAD",
             "time": {
-              "start": 1792165289273
+              "start": 1792165289273,
+              "end": 1792165388460
             }
           },
           "id": "prt_1456019b5001zNNHMMuRGU3PCQ",
           "sessionID": "ses_ebaa24b8affez4C6RHAyM4bED5",
           "messageID": "msg_1455ffe960014Eik6O6kCBXUUA"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "48fdc3fd9423e64a8f77e78720c4bce6861c492e",
+          "type": "step-finish",
+          "tokens": {
+            "total": 27341,
+            "input": 352,
+            "output": 124,
+            "reasoning": 113,
+            "cache": {
+              "write": 0,
+              "read": 26752
+            }
+          },
+          "cost": 0,
+          "id": "prt_14561a12b001AbCksbs5jMBXyf",
+          "sessionID": "ses_ebaa24b8affez4C6RHAyM4bED5",
+          "messageID": "msg_1455ffe960014Eik6O6kCBXUUA"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_1455db489001hrybBfJa6Hb4Ym",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 27573,
+          "input": 456,
+          "output": 38,
+          "reasoning": 7,
+          "cache": {
+            "write": 0,
+            "read": 27072
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792165388711,
+          "completed": 1792165393967
+        },
+        "finish": "tool-calls",
+        "id": "msg_14561a1a7001VLF9lTai43OOKT",
+        "sessionID": "ses_ebaa24b8affez4C6RHAyM4bED5"
+      },
+      "parts": [
+        {
+          "snapshot": "48fdc3fd9423e64a8f77e78720c4bce6861c492e",
+          "type": "step-start",
+          "id": "prt_14561b28c001Sdb4357sxqiwGY",
+          "sessionID": "ses_ebaa24b8affez4C6RHAyM4bED5",
+          "messageID": "msg_14561a1a7001VLF9lTai43OOKT"
+        },
+        {
+          "type": "reasoning",
+          "text": "Now self-review the diff.",
+          "time": {
+            "start": 1792165393099,
+            "end": 1792165393363
+          },
+          "id": "prt_14561b2cb001RUx5fzxj4CW14J",
+          "sessionID": "ses_ebaa24b8affez4C6RHAyM4bED5",
+          "messageID": "msg_14561a1a7001VLF9lTai43OOKT"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "call_bcb7bb713e8e48669c7142b9",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "git show HEAD",
+              "workdir": "/home/alexa/repos/agentic-odi"
+            },
+            "output": "commit 95dd5762d7b9673aba5ee0238c0c365882242584\nAuthor: Alexander Harenstam <alehar9320@users.noreply.github.com>\nDate:   Fri Oct 16 17:41:29 2026 +0200\n\n    feat(core): add build_repository factory for shared store selection\n    \n    Entire-Checkpoint: 01M52P08ZHX7V7ZFTN4N1WG53W\n\ndiff --git a/core/src/core/__init__.py b/core/src/core/__init__.py\nindex 4242968..922c528 100644\n--- a/core/src/core/__init__.py\n+++ b/core/src/core/__init__.py\n@@ -1,5 +1,6 @@\n \"\"\"Agentic ODI Core package.\"\"\"\n \n+from core.factory import build_repository\n from core.messages import (\n     CAPABILITIES,\n     ODI_ASSISTANT_PROMPT,\n@@ -50,6 +51,7 @@ __all__ = [\n     \"ValueOutOfRangeError\",\n     \"InMemoryRepository\",\n     \"Repository\",\n+    \"build_repository\",\n     \"compute_opportunity_score\",\n     \"customer_outcome_not_found\",\n     \"job_not_found\",\ndiff --git a/core/src/core/factory.py b/core/src/core/factory.py\nnew file mode 100644\nindex 0000000..ed50fc0\n--- /dev/null\n+++ b/core/src/core/factory.py\n@@ -0,0 +1,23 @@\n+\"\"\"Repository factory selecting a persistent or in-memory store.\"\"\"\n+\n+from __future__ import annotations\n+\n+import os\n+\n+from core.repository import InMemoryRepository, Repository\n+from core.sqlite_repository import SQLiteRepository\n+\n+\n+def build_repository(db_path: str | None = None) -> Repository:\n+    if db_path is not None:\n+        resolved = db_path\n+    else:\n+        resolved = os.environ.get(\"AGENTIC_ODI_DB\")\n+    if resolved is None:\n+        resolved = os.path.expanduser(\"~/.agentic-odi/odi.db\")\n+    if resolved == \":memory:\":\n+        return InMemoryRepository()\n+    parent = os.path.dirname(resolved)\n+    if parent:\n+        os.makedirs(parent, exist_ok=True)\n+    return SQLiteRepository(db_path=resolved)\ndiff --git a/core/tests/test_factory.py b/core/tests/test_factory.py\nnew file mode 100644\nindex 0000000..76cae9b\n--- /dev/null\n+++ b/core/tests/test_factory.py\n@@ -0,0 +1,39 @@\n+from core import InMemoryRepository, build_repository\n+from core.sqlite_repository import SQLiteRepository\n+\n+\n+def test_memory_path_returns_in_memory(monkeypatch):\n+    monkeypatch.setenv(\"AGENTIC_ODI_DB\", \":memory:\")\n+    assert isinstance(build_repository(), InMemoryRepository)\n+\n+\n+def test_default_path_returns_sqlite(tmp_path, monkeypatch):\n+    monkeypatch.delenv(\"AGENTIC_ODI_DB\", raising=False)\n+    repo = build_repository(db_path=str(tmp_path / \"odi.db\"))\n+    assert isinstance(repo, SQLiteRepository)\n+\n+\n+def test_explicit_db_path_wins_over_env_var(tmp_path, monkeypatch):\n+    env_path = tmp_path / \"env.db\"\n+    explicit_path = tmp_path / \"odi.db\"\n+    monkeypatch.setenv(\"AGENTIC_ODI_DB\", str(env_path))\n+    repo = build_repository(db_path=str(explicit_path))\n+    assert isinstance(repo, SQLiteRepository)\n+    assert explicit_path.exists()\n+    assert not env_path.exists()\n+\n+\n+def test_env_var_resolution(tmp_path, monkeypatch):\n+    env_path = tmp_path / \"e.db\"\n+    monkeypatch.setenv(\"AGENTIC_ODI_DB\", str(env_path))\n+    repo = build_repository()\n+    assert isinstance(repo, SQLiteRepository)\n+    assert env_path.exists()\n+\n+\n+def test_default_is_home_store_and_parent_created(tmp_path, monkeypatch):\n+    monkeypatch.delenv(\"AGENTIC_ODI_DB\", raising=False)\n+    monkeypatch.setenv(\"HOME\", str(tmp_path))\n+    repo = build_repository()\n+    assert isinstance(repo, SQLiteRepository)\n+    assert (tmp_path / \".agentic-odi\" / \"odi.db\").exists()\n",
+            "metadata": {
+              "output": "commit 95dd5762d7b9673aba5ee0238c0c365882242584\nAuthor: Alexander Harenstam <alehar9320@users.noreply.github.com>\nDate:   Fri Oct 16 17:41:29 2026 +0200\n\n    feat(core): add build_repository factory for shared store selection\n    \n    Entire-Checkpoint: 01M52P08ZHX7V7ZFTN4N1WG53W\n\ndiff --git a/core/src/core/__init__.py b/core/src/core/__init__.py\nindex 4242968..922c528 100644\n--- a/core/src/core/__init__.py\n+++ b/core/src/core/__init__.py\n@@ -1,5 +1,6 @@\n \"\"\"Agentic ODI Core package.\"\"\"\n \n+from core.factory import build_repository\n from core.messages import (\n     CAPABILITIES,\n     ODI_ASSISTANT_PROMPT,\n@@ -50,6 +51,7 @@ __all__ = [\n     \"ValueOutOfRangeError\",\n     \"InMemoryRepository\",\n     \"Repository\",\n+    \"build_repository\",\n     \"compute_opportunity_score\",\n     \"customer_outcome_not_found\",\n     \"job_not_found\",\ndiff --git a/core/src/core/factory.py b/core/src/core/factory.py\nnew file mode 100644\nindex 0000000..ed50fc0\n--- /dev/null\n+++ b/core/src/core/factory.py\n@@ -0,0 +1,23 @@\n+\"\"\"Repository factory selecting a persistent or in-memory store.\"\"\"\n+\n+from __future__ import annotations\n+\n+import os\n+\n+from core.repository import InMemoryRepository, Repository\n+from core.sqlite_repository import SQLiteRepository\n+\n+\n+def build_repository(db_path: str | None = None) -> Repository:\n+    if db_path is not None:\n+        resolved = db_path\n+    else:\n+        resolved = os.environ.get(\"AGENTIC_ODI_DB\")\n+    if resolved is None:\n+        resolved = os.path.expanduser(\"~/.agentic-odi/odi.db\")\n+    if resolved == \":memory:\":\n+        return InMemoryRepository()\n+    parent = os.path.dirname(resolved)\n+    if parent:\n+        os.makedirs(parent, exist_ok=True)\n+    return SQLiteRepository(db_path=resolved)\ndiff --git a/core/tests/test_factory.py b/core/tests/test_factory.py\nnew file mode 100644\nindex 0000000..76cae9b\n--- /dev/null\n+++ b/core/tests/test_factory.py\n@@ -0,0 +1,39 @@\n+from core import InMemoryRepository, build_repository\n+from core.sqlite_repository import SQLiteRepository\n+\n+\n+def test_memory_path_returns_in_memory(monkeypatch):\n+    monkeypatch.setenv(\"AGENTIC_ODI_DB\", \":memory:\")\n+    assert isinstance(build_repository(), InMemoryRepository)\n+\n+\n+def test_default_path_returns_sqlite(tmp_path, monkeypatch):\n+    monkeypatch.delenv(\"AGENTIC_ODI_DB\", raising=False)\n+    repo = build_repository(db_path=str(tmp_path / \"odi.db\"))\n+    assert isinstance(repo, SQLiteRepository)\n+\n+\n+def test_explicit_db_path_wins_over_env_var(tmp_path, monkeypatch):\n+    env_path = tmp_path / \"env.db\"\n+    explicit_path = tmp_path / \"odi.db\"\n+    monkeypatch.setenv(\"AGENTIC_ODI_DB\", str(env_path))\n+    repo = build_repository(db_path=str(explicit_path))\n+    assert isinstance(repo, SQLiteRepository)\n+    assert explicit_path.exists()\n+    assert not env_path.exists()\n+\n+\n+def test_env_var_resolution(tmp_path, monkeypatch):\n+    env_path = tmp_path / \"e.db\"\n+    monkeypatch.setenv(\"AGENTIC_ODI_DB\", str(env_path))\n+    repo = build_repository()\n+    assert isinstance(repo, SQLiteRepository)\n+    assert env_path.exists()\n+\n+\n+def test_default_is_home_store_and_parent_created(tmp_path, monkeypatch):\n+    monkeypatch.delenv(\"AGENTIC_ODI_DB\", raising=False)\n+    monkeypatch.setenv(\"HOME\", str(tmp_path))\n+    repo = build_repository()\n+    assert isinstance(repo, SQLiteRepository)\n+    assert (tmp_path / \".agentic-odi\" / \"odi.db\").exists()\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "git show HEAD",
+            "time": {
+              "start": 1792165393842,
+              "end": 1792165393872
+            }
+          },
+          "id": "prt_14561b3d7001t2gq4FamochHWF",
+          "sessionID": "ses_ebaa24b8affez4C6RHAyM4bED5",
+          "messageID": "msg_14561a1a7001VLF9lTai43OOKT"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "48fdc3fd9423e64a8f77e78720c4bce6861c492e",
+          "type": "step-finish",
+          "tokens": {
+            "total": 27573,
+            "input": 456,
+            "output": 38,
+            "reasoning": 7,
+            "cache": {
+              "write": 0,
+              "read": 27072
+            }
+          },
+          "cost": 0,
+          "id": "prt_14561b606001qwodX9PdlwD143",
+          "sessionID": "ses_ebaa24b8affez4C6RHAyM4bED5",
+          "messageID": "msg_14561a1a7001VLF9lTai43OOKT"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_1455db489001hrybBfJa6Hb4Ym",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 29239,
+          "input": 1488,
+          "output": 86,
+          "reasoning": 593,
+          "cache": {
+            "write": 0,
+            "read": 27072
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792165393989,
+          "completed": 1792165417622
+        },
+        "finish": "tool-calls",
+        "id": "msg_14561b6450014scJrsAdnQHlt1",
+        "sessionID": "ses_ebaa24b8affez4C6RHAyM4bED5"
+      },
+      "parts": [
+        {
+          "snapshot": "48fdc3fd9423e64a8f77e78720c4bce6861c492e",
+          "type": "step-start",
+          "id": "prt_14561c34e001JIr5UUtE6t94Vn",
+          "sessionID": "ses_ebaa24b8affez4C6RHAyM4bED5",
+          "messageID": "msg_14561b6450014scJrsAdnQHlt1"
+        },
+        {
+          "type": "reasoning",
+          "text": "Self-review:\n\n1. `factory.py` matches R5 exactly: resolution order arg → env → expanduser default; `:memory:` → InMemory; parent mkdir guarded by `if parent:`; never passes None. ✓\n2. `__init__.py` exports: import placed in isort order (factory before messages), `__all__` entry added. ✓ Ruff passed including `I` rule.\n3. Tests: brief's two kept (with the second slightly extended? No — the second is exactly as brief, `test_default_path_returns_sqlite`), plus the three required additional tests. The brief's `import pytest` was dropped as unused (ruff F401 would flag it) — monkeypatch/tmp_path fixtures are injected by name; no pytest import needed. Worth noting in report.\n4. Enhanced assertions: explicit-path test asserts env path NOT created (proves precedence, not just type); env test asserts file created at env path. Good.\n5. Real home protection: default test rewrites HOME to tmp_path; verified real `~/.agentic-odi/odi.db` mtime unchanged.\n6. Edge: bare filename `\"odi.db\"` → dirname \"\" → no makedirs → SQLiteRepository's own `os.makedirs(os.path.dirname(db_path) or \".\")` handles it. Guard present as required.\n7. Edge: env var set to `:memory:` combined with explicit arg — arg wins, then memory check happens after resolution on the winning value. If someone passes `db_path=\":memory:\"` explicitly, they get InMemory — reasonable and consistent with spec (`value :memory: means in-memory`).\n8. `SQLiteRepository.__init__` also does its own env/default resolution when passed None — we never pass None, so factory is the single source of truth for resolved path. Note SQLiteRepository still has duplicated resolution logic internally (defensive); potential drift concern but out of scope for this task.\n9. Circular import check: `core.factory` imported first in `__init__` — factory imports `core.repository`/`core.sqlite_repository`, which don't import `from core import ...`. Tests pass, so verified.\n10. Full suite 44 passed, ruff clean on the three files. Also ran ruff only on three files — should I run on whole core src? Let me quickly run ruff on the whole core to make sure nothing else broke (only __init__ changed, 2 lines added, unlikely). Quick run for thoroughness.\n\nAlso check no pytest cache/db artifacts left untracked: git status showed only docs/ untracked (pre-existing). Also check for stray *.db files in repo root (from tests)? git status --short showed none (would show as untracked). .gitignore may cover *.db though. Let me check quickly for stray db files.\n\nThen write report.",
+          "time": {
+            "start": 1792165397390,
+            "end": 1792165414813
+          },
+          "id": "prt_14561c38e001w56USdj6QhBGWl",
+          "sessionID": "ses_ebaa24b8affez4C6RHAyM4bED5",
+          "messageID": "msg_14561b6450014scJrsAdnQHlt1"
+        },
+        {
+          "type": "text",
+          "text": "Self-review looks good. Verifying nothing else regressed (ruff over all of core, stray artifacts):",
+          "time": {
+            "start": 1792165414817,
+            "end": 1792165417362
+          },
+          "id": "prt_1456207a1001pBMLWGfrbxYrZS",
+          "sessionID": "ses_ebaa24b8affez4C6RHAyM4bED5",
+          "messageID": "msg_14561b6450014scJrsAdnQHlt1"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "call_0054e6e67bdd44ab9e80d9e4",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "uv run --directory core ruff check . && git status --short && ls *.db core/*.db 2>&1 | head -5",
+              "workdir": "/home/alexa/repos/agentic-odi"
+            },
+            "output": "All checks passed!\n?? docs/\nls: cannot access '*.db': No such file or directory\nls: cannot access 'core/*.db': No such file or directory\n",
+            "metadata": {
+              "output": "All checks passed!\n?? docs/\nls: cannot access '*.db': No such file or directory\nls: cannot access 'core/*.db': No such file or directory\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "uv run --directory core ruff check . && git status --short && ls *.db core/*.db 2>&1 | head -5",
+            "time": {
+              "start": 1792165417349,
+              "end": 1792165417444
+            }
+          },
+          "id": "prt_145620bfc001ke82j73i4a3sjF",
+          "sessionID": "ses_ebaa24b8affez4C6RHAyM4bED5",
+          "messageID": "msg_14561b6450014scJrsAdnQHlt1"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "48fdc3fd9423e64a8f77e78720c4bce6861c492e",
+          "type": "step-finish",
+          "tokens": {
+            "total": 29239,
+            "input": 1488,
+            "output": 86,
+            "reasoning": 593,
+            "cache": {
+              "write": 0,
+              "read": 27072
+            }
+          },
+          "cost": 0,
+          "id": "prt_145621232001qKqq3T2glI1uVC",
+          "sessionID": "ses_ebaa24b8affez4C6RHAyM4bED5",
+          "messageID": "msg_14561b6450014scJrsAdnQHlt1"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_1455db489001hrybBfJa6Hb4Ym",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 30864,
+          "input": 737,
+          "output": 1551,
+          "reasoning": 32,
+          "cache": {
+            "write": 0,
+            "read": 28544
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792165417631,
+          "completed": 1792165445679
+        },
+        "finish": "tool-calls",
+        "id": "msg_14562129f001YBVVhFiPmo5QLM",
+        "sessionID": "ses_ebaa24b8affez4C6RHAyM4bED5"
+      },
+      "parts": [
+        {
+          "snapshot": "48fdc3fd9423e64a8f77e78720c4bce6861c492e",
+          "type": "step-start",
+          "id": "prt_145621c9c001dUy5wEHPVvNVkY",
+          "sessionID": "ses_ebaa24b8affez4C6RHAyM4bED5",
+          "messageID": "msg_14562129f001YBVVhFiPmo5QLM"
+        },
+        {
+          "type": "reasoning",
+          "text": "All clean: ruff over all of core passes, only pre-existing untracked `docs/`, no stray db files.\n\nNow write the report file.",
+          "time": {
+            "start": 1792165420255,
+            "end": 1792165420801
+          },
+          "id": "prt_145621cde001pHZSnBCrAxdaDh",
+          "sessionID": "ses_ebaa24b8affez4C6RHAyM4bED5",
+          "messageID": "msg_14562129f001YBVVhFiPmo5QLM"
+        },
+        {
+          "type": "text",
+          "text": "Writing the report:",
+          "time": {
+            "start": 1792165420806,
+            "end": 1792165445496
+          },
+          "id": "prt_145621f06001i7T7duErrHiRn7",
+          "sessionID": "ses_ebaa24b8affez4C6RHAyM4bED5",
+          "messageID": "msg_14562129f001YBVVhFiPmo5QLM"
+        },
+        {
+          "type": "tool",
+          "tool": "write",
+          "callID": "call_4a9d2bbe6719475bab68a094",
+          "state": {
+            "status": "completed",
+            "input": {
+              "content": "# Task 4 Report: `build_repository` factory\n\n**Status:** DONE\n**Branch:** `feature/cli-odi-entity-parity`\n**Commit:** `95dd576` — `feat(core): add build_repository factory for shared store selection`\n\n## What I implemented\n\n- `core/src/core/factory.py`: `build_repository(db_path: str | None = None) -> Repository`\n  with `from __future__ import annotations`, following controller ruling **R5** (NOT the\n  brief's Step-3 sample, which passed `db_path=None` through to `SQLiteRepository` and\n  never applied the documented default):\n  1. Resolve path: explicit `db_path` arg → `AGENTIC_ODI_DB` env var →\n     `os.path.expanduser(\"~/.agentic-odi/odi.db\")` (design doc spec line 112–113).\n  2. If resolved path is `\":memory:\"` → `InMemoryRepository()`.\n  3. Else create parent dir, guarded for bare filenames:\n     `parent = os.path.dirname(resolved); if parent: os.makedirs(parent, exist_ok=True)`.\n  4. Return `SQLiteRepository(db_path=resolved)` — never `None`.\n- `core/src/core/__init__.py`: added `from core.factory import build_repository`\n  (isort-correct position, before `core.messages`) and `\"build_repository\"` in `__all__`.\n  No circular-import issue: `core.repository` / `core.sqlite_repository` never import\n  `from core import ...` (verified by the suite passing).\n\n## Tests\n\n`core/tests/test_factory.py` — 5 tests: the brief's two plus the three required additions:\n\n1. `test_memory_path_returns_in_memory` (brief) — env `:memory:` → `InMemoryRepository`.\n2. `test_default_path_returns_sqlite` (brief) — explicit `tmp_path` db → `SQLiteRepository`.\n3. `test_explicit_db_path_wins_over_env_var` — env set to `tmp_path/env.db`, arg\n   `tmp_path/odi.db` → `SQLiteRepository`, explicit file created, env file NOT created\n   (asserts precedence, not just the type).\n4. `test_env_var_resolution` — env `tmp_path/e.db`, no arg → `SQLiteRepository` + file exists.\n5. `test_default_is_home_store_and_parent_created` — `delenv AGENTIC_ODI_DB`,\n   `HOME=tmp_path` → `SQLiteRepository` AND `tmp_path/.agentic-odi/odi.db` exists\n   (verifies expanduser + parent-dir creation without touching the real home).\n\nNote: I dropped the brief's unused `import pytest` (ruff `F401` would flag it; fixtures\nare injected by name).\n\n**Isolation:** every test writes only under `tmp_path` (or `:memory:`). No test can reach\nthe real `~/.agentic-odi/odi.db`: test 5 rewrites `HOME` via monkeypatch. Post-run check:\nreal `~/.agentic-odi/odi.db` mtime still `Oct 15 21:15` (untouched). No stray `*.db`\nartifacts in the repo.\n\n## TDD evidence\n\n**RED** — `uv run --directory core pytest tests/test_factory.py -v`:\n\n```\nImportError while importing test module '.../core/tests/test_factory.py'.\ntests/test_factory.py:1: in <module>\n    from core import InMemoryRepository, build_repository\nE   ImportError: cannot import name 'build_repository' from 'core'\n1 error in 0.31s\n```\n\nExactly the expected failure (`build_repository` did not exist yet).\n\n**GREEN** — same command after implementing:\n\n```\ncollected 5 items\ntests/test_factory.py::test_memory_path_returns_in_memory PASSED         [ 20%]\ntests/test_factory.py::test_default_path_returns_sqlite PASSED           [ 40%]\ntests/test_factory.py::test_explicit_db_path_wins_over_env_var PASSED    [ 60%]\ntests/test_factory.py::test_env_var_resolution PASSED                    [ 80%]\ntests/test_factory.py::test_default_is_home_store_and_parent_created PASSED [100%]\n5 passed in 0.22s\n```\n\n**Full core suite** — `uv run --directory core pytest`:\n\n```\ncollected 44 items\ntests/test_factory.py .....   tests/test_models.py .......\ntests/test_repository.py ........   tests/test_service.py ..............\ntests/test_sqlite_repository.py ..........\n44 passed in 0.75s\n```\n\nGreen and pristine. No `UV_PYTHON=3.11` prefix needed — no `pyarrow` source build attempted.\n\n**Lint** — `uv run --directory core ruff check .` → `All checks passed!` (line-length 100,\nselect `E4,E7,E9,F,I,UP,B,BLE`).\n\n## Default-path / parent-dir verification\n\nTest 5 is the proof: with `AGENTIC_ODI_DB` removed and `HOME` pointed at `tmp_path`,\n`build_repository()` both expands `~` to `tmp_path` (file appears at\n`tmp_path/.agentic-odi/odi.db`) and creates the missing `.agentic-odi` parent directory\n(`SQLiteRepository` alone could not expand `~` itself; its internal default only fires\nwhen `db_path is None`, which R5 forbids passing).\n\n## Self-review findings\n\n- Diff is exactly the three specified files (+64 lines); `docs/` untracked dir is\n  pre-existing and was left alone; nothing staged beyond the three files.\n- R5 ordering followed precisely: resolve → `:memory:` check → guarded `makedirs` →\n  return with resolved path. `:memory:` as an explicit `db_path` arg also yields\n  `InMemoryRepository`, consistent with the spec's \"value `:memory:` means in-memory\".\n- Edge case: bare filename `\"odi.db\"` → `dirname` is `\"\"` → `makedirs` skipped (guard\n  present); `SQLiteRepository`'s own `makedirs(... or \".\")` then handles it.\n- No circular import: `core.factory` is now the first import in `core/__init__.py`;\n  its dependencies (`core.repository`, `core.sqlite_repository`) do not import the\n  `core` package itself — confirmed by the 44-test suite passing.\n\n## Concerns\n\n- Minor duplication: `SQLiteRepository.__init__` still contains its own\n  env-var/default-path fallback for `db_path is None`. The factory never triggers it\n  (per R5), but the two resolution sites could drift. Out of scope for this task; worth\n  a follow-up if `SQLiteRepository` is constructed directly elsewhere.\n- No `pyarrow` build issue occurred; no environment workaround was needed.\n",
+              "filePath": "/home/alexa/repos/agentic-odi/.superpowers/sdd/2026-10-15-cli-odi-entity-parity/task-4-report.md"
+            },
+            "output": "Wrote file successfully.",
+            "metadata": {
+              "diagnostics": {},
+              "filepath": "/home/alexa/repos/agentic-odi/.superpowers/sdd/2026-10-15-cli-odi-entity-parity/task-4-report.md",
+              "exists": false,
+              "truncated": false
+            },
+            "title": ".superpowers/sdd/2026-10-15-cli-odi-entity-parity/task-4-report.md",
+            "time": {
+              "start": 1792165445484,
+              "end": 1792165445504
+            }
+          },
+          "id": "prt_145621f83001LBfT0ggTwdJ8DH",
+          "sessionID": "ses_ebaa24b8affez4C6RHAyM4bED5",
+          "messageID": "msg_14562129f001YBVVhFiPmo5QLM"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "48fdc3fd9423e64a8f77e78720c4bce6861c492e",
+          "type": "step-finish",
+          "tokens": {
+            "total": 30864,
+            "input": 737,
+            "output": 1551,
+            "reasoning": 32,
+            "cache": {
+              "write": 0,
+              "read": 28544
+            }
+          },
+          "cost": 0,
+          "id": "prt_145627fe9001wzXcrgPf1deYkD",
+          "sessionID": "ses_ebaa24b8affez4C6RHAyM4bED5",
+          "messageID": "msg_14562129f001YBVVhFiPmo5QLM"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_1455db489001hrybBfJa6Hb4Ym",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 31105,
+          "input": 1628,
+          "output": 212,
+          "reasoning": 17,
+          "cache": {
+            "write": 0,
+            "read": 29248
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792165445690,
+          "completed": 1792165454466
+        },
+        "finish": "stop",
+        "id": "msg_14562803a001dlU0mn2t0fXRGy",
+        "sessionID": "ses_ebaa24b8affez4C6RHAyM4bED5"
+      },
+      "parts": [
+        {
+          "snapshot": "48fdc3fd9423e64a8f77e78720c4bce6861c492e",
+          "type": "step-start",
+          "id": "prt_1456291f9001Fetrncylb5VveG",
+          "sessionID": "ses_ebaa24b8affez4C6RHAyM4bED5",
+          "messageID": "msg_14562803a001dlU0mn2t0fXRGy"
+        },
+        {
+          "type": "reasoning",
+          "text": "Report written. Reply with the short format requested (under 15 lines).",
+          "time": {
+            "start": 1792165450376,
+            "end": 1792165450955
+          },
+          "id": "prt_145629288001opwqtsqztIi4Cb",
+          "sessionID": "ses_ebaa24b8affez4C6RHAyM4bED5",
+          "messageID": "msg_14562803a001dlU0mn2t0fXRGy"
+        },
+        {
+          "type": "text",
+          "text": "- **Status:** DONE\n- Commit: `95dd576` feat(core): add build_repository factory for shared store selection\n- Tests: 5/5 factory tests pass; full core suite 44/44 green; ruff clean (no `UV_PYTHON` needed)\n- TDD: RED (`ImportError: cannot import name 'build_repository'`) → GREEN; R5 resolution order implemented (arg → `AGENTIC_ODI_DB` → `~/.agentic-odi/odi.db`, guarded parent mkdir, never passes `None`); real home db untouched (mtime unchanged)\n- Concerns: `SQLiteRepository.__init__` retains a duplicate env/default fallback for `db_path=None` (dead path under the factory) — noted as possible follow-up, out of scope here\n- Report: /home/alexa/repos/agentic-odi/.superpowers/sdd/2026-10-15-cli-odi-entity-parity/task-4-report.md",
+          "time": {
+            "start": 1792165450959,
+            "end": 1792165454343
+          },
+          "id": "prt_1456294ce001gRRodPK1kaus5v",
+          "sessionID": "ses_ebaa24b8affez4C6RHAyM4bED5",
+          "messageID": "msg_14562803a001dlU0mn2t0fXRGy"
+        },
+        {
+          "reason": "stop",
+          "snapshot": "48fdc3fd9423e64a8f77e78720c4bce6861c492e",
+          "type": "step-finish",
+          "tokens": {
+            "total": 31105,
+            "input": 1628,
+            "output": 212,
+            "reasoning": 17,
+            "cache": {
+              "write": 0,
+              "read": 29248
+            }
+          },
+          "cost": 0,
+          "id": "prt_14562a249001aGeHOUtVlaHrV2",
+          "sessionID": "ses_ebaa24b8affez4C6RHAyM4bED5",
+          "messageID": "msg_14562803a001dlU0mn2t0fXRGy"
         }
       ]
     }
