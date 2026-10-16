@@ -14,6 +14,7 @@ members = ["cli", "client", "connectors", "core", "mcp_server", "local_server"]
 dev = [
     "bandit==1.9.4",
     "mypy==2.4.0",
+    "pyinstaller==6.22.3",
     "pytest==9.1.1",
     "pytest-asyncio==1.4.0",
     "pytest-cov==7.1.0",
