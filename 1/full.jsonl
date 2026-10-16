@@ -1,0 +1,594 @@
+{
+  "info": {
+    "id": "ses_ebde83a58ffeUl7XfZ8TYcC8gT",
+    "slug": "quiet-panda",
+    "projectID": "e4fe19106d06261ebfed21a0e3ba06559abf1100",
+    "directory": "/home/alexa/repos/agentic-odi",
+    "path": "",
+    "parentID": "ses_ebedd9abaffesSyRWO5QAiMN5F",
+    "title": "Review Task 5 (spec + quality) (@general subagent)",
+    "agent": "general",
+    "model": {
+      "id": "big-pickle",
+      "providerID": "opencode",
+      "variant": "default"
+    },
+    "version": "1.18.35",
+    "summary": {
+      "additions": 0,
+      "deletions": 0,
+      "files": 0
+    },
+    "cost": 0,
+    "tokens": {
+      "input": 38709,
+      "output": 1785,
+      "reasoning": 1261,
+      "cache": {
+        "read": 64839,
+        "write": 0
+      }
+    },
+    "permission": [
+      {
+        "permission": "task",
+        "pattern": "*",
+        "action": "deny"
+      }
+    ],
+    "time": {
+      "created": 1792110216615,
+      "updated": 1792110267454
+    }
+  },
+  "messages": [
+    {
+      "info": {
+        "role": "user",
+        "time": {
+          "created": 1792110216623
+        },
+        "agent": "general",
+        "model": {
+          "providerID": "opencode",
+          "modelID": "big-pickle"
+        },
+        "summary": {
+          "diffs": []
+        },
+        "id": "msg_14217c5ae001tdUWhHtknxBrtQ",
+        "sessionID": "ses_ebde83a58ffeUl7XfZ8TYcC8gT"
+      },
+      "parts": [
+        {
+          "type": "text",
+          "text": "You are reviewing one task's implementation: first whether it matches its requirements, then whether it is well-built. This is a task-scoped gate, not a merge review.\n\n## What Was Requested\n\nRead the task brief: /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/.superpowers/sdd/2026-10-15-cli-bundled-distribution-and-self-update/task-5-brief.md\n\n## MANDATORY RULINGS (controller rulings that OVERRIDE the brief — treat these as the correct requirements)\n\nR1 — Checksum source: the brief's line 554 (\"verify against `<asset>.sha256`\") is wrong. The design (spec §Artifacts, lines 109/148), the installers (plan lines 712/749) and the release job (plan line 827) publish ONE `checksums.txt` (sha256sum format `<hex>  <filename>`). So `download()` MUST fetch `checksums.txt`, select the line whose filename equals `asset_name(...)`, and verify against that. If no line matches → `update.UpdateError`. Per-asset `.sha256` is NOT expected.\nR2 — `auto_update_enabled(no_update)` MUST be `(not no_update) and (not os.environ.get(\"AGENTIC_ODI_NO_UPDATE\"))` ONLY. The brief's impl line 78 (is_frozen/is_writable_dir inside `auto_update_enabled`) is overridden because the brief's own test at `tests/test_update_check.py:57-60` requires `True` in a non-frozen env. The spec-157 suppressions (not frozen / not writable / lock held) MUST live in `maybe_auto_update`, which must never raise. Therefore: the plan's review-focus note \"(4) auto_update_enabled writable check\" is satisfied in `maybe_auto_update`, NOT in `auto_update_enabled` — do NOT flag the absence of the writable check in `auto_update_enabled` as a defect.\nR3 — A download test (success + checksum-mismatch → UpdateError) with injected `fetch_bytes` is required in addition to the brief's six tests.\n\n## What the Implementer Claims They Built\n\nRead the implementer's report: /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/.superpowers/sdd/2026-10-15-cli-bundled-distribution-and-self-update/task-5-report.md\n\n## Diff Under Review\n\nBase: 078fcdb098334c277399380a9ab39f2153d9ff61\nHead: 6138534\nDiff file: /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/.superpowers/sdd/2026-10-15-cli-bundled-distribution-and-self-update/review-078fcdb..6138534.diff\n\nRead the diff file once — it contains the commit list, a stat summary, and the full diff with surrounding context. Do not re-run git commands. Do not crawl the broader codebase; inspect outside the diff only for a concrete, named risk.\n\nRead-only review. Do not mutate the working tree, index, HEAD, or branch state.\n\n## You Do Not Dispatch Subagents\n\nDo all of this review yourself. Never spawn a subagent.\n\n## Do Not Trust the Report\n\nTreat the report as unverified claims; verify against the diff. A stated rationale never downgrades a finding.\n\n## Tests\n\nThe implementer already ran the tests and reported TDD evidence. Do not re-run the suite. Run a focused test only if reading raises a specific doubt no existing run answers. Warnings/noise in reported output are findings.\n\n## Part 1: Spec Compliance\nRequired interface (contract for Task 6):\n- `update.CHECK_INTERVAL_SECONDS == 86400`\n- `update.should_check(state_file, now) -> bool` (missing/corrupt file ⇒ True)\n- `update.record_check(state_file, now) -> None` (writes `{\"last_check\": <float>}`, creates parent dirs)\n- `update.latest_release(current, *, fetch=None) -> str | None` (parses `tag_name`, strips `v`, returns newer or None; any exception ⇒ None)\n- `update.download(version, dest_dir, *, fetch_bytes=None) -> Path` (per R1)\n- `update.auto_update_enabled(no_update) -> bool` (per R2)\n- `update.maybe_auto_update(*, no_update, now) -> str | None` (never raises; applies suppression + due check + record_check + latest_release + download + perform_update; returns new version or None)\n\nVerify each with file:line, plus that the six brief tests are present verbatim and the R3 download test exists. Flag Missing / Extra / Misunderstood. If a requirement cannot be verified from this diff alone, report it as a ⚠️ item.\n\n## Part 2: Code Quality\nClean separation, error handling (network failures, corrupt JSON, missing checksums line), DRY, edge cases, structure; tests verify real behavior. Cite file:line for every finding. Specifically probe: does `maybe_auto_update` truly never raise (including JSON/IO/network/UpdateError paths)? Does `record_check` create the config dir? Does `download` handle a missing/非matching checksums line and a checksum mismatch? Does the `latest_release` default fetch close its response and time out sensibly?\n\n## Calibration\nCategorize by real severity (Critical/Important/Minor). If the plan/brief mandates something the rubric calls a defect, report it as Important, labeled plan-mandated. Rulings R1–R3 are correct requirements, not defects. Acknowledge strengths before issues.\n\n## Output Format\n\n### Spec Compliance\n- ✅/❌ with file:line; ⚠️ items\n### Strengths\n### Issues\n#### Critical / #### Important / #### Minor\n### Assessment\n**Task quality:** Approved | Needs fixes\n**Reasoning:** 1-2 sentences\n\nYour final message is the report itself: begin directly with the spec-compliance verdict. No preamble.",
+          "id": "prt_14217c5b2001ed9JutDfjJ4M5X",
+          "sessionID": "ses_ebde83a58ffeUl7XfZ8TYcC8gT",
+          "messageID": "msg_14217c5ae001tdUWhHtknxBrtQ"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_14217c5ae001tdUWhHtknxBrtQ",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 15137,
+          "input": 14964,
+          "output": 78,
+          "reasoning": 22,
+          "cache": {
+            "write": 0,
+            "read": 73
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792110217096,
+          "completed": 1792110221930
+        },
+        "finish": "tool-calls",
+        "id": "msg_14217c788001O1B4VfAhA27TY0",
+        "sessionID": "ses_ebde83a58ffeUl7XfZ8TYcC8gT"
+      },
+      "parts": [
+        {
+          "snapshot": "8f33efb4b478c6620bd5d8537feec7b52fd5cd94",
+          "type": "step-start",
+          "id": "prt_14217d9bc0015VXCR6Avt2yvZI",
+          "sessionID": "ses_ebde83a58ffeUl7XfZ8TYcC8gT",
+          "messageID": "msg_14217c788001O1B4VfAhA27TY0"
+        },
+        {
+          "type": "tool",
+          "tool": "read",
+          "callID": "625614ab-d209-42b4-ab1c-0869cd67d0d2",
+          "state": {
+            "status": "error",
+            "input": {
+              "filePath": "/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/.superpowers/sdd/2026-10-15-cli-bundled-distribution-and-self-update/task-5-brief.md",
+              "offset": "1.0",
+              "limit": "150.0"
+            },
+            "error": "The read tool was called with invalid arguments: SchemaError(Expected number | undefined, got \"1.0\"\n  at [\"offset\"]).\nPlease rewrite the input so it satisfies the expected schema.",
+            "time": {
+              "start": 1792110221767,
+              "end": 1792110221770
+            }
+          },
+          "id": "prt_14217d9be001z4joHo6T9Su0lx",
+          "sessionID": "ses_ebde83a58ffeUl7XfZ8TYcC8gT",
+          "messageID": "msg_14217c788001O1B4VfAhA27TY0"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "8f33efb4b478c6620bd5d8537feec7b52fd5cd94",
+          "type": "step-finish",
+          "tokens": {
+            "total": 15137,
+            "input": 14964,
+            "output": 78,
+            "reasoning": 22,
+            "cache": {
+              "write": 0,
+              "read": 73
+            }
+          },
+          "cost": 0,
+          "id": "prt_14217da4a001mcWYoeKoemkEk4",
+          "sessionID": "ses_ebde83a58ffeUl7XfZ8TYcC8gT",
+          "messageID": "msg_14217c788001O1B4VfAhA27TY0"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_14217c5ae001tdUWhHtknxBrtQ",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 15229,
+          "input": 117,
+          "output": 73,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 15039
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792110221933,
+          "completed": 1792110224118
+        },
+        "finish": "tool-calls",
+        "id": "msg_14217da6d001TOd1Y01YDy70kS",
+        "sessionID": "ses_ebde83a58ffeUl7XfZ8TYcC8gT"
+      },
+      "parts": [
+        {
+          "snapshot": "8f33efb4b478c6620bd5d8537feec7b52fd5cd94",
+          "type": "step-start",
+          "id": "prt_14217e2c8001BKIFVXtt6gM178",
+          "sessionID": "ses_ebde83a58ffeUl7XfZ8TYcC8gT",
+          "messageID": "msg_14217da6d001TOd1Y01YDy70kS"
+        },
+        {
+          "type": "tool",
+          "tool": "read",
+          "callID": "b96bfcd2-5353-46b4-b8b5-63fd9f2f77b8",
+          "state": {
+            "status": "error",
+            "input": {
+              "filePath": "/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/.superpowers/sdd/2026-10-15-cli-bundled-distribution-and-self-update/task-5-brief.md",
+              "offset": "1.0",
+              "limit": "100.0"
+            },
+            "error": "The read tool was called with invalid arguments: SchemaError(Expected number | undefined, got \"1.0\"\n  at [\"offset\"]).\nPlease rewrite the input so it satisfies the expected schema.",
+            "time": {
+              "start": 1792110224079,
+              "end": 1792110224081
+            }
+          },
+          "id": "prt_14217e2ca001jEMt6p5QcXwu2s",
+          "sessionID": "ses_ebde83a58ffeUl7XfZ8TYcC8gT",
+          "messageID": "msg_14217da6d001TOd1Y01YDy70kS"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "8f33efb4b478c6620bd5d8537feec7b52fd5cd94",
+          "type": "step-finish",
+          "tokens": {
+            "total": 15229,
+            "input": 117,
+            "output": 73,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 15039
+            }
+          },
+          "cost": 0,
+          "id": "prt_14217e2dd0012HtEjHbQZtWfyZ",
+          "sessionID": "ses_ebde83a58ffeUl7XfZ8TYcC8gT",
+          "messageID": "msg_14217da6d001TOd1Y01YDy70kS"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_14217c5ae001tdUWhHtknxBrtQ",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 15344,
+          "input": 47,
+          "output": 69,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 15228
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792110224120,
+          "completed": 1792110226869
+        },
+        "finish": "tool-calls",
+        "id": "msg_14217e2f8001ExW5Ch1qDn0ay6",
+        "sessionID": "ses_ebde83a58ffeUl7XfZ8TYcC8gT"
+      },
+      "parts": [
+        {
+          "snapshot": "8f33efb4b478c6620bd5d8537feec7b52fd5cd94",
+          "type": "step-start",
+          "id": "prt_14217ed5c0018zK99ByamMwI49",
+          "sessionID": "ses_ebde83a58ffeUl7XfZ8TYcC8gT",
+          "messageID": "msg_14217e2f8001ExW5Ch1qDn0ay6"
+        },
+        {
+          "type": "tool",
+          "tool": "read",
+          "callID": "8ad507ce-a890-4a06-adef-ec442a4cd0a2",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/.superpowers/sdd/2026-10-15-cli-bundled-distribution-and-self-update/task-5-brief.md",
+              "offset": 1,
+              "limit": 100
+            },
+            "output": "<path>/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/.superpowers/sdd/2026-10-15-cli-bundled-distribution-and-self-update/task-5-brief.md</path>\n<type>file</type>\n<content>\n1: ### Task 5: Update check, cache, and download\n2: \n3: **Files:**\n4: - Modify: `cli/src/cli/update.py`\n5: - Test: `cli/tests/test_update_check.py`\n6: \n7: **Interfaces:**\n8: - Consumes: Task 4 primitives; `paths.*`.\n9: - Produces:\n10:   - `update.CHECK_INTERVAL_SECONDS: int` = `86400`\n11:   - `update.should_check(state_file: Path, now: float) -> bool`\n12:   - `update.record_check(state_file: Path, now: float) -> None`\n13:   - `update.latest_release(current: str, *, fetch: Callable[[str], str] | None = None) -> str | None` (returns newer version or `None`)\n14:   - `update.download(version: str, dest_dir: Path, *, fetch_bytes: Callable[[str], bytes] | None = None) -> Path`\n15:   - `update.auto_update_enabled(no_update: bool) -> bool`\n16:   - `update.maybe_auto_update(*, no_update: bool, now: float) -> str | None`\n17: \n18: - [ ] **Step 1: Write the failing test**\n19: \n20: ```python\n21: # cli/tests/test_update_check.py\n22: import json\n23: \n24: from cli import update\n25: \n26: \n27: def test_should_check_within_and_after_interval(tmp_path):\n28:     state = tmp_path / \"update.json\"\n29:     assert update.should_check(state, now=1000.0) is True\n30:     update.record_check(state, now=1000.0)\n31:     assert update.should_check(state, now=1000.0 + 100) is False\n32:     assert (\n33:         update.should_check(state, now=1000.0 + update.CHECK_INTERVAL_SECONDS + 1)\n34:         is True\n35:     )\n36:     assert json.loads(state.read_text())[\"last_check\"] == 1000.0\n37: \n38: \n39: def test_latest_release_offline_returns_none():\n40:     def boom(_url):\n41:         raise OSError(\"network down\")\n42: \n43:     assert update.latest_release(\"0.1.0\", fetch=boom) is None\n44: \n45: \n46: def test_latest_release_returns_none_when_current():\n47:     payload = json.dumps({\"tag_name\": \"v0.1.0\"})\n48:     assert update.latest_release(\"0.1.0\", fetch=lambda _u: payload) is None\n49: \n50: \n51: def test_latest_release_returns_newer():\n52:     payload = json.dumps({\"tag_name\": \"v0.2.0\"})\n53:     assert update.latest_release(\"0.1.0\", fetch=lambda _u: payload) == \"0.2.0\"\n54: \n55: \n56: def test_auto_update_enabled_matrix(monkeypatch):\n57:     assert update.auto_update_enabled(no_update=False) is True\n58:     assert update.auto_update_enabled(no_update=True) is False\n59:     monkeypatch.setenv(\"AGENTIC_ODI_NO_UPDATE\", \"1\")\n60:     assert update.auto_update_enabled(no_update=False) is False\n61: \n62: \n63: def test_maybe_auto_update_disabled_is_noop(tmp_path, monkeypatch):\n64:     monkeypatch.setenv(\"AGENTIC_ODI_INSTALL_DIR\", str(tmp_path / \"install\"))\n65:     assert update.maybe_auto_update(no_update=True, now=1000.0) is None\n66: ```\n67: \n68: - [ ] **Step 2: Run test to verify it fails**\n69: \n70: Run: `uv run --directory cli pytest tests/test_update_check.py -v`\n71: Expected: FAIL (names not defined).\n72: \n73: - [ ] **Step 3: Implement**\n74: \n75: - `should_check` / `record_check`: read/write `{\"last_check\": <float>}` JSON; missing/corrupt file ⇒ `True`.\n76: - `latest_release`: GET `RELEASES_API` via injected `fetch` (default: `urllib.request`), parse `tag_name`, return stripped version when `is_newer`, else `None`; any exception ⇒ `None`.\n77: - `download`: GET `https://github.com/alehar9320/agentic-odi/releases/download/v<version>/<asset_name>` into `dest_dir`, verify against `<asset>.sha256`; digits-only paths via injected `fetch_bytes` for tests.\n78: - `auto_update_enabled`: `not no_update and not os.environ.get(\"AGENTIC_ODI_NO_UPDATE\") and paths.is_frozen() and paths.is_writable_dir(paths.install_root())`.\n79: - `maybe_auto_update`: if not enabled ⇒ `None`; if `not should_check(state_file(), now)` ⇒ `None`; else `record_check`, `latest_release(...)`; if newer, download + `perform_update`; swallow all exceptions and return `None` (never raises). Return the new version string on success.\n80: \n81: - [ ] **Step 4: Run test to verify it passes**\n82: \n83: Run: `uv run --directory cli pytest tests/test_update_check.py -v`\n84: Expected: PASS.\n85: \n86: - [ ] **Step 5: Commit**\n87: \n88: ```bash\n89: git add cli/src/cli/update.py cli/tests/test_update_check.py\n90: git commit -m \"feat(cli): update check, 24h cache, and download\"\n91: ```\n92: \n93: ---\n94: \n\n(End of file - total 94 lines)\n</content>",
+            "metadata": {
+              "preview": "### Task 5: Update check, cache, and download\n\n**Files:**\n- Modify: `cli/src/cli/update.py`\n- Test: `cli/tests/test_update_check.py`\n\n**Interfaces:**\n- Consumes: Task 4 primitives; `paths.*`.\n- Produces:\n  - `update.CHECK_INTERVAL_SECONDS: int` = `86400`\n  - `update.should_check(state_file: Path, now: float) -> bool`\n  - `update.record_check(state_file: Path, now: float) -> None`\n  - `update.latest_release(current: str, *, fetch: Callable[[str], str] | None = None) -> str | None` (returns newer version or `None`)\n  - `update.download(version: str, dest_dir: Path, *, fetch_bytes: Callable[[str], bytes] | None = None) -> Path`\n  - `update.auto_update_enabled(no_update: bool) -> bool`\n  - `update.maybe_auto_update(*, no_update: bool, now: float) -> str | None`\n\n- [ ] **Step 1: Write the failing test**\n\n```python",
+              "truncated": false,
+              "loaded": [],
+              "display": {
+                "type": "file",
+                "path": "/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/.superpowers/sdd/2026-10-15-cli-bundled-distribution-and-self-update/task-5-brief.md",
+                "text": "### Task 5: Update check, cache, and download\n\n**Files:**\n- Modify: `cli/src/cli/update.py`\n- Test: `cli/tests/test_update_check.py`\n\n**Interfaces:**\n- Consumes: Task 4 primitives; `paths.*`.\n- Produces:\n  - `update.CHECK_INTERVAL_SECONDS: int` = `86400`\n  - `update.should_check(state_file: Path, now: float) -> bool`\n  - `update.record_check(state_file: Path, now: float) -> None`\n  - `update.latest_release(current: str, *, fetch: Callable[[str], str] | None = None) -> str | None` (returns newer version or `None`)\n  - `update.download(version: str, dest_dir: Path, *, fetch_bytes: Callable[[str], bytes] | None = None) -> Path`\n  - `update.auto_update_enabled(no_update: bool) -> bool`\n  - `update.maybe_auto_update(*, no_update: bool, now: float) -> str | None`\n\n- [ ] **Step 1: Write the failing test**\n\n```python\n# cli/tests/test_update_check.py\nimport json\n\nfrom cli import update\n\n\ndef test_should_check_within_and_after_interval(tmp_path):\n    state = tmp_path / \"update.json\"\n    assert update.should_check(state, now=1000.0) is True\n    update.record_check(state, now=1000.0)\n    assert update.should_check(state, now=1000.0 + 100) is False\n    assert (\n        update.should_check(state, now=1000.0 + update.CHECK_INTERVAL_SECONDS + 1)\n        is True\n    )\n    assert json.loads(state.read_text())[\"last_check\"] == 1000.0\n\n\ndef test_latest_release_offline_returns_none():\n    def boom(_url):\n        raise OSError(\"network down\")\n\n    assert update.latest_release(\"0.1.0\", fetch=boom) is None\n\n\ndef test_latest_release_returns_none_when_current():\n    payload = json.dumps({\"tag_name\": \"v0.1.0\"})\n    assert update.latest_release(\"0.1.0\", fetch=lambda _u: payload) is None\n\n\ndef test_latest_release_returns_newer():\n    payload = json.dumps({\"tag_name\": \"v0.2.0\"})\n    assert update.latest_release(\"0.1.0\", fetch=lambda _u: payload) == \"0.2.0\"\n\n\ndef test_auto_update_enabled_matrix(monkeypatch):\n    assert update.auto_update_enabled(no_update=False) is True\n    assert update.auto_update_enabled(no_update=True) is False\n    monkeypatch.setenv(\"AGENTIC_ODI_NO_UPDATE\", \"1\")\n    assert update.auto_update_enabled(no_update=False) is False\n\n\ndef test_maybe_auto_update_disabled_is_noop(tmp_path, monkeypatch):\n    monkeypatch.setenv(\"AGENTIC_ODI_INSTALL_DIR\", str(tmp_path / \"install\"))\n    assert update.maybe_auto_update(no_update=True, now=1000.0) is None\n```\n\n- [ ] **Step 2: Run test to verify it fails**\n\nRun: `uv run --directory cli pytest tests/test_update_check.py -v`\nExpected: FAIL (names not defined).\n\n- [ ] **Step 3: Implement**\n\n- `should_check` / `record_check`: read/write `{\"last_check\": <float>}` JSON; missing/corrupt file ⇒ `True`.\n- `latest_release`: GET `RELEASES_API` via injected `fetch` (default: `urllib.request`), parse `tag_name`, return stripped version when `is_newer`, else `None`; any exception ⇒ `None`.\n- `download`: GET `https://github.com/alehar9320/agentic-odi/releases/download/v<version>/<asset_name>` into `dest_dir`, verify against `<asset>.sha256`; digits-only paths via injected `fetch_bytes` for tests.\n- `auto_update_enabled`: `not no_update and not os.environ.get(\"AGENTIC_ODI_NO_UPDATE\") and paths.is_frozen() and paths.is_writable_dir(paths.install_root())`.\n- `maybe_auto_update`: if not enabled ⇒ `None`; if `not should_check(state_file(), now)` ⇒ `None`; else `record_check`, `latest_release(...)`; if newer, download + `perform_update`; swallow all exceptions and return `None` (never raises). Return the new version string on success.\n\n- [ ] **Step 4: Run test to verify it passes**\n\nRun: `uv run --directory cli pytest tests/test_update_check.py -v`\nExpected: PASS.\n\n- [ ] **Step 5: Commit**\n\n```bash\ngit add cli/src/cli/update.py cli/tests/test_update_check.py\ngit commit -m \"feat(cli): update check, 24h cache, and download\"\n```\n\n---\n",
+                "lineStart": 1,
+                "lineEnd": 94,
+                "totalLines": 94,
+                "truncated": false
+              }
+            },
+            "title": ".worktrees/cli-bundled-distribution/.superpowers/sdd/2026-10-15-cli-bundled-distribution-and-self-update/task-5-brief.md",
+            "time": {
+              "start": 1792110226790,
+              "end": 1792110226802
+            }
+          },
+          "id": "prt_14217ed5e0011HsbRsTnt98Pi0",
+          "sessionID": "ses_ebde83a58ffeUl7XfZ8TYcC8gT",
+          "messageID": "msg_14217e2f8001ExW5Ch1qDn0ay6"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "8f33efb4b478c6620bd5d8537feec7b52fd5cd94",
+          "type": "step-finish",
+          "tokens": {
+            "total": 15344,
+            "input": 47,
+            "output": 69,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 15228
+            }
+          },
+          "cost": 0,
+          "id": "prt_14217ed96001k578G08ujabHtw",
+          "sessionID": "ses_ebde83a58ffeUl7XfZ8TYcC8gT",
+          "messageID": "msg_14217e2f8001ExW5Ch1qDn0ay6"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_14217c5ae001tdUWhHtknxBrtQ",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 16728,
+          "input": 14233,
+          "output": 68,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 2427
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792110226872,
+          "completed": 1792110263503
+        },
+        "finish": "tool-calls",
+        "id": "msg_14217edb8001aplREAVK813PuQ",
+        "sessionID": "ses_ebde83a58ffeUl7XfZ8TYcC8gT"
+      },
+      "parts": [
+        {
+          "snapshot": "8f33efb4b478c6620bd5d8537feec7b52fd5cd94",
+          "type": "step-start",
+          "id": "prt_142187c61001ZO94mk9hhjtqQq",
+          "sessionID": "ses_ebde83a58ffeUl7XfZ8TYcC8gT",
+          "messageID": "msg_14217edb8001aplREAVK813PuQ"
+        },
+        {
+          "type": "tool",
+          "tool": "read",
+          "callID": "76319e2b-c0c6-41a4-8ef2-1a2bd663c3a9",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/.superpowers/sdd/2026-10-15-cli-bundled-distribution-and-self-update/task-5-report.md",
+              "offset": 1,
+              "limit": 200
+            },
+            "output": "<path>/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/.superpowers/sdd/2026-10-15-cli-bundled-distribution-and-self-update/task-5-report.md</path>\n<type>file</type>\n<content>\n1: # Task 5 Report: Update check, cache, and download\n2: \n3: ## Status\n4: Complete. All mandatory rulings (R1–R3) applied and all five Definition of Done gates pass.\n5: \n6: ## What I implemented\n7: Extended `cli/src/cli/update.py` (stdlib only: `json`, `os`, `urllib.request`, `tempfile`,\n8: `collections.abc.Callable`) with the Task 5 public surface, plus a new test module\n9: `cli/tests/test_update_check.py`.\n10: \n11: - `CHECK_INTERVAL_SECONDS = 86400`.\n12: - `should_check(state_file, now)` — reads `{\"last_check\": <float>}`; missing/corrupt file ⇒ `True`;\n13:   otherwise `(now - last_check) >= CHECK_INTERVAL_SECONDS`.\n14: - `record_check(state_file, now)` — `mkdir(parents=True, exist_ok=True)` on the parent then writes\n15:   the JSON state (so the real config/install dir works even when it does not yet exist).\n16: - `latest_release(current, *, fetch=None)` — parses `tag_name`, strips `v`, returns it only when\n17:   `is_newer`; any exception ⇒ `None`.\n18: - `download(version, dest_dir, *, fetch_bytes=None)` — per R1.\n19: - `auto_update_enabled(no_update)` — per R2.\n20: - `maybe_auto_update(*, no_update, now)` — per R2; never raises.\n21: - Private helpers `_default_fetch`, `_default_fetch_bytes`, `_parse_checksums`.\n22: \n23: ## How I applied the mandatory rulings\n24: \n25: ### R1 — checksum source (checksums.txt, not `<asset>.sha256`)\n26: `download()`:\n27: - builds `base = f\"https://github.com/alehar9320/agentic-odi/releases/download/v{version}\"`.\n28: - fetches `f\"{base}/checksums.txt\"` as text via `fetch_bytes(...).decode(\"utf-8\")`.\n29: - parses sha256sum-format lines using `str.split()` (handles one-or-more spaces) and selects the\n30:   line whose **second field equals** `asset_name(version, *current_platform())`.\n31: - if no line matches ⇒ `raise update.UpdateError(f\"no checksum entry for {asset}\")`.\n32: - fetches `f\"{base}/{asset}\"` bytes, writes to `dest_dir/asset` (after `mkdir(parents=True,\n33:   exist_ok=True)`), calls `verify_checksum`; on mismatch ⇒ `raise update.UpdateError`; returns the\n34:   written `Path`.\n35: - Fetch failures are wrapped in `UpdateError` (the mismatch is detected by `verify_checksum`, not by\n36:   the fetch). The brief's `<asset>.sha256` line 554 was intentionally **not** followed.\n37: \n38: ### R2 — `auto_update_enabled` scope\n39: - `auto_update_enabled(no_update) -> bool` is exactly\n40:   `(not no_update) and (not os.environ.get(\"AGENTIC_ODI_NO_UPDATE\"))`.\n41: - It does **not** call `is_frozen()`/`is_writable_dir()`, so `test_auto_update_enabled_matrix`\n42:   returns `True` in the non-frozen, unpatched test env.\n43: - The spec-157 suppressions (not frozen, install root not writable, lock held) live inside\n44:   `maybe_auto_update`, applied in order after the flag/env gate; each returns `None` gracefully.\n45: - `maybe_auto_update` wraps its entire body in `try/except Exception: return None`, so it can never\n46:   raise. On success it returns the new version string.\n47: \n48: ### R3 — download test\n49: Added two tests on top of the six brief tests (kept verbatim, names/semantics unchanged):\n50: - `test_download_writes_and_verifies` — injected `fetch_bytes` returns a valid `checksums.txt`\n51:   (matching asset line + an unrelated line) and the asset bytes; asserts the archive is written to\n52:   `dest / asset`, its bytes match, and both the checksums and asset URLs were requested.\n53: - `test_download_raises_on_checksum_mismatch` — injected `checksums.txt` carries a wrong hash;\n54:   asserts `update.UpdateError` is raised.\n55: `record_check` creates parent dirs per R3. All six brief tests are present verbatim\n56: (`test_should_check_within_and_after_interval`, `test_latest_release_offline_returns_none`,\n57: `test_latest_release_returns_none_when_current`, `test_latest_release_returns_newer`,\n58: `test_auto_update_enabled_matrix`, `test_maybe_auto_update_disabled_is_noop`).\n59: \n60: ## TDD evidence\n61: \n62: ### RED\n63: Command: `UV_PYTHON=3.11 uv run --directory cli pytest tests/test_update_check.py -v`\n64: Output (tail):\n65: ```\n66: FAILED tests/test_update_check.py::test_latest_release_offline_returns_none\n67: FAILED tests/test_update_check.py::test_latest_release_returns_none_when_current\n68: FAILED tests/test_update_check.py::test_latest_release_returns_newer - Attrib...\n69: FAILED tests/test_update_check.py::test_auto_update_enabled_matrix - Attribut...\n70: FAILED tests/test_update_check.py::test_maybe_auto_update_disabled_is_noop - ...\n71: FAILED tests/test_update_check.py::test_download_writes_and_verifies - Attrib...\n72: FAILED tests/test_update_check.py::test_download_raises_on_checksum_mismatch\n73: ============================== 8 failed in 0.06s ===============================\n74: ```\n75: (The first failure listed was `test_should_check_within_and_after_interval`; all 8 failed with\n76: `AttributeError: module 'cli.update' has no attribute ...`.)\n77: \n78: ### GREEN\n79: Command: `UV_PYTHON=3.11 uv run --directory cli pytest tests/test_update_check.py -v`\n80: Output (tail):\n81: ```\n82: tests/test_update_check.py::test_should_check_within_and_after_interval PASSED [ 12%]\n83: tests/test_update_check.py::test_latest_release_offline_returns_none PASSED [ 25%]\n84: tests/test_update_check.py::test_latest_release_returns_none_when_current PASSED [ 37%]\n85: tests/test_update_check.py::test_latest_release_returns_newer PASSED     [ 50%]\n86: tests/test_update_check.py::test_auto_update_enabled_matrix PASSED       [ 62%]\n87: tests/test_update_check.py::test_maybe_auto_update_disabled_is_noop PASSED [ 75%]\n88: tests/test_update_check.py::test_download_writes_and_verifies PASSED     [ 87%]\n89: tests/test_update_check.py::test_download_raises_on_checksum_mismatch PASSED [100%]\n90: ============================== 8 passed in 0.03s ===============================\n91: ```\n92: \n93: ## Definition of Done results\n94: | # | Command | Result |\n95: | --- | --- | --- |\n96: | 1 | `UV_PYTHON=3.11 uv run --directory cli pytest tests/test_update_check.py -v` | PASS (8 passed) |\n97: | 2 | `UV_PYTHON=3.11 uv run --directory cli pytest -q` | PASS (46 passed) |\n98: | 3 | `UV_PYTHON=3.11 uv run ruff check .` | PASS (All checks passed!) |\n99: | 4 | `UV_PYTHON=3.11 uv run ruff format --check .` | PASS (134 files already formatted) |\n100: | 5 | `UV_PYTHON=3.11 uv run --directory cli mypy .` | PASS (Success: no issues found in 19 source files) |\n101: \n102: ## Files changed\n103: - `cli/src/cli/update.py` (modified)\n104: - `cli/tests/test_update_check.py` (new)\n105: \n106: ## Self-review findings\n107: - **Import wiring:** added `from cli import paths` and `from cli.version import __version__`.\n108:   Neither `cli/__init__.py`, `paths.py`, nor `version.py` imports `update`, so there is no circular\n109:   import; the full suite (46 tests) imports cleanly.\n110: - **R1 fetch failure handling:** both fetches are wrapped so `download` only ever surfaces\n111:   `UpdateError`; the wrong-hash case is caught by `verify_checksum`, not the try/except.\n112: - **Formatting:** `ruff format` (DoD gate) collapsed the brief's multi-line `assert (...)` in\n113:   `test_should_check_within_and_after_interval` and reflowed the `latest_release` signature. Test\n114:   names, bodies, and semantics are unchanged — same approach Task 4 documented. Without this the\n115:   format gate fails.\n116: - **mypy:** emits only an `annotation-unchecked` informational note for untyped test bodies (the\n117:   `tmp_path, monkeypatch` fixtures carry no annotations); no errors, exit success.\n118: - **`maybe_auto_update` digest:** `perform_update` requires an `expected_sha`; since `download`\n119:   already verified the archive, the SHA is recomputed from the downloaded file and re-verified\n120:   inside `perform_update` (defense in depth). This full apply path is not covered by the brief's\n121:   tests (see concerns).\n122: \n123: ## Concerns\n124: - **`maybe_auto_update` apply path is not exercised by tests.** The only test for it\n125:   (`test_maybe_auto_update_disabled_is_noop`) hits the `no_update=True` early return, and in the\n126:   test env `paths.is_frozen()` is `False`, so even `no_update=False` returns `None` before any\n127:   network/download/`perform_update` work. The frozen+writable+due+newer branch is correct by\n128:   inspection only. This matches the brief (no such test was specified).\n129: - **Lock-held suppression** is implemented as a pre-check on `<install_root>/.update.lock`\n130:   *plus* the `perform_update` `O_EXCL` lock; the pre-check is a fast-path suppression, the\n131:   authoritative guard remains in `perform_update`.\n132: - **`# noqa: S310`** comments on `urllib.request.urlopen` are defensive (bandit S310); ruff's\n133:   selected rule set does not include S/RUF, so they are inert for the DoD gates.\n\n(End of file - total 133 lines)\n</content>",
+            "metadata": {
+              "preview": "# Task 5 Report: Update check, cache, and download\n\n## Status\nComplete. All mandatory rulings (R1–R3) applied and all five Definition of Done gates pass.\n\n## What I implemented\nExtended `cli/src/cli/update.py` (stdlib only: `json`, `os`, `urllib.request`, `tempfile`,\n`collections.abc.Callable`) with the Task 5 public surface, plus a new test module\n`cli/tests/test_update_check.py`.\n\n- `CHECK_INTERVAL_SECONDS = 86400`.\n- `should_check(state_file, now)` — reads `{\"last_check\": <float>}`; missing/corrupt file ⇒ `True`;\n  otherwise `(now - last_check) >= CHECK_INTERVAL_SECONDS`.\n- `record_check(state_file, now)` — `mkdir(parents=True, exist_ok=True)` on the parent then writes\n  the JSON state (so the real config/install dir works even when it does not yet exist).\n- `latest_release(current, *, fetch=None)` — parses `tag_name`, strips `v`, returns it only when\n  `is_newer`; any exception ⇒ `None`.\n- `download(version, dest_dir, *, fetch_bytes=None)` — per R1.\n- `auto_update_enabled(no_update)` — per R2.\n- `maybe_auto_update(*, no_update, now)` — per R2; never raises.",
+              "truncated": false,
+              "loaded": [],
+              "display": {
+                "type": "file",
+                "path": "/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/.superpowers/sdd/2026-10-15-cli-bundled-distribution-and-self-update/task-5-report.md",
+                "text": "# Task 5 Report: Update check, cache, and download\n\n## Status\nComplete. All mandatory rulings (R1–R3) applied and all five Definition of Done gates pass.\n\n## What I implemented\nExtended `cli/src/cli/update.py` (stdlib only: `json`, `os`, `urllib.request`, `tempfile`,\n`collections.abc.Callable`) with the Task 5 public surface, plus a new test module\n`cli/tests/test_update_check.py`.\n\n- `CHECK_INTERVAL_SECONDS = 86400`.\n- `should_check(state_file, now)` — reads `{\"last_check\": <float>}`; missing/corrupt file ⇒ `True`;\n  otherwise `(now - last_check) >= CHECK_INTERVAL_SECONDS`.\n- `record_check(state_file, now)` — `mkdir(parents=True, exist_ok=True)` on the parent then writes\n  the JSON state (so the real config/install dir works even when it does not yet exist).\n- `latest_release(current, *, fetch=None)` — parses `tag_name`, strips `v`, returns it only when\n  `is_newer`; any exception ⇒ `None`.\n- `download(version, dest_dir, *, fetch_bytes=None)` — per R1.\n- `auto_update_enabled(no_update)` — per R2.\n- `maybe_auto_update(*, no_update, now)` — per R2; never raises.\n- Private helpers `_default_fetch`, `_default_fetch_bytes`, `_parse_checksums`.\n\n## How I applied the mandatory rulings\n\n### R1 — checksum source (checksums.txt, not `<asset>.sha256`)\n`download()`:\n- builds `base = f\"https://github.com/alehar9320/agentic-odi/releases/download/v{version}\"`.\n- fetches `f\"{base}/checksums.txt\"` as text via `fetch_bytes(...).decode(\"utf-8\")`.\n- parses sha256sum-format lines using `str.split()` (handles one-or-more spaces) and selects the\n  line whose **second field equals** `asset_name(version, *current_platform())`.\n- if no line matches ⇒ `raise update.UpdateError(f\"no checksum entry for {asset}\")`.\n- fetches `f\"{base}/{asset}\"` bytes, writes to `dest_dir/asset` (after `mkdir(parents=True,\n  exist_ok=True)`), calls `verify_checksum`; on mismatch ⇒ `raise update.UpdateError`; returns the\n  written `Path`.\n- Fetch failures are wrapped in `UpdateError` (the mismatch is detected by `verify_checksum`, not by\n  the fetch). The brief's `<asset>.sha256` line 554 was intentionally **not** followed.\n\n### R2 — `auto_update_enabled` scope\n- `auto_update_enabled(no_update) -> bool` is exactly\n  `(not no_update) and (not os.environ.get(\"AGENTIC_ODI_NO_UPDATE\"))`.\n- It does **not** call `is_frozen()`/`is_writable_dir()`, so `test_auto_update_enabled_matrix`\n  returns `True` in the non-frozen, unpatched test env.\n- The spec-157 suppressions (not frozen, install root not writable, lock held) live inside\n  `maybe_auto_update`, applied in order after the flag/env gate; each returns `None` gracefully.\n- `maybe_auto_update` wraps its entire body in `try/except Exception: return None`, so it can never\n  raise. On success it returns the new version string.\n\n### R3 — download test\nAdded two tests on top of the six brief tests (kept verbatim, names/semantics unchanged):\n- `test_download_writes_and_verifies` — injected `fetch_bytes` returns a valid `checksums.txt`\n  (matching asset line + an unrelated line) and the asset bytes; asserts the archive is written to\n  `dest / asset`, its bytes match, and both the checksums and asset URLs were requested.\n- `test_download_raises_on_checksum_mismatch` — injected `checksums.txt` carries a wrong hash;\n  asserts `update.UpdateError` is raised.\n`record_check` creates parent dirs per R3. All six brief tests are present verbatim\n(`test_should_check_within_and_after_interval`, `test_latest_release_offline_returns_none`,\n`test_latest_release_returns_none_when_current`, `test_latest_release_returns_newer`,\n`test_auto_update_enabled_matrix`, `test_maybe_auto_update_disabled_is_noop`).\n\n## TDD evidence\n\n### RED\nCommand: `UV_PYTHON=3.11 uv run --directory cli pytest tests/test_update_check.py -v`\nOutput (tail):\n```\nFAILED tests/test_update_check.py::test_latest_release_offline_returns_none\nFAILED tests/test_update_check.py::test_latest_release_returns_none_when_current\nFAILED tests/test_update_check.py::test_latest_release_returns_newer - Attrib...\nFAILED tests/test_update_check.py::test_auto_update_enabled_matrix - Attribut...\nFAILED tests/test_update_check.py::test_maybe_auto_update_disabled_is_noop - ...\nFAILED tests/test_update_check.py::test_download_writes_and_verifies - Attrib...\nFAILED tests/test_update_check.py::test_download_raises_on_checksum_mismatch\n============================== 8 failed in 0.06s ===============================\n```\n(The first failure listed was `test_should_check_within_and_after_interval`; all 8 failed with\n`AttributeError: module 'cli.update' has no attribute ...`.)\n\n### GREEN\nCommand: `UV_PYTHON=3.11 uv run --directory cli pytest tests/test_update_check.py -v`\nOutput (tail):\n```\ntests/test_update_check.py::test_should_check_within_and_after_interval PASSED [ 12%]\ntests/test_update_check.py::test_latest_release_offline_returns_none PASSED [ 25%]\ntests/test_update_check.py::test_latest_release_returns_none_when_current PASSED [ 37%]\ntests/test_update_check.py::test_latest_release_returns_newer PASSED     [ 50%]\ntests/test_update_check.py::test_auto_update_enabled_matrix PASSED       [ 62%]\ntests/test_update_check.py::test_maybe_auto_update_disabled_is_noop PASSED [ 75%]\ntests/test_update_check.py::test_download_writes_and_verifies PASSED     [ 87%]\ntests/test_update_check.py::test_download_raises_on_checksum_mismatch PASSED [100%]\n============================== 8 passed in 0.03s ===============================\n```\n\n## Definition of Done results\n| # | Command | Result |\n| --- | --- | --- |\n| 1 | `UV_PYTHON=3.11 uv run --directory cli pytest tests/test_update_check.py -v` | PASS (8 passed) |\n| 2 | `UV_PYTHON=3.11 uv run --directory cli pytest -q` | PASS (46 passed) |\n| 3 | `UV_PYTHON=3.11 uv run ruff check .` | PASS (All checks passed!) |\n| 4 | `UV_PYTHON=3.11 uv run ruff format --check .` | PASS (134 files already formatted) |\n| 5 | `UV_PYTHON=3.11 uv run --directory cli mypy .` | PASS (Success: no issues found in 19 source files) |\n\n## Files changed\n- `cli/src/cli/update.py` (modified)\n- `cli/tests/test_update_check.py` (new)\n\n## Self-review findings\n- **Import wiring:** added `from cli import paths` and `from cli.version import __version__`.\n  Neither `cli/__init__.py`, `paths.py`, nor `version.py` imports `update`, so there is no circular\n  import; the full suite (46 tests) imports cleanly.\n- **R1 fetch failure handling:** both fetches are wrapped so `download` only ever surfaces\n  `UpdateError`; the wrong-hash case is caught by `verify_checksum`, not the try/except.\n- **Formatting:** `ruff format` (DoD gate) collapsed the brief's multi-line `assert (...)` in\n  `test_should_check_within_and_after_interval` and reflowed the `latest_release` signature. Test\n  names, bodies, and semantics are unchanged — same approach Task 4 documented. Without this the\n  format gate fails.\n- **mypy:** emits only an `annotation-unchecked` informational note for untyped test bodies (the\n  `tmp_path, monkeypatch` fixtures carry no annotations); no errors, exit success.\n- **`maybe_auto_update` digest:** `perform_update` requires an `expected_sha`; since `download`\n  already verified the archive, the SHA is recomputed from the downloaded file and re-verified\n  inside `perform_update` (defense in depth). This full apply path is not covered by the brief's\n  tests (see concerns).\n\n## Concerns\n- **`maybe_auto_update` apply path is not exercised by tests.** The only test for it\n  (`test_maybe_auto_update_disabled_is_noop`) hits the `no_update=True` early return, and in the\n  test env `paths.is_frozen()` is `False`, so even `no_update=False` returns `None` before any\n  network/download/`perform_update` work. The frozen+writable+due+newer branch is correct by\n  inspection only. This matches the brief (no such test was specified).\n- **Lock-held suppression** is implemented as a pre-check on `<install_root>/.update.lock`\n  *plus* the `perform_update` `O_EXCL` lock; the pre-check is a fast-path suppression, the\n  authoritative guard remains in `perform_update`.\n- **`# noqa: S310`** comments on `urllib.request.urlopen` are defensive (bandit S310); ruff's\n  selected rule set does not include S/RUF, so they are inert for the DoD gates.",
+                "lineStart": 1,
+                "lineEnd": 133,
+                "totalLines": 133,
+                "truncated": false
+              }
+            },
+            "title": ".worktrees/cli-bundled-distribution/.superpowers/sdd/2026-10-15-cli-bundled-distribution-and-self-update/task-5-report.md",
+            "time": {
+              "start": 1792110263400,
+              "end": 1792110263417
+            }
+          },
+          "id": "prt_142187c64001QpfaPXG9GZVQ1m",
+          "sessionID": "ses_ebde83a58ffeUl7XfZ8TYcC8gT",
+          "messageID": "msg_14217edb8001aplREAVK813PuQ"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "8f33efb4b478c6620bd5d8537feec7b52fd5cd94",
+          "type": "step-finish",
+          "tokens": {
+            "total": 16728,
+            "input": 14233,
+            "output": 68,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 2427
+            }
+          },
+          "cost": 0,
+          "id": "prt_142187caf001tgtSpHnYGF6sc6",
+          "sessionID": "ses_ebde83a58ffeUl7XfZ8TYcC8gT",
+          "messageID": "msg_14217edb8001aplREAVK813PuQ"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_14217c5ae001tdUWhHtknxBrtQ",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 19244,
+          "input": 2441,
+          "output": 75,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 16728
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792110263507,
+          "completed": 1792110267448
+        },
+        "finish": "tool-calls",
+        "id": "msg_142187cd3001JYSNNWYJADhHeI",
+        "sessionID": "ses_ebde83a58ffeUl7XfZ8TYcC8gT"
+      },
+      "parts": [
+        {
+          "snapshot": "8f33efb4b478c6620bd5d8537feec7b52fd5cd94",
+          "type": "step-start",
+          "id": "prt_142188bd8001eOt0ak4Un5L37A",
+          "sessionID": "ses_ebde83a58ffeUl7XfZ8TYcC8gT",
+          "messageID": "msg_142187cd3001JYSNNWYJADhHeI"
+        },
+        {
+          "type": "tool",
+          "tool": "read",
+          "callID": "a6892af7-fc79-4a20-8439-a379ca03a83f",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/.superpowers/sdd/2026-10-15-cli-bundled-distribution-and-self-update/review-078fcdb..6138534.diff",
+              "offset": 1,
+              "limit": 1200
+            },
+            "output": "<path>/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/.superpowers/sdd/2026-10-15-cli-bundled-distribution-and-self-update/review-078fcdb..6138534.diff</path>\n<type>file</type>\n<content>\n1: # Review package: 078fcdb..HEAD\n2: \n3: ## Commits\n4: 6138534 feat(cli): update check, 24h cache, and download\n5: \n6: ## Files changed\n7:  cli/src/cli/update.py          | 125 +++++++++++++++++++++++++++++++++++++++++\n8:  cli/tests/test_update_check.py |  81 ++++++++++++++++++++++++++\n9:  2 files changed, 206 insertions(+)\n10: \n11: ## Diff\n12: diff --git a/cli/src/cli/update.py b/cli/src/cli/update.py\n13: index abc649a..54e70f3 100644\n14: --- a/cli/src/cli/update.py\n15: +++ b/cli/src/cli/update.py\n16: @@ -1,24 +1,32 @@\n17:  \"\"\"Self-update engine primitives (checksum, extraction, atomic version swap).\"\"\"\n18:  \n19:  from __future__ import annotations\n20:  \n21:  import hashlib\n22: +import json\n23:  import os\n24:  import platform\n25:  import shutil\n26:  import tarfile\n27:  import tempfile\n28: +import urllib.request\n29:  import zipfile\n30: +from collections.abc import Callable\n31:  from pathlib import Path\n32:  \n33: +from cli import paths\n34: +from cli.version import __version__\n35: +\n36:  RELEASES_API = \"https://api.github.com/repos/alehar9320/agentic-odi/releases/latest\"\n37: +CHECK_INTERVAL_SECONDS = 86400\n38: +_RELEASES_DOWNLOAD = \"https://github.com/alehar9320/agentic-odi/releases/download\"\n39:  \n40:  _SYSTEM_MAP = {\"Linux\": \"linux\", \"Darwin\": \"macos\", \"Windows\": \"windows\"}\n41:  _ARCH_MAP = {\n42:      \"x86_64\": \"x86_64\",\n43:      \"AMD64\": \"x86_64\",\n44:      \"arm64\": \"arm64\",\n45:      \"aarch64\": \"arm64\",\n46:  }\n47:  \n48:  \n49: @@ -130,10 +138,127 @@ def perform_update(\n50:              raise\n51:  \n52:          _activate_version(final_dir, install_root)\n53:          return final_dir\n54:      finally:\n55:          os.close(lock_fd)\n56:          try:\n57:              lock_path.unlink()\n58:          except FileNotFoundError:\n59:              pass\n60: +\n61: +\n62: +def should_check(state_file: Path, now: float) -> bool:\n63: +    \"\"\"Return True if an update check is due (missing/corrupt state ⇒ due).\"\"\"\n64: +    try:\n65: +        data = json.loads(Path(state_file).read_text())\n66: +        last_check = float(data[\"last_check\"])\n67: +    except (OSError, ValueError, KeyError, TypeError):\n68: +        return True\n69: +    return (now - last_check) >= CHECK_INTERVAL_SECONDS\n70: +\n71: +\n72: +def record_check(state_file: Path, now: float) -> None:\n73: +    \"\"\"Persist the timestamp of the most recent check.\"\"\"\n74: +    path = Path(state_file)\n75: +    path.parent.mkdir(parents=True, exist_ok=True)\n76: +    path.write_text(json.dumps({\"last_check\": now}))\n77: +\n78: +\n79: +def _default_fetch(url: str) -> str:\n80: +    with urllib.request.urlopen(url) as response:  # noqa: S310\n81: +        return response.read().decode(\"utf-8\")\n82: +\n83: +\n84: +def _default_fetch_bytes(url: str) -> bytes:\n85: +    with urllib.request.urlopen(url) as response:  # noqa: S310\n86: +        return response.read()\n87: +\n88: +\n89: +def latest_release(current: str, *, fetch: Callable[[str], str] | None = None) -> str | None:\n90: +    \"\"\"Return the latest release version if newer than ``current``, else None.\"\"\"\n91: +    fetcher = fetch if fetch is not None else _default_fetch\n92: +    try:\n93: +        payload = json.loads(fetcher(RELEASES_API))\n94: +        tag = str(payload[\"tag_name\"]).strip()\n95: +    except Exception:  # noqa: BLE001\n96: +        return None\n97: +    latest = tag.lstrip(\"v\")\n98: +    if is_newer(latest, current):\n99: +        return latest\n100: +    return None\n101: +\n102: +\n103: +def _parse_checksums(text: str, filename: str) -> str | None:\n104: +    \"\"\"Return the SHA-256 hex for ``filename`` from a sha256sum-format body.\"\"\"\n105: +    for line in text.splitlines():\n106: +        parts = line.split()\n107: +        if len(parts) >= 2 and parts[1] == filename:\n108: +            return parts[0]\n109: +    return None\n110: +\n111: +\n112: +def download(\n113: +    version: str,\n114: +    dest_dir: Path,\n115: +    *,\n116: +    fetch_bytes: Callable[[str], bytes] | None = None,\n117: +) -> Path:\n118: +    \"\"\"Download and verify the release archive for ``version``.\"\"\"\n119: +    fetcher = fetch_bytes if fetch_bytes is not None else _default_fetch_bytes\n120: +    base = f\"{_RELEASES_DOWNLOAD}/v{version}\"\n121: +    asset = asset_name(version, *current_platform())\n122: +\n123: +    try:\n124: +        checksums = fetcher(f\"{base}/checksums.txt\").decode(\"utf-8\")\n125: +    except Exception as exc:  # noqa: BLE001\n126: +        raise UpdateError(f\"failed to fetch checksums.txt: {exc}\") from exc\n127: +\n128: +    expected = _parse_checksums(checksums, asset)\n129: +    if expected is None:\n130: +        raise UpdateError(f\"no checksum entry for {asset}\")\n131: +\n132: +    try:\n133: +        payload = fetcher(f\"{base}/{asset}\")\n134: +    except Exception as exc:  # noqa: BLE001\n135: +        raise UpdateError(f\"failed to fetch {asset}: {exc}\") from exc\n136: +\n137: +    dest_dir = Path(dest_dir)\n138: +    dest_dir.mkdir(parents=True, exist_ok=True)\n139: +    dest = dest_dir / asset\n140: +    dest.write_bytes(payload)\n141: +    if not verify_checksum(dest, expected):\n142: +        raise UpdateError(f\"checksum mismatch for {asset}\")\n143: +    return dest\n144: +\n145: +\n146: +def auto_update_enabled(no_update: bool) -> bool:\n147: +    \"\"\"Return whether auto-update is enabled by the flag/env opt-outs.\"\"\"\n148: +    return (not no_update) and (not os.environ.get(\"AGENTIC_ODI_NO_UPDATE\"))\n149: +\n150: +\n151: +def maybe_auto_update(*, no_update: bool, now: float) -> str | None:\n152: +    \"\"\"Best-effort background update; never raises, returns new version or None.\"\"\"\n153: +    try:\n154: +        if not auto_update_enabled(no_update):\n155: +            return None\n156: +        root = paths.install_root()\n157: +        if not paths.is_frozen():\n158: +            return None\n159: +        if not paths.is_writable_dir(root):\n160: +            return None\n161: +        if (root / \".update.lock\").exists():\n162: +            return None\n163: +        state = paths.state_file()\n164: +        if not should_check(state, now):\n165: +            return None\n166: +        record_check(state, now)\n167: +        version = latest_release(__version__)\n168: +        if version is None:\n169: +            return None\n170: +        with tempfile.TemporaryDirectory(prefix=\"odi-update-\") as tmp:\n171: +            archive = download(version, Path(tmp))\n172: +            digest = hashlib.sha256(archive.read_bytes()).hexdigest()\n173: +            perform_update(version, archive, digest, root)\n174: +        return version\n175: +    except Exception:  # noqa: BLE001\n176: +        return None\n177: diff --git a/cli/tests/test_update_check.py b/cli/tests/test_update_check.py\n178: new file mode 100644\n179: index 0000000..c90ea51\n180: --- /dev/null\n181: +++ b/cli/tests/test_update_check.py\n182: @@ -0,0 +1,81 @@\n183: +import hashlib\n184: +import json\n185: +\n186: +import pytest\n187: +\n188: +from cli import update\n189: +\n190: +\n191: +def test_should_check_within_and_after_interval(tmp_path):\n192: +    state = tmp_path / \"update.json\"\n193: +    assert update.should_check(state, now=1000.0) is True\n194: +    update.record_check(state, now=1000.0)\n195: +    assert update.should_check(state, now=1000.0 + 100) is False\n196: +    assert update.should_check(state, now=1000.0 + update.CHECK_INTERVAL_SECONDS + 1) is True\n197: +    assert json.loads(state.read_text())[\"last_check\"] == 1000.0\n198: +\n199: +\n200: +def test_latest_release_offline_returns_none():\n201: +    def boom(_url):\n202: +        raise OSError(\"network down\")\n203: +\n204: +    assert update.latest_release(\"0.1.0\", fetch=boom) is None\n205: +\n206: +\n207: +def test_latest_release_returns_none_when_current():\n208: +    payload = json.dumps({\"tag_name\": \"v0.1.0\"})\n209: +    assert update.latest_release(\"0.1.0\", fetch=lambda _u: payload) is None\n210: +\n211: +\n212: +def test_latest_release_returns_newer():\n213: +    payload = json.dumps({\"tag_name\": \"v0.2.0\"})\n214: +    assert update.latest_release(\"0.1.0\", fetch=lambda _u: payload) == \"0.2.0\"\n215: +\n216: +\n217: +def test_auto_update_enabled_matrix(monkeypatch):\n218: +    assert update.auto_update_enabled(no_update=False) is True\n219: +    assert update.auto_update_enabled(no_update=True) is False\n220: +    monkeypatch.setenv(\"AGENTIC_ODI_NO_UPDATE\", \"1\")\n221: +    assert update.auto_update_enabled(no_update=False) is False\n222: +\n223: +\n224: +def test_maybe_auto_update_disabled_is_noop(tmp_path, monkeypatch):\n225: +    monkeypatch.setenv(\"AGENTIC_ODI_INSTALL_DIR\", str(tmp_path / \"install\"))\n226: +    assert update.maybe_auto_update(no_update=True, now=1000.0) is None\n227: +\n228: +\n229: +def test_download_writes_and_verifies(tmp_path):\n230: +    version = \"0.2.0\"\n231: +    asset = update.asset_name(version, *update.current_platform())\n232: +    payload = b\"fake-archive-bytes\"\n233: +    digest = hashlib.sha256(payload).hexdigest()\n234: +    checksums = f\"{digest}  {asset}\\n{'0' * 64}  something-else.tar.gz\\n\"\n235: +    requested: list[str] = []\n236: +\n237: +    def fetch_bytes(url: str) -> bytes:\n238: +        requested.append(url)\n239: +        if url.endswith(\"checksums.txt\"):\n240: +            return checksums.encode(\"utf-8\")\n241: +        return payload\n242: +\n243: +    dest = tmp_path / \"downloads\"\n244: +    archive = update.download(version, dest, fetch_bytes=fetch_bytes)\n245: +\n246: +    assert archive == dest / asset\n247: +    assert archive.read_bytes() == payload\n248: +    assert any(url.endswith(\"checksums.txt\") for url in requested)\n249: +    assert any(url.endswith(asset) for url in requested)\n250: +\n251: +\n252: +def test_download_raises_on_checksum_mismatch(tmp_path):\n253: +    version = \"0.2.0\"\n254: +    asset = update.asset_name(version, *update.current_platform())\n255: +    checksums = f\"{'0' * 64}  {asset}\\n\"\n256: +\n257: +    def fetch_bytes(url: str) -> bytes:\n258: +        if url.endswith(\"checksums.txt\"):\n259: +            return checksums.encode(\"utf-8\")\n260: +        return b\"fake-archive-bytes\"\n261: +\n262: +    with pytest.raises(update.UpdateError):\n263: +        update.download(version, tmp_path / \"downloads\", fetch_bytes=fetch_bytes)\n\n(End of file - total 263 lines)\n</content>",
+            "metadata": {
+              "preview": "# Review package: 078fcdb..HEAD\n\n## Commits\n6138534 feat(cli): update check, 24h cache, and download\n\n## Files changed\n cli/src/cli/update.py          | 125 +++++++++++++++++++++++++++++++++++++++++\n cli/tests/test_update_check.py |  81 ++++++++++++++++++++++++++\n 2 files changed, 206 insertions(+)\n\n## Diff\ndiff --git a/cli/src/cli/update.py b/cli/src/cli/update.py\nindex abc649a..54e70f3 100644\n--- a/cli/src/cli/update.py\n+++ b/cli/src/cli/update.py\n@@ -1,24 +1,32 @@\n \"\"\"Self-update engine primitives (checksum, extraction, atomic version swap).\"\"\"\n \n from __future__ import annotations\n ",
+              "truncated": false,
+              "loaded": [],
+              "display": {
+                "type": "file",
+                "path": "/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/.superpowers/sdd/2026-10-15-cli-bundled-distribution-and-self-update/review-078fcdb..6138534.diff",
+                "text": "# Review package: 078fcdb..HEAD\n\n## Commits\n6138534 feat(cli): update check, 24h cache, and download\n\n## Files changed\n cli/src/cli/update.py          | 125 +++++++++++++++++++++++++++++++++++++++++\n cli/tests/test_update_check.py |  81 ++++++++++++++++++++++++++\n 2 files changed, 206 insertions(+)\n\n## Diff\ndiff --git a/cli/src/cli/update.py b/cli/src/cli/update.py\nindex abc649a..54e70f3 100644\n--- a/cli/src/cli/update.py\n+++ b/cli/src/cli/update.py\n@@ -1,24 +1,32 @@\n \"\"\"Self-update engine primitives (checksum, extraction, atomic version swap).\"\"\"\n \n from __future__ import annotations\n \n import hashlib\n+import json\n import os\n import platform\n import shutil\n import tarfile\n import tempfile\n+import urllib.request\n import zipfile\n+from collections.abc import Callable\n from pathlib import Path\n \n+from cli import paths\n+from cli.version import __version__\n+\n RELEASES_API = \"https://api.github.com/repos/alehar9320/agentic-odi/releases/latest\"\n+CHECK_INTERVAL_SECONDS = 86400\n+_RELEASES_DOWNLOAD = \"https://github.com/alehar9320/agentic-odi/releases/download\"\n \n _SYSTEM_MAP = {\"Linux\": \"linux\", \"Darwin\": \"macos\", \"Windows\": \"windows\"}\n _ARCH_MAP = {\n     \"x86_64\": \"x86_64\",\n     \"AMD64\": \"x86_64\",\n     \"arm64\": \"arm64\",\n     \"aarch64\": \"arm64\",\n }\n \n \n@@ -130,10 +138,127 @@ def perform_update(\n             raise\n \n         _activate_version(final_dir, install_root)\n         return final_dir\n     finally:\n         os.close(lock_fd)\n         try:\n             lock_path.unlink()\n         except FileNotFoundError:\n             pass\n+\n+\n+def should_check(state_file: Path, now: float) -> bool:\n+    \"\"\"Return True if an update check is due (missing/corrupt state ⇒ due).\"\"\"\n+    try:\n+        data = json.loads(Path(state_file).read_text())\n+        last_check = float(data[\"last_check\"])\n+    except (OSError, ValueError, KeyError, TypeError):\n+        return True\n+    return (now - last_check) >= CHECK_INTERVAL_SECONDS\n+\n+\n+def record_check(state_file: Path, now: float) -> None:\n+    \"\"\"Persist the timestamp of the most recent check.\"\"\"\n+    path = Path(state_file)\n+    path.parent.mkdir(parents=True, exist_ok=True)\n+    path.write_text(json.dumps({\"last_check\": now}))\n+\n+\n+def _default_fetch(url: str) -> str:\n+    with urllib.request.urlopen(url) as response:  # noqa: S310\n+        return response.read().decode(\"utf-8\")\n+\n+\n+def _default_fetch_bytes(url: str) -> bytes:\n+    with urllib.request.urlopen(url) as response:  # noqa: S310\n+        return response.read()\n+\n+\n+def latest_release(current: str, *, fetch: Callable[[str], str] | None = None) -> str | None:\n+    \"\"\"Return the latest release version if newer than ``current``, else None.\"\"\"\n+    fetcher = fetch if fetch is not None else _default_fetch\n+    try:\n+        payload = json.loads(fetcher(RELEASES_API))\n+        tag = str(payload[\"tag_name\"]).strip()\n+    except Exception:  # noqa: BLE001\n+        return None\n+    latest = tag.lstrip(\"v\")\n+    if is_newer(latest, current):\n+        return latest\n+    return None\n+\n+\n+def _parse_checksums(text: str, filename: str) -> str | None:\n+    \"\"\"Return the SHA-256 hex for ``filename`` from a sha256sum-format body.\"\"\"\n+    for line in text.splitlines():\n+        parts = line.split()\n+        if len(parts) >= 2 and parts[1] == filename:\n+            return parts[0]\n+    return None\n+\n+\n+def download(\n+    version: str,\n+    dest_dir: Path,\n+    *,\n+    fetch_bytes: Callable[[str], bytes] | None = None,\n+) -> Path:\n+    \"\"\"Download and verify the release archive for ``version``.\"\"\"\n+    fetcher = fetch_bytes if fetch_bytes is not None else _default_fetch_bytes\n+    base = f\"{_RELEASES_DOWNLOAD}/v{version}\"\n+    asset = asset_name(version, *current_platform())\n+\n+    try:\n+        checksums = fetcher(f\"{base}/checksums.txt\").decode(\"utf-8\")\n+    except Exception as exc:  # noqa: BLE001\n+        raise UpdateError(f\"failed to fetch checksums.txt: {exc}\") from exc\n+\n+    expected = _parse_checksums(checksums, asset)\n+    if expected is None:\n+        raise UpdateError(f\"no checksum entry for {asset}\")\n+\n+    try:\n+        payload = fetcher(f\"{base}/{asset}\")\n+    except Exception as exc:  # noqa: BLE001\n+        raise UpdateError(f\"failed to fetch {asset}: {exc}\") from exc\n+\n+    dest_dir = Path(dest_dir)\n+    dest_dir.mkdir(parents=True, exist_ok=True)\n+    dest = dest_dir / asset\n+    dest.write_bytes(payload)\n+    if not verify_checksum(dest, expected):\n+        raise UpdateError(f\"checksum mismatch for {asset}\")\n+    return dest\n+\n+\n+def auto_update_enabled(no_update: bool) -> bool:\n+    \"\"\"Return whether auto-update is enabled by the flag/env opt-outs.\"\"\"\n+    return (not no_update) and (not os.environ.get(\"AGENTIC_ODI_NO_UPDATE\"))\n+\n+\n+def maybe_auto_update(*, no_update: bool, now: float) -> str | None:\n+    \"\"\"Best-effort background update; never raises, returns new version or None.\"\"\"\n+    try:\n+        if not auto_update_enabled(no_update):\n+            return None\n+        root = paths.install_root()\n+        if not paths.is_frozen():\n+            return None\n+        if not paths.is_writable_dir(root):\n+            return None\n+        if (root / \".update.lock\").exists():\n+            return None\n+        state = paths.state_file()\n+        if not should_check(state, now):\n+            return None\n+        record_check(state, now)\n+        version = latest_release(__version__)\n+        if version is None:\n+            return None\n+        with tempfile.TemporaryDirectory(prefix=\"odi-update-\") as tmp:\n+            archive = download(version, Path(tmp))\n+            digest = hashlib.sha256(archive.read_bytes()).hexdigest()\n+            perform_update(version, archive, digest, root)\n+        return version\n+    except Exception:  # noqa: BLE001\n+        return None\ndiff --git a/cli/tests/test_update_check.py b/cli/tests/test_update_check.py\nnew file mode 100644\nindex 0000000..c90ea51\n--- /dev/null\n+++ b/cli/tests/test_update_check.py\n@@ -0,0 +1,81 @@\n+import hashlib\n+import json\n+\n+import pytest\n+\n+from cli import update\n+\n+\n+def test_should_check_within_and_after_interval(tmp_path):\n+    state = tmp_path / \"update.json\"\n+    assert update.should_check(state, now=1000.0) is True\n+    update.record_check(state, now=1000.0)\n+    assert update.should_check(state, now=1000.0 + 100) is False\n+    assert update.should_check(state, now=1000.0 + update.CHECK_INTERVAL_SECONDS + 1) is True\n+    assert json.loads(state.read_text())[\"last_check\"] == 1000.0\n+\n+\n+def test_latest_release_offline_returns_none():\n+    def boom(_url):\n+        raise OSError(\"network down\")\n+\n+    assert update.latest_release(\"0.1.0\", fetch=boom) is None\n+\n+\n+def test_latest_release_returns_none_when_current():\n+    payload = json.dumps({\"tag_name\": \"v0.1.0\"})\n+    assert update.latest_release(\"0.1.0\", fetch=lambda _u: payload) is None\n+\n+\n+def test_latest_release_returns_newer():\n+    payload = json.dumps({\"tag_name\": \"v0.2.0\"})\n+    assert update.latest_release(\"0.1.0\", fetch=lambda _u: payload) == \"0.2.0\"\n+\n+\n+def test_auto_update_enabled_matrix(monkeypatch):\n+    assert update.auto_update_enabled(no_update=False) is True\n+    assert update.auto_update_enabled(no_update=True) is False\n+    monkeypatch.setenv(\"AGENTIC_ODI_NO_UPDATE\", \"1\")\n+    assert update.auto_update_enabled(no_update=False) is False\n+\n+\n+def test_maybe_auto_update_disabled_is_noop(tmp_path, monkeypatch):\n+    monkeypatch.setenv(\"AGENTIC_ODI_INSTALL_DIR\", str(tmp_path / \"install\"))\n+    assert update.maybe_auto_update(no_update=True, now=1000.0) is None\n+\n+\n+def test_download_writes_and_verifies(tmp_path):\n+    version = \"0.2.0\"\n+    asset = update.asset_name(version, *update.current_platform())\n+    payload = b\"fake-archive-bytes\"\n+    digest = hashlib.sha256(payload).hexdigest()\n+    checksums = f\"{digest}  {asset}\\n{'0' * 64}  something-else.tar.gz\\n\"\n+    requested: list[str] = []\n+\n+    def fetch_bytes(url: str) -> bytes:\n+        requested.append(url)\n+        if url.endswith(\"checksums.txt\"):\n+            return checksums.encode(\"utf-8\")\n+        return payload\n+\n+    dest = tmp_path / \"downloads\"\n+    archive = update.download(version, dest, fetch_bytes=fetch_bytes)\n+\n+    assert archive == dest / asset\n+    assert archive.read_bytes() == payload\n+    assert any(url.endswith(\"checksums.txt\") for url in requested)\n+    assert any(url.endswith(asset) for url in requested)\n+\n+\n+def test_download_raises_on_checksum_mismatch(tmp_path):\n+    version = \"0.2.0\"\n+    asset = update.asset_name(version, *update.current_platform())\n+    checksums = f\"{'0' * 64}  {asset}\\n\"\n+\n+    def fetch_bytes(url: str) -> bytes:\n+        if url.endswith(\"checksums.txt\"):\n+            return checksums.encode(\"utf-8\")\n+        return b\"fake-archive-bytes\"\n+\n+    with pytest.raises(update.UpdateError):\n+        update.download(version, tmp_path / \"downloads\", fetch_bytes=fetch_bytes)",
+                "lineStart": 1,
+                "lineEnd": 263,
+                "totalLines": 263,
+                "truncated": false
+              }
+            },
+            "title": ".worktrees/cli-bundled-distribution/.superpowers/sdd/2026-10-15-cli-bundled-distribution-and-self-update/review-078fcdb..6138534.diff",
+            "time": {
+              "start": 1792110267358,
+              "end": 1792110267367
+            }
+          },
+          "id": "prt_142188bda001PWewntJEP97XXb",
+          "sessionID": "ses_ebde83a58ffeUl7XfZ8TYcC8gT",
+          "messageID": "msg_142187cd3001JYSNNWYJADhHeI"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "8f33efb4b478c6620bd5d8537feec7b52fd5cd94",
+          "type": "step-finish",
+          "tokens": {
+            "total": 19244,
+            "input": 2441,
+            "output": 75,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 16728
+            }
+          },
+          "cost": 0,
+          "id": "prt_142188c0b001vgBD6s0ZuoAwdJ",
+          "sessionID": "ses_ebde83a58ffeUl7XfZ8TYcC8gT",
+          "messageID": "msg_142187cd3001JYSNNWYJADhHeI"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_14217c5ae001tdUWhHtknxBrtQ",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 24912,
+          "input": 6907,
+          "output": 1422,
+          "reasoning": 1239,
+          "cache": {
+            "write": 0,
+            "read": 15344
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792110267452,
+          "completed": 1792110344014
+        },
+        "finish": "stop",
+        "id": "msg_142188c3c001L6IC1xm8krDu3o",
+        "sessionID": "ses_ebde83a58ffeUl7XfZ8TYcC8gT"
+      },
+      "parts": [
+        {
+          "snapshot": "8f33efb4b478c6620bd5d8537feec7b52fd5cd94",
+          "type": "step-start",
+          "id": "prt_142190599001jsDG2zMAS7AE44",
+          "sessionID": "ses_ebde83a58ffeUl7XfZ8TYcC8gT",
+          "messageID": "msg_142188c3c001L6IC1xm8krDu3o"
+        },
+        {
+          "type": "text",
+          "text": "### Spec Compliance\n\n- ✅ `update.CHECK_INTERVAL_SECONDS == 86400` — cli/src/cli/update.py:38\n- ✅ `update.should_check(state_file, now) -> bool` (missing/corrupt file ⇒ True) — cli/src/cli/update.py:62-69\n- ✅ `update.record_check(state_file, now) -> None` (writes `{\"last_check\": <float>}`, creates parent dirs) — cli/src/cli/update.py:72-77 (parent.mkdir(parents=True, exist_ok=True))\n- ✅ `update.latest_release(current, *, fetch=None) -> str | None` (parses `tag_name`, strips `v`, returns newer or None; any exception ⇒ None) — cli/src/cli/update.py:89-101 (uses RELEASES_API, injected fetch, `is_newer` to decide, broad except ⇒ None)\n- ✅ `update.download(version, dest_dir, *, fetch_bytes=None) -> Path` (R1: fetch `checksums.txt`, select line whose filename equals `asset_name(...)`, verify against that, UpdateError on no match/mismatch/fetch failures) — cli/src/cli/update.py:112-144; helper `_parse_checksums` (103-109)\n- ✅ `update.auto_update_enabled(no_update) -> bool` (R2: `(not no_update) and (not os.environ.get(\"AGENTIC_ODI_NO_UPDATE\"))` only) — cli/src/cli/update.py:147-149\n- ✅ `update.maybe_auto_update(*, no_update, now) -> str | None` (never raises; applies suppressions + due check + record_check + latest_release + download + perform_update; returns new version or None) — cli/src/cli/update.py:151-177 (entire body wrapped try/except Exception ⇒ None; order: flag/env, not frozen ⇒ None, not writable ⇒ None, lock exists ⇒ None, should_check via paths.state_file(), record_check, latest_release, download+perform_update, return version)\n- ✅ Six brief tests verbatim present — cli/tests/test_update_check.py:191-226 (`test_should_check_within_and_after_interval`, `test_latest_release_offline_returns_none`, `test_latest_release_returns_none_when_current`, `test_latest_release_returns_newer`, `test_auto_update_enabled_matrix`, `test_maybe_auto_update_disabled_is_noop`)\n- ✅ R3 download tests exist — cli/tests/test_update_check.py:229-263 (`test_download_writes_and_verifies`, `test_download_raises_on_checksum_mismatch`)\n\n⚠️ `maybe_auto_update` uses `paths.state_file()` internally (line 163) rather than accepting a `state_file` parameter; the public `should_check`/`record_check` still accept `state_file`, so the internal coupling is localized and not exercised by the brief tests. No defect against R1–R3 or the stated contract.\n\n### Strengths\n\n- **Correct checksum source (R1):** `download()` fetches `checksums.txt` (not per-asset `.sha256`), parses sha256sum lines with `str.split()` and matches `parts[1] == asset_name(...)` (lines 123-131, 103-109). Missing match → `UpdateError(f\"no checksum entry for {asset}\")`. Checksum mismatch detected via `verify_checksum` after writing → `UpdateError(f\"checksum mismatch for {asset}\")` (138-144). Fetch failures wrapped in `UpdateError` (125-136).\n- **Scope separation (R2):** `auto_update_enabled` contains only the flag/env opt-outs (147-149), exactly as required by the matrix test. All spec-157 suppressions (not frozen, install root not writable, lock held) live in `maybe_auto_update` (157-166). The “never raises” guarantee is enforced by a top-level `try/except Exception: return None` (175-177).\n- **State handling:** `record_check` creates parent dirs via `path.parent.mkdir(parents=True, exist_ok=True)` (75-77). `should_check` treats missing/corrupt JSON as due (64-69). \n- **Test completeness:** 6 brief tests kept verbatim; R3 adds success + checksum-mismatch download tests with injected `fetch_bytes` (229-263). \n- **Robust parsing:** `_parse_checksums` tolerates one-or-more spaces and ignores extra fields (106-109). \n- **Defense in depth:** `maybe_auto_update` recomputes SHA256 of the downloaded archive and passes it to `perform_update` (172-174); download already verified checksum.\n\n### Issues\n\n#### Important\n\n- **Default fetch has no timeout (network robustness):** `_default_fetch` (80-82) and `_default_fetch_bytes` (84-86) call `urllib.request.urlopen(url)` with no timeout. `latest_release` and `download` default to these; a slow/stuck network could block for arbitrary time. This is a real operational edge case (the “sensible timeout” probe from Part 2). Impact: Important (can hang in real auto-update paths). Location: cli/src/cli/update.py:80-86. Suggested: use a small default timeout (e.g., `timeout=10`) or allow injected timeouts; keep injection surface unchanged for tests.\n\n#### Minor\n\n- **Broad exception mapping in download:** fetch failures are wrapped as `UpdateError(f\"failed to fetch checksums.txt: {exc}\")` and `UpdateError(f\"failed to fetch {asset}: {exc}\")` (125-136). The brief states network failures surface appropriately; this is fine and testable via injection. No change required.\n- **maybe_auto_update hardcodes paths.state_file():** Internal use of `paths.state_file()` (163) is reasonable (canonical location) and matches how state is stored in practice; the public API still exposes `should_check/record_check` with explicit `state_file`. Not a compliance defect.\n- **Bandit noqa S310 present:** defensive comments on `urllib.request.urlopen` (80,85); does not affect tests/lint/mypy gates.\n\n### Assessment\n\n**Task quality:** Approved\n\n**Reasoning:** Implementation matches the contract with R1–R3 correctly applied. `download` uses `checksums.txt` (not per-asset `.sha256`), `auto_update_enabled` is limited to flag/env, suppressions and “never raises” live in `maybe_auto_update`, `record_check` creates parent dirs, and the required 6 tests plus R3 download tests are present. The only notable gap is the absence of a timeout on default `urlopen` calls (operational robustness) — Important but not a spec compliance blocker for this task-scoped gate.",
+          "time": {
+            "start": 1792110298523,
+            "end": 1792110343951
+          },
+          "id": "prt_14219059b0016h9FZdEHu643n9",
+          "sessionID": "ses_ebde83a58ffeUl7XfZ8TYcC8gT",
+          "messageID": "msg_142188c3c001L6IC1xm8krDu3o"
+        },
+        {
+          "reason": "stop",
+          "snapshot": "8f33efb4b478c6620bd5d8537feec7b52fd5cd94",
+          "type": "step-finish",
+          "tokens": {
+            "total": 24912,
+            "input": 6907,
+            "output": 1422,
+            "reasoning": 1239,
+            "cache": {
+              "write": 0,
+              "read": 15344
+            }
+          },
+          "cost": 0,
+          "id": "prt_14219b72f001N0BrRSPp1qzm28",
+          "sessionID": "ses_ebde83a58ffeUl7XfZ8TYcC8gT",
+          "messageID": "msg_142188c3c001L6IC1xm8krDu3o"
+        }
+      ]
+    }
+  ]
+}
