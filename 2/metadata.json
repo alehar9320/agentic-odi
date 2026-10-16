@@ -1,0 +1,43 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M52QJB6CMZ8BDPCJH4R3QJ3K",
+  "session_id": "ses_ebaa24b8affez4C6RHAyM4bED5",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-16T16:09:09.570597181Z",
+  "branch": "feature/cli-odi-entity-parity",
+  "checkpoints_count": 1,
+  "save_step_count": 1,
+  "files_touched": [],
+  "agent": "OpenCode",
+  "model": "big-pickle",
+  "turn_id": "0420abe8da14",
+  "checkpoint_transcript_start": 14,
+  "transcript_lines_at_start": 14,
+  "compact_transcript_start": 14,
+  "token_usage": {
+    "input_tokens": 4309,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 111936,
+    "output_tokens": 1887,
+    "api_call_count": 4
+  },
+  "session_metrics": {
+    "turn_count": 1
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0
+    },
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 2620,
+      "agent_lines_removed": 0
+    }
+  ]
+}
