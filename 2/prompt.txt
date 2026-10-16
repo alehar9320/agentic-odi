@@ -1,0 +1,47 @@
+Fix round for Task 5. A reviewer found one Important issue. Fix ONLY this; do not make other changes.
+
+## The finding
+
+`update_outcome` (the MCP tool you added) leaks a raw pydantic `ValidationError`/FastMCP `ToolError` when `importance`/`satisfaction` is out of the 1.0–10.0 range. Your `except ValueOutOfRangeError` in that tool is dead code, because `service.update_outcome` never raises `ValueOutOfRangeError` — the range is enforced by the model validator (`core/src/core/models.py:52-54`), which raises `ValidationError` during `model_validate` in the repository.
+
+Root cause: `ODIService.add_outcome` validates the range explicitly and raises `ValueOutOfRangeError` (`core/src/core/services.py:134-137`), but `ODIService.update_outcome` (`core/src/core/services.py:90-105`) does not. The CLI local backend (a later task) will have the same leak because it also only catches `ValueOutOfRangeError`.
+
+## The fix (do exactly this)
+
+1. In `core/src/core/services.py`, in `update_outcome`, after resolving `importance`/`satisfaction` and BEFORE computing `opportunity_score`, add the same guards `add_outcome` uses, raising `ValueOutOfRangeError`:
+   - `if importance is not None and not (1.0 <= importance <= 10.0): raise ValueOutOfRangeError()`
+   - `if satisfaction is not None and not (1.0 <= satisfaction <= 10.0): raise ValueOutOfRangeError()`
+   This makes the MCP tool's existing `except ValueOutOfRangeError` live, and keeps MCP + CLI behavior consistent. Do not alter any other service method.
+
+2. RED first — add failing tests that prove the fix, then implement:
+   - In `core/tests/test_service.py`: a test that `service.update_outcome(outcome_id, {"importance": 99})` raises `ValueOutOfRangeError` (and the stored outcome is unchanged).
+   - In `mcp_server/tests/test_parity.py`: a test that calling the `update_outcome` MCP tool with `importance=99` returns a normal string containing `"between 1.0 and 10.0"` (i.e. no leaked `ToolError`). Follow the existing async test style in that file.
+
+3. Run the FULL affected suites and confirm pristine green:
+   - `uv run --directory core pytest`
+   - `uv run --directory mcp_server pytest -v`
+   (Prefix `UV_PYTHON=3.11` only if uv attempts a `pyarrow` source build; report if so.)
+
+4. Commit exactly these files:
+   `git add core/src/core/services.py core/tests/test_service.py mcp_server/tests/test_parity.py`
+   `git commit -m "fix(core): validate score range in update_outcome; cover MCP update error path"`
+
+Do NOT change `mcp_server.py` for this fix (its `except ValueOutOfRangeError` is now correct). Do NOT touch the inline job-not-found messages in `add_outcome`/`add_customer_outcome` — existing tests pin that exact text.
+
+## You Do Not Dispatch Subagents
+
+Do all of this work yourself.
+
+## Report
+
+Append/Write to:
+/home/alexa/repos/agentic-odi/.superpowers/sdd/2026-10-15-cli-odi-entity-parity/task-5-fix-report.md
+
+Include: the failing-test output before the fix (RED), the passing output after (GREEN) for both suites, files changed, and confirmation the commit SHA.
+
+Then reply with ONLY (under 12 lines):
+- **Status:** DONE | BLOCKED | NEEDS_CONTEXT
+- Commit SHA + subject
+- One-line test summary for core and mcp_server
+- Any concerns
+- The report file path
