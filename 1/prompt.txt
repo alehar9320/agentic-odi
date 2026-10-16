@@ -1,0 +1,12 @@
+Explore the repository at /home/alexa/repos/agentic-odi (thoroughness: medium). I need to understand what this project is so I can plan a GitHub Pages marketing/docs site for its users.
+
+Report back:
+1. What the project is (name, purpose, value proposition) — read README, package.json/pyproject.toml/Cargo.toml, etc.
+2. Tech stack, key features, architecture at a high level
+3. Target users / audience signals
+4. Whether any docs/, website/, or GitHub Pages setup already exists (check .github/workflows, docs folders, gh-pages branches config)
+5. License, branding assets (logos, screenshots), demo assets
+6. Any existing tone/style conventions in docs
+7. Install/usage commands a landing page would need to show
+
+Return a concise structured summary with file paths.
