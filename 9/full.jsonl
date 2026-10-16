@@ -20,17 +20,17 @@
     },
     "cost": 0,
     "tokens": {
-      "input": 1818141,
-      "output": 142464,
+      "input": 1916789,
+      "output": 145702,
       "reasoning": 2385,
       "cache": {
-        "read": 12349433,
+        "read": 12798942,
         "write": 0
       }
     },
     "time": {
       "created": 1792094135621,
-      "updated": 1792162913670
+      "updated": 1792163433800
     }
   },
   "messages": [
@@ -18655,19 +18655,22 @@
         },
         "cost": 0,
         "tokens": {
-          "input": 0,
-          "output": 0,
+          "total": 32132,
+          "input": 10,
+          "output": 69,
           "reasoning": 0,
           "cache": {
-            "read": 0,
-            "write": 0
+            "write": 0,
+            "read": 32053
           }
         },
         "modelID": "big-pickle",
         "providerID": "opencode",
         "time": {
-          "created": 1792162913666
+          "created": 1792162913666,
+          "completed": 1792163036716
         },
+        "finish": "tool-calls",
         "id": "msg_1453bdd82001glDL1GP6nYxgmF",
         "sessionID": "ses_ebedd9abaffesSyRWO5QAiMN5F"
       },
@@ -18684,20 +18687,1305 @@
           "tool": "bash",
           "callID": "7ed1d388-7deb-4b44-a64b-6c0d43e0baa3",
           "state": {
-            "metadata": {
-              "output": ""
-            },
-            "status": "running",
+            "status": "completed",
             "input": {
               "command": "cd /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution && git add .github/workflows/release.yml && git commit -m \"ci: release build matrix for all platforms\" 2>&1 | tail -1"
             },
+            "output": "(no output)\n\n<shell_metadata>\nshell tool terminated command after exceeding timeout 120000 ms. If this command is expected to take longer and is not waiting for interactive input, retry with a larger timeout value in milliseconds.\n</shell_metadata>",
+            "metadata": {
+              "output": "(no output)\n\n<shell_metadata>\nshell tool terminated command after exceeding timeout 120000 ms. If this command is expected to take longer and is not waiting for interactive input, retry with a larger timeout value in milliseconds.\n</shell_metadata>",
+              "exit": null,
+              "truncated": false
+            },
+            "title": "cd /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution && git add .github/workflows/release.yml && git commit -m \"ci: release build matrix for all platforms\" 2>&1 | tail -1",
             "time": {
-              "start": 1792162916447
+              "start": 1792162916447,
+              "end": 1792163036576
             }
           },
           "id": "prt_1453be84a001bWtuOj0R79bIGU",
           "sessionID": "ses_ebedd9abaffesSyRWO5QAiMN5F",
           "messageID": "msg_1453bdd82001glDL1GP6nYxgmF"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "9df47ae85e1d9891c39a21cd385d43ee767b18c9",
+          "type": "step-finish",
+          "tokens": {
+            "total": 32132,
+            "input": 10,
+            "output": 69,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 32053
+            }
+          },
+          "cost": 0,
+          "id": "prt_1453dbdbb001KCHn71EOCCdCOM",
+          "sessionID": "ses_ebedd9abaffesSyRWO5QAiMN5F",
+          "messageID": "msg_1453bdd82001glDL1GP6nYxgmF"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_145336373001qaTBLkuYDK45Ff",
+        "role": "assistant",
+        "mode": "plan",
+        "agent": "plan",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 32240,
+          "input": 57,
+          "output": 52,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 32131
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792163036759,
+          "completed": 1792163038784
+        },
+        "finish": "tool-calls",
+        "id": "msg_1453dbe57002UlFBfx3dMOg1LX",
+        "sessionID": "ses_ebedd9abaffesSyRWO5QAiMN5F"
+      },
+      "parts": [
+        {
+          "snapshot": "9df47ae85e1d9891c39a21cd385d43ee767b18c9",
+          "type": "step-start",
+          "id": "prt_1453dc5600016biaf9RrjagBlC",
+          "sessionID": "ses_ebedd9abaffesSyRWO5QAiMN5F",
+          "messageID": "msg_1453dbe57002UlFBfx3dMOg1LX"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "d12f2782-69c6-4a7a-9a79-fc2027865e94",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "cd /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution && git log -1 --oneline 2>&1 | tail -1"
+            },
+            "output": "a7d1d60 ci: release build matrix for all platforms\n",
+            "metadata": {
+              "output": "a7d1d60 ci: release build matrix for all platforms\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "cd /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution && git log -1 --oneline 2>&1 | tail -1",
+            "time": {
+              "start": 1792163038581,
+              "end": 1792163038618
+            }
+          },
+          "id": "prt_1453dc566001NYWK01hOFpiMJa",
+          "sessionID": "ses_ebedd9abaffesSyRWO5QAiMN5F",
+          "messageID": "msg_1453dbe57002UlFBfx3dMOg1LX"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "9df47ae85e1d9891c39a21cd385d43ee767b18c9",
+          "type": "step-finish",
+          "tokens": {
+            "total": 32240,
+            "input": 57,
+            "output": 52,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 32131
+            }
+          },
+          "cost": 0,
+          "id": "prt_1453dc5fc0012t2gyFkmt5dFBs",
+          "sessionID": "ses_ebedd9abaffesSyRWO5QAiMN5F",
+          "messageID": "msg_1453dbe57002UlFBfx3dMOg1LX"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_145336373001qaTBLkuYDK45Ff",
+        "role": "assistant",
+        "mode": "plan",
+        "agent": "plan",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 32850,
+          "input": 24,
+          "output": 587,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 32239
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792163038829,
+          "completed": 1792163057192
+        },
+        "finish": "tool-calls",
+        "id": "msg_1453dc66d002Z8Eu2c7uXlU7fL",
+        "sessionID": "ses_ebedd9abaffesSyRWO5QAiMN5F"
+      },
+      "parts": [
+        {
+          "snapshot": "9df47ae85e1d9891c39a21cd385d43ee767b18c9",
+          "type": "step-start",
+          "id": "prt_1453e0c4e001mM3nmJlEgu1ywj",
+          "sessionID": "ses_ebedd9abaffesSyRWO5QAiMN5F",
+          "messageID": "msg_1453dc66d002Z8Eu2c7uXlU7fL"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "e0498638-712a-470c-a885-25a09cf332bd",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "cd /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution && cat > .github/workflows/e2e-install.yml << 'YML'\nname: e2e-install\n\non:\n  push:\n    tags:\n      - \"v*\"\n  workflow_dispatch:\n    inputs:\n      tag:\n        description: \"Release tag to test (e.g. v0.1.0)\"\n        required: true\n        type: string\n\npermissions:\n  contents: read\n\njobs:\n  e2e-linux-macos:\n    strategy:\n      matrix:\n        include:\n          - os: ubuntu-latest\n            shell: bash\n            install: curl -fsSL https://github.com/alehar9320/agentic-odi/releases/download/${{ inputs.tag || github.ref_name }}/install.sh | AGENTIC_ODI_INSTALL_DIR=$RUNNER_TEMP/odi-home AGENTIC_ODI_BIN_DIR=$RUNNER_TEMP/odi-bin bash\n          - os: macos-latest\n            shell: bash\n            install: curl -fsSL https://github.com/alehar9320/agentic-odi/releases/download/${{ inputs.tag || github.ref_name }}/install.sh | AGENTIC_ODI_INSTALL_DIR=$RUNNER_TEMP/odi-home AGENTIC_ODI_BIN_DIR=$RUNNER_TEMP/odi-bin bash\n    runs-on: ${{ matrix.os }}\n    steps:\n      - name: Install\n        run: ${{ matrix.install }}\n      - name: Smoke test\n        run: |\n          export PATH=\"$RUNNER_TEMP/odi-bin:$PATH\"\n          odi --version\n          odi --help\n          odi outcomes score 8 2\n\n  e2e-windows:\n    runs-on: windows-latest\n    steps:\n      - name: Install\n        shell: pwsh\n        run: |\n          $tag = \"${{ inputs.tag || github.ref_name }}\"\n          $url = \"https://github.com/alehar9320/agentic-odi/releases/download/$tag/install.ps1\"\n          $env:AGENTIC_ODI_INSTALL_DIR = \"$env:RUNNER_TEMP\\odi-home\"\n          $env:AGENTIC_ODI_BIN_DIR = \"$env:RUNNER_TEMP\\odi-bin\"\n          irm $url | iex\n      - name: Smoke test\n        shell: pwsh\n        run: |\n          $env:PATH = \"$env:RUNNER_TEMP\\odi-bin;$env:PATH\"\n          odi --version\n          odi --help\n          odi outcomes score 8 2\nYML\npython3 -c \"\nimport yaml\nyaml.safe_load(open('.github/workflows/e2e-install.yml'))\nprint('yaml-ok')\n\" 2>&1 | tail -1\n"
+            },
+            "output": "yaml-ok\n",
+            "metadata": {
+              "output": "yaml-ok\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "cd /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution && cat > .github/workflows/e2e-install.yml << 'YML'\nname: e2e-install\n\non:\n  push:\n    tags:\n      - \"v*\"\n  workflow_dispatch:\n    inputs:\n      tag:\n        description: \"Release tag to test (e.g. v0.1.0)\"\n        required: true\n        type: string\n\npermissions:\n  contents: read\n\njobs:\n  e2e-linux-macos:\n    strategy:\n      matrix:\n        include:\n          - os: ubuntu-latest\n            shell: bash\n            install: curl -fsSL https://github.com/alehar9320/agentic-odi/releases/download/${{ inputs.tag || github.ref_name }}/install.sh | AGENTIC_ODI_INSTALL_DIR=$RUNNER_TEMP/odi-home AGENTIC_ODI_BIN_DIR=$RUNNER_TEMP/odi-bin bash\n          - os: macos-latest\n            shell: bash\n            install: curl -fsSL https://github.com/alehar9320/agentic-odi/releases/download/${{ inputs.tag || github.ref_name }}/install.sh | AGENTIC_ODI_INSTALL_DIR=$RUNNER_TEMP/odi-home AGENTIC_ODI_BIN_DIR=$RUNNER_TEMP/odi-bin bash\n    runs-on: ${{ matrix.os }}\n    steps:\n      - name: Install\n        run: ${{ matrix.install }}\n      - name: Smoke test\n        run: |\n          export PATH=\"$RUNNER_TEMP/odi-bin:$PATH\"\n          odi --version\n          odi --help\n          odi outcomes score 8 2\n\n  e2e-windows:\n    runs-on: windows-latest\n    steps:\n      - name: Install\n        shell: pwsh\n        run: |\n          $tag = \"${{ inputs.tag || github.ref_name }}\"\n          $url = \"https://github.com/alehar9320/agentic-odi/releases/download/$tag/install.ps1\"\n          $env:AGENTIC_ODI_INSTALL_DIR = \"$env:RUNNER_TEMP\\odi-home\"\n          $env:AGENTIC_ODI_BIN_DIR = \"$env:RUNNER_TEMP\\odi-bin\"\n          irm $url | iex\n      - name: Smoke test\n        shell: pwsh\n        run: |\n          $env:PATH = \"$env:RUNNER_TEMP\\odi-bin;$env:PATH\"\n          odi --version\n          odi --help\n          odi outcomes score 8 2\nYML\npython3 -c \"\nimport yaml\nyaml.safe_load(open('.github/workflows/e2e-install.yml'))\nprint('yaml-ok')\n\" 2>&1 | tail -1\n",
+            "time": {
+              "start": 1792163056747,
+              "end": 1792163056940
+            }
+          },
+          "id": "prt_1453e0c590012Y32BjOxFhhdEm",
+          "sessionID": "ses_ebedd9abaffesSyRWO5QAiMN5F",
+          "messageID": "msg_1453dc66d002Z8Eu2c7uXlU7fL"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "9df47ae85e1d9891c39a21cd385d43ee767b18c9",
+          "type": "step-finish",
+          "tokens": {
+            "total": 32850,
+            "input": 24,
+            "output": 587,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 32239
+            }
+          },
+          "cost": 0,
+          "id": "prt_1453e0d64001lhsY1DXluhrIwB",
+          "sessionID": "ses_ebedd9abaffesSyRWO5QAiMN5F",
+          "messageID": "msg_1453dc66d002Z8Eu2c7uXlU7fL"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_145336373001qaTBLkuYDK45Ff",
+        "role": "assistant",
+        "mode": "plan",
+        "agent": "plan",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 32931,
+          "input": 32763,
+          "output": 70,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 98
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792163057241,
+          "completed": 1792163196537
+        },
+        "finish": "tool-calls",
+        "id": "msg_1453e0e59002srrCvtz7Yugz52",
+        "sessionID": "ses_ebedd9abaffesSyRWO5QAiMN5F"
+      },
+      "parts": [
+        {
+          "snapshot": "9df47ae85e1d9891c39a21cd385d43ee767b18c9",
+          "type": "step-start",
+          "id": "prt_1453e588c001biOr686Q501CDz",
+          "sessionID": "ses_ebedd9abaffesSyRWO5QAiMN5F",
+          "messageID": "msg_1453e0e59002srrCvtz7Yugz52"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "86ea0639-fba7-4789-80ea-c3438a2e5092",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "cd /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution && git add .github/workflows/e2e-install.yml && git commit -m \"ci: e2e install workflow\" 2>&1 | tail -1"
+            },
+            "output": "(no output)\n\n<shell_metadata>\nshell tool terminated command after exceeding timeout 120000 ms. If this command is expected to take longer and is not waiting for interactive input, retry with a larger timeout value in milliseconds.\n</shell_metadata>",
+            "metadata": {
+              "output": "(no output)\n\n<shell_metadata>\nshell tool terminated command after exceeding timeout 120000 ms. If this command is expected to take longer and is not waiting for interactive input, retry with a larger timeout value in milliseconds.\n</shell_metadata>",
+              "exit": null,
+              "truncated": false
+            },
+            "title": "cd /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution && git add .github/workflows/e2e-install.yml && git commit -m \"ci: e2e install workflow\" 2>&1 | tail -1",
+            "time": {
+              "start": 1792163076255,
+              "end": 1792163196379
+            }
+          },
+          "id": "prt_1453e5893001I7kE6v3cG2IsF3",
+          "sessionID": "ses_ebedd9abaffesSyRWO5QAiMN5F",
+          "messageID": "msg_1453e0e59002srrCvtz7Yugz52"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "9df47ae85e1d9891c39a21cd385d43ee767b18c9",
+          "type": "step-finish",
+          "tokens": {
+            "total": 32931,
+            "input": 32763,
+            "output": 70,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 98
+            }
+          },
+          "cost": 0,
+          "id": "prt_145402e00001vCj4RtQ66zRNSW",
+          "sessionID": "ses_ebedd9abaffesSyRWO5QAiMN5F",
+          "messageID": "msg_1453e0e59002srrCvtz7Yugz52"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_145336373001qaTBLkuYDK45Ff",
+        "role": "assistant",
+        "mode": "plan",
+        "agent": "plan",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 33039,
+          "input": 136,
+          "output": 52,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 32851
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792163196589,
+          "completed": 1792163199076
+        },
+        "finish": "tool-calls",
+        "id": "msg_145402ead002wxEsJ5KdluWply",
+        "sessionID": "ses_ebedd9abaffesSyRWO5QAiMN5F"
+      },
+      "parts": [
+        {
+          "snapshot": "9df47ae85e1d9891c39a21cd385d43ee767b18c9",
+          "type": "step-start",
+          "id": "prt_14540375b001NzxEJH2VvB2agB",
+          "sessionID": "ses_ebedd9abaffesSyRWO5QAiMN5F",
+          "messageID": "msg_145402ead002wxEsJ5KdluWply"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "c07b9b9f-967e-4386-a6c6-821bcaddbc01",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "cd /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution && git log -1 --oneline 2>&1 | tail -1"
+            },
+            "output": "b197c55 ci: e2e install workflow\n",
+            "metadata": {
+              "output": "b197c55 ci: e2e install workflow\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "cd /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution && git log -1 --oneline 2>&1 | tail -1",
+            "time": {
+              "start": 1792163198836,
+              "end": 1792163198888
+            }
+          },
+          "id": "prt_1454037650011zrDWltwk9nVQi",
+          "sessionID": "ses_ebedd9abaffesSyRWO5QAiMN5F",
+          "messageID": "msg_145402ead002wxEsJ5KdluWply"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "9df47ae85e1d9891c39a21cd385d43ee767b18c9",
+          "type": "step-finish",
+          "tokens": {
+            "total": 33039,
+            "input": 136,
+            "output": 52,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 32851
+            }
+          },
+          "cost": 0,
+          "id": "prt_1454037f1001AgwDrbcuwlh6kE",
+          "sessionID": "ses_ebedd9abaffesSyRWO5QAiMN5F",
+          "messageID": "msg_145402ead002wxEsJ5KdluWply"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_145336373001qaTBLkuYDK45Ff",
+        "role": "assistant",
+        "mode": "plan",
+        "agent": "plan",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 33623,
+          "input": 29756,
+          "output": 564,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 3303
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792163199117,
+          "completed": 1792163226806
+        },
+        "finish": "tool-calls",
+        "id": "msg_14540388d002lQqI6f44ODIGVK",
+        "sessionID": "ses_ebedd9abaffesSyRWO5QAiMN5F"
+      },
+      "parts": [
+        {
+          "snapshot": "9df47ae85e1d9891c39a21cd385d43ee767b18c9",
+          "type": "step-start",
+          "id": "prt_14540a3af0013RaLDpdoZEHAk6",
+          "sessionID": "ses_ebedd9abaffesSyRWO5QAiMN5F",
+          "messageID": "msg_14540388d002lQqI6f44ODIGVK"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "b462ab77-8c68-4665-b4ba-69a6f46fdadc",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "cd /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution && cat >> /tmp/readme_patch.txt << 'PATCH'\n## Quick Install (Binary)\n\nPrebuilt binaries are available for Linux, macOS, and Windows. Install the latest release with one command:\n\n```bash\ncurl -fsSL https://github.com/alehar9320/agentic-odi/releases/latest/download/install.sh | sh\n```\n\nThe installer places the binary under `~/.local/share/agentic-odi/versions/<version>/`, creates a `current` symlink, and symlinks `odi`, `odipm`, `odi-cli`, and `agentic-odi` into `~/.local/bin/`.\n\nIf `~/.local/bin` is not on your PATH, add it (e.g., `export PATH=\"$HOME/.local/bin:$PATH\"`). On Windows, the PowerShell installer uses `~\\AppData\\Local\\agentic-odi\\` and copies `.exe` files to `~\\AppData\\Local\\agentic-odi\\bin\\`.\n\n### Update\n\nBy default, `odi` auto-checks for updates once every 24 hours and applies the update on the next run (auto-update is enabled by default). Control behavior with:\n\n- `odi update` — explicit check and update\n- `--no-update` flag — skip auto-update for this run\n- `AGENTIC_ODI_NO_UPDATE=1` — disable auto-update globally\n\nWhen running from a non-frozen source install, auto-update is suppressed automatically.\n\n### Install layout\n\n```\n~/.local/share/agentic-odi/\n  ├── versions/<version>/\n  │   └── odi (and bundled files)\n  └── current -> versions/<version>\n\n~/.local/bin/\n  ├── odi -> ../share/agentic-odi/current/odi\n  ├── odipm\n  ├── odi-cli\n  └── agentic-odi\n\n~/.config/agentic-odi/  # state/preferences\n```\n\nEnvironment variables: `AGENTIC_ODI_INSTALL_DIR` (override install root), `XDG_DATA_HOME`, `XDG_BIN_HOME`. The default backend is `local` (`--backend local`); no MCP server is required.\n\n### Unsigned binaries\n\nmacOS may quarantine downloaded binaries: `xattr -d com.apple.quarantine ~/.local/bin/odi` (if needed). Windows SmartScreen may show a warning for unsigned binaries; choose \"More info → Run anyway\" if you trust the release.\nPATCH\necho \"patch written\""
+            },
+            "output": "patch written\n",
+            "metadata": {
+              "output": "patch written\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "cd /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution && cat >> /tmp/readme_patch.txt << 'PATCH'\n## Quick Install (Binary)\n\nPrebuilt binaries are available for Linux, macOS, and Windows. Install the latest release with one command:\n\n```bash\ncurl -fsSL https://github.com/alehar9320/agentic-odi/releases/latest/download/install.sh | sh\n```\n\nThe installer places the binary under `~/.local/share/agentic-odi/versions/<version>/`, creates a `current` symlink, and symlinks `odi`, `odipm`, `odi-cli`, and `agentic-odi` into `~/.local/bin/`.\n\nIf `~/.local/bin` is not on your PATH, add it (e.g., `export PATH=\"$HOME/.local/bin:$PATH\"`). On Windows, the PowerShell installer uses `~\\AppData\\Local\\agentic-odi\\` and copies `.exe` files to `~\\AppData\\Local\\agentic-odi\\bin\\`.\n\n### Update\n\nBy default, `odi` auto-checks for updates once every 24 hours and applies the update on the next run (auto-update is enabled by default). Control behavior with:\n\n- `odi update` — explicit check and update\n- `--no-update` flag — skip auto-update for this run\n- `AGENTIC_ODI_NO_UPDATE=1` — disable auto-update globally\n\nWhen running from a non-frozen source install, auto-update is suppressed automatically.\n\n### Install layout\n\n```\n~/.local/share/agentic-odi/\n  ├── versions/<version>/\n  │   └── odi (and bundled files)\n  └── current -> versions/<version>\n\n~/.local/bin/\n  ├── odi -> ../share/agentic-odi/current/odi\n  ├── odipm\n  ├── odi-cli\n  └── agentic-odi\n\n~/.config/agentic-odi/  # state/preferences\n```\n\nEnvironment variables: `AGENTIC_ODI_INSTALL_DIR` (override install root), `XDG_DATA_HOME`, `XDG_BIN_HOME`. The default backend is `local` (`--backend local`); no MCP server is required.\n\n### Unsigned binaries\n\nmacOS may quarantine downloaded binaries: `xattr -d com.apple.quarantine ~/.local/bin/odi` (if needed). Windows SmartScreen may show a warning for unsigned binaries; choose \"More info → Run anyway\" if you trust the release.\nPATCH\necho \"patch written\"",
+            "time": {
+              "start": 1792163226578,
+              "end": 1792163226608
+            }
+          },
+          "id": "prt_14540a3bb001ruTQO8Bod6w3iA",
+          "sessionID": "ses_ebedd9abaffesSyRWO5QAiMN5F",
+          "messageID": "msg_14540388d002lQqI6f44ODIGVK"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "9df47ae85e1d9891c39a21cd385d43ee767b18c9",
+          "type": "step-finish",
+          "tokens": {
+            "total": 33623,
+            "input": 29756,
+            "output": 564,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 3303
+            }
+          },
+          "cost": 0,
+          "id": "prt_14540a45d001xYhOxd86as1CGz",
+          "sessionID": "ses_ebedd9abaffesSyRWO5QAiMN5F",
+          "messageID": "msg_14540388d002lQqI6f44ODIGVK"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_145336373001qaTBLkuYDK45Ff",
+        "role": "assistant",
+        "mode": "plan",
+        "agent": "plan",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 34267,
+          "input": 594,
+          "output": 633,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 33040
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792163226847,
+          "completed": 1792163249260
+        },
+        "finish": "tool-calls",
+        "id": "msg_14540a4df00250A5UCUtOzNpKV",
+        "sessionID": "ses_ebedd9abaffesSyRWO5QAiMN5F"
+      },
+      "parts": [
+        {
+          "snapshot": "9df47ae85e1d9891c39a21cd385d43ee767b18c9",
+          "type": "step-start",
+          "id": "prt_14540d847001ovCZ6Yy03sCLLb",
+          "sessionID": "ses_ebedd9abaffesSyRWO5QAiMN5F",
+          "messageID": "msg_14540a4df00250A5UCUtOzNpKV"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "0902107d-3bea-4f41-a356-ee05c7d35b79",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "cd /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution && python3 -c \"\ncontent = open('README.md').read()\n# Insert before '## Deployment' section\nmarker = '## 🚀 Deployment'\nreplacement = '''## Quick Install (Binary)\n\nPrebuilt binaries are available for Linux, macOS, and Windows. Install the latest release with one command:\n\n```bash\ncurl -fsSL https://github.com/alehar9320/agentic-odi/releases/latest/download/install.sh | sh\n```\n\nThe installer places the binary under `~/.local/share/agentic-odi/versions/<version>/`, creates a `current` symlink, and symlinks `odi`, `odipm`, `odi-cli`, and `agentic-odi` into `~/.local/bin/`.\n\nIf `~/.local/bin` is not on your PATH, add it (e.g., `export PATH=\"$HOME/.local/bin:$PATH\"`). On Windows, the PowerShell installer uses `~\\\\AppData\\\\Local\\\\agentic-odi\\\\` and copies `.exe` files to `~\\\\AppData\\\\Local\\\\agentic-odi\\\\bin\\\\`.\n\n### Update\n\nBy default, `odi` auto-checks for updates once every 24 hours and applies the update on the next run (auto-update is enabled by default). Control behavior with:\n\n- `odi update` — explicit check and update\n- `--no-update` flag — skip auto-update for this run\n- `AGENTIC_ODI_NO_UPDATE=1` — disable auto-update globally\n\nWhen running from a non-frozen source install, auto-update is suppressed automatically.\n\n### Install layout\n\n```\n~/.local/share/agentic-odi/\n  ├── versions/<version>/\n  │   └── odi (and bundled files)\n  └── current -> versions/<version>\n\n~/.local/bin/\n  ├── odi -> ../share/agentic-odi/current/odi\n  ├── odipm\n  ├── odi-cli\n  └── agentic-odi\n\n~/.config/agentic-odi/  # state/preferences\n```\n\nEnvironment variables: `AGENTIC_ODI_INSTALL_DIR` (override install root), `XDG_DATA_HOME`, `XDG_BIN_HOME`. The default backend is `local` (`--backend local`); no MCP server is required.\n\n### Unsigned binaries\n\nmacOS may quarantine downloaded binaries: `xattr -d com.apple.quarantine ~/.local/bin/odi` (if needed). Windows SmartScreen may show a warning for unsigned binaries; choose \\\"More info → Run anyway\\\" if you trust the release.\n\n## 🚀 Deployment'''\nif marker in content:\n    content = content.replace(marker, replacement)\n    open('README.md','w').write(content)\n    print('ok')\nelse:\n    print('marker not found')\n\" 2>&1 | tail -1\n"
+            },
+            "output": "curl: (22) The requested URL returned error: 404\n/bin/bash: line 1: version: No such file or directory\n/bin/bash: line 1: current: command not found\n/bin/bash: line 1: odi: command not found\n/bin/bash: line 1: odipm: command not found\n/bin/bash: line 1: odi-cli: command not found\n/bin/bash: line 1: agentic-odi: command not found\n/bin/bash: line 1: /home/alexa/.local/bin/: Is a directory\n/bin/bash: line 1: /home/alexa/.local/bin: Is a directory\n/bin/bash: line 3: ~AppDataLocalagentic-odi\\: command not found\n/bin/bash: line 1: .exe: command not found\n/bin/bash: line 3: ~AppDataLocalagentic-odibin\\: command not found\n/bin/bash: line 1: odi: command not found\n/bin/bash: line 1: odi: command not found\n/bin/bash: line 1: --no-update: command not found\n/bin/bash: line 2: /home/alexa/.local/share/agentic-odi/: No such file or directory\n/bin/bash: line 3: version: No such file or directory\n/bin/bash: command substitution: line 4: syntax error near unexpected token `('\n/bin/bash: command substitution: line 4: `  │   └── odi (and bundled files)'\n/bin/bash: line 1: AGENTIC_ODI_INSTALL_DIR: command not found\n/bin/bash: line 1: XDG_DATA_HOME: command not found\n/bin/bash: line 1: XDG_BIN_HOME: command not found\n/bin/bash: line 1: local: can only be used in a function\n/bin/bash: line 1: --backend: command not found\n/bin/bash: line 1: xattr: command not found\nmarker not found\n",
+            "metadata": {
+              "output": "curl: (22) The requested URL returned error: 404\n/bin/bash: line 1: version: No such file or directory\n/bin/bash: line 1: current: command not found\n/bin/bash: line 1: odi: command not found\n/bin/bash: line 1: odipm: command not found\n/bin/bash: line 1: odi-cli: command not found\n/bin/bash: line 1: agentic-odi: command not found\n/bin/bash: line 1: /home/alexa/.local/bin/: Is a directory\n/bin/bash: line 1: /home/alexa/.local/bin: Is a directory\n/bin/bash: line 3: ~AppDataLocalagentic-odi\\: command not found\n/bin/bash: line 1: .exe: command not found\n/bin/bash: line 3: ~AppDataLocalagentic-odibin\\: command not found\n/bin/bash: line 1: odi: command not found\n/bin/bash: line 1: odi: command not found\n/bin/bash: line 1: --no-update: command not found\n/bin/bash: line 2: /home/alexa/.local/share/agentic-odi/: No such file or directory\n/bin/bash: line 3: version: No such file or directory\n/bin/bash: command substitution: line 4: syntax error near unexpected token `('\n/bin/bash: command substitution: line 4: `  │   └── odi (and bundled files)'\n/bin/bash: line 1: AGENTIC_ODI_INSTALL_DIR: command not found\n/bin/bash: line 1: XDG_DATA_HOME: command not found\n/bin/bash: line 1: XDG_BIN_HOME: command not found\n/bin/bash: line 1: local: can only be used in a function\n/bin/bash: line 1: --backend: command not found\n/bin/bash: line 1: xattr: command not found\nmarker not found\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "cd /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution && python3 -c \"\ncontent = open('README.md').read()\n# Insert before '## Deployment' section\nmarker = '## 🚀 Deployment'\nreplacement = '''## Quick Install (Binary)\n\nPrebuilt binaries are available for Linux, macOS, and Windows. Install the latest release with one command:\n\n```bash\ncurl -fsSL https://github.com/alehar9320/agentic-odi/releases/latest/download/install.sh | sh\n```\n\nThe installer places the binary under `~/.local/share/agentic-odi/versions/<version>/`, creates a `current` symlink, and symlinks `odi`, `odipm`, `odi-cli`, and `agentic-odi` into `~/.local/bin/`.\n\nIf `~/.local/bin` is not on your PATH, add it (e.g., `export PATH=\"$HOME/.local/bin:$PATH\"`). On Windows, the PowerShell installer uses `~\\\\AppData\\\\Local\\\\agentic-odi\\\\` and copies `.exe` files to `~\\\\AppData\\\\Local\\\\agentic-odi\\\\bin\\\\`.\n\n### Update\n\nBy default, `odi` auto-checks for updates once every 24 hours and applies the update on the next run (auto-update is enabled by default). Control behavior with:\n\n- `odi update` — explicit check and update\n- `--no-update` flag — skip auto-update for this run\n- `AGENTIC_ODI_NO_UPDATE=1` — disable auto-update globally\n\nWhen running from a non-frozen source install, auto-update is suppressed automatically.\n\n### Install layout\n\n```\n~/.local/share/agentic-odi/\n  ├── versions/<version>/\n  │   └── odi (and bundled files)\n  └── current -> versions/<version>\n\n~/.local/bin/\n  ├── odi -> ../share/agentic-odi/current/odi\n  ├── odipm\n  ├── odi-cli\n  └── agentic-odi\n\n~/.config/agentic-odi/  # state/preferences\n```\n\nEnvironment variables: `AGENTIC_ODI_INSTALL_DIR` (override install root), `XDG_DATA_HOME`, `XDG_BIN_HOME`. The default backend is `local` (`--backend local`); no MCP server is required.\n\n### Unsigned binaries\n\nmacOS may quarantine downloaded binaries: `xattr -d com.apple.quarantine ~/.local/bin/odi` (if needed). Windows SmartScreen may show a warning for unsigned binaries; choose \\\"More info → Run anyway\\\" if you trust the release.\n\n## 🚀 Deployment'''\nif marker in content:\n    content = content.replace(marker, replacement)\n    open('README.md','w').write(content)\n    print('ok')\nelse:\n    print('marker not found')\n\" 2>&1 | tail -1\n",
+            "time": {
+              "start": 1792163240048,
+              "end": 1792163249019
+            }
+          },
+          "id": "prt_14540d852001gW4C27F2cC3JW9",
+          "sessionID": "ses_ebedd9abaffesSyRWO5QAiMN5F",
+          "messageID": "msg_14540a4df00250A5UCUtOzNpKV"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "9df47ae85e1d9891c39a21cd385d43ee767b18c9",
+          "type": "step-finish",
+          "tokens": {
+            "total": 34267,
+            "input": 594,
+            "output": 633,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 33040
+            }
+          },
+          "cost": 0,
+          "id": "prt_14540fbe9001m4ElNKF907IJny",
+          "sessionID": "ses_ebedd9abaffesSyRWO5QAiMN5F",
+          "messageID": "msg_14540a4df00250A5UCUtOzNpKV"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_145336373001qaTBLkuYDK45Ff",
+        "role": "assistant",
+        "mode": "plan",
+        "agent": "plan",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 34797,
+          "input": 427,
+          "output": 103,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 34267
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792163249315,
+          "completed": 1792163252792
+        },
+        "finish": "tool-calls",
+        "id": "msg_14540fca3002JSbs6QWzLEUm7k",
+        "sessionID": "ses_ebedd9abaffesSyRWO5QAiMN5F"
+      },
+      "parts": [
+        {
+          "snapshot": "9df47ae85e1d9891c39a21cd385d43ee767b18c9",
+          "type": "step-start",
+          "id": "prt_1454108a0001BDGb7Cg5y1jTlK",
+          "sessionID": "ses_ebedd9abaffesSyRWO5QAiMN5F",
+          "messageID": "msg_14540fca3002JSbs6QWzLEUm7k"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "ad8b3e3f-1ab0-49ec-8caa-f98c9f228553",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "cd /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution && python3 << 'PY'\ncontent = open('README.md').read()\nmarker = '## 🚀 Deployment'\n# look for it\nidx = content.find(marker)\nif idx >= 0:\n    print('found at', idx)\nelse:\n    print('not found')\nPY\n 2>&1 | tail -2"
+            },
+            "output": "not found\n",
+            "metadata": {
+              "output": "not found\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "cd /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution && python3 << 'PY'\ncontent = open('README.md').read()\nmarker = '## 🚀 Deployment'\n# look for it\nidx = content.find(marker)\nif idx >= 0:\n    print('found at', idx)\nelse:\n    print('not found')\nPY\n 2>&1 | tail -2",
+            "time": {
+              "start": 1792163252411,
+              "end": 1792163252505
+            }
+          },
+          "id": "prt_1454108a7001pckQnScRhjEu8C",
+          "sessionID": "ses_ebedd9abaffesSyRWO5QAiMN5F",
+          "messageID": "msg_14540fca3002JSbs6QWzLEUm7k"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "9df47ae85e1d9891c39a21cd385d43ee767b18c9",
+          "type": "step-finish",
+          "tokens": {
+            "total": 34797,
+            "input": 427,
+            "output": 103,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 34267
+            }
+          },
+          "cost": 0,
+          "id": "prt_145410991001kU3blrJh3DWqWA",
+          "sessionID": "ses_ebedd9abaffesSyRWO5QAiMN5F",
+          "messageID": "msg_14540fca3002JSbs6QWzLEUm7k"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_145336373001qaTBLkuYDK45Ff",
+        "role": "assistant",
+        "mode": "plan",
+        "agent": "plan",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 34857,
+          "input": 10,
+          "output": 49,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 34798
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792163252856,
+          "completed": 1792163255555
+        },
+        "finish": "tool-calls",
+        "id": "msg_145410a77001BpRxToaPfi0H9N",
+        "sessionID": "ses_ebedd9abaffesSyRWO5QAiMN5F"
+      },
+      "parts": [
+        {
+          "snapshot": "9df47ae85e1d9891c39a21cd385d43ee767b18c9",
+          "type": "step-start",
+          "id": "prt_14541138d0018aL3Yj6DYpL59U",
+          "sessionID": "ses_ebedd9abaffesSyRWO5QAiMN5F",
+          "messageID": "msg_145410a77001BpRxToaPfi0H9N"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "34d7108f-99ff-4794-9b01-60e88831c65f",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "cd /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution && grep -n \"Deployment\" README.md | head -2"
+            },
+            "output": "38:- [Deployment](#-deployment)\n361:## ☁️ Deployment\n",
+            "metadata": {
+              "output": "38:- [Deployment](#-deployment)\n361:## ☁️ Deployment\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "cd /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution && grep -n \"Deployment\" README.md | head -2",
+            "time": {
+              "start": 1792163255203,
+              "end": 1792163255229
+            }
+          },
+          "id": "prt_145411393001FmuBHeUDgtZTRG",
+          "sessionID": "ses_ebedd9abaffesSyRWO5QAiMN5F",
+          "messageID": "msg_145410a77001BpRxToaPfi0H9N"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "9df47ae85e1d9891c39a21cd385d43ee767b18c9",
+          "type": "step-finish",
+          "tokens": {
+            "total": 34857,
+            "input": 10,
+            "output": 49,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 34798
+            }
+          },
+          "cost": 0,
+          "id": "prt_1454114380010QfjoHl7fI0yJp",
+          "sessionID": "ses_ebedd9abaffesSyRWO5QAiMN5F",
+          "messageID": "msg_145410a77001BpRxToaPfi0H9N"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_145336373001qaTBLkuYDK45Ff",
+        "role": "assistant",
+        "mode": "plan",
+        "agent": "plan",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 35508,
+          "input": 1258,
+          "output": 626,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 33624
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792163255613,
+          "completed": 1792163276020
+        },
+        "finish": "tool-calls",
+        "id": "msg_14541153d002eCLeLWmQzyOAJ9",
+        "sessionID": "ses_ebedd9abaffesSyRWO5QAiMN5F"
+      },
+      "parts": [
+        {
+          "snapshot": "9df47ae85e1d9891c39a21cd385d43ee767b18c9",
+          "type": "step-start",
+          "id": "prt_1454163f4001rG1SKiELxMZpMa",
+          "sessionID": "ses_ebedd9abaffesSyRWO5QAiMN5F",
+          "messageID": "msg_14541153d002eCLeLWmQzyOAJ9"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "4f465ad5-b27c-4995-9ebd-41694b752a08",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "cd /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution && python3 << 'PY'\ncontent = open('README.md').read()\nold = '## ☁️ Deployment'\nnew = '''## Quick Install (Binary)\n\nPrebuilt binaries are available for Linux, macOS, and Windows. Install the latest release with one command:\n\n```bash\ncurl -fsSL https://github.com/alehar9320/agentic-odi/releases/latest/download/install.sh | sh\n```\n\nThe installer places the binary under `~/.local/share/agentic-odi/versions/<version>/`, creates a `current` symlink, and symlinks `odi`, `odipm`, `odi-cli`, and `agentic-odi` into `~/.local/bin/`.\n\nIf `~/.local/bin` is not on your PATH, add it (e.g., `export PATH=\"$HOME/.local/bin:$PATH\"`). On Windows, the PowerShell installer uses `~\\\\AppData\\\\Local\\\\agentic-odi\\\\` and copies `.exe` files to `~\\\\AppData\\\\Local\\\\agentic-odi\\\\bin\\\\`.\n\n### Update\n\nBy default, `odi` auto-checks for updates once every 24 hours and applies the update on the next run (auto-update is enabled by default). Control behavior with:\n\n- `odi update` — explicit check and update\n- `--no-update` flag — skip auto-update for this run\n- `AGENTIC_ODI_NO_UPDATE=1` — disable auto-update globally\n\nWhen running from a non-frozen source install, auto-update is suppressed automatically.\n\n### Install layout\n\n```\n~/.local/share/agentic-odi/\n  ├── versions/<version>/\n  │   └── odi (and bundled files)\n  └── current -> versions/<version>\n\n~/.local/bin/\n  ├── odi -> ../share/agentic-odi/current/odi\n  ├── odipm\n  ├── odi-cli\n  └── agentic-odi\n\n~/.config/agentic-odi/  # state/preferences\n```\n\nEnvironment variables: `AGENTIC_ODI_INSTALL_DIR` (override install root), `XDG_DATA_HOME`, `XDG_BIN_HOME`. The default backend is `local` (`--backend local`); no MCP server is required.\n\n### Unsigned binaries\n\nmacOS may quarantine downloaded binaries: `xattr -d com.apple.quarantine ~/.local/bin/odi` (if needed). Windows SmartScreen may show a warning for unsigned binaries; choose \"More info → Run anyway\" if you trust the release.\n\n## ☁️ Deployment'''\nif old in content:\n    content = content.replace(old, new)\n    open('README.md','w').write(content)\n    print('ok')\nelse:\n    print('no')\nPY\n 2>&1 | tail -1\n"
+            },
+            "output": "ok\n",
+            "metadata": {
+              "output": "ok\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "cd /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution && python3 << 'PY'\ncontent = open('README.md').read()\nold = '## ☁️ Deployment'\nnew = '''## Quick Install (Binary)\n\nPrebuilt binaries are available for Linux, macOS, and Windows. Install the latest release with one command:\n\n```bash\ncurl -fsSL https://github.com/alehar9320/agentic-odi/releases/latest/download/install.sh | sh\n```\n\nThe installer places the binary under `~/.local/share/agentic-odi/versions/<version>/`, creates a `current` symlink, and symlinks `odi`, `odipm`, `odi-cli`, and `agentic-odi` into `~/.local/bin/`.\n\nIf `~/.local/bin` is not on your PATH, add it (e.g., `export PATH=\"$HOME/.local/bin:$PATH\"`). On Windows, the PowerShell installer uses `~\\\\AppData\\\\Local\\\\agentic-odi\\\\` and copies `.exe` files to `~\\\\AppData\\\\Local\\\\agentic-odi\\\\bin\\\\`.\n\n### Update\n\nBy default, `odi` auto-checks for updates once every 24 hours and applies the update on the next run (auto-update is enabled by default). Control behavior with:\n\n- `odi update` — explicit check and update\n- `--no-update` flag — skip auto-update for this run\n- `AGENTIC_ODI_NO_UPDATE=1` — disable auto-update globally\n\nWhen running from a non-frozen source install, auto-update is suppressed automatically.\n\n### Install layout\n\n```\n~/.local/share/agentic-odi/\n  ├── versions/<version>/\n  │   └── odi (and bundled files)\n  └── current -> versions/<version>\n\n~/.local/bin/\n  ├── odi -> ../share/agentic-odi/current/odi\n  ├── odipm\n  ├── odi-cli\n  └── agentic-odi\n\n~/.config/agentic-odi/  # state/preferences\n```\n\nEnvironment variables: `AGENTIC_ODI_INSTALL_DIR` (override install root), `XDG_DATA_HOME`, `XDG_BIN_HOME`. The default backend is `local` (`--backend local`); no MCP server is required.\n\n### Unsigned binaries\n\nmacOS may quarantine downloaded binaries: `xattr -d com.apple.quarantine ~/.local/bin/odi` (if needed). Windows SmartScreen may show a warning for unsigned binaries; choose \"More info → Run anyway\" if you trust the release.\n\n## ☁️ Deployment'''\nif old in content:\n    content = content.replace(old, new)\n    open('README.md','w').write(content)\n    print('ok')\nelse:\n    print('no')\nPY\n 2>&1 | tail -1\n",
+            "time": {
+              "start": 1792163275785,
+              "end": 1792163275887
+            }
+          },
+          "id": "prt_1454163fe001kdTU3wu8aE5dmG",
+          "sessionID": "ses_ebedd9abaffesSyRWO5QAiMN5F",
+          "messageID": "msg_14541153d002eCLeLWmQzyOAJ9"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "9df47ae85e1d9891c39a21cd385d43ee767b18c9",
+          "type": "step-finish",
+          "tokens": {
+            "total": 35508,
+            "input": 1258,
+            "output": 626,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 33624
+            }
+          },
+          "cost": 0,
+          "id": "prt_1454164a4001btl6iE7w22ESWU",
+          "sessionID": "ses_ebedd9abaffesSyRWO5QAiMN5F",
+          "messageID": "msg_14541153d002eCLeLWmQzyOAJ9"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_145336373001qaTBLkuYDK45Ff",
+        "role": "assistant",
+        "mode": "plan",
+        "agent": "plan",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 35581,
+          "input": 660,
+          "output": 63,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 34858
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792163276065,
+          "completed": 1792163399411
+        },
+        "finish": "tool-calls",
+        "id": "msg_1454165210020kberOiqHUzzvo",
+        "sessionID": "ses_ebedd9abaffesSyRWO5QAiMN5F"
+      },
+      "parts": [
+        {
+          "snapshot": "9df47ae85e1d9891c39a21cd385d43ee767b18c9",
+          "type": "step-start",
+          "id": "prt_14541707000151TO2S6nUItcQ7",
+          "sessionID": "ses_ebedd9abaffesSyRWO5QAiMN5F",
+          "messageID": "msg_1454165210020kberOiqHUzzvo"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "2f8757fc-4d20-467d-9ea9-48f1549e557c",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "cd /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution && git add README.md && git commit -m \"docs: add binary install/update docs\" 2>&1 | tail -1"
+            },
+            "output": "(no output)\n\n<shell_metadata>\nshell tool terminated command after exceeding timeout 120000 ms. If this command is expected to take longer and is not waiting for interactive input, retry with a larger timeout value in milliseconds.\n</shell_metadata>",
+            "metadata": {
+              "output": "(no output)\n\n<shell_metadata>\nshell tool terminated command after exceeding timeout 120000 ms. If this command is expected to take longer and is not waiting for interactive input, retry with a larger timeout value in milliseconds.\n</shell_metadata>",
+              "exit": null,
+              "truncated": false
+            },
+            "title": "cd /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution && git add README.md && git commit -m \"docs: add binary install/update docs\" 2>&1 | tail -1",
+            "time": {
+              "start": 1792163278980,
+              "end": 1792163399110
+            }
+          },
+          "id": "prt_145417078001ue7aDuU3LqqWmF",
+          "sessionID": "ses_ebedd9abaffesSyRWO5QAiMN5F",
+          "messageID": "msg_1454165210020kberOiqHUzzvo"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "9df47ae85e1d9891c39a21cd385d43ee767b18c9",
+          "type": "step-finish",
+          "tokens": {
+            "total": 35581,
+            "input": 660,
+            "output": 63,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 34858
+            }
+          },
+          "cost": 0,
+          "id": "prt_14543462b0019IjpD5EZhclrUC",
+          "sessionID": "ses_ebedd9abaffesSyRWO5QAiMN5F",
+          "messageID": "msg_1454165210020kberOiqHUzzvo"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_145336373001qaTBLkuYDK45Ff",
+        "role": "assistant",
+        "mode": "plan",
+        "agent": "plan",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 35689,
+          "input": 57,
+          "output": 52,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 35580
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792163399513,
+          "completed": 1792163404228
+        },
+        "finish": "tool-calls",
+        "id": "msg_145434758002uX479bzv1dP0Em",
+        "sessionID": "ses_ebedd9abaffesSyRWO5QAiMN5F"
+      },
+      "parts": [
+        {
+          "snapshot": "9df47ae85e1d9891c39a21cd385d43ee767b18c9",
+          "type": "step-start",
+          "id": "prt_1454357dc001xkoxofSnKSpLL3",
+          "sessionID": "ses_ebedd9abaffesSyRWO5QAiMN5F",
+          "messageID": "msg_145434758002uX479bzv1dP0Em"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "ac137fbf-de87-42a1-a282-eca48ed5688a",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "cd /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution && git log -1 --oneline 2>&1 | tail -1"
+            },
+            "output": "3818c9f docs: add binary install/update docs\n",
+            "metadata": {
+              "output": "3818c9f docs: add binary install/update docs\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "cd /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution && git log -1 --oneline 2>&1 | tail -1",
+            "time": {
+              "start": 1792163403780,
+              "end": 1792163403835
+            }
+          },
+          "id": "prt_1454357ec0016jnpFnTwS66eS3",
+          "sessionID": "ses_ebedd9abaffesSyRWO5QAiMN5F",
+          "messageID": "msg_145434758002uX479bzv1dP0Em"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "9df47ae85e1d9891c39a21cd385d43ee767b18c9",
+          "type": "step-finish",
+          "tokens": {
+            "total": 35689,
+            "input": 57,
+            "output": 52,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 35580
+            }
+          },
+          "cost": 0,
+          "id": "prt_1454358fc001VG5q9LLPPUOFYK",
+          "sessionID": "ses_ebedd9abaffesSyRWO5QAiMN5F",
+          "messageID": "msg_145434758002uX479bzv1dP0Em"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_145336373001qaTBLkuYDK45Ff",
+        "role": "assistant",
+        "mode": "plan",
+        "agent": "plan",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 35773,
+          "input": 20,
+          "output": 63,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 35690
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792163404292,
+          "completed": 1792163406780
+        },
+        "finish": "tool-calls",
+        "id": "msg_145435a04002mfYlfgPfUs15Mk",
+        "sessionID": "ses_ebedd9abaffesSyRWO5QAiMN5F"
+      },
+      "parts": [
+        {
+          "snapshot": "9df47ae85e1d9891c39a21cd385d43ee767b18c9",
+          "type": "step-start",
+          "id": "prt_145436289001ohcyxDrU0J6dtS",
+          "sessionID": "ses_ebedd9abaffesSyRWO5QAiMN5F",
+          "messageID": "msg_145435a04002mfYlfgPfUs15Mk"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "2ea0162a-7a02-4a1c-9803-ec556a662b35",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "cd /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution && git diff --name-only 75f1d0c..3818c9f 2>&1 | tail -15"
+            },
+            "output": ".github/workflows/e2e-install.yml\n.github/workflows/release-please.yml\n.github/workflows/release.yml\n.release-please-manifest.json\nREADME.md\nrelease-please-config.json\n",
+            "metadata": {
+              "output": ".github/workflows/e2e-install.yml\n.github/workflows/release-please.yml\n.github/workflows/release.yml\n.release-please-manifest.json\nREADME.md\nrelease-please-config.json\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "cd /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution && git diff --name-only 75f1d0c..3818c9f 2>&1 | tail -15",
+            "time": {
+              "start": 1792163406500,
+              "end": 1792163406548
+            }
+          },
+          "id": "prt_145436291001b0N5F5WLPlrG0b",
+          "sessionID": "ses_ebedd9abaffesSyRWO5QAiMN5F",
+          "messageID": "msg_145435a04002mfYlfgPfUs15Mk"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "9df47ae85e1d9891c39a21cd385d43ee767b18c9",
+          "type": "step-finish",
+          "tokens": {
+            "total": 35773,
+            "input": 20,
+            "output": 63,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 35690
+            }
+          },
+          "cost": 0,
+          "id": "prt_14543634b001EyhhapnHOHCoS8",
+          "sessionID": "ses_ebedd9abaffesSyRWO5QAiMN5F",
+          "messageID": "msg_145435a04002mfYlfgPfUs15Mk"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_145336373001qaTBLkuYDK45Ff",
+        "role": "assistant",
+        "mode": "plan",
+        "agent": "plan",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 35900,
+          "input": 48,
+          "output": 78,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 35774
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792163406854,
+          "completed": 1792163416209
+        },
+        "finish": "tool-calls",
+        "id": "msg_1454364060021WrRAfiJgk1c3C",
+        "sessionID": "ses_ebedd9abaffesSyRWO5QAiMN5F"
+      },
+      "parts": [
+        {
+          "snapshot": "9df47ae85e1d9891c39a21cd385d43ee767b18c9",
+          "type": "step-start",
+          "id": "prt_145436e2f001K8u7kOQ0Te0Bz7",
+          "sessionID": "ses_ebedd9abaffesSyRWO5QAiMN5F",
+          "messageID": "msg_1454364060021WrRAfiJgk1c3C"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "e1610537-977e-4d9a-93de-c03e7cc6971d",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "cd /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution && uv run ruff check . && uv run ruff format --check . && uv run --directory cli mypy . && uv run --directory cli pytest -q 2>&1 | tail -4"
+            },
+            "output": "All checks passed!\n135 files already formatted\ntests/test_update_check.py:53: note: By default the bodies of untyped functions are not checked, consider using --check-untyped-defs  [annotation-unchecked]\nSuccess: no issues found in 20 source files\n...........................................................              [100%]\n59 passed in 3.84s\n",
+            "metadata": {
+              "output": "All checks passed!\n135 files already formatted\ntests/test_update_check.py:53: note: By default the bodies of untyped functions are not checked, consider using --check-untyped-defs  [annotation-unchecked]\nSuccess: no issues found in 20 source files\n...........................................................              [100%]\n59 passed in 3.84s\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "cd /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution && uv run ruff check . && uv run ruff format --check . && uv run --directory cli mypy . && uv run --directory cli pytest -q 2>&1 | tail -4",
+            "time": {
+              "start": 1792163409484,
+              "end": 1792163416036
+            }
+          },
+          "id": "prt_145436e3d001hAOYo1VW16VLYt",
+          "sessionID": "ses_ebedd9abaffesSyRWO5QAiMN5F",
+          "messageID": "msg_1454364060021WrRAfiJgk1c3C"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "9df47ae85e1d9891c39a21cd385d43ee767b18c9",
+          "type": "step-finish",
+          "tokens": {
+            "total": 35900,
+            "input": 48,
+            "output": 78,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 35774
+            }
+          },
+          "cost": 0,
+          "id": "prt_14543882a001bmZJZcwVVBz2dm",
+          "sessionID": "ses_ebedd9abaffesSyRWO5QAiMN5F",
+          "messageID": "msg_1454364060021WrRAfiJgk1c3C"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_145336373001qaTBLkuYDK45Ff",
+        "role": "assistant",
+        "mode": "plan",
+        "agent": "plan",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 36032,
+          "input": 81,
+          "output": 51,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 35900
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792163416281,
+          "completed": 1792163433755
+        },
+        "finish": "tool-calls",
+        "id": "msg_1454388d90020Cw8FbumE6Hk5R",
+        "sessionID": "ses_ebedd9abaffesSyRWO5QAiMN5F"
+      },
+      "parts": [
+        {
+          "snapshot": "9df47ae85e1d9891c39a21cd385d43ee767b18c9",
+          "type": "step-start",
+          "id": "prt_14543cc11001CChaAqs7OO9eLF",
+          "sessionID": "ses_ebedd9abaffesSyRWO5QAiMN5F",
+          "messageID": "msg_1454388d90020Cw8FbumE6Hk5R"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "ea24e479-e2fa-4fa9-9be0-f64051efd902",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "cd /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution && git status --short --branch 2>&1 | tail -1"
+            },
+            "output": "## feature/cli-bundled-distribution\n",
+            "metadata": {
+              "output": "## feature/cli-bundled-distribution\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "cd /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution && git status --short --branch 2>&1 | tail -1",
+            "time": {
+              "start": 1792163433512,
+              "end": 1792163433545
+            }
+          },
+          "id": "prt_14543cc19001h0ybErtqBkwznG",
+          "sessionID": "ses_ebedd9abaffesSyRWO5QAiMN5F",
+          "messageID": "msg_1454388d90020Cw8FbumE6Hk5R"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "9df47ae85e1d9891c39a21cd385d43ee767b18c9",
+          "type": "step-finish",
+          "tokens": {
+            "total": 36032,
+            "input": 81,
+            "output": 51,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 35900
+            }
+          },
+          "cost": 0,
+          "id": "prt_14543ccaf001AQJmzePTvADOyq",
+          "sessionID": "ses_ebedd9abaffesSyRWO5QAiMN5F",
+          "messageID": "msg_1454388d90020Cw8FbumE6Hk5R"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_145336373001qaTBLkuYDK45Ff",
+        "role": "assistant",
+        "mode": "plan",
+        "agent": "plan",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 36176,
+          "input": 32747,
+          "output": 126,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 3303
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792163433797,
+          "completed": 1792163457760
+        },
+        "finish": "stop",
+        "id": "msg_14543cd45002U5044lGrp6TpD1",
+        "sessionID": "ses_ebedd9abaffesSyRWO5QAiMN5F"
+      },
+      "parts": [
+        {
+          "snapshot": "9df47ae85e1d9891c39a21cd385d43ee767b18c9",
+          "type": "step-start",
+          "id": "prt_145441d1e001nBIQOzYrtorLKK",
+          "sessionID": "ses_ebedd9abaffesSyRWO5QAiMN5F",
+          "messageID": "msg_14543cd45002U5044lGrp6TpD1"
+        },
+        {
+          "type": "text",
+          "text": "All Tasks 8–12 are implemented and committed (HEAD 3818c9f). Installers added with checksums.txt verification, release-please config+workflow, release build matrix with 5 platforms (old-glibc for Linux), E2E install workflow, and README updated with install/update/layout notes. All checks pass: ruff clean, mypy clean, pytest 59 passed. Branch is clean.\n\nNext: raise PR from feature/cli-bundled-distribution to main (following repo practice of not auto-merging without review) or proceed per SDD’s finish step if requested.",
+          "time": {
+            "start": 1792163454243,
+            "end": 1792163457563
+          },
+          "id": "prt_145441d230014moxaAGDeNqvnX",
+          "sessionID": "ses_ebedd9abaffesSyRWO5QAiMN5F",
+          "messageID": "msg_14543cd45002U5044lGrp6TpD1"
+        },
+        {
+          "reason": "stop",
+          "snapshot": "9df47ae85e1d9891c39a21cd385d43ee767b18c9",
+          "type": "step-finish",
+          "tokens": {
+            "total": 36176,
+            "input": 32747,
+            "output": 126,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 3303
+            }
+          },
+          "cost": 0,
+          "id": "prt_145442a82001ghrJntMjG4b5Ej",
+          "sessionID": "ses_ebedd9abaffesSyRWO5QAiMN5F",
+          "messageID": "msg_14543cd45002U5044lGrp6TpD1"
         }
       ]
     }
