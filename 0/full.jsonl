@@ -21,11 +21,11 @@
     },
     "cost": 0,
     "tokens": {
-      "input": 42221,
-      "output": 4184,
+      "input": 47122,
+      "output": 6207,
       "reasoning": 2613,
       "cache": {
-        "read": 338752,
+        "read": 435520,
         "write": 0
       }
     },
@@ -38,7 +38,7 @@
     ],
     "time": {
       "created": 1792162766383,
-      "updated": 1792162911434
+      "updated": 1792163044343
     }
   },
   "messages": [
@@ -1922,19 +1922,22 @@
         },
         "cost": 0,
         "tokens": {
-          "input": 0,
-          "output": 0,
+          "total": 33474,
+          "input": 2878,
+          "output": 388,
           "reasoning": 0,
           "cache": {
-            "read": 0,
-            "write": 0
+            "write": 0,
+            "read": 30208
           }
         },
         "modelID": "big-pickle",
         "providerID": "opencode",
         "time": {
-          "created": 1792162911427
+          "created": 1792162911427,
+          "completed": 1792163029092
         },
+        "finish": "tool-calls",
         "id": "msg_1453bd4c3001J7om3NpoJRDxg1",
         "sessionID": "ses_ebac661d0ffeFaTKcT8ejY4931"
       },
@@ -1962,20 +1965,213 @@
           "tool": "bash",
           "callID": "call_09dc63d5394349cd8605fe3f",
           "state": {
-            "metadata": {
-              "output": ""
-            },
-            "status": "running",
+            "status": "completed",
             "input": {
               "command": "git add core/src/core/repository.py core/tests/test_repository.py && git commit -m \"feat(core): add job/step/outcome CRUD with cascade delete to repository\" && git log --oneline -1 && git status --short"
             },
+            "output": "[feature/cli-odi-entity-parity 105ec8b] feat(core): add job/step/outcome CRUD with cascade delete to repository\n 2 files changed, 179 insertions(+)\n create mode 100644 core/tests/test_repository.py\n105ec8b feat(core): add job/step/outcome CRUD with cascade delete to repository\n?? docs/\n",
+            "metadata": {
+              "output": "[feature/cli-odi-entity-parity 105ec8b] feat(core): add job/step/outcome CRUD with cascade delete to repository\n 2 files changed, 179 insertions(+)\n create mode 100644 core/tests/test_repository.py\n105ec8b feat(core): add job/step/outcome CRUD with cascade delete to repository\n?? docs/\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "git add core/src/core/repository.py core/tests/test_repository.py && git commit -m \"feat(core): add job/step/outcome CRUD with cascade delete to repository\" && git log --oneline -1 && git status --short",
             "time": {
-              "start": 1792162916303
+              "start": 1792162916303,
+              "end": 1792163028846
             }
           },
           "id": "prt_1453be7bf001Xah0S1hXiUg9lz",
           "sessionID": "ses_ebac661d0ffeFaTKcT8ejY4931",
           "messageID": "msg_1453bd4c3001J7om3NpoJRDxg1"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "9df47ae85e1d9891c39a21cd385d43ee767b18c9",
+          "type": "step-finish",
+          "tokens": {
+            "total": 33474,
+            "input": 2878,
+            "output": 388,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 30208
+            }
+          },
+          "cost": 0,
+          "id": "prt_1453da00b001NWR1uhCwG36ttJ",
+          "sessionID": "ses_ebac661d0ffeFaTKcT8ejY4931",
+          "messageID": "msg_1453bd4c3001J7om3NpoJRDxg1"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_145399e3c001W7PQIupeOfMATm",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 34997,
+          "input": 546,
+          "output": 1427,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 33024
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792163029109,
+          "completed": 1792163044323
+        },
+        "finish": "tool-calls",
+        "id": "msg_1453da07500183pIHQr12vVLo7",
+        "sessionID": "ses_ebac661d0ffeFaTKcT8ejY4931"
+      },
+      "parts": [
+        {
+          "snapshot": "9df47ae85e1d9891c39a21cd385d43ee767b18c9",
+          "type": "step-start",
+          "id": "prt_1453da65c001OB5dQajByLjg2W",
+          "sessionID": "ses_ebac661d0ffeFaTKcT8ejY4931",
+          "messageID": "msg_1453da07500183pIHQr12vVLo7"
+        },
+        {
+          "type": "text",
+          "text": "Committed. Now write the report file. Let me write a concise but complete report.\n\nAlso verify the commit contains only the 2 files (179 insertions). yes.\n\nWrite report to .superpowers/sdd/2026-10-15-cli-odi-entity-parity/task-1-report.md.</think>Now write the report file.",
+          "time": {
+            "start": 1792163030625,
+            "end": 1792163044103
+          },
+          "id": "prt_1453da661001ViSHNWSU7Hyns1",
+          "sessionID": "ses_ebac661d0ffeFaTKcT8ejY4931",
+          "messageID": "msg_1453da07500183pIHQr12vVLo7"
+        },
+        {
+          "type": "tool",
+          "tool": "write",
+          "callID": "call_771c88f945384d4cbbdee880",
+          "state": {
+            "status": "completed",
+            "input": {
+              "content": "# Task 1 Report: Core repository CRUD + cascade (in-memory)\n\n## Status: DONE\n\n## Commit\n- `105ec8b` — feat(core): add job/step/outcome CRUD with cascade delete to repository\n- Files: `core/src/core/repository.py` (modified), `core/tests/test_repository.py` (new)\n- `git status` after commit: only untracked `docs/` (pre-existing, not touched).\n\n## What I implemented\nAdded the eight required methods to BOTH the `Repository` protocol and `InMemoryRepository`:\n\n| Method | Behavior |\n| --- | --- |\n| `get_step(step_id) -> Step \\| None` | `self.steps.get(step_id)` |\n| `get_outcome(outcome_id) -> Outcome \\| None` | `self.outcomes.get(outcome_id)` |\n| `update_job(job_id, updates) -> Job \\| None` | merge `model_dump(exclude_unset=True)` + `updates`, re-validate; `None` if absent |\n| `delete_job(job_id) -> bool` | delete job + every step/outcome/customer_outcome whose `job_id` matches; `False` if absent |\n| `update_step(step_id, updates) -> Step \\| None` | same merge pattern; `None` if absent |\n| `delete_step(step_id) -> bool` | delete step + every outcome/customer_outcome whose `step_id` matches; `False` if absent |\n| `update_outcome(outcome_id, updates) -> Outcome \\| None` | same merge pattern; `None` if absent |\n| `delete_outcome(outcome_id) -> bool` | `False` if absent |\n\nUpdate methods mirror the existing `update_customer_outcome` pattern exactly:\n`current = obj.model_dump(exclude_unset=True); current.update(updates); new = obj.model_validate(current)`.\n\nCascade deletes iterate over a snapshot list of matching keys and `del` in place, so the\nunderlying dict objects are mutated (not reassigned) and unrelated entities are preserved.\n`Outcome`/`CustomerOutcome` with `step_id is None` are left intact by `delete_step`; entities\nbelonging to other jobs are left intact by `delete_job`.\n\n## TDD evidence\n\n### RED\nCommand: `uv run --directory core pytest tests/test_repository.py -v`\nResult: `8 failed in 0.37s`, every failure an `AttributeError` for the missing method, e.g.:\n```\nE   AttributeError: 'InMemoryRepository' object has no attribute 'get_step'\n```\nThis is expected: the methods did not exist yet, so all new tests must fail.\n\n### GREEN\nCommand (same): `uv run --directory core pytest tests/test_repository.py -v`\nResult: `8 passed in 0.16s`.\n\n### Full suite (before commit)\nCommand: `uv run --directory core pytest`\nResult: `24 passed in 0.22s` (test_models 7, test_repository 8, test_service 9) — pristine output,\nno warnings.\n\n### Lint / types\n- `uv run --directory core ruff check src/core/repository.py tests/test_repository.py` -> All checks passed!\n- `uv run --directory core ruff format --check ...` -> 2 files already formatted\n- `uv run --directory core mypy src/core/repository.py` -> Success: no issues found\n\nNo `pyarrow` build was triggered; `UV_PYTHON=3.11` was not needed.\n\n## What I tested\nBrief tests (verbatim): `test_get_step_and_get_outcome`,\n`test_update_job_merges_and_returns_none_when_missing`, `test_delete_job_cascades_dependents`,\n`test_delete_step_cascades_its_outcomes`.\n\nAdditional tests I added to cover required behaviors the brief's sample block did not exercise:\n- `test_update_step_and_update_outcome_merge_or_return_none`\n- `test_delete_outcome_and_delete_step_return_false_when_missing`\n- `test_delete_job_cascades_customer_outcomes`\n- `test_delete_step_cascades_customer_outcomes`\n\nThese enforce the task's explicit cascade requirement (customer_outcomes included) and the\n`None`/`False` return contracts for the remaining methods.\n\n## Files changed\n- `core/src/core/repository.py` — 8 protocol signatures + 8 in-memory implementations\n- `core/tests/test_repository.py` — new (8 tests)\n\n## Self-review findings\n- Both `Repository` protocol and `InMemoryRepository` updated — no drift.\n- All three delete paths return `False` on absent target; both update paths return `None`.\n- Cascades confirmed by tests to (a) remove dependents and (b) preserve non-matching entities.\n- In-place `del` used rather than dict reassignment, avoiding stale references held elsewhere.\n- No DB access in tests; no real `~/.agentic-odi/odi.db` touched.\n- `docs/` untracked directory was deliberately excluded from the commit.\n\n## Concerns\n- Minor: the import line in the test file was expanded beyond the brief's exact one-liner\n  (`from core.models import Job, Outcome, Step`) to import the extra models needed by the added\n  tests. The four brief tests themselves are verbatim; ruff's isort (`I`) rule requires a single\n  combined import. No functional concern.\n- The in-memory update merge relies on pydantic `exclude_unset` semantics; a field explicitly\n  set to `None` at construction is treated as set and will be carried through. This matches the\n  pre-existing `update_customer_outcome` behavior, so it is consistent but worth noting for the\n  later SQLite/service tasks.\n",
+              "filePath": "/home/alexa/repos/agentic-odi/.superpowers/sdd/2026-10-15-cli-odi-entity-parity/task-1-report.md"
+            },
+            "output": "Wrote file successfully.",
+            "metadata": {
+              "diagnostics": {},
+              "filepath": "/home/alexa/repos/agentic-odi/.superpowers/sdd/2026-10-15-cli-odi-entity-parity/task-1-report.md",
+              "exists": false,
+              "truncated": false
+            },
+            "title": ".superpowers/sdd/2026-10-15-cli-odi-entity-parity/task-1-report.md",
+            "time": {
+              "start": 1792163044052,
+              "end": 1792163044097
+            }
+          },
+          "id": "prt_1453ddac5001EhGDz6hBuYTtEH",
+          "sessionID": "ses_ebac661d0ffeFaTKcT8ejY4931",
+          "messageID": "msg_1453da07500183pIHQr12vVLo7"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "9df47ae85e1d9891c39a21cd385d43ee767b18c9",
+          "type": "step-finish",
+          "tokens": {
+            "total": 34997,
+            "input": 546,
+            "output": 1427,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 33024
+            }
+          },
+          "cost": 0,
+          "id": "prt_1453ddb8a0010yGtFoheHwALud",
+          "sessionID": "ses_ebac661d0ffeFaTKcT8ejY4931",
+          "messageID": "msg_1453da07500183pIHQr12vVLo7"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_145399e3c001W7PQIupeOfMATm",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 35221,
+          "input": 1477,
+          "output": 208,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 33536
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792163044339,
+          "completed": 1792163048066
+        },
+        "finish": "stop",
+        "id": "msg_1453ddbf2001fsXlgQhttQzBHY",
+        "sessionID": "ses_ebac661d0ffeFaTKcT8ejY4931"
+      },
+      "parts": [
+        {
+          "snapshot": "9df47ae85e1d9891c39a21cd385d43ee767b18c9",
+          "type": "step-start",
+          "id": "prt_1453ddeec001w0IL1lJPY3Fg9R",
+          "sessionID": "ses_ebac661d0ffeFaTKcT8ejY4931",
+          "messageID": "msg_1453ddbf2001fsXlgQhttQzBHY"
+        },
+        {
+          "type": "text",
+          "text": "The report file is written. It's inside .superpowers which may be gitignored. Not asked to commit it. Good.\n\nFinal reply under 15 lines.</think>- **Status:** DONE\n- **Commit:** `105ec8b` feat(core): add job/step/outcome CRUD with cascade delete to repository\n- **Tests:** `uv run --directory core pytest` → 24 passed; `test_repository.py` RED 8 failed (AttributeError) → GREEN 8 passed; ruff + mypy clean.\n- **Concerns:** Test-file import line expanded beyond brief's one-liner to cover added tests (brief's four tests kept verbatim). No `pyarrow` build; `UV_PYTHON=3.11` not needed.\n- **Report:** `/home/alexa/repos/agentic-odi/.superpowers/sdd/2026-10-15-cli-odi-entity-parity/task-1-report.md`",
+          "time": {
+            "start": 1792163045105,
+            "end": 1792163047895
+          },
+          "id": "prt_1453ddef1001jftw4xMySmC8P0",
+          "sessionID": "ses_ebac661d0ffeFaTKcT8ejY4931",
+          "messageID": "msg_1453ddbf2001fsXlgQhttQzBHY"
+        },
+        {
+          "reason": "stop",
+          "snapshot": "9df47ae85e1d9891c39a21cd385d43ee767b18c9",
+          "type": "step-finish",
+          "tokens": {
+            "total": 35221,
+            "input": 1477,
+            "output": 208,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 33536
+            }
+          },
+          "cost": 0,
+          "id": "prt_1453dea26001cIZOQiwCSD0Mjy",
+          "sessionID": "ses_ebac661d0ffeFaTKcT8ejY4931",
+          "messageID": "msg_1453ddbf2001fsXlgQhttQzBHY"
         }
       ]
     }
