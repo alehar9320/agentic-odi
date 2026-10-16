@@ -3,7 +3,7 @@
   "checkpoint_id": "01M514KYF29E6TDQ22026P6H2P",
   "strategy": "manual-commit",
   "branch": "feature/cli-bundled-distribution",
-  "checkpoints_count": 14,
+  "checkpoints_count": 15,
   "files_touched": [
     ".gitignore",
     "packaging/pyinstaller/odi.spec",
@@ -108,6 +108,13 @@
       "transcript": "/13/full.jsonl",
       "compact_transcript": "/13/transcript.jsonl",
       "content_hash": "/13/content_hash.txt",
+      "prompt": ""
+    },
+    {
+      "metadata": "/14/metadata.json",
+      "transcript": "/14/full.jsonl",
+      "compact_transcript": "/14/transcript.jsonl",
+      "content_hash": "/14/content_hash.txt",
       "prompt": ""
     }
   ],
