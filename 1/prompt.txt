@@ -1,0 +1,57 @@
+You are implementing Task 6: `odi update` command + startup auto-update hook.
+
+## CRITICAL ENVIRONMENT (read first)
+
+- Work ONLY in the worktree: `/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution`.
+- The checkout at `/home/alexa/repos/agentic-odi` (branch `main`) is OFF-LIMITS. Never run git or write files there.
+- Prefix shell commands with `cd /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution && ...`, or use `git -C /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution ...`.
+- Use `UV_PYTHON=3.11` for all uv commands.
+- Before finishing, verify with `git log --oneline -3` that your commit is on branch `feature/cli-bundled-distribution` (current worktree HEAD is `c89a843`).
+
+## Task Description
+
+Read your task brief first — it is your requirements, EXCEPT where the rulings below override it:
+/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/.superpowers/sdd/2026-10-15-cli-bundled-distribution-and-self-update/task-6-brief.md
+
+## MANDATORY RULINGS (override the brief)
+
+R1 — `--now` is POSIX-only. `os.execv(paths.current_link() / "odi", [...])` only works where `current` is a symlink. On Windows (or if `current` is not a symlink / marker-file), do NOT exec — print a message like `Update applied; it will take effect on the next run.` and exit 0. Use a platform check (e.g. `os.name == "posix"` / `hasattr(os, "execv")`) and optionally verify `paths.current_link().is_symlink()`.
+
+R2 — Startup notice. Spec requires that when the background auto-update actually installs a newer version, the process prints `Updated to vX.Y.Z — takes effect next run`. In the daemon thread, capture the return value of `update.maybe_auto_update(...)`; if it is a non-None version string, `typer.echo(f"Updated to v{version} — takes effect next run")`, all inside the same try/except that swallows exceptions so it can never raise.
+
+## Interfaces from earlier tasks
+
+- `cli/src/cli/update.py`: `latest_release(current, *, fetch=None)`, `auto_update_enabled(no_update)`, `maybe_auto_update(*, no_update, now)`, `download(version, dest_dir, *, fetch_bytes=None)`, `perform_update(...)`, `current_platform`, `asset_name`, `UpdateError`, `CHECK_INTERVAL_SECONDS`.
+- `cli/src/cli/paths.py`: `is_frozen()`, `current_link()`, `versions_dir()`, `install_root()`.
+- `cli/src/cli/version.py`: `__version__`.
+- `cli/src/cli/context.py`: `set_backend`/`selected_backend` (already wired in root callback by Task 3 — keep it).
+- `cli/src/cli/cli.py` currently has: root callback with `--backend` (Task 3) + `--verbose` eager version option (Task 1), a `version` subcommand using `version.build_summary()`, and existing commands.
+
+## Implementation notes
+
+- The root callback must spawn the startup check in a `threading.Thread(daemon=True)` ONLY when `not no_update`, and the thread body must swallow all exceptions (never raise, never block the command).
+- `odi update` command signature: `update_cmd(check: bool = False, force: bool = False, version: str | None = None, now: bool = False)`.
+- For `--version X.Y.Z` (explicit target) and `--force`: download + `perform_update`, then print `f"Updated to v{target}"` (POSIX `--now` may exec).
+- The four brief tests must pass verbatim. Keep existing tests green.
+
+## Definition of Done (global gate — all must pass)
+
+From the worktree:
+- `UV_PYTHON=3.11 uv run --directory cli pytest tests/test_update_command.py -v`
+- `UV_PYTHON=3.11 uv run --directory cli pytest -q`
+- `UV_PYTHON=3.11 uv run ruff check .`
+- `UV_PYTHON=3.11 uv run ruff format --check .`
+- `UV_PYTHON=3.11 uv run --directory cli mypy .`
+
+## You Do Not Dispatch Subagents
+
+Do all work yourself. Never spawn a subagent or reviewer.
+
+## Report Format
+
+Write your full report to:
+/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/.superpowers/sdd/2026-10-15-cli-bundled-distribution-and-self-update/task-6-report.md
+
+Include: what you implemented, how you applied R1/R2, tests + results, TDD evidence (RED/GREEN command/output), the five DoD results, files changed, self-review findings, concerns.
+
+Reply with ONLY (under 15 lines): Status, commit (short SHA + subject), one-line test summary, DoD pass/fail, concerns, report path — and confirm the commit is on `feature/cli-bundled-distribution`.
