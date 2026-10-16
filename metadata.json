@@ -3,7 +3,7 @@
   "checkpoint_id": "01M5156244E2SVY707C6TTR1GK",
   "strategy": "manual-commit",
   "branch": "feature/cli-bundled-distribution",
-  "checkpoints_count": 19,
+  "checkpoints_count": 20,
   "files_touched": [
     "cli/src/cli/connectors.py",
     "cli/src/cli/outcomes.py"
@@ -140,6 +140,13 @@
       "transcript": "/18/full.jsonl",
       "compact_transcript": "/18/transcript.jsonl",
       "content_hash": "/18/content_hash.txt",
+      "prompt": ""
+    },
+    {
+      "metadata": "/19/metadata.json",
+      "transcript": "/19/full.jsonl",
+      "compact_transcript": "/19/transcript.jsonl",
+      "content_hash": "/19/content_hash.txt",
       "prompt": ""
     }
   ],
