@@ -1,0 +1,64 @@
+You are reviewing one task's implementation: first whether it matches its requirements, then whether it is well-built. This is a task-scoped gate, not a merge review.
+
+## What Was Requested
+
+Read the task brief: /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/.superpowers/sdd/2026-10-15-cli-bundled-distribution-and-self-update/task-4-brief.md
+
+## What the Implementer Claims They Built
+
+Read the implementer's report: /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/.superpowers/sdd/2026-10-15-cli-bundled-distribution-and-self-update/task-4-report.md
+
+## Diff Under Review
+
+Base: f0e717d5286eb2dd31ecd74173700851d8de36cf
+Head: 078fcdb
+Diff file: /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/.superpowers/sdd/2026-10-15-cli-bundled-distribution-and-self-update/review-f0e717d..078fcdb.diff
+
+Read the diff file once — it contains the commit list, a stat summary, and the full diff with surrounding context. Do not re-run git commands. Do not crawl the broader codebase; inspect outside the diff only for a concrete, named risk.
+
+Read-only review. Do not mutate the working tree, index, HEAD, or branch state.
+
+## You Do Not Dispatch Subagents
+
+Do all of this review yourself. Never spawn a subagent.
+
+## Do Not Trust the Report
+
+Treat the report as unverified claims; verify against the diff. A stated rationale never downgrades a finding.
+
+## Tests
+
+The implementer already ran the tests and reported TDD evidence. Do not re-run the suite. Run a focused test only if reading raises a specific doubt no existing run answers. Warnings/noise in reported output are findings.
+
+## Part 1: Spec Compliance
+Required public interface (names and signatures are a contract for Tasks 5, 6, 8, 9, 11):
+- `update.RELEASES_API == "https://api.github.com/repos/alehar9320/agentic-odi/releases/latest"`
+- `update.parse_version(s) -> tuple[int,int,int]` (strips leading `v`)
+- `update.is_newer(latest, current) -> bool`
+- `update.asset_name(version, os_name, arch) -> str` (`.zip` for windows, else `.tar.gz`)
+- `update.current_platform() -> tuple[str,str]` (Linux→linux, Darwin→macos, Windows→windows; x86_64/AMD64→x86_64, arm64/aarch64→arm64)
+- `update.verify_checksum(path, expected_hex) -> bool` (case-insensitive)
+- `update.extract_archive(archive, dest) -> None` (tar.gz and zip)
+- `update.perform_update(version, archive_path, expected_sha, install_root) -> Path` — verifies checksum, extracts into temp inside `install_root/versions/` then moves to `versions/<version>`, atomically flips `current`; returns the version dir
+- `update.UpdateError(Exception)`
+
+Also verify the atomicity/lock requirements: extract into a temp dir inside `install_root/versions/` (never a partial final dir), `current` flip via `current.tmp` symlink + `os.replace`, Windows copy + marker file, and `install_root/.update.lock` serialization via `O_CREAT|O_EXCL` raising `UpdateError("update already in progress")`. Flag Missing / Extra / Misunderstood with file:line. If a requirement cannot be verified from this diff alone, report it as a ⚠️ item.
+
+## Part 2: Code Quality
+Clean separation, error handling, edge cases (checksum mismatch leaves no `current`; relaunch/idempotency; lock release on failure), DRY, structure; tests verify real behavior. Cite file:line for every finding. Pay attention to: does a failed update leave the install usable (lock cleanup)? Is the temp dir cleaned up on failure? Does the Windows marker approach leave `current` non-resolvable for callers that expect a symlink?
+
+## Calibration
+Categorize by real severity (Critical/Important/Minor). If the plan/brief mandates something the rubric calls a defect, report it as Important, labeled plan-mandated. Acknowledge strengths before issues.
+
+## Output Format
+
+### Spec Compliance
+- ✅/❌ with file:line; ⚠️ items
+### Strengths
+### Issues
+#### Critical / #### Important / #### Minor
+### Assessment
+**Task quality:** Approved | Needs fixes
+**Reasoning:** 1-2 sentences
+
+Your final message is the report itself: begin directly with the spec-compliance verdict. No preamble.
