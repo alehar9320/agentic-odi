@@ -1,0 +1,70 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M513X2YKMR0WJ4HZ6FCY1ASP",
+  "session_id": "ses_ec4146278ffeqV5JHpDQIAkGJN",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-16T01:05:58.51784906Z",
+  "branch": "main",
+  "checkpoints_count": 1,
+  "save_step_count": 1,
+  "files_touched": [
+    ".worktrees/ci-green/.agents/rules/agent_instructions.md",
+    ".worktrees/ci-green/.agents/workflows/dev.md",
+    ".worktrees/ci-green/.agents/workflows/test.md",
+    ".worktrees/ci-green/.github/actions/setup/action.yml",
+    ".worktrees/ci-green/.github/dependabot.yml",
+    ".worktrees/ci-green/.github/workflows/ci.yml",
+    ".worktrees/ci-green/README.md",
+    ".worktrees/ci-green/cli/pyproject.toml",
+    ".worktrees/ci-green/cli/src/cli/backend.py",
+    ".worktrees/ci-green/cli/src/cli/outcomes.py",
+    ".worktrees/ci-green/client/pyproject.toml",
+    ".worktrees/ci-green/client/src/client/run.py",
+    ".worktrees/ci-green/core/pyproject.toml",
+    ".worktrees/ci-green/core/src/core/sqlite_repository.py",
+    ".worktrees/ci-green/core/tests/test_models.py",
+    ".worktrees/ci-green/core/tests/test_service.py",
+    ".worktrees/ci-green/local_server/pyproject.toml",
+    ".worktrees/ci-green/local_server/src/local_server/app.py",
+    ".worktrees/ci-green/mcp_server/pyproject.toml",
+    ".worktrees/ci-green/mcp_server/src/mcp_server/mcp_server.py",
+    ".worktrees/ci-green/pyproject.toml"
+  ],
+  "agent": "OpenCode",
+  "model": "big-pickle",
+  "turn_id": "024ec4d29b08",
+  "checkpoint_transcript_start": 18,
+  "transcript_lines_at_start": 18,
+  "compact_transcript_start": 18,
+  "token_usage": {
+    "input_tokens": 277737,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 7576576,
+    "output_tokens": 72930,
+    "api_call_count": 95
+  },
+  "session_metrics": {
+    "turn_count": 2
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-10-16T01:05:58.457656802Z",
+    "agent_lines": 0,
+    "agent_removed": 0,
+    "human_added": 2614,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 2614,
+    "total_lines_changed": 2984,
+    "agent_percentage": 0,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0
+    }
+  ]
+}

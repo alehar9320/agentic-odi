@@ -1,0 +1,46 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M513X2YKMR0WJ4HZ6FCY1ASP",
+  "strategy": "manual-commit",
+  "branch": "main",
+  "checkpoints_count": 1,
+  "files_touched": [
+    ".worktrees/ci-green/.agents/rules/agent_instructions.md",
+    ".worktrees/ci-green/.agents/workflows/dev.md",
+    ".worktrees/ci-green/.agents/workflows/test.md",
+    ".worktrees/ci-green/.github/actions/setup/action.yml",
+    ".worktrees/ci-green/.github/dependabot.yml",
+    ".worktrees/ci-green/.github/workflows/ci.yml",
+    ".worktrees/ci-green/README.md",
+    ".worktrees/ci-green/cli/pyproject.toml",
+    ".worktrees/ci-green/cli/src/cli/backend.py",
+    ".worktrees/ci-green/cli/src/cli/outcomes.py",
+    ".worktrees/ci-green/client/pyproject.toml",
+    ".worktrees/ci-green/client/src/client/run.py",
+    ".worktrees/ci-green/core/pyproject.toml",
+    ".worktrees/ci-green/core/src/core/sqlite_repository.py",
+    ".worktrees/ci-green/core/tests/test_models.py",
+    ".worktrees/ci-green/core/tests/test_service.py",
+    ".worktrees/ci-green/local_server/pyproject.toml",
+    ".worktrees/ci-green/local_server/src/local_server/app.py",
+    ".worktrees/ci-green/mcp_server/pyproject.toml",
+    ".worktrees/ci-green/mcp_server/src/mcp_server/mcp_server.py",
+    ".worktrees/ci-green/pyproject.toml"
+  ],
+  "sessions": [
+    {
+      "metadata": "/0/metadata.json",
+      "transcript": "/0/full.jsonl",
+      "compact_transcript": "/0/transcript.jsonl",
+      "content_hash": "/0/content_hash.txt",
+      "prompt": "/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 277737,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 7576576,
+    "output_tokens": 72930,
+    "api_call_count": 95
+  }
+}
