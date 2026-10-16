@@ -1,0 +1,64 @@
+You are reviewing one task's implementation: first whether it matches its requirements, then whether it is well-built. This is a task-scoped gate, not a merge review.
+
+## What Was Requested
+
+Read the task brief: /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/.superpowers/sdd/2026-10-15-cli-bundled-distribution-and-self-update/task-7-brief.md
+
+## MANDATORY RULINGS (override the brief — these ARE requirements)
+
+R1 — `pyinstaller==6.22.3` added to root `[dependency-groups] dev`; root `pyproject.toml` + `uv.lock` committed.
+R2 — `.gitignore` gets `!packaging/pyinstaller/odi.spec` so the spec is tracked.
+R3 — spec path `../packaging/pyinstaller/odi.spec` (cwd is `cli/`); PyInstaller output lands at REPO ROOT `dist/odi`; archive at repo root.
+R4 — build regenerates tracked `cli/src/cli/_build_info.py` from env, but that dirty file must NOT be committed (committed defaults stay `0.1.0 / "" / dev / dev`).
+R5 — script `set -euo pipefail`; `.zip` when TARGET starts with `windows`, else `.tar.gz`.
+R6 — ARCHIVE ROOT CONTRACT: archive contains the onedir payload at its ROOT (`tar -C dist/odi -czf ... .`) so extraction into `versions/<v>` yields `versions/<v>/odi` (Task 4 `perform_update` extracts with no strip-components). Archive must NOT be `odi/odi`.
+R7 — script prints the absolute archive path on its last line.
+
+## What the Implementer Claims
+
+Read the report: /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/.superpowers/sdd/2026-10-15-cli-bundled-distribution-and-self-update/task-7-report.md
+
+## Diff Under Review
+
+Base: 6407d5df... (6407d5d)
+Head: 4ddcd0e
+Diff file: /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/.superpowers/sdd/2026-10-15-cli-bundled-distribution-and-self-update/review-6407d5d..4ddcd0e.diff
+
+Read the diff file once. Do not re-run git commands. Do not crawl the broader codebase; inspect outside the diff only for a concrete, named risk.
+
+Read-only review. Do not mutate the working tree, index, HEAD, or branch state.
+
+## You Do Not Dispatch Subagents
+Do all of this review yourself.
+
+## Do Not Trust the Report
+Treat claims as unverified; verify against the diff. A stated rationale never downgrades a finding.
+
+## Tests
+This is a build spike; its acceptance is the DoD commands in the brief/implementation (build + smoke tests + archive member check + size/startup measurement), not pytest. The implementer ran them; do not re-run the full build. Run a focused check only if reading raises a concrete doubt (e.g. `tar -tzf <archive>` if present, `bash -n`).
+
+## Part 1: Spec Compliance
+Verify from the diff: R1–R7; odi.spec (onedir named `odi`, entry `cli/src/cli/__main__.py`, `pathex`, `collect_all` for fastmcp/mcp/pydantic/pydantic_core/starlette/uvicorn/anyio, `console=True`, `upx=False`); build script (`uv sync --all-packages --locked`; env-driven `_build_info.py`; VERSION required). Flag Missing/Extra/Misunderstood with file:line.
+
+## Part 2: Code Quality + the startup concern (IMPORTANT)
+Evidence gathered by the controller:
+- Frozen `./dist/odi/odi --version` ≈ 1.38s; unfrozen `python -m cli --version` ≈ 1.22s. PyInstaller overhead is therefore minimal; the ~1.2s is Python import cost.
+- Root cause: `cli/src/cli/outcomes.py:10` does `from fastmcp import Client` at module import, and `cli/src/cli/cli.py:15` imports `outcomes_app` at top, so every invocation (even `--version`) pays the fastmcp/mcp import graph.
+- The brief step 4 expects startup "well under ~0.5s (onedir, no extraction)", and the design motivates the onedir bundle with near-instant startup.
+Assess whether this is a genuine Important gap (plan-mandated startup target not met) and whether the brief's authorized remedy (lazy-import the MCP client so the non-MCP path doesn't pay for fastmcp) is the right fix, while ensuring the frozen `--backend mcp` path still works. Also probe: does the build script correctly handle a missing `uv.lock` consistency (`--locked`), Windows `.zip` branch, and the archive-root contract (R6)? Any risk the generated `_build_info.py` gets committed (R4)? Cite file:line for every finding.
+
+## Calibration
+Categorize by real severity (Critical/Important/Minor). Rulings R1–R7 are correct requirements, not defects. Acknowledge strengths before issues.
+
+## Output Format
+
+### Spec Compliance
+- ✅/❌ with file:line; ⚠️ items
+### Strengths
+### Issues
+#### Critical / #### Important / #### Minor
+### Assessment
+**Task quality:** Approved | Needs fixes
+**Reasoning:** 1-2 sentences
+
+Your final message is the report itself: begin directly with the spec-compliance verdict. No preamble.
