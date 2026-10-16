@@ -1,0 +1,71 @@
+You are implementing Task 4: `build_repository` factory.
+
+## Task Description
+
+Read your task brief first:
+/home/alexa/repos/agentic-odi/.superpowers/sdd/2026-10-15-cli-odi-entity-parity/task-4-brief.md
+
+## Context
+
+This factory is what lets the PM's CLI and the AI agent's MCP server resolve the SAME persistent SQLite store by default. Prior tasks on this branch added `InMemoryRepository`/`SQLiteRepository` CRUD and a read-through `SQLiteRepository`.
+
+You are in the `agentic-odi` uv workspace at /home/alexa/repos/agentic-odi, on branch `feature/cli-odi-entity-parity`. Do NOT switch branches. Do NOT commit to `main`.
+
+## IMPORTANT — controller ruling R5 (the brief's sample code is defective; follow this instead)
+
+The brief's Step-3 sample never applies the documented default path and passes `db_path=None` into `SQLiteRepository` (whose own default is `"intent_store.db"` — wrong, and it also cannot create the parent directory). The design doc (spec line 112–113) requires the default `~/.agentic-odi/odi.db`. Implement this resolution:
+
+1. Resolve the path in this order: the `db_path` argument if not `None`; else `AGENTIC_ODI_DB` from the environment; else `os.path.expanduser("~/.agentic-odi/odi.db")`.
+2. If the resolved path equals `":memory:"`, return `InMemoryRepository()`.
+3. Otherwise, ensure the parent directory exists — `parent = os.path.dirname(resolved); if parent: os.makedirs(parent, exist_ok=True)` (guard against an empty dirname for a bare filename like `"odi.db"`).
+4. Return `SQLiteRepository(db_path=resolved)` with the RESOLVED path. Never pass `None` to `SQLiteRepository`.
+
+## Global constraints that bind this task
+
+- Python `>=3.10`; ruff line-length 100; ruff select `["E4","E7","E9","F","I","UP","B","BLE"]`.
+- Create `core/src/core/factory.py` with `build_repository(db_path: str | None = None) -> Repository` (use `from __future__ import annotations`).
+- Add `build_repository` to `core/src/core/__init__.py` imports and `__all__`.
+- Tests must NEVER touch the real `~/.agentic-odi/odi.db` or any real home dir.
+
+## Tests (extend the brief's two)
+
+Keep the brief's two tests, and ADD:
+- a test that an explicit `db_path` argument wins over the env var (set `AGENTIC_ODI_DB` to something else, pass `db_path=str(tmp_path/"odi.db")`, assert `SQLiteRepository`);
+- a test for env-var resolution (`monkeypatch.setenv("AGENTIC_ODI_DB", str(tmp_path/"e.db"))`, `build_repository()` → `SQLiteRepository`);
+- a test for the default: `monkeypatch.delenv("AGENTIC_ODI_DB", raising=False)` and `monkeypatch.setenv("HOME", str(tmp_path))`, then `build_repository()` → a `SQLiteRepository` AND `(tmp_path / ".agentic-odi" / "odi.db").exists()` (this verifies expanduser + parent-dir creation without touching the real home).
+
+Run tests with `uv run --directory core pytest` (prefix `UV_PYTHON=3.11` only if uv attempts a `pyarrow` source build; report if so).
+
+## Before You Begin
+
+If anything is unclear, ask now.
+
+## Your Job
+
+Work from: /home/alexa/repos/agentic-odi
+
+1. TDD: write `core/tests/test_factory.py` (RED), implement `factory.py` + `__init__.py`, confirm GREEN.
+2. Run the whole core suite `uv run --directory core pytest` — green, pristine.
+3. Commit exactly these three files:
+   `git add core/src/core/factory.py core/src/core/__init__.py core/tests/test_factory.py`
+   `git commit -m "feat(core): add build_repository factory for shared store selection"`
+4. Self-review the diff.
+5. Report back.
+
+## You Do Not Dispatch Subagents
+
+Do all of this task's work yourself. Never spawn a subagent, never spawn a reviewer.
+
+## Report Format
+
+Write your full report to:
+/home/alexa/repos/agentic-odi/.superpowers/sdd/2026-10-15-cli-odi-entity-parity/task-4-report.md
+
+Include: what you implemented; tests + results; TDD evidence (RED command + failing output and why expected; GREEN command + passing output); files changed; how you verified the default-path/parent-dir behavior; self-review findings; concerns.
+
+Then reply with ONLY (under 15 lines):
+- **Status:** DONE | DONE_WITH_CONCERNS | BLOCKED | NEEDS_CONTEXT
+- Commits created (short SHA + subject)
+- One-line test summary
+- Concerns, if any
+- The report file path
