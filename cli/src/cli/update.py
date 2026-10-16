@@ -165,12 +165,12 @@ def record_check(state_file: Path, now: float) -> None:
 
 
 def _default_fetch(url: str) -> str:
-    with urllib.request.urlopen(url) as response:  # noqa: S310
+    with urllib.request.urlopen(url, timeout=10) as response:  # noqa: S310
         return response.read().decode("utf-8")
 
 
 def _default_fetch_bytes(url: str) -> bytes:
-    with urllib.request.urlopen(url) as response:  # noqa: S310
+    with urllib.request.urlopen(url, timeout=10) as response:  # noqa: S310
         return response.read()
 
 
