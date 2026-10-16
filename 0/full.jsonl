@@ -1,0 +1,326 @@
+{
+  "info": {
+    "id": "ses_ebaccee25ffeisRG9rEHI9DWj3",
+    "slug": "happy-island",
+    "projectID": "e4fe19106d06261ebfed21a0e3ba06559abf1100",
+    "directory": "/home/alexa/repos/agentic-odi",
+    "path": "",
+    "parentID": "ses_ebec44445ffeWiuRy0KAza9ZKH",
+    "title": "Probe subagent default cwd (@general subagent)",
+    "agent": "general",
+    "model": {
+      "id": "big-pickle",
+      "providerID": "opencode",
+      "variant": "default"
+    },
+    "version": "1.18.35",
+    "summary": {
+      "additions": 0,
+      "deletions": 0,
+      "files": 0
+    },
+    "cost": 0,
+    "tokens": {
+      "input": 324,
+      "output": 155,
+      "reasoning": 29,
+      "cache": {
+        "read": 29376,
+        "write": 0
+      }
+    },
+    "permission": [
+      {
+        "permission": "task",
+        "pattern": "*",
+        "action": "deny"
+      }
+    ],
+    "time": {
+      "created": 1792162337242,
+      "updated": 1792162343565
+    }
+  },
+  "messages": [
+    {
+      "info": {
+        "role": "user",
+        "time": {
+          "created": 1792162337279
+        },
+        "agent": "general",
+        "model": {
+          "providerID": "opencode",
+          "modelID": "big-pickle"
+        },
+        "summary": {
+          "diffs": []
+        },
+        "id": "msg_1453311fd00123xAC7kLYhE3QQ",
+        "sessionID": "ses_ebaccee25ffeisRG9rEHI9DWj3"
+      },
+      "parts": [
+        {
+          "type": "text",
+          "text": "This is a read-only environment probe. Do NOT modify any files. Run these exact bash commands (do not use a workdir parameter; use the default) and report their raw output:\n\n1. `pwd`\n2. `git rev-parse --show-toplevel`\n3. `git branch --show-current`\n4. `git status --short`\n\nThen report back ONLY: the four raw outputs, and one line answering \"what is my default working directory?\" Nothing else.",
+          "id": "prt_145331213001fQZ1WRDd0a3Xpc",
+          "sessionID": "ses_ebaccee25ffeisRG9rEHI9DWj3",
+          "messageID": "msg_1453311fd00123xAC7kLYhE3QQ"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_1453311fd00123xAC7kLYhE3QQ",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 14877,
+          "input": 123,
+          "output": 83,
+          "reasoning": 15,
+          "cache": {
+            "write": 0,
+            "read": 14656
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792162339877,
+          "completed": 1792162343544
+        },
+        "finish": "tool-calls",
+        "id": "msg_145331c25001Fs2WaA45ENUpWL",
+        "sessionID": "ses_ebaccee25ffeisRG9rEHI9DWj3"
+      },
+      "parts": [
+        {
+          "snapshot": "d559595b569e24876eb457e1ec3a5b9acea12fd4",
+          "type": "step-start",
+          "id": "prt_145332539001Zwy6Z2kZYF3Wgs",
+          "sessionID": "ses_ebaccee25ffeisRG9rEHI9DWj3",
+          "messageID": "msg_145331c25001Fs2WaA45ENUpWL"
+        },
+        {
+          "type": "reasoning",
+          "text": "The user wants four exact bash commands run, with raw outputs reported.",
+          "time": {
+            "start": 1792162342295,
+            "end": 1792162342625
+          },
+          "id": "prt_1453325970018n1VCDgo8doYPR",
+          "sessionID": "ses_ebaccee25ffeisRG9rEHI9DWj3",
+          "messageID": "msg_145331c25001Fs2WaA45ENUpWL"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "call_38cb6efb74ff4bc6a451f6e4",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "pwd"
+            },
+            "output": "/home/alexa/repos/agentic-odi\n",
+            "metadata": {
+              "output": "/home/alexa/repos/agentic-odi\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "pwd",
+            "time": {
+              "start": 1792162342721,
+              "end": 1792162342796
+            }
+          },
+          "id": "prt_1453326ea001w1MHGURYX9a9an",
+          "sessionID": "ses_ebaccee25ffeisRG9rEHI9DWj3",
+          "messageID": "msg_145331c25001Fs2WaA45ENUpWL"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "call_755316cdb4094fd2b6c08608",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "git rev-parse --show-toplevel"
+            },
+            "output": "/home/alexa/repos/agentic-odi\n",
+            "metadata": {
+              "output": "/home/alexa/repos/agentic-odi\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "git rev-parse --show-toplevel",
+            "time": {
+              "start": 1792162342851,
+              "end": 1792162342934
+            }
+          },
+          "id": "prt_145332752001U0kEfFpl8BiVQB",
+          "sessionID": "ses_ebaccee25ffeisRG9rEHI9DWj3",
+          "messageID": "msg_145331c25001Fs2WaA45ENUpWL"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "call_03b0711744174fa9a9217fb6",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "git branch --show-current"
+            },
+            "output": "main\n",
+            "metadata": {
+              "output": "main\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "git branch --show-current",
+            "time": {
+              "start": 1792162342982,
+              "end": 1792162343081
+            }
+          },
+          "id": "prt_1453327d7001rePgK2k31jza5k",
+          "sessionID": "ses_ebaccee25ffeisRG9rEHI9DWj3",
+          "messageID": "msg_145331c25001Fs2WaA45ENUpWL"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "call_4be201ccbc6541dab8bd15a2",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "git status --short"
+            },
+            "output": "?? docs/\n",
+            "metadata": {
+              "output": "?? docs/\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "git status --short",
+            "time": {
+              "start": 1792162343119,
+              "end": 1792162343252
+            }
+          },
+          "id": "prt_145332863001HW9FMiWk7SFMsO",
+          "sessionID": "ses_ebaccee25ffeisRG9rEHI9DWj3",
+          "messageID": "msg_145331c25001Fs2WaA45ENUpWL"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "d559595b569e24876eb457e1ec3a5b9acea12fd4",
+          "type": "step-finish",
+          "tokens": {
+            "total": 14877,
+            "input": 123,
+            "output": 83,
+            "reasoning": 15,
+            "cache": {
+              "write": 0,
+              "read": 14656
+            }
+          },
+          "cost": 0,
+          "id": "prt_1453329d8001lstsAj6Q9t374W",
+          "sessionID": "ses_ebaccee25ffeisRG9rEHI9DWj3",
+          "messageID": "msg_145331c25001Fs2WaA45ENUpWL"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_1453311fd00123xAC7kLYhE3QQ",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 15007,
+          "input": 201,
+          "output": 72,
+          "reasoning": 14,
+          "cache": {
+            "write": 0,
+            "read": 14720
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792162343561,
+          "completed": 1792162347023
+        },
+        "finish": "stop",
+        "id": "msg_145332a89001QUm8Aw2p8eFM9B",
+        "sessionID": "ses_ebaccee25ffeisRG9rEHI9DWj3"
+      },
+      "parts": [
+        {
+          "snapshot": "d559595b569e24876eb457e1ec3a5b9acea12fd4",
+          "type": "step-start",
+          "id": "prt_1453333e2001LFZrfpauvrMzY3",
+          "sessionID": "ses_ebaccee25ffeisRG9rEHI9DWj3",
+          "messageID": "msg_145332a89001QUm8Aw2p8eFM9B"
+        },
+        {
+          "type": "reasoning",
+          "text": "Report the four raw outputs and one line about default working directory.",
+          "time": {
+            "start": 1792162345963,
+            "end": 1792162345971
+          },
+          "id": "prt_1453333eb001K2JplJVqsJ8dzP",
+          "sessionID": "ses_ebaccee25ffeisRG9rEHI9DWj3",
+          "messageID": "msg_145332a89001QUm8Aw2p8eFM9B"
+        },
+        {
+          "type": "text",
+          "text": "```\n$ pwd\n/home/alexa/repos/agentic-odi\n\n$ git rev-parse --show-toplevel\n/home/alexa/repos/agentic-odi\n\n$ git branch --show-current\nmain\n\n$ git status --short\n?? docs/\n```\n\nYour default working directory is `/home/alexa/repos/agentic-odi`.",
+          "time": {
+            "start": 1792162345982,
+            "end": 1792162346755
+          },
+          "id": "prt_1453333fe001XO4QQU9MskuJdS",
+          "sessionID": "ses_ebaccee25ffeisRG9rEHI9DWj3",
+          "messageID": "msg_145332a89001QUm8Aw2p8eFM9B"
+        },
+        {
+          "reason": "stop",
+          "snapshot": "d559595b569e24876eb457e1ec3a5b9acea12fd4",
+          "type": "step-finish",
+          "tokens": {
+            "total": 15007,
+            "input": 201,
+            "output": 72,
+            "reasoning": 14,
+            "cache": {
+              "write": 0,
+              "read": 14720
+            }
+          },
+          "cost": 0,
+          "id": "prt_14533377c001124nZX1tIfjn74",
+          "sessionID": "ses_ebaccee25ffeisRG9rEHI9DWj3",
+          "messageID": "msg_145332a89001QUm8Aw2p8eFM9B"
+        }
+      ]
+    }
+  ]
+}

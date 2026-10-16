@@ -1,0 +1,8 @@
+This is a read-only environment probe. Do NOT modify any files. Run these exact bash commands (do not use a workdir parameter; use the default) and report their raw output:
+
+1. `pwd`
+2. `git rev-parse --show-toplevel`
+3. `git branch --show-current`
+4. `git status --short`
+
+Then report back ONLY: the four raw outputs, and one line answering "what is my default working directory?" Nothing else.
