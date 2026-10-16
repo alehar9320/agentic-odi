@@ -1,0 +1,47 @@
+You are implementing Task 3: Standalone local backend + `--backend` flag.
+
+## CRITICAL ENVIRONMENT (read first)
+
+- Work ONLY in the worktree: `/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution`.
+- The checkout at `/home/alexa/repos/agentic-odi` (branch `main`) is OFF-LIMITS. Never run git or write files there.
+- Prefix shell commands with `cd /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution && ...`, or use `git -C /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution ...`.
+- Use `UV_PYTHON=3.11` for all uv commands (uv's default 3.15 breaks workspace sync).
+- Before you finish, verify your commit is on branch `feature/cli-bundled-distribution` with `git log --oneline -3` (current worktree HEAD is `590cd9f`).
+
+## Task Description
+
+Read your task brief first — it is your requirements, with the exact values to use verbatim:
+/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/.superpowers/sdd/2026-10-15-cli-bundled-distribution-and-self-update/task-3-brief.md
+
+## Context
+
+This plan turns the CLI into a self-contained binary. Today every `outcomes` command hardcodes the MCP backend (`get_backend("mcp", ...)`), so the CLI effectively requires a running server. This task adds a global `--backend {local,mcp}` flag and a tiny `cli/context.py` so `local` (the default) makes the CLI work standalone. Later tasks build on this.
+
+## Interfaces from earlier tasks
+
+- `cli/src/cli/paths.py` exists (Task 2): `install_root`, `bin_dir`, `config_dir`, `versions_dir`, `current_link`, `state_file`, `is_frozen`, `is_writable_dir`. Not needed here.
+- `cli/src/cli/version.py` exposes `build_summary()`/`verbose_summary()` (Task 1).
+- `cli/src/cli/backend.py` already has `get_backend(backend=None, db_path=None, mcp_url=None) -> Backend` that reads env `AGENTIC_ODI_BACKEND` and defaults to `"local"`; `LocalBackend.call("compute_opportunity", {...})` returns `f"Opportunity score: {score:.2f}"`.
+
+## Notes / ambiguity resolution
+
+- IMPORTANT: do NOT mutate `os.environ` for the backend selection — use a module-level value in `cli/context.py` (`set_backend`/`selected_backend`) as the brief specifies, so in-process test invocations don't leak state.
+- Update the three existing MCP tests in `cli/tests/test_outcomes_cli.py` to prefix their args with `["--backend", "mcp"]` (they patch `cli.outcomes._call_mcp` and must now opt in).
+- Keep `MCP_URL_DEFAULT` behavior intact.
+
+## Your Job
+
+Follow the brief's steps in order (TDD). Commit with the message given in the brief.
+
+## You Do Not Dispatch Subagents
+
+Do all of this task's work yourself. Never spawn a subagent, and never spawn a reviewer — review is the controller's job after you report.
+
+## Report Format
+
+Write your full report to:
+/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/.superpowers/sdd/2026-10-15-cli-bundled-distribution-and-self-update/task-3-report.md
+
+Include: what you implemented, tests + results, TDD evidence (RED command/output, GREEN command/output), files changed, self-review findings, concerns.
+
+Then reply with ONLY (under 15 lines): Status, commits (short SHA + subject), one-line test summary, concerns, report file path — and confirm `git log --oneline -3` shows the commit on `feature/cli-bundled-distribution`.
