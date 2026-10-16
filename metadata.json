@@ -3,7 +3,7 @@
   "checkpoint_id": "01M52P08ZHX7V7ZFTN4N1WG53W",
   "strategy": "manual-commit",
   "branch": "feature/cli-odi-entity-parity",
-  "checkpoints_count": 2,
+  "checkpoints_count": 3,
   "files_touched": [
     "core/src/core/__init__.py",
     "core/src/core/factory.py",
@@ -23,13 +23,20 @@
       "compact_transcript": "/1/transcript.jsonl",
       "content_hash": "/1/content_hash.txt",
       "prompt": ""
+    },
+    {
+      "metadata": "/2/metadata.json",
+      "transcript": "/2/full.jsonl",
+      "compact_transcript": "/2/transcript.jsonl",
+      "content_hash": "/2/content_hash.txt",
+      "prompt": "/2/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 24749,
+    "input_tokens": 50708,
     "cache_creation_tokens": 0,
-    "cache_read_tokens": 350784,
-    "output_tokens": 4244,
-    "api_call_count": 15
+    "cache_read_tokens": 424768,
+    "output_tokens": 6861,
+    "api_call_count": 20
   }
 }
