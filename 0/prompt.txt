@@ -1,0 +1,64 @@
+You are implementing Task 2: Core service CRUD, FK validation, score recompute.
+
+## Task Description
+
+Read your task brief first — it is your requirements, with the exact values to use verbatim:
+/home/alexa/repos/agentic-odi/.superpowers/sdd/2026-10-15-cli-odi-entity-parity/task-2-brief.md
+
+## Context
+
+This is task 2 of a plan giving the `agentic-odi` CLI full CRUD over every ODI entity, backed by a shared persistent SQLite store. Task 1 (already merged on this branch) added these methods to `core/src/core/repository.py` on both the `Repository` protocol and `InMemoryRepository`:
+`get_step`, `get_outcome`, `update_job`, `delete_job`, `update_step`, `delete_step`, `update_outcome`, `delete_outcome` (plus the pre-existing CRUD). You consume those.
+
+You are in the `agentic-odi` uv workspace at /home/alexa/repos/agentic-odi, on branch `feature/cli-odi-entity-parity`. Do NOT switch branches. Do NOT commit to `main`.
+
+Existing code to match:
+- `core/src/core/services.py` defines `ODIService`, `JobNotFoundError`, `CustomerOutcomeNotFoundError`, `ValueOutOfRangeError`, and the existing `add_job`/`get_job`/`add_step`/`get_job_map`/`add_outcome`/`get_outcomes`/`add_customer_outcome`/`get_customer_outcome`/`list_customer_outcomes`/`update_customer_outcome`/`delete_customer_outcome`/`compute_opportunity`. `add_outcome` already computes `opportunity_score` from `compute_opportunity_score`.
+- `core/src/core/__init__.py` re-exports public names and maintains `__all__`; you add the two new errors there.
+- The existing test fixture in `core/tests/test_service.py` (`service`) constructs `ODIService(InMemoryRepository())` — so these tests do NOT need the SQLite repository.
+
+Follow the brief exactly.
+
+## Global constraints that bind this task
+
+- Python `>=3.10`; ruff line-length 100; ruff select `["E4","E7","E9","F","I","UP","B","BLE"]`.
+- Add `StepNotFoundError(step_id)` and `OutcomeNotFoundError(outcome_id)` (mirroring `JobNotFoundError`) and export both from `core/__init__.py` (imports + `__all__`).
+- Service methods to add: `get_step`, `get_outcome`, `update_job`, `delete_job`, `update_step`, `delete_step`, `update_outcome`, `delete_outcome`. `update_job/step/outcome` raise the matching NotFound error when the repo returns `None`; `delete_job/step/outcome` raise the matching NotFound error when the repo returns `False`.
+- `add_step`, `add_outcome`, `add_customer_outcome` must call `self.repo.get_job(job_id)` first and raise `JobNotFoundError` if missing; when `step_id` is given, call `self.repo.get_step(step_id)` and raise `StepNotFoundError` if missing.
+- `update_outcome`: fetch existing (raise `OutcomeNotFoundError` if absent); compute `importance`/`satisfaction` by falling back from `updates` to the existing values; set `updates["opportunity_score"] = compute_opportunity_score(imp, sat)` when both non-null else `None`; then call `repo.update_outcome`.
+- Sentinel semantics (controller ruling R3): the `updates` dict is literal — an explicit `None` value clears that field. The pinned test `service.update_outcome(outcome.id, {"satisfaction": None})` MUST produce `opportunity_score is None`. Do not implement an "is not None" filter that would break this.
+- Run tests with `uv run --directory core pytest` (prefix `UV_PYTHON=3.11` only if uv attempts a `pyarrow` source build; report if so).
+
+## Before You Begin
+
+If anything is unclear, ask now.
+
+## Your Job
+
+Work from: /home/alexa/repos/agentic-odi
+
+1. TDD per the brief: append the failing tests to `core/tests/test_service.py`, run to confirm failure, implement, run to confirm pass.
+2. Before committing, run the whole core suite `uv run --directory core pytest` — green, pristine output.
+3. Commit exactly these three files:
+   `git add core/src/core/services.py core/src/core/__init__.py core/tests/test_service.py`
+   `git commit -m "feat(core): add job/step/outcome service CRUD, FK validation, score recompute"`
+4. Self-review the diff.
+5. Report back.
+
+## You Do Not Dispatch Subagents
+
+Do all of this task's work yourself. Never spawn a subagent, never spawn a reviewer.
+
+## Report Format
+
+Write your full report to:
+/home/alexa/repos/agentic-odi/.superpowers/sdd/2026-10-15-cli-odi-entity-parity/task-2-report.md
+
+Include: what you implemented; tests + results; TDD evidence (RED command + failing output and why expected; GREEN command + passing output); files changed; self-review findings; concerns.
+
+Then reply with ONLY (under 15 lines):
+- **Status:** DONE | DONE_WITH_CONCERNS | BLOCKED | NEEDS_CONTEXT
+- Commits created (short SHA + subject)
+- One-line test summary
+- Concerns, if any
+- The report file path
