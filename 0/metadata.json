@@ -1,0 +1,37 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M52KQV7NQ3P7DHF14JREB5VV",
+  "session_id": "ses_ebac661d0ffeFaTKcT8ejY4931",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-16T15:03:42.426124595Z",
+  "branch": "feature/cli-bundled-distribution",
+  "checkpoints_count": 1,
+  "files_touched": [
+    ".github/workflows/release.yml"
+  ],
+  "agent": "OpenCode",
+  "model": "",
+  "turn_id": "3f1d4411d822",
+  "checkpoint_transcript_start": 18,
+  "transcript_lines_at_start": 18,
+  "compact_transcript_start": 18,
+  "token_usage": {
+    "input_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 0,
+    "output_tokens": 0,
+    "api_call_count": 0
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-10-16T15:03:42.404853212Z",
+    "agent_lines": 0,
+    "agent_removed": 0,
+    "human_added": 79,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 79,
+    "total_lines_changed": 79,
+    "agent_percentage": 0,
+    "metric_version": 2
+  }
+}
