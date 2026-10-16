@@ -1,0 +1,64 @@
+You are implementing Task 7: PyInstaller onedir bundle + build script (the plan's highest-risk spike).
+
+## CRITICAL ENVIRONMENT (read first)
+
+- Work ONLY in the worktree: `/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution`.
+- The checkout at `/home/alexa/repos/agentic-odi` (branch `main`) is OFF-LIMITS.
+- Prefix shell commands with `cd /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution && ...`, or use `git -C ...`.
+- Use `UV_PYTHON=3.11` for ALL uv commands (uv's default 3.15 breaks workspace sync). Network is available.
+- Before finishing, verify with `git log --oneline -3` that your commit is on branch `feature/cli-bundled-distribution` (current worktree HEAD is `6407d5d`).
+
+## Task Description
+
+Read your task brief first — it is your requirements, EXCEPT where the rulings below override it:
+/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/.superpowers/sdd/2026-10-15-cli-bundled-distribution-and-self-update/task-7-brief.md
+
+## MANDATORY RULINGS (override the brief)
+
+R1 — PyInstaller dependency. `pyinstaller` is not a dep and not in the lock. From the worktree ROOT run `UV_PYTHON=3.11 uv add --dev pyinstaller==6.22.3` (adds it to root `[dependency-groups] dev`, matching the repo's exact-pin dev-tool convention) and update `uv.lock`. Commit BOTH root `pyproject.toml` and `uv.lock`. The build script may then use `uv run --directory cli pyinstaller ...`.
+
+R2 — `.gitignore` ignores `*.spec` (line 33), so your spec would be untracked. Add a negation `!packaging/pyinstaller/odi.spec` after line 33 and commit `.gitignore`. Verify with `git check-ignore -v packaging/pyinstaller/odi.spec` returning non-zero (not ignored) and that `git status` offers it for add.
+
+R3 — Paths/output. `uv run --directory cli` sets cwd to `cli/`. So the spec path is `../packaging/pyinstaller/odi.spec` (the brief's `../../` is wrong). PyInstaller output MUST land at the REPO ROOT as `dist/odi` (the brief's smoke test runs `./dist/odi/odi` from the repo root). Use `--distpath ../dist --workpath ../build/odi` (relative to `cli/`) or equivalent. Emit the final archive in the REPO ROOT.
+
+R4 — `_build_info.py` is a tracked file. The build script regenerates it from env (overwriting the committed dev defaults). Do NOT commit that modification — the committed `cli/src/cli/_build_info.py` must remain `VERSION="0.1.0", RELEASE_DATE_UTC="", COMMIT="dev", TARGET="dev"`. Check `git status` before committing.
+
+R5 — Script hygiene: `set -euo pipefail`. Use `.zip` when `TARGET` starts with `windows`, else `.tar.gz`.
+
+R6 — ARCHIVE ROOT CONTRACT (critical, mandated by Task 4's `perform_update`, which extracts with NO strip-components). The archive MUST contain the onedir payload at its ROOT — e.g. `tar -C dist/odi -czf odi_${VERSION}_${TARGET}.tar.gz .` (for zip: `(cd dist/odi && zip -r ... .)`) — so extracting into `versions/<v>` yields `versions/<v>/odi` (the binary), NOT `versions/<v>/odi/odi`. Verify the archive members: `tar -tzf odi_0.1.0_linux_x86_64.tar.gz | head` should show `./odi` (or `odi`), not `odi/odi`.
+
+R7 — The script must print the absolute path of the produced archive on its LAST line (Task 11 consumes it).
+
+## Implementation notes
+
+- Spec: onedir named `odi`; entry `cli/src/cli/__main__.py`; `pathex=["cli/src"]` (resolve relative to spec location or make absolute); use `PyInstaller.utils.hooks.collect_all` for `fastmcp`, `mcp`, `pydantic`, `pydantic_core`, `starlette`, `uvicorn`, `anyio`; append their datas/binaries/hiddenimports; `console=True`; `upx=False`.
+- Build script: `uv sync --all-packages --locked`; write `_build_info.py` from env (`VERSION` required; `RELEASE_DATE_UTC`, `COMMIT`, `TARGET` default to dev values); run pyinstaller; package per R5/R6.
+- The build may take several minutes and produce a large `dist/`. That's expected. `dist/`, `build/` are gitignored.
+
+## Acceptance / DoD (run from the worktree ROOT unless noted)
+
+1. `bash -n scripts/build_binary.sh`
+2. `VERSION=0.1.0 RELEASE_DATE_UTC=2026-10-15T21:13:00Z COMMIT=dev TARGET=linux_x86_64 bash scripts/build_binary.sh`
+3. `./dist/odi/odi --version` → prints `0.1.0 (2026-10-15)`
+4. `./dist/odi/odi --help` → lists `outcomes`, `connectors`, `update`
+5. `AGENTIC_ODI_DB=/tmp/odi-spike.db ./dist/odi/odi outcomes score 8 2` → prints an opportunity score
+6. `AGENTIC_ODI_DB=/tmp/odi-spike.db ./dist/odi/odi --backend local outcomes score 8 2` → works
+7. `tar -tzf odi_0.1.0_linux_x86_64.tar.gz | grep -E '^\.?/?odi$'` → finds the `odi` binary at archive root (R6 evidence)
+8. `time ./dist/odi/odi --version` and `du -h dist/odi` → record startup + size
+9. Regression gates: `UV_PYTHON=3.11 uv run ruff check .`, `UV_PYTHON=3.11 uv run ruff format --check .`, `UV_PYTHON=3.11 uv run --directory cli mypy .`, `UV_PYTHON=3.11 uv run --directory cli pytest -q` (all must pass)
+10. `git status --porcelain` shows no `dist/`, no `build/`, and no modified `_build_info.py` staged.
+
+If bundling `fastmcp`/`pydantic_core` fails, STOP and fix the spec's hidden imports/collect_all before proceeding (this is the plan's biggest risk). If the compressed archive exceeds ~80 MB, consider a lazy `fastmcp` import ONLY if the frozen `--backend mcp` path still works.
+
+## You Do Not Dispatch Subagents
+
+Do all work yourself. Never spawn a subagent or reviewer.
+
+## Report Format
+
+Write your full report to:
+/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/.superpowers/sdd/2026-10-15-cli-bundled-distribution-and-self-update/task-7-report.md
+
+Include: what you built; how you applied R1–R7; every DoD command + observed output (especially the archive member list, `--version`, `--help`, score, startup time, `du -h`); any spec fixes made; self-review; concerns.
+
+Reply with ONLY (under 15 lines): Status, commit (short SHA + subject), DoD pass/fail summary, startup time + size, concerns, report path — and confirm the commit is on `feature/cli-bundled-distribution`.
