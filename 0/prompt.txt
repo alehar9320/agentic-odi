@@ -1,0 +1,68 @@
+You are reviewing one task's implementation: first whether it matches its requirements, then whether it is well-built. This is a task-scoped gate, not a merge review.
+
+## What Was Requested
+
+Read the task brief: /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/.superpowers/sdd/2026-10-15-cli-bundled-distribution-and-self-update/task-5-brief.md
+
+## MANDATORY RULINGS (controller rulings that OVERRIDE the brief — treat these as the correct requirements)
+
+R1 — Checksum source: the brief's line 554 ("verify against `<asset>.sha256`") is wrong. The design (spec §Artifacts, lines 109/148), the installers (plan lines 712/749) and the release job (plan line 827) publish ONE `checksums.txt` (sha256sum format `<hex>  <filename>`). So `download()` MUST fetch `checksums.txt`, select the line whose filename equals `asset_name(...)`, and verify against that. If no line matches → `update.UpdateError`. Per-asset `.sha256` is NOT expected.
+R2 — `auto_update_enabled(no_update)` MUST be `(not no_update) and (not os.environ.get("AGENTIC_ODI_NO_UPDATE"))` ONLY. The brief's impl line 78 (is_frozen/is_writable_dir inside `auto_update_enabled`) is overridden because the brief's own test at `tests/test_update_check.py:57-60` requires `True` in a non-frozen env. The spec-157 suppressions (not frozen / not writable / lock held) MUST live in `maybe_auto_update`, which must never raise. Therefore: the plan's review-focus note "(4) auto_update_enabled writable check" is satisfied in `maybe_auto_update`, NOT in `auto_update_enabled` — do NOT flag the absence of the writable check in `auto_update_enabled` as a defect.
+R3 — A download test (success + checksum-mismatch → UpdateError) with injected `fetch_bytes` is required in addition to the brief's six tests.
+
+## What the Implementer Claims They Built
+
+Read the implementer's report: /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/.superpowers/sdd/2026-10-15-cli-bundled-distribution-and-self-update/task-5-report.md
+
+## Diff Under Review
+
+Base: 078fcdb098334c277399380a9ab39f2153d9ff61
+Head: 6138534
+Diff file: /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/.superpowers/sdd/2026-10-15-cli-bundled-distribution-and-self-update/review-078fcdb..6138534.diff
+
+Read the diff file once — it contains the commit list, a stat summary, and the full diff with surrounding context. Do not re-run git commands. Do not crawl the broader codebase; inspect outside the diff only for a concrete, named risk.
+
+Read-only review. Do not mutate the working tree, index, HEAD, or branch state.
+
+## You Do Not Dispatch Subagents
+
+Do all of this review yourself. Never spawn a subagent.
+
+## Do Not Trust the Report
+
+Treat the report as unverified claims; verify against the diff. A stated rationale never downgrades a finding.
+
+## Tests
+
+The implementer already ran the tests and reported TDD evidence. Do not re-run the suite. Run a focused test only if reading raises a specific doubt no existing run answers. Warnings/noise in reported output are findings.
+
+## Part 1: Spec Compliance
+Required interface (contract for Task 6):
+- `update.CHECK_INTERVAL_SECONDS == 86400`
+- `update.should_check(state_file, now) -> bool` (missing/corrupt file ⇒ True)
+- `update.record_check(state_file, now) -> None` (writes `{"last_check": <float>}`, creates parent dirs)
+- `update.latest_release(current, *, fetch=None) -> str | None` (parses `tag_name`, strips `v`, returns newer or None; any exception ⇒ None)
+- `update.download(version, dest_dir, *, fetch_bytes=None) -> Path` (per R1)
+- `update.auto_update_enabled(no_update) -> bool` (per R2)
+- `update.maybe_auto_update(*, no_update, now) -> str | None` (never raises; applies suppression + due check + record_check + latest_release + download + perform_update; returns new version or None)
+
+Verify each with file:line, plus that the six brief tests are present verbatim and the R3 download test exists. Flag Missing / Extra / Misunderstood. If a requirement cannot be verified from this diff alone, report it as a ⚠️ item.
+
+## Part 2: Code Quality
+Clean separation, error handling (network failures, corrupt JSON, missing checksums line), DRY, edge cases, structure; tests verify real behavior. Cite file:line for every finding. Specifically probe: does `maybe_auto_update` truly never raise (including JSON/IO/network/UpdateError paths)? Does `record_check` create the config dir? Does `download` handle a missing/非matching checksums line and a checksum mismatch? Does the `latest_release` default fetch close its response and time out sensibly?
+
+## Calibration
+Categorize by real severity (Critical/Important/Minor). If the plan/brief mandates something the rubric calls a defect, report it as Important, labeled plan-mandated. Rulings R1–R3 are correct requirements, not defects. Acknowledge strengths before issues.
+
+## Output Format
+
+### Spec Compliance
+- ✅/❌ with file:line; ⚠️ items
+### Strengths
+### Issues
+#### Critical / #### Important / #### Minor
+### Assessment
+**Task quality:** Approved | Needs fixes
+**Reasoning:** 1-2 sentences
+
+Your final message is the report itself: begin directly with the spec-compliance verdict. No preamble.
