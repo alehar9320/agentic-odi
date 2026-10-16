@@ -1,0 +1,81 @@
+You are implementing Task 5: MCP server — persistent store, CRUD parity, value_metrics.
+
+## Task Description
+
+Read your task brief first:
+/home/alexa/repos/agentic-odi/.superpowers/sdd/2026-10-15-cli-odi-entity-parity/task-5-brief.md
+
+## Context
+
+This is task 5 of a plan giving the `agentic-odi` CLI full CRUD over every ODI entity, backed by one shared persistent SQLite store that the PM's CLI and the AI agent's MCP server both use. This task makes the MCP server share that store (`build_repository()` from Task 4) and adds the missing tools so the agent matches the CLI.
+
+You are in the `agentic-odi` uv workspace at /home/alexa/repos/agentic-odi, on branch `feature/cli-odi-entity-parity`. Do NOT switch branches. Do NOT commit to `main`.
+
+Prior tasks on this branch (already committed):
+- Task 2 added service methods `get_step`, `get_outcome`, `update_job`, `delete_job`, `update_step`, `delete_step`, `update_outcome`, `delete_outcome`, plus `StepNotFoundError` and `OutcomeNotFoundError`, plus FK validation: `add_step`/`add_outcome`/`add_customer_outcome` now raise `JobNotFoundError` (unknown job) and `StepNotFoundError` (unknown step) instead of silently accepting bad FKs.
+- Task 4 added `core.build_repository(db_path=None) -> Repository` (returns `InMemoryRepository` when resolved path is `:memory:`, else a read-through `SQLiteRepository`; resolves `AGENTIC_ODI_DB` then default).
+
+Current `mcp_server/src/mcp_server/mcp_server.py` facts:
+- `_repo = InMemoryRepository()`; `service = ODIService(_repo)`; `jobs_db = _repo.jobs`, `steps_db = _repo.steps`, `outcomes_db = _repo.outcomes`, `customer_outcomes_db = _repo.customer_outcomes` (these names are the repo's dicts and are imported by `conftest.py`).
+- It imports `customer_outcome_not_found as _cust_not_found` from `core`; `core` also exports `job_not_found(job_id) -> str`. There is NO step/outcome not-found helper.
+- Existing tools: `add_job`, `get_jobs`, `get_job`, `add_step`, `get_job_map`, `add_outcome`, `get_outcomes`, `add_customer_outcome`, `get_customer_outcome`, `list_customer_outcomes`, `update_customer_outcome`, `delete_customer_outcome`, `compute_opportunity`, plus prompts/guidelines.
+- `add_step` currently has NO error handling; `add_outcome` catches `ValueOutOfRangeError` only; `add_customer_outcome` catches `ValidationError` only.
+
+## Controller rulings for this task (follow these)
+
+**R6a — not-found messages, and file scope.** The plan's commit for this task is exactly three files (`mcp_server.py`, `mcp_server/tests/conftest.py`, `mcp_server/tests/test_parity.py`) — do NOT modify `core`. Use the existing `job_not_found` helper from `core` for job-not-found, and define two small module-level helpers in `mcp_server.py` mirroring the existing `_cust_not_found` alias pattern:
+`def _step_not_found(step_id): return f"Error: Step with ID {step_id} not found."` and the analogous `_outcome_not_found(outcome_id)`.
+
+**R6b — never leak service exceptions to the MCP client.** Every new or edited MCP tool must catch the relevant service errors and return a string. Specifically:
+- `add_step`: catch `JobNotFoundError` → `job_not_found(job_id)`.
+- `add_outcome`: keep the `ValueOutOfRangeError` catch; ALSO catch `JobNotFoundError` and `StepNotFoundError`.
+- `add_customer_outcome`: keep the `ValidationError` catch; ALSO catch `StepNotFoundError` (job is pre-checked).
+- `get_step`/`update_step`/`delete_step`: catch `StepNotFoundError` → `_step_not_found(...)`.
+- `get_outcome`/`update_outcome`/`delete_outcome`: catch `OutcomeNotFoundError` → `_outcome_not_found(...)`.
+- `update_job`/`delete_job`: catch `JobNotFoundError` → `job_not_found(job_id)`.
+- `update_outcome`: also catch `ValueOutOfRangeError`.
+
+**R6c — `update_outcome` builds a sparse updates dict.** Only include a key when its argument is not `None` (`statement`, `importance`, `satisfaction`, `step_id`), then call `service.update_outcome(outcome_id, updates)`; return `f"Outcome updated successfully: {updated.model_dump_json()}"`. Do NOT include `job_id`.
+
+## Global constraints that bind this task
+
+- Python `>=3.10`; ruff line-length 100; ruff select `["E4","E7","E9","F","I","UP","B","BLE"]`.
+- `conftest.py` must set `os.environ["AGENTIC_ODI_DB"] = ":memory:"` BEFORE importing `mcp_server` (use `# noqa: E402` on the deferred imports exactly as the brief shows), so no test ever touches the real `~/.agentic-odi/odi.db`.
+- Replace `_repo = InMemoryRepository()` with `_repo = build_repository()` (import `build_repository` from `core`; drop the now-unused `InMemoryRepository` import if nothing else uses it). Keep the `jobs_db`/`steps_db`/`outcomes_db`/`customer_outcomes_db` names assigned from `_repo.*`.
+- All new tools are `@mcp.tool` functions returning strings, matching the existing message style.
+- `update_customer_outcome`: add `value_metrics: list[dict] | None = None`; when provided, set `cv_d["value_metrics"] = value_metrics` before validation.
+- Run tests with `uv run --directory mcp_server pytest` (prefix `UV_PYTHON=3.11` only if uv attempts a `pyarrow` source build; report if so).
+
+## Before You Begin
+
+If anything is unclear, ask now.
+
+## Your Job
+
+Work from: /home/alexa/repos/agentic-odi
+
+1. TDD per the brief: edit `conftest.py` (Step 1), write `mcp_server/tests/test_parity.py` (Step 2), confirm RED, implement the tools (Step 4), confirm GREEN.
+2. Run the full MCP suite `uv run --directory mcp_server pytest -v` — green, pristine (existing + new). Confirm no test created `intent_store.db` or `~/.agentic-odi/odi.db`.
+3. Commit exactly these three files:
+   `git add mcp_server/src/mcp_server/mcp_server.py mcp_server/tests/conftest.py mcp_server/tests/test_parity.py`
+   `git commit -m "feat(mcp): persistent shared store and CRUD tool parity incl. value_metrics"`
+4. Self-review the diff.
+5. Report back.
+
+## You Do Not Dispatch Subagents
+
+Do all of this task's work yourself. Never spawn a subagent, never spawn a reviewer.
+
+## Report Format
+
+Write your full report to:
+/home/alexa/repos/agentic-odi/.superpowers/sdd/2026-10-15-cli-odi-entity-parity/task-5-report.md
+
+Include: what you implemented; the full list of tools added/edited and how each handles errors; tests + results; TDD evidence (RED command + failing output and why expected; GREEN command + passing output); files changed; confirmation tests did not create a real DB; self-review findings; concerns.
+
+Then reply with ONLY (under 15 lines):
+- **Status:** DONE | DONE_WITH_CONCERNS | BLOCKED | NEEDS_CONTEXT
+- Commits created (short SHA + subject)
+- One-line test summary
+- Concerns, if any
+- The report file path
