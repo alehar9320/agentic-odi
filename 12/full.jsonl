@@ -1,0 +1,1057 @@
+{
+  "info": {
+    "id": "ses_ebec66ddeffeNuKIbZ6Iv0482W",
+    "slug": "swift-river",
+    "projectID": "e4fe19106d06261ebfed21a0e3ba06559abf1100",
+    "directory": "/home/alexa/repos/agentic-odi",
+    "path": "",
+    "parentID": "ses_ebedd9abaffesSyRWO5QAiMN5F",
+    "title": "Builder-check the design doc (@general subagent)",
+    "agent": "general",
+    "model": {
+      "id": "big-pickle",
+      "providerID": "opencode",
+      "variant": "default"
+    },
+    "version": "1.18.35",
+    "summary": {
+      "additions": 0,
+      "deletions": 0,
+      "files": 0
+    },
+    "cost": 0,
+    "tokens": {
+      "input": 49942,
+      "output": 1820,
+      "reasoning": 11243,
+      "cache": {
+        "read": 189504,
+        "write": 0
+      }
+    },
+    "permission": [
+      {
+        "permission": "task",
+        "pattern": "*",
+        "action": "deny"
+      }
+    ],
+    "time": {
+      "created": 1792095654433,
+      "updated": 1792096307710
+    }
+  },
+  "messages": [
+    {
+      "info": {
+        "role": "user",
+        "time": {
+          "created": 1792095654473
+        },
+        "agent": "general",
+        "model": {
+          "providerID": "opencode",
+          "modelID": "big-pickle"
+        },
+        "summary": {
+          "diffs": []
+        },
+        "id": "msg_141399246001RL60J0ZtmI09EV",
+        "sessionID": "ses_ebec66ddeffeNuKIbZ6Iv0482W"
+      },
+      "parts": [
+        {
+          "type": "text",
+          "text": "You are a talented software engineer with deep experience packaging Python CLIs into self-contained binaries and building release pipelines. You've been handed a design document and asked to put together a plan to build what it describes. You will not be able to talk to the person who wrote it.\n\nRead /home/alexa/repos/agentic-odi/docs/superpowers/specs/2026-10-15-cli-bundled-distribution-design.md\n\nYou may also inspect the repository at /home/alexa/repos/agentic-odi (uv workspace, Python CLI package at cli/, CI at .github/workflows/ci.yml) to ground your questions.\n\nReport only the questions you'd still need answered before you could plan this well: places where you'd have to guess and a wrong guess would matter. For each, give the question and why the answer changes the plan. Rank them by importance.\n\nSkip anything the document explicitly leaves to the builder, and anything you could reasonably decide yourself. Skip nitpicks about wording.\n\nIf nothing important is left, say \"nothing important left\".\n\nDo NOT write any code or files. Return only your ranked list of questions (or \"nothing important left\").",
+          "id": "prt_141399256001y3loYdbA29ltdm",
+          "sessionID": "ses_ebec66ddeffeNuKIbZ6Iv0482W",
+          "messageID": "msg_141399246001RL60J0ZtmI09EV"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_141399246001RL60J0ZtmI09EV",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 14986,
+          "input": 9038,
+          "output": 51,
+          "reasoning": 9,
+          "cache": {
+            "write": 0,
+            "read": 5888
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792095656082,
+          "completed": 1792095659715
+        },
+        "finish": "tool-calls",
+        "id": "msg_141399891001aACtSRPdw3W3g5",
+        "sessionID": "ses_ebec66ddeffeNuKIbZ6Iv0482W"
+      },
+      "parts": [
+        {
+          "snapshot": "a9463ef83a6340e5b45c674d83bb7a1a0a0f2587",
+          "type": "step-start",
+          "id": "prt_14139a251001ofzEsSZRaCR72J",
+          "sessionID": "ses_ebec66ddeffeNuKIbZ6Iv0482W",
+          "messageID": "msg_141399891001aACtSRPdw3W3g5"
+        },
+        {
+          "type": "reasoning",
+          "text": "Let me read the design doc first.",
+          "time": {
+            "start": 1792095658745,
+            "end": 1792095659042
+          },
+          "id": "prt_14139a2f90012GqK1yA12zh1MM",
+          "sessionID": "ses_ebec66ddeffeNuKIbZ6Iv0482W",
+          "messageID": "msg_141399891001aACtSRPdw3W3g5"
+        },
+        {
+          "type": "tool",
+          "tool": "read",
+          "callID": "call_48278678886343b388d92916",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/home/alexa/repos/agentic-odi/docs/superpowers/specs/2026-10-15-cli-bundled-distribution-design.md"
+            },
+            "output": "<path>/home/alexa/repos/agentic-odi/docs/superpowers/specs/2026-10-15-cli-bundled-distribution-design.md</path>\n<type>file</type>\n<content>\n1: # Bundled CLI Distribution & Self-Update — Design\n2: \n3: Date: 2026-10-15\n4: Status: Approved (design); implementation plan pending\n5: \n6: ## Intent and why\n7: \n8: Today the `agentic-odi` CLI is consumed by installing the whole `uv`\n9: workspace in editable mode. We want a world-class, \"state-of-the-art\"\n10: binary distribution: a self-contained executable that a user installs with\n11: a single `curl … | sh` and that keeps itself current without the user\n12: managing a Python toolchain.\n13: \n14: This mirrors the experience of `gh`, `deno`, `bun`, and `ollama`: install\n15: with a one-liner, get a native-feeling command, and receive updates without\n16: thinking about it.\n17: \n18: ## Goals\n19: \n20: - A self-contained artifact per platform with **near-instant startup**.\n21: - One-line install: `curl -fsSL <url>/install.sh | sh` (and a PowerShell\n22:   equivalent for Windows).\n23: - **Automatic background updates, on by default**, plus an explicit\n24:   user-invoked update command.\n25: - Automated versioning and release/tag creation driven by CI.\n26: - Support Linux (x86_64, arm64), macOS (x86_64, arm64), Windows (x86_64).\n27: \n28: ## Non-goals\n29: \n30: - Code signing / notarization (deferred; document the workarounds).\n31: - Packaging the MCP server / local server / chat client as binaries (this is\n32:   about the CLI only).\n33: - Publishing to PyPI as the primary distribution channel.\n34: - A vanity download domain (use GitHub Releases for now).\n35: \n36: ## Anti-goals (what would make this a failure even if it \"works\")\n37: \n38: - Shipping a build that crashes on `--backend mcp` because a dependency was\n39:   stripped for size.\n40: - An auto-updater that blocks or slows a command when offline.\n41: - An updater that can corrupt an install if interrupted (non-atomic swap).\n42: - Replacing a running executable in place (fails on Windows; races on unix).\n43: \n44: ## Constraints\n45: \n46: - The CLI is a Python package (`agentic-odi-cli`) in a `uv` workspace with\n47:   six members. Once bundled, the CLI no longer depends on the workspace at\n48:   runtime; the source tree keeps its current editable-install workflow.\n49: - The CLI defaults to a local SQLite backend (`AGENTIC_ODI_BACKEND=local`),\n50:   so the binary is useful standalone. MCP is opt-in (`--backend mcp`).\n51: - The CLI imports `fastmcp` at module top (`cli/src/cli/outcomes.py`), which\n52:   pulls a large tree (mcp, httpx, starlette, uvicorn). `pydantic` v2 pulls\n53:   compiled `pydantic-core`. These are the bundling risk points.\n54: - No git tags exist today; `cli/src/cli/version.py` hardcodes `0.1.0`.\n55: - Reproduction of the current runner matrix: GitHub-hosted Ubuntu, macOS,\n56:   and Windows runners.\n57: \n58: ## Decisions (made by the human partner unless noted)\n59: \n60: 1. **Bundler: PyInstaller `--onedir`, shipped as a compressed archive.**\n61:    `--onefile` re-extracts to a temp dir on every invocation and adds\n62:    ~0.5–1.5s startup latency; `--onedir` starts near-instantly. We accept\n63:    \"one downloadable archive, installed into a versioned directory\" instead\n64:    of \"one literal file.\" Nuitka is the fallback if PyInstaller proves\n65:    unusable.\n66: 2. **No code signing for now.** Document Gatekeeper (macOS) and SmartScreen\n67:    (Windows) workarounds in the README.\n68: 3. **Background auto-update is ON by default**, applied on the next run,\n69:    with opt-out (flag/env). Also expose explicit `odi update`.\n70: 4. **Binary size: full functionality, optimized.** *It just works* beats\n71:    *small* (builder's call). Bundle everything so `--backend mcp` works out\n72:    of the box. Optimize with strip/exclusions. **No UPX** (AV false\n73:    positives). Because onedir has no per-run extraction cost, size is only a\n74:    download-time concern. Revisit a lazy `fastmcp` import only if measured\n75:    size is egregious *and* the MCP backend keeps working.\n76: 5. **Versioning: semver primary + release datetime secondary.**\n77:    Git tag is `v<semver>`; the build also embeds the release datetime (UTC)\n78:    so users can see *when* a version was released.\n79: 6. **Command names:** primary `odi`; additionally `odipm` and `odi-cli`;\n80:    keep `agentic-odi` for backward compatibility.\n81: \n82: ## The how (decided)\n83: \n84: ### Artifact\n85: \n86: - PyInstaller **onedir** build producing an executable named `odi`\n87:   (`odi.exe` on Windows) plus its `_internal/` support directory.\n88: - Packaged per platform:\n89:   - unix: `odi_<version>_<os>_<arch>.tar.gz`\n90:   - windows: `odi_<version>_<os>_<arch>.zip`\n91: - `os`/`arch` tokens: `linux/x86_64`, `linux/arm64`, `macos/x86_64`,\n92:   `macos/arm64`, `windows/x86_64`.\n93: - A `checksums.txt` (SHA-256) is published alongside the archives.\n94: \n95: ### Install layout\n96: \n97: ```\n98: ~/.local/share/agentic-odi/\n99:   versions/0.1.0/            # extracted onedir bundle (odi + _internal/)\n100:   versions/0.2.0/\n101:   current -> versions/0.2.0  # atomic symlink; flipping it IS the update\n102: ~/.local/bin/\n103:   odi         -> ../share/agentic-odi/current/odi\n104:   odipm       -> ../share/agentic-odi/current/odi\n105:   odi-cli     -> ../share/agentic-odi/current/odi\n106:   agentic-odi -> ../share/agentic-odi/current/odi\n107: ~/.config/agentic-odi/update.json   # last-check time + state\n108: ```\n109: \n110: - Install root overridable via `AGENTIC_ODI_INSTALL_DIR`.\n111: - Both `share` and `bin` roots derive from XDG (`XDG_DATA_HOME`,\n112:   `XDG_BIN_HOME`) with sensible fallbacks. Use `platformdirs` or hand-rolled\n113:   XDG resolution (builder's call).\n114: - **Windows:** no symlinks. Install to `%LOCALAPPDATA%\\agentic-odi\\`; ship\n115:   `odi.exe` plus `odipm.exe`, `odi-cli.exe`, `agentic-odi.exe` copies.\n116:   Updates use a deferred helper process so the running `.exe` can be\n117:   swapped.\n118: \n119: ### Update mechanism\n120: \n121: - `cli/update.py` module providing:\n122:   - `check_for_update()` → query GitHub Releases \"latest\"; semver-compare\n123:     against the embedded version.\n124:   - `resolve_asset()` → map runtime OS/arch to the correct asset name.\n125:   - `verify_checksum()` → SHA-256 verify against `checksums.txt`.\n126:   - `perform_update()` → download → verify → extract to\n127:     `versions/<new>` → **atomically** re-point `current`.\n128:   - A **lockfile** guards concurrent updates.\n129: - **Auto path:** on launch, at most one network check per 24h (cached in\n130:   `update.json`). If newer, download + verify + extract + flip in a\n131:   background thread, then print\n132:   `Updated to vX.Y.Z — takes effect next run`. Never blocks the command;\n133:   network failures are swallowed.\n134: - **Suppressed when:** not a frozen build (running from source), env\n135:   `AGENTIC_ODI_NO_UPDATE=1`, global flag `--no-update`, non-interactive\n136:   context, lock held, or install location not writable.\n137: - **Explicit path:** `odi update [--check] [--force] [--version X.Y.Z]\n138:   [--now]`. `--now` re-execs into the newly installed version.\n139: - Updates are never applied to a running process; they apply on next launch.\n140: \n141: ### Versioning & naming\n142: \n143: - Single source of truth = the git tag `vX.Y.Z`.\n144: - Build step injects a generated `_build_info.py` with:\n145:   `VERSION = \"0.1.0\"`, `RELEASE_DATE_UTC = \"2026-10-15T21:13:00Z\"`,\n146:   `COMMIT = \"<sha>\"`, `TARGET = \"<os>-<arch>\"`.\n147: - `cli/version.py` reads from `_build_info` (falling back for editable/dev\n148:   installs).\n149: - `odi --version` → `0.1.0 (2026-10-15)`.\n150: - `odi --version --verbose` → adds commit SHA, build date, target triple.\n151: \n152: ### CI / tagging\n153: \n154: - **release-please** (Conventional Commits) maintains a release PR that\n155:   bumps the version and updates the changelog. Merging it creates the tag\n156:   `vX.Y.Z` and a GitHub Release.\n157: - A single **root component** version for the whole repo (one product\n158:   version), not per-package versions.\n159: - `release.yml` triggers on tag push → matrix build → uploads archives +\n160:   `checksums.txt` + `install.sh` + `install.ps1` to the Release → publishes.\n161: \n162: | Runner | Target |\n163: |---|---|\n164: | `ubuntu-latest` | linux-x86_64 |\n165: | `ubuntu-24.04-arm` | linux-arm64 |\n166: | `macos-14` | macos-arm64 |\n167: | `macos-13` (or Rosetta on 14) | macos-x86_64 |\n168: | `windows-latest` | windows-x86_64 |\n169: \n170: ## Phasing\n171: \n172: 1. **Spike (highest risk):** PyInstaller `--onedir` bundle the CLI on Linux;\n173:    run `--version`, `--help`, `outcomes add` against both backends. Confirms\n174:    `pydantic-core` + `fastmcp` bundle cleanly and startup is fast.\n175: 2. `_build_info` injection + `cli/update.py` + `odi update` command +\n176:    startup hook, with unit tests (semver compare, OS/arch→asset resolution,\n177:    checksum verify, cache/lock, atomic flip).\n178: 3. `install.sh` / `install.ps1` (aliases, PATH, completions).\n179: 4. release-please config + `release.yml` matrix + checksums.\n180: 5. README install/update docs + end-to-end test installing from a real\n181:    tagged Release.\n182: \n183: ## Flagged wrinkles\n184: \n185: - **macOS Intel builds:** `macos-13` is the last x86_64 runner and is being\n186:   retired; fallback is an x86_64 build under Rosetta on `macos-14`. May\n187:   force a \"drop Intel Mac\" decision later.\n188: - **Auto-update assumes a writable home.** Under system-wide installs\n189:   (`/usr/local/bin`, package managers) auto-update is disabled; only the\n190:   install script manages those.\n191: - **Offline behavior:** auto-update must always no-op gracefully and never\n192:   block or slow a command.\n193: - **`fastmcp` weight:** bundled for correctness; size revisited only if\n194:   measured and if the MCP backend can stay functional.\n195: \n196: ## Left to the builder\n197: \n198: - Exact PyInstaller spec / hidden-import hooks and exclusion list.\n199: - Exact `platformdirs` vs hand-rolled XDG resolution.\n200: - Exact lockfile mechanism (file lock vs atomic O_EXCL).\n201: - Windows deferred-swap implementation details.\n202: - release-please configuration specifics.\n203: \n204: ## Assumptions confirmed by the human partner\n205: \n206: 1. Keep `agentic-odi` as an alias alongside `odi` / `odipm` / `odi-cli`.\n207: 2. Release assets live on GitHub Releases (`alehar9320/agentic-odi`) for now.\n208: 3. release-please with a single root component (one product version).\n\n(End of file - total 208 lines)\n</content>",
+            "metadata": {
+              "preview": "# Bundled CLI Distribution & Self-Update — Design\n\nDate: 2026-10-15\nStatus: Approved (design); implementation plan pending\n\n## Intent and why\n\nToday the `agentic-odi` CLI is consumed by installing the whole `uv`\nworkspace in editable mode. We want a world-class, \"state-of-the-art\"\nbinary distribution: a self-contained executable that a user installs with\na single `curl … | sh` and that keeps itself current without the user\nmanaging a Python toolchain.\n\nThis mirrors the experience of `gh`, `deno`, `bun`, and `ollama`: install\nwith a one-liner, get a native-feeling command, and receive updates without\nthinking about it.\n\n## Goals\n\n- A self-contained artifact per platform with **near-instant startup**.",
+              "truncated": false,
+              "loaded": [],
+              "display": {
+                "type": "file",
+                "path": "/home/alexa/repos/agentic-odi/docs/superpowers/specs/2026-10-15-cli-bundled-distribution-design.md",
+                "text": "# Bundled CLI Distribution & Self-Update — Design\n\nDate: 2026-10-15\nStatus: Approved (design); implementation plan pending\n\n## Intent and why\n\nToday the `agentic-odi` CLI is consumed by installing the whole `uv`\nworkspace in editable mode. We want a world-class, \"state-of-the-art\"\nbinary distribution: a self-contained executable that a user installs with\na single `curl … | sh` and that keeps itself current without the user\nmanaging a Python toolchain.\n\nThis mirrors the experience of `gh`, `deno`, `bun`, and `ollama`: install\nwith a one-liner, get a native-feeling command, and receive updates without\nthinking about it.\n\n## Goals\n\n- A self-contained artifact per platform with **near-instant startup**.\n- One-line install: `curl -fsSL <url>/install.sh | sh` (and a PowerShell\n  equivalent for Windows).\n- **Automatic background updates, on by default**, plus an explicit\n  user-invoked update command.\n- Automated versioning and release/tag creation driven by CI.\n- Support Linux (x86_64, arm64), macOS (x86_64, arm64), Windows (x86_64).\n\n## Non-goals\n\n- Code signing / notarization (deferred; document the workarounds).\n- Packaging the MCP server / local server / chat client as binaries (this is\n  about the CLI only).\n- Publishing to PyPI as the primary distribution channel.\n- A vanity download domain (use GitHub Releases for now).\n\n## Anti-goals (what would make this a failure even if it \"works\")\n\n- Shipping a build that crashes on `--backend mcp` because a dependency was\n  stripped for size.\n- An auto-updater that blocks or slows a command when offline.\n- An updater that can corrupt an install if interrupted (non-atomic swap).\n- Replacing a running executable in place (fails on Windows; races on unix).\n\n## Constraints\n\n- The CLI is a Python package (`agentic-odi-cli`) in a `uv` workspace with\n  six members. Once bundled, the CLI no longer depends on the workspace at\n  runtime; the source tree keeps its current editable-install workflow.\n- The CLI defaults to a local SQLite backend (`AGENTIC_ODI_BACKEND=local`),\n  so the binary is useful standalone. MCP is opt-in (`--backend mcp`).\n- The CLI imports `fastmcp` at module top (`cli/src/cli/outcomes.py`), which\n  pulls a large tree (mcp, httpx, starlette, uvicorn). `pydantic` v2 pulls\n  compiled `pydantic-core`. These are the bundling risk points.\n- No git tags exist today; `cli/src/cli/version.py` hardcodes `0.1.0`.\n- Reproduction of the current runner matrix: GitHub-hosted Ubuntu, macOS,\n  and Windows runners.\n\n## Decisions (made by the human partner unless noted)\n\n1. **Bundler: PyInstaller `--onedir`, shipped as a compressed archive.**\n   `--onefile` re-extracts to a temp dir on every invocation and adds\n   ~0.5–1.5s startup latency; `--onedir` starts near-instantly. We accept\n   \"one downloadable archive, installed into a versioned directory\" instead\n   of \"one literal file.\" Nuitka is the fallback if PyInstaller proves\n   unusable.\n2. **No code signing for now.** Document Gatekeeper (macOS) and SmartScreen\n   (Windows) workarounds in the README.\n3. **Background auto-update is ON by default**, applied on the next run,\n   with opt-out (flag/env). Also expose explicit `odi update`.\n4. **Binary size: full functionality, optimized.** *It just works* beats\n   *small* (builder's call). Bundle everything so `--backend mcp` works out\n   of the box. Optimize with strip/exclusions. **No UPX** (AV false\n   positives). Because onedir has no per-run extraction cost, size is only a\n   download-time concern. Revisit a lazy `fastmcp` import only if measured\n   size is egregious *and* the MCP backend keeps working.\n5. **Versioning: semver primary + release datetime secondary.**\n   Git tag is `v<semver>`; the build also embeds the release datetime (UTC)\n   so users can see *when* a version was released.\n6. **Command names:** primary `odi`; additionally `odipm` and `odi-cli`;\n   keep `agentic-odi` for backward compatibility.\n\n## The how (decided)\n\n### Artifact\n\n- PyInstaller **onedir** build producing an executable named `odi`\n  (`odi.exe` on Windows) plus its `_internal/` support directory.\n- Packaged per platform:\n  - unix: `odi_<version>_<os>_<arch>.tar.gz`\n  - windows: `odi_<version>_<os>_<arch>.zip`\n- `os`/`arch` tokens: `linux/x86_64`, `linux/arm64`, `macos/x86_64`,\n  `macos/arm64`, `windows/x86_64`.\n- A `checksums.txt` (SHA-256) is published alongside the archives.\n\n### Install layout\n\n```\n~/.local/share/agentic-odi/\n  versions/0.1.0/            # extracted onedir bundle (odi + _internal/)\n  versions/0.2.0/\n  current -> versions/0.2.0  # atomic symlink; flipping it IS the update\n~/.local/bin/\n  odi         -> ../share/agentic-odi/current/odi\n  odipm       -> ../share/agentic-odi/current/odi\n  odi-cli     -> ../share/agentic-odi/current/odi\n  agentic-odi -> ../share/agentic-odi/current/odi\n~/.config/agentic-odi/update.json   # last-check time + state\n```\n\n- Install root overridable via `AGENTIC_ODI_INSTALL_DIR`.\n- Both `share` and `bin` roots derive from XDG (`XDG_DATA_HOME`,\n  `XDG_BIN_HOME`) with sensible fallbacks. Use `platformdirs` or hand-rolled\n  XDG resolution (builder's call).\n- **Windows:** no symlinks. Install to `%LOCALAPPDATA%\\agentic-odi\\`; ship\n  `odi.exe` plus `odipm.exe`, `odi-cli.exe`, `agentic-odi.exe` copies.\n  Updates use a deferred helper process so the running `.exe` can be\n  swapped.\n\n### Update mechanism\n\n- `cli/update.py` module providing:\n  - `check_for_update()` → query GitHub Releases \"latest\"; semver-compare\n    against the embedded version.\n  - `resolve_asset()` → map runtime OS/arch to the correct asset name.\n  - `verify_checksum()` → SHA-256 verify against `checksums.txt`.\n  - `perform_update()` → download → verify → extract to\n    `versions/<new>` → **atomically** re-point `current`.\n  - A **lockfile** guards concurrent updates.\n- **Auto path:** on launch, at most one network check per 24h (cached in\n  `update.json`). If newer, download + verify + extract + flip in a\n  background thread, then print\n  `Updated to vX.Y.Z — takes effect next run`. Never blocks the command;\n  network failures are swallowed.\n- **Suppressed when:** not a frozen build (running from source), env\n  `AGENTIC_ODI_NO_UPDATE=1`, global flag `--no-update`, non-interactive\n  context, lock held, or install location not writable.\n- **Explicit path:** `odi update [--check] [--force] [--version X.Y.Z]\n  [--now]`. `--now` re-execs into the newly installed version.\n- Updates are never applied to a running process; they apply on next launch.\n\n### Versioning & naming\n\n- Single source of truth = the git tag `vX.Y.Z`.\n- Build step injects a generated `_build_info.py` with:\n  `VERSION = \"0.1.0\"`, `RELEASE_DATE_UTC = \"2026-10-15T21:13:00Z\"`,\n  `COMMIT = \"<sha>\"`, `TARGET = \"<os>-<arch>\"`.\n- `cli/version.py` reads from `_build_info` (falling back for editable/dev\n  installs).\n- `odi --version` → `0.1.0 (2026-10-15)`.\n- `odi --version --verbose` → adds commit SHA, build date, target triple.\n\n### CI / tagging\n\n- **release-please** (Conventional Commits) maintains a release PR that\n  bumps the version and updates the changelog. Merging it creates the tag\n  `vX.Y.Z` and a GitHub Release.\n- A single **root component** version for the whole repo (one product\n  version), not per-package versions.\n- `release.yml` triggers on tag push → matrix build → uploads archives +\n  `checksums.txt` + `install.sh` + `install.ps1` to the Release → publishes.\n\n| Runner | Target |\n|---|---|\n| `ubuntu-latest` | linux-x86_64 |\n| `ubuntu-24.04-arm` | linux-arm64 |\n| `macos-14` | macos-arm64 |\n| `macos-13` (or Rosetta on 14) | macos-x86_64 |\n| `windows-latest` | windows-x86_64 |\n\n## Phasing\n\n1. **Spike (highest risk):** PyInstaller `--onedir` bundle the CLI on Linux;\n   run `--version`, `--help`, `outcomes add` against both backends. Confirms\n   `pydantic-core` + `fastmcp` bundle cleanly and startup is fast.\n2. `_build_info` injection + `cli/update.py` + `odi update` command +\n   startup hook, with unit tests (semver compare, OS/arch→asset resolution,\n   checksum verify, cache/lock, atomic flip).\n3. `install.sh` / `install.ps1` (aliases, PATH, completions).\n4. release-please config + `release.yml` matrix + checksums.\n5. README install/update docs + end-to-end test installing from a real\n   tagged Release.\n\n## Flagged wrinkles\n\n- **macOS Intel builds:** `macos-13` is the last x86_64 runner and is being\n  retired; fallback is an x86_64 build under Rosetta on `macos-14`. May\n  force a \"drop Intel Mac\" decision later.\n- **Auto-update assumes a writable home.** Under system-wide installs\n  (`/usr/local/bin`, package managers) auto-update is disabled; only the\n  install script manages those.\n- **Offline behavior:** auto-update must always no-op gracefully and never\n  block or slow a command.\n- **`fastmcp` weight:** bundled for correctness; size revisited only if\n  measured and if the MCP backend can stay functional.\n\n## Left to the builder\n\n- Exact PyInstaller spec / hidden-import hooks and exclusion list.\n- Exact `platformdirs` vs hand-rolled XDG resolution.\n- Exact lockfile mechanism (file lock vs atomic O_EXCL).\n- Windows deferred-swap implementation details.\n- release-please configuration specifics.\n\n## Assumptions confirmed by the human partner\n\n1. Keep `agentic-odi` as an alias alongside `odi` / `odipm` / `odi-cli`.\n2. Release assets live on GitHub Releases (`alehar9320/agentic-odi`) for now.\n3. release-please with a single root component (one product version).",
+                "lineStart": 1,
+                "lineEnd": 208,
+                "totalLines": 208,
+                "truncated": false
+              }
+            },
+            "title": "docs/superpowers/specs/2026-10-15-cli-bundled-distribution-design.md",
+            "time": {
+              "start": 1792095659343,
+              "end": 1792095659440
+            }
+          },
+          "id": "prt_14139a429001pwsCheDmRC6kGQ",
+          "sessionID": "ses_ebec66ddeffeNuKIbZ6Iv0482W",
+          "messageID": "msg_141399891001aACtSRPdw3W3g5"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "a9463ef83a6340e5b45c674d83bb7a1a0a0f2587",
+          "type": "step-finish",
+          "tokens": {
+            "total": 14986,
+            "input": 9038,
+            "output": 51,
+            "reasoning": 9,
+            "cache": {
+              "write": 0,
+              "read": 5888
+            }
+          },
+          "cost": 0,
+          "id": "prt_14139a65a0014EKHCQlVErsna4",
+          "sessionID": "ses_ebec66ddeffeNuKIbZ6Iv0482W",
+          "messageID": "msg_141399891001aACtSRPdw3W3g5"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_141399246001RL60J0ZtmI09EV",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 18533,
+          "input": 3501,
+          "output": 94,
+          "reasoning": 26,
+          "cache": {
+            "write": 0,
+            "read": 14912
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792095659729,
+          "completed": 1792095663358
+        },
+        "finish": "tool-calls",
+        "id": "msg_14139a6d1001ExnPiIAgx9JJFp",
+        "sessionID": "ses_ebec66ddeffeNuKIbZ6Iv0482W"
+      },
+      "parts": [
+        {
+          "snapshot": "a9463ef83a6340e5b45c674d83bb7a1a0a0f2587",
+          "type": "step-start",
+          "id": "prt_14139af17001g8Y2B4zjAEt530",
+          "sessionID": "ses_ebec66ddeffeNuKIbZ6Iv0482W",
+          "messageID": "msg_14139a6d1001ExnPiIAgx9JJFp"
+        },
+        {
+          "type": "reasoning",
+          "text": "Let me inspect the repo to ground questions: the CLI structure, CI, workspace, version.py, entry points, tests.",
+          "time": {
+            "start": 1792095661901,
+            "end": 1792095662460
+          },
+          "id": "prt_14139af4d001Urnqojll3ztq3j",
+          "sessionID": "ses_ebec66ddeffeNuKIbZ6Iv0482W",
+          "messageID": "msg_14139a6d1001ExnPiIAgx9JJFp"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "call_fb0387cf456e4fa9a691f764",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "ls -la /home/alexa/repos/agentic-odi && cat /home/alexa/repos/agentic-odi/pyproject.toml"
+            },
+            "output": "total 1044\ndrwxr-xr-x 22 alexa alexa   4096 Oct 15 22:20 .\ndrwxr-xr-x  8 alexa alexa   4096 Oct 15 20:48 ..\ndrwxr-xr-x  4 alexa alexa   4096 Oct 10 19:14 .agents\n-rw-r--r--  1 alexa alexa  53248 Oct 11 14:30 .coverage\ndrwxr-xr-x  2 alexa alexa   4096 Oct 15 19:34 .cursor\ndrwxr-x---  5 alexa alexa   4096 Oct 11 14:30 .entire\ndrwxr-xr-x 15 alexa alexa   4096 Oct 15 22:20 .git\ndrwxr-xr-x  4 alexa alexa   4096 Oct 15 19:16 .github\n-rw-r--r--  1 alexa alexa   2305 Oct 15 21:13 .gitignore\ndrwxr-x---  5 alexa alexa   4096 Oct 15 21:04 .opencode\ndrwxr-xr-x  2 alexa alexa   4096 Oct 15 18:00 .pi\n-rw-r--r--  1 alexa alexa    182 Oct 11 09:47 .pre-commit-config.yaml\ndrwxr-xr-x  3 alexa alexa   4096 Oct 13 21:15 .pytest_cache\ndrwxr-xr-x  4 alexa alexa   4096 Oct 11 21:31 .qodo\ndrwxr-xr-x  3 alexa alexa   4096 Oct 11 09:45 .ruff_cache\ndrwxr-xr-x  6 alexa alexa   4096 Oct 11 09:17 .venv\ndrwxr-xr-x  4 alexa alexa   4096 Oct 15 21:04 .worktrees\n-rw-r--r--  1 alexa alexa  19610 Oct 15 21:14 README.md\ndrwxr-xr-x  7 alexa alexa   4096 Oct 15 21:13 cli\ndrwxr-xr-x  7 alexa alexa   4096 Oct 15 19:16 client\ndrwxr-xr-x  4 alexa alexa   4096 Oct 15 21:13 connectors\ndrwxr-xr-x  6 alexa alexa   4096 Oct 15 19:16 core\n-rw-r--r--  1 alexa alexa  12748 Oct 11 14:30 coverage.xml\ndrwxr-xr-x  3 alexa alexa   4096 Oct 15 22:20 docs\ndrwxr-xr-x  2 alexa alexa   4096 Oct 10 19:14 knowledge\ndrwxr-xr-x  5 alexa alexa   4096 Oct 15 19:16 local_server\ndrwxr-xr-x  6 alexa alexa   4096 Oct 15 19:16 mcp_server\n-rw-r--r--  1 alexa alexa    124 Oct 12 20:27 opencode.json\n-rw-r--r--  1 alexa alexa    526 Oct 15 21:13 pyproject.toml\n-rw-r--r--  1 alexa alexa 870234 Oct 15 21:13 uv.lock\n[project]\nname = \"agentic-odi\"\nversion = \"0.1.0\"\ndescription = \"Outcome-Driven Innovation (ODI): an MCP server, chat client, CLI, and external connectors.\"\nrequires-python = \">=3.10\"\n\n[tool.uv]\npackage = false\n\n[tool.uv.workspace]\nmembers = [\"cli\", \"client\", \"connectors\", \"core\", \"mcp_server\", \"local_server\"]\n\n[dependency-groups]\ndev = [\n    \"bandit==1.9.4\",\n    \"mypy==2.4.0\",\n    \"pytest==9.1.1\",\n    \"pytest-asyncio==1.4.0\",\n    \"pytest-cov==7.1.0\",\n    \"ruff==0.17.0\",\n]\n\n[tool.bandit]\nexclude_dirs = [\".venv\", \"tests\"]\n",
+            "metadata": {
+              "output": "total 1044\ndrwxr-xr-x 22 alexa alexa   4096 Oct 15 22:20 .\ndrwxr-xr-x  8 alexa alexa   4096 Oct 15 20:48 ..\ndrwxr-xr-x  4 alexa alexa   4096 Oct 10 19:14 .agents\n-rw-r--r--  1 alexa alexa  53248 Oct 11 14:30 .coverage\ndrwxr-xr-x  2 alexa alexa   4096 Oct 15 19:34 .cursor\ndrwxr-x---  5 alexa alexa   4096 Oct 11 14:30 .entire\ndrwxr-xr-x 15 alexa alexa   4096 Oct 15 22:20 .git\ndrwxr-xr-x  4 alexa alexa   4096 Oct 15 19:16 .github\n-rw-r--r--  1 alexa alexa   2305 Oct 15 21:13 .gitignore\ndrwxr-x---  5 alexa alexa   4096 Oct 15 21:04 .opencode\ndrwxr-xr-x  2 alexa alexa   4096 Oct 15 18:00 .pi\n-rw-r--r--  1 alexa alexa    182 Oct 11 09:47 .pre-commit-config.yaml\ndrwxr-xr-x  3 alexa alexa   4096 Oct 13 21:15 .pytest_cache\ndrwxr-xr-x  4 alexa alexa   4096 Oct 11 21:31 .qodo\ndrwxr-xr-x  3 alexa alexa   4096 Oct 11 09:45 .ruff_cache\ndrwxr-xr-x  6 alexa alexa   4096 Oct 11 09:17 .venv\ndrwxr-xr-x  4 alexa alexa   4096 Oct 15 21:04 .worktrees\n-rw-r--r--  1 alexa alexa  19610 Oct 15 21:14 README.md\ndrwxr-xr-x  7 alexa alexa   4096 Oct 15 21:13 cli\ndrwxr-xr-x  7 alexa alexa   4096 Oct 15 19:16 client\ndrwxr-xr-x  4 alexa alexa   4096 Oct 15 21:13 connectors\ndrwxr-xr-x  6 alexa alexa   4096 Oct 15 19:16 core\n-rw-r--r--  1 alexa alexa  12748 Oct 11 14:30 coverage.xml\ndrwxr-xr-x  3 alexa alexa   4096 Oct 15 22:20 docs\ndrwxr-xr-x  2 alexa alexa   4096 Oct 10 19:14 knowledge\ndrwxr-xr-x  5 alexa alexa   4096 Oct 15 19:16 local_server\ndrwxr-xr-x  6 alexa alexa   4096 Oct 15 19:16 mcp_server\n-rw-r--r--  1 alexa alexa    124 Oct 12 20:27 opencode.json\n-rw-r--r--  1 alexa alexa    526 Oct 15 21:13 pyproject.toml\n-rw-r--r--  1 alexa alexa 870234 Oct 15 21:13 uv.lock\n[project]\nname = \"agentic-odi\"\nversion = \"0.1.0\"\ndescription = \"Outcome-Driven Innovation (ODI): an MCP server, chat client, CLI, and external connectors.\"\nrequires-python = \">=3.10\"\n\n[tool.uv]\npackage = false\n\n[tool.uv.workspace]\nmembers = [\"cli\", \"client\", \"connectors\", \"core\", \"mcp_server\", \"local_server\"]\n\n[dependency-groups]\ndev = [\n    \"bandit==1.9.4\",\n    \"mypy==2.4.0\",\n    \"pytest==9.1.1\",\n    \"pytest-asyncio==1.4.0\",\n    \"pytest-cov==7.1.0\",\n    \"ruff==0.17.0\",\n]\n\n[tool.bandit]\nexclude_dirs = [\".venv\", \"tests\"]\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "ls -la /home/alexa/repos/agentic-odi && cat /home/alexa/repos/agentic-odi/pyproject.toml",
+            "time": {
+              "start": 1792095662762,
+              "end": 1792095662839
+            }
+          },
+          "id": "prt_14139b18800130mqBaqfBn6wKE",
+          "sessionID": "ses_ebec66ddeffeNuKIbZ6Iv0482W",
+          "messageID": "msg_14139a6d1001ExnPiIAgx9JJFp"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "call_b61ae06870ba47879e51827a",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "cat /home/alexa/repos/agentic-odi/cli/pyproject.toml; ls /home/alexa/repos/agentic-odi/cli/src/cli"
+            },
+            "output": "[project]\nname = \"agentic-odi-cli\"\nversion = \"0.1.0\"\ndescription = \"Command-line interface for Agentic ODI.\"\nrequires-python = \">=3.10\"\ndependencies = [\n    \"agentic-odi-connectors\",\n    \"typer\",\n    \"fastmcp\",\n    \"agentic-odi-core\",\n]\n\n[tool.uv.sources]\nagentic-odi-connectors = { workspace = true }\nagentic-odi-core = { workspace = true }\n\n[project.scripts]\nagentic-odi = \"cli.cli:app\"\n\n[build-system]\nrequires = [\"hatchling\"]\nbuild-backend = \"hatchling.build\"\n\n[tool.hatch.build.targets.wheel]\npackages = [\"src/cli\"]\n\n[tool.ruff]\nline-length = 100\ntarget-version = \"py310\"\n\n[tool.ruff.lint]\nselect = [\"E4\", \"E7\", \"E9\", \"F\", \"I\", \"UP\", \"B\", \"BLE\"]\n\n[tool.mypy]\npython_version = \"3.10\"\nignore_missing_imports = true\n__init__.py\n__main__.py\n__pycache__\nbackend.py\ncli.py\nconnectors.py\noutcomes.py\nversion.py\n",
+            "metadata": {
+              "output": "[project]\nname = \"agentic-odi-cli\"\nversion = \"0.1.0\"\ndescription = \"Command-line interface for Agentic ODI.\"\nrequires-python = \">=3.10\"\ndependencies = [\n    \"agentic-odi-connectors\",\n    \"typer\",\n    \"fastmcp\",\n    \"agentic-odi-core\",\n]\n\n[tool.uv.sources]\nagentic-odi-connectors = { workspace = true }\nagentic-odi-core = { workspace = true }\n\n[project.scripts]\nagentic-odi = \"cli.cli:app\"\n\n[build-system]\nrequires = [\"hatchling\"]\nbuild-backend = \"hatchling.build\"\n\n[tool.hatch.build.targets.wheel]\npackages = [\"src/cli\"]\n\n[tool.ruff]\nline-length = 100\ntarget-version = \"py310\"\n\n[tool.ruff.lint]\nselect = [\"E4\", \"E7\", \"E9\", \"F\", \"I\", \"UP\", \"B\", \"BLE\"]\n\n[tool.mypy]\npython_version = \"3.10\"\nignore_missing_imports = true\n__init__.py\n__main__.py\n__pycache__\nbackend.py\ncli.py\nconnectors.py\noutcomes.py\nversion.py\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "cat /home/alexa/repos/agentic-odi/cli/pyproject.toml; ls /home/alexa/repos/agentic-odi/cli/src/cli",
+            "time": {
+              "start": 1792095662997,
+              "end": 1792095663098
+            }
+          },
+          "id": "prt_14139b2cd001KXUiPmWr92NfpO",
+          "sessionID": "ses_ebec66ddeffeNuKIbZ6Iv0482W",
+          "messageID": "msg_14139a6d1001ExnPiIAgx9JJFp"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "a9463ef83a6340e5b45c674d83bb7a1a0a0f2587",
+          "type": "step-finish",
+          "tokens": {
+            "total": 18533,
+            "input": 3501,
+            "output": 94,
+            "reasoning": 26,
+            "cache": {
+              "write": 0,
+              "read": 14912
+            }
+          },
+          "cost": 0,
+          "id": "prt_14139b4aa001FGfIx4rGBr1Ein",
+          "sessionID": "ses_ebec66ddeffeNuKIbZ6Iv0482W",
+          "messageID": "msg_14139a6d1001ExnPiIAgx9JJFp"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_141399246001RL60J0ZtmI09EV",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 20133,
+          "input": 1599,
+          "output": 125,
+          "reasoning": 41,
+          "cache": {
+            "write": 0,
+            "read": 18368
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792095663379,
+          "completed": 1792095667957
+        },
+        "finish": "tool-calls",
+        "id": "msg_14139b513001qyR31E4sQmFVKW",
+        "sessionID": "ses_ebec66ddeffeNuKIbZ6Iv0482W"
+      },
+      "parts": [
+        {
+          "snapshot": "a9463ef83a6340e5b45c674d83bb7a1a0a0f2587",
+          "type": "step-start",
+          "id": "prt_14139c0fc0010W57VE5bj4GOAf",
+          "sessionID": "ses_ebec66ddeffeNuKIbZ6Iv0482W",
+          "messageID": "msg_14139b513001qyR31E4sQmFVKW"
+        },
+        {
+          "type": "reasoning",
+          "text": "Let me look at CI, cli.py structure, version.py, and check for things like how the CLI imports workspace packages, any dynamic data files, shell completions, config dir usage, etc.",
+          "time": {
+            "start": 1792095666444,
+            "end": 1792095666973
+          },
+          "id": "prt_14139c10c001WfNx8RY7cCisnI",
+          "sessionID": "ses_ebec66ddeffeNuKIbZ6Iv0482W",
+          "messageID": "msg_14139b513001qyR31E4sQmFVKW"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "call_82dd2096b4de44f39985ebba",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "cat /home/alexa/repos/agentic-odi/.github/workflows/ci.yml; ls /home/alexa/repos/agentic-odi/.github/workflows"
+            },
+            "output": "name: CI\n\non:\n  push:\n    branches: [main]\n  pull_request:\n    branches: [main]\n  workflow_dispatch:\n\nconcurrency:\n  group: ${{ github.workflow }}-${{ github.ref }}\n  cancel-in-progress: true\n\npermissions:\n  contents: read\n\ndefaults:\n  run:\n    shell: bash\n\njobs:\n  lint:\n    runs-on: ubuntu-latest\n    timeout-minutes: 10\n    steps:\n      - uses: actions/checkout@v7\n      - uses: ./.github/actions/setup\n\n      - name: Run Ruff Lint (no auto-fix)\n        run: uv run ruff check .\n\n      - name: Verify Ruff Formatting (no auto-fix)\n        run: uv run ruff format --check .\n\n  typecheck:\n    runs-on: ubuntu-latest\n    timeout-minutes: 10\n    steps:\n      - uses: actions/checkout@v7\n      - uses: ./.github/actions/setup\n\n      - name: Run Mypy (core)\n        run: uv run --directory core mypy .\n\n      - name: Run Mypy (mcp_server)\n        run: uv run --directory mcp_server mypy .\n\n      - name: Run Mypy (local_server)\n        run: uv run --directory local_server mypy .\n\n      - name: Run Mypy (cli)\n        run: uv run --directory cli mypy .\n\n      - name: Run Mypy (client)\n        run: uv run --directory client mypy .\n\n      - name: Run Mypy (connectors)\n        run: uv run --directory connectors mypy .\n\n  security:\n    runs-on: ubuntu-latest\n    timeout-minutes: 10\n    steps:\n      - uses: actions/checkout@v7\n      - uses: ./.github/actions/setup\n\n      - name: Run Bandit\n        run: uv run bandit -c pyproject.toml -r core/src mcp_server/src local_server/src cli/src client/src connectors/src\n\n  test:\n    runs-on: ubuntu-latest\n    timeout-minutes: 20\n    strategy:\n      fail-fast: false\n      matrix:\n        python-version: [\"3.10\", \"3.11\", \"3.12\"]\n    steps:\n      - uses: actions/checkout@v7\n      - uses: ./.github/actions/setup\n        with:\n          python-version: ${{ matrix.python-version }}\n\n      - name: Pytest (core)\n        run: uv run --directory core pytest --cov=core --cov-report=term-missing\n        env:\n          COVERAGE_FILE: ${{ github.workspace }}/.coverage.core\n\n      - name: Pytest (mcp_server)\n        run: uv run --directory mcp_server pytest --cov=mcp_server --cov-report=term-missing\n        env:\n          COVERAGE_FILE: ${{ github.workspace }}/.coverage.mcp_server\n\n      - name: Pytest (local_server)\n        run: uv run --directory local_server pytest --cov=local_server --cov-report=term-missing\n        env:\n          COVERAGE_FILE: ${{ github.workspace }}/.coverage.local_server\n\n      - name: Pytest (cli)\n        run: uv run --directory cli pytest --cov=cli --cov-report=term-missing\n        env:\n          COVERAGE_FILE: ${{ github.workspace }}/.coverage.cli\n\n      - name: Pytest (client)\n        run: uv run --directory client pytest --cov=client --cov-report=term-missing\n        env:\n          COVERAGE_FILE: ${{ github.workspace }}/.coverage.client\n\n      - name: Pytest (connectors)\n        run: uv run --directory connectors pytest --cov=connectors --cov-report=term-missing\n        env:\n          COVERAGE_FILE: ${{ github.workspace }}/.coverage.connectors\n\n      - name: Combine and report coverage\n        run: |\n          unset COVERAGE_FILE\n          uv run coverage combine \\\n            \"${{ github.workspace }}/.coverage.core\" \\\n            \"${{ github.workspace }}/.coverage.mcp_server\" \\\n            \"${{ github.workspace }}/.coverage.local_server\" \\\n            \"${{ github.workspace }}/.coverage.cli\" \\\n            \"${{ github.workspace }}/.coverage.client\" \\\n            \"${{ github.workspace }}/.coverage.connectors\"\n          uv run coverage xml -o \"${{ github.workspace }}/coverage.xml\"\n          uv run coverage report\n\n      - name: Upload coverage report\n        uses: actions/upload-artifact@v7\n        with:\n          name: coverage-${{ matrix.python-version }}\n          path: coverage.xml\n          if-no-files-found: error\n\n  smoke:\n    runs-on: ubuntu-latest\n    needs: [lint, typecheck, security, test]\n    timeout-minutes: 15\n    steps:\n      - uses: actions/checkout@v7\n      - uses: ./.github/actions/setup\n\n      - name: CLI reports a version\n        run: |\n          version=\"$(uv run python -m cli --version)\"\n          [ -n \"$version\" ]\n          echo \"OK: $version\"\n\n      - name: CLI exposes connectors commands\n        run: |\n          help=\"$(uv run python -m cli connectors --help)\"\n          echo \"$help\" | grep -q list\n          echo \"$help\" | grep -q ingest\n          echo \"OK: connectors help\"\n\n      - name: MCP server boots and serves /mcp\n        run: |\n          uv run python -m mcp_server > /tmp/mcp_server.log 2>&1 &\n          SERVER_PID=$!\n          probe() {\n            curl -sfX POST http://localhost:8000/mcp \\\n              -H 'Content-Type: application/json' \\\n              -d '{\"jsonrpc\":\"2.0\",\"method\":\"initialize\",\"id\":1,\"params\":{\"protocolVersion\":\"2024-11-05\",\"capabilities\":{},\"clientInfo\":{\"name\":\"ci\",\"version\":\"1\"}}}' \\\n              -o /dev/null\n          }\n          ok=0\n          for _ in $(seq 1 30); do\n            if probe; then ok=1; break; fi\n            sleep 1\n          done\n          kill \"$SERVER_PID\" 2>/dev/null || true\n          wait \"$SERVER_PID\" 2>/dev/null || true\n          if [ \"$ok\" -ne 1 ]; then\n            echo \"MCP server did not respond on :8000/mcp\"\n            cat /tmp/mcp_server.log\n            exit 1\n          fi\n          echo \"OK: MCP server responded with 200\"\n\n      - name: python -m client.run brings up both services and stops cleanly\n        run: |\n          uv run python -m client.run > /tmp/clientrun.log 2>&1 &\n          RUN_PID=$!\n          probe() {\n            curl -sf -o /dev/null http://localhost:8501 &&\n              curl -sfX POST http://localhost:8000/mcp \\\n                -H 'Content-Type: application/json' \\\n                -d '{\"jsonrpc\":\"2.0\",\"method\":\"initialize\",\"id\":1,\"params\":{\"protocolVersion\":\"2024-11-05\",\"capabilities\":{},\"clientInfo\":{\"name\":\"ci\",\"version\":\"1\"}}}' \\\n                -o /dev/null\n          }\n          ok=0\n          for _ in $(seq 1 60); do\n            if probe; then ok=1; break; fi\n            sleep 1\n          done\n          if [ \"$ok\" -ne 1 ]; then\n            echo \"client.run did not bring up both services\"\n            cat /tmp/clientrun.log\n            kill \"$RUN_PID\" 2>/dev/null || true\n            exit 1\n          fi\n          kill -INT \"$RUN_PID\"\n          wait \"$RUN_PID\"\n          echo \"OK: both services stopped cleanly\"\n\n  ci-green:\n    name: CI green\n    runs-on: ubuntu-latest\n    needs: [lint, typecheck, security, test, smoke]\n    if: always()\n    steps:\n      - name: Verify all required jobs succeeded\n        run: |\n          results='${{ join(needs.*.result, ' ') }}'\n          echo \"Job results: $results\"\n          for result in $results; do\n            if [ \"$result\" != \"success\" ]; then\n              echo \"::error::A required job did not succeed ($results)\"\n              exit 1\n            fi\n          done\n          echo \"OK: all required jobs succeeded\"\nci.yml\n",
+            "metadata": {
+              "output": "name: CI\n\non:\n  push:\n    branches: [main]\n  pull_request:\n    branches: [main]\n  workflow_dispatch:\n\nconcurrency:\n  group: ${{ github.workflow }}-${{ github.ref }}\n  cancel-in-progress: true\n\npermissions:\n  contents: read\n\ndefaults:\n  run:\n    shell: bash\n\njobs:\n  lint:\n    runs-on: ubuntu-latest\n    timeout-minutes: 10\n    steps:\n      - uses: actions/checkout@v7\n      - uses: ./.github/actions/setup\n\n      - name: Run Ruff Lint (no auto-fix)\n        run: uv run ruff check .\n\n      - name: Verify Ruff Formatting (no auto-fix)\n        run: uv run ruff format --check .\n\n  typecheck:\n    runs-on: ubuntu-latest\n    timeout-minutes: 10\n    steps:\n      - uses: actions/checkout@v7\n      - uses: ./.github/actions/setup\n\n      - name: Run Mypy (core)\n        run: uv run --directory core mypy .\n\n      - name: Run Mypy (mcp_server)\n        run: uv run --directory mcp_server mypy .\n\n      - name: Run Mypy (local_server)\n        run: uv run --directory local_server mypy .\n\n      - name: Run Mypy (cli)\n        run: uv run --directory cli mypy .\n\n      - name: Run Mypy (client)\n        run: uv run --directory client mypy .\n\n      - name: Run Mypy (connectors)\n        run: uv run --directory connectors mypy .\n\n  security:\n    runs-on: ubuntu-latest\n    timeout-minutes: 10\n    steps:\n      - uses: actions/checkout@v7\n      - uses: ./.github/actions/setup\n\n      - name: Run Bandit\n        run: uv run bandit -c pyproject.toml -r core/src mcp_server/src local_server/src cli/src client/src connectors/src\n\n  test:\n    runs-on: ubuntu-latest\n    timeout-minutes: 20\n    strategy:\n      fail-fast: false\n      matrix:\n        python-version: [\"3.10\", \"3.11\", \"3.12\"]\n    steps:\n      - uses: actions/checkout@v7\n      - uses: ./.github/actions/setup\n        with:\n          python-version: ${{ matrix.python-version }}\n\n      - name: Pytest (core)\n        run: uv run --directory core pytest --cov=core --cov-report=term-missing\n        env:\n          COVERAGE_FILE: ${{ github.workspace }}/.coverage.core\n\n      - name: Pytest (mcp_server)\n        run: uv run --directory mcp_server pytest --cov=mcp_server --cov-report=term-missing\n        env:\n          COVERAGE_FILE: ${{ github.workspace }}/.coverage.mcp_server\n\n      - name: Pytest (local_server)\n        run: uv run --directory local_server pytest --cov=local_server --cov-report=term-missing\n        env:\n          COVERAGE_FILE: ${{ github.workspace }}/.coverage.local_server\n\n      - name: Pytest (cli)\n        run: uv run --directory cli pytest --cov=cli --cov-report=term-missing\n        env:\n          COVERAGE_FILE: ${{ github.workspace }}/.coverage.cli\n\n      - name: Pytest (client)\n        run: uv run --directory client pytest --cov=client --cov-report=term-missing\n        env:\n          COVERAGE_FILE: ${{ github.workspace }}/.coverage.client\n\n      - name: Pytest (connectors)\n        run: uv run --directory connectors pytest --cov=connectors --cov-report=term-missing\n        env:\n          COVERAGE_FILE: ${{ github.workspace }}/.coverage.connectors\n\n      - name: Combine and report coverage\n        run: |\n          unset COVERAGE_FILE\n          uv run coverage combine \\\n            \"${{ github.workspace }}/.coverage.core\" \\\n            \"${{ github.workspace }}/.coverage.mcp_server\" \\\n            \"${{ github.workspace }}/.coverage.local_server\" \\\n            \"${{ github.workspace }}/.coverage.cli\" \\\n            \"${{ github.workspace }}/.coverage.client\" \\\n            \"${{ github.workspace }}/.coverage.connectors\"\n          uv run coverage xml -o \"${{ github.workspace }}/coverage.xml\"\n          uv run coverage report\n\n      - name: Upload coverage report\n        uses: actions/upload-artifact@v7\n        with:\n          name: coverage-${{ matrix.python-version }}\n          path: coverage.xml\n          if-no-files-found: error\n\n  smoke:\n    runs-on: ubuntu-latest\n    needs: [lint, typecheck, security, test]\n    timeout-minutes: 15\n    steps:\n      - uses: actions/checkout@v7\n      - uses: ./.github/actions/setup\n\n      - name: CLI reports a version\n        run: |\n          version=\"$(uv run python -m cli --version)\"\n          [ -n \"$version\" ]\n          echo \"OK: $version\"\n\n      - name: CLI exposes connectors commands\n        run: |\n          help=\"$(uv run python -m cli connectors --help)\"\n          echo \"$help\" | grep -q list\n          echo \"$help\" | grep -q ingest\n          echo \"OK: connectors help\"\n\n      - name: MCP server boots and serves /mcp\n        run: |\n          uv run python -m mcp_server > /tmp/mcp_server.log 2>&1 &\n          SERVER_PID=$!\n          probe() {\n            curl -sfX POST http://localhost:8000/mcp \\\n              -H 'Content-Type: application/json' \\\n              -d '{\"jsonrpc\":\"2.0\",\"method\":\"initialize\",\"id\":1,\"params\":{\"protocolVersion\":\"2024-11-05\",\"capabilities\":{},\"clientInfo\":{\"name\":\"ci\",\"version\":\"1\"}}}' \\\n              -o /dev/null\n          }\n          ok=0\n          for _ in $(seq 1 30); do\n            if probe; then ok=1; break; fi\n            sleep 1\n          done\n          kill \"$SERVER_PID\" 2>/dev/null || true\n          wait \"$SERVER_PID\" 2>/dev/null || true\n          if [ \"$ok\" -ne 1 ]; then\n            echo \"MCP server did not respond on :8000/mcp\"\n            cat /tmp/mcp_server.log\n            exit 1\n          fi\n          echo \"OK: MCP server responded with 200\"\n\n      - name: python -m client.run brings up both services and stops cleanly\n        run: |\n          uv run python -m client.run > /tmp/clientrun.log 2>&1 &\n          RUN_PID=$!\n          probe() {\n            curl -sf -o /dev/null http://localhost:8501 &&\n              curl -sfX POST http://localhost:8000/mcp \\\n                -H 'Content-Type: application/json' \\\n                -d '{\"jsonrpc\":\"2.0\",\"method\":\"initialize\",\"id\":1,\"params\":{\"protocolVersion\":\"2024-11-05\",\"capabilities\":{},\"clientInfo\":{\"name\":\"ci\",\"version\":\"1\"}}}' \\\n                -o /dev/null\n          }\n          ok=0\n          for _ in $(seq 1 60); do\n            if probe; then ok=1; break; fi\n            sleep 1\n          done\n          if [ \"$ok\" -ne 1 ]; then\n            echo \"client.run did not bring up both services\"\n            cat /tmp/clientrun.log\n            kill \"$RUN_PID\" 2>/dev/null || true\n            exit 1\n          fi\n          kill -INT \"$RUN_PID\"\n          wait \"$RUN_PID\"\n          echo \"OK: both services stopped cleanly\"\n\n  ci-green:\n    name: CI green\n    runs-on: ubuntu-latest\n    needs: [lint, typecheck, security, test, smoke]\n    if: always()\n    steps:\n      - name: Verify all required jobs succeeded\n        run: |\n          results='${{ join(needs.*.result, ' ') }}'\n          echo \"Job results: $results\"\n          for result in $results; do\n            if [ \"$result\" != \"success\" ]; then\n              echo \"::error::A required job did not succeed ($results)\"\n              exit 1\n            fi\n          done\n          echo \"OK: all required jobs succeeded\"\nci.yml\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "cat /home/alexa/repos/agentic-odi/.github/workflows/ci.yml; ls /home/alexa/repos/agentic-odi/.github/workflows",
+            "time": {
+              "start": 1792095667078,
+              "end": 1792095667138
+            }
+          },
+          "id": "prt_14139c321001Hfe8HDRst8vFa8",
+          "sessionID": "ses_ebec66ddeffeNuKIbZ6Iv0482W",
+          "messageID": "msg_14139b513001qyR31E4sQmFVKW"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "call_060e2f2b39034c27baa3ea79",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "cat /home/alexa/repos/agentic-odi/cli/src/cli/version.py; head -80 /home/alexa/repos/agentic-odi/cli/src/cli/cli.py; head -50 /home/alexa/repos/agentic-odi/cli/src/cli/outcomes.py"
+            },
+            "output": "\"\"\"Version information.\"\"\"\n\n__version__ = \"0.1.0\"\n\"\"\"Main CLI entry point.\"\"\"\n\nimport typer\n\nfrom cli.connectors import connectors_app\nfrom cli.outcomes import outcomes_app\nfrom cli.version import __version__\n\napp = typer.Typer(\n    name=\"agentic-odi-cli\",\n    help=\"Agentic ODI CLI - Tool for managing Jobs-to-be-Done (JTBD) and ODI workflows.\",\n)\napp.add_typer(connectors_app, name=\"connectors\")\n\napp.add_typer(outcomes_app, name=\"outcomes\", help=\"Manage Customer Outcomes\")\n\n\ndef _version_callback(value: bool) -> None:\n    if value:\n        typer.echo(__version__)\n        raise typer.Exit()\n\n\n@app.callback()\ndef main(\n    version: bool = typer.Option(\n        False, \"--version\", callback=_version_callback, help=\"Show version\"\n    ),\n) -> None:  # noqa: B008\n    pass\n\n\n@app.command()\ndef version_cmd() -> None:\n    \"\"\"Show CLI version.\"\"\"\n    typer.echo(__version__)\n\n\nif __name__ == \"__main__\":\n    app()\n\"\"\"Customer Outcomes CLI subcommands.\"\"\"\n\nfrom __future__ import annotations\n\nimport asyncio\nimport os\nfrom enum import Enum\nfrom typing import Any\n\nimport typer\nfrom fastmcp import Client\n\nMCP_URL_DEFAULT = os.getenv(\"AGENTIC_ODI_MCP_URL\", \"http://localhost:8000/mcp\")\n\noutcomes_app = typer.Typer(help=\"Manage Customer Outcome entities.\")\n\n\nclass DirectionOption(str, Enum):\n    MINIMIZE = \"minimize\"\n    MAXIMIZE = \"maximize\"\n\n\nclass CategoryOption(str, Enum):\n    REVENUE_GROWTH = \"revenue_growth\"\n    COST_REDUCTION = \"cost_reduction\"\n    RETENTION = \"retention\"\n    RISK_MITIGATION = \"risk_mitigation\"\n    OPERATIONAL_EFFICIENCY = \"operational_efficiency\"\n    COMPLIANCE = \"compliance\"\n    BRAND_REPUTATION = \"brand_reputation\"\n    OTHER = \"other\"\n\n\ndef _call_mcp(tool: str, args: dict[str, Any], mcp_url: str = MCP_URL_DEFAULT) -> str:\n    async def _run() -> str:\n        async with Client(mcp_url) as client:\n            result = await client.call_tool(tool, args)\n            return result.content[0].text  # type: ignore[index]\n\n    try:\n        return asyncio.run(_run())\n    except Exception as exc:  # noqa: BLE001\n        typer.echo(f\"Error: could not reach MCP server at {mcp_url}: {exc}\", err=True)\n        raise typer.Exit(code=1) from exc\n\n\n@outcomes_app.command(\"add\")\ndef add(\n    job_id: str = typer.Option(..., help=\"Job ID the outcome belongs to\"),\n    direction: DirectionOption = typer.Option(..., help=\"minimize | maximize\"),  # noqa: B008\n",
+            "metadata": {
+              "output": "\"\"\"Version information.\"\"\"\n\n__version__ = \"0.1.0\"\n\"\"\"Main CLI entry point.\"\"\"\n\nimport typer\n\nfrom cli.connectors import connectors_app\nfrom cli.outcomes import outcomes_app\nfrom cli.version import __version__\n\napp = typer.Typer(\n    name=\"agentic-odi-cli\",\n    help=\"Agentic ODI CLI - Tool for managing Jobs-to-be-Done (JTBD) and ODI workflows.\",\n)\napp.add_typer(connectors_app, name=\"connectors\")\n\napp.add_typer(outcomes_app, name=\"outcomes\", help=\"Manage Customer Outcomes\")\n\n\ndef _version_callback(value: bool) -> None:\n    if value:\n        typer.echo(__version__)\n        raise typer.Exit()\n\n\n@app.callback()\ndef main(\n    version: bool = typer.Option(\n        False, \"--version\", callback=_version_callback, help=\"Show version\"\n    ),\n) -> None:  # noqa: B008\n    pass\n\n\n@app.command()\ndef version_cmd() -> None:\n    \"\"\"Show CLI version.\"\"\"\n    typer.echo(__version__)\n\n\nif __name__ == \"__main__\":\n    app()\n\"\"\"Customer Outcomes CLI subcommands.\"\"\"\n\nfrom __future__ import annotations\n\nimport asyncio\nimport os\nfrom enum import Enum\nfrom typing import Any\n\nimport typer\nfrom fastmcp import Client\n\nMCP_URL_DEFAULT = os.getenv(\"AGENTIC_ODI_MCP_URL\", \"http://localhost:8000/mcp\")\n\noutcomes_app = typer.Typer(help=\"Manage Customer Outcome entities.\")\n\n\nclass DirectionOption(str, Enum):\n    MINIMIZE = \"minimize\"\n    MAXIMIZE = \"maximize\"\n\n\nclass CategoryOption(str, Enum):\n    REVENUE_GROWTH = \"revenue_growth\"\n    COST_REDUCTION = \"cost_reduction\"\n    RETENTION = \"retention\"\n    RISK_MITIGATION = \"risk_mitigation\"\n    OPERATIONAL_EFFICIENCY = \"operational_efficiency\"\n    COMPLIANCE = \"compliance\"\n    BRAND_REPUTATION = \"brand_reputation\"\n    OTHER = \"other\"\n\n\ndef _call_mcp(tool: str, args: dict[str, Any], mcp_url: str = MCP_URL_DEFAULT) -> str:\n    async def _run() -> str:\n        async with Client(mcp_url) as client:\n            result = await client.call_tool(tool, args)\n            return result.content[0].text  # type: ignore[index]\n\n    try:\n        return asyncio.run(_run())\n    except Exception as exc:  # noqa: BLE001\n        typer.echo(f\"Error: could not reach MCP server at {mcp_url}: {exc}\", err=True)\n        raise typer.Exit(code=1) from exc\n\n\n@outcomes_app.command(\"add\")\ndef add(\n    job_id: str = typer.Option(..., help=\"Job ID the outcome belongs to\"),\n    direction: DirectionOption = typer.Option(..., help=\"minimize | maximize\"),  # noqa: B008\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "cat /home/alexa/repos/agentic-odi/cli/src/cli/version.py; head -80 /home/alexa/repos/agentic-odi/cli/src/cli/cli.py; head -50 /home/alexa/repos/agentic-odi/cli/src/cli/outcomes.py",
+            "time": {
+              "start": 1792095667603,
+              "end": 1792095667647
+            }
+          },
+          "id": "prt_14139c39b001r10h6CtJHVpRLs",
+          "sessionID": "ses_ebec66ddeffeNuKIbZ6Iv0482W",
+          "messageID": "msg_14139b513001qyR31E4sQmFVKW"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "a9463ef83a6340e5b45c674d83bb7a1a0a0f2587",
+          "type": "step-finish",
+          "tokens": {
+            "total": 20133,
+            "input": 1599,
+            "output": 125,
+            "reasoning": 41,
+            "cache": {
+              "write": 0,
+              "read": 18368
+            }
+          },
+          "cost": 0,
+          "id": "prt_14139c62f001rW6v2tMutRka3W",
+          "sessionID": "ses_ebec66ddeffeNuKIbZ6Iv0482W",
+          "messageID": "msg_14139b513001qyR31E4sQmFVKW"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_141399246001RL60J0ZtmI09EV",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 22878,
+          "input": 2675,
+          "output": 186,
+          "reasoning": 113,
+          "cache": {
+            "write": 0,
+            "read": 19904
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792095667969,
+          "completed": 1792095712848
+        },
+        "finish": "tool-calls",
+        "id": "msg_14139c701001yEXi6GCDn2Ir2X",
+        "sessionID": "ses_ebec66ddeffeNuKIbZ6Iv0482W"
+      },
+      "parts": [
+        {
+          "snapshot": "a9463ef83a6340e5b45c674d83bb7a1a0a0f2587",
+          "type": "step-start",
+          "id": "prt_1413a6815001m2vp82puYQ7wAv",
+          "sessionID": "ses_ebec66ddeffeNuKIbZ6Iv0482W",
+          "messageID": "msg_14139c701001yEXi6GCDn2Ir2X"
+        },
+        {
+          "type": "reasoning",
+          "text": "Let me dig deeper at things that matter for the plan: how the CLI uses workspace deps (core, connectors — do they bundle data files, templates?), whether there's config/state dirs, whether there are shell completions, entry points, whether core/connectors load data files via importlib.resources, and whether there's existing release infra. Also check for things like `--backend` flag (doc mentions `--backend mcp` and `AGENTIC_ODI_BACKEND=local` but cli.py shown doesn't have that... let's check backend.py).",
+          "time": {
+            "start": 1792095709722,
+            "end": 1792095711298
+          },
+          "id": "prt_1413a6a1a001cIH7s5V88PcFuD",
+          "sessionID": "ses_ebec66ddeffeNuKIbZ6Iv0482W",
+          "messageID": "msg_14139c701001yEXi6GCDn2Ir2X"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "call_33a001c0b4da4cbfa7635d5b",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "cat /home/alexa/repos/agentic-odi/cli/src/cli/backend.py; sed -n 50,200p /home/alexa/repos/agentic-odi/cli/src/cli/outcomes.py"
+            },
+            "output": "\"\"\"Backend abstraction for CLI.\"\"\"\n\nfrom __future__ import annotations\n\nimport os\nfrom abc import ABC, abstractmethod\n\nfrom core import CustomerOutcomeNotFoundError, ODIService, ValueOutOfRangeError\nfrom core.repository import Repository\nfrom core.sqlite_repository import SQLiteRepository\n\n\nclass Backend(ABC):\n    @abstractmethod\n    def call(self, tool_name: str, args: dict) -> str:\n        raise NotImplementedError\n\n\nclass LocalBackend(Backend):\n    def __init__(self, db_path: str | None = None) -> None:\n        repo: Repository = SQLiteRepository(db_path=db_path)\n        self.service = ODIService(repo)\n\n    def call(self, tool_name: str, args: dict) -> str:\n        # Delegate to service and format\n        if tool_name == \"add_customer_outcome\":\n            co = self.service.add_customer_outcome(\n                job_id=args[\"job_id\"],\n                customer_value=args[\"customer_value\"],\n                business_value=args[\"business_value\"],\n                step_id=args.get(\"step_id\"),\n            )\n            return f\"Customer outcome created successfully: {co.model_dump_json()}\"\n        if tool_name == \"get_customer_outcome\":\n            try:\n                co = self.service.get_customer_outcome(args[\"outcome_id\"])\n                return co.model_dump_json()\n            except CustomerOutcomeNotFoundError as e:\n                return str(e)\n        if tool_name == \"list_customer_outcomes\":\n            cos = self.service.list_customer_outcomes(args.get(\"job_id\"))\n            import json\n\n            return json.dumps([c.model_dump() for c in cos])\n        if tool_name == \"update_customer_outcome\":\n            try:\n                co = self.service.update_customer_outcome(args[\"outcome_id\"], args)\n                return f\"Customer outcome updated successfully: {co.model_dump_json()}\"\n            except (CustomerOutcomeNotFoundError, ValueOutOfRangeError) as e:\n                return str(e)\n        if tool_name == \"delete_customer_outcome\":\n            try:\n                self.service.delete_customer_outcome(args[\"outcome_id\"])\n                return f\"Customer outcome deleted successfully: {args['outcome_id']}\"\n            except CustomerOutcomeNotFoundError as e:\n                return str(e)\n        if tool_name == \"compute_opportunity\":\n            score = self.service.compute_opportunity(args[\"importance\"], args[\"satisfaction\"])\n            return f\"Opportunity score: {score:.2f}\"\n        raise NotImplementedError(f\"Unknown tool: {tool_name}\")\n\n\nclass MCPBackend(Backend):\n    def __init__(self, mcp_url: str) -> None:\n        self.mcp_url = mcp_url\n\n    def call(self, tool_name: str, args: dict) -> str:\n        from cli.outcomes import _call_mcp\n\n        return _call_mcp(tool_name, args, self.mcp_url)\n\n\ndef get_backend(\n    backend: str | None = None, db_path: str | None = None, mcp_url: str | None = None\n) -> Backend:\n    if backend is None:\n        backend = os.environ.get(\"AGENTIC_ODI_BACKEND\", \"local\")\n    if backend == \"local\":\n        return LocalBackend(db_path=db_path)\n    if backend == \"mcp\":\n        return MCPBackend(\n            mcp_url or os.environ.get(\"AGENTIC_ODI_MCP_URL\", \"http://localhost:8000/mcp\")\n        )\n    raise ValueError(f\"Unknown backend: {backend}\")\n    direction: DirectionOption = typer.Option(..., help=\"minimize | maximize\"),  # noqa: B008\n    unit_of_measure: str = typer.Option(..., \"--unit\"),\n    object_of_control: str = typer.Option(..., \"--object\"),\n    statement: str = typer.Option(..., help=\"Full outcome statement\"),\n    importance: float = typer.Option(..., min=1.0, max=10.0),\n    satisfaction: float = typer.Option(..., min=1.0, max=10.0),\n    category: CategoryOption = typer.Option(..., help=\"Business impact category\"),  # noqa: B008\n    business_statement: str = typer.Option(..., help=\"Business value statement\"),\n    contextual_clarifier: str | None = typer.Option(default=None),\n    step_id: str | None = typer.Option(default=None),\n    mcp_url: str = typer.Option(default=MCP_URL_DEFAULT, help=\"MCP server URL\"),\n) -> None:\n    \"\"\"Add a Customer Outcome with customer and business value.\"\"\"\n    customer_value = {\n        \"direction\": direction.value,\n        \"unit_of_measure\": unit_of_measure,\n        \"object_of_control\": object_of_control,\n        \"statement\": statement,\n        \"importance\": importance,\n        \"satisfaction\": satisfaction,\n    }\n    if contextual_clarifier:\n        customer_value[\"contextual_clarifier\"] = contextual_clarifier\n    business_value = {\n        \"category\": category.value,\n        \"statement\": business_statement,\n    }\n    args: dict[str, Any] = {\n        \"job_id\": job_id,\n        \"customer_value\": customer_value,\n        \"business_value\": business_value,\n    }\n    if step_id:\n        args[\"step_id\"] = step_id\n    from cli.backend import get_backend\n\n    typer.echo(get_backend(\"mcp\", mcp_url=mcp_url).call(\"add_customer_outcome\", args))\n\n\n@outcomes_app.command(\"get\")\ndef get(\n    outcome_id: str = typer.Argument(...),\n    mcp_url: str = typer.Option(default=MCP_URL_DEFAULT, help=\"MCP server URL\"),\n) -> None:\n    \"\"\"Get a Customer Outcome by ID.\"\"\"\n    from cli.backend import get_backend\n\n    typer.echo(\n        get_backend(\"mcp\", mcp_url=mcp_url).call(\"get_customer_outcome\", {\"outcome_id\": outcome_id})\n    )\n\n\n@outcomes_app.command(\"list\")\ndef list_outcomes(\n    job_id: str | None = typer.Option(default=None, help=\"Filter by job ID\"),\n    mcp_url: str = typer.Option(default=MCP_URL_DEFAULT, help=\"MCP server URL\"),\n) -> None:\n    \"\"\"List Customer Outcomes.\"\"\"\n    args: dict[str, Any] = {}\n    if job_id:\n        args[\"job_id\"] = job_id\n    from cli.backend import get_backend\n\n    typer.echo(get_backend(\"mcp\", mcp_url=mcp_url).call(\"list_customer_outcomes\", args))\n\n\n@outcomes_app.command(\"update\")\ndef update(\n    outcome_id: str = typer.Argument(...),\n    importance: float | None = typer.Option(default=None, min=1.0, max=10.0),\n    satisfaction: float | None = typer.Option(default=None, min=1.0, max=10.0),\n    direction: DirectionOption | None = typer.Option(default=None),  # noqa: B008\n    unit_of_measure: str | None = typer.Option(default=None, help=\"Unit of measure\"),\n    object_of_control: str | None = typer.Option(default=None, help=\"Object of control\"),\n    contextual_clarifier: str | None = typer.Option(default=None),\n    statement: str | None = typer.Option(default=None),\n    category: CategoryOption | None = typer.Option(default=None),  # noqa: B008\n    business_statement: str | None = typer.Option(default=None),\n    detail: str | None = typer.Option(default=None),\n    estimated_annual_value: float | None = typer.Option(default=None),\n    confidence: float | None = typer.Option(default=None),\n    step_id: str | None = typer.Option(default=None),\n    mcp_url: str = typer.Option(default=MCP_URL_DEFAULT, help=\"MCP server URL\"),\n) -> None:\n    \"\"\"Update a Customer Outcome.\"\"\"\n    args: dict[str, Any] = {\"outcome_id\": outcome_id}\n    if step_id is not None:\n        args[\"step_id\"] = step_id\n    if importance is not None:\n        args[\"importance\"] = importance\n    if satisfaction is not None:\n        args[\"satisfaction\"] = satisfaction\n    if direction is not None:\n        args[\"direction\"] = direction.value\n    if unit_of_measure is not None:\n        args[\"unit_of_measure\"] = unit_of_measure\n    if object_of_control is not None:\n        args[\"object_of_control\"] = object_of_control\n    if contextual_clarifier is not None:\n        args[\"contextual_clarifier\"] = contextual_clarifier\n    if statement is not None:\n        args[\"statement\"] = statement\n    if category is not None:\n        args[\"category\"] = category.value\n    if business_statement is not None:\n        args[\"business_statement\"] = business_statement\n    if detail is not None:\n        args[\"detail\"] = detail\n    if estimated_annual_value is not None:\n        args[\"estimated_annual_value\"] = estimated_annual_value\n    if confidence is not None:\n        args[\"confidence\"] = confidence\n    from cli.backend import get_backend\n\n    typer.echo(get_backend(\"mcp\", mcp_url=mcp_url).call(\"update_customer_outcome\", args))\n\n\n@outcomes_app.command(\"delete\")\ndef delete(\n    outcome_id: str = typer.Argument(...),\n    yes: bool = typer.Option(False, \"--yes\", \"-y\", help=\"Skip confirmation\"),\n    mcp_url: str = typer.Option(default=MCP_URL_DEFAULT, help=\"MCP server URL\"),\n) -> None:\n    \"\"\"Delete a Customer Outcome.\"\"\"\n    if not yes:\n        confirm = typer.confirm(f\"Delete customer outcome {outcome_id}?\")\n        if not confirm:\n            raise typer.Exit()\n    from cli.backend import get_backend\n\n    typer.echo(\n        get_backend(\"mcp\", mcp_url=mcp_url).call(\n            \"delete_customer_outcome\", {\"outcome_id\": outcome_id}\n        )\n    )\n\n\n@outcomes_app.command(\"score\")\ndef score(\n    importance: float = typer.Argument(..., min=1.0, max=10.0),\n    satisfaction: float = typer.Argument(..., min=1.0, max=10.0),\n    mcp_url: str = typer.Option(default=MCP_URL_DEFAULT, help=\"MCP server URL\"),\n) -> None:\n    \"\"\"Compute ODI Opportunity Score.\"\"\"\n    typer.echo(\n        _call_mcp(\n            \"compute_opportunity\",\n            {\"importance\": importance, \"satisfaction\": satisfaction},\n            mcp_url,\n        )\n    )\n",
+            "metadata": {
+              "output": "\"\"\"Backend abstraction for CLI.\"\"\"\n\nfrom __future__ import annotations\n\nimport os\nfrom abc import ABC, abstractmethod\n\nfrom core import CustomerOutcomeNotFoundError, ODIService, ValueOutOfRangeError\nfrom core.repository import Repository\nfrom core.sqlite_repository import SQLiteRepository\n\n\nclass Backend(ABC):\n    @abstractmethod\n    def call(self, tool_name: str, args: dict) -> str:\n        raise NotImplementedError\n\n\nclass LocalBackend(Backend):\n    def __init__(self, db_path: str | None = None) -> None:\n        repo: Repository = SQLiteRepository(db_path=db_path)\n        self.service = ODIService(repo)\n\n    def call(self, tool_name: str, args: dict) -> str:\n        # Delegate to service and format\n        if tool_name == \"add_customer_outcome\":\n            co = self.service.add_customer_outcome(\n                job_id=args[\"job_id\"],\n                customer_value=args[\"customer_value\"],\n                business_value=args[\"business_value\"],\n                step_id=args.get(\"step_id\"),\n            )\n            return f\"Customer outcome created successfully: {co.model_dump_json()}\"\n        if tool_name == \"get_customer_outcome\":\n            try:\n                co = self.service.get_customer_outcome(args[\"outcome_id\"])\n                return co.model_dump_json()\n            except CustomerOutcomeNotFoundError as e:\n                return str(e)\n        if tool_name == \"list_customer_outcomes\":\n            cos = self.service.list_customer_outcomes(args.get(\"job_id\"))\n            import json\n\n            return json.dumps([c.model_dump() for c in cos])\n        if tool_name == \"update_customer_outcome\":\n            try:\n                co = self.service.update_customer_outcome(args[\"outcome_id\"], args)\n                return f\"Customer outcome updated successfully: {co.model_dump_json()}\"\n            except (CustomerOutcomeNotFoundError, ValueOutOfRangeError) as e:\n                return str(e)\n        if tool_name == \"delete_customer_outcome\":\n            try:\n                self.service.delete_customer_outcome(args[\"outcome_id\"])\n                return f\"Customer outcome deleted successfully: {args['outcome_id']}\"\n            except CustomerOutcomeNotFoundError as e:\n                return str(e)\n        if tool_name == \"compute_opportunity\":\n            score = self.service.compute_opportunity(args[\"importance\"], args[\"satisfaction\"])\n            return f\"Opportunity score: {score:.2f}\"\n        raise NotImplementedError(f\"Unknown tool: {tool_name}\")\n\n\nclass MCPBackend(Backend):\n    def __init__(self, mcp_url: str) -> None:\n        self.mcp_url = mcp_url\n\n    def call(self, tool_name: str, args: dict) -> str:\n        from cli.outcomes import _call_mcp\n\n        return _call_mcp(tool_name, args, self.mcp_url)\n\n\ndef get_backend(\n    backend: str | None = None, db_path: str | None = None, mcp_url: str | None = None\n) -> Backend:\n    if backend is None:\n        backend = os.environ.get(\"AGENTIC_ODI_BACKEND\", \"local\")\n    if backend == \"local\":\n        return LocalBackend(db_path=db_path)\n    if backend == \"mcp\":\n        return MCPBackend(\n            mcp_url or os.environ.get(\"AGENTIC_ODI_MCP_URL\", \"http://localhost:8000/mcp\")\n        )\n    raise ValueError(f\"Unknown backend: {backend}\")\n    direction: DirectionOption = typer.Option(..., help=\"minimize | maximize\"),  # noqa: B008\n    unit_of_measure: str = typer.Option(..., \"--unit\"),\n    object_of_control: str = typer.Option(..., \"--object\"),\n    statement: str = typer.Option(..., help=\"Full outcome statement\"),\n    importance: float = typer.Option(..., min=1.0, max=10.0),\n    satisfaction: float = typer.Option(..., min=1.0, max=10.0),\n    category: CategoryOption = typer.Option(..., help=\"Business impact category\"),  # noqa: B008\n    business_statement: str = typer.Option(..., help=\"Business value statement\"),\n    contextual_clarifier: str | None = typer.Option(default=None),\n    step_id: str | None = typer.Option(default=None),\n    mcp_url: str = typer.Option(default=MCP_URL_DEFAULT, help=\"MCP server URL\"),\n) -> None:\n    \"\"\"Add a Customer Outcome with customer and business value.\"\"\"\n    customer_value = {\n        \"direction\": direction.value,\n        \"unit_of_measure\": unit_of_measure,\n        \"object_of_control\": object_of_control,\n        \"statement\": statement,\n        \"importance\": importance,\n        \"satisfaction\": satisfaction,\n    }\n    if contextual_clarifier:\n        customer_value[\"contextual_clarifier\"] = contextual_clarifier\n    business_value = {\n        \"category\": category.value,\n        \"statement\": business_statement,\n    }\n    args: dict[str, Any] = {\n        \"job_id\": job_id,\n        \"customer_value\": customer_value,\n        \"business_value\": business_value,\n    }\n    if step_id:\n        args[\"step_id\"] = step_id\n    from cli.backend import get_backend\n\n    typer.echo(get_backend(\"mcp\", mcp_url=mcp_url).call(\"add_customer_outcome\", args))\n\n\n@outcomes_app.command(\"get\")\ndef get(\n    outcome_id: str = typer.Argument(...),\n    mcp_url: str = typer.Option(default=MCP_URL_DEFAULT, help=\"MCP server URL\"),\n) -> None:\n    \"\"\"Get a Customer Outcome by ID.\"\"\"\n    from cli.backend import get_backend\n\n    typer.echo(\n        get_backend(\"mcp\", mcp_url=mcp_url).call(\"get_customer_outcome\", {\"outcome_id\": outcome_id})\n    )\n\n\n@outcomes_app.command(\"list\")\ndef list_outcomes(\n    job_id: str | None = typer.Option(default=None, help=\"Filter by job ID\"),\n    mcp_url: str = typer.Option(default=MCP_URL_DEFAULT, help=\"MCP server URL\"),\n) -> None:\n    \"\"\"List Customer Outcomes.\"\"\"\n    args: dict[str, Any] = {}\n    if job_id:\n        args[\"job_id\"] = job_id\n    from cli.backend import get_backend\n\n    typer.echo(get_backend(\"mcp\", mcp_url=mcp_url).call(\"list_customer_outcomes\", args))\n\n\n@outcomes_app.command(\"update\")\ndef update(\n    outcome_id: str = typer.Argument(...),\n    importance: float | None = typer.Option(default=None, min=1.0, max=10.0),\n    satisfaction: float | None = typer.Option(default=None, min=1.0, max=10.0),\n    direction: DirectionOption | None = typer.Option(default=None),  # noqa: B008\n    unit_of_measure: str | None = typer.Option(default=None, help=\"Unit of measure\"),\n    object_of_control: str | None = typer.Option(default=None, help=\"Object of control\"),\n    contextual_clarifier: str | None = typer.Option(default=None),\n    statement: str | None = typer.Option(default=None),\n    category: CategoryOption | None = typer.Option(default=None),  # noqa: B008\n    business_statement: str | None = typer.Option(default=None),\n    detail: str | None = typer.Option(default=None),\n    estimated_annual_value: float | None = typer.Option(default=None),\n    confidence: float | None = typer.Option(default=None),\n    step_id: str | None = typer.Option(default=None),\n    mcp_url: str = typer.Option(default=MCP_URL_DEFAULT, help=\"MCP server URL\"),\n) -> None:\n    \"\"\"Update a Customer Outcome.\"\"\"\n    args: dict[str, Any] = {\"outcome_id\": outcome_id}\n    if step_id is not None:\n        args[\"step_id\"] = step_id\n    if importance is not None:\n        args[\"importance\"] = importance\n    if satisfaction is not None:\n        args[\"satisfaction\"] = satisfaction\n    if direction is not None:\n        args[\"direction\"] = direction.value\n    if unit_of_measure is not None:\n        args[\"unit_of_measure\"] = unit_of_measure\n    if object_of_control is not None:\n        args[\"object_of_control\"] = object_of_control\n    if contextual_clarifier is not None:\n        args[\"contextual_clarifier\"] = contextual_clarifier\n    if statement is not None:\n        args[\"statement\"] = statement\n    if category is not None:\n        args[\"category\"] = category.value\n    if business_statement is not None:\n        args[\"business_statement\"] = business_statement\n    if detail is not None:\n        args[\"detail\"] = detail\n    if estimated_annual_value is not None:\n        args[\"estimated_annual_value\"] = estimated_annual_value\n    if confidence is not None:\n        args[\"confidence\"] = confidence\n    from cli.backend import get_backend\n\n    typer.echo(get_backend(\"mcp\", mcp_url=mcp_url).call(\"update_customer_outcome\", args))\n\n\n@outcomes_app.command(\"delete\")\ndef delete(\n    outcome_id: str = typer.Argument(...),\n    yes: bool = typer.Option(False, \"--yes\", \"-y\", help=\"Skip confirmation\"),\n    mcp_url: str = typer.Option(default=MCP_URL_DEFAULT, help=\"MCP server URL\"),\n) -> None:\n    \"\"\"Delete a Customer Outcome.\"\"\"\n    if not yes:\n        confirm = typer.confirm(f\"Delete customer outcome {outcome_id}?\")\n        if not confirm:\n            raise typer.Exit()\n    from cli.backend import get_backend\n\n    typer.echo(\n        get_backend(\"mcp\", mcp_url=mcp_url).call(\n            \"delete_customer_outcome\", {\"outcome_id\": outcome_id}\n        )\n    )\n\n\n@outcomes_app.command(\"score\")\ndef score(\n    importance: float = typer.Argument(..., min=1.0, max=10.0),\n    satisfaction: float = typer.Argument(..., min=1.0, max=10.0),\n    mcp_url: str = typer.Option(default=MCP_URL_DEFAULT, help=\"MCP server URL\"),\n) -> None:\n    \"\"\"Compute ODI Opportunity Score.\"\"\"\n    typer.echo(\n        _call_mcp(\n            \"compute_opportunity\",\n            {\"importance\": importance, \"satisfaction\": satisfaction},\n            mcp_url,\n        )\n    )\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "cat /home/alexa/repos/agentic-odi/cli/src/cli/backend.py; sed -n 50,200p /home/alexa/repos/agentic-odi/cli/src/cli/outcomes.py",
+            "time": {
+              "start": 1792095711818,
+              "end": 1792095711869
+            }
+          },
+          "id": "prt_1413a7048001cSVAHe13nh9tJI",
+          "sessionID": "ses_ebec66ddeffeNuKIbZ6Iv0482W",
+          "messageID": "msg_14139c701001yEXi6GCDn2Ir2X"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "call_35521fbf5bd246efbb563a6f",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "grep -rn \"files(\\|read_text\\|importlib.resources\\|pkgutil\\|__file__\\|Path(__file__\" /home/alexa/repos/agentic-odi/core/src /home/alexa/repos/agentic-odi/connectors/src /home/alexa/repos/agentic-odi/cli/src 2>/dev/null | head -40; echo ---; ls /home/alexa/repos/agentic-odi/core/src/core /home/alexa/repos/agentic-odi/connectors/src"
+            },
+            "output": "---\n/home/alexa/repos/agentic-odi/connectors/src:\nconnectors\n\n/home/alexa/repos/agentic-odi/core/src/core:\n__init__.py\n__pycache__\nintent_store.py\nmessages.py\nmodels.py\nrepository.py\nservices.py\nsqlite_repository.py\n",
+            "metadata": {
+              "output": "---\n/home/alexa/repos/agentic-odi/connectors/src:\nconnectors\n\n/home/alexa/repos/agentic-odi/core/src/core:\n__init__.py\n__pycache__\nintent_store.py\nmessages.py\nmodels.py\nrepository.py\nservices.py\nsqlite_repository.py\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "grep -rn \"files(\\|read_text\\|importlib.resources\\|pkgutil\\|__file__\\|Path(__file__\" /home/alexa/repos/agentic-odi/core/src /home/alexa/repos/agentic-odi/connectors/src /home/alexa/repos/agentic-odi/cli/src 2>/dev/null | head -40; echo ---; ls /home/alexa/repos/agentic-odi/core/src/core /home/alexa/repos/agentic-odi/connectors/src",
+            "time": {
+              "start": 1792095712648,
+              "end": 1792095712700
+            }
+          },
+          "id": "prt_1413a725b001dI78LcXdF7OO0H",
+          "sessionID": "ses_ebec66ddeffeNuKIbZ6Iv0482W",
+          "messageID": "msg_14139c701001yEXi6GCDn2Ir2X"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "a9463ef83a6340e5b45c674d83bb7a1a0a0f2587",
+          "type": "step-finish",
+          "tokens": {
+            "total": 22878,
+            "input": 2675,
+            "output": 186,
+            "reasoning": 113,
+            "cache": {
+              "write": 0,
+              "read": 19904
+            }
+          },
+          "cost": 0,
+          "id": "prt_1413a75fb001l2djZwyNfpV9dT",
+          "sessionID": "ses_ebec66ddeffeNuKIbZ6Iv0482W",
+          "messageID": "msg_14139c701001yEXi6GCDn2Ir2X"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_141399246001RL60J0ZtmI09EV",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 28449,
+          "input": 21060,
+          "output": 226,
+          "reasoning": 3067,
+          "cache": {
+            "write": 0,
+            "read": 4096
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792095712856,
+          "completed": 1792095858639
+        },
+        "finish": "tool-calls",
+        "id": "msg_1413a76580019koHUQtb8WIbIL",
+        "sessionID": "ses_ebec66ddeffeNuKIbZ6Iv0482W"
+      },
+      "parts": [
+        {
+          "snapshot": "a9463ef83a6340e5b45c674d83bb7a1a0a0f2587",
+          "type": "step-start",
+          "id": "prt_1413ac75e001uIbZzMLBhoJMuF",
+          "sessionID": "ses_ebec66ddeffeNuKIbZ6Iv0482W",
+          "messageID": "msg_1413a76580019koHUQtb8WIbIL"
+        },
+        {
+          "type": "reasoning",
+          "text": "No importlib.resources matches apparently (the grep returned only the \"---\" separator line... actually grep output before \"---\" was empty). Let me double-check quickly: the grep found nothing in those src dirs. Good — no data files.\n\nLet me check connectors for data files, whether CLI has other entry points (`odipm` purpose?), how `odipm` differs — odipm likely is for mcp_server? Actually the doc says all aliases point to the same `odi`. Also check existing README install instructions, whether there's an existing release workflow, GitHub repo (alehar9320/agentic-odi — is it public? matters for unauthenticated API rate limits and curl install), whether tests exist for cli, whether `--no-update` global flag exists.\n\nKey questions I'd have:\n\n1. **Is the GitHub repo public?** install.sh + unauthenticated GitHub Releases API depends on it. If private, need token handling. Doc says assets live on GitHub Releases alehar9320/agentic-odi \"for now\". But public/private not stated. Wrong guess matters: rate limits, install flow.\n\n2. **Python version for the bundled runtime** — requires-python >=3.10; CI tests 3.10–3.12. Which Python does the release build use (e.g., 3.12)? Affects pydantic-core wheel tags, glibc compatibility on linux. Also linux builds: GitHub ubuntu-latest is24.04 with glibc 2.39 — binary won't run on older distros (manylinux issue). Does the plan need manylinux/auditwheel-style compatibility (e.g., build on older container or use uv python-build-standalone)? This is a big one: building on ubuntu-latest produces glibc-2.39+ only binaries; should we target older glibc (e.g., build in manylinux container)? Wrong guess matters: users on Ubuntu 20.02/22.04 can't run it. Doc says reproduce current runner matrix (GitHub-hosted Ubuntu). But it doesn't address glibc floor. I'd ask: is it acceptable that linux x86_64/arm64 binaries only run on glibc ≥ (runner's), or should we pin a minimum glibc (build on ubuntu-20.04/22.04 or manylinux container)? Though maybe this is a builder decision... it's a policy decision with user impact — worth asking. Actually builder could reasonably decide to build on ubuntu-22.04. Hmm, but arm64 runner is ubuntu-24.04-arm only. Trade-off. It's a question: \"minimum supported Linux/glibc?\"\n\n3. **Who is `odipm` for?** The doc says aliases all point to same `odi` binary. On unix, symlinks mean argv[0]-based dispatch could distinguish... but doc says all point to `odi`. Wait — symlinks with same target: if behavior should differ by name (odipm → package manager?), doc says symlink to same file, so behavior identical. That's decided. Skip.\n\n4. **Self-update GitHub API vs direct URL**: check_for_update queries GitHub Releases \"latest\" — unauthenticated API rate limit 60/hr/IP; many corporate users behind shared NAT. Alternative: fetch a `latest.txt`/manifest from raw URL. Is rate limiting acceptable / is there a fallback? This matters: if API fails, updates silently skipped. But maybe builder decides implementation. The choice of API vs static manifest is arguably design. Could ask: any constraint on GitHub API unauthenticated use? Hmm. Could be a builder decision (could use the release download URL directly with /releases/latest/download/... redirect). I'd rank lower or skip.\n\n5. **Auto-update concurrency/downtime**: \"background thread\" download then print \"takes effect next run\" — fine.\n\n6. **Non-interactive detection**: suppressed in \"non-interactive context\" — how determined? Builder's call, arguably. Could be ambiguous but decide myself: isatty on stdin/stdout. Skip.\n\n7. **Completions**: install.sh mentions \"completions\" in phasing 3 but nowhere specified — typer completions via `odi --install-completion`? With frozen binary, typer's completion installs into shell rc referencing the binary. Doc says install.sh handles completions. Minor; builder can decide. Skip.\n\n8. **`curl | sh` distribution URL**: where does install.sh live? It's uploaded as a Release asset — but `curl -fsSL <url>/install.sh` needs a stable URL: `https://github.com/alehar9320/agentic-odi/releases/latest/download/install.sh` works. But chicken-and-egg: install.sh must know asset naming and repo. Builder decision. But is the repo public? Ask #1.\n\n9. **Windows auto-update semantics**: deferred helper — left to builder. Skip.\n\n10. **What does the update check compare when running from source?** Suppressed when not frozen. Fine.\n\n11. **State/DB location for local SQLite backend**: where does SQLiteRepository put the DB? If the binary stores DB under install dir or cwd — matters for install dir writable assumption and updates. Let me check sqlite_repository default path.\n\n12. **release-please + single root component**: root package is `package = false` (not a package). release-please works with a non-package root? It can with `release-type: simple`. Builder config — skip.\n\n13. **Signing/attestation**: non-goal. Skip.\n\n14. **Testing strategy for release**: e2e test installing from a real tagged release — needs a repo... they'd do it in CI post-release. Skip.\n\n15. **Does the binary need to support `python -m cli` style or shell entry?** No.\n\n16. **Version injection vs `_build_info.py`**: single source = git tag; but editable/dev fallback to 0.1.0. Fine.\n\n17. **Auto-update on by default + CI environments**: suppressed when non-interactive. Fine.\n\n18. **macOS x86_64**: flagged wrinkle — decision deferred. The doc says \"may force a decision later\" — so build both now? It says fallback is Rosetta on macos-14. Builder can just do that. Skip.\n\n19. **What about `connectors` package — does it embed anything (e.g., wordnet data, large files)?** Let me check connectors deps and data. Also core deps (pydantic). Let's check uv.lock quickly for heavy deps like numpy? Let me check connectors pyproject.\n\n20. **Startup hook doing a network check at most once/24h — but \"never block\":** first run after 24h would do a blocking network call in background thread — ok.\n\n21. **Does the CLI need to keep working when `~/.local/share` is on NFS/noexec?** Edge — skip.\n\n22. **Rollback**: if new version crashes, current stays flipped. Does design want keep N old versions / auto-rollback? Doc doesn't mention pruning either — versions/ accumulate. Pruning policy = builder decision? Could matter (disk). Probably builder decides; skip or low rank.\n\n23. **Big one: does `curl | sh` need to handle existing installs from uv editable / PATH conflicts?** install.sh behavior when odi already installed via uv — skip, builder.\n\n24. **Test matrix for PyInstaller builds: should release.yml block publish on smoke tests of each artifact?** The doc doesn't specify whether artifacts are smoke-tested before release publish. Anti-goal: shipping build that crashes on --backend mcp. The spike only tests on Linux. Should CI smoke-test all 5 artifacts (run --version, outcomes add both backends) before publishing? This is arguably a plan decision I could make myself (yes, test). Skip? The question of \"release gating\" could matter: publishing happens then test... I'd include as maybe: \"Should release.yml run artifact smoke tests before publishing, and can tests requiring an MCP server run on all runners?\" Hmm — I could decide: yes, smoke test each artifact (run binary --version, --help, and a local-backend command; mcp backend against a spun-up server only where feasible). Decidable. Skip.\n\n25. **Who consumes `checksums.txt`?** install.sh and updater both verify. Fine.\n\n26. **Windows: install.ps1 and PATH** — user-scope PATH modification. Fine.\n\n27. **Auto-update disabled for system-wide installs — but install.sh installs to ~/.local (user). So fine.**\n\n28. **Repos public?** — Let me check with gh or git remote.\n\n29. **The `update` command name conflict**: `odi update` new subcommand — fine.\n\n30. **Does the CLI currently have a global `--no-update` need to be plumbed through typer callback** — implementation.\n\n31. **Rate limit question about GitHub API** — I'll fold into a question about update-check transport? Maybe ask: \"Is unauthenticated GitHub API access acceptable for the 24h update check (60 req/hr per IP), or should it use a static manifest asset (e.g., releases/latest/download/latest.txt)?\" Wrong guess matters: shared-NAT users get silently skipped updates or429s. Actually the design explicitly says \"query GitHub Releases 'latest'\". That's a decided point. Hmm — decided, so skip? It says \"query GitHub Releases 'latest'\" — that's in the how (decided). Skip then. But rate limit is a real risk... The instruction says skip anything explicitly left to builder and anything I could decide myself. This is decided by the human. Skip.\n\n32. **Something not addressed: what happens to `uv` editable install users / coexistence?** The constraint says source tree keeps editable-install workflow. Fine.\n\n33. **Distribution of install.sh: uploaded to Release — `releases/latest/download/install.sh` gives latest only; users installing a specific version? Fine.\n\n34. **Private repo / auth for releases?** Check git remote and gh.\n\n35. **Big one: how does the auto-updater know the install dir matches the layout (e.g., user installed via package manager)?** Suppressed when not writable. Fine.\n\n36. **Updater on Windows and antivirus**: skip.\n\n37. **What Python do the runners ship? PyInstaller needs a Python on the runner — via uv with pinned version. Which CPython version to bundle: matters because pydantic-core/fastmcp support, and 3.10 vs 3.12 affects... Also PyInstaller support for free-threaded etc. Ask: which Python version should release builds pin (e.g., 3.12)? Could be builder decision (I'd pick 3.12). But interacts with glibc question? Not really. I can decide: pick 3.12 (CI tests up to 3.12). Hmm — but does requiring-python >=3.10 mean users on 3.10 features? Bundled python version is internal. I'd decide 3.12. Skip? There's a subtlety: macOS arm64 runner and universal2 vs arch-specific builds — doc says arch-specific. Fine.\n\n38. **glibc/manylinux question is real** — rank high.\n\n39. **Is there a preference for how `odi update --now` re-execs (exec vs spawn)?** implementation.\n\n40. **What about `XDG_BIN_HOME` symlink layout — symlinks in ~/.local/bin pointing into ~/.local/share (relative symlinks shown). Fine.\n\n41. **Missing: does anything in the CLI shell out or need a real Python (e.g., connectors calling `uv run`, subprocess with sys.executable)?** If connectors spawn `python` or rely on the workspace... Let me check connectors for subprocess usage.\n\n42. **Also `local_server`/`client` non-goals — fine.\n\n43. **Missing: how are shell completions shipped?** decided-ish (install.sh does completions). Typer provides `odi --install-completion` which writes to shell rc — works with frozen binary? Typer's completion uses click's shell completion which for frozen executables works if the executable path is used. Builder decision. Skip.\n\n44. **Backward compat: existing users who installed via `uv tool install` or editable — will install.sh detect and warn?** Builder. Skip.\n\n45. **Semver compare: versions like 0.1.0 — pre-releases?** skip.\n\n46. **Does release-please Conventional Commits require the team to adopt commit conventions — is the repo already using them?** Let me check git log. If current commits aren't conventional, migration needed — plan impact (CI enforcement?). The doc says release-please (Conventional Commits) — decision made. Whether existing history matters: release-please only cares about commits since last release; first run creates initial release. Also: no tags exist → release-please initial version. Fine, builder config. But one real question: **first release bootstrap** — with no tags, release-please will propose initial release; also current `version.py` hardcodes 0.1.0. Minor. Skip.\n\n47. **Windows: `--backend mcp` from Windows binary — fastmcp bundles on Windows?** spike covers Linux only; plan should extend spike to all platforms. I can decide: run spike/smoke on all runners. Decidable.\n\n48. **Auto-update applies \"on the next run\" — but who prints the message if update happens in background thread at end of command?** Fine.\n\n49. **What about updating while another process runs the binary (macOS/Linux: can delete/replace open files)?** atomic symlink flip handles. Windows deferred helper. Fine.\n\n50. **Crucial: the doc says `versions/0.1.0/` keyed by semver only — what if two builds of same version (rebuild)?** checksum differs; edge. Skip.\n\n51. **Security: updater trust — assets verified via checksums.txt downloaded from same release — TOFU; no signing (non-goal). Skip.\n\nNow check a few things: git remote/publicness, connectors deps/subprocess, sqlite db path, README install section.",
+          "time": {
+            "start": 1792095733686,
+            "end": 1792095854019
+          },
+          "id": "prt_1413ac7b6001678syZaoNj1x0X",
+          "sessionID": "ses_ebec66ddeffeNuKIbZ6Iv0482W",
+          "messageID": "msg_1413a76580019koHUQtb8WIbIL"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "call_aed79d3eb301438aadf58b85",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "git -C /home/alexa/repos/agentic-odi remote -v; git -C /home/alexa/repos/agentic-odi log --oneline -15; gh repo view alehar9320/agentic-odi --json visibility,name 2>&1 | head -5"
+            },
+            "output": "origin\tgit@github.com:alehar9320/agentic-odi.git (fetch)\norigin\tgit@github.com:alehar9320/agentic-odi.git (push)\n0d701a3 docs: elevate README with badges, TOC, and structured formatting\n102030a Merge pull request #3 from alehar9320/topic/living-studio-gui\nb9637d0 Merge pull request #6 from alehar9320/dependabot/github_actions/actions/checkout-7\n0f0300f fix(connectors): repair rebased branch so CI passes\ned622bb chore(deps): bump actions/checkout from 4 to 7\n62ec425 chore: remove stale pre-refactor LLM launcher plan\n86161b0 Merge pull request #4 from alehar9320/mcp-connector-module\n2466ac5 Merge remote-tracking branch 'origin/main' into mcp-connector-module\ncb18b59 docs: add completed MCP connector module implementation plan\na645779 feat(client): implement The Living Studio GUI with progressive loading, ghost elements, and dual-interaction experience\n50165de chore(deps): bump actions/upload-artifact from 4 to 7\nd6f5c79 fix(ci): align workspace, lockfile, and CI with server->mcp_server refactor\n3e9a2b7 fix(ci): require Python 3.11 to match StrEnum usage\n25f508e docs: correct README package overview and CLI description\nf110aa2 ci+docs: wire connectors into CI and document the package\n{\"name\":\"agentic-odi\",\"visibility\":\"PUBLIC\"}\n",
+            "metadata": {
+              "output": "origin\tgit@github.com:alehar9320/agentic-odi.git (fetch)\norigin\tgit@github.com:alehar9320/agentic-odi.git (push)\n0d701a3 docs: elevate README with badges, TOC, and structured formatting\n102030a Merge pull request #3 from alehar9320/topic/living-studio-gui\nb9637d0 Merge pull request #6 from alehar9320/dependabot/github_actions/actions/checkout-7\n0f0300f fix(connectors): repair rebased branch so CI passes\ned622bb chore(deps): bump actions/checkout from 4 to 7\n62ec425 chore: remove stale pre-refactor LLM launcher plan\n86161b0 Merge pull request #4 from alehar9320/mcp-connector-module\n2466ac5 Merge remote-tracking branch 'origin/main' into mcp-connector-module\ncb18b59 docs: add completed MCP connector module implementation plan\na645779 feat(client): implement The Living Studio GUI with progressive loading, ghost elements, and dual-interaction experience\n50165de chore(deps): bump actions/upload-artifact from 4 to 7\nd6f5c79 fix(ci): align workspace, lockfile, and CI with server->mcp_server refactor\n3e9a2b7 fix(ci): require Python 3.11 to match StrEnum usage\n25f508e docs: correct README package overview and CLI description\nf110aa2 ci+docs: wire connectors into CI and document the package\n{\"name\":\"agentic-odi\",\"visibility\":\"PUBLIC\"}\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "git -C /home/alexa/repos/agentic-odi remote -v; git -C /home/alexa/repos/agentic-odi log --oneline -15; gh repo view alehar9320/agentic-odi --json visibility,name 2>&1 | head -5",
+            "time": {
+              "start": 1792095854844,
+              "end": 1792095858445
+            }
+          },
+          "id": "prt_1413c9dce001VeU1bG2Cbvlbcg",
+          "sessionID": "ses_ebec66ddeffeNuKIbZ6Iv0482W",
+          "messageID": "msg_1413a76580019koHUQtb8WIbIL"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "call_34d103f844a14aad9d726d23",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "grep -rn \"subprocess\\|sys.executable\\|uv run\\|shutil.which\" /home/alexa/repos/agentic-odi/cli/src /home/alexa/repos/agentic-odi/connectors/src /home/alexa/repos/agentic-odi/core/src | head; echo ---SQLITE---; grep -rn \"db_path\\|default\\|Path\\|home\" /home/alexa/repos/agentic-odi/core/src/core/sqlite_repository.py | head -20; echo ---CONNECTORS---; cat /home/alexa/repos/agentic-odi/connectors/pyproject.toml"
+            },
+            "output": "---SQLITE---\n16:    def __init__(self, db_path: str | None = None) -> None:\n17:        if db_path is None:\n18:            db_path = os.environ.get(\"AGENTIC_ODI_DB\", os.path.expanduser(\"~/.agentic-odi/odi.db\"))\n19:        os.makedirs(os.path.dirname(db_path) or \".\", exist_ok=True)\n20:        self.store = IntentStore(db_path)\n---CONNECTORS---\n[project]\nname = \"agentic-odi-connectors\"\nversion = \"0.1.0\"\ndescription = \"External system connectors for Agentic ODI, including an MCP client ingest connector.\"\nrequires-python = \">=3.10\"\ndependencies = [\n    \"fastmcp\",\n    \"pydantic\",\n]\n\n[build-system]\nrequires = [\"hatchling\"]\nbuild-backend = \"hatchling.build\"\n\n[tool.hatch.build.targets.wheel]\npackages = [\"src/connectors\"]\n\n[tool.ruff]\nline-length = 100\ntarget-version = \"py311\"\n\n[tool.ruff.lint]\nselect = [\"E4\", \"E7\", \"E9\", \"F\", \"I\", \"UP\", \"B\", \"BLE\"]\n\n[tool.mypy]\npython_version = \"3.11\"\nignore_missing_imports = true\n\n[tool.pytest.ini_options]\nasyncio_mode = \"strict\"\n",
+            "metadata": {
+              "output": "---SQLITE---\n16:    def __init__(self, db_path: str | None = None) -> None:\n17:        if db_path is None:\n18:            db_path = os.environ.get(\"AGENTIC_ODI_DB\", os.path.expanduser(\"~/.agentic-odi/odi.db\"))\n19:        os.makedirs(os.path.dirname(db_path) or \".\", exist_ok=True)\n20:        self.store = IntentStore(db_path)\n---CONNECTORS---\n[project]\nname = \"agentic-odi-connectors\"\nversion = \"0.1.0\"\ndescription = \"External system connectors for Agentic ODI, including an MCP client ingest connector.\"\nrequires-python = \">=3.10\"\ndependencies = [\n    \"fastmcp\",\n    \"pydantic\",\n]\n\n[build-system]\nrequires = [\"hatchling\"]\nbuild-backend = \"hatchling.build\"\n\n[tool.hatch.build.targets.wheel]\npackages = [\"src/connectors\"]\n\n[tool.ruff]\nline-length = 100\ntarget-version = \"py311\"\n\n[tool.ruff.lint]\nselect = [\"E4\", \"E7\", \"E9\", \"F\", \"I\", \"UP\", \"B\", \"BLE\"]\n\n[tool.mypy]\npython_version = \"3.11\"\nignore_missing_imports = true\n\n[tool.pytest.ini_options]\nasyncio_mode = \"strict\"\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "grep -rn \"subprocess\\|sys.executable\\|uv run\\|shutil.which\" /home/alexa/repos/agentic-odi/cli/src /home/alexa/repos/agentic-odi/connectors/src /home/alexa/repos/agentic-odi/core/src | head; echo ---SQLITE---; grep -rn \"db_path\\|default\\|Path\\|home\" /home/alexa/repos/agentic-odi/core/src/core/sqlite_repository.py | head -20; echo ---CONNECTORS---; cat /home/alexa/repos/agentic-odi/connectors/pyproject.toml",
+            "time": {
+              "start": 1792095856874,
+              "end": 1792095856932
+            }
+          },
+          "id": "prt_1413ca13d001abpcTgMwI04R2i",
+          "sessionID": "ses_ebec66ddeffeNuKIbZ6Iv0482W",
+          "messageID": "msg_1413a76580019koHUQtb8WIbIL"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "a9463ef83a6340e5b45c674d83bb7a1a0a0f2587",
+          "type": "step-finish",
+          "tokens": {
+            "total": 28449,
+            "input": 21060,
+            "output": 226,
+            "reasoning": 3067,
+            "cache": {
+              "write": 0,
+              "read": 4096
+            }
+          },
+          "cost": 0,
+          "id": "prt_1413caf4c00149YQh6FB5TqY8A",
+          "sessionID": "ses_ebec66ddeffeNuKIbZ6Iv0482W",
+          "messageID": "msg_1413a76580019koHUQtb8WIbIL"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_141399246001RL60J0ZtmI09EV",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 34223,
+          "input": 3988,
+          "output": 249,
+          "reasoning": 4834,
+          "cache": {
+            "write": 0,
+            "read": 25152
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792095858652,
+          "completed": 1792096114839
+        },
+        "finish": "tool-calls",
+        "id": "msg_1413cafdc0017udpM8lncQENC2",
+        "sessionID": "ses_ebec66ddeffeNuKIbZ6Iv0482W"
+      },
+      "parts": [
+        {
+          "snapshot": "a9463ef83a6340e5b45c674d83bb7a1a0a0f2587",
+          "type": "step-start",
+          "id": "prt_1413d683a001VgLXFcI8DKpx1L",
+          "sessionID": "ses_ebec66ddeffeNuKIbZ6Iv0482W",
+          "messageID": "msg_1413cafdc0017udpM8lncQENC2"
+        },
+        {
+          "type": "reasoning",
+          "text": "Repo is public. Good — that question resolves itself (verified public). So drop that question.\n\nNote: commit history shows \"require Python 3.11 to match StrEnum usage\" — cli requires-python >=3.10 but core may need 3.11 (StrEnum). So bundled Python choice: ≥3.11. Minor; builder can pick 3.11 or 3.12. Also CI test matrix uses 3.10 but smoke... wait CI says test matrix 3.10–3.12 and a commit says \"require Python 3.11 to match StrEnum usage\". Let me check core pyproject requires-python. Not critical.\n\nNow, other checks: does README document installation currently (uv editable)? Does repo have any existing release workflow? Only ci.yml. Does cli have tests? Let's check cli/tests and whether `odi` name conflicts.\n\nAlso important: the design says asset naming and install.sh uploaded to release; `curl -fsSL <url>/install.sh` — with GitHub releases, `releases/latest/download/install.sh` works only if install.sh is attached to latest release. Fine.\n\nAnother potentially important open question: **what URL/channel does install.sh use, and does the plan include a stable \"latest\" manifest** — decided enough.\n\nBigger issues I should verify as questions:\n\nA. **glibc baseline for Linux artifacts** — building on ubuntu-latest (24.04, glibc 2.39) means binaries won't run on Ubuntu 20.04/22.04? Actually 22.04 = glibc 2.35, 24.04-built binaries require ≥2.39 → fail on 22.04 and most current distros (Debian 12 = 2.36). That's a major compatibility question: PyInstaller doesn't do manylinux. Options: build in container with older glibc (e.g., quay.io/pypa/manylinux or ubuntu-20.04), or accept modern-glibc-only, or document floor. But constraint says \"Reproduction of the current runner matrix: GitHub-hosted Ubuntu, macOS, Windows runners\" — which suggests human wants GitHub-hosted runners, not containers. Hmm — that constrains. Still the *minimum supported glibc* is unstated and matters (users on Debian 12/Ubuntu 22.04). Worth asking: what's the minimum Linux/glibc we must support — build on ubuntu-22.04 (x86_64) if so? Note arm runner only has 24.04-arm. Actually ubuntu-22.04 runners are being retired too maybe. Alternatively build inside manylinux docker container on the runner — still GitHub-hosted runner, just with a container job. That's arguably allowed. I'd ask the question: which Linux distro/glibc floor must the binary support? Wrong guess = broken on most distros. Rank #1 or #2.\n\nB. **Python version to bundle / CPython ABI** — I could decide (3.11 or 3.12). The design's requires-python >=3.10 but StrEnum needs 3.11. Builder picks 3.12. Skip? One wrinkle: pydantic-core and fastmcp wheels — fine on 3.12. I'll skip.\n\nC. **`odipm` semantics** — doc says all four names symlink to same binary. But why would odipm exist as a distinct name if identical? Perhaps historical. It's decided. Skip.\n\nD. **Auto-update and CI/test environments / package-manager installs** — decided. Skip.\n\nE. **Windows install: does the plan need to modify user PATH in install.ps1, and is user-scope PATH okay?** Commonly yes. Builder decision. Skip.\n\nF. **What happens when two different install methods coexist (uv editable `agentic-odi` script vs ~/.local/bin/odi)** — PATH order. Builder/install.sh concern. Skip.\n\nG. **First-run seeding: release-please bootstrap with no tags** — What should the first released version be (0.1.0 already hardcoded, changelog empty)? release-please on first run will create release PR bumping to 0.2.0 maybe (since commits are feat/fix). Is there a desired initial tag (e.g., tag v0.1.0 first, or let release-please decide)? Matters little. Skip? Could cause confusion: the doc says version.py hardcodes 0.1.0 and no tags exist. Plan should include bootstrap: initial tag v0.1.0? I might include as a low-rank question: \"Bootstrap: should we tag v0.1.0 now to match the hardcoded version, or let release-please's first PR set the baseline (which would be 0.2.0/1.0.0)?\" Actually matters: release-please needs an anchor; first PR without tags → initial version based on commits (minor bump → 0.2.0). Users would see 0.2.0 as first release while repo says 0.1.0. Wrong guess isn't catastrophic but plan-shaping. Also **is1.0.0 desired eventually?** skip. I'd rank this moderate-low. Also there's a real question: **who merges the release PR / is tagging allowed to be automated by the GitHub token?** release-please needs `contents: write` permission and a PAT or GITHUB_TOKEN with workflow perms — builder config. Skip.\n\nH. **Auto-update channel: should there be a stable/prerelease channel?** release-please produces stable releases only. Skip.\n\nI. **Non-interactive context determination** — builder decides (isatty). Skip.\n\nJ. **What \"update\" does for people who installed but the install dir is a git checkout / running from source** — suppressed. Skip.\n\nK. **Artifact verification across platforms before publish (smoke gate)** — I can decide yes. But there's a subtlety worth asking? The MCP smoke requires spinning an mcp_server from source on the runner — doable on all runners since repo checked out. Decide myself: yes, gate each artifact. Skip.\n\nL. **Size budget / acceptable download size**: doc says \"revisit only if egregious\" and \"builder's call\" for optimization... decision 4 says full functionality beats small (builder's call) — but is there any hard cap (e.g., >150MB problematic)? Doc explicitly left optimization to builder except lazy fastmcp if egregious. Could ask \"is there a size budget?\" — the doc says builder's call unless egregious... \"egregious\" undefined. Is that a question worth asking? A wrong guess: bundle ~100–150MB typical for fastmcp+pydantic+uvicorn. If the human expects <50MB, plan changes (lazy imports, slim). I'd ask: \"Is there a size ceiling you care about? A fastmcp+pydantic+uvicorn onedir will land around 80–150MB compressed.\" Hmm, doc says \"Binary size: full functionality, optimized... (builder's call)... Revisit a lazy fastmcp import only if measured size is egregious and MCP keeps working.\" So it's explicitly left to builder with a vague threshold. Asking for a number is legitimate since \"egregious\" is undefined and changes whether we do the lazy-import work. Moderate rank.\n\nM. **Distribution of updates to users who installed with different install roots / `AGENTIC_ODI_INSTALL_DIR`** — updater reads env. Fine.\n\nN. **Does the auto-updater run for `odipm`-style long-lived processes?** no.\n\nO. **Big one maybe: Does `curl | sh` need to support pinning a version and install to system-wide location (sudo)?** Doc says system-wide installs handled only by install script... \"Under system-wide installs (/usr/local/bin, package managers) auto-update is disabled; only the install script manages those.\" implying install.sh may offer system-wide mode? Ambiguous. Does install.sh need a `--system`/sudo mode? Could ask. Moderate-low.\n\nP. **Windows: does the design want auto-update enabled on Windows given deferred helper complexity, or ship v1 with manual `odi update` on Windows?** That's a plan-affecting scope question: the Windows deferred helper is the riskiest piece and explicitly left to builder. Could ask whether Windows auto-update is required for first release or can lag behind (manual update only). Wrong guess: lots of work / risk. I think this is a good question: \"Is background auto-update required on Windows in v1, or is explicit `odi update` acceptable there initially?\" Rank moderate-high because the doc lists it as an anti-goal to corrupt installs, and Windows swap is genuinely hard. Hmm, but doc says auto-update ON by default across platforms, and left Windows deferred-swap to builder. It's decided that Windows gets auto-update. Question could be about fallback... I'd maybe skip since decided. Or ask if it's acceptable that v1 Windows auto-update... No — decided. Skip.\n\nQ. **`update.json` in ~/.config but install root overridable — if AGENTIC_ODI_INSTALL_DIR set, does state stay in XDG config?** builder. Skip.\n\nR. **Semver comparison with dev/fallback version \"0.1.0\" when running from source — suppressed anyway.** Skip.\n\nS. **Does `odi --version` output format change break the existing CI smoke test?** Current smoke: `uv run python -m cli --version` non-empty — fine. Doc changes output to `0.1.0 (2026-10-15)`. Fine.\n\nT. **Do they want CI to keep testing Python 3.10 given StrEnum needs 3.11?** Not this plan's concern.\n\nU. **The startup update-check hook: is a network call acceptable in contexts like airgapped/CI where isatty may be true but network blackholed? \"network failures swallowed\" and must not slow command — but a blackholed connection hangs until timeout in a background thread; does it need a short timeout (e.g., 2s connect) so the process doesn't linger after command completes?** Plan-relevant: if update thread is non-daemon, a hung HTTPS connection could keep the process alive after command output — directly conflicts with \"never block or slow\". I can decide: daemon thread + short timeouts + join with timeout. Decidable. Skip.\n\nV. **Update check even for `--help`?** trivial.\n\nW. **What about pinning `fastmcp`/deps lockstep with uv.lock for reproducible builds?** The build should use `uv sync --frozen` — builder. Skip.\n\nX. **Release artifacts reproducibility / build provenance** — not stated; non-goal-ish. Skip.\n\nY. **Repo has `.worktrees`, docs/superpowers... irrelevant.\n\nZ. **Where does `install.sh` get hosted for `curl|sh` given assets on GitHub releases — `releases/latest/download/install.sh`? Then install.sh version drift: latest install.sh always downloaded, fine. But before first release, nothing works. Bootstrap ordering: need a release before README docs. Plan detail. Skip.\n\nAA. **Does the human expect the four command names to appear in shell completions etc.?** skip.\n\nBB. **Auto-update \"applied on the next run\" message printed during background thread — when the command is e.g. `odi --help` fast exit, thread may be killed before completing download → wasted partial downloads; do we resume/cache?** builder. Skip.\n\nCC. **Concurrency between update and long-running command using SQLite DB under ~/.agentic-odi while directory swap?** DB is outside install dir. Fine.\n\nDD. **One more genuinely important: does the design assume the CLI ships shell completions/man pages generated at build (typer can emit) — phasing 3 mentions completions.** Skip (builder).\n\nEE. **Windows runners: PyInstaller on windows-latest + the `_internal` dir + zip extraction preserving... fine.\n\nFF. **What about arm64 Windows?** not required.\n\nGG. **Backward-compat alias `agentic-odi` already exists as entry point in pyproject `[project.scripts] agentic-odi` — the bundle names decided. Fine.\n\nHH. **Who is allowed to trigger releases? Is `workflow_dispatch` needed?** skip.\n\nII. **Auto-update on by default — compliance/security: enterprises may need to disable globally (system-wide env var).** decided opt-out exists. Skip.\n\nJJ. **Potentially important: the design says update check queries GitHub Releases latest; but for a *private* repo — resolved: public.\n\nKK. **Does install dir layout assume single-user; what about upgrades from a previous install.sh version (layout changes)?** v1, skip.\n\nLL. **Testing update flow end-to-end in CI without publishing** — plan detail I can decide (mock releases via local HTTP fixture / test against a pre-release tag). Skip.\n\nSo my candidate ranked questions:\n\n1. Minimum supported Linux glibc/distro floor — binary built on ubuntu-24.04 runner will require glibc ≥2.39 and fail on Debian 12/Ubuntu 22.04. Do we need older-glibc compatibility (build in a manylinux/older-glibc container on the runner, or pin runner), or is \"current distros only\" acceptable? Also applies to arm64 (only ubuntu-24.04-arm hosted). Changes: runner/container setup in release.yml, possibly two build paths, docs.\n\n2. Size budget threshold for \"egregious\": expected 80–150MB compressed. Does anything (CDN, user experience on curl|sh, corporate proxies) set a ceiling, or can we truly ship full bundle without lazy fastmcp work? Changes: whether phase 1 includes lazy-import refactor.\n\n3. First-release bootstrap / version baseline: no tags exist; release-please's first PR would bump based on conventional commits since... what initial version? Should we pre-tag v0.1.0 to match hardcoded version or accept release-please choosing (likely 0.2.0)? Changes: release-please config, whether the first `curl|sh` install works, and version.py fallbacks.\n\nHmm wait — is #3 important enough? Wrong guess matters: moderate. The repo's root version is 0.1.0 in pyproject; release-please with `bootstrap-sha` and no tags → first release PR typically bumps minor from the last version in... if no previous release, it uses `lastRelease` empty → initial version from `version-file`? release-please can read version from a file (`version-file: pyproject.toml#project.version`) so first PR would bump0.1.0 → 0.2.0. Or tag v0.1.0 manually first so first release is 0.2.0 anyway with changelog. Either way fine-ish. Meh — could be decided by builder with human input. I'll include as a lower-ranked question since doc explicitly notes \"No git tags exist today; version.py hardcodes 0.1.0\" as a constraint — implying they know. The plan-relevant decision: is the first public release allowed to be 0.2.0, or must the first tagged release be v0.1.0 (matching what people see in source)? Ask low rank.\n\n4. Install.sh scope: does it need a system-wide/sudo mode (doc references system-wide installs being managed \"only by the install script\"), or is user-local (~/.local) the only supported path? Changes install.sh design and auto-update disable logic. Moderate.\n\n5. Update-check transport rate limits — decided (GitHub API latest). Skip? Actually doc says \"query GitHub Releases 'latest'\". Unauthenticated API: 60/hr/IP. Behind corporate NAT/shared CI runners, many users → 429 → updates silently skipped (failures swallowed). Worth asking whether a static manifest asset is acceptable as the check endpoint instead of API. But it's a \"decided\" item... The decision says query GitHub Releases \"latest\" — ambiguous whether API call or redirect-based. `https://github.com/.../releases/latest` HTML redirect includes tag; or `/releases/latest/download/...`. Honestly the builder can pick API vs no-API within \"query GitHub Releases latest\". Rate limit consideration is a builder implementation concern. Skip? I think I could rank it low or skip. The instruction: skip what I can reasonably decide myself. I'd choose the redirect-based `releases/latest` (no API, no rate limit) — decidable. Skip.\n\n6. Windows deferred helper vs explicit-only — decided. Skip.\n\n7. Auto-update should it also run when only `--version`? skip.\n\n8. Non-interactive detection — decide myself (isatty/stdout + CI env vars). Skip.\n\n9. macOS x86_64 — flagged wrinkle with a stated fallback (Rosetta build on macos-14). Is building x86_64 under Rosetta acceptable for v1 (PyInstaller cross-arch under Rosetta works with x86_64 Python)? Actually a real technical risk: building x86_64 on arm64 macos-14 requires an x86_64 Python + Rosetta — uv can install x86_64 CPython? Under Rosetta you'd run an x86_64 uv/python. Feasible but fiddly; alternative: `macos-13` runner (retiring — GH says macos-13 retired? By 2026 likely gone). Doc flags this. Question: is shipping macos-x86_64 required for the first release, or can we ship arm64-only macOS and add Intel later? Changes matrix significantly. This is a real question — doc says \"May force a 'drop Intel Mac' decision later\" implying keep for now. But if macos-13 runners are gone in 2026, the plan must use Rosetta. I'd ask: confirm Intel macOS is required for v1 (given runner retirement), or arm64-only? Hmm, the doc's fallback explicitly says Rosetta build — builder can attempt it. If Rosetta build fails, escalate. Could be \"decide and verify during spike.\" I might include as a question because it determines matrix. Medium-low rank. Actually the more decision-y variant: \"Is a Rosetta-built x86_64 PyInstaller artifact acceptable as the Intel Mac deliverable, or do we need a true x86_64-native build?\" Rosetta-built artifact IS a genuine x86_64 artifact (built under translation) — that's fine technically. So builder can just do it. Skip? The risk is whether GitHub macos-14 arm runner can run x86_64 Python (Rosetta available on GH arm runners — yes, Rosetta is installed on macOS arm64 runners). So decidable: attempt. Skip.\n\n10. **Who verifies/checksums trust** — skip (no signing, non-goal).\n\n11. **Does `odi update` need to work for system-wide (non-writable) installs?** doc: auto-update disabled there; explicit update presumably also can't write. skip.\n\n12. **Existing uv-tool users migration** — skip.\n\n13. **Test coverage requirement: should release.yml block publish until artifact smoke tests pass on every matrix target?** I'd decide yes. But note MCP smoke needs the workspace source + uv on runner — fine. Skip.\n\n14. **Python version pin for builds**: I'd pick 3.12... but wait: commit history says StrEnum requires 3.11; cli pyproject says >=3.10 (misconfigured but whatever). Builder picks 3.11 or 3.12. Also: does the human want builds against the *oldest* supported (3.10) to catch? Irrelevant for bundle. Skip.\n\n15. **One more: where should `install.sh` be developed/tested — is downloading from `releases/latest/download/install.sh` the intended URL (`curl -fsSL <url>` placeholder)? The doc uses `<url>`. Builder can decide the exact URL. Skip.\n\n16. **Auto-update thread + lock held → suppressed: if a long-running command holds lock...** skip.\n\n17. **Big-ish: Should the bundled binary support acting as a launcher for the MCP server/local server (users may expect `odi serve`)?** Non-goal: MCP server not packaged. But then a user with only the binary can't run `--backend mcp` without a server... The anti-goal says `--backend mcp` must work out of the box — against an existing server (e.g., npx/uvx run mcp_server separately). Fine: non-goal. Skip.\n\n18. **Concurrent with system package managers / Homebrew?** skip.\n\nAlso: **Does the human want the docs/README rewrite to remove uv-install instructions or keep both?** Doc: source tree keeps editable workflow; README install/update docs in phase 5. Both channels coexist — decide: README gets binary install as primary, contributor section keeps uv. Skip.\n\n**One thing I haven't checked: does `cli` package include shell completion metadata or entry points beyond agentic-odi? And `__main__.py` exists for `python -m cli`.** Fine.\n\nAnother potentially plan-changing question: **Is `odipm` supposed to be a *different* program?** The name \"odipm\" suggests package manager. The doc says symlink to same binary — decided identical. But wait, maybe `odipm` historically exists somewhere? Let me grep for odipm in repo. If odipm doesn't exist in repo, fine. Quick check.\n\nAlso check README for install instructions context and whether `odi` command name conflicts with something.\n\nLet me also reconsider glibc: is it truly unaddressed? Doc: \"Reproduction of the current runner matrix: GitHub-hosted Ubuntu, macOS, and Windows runners.\" That's about reproducing CI runners. glibc floor unstated. Yes — top question.\n\nAlso maybe: **Should release builds be reproducible from the same tag (rebuild support)?** skip.\n\nAnother: **Auto-update uses GitHub Releases; forks/self-hosters?** skip.\n\n**Question about `AGENTIC_ODI_INSTALL_DIR` override semantics for updates — skip.**\n\nLet me quickly grep odipm and README install section to ground.",
+          "time": {
+            "start": 1792095906067,
+            "end": 1792096107901
+          },
+          "id": "prt_1413d691300177epX6cvRrgNeV",
+          "sessionID": "ses_ebec66ddeffeNuKIbZ6Iv0482W",
+          "messageID": "msg_1413cafdc0017udpM8lncQENC2"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "call_9d49f73d8cc1485aab3cf2da",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "grep -rn \"odipm\\|odi-cli\\|\\bodi\\b\" /home/alexa/repos/agentic-odi/README.md | head -20; echo ---; grep -rn \"odipm\" /home/alexa/repos/agentic-odi --include=*.py --include=*.md --include=*.toml -l | head; echo ---; grep -n \"uv tool\\|pipx\\|Install\" /home/alexa/repos/agentic-odi/README.md | head -20"
+            },
+            "output": "5:[![CI](https://github.com/alehar9320/agentic-odi/actions/workflows/ci.yml/badge.svg)](https://github.com/alehar9320/agentic-odi/actions/workflows/ci.yml)\n67:| **`core/`** (`agentic-odi-core`) | Domain models, the `ODIService` business-logic layer, and repository implementations (in-memory and SQLite), including ODI opportunity-score computation. |\n68:| **`mcp_server/`** (`agentic-odi-mcp-server`) | A foundational MCP Server exposing an HTTP transport layer. It hosts tools for Jobs, Steps, Desired Outcomes, and Customer Outcomes (linking customer value to business value). |\n69:| **`local_server/`** (`agentic-odi-local-server`) | A local FastAPI server that talks to the repository directly (no MCP transport). |\n70:| **`client/`** (`agentic-odi-client`) | **The Living Studio** — a spatial, conversational GUI for Outcome-Driven Innovation. Provides an interactive Opportunity Landscape, Universal Job Map, WYSIWYG Impact Simulation, and Causal Lineage inspection, paired with an autonomous conversational agent connected to the MCP server. It also hosts `run.py`, the local dev launcher that starts the server and the Studio UI together. |\n71:| **`cli/`** (`agentic-odi-cli`) | A [`Typer`](https://github.com/fastapi/typer)-based command-line interface. It provides version/help plus `outcomes` and `connectors` commands. |\n72:| **`connectors/`** (`agentic-odi-connectors`) | Pluggable external integrations. The first kind is an **MCP client connector** that connects to a remote MCP server over HTTP, checks health, and ingests tools/resources into a local ingest sink. Additional kinds (REST, webhooks, and so on) can register against the same protocol later. |\n89:This creates a `.venv` and installs `agentic-odi-core`, `agentic-odi-mcp-server`, `agentic-odi-local-server`, `agentic-odi-client`, `agentic-odi-cli`, and `agentic-odi-connectors` in editable mode.\n103:A console script is also installed, so `agentic-odi --version` works the same way.\n111:agentic-odi outcomes add --job-id <job-id>   --direction minimize --unit \"time\" --object \"to resolve setup errors\"   --statement \"Minimize the time to resolve environment setup errors when onboarding\"   --importance 8.8 --satisfaction 3.2   --category cost_reduction   --business-statement \"Saves engineering hours and reduces early churn\"\n114:agentic-odi outcomes list\n115:agentic-odi outcomes list --job-id <job-id>\n118:agentic-odi outcomes get <outcome-id>\n119:agentic-odi outcomes update <outcome-id> --importance 9.0\n120:agentic-odi outcomes delete <outcome-id> --yes\n123:agentic-odi outcomes score 8 2\n130:Connectors are named integrations stored in `.agentic-odi/connectors.json` (or a path you pass with `--config` / `AGENTIC_ODI_CONNECTORS_FILE`). The first kind is `mcp`: Agentic ODI acts as an MCP **client** and pulls catalog, resources, and optional tool results from an external MCP **server**.\n369:> **[https://horizon.prefect.io/alhase/servers/agentic-odi/chat](https://horizon.prefect.io/alhase/servers/agentic-odi/chat)**\n375:> **[https://agentic-odi.fastmcp.app/mcp](https://agentic-odi.fastmcp.app/mcp)**\n---\n/home/alexa/repos/agentic-odi/docs/superpowers/specs/2026-10-15-cli-bundled-distribution-design.md\n---\n83:Install the entire workspace (all six projects plus dev tooling):\n175:1. **Install a local LLM server**\n177:   Install `llama-cpp-python` in your environment (see its README for platform-specific build notes):\n267:uv tool install pre-commit\n332:1. Install Pi: `curl -fsSL https://pi.dev/install.sh | sh`\n",
+            "metadata": {
+              "output": "5:[![CI](https://github.com/alehar9320/agentic-odi/actions/workflows/ci.yml/badge.svg)](https://github.com/alehar9320/agentic-odi/actions/workflows/ci.yml)\n67:| **`core/`** (`agentic-odi-core`) | Domain models, the `ODIService` business-logic layer, and repository implementations (in-memory and SQLite), including ODI opportunity-score computation. |\n68:| **`mcp_server/`** (`agentic-odi-mcp-server`) | A foundational MCP Server exposing an HTTP transport layer. It hosts tools for Jobs, Steps, Desired Outcomes, and Customer Outcomes (linking customer value to business value). |\n69:| **`local_server/`** (`agentic-odi-local-server`) | A local FastAPI server that talks to the repository directly (no MCP transport). |\n70:| **`client/`** (`agentic-odi-client`) | **The Living Studio** — a spatial, conversational GUI for Outcome-Driven Innovation. Provides an interactive Opportunity Landscape, Universal Job Map, WYSIWYG Impact Simulation, and Causal Lineage inspection, paired with an autonomous conversational agent connected to the MCP server. It also hosts `run.py`, the local dev launcher that starts the server and the Studio UI together. |\n71:| **`cli/`** (`agentic-odi-cli`) | A [`Typer`](https://github.com/fastapi/typer)-based command-line interface. It provides version/help plus `outcomes` and `connectors` commands. |\n72:| **`connectors/`** (`agentic-odi-connectors`) | Pluggable external integrations. The first kind is an **MCP client connector** that connects to a remote MCP server over HTTP, checks health, and ingests tools/resources into a local ingest sink. Additional kinds (REST, webhooks, and so on) can register against the same protocol later. |\n89:This creates a `.venv` and installs `agentic-odi-core`, `agentic-odi-mcp-server`, `agentic-odi-local-server`, `agentic-odi-client`, `agentic-odi-cli`, and `agentic-odi-connectors` in editable mode.\n103:A console script is also installed, so `agentic-odi --version` works the same way.\n111:agentic-odi outcomes add --job-id <job-id>   --direction minimize --unit \"time\" --object \"to resolve setup errors\"   --statement \"Minimize the time to resolve environment setup errors when onboarding\"   --importance 8.8 --satisfaction 3.2   --category cost_reduction   --business-statement \"Saves engineering hours and reduces early churn\"\n114:agentic-odi outcomes list\n115:agentic-odi outcomes list --job-id <job-id>\n118:agentic-odi outcomes get <outcome-id>\n119:agentic-odi outcomes update <outcome-id> --importance 9.0\n120:agentic-odi outcomes delete <outcome-id> --yes\n123:agentic-odi outcomes score 8 2\n130:Connectors are named integrations stored in `.agentic-odi/connectors.json` (or a path you pass with `--config` / `AGENTIC_ODI_CONNECTORS_FILE`). The first kind is `mcp`: Agentic ODI acts as an MCP **client** and pulls catalog, resources, and optional tool results from an external MCP **server**.\n369:> **[https://horizon.prefect.io/alhase/servers/agentic-odi/chat](https://horizon.prefect.io/alhase/servers/agentic-odi/chat)**\n375:> **[https://agentic-odi.fastmcp.app/mcp](https://agentic-odi.fastmcp.app/mcp)**\n---\n/home/alexa/repos/agentic-odi/docs/superpowers/specs/2026-10-15-cli-bundled-distribution-design.md\n---\n83:Install the entire workspace (all six projects plus dev tooling):\n175:1. **Install a local LLM server**\n177:   Install `llama-cpp-python` in your environment (see its README for platform-specific build notes):\n267:uv tool install pre-commit\n332:1. Install Pi: `curl -fsSL https://pi.dev/install.sh | sh`\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "grep -rn \"odipm\\|odi-cli\\|\\bodi\\b\" /home/alexa/repos/agentic-odi/README.md | head -20; echo ---; grep -rn \"odipm\" /home/alexa/repos/agentic-odi --include=*.py --include=*.md --include=*.toml -l | head; echo ---; grep -n \"uv tool\\|pipx\\|Install\" /home/alexa/repos/agentic-odi/README.md | head -20",
+            "time": {
+              "start": 1792096109639,
+              "end": 1792096114537
+            }
+          },
+          "id": "prt_141407d88001cV6LTbTQyUh6A0",
+          "sessionID": "ses_ebec66ddeffeNuKIbZ6Iv0482W",
+          "messageID": "msg_1413cafdc0017udpM8lncQENC2"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "call_05d9ac69866f4d358b722858",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "grep -rn \"StrEnum\" /home/alexa/repos/agentic-odi/core/src | head -3; grep -n \"requires-python\" /home/alexa/repos/agentic-odi/core/pyproject.toml /home/alexa/repos/agentic-odi/*/pyproject.toml; echo ---; ls /home/alexa/repos/agentic-odi/cli/tests 2>/dev/null; ls /home/alexa/repos/agentic-odi/docs/superpowers/specs/"
+            },
+            "output": "/home/alexa/repos/agentic-odi/core/pyproject.toml:5:requires-python = \">=3.10\"\n/home/alexa/repos/agentic-odi/cli/pyproject.toml:5:requires-python = \">=3.10\"\n/home/alexa/repos/agentic-odi/client/pyproject.toml:5:requires-python = \">=3.10\"\n/home/alexa/repos/agentic-odi/connectors/pyproject.toml:5:requires-python = \">=3.10\"\n/home/alexa/repos/agentic-odi/core/pyproject.toml:5:requires-python = \">=3.10\"\n/home/alexa/repos/agentic-odi/local_server/pyproject.toml:5:requires-python = \">=3.10\"\n/home/alexa/repos/agentic-odi/mcp_server/pyproject.toml:5:requires-python = \">=3.10\"\n---\n__pycache__\ntest_cli.py\ntest_connectors_cli.py\ntest_outcomes_cli.py\n2026-10-15-cli-bundled-distribution-design.md\n",
+            "metadata": {
+              "output": "/home/alexa/repos/agentic-odi/core/pyproject.toml:5:requires-python = \">=3.10\"\n/home/alexa/repos/agentic-odi/cli/pyproject.toml:5:requires-python = \">=3.10\"\n/home/alexa/repos/agentic-odi/client/pyproject.toml:5:requires-python = \">=3.10\"\n/home/alexa/repos/agentic-odi/connectors/pyproject.toml:5:requires-python = \">=3.10\"\n/home/alexa/repos/agentic-odi/core/pyproject.toml:5:requires-python = \">=3.10\"\n/home/alexa/repos/agentic-odi/local_server/pyproject.toml:5:requires-python = \">=3.10\"\n/home/alexa/repos/agentic-odi/mcp_server/pyproject.toml:5:requires-python = \">=3.10\"\n---\n__pycache__\ntest_cli.py\ntest_connectors_cli.py\ntest_outcomes_cli.py\n2026-10-15-cli-bundled-distribution-design.md\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "grep -rn \"StrEnum\" /home/alexa/repos/agentic-odi/core/src | head -3; grep -n \"requires-python\" /home/alexa/repos/agentic-odi/core/pyproject.toml /home/alexa/repos/agentic-odi/*/pyproject.toml; echo ---; ls /home/alexa/repos/agentic-odi/cli/tests 2>/dev/null; ls /home/alexa/repos/agentic-odi/docs/superpowers/specs/",
+            "time": {
+              "start": 1792096112540,
+              "end": 1792096112638
+            }
+          },
+          "id": "prt_1414084a4001YRDxAwVz9JnN8i",
+          "sessionID": "ses_ebec66ddeffeNuKIbZ6Iv0482W",
+          "messageID": "msg_1413cafdc0017udpM8lncQENC2"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "a9463ef83a6340e5b45c674d83bb7a1a0a0f2587",
+          "type": "step-finish",
+          "tokens": {
+            "total": 34223,
+            "input": 3988,
+            "output": 249,
+            "reasoning": 4834,
+            "cache": {
+              "write": 0,
+              "read": 25152
+            }
+          },
+          "cost": 0,
+          "id": "prt_1414097f90016ae02L7jnB5LRq",
+          "sessionID": "ses_ebec66ddeffeNuKIbZ6Iv0482W",
+          "messageID": "msg_1413cafdc0017udpM8lncQENC2"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_141399246001RL60J0ZtmI09EV",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 35808,
+          "input": 6323,
+          "output": 89,
+          "reasoning": 276,
+          "cache": {
+            "write": 0,
+            "read": 29120
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792096114855,
+          "completed": 1792096139142
+        },
+        "finish": "tool-calls",
+        "id": "msg_1414098a7001dAcZHIRFTxO0aY",
+        "sessionID": "ses_ebec66ddeffeNuKIbZ6Iv0482W"
+      },
+      "parts": [
+        {
+          "snapshot": "a9463ef83a6340e5b45c674d83bb7a1a0a0f2587",
+          "type": "step-start",
+          "id": "prt_14140cbbd001dJ9TNEsjhu2v1Y",
+          "sessionID": "ses_ebec66ddeffeNuKIbZ6Iv0482W",
+          "messageID": "msg_1414098a7001dAcZHIRFTxO0aY"
+        },
+        {
+          "type": "reasoning",
+          "text": "Also check `connectors` config file location `.agentic-odi/connectors.json` — data/config paths outside install dir. Fine.\n\nOne more thing: README references `--backend mcp`? The outcomes commands currently hardcode `get_backend(\"mcp\", ...)` — wait! In outcomes.py, every command calls `get_backend(\"mcp\", ...)` explicitly, ignoring AGENTIC_ODI_BACKEND=local default! The design constraint says \"CLI defaults to a local SQLite backend (AGENTIC_ODI_BACKEND=local)\" and spike tests \"outcomes add against both backends\". But the actual outcomes commands pass \"mcp\" hardcoded — the local backend appears unused by outcomes commands (backend.py has LocalBackend but is it wired anywhere?). Let me check test_cli / cli.py for get_backend usage.\n\nIf the current code always uses MCP for outcomes, then \"outcomes add against both backends\" in the spike and the claim that the binary is \"useful standalone\" with local backend contradicts the implementation. That's a real discrepancy: does the bundled CLI need a code change so outcomes commands honor AGENTIC_ODI_BACKEND (local default)? The design assumes local backend is the default path, but outcomes hardcode mcp. Hmm — maybe `connectors` commands use backend? Let me check connectors.py and where get_backend is called.",
+          "time": {
+            "start": 1792096128111,
+            "end": 1792096137872
+          },
+          "id": "prt_14140cc6f001xgJcmBZ9p4sygw",
+          "sessionID": "ses_ebec66ddeffeNuKIbZ6Iv0482W",
+          "messageID": "msg_1414098a7001dAcZHIRFTxO0aY"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "call_d07b0d90edae4955b935b344",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "grep -rn \"get_backend\\|AGENTIC_ODI_BACKEND\\|LocalBackend\" /home/alexa/repos/agentic-odi/cli/src /home/alexa/repos/agentic-odi/cli/tests; echo ---; sed -n 1,60p /home/alexa/repos/agentic-odi/cli/src/cli/connectors.py"
+            },
+            "output": "grep: /home/alexa/repos/agentic-odi/cli/src/cli/__pycache__/outcomes.cpython-311.pyc: binary file matches\ngrep: /home/alexa/repos/agentic-odi/cli/src/cli/__pycache__/backend.cpython-311.pyc: binary file matches\n/home/alexa/repos/agentic-odi/cli/src/cli/backend.py:19:class LocalBackend(Backend):\n/home/alexa/repos/agentic-odi/cli/src/cli/backend.py:73:def get_backend(\n/home/alexa/repos/agentic-odi/cli/src/cli/backend.py:77:        backend = os.environ.get(\"AGENTIC_ODI_BACKEND\", \"local\")\n/home/alexa/repos/agentic-odi/cli/src/cli/backend.py:79:        return LocalBackend(db_path=db_path)\n/home/alexa/repos/agentic-odi/cli/src/cli/outcomes.py:84:    from cli.backend import get_backend\n/home/alexa/repos/agentic-odi/cli/src/cli/outcomes.py:86:    typer.echo(get_backend(\"mcp\", mcp_url=mcp_url).call(\"add_customer_outcome\", args))\n/home/alexa/repos/agentic-odi/cli/src/cli/outcomes.py:95:    from cli.backend import get_backend\n/home/alexa/repos/agentic-odi/cli/src/cli/outcomes.py:98:        get_backend(\"mcp\", mcp_url=mcp_url).call(\"get_customer_outcome\", {\"outcome_id\": outcome_id})\n/home/alexa/repos/agentic-odi/cli/src/cli/outcomes.py:111:    from cli.backend import get_backend\n/home/alexa/repos/agentic-odi/cli/src/cli/outcomes.py:113:    typer.echo(get_backend(\"mcp\", mcp_url=mcp_url).call(\"list_customer_outcomes\", args))\n/home/alexa/repos/agentic-odi/cli/src/cli/outcomes.py:162:    from cli.backend import get_backend\n/home/alexa/repos/agentic-odi/cli/src/cli/outcomes.py:164:    typer.echo(get_backend(\"mcp\", mcp_url=mcp_url).call(\"update_customer_outcome\", args))\n/home/alexa/repos/agentic-odi/cli/src/cli/outcomes.py:178:    from cli.backend import get_backend\n/home/alexa/repos/agentic-odi/cli/src/cli/outcomes.py:181:        get_backend(\"mcp\", mcp_url=mcp_url).call(\n---\n\"\"\"CLI adapter for listing, adding, checking, and ingesting external connectors.\"\"\"\n\nfrom __future__ import annotations\n\nimport asyncio\nimport os\nfrom pathlib import Path\n\nimport typer\nfrom connectors.factory import build_connector\nfrom connectors.models import ConnectorConfig\nfrom connectors.registry import (\n    ConnectorNotFoundError,\n    ConnectorRegistry,\n    DuplicateConnectorError,\n    UnknownConnectorKindError,\n)\nfrom connectors.sink import get_default_sink\n\nconnectors_app = typer.Typer(\n    name=\"connectors\",\n    help=\"Connect Agentic ODI to external systems.\",\n    no_args_is_help=True,\n)\n\n\ndef _config_path(config: Path | None) -> Path:\n    if config is not None:\n        return config\n    env = os.getenv(\"AGENTIC_ODI_CONNECTORS_FILE\")\n    if env:\n        return Path(env)\n    return Path.cwd() / \".agentic-odi\" / \"connectors.json\"\n\n\ndef _registry(config: Path | None) -> ConnectorRegistry:\n    return ConnectorRegistry(_config_path(config))\n\n\nConfigOption = typer.Option(\n    None,\n    \"--config\",\n    help=\"Path to the connectors JSON registry.\",\n    envvar=\"AGENTIC_ODI_CONNECTORS_FILE\",\n)\n\n\n@connectors_app.command(\"list\")\ndef list_connectors(\n    config: Path | None = ConfigOption,\n) -> None:\n    \"\"\"List configured external connectors.\"\"\"\n    items = _registry(config).list_all()\n    if not items:\n        typer.echo(\"No connectors configured.\")\n        return\n    for item in items:\n        status = \"enabled\" if item.enabled else \"disabled\"\n        typer.echo(f\"{item.name}\\t{item.kind}\\t{status}\")\n\n",
+            "metadata": {
+              "output": "grep: /home/alexa/repos/agentic-odi/cli/src/cli/__pycache__/outcomes.cpython-311.pyc: binary file matches\ngrep: /home/alexa/repos/agentic-odi/cli/src/cli/__pycache__/backend.cpython-311.pyc: binary file matches\n/home/alexa/repos/agentic-odi/cli/src/cli/backend.py:19:class LocalBackend(Backend):\n/home/alexa/repos/agentic-odi/cli/src/cli/backend.py:73:def get_backend(\n/home/alexa/repos/agentic-odi/cli/src/cli/backend.py:77:        backend = os.environ.get(\"AGENTIC_ODI_BACKEND\", \"local\")\n/home/alexa/repos/agentic-odi/cli/src/cli/backend.py:79:        return LocalBackend(db_path=db_path)\n/home/alexa/repos/agentic-odi/cli/src/cli/outcomes.py:84:    from cli.backend import get_backend\n/home/alexa/repos/agentic-odi/cli/src/cli/outcomes.py:86:    typer.echo(get_backend(\"mcp\", mcp_url=mcp_url).call(\"add_customer_outcome\", args))\n/home/alexa/repos/agentic-odi/cli/src/cli/outcomes.py:95:    from cli.backend import get_backend\n/home/alexa/repos/agentic-odi/cli/src/cli/outcomes.py:98:        get_backend(\"mcp\", mcp_url=mcp_url).call(\"get_customer_outcome\", {\"outcome_id\": outcome_id})\n/home/alexa/repos/agentic-odi/cli/src/cli/outcomes.py:111:    from cli.backend import get_backend\n/home/alexa/repos/agentic-odi/cli/src/cli/outcomes.py:113:    typer.echo(get_backend(\"mcp\", mcp_url=mcp_url).call(\"list_customer_outcomes\", args))\n/home/alexa/repos/agentic-odi/cli/src/cli/outcomes.py:162:    from cli.backend import get_backend\n/home/alexa/repos/agentic-odi/cli/src/cli/outcomes.py:164:    typer.echo(get_backend(\"mcp\", mcp_url=mcp_url).call(\"update_customer_outcome\", args))\n/home/alexa/repos/agentic-odi/cli/src/cli/outcomes.py:178:    from cli.backend import get_backend\n/home/alexa/repos/agentic-odi/cli/src/cli/outcomes.py:181:        get_backend(\"mcp\", mcp_url=mcp_url).call(\n---\n\"\"\"CLI adapter for listing, adding, checking, and ingesting external connectors.\"\"\"\n\nfrom __future__ import annotations\n\nimport asyncio\nimport os\nfrom pathlib import Path\n\nimport typer\nfrom connectors.factory import build_connector\nfrom connectors.models import ConnectorConfig\nfrom connectors.registry import (\n    ConnectorNotFoundError,\n    ConnectorRegistry,\n    DuplicateConnectorError,\n    UnknownConnectorKindError,\n)\nfrom connectors.sink import get_default_sink\n\nconnectors_app = typer.Typer(\n    name=\"connectors\",\n    help=\"Connect Agentic ODI to external systems.\",\n    no_args_is_help=True,\n)\n\n\ndef _config_path(config: Path | None) -> Path:\n    if config is not None:\n        return config\n    env = os.getenv(\"AGENTIC_ODI_CONNECTORS_FILE\")\n    if env:\n        return Path(env)\n    return Path.cwd() / \".agentic-odi\" / \"connectors.json\"\n\n\ndef _registry(config: Path | None) -> ConnectorRegistry:\n    return ConnectorRegistry(_config_path(config))\n\n\nConfigOption = typer.Option(\n    None,\n    \"--config\",\n    help=\"Path to the connectors JSON registry.\",\n    envvar=\"AGENTIC_ODI_CONNECTORS_FILE\",\n)\n\n\n@connectors_app.command(\"list\")\ndef list_connectors(\n    config: Path | None = ConfigOption,\n) -> None:\n    \"\"\"List configured external connectors.\"\"\"\n    items = _registry(config).list_all()\n    if not items:\n        typer.echo(\"No connectors configured.\")\n        return\n    for item in items:\n        status = \"enabled\" if item.enabled else \"disabled\"\n        typer.echo(f\"{item.name}\\t{item.kind}\\t{status}\")\n\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "grep -rn \"get_backend\\|AGENTIC_ODI_BACKEND\\|LocalBackend\" /home/alexa/repos/agentic-odi/cli/src /home/alexa/repos/agentic-odi/cli/tests; echo ---; sed -n 1,60p /home/alexa/repos/agentic-odi/cli/src/cli/connectors.py",
+            "time": {
+              "start": 1792096138725,
+              "end": 1792096138796
+            }
+          },
+          "id": "prt_14140f29f001gLKtLhTqvsGHUz",
+          "sessionID": "ses_ebec66ddeffeNuKIbZ6Iv0482W",
+          "messageID": "msg_1414098a7001dAcZHIRFTxO0aY"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "a9463ef83a6340e5b45c674d83bb7a1a0a0f2587",
+          "type": "step-finish",
+          "tokens": {
+            "total": 35808,
+            "input": 6323,
+            "output": 89,
+            "reasoning": 276,
+            "cache": {
+              "write": 0,
+              "read": 29120
+            }
+          },
+          "cost": 0,
+          "id": "prt_14140f72300112KqOD5Q24Sr5Q",
+          "sessionID": "ses_ebec66ddeffeNuKIbZ6Iv0482W",
+          "messageID": "msg_1414098a7001dAcZHIRFTxO0aY"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_141399246001RL60J0ZtmI09EV",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 37123,
+          "input": 1297,
+          "output": 72,
+          "reasoning": 362,
+          "cache": {
+            "write": 0,
+            "read": 35392
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792096139160,
+          "completed": 1792096160991
+        },
+        "finish": "tool-calls",
+        "id": "msg_14140f79800113TpY0vX0NtISU",
+        "sessionID": "ses_ebec66ddeffeNuKIbZ6Iv0482W"
+      },
+      "parts": [
+        {
+          "snapshot": "a9463ef83a6340e5b45c674d83bb7a1a0a0f2587",
+          "type": "step-start",
+          "id": "prt_1414111a2001T6FTaO9MVOvxHu",
+          "sessionID": "ses_ebec66ddeffeNuKIbZ6Iv0482W",
+          "messageID": "msg_14140f79800113TpY0vX0NtISU"
+        },
+        {
+          "type": "reasoning",
+          "text": "Confirmed: `outcomes` commands hardcode `get_backend(\"mcp\", ...)`. `LocalBackend` exists but is never used by any command. The design's constraint says \"The CLI defaults to a local SQLite backend (AGENTIC_ODI_BACKEND=local), so the binary is useful standalone\" and the spike says \"run `outcomes add` against both backends.\"\n\nSo there's a discrepancy between design assumption and current code: does the design *require* changing the outcomes commands to honor AGENTIC_ODI_BACKEND (default local)? Or is \"local backend\" only reachable through some path I'm missing? Nothing calls get_backend() without an explicit \"mcp\". So `AGENTIC_ODI_BACKEND=local` currently has no effect on outcomes commands.\n\nThis is a genuine question: the design's premise (\"binary is useful standalone / local default / spike tests both backends\") implies a code change to wire the local backend into outcomes commands (or a global `--backend` flag). That's scope not stated anywhere in the design — is it in scope for this project, or should the plan assume current hardcoded-MCP behavior stays and the \"spike against both backends\" just exercises `cli.backend.get_backend` directly? Also note: the design mentions a \"global flag `--no-update`\" and `--backend mcp` — the current CLI has no global `--backend` flag either (commands take `--mcp-url`, backend is hardcoded). Wait, design says \"Shipping a build that crashes on `--backend mcp`\" — implies `--backend mcp` flag exists. It doesn't exist in the current code! So the design assumes a `--backend` option. Let me double check: grep \"--backend\" in cli.",
+          "time": {
+            "start": 1792096146104,
+            "end": 1792096158645
+          },
+          "id": "prt_1414112b8001rvtMqdKYjiUJr8",
+          "sessionID": "ses_ebec66ddeffeNuKIbZ6Iv0482W",
+          "messageID": "msg_14140f79800113TpY0vX0NtISU"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "call_064c395e7fe94d2d8abef3ed",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "grep -rn \"\\-\\-backend\\|backend\" /home/alexa/repos/agentic-odi/cli/tests/*.py | head -20; grep -rn \"\\-\\-backend\" /home/alexa/repos/agentic-odi/README.md | head"
+            },
+            "output": "(no output)",
+            "metadata": {
+              "output": "(no output)",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "grep -rn \"\\-\\-backend\\|backend\" /home/alexa/repos/agentic-odi/cli/tests/*.py | head -20; grep -rn \"\\-\\-backend\" /home/alexa/repos/agentic-odi/README.md | head",
+            "time": {
+              "start": 1792096160627,
+              "end": 1792096160673
+            }
+          },
+          "id": "prt_1414143be001Q0hUUA2DdJYnoS",
+          "sessionID": "ses_ebec66ddeffeNuKIbZ6Iv0482W",
+          "messageID": "msg_14140f79800113TpY0vX0NtISU"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "a9463ef83a6340e5b45c674d83bb7a1a0a0f2587",
+          "type": "step-finish",
+          "tokens": {
+            "total": 37123,
+            "input": 1297,
+            "output": 72,
+            "reasoning": 362,
+            "cache": {
+              "write": 0,
+              "read": 35392
+            }
+          },
+          "cost": 0,
+          "id": "prt_141414c5b001xiKhH6Dj4gCo09",
+          "sessionID": "ses_ebec66ddeffeNuKIbZ6Iv0482W",
+          "messageID": "msg_14140f79800113TpY0vX0NtISU"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_141399246001RL60J0ZtmI09EV",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 40376,
+          "input": 461,
+          "output": 728,
+          "reasoning": 2515,
+          "cache": {
+            "write": 0,
+            "read": 36672
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792096161007,
+          "completed": 1792096301707
+        },
+        "finish": "stop",
+        "id": "msg_141414cef001DukRZSiwVK6z44",
+        "sessionID": "ses_ebec66ddeffeNuKIbZ6Iv0482W"
+      },
+      "parts": [
+        {
+          "snapshot": "a9463ef83a6340e5b45c674d83bb7a1a0a0f2587",
+          "type": "step-start",
+          "id": "prt_141417244001xqL0RSGOWmFQcF",
+          "sessionID": "ses_ebec66ddeffeNuKIbZ6Iv0482W",
+          "messageID": "msg_141414cef001DukRZSiwVK6z44"
+        },
+        {
+          "type": "reasoning",
+          "text": "No `--backend` flag anywhere in tests or README. So the design references `--backend mcp` which doesn't exist as a flag; and claims local backend default which is only in `get_backend()` defaults but never used by commands. This is an important scope question.\n\nAlso design says spike: \"run `outcomes add` against both backends\" — against local backend would require wiring.\n\nSo question: Is wiring a real `--backend local|mcp` (defaulting to local per AGENTIC_ODI_BACKEND) into the outcomes commands in scope for this work, or is the design written against an assumed future state of the CLI?\n\nRank this high (#2 or #3?) — it directly affects spike acceptance criteria and whether the standalone-binary claim is true. Actually it might be #1 or #2. The whole \"useful standalone\" value prop depends on it. And anti-goal \"crashes on --backend mcp\" implies flag exists.\n\nHmm, but wait — maybe I should double check `score` command: `outcomes score` calls `_call_mcp` directly. And `delete` etc. all mcp. Yes.\n\nAlso note `LocalBackend` formats success but the MCP path returns JSON — behavior differs.\n\nNow let me also reconsider: design says \"the CLI imports fastmcp at module top (cli/src/cli/outcomes.py)\" — correct.\n\nAnother check: does `connectors` ingest need `uv` or network? It uses fastmcp client — bundled fine.\n\nOther candidate: **sqlite3 module** — Python stdlib sqlite3 needs libsqlite3 shared lib bundled by PyInstaller — fine, builder.\n\nNow finalize ranked questions. Let me weigh:\n\n1. **glibc/minimum Linux support** — build on ubuntu-latest (24.04) → glibc ≥2.39 floor; breaks Debian 12 (2.36), Ubuntu 22.04 (2.35), basically most of today's installed base. Wrong guess = binary doesn't run for large share of Linux users, docs wrong, matrix changes (container job or older runner; arm64 runner only 24.04). Very important. Does doc leave it to builder? Not mentioned at all. Rank 1.\n\n2. **Backend wiring discrepancy** — design asserts local default + `--backend mcp` flag + spike \"both backends\"; code hardcodes MCP. Wrong guess = plan misses a CLI behavior-change work item (or adds one that wasn't wanted), and spike can't pass as written. Rank 2. Actually — is this \"something I could decide myself\"? No, it's a scope question about intended behavior; can't guess whether they want outcomes to default local (behavior change affecting existing users) — actually design explicitly says default local is a constraint they've decided. Hmm: \"The CLI defaults to a local SQLite backend (AGENTIC_ODI_BACKEND=local), so the binary is useful standalone.\" If design decided it, then the plan must implement wiring. Is there still a question? The question becomes: should `outcomes` commands change behavior (default local instead of hardcoded MCP) — a breaking change for existing users of the editable install — or does \"defaults to local\" apply only... Honestly the design asserts a state that isn't true; I'd ask whether implementing that wiring (a functional change to outcomes commands) is in scope, since it's not listed anywhere in the phasing. That's legitimately plan-shaping: phasing items don't include \"make local backend actually reachable.\" Also `--backend mcp` flag doesn't exist. Rank 2.\n\n3. **Size budget / \"egregious\" threshold** — if the human has a ceiling (e.g., install.sh one-liner UX, corporate networks), phase 1 changes (lazy fastmcp import). Expected compressed size ~100–150MB. Rank 3 (moderate). Doc says builder's call but threshold undefined... \"Revisit a lazy fastmcp import only if measured size is egregious *and*...\" — vague; asking for a number is fair. Or I could skip since it's explicitly conditioned on measurement. I'll keep it but mid-rank with note.\n\n4. **First release bootstrap / initial version** — no tags; what's the first released version and does release-please need a bootstrap tag/config? Affects whether version.py's 0.1.0 matches first artifact. Rank 4.\n\n5. **install.sh system-wide mode** — doc references system-wide installs handled \"only by the install script\", implying install.sh may support /usr/local with sudo; or maybe it just means \"if a package manager did it, we don't touch it.\" Ambiguous; changes install.sh design (root escalation, PATH edit, auto-update disable detection). Rank 5.\n\n6. Maybe: **update check needs GitHub API vs static** — skip (decidable).\n\n7. **Non-interactive detection** — skip.\n\n8. **Windows auto-update in v1** — decided; skip... but actually, is there a fallback if the deferred helper can't be made safe? The anti-goals say corruption = failure. Could ask: \"If the Windows deferred-swap helper proves risky, is shipping Windows with explicit `odi update` only (auto-update off) acceptable for v1?\" That's a contingency question — plan-worthy? It's a fallback decision the doc gives no answer to. Moderate. Maybe rank 6. Hmm, doc explicitly: \"Updates use a deferred helper process so the running .exe can be swapped.\" decided. Fallback unstated. I could include as lower-ranked.\n\n9. **macOS Intel** — flagged wrinkle, may force decision \"later\" → proceed with Rosetta build; decidable during spike. Skip.\n\n10. **Python version for build** — decidable (3.12? but note StrEnum needs ≥3.11; CI green on 3.10? irrelevant). Skip.\n\n11. **What about keeping uv-based install documented as primary for contributors** — skip.\n\n12. **Auto-update on by default in dev/editable** — suppressed when not frozen; skip.\n\n13. **Pruning old versions / rollback policy** — not specified; decidable (keep last2, no auto-rollback). Wrong guess matters little. Skip.\n\n14. **Does `curl|sh` need to add ~/.local/bin to PATH if missing?** — install.sh standard; decidable. Skip.\n\n15. **Gating publish on smoke tests** — decidable. Skip.\n\n16. **Release asset naming vs install.sh embedded** — decided naming. Skip.\n\nAnother thought — **`update.json` location `~/.config/agentic-odi/update.json` vs `AGENTIC_ODI_INSTALL_DIR` override**: if install dir is overridden, state file path? decidable. Skip.\n\n**Concurrency: user runs odi while CI...** skip.\n\nWhat about **distribution when GitHub API returns prereleases** — skip.\n\nOne more possibly-important: **The design says auto-update \"applied on the next run ... print 'Updated to vX.Y.Z — takes effect next run'\". But if the command was the last of the session, user never sees it...** nitpick. Skip.\n\n**Security: install.sh uploaded as release asset and fetched via latest/download — but user curls `<url>/install.sh` — should the README point at a versioned/tagged URL?** nitpick-ish. Skip.\n\nAlso: **Should `checksums.txt` verification also apply to install.sh itself?** skip.\n\nI think final list: rank1. Linux glibc floor / build environment.\n2. Backend discrepancy (local default + `--backend mcp` flag don't exist in code — in scope?).\n3. Size ceiling for \"egregious\" (informs whether lazy fastmcp import is in scope).\n4. First-release bootstrap: what initial version / pre-tag?\n5. install.sh system-wide (sudo) mode in scope?\n6. Windows v1 fallback: is manual-only update on Windows acceptable if deferred helper can't be made safe?\n\nIs #3 worth keeping? \"binary size is only a download-time concern\" and explicitly \"builder's call\" / \"revisit only if measured\". The threshold question is genuinely needed: I'd have to guess what egregious means. Keep.\n\nIs #4 important? \"wrong guess would matter\" — moderate: version mismatch between source0.1.0 and first release (maybe 0.2.0) confuses; release-please config (bootstrap-sha, version-file) depends. Keep low.\n\n#5: does wrong guess matter? If we don't build sudo mode and users expect it → support burden. Doc's flagged wrinkle says system-wide installs exist and \"only the install script manages those\" — this sentence only makes sense if install script can do system-wide. So the doc kind of implies it's in scope but doesn't specify. Ask: does install.sh need a sudo/system-wide install mode? Medium-low.\n\n#6: contingency — maybe skip since decided + builder implements. I'll include as lowest? The instruction says skip anything explicitly left to builder — Windows deferred-swap implementation details left to builder, but *fallback policy if unsafe* isn't. I'll include it low.\n\nActually, let me reconsider one more class: **update check endpoint & rate limiting** — decided \"query GitHub Releases latest\". Implementation could use API or redirect. I can decide. Skip.\n\nAnd **`--no-update` as a global flag interacting with typer's callback** — implementation. Skip.\n\nAlso **shell completions in install.sh** — phasing mentions them; typer's completion for frozen binary: click shell-complete scripts need the `odi` executable to support `_ODI_COMPLETE` env — PyInstaller bundles that fine. Decidable. Skip.\n\nWhat about **where the plan's e2e \"installing from a real tagged Release\" test runs** — needs a release first; chicken-egg sequencing (phase 5 after first tag). Decidable in plan. Skip.\n\nI'm fairly happy with 6 questions. Let me sanity-check #1: is glibc really a plan-shaping question rather than a builder detail? Options: (a) accept modern glibc only, document floor; (b) build in manylinux2014/2_28 container → changes release.yml significantly (docker on all linux jobs incl. arm), changes smoke testing; (c) build on ubuntu-22.04 (retiring? GH retired macos-13; ubuntu-22.04 runners still around in 2026? possibly being retired too) → arm64 problem since only 24.04-arm hosted. Yes, plan-shaping, must ask human what distros they care about.\n\nRanking: I'll put backend discrepancy #1 or glibc #1? \"Wrong guess would matter\" — both matter. The glibc one affects the core deliverable's usability on Linux broadly; the backend one affects scope/acceptance criteria of the spike and the standalone value prop. The doc presents backend-default as a *constraint/confirmed fact* that is false — I'd argue confirming the discrepancy is more urgent because it's a factual mismatch: either the design is wrong or the code is stale. That determines whether phase 1 includes a behavior change. I'll put backend discrepancy first? Hmm. The instruction: \"places where you'd have to guess and a wrong guess would matter. Rank by importance.\"\n\nIf I guess wrong on glibc: ship binaries that fail on most Linux → catastrophic, silent until users complain. If I guess wrong on backend: spike fails at \"outcomes add against local backend\" → I'd discover it during spike anyway. Discovery cost differs. glibc also discoverable only when external users try. I'll rank glibc #1, backend #2.\n\nKeep answers tight. Format: ranked list, question + why it changes plan. No code/files written. Done — no more tool calls needed.",
+          "time": {
+            "start": 1792096170739,
+            "end": 1792096278290
+          },
+          "id": "prt_1414172f3001qERgdkEzUp6Yyi",
+          "sessionID": "ses_ebec66ddeffeNuKIbZ6Iv0482W",
+          "messageID": "msg_141414cef001DukRZSiwVK6z44"
+        },
+        {
+          "type": "text",
+          "text": "## Questions before planning\n\n**1. What minimum Linux/glibc must the binary support?**\n`release.yml` builds on GitHub-hosted Ubuntu (`ubuntu-latest` = 24.04, glibc 2.39; the arm runner is 24.04-only). PyInstaller does no manylinux-style compatibility, so a plain runner build will fail on Debian 12 (glibc 2.36), Ubuntu 22.04, and most current distros. Wrong guess = the headline Linux artifact doesn't run for much of the install base, and the fix changes the whole Linux matrix (manylinux/older-glibc container job on the runner, or an explicit documented glibc floor).\n\n**2. Is wiring the local backend actually in scope?**\nThe design states \"The CLI defaults to a local SQLite backend (`AGENTIC_ODI_BACKEND=local`), so the binary is useful standalone\" and the spike runs `outcomes add` \"against both backends\" / references `--backend mcp`. But `cli/src/cli/outcomes.py` hardcodes `get_backend(\"mcp\", ...)` in every command (`score` calls `_call_mcp` directly); `LocalBackend` is unreachable and no `--backend` flag exists anywhere (code, tests, or README). Wrong guess = either the plan omits a functional change needed for the spike and the \"useful standalone\" claim, or it schedules a breaking behavior change to existing `outcomes` commands the human didn't intend.\n\n**3. What size is \"egregious\"?**\nDecision 4 defers lazy `fastmcp` import \"only if measured size is egregious\" — undefined. A full fastmcp+pydantic-core+uvicorn onedir will likely be ~80–150 MB compressed. If there's a ceiling (one-liner UX, corporate proxies), phase 1 must include the lazy-import work and MCP-keeps-working validation; if not, the plan skips it entirely. I can't pick the threshold myself.\n\n**4. What's the first released version, given no tags exist?**\n`version.py` and both pyprojects say `0.1.0`, but release-please with no prior tag will derive its first PR from conventional-commit history (likely → 0.2.0), and the first `curl | sh` user sees whatever that tag is. Wrong guess = mismatched first artifact/changelog/version fallback, or release-please config (`version-file`, `bootstrap-sha`) anchored to the wrong baseline.\n\n**5. Does `install.sh` need a sudo/system-wide mode?**\nThe flagged wrinkle says system-wide installs (`/usr/local/bin`, package managers) are managed \"only by the install script\" — implying the script can install there — but layout, PATH editing, and auto-update-disable detection differ sharply from user-local `~/.local`. Wrong guess = install script redesigned after the fact, or users can't get the system-wide path the design promises them.\n\n**6. Is Windows acceptable for v1 with explicit `odi update` only, if the deferred swap can't be made safe?**\nAuto-update-on-by-default is decided, but the Windows deferred-helper mechanism is the riskiest unproven piece and the anti-goals treat corrupted installs as failure. No fallback is stated. Wrong guess = either v1 ships a risky Windows updater, or a lot of Windows-specific plan work is cut without the human's sign-off.",
+          "time": {
+            "start": 1792096278301,
+            "end": 1792096301559
+          },
+          "id": "prt_14143171d001jkcg4DU6Ru79mQ",
+          "sessionID": "ses_ebec66ddeffeNuKIbZ6Iv0482W",
+          "messageID": "msg_141414cef001DukRZSiwVK6z44"
+        },
+        {
+          "reason": "stop",
+          "snapshot": "a9463ef83a6340e5b45c674d83bb7a1a0a0f2587",
+          "type": "step-finish",
+          "tokens": {
+            "total": 40376,
+            "input": 461,
+            "output": 728,
+            "reasoning": 2515,
+            "cache": {
+              "write": 0,
+              "read": 36672
+            }
+          },
+          "cost": 0,
+          "id": "prt_141437250001Jc4jCmlASZa4WH",
+          "sessionID": "ses_ebec66ddeffeNuKIbZ6Iv0482W",
+          "messageID": "msg_141414cef001DukRZSiwVK6z44"
+        }
+      ]
+    }
+  ]
+}
