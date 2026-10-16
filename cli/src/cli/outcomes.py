@@ -8,7 +8,6 @@ from enum import Enum
 from typing import Any
 
 import typer
-from fastmcp import Client
 
 from cli import context
 
@@ -34,6 +33,8 @@ class CategoryOption(str, Enum):
 
 
 def _call_mcp(tool: str, args: dict[str, Any], mcp_url: str = MCP_URL_DEFAULT) -> str:
+    from fastmcp import Client
+
     async def _run() -> str:
         async with Client(mcp_url) as client:
             result = await client.call_tool(tool, args)
