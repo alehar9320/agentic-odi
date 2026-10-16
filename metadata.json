@@ -3,7 +3,7 @@
   "checkpoint_id": "01M52NDHSZRXN10YBQR7PY4VRB",
   "strategy": "manual-commit",
   "branch": "feature/cli-odi-entity-parity",
-  "checkpoints_count": 4,
+  "checkpoints_count": 5,
   "files_touched": [
     "core/src/core/intent_store.py",
     "core/src/core/sqlite_repository.py",
@@ -37,13 +37,20 @@
       "compact_transcript": "/3/transcript.jsonl",
       "content_hash": "/3/content_hash.txt",
       "prompt": "/3/prompt.txt"
+    },
+    {
+      "metadata": "/4/metadata.json",
+      "transcript": "/4/full.jsonl",
+      "compact_transcript": "/4/transcript.jsonl",
+      "content_hash": "/4/content_hash.txt",
+      "prompt": "/4/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 144330,
+    "input_tokens": 226867,
     "cache_creation_tokens": 0,
-    "cache_read_tokens": 1794894,
-    "output_tokens": 19379,
-    "api_call_count": 89
+    "cache_read_tokens": 1947982,
+    "output_tokens": 25766,
+    "api_call_count": 96
   }
 }
