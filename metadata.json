@@ -1,0 +1,28 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M52QJB6CMZ8BDPCJH4R3QJ3K",
+  "strategy": "manual-commit",
+  "branch": "feature/cli-odi-entity-parity",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "mcp_server/src/mcp_server/mcp_server.py",
+    "mcp_server/tests/conftest.py",
+    "mcp_server/tests/test_parity.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/0/metadata.json",
+      "transcript": "/0/full.jsonl",
+      "compact_transcript": "/0/transcript.jsonl",
+      "content_hash": "/0/content_hash.txt",
+      "prompt": "/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 20059,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 103872,
+    "output_tokens": 2153,
+    "api_call_count": 8
+  }
+}
