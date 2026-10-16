@@ -1,0 +1,79 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: linux
+            runner: ubuntu-latest
+            target: linux_x86_64
+            container: quay.io/pypa/manylinux2014_x86_64:latest
+          - os: linux
+            runner: ubuntu-24.04-arm
+            target: linux_arm64
+            container: quay.io/pypa/manylinux2014_aarch64:latest
+          - os: macos
+            runner: macos-14
+            target: macos_arm64
+          - os: macos
+            runner: macos-13
+            target: macos_x86_64
+          - os: windows
+            runner: windows-latest
+            target: windows_x86_64
+    runs-on: ${{ matrix.runner }}
+    container: ${{ matrix.container }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup uv
+        uses: ./.github/actions/setup
+        with:
+          uv-version: "0.8.22"
+          python-version: "3.11"
+      - name: Build
+        env:
+          TARGET: ${{ matrix.target }}
+          RELEASE_DATE_UTC: ${{ github.event.repository.pushed_at || github.event.head_commit.timestamp }}
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          RELEASE_DATE_UTC=$(git log -1 --format=%cI)
+          export VERSION RELEASE_DATE_UTC
+          bash scripts/build_binary.sh
+      - name: Generate checksums
+        run: |
+          shopt -s nullglob
+          for f in odi_*.tar.gz odi_*.zip; do echo "hash $f"; done
+          if command -v sha256sum >/dev/null 2>&1; then
+            sha256sum odi_*.tar.gz odi_*.zip > checksums.txt 2>/dev/null || true
+          elif command -v shasum >/dev/null 2>&1; then
+            shasum -a 256 odi_*.tar.gz odi_*.zip > checksums.txt 2>/dev/null || true
+          fi
+        shell: bash
+      - name: Upload assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            odi_*.tar.gz
+            odi_*.zip
+            checksums.txt
+
+  upload-installers:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Upload install scripts
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            scripts/install.sh
+            scripts/install.ps1

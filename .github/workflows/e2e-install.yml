@@ -1,0 +1,56 @@
+name: e2e-install
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to test (e.g. v0.1.0)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  e2e-linux-macos:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            shell: bash
+            install: curl -fsSL https://github.com/alehar9320/agentic-odi/releases/download/${{ inputs.tag || github.ref_name }}/install.sh | AGENTIC_ODI_INSTALL_DIR=$RUNNER_TEMP/odi-home AGENTIC_ODI_BIN_DIR=$RUNNER_TEMP/odi-bin bash
+          - os: macos-latest
+            shell: bash
+            install: curl -fsSL https://github.com/alehar9320/agentic-odi/releases/download/${{ inputs.tag || github.ref_name }}/install.sh | AGENTIC_ODI_INSTALL_DIR=$RUNNER_TEMP/odi-home AGENTIC_ODI_BIN_DIR=$RUNNER_TEMP/odi-bin bash
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Install
+        run: ${{ matrix.install }}
+      - name: Smoke test
+        run: |
+          export PATH="$RUNNER_TEMP/odi-bin:$PATH"
+          odi --version
+          odi --help
+          odi outcomes score 8 2
+
+  e2e-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Install
+        shell: pwsh
+        run: |
+          $tag = "${{ inputs.tag || github.ref_name }}"
+          $url = "https://github.com/alehar9320/agentic-odi/releases/download/$tag/install.ps1"
+          $env:AGENTIC_ODI_INSTALL_DIR = "$env:RUNNER_TEMP\odi-home"
+          $env:AGENTIC_ODI_BIN_DIR = "$env:RUNNER_TEMP\odi-bin"
+          irm $url | iex
+      - name: Smoke test
+        shell: pwsh
+        run: |
+          $env:PATH = "$env:RUNNER_TEMP\odi-bin;$env:PATH"
+          odi --version
+          odi --help
+          odi outcomes score 8 2
