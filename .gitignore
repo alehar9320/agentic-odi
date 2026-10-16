@@ -32,6 +32,8 @@ MANIFEST
 *.manifest
 *.spec
 !packaging/pyinstaller/odi.spec
+/odi_*.tar.gz
+/odi_*.zip
 
 # Installer logs
 pip-log.txt

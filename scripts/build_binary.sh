@@ -22,6 +22,18 @@ RELEASE_DATE_UTC="${RELEASE_DATE_UTC:-}"
 COMMIT="${COMMIT:-dev}"
 TARGET="${TARGET:-dev}"
 
+# _build_info.py is tracked with committed dev defaults; the build regenerates
+# it from the environment. Back it up and always restore it on exit (even on
+# failure) so a build never leaves the working tree dirty.
+BUILD_INFO="cli/src/cli/_build_info.py"
+BUILD_INFO_BACKUP="$(mktemp)"
+cp "$BUILD_INFO" "$BUILD_INFO_BACKUP"
+restore_build_info() {
+    cp "$BUILD_INFO_BACKUP" "$BUILD_INFO"
+    rm -f "$BUILD_INFO_BACKUP"
+}
+trap restore_build_info EXIT
+
 echo "==> Syncing workspace (uv)"
 uv sync --all-packages --locked
 
