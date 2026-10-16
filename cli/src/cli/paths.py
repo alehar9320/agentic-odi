@@ -94,5 +94,5 @@ def is_writable_dir(p: Path) -> bool:
     """Check if the given path is a writable directory."""
     try:
         return p.is_dir() and os.access(p, os.W_OK)
-    except Exception:
+    except Exception:  # noqa: BLE001
         return False

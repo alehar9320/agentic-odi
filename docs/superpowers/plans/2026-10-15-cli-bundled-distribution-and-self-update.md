@@ -95,7 +95,12 @@ TARGET = "dev"
 `version.py`:
 
 ```python
-from cli._build_info import COMMIT, RELEASE_DATE_UTC as _RELEASE_DATE_UTC, TARGET, VERSION
+from cli._build_info import (
+    COMMIT,
+    RELEASE_DATE_UTC as _RELEASE_DATE_UTC,
+    TARGET,
+    VERSION,
+)
 
 __version__ = VERSION
 RELEASE_DATE_UTC = _RELEASE_DATE_UTC
@@ -240,10 +245,26 @@ from typer.testing import CliRunner
 from cli.cli import app
 
 ADD_ARGS = [
-    "outcomes", "add", "--job-id", "job-1", "--direction", "minimize",
-    "--unit", "time", "--object", "to setup", "--statement", "Minimize time",
-    "--importance", "8.5", "--satisfaction", "4.0", "--category",
-    "cost_reduction", "--business-statement", "Saves hours",
+    "outcomes",
+    "add",
+    "--job-id",
+    "job-1",
+    "--direction",
+    "minimize",
+    "--unit",
+    "time",
+    "--object",
+    "to setup",
+    "--statement",
+    "Minimize time",
+    "--importance",
+    "8.5",
+    "--satisfaction",
+    "4.0",
+    "--category",
+    "cost_reduction",
+    "--business-statement",
+    "Saves hours",
 ]
 
 
@@ -308,7 +329,11 @@ In `cli/src/cli/cli.py` root callback add `backend: str | None = typer.Option(No
 
 In `cli/src/cli/outcomes.py`, replace every `get_backend("mcp", mcp_url=mcp_url)` with `get_backend(context.selected_backend(), mcp_url=mcp_url)`, and change `score` to:
 ```python
-typer.echo(get_backend(context.selected_backend(), mcp_url=mcp_url).call("compute_opportunity", {"importance": importance, "satisfaction": satisfaction}))
+typer.echo(
+    get_backend(context.selected_backend(), mcp_url=mcp_url).call(
+        "compute_opportunity", {"importance": importance, "satisfaction": satisfaction}
+    )
+)
 ```
 (`LocalBackend.call("compute_opportunity", …)` already exists and returns `f"Opportunity score: {score:.2f}"`.)
 
@@ -370,8 +395,13 @@ def test_parse_and_compare():
 
 
 def test_asset_name():
-    assert update.asset_name("0.1.0", "linux", "x86_64") == "odi_0.1.0_linux_x86_64.tar.gz"
-    assert update.asset_name("0.1.0", "windows", "x86_64") == "odi_0.1.0_windows_x86_64.zip"
+    assert (
+        update.asset_name("0.1.0", "linux", "x86_64") == "odi_0.1.0_linux_x86_64.tar.gz"
+    )
+    assert (
+        update.asset_name("0.1.0", "windows", "x86_64")
+        == "odi_0.1.0_windows_x86_64.zip"
+    )
 
 
 def test_current_platform_mapping(monkeypatch):
@@ -476,7 +506,10 @@ def test_should_check_within_and_after_interval(tmp_path):
     assert update.should_check(state, now=1000.0) is True
     update.record_check(state, now=1000.0)
     assert update.should_check(state, now=1000.0 + 100) is False
-    assert update.should_check(state, now=1000.0 + update.CHECK_INTERVAL_SECONDS + 1) is True
+    assert (
+        update.should_check(state, now=1000.0 + update.CHECK_INTERVAL_SECONDS + 1)
+        is True
+    )
     assert json.loads(state.read_text())["last_check"] == 1000.0
 
 
