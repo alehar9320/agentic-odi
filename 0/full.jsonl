@@ -21,11 +21,11 @@
     },
     "cost": 0,
     "tokens": {
-      "input": 61695,
-      "output": 7604,
+      "input": 69241,
+      "output": 10653,
       "reasoning": 7010,
       "cache": {
-        "read": 684160,
+        "read": 841600,
         "write": 0
       }
     },
@@ -38,7 +38,7 @@
     ],
     "time": {
       "created": 1792164318172,
-      "updated": 1792164665989
+      "updated": 1792164801431
     }
   },
   "messages": [
@@ -2601,19 +2601,22 @@
         },
         "cost": 0,
         "tokens": {
-          "input": 0,
-          "output": 0,
+          "total": 54310,
+          "input": 4083,
+          "output": 563,
           "reasoning": 0,
           "cache": {
-            "read": 0,
-            "write": 0
+            "write": 0,
+            "read": 49664
           }
         },
         "modelID": "big-pickle",
         "providerID": "opencode",
         "time": {
-          "created": 1792164665985
+          "created": 1792164665985,
+          "completed": 1792164770173
         },
+        "finish": "tool-calls",
         "id": "msg_145569a810014N5sO0isg3TSS1",
         "sessionID": "ses_ebaaeb423ffewIFN4ff93OaTRA"
       },
@@ -2641,21 +2644,214 @@
           "tool": "bash",
           "callID": "call_a3e4893c32574c668aaf0d5d",
           "state": {
-            "metadata": {
-              "output": ""
-            },
-            "status": "running",
+            "status": "completed",
             "input": {
               "command": "git add core/src/core/intent_store.py core/src/core/sqlite_repository.py core/tests/test_sqlite_repository.py && git commit -m \"feat(core): read-through SQLite repository with locking and cascade events\" && git log --oneline -3 && git status --short",
               "workdir": "/home/alexa/repos/agentic-odi"
             },
+            "output": "[feature/cli-odi-entity-parity 5f84f98] feat(core): read-through SQLite repository with locking and cascade events\n 3 files changed, 387 insertions(+), 72 deletions(-)\n create mode 100644 core/tests/test_sqlite_repository.py\n5f84f98 feat(core): read-through SQLite repository with locking and cascade events\na18e1ec feat(core): add job/step/outcome service CRUD, FK validation, score recompute\n105ec8b feat(core): add job/step/outcome CRUD with cascade delete to repository\n?? docs/\n",
+            "metadata": {
+              "output": "[feature/cli-odi-entity-parity 5f84f98] feat(core): read-through SQLite repository with locking and cascade events\n 3 files changed, 387 insertions(+), 72 deletions(-)\n create mode 100644 core/tests/test_sqlite_repository.py\n5f84f98 feat(core): read-through SQLite repository with locking and cascade events\na18e1ec feat(core): add job/step/outcome service CRUD, FK validation, score recompute\n105ec8b feat(core): add job/step/outcome CRUD with cascade delete to repository\n?? docs/\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "git add core/src/core/intent_store.py core/src/core/sqlite_repository.py core/tests/test_sqlite_repository.py && git commit -m \"feat(core): read-through SQLite repository with locking and cascade events\" && git log --oneline -3 && git status --short",
             "time": {
-              "start": 1792164675724
+              "start": 1792164675724,
+              "end": 1792164769931
             }
           },
           "id": "prt_14556c080001JaqTtE7JAhLCcS",
           "sessionID": "ses_ebaaeb423ffewIFN4ff93OaTRA",
           "messageID": "msg_145569a810014N5sO0isg3TSS1"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "071a222bb8d8bc090d3fadd08bbabcd4001d3933",
+          "type": "step-finish",
+          "tokens": {
+            "total": 54310,
+            "input": 4083,
+            "output": 563,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 49664
+            }
+          },
+          "cost": 0,
+          "id": "prt_145583110001PCRvPnjuiM2np5",
+          "sessionID": "ses_ebaaeb423ffewIFN4ff93OaTRA",
+          "messageID": "msg_145569a810014N5sO0isg3TSS1"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_145514bf1001Fu0nPs6FYcCr6k",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 56765,
+          "input": 954,
+          "output": 2307,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 53504
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792164770184,
+          "completed": 1792164801401
+        },
+        "finish": "tool-calls",
+        "id": "msg_145583188001Uxd6YY7dVfjBq9",
+        "sessionID": "ses_ebaaeb423ffewIFN4ff93OaTRA"
+      },
+      "parts": [
+        {
+          "snapshot": "071a222bb8d8bc090d3fadd08bbabcd4001d3933",
+          "type": "step-start",
+          "id": "prt_1455846f6001mEPCzI0iXjWRA2",
+          "sessionID": "ses_ebaaeb423ffewIFN4ff93OaTRA",
+          "messageID": "msg_145583188001Uxd6YY7dVfjBq9"
+        },
+        {
+          "type": "text",
+          "text": "Committed. Now write the report file. Then reply with the concise format.\n\nLet me include TDD evidence. I have the RED output and GREEN output. Let me capture commands and key output.\n\nWrite report to task-3-report.md.</think>Now writing the report:",
+          "time": {
+            "start": 1792164775675,
+            "end": 1792164801324
+          },
+          "id": "prt_1455846fb001QnlKnpHYHx154s",
+          "sessionID": "ses_ebaaeb423ffewIFN4ff93OaTRA",
+          "messageID": "msg_145583188001Uxd6YY7dVfjBq9"
+        },
+        {
+          "type": "tool",
+          "tool": "write",
+          "callID": "call_54fbb3321e82427fbd823635",
+          "state": {
+            "status": "completed",
+            "input": {
+              "content": "# Task 3 Report: SQLiteRepository read-through, locking, cascade events\n\n## Status: DONE\n\n## Branch / Commit\n- Branch: `feature/cli-odi-entity-parity`\n- Commit: `5f84f98 feat(core): read-through SQLite repository with locking and cascade events`\n- Files committed (exactly 3):\n  - `core/src/core/intent_store.py`\n  - `core/src/core/sqlite_repository.py`\n  - `core/tests/test_sqlite_repository.py` (new)\n\n## What I implemented\n\n### `core/src/core/intent_store.py`\n- `IntentStore.__init__(self, db_path=\"intent_store.db\", check_same_thread=True)` now threads the flag into\n  `sqlite3.connect(db_path, check_same_thread=check_same_thread)`. Default preserved (`True`), so all\n  existing callers keep their current behavior. WAL mode unchanged.\n\n### `core/src/core/sqlite_repository.py`\n- `self._lock = threading.RLock()`; `IntentStore(db_path, check_same_thread=False)`.\n- `self._last_event_id = 0` set before/inside `_load_snapshot`.\n- Extracted `_apply_event(self, ev)` — handles **all** event types:\n  - `JOB_CREATED`/`STEP_CREATED`/`OUTCOME_CREATED`/`CUSTOMER_OUTCOME_CREATED` → `model_validate(payload)`.\n  - `JOB_UPDATED`/`STEP_UPDATED`/`OUTCOME_UPDATED`/`CUSTOMER_OUTCOME_UPDATED` → `_merge_updates`\n    (merge `p[\"updates\"]` into `model_dump(exclude_unset=True)` of the current model, re-validate,\n    tolerate `ValidationError`; no-op if the entity is absent).\n  - `JOB_DELETED` → pop the job, plus steps/outcomes/customer_outcomes with that `job_id`.\n  - `STEP_DELETED` → pop the step, plus outcomes/customer_outcomes with that `step_id`.\n  - `OUTCOME_DELETED`, `CUSTOMER_OUTCOME_DELETED` (pre-existing behavior preserved) → pop.\n  - Tracks `self._last_event_id = max(self._last_event_id, ev[\"id\"])`.\n- `_load_snapshot` resets the four dicts + `_last_event_id`, then applies every stream event through\n  `_apply_event` (single application path).\n- `_sync()` reads the stream and applies events with `id > self._last_event_id`.\n- Every public read: `with self._lock: self._sync(); ...`.\n- Every write: `with self._lock: append(...); self._sync(); ...` (write path applies through the same\n  `_apply_event`).\n- Implemented Task-1 parity methods mirroring `InMemoryRepository` semantics exactly:\n  - `get_step`, `get_outcome`.\n  - `update_job`/`update_step`/`update_outcome`: merge `model_dump(exclude_unset=True)` + `updates`,\n    re-validate (ValidationError propagates, as in-memory), store under the original lookup key, return\n    `None` when the id is absent.\n  - `delete_job`/`delete_step`/`delete_outcome`: return `False` when absent, append the delete event\n    (which cascades on replay), return `True` otherwise.\n  - Customer-outcome update/delete keep the existing `ValidationError → None` write-path behavior, now\n    lock-guarded and read-through.\n- `clear()` → lock-guarded `self.store.clear(); self._load_snapshot()`.\n\nNote: this also fixes a pre-existing bug where `_load_snapshot` only applied `JOB_CREATED` and\n`CUSTOMER_OUTCOME_CREATED` — `STEP_CREATED`/`OUTCOME_CREATED` were never replayed.\n\n## Tests added (`core/tests/test_sqlite_repository.py`)\nBrief's four tests verbatim, plus parity/regression coverage:\n1. `test_round_trips_all_entity_types` (brief)\n2. `test_concurrent_writer_is_visible` (brief)\n3. `test_delete_job_cascades_after_reopen` (brief)\n4. `test_update_outcome_persists` (brief)\n5. `test_update_job_and_step_merge_or_return_none_when_missing`\n6. `test_delete_missing_returns_false_and_cascade_events_replay`\n7. `test_read_through_sees_update_and_delete_from_other_connection`\n8. `test_customer_outcome_update_and_delete_persist`\n9. `test_delete_job_cascades_customer_outcomes_after_reopen`\n10. `test_clear_removes_everything`\n\nAll tests use `tmp_path`; none touch `~/.agentic-odi/odi.db`.\n\n## TDD evidence\n\n### RED — `UV_PYTHON` not needed (no pyarrow source build; Python 3.11.17 already active)\nCommand: `uv run --directory core pytest tests/test_sqlite_repository.py -v`\nResult: **8 failed, 2 passed** — exactly as expected:\n- `test_concurrent_writer_is_visible` — `AssertionError: assert None is not None` (reader's snapshot was\n  cached at construction; stale across connections).\n- `test_delete_job_cascades_after_reopen` — `AssertionError: assert Job(...) is None` (`JOB_DELETED` not\n  replayed).\n- `test_update_outcome_persists` — `AttributeError: 'NoneType' object has no attribute 'statement'`\n  (Task-1 method missing → inherited `Repository` protocol stub returned `None`).\n- `test_round_trips_all_entity_types`, `test_delete_missing_returns_false_and_cascade_events_replay`,\n  `test_read_through_...`, `test_delete_job_cascades_customer_outcomes_after_reopen`,\n  `test_update_job_and_step_merge_or_return_none_when_missing` — all failed on stale snapshot / protocol\n  stub `None` / missing methods.\n- Two passed pre-implementation (`test_customer_outcome_update_and_delete_persist`,\n  `test_clear_removes_everything`) because the customer-outcome and clear paths already worked while\n  snapshots were fresh in-process; they were retained as regression guards.\n\n### GREEN\nCommand: `uv run --directory core pytest tests/test_sqlite_repository.py -v`\nResult: **10 passed**.\n\nFull core suite (`uv run --directory core pytest`): **39 passed** — pristine (models 7, repository 8,\nservice 14, sqlite_repository 10).\n\n### Lint / typecheck / security (repo CI parity)\n- `uv run --directory core ruff check .` → All checks passed.\n- `uv run ruff format --check <3 changed files>` → 3 files already formatted.\n  (CI runs `ruff format --check .` at repo root, so I ran `ruff format` on the changed files. This only\n  reflowed the brief's `test_concurrent_writer_is_visible` assert onto one line — values/semantics\n  unchanged.)\n- `uv run --directory core mypy .` → Success: no issues found in 11 source files.\n- `uv run bandit -c pyproject.toml -r core/src` → 0 issues.\n\n## Files changed\n- `core/src/core/intent_store.py` — `check_same_thread` parameter threaded into `sqlite3.connect`.\n- `core/src/core/sqlite_repository.py` — rewritten: RLock, read-through `_sync`, full `_apply_event`,\n  Task-1 CRUD parity, lock-guarded `clear`.\n- `core/tests/test_sqlite_repository.py` — new (10 tests).\n\n## Self-review findings\n- All public methods go through the lock; every read calls `_sync()`; every write appends then `_sync()`\n  (single `_apply_event` application path). No method bypasses.\n- `update_*` return the freshly validated model and persist under the original lookup key; `None` on\n  absent id; deletes `False` on absent id — matches `InMemoryRepository`.\n- `_last_event_id` is advanced inside `_apply_event`, so both `_load_snapshot` and `_sync` track `max(id)`\n  from one place.\n- `_merge_updates` tolerates `ValidationError` (important because a single malformed update event must not\n  break replay of later events). `_load_snapshot` resets `_last_event_id = 0` before replay, which is safe\n  after `clear()` since SQLite `AUTOINCREMENT` keeps issuing strictly increasing ids.\n- Customer-outcome paths (`_UPDATED`/`_DELETED`, `ValidationError → None`) preserved verbatim in effect.\n- Untracked `docs/` directory was intentionally left out of the commit.\n\n## Concerns\n- `_sync()` re-reads the entire event stream on every call and filters in Python (`id > _last_event_id`),\n  exactly as the brief prescribes. This is O(n) per operation; fine for correctness/tests, but a\n  `WHERE id > ?` query on `IntentStore` would be a worthwhile future optimization for large stores.\n- `check_same_thread=False` on SQLite connections is intentional (matches the task constraint); safety is\n  provided per-instance by `threading.RLock()` and cross-instance by SQLite WAL. Callers sharing a single\n  repository across threads must rely on that lock (they do, since all public methods take it).\n",
+              "filePath": "/home/alexa/repos/agentic-odi/.superpowers/sdd/2026-10-15-cli-odi-entity-parity/task-3-report.md"
+            },
+            "output": "Wrote file successfully.",
+            "metadata": {
+              "diagnostics": {},
+              "filepath": "/home/alexa/repos/agentic-odi/.superpowers/sdd/2026-10-15-cli-odi-entity-parity/task-3-report.md",
+              "exists": false,
+              "truncated": false
+            },
+            "title": ".superpowers/sdd/2026-10-15-cli-odi-entity-parity/task-3-report.md",
+            "time": {
+              "start": 1792164801087,
+              "end": 1792164801128
+            }
+          },
+          "id": "prt_14558aa32001aYW5hh9uRXfjLX",
+          "sessionID": "ses_ebaaeb423ffewIFN4ff93OaTRA",
+          "messageID": "msg_145583188001Uxd6YY7dVfjBq9"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "071a222bb8d8bc090d3fadd08bbabcd4001d3933",
+          "type": "step-finish",
+          "tokens": {
+            "total": 56765,
+            "input": 954,
+            "output": 2307,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 53504
+            }
+          },
+          "cost": 0,
+          "id": "prt_14558ab420015eYw16FFrrIFyc",
+          "sessionID": "ses_ebaaeb423ffewIFN4ff93OaTRA",
+          "messageID": "msg_145583188001Uxd6YY7dVfjBq9"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_145514bf1001Fu0nPs6FYcCr6k",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 56960,
+          "input": 2509,
+          "output": 179,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 54272
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792164801428,
+          "completed": 1792164804927
+        },
+        "finish": "stop",
+        "id": "msg_14558ab93001PB08RON3WqLKB4",
+        "sessionID": "ses_ebaaeb423ffewIFN4ff93OaTRA"
+      },
+      "parts": [
+        {
+          "snapshot": "071a222bb8d8bc090d3fadd08bbabcd4001d3933",
+          "type": "step-start",
+          "id": "prt_14558b339001itF2rTXz7gOGjJ",
+          "sessionID": "ses_ebaaeb423ffewIFN4ff93OaTRA",
+          "messageID": "msg_14558ab93001PB08RON3WqLKB4"
+        },
+        {
+          "type": "text",
+          "text": "Done. Reply with concise format under 15 lines.</think>- **Status:** DONE\n- **Commit:** `5f84f98 feat(core): read-through SQLite repository with locking and cascade events`\n- **Tests:** core suite 39 passed (new `test_sqlite_repository.py`: 10 passed); ruff check+format, mypy, bandit all clean.\n- **Concerns:** `_sync()` re-reads the full event stream each call (as briefed) — O(n), future optimization could add `WHERE id > ?`. `ruff format` reflowed one brief-given assert line only (values unchanged).\n- **Report:** /home/alexa/repos/agentic-odi/.superpowers/sdd/2026-10-15-cli-odi-entity-parity/task-3-report.md",
+          "time": {
+            "start": 1792164803389,
+            "end": 1792164804794
+          },
+          "id": "prt_14558b33d001MyAeBlC4F1BOFq",
+          "sessionID": "ses_ebaaeb423ffewIFN4ff93OaTRA",
+          "messageID": "msg_14558ab93001PB08RON3WqLKB4"
+        },
+        {
+          "reason": "stop",
+          "snapshot": "071a222bb8d8bc090d3fadd08bbabcd4001d3933",
+          "type": "step-finish",
+          "tokens": {
+            "total": 56960,
+            "input": 2509,
+            "output": 179,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 54272
+            }
+          },
+          "cost": 0,
+          "id": "prt_14558b8ec001IB0pAhtCiuxvvX",
+          "sessionID": "ses_ebaaeb423ffewIFN4ff93OaTRA",
+          "messageID": "msg_14558ab93001PB08RON3WqLKB4"
         }
       ]
     }
