@@ -1,0 +1,69 @@
+You are implementing Task 3: SQLiteRepository read-through, locking, cascade events.
+
+## Task Description
+
+Read your task brief first — it is your requirements, with the exact values to use verbatim:
+/home/alexa/repos/agentic-odi/.superpowers/sdd/2026-10-15-cli-odi-entity-parity/task-3-brief.md
+
+## Context
+
+This is task 3 of a plan giving the `agentic-odi` CLI full CRUD over every ODI entity, backed by one shared persistent SQLite store that the PM's CLI and the AI agent's MCP server both read/write, seeing each other's changes.
+
+Prior tasks on this branch (already committed):
+- Task 1 added to `core/src/core/repository.py` (on the `Repository` protocol AND `InMemoryRepository`): `get_step`, `get_outcome`, `update_job`, `delete_job`, `update_step`, `delete_step`, `update_outcome`, `delete_outcome`, plus the pre-existing CRUD. Mirror their exact semantics in `SQLiteRepository`.
+- Task 2 added service methods + FK validation consuming those repository methods.
+
+You are in the `agentic-odi` uv workspace at /home/alexa/repos/agentic-odi, on branch `feature/cli-odi-entity-parity`. Do NOT switch branches. Do NOT commit to `main`.
+
+Existing code facts:
+- `core/src/core/sqlite_repository.py` currently: `class SQLiteRepository(Repository)`, `__init__(self, repo=None, db_path="intent_store.db")` builds `IntentStore(db_path)`, keeps in-memory dicts (`jobs`, `steps`, `outcomes`, `customer_outcomes`), caches a snapshot at construction (so it is STALE across processes — that is the bug you fix), and has `_load_snapshot()` which currently streams events and applies only the `*_CREATED` events.
+- `core/src/core/intent_store.py` `IntentStore` wraps `sqlite3` and has an `append(event)` and a `stream()` of events; `sqlite3.connect` is currently called without `check_same_thread`.
+- Task 1's `update_*` repository methods merge `model_dump(exclude_unset=True)` with `updates`, re-validate with `model_validate`, and store under the ORIGINAL lookup key; they return `None` when the id is absent. Deletes return `False` when absent. Cascade deletes remove dependent rows. Reproduce these semantics in the SQLite repository.
+
+Follow the brief's Steps 1-5 exactly.
+
+## Global constraints that bind this task
+
+- Python `>=3.10`; ruff line-length 100; ruff select `["E4","E7","E9","F","I","UP","B","BLE"]`.
+- `IntentStore.__init__(self, db_path: str = "intent_store.db", check_same_thread: bool = True)` — thread the flag into `sqlite3.connect(..., check_same_thread=check_same_thread)`.
+- `SQLiteRepository` uses `threading.RLock()` and passes `check_same_thread=False` to `IntentStore`.
+- Read-through: every public read re-reads and applies new events (`id > self._last_event_id`) before returning; every write appends the event then applies it through the same `_apply_event` path.
+- `_apply_event` must handle ALL of: `JOB_CREATED`/`STEP_CREATED`/`OUTCOME_CREATED`/`CUSTOMER_OUTCOME_CREATED` (model_validate the payload), the new `JOB_UPDATED`/`STEP_UPDATED`/`OUTCOME_UPDATED` (+ customer outcome updated if it exists), the pre-existing `CUSTOMER_OUTCOME_DELETED`, the new `JOB_DELETED`/`STEP_DELETED`/`OUTCOME_DELETED`. `JOB_DELETED` also removes steps/outcomes/customer_outcomes with that `job_id`; `STEP_DELETED` also removes outcomes/customer_outcomes with that `step_id`. Updated = merge `p["updates"]` into the current model; tolerate `ValidationError`.
+- Preserve existing customer-outcome behavior (`CUSTOMER_OUTCOME_UPDATED`/`_DELETED`) so nothing regresses.
+- `clear()` becomes lock-guarded `store.clear()` + `_load_snapshot()`.
+- Tests use `tmp_path`; they must NEVER touch the real `~/.agentic-odi/odi.db`.
+- Run tests with `uv run --directory core pytest` (prefix `UV_PYTHON=3.11` only if uv attempts a `pyarrow` source build; report if so).
+
+## Before You Begin
+
+If anything is unclear, ask now.
+
+## Your Job
+
+Work from: /home/alexa/repos/agentic-odi
+
+1. TDD per the brief: write `core/tests/test_sqlite_repository.py` (new), confirm RED, implement, confirm GREEN.
+2. Before committing, run the whole core suite `uv run --directory core pytest` — green, pristine output.
+3. Commit exactly these three files:
+   `git add core/src/core/intent_store.py core/src/core/sqlite_repository.py core/tests/test_sqlite_repository.py`
+   `git commit -m "feat(core): read-through SQLite repository with locking and cascade events"`
+4. Self-review the diff.
+5. Report back.
+
+## You Do Not Dispatch Subagents
+
+Do all of this task's work yourself. Never spawn a subagent, never spawn a reviewer.
+
+## Report Format
+
+Write your full report to:
+/home/alexa/repos/agentic-odi/.superpowers/sdd/2026-10-15-cli-odi-entity-parity/task-3-report.md
+
+Include: what you implemented; tests + results; TDD evidence (RED command + failing output and why expected; GREEN command + passing output); files changed; self-review findings; concerns.
+
+Then reply with ONLY (under 15 lines):
+- **Status:** DONE | DONE_WITH_CONCERNS | BLOCKED | NEEDS_CONTEXT
+- Commits created (short SHA + subject)
+- One-line test summary
+- Concerns, if any
+- The report file path
