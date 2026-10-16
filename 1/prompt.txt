@@ -1,0 +1,65 @@
+You are implementing Task 5: Update check, cache, and download.
+
+## CRITICAL ENVIRONMENT (read first)
+
+- Work ONLY in the worktree: `/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution`.
+- The checkout at `/home/alexa/repos/agentic-odi` (branch `main`) is OFF-LIMITS. Never run git or write files there.
+- Prefix shell commands with `cd /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution && ...`, or use `git -C /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution ...`.
+- Use `UV_PYTHON=3.11` for all uv commands.
+- Before finishing, verify with `git log --oneline -3` that your commit is on branch `feature/cli-bundled-distribution` (current worktree HEAD is `078fcdb`).
+
+## Task Description
+
+Read your task brief first — it is your requirements, EXCEPT where the mandatory rulings below override it:
+/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/.superpowers/sdd/2026-10-15-cli-bundled-distribution-and-self-update/task-5-brief.md
+
+## MANDATORY RULINGS (these override the brief; follow exactly)
+
+R1 — Checksum source. The brief line 554 says verify against `<asset>.sha256`; that is WRONG. The design (spec §Artifacts, line 109/148), the installers (plan lines 712/749) and the release job (plan line 827) all publish ONE `checksums.txt` per release. Implement `download()` to:
+- build `base = f"https://github.com/alehar9320/agentic-odi/releases/download/v{version}"`
+- fetch `f"{base}/checksums.txt"` as text via `fetch_bytes`
+- parse sha256sum-format lines: `"<hex>  <filename>"` (one or more spaces), select the line whose filename equals `asset_name(...)`
+- fetch `f"{base}/{asset}"` bytes, write to `dest_dir/asset`, call `verify_checksum`; on mismatch raise `update.UpdateError`; return the written path.
+If `checksums.txt` has no line for the asset, raise `update.UpdateError`.
+
+R2 — `auto_update_enabled` scope. Do NOT put `is_frozen()` or `is_writable_dir()` inside `auto_update_enabled` (the brief's impl line 78 does, but the brief's own test at `tests/test_update_check.py:57-60` requires it return `True` in a non-frozen test env with no monkeypatch, so those checks would break the test). Implement:
+`auto_update_enabled(no_update: bool) -> bool` = `(not no_update) and (not os.environ.get("AGENTIC_ODI_NO_UPDATE"))`.
+Apply the spec-157 suppressions (not frozen OR install root not writable OR lock held) inside `maybe_auto_update`, returning `None` gracefully. `maybe_auto_update` must never raise (swallow all exceptions → `None`).
+
+R3 — Add a download test. The brief says download uses injected `fetch_bytes` "for tests" but provides no such test. Author one:
+- success: inject a `fetch_bytes` returning a valid `checksums.txt` body and the asset bytes; assert `download(...)` writes the archive and verifies.
+- mismatch: inject a `checksums.txt` with a wrong hash; assert `update.UpdateError` is raised.
+Keep the six tests the brief specifies verbatim (including `test_maybe_auto_update_disabled_is_noop`). `record_check` must create parent dirs (`mkdir(parents=True, exist_ok=True)`) so the real config dir works.
+
+## Interfaces from earlier tasks
+
+- `cli/src/cli/update.py` (Task 4) provides: `RELEASES_API`, `parse_version`, `is_newer`, `asset_name`, `current_platform`, `verify_checksum`, `extract_archive`, `perform_update`, `UpdateError`.
+- `cli/src/cli/paths.py` (Task 2): `state_file()`, `install_root()`, `is_frozen()`, `is_writable_dir()`.
+- `cli/src/cli/version.py` (Task 1): `__version__`.
+- Stdlib only (urllib, json, os, tempfile).
+
+## Definition of Done (global gate — all must pass)
+
+From the worktree, all must succeed:
+- `UV_PYTHON=3.11 uv run --directory cli pytest tests/test_update_check.py -v`
+- `UV_PYTHON=3.11 uv run --directory cli pytest -q`
+- `UV_PYTHON=3.11 uv run ruff check .`
+- `UV_PYTHON=3.11 uv run ruff format --check .`
+- `UV_PYTHON=3.11 uv run --directory cli mypy .`
+
+## Your Job
+
+TDD (RED → GREEN) per the brief, applying R1–R3. Commit with the brief's message.
+
+## You Do Not Dispatch Subagents
+
+Do all work yourself. Never spawn a subagent or reviewer.
+
+## Report Format
+
+Write your full report to:
+/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/.superpowers/sdd/2026-10-15-cli-bundled-distribution-and-self-update/task-5-report.md
+
+Include: what you implemented, how you applied R1/R2/R3, tests + results, TDD evidence (RED command/output, GREEN command/output), the five DoD results, files changed, self-review findings, concerns.
+
+Reply with ONLY (under 15 lines): Status, commit (short SHA + subject), one-line test summary, DoD pass/fail, concerns, report path — and confirm the commit is on `feature/cli-bundled-distribution`.
