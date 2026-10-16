@@ -3,7 +3,7 @@
   "checkpoint_id": "01M52KJETZSANDZ2SQ4PFVWDC9",
   "strategy": "manual-commit",
   "branch": "feature/cli-bundled-distribution",
-  "checkpoints_count": 2,
+  "checkpoints_count": 3,
   "files_touched": [
     ".github/workflows/release-please.yml",
     ".release-please-manifest.json",
@@ -23,13 +23,20 @@
       "compact_transcript": "/1/transcript.jsonl",
       "content_hash": "/1/content_hash.txt",
       "prompt": "/1/prompt.txt"
+    },
+    {
+      "metadata": "/2/metadata.json",
+      "transcript": "/2/full.jsonl",
+      "compact_transcript": "/2/transcript.jsonl",
+      "content_hash": "/2/content_hash.txt",
+      "prompt": "/2/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 36641,
+    "input_tokens": 72707,
     "cache_creation_tokens": 0,
-    "cache_read_tokens": 130240,
-    "output_tokens": 3911,
-    "api_call_count": 11
+    "cache_read_tokens": 327168,
+    "output_tokens": 5997,
+    "api_call_count": 20
   }
 }
