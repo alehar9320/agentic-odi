@@ -3,7 +3,7 @@
   "checkpoint_id": "01M513SKJ37S3RB6ATG0SCZ8S2",
   "strategy": "manual-commit",
   "branch": "feature/cli-bundled-distribution",
-  "checkpoints_count": 16,
+  "checkpoints_count": 17,
   "files_touched": [
     "cli/src/cli/cli.py",
     "cli/tests/test_update_command.py"
@@ -119,6 +119,13 @@
       "transcript": "/15/full.jsonl",
       "compact_transcript": "/15/transcript.jsonl",
       "content_hash": "/15/content_hash.txt",
+      "prompt": ""
+    },
+    {
+      "metadata": "/16/metadata.json",
+      "transcript": "/16/full.jsonl",
+      "compact_transcript": "/16/transcript.jsonl",
+      "content_hash": "/16/content_hash.txt",
       "prompt": ""
     }
   ],
