@@ -1,0 +1,1 @@
+We want to build out a gh pages site for this repo, wrt what we know, and along with best practices, and along with state-of-the-art impression. The intended audience is customers/users of the project. They'll want to understand why, what, how, when, etc relative to project value proposition. The pages need to be done according to what Steve Jobs would have mandated.

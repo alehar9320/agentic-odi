@@ -1,0 +1,64 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M52QJB6CMZ8BDPCJH4R3QJ3K",
+  "session_id": "ses_ebace1c46ffeI8duUptUH4VBXz",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-16T16:09:29.798184329Z",
+  "branch": "feature/cli-odi-entity-parity",
+  "checkpoints_count": 2,
+  "save_step_count": 1,
+  "files_touched": [
+    "mcp_server/src/mcp_server/mcp_server.py",
+    "mcp_server/tests/conftest.py"
+  ],
+  "agent": "OpenCode",
+  "model": "big-pickle",
+  "turn_id": "85e010fa46dc",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 28688,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 137280,
+    "output_tokens": 4012,
+    "api_call_count": 7
+  },
+  "session_metrics": {
+    "turn_count": 2
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-10-16T16:09:29.787184563Z",
+    "agent_lines": 0,
+    "agent_removed": 0,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 14,
+    "total_committed": 0,
+    "total_lines_changed": 14,
+    "agent_percentage": 0,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 3493,
+      "user_lines_removed": 13,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        "docs/superpowers/plans/2026-10-15-cli-bundled-distribution-and-self-update.md": 884,
+        "docs/superpowers/plans/2026-10-15-cli-odi-entity-parity.md": 1123,
+        "docs/superpowers/plans/2026-10-16-first-run-onboarding.md": 619,
+        "docs/superpowers/specs/2026-10-15-cli-bundled-distribution-design.md": 248,
+        "docs/superpowers/specs/2026-10-15-cli-odi-entity-parity-design.md": 219,
+        "docs/superpowers/specs/2026-10-16-first-run-onboarding-design.md": 151,
+        "mcp_server/src/mcp_server/mcp_server.py": 137,
+        "mcp_server/tests/conftest.py": 8,
+        "mcp_server/tests/test_parity.py": 104
+      },
+      "user_removed_per_file": {
+        "mcp_server/src/mcp_server/mcp_server.py": 9,
+        "mcp_server/tests/conftest.py": 4
+      }
+    }
+  ]
+}
