@@ -1,0 +1,57 @@
+You are implementing Task 4: Update engine primitives.
+
+## CRITICAL ENVIRONMENT (read first)
+
+- Work ONLY in the worktree: `/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution`.
+- The checkout at `/home/alexa/repos/agentic-odi` (branch `main`) is OFF-LIMITS. Never run git or write files there. (A previous subagent polluted `main`; do not repeat that.)
+- Prefix shell commands with `cd /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution && ...`, or use `git -C /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution ...`.
+- Use `UV_PYTHON=3.11` for all uv commands (uv's default 3.15 breaks workspace sync).
+- Before finishing, verify with `git log --oneline -3` that your commit is on branch `feature/cli-bundled-distribution` (current worktree HEAD is `f0e717d`).
+
+## Task Description
+
+Read your task brief first — it is your requirements, with the exact values to use verbatim:
+/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/.superpowers/sdd/2026-10-15-cli-bundled-distribution-and-self-update/task-4-brief.md
+
+## Context
+
+This plan adds a self-updating bundled CLI. This task builds the update engine primitives that later tasks (check/download in Task 5, the `odi update` command in Task 6, and installers in Tasks 8–9) will consume. The asset naming here is a public contract used by the release workflow — follow the brief's names exactly.
+
+## Interfaces from earlier tasks
+
+- `cli/src/cli/paths.py` (Task 2): `install_root()`, `versions_dir()`, `current_link()`, `state_file()`, etc. The brief's `perform_update` takes an explicit `install_root: Path` argument (tests pass a tmp dir), so do NOT call `paths.install_root()` inside it — use the passed argument. `paths` is listed as consumed for cross-checking/consistency only.
+
+## Notes / ambiguity resolution
+
+- `update.py` must `import platform` (the tests monkeypatch `update.platform.system` / `update.platform.machine`).
+- Follow the brief's atomicity rules precisely: extract into a temp dir INSIDE `install_root/versions/`, then move to the final `versions/<version>`; flip `current` via a `current.tmp` symlink + `os.replace`. On Windows, copy the version dir and write a `current` marker file instead.
+- Serialize mutating work behind `install_root/.update.lock` using `O_CREAT | O_EXCL`; if held, raise `UpdateError("update already in progress")`.
+- `verify_checksum` compares hex case-insensitively.
+- No new third-party dependencies (stdlib only).
+- Windows branches and the lock are not unit-tested by the brief; implement them correctly anyway and note in your report that they are only exercised by inspection.
+
+## Your Job
+
+Follow the brief's steps in order (TDD: RED → GREEN). Commit with the message given in the brief.
+
+## Definition of Done (global gate — all must pass)
+
+From the worktree, all of the following must succeed:
+- `UV_PYTHON=3.11 uv run --directory cli pytest tests/test_update.py -v`
+- `UV_PYTHON=3.11 uv run --directory cli pytest -q` (full cli suite)
+- `UV_PYTHON=3.11 uv run ruff check .`
+- `UV_PYTHON=3.11 uv run ruff format --check .`
+- `UV_PYTHON=3.11 uv run --directory cli mypy .`
+
+## You Do Not Dispatch Subagents
+
+Do all of this task's work yourself. Never spawn a subagent, and never spawn a reviewer — review is the controller's job after you report.
+
+## Report Format
+
+Write your full report to:
+/home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/.superpowers/sdd/2026-10-15-cli-bundled-distribution-and-self-update/task-4-report.md
+
+Include: what you implemented, tests + results, TDD evidence (RED command/output, GREEN command/output), the five DoD command results, files changed, self-review findings, concerns.
+
+Then reply with ONLY (under 15 lines): Status, commits (short SHA + subject), one-line test summary, DoD pass/fail, concerns, report file path — and confirm `git log --oneline -3` shows the commit on `feature/cli-bundled-distribution`.
