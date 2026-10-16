@@ -1,0 +1,362 @@
+The first time a user launches the CLI (and in the future and/or GUI) (likely leave for later), the user should be prompted for baseline input that establishes the fundamental context of the product manager, so that everything else may then tie into this. To understand how we envision that this is done, you may use the following context below: Konversation med Gemini
+Output the initial questions that pawel huryn pm skills ask to establish baseline. We're looking for the initial key questions as per establishing details about a product manager, like domain, company, company goals, etc.
+
+To establish a baseline for a product or Product Manager role—particularly within framework setups like Paweł Huryn’s PM Skills framework—initial diagnostic questions are used to map out the Product Context, Business Goals, Market Domain, and Strategic Constraints before diving into execution or discovery.
+
+The baseline assessment questions are grouped into key structural domains:
+
+1. Product & Domain Context
+Product Identity: What is the product, and what core problem does it solve?
+
+Domain / Industry: What domain or industry does this product operate in (e.g., B2B SaaS, B2C FinTech, Developer Tools, Marketplace)?
+
+Target Audience: Who is the Ideal Customer Profile (ICP) and primary end-user? What are their key jobs-to-be-done (JTBD)?
+
+Lifecycle Stage: What stage is the product currently in (e.g., 0-to-1, scale-up, mature/enterprise)?
+
+2. Business Model & Strategic Alignment
+Company Vision & Strategy: What is the overarching company vision and strategic direction for the next 12–36 months?
+
+Business Model: How does the product generate revenue or create business value (e.g., subscription, usage-based, freemium, transactional)?
+
+Top Company Goals & OKRs: What are the primary company-level objectives and key results right now (e.g., ARR growth, retention, expansion, cost reduction)?
+
+Product Success Metrics: What is the product’s North Star Metric and key input metrics that align with company goals?
+
+3. Market & Competitive Landscape
+Competitors & Alternatives: Who are the primary direct and indirect competitors, and what do users do if your product doesn’t exist?
+
+Competitive Advantage: What is your key differentiator or moat in the market?
+
+Constraints & Compliance: Are there specific domain-level constraints (e.g., regulatory requirements, security standards, legacy tech debt)?
+
+4. PM Role & Operational Scope
+Value Proposition: What business and customer outcomes is your specific team/squad responsible for?
+
+Team Structure: How is the product team structured (e.g., product trio with tech lead and designer, feature team, platform team)?
+
+Baseline Competencies: Where do you currently sit across key PM pillars (Strategy, Discovery, Execution, Data/Metrics, and Growth)?
+
+Suggested Next Steps
+If you're using this to set up an AI agent workspace or run a product diagnostic, I can help you:
+
+Draft a structured PRD or Product Strategy Canvas template based on these baseline inputs.
+
+Tailor a custom baseline questionnaire for a specific team or domain (e.g., B2B vs. B2C).
+
+Would you like to customize these baseline questions for a specific product or workflow?
+
+For a complete walkthrough of product discovery frameworks, check out this video breakdown:
+Product Discovery Masterclass — Paweł Huryn breaks down continuous discovery and strategy frameworks for product managers.
+
+
+Product Discovery Masterclass
+Aakash Gupta · 2,4 tn visningar
+
+How can we make this as minimal as possible and then have agent and/or system retrieve more context and ask follow-up questions only as needed?
+
+To make the onboarding baseline as minimal as possible, you can compress the initial questionnaire into 4 core questions (the absolute minimum required for an AI agent or system to form a foundation) and offload everything else to automated context retrieval and progressive disclosure.
+
+Step 1: The Minimal 4-Question Onboarding
+Present only these four fields to the user upfront:
+
+Product Name & URL: What is the product and where can we see it (e.g., website, app, repo)?
+
+Core Value Prop & User: What problem does it solve, and for whom?
+
+Primary Goal / Focus: What is the #1 priority or challenge right now (e.g., launch, activation, retention, scaling)?
+
+Target Role / Scope: What specific team/area do you own (e.g., Core Product, DevEx, Growth)?
+
+Step 2: Automated Context Retrieval (System Phase)
+Before asking any follow-up questions, the system/agent uses the inputs from Step 1 to retrieve background context automatically:
+
+Domain & Market: Scrapes the product website/landing page to extract product features, value propositions, and messaging.
+
+Tech Stack & Architecture: Inspects public/internal repositories, documentation, or architecture decision records (ADRs) if linked.
+
+Competitor Benchmarking: Performs web searches on the product name and key problem statement to map main competitors and market alternatives.
+
+Organizational Data: Ingests connected tools (e.g., Jira, Notion, Linear, Slack, or strategy docs) to pull existing OKRs, roadmaps, and team structures.
+
+Step 3: Progressive Disclosure & Follow-up Trigger Rules
+Instead of asking a massive up-front diagnostic, the agent operates on a "pull-as-needed" basis. It only asks targeted follow-up questions when a specific task requires missing information.
+
+Scenario / Task	Trigger Condition	Targeted Follow-up Question
+Strategy & Vision	Company-level OKRs are unlinked or ambiguous.	"What is the main business metric (e.g., ARR, NRR, CAC) that your leadership team is prioritizing this quarter?"
+Feature Prioritization	Multiple target personas or JTBD overlap.	"Which user segment is the highest priority for this specific feature release?"
+Discovery / Problem Validation	Quantitative data is missing for a proposed feature.	"Do you have existing user analytics or research insights on where drop-off is occurring here?"
+Tech & Constraints	Architectural boundaries or compliance rules are unknown.	"Are there technical debt or compliance constraints (e.g., security, API limits) we need to factor into this solution?"
+Benefits of this Approach
+Zero Friction: The PM completes setup in under 60 seconds.
+
+High Relevance: The agent never asks questions it can figure out itself or that aren't relevant to the task at hand.
+
+Living Context: The agent builds its domain understanding organically as you collaborate over time.
+
+Would you like to design the system prompt or workflow instructions for an agent to execute this 3-step loop?
+
+How can we make this more seamless as per establish product domain ratehr than a specific product?
+
+To shift the focus from a specific product (e.g., "My App Name") to establishing a Product Domain (e.g., "B2B Developer Tools" or "Healthcare Compliance Software"), the initial onboarding can be made much more seamless.
+
+By grounding the interaction in domain dynamics (business model, buyer/user mechanics, and regulatory/market boundaries), the system can immediately adopt the correct strategic mental model. From there, the agent relies on context retrieval and lazy loading for specifics.
+
+Step 1: The 2-Prompt Domain Onboarding
+Instead of product-level details, capture only the domain archetypes:
+
+Domain & Business Archetype: What domain are you operating in, and what is the primary business model?
+
+Example: "B2B Developer Experience / SaaS" or "B2C Consumer Health / Subscription"
+
+Target Audience & Core Outcome: Who is the target user/buyer, and what main outcome or Job-to-be-Done (JTBD) do they hire products in this space to achieve?
+
+Example: "Staff Software Engineers; reducing lead time for code reviews and CI pipeline friction."
+
+Step 2: Automated Domain Baseline Retrieval (Agent Phase)
+Once the domain archetype is established, the agent automatically initializes the strategic context using domain search and pattern recognition:
+
+                  ┌─────────────────────────────────┐
+                  │   2-Prompt Domain Onboarding    │
+                  └────────────────┬────────────────┘
+                                   │
+                                   ▼
+          ┌──────────────────────────────────────────────────┐
+          │     System Inters Domain Strategy Context        │
+          └────────────────┬─────────────────────────┬────────┘
+                           │                         │
+                           ▼                         ▼
+            ┌───────────────────────────┐ ┌───────────────────────────┐
+            │   Domain Macro Analysis   │ │   Archetype Assumptions   │
+            │  • Common Monies & CAC    │ │  • Typical Metrics/OKRs   │
+            │  • Top Competitors/Moats  │ │  • Standard Risks & Rules │
+            │  • Key Compliance Boundaries │ │  • Buyer vs. User Dynamic │
+            └───────────────────────────┘ └───────────────────────────┘
+Competitive & Market Landscape: The agent searches for standard incumbents, emerging alternatives, and established industry benchmarks for that domain.
+
+Metric Frameworks: Automatically maps common North Star Metrics for the domain (e.g., PLG/DevTools 
+→ Time to First Value / Weekly Active Contributors; B2B Enterprise 
+→ Net Revenue Retention / Seat Expansion).
+
+Risk & Constraint Baseline: Pre-loads standard domain risks (e.g., SOC2/GDPR for B2B SaaS, HIPAA for HealthTech, compliance/latency for FinTech).
+
+Step 3: Event-Driven Context Retrieval (Progressive Disclosure)
+The agent operates silently until a specific PM task requires missing domain specifics. Follow-up queries are triggered only when moving into execution or discovery:
+
+PM Task / Workflow	Trigger Condition	Targeted Domain Follow-up Question
+Strategy & Positioning	Need to establish market positioning.	"In your specific slice of [Domain], what is the primary alternative customers switch from (e.g., manual processes, legacy software, open source)?"
+Product Discovery	Validating user pain points or assumptions.	"Is the decision-maker (buyer) the same person as the end-user in your organization, or is there a separate procurement gatekeeper?"
+Metrics & Growth	Setting up North Star metrics or OKRs.	"What is your team's primary focus metric right now—acquisition, activation/onboarding, or retention?"
+Feature Execution / PRD	Writing specifications or user stories.	"Are there any technical boundaries, legacy debt, or strict compliance rules specific to your stack in this domain?"
+Why This Domain-First Approach Works
+Immediate Framework Alignment: Setting the domain instantly configures the agent's reasoning (e.g., PLG vs. Enterprise Sales-Led vs. Marketplace dynamics).
+
+Zero Input Fatigue: Eliminates long questionnaires upfront. The PM can start working immediately, and the agent asks for missing details in-context.
+
+Reusability: Domain context stays stable even as you pivot features, launch sub-products, or manage different areas within the same domain.
+
+How might we make these baseline questions as easy as possible for the user? Imagine what Steve Jobs would've pushed us to do
+
+If Steve Jobs were in the room, he’d likely stop us mid-sentence and say:
+
+"Why are you asking the user to answer questions at all? Every question you ask is a tax on their time and a failure of your software."
+
+To make establishing the product domain feel effortless, the ultimate user experience isn't a shorter form—it’s zero forms. You move from asking questions to asking for confirmation.
+
+The Jobsian Philosophy: Invert the Onboarding
+Instead of asking the PM to input information, you take a single fragment of identity (an email address, a website link, or a company name), let the agent do all the heavy lifting, and present a pre-populated model for them to accept or tweak in a single click.
+
+       [ Single Input: "acme.com" ]
+                   │
+                   ▼
+       [ Agent Researches Domain ]
+  (Scrapes site, maps competitors, identifies archetype)
+                   │
+                   ▼
+      [ Pre-Populated Concept Card ]
+ "We think you're building B2B Developer Tools focused on 
+  CI/CD automation for Enterprise teams. Is this right?"
+                   │
+         ┌─────────┴─────────┐
+         ▼                   ▼
+    [ Looks Good ]      [ Adjust 1 Detail ]
+1. The One-Tap Setup (Magic Auto-Detection)
+The Interface: A single input box.
+
+"Enter your product URL or company name."
+
+What happens behind the scenes:
+
+Domain Detection: The agent scrapes the landing page, docs, or GitHub org.
+
+Archetype Mapping: It infers the domain (e.g., DevTools / Infrastructure), the target audience (DevOps / Platform Engineers), and the business model (PLG + Enterprise tier).
+
+Context Assembly: It automatically pulls top market competitors, standard domain metrics, and common compliance rules.
+
+2. "Is This You?" (Confirmation Over Input)
+Instead of forcing the user to type out descriptions, show them a beautifully rendered Domain Card and ask them to confirm:
+
+We set up your workspace based on acme.com:
+
+Domain: B2B Developer Experience & Infrastructure
+
+Primary User: Staff Engineers & DevOps
+
+Core Value: Automating CI/CD pipeline bottlenecks
+
+Archetype: Product-Led Growth (Freemium 
+→ Enterprise)
+
+[ Confirm & Start ] · (Edit details)
+
+Cognitive Load: Drops from writing paragraphs to a 2-second visual scan.
+
+Psychological Impact: It feels like magic. The software already "gets" what they are doing.
+
+3. Just-In-Time Context (The Invisible Questionnaire)
+Anything the agent couldn't auto-detect isn't asked upfront. It is revealed only when the user takes an action where that detail actually matters:
+
+When they ask for a PRD: The agent says: "I'm drafting this for a PLG motion. Are we targeting individual devs or engineering managers for this specific release?"
+
+When they ask for metrics: The agent says: "In DevEx, we usually track Time to First Commit or Pipeline Latency. Which one matters most to your team right now?"
+
+Summary of the Shift
+Standard Approach	Minimal Approach	Steve Jobs Approach
+15-question survey	2 broad questions	1 URL input + 1 click to confirm
+PM types out their domain	PM picks from dropdowns	System predicts the domain; PM verifies
+Upfront cognitive load	Staggered questions	Zero friction; context gathered dynamically
+Write the system prompt or web retrieval instructions for auto-detecting a domain from a single URL.
+
+Here is a production-ready System Prompt & Web Retrieval Pipeline designed to execute the zero-friction "auto-detection" flow.
+
+It takes a single URL, retrieves live context, and infers the core domain, target persona, business model, and strategic metrics.
+
+1. Web Retrieval Pipeline (Function & Execution Protocol)
+Before running the system prompt, instruct your agent/system to execute a 2-step web lookup:
+
+1. Fetch URL Content (Scrape / Jina Reader / Playwright):
+   - Primary: Main landing page (H1, H2, hero copy, value props).
+   - Secondary (if present): /about, /pricing, /docs, or /developers.
+
+2. Web Search Fallback / Context Boost:
+   - Query: "[Brand/Company Name] product value proposition target audience"
+   - Query: "[Brand/Company Name] competitors alternative software"
+2. System Prompt: Domain Auto-Detection Engine
+Markdown
+# ROLE & PURPOSE
+You are an expert Product Strategy Agent. Your job is to analyze raw web page content and search results for a product/company URL, then automatically detect its core Product Domain, Business Archetype, and Strategic Blueprint with high precision.
+
+You eliminate onboarding friction by predicting context so the Product Manager only has to confirm or tweak the details.
+
+---
+
+# INPUT DATA
+You will be provided with:
+- Target URL
+- Scraped Web Content / Search Results
+
+---
+
+# ANALYSIS INSTRUCTIONS
+Analyze the provided text and infer the following 5 dimensions:
+
+1. **Domain & Sub-domain:**
+   - Categorize into standard software/tech verticals (e.g., *DevTools / DevEx*, *FinTech / Payments*, *Healthcare / EHR*, *MarTech / Analytics*, *B2B Enterprise SaaS*, *B2C Marketplace*).
+
+2. **Target Audience & Buyer Dynamic:**
+   - Primary User (who uses it daily).
+   - Primary Buyer (who signs the check/approves procurement).
+   - Dynamic: Is it PLG (User = Buyer / Bottom-up) or Enterprise (User ≠ Buyer / Top-down)?
+
+3. **Core Jobs-to-be-Done (JTBD) & Value Prop:**
+   - What core problem does this solve, and what is the primary outcome delivered?
+
+4. **Business & Growth Model:**
+   - Revenue model (e.g., Subscription / Seat-based, Usage-based / Consumption, Transactional, Freemium, Open Source / Commercial).
+
+5. **Strategic Baseline & Inferred Metrics:**
+   - **North Star Metric:** Standard primary metric for this archetype (e.g., Time-to-First-Commit, Monthly Active Transacting Users, Net Revenue Retention).
+   - **Domain Constraints & Risks:** Key regulatory, security, or technical hurdles inherent to this space (e.g., SOC2, HIPAA, latency, API limits).
+   - **Main Alternatives:** Immediate direct competitors or legacy status-quo alternatives (e.g., spreadsheets, manual workflows, open-source scripts).
+
+---
+
+# OUTPUT FORMAT (JSON ONLY)
+Return strictly a valid JSON object following this schema. Do not include markdown commentary around the JSON unless wrapped in standard tags.
+
+```json
+{
+  "product_identity": {
+    "brand_name": "String",
+    "url": "String",
+    "one_sentence_summary": "String"
+  },
+  "domain_archetype": {
+    "primary_domain": "String",
+    "sub_domain": "String",
+    "business_model": "String (e.g., B2B PLG, Enterprise Sales-Led, B2C Marketplace)",
+    "monetization": "String (e.g., Usage-based, Per-seat subscription, Freemium)"
+  },
+  "audience_and_jtbd": {
+    "primary_user": "String",
+    "primary_buyer": "String",
+    "core_jtbd": "String"
+  },
+  "strategic_baseline": {
+    "suggested_north_star_metric": "String",
+    "key_input_metrics": ["String", "String"],
+    "domain_constraints": ["String", "String"],
+    "top_alternatives_or_competitors": ["String", "String"]
+  },
+  "confirmation_card_copy": {
+    "headline": "String (e.g., We mapped your domain context for [Brand Name])",
+    "domain_summary_bullet": "String",
+    "user_buyer_bullet": "String",
+    "core_value_bullet": "String",
+    "archetype_bullet": "String"
+  }
+}
+CONFIDENCE & FALLBACK RULES
+High Confidence: Fill out all fields using direct evidence from the text.
+
+Low Context / Ambiguous Site: If the URL is minimal or vague, make reasonable domain inferences based on typical industry patterns, but flag uncertainties in the one_sentence_summary.
+
+Tone: Sharp, professional, product-focused. Avoid marketing buzzwords; use standard PM terminology.
+
+---
+
+## 3. Example Execution Strategy
+
+1. **User inputs:** `[https://sentry.io](https://sentry.io)`
+2. **System executes:** Web retrieval on `sentry.io` + search query `"Sentry product competitors"`.
+3. **Agent outputs JSON:**
+   * **Primary Domain:** Developer Tools / Application Performance & Observability
+   * **Primary User:** Software Engineers & DevOps
+   * **Primary Buyer:** Engineering Managers / CTOs
+   * **Archetype:** Developer PLG (Bottom-up adoption $\rightarrow$ Team plans)
+   * **Suggested North Star Metric:** Weekly Active Developers triaging/resolving issues
+4. **UI renders the "Is This You?" card:**
+
+> **We set up your workspace based on sentry.io:**
+> * **Domain:** DevTools / Application Observability & Error Tracking
+> * **Target User:** Software Engineers & DevOps Teams
+> * **Core Value:** Real-time application error tracking & code-level debugging
+> * **Motion:** Product-Led Growth (Developer Adoption $\rightarrow$ Team/Enterprise Tier)
+> 
+> **[ Confirm & Continue ]** · *(Edit details)*
+
+---
+
+<Elicitations message="Would you like to build on this implementation?">
+  <Elicitation label="Test with a Real URL" query="Let's test this system prompt on a real product URL. Analyze [insert URL]."/>
+  <Elicitation label="Connect to Agent Memory" query="How should we store and retrieve this JSON schema inside an AI agent's long-term memory system?"/>
+</Elicitations>
+
+
+
+
+Gemini är AI och den kan göra misstag, inklusive om personer. Din integritet och GeminiÖppnas i ett nytt fönster
+
+Convert chat to PDF
+Convert chat to PDF
+Open this chat in Acrobat
