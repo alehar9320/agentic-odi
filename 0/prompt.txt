@@ -1,0 +1,60 @@
+You are reviewing one task's implementation: first whether it matches its requirements, then whether it is well-built. This is a task-scoped gate, not a merge review.
+
+## What Was Requested
+
+Read the task brief: /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/.superpowers/sdd/2026-10-15-cli-bundled-distribution-and-self-update/task-3-brief.md
+
+## What the Implementer Claims They Built
+
+Read the implementer's report: /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/.superpowers/sdd/2026-10-15-cli-bundled-distribution-and-self-update/task-3-report.md
+
+## Diff Under Review
+
+Base: 590cd9f4e070fdfe7138578f3fcf972aa12d9d34
+Head: ebe977e
+Diff file: /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution/.superpowers/sdd/2026-10-15-cli-bundled-distribution-and-self-update/review-590cd9f..ebe977e.diff
+
+Read the diff file once — it contains the commit list, a stat summary, and the full diff with surrounding context. Do not re-run git commands. Do not crawl the broader codebase; inspect outside the diff only for a concrete, named risk.
+
+Read-only review. Do not mutate the working tree, index, HEAD, or branch state.
+
+## You Do Not Dispatch Subagents
+
+Do all of this review yourself. Never spawn a subagent.
+
+## Do Not Trust the Report
+
+Treat the report as unverified claims; verify against the diff. A stated rationale never downgrades a finding.
+
+## Tests
+
+The implementer already ran the tests and reported TDD evidence. Do not re-run the suite. Run a focused test only if reading raises a specific doubt no existing run answers. Warnings/noise in reported output are findings.
+
+## Part 1: Spec Compliance
+Success criteria from the brief:
+- A global `--backend {local,mcp}` option exists on the root command, defaulting to `local`.
+- `cli/context.py` exposes `set_backend(value)` / `selected_backend()`; selection is stored in module state (NOT `os.environ`).
+- The outcomes commands dispatch through `selected_backend()` instead of hardcoded `"mcp"`.
+- Existing MCP tests updated to pass `--backend mcp`.
+- No behavior regression for MCP path.
+
+Verify each against the diff with file:line. Flag Missing / Extra / Misunderstood. If a requirement cannot be verified from this diff alone, report it as a ⚠️ item.
+
+## Part 2: Code Quality
+Clean separation, error handling, DRY, edge cases; tests verify real behavior; structure. Cite file:line for every finding. Note the implementer's concern that `--backend nope` exits non-zero via an uncaught `ValueError` traceback rather than a clean usage error — assess whether that is acceptable given the brief (the brief may or may not require a clean error).
+
+## Calibration
+Categorize by real severity (Critical/Important/Minor). If the plan/brief mandates something the rubric calls a defect, report it as Important, labeled plan-mandated. Acknowledge strengths before issues.
+
+## Output Format
+
+### Spec Compliance
+- ✅/❌ with file:line; ⚠️ items
+### Strengths
+### Issues
+#### Critical / #### Important / #### Minor
+### Assessment
+**Task quality:** Approved | Needs fixes
+**Reasoning:** 1-2 sentences
+
+Your final message is the report itself: begin directly with the spec-compliance verdict. No preamble.
