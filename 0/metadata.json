@@ -1,0 +1,64 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M57TCNZ2HVZHDTZYH08Q21NH",
+  "session_id": "ses_eb06a7de8ffeQf9ybA6xKLoJdy",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-18T15:34:38.774326618Z",
+  "branch": "topic/living-studio-tauri",
+  "checkpoints_count": 1,
+  "files_touched": [
+    ".gitignore",
+    "studio/src/lib/odi.test.ts",
+    "studio/src/lib/odi.ts"
+  ],
+  "agent": "OpenCode",
+  "model": "big-pickle",
+  "turn_id": "430aaa8c7d6b",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 115705,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 776064,
+    "output_tokens": 1982,
+    "api_call_count": 16
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-10-18T15:34:38.749418959Z",
+    "agent_lines": 0,
+    "agent_removed": 0,
+    "human_added": 92,
+    "human_modified": 2,
+    "human_removed": 0,
+    "total_committed": 92,
+    "total_lines_changed": 94,
+    "agent_percentage": 0,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 3887,
+      "user_lines_removed": 54,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        ".opencode/plans/ci-green-pr7-pr8.md": 103,
+        "cli/src/cli/backend.py": 296,
+        "cli/src/cli/outcomes.py": 2,
+        "cli/tests/test_backend.py": 202,
+        "cli/tests/test_outcomes_cli.py": 2,
+        "docs/superpowers/plans/2026-10-15-cli-bundled-distribution-and-self-update.md": 884,
+        "docs/superpowers/plans/2026-10-15-cli-odi-entity-parity.md": 1123,
+        "docs/superpowers/plans/2026-10-16-first-run-onboarding.md": 657,
+        "docs/superpowers/specs/2026-10-15-cli-bundled-distribution-design.md": 248,
+        "docs/superpowers/specs/2026-10-15-cli-odi-entity-parity-design.md": 219,
+        "docs/superpowers/specs/2026-10-16-first-run-onboarding-design.md": 151
+      },
+      "user_removed_per_file": {
+        "cli/src/cli/backend.py": 37,
+        "cli/src/cli/outcomes.py": 15,
+        "cli/tests/test_outcomes_cli.py": 2
+      }
+    }
+  ]
+}
