@@ -1,0 +1,46 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M589K9A33P5QT02ENDTDS5ED",
+  "strategy": "manual-commit",
+  "branch": "feature/cli-odi-entity-parity",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "README.md",
+    "cli/src/cli/backend.py",
+    "cli/src/cli/evidence.py",
+    "cli/tests/test_backend.py",
+    "cli/tests/test_evidence_cli.py",
+    "cli/tests/test_persistence.py",
+    "core/src/core/__init__.py",
+    "core/src/core/messages.py",
+    "core/src/core/models.py",
+    "core/src/core/repository.py",
+    "core/src/core/schema.py",
+    "core/src/core/services.py",
+    "core/src/core/sqlite_repository.py",
+    "core/tests/test_models.py",
+    "core/tests/test_repository.py",
+    "core/tests/test_schema.py",
+    "core/tests/test_service.py",
+    "core/tests/test_sqlite_repository.py",
+    "mcp_server/src/mcp_server/__init__.py",
+    "mcp_server/src/mcp_server/mcp_server.py",
+    "mcp_server/tests/conftest.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/0/metadata.json",
+      "transcript": "/0/full.jsonl",
+      "compact_transcript": "/0/transcript.jsonl",
+      "content_hash": "/0/content_hash.txt",
+      "prompt": ""
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 288226,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 1494448,
+    "output_tokens": 3739,
+    "api_call_count": 19
+  }
+}
