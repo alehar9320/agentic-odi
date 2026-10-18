@@ -3,7 +3,7 @@
   "checkpoint_id": "01M587G4PSHG7EP0RKJ9GEMTZN",
   "strategy": "manual-commit",
   "branch": "feature/mcp-connector-presets",
-  "checkpoints_count": 7,
+  "checkpoints_count": 8,
   "files_touched": [
     "README.md",
     "cli/src/cli/connectors.py",
@@ -63,6 +63,13 @@
       "transcript": "/6/full.jsonl",
       "compact_transcript": "/6/transcript.jsonl",
       "content_hash": "/6/content_hash.txt",
+      "prompt": ""
+    },
+    {
+      "metadata": "/7/metadata.json",
+      "transcript": "/7/full.jsonl",
+      "compact_transcript": "/7/transcript.jsonl",
+      "content_hash": "/7/content_hash.txt",
       "prompt": ""
     }
   ],
