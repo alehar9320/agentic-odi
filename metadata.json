@@ -1,0 +1,26 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M57R43B7F2HMV5T5G68ZWWWW",
+  "strategy": "manual-commit",
+  "branch": "feature/cli-odi-entity-parity",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "docs/superpowers/plans/2026-10-15-cli-odi-entity-parity.md"
+  ],
+  "sessions": [
+    {
+      "metadata": "/0/metadata.json",
+      "transcript": "/0/full.jsonl",
+      "compact_transcript": "/0/transcript.jsonl",
+      "content_hash": "/0/content_hash.txt",
+      "prompt": "/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 25959,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 73984,
+    "output_tokens": 2617,
+    "api_call_count": 5
+  }
+}
