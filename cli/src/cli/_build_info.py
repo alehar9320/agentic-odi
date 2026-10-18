@@ -1,0 +1,4 @@
+VERSION = "0.1.0"
+RELEASE_DATE_UTC = ""
+COMMIT = "dev"
+TARGET = "dev"
