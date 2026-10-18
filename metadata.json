@@ -1,0 +1,26 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M57SXV8WT7JAF5E2SW7DXR7N",
+  "strategy": "manual-commit",
+  "branch": "feature/cli-bundled-distribution",
+  "checkpoints_count": 2,
+  "files_touched": [
+    "cli/tests/test_update.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/0/metadata.json",
+      "transcript": "/0/full.jsonl",
+      "compact_transcript": "/0/transcript.jsonl",
+      "content_hash": "/0/content_hash.txt",
+      "prompt": "/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 118472,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 741440,
+    "output_tokens": 6692,
+    "api_call_count": 19
+  }
+}

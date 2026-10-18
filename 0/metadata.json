@@ -1,0 +1,55 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M57SXV8WT7JAF5E2SW7DXR7N",
+  "session_id": "ses_eb07dfa09ffelRWgiaaXzpr2r0",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-18T15:26:53.968968318Z",
+  "branch": "feature/cli-bundled-distribution",
+  "checkpoints_count": 2,
+  "files_touched": [
+    "cli/tests/test_update.py"
+  ],
+  "agent": "OpenCode",
+  "model": "big-pickle",
+  "turn_id": "e2cd48daa3c9",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 118472,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 741440,
+    "output_tokens": 6692,
+    "api_call_count": 19
+  },
+  "session_metrics": {
+    "turn_count": 2
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-10-18T15:26:53.953150552Z",
+    "agent_lines": 91,
+    "agent_removed": 0,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 91,
+    "total_lines_changed": 91,
+    "agent_percentage": 100,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 3282,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        "docs/superpowers/plans/2026-10-15-cli-bundled-distribution-and-self-update.md": 884,
+        "docs/superpowers/plans/2026-10-15-cli-odi-entity-parity.md": 1123,
+        "docs/superpowers/plans/2026-10-16-first-run-onboarding.md": 657,
+        "docs/superpowers/specs/2026-10-15-cli-bundled-distribution-design.md": 248,
+        "docs/superpowers/specs/2026-10-15-cli-odi-entity-parity-design.md": 219,
+        "docs/superpowers/specs/2026-10-16-first-run-onboarding-design.md": 151
+      }
+    }
+  ]
+}

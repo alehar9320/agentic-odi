@@ -1,0 +1,5 @@
+I had both plan and build opencode terminal processes open in parallel when my computer crashed. Help me pick up and finish those. Perhaps start by finding and listing the work the up to five executions that may have been interrupted and then help me finish those.
+
+---
+
+Priority order LGTME. Resume both plan sessions also so we have the specs to go off from also. Leave out the fixing CI errors running another terminal. Once we finish one of the tasks, we need to ensure that we push a PR that will pass CI, as the definition of done. As per execution mode, we use subagent-driven whenever recommended.
