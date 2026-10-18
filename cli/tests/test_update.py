@@ -1,5 +1,7 @@
 import hashlib
+import io
 import tarfile
+import zipfile
 from pathlib import Path
 
 import pytest
@@ -58,3 +60,32 @@ def test_verify_checksum(tmp_path):
     good = hashlib.sha256(b"hello").hexdigest()
     assert update.verify_checksum(p, good) is True
     assert update.verify_checksum(p, "0" * 64) is False
+
+
+def test_extract_archive_rejects_tar_path_traversal(tmp_path):
+    archive = tmp_path / "evil.tar.gz"
+    with tarfile.open(archive, "w:gz") as tf:
+        info = tarfile.TarInfo(name="../escape.txt")
+        payload = b"pwned"
+        info.size = len(payload)
+        tf.addfile(info, io.BytesIO(payload))
+    dest = tmp_path / "out"
+    with pytest.raises((tarfile.TarError, update.UpdateError)):
+        update.extract_archive(archive, dest)
+    assert not (tmp_path / "escape.txt").exists()
+
+
+def test_extract_archive_contains_zip_path_traversal(tmp_path):
+    archive = tmp_path / "evil.zip"
+    with zipfile.ZipFile(archive, "w") as zf:
+        zf.writestr("../evil.txt", "pwned")
+    dest = tmp_path / "out"
+    update.extract_archive(archive, dest)
+    assert not (tmp_path / "evil.txt").exists()
+
+
+def test_default_fetch_rejects_non_https(tmp_path):
+    local = tmp_path / "payload.txt"
+    local.write_text("secret")
+    with pytest.raises(update.UpdateError):
+        update._default_fetch(local.as_uri())
