@@ -22,3 +22,9 @@ dev = [
 
 [tool.bandit]
 exclude_dirs = [".venv", "tests"]
+
+[tool.ruff]
+# Vendored Superpowers skills are third-party content. Their Markdown code
+# fences are examples, not project Python, so Ruff must not lint or reformat
+# them (and `npx skills update` would overwrite any local edits anyway).
+extend-exclude = [".agents/skills"]
