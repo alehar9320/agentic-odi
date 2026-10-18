@@ -19,6 +19,7 @@ dev = [
     "pytest-asyncio==1.4.0",
     "pytest-cov==7.1.0",
     "ruff==0.17.0",
+    "pillow==12.3.0",
 ]
 
 [tool.bandit]
@@ -29,3 +30,8 @@ exclude_dirs = [".venv", "tests"]
 # fences are examples, not project Python, so Ruff must not lint or reformat
 # them (and `npx skills update` would overwrite any local edits anyway).
 extend-exclude = [".agents/skills"]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I", "UP", "B", "BLE"]
