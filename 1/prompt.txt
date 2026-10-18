@@ -1,0 +1,44 @@
+You are implementing Task 7: CLI `jobs` group, for the cli-odi-entity-parity feature.
+
+## Task Description
+
+Read your task brief first: /home/alexa/repos/agentic-odi/.superpowers/sdd/2026-10-15-cli-odi-entity-parity/task-7-brief.md
+It is your requirements, with exact values to use verbatim.
+
+## Context
+
+Work from: /home/alexa/repos/agentic-odi (branch feature/cli-odi-entity-parity, HEAD c94760b). uv workspace, Python 3.11 (`uv run` is pinned).
+
+Task 6 is complete: `cli/src/cli/backend.py` now provides:
+- `_call_mcp(tool, args, mcp_url) -> str`
+- `LocalBackend(db_path: str | None = None).call(tool_name, args) -> str` — full dispatch over all tool names, formats like MCP ("Job created successfully: {...}", "Error: Job with ID {id} not found.", JSON for lists/gets)
+- `MCPBackend(mcp_url).call(...)`
+- `BackendConfig(backend: str, db_path: str | None, mcp_url: str | None)` dataclass
+- `resolve_backend(config: BackendConfig)` — returns LocalBackend or MCPBackend; warns to stderr if db_path set with backend=="mcp"; raises ValueError on unknown backend.
+
+Rulings that bind you:
+- R3: unset options are omitted from the updates/args dicts; job_id never included in update args. Build args with key-presence and strip Nones.
+- The brief says "the callback stores a BackendConfig on ctx.obj" — implement the root callback in cli.py as specified: global options `--backend [local|mcp]` (default local per existing behavior — check current cli.py; the plan's Task 6 brief defined `--backend` but Task 6 only built backend.py, the CLI wiring is yours in this task), `--db`, `--mcp-url`. Actually read the brief carefully: it says "Add the global callback + mount in cli/cli.py". The full global-options spec is in the plan's Task 6 section but Task 6's brief scoped CLI wiring out; your brief references it. Resolve: implement the root callback with `--backend` (default "local"), `--db PATH`, `--mcp-url URL`, storing `resolve_backend(BackendConfig(...))` on `ctx.obj`; jobs commands retrieve it via `ctx.obj`. Default backend stays "local" so existing tests (test_cli.py, test_outcomes_cli.py, test_connectors_cli.py) that don't pass --backend keep working — verify the full cli suite stays green.
+- Existing `cli/tests/test_outcomes_cli.py` patches `cli.backend._call_mcp` and invokes outcomes commands; your cli.py change (adding ctx/Callback) must not break those invocations (they pass `--db`). Check how outcomes_app currently gets its backend (likely constructs MCPBackend or similar) — do not change outcomes.py's mounting behavior beyond what's needed; Task 9 will rework outcomes. If outcomes commands currently hardcode MCP, leave that as-is for now.
+
+## Before You Begin
+
+If anything in the brief is unclear or conflicts with the current cli.py, ask (NEEDS_CONTEXT) rather than guess.
+
+## Your Job
+
+1. TDD per the brief: failing tests first in cli/tests/test_jobs_cli.py
+2. Implement jobs.py + cli.py wiring
+3. Full cli suite must pass; ruff check + format on cli/src cli/tests; mypy cli clean
+4. Commit with the brief's message
+5. Self-review, report
+
+## You Do Not Dispatch Subagents
+
+Review arrives from the controller after you report.
+
+## Report Format
+
+Write your full report to /home/alexa/repos/agentic-odi/.superpowers/sdd/2026-10-15-cli-odi-entity-parity/task-7-report.md (what you implemented, TDD evidence RED/GREEN, test results, files changed, self-review, concerns).
+
+Then report back ONLY (under 15 lines): Status (DONE/DONE_WITH_CONCERNS/BLOCKED/NEEDS_CONTEXT), commits (short SHA + subject), one-line test summary, concerns, report path.
