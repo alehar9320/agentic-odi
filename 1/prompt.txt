@@ -1,0 +1,37 @@
+You are implementing Task 8: CLI `steps` group, for the cli-odi-entity-parity feature.
+
+## Task Description
+
+Read your task brief first: /home/alexa/repos/agentic-odi/.superpowers/sdd/2026-10-15-cli-odi-entity-parity/task-8-brief.md
+It is your requirements, with exact values to use verbatim.
+
+## Context
+
+Work from: /home/alexa/repos/agentic-odi (branch feature/cli-odi-entity-parity, HEAD ad0049f). Tasks 1–7 complete (entity parity: service CRUD + SQLite read-through + factory + MCP server + backend abstraction + jobs group). Python 3.11; uv.
+
+Task 7 deliverable: jobs_app with add/list/get/update/delete and global `--backend`/`--db`/`--mcp-url` callback on ctx.obj; test_jobs_cli.py 10 passed. Default backend stays "local".
+
+Dependencies you must respect:
+- `resolve_backend` from Task 6 is available on `ctx.obj`; steps commands retrieve it the same way jobs did.
+- R3: key-presence/None-stripping in args; `step_id` is the addressing arg in `call()`, never part of the updates payload.
+- Existing cli suite must stay green: test_cli.py, test_outcomes_cli.py, test_connectors_cli.py, test_jobs_cli.py all pass after your changes.
+
+## Before You Begin
+
+If anything conflicts with current cli.py or the task text, ask (NEEDS_CONTEXT) now.
+
+## Your Job
+
+1. TDD: failing tests first in cli/tests/test_steps_cli.py
+2. Implement steps.py; wire cli.py root callback to mount steps_app as `steps` (same pattern as jobs)
+3. Full cli suite + ruff + mypy clean
+4. Commit with brief's message
+5. Self-review, report
+
+## You Do Not Dispatch Subagents
+
+## Report Format
+
+Write your full report to /home/alexa/repos/agentic-odi/.superpowers/sdd/2026-10-15-cli-odi-entity-parity/task-8-report.md
+
+Then report ONLY (under 15 lines): Status, commits, one-line test summary, concerns, report path.
