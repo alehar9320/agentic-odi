@@ -3,7 +3,7 @@
   "checkpoint_id": "01M582QEF4CZZKS1WC0H9HWMBW",
   "strategy": "manual-commit",
   "branch": "feature/cli-interactive-chat",
-  "checkpoints_count": 6,
+  "checkpoints_count": 7,
   "files_touched": [
     "README.md",
     "cli/pyproject.toml",
@@ -53,6 +53,13 @@
       "transcript": "/5/full.jsonl",
       "compact_transcript": "/5/transcript.jsonl",
       "content_hash": "/5/content_hash.txt",
+      "prompt": ""
+    },
+    {
+      "metadata": "/6/metadata.json",
+      "transcript": "/6/full.jsonl",
+      "compact_transcript": "/6/transcript.jsonl",
+      "content_hash": "/6/content_hash.txt",
       "prompt": ""
     }
   ],

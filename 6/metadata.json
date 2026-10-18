@@ -1,0 +1,45 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M582QEF4CZZKS1WC0H9HWMBW",
+  "session_id": "ses_eb04498b0ffet7orZN8HAQx60O",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-18T18:01:14.231562961Z",
+  "branch": "feature/cli-interactive-chat",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "README.md",
+    "cli/pyproject.toml",
+    "cli/src/cli/chat.py",
+    "cli/src/cli/cli.py",
+    "cli/tests/test_chat_cli.py",
+    "uv.lock"
+  ],
+  "agent": "OpenCode",
+  "model": "big-pickle",
+  "turn_id": "422caf6cf7e1",
+  "checkpoint_transcript_start": 13,
+  "transcript_lines_at_start": 13,
+  "compact_transcript_start": 13,
+  "token_usage": {
+    "input_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 0,
+    "output_tokens": 0,
+    "api_call_count": 0
+  },
+  "session_metrics": {
+    "turn_count": 1
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-10-18T18:01:14.218501332Z",
+    "agent_lines": 1039,
+    "agent_removed": 1221,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 1039,
+    "total_lines_changed": 2260,
+    "agent_percentage": 100,
+    "metric_version": 2
+  }
+}
