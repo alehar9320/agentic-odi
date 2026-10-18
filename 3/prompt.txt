@@ -1,0 +1,34 @@
+You are reviewing one task's implementation: first whether it matches its requirements, then whether it is well-built. This is a task-scoped gate, not a merge review.
+
+## What Was Requested
+
+Read the task brief: /home/alexa/repos/agentic-odi/.superpowers/sdd/2026-10-15-cli-odi-entity-parity/task-7-brief.md
+
+Global constraints that bind this task:
+- Python >= 3.10; ruff line-length 100; BLE noqa where intentional.
+- jobs_app: add (--name required, --description optional), list, get JOB_ID, update JOB_ID [--name --description], delete JOB_ID [-y/--yes].
+- Mount as `jobs` in cli.py; root callback stores backend on ctx.obj; commands use it.
+- R3: unset options omitted from update args (key-presence, strip Nones); job_id is the addressing arg (passed to call()) but never part of the updates payload.
+- Pre-existing cli suite (test_cli.py, test_outcomes_cli.py, test_connectors_cli.py) must stay green; default backend stays "local".
+- Implementer concern to adjudicate: they read R3's "job_id never in updates" as updates-payload-only, keeping job_id in the call() args dict as addressing arg — judge whether that matches backend.py's contract and the plan.
+
+## What the Implementer Claims They Built
+
+Read the report: /home/alexa/repos/agentic-odi/.superpowers/sdd/2026-10-15-cli-odi-entity-parity/task-7-report.md
+
+## Diff Under Review
+
+**Base:** c94760b
+**Head:** ad0049f
+**Diff file:** /home/alexa/repos/agentic-odi/.superpowers/sdd/2026-10-15-cli-odi-entity-parity/review-c94760b..ad0049f.diff
+
+Read the diff file once. Do not re-run git commands. Do not crawl the codebase; inspect outside the diff only for a named risk, one focused check each. Read-only on /home/alexa/repos/agentic-odi.
+
+## You Do Not Dispatch Subagents
+
+## Report
+
+- Spec: ✅/❌ per requirement
+- Quality: Approved / Needs fixes
+- Findings: severity + file:line + issue + fix
+- ⚠️ cannot-verify items separately
