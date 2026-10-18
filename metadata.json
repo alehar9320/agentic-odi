@@ -3,7 +3,7 @@
   "checkpoint_id": "01M5806YYX4EDQVC1MHWBPYFE1",
   "strategy": "manual-commit",
   "branch": "feature/freebuff-superpowers",
-  "checkpoints_count": 4,
+  "checkpoints_count": 5,
   "files_touched": [
     "AGENTS.md",
     "README.md",
@@ -38,13 +38,20 @@
       "compact_transcript": "/3/transcript.jsonl",
       "content_hash": "/3/content_hash.txt",
       "prompt": "/3/prompt.txt"
+    },
+    {
+      "metadata": "/4/metadata.json",
+      "transcript": "/4/full.jsonl",
+      "compact_transcript": "/4/transcript.jsonl",
+      "content_hash": "/4/content_hash.txt",
+      "prompt": ""
     }
   ],
   "token_usage": {
-    "input_tokens": 345837,
+    "input_tokens": 351288,
     "cache_creation_tokens": 0,
-    "cache_read_tokens": 443316,
-    "output_tokens": 4253,
-    "api_call_count": 39
+    "cache_read_tokens": 651828,
+    "output_tokens": 7272,
+    "api_call_count": 42
   }
 }
