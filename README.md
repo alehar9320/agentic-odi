@@ -34,6 +34,7 @@
   - [Agent Session Tracking](#-agent-session-tracking)
 - [Superpowers with Pi](#-superpowers-with-pi)
   - [Developer Workflow for Formatting](#-developer-workflow-for-formatting)
+- [Superpowers with Freebuff](#-superpowers-with-freebuff)
 - [Deployment](#-deployment)
 - [Roadmap & Next Steps](#-roadmap--next-steps)
 - [Contributing](#-contributing)
@@ -477,6 +478,16 @@ The `.pi/settings.json` declares the Superpowers package. Pi will clone it and l
   - CI runs `uv run ruff check .` to lint without modifying files.
   - CI runs `uv run ruff format --check .` to *verify* formatting only.
   - If CI fails on formatting, run `uv run ruff format .` locally, commit the changes, and push again.
+
+## 🤖 Superpowers with Freebuff
+
+This project ships [Superpowers](https://github.com/obra/superpowers) for [Freebuff](https://freebuff.com) as repo-local skills plus a session-start bootstrap. No plugin or hook is required:
+
+- **Skills**: `.agents/skills/` contains 15 Superpowers skills. Freebuff discovers them automatically; load one with the `skill` tool.
+- **Bootstrap**: `AGENTS.md` injects the `using-superpowers` rules and the Freebuff tool mapping at session start.
+- **Mapping**: `.agents/skills/using-superpowers/references/freebuff-tools.md` maps skill actions to Freebuff tools.
+
+Start Freebuff in the repository and ask "What are your superpowers?" to verify. See [docs/superpowers/freebuff-setup.md](docs/superpowers/freebuff-setup.md) for update and troubleshooting notes.
 
 ---
 
