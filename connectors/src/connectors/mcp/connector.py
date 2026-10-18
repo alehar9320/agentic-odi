@@ -3,9 +3,13 @@
 from __future__ import annotations
 
 import json
+import os
+import re
+from collections.abc import Mapping
 from typing import Any
 
 from fastmcp import Client, FastMCP
+from fastmcp.client.transports import StreamableHttpTransport
 
 from connectors.models import (
     HealthStatus,
@@ -14,6 +18,20 @@ from connectors.models import (
     McpConnectorSettings,
 )
 from connectors.protocol import Connector
+
+_ENV_VAR_PATTERN = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}")
+
+
+class MissingEnvironmentError(RuntimeError):
+    """Raised when a connector needs credentials that are not in the environment."""
+
+    def __init__(self, names: list[str]) -> None:
+        self.names = names
+        super().__init__("Missing environment variable(s): " + ", ".join(names))
+
+
+def _expand_env(value: str, environ: Mapping[str, str]) -> str:
+    return _ENV_VAR_PATTERN.sub(lambda match: environ.get(match.group(1), ""), value)
 
 
 def _to_dict(obj: Any) -> dict[str, Any]:
@@ -53,10 +71,24 @@ class MCPClientConnector(Connector):
         self.settings = settings
         self._server = server
 
-    def _client(self) -> Client:
+    def transport(self) -> StreamableHttpTransport | FastMCP:
+        """Build the MCP transport, resolving credentials from the environment."""
         if self._server is not None:
-            return Client(self._server)
-        return Client(self.settings.url)
+            return self._server
+        missing = sorted(name for name in self.settings.env_vars if not os.environ.get(name))
+        if missing:
+            raise MissingEnvironmentError(missing)
+        headers = {
+            key: _expand_env(value, os.environ) for key, value in self.settings.headers.items()
+        }
+        return StreamableHttpTransport(
+            url=_expand_env(self.settings.url, os.environ),
+            headers=headers or None,
+            auth="oauth" if self.settings.auth == "oauth" else None,
+        )
+
+    def _client(self) -> Client:
+        return Client(self.transport())
 
     async def health(self) -> HealthStatus:
         try:
@@ -70,6 +102,12 @@ class MCPClientConnector(Connector):
                     "tool_count": len(tools),
                     "resource_count": len(resources),
                 },
+            )
+        except MissingEnvironmentError as exc:
+            return HealthStatus(
+                ok=False,
+                message=str(exc),
+                details={"missing_env": exc.names},
             )
         except Exception as exc:  # noqa: BLE001
             return HealthStatus(ok=False, message=str(exc))

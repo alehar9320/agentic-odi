@@ -8,6 +8,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 
 ItemType = Literal["resource", "tool_result", "catalog"]
+McpAuthMode = Literal["none", "oauth"]
 
 
 class HealthStatus(BaseModel):
@@ -33,8 +34,18 @@ class IngestBatch(BaseModel):
 
 
 class McpConnectorSettings(BaseModel):
+    """Connection details for an MCP server.
+
+    ``url`` and ``headers`` may interpolate environment variables with
+    ``${VAR}`` so registry files never hold tokens. ``env_vars`` names the
+    variables that must be present before connecting.
+    """
+
     url: str
     tools: list[str] = Field(default_factory=list)
+    auth: McpAuthMode = "none"
+    headers: dict[str, str] = Field(default_factory=dict)
+    env_vars: list[str] = Field(default_factory=list)
 
 
 class ConnectorConfig(BaseModel):
