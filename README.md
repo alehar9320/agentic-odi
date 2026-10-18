@@ -36,6 +36,8 @@
 - [Superpowers with Pi](#-superpowers-with-pi)
   - [Developer Workflow for Formatting](#-developer-workflow-for-formatting)
 - [Superpowers with Freebuff](#-superpowers-with-freebuff)
+- [Quick Install (Binary)](#quick-install-binary)
+  - [Release automation](#release-automation)
 - [Deployment](#-deployment)
 - [Roadmap & Next Steps](#-roadmap--next-steps)
 - [Contributing](#-contributing)
@@ -596,6 +598,25 @@ Environment variables: `AGENTIC_ODI_INSTALL_DIR` (override install root), `XDG_D
 ### Unsigned binaries
 
 macOS may quarantine downloaded binaries: `xattr -d com.apple.quarantine ~/.local/bin/odi` (if needed). Windows SmartScreen may show a warning for unsigned binaries; choose "More info → Run anyway" if you trust the release.
+
+### Release automation
+
+Releases are cut and published by CI with no approval step:
+
+1. Conventional commits land on `main`; `release-please` opens or updates the release PR.
+2. The `release-please` workflow arms auto-merge on that PR. `main` requires the `CI green` check (ruleset `main-requires-ci-green`), so the PR merges itself as soon as CI passes — nobody clicks merge.
+3. The merge cuts tag `vX.Y.Z` and the GitHub Release; the tag starts the `release` and `Tauri Release` workflows, which attach the CLI archives, `checksums.txt`, the install scripts, and the desktop bundles to it.
+4. `e2e-install` runs after `release` succeeds and installs the published binary on Linux, macOS, and Windows.
+
+**One-time setup (GitHub App).** GitHub holds workflow runs that start from `GITHUB_TOKEN`-authored pushes ("This workflow requires approval from a maintainer") and ignores the tag such a push creates, which is why releases used to need a maintainer. A release-only GitHub App avoids both:
+
+1. Settings → Developer settings → GitHub Apps → New GitHub App, with permissions: Contents `Read and write`, Issues `Read and write`, Pull requests `Read and write` (no webhook).
+2. Install the App on this repository.
+3. Add repository secrets `RELEASE_PLEASE_APP_CLIENT_ID` (the App's client ID) and `RELEASE_PLEASE_APP_PRIVATE_KEY` (a generated private key).
+
+Until those secrets exist, the `release-please` workflow logs a warning and falls back to `GITHUB_TOKEN`: releases still happen, but the release PR needs a maintainer approval and merge, and the tag will not start the asset builds. After adding the secrets, re-run the workflow (`gh workflow run release-please.yml`) or push to `main` so the open release PR is re-driven by the App.
+
+To check the installer without cutting a release, run `bash scripts/tests/install_e2e.sh` — it serves a simulated release over HTTP and exercises `scripts/install.sh` end to end (CI runs it too).
 
 ## ☁️ Deployment
 

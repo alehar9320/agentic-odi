@@ -5,16 +5,69 @@ on:
     branches:
       - main
 
+# Releases are meant to complete without a human in the loop:
+#   1. release-please opens/updates the release PR
+#   2. this workflow arms auto-merge on it (the repo requires the `CI green`
+#      status check on main, so it merges only once CI is green)
+#   3. the merge is pushed by the GitHub App below, which is what makes the
+#      push trigger this workflow again, cut the tag, and start the asset
+#      builds. GITHUB_TOKEN-authored pushes and merges trigger nothing, which
+#      is why releases used to need a maintainer.
 permissions:
   contents: write
+  issues: write
   pull-requests: write
 
 jobs:
   release-please:
     runs-on: ubuntu-latest
     steps:
+      - name: Check for GitHub App credentials
+        id: app-check
+        env:
+          APP_CLIENT_ID: ${{ secrets.RELEASE_PLEASE_APP_CLIENT_ID }}
+          APP_PRIVATE_KEY: ${{ secrets.RELEASE_PLEASE_APP_PRIVATE_KEY }}
+        run: |
+          if [ -n "$APP_CLIENT_ID" ] && [ -n "$APP_PRIVATE_KEY" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::warning title=Release automation is degraded::RELEASE_PLEASE_APP_CLIENT_ID and/or RELEASE_PLEASE_APP_PRIVATE_KEY are missing, so release-please falls back to GITHUB_TOKEN. GitHub holds workflow runs created from GITHUB_TOKEN-authored pushes (\"This workflow requires approval from a maintainer\") and ignores the tag it creates, so this release needs a maintainer approval and ships without binaries. See 'Release automation' in README.md."
+          fi
+
+      - name: Create GitHub App token
+        id: app-token
+        if: steps.app-check.outputs.configured == 'true'
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ secrets.RELEASE_PLEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_PLEASE_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-issues: write
+          permission-pull-requests: write
+
       - name: Release Please
+        id: release
         uses: googleapis/release-please-action@v4
         with:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+          token: ${{ steps.app-token.outputs.token || github.token }}
+
+      - name: Arm auto-merge on the release PR
+        id: auto-merge
+        if: steps.release.outputs.prs_created == 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token || github.token }}
+          PRS: ${{ steps.release.outputs.prs }}
+        run: |
+          set -euo pipefail
+          for pr in $(echo "$PRS" | jq -r '.[].number'); do
+            state="$(gh pr view "$pr" --repo "$GITHUB_REPOSITORY" --json state --jq .state)"
+            if [ "$state" != "OPEN" ]; then
+              echo "Skipping #$pr (state: $state)"
+              continue
+            fi
+            echo "Arming auto-merge on #$pr"
+            gh pr merge --auto --squash "$pr" --repo "$GITHUB_REPOSITORY"
+          done

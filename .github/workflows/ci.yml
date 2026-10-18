@@ -151,6 +151,9 @@ jobs:
           echo "$help" | grep -q ingest
           echo "OK: connectors help"
 
+      - name: Installer installs from a simulated release
+        run: bash scripts/tests/install_e2e.sh
+
       - name: MCP server boots and serves /mcp
         run: |
           uv run python -m mcp_server > /tmp/mcp_server.log 2>&1 &
