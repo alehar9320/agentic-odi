@@ -1,0 +1,44 @@
+You are reviewing one task's implementation: first whether it matches its requirements, then whether it is well-built. This is a task-scoped gate, not a merge review — a broad whole-branch review happens separately after all tasks are complete.
+
+## What Was Requested
+
+Read the task brief: /home/alexa/repos/agentic-odi/.superpowers/sdd/2026-10-15-cli-odi-entity-parity/task-6-brief.md
+
+Global constraints from the plan that bind this task:
+- Python >= 3.10; ruff line-length 100; lint per cli/pyproject.toml (incl. BLE — intentional broad catches need `# noqa: BLE001`).
+- Tool-name map must cover: add_job, get_jobs, get_job, update_job, delete_job, add_step, get_job_map, get_step, update_step, delete_step, add_outcome, get_outcomes, get_outcome, update_outcome, delete_outcome, plus the five `*_customer_outcome` names and `compute_opportunity`.
+- `_call_mcp` moves here from outcomes.py (same asyncio + Client logic; fastmcp import stays lazy/function-scope). Existing cli/tests/test_outcomes_cli.py must stay green (ledger ruling R2: either preserve cli.outcomes._call_mcp alias or retarget the two tests to patch cli.backend._call_mcp).
+- `resolve_backend(BackendConfig(backend="mcp", db_path=..., mcp_url=...))` warns to stderr that db_path is ignored (typer.echo err=True); unknown backend raises ValueError.
+- LocalBackend formats results the way the existing outcomes.py branches do; catches service not-found/value errors and returns their messages.
+- Global constraint: unset options are omitted from updates dicts; job_id never included in updates (ledger R3).
+
+## What the Implementer Claims They Built
+
+Read the implementer's report: /home/alexa/repos/agentic-odi/.superpowers/sdd/2026-10-15-cli-odi-entity-parity/task-6-report.md
+
+## Diff Under Review
+
+**Base:** 48a5ffd
+**Head:** c94760b
+**Diff file:** /home/alexa/repos/agentic-odi/.superpowers/sdd/2026-10-15-cli-odi-entity-parity/review-48a5ffd..c94760b.diff
+
+Read the diff file once — it contains the commit list, a stat summary, and the full diff with surrounding context, and it is your view of the change. Do not re-run git commands. Do not crawl the broader codebase. Inspect code outside the diff only to evaluate a concrete risk you can name — one focused check per named risk, and name both the risk and what you checked in your report.
+
+Your review is read-only on this checkout (/home/alexa/repos/agentic-odi). Do not mutate the working tree, the index, HEAD, or branch state in any way.
+
+## You Do Not Dispatch Subagents
+
+Do all of this review yourself. Never spawn a subagent.
+
+## Review Process
+
+1. Spec compliance: for each requirement in the brief, verify from the diff (✅ met / ❌ missing / ⚠️ cannot verify from diff). Nothing extra built beyond the brief.
+2. Task quality: correctness, test hygiene (tests assert real behavior), maintainability, YAGNI, adherence to existing patterns. Severity rubric: Critical (breaks behavior/security), Important (real defect a reviewer must flag), Minor (style/polish/deferred).
+
+## Report
+
+Return two verdicts and a findings list:
+- **Spec:** ✅ or ❌ with one line per missing/extra item
+- **Quality:** Approved / Needs fixes
+- Findings: severity + file:line + what's wrong + suggested fix (for Important/Critical)
+- ⚠️ Cannot-verify items listed separately
