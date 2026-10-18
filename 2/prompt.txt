@@ -1,0 +1,29 @@
+You are reviewing one task's implementation: first whether it matches its requirements, then whether it is well-built. This is a task-scoped gate, not a merge review.
+
+## What Was Requested
+
+Read the task brief: /home/alexa/repos/agentic-odi/.superpowers/sdd/2026-10-18-github-pages/task-1-brief.md
+Also skim Global Constraints + OG strategy in docs/superpowers/specs/2026-10-18-github-pages-design.md and the plan header in the worktree /home/alexa/repos/agentic-odi/.worktrees/gh-pages/ (the brief was extracted from the plan; the plan's Global Constraints also bind).
+
+Key constraints: deterministic reproducible OG generator (same input → byte-identical PNG); Pillow pinned; committed og.png + website/tools/make_og.py; root ruff config scoped to website/** per brief; no network in tests.
+
+## What the Implementer Claims They Built
+
+Read the report: /home/alexa/repos/agentic-odi/.superpowers/sdd/2026-10-18-github-pages/task-1-report.md
+
+## Diff Under Review
+
+**Base:** 0d701a3
+**Head:** 383e3be
+**Diff file:** /home/alexa/repos/agentic-odi/.superpowers/sdd/2026-10-18-github-pages/review-0d701a3..383e3be.diff
+
+Read the diff file once. Do not re-run git. Named-risk checks only. Read-only on /home/alexa/repos/agentic-odi/.worktrees/gh-pages.
+
+## You Do Not Dispatch Subagents
+
+## Report
+
+- Spec: ✅/❌ per requirement
+- Quality: Approved / Needs fixes
+- Findings: severity + file:line + issue + fix
+- ⚠️ cannot-verify items separately (implementer noted they couldn't visually verify the PNG — that's a known gap, note it but a programmatic layout test may suffice)
