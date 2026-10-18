@@ -7,6 +7,7 @@ dependencies = [
     "agentic-odi-connectors",
     "typer",
     "fastmcp",
+    "openai",
     "agentic-odi-core",
 ]
 

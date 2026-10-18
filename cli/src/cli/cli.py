@@ -18,6 +18,7 @@ from cli.version import __version__  # noqa: F401  (re-exported for tests)
 app = typer.Typer(
     name="agentic-odi-cli",
     help="Agentic ODI CLI - Tool for managing Jobs-to-be-Done (JTBD) and ODI workflows.",
+    no_args_is_help=False,
 )
 app.add_typer(connectors_app, name="connectors")
 
@@ -43,8 +44,9 @@ def _startup_auto_update(no_update: bool) -> None:
         return None
 
 
-@app.callback()
+@app.callback(invoke_without_command=True)
 def main(
+    ctx: typer.Context,
     version: bool = typer.Option(
         False, "--version", callback=_version_callback, help="Show version"
     ),
@@ -60,6 +62,56 @@ def main(
     context.set_backend(backend)
     if not no_update:
         threading.Thread(target=_startup_auto_update, args=(no_update,), daemon=True).start()
+
+    if ctx.invoked_subcommand is None:
+        # No subcommand: start the conversational experience when attached to a
+        # terminal, otherwise print help so pipes and CI never block on a prompt.
+        if sys.stdin.isatty() and sys.stdout.isatty():
+            from cli.chat import ChatConfig, run_chat
+
+            run_chat(ChatConfig.from_env())
+        else:
+            typer.echo(ctx.get_help())
+
+
+@app.command(name="chat")
+def chat_cmd(
+    base_url: str | None = typer.Option(  # noqa: B008
+        None,
+        "--base-url",
+        envvar="AGENTIC_ODI_BASE_URL",
+        help="OpenAI-compatible LLM base URL.",
+    ),
+    model: str | None = typer.Option(  # noqa: B008
+        None,
+        "--model",
+        envvar="AGENTIC_ODI_MODEL",
+        help="Model name or alias.",
+    ),
+    api_key: str | None = typer.Option(  # noqa: B008
+        None,
+        "--api-key",
+        envvar="AGENTIC_ODI_API_KEY",
+        help="API key for the LLM endpoint.",
+    ),
+    mcp_url: str | None = typer.Option(  # noqa: B008
+        None,
+        "--mcp-url",
+        envvar="AGENTIC_ODI_MCP_URL",
+        help="Agentic ODI MCP server URL.",
+    ),
+) -> None:
+    """Start an interactive conversation with the ODI assistant (needs the MCP server)."""
+    from cli.chat import ChatConfig, run_chat
+
+    run_chat(
+        ChatConfig.from_env(
+            base_url=base_url,
+            api_key=api_key,
+            model=model,
+            mcp_url=mcp_url,
+        )
+    )
 
 
 def _reexec_current() -> None:

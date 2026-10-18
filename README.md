@@ -23,6 +23,7 @@
 - [Code Overview](#-code-overview)
 - [Getting Started](#-getting-started)
   - [Command-Line Interface (CLI)](#-command-line-interface-cli)
+  - [Interactive Chat](#-interactive-chat)
   - [Manage Customer Outcomes](#-manage-customer-outcomes)
   - [External Connectors (MCP Ingest)](#-external-connectors-mcp-ingest)
   - [Living Studio Run Modes](#-living-studio-run-modes)
@@ -69,7 +70,7 @@ This repository is a [uv workspace](https://docs.astral.sh/uv/concepts/projects/
 | **`local_server/`** (`agentic-odi-local-server`) | The FastAPI **Living Studio sidecar**. It talks to the MCP server on the client's behalf and serves the Studio API — configuration, health probes, canvas data, MCP mutations, and streaming (SSE) chat with the LLM tool-loop — plus the built SPA when `studio/dist` exists. |
 | **`client/`** (`agentic-odi-client`) | The local dev **launcher** (`run.py` / `python -m client.run`) that starts the MCP server and the Studio sidecar together. (Its former Streamlit UI has been replaced by the `studio/` SPA.) |
 | **`studio/`** (React + TypeScript + Vite) | **The Living Studio** front end — a spatial, conversational GUI for Outcome-Driven Innovation with an interactive Opportunity Landscape, Universal Job Map, WYSIWYG Impact Simulation, and Causal Lineage inspection, paired with an autonomous copilot. Ships as a browser SPA and as a **Tauri 2 desktop app** (`studio/src-tauri/`). |
-| **`cli/`** (`agentic-odi-cli`) | A [`Typer`](https://github.com/fastapi/typer)-based command-line interface. It provides version/help plus `outcomes` and `connectors` commands. |
+| **`cli/`** (`agentic-odi-cli`) | A [`Typer`](https://github.com/fastapi/typer)-based command-line interface with an interactive chat mode plus `version`, `update`, `outcomes`, and `connectors` commands. |
 | **`connectors/`** (`agentic-odi-connectors`) | Pluggable external integrations. The first kind is an **MCP client connector** that connects to a remote MCP server over HTTP, checks health, and ingests tools/resources into a local ingest sink. Additional kinds (REST, webhooks, and so on) can register against the same protocol later. |
 
 ---
@@ -91,17 +92,40 @@ This creates a `.venv` and installs `agentic-odi-core`, `agentic-odi-mcp-server`
 
 ### 💻 Command-Line Interface (CLI)
 
-The [`Typer`](https://github.com/fastapi/typer)-based CLI lets you interact with Agentic ODI directly from your terminal — no chat UI required. It provides version and help information plus commands for connecting to external systems. Over time it will also expose commands for working with the ODI dataset (Jobs, Steps, and Outcomes).
+The [`Typer`](https://github.com/fastapi/typer)-based CLI lets you interact with Agentic ODI directly from your terminal. It provides an interactive chat mode plus version, update, and data commands.
 
 Launch it with:
 
 ```bash
 python -m cli --version   # print the Agentic ODI version
 python -m cli --help      # show available options and commands
-python -m cli             # show help when no command is given
+python -m cli             # start interactive chat in a terminal (help when piped)
 ```
 
 A console script is also installed, so `agentic-odi --version` works the same way.
+
+### 💬 Interactive Chat
+
+`agentic-odi chat` (or simply `agentic-odi` in a terminal) starts a conversational session against the MCP server and an OpenAI-compatible LLM. Responses stream to the terminal, and the assistant can call the ODI MCP tools as it talks.
+
+```bash
+agentic-odi chat
+agentic-odi chat --model local-tools-model --mcp-url http://localhost:8000/mcp
+```
+
+Before starting, run the MCP server (`python -m mcp_server`) and point the chat at an OpenAI-compatible model endpoint. The chat reads the same environment variables as the Living Studio:
+
+| Variable | Default | CLI flag |
+|---|---|---|
+| `AGENTIC_ODI_BASE_URL` | `http://localhost:8001/v1` | `--base-url` |
+| `AGENTIC_ODI_MODEL` | `local-tools-model` | `--model` |
+| `AGENTIC_ODI_API_KEY` | `local` | `--api-key` |
+| `AGENTIC_ODI_MCP_URL` | `http://localhost:8000/mcp` | `--mcp-url` |
+
+Inside the session, `/help` lists the commands, `/tools` lists the MCP tools the assistant can call, `/clear` resets the conversation, and `/exit` (or `/quit`) ends the session.
+
+> [!NOTE]
+> Chat is the only CLI mode that needs an LLM endpoint. The `outcomes` and `connectors` commands keep working without one.
 
 ### 🎯 Manage Customer Outcomes
 
