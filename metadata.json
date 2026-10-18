@@ -3,7 +3,7 @@
   "checkpoint_id": "01M58CDMS85J0K5D13E2MMBP6V",
   "strategy": "manual-commit",
   "branch": "feature/gh-pages",
-  "checkpoints_count": 6,
+  "checkpoints_count": 7,
   "files_touched": [
     "website/assets/main.js",
     "website/assets/style.css",
@@ -51,13 +51,20 @@
       "compact_transcript": "/5/transcript.jsonl",
       "content_hash": "/5/content_hash.txt",
       "prompt": ""
+    },
+    {
+      "metadata": "/6/metadata.json",
+      "transcript": "/6/full.jsonl",
+      "compact_transcript": "/6/transcript.jsonl",
+      "content_hash": "/6/content_hash.txt",
+      "prompt": "/6/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 728796,
+    "input_tokens": 1097028,
     "cache_creation_tokens": 0,
-    "cache_read_tokens": 4208768,
-    "output_tokens": 5563,
-    "api_call_count": 45
+    "cache_read_tokens": 5564032,
+    "output_tokens": 33834,
+    "api_call_count": 71
   }
 }

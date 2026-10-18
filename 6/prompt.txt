@@ -1,0 +1,49 @@
+You are completing an interrupted design session by writing a product spec and implementation plan for a user-facing, auto-generated changelog for the agentic-odi project. This is a WRITING task (docs only, no code).
+
+## Background
+
+An opencode session (id ses_ebea76e4dffeNzxhwoqkB40AW5, directory /home/alexa/repos/agentic-odi) was brainstorming this feature when the machine crashed mid-design. Recover its decisions from the session DB (read-only):
+
+```python
+import sqlite3, os, json
+db=os.path.expanduser('~/.local/share/opencode/opencode.db')
+con=sqlite3.connect(db)
+# messages for session ses_ebea76e4dffeNzxhwoqkB40AW5 (role=user and assistant)
+# message: id, session_id, data(JSON role); part: message_id, data(JSON type text/tool)
+```
+
+## User answers already given (binding)
+
+1. Prose mechanism: fully automated AI rewrite at release time, with a disclaimer that it was AI-made, and proper guardrails ensuring output is grounded in source material (no hallucination).
+2. Branch naming: Conventional Branch standard.
+3. Distribution: fetch from GitHub Releases — CLI (and later GUI) computes "all changes since the version you last ran" by fetching release notes from GitHub Releases.
+
+## User requirements already established
+
+- End-user audience (person who installs/uses agentic-odi), professionally written, value-focused language — not developer-speak.
+- Complete list of all changes since the last version the user ran (no gaps).
+- Auto-generated; user worried about merge conflicts of a committed CHANGELOG.md — prefer release-time generation, not a committed source-of-truth file (release-please config in PR #8 does commit a CHANGELOG.md — you must reconcile: the design may replace, augment, or route around that; make a call).
+- Repo facts: no tags yet; commit history partially non-conventional; an open PR #8 adds release-please (semver releases + generated CHANGELOG.md) and self-update machinery (cli/src/cli/update.py, paths.py — versions stored under ~/.local-ish root, `odi update` command). First release will be 0.1.0.
+
+## Settle these open decisions yourself (Jobs-level bar, grounded engineering)
+
+- Semver/tag engine (keep release-please vs alternatives) and how AI notes attach to releases.
+- Historical backfill: how the 0.1.0 "Initial release" entry is produced from messy pre-tag history.
+- Grounding guardrails: structured output schema (cite commit SHAs per entry), validation that every cited SHA exists in the range, temperature/pinning, draft-release human publish gate vs fully automated publish (user said fully automated — reconcile with a safety mechanism that still honors that).
+- Runtime surface: minimal CLI command (e.g. `odi changelog [--since VERSION]`) and how "last version ran" is tracked (tie into existing update state file from PR #8's paths.py if sensible).
+- Filtering: what commit classes (ci/chore/test/docs/deps) are hidden from end users while keeping the list complete for value-bearing changes — define "complete" honestly.
+
+## Deliverables (write these two files)
+
+1. `docs/superpowers/specs/2026-10-18-user-facing-changelog-design.md` — design doc: audience/JTBD, data pipeline (commits/PRs/tags → AI rewrite → GitHub Release asset/body → CLI fetch), grounding guardrails spec, output JSON schema, release workflow integration, runtime UX, backfill strategy, anti-goals.
+2. `docs/superpowers/plans/2026-10-18-user-facing-changelog.md` — implementation plan in the same style as docs/superpowers/plans/2026-10-16-first-run-onboarding.md (read it for format: Global Constraints, Review Focus, numbered Tasks with Files/Interfaces/TDD steps/commit messages). 5–8 tasks. Mark tasks that are BLOCKED-on-PR-8-merge explicitly. Include a local-mode test harness so the AI rewrite is testable without network/model calls (fixture-driven). Definition of done for the eventual build: PR with all GitHub Actions checks green (repo CI: ruff lint, mypy typecheck, bandit security, pytest matrix, "CI green" aggregate).
+
+Read the relevant existing code read-only for grounding: cli/src/cli/update.py and cli/src/cli/paths.py on branch feature/cli-bundled-distribution (worktree /home/alexa/repos/agentic-odi/.worktrees/cli-bundled-distribution), plus .github/workflows and release-please config on that branch.
+
+Keep the plan executable by a subagent implementer. Do not commit anything — just write the two files. Do not touch any other files.
+
+When done, report: the two file paths, the task count, which tasks depend on PR #8, and any decisions you made beyond the user answers (one line each).
+
+---
+
+Continue if you have next steps, or stop and ask for clarification if you are unsure how to proceed.
