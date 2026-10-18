@@ -1,5 +1,8 @@
 import socket
+import sys
+from pathlib import Path
 
+from client import run
 from client.run import is_port_in_use
 
 
@@ -18,3 +21,29 @@ def test_is_port_in_use_returns_false_for_free_port():
         port = s.getsockname()[1]
 
     assert is_port_in_use(port) is False
+
+
+def test_ports_are_mcp_and_sidecar():
+    assert run.MCP_PORT == 8000
+    assert run.STUDIO_PORT == 8100
+
+
+def test_build_commands_exposes_mcp_and_sidecar():
+    mcp, sidecar = run.build_commands()
+
+    assert mcp == [sys.executable, "-m", "mcp_server"]
+    assert "uvicorn" in sidecar
+    assert "local_server.app:create_app" in sidecar
+    assert "--factory" in sidecar
+    assert str(run.STUDIO_PORT) in sidecar
+
+
+def test_spa_build_hint_points_at_studio_package():
+    assert "npm" in run.SPA_BUILD_HINT
+    assert "studio" in run.SPA_BUILD_HINT
+
+
+def test_launcher_no_longer_references_streamlit():
+    source = Path(run.__file__).read_text().lower()
+
+    assert "streamlit" not in source

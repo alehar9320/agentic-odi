@@ -1,0 +1,7 @@
+node_modules
+dist
+coverage
+*.local
+.vite
+src-tauri/target
+src-tauri/gen

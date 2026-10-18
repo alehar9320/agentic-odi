@@ -1,13 +1,16 @@
 """
 run.py — Local dev launcher for Agentic ODI.
 
-Starts the FastMCP server (``python -m mcp_server``) and the Streamlit client
-(``client/app.py``) concurrently. Shutting down this script (Ctrl+C) terminates
+Starts the FastMCP server (``python -m mcp_server``) and the Living Studio
+sidecar (``uvicorn local_server.app:create_app --factory``) concurrently, then
+prints the MCP and Studio URLs. Shutting down this script (Ctrl+C) terminates
 both processes.
 
 Usage:
     python -m client.run
 """
+
+from __future__ import annotations
 
 import os
 import signal
@@ -17,13 +20,35 @@ import sys
 import time
 
 MCP_PORT = 8000
-CLIENT_PORT = 8501
-CLIENT_APP = os.path.join(os.path.dirname(os.path.abspath(__file__)), "app.py")
+STUDIO_PORT = 8100
+
+REPO_ROOT = os.path.dirname(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+)
+SPA_DIST = os.path.join(REPO_ROOT, "studio", "dist")
+SPA_BUILD_HINT = "Frontend not built — run `npm --prefix studio run build` to serve the Studio UI."
 
 
 def is_port_in_use(port: int) -> bool:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         return s.connect_ex(("localhost", port)) == 0
+
+
+def build_commands() -> tuple[list[str], list[str]]:
+    """Return the (mcp_server, sidecar) argv lists, both shell-free and fixed."""
+    mcp_command = [sys.executable, "-m", "mcp_server"]
+    sidecar_command = [
+        sys.executable,
+        "-m",
+        "uvicorn",
+        "local_server.app:create_app",
+        "--factory",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        str(STUDIO_PORT),
+    ]
+    return mcp_command, sidecar_command
 
 
 def start_server() -> subprocess.Popen:
@@ -32,53 +57,41 @@ def start_server() -> subprocess.Popen:
         print("Please stop any process running on this port and try again.")
         sys.exit(1)
 
+    mcp_command, _ = build_commands()
     print(f"Starting MCP server on http://localhost:{MCP_PORT}/mcp ...")
     # Fixed command, no shell, no untrusted input.
-    return subprocess.Popen([sys.executable, "-m", "mcp_server"])  # nosec B603
+    return subprocess.Popen(mcp_command)  # nosec B603
 
 
-def start_client() -> subprocess.Popen:
-    if is_port_in_use(CLIENT_PORT):
-        print(
-            f"Warning: Port {CLIENT_PORT} is already in use. Streamlit might choose another port."
-        )
+def start_studio() -> subprocess.Popen:
+    if is_port_in_use(STUDIO_PORT):
+        print(f"Warning: Port {STUDIO_PORT} is already in use. The sidecar may fail to start.")
 
-    print(f"Starting Streamlit client on http://localhost:{CLIENT_PORT} ...")
+    _, sidecar_command = build_commands()
+    print(f"Starting Living Studio sidecar on http://localhost:{STUDIO_PORT} ...")
     # Fixed command, no shell, no untrusted input.
-    return subprocess.Popen(  # nosec B603
-        [
-            sys.executable,
-            "-m",
-            "streamlit",
-            "run",
-            CLIENT_APP,
-            "--server.headless",
-            "true",
-            "--server.port",
-            str(CLIENT_PORT),
-        ]
-    )
+    return subprocess.Popen(sidecar_command)  # nosec B603
 
 
 def main() -> None:
     server = None
-    client = None
+    studio = None
 
     def shutdown(signum=None, frame=None):
         print("\nShutting down...")
-        if client:
-            client.terminate()
+        if studio:
+            studio.terminate()
         if server:
             server.terminate()
 
         try:
-            if client:
-                client.wait(timeout=5)
+            if studio:
+                studio.wait(timeout=5)
             if server:
                 server.wait(timeout=5)
         except subprocess.TimeoutExpired:
-            if client:
-                client.kill()
+            if studio:
+                studio.kill()
             if server:
                 server.kill()
 
@@ -90,26 +103,28 @@ def main() -> None:
 
     try:
         server = start_server()
-        # Give the server a moment to bind its port before the client tries to connect
+        # Give the server a moment to bind its port before the sidecar connects
         time.sleep(2)
-        client = start_client()
+        studio = start_studio()
 
         print("\nBoth processes are running.")
-        print(f"MCP Server  -> http://localhost:{MCP_PORT}/mcp")
-        print(f"Streamlit   -> http://localhost:{CLIENT_PORT}")
+        print(f"MCP Server   -> http://localhost:{MCP_PORT}/mcp")
+        print(f"Living Studio -> http://localhost:{STUDIO_PORT}")
+        if not os.path.isdir(SPA_DIST):
+            print(f"\n⚠️  {SPA_BUILD_HINT}")
         print("\nPress Ctrl+C to stop both.\n")
 
         # Wait for either process to exit unexpectedly
         while True:
             rc_server = server.poll()
-            rc_client = client.poll()
+            rc_studio = studio.poll()
 
             if rc_server is not None:
                 print(f"\nServer exited unexpectedly (code {rc_server}).")
                 break
 
-            if rc_client is not None:
-                print(f"\nClient exited unexpectedly (code {rc_client}).")
+            if rc_studio is not None:
+                print(f"\nStudio sidecar exited unexpectedly (code {rc_studio}).")
                 break
 
             time.sleep(1)
