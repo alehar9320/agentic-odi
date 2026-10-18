@@ -11,6 +11,8 @@
 [![pytest](https://img.shields.io/badge/tests-pytest-blue)](https://pytest.org)
 [![MCP](https://img.shields.io/badge/Model%20Context%20Protocol-enabled-8A2BE2)](https://modelcontextprotocol.io)
 
+> **[![Experimental](https://img.shields.io/badge/Experimental-1e293b?style=for-the-badge)](https://github.com/alehar9320/agentic-odi)**
+
 > **Experimental test to learn and evaluate the feasibility of utilizing Model Context Protocol (MCP) for Outcome-Driven Innovation (ODI) specifications.**
 
 </div>
@@ -27,6 +29,8 @@ Opportunity Scores).
 
 This repository is an experimental testbed for understanding server–client MCP
 communication streams, built on [`FastMCP`](https://github.com/jlowin/fastmcp).
+
+We don't publish dates. This page changes when the code does.
 
 ## Code Overview
 
