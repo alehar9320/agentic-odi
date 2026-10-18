@@ -13,6 +13,7 @@ import urllib.request
 import zipfile
 from collections.abc import Callable
 from pathlib import Path
+from urllib.parse import urlparse
 
 from cli import paths
 from cli.version import __version__
@@ -76,10 +77,10 @@ def extract_archive(archive: Path, dest: Path) -> None:
     dest.mkdir(parents=True, exist_ok=True)
     if archive.name.endswith(".zip"):
         with zipfile.ZipFile(archive) as zf:
-            zf.extractall(dest)
+            zf.extractall(dest)  # nosec B202 - ZipFile strips absolute/'..' member paths
     else:
         with tarfile.open(archive, "r:gz") as tf:
-            tf.extractall(dest)
+            tf.extractall(dest, filter="data")
 
 
 def _acquire_lock(install_root: Path) -> tuple[int, Path]:
@@ -164,13 +165,21 @@ def record_check(state_file: Path, now: float) -> None:
     path.write_text(json.dumps({"last_check": now}))
 
 
+def _require_https(url: str) -> None:
+    """Reject anything that is not plain HTTPS before it can be opened."""
+    if urlparse(url).scheme != "https":
+        raise UpdateError(f"refusing non-HTTPS URL: {url}")
+
+
 def _default_fetch(url: str) -> str:
-    with urllib.request.urlopen(url, timeout=10) as response:  # noqa: S310
+    _require_https(url)
+    with urllib.request.urlopen(url, timeout=10) as response:  # nosec B310 - _require_https
         return response.read().decode("utf-8")
 
 
 def _default_fetch_bytes(url: str) -> bytes:
-    with urllib.request.urlopen(url, timeout=10) as response:  # noqa: S310
+    _require_https(url)
+    with urllib.request.urlopen(url, timeout=10) as response:  # nosec B310 - _require_https
         return response.read()
 
 

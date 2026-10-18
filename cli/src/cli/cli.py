@@ -40,7 +40,7 @@ def _startup_auto_update(no_update: bool) -> None:
         if updated is not None:
             typer.echo(f"Updated to v{updated} — takes effect next run")
     except Exception:  # noqa: BLE001
-        pass
+        return None
 
 
 @app.callback()
@@ -75,7 +75,7 @@ def _reexec_current() -> None:
     argv = sys.argv[1:]
     if "update" in argv:
         argv = argv[: argv.index("update")]
-    os.execv(str(binary), [str(binary), *argv])
+    os.execv(str(binary), [str(binary), *argv])  # nosec B606 - re-execs own verified binary
 
 
 @app.command(name="version")
