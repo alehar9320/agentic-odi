@@ -1,0 +1,594 @@
+{
+  "info": {
+    "id": "ses_eb02a5e98ffeyAz1QVZXotyja6",
+    "slug": "silent-orchid",
+    "projectID": "e4fe19106d06261ebfed21a0e3ba06559abf1100",
+    "directory": "/home/alexa/repos/agentic-odi",
+    "path": "",
+    "parentID": "ses_eb07dfa09ffelRWgiaaXzpr2r0",
+    "title": "Review Task 7 (spec + quality) (@general subagent)",
+    "agent": "general",
+    "model": {
+      "id": "big-pickle",
+      "providerID": "opencode",
+      "variant": "default"
+    },
+    "version": "1.18.35",
+    "summary": {
+      "additions": 0,
+      "deletions": 0,
+      "files": 0
+    },
+    "cost": 0,
+    "tokens": {
+      "input": 34766,
+      "output": 711,
+      "reasoning": 1271,
+      "cache": {
+        "read": 61663,
+        "write": 0
+      }
+    },
+    "permission": [
+      {
+        "permission": "task",
+        "pattern": "*",
+        "action": "deny"
+      }
+    ],
+    "time": {
+      "created": 1792340762984,
+      "updated": 1792340827291
+    }
+  },
+  "messages": [
+    {
+      "info": {
+        "role": "user",
+        "time": {
+          "created": 1792340762993
+        },
+        "agent": "general",
+        "model": {
+          "providerID": "opencode",
+          "modelID": "big-pickle"
+        },
+        "summary": {
+          "diffs": []
+        },
+        "id": "msg_14fd5a170001IoNojJGao5ln7y",
+        "sessionID": "ses_eb02a5e98ffeyAz1QVZXotyja6"
+      },
+      "parts": [
+        {
+          "type": "text",
+          "text": "You are reviewing one task's implementation: first whether it matches its requirements, then whether it is well-built. This is a task-scoped gate, not a merge review.\n\n## What Was Requested\n\nRead the task brief: /home/alexa/repos/agentic-odi/.superpowers/sdd/2026-10-15-cli-odi-entity-parity/task-7-brief.md\n\nGlobal constraints that bind this task:\n- Python >= 3.10; ruff line-length 100; BLE noqa where intentional.\n- jobs_app: add (--name required, --description optional), list, get JOB_ID, update JOB_ID [--name --description], delete JOB_ID [-y/--yes].\n- Mount as `jobs` in cli.py; root callback stores backend on ctx.obj; commands use it.\n- R3: unset options omitted from update args (key-presence, strip Nones); job_id is the addressing arg (passed to call()) but never part of the updates payload.\n- Pre-existing cli suite (test_cli.py, test_outcomes_cli.py, test_connectors_cli.py) must stay green; default backend stays \"local\".\n- Implementer concern to adjudicate: they read R3's \"job_id never in updates\" as updates-payload-only, keeping job_id in the call() args dict as addressing arg — judge whether that matches backend.py's contract and the plan.\n\n## What the Implementer Claims They Built\n\nRead the report: /home/alexa/repos/agentic-odi/.superpowers/sdd/2026-10-15-cli-odi-entity-parity/task-7-report.md\n\n## Diff Under Review\n\n**Base:** c94760b\n**Head:** ad0049f\n**Diff file:** /home/alexa/repos/agentic-odi/.superpowers/sdd/2026-10-15-cli-odi-entity-parity/review-c94760b..ad0049f.diff\n\nRead the diff file once. Do not re-run git commands. Do not crawl the codebase; inspect outside the diff only for a named risk, one focused check each. Read-only on /home/alexa/repos/agentic-odi.\n\n## You Do Not Dispatch Subagents\n\n## Report\n\n- Spec: ✅/❌ per requirement\n- Quality: Approved / Needs fixes\n- Findings: severity + file:line + issue + fix\n- ⚠️ cannot-verify items separately",
+          "id": "prt_14fd5a174001DX0u9t0T3oictp",
+          "sessionID": "ses_eb02a5e98ffeyAz1QVZXotyja6",
+          "messageID": "msg_14fd5a170001IoNojJGao5ln7y"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_14fd5a170001IoNojJGao5ln7y",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 14474,
+          "input": 14097,
+          "output": 67,
+          "reasoning": 148,
+          "cache": {
+            "write": 0,
+            "read": 162
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792340763098,
+          "completed": 1792340770624
+        },
+        "finish": "tool-calls",
+        "id": "msg_14fd5a1da001HNhzXwLV2mwmSq",
+        "sessionID": "ses_eb02a5e98ffeyAz1QVZXotyja6"
+      },
+      "parts": [
+        {
+          "snapshot": "24d3cd583cc60203c19f7a72284244e2c16a7df8",
+          "type": "step-start",
+          "id": "prt_14fd5bef6001EYaUyw894zW5Er",
+          "sessionID": "ses_eb02a5e98ffeyAz1QVZXotyja6",
+          "messageID": "msg_14fd5a1da001HNhzXwLV2mwmSq"
+        },
+        {
+          "type": "tool",
+          "tool": "read",
+          "callID": "21683979-f3e2-4be6-a493-0feed2a47c6f",
+          "state": {
+            "status": "error",
+            "input": {
+              "filePath": "/home/alexa/repos/agentic-odi/.superpowers/sdd/2026-10-15-cli-odi-entity-parity/task-7-brief.md",
+              "offset": "1.0",
+              "limit": "2000.0"
+            },
+            "error": "The read tool was called with invalid arguments: SchemaError(Expected number | undefined, got \"1.0\"\n  at [\"offset\"]).\nPlease rewrite the input so it satisfies the expected schema.",
+            "time": {
+              "start": 1792340770569,
+              "end": 1792340770572
+            }
+          },
+          "id": "prt_14fd5bef9001KC49qXYpgYV2JW",
+          "sessionID": "ses_eb02a5e98ffeyAz1QVZXotyja6",
+          "messageID": "msg_14fd5a1da001HNhzXwLV2mwmSq"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "24d3cd583cc60203c19f7a72284244e2c16a7df8",
+          "type": "step-finish",
+          "tokens": {
+            "total": 14474,
+            "input": 14097,
+            "output": 67,
+            "reasoning": 148,
+            "cache": {
+              "write": 0,
+              "read": 162
+            }
+          },
+          "cost": 0,
+          "id": "prt_14fd5bf1b001ENJscKRrGmhPtO",
+          "sessionID": "ses_eb02a5e98ffeyAz1QVZXotyja6",
+          "messageID": "msg_14fd5a1da001HNhzXwLV2mwmSq"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_14fd5a170001IoNojJGao5ln7y",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 14427,
+          "input": 106,
+          "output": 60,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 14261
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792340770627,
+          "completed": 1792340772543
+        },
+        "finish": "tool-calls",
+        "id": "msg_14fd5bf43001oHMRjA2IALMUD9",
+        "sessionID": "ses_eb02a5e98ffeyAz1QVZXotyja6"
+      },
+      "parts": [
+        {
+          "snapshot": "24d3cd583cc60203c19f7a72284244e2c16a7df8",
+          "type": "step-start",
+          "id": "prt_14fd5c657001Z5RumPGtQay5FM",
+          "sessionID": "ses_eb02a5e98ffeyAz1QVZXotyja6",
+          "messageID": "msg_14fd5bf43001oHMRjA2IALMUD9"
+        },
+        {
+          "type": "tool",
+          "tool": "read",
+          "callID": "8b48df01-1138-4993-9540-8627b1ef5bd3",
+          "state": {
+            "status": "error",
+            "input": {
+              "filePath": "/home/alexa/repos/agentic-odi/.superpowers/sdd/2026-10-15-cli-odi-entity-parity/task-7-brief.md",
+              "offset": 1,
+              "limit": "2000.0"
+            },
+            "error": "The read tool was called with invalid arguments: SchemaError(Expected number | undefined, got \"2000.0\"\n  at [\"limit\"]).\nPlease rewrite the input so it satisfies the expected schema.",
+            "time": {
+              "start": 1792340772445,
+              "end": 1792340772448
+            }
+          },
+          "id": "prt_14fd5c659001eF4OL9XMDQ8Om6",
+          "sessionID": "ses_eb02a5e98ffeyAz1QVZXotyja6",
+          "messageID": "msg_14fd5bf43001oHMRjA2IALMUD9"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "24d3cd583cc60203c19f7a72284244e2c16a7df8",
+          "type": "step-finish",
+          "tokens": {
+            "total": 14427,
+            "input": 106,
+            "output": 60,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 14261
+            }
+          },
+          "cost": 0,
+          "id": "prt_14fd5c68d0017BB1tU7X2p91xs",
+          "sessionID": "ses_eb02a5e98ffeyAz1QVZXotyja6",
+          "messageID": "msg_14fd5bf43001oHMRjA2IALMUD9"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_14fd5a170001IoNojJGao5ln7y",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 14532,
+          "input": 14401,
+          "output": 58,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 73
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792340772546,
+          "completed": 1792340775655
+        },
+        "finish": "tool-calls",
+        "id": "msg_14fd5c6c2001kWTiII3ss8geWU",
+        "sessionID": "ses_eb02a5e98ffeyAz1QVZXotyja6"
+      },
+      "parts": [
+        {
+          "snapshot": "24d3cd583cc60203c19f7a72284244e2c16a7df8",
+          "type": "step-start",
+          "id": "prt_14fd5cf86001zu4l8i5MKznMrN",
+          "sessionID": "ses_eb02a5e98ffeyAz1QVZXotyja6",
+          "messageID": "msg_14fd5c6c2001kWTiII3ss8geWU"
+        },
+        {
+          "type": "tool",
+          "tool": "read",
+          "callID": "2b95bb95-3865-4891-9d1f-620d2b6a676b",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/home/alexa/repos/agentic-odi/.superpowers/sdd/2026-10-15-cli-odi-entity-parity/task-7-brief.md",
+              "offset": 1,
+              "limit": 2000
+            },
+            "output": "<path>/home/alexa/repos/agentic-odi/.superpowers/sdd/2026-10-15-cli-odi-entity-parity/task-7-brief.md</path>\n<type>file</type>\n<content>\n1: ### Task 7: CLI `jobs` group\n2: \n3: **Files:**\n4: - Create: `cli/src/cli/jobs.py`\n5: - Modify: `cli/src/cli/cli.py`\n6: - Test: `cli/tests/test_jobs_cli.py` (new)\n7: \n8: **Interfaces:**\n9: - Consumes: `resolve_backend`, `BackendConfig` (Task 6); the callback stores a `BackendConfig` on `ctx.obj`.\n10: - Produces: `jobs_app` (Typer) with `add`, `list`, `get`, `update`, `delete`; mounted as `jobs`.\n11:   - `add --name (required) [--description]`, `list`, `get JOB_ID`, `update JOB_ID [--name --description]`, `delete JOB_ID [-y/--yes]`.\n12: \n13: - [ ] **Step 1: Add the global callback + mount** in `cli/cli.py`, then write tests in `cli/tests/test_jobs_cli.py`\n14: \n15: ```python\n16: from typer.testing import CliRunner\n17: \n18: from cli.cli import app\n19: \n20: \n21: def test_jobs_add_list_get_round_trip(tmp_path):\n22:     db = str(tmp_path / \"odi.db\")\n23:     runner = CliRunner()\n24:     add = runner.invoke(app, [\"--db\", db, \"jobs\", \"add\", \"--name\", \"Onboard\"])\n25:     assert add.exit_code == 0 and \"created successfully\" in add.output\n26:     listed = runner.invoke(app, [\"--db\", db, \"jobs\", \"list\"])\n27:     assert \"Onboard\" in listed.output\n28: \n29: \n30: def test_jobs_get_unknown_reports_error(tmp_path):\n31:     result = CliRunner().invoke(\n32:         app, [\"--db\", str(tmp_path / \"odi.db\"), \"jobs\", \"get\", \"nope\"]\n33:     )\n34:     assert result.exit_code == 0 and \"not found\" in result.output.lower()\n35: ```\n36: \n37: - [ ] **Step 2: Run to verify failure**\n38: \n39: Run: `uv run --directory cli pytest tests/test_jobs_cli.py -v`\n40: Expected: FAIL (no `--db` option / no `jobs` command).\n41: \n42: - [ ] **Step 3: Implement**\n43: \n44: In `cli.py`: add `--backend`, `--db`, `--mcp-url` to `@app.callback()` (`main`), keep `--version`; set `ctx.obj = BackendConfig(...)`; mount `jobs_app`. In `jobs.py`: build `jobs_app = typer.Typer(help=\"Manage Jobs-to-be-Done.\")`, each command reads `ctx.obj`, calls the backend tool (`add_job`/`get_jobs`/`get_job`/`update_job`/`delete_job`), and echoes the result; `delete` prompts unless `-y`.\n45: \n46: - [ ] **Step 4: Run to verify pass**\n47: \n48: Run: `uv run --directory cli pytest tests/test_jobs_cli.py -v`\n49: Expected: PASS.\n50: \n51: - [ ] **Step 5: Commit**\n52: \n53: ```bash\n54: git add cli/src/cli/jobs.py cli/src/cli/cli.py cli/tests/test_jobs_cli.py\n55: git commit -m \"feat(cli): add jobs command group with global backend options\"\n56: ```\n57: \n58: ---\n59: \n\n(End of file - total 59 lines)\n</content>",
+            "metadata": {
+              "preview": "### Task 7: CLI `jobs` group\n\n**Files:**\n- Create: `cli/src/cli/jobs.py`\n- Modify: `cli/src/cli/cli.py`\n- Test: `cli/tests/test_jobs_cli.py` (new)\n\n**Interfaces:**\n- Consumes: `resolve_backend`, `BackendConfig` (Task 6); the callback stores a `BackendConfig` on `ctx.obj`.\n- Produces: `jobs_app` (Typer) with `add`, `list`, `get`, `update`, `delete`; mounted as `jobs`.\n  - `add --name (required) [--description]`, `list`, `get JOB_ID`, `update JOB_ID [--name --description]`, `delete JOB_ID [-y/--yes]`.\n\n- [ ] **Step 1: Add the global callback + mount** in `cli/cli.py`, then write tests in `cli/tests/test_jobs_cli.py`\n\n```python\nfrom typer.testing import CliRunner\n\nfrom cli.cli import app\n\n",
+              "truncated": false,
+              "loaded": [],
+              "display": {
+                "type": "file",
+                "path": "/home/alexa/repos/agentic-odi/.superpowers/sdd/2026-10-15-cli-odi-entity-parity/task-7-brief.md",
+                "text": "### Task 7: CLI `jobs` group\n\n**Files:**\n- Create: `cli/src/cli/jobs.py`\n- Modify: `cli/src/cli/cli.py`\n- Test: `cli/tests/test_jobs_cli.py` (new)\n\n**Interfaces:**\n- Consumes: `resolve_backend`, `BackendConfig` (Task 6); the callback stores a `BackendConfig` on `ctx.obj`.\n- Produces: `jobs_app` (Typer) with `add`, `list`, `get`, `update`, `delete`; mounted as `jobs`.\n  - `add --name (required) [--description]`, `list`, `get JOB_ID`, `update JOB_ID [--name --description]`, `delete JOB_ID [-y/--yes]`.\n\n- [ ] **Step 1: Add the global callback + mount** in `cli/cli.py`, then write tests in `cli/tests/test_jobs_cli.py`\n\n```python\nfrom typer.testing import CliRunner\n\nfrom cli.cli import app\n\n\ndef test_jobs_add_list_get_round_trip(tmp_path):\n    db = str(tmp_path / \"odi.db\")\n    runner = CliRunner()\n    add = runner.invoke(app, [\"--db\", db, \"jobs\", \"add\", \"--name\", \"Onboard\"])\n    assert add.exit_code == 0 and \"created successfully\" in add.output\n    listed = runner.invoke(app, [\"--db\", db, \"jobs\", \"list\"])\n    assert \"Onboard\" in listed.output\n\n\ndef test_jobs_get_unknown_reports_error(tmp_path):\n    result = CliRunner().invoke(\n        app, [\"--db\", str(tmp_path / \"odi.db\"), \"jobs\", \"get\", \"nope\"]\n    )\n    assert result.exit_code == 0 and \"not found\" in result.output.lower()\n```\n\n- [ ] **Step 2: Run to verify failure**\n\nRun: `uv run --directory cli pytest tests/test_jobs_cli.py -v`\nExpected: FAIL (no `--db` option / no `jobs` command).\n\n- [ ] **Step 3: Implement**\n\nIn `cli.py`: add `--backend`, `--db`, `--mcp-url` to `@app.callback()` (`main`), keep `--version`; set `ctx.obj = BackendConfig(...)`; mount `jobs_app`. In `jobs.py`: build `jobs_app = typer.Typer(help=\"Manage Jobs-to-be-Done.\")`, each command reads `ctx.obj`, calls the backend tool (`add_job`/`get_jobs`/`get_job`/`update_job`/`delete_job`), and echoes the result; `delete` prompts unless `-y`.\n\n- [ ] **Step 4: Run to verify pass**\n\nRun: `uv run --directory cli pytest tests/test_jobs_cli.py -v`\nExpected: PASS.\n\n- [ ] **Step 5: Commit**\n\n```bash\ngit add cli/src/cli/jobs.py cli/src/cli/cli.py cli/tests/test_jobs_cli.py\ngit commit -m \"feat(cli): add jobs command group with global backend options\"\n```\n\n---\n",
+                "lineStart": 1,
+                "lineEnd": 59,
+                "totalLines": 59,
+                "truncated": false
+              }
+            },
+            "title": ".superpowers/sdd/2026-10-15-cli-odi-entity-parity/task-7-brief.md",
+            "time": {
+              "start": 1792340774796,
+              "end": 1792340774831
+            }
+          },
+          "id": "prt_14fd5cf880016q3eL9k0j0zd2l",
+          "sessionID": "ses_eb02a5e98ffeyAz1QVZXotyja6",
+          "messageID": "msg_14fd5c6c2001kWTiII3ss8geWU"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "24d3cd583cc60203c19f7a72284244e2c16a7df8",
+          "type": "step-finish",
+          "tokens": {
+            "total": 14532,
+            "input": 14401,
+            "output": 58,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 73
+            }
+          },
+          "cost": 0,
+          "id": "prt_14fd5cfd4001a4xK12gJN6stif",
+          "sessionID": "ses_eb02a5e98ffeyAz1QVZXotyja6",
+          "messageID": "msg_14fd5c6c2001kWTiII3ss8geWU"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_14fd5a170001IoNojJGao5ln7y",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 15440,
+          "input": 957,
+          "output": 57,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 14426
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792340775659,
+          "completed": 1792340783373
+        },
+        "finish": "tool-calls",
+        "id": "msg_14fd5d2eb001Rf2UJMtuS35yKC",
+        "sessionID": "ses_eb02a5e98ffeyAz1QVZXotyja6"
+      },
+      "parts": [
+        {
+          "snapshot": "24d3cd583cc60203c19f7a72284244e2c16a7df8",
+          "type": "step-start",
+          "id": "prt_14fd5f02c001r3r0ur3rTMfzy3",
+          "sessionID": "ses_eb02a5e98ffeyAz1QVZXotyja6",
+          "messageID": "msg_14fd5d2eb001Rf2UJMtuS35yKC"
+        },
+        {
+          "type": "tool",
+          "tool": "read",
+          "callID": "d73f1bba-06e9-48fb-bd54-b1fa17fa3a85",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/home/alexa/repos/agentic-odi/.superpowers/sdd/2026-10-15-cli-odi-entity-parity/task-7-report.md",
+              "offset": 1,
+              "limit": 2000
+            },
+            "output": "<path>/home/alexa/repos/agentic-odi/.superpowers/sdd/2026-10-15-cli-odi-entity-parity/task-7-report.md</path>\n<type>file</type>\n<content>\n1: # Task 7 report — CLI `jobs` group\n2: \n3: **Commit:** `ad0049f` — `feat(cli): add jobs command group with global backend options`\n4: **Branch:** feature/cli-odi-entity-parity (based on c94760b)\n5: \n6: ## What I implemented\n7: \n8: ### `cli/src/cli/jobs.py` (new)\n9: - `jobs_app = typer.Typer(help=\"Manage Jobs-to-be-Done.\")`\n10: - Commands per the brief's interface:\n11:   - `add --name (required) [--description]` → `call(\"add_job\", {\"name\", \"description\"?})`\n12:   - `list` → `call(\"get_jobs\", {})`\n13:   - `get JOB_ID` → `call(\"get_job\", {\"job_id\"})`\n14:   - `update JOB_ID [--name --description]` → `call(\"update_job\", {\"job_id\", \"name\"? , \"description\"?})`\n15:   - `delete JOB_ID [-y/--yes]` → `typer.confirm` unless `-y`, then `call(\"delete_job\", {\"job_id\"})`\n16: - Each command reads the backend via `_backend(ctx)` helper that returns the typed `Backend` from `ctx.obj` (clear error + exit 1 if unset — unreachable through `app`, guards standalone `jobs_app` use).\n17: - **R3:** args built by key-presence; `None` options are omitted entirely (only unset is representable at the CLI — no `--no-description`), so `LocalBackend._update_job`'s `if key in args` extraction never sees nulls.\n18: \n19: ### `cli/src/cli/cli.py` (modified)\n20: - Root callback `main` gains `ctx: typer.Context` and global options:\n21:   - `--backend` (default `\"local\"`, preserving existing no-flag behavior),\n22:   - `--db PATH`, `--mcp-url URL`;\n23:   - `--version` and `version_cmd` untouched.\n24: - Body: `ctx.obj = resolve_backend(BackendConfig(backend=backend, db_path=db, mcp_url=mcp_url))`, per the controller ruling (the brief/plan text said \"stores a `BackendConfig`\"; the ruling resolved this to storing the *resolved* backend — binding instruction followed).\n25: - `ValueError` from unknown backend caught → `typer.echo(\"Error: Unknown backend: nope\", err=True)` + `Exit(1)` — satisfies the plan's \"unknown `--backend` … clear error, never a traceback\" (risk line 35, attributed to Tasks 6–8; the global options land in this task).\n26: - `app.add_typer(jobs_app, name=\"jobs\", help=\"Manage Jobs-to-be-Done.\")`.\n27: - `outcomes.py` / `connectors.py` **not modified** (outcomes still hardcodes `get_backend(\"mcp\", ...)` — Task 9's scope).\n28: \n29: ## TDD evidence\n30: \n31: **RED** — `uv run --directory cli pytest tests/test_jobs_cli.py -v` after writing all 10 tests, before implementation:\n32: `10 failed` — every test `SystemExit(2)` with `No such option: --db` / `No such option: --backend` (no `jobs` command, no global options existed).\n33: \n34: **GREEN** — after implementing `jobs.py` + `cli.py` wiring:\n35: `10 passed in 1.63s`.\n36: \n37: ## Test results (final, post-commit)\n38: \n39: | Gate | Result |\n40: |---|---|\n41: | `uv run --directory cli pytest tests -q` | **33 passed** (23 baseline + 10 new) |\n42: | `uv run --directory cli ruff check src tests` | All checks passed |\n43: | `uv run --directory cli ruff format --check src tests` | 13 files already formatted |\n44: | `uv run --directory cli mypy src` | Success: no issues found in 8 source files |\n45: \n46: Baseline before changes was 23 passed / mypy clean / ruff clean — no regressions; `test_cli.py`, `test_outcomes_cli.py`, `test_connectors_cli.py` all green (outcomes tests patch `cli.backend._call_mcp` and pass no global options; default backend `\"local\"` keeps their invocations valid).\n47: \n48: ## Files changed\n49: \n50: - `cli/src/cli/jobs.py` — new (74 lines)\n51: - `cli/src/cli/cli.py` — callback options + `jobs_app` mount (+13/-1)\n52: - `cli/tests/test_jobs_cli.py` — new (10 tests)\n53: \n54: ## Self-review\n55: \n56: - Brief's two example tests kept verbatim in logic/assertions; `ruff format` (line-length 100) reflowed the `test_jobs_get_unknown_reports_error` wrap — same brief-vs-format deviation Task 6 already recorded.\n57: - Added coverage beyond the brief's two tests: full get round-trip JSON, update option-isolation (name-only leaves description and vice-versa — the observable R3 behavior), update/delete not-found (exit 0 + \"not found\", matching backend string contract), delete decline/confirm/`-y`, unknown `--backend` clear error with no traceback, `--db`+`--backend mcp` stderr warning.\n58: - Verified `# noqa: B008` is inert in this ruff config (`--select B008` passes with noqa stripped); kept the pre-existing one on `cli.py`'s callback line for minimal churn, added none in `jobs.py` (matches `outcomes.py` dominant style).\n59: - `git diff` reviewed: only intended 3 files staged; untracked `.opencode/plans/`, `docs/` left alone.\n60: - Command shapes match the brief exactly: `add --name [--description]`, `list`, `get JOB_ID`, `update JOB_ID [--name --description]`, `delete JOB_ID [-y/--yes]`.\n61: \n62: ## Concerns\n63: \n64: 1. **R3 wording vs. function:** the ruling says \"job_id never included in update args\", but `call(\"update_job\", ...)` *requires* `job_id` in the tool-args dict (`backend.py:132` reads `args[\"job_id\"]`; `test_backend.py:68` passes the same shape). I read \"update args\" as the *updates payload*: user fields are added by key-presence and `job_id` is never among them — it is present only as the addressing argument. If the controller meant literally excluding `job_id` from the dict passed to `call()`, the command cannot dispatch and this would need a different contract (flagging for review rather than guessing).\n65: 2. **Eager backend resolution side effect:** per the ruling, the callback resolves the backend for *every* invocation, including `outcomes`/`connectors` commands and their tests, which construct `LocalBackend(None)` → `build_repository(None)` → opens/initializes `~/.agentic-odi/odi.db` (observed: default-DB directory touched during the suite; no-op schema init on the existing file, no data change). Tests all pass; the alternative (store `BackendConfig`, resolve lazily) was rejected per ruling. Worth knowing for CI environments with read-only `$HOME`.\n66: 3. `--backend mcp` without `--mcp-url` falls through to `get_backend`'s env/default URL (existing Task 6 behavior) — no validation at the CLI boundary; first jobs command would then attempt an MCP connection and exit 1 with the `_call_mcp` reachability message.\n\n(End of file - total 66 lines)\n</content>",
+            "metadata": {
+              "preview": "# Task 7 report — CLI `jobs` group\n\n**Commit:** `ad0049f` — `feat(cli): add jobs command group with global backend options`\n**Branch:** feature/cli-odi-entity-parity (based on c94760b)\n\n## What I implemented\n\n### `cli/src/cli/jobs.py` (new)\n- `jobs_app = typer.Typer(help=\"Manage Jobs-to-be-Done.\")`\n- Commands per the brief's interface:\n  - `add --name (required) [--description]` → `call(\"add_job\", {\"name\", \"description\"?})`\n  - `list` → `call(\"get_jobs\", {})`\n  - `get JOB_ID` → `call(\"get_job\", {\"job_id\"})`\n  - `update JOB_ID [--name --description]` → `call(\"update_job\", {\"job_id\", \"name\"? , \"description\"?})`\n  - `delete JOB_ID [-y/--yes]` → `typer.confirm` unless `-y`, then `call(\"delete_job\", {\"job_id\"})`\n- Each command reads the backend via `_backend(ctx)` helper that returns the typed `Backend` from `ctx.obj` (clear error + exit 1 if unset — unreachable through `app`, guards standalone `jobs_app` use).\n- **R3:** args built by key-presence; `None` options are omitted entirely (only unset is representable at the CLI — no `--no-description`), so `LocalBackend._update_job`'s `if key in args` extraction never sees nulls.\n\n### `cli/src/cli/cli.py` (modified)\n- Root callback `main` gains `ctx: typer.Context` and global options:",
+              "truncated": false,
+              "loaded": [],
+              "display": {
+                "type": "file",
+                "path": "/home/alexa/repos/agentic-odi/.superpowers/sdd/2026-10-15-cli-odi-entity-parity/task-7-report.md",
+                "text": "# Task 7 report — CLI `jobs` group\n\n**Commit:** `ad0049f` — `feat(cli): add jobs command group with global backend options`\n**Branch:** feature/cli-odi-entity-parity (based on c94760b)\n\n## What I implemented\n\n### `cli/src/cli/jobs.py` (new)\n- `jobs_app = typer.Typer(help=\"Manage Jobs-to-be-Done.\")`\n- Commands per the brief's interface:\n  - `add --name (required) [--description]` → `call(\"add_job\", {\"name\", \"description\"?})`\n  - `list` → `call(\"get_jobs\", {})`\n  - `get JOB_ID` → `call(\"get_job\", {\"job_id\"})`\n  - `update JOB_ID [--name --description]` → `call(\"update_job\", {\"job_id\", \"name\"? , \"description\"?})`\n  - `delete JOB_ID [-y/--yes]` → `typer.confirm` unless `-y`, then `call(\"delete_job\", {\"job_id\"})`\n- Each command reads the backend via `_backend(ctx)` helper that returns the typed `Backend` from `ctx.obj` (clear error + exit 1 if unset — unreachable through `app`, guards standalone `jobs_app` use).\n- **R3:** args built by key-presence; `None` options are omitted entirely (only unset is representable at the CLI — no `--no-description`), so `LocalBackend._update_job`'s `if key in args` extraction never sees nulls.\n\n### `cli/src/cli/cli.py` (modified)\n- Root callback `main` gains `ctx: typer.Context` and global options:\n  - `--backend` (default `\"local\"`, preserving existing no-flag behavior),\n  - `--db PATH`, `--mcp-url URL`;\n  - `--version` and `version_cmd` untouched.\n- Body: `ctx.obj = resolve_backend(BackendConfig(backend=backend, db_path=db, mcp_url=mcp_url))`, per the controller ruling (the brief/plan text said \"stores a `BackendConfig`\"; the ruling resolved this to storing the *resolved* backend — binding instruction followed).\n- `ValueError` from unknown backend caught → `typer.echo(\"Error: Unknown backend: nope\", err=True)` + `Exit(1)` — satisfies the plan's \"unknown `--backend` … clear error, never a traceback\" (risk line 35, attributed to Tasks 6–8; the global options land in this task).\n- `app.add_typer(jobs_app, name=\"jobs\", help=\"Manage Jobs-to-be-Done.\")`.\n- `outcomes.py` / `connectors.py` **not modified** (outcomes still hardcodes `get_backend(\"mcp\", ...)` — Task 9's scope).\n\n## TDD evidence\n\n**RED** — `uv run --directory cli pytest tests/test_jobs_cli.py -v` after writing all 10 tests, before implementation:\n`10 failed` — every test `SystemExit(2)` with `No such option: --db` / `No such option: --backend` (no `jobs` command, no global options existed).\n\n**GREEN** — after implementing `jobs.py` + `cli.py` wiring:\n`10 passed in 1.63s`.\n\n## Test results (final, post-commit)\n\n| Gate | Result |\n|---|---|\n| `uv run --directory cli pytest tests -q` | **33 passed** (23 baseline + 10 new) |\n| `uv run --directory cli ruff check src tests` | All checks passed |\n| `uv run --directory cli ruff format --check src tests` | 13 files already formatted |\n| `uv run --directory cli mypy src` | Success: no issues found in 8 source files |\n\nBaseline before changes was 23 passed / mypy clean / ruff clean — no regressions; `test_cli.py`, `test_outcomes_cli.py`, `test_connectors_cli.py` all green (outcomes tests patch `cli.backend._call_mcp` and pass no global options; default backend `\"local\"` keeps their invocations valid).\n\n## Files changed\n\n- `cli/src/cli/jobs.py` — new (74 lines)\n- `cli/src/cli/cli.py` — callback options + `jobs_app` mount (+13/-1)\n- `cli/tests/test_jobs_cli.py` — new (10 tests)\n\n## Self-review\n\n- Brief's two example tests kept verbatim in logic/assertions; `ruff format` (line-length 100) reflowed the `test_jobs_get_unknown_reports_error` wrap — same brief-vs-format deviation Task 6 already recorded.\n- Added coverage beyond the brief's two tests: full get round-trip JSON, update option-isolation (name-only leaves description and vice-versa — the observable R3 behavior), update/delete not-found (exit 0 + \"not found\", matching backend string contract), delete decline/confirm/`-y`, unknown `--backend` clear error with no traceback, `--db`+`--backend mcp` stderr warning.\n- Verified `# noqa: B008` is inert in this ruff config (`--select B008` passes with noqa stripped); kept the pre-existing one on `cli.py`'s callback line for minimal churn, added none in `jobs.py` (matches `outcomes.py` dominant style).\n- `git diff` reviewed: only intended 3 files staged; untracked `.opencode/plans/`, `docs/` left alone.\n- Command shapes match the brief exactly: `add --name [--description]`, `list`, `get JOB_ID`, `update JOB_ID [--name --description]`, `delete JOB_ID [-y/--yes]`.\n\n## Concerns\n\n1. **R3 wording vs. function:** the ruling says \"job_id never included in update args\", but `call(\"update_job\", ...)` *requires* `job_id` in the tool-args dict (`backend.py:132` reads `args[\"job_id\"]`; `test_backend.py:68` passes the same shape). I read \"update args\" as the *updates payload*: user fields are added by key-presence and `job_id` is never among them — it is present only as the addressing argument. If the controller meant literally excluding `job_id` from the dict passed to `call()`, the command cannot dispatch and this would need a different contract (flagging for review rather than guessing).\n2. **Eager backend resolution side effect:** per the ruling, the callback resolves the backend for *every* invocation, including `outcomes`/`connectors` commands and their tests, which construct `LocalBackend(None)` → `build_repository(None)` → opens/initializes `~/.agentic-odi/odi.db` (observed: default-DB directory touched during the suite; no-op schema init on the existing file, no data change). Tests all pass; the alternative (store `BackendConfig`, resolve lazily) was rejected per ruling. Worth knowing for CI environments with read-only `$HOME`.\n3. `--backend mcp` without `--mcp-url` falls through to `get_backend`'s env/default URL (existing Task 6 behavior) — no validation at the CLI boundary; first jobs command would then attempt an MCP connection and exit 1 with the `_call_mcp` reachability message.",
+                "lineStart": 1,
+                "lineEnd": 66,
+                "totalLines": 66,
+                "truncated": false
+              }
+            },
+            "title": ".superpowers/sdd/2026-10-15-cli-odi-entity-parity/task-7-report.md",
+            "time": {
+              "start": 1792340783171,
+              "end": 1792340783197
+            }
+          },
+          "id": "prt_14fd5f035001ishUmLKsvFrf95",
+          "sessionID": "ses_eb02a5e98ffeyAz1QVZXotyja6",
+          "messageID": "msg_14fd5d2eb001Rf2UJMtuS35yKC"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "24d3cd583cc60203c19f7a72284244e2c16a7df8",
+          "type": "step-finish",
+          "tokens": {
+            "total": 15440,
+            "input": 957,
+            "output": 57,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 14426
+            }
+          },
+          "cost": 0,
+          "id": "prt_14fd5f0b3001b6rKdzyoVdHXAJ",
+          "sessionID": "ses_eb02a5e98ffeyAz1QVZXotyja6",
+          "messageID": "msg_14fd5d2eb001Rf2UJMtuS35yKC"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_14fd5a170001IoNojJGao5ln7y",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 17301,
+          "input": 1796,
+          "output": 64,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 15441
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792340783382,
+          "completed": 1792340787827
+        },
+        "finish": "tool-calls",
+        "id": "msg_14fd5f1160010HVJpVSO2NNNSS",
+        "sessionID": "ses_eb02a5e98ffeyAz1QVZXotyja6"
+      },
+      "parts": [
+        {
+          "snapshot": "24d3cd583cc60203c19f7a72284244e2c16a7df8",
+          "type": "step-start",
+          "id": "prt_14fd60082001UoDrYB0Zy5G7Cc",
+          "sessionID": "ses_eb02a5e98ffeyAz1QVZXotyja6",
+          "messageID": "msg_14fd5f1160010HVJpVSO2NNNSS"
+        },
+        {
+          "type": "tool",
+          "tool": "read",
+          "callID": "a6f750fe-823d-4e06-8150-5b2415d8e2ad",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/home/alexa/repos/agentic-odi/.superpowers/sdd/2026-10-15-cli-odi-entity-parity/review-c94760b..ad0049f.diff",
+              "offset": 1,
+              "limit": 2000
+            },
+            "output": "<path>/home/alexa/repos/agentic-odi/.superpowers/sdd/2026-10-15-cli-odi-entity-parity/review-c94760b..ad0049f.diff</path>\n<type>file</type>\n<content>\n1: # Review package: c94760b..ad0049f\n2: \n3: ## Commits\n4: ad0049f feat(cli): add jobs command group with global backend options\n5: \n6: ## Files changed\n7:  cli/src/cli/cli.py         |  14 ++++-\n8:  cli/src/cli/jobs.py        |  74 ++++++++++++++++++++++++++\n9:  cli/tests/test_jobs_cli.py | 128 +++++++++++++++++++++++++++++++++++++++++++++\n10:  3 files changed, 215 insertions(+), 1 deletion(-)\n11: \n12: ## Diff\n13: diff --git a/cli/src/cli/cli.py b/cli/src/cli/cli.py\n14: index ad7caf6..6294e0a 100644\n15: --- a/cli/src/cli/cli.py\n16: +++ b/cli/src/cli/cli.py\n17: @@ -1,40 +1,52 @@\n18:  \"\"\"Main CLI entry point.\"\"\"\n19:  \n20:  import typer\n21:  \n22: +from cli.backend import BackendConfig, resolve_backend\n23:  from cli.connectors import connectors_app\n24: +from cli.jobs import jobs_app\n25:  from cli.outcomes import outcomes_app\n26:  from cli.version import __version__\n27:  \n28:  app = typer.Typer(\n29:      name=\"agentic-odi-cli\",\n30:      help=\"Agentic ODI CLI - Tool for managing Jobs-to-be-Done (JTBD) and ODI workflows.\",\n31:  )\n32:  app.add_typer(connectors_app, name=\"connectors\")\n33:  \n34: +app.add_typer(jobs_app, name=\"jobs\", help=\"Manage Jobs-to-be-Done.\")\n35: +\n36:  app.add_typer(outcomes_app, name=\"outcomes\", help=\"Manage Customer Outcomes\")\n37:  \n38:  \n39:  def _version_callback(value: bool) -> None:\n40:      if value:\n41:          typer.echo(__version__)\n42:          raise typer.Exit()\n43:  \n44:  \n45:  @app.callback()\n46:  def main(\n47: +    ctx: typer.Context,\n48:      version: bool = typer.Option(\n49:          False, \"--version\", callback=_version_callback, help=\"Show version\"\n50:      ),\n51: +    backend: str = typer.Option(\"local\", help=\"Backend to use: local or mcp\"),\n52: +    db: str | None = typer.Option(default=None, help=\"Path to the local SQLite database\"),\n53: +    mcp_url: str | None = typer.Option(default=None, help=\"MCP server URL\"),\n54:  ) -> None:  # noqa: B008\n55: -    pass\n56: +    try:\n57: +        ctx.obj = resolve_backend(BackendConfig(backend=backend, db_path=db, mcp_url=mcp_url))\n58: +    except ValueError as exc:\n59: +        typer.echo(f\"Error: {exc}\", err=True)\n60: +        raise typer.Exit(code=1) from exc\n61:  \n62:  \n63:  @app.command()\n64:  def version_cmd() -> None:\n65:      \"\"\"Show CLI version.\"\"\"\n66:      typer.echo(__version__)\n67:  \n68:  \n69:  if __name__ == \"__main__\":\n70:      app()\n71: diff --git a/cli/src/cli/jobs.py b/cli/src/cli/jobs.py\n72: new file mode 100644\n73: index 0000000..cf36cad\n74: --- /dev/null\n75: +++ b/cli/src/cli/jobs.py\n76: @@ -0,0 +1,74 @@\n77: +\"\"\"Jobs-to-be-Done CLI subcommands.\"\"\"\n78: +\n79: +from __future__ import annotations\n80: +\n81: +from typing import Any\n82: +\n83: +import typer\n84: +\n85: +from cli.backend import Backend\n86: +\n87: +jobs_app = typer.Typer(help=\"Manage Jobs-to-be-Done.\")\n88: +\n89: +\n90: +def _backend(ctx: typer.Context) -> Backend:\n91: +    backend: Backend | None = ctx.obj\n92: +    if backend is None:\n93: +        typer.echo(\"Error: no backend configured\", err=True)\n94: +        raise typer.Exit(code=1)\n95: +    return backend\n96: +\n97: +\n98: +@jobs_app.command(\"add\")\n99: +def add(\n100: +    ctx: typer.Context,\n101: +    name: str = typer.Option(..., help=\"Job name\"),\n102: +    description: str | None = typer.Option(default=None, help=\"Job description\"),\n103: +) -> None:\n104: +    \"\"\"Add a new Job.\"\"\"\n105: +    args: dict[str, Any] = {\"name\": name}\n106: +    if description is not None:\n107: +        args[\"description\"] = description\n108: +    typer.echo(_backend(ctx).call(\"add_job\", args))\n109: +\n110: +\n111: +@jobs_app.command(\"list\")\n112: +def list_jobs(ctx: typer.Context) -> None:\n113: +    \"\"\"List all Jobs.\"\"\"\n114: +    typer.echo(_backend(ctx).call(\"get_jobs\", {}))\n115: +\n116: +\n117: +@jobs_app.command(\"get\")\n118: +def get(ctx: typer.Context, job_id: str = typer.Argument(..., help=\"Job ID\")) -> None:\n119: +    \"\"\"Get a Job by ID.\"\"\"\n120: +    typer.echo(_backend(ctx).call(\"get_job\", {\"job_id\": job_id}))\n121: +\n122: +\n123: +@jobs_app.command(\"update\")\n124: +def update(\n125: +    ctx: typer.Context,\n126: +    job_id: str = typer.Argument(..., help=\"Job ID\"),\n127: +    name: str | None = typer.Option(default=None, help=\"New job name\"),\n128: +    description: str | None = typer.Option(default=None, help=\"New job description\"),\n129: +) -> None:\n130: +    \"\"\"Update an existing Job.\"\"\"\n131: +    args: dict[str, Any] = {\"job_id\": job_id}\n132: +    if name is not None:\n133: +        args[\"name\"] = name\n134: +    if description is not None:\n135: +        args[\"description\"] = description\n136: +    typer.echo(_backend(ctx).call(\"update_job\", args))\n137: +\n138: +\n139: +@jobs_app.command(\"delete\")\n140: +def delete(\n141: +    ctx: typer.Context,\n142: +    job_id: str = typer.Argument(..., help=\"Job ID\"),\n143: +    yes: bool = typer.Option(False, \"--yes\", \"-y\", help=\"Skip confirmation\"),\n144: +) -> None:\n145: +    \"\"\"Delete a Job.\"\"\"\n146: +    if not yes:\n147: +        confirm = typer.confirm(f\"Delete job {job_id}?\")\n148: +        if not confirm:\n149: +            raise typer.Exit()\n150: +    typer.echo(_backend(ctx).call(\"delete_job\", {\"job_id\": job_id}))\n151: diff --git a/cli/tests/test_jobs_cli.py b/cli/tests/test_jobs_cli.py\n152: new file mode 100644\n153: index 0000000..8a64b9c\n154: --- /dev/null\n155: +++ b/cli/tests/test_jobs_cli.py\n156: @@ -0,0 +1,128 @@\n157: +\"\"\"Tests for the Jobs CLI command group.\"\"\"\n158: +\n159: +from __future__ import annotations\n160: +\n161: +import json\n162: +\n163: +from typer.testing import CliRunner\n164: +\n165: +from cli.cli import app\n166: +\n167: +\n168: +def test_jobs_add_list_get_round_trip(tmp_path):\n169: +    db = str(tmp_path / \"odi.db\")\n170: +    runner = CliRunner()\n171: +    add = runner.invoke(app, [\"--db\", db, \"jobs\", \"add\", \"--name\", \"Onboard\"])\n172: +    assert add.exit_code == 0 and \"created successfully\" in add.output\n173: +    listed = runner.invoke(app, [\"--db\", db, \"jobs\", \"list\"])\n174: +    assert \"Onboard\" in listed.output\n175: +\n176: +\n177: +def test_jobs_get_unknown_reports_error(tmp_path):\n178: +    result = CliRunner().invoke(app, [\"--db\", str(tmp_path / \"odi.db\"), \"jobs\", \"get\", \"nope\"])\n179: +    assert result.exit_code == 0 and \"not found\" in result.output.lower()\n180: +\n181: +\n182: +def _only_job_id(listed_output: str) -> str:\n183: +    jobs = json.loads(listed_output)\n184: +    assert len(jobs) == 1\n185: +    return jobs[0][\"id\"]\n186: +\n187: +\n188: +def test_jobs_get_returns_full_job(tmp_path):\n189: +    db = str(tmp_path / \"odi.db\")\n190: +    runner = CliRunner()\n191: +    runner.invoke(\n192: +        app,\n193: +        [\"--db\", db, \"jobs\", \"add\", \"--name\", \"Write docs\", \"--description\", \"draft\"],\n194: +    )\n195: +    job_id = _only_job_id(runner.invoke(app, [\"--db\", db, \"jobs\", \"list\"]).output)\n196: +\n197: +    fetched = runner.invoke(app, [\"--db\", db, \"jobs\", \"get\", job_id])\n198: +\n199: +    assert fetched.exit_code == 0\n200: +    payload = json.loads(fetched.output)\n201: +    assert payload[\"name\"] == \"Write docs\"\n202: +    assert payload[\"description\"] == \"draft\"\n203: +\n204: +\n205: +def test_jobs_update_only_changes_provided_options(tmp_path):\n206: +    db = str(tmp_path / \"odi.db\")\n207: +    runner = CliRunner()\n208: +    runner.invoke(\n209: +        app, [\"--db\", db, \"jobs\", \"add\", \"--name\", \"Old name\", \"--description\", \"keep me\"]\n210: +    )\n211: +    job_id = _only_job_id(runner.invoke(app, [\"--db\", db, \"jobs\", \"list\"]).output)\n212: +\n213: +    renamed = runner.invoke(app, [\"--db\", db, \"jobs\", \"update\", job_id, \"--name\", \"New name\"])\n214: +    assert renamed.exit_code == 0 and \"updated successfully\" in renamed.output\n215: +    after = json.loads(runner.invoke(app, [\"--db\", db, \"jobs\", \"get\", job_id]).output)\n216: +    assert after[\"name\"] == \"New name\"\n217: +    assert after[\"description\"] == \"keep me\"\n218: +\n219: +    redescribed = runner.invoke(\n220: +        app, [\"--db\", db, \"jobs\", \"update\", job_id, \"--description\", \"new desc\"]\n221: +    )\n222: +    assert redescribed.exit_code == 0\n223: +    after = json.loads(runner.invoke(app, [\"--db\", db, \"jobs\", \"get\", job_id]).output)\n224: +    assert after[\"name\"] == \"New name\"\n225: +    assert after[\"description\"] == \"new desc\"\n226: +\n227: +\n228: +def test_jobs_update_unknown_reports_error(tmp_path):\n229: +    result = CliRunner().invoke(\n230: +        app, [\"--db\", str(tmp_path / \"odi.db\"), \"jobs\", \"update\", \"nope\", \"--name\", \"X\"]\n231: +    )\n232: +    assert result.exit_code == 0 and \"not found\" in result.output.lower()\n233: +\n234: +\n235: +def test_jobs_delete_prompts_then_removes(tmp_path):\n236: +    db = str(tmp_path / \"odi.db\")\n237: +    runner = CliRunner()\n238: +    runner.invoke(app, [\"--db\", db, \"jobs\", \"add\", \"--name\", \"Temp\"])\n239: +    job_id = _only_job_id(runner.invoke(app, [\"--db\", db, \"jobs\", \"list\"]).output)\n240: +\n241: +    declined = runner.invoke(app, [\"--db\", db, \"jobs\", \"delete\", job_id], input=\"n\\n\")\n242: +    assert declined.exit_code == 0\n243: +    assert json.loads(runner.invoke(app, [\"--db\", db, \"jobs\", \"list\"]).output) != []\n244: +\n245: +    confirmed = runner.invoke(app, [\"--db\", db, \"jobs\", \"delete\", job_id], input=\"y\\n\")\n246: +    assert confirmed.exit_code == 0 and \"deleted successfully\" in confirmed.output\n247: +    assert json.loads(runner.invoke(app, [\"--db\", db, \"jobs\", \"list\"]).output) == []\n248: +\n249: +\n250: +def test_jobs_delete_yes_skips_prompt(tmp_path):\n251: +    db = str(tmp_path / \"odi.db\")\n252: +    runner = CliRunner()\n253: +    runner.invoke(app, [\"--db\", db, \"jobs\", \"add\", \"--name\", \"Temp\"])\n254: +    job_id = _only_job_id(runner.invoke(app, [\"--db\", db, \"jobs\", \"list\"]).output)\n255: +\n256: +    result = runner.invoke(app, [\"--db\", db, \"jobs\", \"delete\", job_id, \"-y\"])\n257: +\n258: +    assert result.exit_code == 0 and \"deleted successfully\" in result.output\n259: +    assert \"y/N\" not in result.output\n260: +    assert json.loads(runner.invoke(app, [\"--db\", db, \"jobs\", \"list\"]).output) == []\n261: +\n262: +\n263: +def test_jobs_delete_unknown_reports_error(tmp_path):\n264: +    result = CliRunner().invoke(\n265: +        app, [\"--db\", str(tmp_path / \"odi.db\"), \"jobs\", \"delete\", \"nope\", \"-y\"]\n266: +    )\n267: +    assert result.exit_code == 0 and \"not found\" in result.output.lower()\n268: +\n269: +\n270: +def test_unknown_backend_reports_clear_error():\n271: +    result = CliRunner().invoke(app, [\"--backend\", \"nope\", \"jobs\", \"list\"])\n272: +\n273: +    assert result.exit_code != 0\n274: +    assert \"Unknown backend\" in result.output\n275: +    assert \"Traceback\" not in result.output\n276: +\n277: +\n278: +def test_db_with_mcp_backend_warns(tmp_path):\n279: +    result = CliRunner().invoke(\n280: +        app, [\"--backend\", \"mcp\", \"--db\", str(tmp_path / \"odi.db\"), \"jobs\", \"--help\"]\n281: +    )\n282: +\n283: +    assert result.exit_code == 0\n284: +    assert \"ignored\" in result.stderr.lower()\n\n(End of file - total 284 lines)\n</content>",
+            "metadata": {
+              "preview": "# Review package: c94760b..ad0049f\n\n## Commits\nad0049f feat(cli): add jobs command group with global backend options\n\n## Files changed\n cli/src/cli/cli.py         |  14 ++++-\n cli/src/cli/jobs.py        |  74 ++++++++++++++++++++++++++\n cli/tests/test_jobs_cli.py | 128 +++++++++++++++++++++++++++++++++++++++++++++\n 3 files changed, 215 insertions(+), 1 deletion(-)\n\n## Diff\ndiff --git a/cli/src/cli/cli.py b/cli/src/cli/cli.py\nindex ad7caf6..6294e0a 100644\n--- a/cli/src/cli/cli.py\n+++ b/cli/src/cli/cli.py\n@@ -1,40 +1,52 @@\n \"\"\"Main CLI entry point.\"\"\"\n \n import typer",
+              "truncated": false,
+              "loaded": [],
+              "display": {
+                "type": "file",
+                "path": "/home/alexa/repos/agentic-odi/.superpowers/sdd/2026-10-15-cli-odi-entity-parity/review-c94760b..ad0049f.diff",
+                "text": "# Review package: c94760b..ad0049f\n\n## Commits\nad0049f feat(cli): add jobs command group with global backend options\n\n## Files changed\n cli/src/cli/cli.py         |  14 ++++-\n cli/src/cli/jobs.py        |  74 ++++++++++++++++++++++++++\n cli/tests/test_jobs_cli.py | 128 +++++++++++++++++++++++++++++++++++++++++++++\n 3 files changed, 215 insertions(+), 1 deletion(-)\n\n## Diff\ndiff --git a/cli/src/cli/cli.py b/cli/src/cli/cli.py\nindex ad7caf6..6294e0a 100644\n--- a/cli/src/cli/cli.py\n+++ b/cli/src/cli/cli.py\n@@ -1,40 +1,52 @@\n \"\"\"Main CLI entry point.\"\"\"\n \n import typer\n \n+from cli.backend import BackendConfig, resolve_backend\n from cli.connectors import connectors_app\n+from cli.jobs import jobs_app\n from cli.outcomes import outcomes_app\n from cli.version import __version__\n \n app = typer.Typer(\n     name=\"agentic-odi-cli\",\n     help=\"Agentic ODI CLI - Tool for managing Jobs-to-be-Done (JTBD) and ODI workflows.\",\n )\n app.add_typer(connectors_app, name=\"connectors\")\n \n+app.add_typer(jobs_app, name=\"jobs\", help=\"Manage Jobs-to-be-Done.\")\n+\n app.add_typer(outcomes_app, name=\"outcomes\", help=\"Manage Customer Outcomes\")\n \n \n def _version_callback(value: bool) -> None:\n     if value:\n         typer.echo(__version__)\n         raise typer.Exit()\n \n \n @app.callback()\n def main(\n+    ctx: typer.Context,\n     version: bool = typer.Option(\n         False, \"--version\", callback=_version_callback, help=\"Show version\"\n     ),\n+    backend: str = typer.Option(\"local\", help=\"Backend to use: local or mcp\"),\n+    db: str | None = typer.Option(default=None, help=\"Path to the local SQLite database\"),\n+    mcp_url: str | None = typer.Option(default=None, help=\"MCP server URL\"),\n ) -> None:  # noqa: B008\n-    pass\n+    try:\n+        ctx.obj = resolve_backend(BackendConfig(backend=backend, db_path=db, mcp_url=mcp_url))\n+    except ValueError as exc:\n+        typer.echo(f\"Error: {exc}\", err=True)\n+        raise typer.Exit(code=1) from exc\n \n \n @app.command()\n def version_cmd() -> None:\n     \"\"\"Show CLI version.\"\"\"\n     typer.echo(__version__)\n \n \n if __name__ == \"__main__\":\n     app()\ndiff --git a/cli/src/cli/jobs.py b/cli/src/cli/jobs.py\nnew file mode 100644\nindex 0000000..cf36cad\n--- /dev/null\n+++ b/cli/src/cli/jobs.py\n@@ -0,0 +1,74 @@\n+\"\"\"Jobs-to-be-Done CLI subcommands.\"\"\"\n+\n+from __future__ import annotations\n+\n+from typing import Any\n+\n+import typer\n+\n+from cli.backend import Backend\n+\n+jobs_app = typer.Typer(help=\"Manage Jobs-to-be-Done.\")\n+\n+\n+def _backend(ctx: typer.Context) -> Backend:\n+    backend: Backend | None = ctx.obj\n+    if backend is None:\n+        typer.echo(\"Error: no backend configured\", err=True)\n+        raise typer.Exit(code=1)\n+    return backend\n+\n+\n+@jobs_app.command(\"add\")\n+def add(\n+    ctx: typer.Context,\n+    name: str = typer.Option(..., help=\"Job name\"),\n+    description: str | None = typer.Option(default=None, help=\"Job description\"),\n+) -> None:\n+    \"\"\"Add a new Job.\"\"\"\n+    args: dict[str, Any] = {\"name\": name}\n+    if description is not None:\n+        args[\"description\"] = description\n+    typer.echo(_backend(ctx).call(\"add_job\", args))\n+\n+\n+@jobs_app.command(\"list\")\n+def list_jobs(ctx: typer.Context) -> None:\n+    \"\"\"List all Jobs.\"\"\"\n+    typer.echo(_backend(ctx).call(\"get_jobs\", {}))\n+\n+\n+@jobs_app.command(\"get\")\n+def get(ctx: typer.Context, job_id: str = typer.Argument(..., help=\"Job ID\")) -> None:\n+    \"\"\"Get a Job by ID.\"\"\"\n+    typer.echo(_backend(ctx).call(\"get_job\", {\"job_id\": job_id}))\n+\n+\n+@jobs_app.command(\"update\")\n+def update(\n+    ctx: typer.Context,\n+    job_id: str = typer.Argument(..., help=\"Job ID\"),\n+    name: str | None = typer.Option(default=None, help=\"New job name\"),\n+    description: str | None = typer.Option(default=None, help=\"New job description\"),\n+) -> None:\n+    \"\"\"Update an existing Job.\"\"\"\n+    args: dict[str, Any] = {\"job_id\": job_id}\n+    if name is not None:\n+        args[\"name\"] = name\n+    if description is not None:\n+        args[\"description\"] = description\n+    typer.echo(_backend(ctx).call(\"update_job\", args))\n+\n+\n+@jobs_app.command(\"delete\")\n+def delete(\n+    ctx: typer.Context,\n+    job_id: str = typer.Argument(..., help=\"Job ID\"),\n+    yes: bool = typer.Option(False, \"--yes\", \"-y\", help=\"Skip confirmation\"),\n+) -> None:\n+    \"\"\"Delete a Job.\"\"\"\n+    if not yes:\n+        confirm = typer.confirm(f\"Delete job {job_id}?\")\n+        if not confirm:\n+            raise typer.Exit()\n+    typer.echo(_backend(ctx).call(\"delete_job\", {\"job_id\": job_id}))\ndiff --git a/cli/tests/test_jobs_cli.py b/cli/tests/test_jobs_cli.py\nnew file mode 100644\nindex 0000000..8a64b9c\n--- /dev/null\n+++ b/cli/tests/test_jobs_cli.py\n@@ -0,0 +1,128 @@\n+\"\"\"Tests for the Jobs CLI command group.\"\"\"\n+\n+from __future__ import annotations\n+\n+import json\n+\n+from typer.testing import CliRunner\n+\n+from cli.cli import app\n+\n+\n+def test_jobs_add_list_get_round_trip(tmp_path):\n+    db = str(tmp_path / \"odi.db\")\n+    runner = CliRunner()\n+    add = runner.invoke(app, [\"--db\", db, \"jobs\", \"add\", \"--name\", \"Onboard\"])\n+    assert add.exit_code == 0 and \"created successfully\" in add.output\n+    listed = runner.invoke(app, [\"--db\", db, \"jobs\", \"list\"])\n+    assert \"Onboard\" in listed.output\n+\n+\n+def test_jobs_get_unknown_reports_error(tmp_path):\n+    result = CliRunner().invoke(app, [\"--db\", str(tmp_path / \"odi.db\"), \"jobs\", \"get\", \"nope\"])\n+    assert result.exit_code == 0 and \"not found\" in result.output.lower()\n+\n+\n+def _only_job_id(listed_output: str) -> str:\n+    jobs = json.loads(listed_output)\n+    assert len(jobs) == 1\n+    return jobs[0][\"id\"]\n+\n+\n+def test_jobs_get_returns_full_job(tmp_path):\n+    db = str(tmp_path / \"odi.db\")\n+    runner = CliRunner()\n+    runner.invoke(\n+        app,\n+        [\"--db\", db, \"jobs\", \"add\", \"--name\", \"Write docs\", \"--description\", \"draft\"],\n+    )\n+    job_id = _only_job_id(runner.invoke(app, [\"--db\", db, \"jobs\", \"list\"]).output)\n+\n+    fetched = runner.invoke(app, [\"--db\", db, \"jobs\", \"get\", job_id])\n+\n+    assert fetched.exit_code == 0\n+    payload = json.loads(fetched.output)\n+    assert payload[\"name\"] == \"Write docs\"\n+    assert payload[\"description\"] == \"draft\"\n+\n+\n+def test_jobs_update_only_changes_provided_options(tmp_path):\n+    db = str(tmp_path / \"odi.db\")\n+    runner = CliRunner()\n+    runner.invoke(\n+        app, [\"--db\", db, \"jobs\", \"add\", \"--name\", \"Old name\", \"--description\", \"keep me\"]\n+    )\n+    job_id = _only_job_id(runner.invoke(app, [\"--db\", db, \"jobs\", \"list\"]).output)\n+\n+    renamed = runner.invoke(app, [\"--db\", db, \"jobs\", \"update\", job_id, \"--name\", \"New name\"])\n+    assert renamed.exit_code == 0 and \"updated successfully\" in renamed.output\n+    after = json.loads(runner.invoke(app, [\"--db\", db, \"jobs\", \"get\", job_id]).output)\n+    assert after[\"name\"] == \"New name\"\n+    assert after[\"description\"] == \"keep me\"\n+\n+    redescribed = runner.invoke(\n+        app, [\"--db\", db, \"jobs\", \"update\", job_id, \"--description\", \"new desc\"]\n+    )\n+    assert redescribed.exit_code == 0\n+    after = json.loads(runner.invoke(app, [\"--db\", db, \"jobs\", \"get\", job_id]).output)\n+    assert after[\"name\"] == \"New name\"\n+    assert after[\"description\"] == \"new desc\"\n+\n+\n+def test_jobs_update_unknown_reports_error(tmp_path):\n+    result = CliRunner().invoke(\n+        app, [\"--db\", str(tmp_path / \"odi.db\"), \"jobs\", \"update\", \"nope\", \"--name\", \"X\"]\n+    )\n+    assert result.exit_code == 0 and \"not found\" in result.output.lower()\n+\n+\n+def test_jobs_delete_prompts_then_removes(tmp_path):\n+    db = str(tmp_path / \"odi.db\")\n+    runner = CliRunner()\n+    runner.invoke(app, [\"--db\", db, \"jobs\", \"add\", \"--name\", \"Temp\"])\n+    job_id = _only_job_id(runner.invoke(app, [\"--db\", db, \"jobs\", \"list\"]).output)\n+\n+    declined = runner.invoke(app, [\"--db\", db, \"jobs\", \"delete\", job_id], input=\"n\\n\")\n+    assert declined.exit_code == 0\n+    assert json.loads(runner.invoke(app, [\"--db\", db, \"jobs\", \"list\"]).output) != []\n+\n+    confirmed = runner.invoke(app, [\"--db\", db, \"jobs\", \"delete\", job_id], input=\"y\\n\")\n+    assert confirmed.exit_code == 0 and \"deleted successfully\" in confirmed.output\n+    assert json.loads(runner.invoke(app, [\"--db\", db, \"jobs\", \"list\"]).output) == []\n+\n+\n+def test_jobs_delete_yes_skips_prompt(tmp_path):\n+    db = str(tmp_path / \"odi.db\")\n+    runner = CliRunner()\n+    runner.invoke(app, [\"--db\", db, \"jobs\", \"add\", \"--name\", \"Temp\"])\n+    job_id = _only_job_id(runner.invoke(app, [\"--db\", db, \"jobs\", \"list\"]).output)\n+\n+    result = runner.invoke(app, [\"--db\", db, \"jobs\", \"delete\", job_id, \"-y\"])\n+\n+    assert result.exit_code == 0 and \"deleted successfully\" in result.output\n+    assert \"y/N\" not in result.output\n+    assert json.loads(runner.invoke(app, [\"--db\", db, \"jobs\", \"list\"]).output) == []\n+\n+\n+def test_jobs_delete_unknown_reports_error(tmp_path):\n+    result = CliRunner().invoke(\n+        app, [\"--db\", str(tmp_path / \"odi.db\"), \"jobs\", \"delete\", \"nope\", \"-y\"]\n+    )\n+    assert result.exit_code == 0 and \"not found\" in result.output.lower()\n+\n+\n+def test_unknown_backend_reports_clear_error():\n+    result = CliRunner().invoke(app, [\"--backend\", \"nope\", \"jobs\", \"list\"])\n+\n+    assert result.exit_code != 0\n+    assert \"Unknown backend\" in result.output\n+    assert \"Traceback\" not in result.output\n+\n+\n+def test_db_with_mcp_backend_warns(tmp_path):\n+    result = CliRunner().invoke(\n+        app, [\"--backend\", \"mcp\", \"--db\", str(tmp_path / \"odi.db\"), \"jobs\", \"--help\"]\n+    )\n+\n+    assert result.exit_code == 0\n+    assert \"ignored\" in result.stderr.lower()",
+                "lineStart": 1,
+                "lineEnd": 284,
+                "totalLines": 284,
+                "truncated": false
+              }
+            },
+            "title": ".superpowers/sdd/2026-10-15-cli-odi-entity-parity/review-c94760b..ad0049f.diff",
+            "time": {
+              "start": 1792340787339,
+              "end": 1792340787377
+            }
+          },
+          "id": "prt_14fd60085001tVih0cqAEa7f7R",
+          "sessionID": "ses_eb02a5e98ffeyAz1QVZXotyja6",
+          "messageID": "msg_14fd5f1160010HVJpVSO2NNNSS"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "24d3cd583cc60203c19f7a72284244e2c16a7df8",
+          "type": "step-finish",
+          "tokens": {
+            "total": 17301,
+            "input": 1796,
+            "output": 64,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 15441
+            }
+          },
+          "cost": 0,
+          "id": "prt_14fd600e1001bdJprSiwxCdbif",
+          "sessionID": "ses_eb02a5e98ffeyAz1QVZXotyja6",
+          "messageID": "msg_14fd5f1160010HVJpVSO2NNNSS"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_14fd5a170001IoNojJGao5ln7y",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 22237,
+          "input": 3409,
+          "output": 405,
+          "reasoning": 1123,
+          "cache": {
+            "write": 0,
+            "read": 17300
+          }
+        },
+        "modelID": "big-pickle",
+        "providerID": "opencode",
+        "time": {
+          "created": 1792340787833,
+          "completed": 1792340824963
+        },
+        "finish": "stop",
+        "id": "msg_14fd60279001eY1up8paUkbt4f",
+        "sessionID": "ses_eb02a5e98ffeyAz1QVZXotyja6"
+      },
+      "parts": [
+        {
+          "snapshot": "24d3cd583cc60203c19f7a72284244e2c16a7df8",
+          "type": "step-start",
+          "id": "prt_14fd66ff3001h8cX4cRAMoP81v",
+          "sessionID": "ses_eb02a5e98ffeyAz1QVZXotyja6",
+          "messageID": "msg_14fd60279001eY1up8paUkbt4f"
+        },
+        {
+          "type": "text",
+          "text": "**Spec: ✅** per requirement\n\nAll stated requirements are satisfied:\n- `cli/src/cli/jobs.py` created with `jobs_app`, commands `add` (`--name` required, `--description` optional), `list`, `get JOB_ID`, `update JOB_ID` (`--name`/`--description` optional), `delete JOB_ID` with `-y/--yes` confirmation; unset options omitted via key-presence (strip Nones). \n- `cli/src/cli/cli.py` adds global `--backend`/`--db`/`--mcp-url`, stores resolved backend on `ctx.obj`, mounts `jobs_app` as `jobs`, handles unknown backend with clear error and exit 1 (no traceback). \n- Tests added in `cli/tests/test_jobs_cli.py`; all existing CLI tests remain green (33 passed total). \n- R3: update args include only user fields when provided; `job_id` remains in the dict passed to `call()` as the addressing argument — this matches `backend.update_job` contract (expects `job_id` in args) and does not violate “never part of the updates payload” (payload = updatable fields). Default backend remains `\"local\"`. \n\n**Quality: Approved**\n\n**Findings:** (none blocking)\n\n**⚠️ cannot-verify items separately**\n- R3 contract alignment: cannot re-read `cli/src/cli/backend.py` in full beyond the diff’s implied contract (implementer cites `backend.py:132`, `test_backend.py:68`) — treating `job_id` as addressing in `call()` args is consistent with that; backend must not treat `job_id` as an updatable field (enforced by backend, not CLI). \n- Eager backend resolution side effect (default DB init in `$HOME`) not observable from diff alone; noted by implementer as environment-dependent (no functional regression in this suite).",
+          "time": {
+            "start": 1792340815862,
+            "end": 1792340824157
+          },
+          "id": "prt_14fd66ff6001oSorKYALFPobyx",
+          "sessionID": "ses_eb02a5e98ffeyAz1QVZXotyja6",
+          "messageID": "msg_14fd60279001eY1up8paUkbt4f"
+        },
+        {
+          "reason": "stop",
+          "snapshot": "24d3cd583cc60203c19f7a72284244e2c16a7df8",
+          "type": "step-finish",
+          "tokens": {
+            "total": 22237,
+            "input": 3409,
+            "output": 405,
+            "reasoning": 1123,
+            "cache": {
+              "write": 0,
+              "read": 17300
+            }
+          },
+          "cost": 0,
+          "id": "prt_14fd69077001QqAvu2DsQK5dTF",
+          "sessionID": "ses_eb02a5e98ffeyAz1QVZXotyja6",
+          "messageID": "msg_14fd60279001eY1up8paUkbt4f"
+        }
+      ]
+    }
+  ]
+}
