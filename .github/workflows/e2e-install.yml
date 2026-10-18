@@ -1,13 +1,15 @@
 name: e2e-install
 
+# Runs after the `release` workflow publishes a tag's assets: installing straight
+# off the tag push raced the asset uploads and 404'd every time.
 on:
-  push:
-    tags:
-      - "v*"
+  workflow_run:
+    workflows: ["release"]
+    types: [completed]
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag to test (e.g. v0.1.0)"
+        description: "Release tag to test (e.g. v0.3.0)"
         required: true
         type: string
 
@@ -16,19 +18,37 @@ permissions:
 
 jobs:
   e2e-linux-macos:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     strategy:
+      fail-fast: false
       matrix:
-        include:
-          - os: ubuntu-latest
-            shell: bash
-            install: curl -fsSL https://github.com/alehar9320/agentic-odi/releases/download/${{ inputs.tag || github.ref_name }}/install.sh | AGENTIC_ODI_INSTALL_DIR=$RUNNER_TEMP/odi-home AGENTIC_ODI_BIN_DIR=$RUNNER_TEMP/odi-bin bash
-          - os: macos-latest
-            shell: bash
-            install: curl -fsSL https://github.com/alehar9320/agentic-odi/releases/download/${{ inputs.tag || github.ref_name }}/install.sh | AGENTIC_ODI_INSTALL_DIR=$RUNNER_TEMP/odi-home AGENTIC_ODI_BIN_DIR=$RUNNER_TEMP/odi-bin bash
+        os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
+      - name: Resolve release tag
+        id: tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DISPATCH_TAG: ${{ inputs.tag }}
+          RUN_BRANCH: ${{ github.event.workflow_run.head_branch }}
+        run: |
+          set -euo pipefail
+          tag="${DISPATCH_TAG:-$RUN_BRANCH}"
+          if ! gh api "repos/$GITHUB_REPOSITORY/releases/tags/$tag" >/dev/null 2>&1; then
+            tag="$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name)"
+          fi
+          case "$tag" in
+            v*) ;;
+            *) echo "::error::Could not resolve a release tag (got '$tag')"; exit 1 ;;
+          esac
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "Testing $tag"
       - name: Install
-        run: ${{ matrix.install }}
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          curl -fsSL "https://github.com/${{ github.repository }}/releases/download/$TAG/install.sh" \
+            | AGENTIC_ODI_INSTALL_DIR="$RUNNER_TEMP/odi-home" AGENTIC_ODI_BIN_DIR="$RUNNER_TEMP/odi-bin" bash
       - name: Smoke test
         run: |
           export PATH="$RUNNER_TEMP/odi-bin:$PATH"
@@ -37,13 +57,33 @@ jobs:
           odi outcomes score 8 2
 
   e2e-windows:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: windows-latest
     steps:
+      - name: Resolve release tag
+        id: tag
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DISPATCH_TAG: ${{ inputs.tag }}
+          RUN_BRANCH: ${{ github.event.workflow_run.head_branch }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          $tag = $env:DISPATCH_TAG
+          if (-not $tag) { $tag = $env:RUN_BRANCH }
+          gh api "repos/$env:GITHUB_REPOSITORY/releases/tags/$tag" *> $null
+          if ($LASTEXITCODE -ne 0) {
+            $tag = gh api "repos/$env:GITHUB_REPOSITORY/releases/latest" --jq .tag_name
+          }
+          if ($tag -notmatch '^v') { throw "Could not resolve a release tag (got '$tag')" }
+          "tag=$tag" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          Write-Output "Testing $tag"
       - name: Install
         shell: pwsh
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
         run: |
-          $tag = "${{ inputs.tag || github.ref_name }}"
-          $url = "https://github.com/alehar9320/agentic-odi/releases/download/$tag/install.ps1"
+          $url = "https://github.com/${{ github.repository }}/releases/download/$env:TAG/install.ps1"
           $env:AGENTIC_ODI_INSTALL_DIR = "$env:RUNNER_TEMP\odi-home"
           $env:AGENTIC_ODI_BIN_DIR = "$env:RUNNER_TEMP\odi-bin"
           irm $url | iex

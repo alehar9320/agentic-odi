@@ -9,6 +9,12 @@ BIN_DIR="${AGENTIC_ODI_BIN_DIR:-${XDG_BIN_HOME:-${HOME}/.local/bin}}"
 BASE_URL_DEFAULT="https://github.com/alehar9320/agentic-odi/releases"
 API_BASE_DEFAULT="https://api.github.com/repos/alehar9320/agentic-odi"
 
+# The download directory must outlive main() so the EXIT trap can clean it up
+# (`set -u` makes a function-local reference in a trap fatal).
+TMPDIR_INSTALL=""
+cleanup() { [[ -n "$TMPDIR_INSTALL" ]] && rm -rf "$TMPDIR_INSTALL"; }
+trap cleanup EXIT
+
 detect_os() {
   case "$(uname -s)" in
     Linux*)  echo "linux" ;;
@@ -42,22 +48,29 @@ resolve_version() {
   curl -fsSL "${API_BASE_DEFAULT}/releases/latest" | grep -o '"tag_name"[[:space:]]*:[[:space:]]*"[^"]*"' | sed -E 's/.*"([^"]+)"/\1/' | sed 's/^v//'
 }
 
+# checksums.txt lists every platform's archive, but only this platform's archive
+# is downloaded here, so verify that single entry instead of the whole file.
 sha256_verify() {
   local file="$1"
   local checksums="$2"
+  local name entry
+  name="$(basename "$file")"
+  if ! entry="$(awk -v name="$name" '$2 == name || $2 == "*" name { print; found = 1 } END { if (!found) exit 1 }' "$checksums")"; then
+    echo "No checksum entry for $name in $(basename "$checksums")" >&2
+    exit 1
+  fi
   if command -v sha256sum >/dev/null 2>&1; then
-    (cd "$(dirname "$checksums")" && sha256sum -c "$(basename "$checksums")" --quiet 2>/dev/null) || true
-    if ! sha256sum -c "$checksums" --quiet 2>/dev/null; then
-      echo "Checksum verification failed for $file" >&2
+    if ! (cd "$(dirname "$file")" && printf '%s\n' "$entry" | sha256sum -c --quiet -); then
+      echo "Checksum verification failed for $name" >&2
       exit 1
     fi
     return
   fi
   if command -v shasum >/dev/null 2>&1; then
-    shasum -a 256 -c "$checksums" >/dev/null 2>&1 || {
-      echo "Checksum verification failed for $file" >&2
+    if ! (cd "$(dirname "$file")" && printf '%s\n' "$entry" | shasum -a 256 -c - >/dev/null 2>&1); then
+      echo "Checksum verification failed for $name" >&2
       exit 1
-    }
+    fi
     return
   fi
   echo "Warning: no sha256 tool found; skipping verification" >&2
@@ -82,9 +95,8 @@ main() {
 
   mkdir -p "$INSTALL_ROOT/versions" "$BIN_DIR"
 
-  local tmpdir
-  tmpdir="$(mktemp -d)"
-  trap 'rm -rf "${tmpdir}"' EXIT
+  TMPDIR_INSTALL="$(mktemp -d)"
+  local tmpdir="$TMPDIR_INSTALL"
 
   curl -fsSL "${dl_base}/${archive_name}" -o "${tmpdir}/${archive_name}"
   curl -fsSL "${dl_base}/${checksums_name}" -o "${tmpdir}/${checksums_name}"
