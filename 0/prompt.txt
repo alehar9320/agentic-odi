@@ -1,0 +1,48 @@
+You are implementing Task 6: CLI backend abstraction + global options, for the cli-odi-entity-parity feature.
+
+## Task Description
+
+Read your task brief first: /home/alexa/repos/agentic-odi/.superpowers/sdd/2026-10-15-cli-odi-entity-parity/task-6-brief.md
+It contains the full task text from the plan — it is your requirements, with the exact values to use verbatim.
+
+## Context
+
+Work from: /home/alexa/repos/agentic-odi (branch feature/cli-odi-entity-parity, HEAD 48a5ffd). This is a uv workspace (Python 3.11 — always use `UV_PYTHON=3.11` or `uv run` which is pinned).
+
+Tasks 1–5 are complete: `core` has `ODIService` with full job/step/outcome/customer-outcome CRUD (service methods: add_job, list_jobs, get_job, update_job, delete_job, add_step, list_steps, get_step, update_step, delete_step, add_outcome, list_outcomes, get_outcome, update_outcome, delete_outcome, add_customer_outcome, list_customer_outcomes, get_customer_outcome, update_customer_outcome, delete_customer_outcome, compute_opportunity), plus `build_repository(db_path)`, `SQLiteRepository`, error types `JobNotFoundError`/`StepNotFoundError`/`OutcomeNotFoundError`/`ValueOutOfRangeError`/`ValidationError`/`CustomerOutcomeNotFoundError` exported from `core`.
+
+The MCP server (mcp_server/) already exposes these as tools with specific success/error message formats ("Job created successfully: {...}", "Error: Job with ID {id} not found.", etc.). Your LocalBackend must format results the same way the existing `cli/src/cli/outcomes.py` add/update/delete/list branches do.
+
+Rulings from earlier tasks that bind you:
+- R3: the service `updates` dict is literal — explicit None clears a field; the CLI/MCP input boundary omits unset options.
+- `resolve_backend` with backend=="mcp" and db_path set must warn to stderr that db_path is ignored (typer.echo(..., err=True)).
+- `_call_mcp` moves from outcomes.py into backend.py; keep the same asyncio + fastmcp Client logic (fastmcp import must stay lazy/function-scope — it was deliberately moved to function scope for startup time in a related branch; keep it that way). Also update outcomes.py to import/re-export or call the moved function so existing `cli/tests/test_outcomes_cli.py` still passes — those tests patch `cli.outcomes._call_mcp` per an earlier ledger ruling, so preserve a module-level name `cli.outcomes._call_mcp` that the dispatch actually uses (e.g. keep a thin alias), OR retarget the two tests to patch `cli.backend._call_mcp` — your choice, but the cli suite must stay green.
+
+## Before You Begin
+
+If you have questions about requirements, approach, dependencies, or anything unclear in the brief — ask them now (report NEEDS_CONTEXT). Don't guess.
+
+## Your Job
+
+1. Implement exactly what the brief specifies (TDD: failing tests first per the brief's steps)
+2. Run the focused test while iterating; full cli suite once before committing
+3. Also run `uv run --directory cli ruff check src tests` and `uv run --directory cli ruff format --check src tests` (CI parity gates) — but EXCLUDE any *.md files from format concerns (ruff 0.17 formats markdown; foreign untracked docs are out of scope)
+4. Commit with the message from the brief
+5. Self-review your diff (completeness, quality, YAGNI, test hygiene)
+6. Report back
+
+## You Do Not Dispatch Subagents
+
+Do all of this task's work yourself. Never spawn a subagent. Review arrives from the controller after you report.
+
+## Report Format
+
+Write your full report to /home/alexa/repos/agentic-odi/.superpowers/sdd/2026-10-15-cli-odi-entity-parity/task-6-report.md:
+- What you implemented, test results, TDD evidence (RED/GREEN), files changed, self-review findings, concerns.
+
+Then report back with ONLY (under 15 lines):
+- **Status:** DONE | DONE_WITH_CONCERNS | BLOCKED | NEEDS_CONTEXT
+- Commits created (short SHA + subject)
+- One-line test summary
+- Concerns if any
+- Report file path
