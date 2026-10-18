@@ -3,7 +3,7 @@
   "checkpoint_id": "01M57X5R4WN3GMQBC428SZC8MD",
   "strategy": "manual-commit",
   "branch": "feature/gh-pages",
-  "checkpoints_count": 2,
+  "checkpoints_count": 3,
   "files_touched": [
     "pyproject.toml",
     "uv.lock",
@@ -26,13 +26,20 @@
       "compact_transcript": "/1/transcript.jsonl",
       "content_hash": "/1/content_hash.txt",
       "prompt": "/1/prompt.txt"
+    },
+    {
+      "metadata": "/2/metadata.json",
+      "transcript": "/2/full.jsonl",
+      "compact_transcript": "/2/transcript.jsonl",
+      "content_hash": "/2/content_hash.txt",
+      "prompt": "/2/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 110577,
+    "input_tokens": 355722,
     "cache_creation_tokens": 0,
-    "cache_read_tokens": 1689344,
-    "output_tokens": 9756,
-    "api_call_count": 41
+    "cache_read_tokens": 2184320,
+    "output_tokens": 35895,
+    "api_call_count": 51
   }
 }
