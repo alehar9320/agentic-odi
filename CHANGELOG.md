@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/alehar9320/agentic-odi/compare/v0.2.0...v0.3.0) (2026-10-18)
+
+
+### Features
+
+* **cli:** add interactive chat mode with streaming MCP tool loop ([45453eb](https://github.com/alehar9320/agentic-odi/commit/45453eb5124932eeaa4a293bc5aedea77b63de6f))
+
 ## [0.2.0](https://github.com/alehar9320/agentic-odi/compare/v0.1.0...v0.2.0) (2026-10-18)
 
 
