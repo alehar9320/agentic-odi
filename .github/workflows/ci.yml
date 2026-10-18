@@ -181,8 +181,9 @@ jobs:
           SIDECAR_PID=$!
           probe() {
             curl -fsS -X POST http://127.0.0.1:8100/api/health/mcp \
-              -H 'Content-Type: application/json' -d '{}' -o /dev/null &&
-              curl -fsS http://127.0.0.1:8100/api/canvas -o /dev/null
+              -H 'Content-Type: application/json' \
+              -d '{"mcp_url":"http://127.0.0.1:8000/mcp"}' -o /dev/null &&
+              curl -fsS "http://127.0.0.1:8100/api/canvas?mcp_url=http://127.0.0.1:8000/mcp" -o /dev/null
           }
           ok=0
           for _ in $(seq 1 30); do
