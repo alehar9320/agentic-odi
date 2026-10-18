@@ -3,14 +3,25 @@
   "checkpoint_id": "01M58CDMS85J0K5D13E2MMBP6V",
   "strategy": "manual-commit",
   "branch": "feature/gh-pages",
-  "checkpoints_count": 1,
-  "files_touched": null,
+  "checkpoints_count": 2,
+  "files_touched": [
+    "website/assets/main.js",
+    "website/assets/style.css",
+    "website/tests/test_design_system.py"
+  ],
   "sessions": [
     {
       "metadata": "/0/metadata.json",
       "transcript": "/0/full.jsonl",
       "compact_transcript": "/0/transcript.jsonl",
       "content_hash": "/0/content_hash.txt",
+      "prompt": ""
+    },
+    {
+      "metadata": "/1/metadata.json",
+      "transcript": "/1/full.jsonl",
+      "compact_transcript": "/1/transcript.jsonl",
+      "content_hash": "/1/content_hash.txt",
       "prompt": ""
     }
   ],
