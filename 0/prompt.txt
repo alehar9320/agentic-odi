@@ -1,0 +1,42 @@
+You are implementing Task 2 of the GitHub Pages site plan: the basic site structure.
+
+## Task Description
+
+Read your task brief first: /home/alexa/repos/agentic-odi/.superpowers/sdd/2026-10-18-github-pages/task-2-brief.md
+It is your requirements, with exact values to use verbatim.
+
+## Context
+
+Work from: /home/alexa/repos/agentic-odi/.worktrees/gh-pages (branch feature/gh-pages, HEAD 383e3be). uv workspace; Python 3.11 via `uv run` / `UV_PYTHON=3.11`.
+
+The design spec is at docs/superpowers/specs/2026-10-18-github-pages-design.md (read OG strategy section). The full plan at docs/superpowers/plans/2026-10-18-github-pages.md has 6 tasks; Task 2 is next.
+
+Task 1 (make_og.py) is complete and all its gates pass. This task should NOT touch website/tools/make_og.py or website/tests/test_make_og.py.
+
+Your work should expand the `website/` directory with new HTML, CSS, and JS that realizes the site architecture described in the plan and spec, without modifying Task 1's deliverables.
+
+## Key constraints from the spec/planning session (binding)
+1. **No dates / experimental badge** — site must render "Experimental" badge with no dates anywhere; "What works today / What's next" mirrors actual repo state.
+2. **OG-linked meta tags** — every page must have og:title, og:description, og:image pointing to the committed `website/assets/og.png`.
+3. **GitHub Issues link in footer** — no personal email, no invented Discord.
+4. **sticky header with single CTA** — "Try the quickstart" linking to local `uv sync` + `python -m client.run`.
+5. **Static HTML in `website/`**, served via GitHub Actions `website` job using `rsync -av website/ _site/` (brief mandates this CI job; spec calls out `_site/` as deploy dir).
+6. **Root `[tool.ruff]` and `[tool.ruff.lint]` config** scoped to `website/**` (already added in Task 1; keep unchanged).
+7. **No framework** — plain HTML/CSS/JS (no React/SASS/etc) unless you can justify it to the Jobs bar. The plan said "static HTML in website/"; use that.
+
+## Your Job
+
+1. TDD: failing structural tests first (e.g. test that pages render, links resolve, meta tags present)
+2. Implement the site structure: index.html, about.html (or equivalent), CSS, JS for CTA/interaction
+3. Ensure ruff check + format on website/ passes (use the website/ pyproject.toml from Task 1)
+4. Add pytest tests in website/tests/ that verify core invariants
+5. Commit with the brief's message
+6. Self-review, report
+
+## You Do Not Dispatch Subagents
+
+## Report Format
+
+Write your full report to /home/alexa/repos/agentic-odi/.superpowers/sdd/2026-10-18-github-pages/task-2-report.md
+
+Then report ONLY (under 15 lines): Status, commits, one-line test summary, concerns, report path.
