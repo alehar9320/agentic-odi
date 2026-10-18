@@ -1,0 +1,38 @@
+You are completing an interrupted design session by writing a product spec and implementation plan for a GitHub Pages marketing site for the agentic-odi project. This is a WRITING task (docs only, no code).
+
+## Background
+
+An opencode session (id ses_ebace1c46ffeI8duUptUH4VBXz, directory /home/alexa/repos/agentic-odi) was brainstorming a GitHub Pages one-pager site when the machine crashed mid-design. The user delegated all design authority: "You make the calls but only settle for what a principal world-class chief technology officer under Steve Jobs would have agreed to proceed with." A builder-check subagent had returned 7 load-bearing questions; the designer's answers were being written when it crashed.
+
+## Recover the session's decisions
+
+Query the opencode session database for the interrupted design (read-only):
+```python
+import sqlite3, os, json
+db=os.path.expanduser('~/.local/share/opencode/opencode.db')
+con=sqlite3.connect(db)
+# messages for session ses_ebace1c46ffeI8duUptUH4VBXz, role=user and assistant, especially late messages
+# message table: id, session_id, time_created, data (JSON with role); part table: message_id, data (JSON with type text/tool)
+```
+Pull the user's answers and the designer's decision list (it was truncated mid-sentence at "Over-promising on an experimental product is the one thing Jobs never..."). Also pull the builder-check result (subagent session ses_eba93cdc6ffex4JRS42A25wyHa) with its 7 questions. Settle any remaining open decisions yourself at the same Jobs-level bar.
+
+## Repo grounding (verify yourself, read-only)
+
+/home/alexa/repos/agentic-odi — Python/uv monorepo, MCP-based ODI (Outcome-Driven Innovation) testbed. Key facts already established: no existing website; README.md is the current front door; hosted Horizon endpoints require auth (401/302); local quickstart is `uv sync --all-packages && python -m client.run`; Streamlit client + local_server FastAPI + mcp_server + core + cli packages; no license file (all rights reserved); docs/ holds internal specs.
+
+Settled decisions from the session (binding):
+1. Primary CTA = local quickstart ("Run it in 60 seconds"), NOT hosted demo (auth-walled). Hosted shown as secondary, honestly labeled "requires a free Prefect account."
+2. Access channel = GitHub Issues (no personal email, no invented Discord).
+3. MCP snippet shows local config only (http://localhost:8000/mcp).
+4. One committed OG image PNG, regenerable via a committed website/tools/make-og.py script.
+5. No dates/milestones. "What works today / What's next" under an explicit Experimental badge.
+6. Static HTML in website/, GitHub Actions deploy (Pages).
+
+## Deliverables (write these two files)
+
+1. `docs/superpowers/specs/2026-10-18-github-pages-design.md` — the design doc: audience, Jobs-to-be-Done, messaging hierarchy (headline, subhead, sections), IA/sitemap, visual direction (typography, color, motion), content sources (what text is drawn from README vs written fresh), technical approach (static HTML/CSS, no framework unless justified), OG/social strategy, deploy pipeline, accessibility/performance budget, anti-goals.
+2. `docs/superpowers/plans/2026-10-18-github-pages.md` — an implementation plan in the same style as docs/superpowers/plans/2026-10-16-first-run-onboarding.md (read it for format: Global Constraints, Review Focus, numbered Tasks each with Files/Interfaces/TDD steps/commit message). 5–7 tasks, TDD where sensible (HTML content can be verified with structural tests via python/pytest e.g. checking links resolve, meta tags present, no dead anchors; the make-og.py script gets a real test). Include the Actions workflow task and a final verification task. Definition of done for the eventual build: PR pushed with all GitHub Actions checks green (repo CI runs: lint ruff, typecheck mypy, security bandit, tests, "CI green" aggregate).
+
+Keep the plan tight and executable by a subagent implementer. No code outside test snippets embedded in the plan. Do not commit anything — just write the two files. Do not touch any other files.
+
+When done, report: the two file paths, the task count, and any decisions you made beyond the six listed above (one line each).
