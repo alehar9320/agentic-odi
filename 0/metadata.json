@@ -1,0 +1,67 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M582QEF4CZZKS1WC0H9HWMBW",
+  "session_id": "ses_eb003681bffeTs9r2XO6CifiBB",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-18T18:00:42.399321269Z",
+  "branch": "feature/cli-interactive-chat",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "README.md",
+    "cli/pyproject.toml",
+    "cli/src/cli/chat.py",
+    "cli/src/cli/cli.py",
+    "cli/tests/test_chat_cli.py",
+    "uv.lock"
+  ],
+  "agent": "OpenCode",
+  "model": "nemotron-3.5-lightning-free",
+  "turn_id": "be0992a0dc31",
+  "checkpoint_transcript_start": 8,
+  "transcript_lines_at_start": 8,
+  "compact_transcript_start": 8,
+  "token_usage": {
+    "input_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 0,
+    "output_tokens": 0,
+    "api_call_count": 0
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-10-18T18:00:42.386925044Z",
+    "agent_lines": 0,
+    "agent_removed": 0,
+    "human_added": 0,
+    "human_modified": 1039,
+    "human_removed": 182,
+    "total_committed": 0,
+    "total_lines_changed": 1221,
+    "agent_percentage": 0,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 6105,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        ".freebuff/project-id": 1,
+        ".opencode/plans/ci-green-pr7-pr8.md": 103,
+        "core/src/core/repository.py": 18,
+        "core/src/core/services.py": 11,
+        "docs/superpowers/plans/2026-10-15-cli-bundled-distribution-and-self-update.md": 884,
+        "docs/superpowers/plans/2026-10-15-cli-odi-entity-parity.md": 1123,
+        "docs/superpowers/plans/2026-10-16-first-run-onboarding.md": 657,
+        "docs/superpowers/plans/2026-10-18-github-pages.md": 733,
+        "docs/superpowers/plans/2026-10-18-user-facing-changelog.md": 1318,
+        "docs/superpowers/specs/2026-10-15-cli-bundled-distribution-design.md": 248,
+        "docs/superpowers/specs/2026-10-15-cli-odi-entity-parity-design.md": 219,
+        "docs/superpowers/specs/2026-10-16-first-run-onboarding-design.md": 151,
+        "docs/superpowers/specs/2026-10-18-github-pages-design.md": 398,
+        "docs/superpowers/specs/2026-10-18-user-facing-changelog-design.md": 241
+      }
+    }
+  ]
+}
