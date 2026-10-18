@@ -34,6 +34,9 @@ MANIFEST
 #  before PyInstaller builds the exe, so may be deleted later.
 *.manifest
 *.spec
+!packaging/pyinstaller/odi.spec
+/odi_*.tar.gz
+/odi_*.zip
 
 # Installer logs
 pip-log.txt

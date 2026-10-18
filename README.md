@@ -480,6 +480,51 @@ The `.pi/settings.json` declares the Superpowers package. Pi will clone it and l
 
 ---
 
+## Quick Install (Binary)
+
+Prebuilt binaries are available for Linux, macOS, and Windows. Install the latest release with one command:
+
+```bash
+curl -fsSL https://github.com/alehar9320/agentic-odi/releases/latest/download/install.sh | sh
+```
+
+The installer places the binary under `~/.local/share/agentic-odi/versions/<version>/`, creates a `current` symlink, and symlinks `odi`, `odipm`, `odi-cli`, and `agentic-odi` into `~/.local/bin/`.
+
+If `~/.local/bin` is not on your PATH, add it (e.g., `export PATH="$HOME/.local/bin:$PATH"`). On Windows, the PowerShell installer uses `~\AppData\Local\agentic-odi\` and copies `.exe` files to `~\AppData\Local\agentic-odi\bin\`.
+
+### Update
+
+By default, `odi` auto-checks for updates once every 24 hours and applies the update on the next run (auto-update is enabled by default). Control behavior with:
+
+- `odi update` — explicit check and update
+- `--no-update` flag — skip auto-update for this run
+- `AGENTIC_ODI_NO_UPDATE=1` — disable auto-update globally
+
+When running from a non-frozen source install, auto-update is suppressed automatically.
+
+### Install layout
+
+```
+~/.local/share/agentic-odi/
+  ├── versions/<version>/
+  │   └── odi (and bundled files)
+  └── current -> versions/<version>
+
+~/.local/bin/
+  ├── odi -> ../share/agentic-odi/current/odi
+  ├── odipm
+  ├── odi-cli
+  └── agentic-odi
+
+~/.config/agentic-odi/  # state/preferences
+```
+
+Environment variables: `AGENTIC_ODI_INSTALL_DIR` (override install root), `XDG_DATA_HOME`, `XDG_BIN_HOME`. The default backend is `local` (`--backend local`); no MCP server is required.
+
+### Unsigned binaries
+
+macOS may quarantine downloaded binaries: `xattr -d com.apple.quarantine ~/.local/bin/odi` (if needed). Windows SmartScreen may show a warning for unsigned binaries; choose "More info → Run anyway" if you trust the release.
+
 ## ☁️ Deployment
 
 The server is deployed via **[Horizon Prefect](https://www.prefect.io/horizon)**, Prefect's managed infrastructure for hosting MCP-compatible agents.

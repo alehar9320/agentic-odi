@@ -5,23 +5,37 @@ from __future__ import annotations
 import asyncio
 import os
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import typer
-from connectors.factory import build_connector
-from connectors.models import ConnectorConfig
-from connectors.registry import (
-    ConnectorNotFoundError,
-    ConnectorRegistry,
-    DuplicateConnectorError,
-    UnknownConnectorKindError,
-)
-from connectors.sink import get_default_sink
+
+# The connectors package eagerly imports fastmcp via ``connectors/__init__``.
+# Import it lazily so that merely loading the CLI (e.g. ``odi --version``) does
+# not pay the fastmcp/mcp import cost. The wrappers below keep stable module
+# attributes for tests to monkeypatch.
+if TYPE_CHECKING:
+    from connectors.models import ConnectorConfig
+    from connectors.protocol import Connector
+    from connectors.registry import ConnectorRegistry
+    from connectors.sink import IngestSink
 
 connectors_app = typer.Typer(
     name="connectors",
     help="Connect Agentic ODI to external systems.",
     no_args_is_help=True,
 )
+
+
+def build_connector(config: ConnectorConfig) -> Connector:
+    from connectors.factory import build_connector as _build_connector
+
+    return _build_connector(config)
+
+
+def get_default_sink() -> IngestSink:
+    from connectors.sink import get_default_sink as _get_default_sink
+
+    return _get_default_sink()
 
 
 def _config_path(config: Path | None) -> Path:
@@ -34,6 +48,8 @@ def _config_path(config: Path | None) -> Path:
 
 
 def _registry(config: Path | None) -> ConnectorRegistry:
+    from connectors.registry import ConnectorRegistry
+
     return ConnectorRegistry(_config_path(config))
 
 
@@ -72,6 +88,9 @@ def add_connector(
     config: Path | None = ConfigOption,
 ) -> None:
     """Register a new external connector."""
+    from connectors.models import ConnectorConfig
+    from connectors.registry import DuplicateConnectorError, UnknownConnectorKindError
+
     settings: dict[str, object] = {}
     if kind == "mcp":
         if not url:
@@ -98,6 +117,8 @@ def health_connector(
     config: Path | None = ConfigOption,
 ) -> None:
     """Check whether a connector can reach its external system."""
+    from connectors.registry import ConnectorNotFoundError, UnknownConnectorKindError
+
     try:
         connector_config = _registry(config).get(name)
         connector = build_connector(connector_config)
@@ -116,6 +137,8 @@ def ingest_connector(
     config: Path | None = ConfigOption,
 ) -> None:
     """Ingest data from an external connector into the local ingest sink."""
+    from connectors.registry import ConnectorNotFoundError, UnknownConnectorKindError
+
     try:
         connector_config = _registry(config).get(name)
         connector = build_connector(connector_config)

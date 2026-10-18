@@ -8,7 +8,8 @@ from enum import Enum
 from typing import Any
 
 import typer
-from fastmcp import Client
+
+from cli import context
 
 MCP_URL_DEFAULT = os.getenv("AGENTIC_ODI_MCP_URL", "http://localhost:8000/mcp")
 
@@ -32,6 +33,8 @@ class CategoryOption(str, Enum):
 
 
 def _call_mcp(tool: str, args: dict[str, Any], mcp_url: str = MCP_URL_DEFAULT) -> str:
+    from fastmcp import Client
+
     async def _run() -> str:
         async with Client(mcp_url) as client:
             result = await client.call_tool(tool, args)
@@ -83,7 +86,9 @@ def add(
         args["step_id"] = step_id
     from cli.backend import get_backend
 
-    typer.echo(get_backend("mcp", mcp_url=mcp_url).call("add_customer_outcome", args))
+    typer.echo(
+        get_backend(context.selected_backend(), mcp_url=mcp_url).call("add_customer_outcome", args)
+    )
 
 
 @outcomes_app.command("get")
@@ -95,7 +100,9 @@ def get(
     from cli.backend import get_backend
 
     typer.echo(
-        get_backend("mcp", mcp_url=mcp_url).call("get_customer_outcome", {"outcome_id": outcome_id})
+        get_backend(context.selected_backend(), mcp_url=mcp_url).call(
+            "get_customer_outcome", {"outcome_id": outcome_id}
+        )
     )
 
 
@@ -110,7 +117,11 @@ def list_outcomes(
         args["job_id"] = job_id
     from cli.backend import get_backend
 
-    typer.echo(get_backend("mcp", mcp_url=mcp_url).call("list_customer_outcomes", args))
+    typer.echo(
+        get_backend(context.selected_backend(), mcp_url=mcp_url).call(
+            "list_customer_outcomes", args
+        )
+    )
 
 
 @outcomes_app.command("update")
@@ -161,7 +172,11 @@ def update(
         args["confidence"] = confidence
     from cli.backend import get_backend
 
-    typer.echo(get_backend("mcp", mcp_url=mcp_url).call("update_customer_outcome", args))
+    typer.echo(
+        get_backend(context.selected_backend(), mcp_url=mcp_url).call(
+            "update_customer_outcome", args
+        )
+    )
 
 
 @outcomes_app.command("delete")
@@ -178,7 +193,7 @@ def delete(
     from cli.backend import get_backend
 
     typer.echo(
-        get_backend("mcp", mcp_url=mcp_url).call(
+        get_backend(context.selected_backend(), mcp_url=mcp_url).call(
             "delete_customer_outcome", {"outcome_id": outcome_id}
         )
     )
@@ -191,10 +206,11 @@ def score(
     mcp_url: str = typer.Option(default=MCP_URL_DEFAULT, help="MCP server URL"),
 ) -> None:
     """Compute ODI Opportunity Score."""
+    from cli.backend import get_backend
+
     typer.echo(
-        _call_mcp(
+        get_backend(context.selected_backend(), mcp_url=mcp_url).call(
             "compute_opportunity",
             {"importance": importance, "satisfaction": satisfaction},
-            mcp_url,
         )
     )
