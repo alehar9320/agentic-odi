@@ -1,0 +1,65 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M58CYFVK2YV2250TDFEHJ2YG",
+  "session_id": "ses_eb07dfa09ffelRWgiaaXzpr2r0",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-18T20:59:31.986204305Z",
+  "branch": "feature/gh-pages",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "README.md",
+    "website/index.html",
+    "website/tests/test_sync_readme.py",
+    "website/tools/sync-readme.py"
+  ],
+  "agent": "OpenCode",
+  "model": "nemotron-3.5-lightning-free",
+  "turn_id": "336a9548420f",
+  "checkpoint_transcript_start": 40,
+  "transcript_lines_at_start": 40,
+  "compact_transcript_start": 40,
+  "token_usage": {
+    "input_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 0,
+    "output_tokens": 0,
+    "api_call_count": 0
+  },
+  "session_metrics": {
+    "turn_count": 3
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-10-18T20:59:31.95865412Z",
+    "agent_lines": 0,
+    "agent_removed": 0,
+    "human_added": 424,
+    "human_modified": 127,
+    "human_removed": 0,
+    "total_committed": 424,
+    "total_lines_changed": 551,
+    "agent_percentage": 0,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 5061,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        ".freebuff/project-id": 1,
+        ".opencode/plans/ci-green-pr7-pr8.md": 103,
+        ".pi/git/.gitignore": 2,
+        "docs/superpowers/plans/2026-10-15-cli-odi-entity-parity.md": 1123,
+        "docs/superpowers/plans/2026-10-16-first-run-onboarding.md": 669,
+        "docs/superpowers/plans/2026-10-18-github-pages.md": 742,
+        "docs/superpowers/plans/2026-10-18-user-facing-changelog.md": 1412,
+        "docs/superpowers/specs/2026-10-15-cli-odi-entity-parity-design.md": 219,
+        "docs/superpowers/specs/2026-10-16-first-run-onboarding-design.md": 151,
+        "docs/superpowers/specs/2026-10-18-github-pages-design.md": 398,
+        "docs/superpowers/specs/2026-10-18-user-facing-changelog-design.md": 241
+      }
+    }
+  ]
+}
