@@ -25,6 +25,7 @@ def test_connectors_help_lists_commands() -> None:
     output = _strip(result.output)
     assert "list" in output
     assert "add" in output
+    assert "catalog" in output
     assert "health" in output
     assert "ingest" in output
 
@@ -103,6 +104,118 @@ def test_connectors_add_mcp_requires_url(tmp_path: Path) -> None:
 
     assert result.exit_code == 1
     assert "--url is required" in _strip(result.output)
+
+
+def test_connectors_catalog_groups_presets_by_area() -> None:
+    result = runner.invoke(app, ["connectors", "catalog"])
+
+    assert result.exit_code == 0
+    output = _strip(result.output)
+    assert "voice-of-customer" in output
+    assert "market-intelligence" in output
+    assert "notion" in output
+    assert "tavily" in output
+    assert "GITHUB_PERSONAL_ACCESS_TOKEN" in output
+
+
+def test_connectors_catalog_json_lists_every_area() -> None:
+    result = runner.invoke(app, ["connectors", "catalog", "--json"])
+
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    assert {item["area"] for item in payload} == {
+        "voice-of-customer",
+        "quantitative-data",
+        "market-intelligence",
+        "strategy-alignment",
+        "knowledge-output",
+    }
+    assert all(item["url"].startswith("https://") for item in payload)
+
+
+def test_connectors_catalog_filters_by_area() -> None:
+    result = runner.invoke(app, ["connectors", "catalog", "--area", "strategy-alignment"])
+
+    assert result.exit_code == 0
+    output = _strip(result.output)
+    assert "linear" in output
+    assert "notion" not in output
+
+
+def test_connectors_catalog_rejects_unknown_area() -> None:
+    result = runner.invoke(app, ["connectors", "catalog", "--area", "nope"])
+
+    assert result.exit_code == 1
+    assert "Unknown capability area" in _strip(result.output)
+
+
+def test_connectors_add_from_preset(tmp_path: Path) -> None:
+    config = tmp_path / "connectors.json"
+
+    result = runner.invoke(
+        app,
+        ["connectors", "add", "mcp", "--preset", "github", "--config", str(config)],
+    )
+
+    assert result.exit_code == 0
+    output = _strip(result.output)
+    assert "Added mcp connector 'github'" in output
+    assert "GITHUB_PERSONAL_ACCESS_TOKEN" in output
+    payload = json.loads(config.read_text(encoding="utf-8"))
+    stored = payload["connectors"][0]
+    assert stored["name"] == "github"
+    assert stored["settings"]["url"] == "https://api.githubcopilot.com/mcp/"
+    assert stored["settings"]["env_vars"] == ["GITHUB_PERSONAL_ACCESS_TOKEN"]
+    assert stored["settings"]["headers"]["Authorization"].startswith("Bearer ")
+
+
+def test_connectors_add_from_preset_with_name_override(tmp_path: Path) -> None:
+    config = tmp_path / "connectors.json"
+
+    result = runner.invoke(
+        app,
+        [
+            "connectors",
+            "add",
+            "mcp",
+            "--preset",
+            "notion",
+            "--name",
+            "voice-of-customer",
+            "--config",
+            str(config),
+        ],
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(config.read_text(encoding="utf-8"))
+    stored = payload["connectors"][0]
+    assert stored["name"] == "voice-of-customer"
+    assert stored["settings"]["auth"] == "oauth"
+
+
+def test_connectors_add_rejects_unknown_preset(tmp_path: Path) -> None:
+    config = tmp_path / "connectors.json"
+
+    result = runner.invoke(
+        app,
+        ["connectors", "add", "mcp", "--preset", "nope", "--config", str(config)],
+    )
+
+    assert result.exit_code == 1
+    assert "Unknown preset" in _strip(result.output)
+
+
+def test_connectors_add_preset_requires_mcp_kind(tmp_path: Path) -> None:
+    config = tmp_path / "connectors.json"
+
+    result = runner.invoke(
+        app,
+        ["connectors", "add", "rest", "--preset", "notion", "--config", str(config)],
+    )
+
+    assert result.exit_code == 1
+    assert "only supported for MCP connectors" in _strip(result.output)
 
 
 class _FakeConnector:

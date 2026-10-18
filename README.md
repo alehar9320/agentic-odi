@@ -154,14 +154,51 @@ Set `AGENTIC_ODI_MCP_URL` to point to a non-default server if needed.
 
 Connectors are named integrations stored in `.agentic-odi/connectors.json` (or a path you pass with `--config` / `AGENTIC_ODI_CONNECTORS_FILE`). The first kind is `mcp`: Agentic ODI acts as an MCP **client** and pulls catalog, resources, and optional tool results from an external MCP **server**.
 
+The fastest way to connect is a preset. `connectors catalog` lists every built-in preset, grouped by the capability area it serves:
+
 ```bash
-python -m cli connectors add mcp --name gong --url http://localhost:9000/mcp --tool latest_quote
+python -m cli connectors catalog                          # all presets
+python -m cli connectors catalog --area strategy-alignment
+python -m cli connectors catalog --json
+```
+
+| Capability area (`--area`) | Presets |
+|---|---|
+| Voice of customer & qualitative research (`voice-of-customer`) | `notion`, `gong`, `fireflies`, `intercom`, `confluence` |
+| Quantitative data & opportunity scoring (`quantitative-data`) | `posthog`, `amplitude`, `mixpanel` |
+| Market & competitive intelligence (`market-intelligence`) | `exa`, `tavily` |
+| Product strategy & backlog alignment (`strategy-alignment`) | `linear`, `github`, `jira`, `miro`, `figma` |
+| Strategy & knowledge management output (`knowledge-output`) | `slack` |
+
+Register one with `--preset`; `--name` defaults to the preset id:
+
+```bash
+# Token-based preset: export the variable it needs first
+export GITHUB_PERSONAL_ACCESS_TOKEN=ghp_...
+python -m cli connectors add mcp --preset github
+python -m cli connectors health --name github
+python -m cli connectors ingest --name github
+
+# OAuth-based preset: the browser consent flow starts on first use
+python -m cli connectors add mcp --preset notion
+```
+
+Credentials never enter the registry. Presets that use API keys store `${VAR}` placeholders that are resolved from the environment when a connection is opened, and `connectors health` names any variable that is missing. `--url` overrides the endpoint (self-hosted or proxied deployments) and `--tool` still selects which tools to call during ingest.
+
+Custom servers keep working the same way:
+
+```bash
+python -m cli connectors add mcp --name internal --url https://mcp.internal.example/mcp --tool latest_quote
 python -m cli connectors list
-python -m cli connectors health --name gong
-python -m cli connectors ingest --name gong
 ```
 
 Ingested records are normalized (`catalog`, `resource`, `tool_result`) and appended to the in-process ingest sink. They are not written into the ODI jobs/outcomes store.
+
+> [!NOTE]
+> Presets cover MCP servers with a hosted endpoint. Servers you run yourself (Snowflake, BigQuery, Google Drive, Brave Search, and similar) are added with an explicit `--url`. The catalog lives in `connectors/src/connectors/catalog.py`.
+
+> [!NOTE]
+> OAuth tokens are cached in memory for the life of one CLI process, so an OAuth preset may ask for consent again on the next `connectors health` or `connectors ingest`. Prefer a token-based preset where the server offers one.
 
 ### ⚡ Living Studio Run Modes
 
