@@ -1,0 +1,25 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M5AKJYK5H1RP885ETYGFGPXD",
+  "session_id": "ses_eaadde49fffes4f9MXaocNI94N",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-19T17:33:16.362501215Z",
+  "branch": "topic/rebase-pr-17",
+  "checkpoints_count": 1,
+  "save_step_count": 1,
+  "files_touched": [],
+  "agent": "OpenCode",
+  "model": "deepseek-v4.1-flash-free",
+  "turn_id": "15d4edfad690",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 313441,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 3071616,
+    "output_tokens": 11438,
+    "api_call_count": 37
+  },
+  "session_metrics": {
+    "turn_count": 1
+  }
+}
