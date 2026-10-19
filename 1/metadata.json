@@ -1,0 +1,100 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M5AJ8Q8RV7CAS3XE9RKSD8DT",
+  "session_id": "ses_eab1cee33ffec2koYTlay8klK2",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-19T17:10:17.693766335Z",
+  "branch": "feature/cli-odi-entity-parity",
+  "checkpoints_count": 1,
+  "save_step_count": 2,
+  "files_touched": [
+    "studio/src/App.tsx",
+    "studio/src/components/canvas/CanvasTabs.tsx",
+    "studio/src/components/canvas/OpportunityLandscape.tsx",
+    "studio/src/components/chat/ChatCopilot.tsx",
+    "studio/src/state/StudioContext.tsx"
+  ],
+  "agent": "OpenCode",
+  "model": "nemotron-3.5-lightning-free",
+  "turn_id": "3bd261f5f7f0",
+  "checkpoint_transcript_start": 18,
+  "transcript_lines_at_start": 18,
+  "compact_transcript_start": 18,
+  "token_usage": {
+    "input_tokens": 198170,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 2552928,
+    "output_tokens": 13772,
+    "api_call_count": 48
+  },
+  "session_metrics": {
+    "turn_count": 2
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-10-19T17:10:17.653452757Z",
+    "agent_lines": 153,
+    "agent_removed": 44,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 153,
+    "total_lines_changed": 197,
+    "agent_percentage": 100,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 5565,
+      "user_lines_removed": 151,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        ".freebuff/project-id": 1,
+        ".opencode/plans/ci-green-pr7-pr8.md": 103,
+        ".pi/git/.gitignore": 2,
+        "cli/src/cli/cli.py": 34,
+        "cli/src/cli/onboard.py": 253,
+        "cli/src/cli/profile.py": 122,
+        "cli/tests/test_profile.py": 51,
+        "docs/superpowers/plans/2026-10-15-cli-odi-entity-parity.md": 1123,
+        "docs/superpowers/plans/2026-10-16-first-run-onboarding.md": 669,
+        "docs/superpowers/plans/2026-10-18-github-pages.md": 742,
+        "docs/superpowers/plans/2026-10-18-user-facing-changelog.md": 1412,
+        "docs/superpowers/specs/2026-10-15-cli-odi-entity-parity-design.md": 219,
+        "docs/superpowers/specs/2026-10-16-first-run-onboarding-design.md": 151,
+        "docs/superpowers/specs/2026-10-18-github-pages-design.md": 398,
+        "docs/superpowers/specs/2026-10-18-user-facing-changelog-design.md": 241,
+        "pyproject.toml": 3,
+        "uv.lock": 41
+      },
+      "user_removed_per_file": {
+        "cli/src/cli/cli.py": 151
+      }
+    },
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 106,
+      "user_lines_removed": 0,
+      "agent_lines_added": 5459,
+      "agent_lines_removed": 151,
+      "user_added_per_file": {
+        ".freebuff/project-id": 1,
+        ".opencode/plans/ci-green-pr7-pr8.md": 103,
+        ".pi/git/.gitignore": 2
+      }
+    },
+    {
+      "checkpoint_number": 3,
+      "user_lines_added": 106,
+      "user_lines_removed": 0,
+      "agent_lines_added": 5612,
+      "agent_lines_removed": 195,
+      "user_added_per_file": {
+        ".freebuff/project-id": 1,
+        ".opencode/plans/ci-green-pr7-pr8.md": 103,
+        ".pi/git/.gitignore": 2
+      }
+    }
+  ]
+}
