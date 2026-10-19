@@ -158,5 +158,8 @@ cython_debug/
 # PyCharm
 .idea/
 
+# Cloudflare Wrangler local state
+.wrangler/
+
 # VS Code
 .vscode/
