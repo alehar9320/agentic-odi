@@ -1,0 +1,57 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M59CGDXKPW948GTJ9025GY4E",
+  "session_id": "ses_ead3febacffezXw6ozltkX2KJT",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-19T06:10:24.467061262Z",
+  "branch": "feature/cli-odi-entity-parity",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "cli/tests/test_persistence.py"
+  ],
+  "agent": "OpenCode",
+  "model": "nemotron-3.5-lightning-free",
+  "turn_id": "10334916cf73",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 83312,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 1676800,
+    "output_tokens": 6157,
+    "api_call_count": 42
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-10-19T06:10:24.453026753Z",
+    "agent_lines": 0,
+    "agent_removed": 0,
+    "human_added": 0,
+    "human_modified": 21,
+    "human_removed": 54,
+    "total_committed": 31,
+    "total_lines_changed": 75,
+    "agent_percentage": 0,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 5061,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        ".freebuff/project-id": 1,
+        ".opencode/plans/ci-green-pr7-pr8.md": 103,
+        ".pi/git/.gitignore": 2,
+        "docs/superpowers/plans/2026-10-15-cli-odi-entity-parity.md": 1123,
+        "docs/superpowers/plans/2026-10-16-first-run-onboarding.md": 669,
+        "docs/superpowers/plans/2026-10-18-github-pages.md": 742,
+        "docs/superpowers/plans/2026-10-18-user-facing-changelog.md": 1412,
+        "docs/superpowers/specs/2026-10-15-cli-odi-entity-parity-design.md": 219,
+        "docs/superpowers/specs/2026-10-16-first-run-onboarding-design.md": 151,
+        "docs/superpowers/specs/2026-10-18-github-pages-design.md": 398,
+        "docs/superpowers/specs/2026-10-18-user-facing-changelog-design.md": 241
+      }
+    }
+  ]
+}

@@ -1,0 +1,102 @@
+You are implementing Task 11: Persistence acceptance test, README, full verification, for the cli-odi-entity-parity feature.
+
+## Task Description
+
+Read your task brief first: /home/alexa/repos/agentic-odi/.superpowers/sdd/2026-10-15-cli-odi-entity-parity/task-11-brief.md
+It is your requirements, with exact values to use verbatim.
+
+## Context
+
+Work from: /home/alexa/repos/agentic-odi (branch feature/cli-odi-entity-parity, HEAD after Task 10). Tasks 1–10 complete. Python 3.11; uv.
+
+Dependencies:
+- Everything from Tasks 1–10: `ODIService` full CRUD, `SQLiteRepository`, `build_repository`, `LocalBackend` dispatch over all tools including `add_customer_outcome`, `update_customer_outcome` with `value_metrics`, `compute_opportunity`.
+- The `SQLiteRepository` persists to `:.memory:` (per Task 5 conftest) or a temp db; the acceptance test opens a new SQLite file per test function.
+- `test_persistence.py` is a new file (per the brief) that tests every entity type survives reopen against `SQLiteRepository`.
+- The test creates a job, step, outcome, customer_outcome; then reopens via `SQLiteRepository(db_path=db)` and asserts each field.
+
+## The acceptance test (from the brief, Step 1)
+
+```python
+def test_every_entity_type_survives_reopen(tmp_path):
+    db = str(tmp_path / "odi.db")
+    backend = LocalBackend(db_path=db)
+
+    import json, re
+
+    def json_of(text: str) -> dict:
+        return json.loads(re.search(r"({.*})", text).group(1))
+
+    job_id = json_of(backend.call("add_job", {"name": "J", "description": "d"}))["id"]
+    step_id = json_of(
+        backend.call("add_step", {"job_id": job_id, "name": "S", "order": 1})
+    )["id"]
+    backend.call(
+        "add_outcome",
+        {
+            "job_id": job_id,
+            "statement": "Min x",
+            "importance": 8.0,
+            "satisfaction": 4.0,
+            "step_id": step_id,
+        },
+    )
+    backend.call(
+        "add_customer_outcome",
+        {
+            "job_id": job_id,
+            "customer_value": {
+                "direction": "minimize",
+                "unit_of_measure": "time",
+                "object_of_control": "x",
+                "statement": "Min x",
+                "importance": 8.0,
+                "satisfaction": 4.0,
+                "value_metrics": [
+                    {
+                        "name": "m",
+                        "direction": "minimize",
+                        "unit_of_measure": "s",
+                        "importance": 6.0,
+                        "satisfaction": 2.0,
+                    }
+                ],
+            },
+            "business_value": {"category": "cost_reduction", "statement": "Save"},
+        },
+    )
+
+    repo = SQLiteRepository(db_path=db)
+    assert repo.get_job(job_id).name == "J"
+    assert repo.get_step(step_id).order == 1
+    outcome = repo.get_outcome(repo.get_outcomes(job_id)[0].id)
+    assert outcome.opportunity_score == 12.0
+    co = repo.list_customer_outcomes(job_id)[0]
+    assert co.customer_value.value_metrics[0].opportunity_score == 10.0
+```
+
+## Rulings from earlier tasks that bind you:
+- R3: `value_metrics` added to `customer_value` on add; on update passed as top-level argument merging into `customer_value`/`business_value`.
+- The `SQLiteRepository` constructor resolves `db_path` from env `AGENTIC_ODI_DB` or default `~/.agentic-odi/odi.db`; but the acceptance test uses `tmp_path / "odi.db"` so it's explicit.
+- Per the earlier ledger R5: `SQLiteRepository.__init__` retains duplicate env/default resolution (dead under factory) — drift risk; make `db_path` required. The acceptance test uses explicit `db_path`, so no issue.
+
+## Before You Begin
+
+If anything conflicts with current code or the test expectations, ask (NEEDS_CONTEXT).
+
+## Your Job
+
+1. Create `cli/tests/test_persistence.py` with the `test_every_entity_type_survives_reopen` test verbatim from the brief
+2. Run `uv run --directory cli pytest tests/test_persistence.py -v` → expect PASS
+3. Also run the full cli suite to ensure no regressions (105 tests + any new ones)
+4. Run ruff check + format on cli/src/cli; mypy cli clean
+5. Commit with the brief's commit message
+6. Self-review, report
+
+## You Do Not Dispatch Subagents
+
+## Report Format
+
+Write your full report to /home/alexa/repos/agentic-odi/.superpowers/sdd/2026-10-15-cli-odi-entity-parity/task-11-report.md
+
+Then report ONLY (under 15 lines): Status, commits, one-line test summary, concerns, report path.
