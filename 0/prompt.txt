@@ -1,0 +1,37 @@
+You are implementing Task 10: CLI `customer-outcomes` group + `value_metrics`, for the cli-odi-entity-parity feature.
+
+## Task Description
+
+Read your task brief first: /home/alexa/repos/agentic-odi/.superpowers/sdd/2026-10-15-cli-odi-entity-parity/task-10-brief.md
+It is your requirements, with exact values to use verbatim.
+
+## Context
+
+Work from: /home/alexa/repos/agentic-odi (branch feature/cli-odi-entity-parity, HEAD after Task 9). Tasks 1–9 complete. Python 3.11; uv.
+
+Dependencies from earlier tasks:
+- `resolve_backend`, `LocalBackend`, `BackendConfig`, `MCPBackend` all from Tasks 6–8; outcomes_app from Task 9 is available.
+- `compute_opportunity` already implemented in services/models.
+- The service already has `add_customer_outcome`, `list_customer_outcomes`, `get_customer_outcome`, `update_customer_outcome`, `delete_customer_outcome` with `customer_value` and `business_value` fields plus `value_metrics` list.
+- R3: key-presence args; `None` omitted from updates payload.
+- `value_metrics` on `add` placed at `customer_value["value_metrics"]`; on `update` passed as top-level `value_metrics` argument.
+
+## Before You Begin
+
+If anything in the brief conflicts with current code, ask (NEEDS_CONTEXT).
+
+## Your Job
+
+1. TDD: failing tests first in cli/tests/test_customer_outcomes_cli.py
+2. Create cli/src/cli/customer_outcomes.py mounted as `customer-outcomes` with commands: `add` (with `--direction --unit --object --statement --importance --satisfaction --value-metric '<json>'`), `list [--job-id]`, `get`, `update`, `delete`; plus `--value-metric` on add/update that parses JSON to dicts and places them per spec.
+3. Full cli suite green; ruff + mypy clean
+4. Commit with brief's message
+5. Self-review, report
+
+## You Do Not Dispatch Subagents
+
+## Report Format
+
+Write your full report to /home/alexa/repos/agentic-odi/.superpowers/sdd/2026-10-15-cli-odi-entity-parity/task-10-report.md
+
+Then report ONLY (under 15 lines): Status, commits, one-line test summary, concerns, report path.
