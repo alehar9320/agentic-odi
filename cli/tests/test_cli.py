@@ -71,3 +71,32 @@ def test_version_verbose_includes_release_date_when_set(monkeypatch):
 
     assert result.exit_code == 0
     assert "0.1.0 (2026-10-15)" in _strip_ansi(result.output)
+
+
+def test_help_lists_global_backend_options():
+    runner = CliRunner()
+    result = runner.invoke(app, ["--help"])
+
+    assert result.exit_code == 0
+    output = _strip_ansi(result.output)
+    assert "--backend" in output
+    assert "--db" in output
+    assert "--mcp-url" in output
+    assert "customer-outcomes" in output
+    assert "score" in output
+
+
+def test_no_args_prints_help_when_not_a_tty():
+    runner = CliRunner()
+    result = runner.invoke(app, [])
+
+    assert result.exit_code == 0
+    assert "Usage" in _strip_ansi(result.output)
+
+
+def test_unknown_backend_exits_nonzero():
+    runner = CliRunner()
+    result = runner.invoke(app, ["--backend", "warp", "score", "8", "2"])
+
+    assert result.exit_code == 1
+    assert "unknown backend: warp" in _strip_ansi(result.output)

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import re
 from pathlib import Path
@@ -290,3 +291,34 @@ def test_connectors_ingest_appends_to_sink(tmp_path: Path, monkeypatch) -> None:
     assert result.exit_code == 0
     sink.append.assert_called_once()
     assert "gong" in _strip(result.output)
+
+
+class _SlowConnector:
+    async def health(self) -> HealthStatus:
+        await asyncio.sleep(5)
+        return HealthStatus(ok=True, message="reachable")
+
+
+def test_connectors_health_times_out(tmp_path: Path, monkeypatch) -> None:
+    config = tmp_path / "connectors.json"
+    runner.invoke(
+        app,
+        [
+            "connectors",
+            "add",
+            "mcp",
+            "--name",
+            "gong",
+            "--url",
+            "http://localhost:9000/mcp",
+            "--config",
+            str(config),
+        ],
+    )
+    monkeypatch.setattr("cli.connectors.build_connector", lambda _config: _SlowConnector())
+    monkeypatch.setenv("AGENTIC_ODI_CONNECTOR_TIMEOUT", "0.05")
+
+    result = runner.invoke(app, ["connectors", "health", "--name", "gong", "--config", str(config)])
+
+    assert result.exit_code == 1
+    assert "timed out" in _strip(result.output)

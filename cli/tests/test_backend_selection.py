@@ -31,7 +31,7 @@ ADD_ARGS = [
 def test_outcomes_add_defaults_to_local(tmp_path, monkeypatch):
     monkeypatch.setenv("AGENTIC_ODI_DB", str(tmp_path / "odi.db"))
     runner = CliRunner()
-    with patch("cli.outcomes._call_mcp") as mock_call:
+    with patch("cli.backend._call_mcp") as mock_call:
         result = runner.invoke(app, ADD_ARGS)
     assert result.exit_code == 0
     mock_call.assert_not_called()
@@ -40,8 +40,8 @@ def test_outcomes_add_defaults_to_local(tmp_path, monkeypatch):
 def test_outcomes_add_backend_mcp_calls_mcp(monkeypatch):
     monkeypatch.setenv("AGENTIC_ODI_DB", ":memory:")
     runner = CliRunner()
-    with patch("cli.outcomes._call_mcp") as mock_call:
-        mock_call.return_value = "ok"
+    with patch("cli.backend._call_mcp") as mock_call:
+        mock_call.return_value = "Customer outcome created successfully: {}"
         result = runner.invoke(app, ["--backend", "mcp", *ADD_ARGS])
     assert result.exit_code == 0
     mock_call.assert_called_once()
