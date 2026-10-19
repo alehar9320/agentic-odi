@@ -121,3 +121,107 @@ def backup_baseline() -> Path | None:
     )
     shutil.copy2(baseline_file(), backup_path)
     return backup_path
+
+
+# ---------------------------------------------------------------------------
+# LLM Profile
+# ---------------------------------------------------------------------------
+
+LLM_PROFILE_FILE_NAME = "llm_profile.json"
+
+
+@dataclass
+class LLMProfile:
+    """Persisted LLM connection settings for the interactive chat."""
+
+    base_url: str | None = None
+    api_key: str | None = None
+    model: str | None = None
+    mcp_url: str | None = None
+    provider_label: str | None = None
+    schema_version: int = 1
+    created_at: str | None = None
+    updated_at: str | None = None
+
+    def to_dict(self) -> dict:
+        return {
+            "base_url": self.base_url,
+            "api_key": self.api_key,
+            "model": self.model,
+            "mcp_url": self.mcp_url,
+            "provider_label": self.provider_label,
+            "schema_version": self.schema_version,
+            "created_at": self.created_at,
+            "updated_at": self.updated_at,
+        }
+
+    @classmethod
+    def from_dict(cls, d: dict) -> LLMProfile:
+        kwargs = {k: v for k, v in d.items() if k in cls.__dataclass_fields__}  # type: ignore[attr-defined]
+        return cls(**kwargs)
+
+
+def llm_profile_file() -> Path:
+    """Return the path to the LLM profile JSON file."""
+    return config_dir() / LLM_PROFILE_FILE_NAME
+
+
+def llm_profile_exists() -> bool:
+    """Return True if the LLM profile file exists."""
+    return llm_profile_file().exists()
+
+
+def load_llm_profile() -> LLMProfile | None:
+    """Load the LLM profile file, returning None if it does not exist.
+
+    Raises ValueError on unparseable JSON.
+    """
+    if not llm_profile_exists():
+        return None
+    try:
+        with open(llm_profile_file()) as f:
+            data = json.load(f)
+    except (json.JSONDecodeError, OSError) as e:
+        raise ValueError(f"Failed to parse LLM profile file: {e}") from e
+    return LLMProfile.from_dict(data)
+
+
+def load_llm_config_dict() -> dict[str, str]:
+    """Return persisted LLM config as a plain dict for use by any package.
+
+    Returns an empty dict if no profile exists or parsing fails.
+    Keys: base_url, api_key, model, mcp_url (only non-None values included).
+    """
+    try:
+        p = load_llm_profile()
+    except Exception:  # noqa: BLE001
+        return {}
+    if p is None:
+        return {}
+    result: dict[str, str] = {}
+    for field in ("base_url", "api_key", "model", "mcp_url"):
+        val = getattr(p, field, None)
+        if val is not None:
+            result[field] = val
+    return result
+
+
+def save_llm_profile(p: LLMProfile) -> Path:
+    """Save the LLM profile atomically.
+
+    Sets ``updated_at`` to UTC ISO-8601 on every save.
+    Sets ``created_at`` if it is currently None.
+    """
+    cfg_dir = config_dir()
+    cfg_dir.mkdir(parents=True, exist_ok=True)
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    d = p.to_dict()
+    if d["created_at"] is None:
+        d["created_at"] = now
+    d["updated_at"] = now
+    target = llm_profile_file()
+    tmp = target.with_name(target.name + ".tmp")
+    with open(tmp, "w") as f:
+        f.write(json.dumps(d))
+    os.replace(tmp, target)
+    return target

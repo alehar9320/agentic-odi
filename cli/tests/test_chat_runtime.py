@@ -184,14 +184,14 @@ def test_run_chat_reports_turn_errors_and_keeps_running(monkeypatch, capsys) -> 
     assert "Goodbye." in captured.out
 
 
-def test_run_chat_returns_one_when_startup_fails(monkeypatch, capsys) -> None:
-    _install(monkeypatch, inputs=[], mcp=_FakeMCP(fail_list=True))
+def test_run_chat_returns_zero_when_mcp_fails_but_llm_available(monkeypatch, capsys) -> None:
+    """MCP failure is a warning, not a fatal error — REPL still starts."""
+    _install(monkeypatch, inputs=[EOFError()], mcp=_FakeMCP(fail_list=True))
 
-    assert asyncio.run(chat._run_chat(_config())) == 1
+    assert asyncio.run(chat._run_chat(_config())) == 0
 
-    error = capsys.readouterr().err
-    assert "could not start chat: no tools" in error
-    assert "MCP server: http://localhost:8000/mcp" in error
+    output = capsys.readouterr().out
+    assert "MCP unavailable" in output or "mcp" in output.lower()
     assert _FakeLLM.instances[0].closed is True
 
 
@@ -303,3 +303,53 @@ def test_tool_result_text_falls_back_to_the_raw_result() -> None:
         )
         == "a"
     )
+
+
+def test_repl_starts_with_mcp_failure(monkeypatch, capsys) -> None:
+    """REPL starts and returns 0 even when the MCP server is unreachable."""
+
+    class _FailingMCP:
+        """Context manager that raises on entry, simulating an unreachable MCP server."""
+
+        async def __aenter__(self) -> _FailingMCP:
+            raise OSError("connection refused")
+
+        async def __aexit__(self, *exc: object) -> bool:
+            return False
+
+        async def list_tools(self) -> list[object]:
+            raise OSError("connection refused")
+
+        async def call_tool(self, name: str, arguments: dict) -> object:
+            raise OSError("connection refused")
+
+    _FakeLLM.instances = []
+    monkeypatch.setattr(chat, "Client", lambda url: _FailingMCP())
+    monkeypatch.setattr(chat, "AsyncOpenAI", lambda **kwargs: _FakeLLM([], None, **kwargs))
+    monkeypatch.setattr("builtins.input", _inputs([EOFError()]))
+
+    result = asyncio.run(chat._run_chat(_config()))
+
+    assert result == 0
+
+    output = capsys.readouterr().out
+    # Should contain a warning about MCP being unavailable
+    assert "mcp" in output.lower() or "unavailable" in output.lower() or "offline" in output.lower()
+
+
+def test_repl_sends_nudge_when_llm_not_connected() -> None:
+    """ChatSession.ask returns a nudge string when llm_ok is False, without calling OpenAI."""
+    conn = chat.ConnectionState(llm_ok=False)
+    session = chat.ChatSession(
+        _config(),
+        SimpleNamespace(),  # openai_client — must NOT be called
+        _FakeMCP(),
+        connection_state=conn,
+    )
+
+    result = asyncio.run(session.ask("hello"))
+
+    assert result == "No model connected. Type /connect to set one up."
+    # The messages list should be unchanged (nudge doesn't add to history)
+    assert len(session.messages) == 1
+    assert session.messages[0]["role"] == "system"

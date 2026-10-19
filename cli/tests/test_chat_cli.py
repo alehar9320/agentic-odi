@@ -12,6 +12,7 @@ from typer.testing import CliRunner
 from cli.chat import (
     ChatConfig,
     ChatSession,
+    ConnectionState,
     _normalize_tool_calls,
     _to_openai_tools,
     handle_command,
@@ -91,7 +92,9 @@ def _make_session(
     completions = _FakeCompletions(streams)
     openai_client = SimpleNamespace(chat=SimpleNamespace(completions=completions))
     mcp = _FakeMCP(tools, results)
-    session = ChatSession(_config(), openai_client, mcp)
+    session = ChatSession(
+        _config(), openai_client, mcp, connection_state=ConnectionState(llm_ok=True)
+    )
     return session, completions, mcp
 
 
@@ -235,7 +238,9 @@ def test_session_rolls_back_failed_turn() -> None:
             raise RuntimeError("boom")
 
     openai_client = SimpleNamespace(chat=SimpleNamespace(completions=_BoomCompletions()))
-    session = ChatSession(_config(), openai_client, _FakeMCP([], {}))
+    session = ChatSession(
+        _config(), openai_client, _FakeMCP([], {}), connection_state=ConnectionState(llm_ok=True)
+    )
     before = list(session.messages)
 
     try:
@@ -256,3 +261,164 @@ def test_session_clear_drops_history() -> None:
 
     assert len(session.messages) == 1
     assert session.messages[0]["role"] == "system"
+
+
+# ---------------------------------------------------------------------------
+# Helpers for /status, /model, /mcp tests
+# ---------------------------------------------------------------------------
+
+
+class _FullFakeSession:
+    """Fake session satisfying the full ChatSessionLike protocol."""
+
+    def __init__(self, config: ChatConfig, connection_state: ConnectionState) -> None:
+        self.config = config
+        self.connection_state = connection_state
+        self.tool_names: list[str] = ["add_job", "get_jobs"]
+        self.cleared = False
+
+    def clear(self) -> None:
+        self.cleared = True
+
+    def update_config(self, new_config: ChatConfig) -> None:
+        self.config = new_config
+        self.connection_state.llm_ok = True
+
+
+def _full_session(
+    *,
+    model: str = "test-model",
+    mcp_url: str = "http://localhost:8000/mcp",
+    llm_ok: bool = True,
+    mcp_ok: bool = True,
+    mcp_tool_count: int = 3,
+) -> _FullFakeSession:
+    config = ChatConfig(
+        base_url="http://localhost:8001/v1",
+        api_key="local",
+        model=model,
+        mcp_url=mcp_url,
+    )
+    conn = ConnectionState(llm_ok=llm_ok, mcp_ok=mcp_ok, mcp_tool_count=mcp_tool_count)
+    return _FullFakeSession(config, conn)
+
+
+# ---------------------------------------------------------------------------
+# Tests: /status
+# ---------------------------------------------------------------------------
+
+
+def test_status_shows_model_and_connection_info(capsys) -> None:
+    session = _full_session(model="my-model", llm_ok=True, mcp_ok=True, mcp_tool_count=5)
+
+    result = handle_command("/status", session)
+
+    assert result == "handled"
+    out = capsys.readouterr().out
+    assert "my-model" in out
+    assert "connected" in out
+    assert "5 tools" in out
+
+
+def test_status_shows_not_connected_when_offline(capsys) -> None:
+    session = _full_session(llm_ok=False, mcp_ok=False)
+
+    handle_command("/status", session)
+
+    out = capsys.readouterr().out
+    assert "not connected" in out
+
+
+# ---------------------------------------------------------------------------
+# Tests: /model
+# ---------------------------------------------------------------------------
+
+
+def test_model_command_updates_session_model(capsys) -> None:
+    session = _full_session(model="old-model")
+
+    result = handle_command("/model gpt-4o-mini", session)
+
+    assert result == "handled"
+    assert session.config.model == "gpt-4o-mini"
+    out = capsys.readouterr().out
+    assert "gpt-4o-mini" in out
+
+
+def test_model_command_without_arg_prints_current(capsys) -> None:
+    session = _full_session(model="current-model")
+
+    result = handle_command("/model", session)
+
+    assert result == "handled"
+    out = capsys.readouterr().out
+    assert "current-model" in out
+    # Model should be unchanged
+    assert session.config.model == "current-model"
+
+
+def test_model_command_preserves_other_config_fields(capsys) -> None:
+    session = _full_session(model="old", mcp_url="http://mcp.test/mcp")
+
+    handle_command("/model new-model", session)
+
+    assert session.config.mcp_url == "http://mcp.test/mcp"
+    assert session.config.base_url == "http://localhost:8001/v1"
+
+
+# ---------------------------------------------------------------------------
+# Tests: /mcp
+# ---------------------------------------------------------------------------
+
+
+def test_mcp_command_without_url_prints_current(capsys) -> None:
+    session = _full_session(mcp_url="http://localhost:8000/mcp")
+
+    result = handle_command("/mcp", session)
+
+    assert result == "handled"
+    out = capsys.readouterr().out
+    assert "http://localhost:8000/mcp" in out
+
+
+def test_mcp_command_calls_reconnect_callback_on_success(capsys) -> None:
+    session = _full_session(mcp_url="http://old/mcp", mcp_tool_count=2)
+    new_url = "http://new-server/mcp"
+
+    calls: list[str] = []
+
+    def fake_reconnect(url: str) -> bool:
+        calls.append(url)
+        # Simulate the reconnect updating the session state
+        session.connection_state.mcp_tool_count = 7
+        return True
+
+    result = handle_command(f"/mcp {new_url}", session, on_mcp_reconnect=fake_reconnect)
+
+    assert result == "handled"
+    assert calls == [new_url]
+    out = capsys.readouterr().out
+    assert new_url in out
+    assert "7 tools" in out
+
+
+def test_mcp_command_reports_failure(capsys) -> None:
+    session = _full_session()
+
+    def bad_reconnect(url: str) -> bool:
+        return False
+
+    handle_command("/mcp http://bad/mcp", session, on_mcp_reconnect=bad_reconnect)
+
+    out = capsys.readouterr().out
+    assert "Failed" in out
+    assert "http://bad/mcp" in out
+
+
+def test_mcp_command_without_callback_prints_unavailable(capsys) -> None:
+    session = _full_session()
+
+    handle_command("/mcp http://some/mcp", session)  # no on_mcp_reconnect
+
+    out = capsys.readouterr().out
+    assert "not available" in out
