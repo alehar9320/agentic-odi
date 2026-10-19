@@ -30,6 +30,7 @@ import type {
 
 const SETTINGS_KEY = "studio.settings";
 const CANVAS_KEY = "studio.canvas";
+const ENGAGEMENT_KEY = "studio.engagementLevel";
 
 export const WELCOME_MESSAGE =
   "Welcome to **The Living Studio**. We have eliminated backlogs and Jira spreadsheets.\n\n" +
@@ -110,11 +111,24 @@ function loadCanvasCache(): CanvasData | null {
   return null;
 }
 
+function loadEngagementLevel(): number {
+  try {
+    const raw = localStorage.getItem(ENGAGEMENT_KEY);
+    if (raw) {
+      return Math.max(0, Math.min(2, parseInt(raw, 10)));
+    }
+  } catch {
+    /* ignore malformed cache */
+  }
+  return 0;
+}
+
 export function StudioProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<StudioConfig>(loadSettings);
   const [canvas, setCanvas] = useState<CanvasData | null>(loadCanvasCache);
   const [canvasLoading, setCanvasLoading] = useState(false);
   const [canvasCached, setCanvasCached] = useState(() => loadCanvasCache() !== null);
+  const [engagementLevel, setEngagementLevel] = useState(() => loadEngagementLevel());
   const [llmHealth, setLlmHealth] = useState<{ healthy: boolean | null; message: string }>({
     healthy: null,
     message: "Health not checked yet.",
@@ -148,6 +162,15 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     setSettings(config);
     try {
       localStorage.setItem(SETTINGS_KEY, JSON.stringify(config));
+    } catch {
+      /* storage unavailable */
+    }
+  }, []);
+
+  const saveEngagementLevel = useCallback((level: number) => {
+    setEngagementLevel(level);
+    try {
+      localStorage.setItem(ENGAGEMENT_KEY, String(level));
     } catch {
       /* storage unavailable */
     }
@@ -397,6 +420,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       requestSimulate,
       clearPendingSimOutcome,
       activeTab,
+      engagementLevel,
+      saveEngagementLevel,
       toasts,
       pushToast,
       dismissToast,

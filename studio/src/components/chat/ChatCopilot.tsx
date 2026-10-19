@@ -2,7 +2,24 @@ import { useEffect, useRef, useState } from "react";
 
 import { useStudio } from "../../state/StudioContext";
 
-const QUICK_PROMPTS: { label: string; prompt: string }[] = [
+const QUICK_PROMPTS_LEVEL0: { label: string; prompt: string }[] = [
+  {
+    label: "🎯 Define Job",
+    prompt: "Help me define a new Job-to-be-Done for developer platforms.",
+  },
+  { label: "📖 Guidelines", prompt: "Give me the ODI Stage-by-Stage guidelines." },
+];
+
+const QUICK_PROMPTS_LEVEL1: { label: string; prompt: string }[] = [
+  {
+    label: "🎯 Define Job",
+    prompt: "Help me define a new Job-to-be-Done for developer platforms.",
+  },
+  { label: "⚡ Simulate Bet", prompt: "Simulate the impact of an Auto-Sync Agent on outcome O-1." },
+  { label: "📖 Guidelines", prompt: "Give me the ODI Stage-by-Stage guidelines." },
+];
+
+const QUICK_PROMPTS_LEVEL2: { label: string; prompt: string }[] = [
   {
     label: "🎯 Define Job",
     prompt: "Help me define a new Job-to-be-Done for developer platforms.",
@@ -12,7 +29,15 @@ const QUICK_PROMPTS: { label: string; prompt: string }[] = [
 ];
 
 export function ChatCopilot() {
-  const { messages, streaming, thinkingPhase, toolActivity, sendMessage } = useStudio();
+  const {
+    messages,
+    streaming,
+    thinkingPhase,
+    toolActivity,
+    sendMessage,
+    engagementLevel,
+    setEngagementLevel,
+  } = useStudio();
   const [draft, setDraft] = useState("");
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const logRef = useRef<HTMLDivElement>(null);
@@ -30,7 +55,13 @@ export function ChatCopilot() {
 
   useEffect(() => {
     logRef.current?.scrollTo({ top: logRef.current.scrollHeight });
-  }, [messages, toolActivity, streaming]);
+  }, [messages, toolActivity, streaming, engagementLevel]);
+
+  useEffect(() => {
+    if (messages.length === 1 && engagementLevel === 0) {
+      setEngagementLevel(1);
+    }
+  }, [messages.length, engagementLevel]);
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -38,6 +69,12 @@ export function ChatCopilot() {
     setDraft("");
     await sendMessage(text);
   }
+
+  const quickPrompts = engagementLevel >= 2
+    ? QUICK_PROMPTS_LEVEL2
+    : engagementLevel >= 1
+      ? QUICK_PROMPTS_LEVEL1
+      : QUICK_PROMPTS_LEVEL0;
 
   return (
     <section className="chat-copilot">
@@ -50,7 +87,7 @@ export function ChatCopilot() {
         <b>Suggested Intents:</b>
       </p>
       <div className="chat-quick-pills">
-        {QUICK_PROMPTS.map((quick) => (
+        {quickPrompts.map((quick) => (
           <button
             key={quick.label}
             type="button"

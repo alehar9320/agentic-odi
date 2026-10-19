@@ -30,7 +30,7 @@ export function OpportunityLandscape() {
   }, [outcomes, underservedOnly, sorted]);
 
   return (
-    <section>
+    <section className="fade-in">
       <h2 className="section-title">The Landscape of Human Need</h2>
       <p className="caption">
         Outcomes with Opportunity Scores &gt; 10 pulse as urgent innovation targets.
