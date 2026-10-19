@@ -35,46 +35,54 @@ function renderPanel(tab: string) {
 }
 
 export function CanvasTabs() {
-  const { canvas, canvasLoading, canvasCached, activeTab, setActiveTab } = useStudio();
+  const { canvas, canvasLoading, canvasCached, activeTab, setActiveTab, engagementLevel } = useStudio();
+
+  const showTabs = engagementLevel >= 1;
 
   return (
     <div>
-      <div className="studio-card" role="status" aria-live="polite">
-        {canvasLoading ? (
-          <span>⚡ Syncing with Living Studio Canvas &amp; FastMCP...</span>
-        ) : canvas?.source === "seed" ? (
-          <span>🟢 Local Studio Prototype Loaded</span>
-        ) : (
-          <span>✨ Living Studio Canvas ready</span>
-        )}
-        {canvas && (
-          <span className="source-badge">
-            source: <b>{canvas.source}</b>
-            {canvasCached && <span className="cached-badge"> · cached · updating…</span>}
-          </span>
-        )}
-      </div>
+      {showTabs && (
+        <div className="studio-card" role="status" aria-live="polite">
+          {canvasLoading ? (
+            <span>⚡ Syncing with Living Studio Canvas & FastMCP...</span>
+          ) : canvas?.source === "seed" ? (
+            <span>🟢 Local Studio Prototype Loaded</span>
+          ) : (
+            <span>✨ Living Studio Canvas ready</span>
+          )}
+          {canvas && (
+            <span className="source-badge">
+              source: <b>{canvas.source}</b>
+              {canvasCached && <span className="cached-badge"> · cached · updating…</span>}
+            </span>
+          )}
+        </div>
+      )}
 
-      <div className="studio-tabs__list" role="tablist" aria-label="Living Studio canvas">
-        {TABS.map((tab) => (
-          <button
-            key={tab.id}
-            type="button"
-            role="tab"
-            id={`tab-${tab.id}`}
-            className="studio-tab"
-            aria-selected={activeTab === tab.id}
-            aria-controls={`panel-${tab.id}`}
-            onClick={() => setActiveTab(tab.id)}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
+      {showTabs && (
+        <div className="studio-tabs__list" role="tablist" aria-label="Living Studio canvas">
+          {TABS.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              role="tab"
+              id={`tab-${tab.id}`}
+              className="studio-tab"
+              aria-selected={activeTab === tab.id}
+              aria-controls={`panel-${tab.id}`}
+              onClick={() => setActiveTab(tab.id)}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      )}
 
-      <div role="tabpanel" id={`panel-${activeTab}`} aria-labelledby={`tab-${activeTab}`}>
-        {renderPanel(activeTab)}
-      </div>
+      {showTabs && (
+        <div role="tabpanel" id={`panel-${activeTab}`} aria-labelledby={`tab-${activeTab}`}>
+          {renderPanel(activeTab)}
+        </div>
+      )}
     </div>
   );
 }
