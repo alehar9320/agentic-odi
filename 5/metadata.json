@@ -1,0 +1,27 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M5AJ8Q8RV7CAS3XE9RKSD8DT",
+  "session_id": "ses_eb004a12cffe1EZvuFNcCCzI6S",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-19T17:10:30.004953191Z",
+  "branch": "feature/cli-odi-entity-parity",
+  "checkpoints_count": 1,
+  "save_step_count": 1,
+  "files_touched": [],
+  "agent": "OpenCode",
+  "model": "nemotron-3.5-lightning-free",
+  "turn_id": "a6bdc710748f",
+  "checkpoint_transcript_start": 154,
+  "transcript_lines_at_start": 154,
+  "compact_transcript_start": 154,
+  "token_usage": {
+    "input_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 0,
+    "output_tokens": 0,
+    "api_call_count": 0
+  },
+  "session_metrics": {
+    "turn_count": 1
+  }
+}
