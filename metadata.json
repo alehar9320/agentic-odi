@@ -3,7 +3,7 @@
   "checkpoint_id": "01M5AKH1NVE2K80SSF1CPNPZ8N",
   "strategy": "manual-commit",
   "branch": "topic/minimalistic-gui",
-  "checkpoints_count": 2,
+  "checkpoints_count": 4,
   "files_touched": null,
   "sessions": [
     {
@@ -19,13 +19,20 @@
       "compact_transcript": "/1/transcript.jsonl",
       "content_hash": "/1/content_hash.txt",
       "prompt": "/1/prompt.txt"
+    },
+    {
+      "metadata": "/2/metadata.json",
+      "transcript": "/2/full.jsonl",
+      "compact_transcript": "/2/transcript.jsonl",
+      "content_hash": "/2/content_hash.txt",
+      "prompt": "/2/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 207742,
+    "input_tokens": 309700,
     "cache_creation_tokens": 0,
-    "cache_read_tokens": 1810944,
-    "output_tokens": 2937,
-    "api_call_count": 18
+    "cache_read_tokens": 3229936,
+    "output_tokens": 7463,
+    "api_call_count": 38
   }
 }
