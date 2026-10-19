@@ -12,7 +12,7 @@ import typer
 
 from cli import context, paths, update, version
 from cli.connectors import connectors_app
-from cli.outcomes import outcomes_app
+from cli.customer_outcomes import customer_outcomes_app, score
 from cli.version import __version__  # noqa: F401  (re-exported for tests)
 
 app = typer.Typer(
@@ -21,8 +21,14 @@ app = typer.Typer(
     no_args_is_help=False,
 )
 app.add_typer(connectors_app, name="connectors")
-
-app.add_typer(outcomes_app, name="outcomes", help="Manage Customer Outcomes")
+app.add_typer(customer_outcomes_app, name="customer-outcomes", help="Manage Customer Outcomes")
+app.add_typer(
+    customer_outcomes_app,
+    name="outcomes",
+    help="Alias for customer-outcomes.",
+    hidden=True,
+)
+app.command(name="score")(score)
 
 
 def _version_callback(ctx: typer.Context, value: bool) -> None:
@@ -56,10 +62,16 @@ def main(
         is_eager=True,
         help="Show verbose version information (with --version)",
     ),
-    backend: str | None = typer.Option(None, "--backend", help="Backend: local | mcp"),
+    backend: str | None = typer.Option(
+        None, "--backend", help="Backend to use: local (SQLite) | mcp (remote server)."
+    ),
+    db: str | None = typer.Option(
+        None, "--db", help="Path to the local SQLite database (local backend)."
+    ),
+    mcp_url: str | None = typer.Option(None, "--mcp-url", help="MCP server URL (mcp backend)."),
     no_update: bool = typer.Option(False, "--no-update", help="Disable the startup update check"),
 ) -> None:  # noqa: B008
-    context.set_backend(backend)
+    context.set_options(backend=backend, db_path=db, mcp_url=mcp_url)
     if not no_update:
         threading.Thread(target=_startup_auto_update, args=(no_update,), daemon=True).start()
 

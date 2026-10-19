@@ -1,19 +1,27 @@
-"""Customer Outcomes CLI subcommands."""
+"""Customer Outcomes CLI subcommands.
+
+Customer Outcomes link customer value to business value. Every command works
+against whichever backend is selected (local SQLite by default, or a remote MCP
+server via ``--backend mcp``).
+"""
 
 from __future__ import annotations
 
-import asyncio
-import os
 from enum import Enum
 from typing import Any
 
 import typer
 
-from cli import context
+from cli.backend import run_tool
+from cli.render import (
+    render_customer_outcome,
+    render_customer_outcome_list,
+    render_deleted,
+    render_saved,
+    render_score,
+)
 
-MCP_URL_DEFAULT = os.getenv("AGENTIC_ODI_MCP_URL", "http://localhost:8000/mcp")
-
-outcomes_app = typer.Typer(help="Manage Customer Outcome entities.")
+customer_outcomes_app = typer.Typer(help="Manage Customer Outcomes.")
 
 
 class DirectionOption(str, Enum):
@@ -32,22 +40,10 @@ class CategoryOption(str, Enum):
     OTHER = "other"
 
 
-def _call_mcp(tool: str, args: dict[str, Any], mcp_url: str = MCP_URL_DEFAULT) -> str:
-    from fastmcp import Client
-
-    async def _run() -> str:
-        async with Client(mcp_url) as client:
-            result = await client.call_tool(tool, args)
-            return result.content[0].text  # type: ignore[index]
-
-    try:
-        return asyncio.run(_run())
-    except Exception as exc:  # noqa: BLE001
-        typer.echo(f"Error: could not reach MCP server at {mcp_url}: {exc}", err=True)
-        raise typer.Exit(code=1) from exc
+JSON_OPTION = typer.Option(False, "--json", help="Emit machine-readable JSON.")
 
 
-@outcomes_app.command("add")
+@customer_outcomes_app.command("add")
 def add(
     job_id: str = typer.Option(..., help="Job ID the outcome belongs to"),
     direction: DirectionOption = typer.Option(..., help="minimize | maximize"),  # noqa: B008
@@ -60,10 +56,10 @@ def add(
     business_statement: str = typer.Option(..., help="Business value statement"),
     contextual_clarifier: str | None = typer.Option(default=None),
     step_id: str | None = typer.Option(default=None),
-    mcp_url: str = typer.Option(default=MCP_URL_DEFAULT, help="MCP server URL"),
+    json_output: bool = JSON_OPTION,
 ) -> None:
     """Add a Customer Outcome with customer and business value."""
-    customer_value = {
+    customer_value: dict[str, Any] = {
         "direction": direction.value,
         "unit_of_measure": unit_of_measure,
         "object_of_control": object_of_control,
@@ -73,58 +69,41 @@ def add(
     }
     if contextual_clarifier:
         customer_value["contextual_clarifier"] = contextual_clarifier
-    business_value = {
-        "category": category.value,
-        "statement": business_statement,
-    }
     args: dict[str, Any] = {
         "job_id": job_id,
         "customer_value": customer_value,
-        "business_value": business_value,
+        "business_value": {"category": category.value, "statement": business_statement},
     }
     if step_id:
         args["step_id"] = step_id
-    from cli.backend import get_backend
-
-    typer.echo(
-        get_backend(context.selected_backend(), mcp_url=mcp_url).call("add_customer_outcome", args)
-    )
+    result = run_tool("add_customer_outcome", args)
+    typer.echo(render_saved("created", result, as_json=json_output))
 
 
-@outcomes_app.command("get")
+@customer_outcomes_app.command("get")
 def get(
     outcome_id: str = typer.Argument(...),
-    mcp_url: str = typer.Option(default=MCP_URL_DEFAULT, help="MCP server URL"),
+    json_output: bool = JSON_OPTION,
 ) -> None:
     """Get a Customer Outcome by ID."""
-    from cli.backend import get_backend
-
-    typer.echo(
-        get_backend(context.selected_backend(), mcp_url=mcp_url).call(
-            "get_customer_outcome", {"outcome_id": outcome_id}
-        )
-    )
+    result = run_tool("get_customer_outcome", {"outcome_id": outcome_id})
+    typer.echo(render_customer_outcome(result, as_json=json_output))
 
 
-@outcomes_app.command("list")
+@customer_outcomes_app.command("list")
 def list_outcomes(
     job_id: str | None = typer.Option(default=None, help="Filter by job ID"),
-    mcp_url: str = typer.Option(default=MCP_URL_DEFAULT, help="MCP server URL"),
+    json_output: bool = JSON_OPTION,
 ) -> None:
     """List Customer Outcomes."""
     args: dict[str, Any] = {}
     if job_id:
         args["job_id"] = job_id
-    from cli.backend import get_backend
-
-    typer.echo(
-        get_backend(context.selected_backend(), mcp_url=mcp_url).call(
-            "list_customer_outcomes", args
-        )
-    )
+    result = run_tool("list_customer_outcomes", args)
+    typer.echo(render_customer_outcome_list(result, as_json=json_output))
 
 
-@outcomes_app.command("update")
+@customer_outcomes_app.command("update")
 def update(
     outcome_id: str = typer.Argument(...),
     importance: float | None = typer.Option(default=None, min=1.0, max=10.0),
@@ -140,7 +119,7 @@ def update(
     estimated_annual_value: float | None = typer.Option(default=None),
     confidence: float | None = typer.Option(default=None),
     step_id: str | None = typer.Option(default=None),
-    mcp_url: str = typer.Option(default=MCP_URL_DEFAULT, help="MCP server URL"),
+    json_output: bool = JSON_OPTION,
 ) -> None:
     """Update a Customer Outcome."""
     args: dict[str, Any] = {"outcome_id": outcome_id}
@@ -170,47 +149,36 @@ def update(
         args["estimated_annual_value"] = estimated_annual_value
     if confidence is not None:
         args["confidence"] = confidence
-    from cli.backend import get_backend
-
-    typer.echo(
-        get_backend(context.selected_backend(), mcp_url=mcp_url).call(
-            "update_customer_outcome", args
-        )
-    )
+    result = run_tool("update_customer_outcome", args)
+    typer.echo(render_saved("updated", result, as_json=json_output))
 
 
-@outcomes_app.command("delete")
+@customer_outcomes_app.command("delete")
 def delete(
     outcome_id: str = typer.Argument(...),
     yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation"),
-    mcp_url: str = typer.Option(default=MCP_URL_DEFAULT, help="MCP server URL"),
+    json_output: bool = JSON_OPTION,
 ) -> None:
     """Delete a Customer Outcome."""
     if not yes:
         confirm = typer.confirm(f"Delete customer outcome {outcome_id}?")
         if not confirm:
             raise typer.Exit()
-    from cli.backend import get_backend
-
-    typer.echo(
-        get_backend(context.selected_backend(), mcp_url=mcp_url).call(
-            "delete_customer_outcome", {"outcome_id": outcome_id}
-        )
-    )
+    result = run_tool("delete_customer_outcome", {"outcome_id": outcome_id})
+    typer.echo(render_deleted(result, as_json=json_output))
 
 
-@outcomes_app.command("score")
 def score(
     importance: float = typer.Argument(..., min=1.0, max=10.0),
     satisfaction: float = typer.Argument(..., min=1.0, max=10.0),
-    mcp_url: str = typer.Option(default=MCP_URL_DEFAULT, help="MCP server URL"),
+    json_output: bool = JSON_OPTION,
 ) -> None:
-    """Compute ODI Opportunity Score."""
-    from cli.backend import get_backend
-
-    typer.echo(
-        get_backend(context.selected_backend(), mcp_url=mcp_url).call(
-            "compute_opportunity",
-            {"importance": importance, "satisfaction": satisfaction},
-        )
+    """Compute an ODI Opportunity Score."""
+    result = run_tool(
+        "compute_opportunity",
+        {"importance": importance, "satisfaction": satisfaction},
     )
+    typer.echo(render_score(importance, satisfaction, result, as_json=json_output))
+
+
+customer_outcomes_app.command(name="score")(score)

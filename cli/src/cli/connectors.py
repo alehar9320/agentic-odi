@@ -61,6 +61,28 @@ ConfigOption = typer.Option(
     envvar="AGENTIC_ODI_CONNECTORS_FILE",
 )
 
+_CONNECTOR_TIMEOUT = 30.0
+
+
+def _connector_timeout() -> float:
+    raw = os.getenv("AGENTIC_ODI_CONNECTOR_TIMEOUT")
+    if not raw:
+        return _CONNECTOR_TIMEOUT
+    try:
+        return float(raw)
+    except ValueError:
+        return _CONNECTOR_TIMEOUT
+
+
+def _run(coro, name: str):
+    """Run a connector coroutine with a bounded timeout and clean failure."""
+    timeout = _connector_timeout()
+    try:
+        return asyncio.run(asyncio.wait_for(coro, timeout=timeout))
+    except asyncio.TimeoutError as exc:
+        typer.echo(f"Error: connector '{name}' timed out after {timeout:.0f}s", err=True)
+        raise typer.Exit(code=1) from exc
+
 
 @connectors_app.command("list")
 def list_connectors(
@@ -208,7 +230,7 @@ def health_connector(
     except (ConnectorNotFoundError, UnknownConnectorKindError) as exc:
         typer.echo(f"Error: {exc}", err=True)
         raise typer.Exit(code=1) from exc
-    status = asyncio.run(connector.health())
+    status = _run(connector.health(), name)
     typer.echo(status.model_dump_json())
     if not status.ok:
         raise typer.Exit(code=1)
@@ -228,6 +250,6 @@ def ingest_connector(
     except (ConnectorNotFoundError, UnknownConnectorKindError) as exc:
         typer.echo(f"Error: {exc}", err=True)
         raise typer.Exit(code=1) from exc
-    batch = asyncio.run(connector.ingest())
+    batch = _run(connector.ingest(), name)
     get_default_sink().append(batch)
     typer.echo(batch.model_dump_json())
