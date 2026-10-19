@@ -1,0 +1,46 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M5AF9TF402SBXBA2TGQ6RB93",
+  "session_id": "ses_eaf374cd7ffemVVX3um6Gk3zNr",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-19T16:19:01.661107839Z",
+  "branch": "topic/cli-hardening",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "cli/tests/test_backend.py",
+    "cli/tests/test_backend_selection.py",
+    "cli/tests/test_cli.py",
+    "cli/tests/test_connectors_cli.py",
+    "cli/tests/test_customer_outcomes_cli.py",
+    "cli/tests/test_render.py",
+    "cli/tests/test_startup_perf.py"
+  ],
+  "agent": "OpenCode",
+  "model": "nemotron-3.5-lightning-free",
+  "turn_id": "6ed53aa02e08",
+  "checkpoint_transcript_start": 20,
+  "transcript_lines_at_start": 20,
+  "compact_transcript_start": 20,
+  "token_usage": {
+    "input_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 0,
+    "output_tokens": 0,
+    "api_call_count": 0
+  },
+  "session_metrics": {
+    "turn_count": 1
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-10-19T16:19:01.650679582Z",
+    "agent_lines": 488,
+    "agent_removed": 324,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 488,
+    "total_lines_changed": 812,
+    "agent_percentage": 100,
+    "metric_version": 2
+  }
+}
