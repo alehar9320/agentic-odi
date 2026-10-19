@@ -58,12 +58,16 @@ export function StudioShell({ engagementLevel }: { engagementLevel: number }) {
   }
 }
 
-export default function App() {
+function StudioShellFromContext() {
   const { engagementLevel } = useStudio();
+  return <StudioShell engagementLevel={engagementLevel} />;
+}
+
+export default function App() {
   return (
     <ErrorBoundary>
       <StudioProvider>
-        <StudioShell engagementLevel={engagementLevel} />
+        <StudioShellFromContext />
       </StudioProvider>
     </ErrorBoundary>
   );
