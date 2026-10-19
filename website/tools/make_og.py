@@ -53,7 +53,7 @@ _MARK_POINTS = (
 def _wrap(
     draw: ImageDraw.ImageDraw,
     text: str,
-    font: ImageFont.ImageFont,
+    font: ImageFont.ImageFont | ImageFont.FreeTypeFont,
     max_width: float,
 ) -> list[str]:
     """Greedy word wrap measured with draw.textlength."""
