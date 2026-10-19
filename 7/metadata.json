@@ -1,0 +1,43 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M5AE0EVRPT4GZHB9ZXFEHJ2N",
+  "session_id": "ses_eb02a3570ffe6cUPx2JaxLXSH3",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-19T15:56:34.559190004Z",
+  "branch": "fix/cli-main-hardening",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "cli/src/cli/connectors.py",
+    "cli/src/cli/outcomes.py",
+    "cli/tests/test_connectors_cli.py",
+    "cli/tests/test_startup_perf.py"
+  ],
+  "agent": "OpenCode",
+  "model": "big-pickle",
+  "turn_id": "d9092a6561d6",
+  "checkpoint_transcript_start": 20,
+  "transcript_lines_at_start": 20,
+  "compact_transcript_start": 20,
+  "token_usage": {
+    "input_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 0,
+    "output_tokens": 0,
+    "api_call_count": 0
+  },
+  "session_metrics": {
+    "turn_count": 1
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-10-19T15:56:34.551745017Z",
+    "agent_lines": 207,
+    "agent_removed": 278,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 207,
+    "total_lines_changed": 485,
+    "agent_percentage": 100,
+    "metric_version": 2
+  }
+}
