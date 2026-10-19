@@ -1,9 +1,1 @@
 The README has become way too lengthy. Shorten and move secondary information into docs/, as per industry best practice.
-
----
-
-It's me as sponsor that finds it ridiculously verbose
-
----
-
-Sure. I however need you to ensure that the README is helpful to both other developers, as well as users. As such, you need to link to those documents for detailed reading, but likely have high-level details still in README. This should be done with git worktree on separate topic branch
