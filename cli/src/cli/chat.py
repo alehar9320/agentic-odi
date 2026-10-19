@@ -239,9 +239,9 @@ def handle_command(
         return "handled"
     if command == "/connect":
         if on_connect is not None:
-            new_config = on_connect()
-            if new_config is not None:
-                typer.echo(f"Connected: {new_config.model} @ {new_config.base_url}")
+            connected_config = on_connect()
+            if connected_config is not None:
+                typer.echo(f"Connected: {connected_config.model} @ {connected_config.base_url}")
         else:
             typer.echo("Connect wizard not available in this context.")
         return "handled"

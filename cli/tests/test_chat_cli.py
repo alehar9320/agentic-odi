@@ -39,9 +39,15 @@ class _FakeSession:
     def __init__(self) -> None:
         self.tool_names = ["add_job", "get_jobs"]
         self.cleared = False
+        self.config = _config()
+        self.connection_state = ConnectionState(llm_ok=True, mcp_ok=True, mcp_tool_count=2)
 
     def clear(self) -> None:
         self.cleared = True
+
+    def update_config(self, new_config: ChatConfig) -> None:
+        self.config = new_config
+        self.connection_state.llm_ok = True
 
 
 class _FakeStream:

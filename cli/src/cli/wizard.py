@@ -6,6 +6,7 @@ import getpass
 
 import typer
 
+from cli.chat import ChatConfig
 from cli.profile import LLMProfile, save_llm_profile
 
 # ---------------------------------------------------------------------------
@@ -31,7 +32,7 @@ _VALID_PROVIDERS = list(_PRESETS.keys()) + ["other"]
 _PROVIDER_PROMPT = "Provider [openai/anthropic/local/other]"
 
 
-def run_connect_wizard(current_config: ChatConfig) -> ChatConfig | None:  # noqa: F821
+def run_connect_wizard(current_config: ChatConfig) -> ChatConfig | None:
     """Walk the user through LLM provider and MCP configuration interactively.
 
     Args:
@@ -42,9 +43,6 @@ def run_connect_wizard(current_config: ChatConfig) -> ChatConfig | None:  # noqa
         A new :class:`ChatConfig` built from the wizard's answers, or ``None``
         if the user cancelled with Ctrl-C.
     """
-    # Lazy import to avoid circular dependency: wizard → chat → wizard would loop.
-    from cli.chat import ChatConfig  # noqa: PLC0415
-
     try:
         # ------------------------------------------------------------------
         # Step 1 — Provider
