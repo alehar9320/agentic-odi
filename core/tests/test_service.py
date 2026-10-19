@@ -8,6 +8,7 @@ from core.models import BusinessImpactCategory, BusinessValue, CustomerValue, Di
 from core.repository import InMemoryRepository
 from core.services import (
     CustomerOutcomeNotFoundError,
+    JobNotFoundError,
     ODIService,
     ValueOutOfRangeError,
 )
@@ -107,3 +108,39 @@ def test_customer_outcome_not_found_errors(service: ODIService) -> None:
         service.update_customer_outcome("missing", {})
     with pytest.raises(CustomerOutcomeNotFoundError):
         service.delete_customer_outcome("missing")
+
+
+def test_job_not_found_error_exposes_the_job_id() -> None:
+    error = JobNotFoundError("job-1")
+
+    assert error.job_id == "job-1"
+    assert str(error) == "job-1"
+
+
+def test_add_customer_outcome_accepts_dict_payloads(service: ODIService) -> None:
+    job = service.add_job("Onboard customers")
+
+    outcome = service.add_customer_outcome(
+        job.id,
+        {
+            "direction": "minimize",
+            "unit_of_measure": "minutes",
+            "object_of_control": "time to onboard a customer",
+            "statement": "Minimize the time it takes to onboard a customer",
+            "importance": 8.0,
+            "satisfaction": 4.0,
+        },
+        {
+            "category": "revenue_growth",
+            "statement": "Increase expansion revenue",
+        },
+        step_id="step-1",
+    )
+
+    assert outcome.customer_value.opportunity_score == 12.0
+    assert outcome.business_value.category == BusinessImpactCategory.REVENUE_GROWTH
+    assert outcome.step_id == "step-1"
+
+
+def test_compute_opportunity_delegates_to_the_model(service: ODIService) -> None:
+    assert service.compute_opportunity(8.0, 4.0) == 12.0

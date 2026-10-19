@@ -7,11 +7,11 @@ coverage:
   range: "50...90"
 
   status:
-    # Baseline: hold the project at its current level (allow a 1% dip) instead of
-    # demanding a fixed target before we know where we stand.
+    # The suite is above 90% project-wide; hold that floor (with a 1% dip)
+    # instead of letting coverage drift back down.
     project:
       default:
-        target: auto
+        target: 90%
         threshold: 1%
     # Patch coverage is advisory while the suite is still being built out.
     patch:
