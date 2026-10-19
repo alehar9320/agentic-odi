@@ -3,8 +3,12 @@
   "checkpoint_id": "01M5AKFENXERA59N0RXEWKGNBM",
   "strategy": "manual-commit",
   "branch": "feature/codecov-coverage",
-  "checkpoints_count": 4,
-  "files_touched": null,
+  "checkpoints_count": 5,
+  "files_touched": [
+    ".github/workflows/ci.yml",
+    "README.md",
+    "codecov.yml"
+  ],
   "sessions": [
     {
       "metadata": "/0/metadata.json",
@@ -26,6 +30,13 @@
       "compact_transcript": "/2/transcript.jsonl",
       "content_hash": "/2/content_hash.txt",
       "prompt": "/2/prompt.txt"
+    },
+    {
+      "metadata": "/3/metadata.json",
+      "transcript": "/3/full.jsonl",
+      "compact_transcript": "/3/transcript.jsonl",
+      "content_hash": "/3/content_hash.txt",
+      "prompt": ""
     }
   ],
   "token_usage": {
