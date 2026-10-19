@@ -138,29 +138,36 @@ These are absolute constraints the agent must respect:
 
 ## 📄 README Maintenance Guardrail
 
-`README.md` is the **primary human-facing source of truth** for this project. The agent MUST keep it current at all times.
+`README.md` is the **primary human-facing entry point** for this project: a short,
+high-level front door aimed at both users and developers. Detailed material lives
+in `docs/` and is linked from the README. The agent MUST keep both current at all
+times.
 
-### When to update README.md
+### When to update
 
-Update `README.md` whenever any of the following change:
+Update the relevant file whenever any of the following change:
 
-| Change type | README section to update |
+| Change type | Where to update |
 |---|---|
-| New or removed Python file | **Code Overview** |
-| New dependency added (`pip install ...`) | **Prerequisites** |
-| New way to run the project | **Running the Environment** |
-| New MCP tool or capability | **Code Overview** / relevant section |
-| New workflow or agent instruction | **Getting Started → Agent-driven testing** |
-| Deployment URL or cloud setup changes | **Deployment** |
-| Roadmap item completed or added | **Roadmap & Next Steps** |
+| New or removed Python file / package | `README.md` **Code Overview** |
+| New dependency added (`pip install ...`) | `README.md` **Quick Start → Prerequisites** |
+| New way to run the project | `README.md` **Quick Start** and `docs/living-studio.md` |
+| New MCP tool or capability | `README.md` **Code Overview** / relevant doc |
+| New CLI command or flag | `docs/cli.md` |
+| New connector kind | `docs/connectors.md` |
+| New workflow or agent instruction | `docs/living-studio.md` |
+| Deployment URL or cloud setup changes | `docs/deployment.md` |
+| Roadmap item completed or added | `docs/roadmap.md` |
+| Test layout or coverage changes | `docs/development.md` |
 
 ### Rules
 
-- ✅ **Update README in the same task** as the change that triggered it — never defer to a follow-up.
-- ✅ **Keep the "Running the Environment" section accurate**: always reflect `python -m client.run` as the recommended launch command.
+- ✅ **Update docs in the same task** as the change that triggered it — never defer to a follow-up.
+- ✅ **Keep README short**: it stays a high-level orientation page. Push detail into `docs/` and link to it rather than growing the README.
+- ✅ **Keep the Quick Start accurate**: always reflect `python -m client.run` as the recommended launch command.
 - ✅ **Keep Prerequisites up to date**: add any new `pip install` dependency immediately.
 - ✅ **Mark Roadmap items `[x]` when completed** — do not leave stale unchecked items.
-- ❌ **Never leave README in a stale state** where documented commands or files no longer match the codebase.
+- ❌ **Never leave the README or `docs/` in a stale state** where documented commands or files no longer match the codebase.
 
 ---
 
