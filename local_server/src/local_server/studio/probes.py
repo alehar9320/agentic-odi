@@ -17,13 +17,34 @@ DEFAULT_MCP_URL = "http://localhost:8000/mcp"
 OFFLINE_MESSAGE = "LLM server offline (Local Studio Mode enabled)"
 
 
+def _load_profile_fallback() -> dict[str, str]:
+    """Read llm_profile.json directly without importing cli package."""
+    import json
+    from pathlib import Path
+
+    xdg = os.getenv("XDG_CONFIG_HOME")
+    cfg_dir = Path(xdg) / "agentic-odi" if xdg else Path.home() / ".config" / "agentic-odi"
+    profile_file = cfg_dir / "llm_profile.json"
+    if not profile_file.exists():
+        return {}
+    try:
+        with open(profile_file) as f:
+            return json.load(f)
+    except Exception:  # noqa: BLE001
+        return {}
+
+
 def defaults() -> dict[str, str]:
-    """Streamlit-compatible environment defaults (same variable names)."""
+    """Streamlit-compatible environment defaults (same variable names).
+
+    Priority order: environment variable > persisted llm_profile.json > hardcoded constant.
+    """
+    profile = _load_profile_fallback()
     return {
-        "base_url": os.getenv("AGENTIC_ODI_BASE_URL", DEFAULT_BASE_URL),
-        "api_key": os.getenv("AGENTIC_ODI_API_KEY", DEFAULT_API_KEY),
-        "model_name": os.getenv("AGENTIC_ODI_MODEL", DEFAULT_MODEL),
-        "mcp_url": os.getenv("AGENTIC_ODI_MCP_URL", DEFAULT_MCP_URL),
+        "base_url": os.getenv("AGENTIC_ODI_BASE_URL") or profile.get("base_url") or DEFAULT_BASE_URL,
+        "api_key": os.getenv("AGENTIC_ODI_API_KEY") or profile.get("api_key") or DEFAULT_API_KEY,
+        "model_name": os.getenv("AGENTIC_ODI_MODEL") or profile.get("model") or DEFAULT_MODEL,
+        "mcp_url": os.getenv("AGENTIC_ODI_MCP_URL") or profile.get("mcp_url") or DEFAULT_MCP_URL,
     }
 
 

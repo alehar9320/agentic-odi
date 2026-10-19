@@ -36,19 +36,20 @@ machine-readable output. Diagnostics go to stderr and failures exit non-zero
 
 ## Interactive chat
 
-`agentic-odi chat` (or simply `agentic-odi` in a terminal) starts a
-conversational session against the MCP server and an OpenAI-compatible LLM.
-Responses stream to the terminal, and the assistant can call the ODI MCP tools
-as it talks.
+`agentic-odi chat` (or simply `agentic-odi` in a terminal) starts an
+offline-first interactive REPL. The session always boots, even when no model or
+MCP server is reachable — a yellow warning is shown for any unavailable service,
+and free-text messages return a friendly nudge until you connect.
 
 ```bash
 agentic-odi chat
 agentic-odi chat --model local-tools-model --mcp-url http://localhost:8000/mcp
 ```
 
-Before starting, run the MCP server (`python -m mcp_server`) and point the chat
-at an OpenAI-compatible model endpoint. The chat reads the same environment
-variables as the Living Studio:
+### Connection settings
+
+The chat resolves settings in priority order:
+**CLI flag → environment variable → persisted profile → built-in default.**
 
 | Variable | Default | CLI flag |
 |---|---|---|
@@ -57,9 +58,35 @@ variables as the Living Studio:
 | `AGENTIC_ODI_API_KEY` | `local` | `--api-key` |
 | `AGENTIC_ODI_MCP_URL` | `http://localhost:8000/mcp` | `--mcp-url` |
 
-Inside the session, `/help` lists the commands, `/tools` lists the MCP tools the
-assistant can call, `/clear` resets the conversation, and `/exit` (or `/quit`)
-ends the session.
+The **persisted profile** is stored at
+`~/.config/agentic-odi/llm_profile.json`. You can create or update it from
+within the session using `/connect`.
+
+### Slash commands
+
+| Command | Description |
+|---|---|
+| `/help` | Show all available commands |
+| `/status` | Show current model, base URL, and MCP server with connection status |
+| `/connect` | Launch the wizard: provider → URL → API key → model → MCP URL → save |
+| `/model <name>` | Hot-swap to a different model mid-session |
+| `/mcp <url>` | Reconnect to a different MCP server mid-session |
+| `/tools` | List the MCP tools the assistant can call |
+| `/clear` | Reset conversation history (keeps connection) |
+| `/exit` | Quit the session (also `/quit`) |
+
+### /connect wizard
+
+`/connect` walks you through configuring your LLM provider interactively:
+
+1. **Provider** — choose `openai`, `anthropic`, `local`, or `other`
+2. **Base URL** — preset filled for known providers; override freely
+3. **API key** — input is hidden via `getpass`
+4. **Model** — sensible default per provider
+5. **MCP URL** — defaults to the current value
+6. **Save to profile?** — writes `~/.config/agentic-odi/llm_profile.json` so settings persist across sessions
+
+The wizard can be cancelled at any step with Ctrl-C.
 
 > [!NOTE]
 > Chat is the only CLI mode that needs an LLM endpoint. The `customer-outcomes`

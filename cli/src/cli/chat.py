@@ -36,10 +36,14 @@ scores above 10 as underserved. Keep answers concise and readable as plain text.
 )
 
 HELP_TEXT = """Commands:
-  /help   Show this help
-  /clear  Clear the conversation history
-  /tools  List the MCP tools available to the assistant
-  /exit   Quit (also /quit)
+  /help      Show this help
+  /status    Show connection status (model, MCP server)
+  /connect   Configure LLM provider and MCP server (wizard)
+  /model <name>  Switch to a different model
+  /mcp <url>     Reconnect to a different MCP server
+  /clear     Clear the conversation history
+  /tools     List the MCP tools available to the assistant
+  /exit      Quit (also /quit)
 
 Anything else is sent to the ODI assistant."""
 
@@ -62,21 +66,64 @@ class ChatConfig:
         model: str | None = None,
         mcp_url: str | None = None,
     ) -> ChatConfig:
-        """Resolve explicit values first, then environment variables, then defaults."""
+        """Resolve settings in priority order: explicit arg > env var > LLM profile > default."""
+        # Lazy import to avoid circular imports between chat and profile.
+        from cli.profile import load_llm_profile  # noqa: PLC0415
+
+        try:
+            llm_profile = load_llm_profile()
+        except Exception:  # noqa: BLE001
+            llm_profile = None
+
         return cls(
-            base_url=base_url or os.getenv("AGENTIC_ODI_BASE_URL") or DEFAULT_BASE_URL,
-            api_key=api_key or os.getenv("AGENTIC_ODI_API_KEY") or DEFAULT_API_KEY,
-            model=model or os.getenv("AGENTIC_ODI_MODEL") or DEFAULT_MODEL,
-            mcp_url=mcp_url or os.getenv("AGENTIC_ODI_MCP_URL") or DEFAULT_MCP_URL,
+            base_url=(
+                base_url
+                or os.getenv("AGENTIC_ODI_BASE_URL")
+                or (llm_profile.base_url if llm_profile else None)
+                or DEFAULT_BASE_URL
+            ),
+            api_key=(
+                api_key
+                or os.getenv("AGENTIC_ODI_API_KEY")
+                or (llm_profile.api_key if llm_profile else None)
+                or DEFAULT_API_KEY
+            ),
+            model=(
+                model
+                or os.getenv("AGENTIC_ODI_MODEL")
+                or (llm_profile.model if llm_profile else None)
+                or DEFAULT_MODEL
+            ),
+            mcp_url=(
+                mcp_url
+                or os.getenv("AGENTIC_ODI_MCP_URL")
+                or (llm_profile.mcp_url if llm_profile else None)
+                or DEFAULT_MCP_URL
+            ),
         )
+
+
+@dataclass
+class ConnectionState:
+    """Mutable connection status for a chat session."""
+
+    llm_ok: bool = False
+    mcp_ok: bool = False
+    mcp_tool_count: int = 0
+    error_llm: str | None = None
+    error_mcp: str | None = None
 
 
 class ChatSessionLike(Protocol):
     """The session surface the command handler needs."""
 
     tool_names: list[str]
+    config: ChatConfig
+    connection_state: ConnectionState
 
     def clear(self) -> None: ...
+
+    def update_config(self, config: ChatConfig) -> None: ...
 
 
 def _to_openai_tools(tools: list[Any]) -> list[dict[str, Any]]:
@@ -117,8 +164,21 @@ def _tool_result_text(result: Any) -> str:
     return text or str(result)
 
 
-def handle_command(line: str, session: ChatSessionLike) -> Literal["exit", "handled"] | None:
-    """Handle a slash command, or return None when the line is a chat message."""
+def handle_command(
+    line: str,
+    session: ChatSessionLike,
+    *,
+    on_connect: Callable[[], ChatConfig | None] | None = None,
+    on_mcp_reconnect: Callable[[str], bool] | None = None,
+) -> Literal["exit", "handled"] | tuple[str, str] | None:
+    """Handle a slash command, or return None when the line is a chat message.
+
+    Returns:
+        "exit"              — caller should end the session.
+        "handled"           — command was handled; continue the REPL.
+        ("reconnect_mcp", url) — caller should reconnect MCP then continue.
+        None                — not a command; caller should send to the LLM.
+    """
     command = line.strip().lower()
     if command in {"/exit", "/quit"}:
         return "exit"
@@ -135,10 +195,76 @@ def handle_command(line: str, session: ChatSessionLike) -> Literal["exit", "hand
         else:
             typer.echo("No tools loaded.")
         return "handled"
+    if command == "/status":
+        state = session.connection_state
+        llm_status = "connected" if state.llm_ok else "not connected"
+        mcp_status = (
+            f"connected ({state.mcp_tool_count} tools)" if state.mcp_ok else "not connected"
+        )
+        typer.echo(f"model  : {session.config.model}  [{llm_status}]")
+        typer.echo(f"url    : {session.config.base_url}")
+        typer.echo(f"mcp    : {session.config.mcp_url}  [{mcp_status}]")
+        return "handled"
+    if command.startswith("/model"):
+        parts = line.strip().split(None, 1)
+        if len(parts) < 2 or not parts[1].strip():
+            typer.echo(f"Current model: {session.config.model}")
+        else:
+            new_model = parts[1].strip()
+            new_config = ChatConfig(
+                base_url=session.config.base_url,
+                api_key=session.config.api_key,
+                model=new_model,
+                mcp_url=session.config.mcp_url,
+            )
+            session.update_config(new_config)
+            typer.echo(f"Model set to: {new_model}")
+        return "handled"
+    if command.startswith("/mcp"):
+        parts = line.strip().split(None, 1)
+        if len(parts) < 2 or not parts[1].strip():
+            typer.echo(f"Current MCP URL: {session.config.mcp_url}")
+        else:
+            new_url = parts[1].strip()
+            if on_mcp_reconnect is not None:
+                ok = on_mcp_reconnect(new_url)
+                if ok:
+                    typer.echo(
+                        f"MCP reconnected: {new_url} ({session.connection_state.mcp_tool_count} tools)"
+                    )
+                else:
+                    typer.echo(f"Failed to connect to MCP at {new_url}")
+            else:
+                typer.echo("MCP reconnect not available in this context.")
+        return "handled"
+    if command == "/connect":
+        if on_connect is not None:
+            new_config = on_connect()
+            if new_config is not None:
+                typer.echo(f"Connected: {new_config.model} @ {new_config.base_url}")
+        else:
+            typer.echo("Connect wizard not available in this context.")
+        return "handled"
     if command.startswith("/"):
         typer.echo(f"Unknown command: {line}. Type /help for commands.")
         return "handled"
     return None
+
+
+async def _try_connect_mcp(mcp_url: str) -> tuple[Any, list[Any], str | None]:
+    """Attempt to connect to the MCP server and list its tools.
+
+    Returns:
+        (mcp_client, tools, None) on success.
+        (None, [], error_message) on failure.
+    """
+    try:
+        async with Client(mcp_url) as c:
+            tools = await c.list_tools()
+        # Re-create a fresh context manager for the caller to manage lifetime.
+        return Client(mcp_url), tools, None
+    except Exception as exc:  # noqa: BLE001
+        return None, [], str(exc)
 
 
 class ChatSession:
@@ -150,11 +276,15 @@ class ChatSession:
         openai_client: Any,
         mcp_client: Any,
         *,
+        connection_state: ConnectionState | None = None,
         on_tool: Callable[[str, dict[str, Any]], None] | None = None,
     ) -> None:
         self.config = config
         self.openai_client = openai_client
         self.mcp_client = mcp_client
+        self.connection_state = (
+            connection_state if connection_state is not None else ConnectionState()
+        )
         self.on_tool = on_tool
         self.messages: list[dict[str, Any]] = [{"role": "system", "content": SYSTEM_PROMPT}]
         self.tools: list[dict[str, Any]] = []
@@ -169,6 +299,11 @@ class ChatSession:
     def clear(self) -> None:
         """Drop the conversation history but keep the system prompt and tools."""
         self.messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+
+    def update_config(self, new_config: ChatConfig) -> None:
+        """Hot-swap the session config and mark the LLM connection as live."""
+        self.config = new_config
+        self.connection_state.llm_ok = True
 
     async def _stream_completion(
         self, on_delta: Callable[[str], None] | None
@@ -230,6 +365,9 @@ class ChatSession:
 
     async def ask(self, text: str, on_delta: Callable[[str], None] | None = None) -> str:
         """Send a message, execute any tool calls, and return the final text."""
+        if not self.connection_state.llm_ok:
+            return "No model connected. Type /connect to set one up."
+
         checkpoint = len(self.messages)
         self.messages.append({"role": "user", "content": text})
         try:
@@ -267,64 +405,130 @@ def _print_tool(name: str, arguments: dict[str, Any]) -> None:
 
 async def _run_chat(config: ChatConfig) -> int:
     typer.echo("Agentic ODI · interactive")
-    typer.echo(f"model: {config.model}  ·  mcp: {config.mcp_url}")
-    typer.echo("Type /help for commands, /exit to quit.\n")
 
     llm: Any | None = None
+    conn = ConnectionState()
+
     try:
-        async with Client(config.mcp_url) as mcp_client:
-            llm = AsyncOpenAI(
-                base_url=config.base_url,
-                api_key=config.api_key,
-                timeout=60.0,
+        # --- MCP connection (optional) ---
+        mcp_client_ctx, tools, mcp_error = await _try_connect_mcp(config.mcp_url)
+        if mcp_error is None:
+            conn.mcp_ok = True
+            conn.mcp_tool_count = len(tools)
+        else:
+            conn.error_mcp = mcp_error
+            typer.secho(
+                f"⚠  MCP unavailable ({config.mcp_url}): {mcp_error}",
+                fg="yellow",
+                err=False,
             )
-            session = ChatSession(config, llm, mcp_client, on_tool=_print_tool)
-            await session.initialize()
+            typer.secho(
+                "   Starting without MCP tools. Use /mcp to reconnect.",
+                fg="yellow",
+                err=False,
+            )
 
-            while True:
-                try:
-                    line = input("you › ").strip()
-                except EOFError:
-                    typer.echo()
-                    break
-                except KeyboardInterrupt:
-                    typer.echo("\nUse /exit to quit.")
-                    continue
-
-                if not line:
-                    continue
-
-                action = handle_command(line, session)
-                if action == "exit":
-                    break
-                if action == "handled":
-                    continue
-
-                typer.secho("odi › ", fg="green", bold=True, nl=False)
-                printed = False
-
-                def on_delta(piece: str) -> None:
-                    nonlocal printed
-                    printed = True
-                    typer.echo(piece, nl=False)
-
-                try:
-                    await session.ask(line, on_delta=on_delta)
-                except Exception as exc:  # noqa: BLE001
-                    typer.echo()
-                    typer.echo(f"Error: {exc}", err=True)
-                    continue
-                typer.echo()
-                if not printed:
-                    typer.echo("(no response)")
-    except Exception as exc:  # noqa: BLE001
-        typer.echo(f"Error: could not start chat: {exc}", err=True)
-        typer.echo(
-            f"MCP server: {config.mcp_url} (`python -m mcp_server`)\n"
-            f"LLM endpoint: {config.base_url}",
-            err=True,
+        # --- LLM client (always created; actual reachability found on first use) ---
+        llm = AsyncOpenAI(
+            base_url=config.base_url,
+            api_key=config.api_key,
+            timeout=60.0,
         )
-        return 1
+        conn.llm_ok = True
+
+        # --- Startup banner ---
+        mcp_status = f"✓ {conn.mcp_tool_count} tools" if conn.mcp_ok else "✗ offline"
+        typer.echo(f"model: {config.model}  ·  mcp: {config.mcp_url} [{mcp_status}]")
+        typer.echo("Type /help for commands, /exit to quit.\n")
+
+        # --- Build session ---
+        session = ChatSession(
+            config,
+            llm,
+            mcp_client_ctx,  # may be None if MCP is offline
+            connection_state=conn,
+            on_tool=_print_tool,
+        )
+
+        # Populate tools from the probe we already did (avoids a second round-trip).
+        if conn.mcp_ok and tools:
+            session.tools = _to_openai_tools(tools)
+            session.tool_names = [t["function"]["name"] for t in session.tools]
+
+        # --- REPL ---
+        while True:
+            try:
+                line = input("you › ").strip()
+            except EOFError:
+                typer.echo()
+                break
+            except KeyboardInterrupt:
+                typer.echo("\nUse /exit to quit.")
+                continue
+
+            if not line:
+                continue
+
+            def _on_connect() -> ChatConfig | None:
+                from cli.wizard import run_connect_wizard  # noqa: PLC0415
+
+                new_config = run_connect_wizard(session.config)
+                if new_config is not None:
+                    session.update_config(new_config)
+                return new_config
+
+            def _on_mcp_reconnect(new_url: str) -> bool:
+                """Run MCP reconnect in a separate thread (avoids nested event loops)."""
+                import concurrent.futures  # noqa: PLC0415
+
+                async def _reconnect() -> bool:
+                    _, new_tools, err = await _try_connect_mcp(new_url)
+                    if err is not None:
+                        return False
+                    new_config = ChatConfig(
+                        base_url=session.config.base_url,
+                        api_key=session.config.api_key,
+                        model=session.config.model,
+                        mcp_url=new_url,
+                    )
+                    session.update_config(new_config)
+                    session.mcp_client = Client(new_url)
+                    session.tools = _to_openai_tools(new_tools)
+                    session.tool_names = [t["function"]["name"] for t in session.tools]
+                    session.connection_state.mcp_ok = True
+                    session.connection_state.mcp_tool_count = len(new_tools)
+                    return True
+
+                with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                    future = executor.submit(asyncio.run, _reconnect())
+                    return future.result()
+
+            action = handle_command(
+                line, session, on_connect=_on_connect, on_mcp_reconnect=_on_mcp_reconnect
+            )
+            if action == "exit":
+                break
+            if action == "handled":
+                continue
+
+            typer.secho("odi › ", fg="green", bold=True, nl=False)
+            printed = False
+
+            def on_delta(piece: str) -> None:
+                nonlocal printed
+                printed = True
+                typer.echo(piece, nl=False)
+
+            try:
+                reply = await session.ask(line, on_delta=on_delta)
+            except Exception as exc:  # noqa: BLE001
+                typer.echo()
+                typer.echo(f"Error: {exc}", err=True)
+                continue
+            typer.echo()
+            if not printed:
+                typer.echo(reply if reply else "(no response)")
+
     finally:
         if llm is not None:
             await llm.close()
