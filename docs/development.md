@@ -20,9 +20,10 @@ uv run --directory local_server mypy .
 uv run --directory client mypy .
 uv run --directory cli mypy .
 uv run --directory connectors mypy .
+uv run --directory website mypy .
 
 # Security scanning
-uv run bandit -c pyproject.toml -r core/src mcp_server/src local_server/src cli/src client/src connectors/src
+uv run bandit -c pyproject.toml -r core/src mcp_server/src local_server/src cli/src client/src connectors/src website/
 ```
 
 ## Frontend & Desktop Checks (studio)
@@ -35,6 +36,16 @@ npm --prefix studio run typecheck  # tsc --noEmit
 npm --prefix studio test -- --run  # Vitest (run once)
 npm --prefix studio run build      # production build → studio/dist
 cd studio/src-tauri && cargo fmt --check && cargo clippy -- -D warnings && cargo check
+```
+
+## Website Checks (GitHub Pages)
+
+The `website/` static site is part of the main CI workflow. Its tests assert the
+committed OG art is reproducible and that `index.html` stays in sync with the
+README:
+
+```bash
+uv run --directory website pytest tests/
 ```
 
 ## Formatting workflow
