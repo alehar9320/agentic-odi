@@ -1,0 +1,26 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M5APF172D942ECKJE71WWYJQ",
+  "strategy": "manual-commit",
+  "branch": "test/raise-coverage-to-90",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "uv.lock"
+  ],
+  "sessions": [
+    {
+      "metadata": "/0/metadata.json",
+      "transcript": "/0/full.jsonl",
+      "compact_transcript": "/0/transcript.jsonl",
+      "content_hash": "/0/content_hash.txt",
+      "prompt": "/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 1200827,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 17088128,
+    "output_tokens": 61416,
+    "api_call_count": 168
+  }
+}
