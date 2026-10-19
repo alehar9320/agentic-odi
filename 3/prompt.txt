@@ -1,0 +1,39 @@
+You are implementing Task 3 of the GitHub Pages site plan: the design system (colors, typography, spacing, responsive grid, focus-visible).
+
+## Task Description
+
+Read your task brief first: /home/alexa/repos/agentic-odi/.superpowers/sdd/2026-10-18-github-pages/task-3-brief.md
+It is your requirements, with exact values to use verbatim.
+
+## Context
+
+Work from: /home/alexa/repos/agentic-odi/.worktrees/gh-pages (branch feature/gh-pages, HEAD 383e3be). uv workspace; Python 3.11 via `uv run` / `UV_PYTHON=3.11`.
+
+Task 1 (make_og.py + tests) and Task 2 (site structure + tests) are complete and all gates pass. Task 3 starts from a clean state where only the deliverables from Tasks 1-2 exist.
+
+The design spec at docs/superpowers/specs/2026-10-18-github-pages-design.md has a full design system section (colors, typography, spacing, motion, accessibility). The plan at docs/superpowers/plans/2026-10-18-github-pages.md has 6 tasks; Task 3 is next. Do NOT modify Tasks 1-2 deliverables.
+
+Key constraints from the design + planning session (binding):
+1. **Color palette**: exactly these tokens (from spec): `--color-bg-light: #f8f9fa`, `--color-bg-dark: #212b36`, `--color-fg-light: #212b36`, `--color-fg-dark: #f8f9fa`, `--color-accent: #3b82f6`, `--color-accent-hover: #2563eb`, `--color-contrast: #334155`, `--color-reduced-motion: #e5e7eb`. All defined as CSS `:root` light tokens with `prefers-color-scheme: dark` overrides.
+2. **Typography**: system font stack; `font-size: 1rem` base; `line-height: 1.5`; `max-width: 64ch` for text blocks; heading scale `clamp(1.5rem, 3vw, 3rem)` for h1, `clamp(1.25rem, 2vw, 2rem)` for h2, etc.
+3. **Spacing / grid**: `spacing` scale `0.25rem` unit (0, 0.25, 0.5, 0.75, 1, 1.5, 2, 3); `max-width` of `64ch` for main content; `grid-template-columns: repeat(auto-fit, minmax(250px, 1fr))` for feature cards.
+4. **Motion**: `transition: all 200ms ease-in-out` as default; `prefers-reduced-motion` disables transitions (already in Task 2 CSS base). All JS IntersectionObserver thresholds opt-in with `prefers-reduced-motion` support.
+5. **Focus-visible**: `outline: 2px solid var(--color-accent)` on `*:focus-visible`; no outline on non-interactive elements.
+6. **Responsive**: above 640px grid shows 2-col layout; below mobile-first single column.
+
+## Your Job
+
+1. Create/extend `website/assets/style.css` with the full design system (colors, typography, spacing, grid, motion, focus-visible). Do NOT break existing selectors from Task 2.
+2. Create `website/assets/main.js` additions if needed for design system JS (e.g. reduced-motion media query handling, focus-visible enhancements). Keep it under 100 non-blank lines.
+3. TDD: add tests in `website/tests/test_site.py` (or a new `website/tests/test_design_system.py`) that verify color tokens are defined, typography clamp values, grid behaviour at breakpoints, focus-visible rules.
+4. Run ruff check + format on website/; mypy if applicable (these are HTML/CSS/JS so just lint).
+5. Commit with the brief's message
+6. Self-review, report
+
+## You Do Not Dispatch Subagents
+
+## Report Format
+
+Write your full report to /home/alexa/repos/agentic-odi/.superpowers/sdd/2026-10-18-github-pages/task-3-report.md
+
+Then report ONLY (under 15 lines): Status, commits, one-line test summary, concerns, report path.
