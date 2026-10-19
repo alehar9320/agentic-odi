@@ -5,17 +5,12 @@ from __future__ import annotations
 import asyncio
 import os
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import typer
-from connectors.factory import build_connector
-from connectors.models import ConnectorConfig
-from connectors.registry import (
-    ConnectorNotFoundError,
-    ConnectorRegistry,
-    DuplicateConnectorError,
-    UnknownConnectorKindError,
-)
-from connectors.sink import get_default_sink
+
+if TYPE_CHECKING:
+    from connectors.registry import ConnectorRegistry
 
 connectors_app = typer.Typer(
     name="connectors",
@@ -34,6 +29,8 @@ def _config_path(config: Path | None) -> Path:
 
 
 def _registry(config: Path | None) -> ConnectorRegistry:
+    from connectors.registry import ConnectorRegistry
+
     return ConnectorRegistry(_config_path(config))
 
 
@@ -72,6 +69,8 @@ def add_connector(
     config: Path | None = ConfigOption,
 ) -> None:
     """Register a new external connector."""
+    from connectors import models, registry
+
     settings: dict[str, object] = {}
     if kind == "mcp":
         if not url:
@@ -80,13 +79,13 @@ def add_connector(
         settings["url"] = url
         if tool:
             settings["tools"] = tool
-    connector_config = ConnectorConfig(name=name, kind=kind, settings=settings)
+    connector_config = models.ConnectorConfig(name=name, kind=kind, settings=settings)
     try:
         _registry(config).add(connector_config)
-    except DuplicateConnectorError as exc:
+    except registry.DuplicateConnectorError as exc:
         typer.echo(f"Error: {exc}", err=True)
         raise typer.Exit(code=1) from exc
-    except UnknownConnectorKindError as exc:
+    except registry.UnknownConnectorKindError as exc:
         typer.echo(f"Error: {exc}", err=True)
         raise typer.Exit(code=1) from exc
     typer.echo(f"Added {kind} connector '{name}'.")
@@ -98,10 +97,12 @@ def health_connector(
     config: Path | None = ConfigOption,
 ) -> None:
     """Check whether a connector can reach its external system."""
+    from connectors import factory, registry
+
     try:
         connector_config = _registry(config).get(name)
-        connector = build_connector(connector_config)
-    except (ConnectorNotFoundError, UnknownConnectorKindError) as exc:
+        connector = factory.build_connector(connector_config)
+    except (registry.ConnectorNotFoundError, registry.UnknownConnectorKindError) as exc:
         typer.echo(f"Error: {exc}", err=True)
         raise typer.Exit(code=1) from exc
     status = asyncio.run(connector.health())
@@ -116,12 +117,14 @@ def ingest_connector(
     config: Path | None = ConfigOption,
 ) -> None:
     """Ingest data from an external connector into the local ingest sink."""
+    from connectors import factory, registry, sink
+
     try:
         connector_config = _registry(config).get(name)
-        connector = build_connector(connector_config)
-    except (ConnectorNotFoundError, UnknownConnectorKindError) as exc:
+        connector = factory.build_connector(connector_config)
+    except (registry.ConnectorNotFoundError, registry.UnknownConnectorKindError) as exc:
         typer.echo(f"Error: {exc}", err=True)
         raise typer.Exit(code=1) from exc
     batch = asyncio.run(connector.ingest())
-    get_default_sink().append(batch)
+    sink.get_default_sink().append(batch)
     typer.echo(batch.model_dump_json())

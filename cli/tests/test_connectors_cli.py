@@ -132,7 +132,7 @@ def test_connectors_health_uses_built_connector(tmp_path: Path, monkeypatch) -> 
             str(config),
         ],
     )
-    monkeypatch.setattr("cli.connectors.build_connector", lambda _config: _FakeConnector())
+    monkeypatch.setattr("connectors.factory.build_connector", lambda _config: _FakeConnector())
 
     result = runner.invoke(app, ["connectors", "health", "--name", "gong", "--config", str(config)])
 
@@ -169,8 +169,8 @@ def test_connectors_ingest_appends_to_sink(tmp_path: Path, monkeypatch) -> None:
         ],
     )
     sink = MagicMock()
-    monkeypatch.setattr("cli.connectors.build_connector", lambda _config: _FakeConnector(batch))
-    monkeypatch.setattr("cli.connectors.get_default_sink", lambda: sink)
+    monkeypatch.setattr("connectors.factory.build_connector", lambda _config: _FakeConnector(batch))
+    monkeypatch.setattr("connectors.sink.get_default_sink", lambda: sink)
 
     result = runner.invoke(app, ["connectors", "ingest", "--name", "gong", "--config", str(config)])
 

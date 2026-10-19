@@ -8,7 +8,6 @@ from enum import Enum
 from typing import Any
 
 import typer
-from fastmcp import Client
 
 MCP_URL_DEFAULT = os.getenv("AGENTIC_ODI_MCP_URL", "http://localhost:8000/mcp")
 
@@ -32,6 +31,8 @@ class CategoryOption(str, Enum):
 
 
 def _call_mcp(tool: str, args: dict[str, Any], mcp_url: str = MCP_URL_DEFAULT) -> str:
+    from fastmcp import Client
+
     async def _run() -> str:
         async with Client(mcp_url) as client:
             result = await client.call_tool(tool, args)
