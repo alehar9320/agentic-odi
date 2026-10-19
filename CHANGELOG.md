@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.4.0](https://github.com/alehar9320/agentic-odi/compare/v0.3.0...v0.4.0) (2026-10-19)
+
+
+### Features
+
+* **cli:** local-first backend seam, customer-outcomes, readable output ([2e25c03](https://github.com/alehar9320/agentic-odi/commit/2e25c03713c4ebb5fd8d64e73b79b4bf5e6f0867))
+* **connectors:** add MCP connector presets for common ODI workflows ([dd81daf](https://github.com/alehar9320/agentic-odi/commit/dd81daf489f7903c0d03a93c4f2ef35663f7cd7e))
+
+
+### Bug Fixes
+
+* **ci:** unblock autonomous releases and make release assets attach ([9ce8db5](https://github.com/alehar9320/agentic-odi/commit/9ce8db5eb69d7924f2fda4bdf38ba6abd8f90517))
+
 ## [0.3.0](https://github.com/alehar9320/agentic-odi/compare/v0.2.0...v0.3.0) (2026-10-18)
 
 
