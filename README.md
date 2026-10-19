@@ -72,7 +72,7 @@ This repository is a [uv workspace](https://docs.astral.sh/uv/concepts/projects/
 | **`local_server/`** (`agentic-odi-local-server`) | The FastAPI **Living Studio sidecar**. It talks to the MCP server on the client's behalf and serves the Studio API — configuration, health probes, canvas data, MCP mutations, and streaming (SSE) chat with the LLM tool-loop — plus the built SPA when `studio/dist` exists. |
 | **`client/`** (`agentic-odi-client`) | The local dev **launcher** (`run.py` / `python -m client.run`) that starts the MCP server and the Studio sidecar together. (Its former Streamlit UI has been replaced by the `studio/` SPA.) |
 | **`studio/`** (React + TypeScript + Vite) | **The Living Studio** front end — a spatial, conversational GUI for Outcome-Driven Innovation with an interactive Opportunity Landscape, Universal Job Map, WYSIWYG Impact Simulation, and Causal Lineage inspection, paired with an autonomous copilot. Ships as a browser SPA and as a **Tauri 2 desktop app** (`studio/src-tauri/`). |
-| **`cli/`** (`agentic-odi-cli`) | A [`Typer`](https://github.com/fastapi/typer)-based command-line interface with an interactive chat mode plus `version`, `update`, `outcomes`, and `connectors` commands. |
+| **`cli/`** (`agentic-odi-cli`) | A [`Typer`](https://github.com/fastapi/typer)-based command-line interface with an interactive chat mode plus `version`, `update`, `connectors`, and `customer-outcomes` (alias `outcomes`) commands. Data commands are local-first (`--backend local`, default) or remote (`--backend mcp`), with readable tables, `--json`, and a top-level `score`. |
 | **`connectors/`** (`agentic-odi-connectors`) | Pluggable external integrations. The first kind is an **MCP client connector** that connects to a remote MCP server over HTTP, checks health, and ingests tools/resources into a local ingest sink. Additional kinds (REST, webhooks, and so on) can register against the same protocol later. |
 
 ---
@@ -94,7 +94,7 @@ This creates a `.venv` and installs `agentic-odi-core`, `agentic-odi-mcp-server`
 
 ### 💻 Command-Line Interface (CLI)
 
-The [`Typer`](https://github.com/fastapi/typer)-based CLI lets you interact with Agentic ODI directly from your terminal. It provides an interactive chat mode plus version, update, and data commands.
+The [`Typer`](https://github.com/fastapi/typer)-based CLI lets you interact with Agentic ODI directly from your terminal. It provides an interactive chat mode plus version, update, and data commands. Data commands are **local-first**: they read and write a SQLite store with no server required, and switch to a remote MCP server with `--backend mcp`.
 
 Launch it with:
 
@@ -105,6 +105,16 @@ python -m cli             # start interactive chat in a terminal (help when pipe
 ```
 
 A console script is also installed, so `agentic-odi --version` works the same way.
+
+**Global options:**
+
+| Option | Environment variable | Default | Meaning |
+|---|---|---|---|
+| `--backend local\|mcp` | `AGENTIC_ODI_BACKEND` | `local` | Run in-process against SQLite, or call a remote MCP server. |
+| `--db PATH` | `AGENTIC_ODI_DB` | `~/.agentic-odi/odi.db` | Store path for the `local` backend. |
+| `--mcp-url URL` | `AGENTIC_ODI_MCP_URL` | `http://localhost:8000/mcp` | Server URL for the `mcp` backend. |
+
+Data commands print readable tables and blocks by default; add `--json` for machine-readable output. Diagnostics go to stderr and failures exit non-zero (`0` success, `1` error, `2` usage error).
 
 ### 💬 Interactive Chat
 
@@ -127,30 +137,32 @@ Before starting, run the MCP server (`python -m mcp_server`) and point the chat 
 Inside the session, `/help` lists the commands, `/tools` lists the MCP tools the assistant can call, `/clear` resets the conversation, and `/exit` (or `/quit`) ends the session.
 
 > [!NOTE]
-> Chat is the only CLI mode that needs an LLM endpoint. The `outcomes` and `connectors` commands keep working without one.
+> Chat is the only CLI mode that needs an LLM endpoint. The `customer-outcomes` and `connectors` commands keep working without one.
 
 ### 🎯 Manage Customer Outcomes
 
-Manage Customer Outcomes (linking customer value to business value) via the CLI. The CLI acts as an MCP client, so the server must be running (`python -m mcp_server`):
+Customer Outcomes link customer value to business value. The `local` backend writes to the shared SQLite store with no server required; add `--backend mcp` to route through a running MCP server (`python -m mcp_server`). The group is also available under its historical name `outcomes`.
 
 ```bash
 # Add a Customer Outcome
-agentic-odi outcomes add --job-id <job-id>   --direction minimize --unit "time" --object "to resolve setup errors"   --statement "Minimize the time to resolve environment setup errors when onboarding"   --importance 8.8 --satisfaction 3.2   --category cost_reduction   --business-statement "Saves engineering hours and reduces early churn"
+agentic-odi customer-outcomes add --job-id <job-id>   --direction minimize --unit "time" --object "to resolve setup errors"   --statement "Minimize the time to resolve environment setup errors when onboarding"   --importance 8.8 --satisfaction 3.2   --category cost_reduction   --business-statement "Saves engineering hours and reduces early churn"
 
-# List outcomes (optionally filtered)
-agentic-odi outcomes list
-agentic-odi outcomes list --job-id <job-id>
+# List outcomes (optionally filtered, or as JSON)
+agentic-odi customer-outcomes list
+agentic-odi customer-outcomes list --job-id <job-id>
+agentic-odi customer-outcomes list --json
 
 # Get, update, delete
-agentic-odi outcomes get <outcome-id>
-agentic-odi outcomes update <outcome-id> --importance 9.0
-agentic-odi outcomes delete <outcome-id> --yes
+agentic-odi customer-outcomes get <outcome-id>
+agentic-odi customer-outcomes update <outcome-id> --importance 9.0
+agentic-odi customer-outcomes delete <outcome-id> --yes
 
-# Compute ODI Opportunity Score
+# Compute ODI Opportunity Score (top-level, also under the group)
+agentic-odi score 8 2
 agentic-odi outcomes score 8 2
 ```
 
-Set `AGENTIC_ODI_MCP_URL` to point to a non-default server if needed.
+Set `AGENTIC_ODI_MCP_URL` (or `--mcp-url`) to point to a non-default server when using `--backend mcp`.
 
 ### 🔌 External Connectors (MCP Ingest)
 
@@ -487,9 +499,12 @@ uv run --directory connectors pytest
 | `local_server/tests/test_studio_api.py` | Living Studio sidecar API (config, health, canvas, SSE chat, steps/outcomes) |
 | `client/tests/test_run.py` | Dev launcher helpers (port checks, mcp + sidecar commands) |
 | `studio/src/**/*.test.ts` | SPA units: ODI math, transport bridge, SSE parser, sidecar client |
-| `cli/tests/test_cli.py` | CLI `--version` and `--help` behavior |
-| `cli/tests/test_outcomes_cli.py` | Customer Outcomes CLI subcommands with MCP stub |
-| `cli/tests/test_connectors_cli.py` | CLI `connectors` add/list/health/ingest adapter |
+| `cli/tests/test_cli.py` | CLI `--version`/`version`, help, global options, and unknown-backend handling |
+| `cli/tests/test_backend.py` | Local SQLite backend CRUD, remote MCP parsing/errors/timeouts, backend resolution |
+| `cli/tests/test_customer_outcomes_cli.py` | `customer-outcomes` CRUD against SQLite, aliases, human/`--json` output, error exit codes |
+| `cli/tests/test_connectors_cli.py` | CLI `connectors` add/list/health/ingest adapter and call timeouts |
+| `cli/tests/test_render.py` | Human/JSON rendering, truncation, and unicode safety |
+| `cli/tests/test_startup_perf.py` | `--version`/`--help` avoid importing fastmcp, connectors, core, and openai |
 | `connectors/tests/test_registry.py` | JSON connector registry persist/load and kind checks |
 | `connectors/tests/test_mcp_connector.py` | In-memory FastMCP health and ingest records |
 
