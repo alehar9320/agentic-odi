@@ -1,0 +1,25 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M5AP6H1EJB0KFQ7QKJ36W1AQ",
+  "session_id": "ses_eaadde49fffes4f9MXaocNI94N",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-19T18:18:56.718768959Z",
+  "branch": "test/raise-coverage-to-90",
+  "checkpoints_count": 1,
+  "save_step_count": 1,
+  "files_touched": [],
+  "agent": "OpenCode",
+  "model": "deepseek-v4.1-flash-free",
+  "turn_id": "d0dd0bbdf7c7",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 1200827,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 17088128,
+    "output_tokens": 61416,
+    "api_call_count": 168
+  },
+  "session_metrics": {
+    "turn_count": 1
+  }
+}
