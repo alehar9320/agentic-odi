@@ -3,7 +3,7 @@
   "checkpoint_id": "01M5AJ8Q8RV7CAS3XE9RKSD8DT",
   "strategy": "manual-commit",
   "branch": "feature/cli-odi-entity-parity",
-  "checkpoints_count": 4,
+  "checkpoints_count": 5,
   "files_touched": [
     "studio/src/App.tsx",
     "studio/src/components/canvas/CanvasTabs.tsx",
@@ -39,6 +39,13 @@
       "compact_transcript": "/3/transcript.jsonl",
       "content_hash": "/3/content_hash.txt",
       "prompt": "/3/prompt.txt"
+    },
+    {
+      "metadata": "/4/metadata.json",
+      "transcript": "/4/full.jsonl",
+      "compact_transcript": "/4/transcript.jsonl",
+      "content_hash": "/4/content_hash.txt",
+      "prompt": ""
     }
   ],
   "token_usage": {
