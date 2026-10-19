@@ -61,6 +61,8 @@ export interface ToolActivity {
 export interface StudioContextValue {
   settings: StudioConfig;
   saveSettings: (config: StudioConfig) => void;
+  engagementLevel: number;
+  setEngagementLevel: (level: number) => void;
   canvas: CanvasData | null;
   canvasLoading: boolean;
   canvasCached: boolean;
@@ -376,6 +378,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     () => ({
       settings,
       saveSettings,
+      engagementLevel,
+      setEngagementLevel: saveEngagementLevel,
       canvas,
       canvasLoading,
       canvasCached,

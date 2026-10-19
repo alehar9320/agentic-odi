@@ -61,7 +61,7 @@ export function ChatCopilot() {
     if (messages.length === 1 && engagementLevel === 0) {
       setEngagementLevel(1);
     }
-  }, [messages.length, engagementLevel]);
+  }, [messages.length, engagementLevel, setEngagementLevel]);
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
