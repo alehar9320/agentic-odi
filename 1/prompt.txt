@@ -1,0 +1,8 @@
+Explore the codebase at /home/alexa/repos/agentic-odi to understand:
+1. What kind of project this is (language, framework, purpose)
+2. The directory structure (top-level and key subdirectories)
+3. Any existing GUI/components related to user experience
+4. Any references to "Saba Labs" or similar design systems
+5. The README and any documentation
+
+Return a comprehensive summary of the project structure, purpose, and any relevant GUI/UX elements you find.
