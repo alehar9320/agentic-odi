@@ -3,6 +3,7 @@
 # Agentic ODI
 
 [![CI](https://github.com/alehar9320/agentic-odi/actions/workflows/ci.yml/badge.svg)](https://github.com/alehar9320/agentic-odi/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/alehar9320/agentic-odi/branch/main/graph/badge.svg)](https://codecov.io/gh/alehar9320/agentic-odi)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 [![uv](https://img.shields.io/badge/uv-managed-green)](https://docs.astral.sh/uv/)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
@@ -31,6 +32,7 @@
   - [Agent-Driven Testing](#-agent-driven-testing)
 - [Linting, Formatting & Type Checks](#-linting-formatting--type-checks-ci-parity)
 - [Testing](#-testing)
+  - [Test Coverage](#-test-coverage)
   - [Test Coverage Map](#-test-coverage-map)
   - [Agent Session Tracking](#-agent-session-tracking)
 - [Superpowers with Pi](#-superpowers-with-pi)
@@ -460,7 +462,7 @@ pre-commit run --all-files
 
 ## ✅ Testing
 
-Tests use **pytest** with **pytest-asyncio** (strict mode) and run entirely in-memory — no running server required. Each project owns its tests. CI runs the suite on Python **3.10, 3.11, and 3.12** and stores a coverage report as a build artifact:
+Tests use **pytest** with **pytest-asyncio** (strict mode) and run entirely in-memory — no running server required. Each project owns its tests:
 
 ```bash
 uv run --directory core pytest
@@ -470,6 +472,30 @@ uv run --directory client pytest
 uv run --directory cli pytest
 uv run --directory connectors pytest
 ```
+
+### 📈 Test Coverage
+
+CI runs the suite on Python **3.10, 3.11, and 3.12**, combines each package's coverage into one `coverage.xml`, and uploads it to [Codecov](https://codecov.io/gh/alehar9320/agentic-odi) from the 3.12 job. Each matrix job also stores its combined report as a build artifact.
+
+The Codecov upload authenticates with the `CODECOV_TOKEN` repository secret and is non-blocking (`fail_ci_if_error: false`), so a Codecov outage or a fork PR without secrets cannot fail the test job. The badge at the top of this README tracks `main`, which is the baseline every PR is compared against:
+
+- **Project** status holds `main` at its current level (`target: auto`) and tolerates a 1% dip from `codecov.yml`.
+- **Patch** status is informational for now, so new code can land while the suite catches up.
+
+To reproduce the combined report locally, run each package with its own coverage file and merge them the way CI does:
+
+```bash
+set -e
+for pkg in core mcp_server local_server client cli connectors; do
+  # Absolute path, so each package writes to the repo root rather than its own directory.
+  COVERAGE_FILE="$PWD/.coverage.$pkg" uv run --directory "$pkg" pytest --cov="$pkg" -q
+done
+uv run coverage combine .coverage.*
+uv run coverage xml -o coverage.xml && uv run coverage report
+```
+
+> [!NOTE]
+> Coverage is only collected for the Python packages. `studio/` and test directories are excluded in `codecov.yml`.
 
 ### 📊 Test Coverage Map
 
