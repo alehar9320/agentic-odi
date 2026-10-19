@@ -395,13 +395,8 @@ def test_parse_and_compare():
 
 
 def test_asset_name():
-    assert (
-        update.asset_name("0.1.0", "linux", "x86_64") == "odi_0.1.0_linux_x86_64.tar.gz"
-    )
-    assert (
-        update.asset_name("0.1.0", "windows", "x86_64")
-        == "odi_0.1.0_windows_x86_64.zip"
-    )
+    assert update.asset_name("0.1.0", "linux", "x86_64") == "odi_0.1.0_linux_x86_64.tar.gz"
+    assert update.asset_name("0.1.0", "windows", "x86_64") == "odi_0.1.0_windows_x86_64.zip"
 
 
 def test_current_platform_mapping(monkeypatch):
@@ -506,10 +501,7 @@ def test_should_check_within_and_after_interval(tmp_path):
     assert update.should_check(state, now=1000.0) is True
     update.record_check(state, now=1000.0)
     assert update.should_check(state, now=1000.0 + 100) is False
-    assert (
-        update.should_check(state, now=1000.0 + update.CHECK_INTERVAL_SECONDS + 1)
-        is True
-    )
+    assert update.should_check(state, now=1000.0 + update.CHECK_INTERVAL_SECONDS + 1) is True
     assert json.loads(state.read_text())["last_check"] == 1000.0
 
 
