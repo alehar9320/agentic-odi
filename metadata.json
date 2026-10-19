@@ -3,7 +3,7 @@
   "checkpoint_id": "01M5AF9TF402SBXBA2TGQ6RB93",
   "strategy": "manual-commit",
   "branch": "topic/cli-hardening",
-  "checkpoints_count": 8,
+  "checkpoints_count": 9,
   "files_touched": [
     "cli/tests/test_backend.py",
     "cli/tests/test_backend_selection.py",
@@ -61,6 +61,13 @@
       "transcript": "/6/full.jsonl",
       "compact_transcript": "/6/transcript.jsonl",
       "content_hash": "/6/content_hash.txt",
+      "prompt": ""
+    },
+    {
+      "metadata": "/7/metadata.json",
+      "transcript": "/7/full.jsonl",
+      "compact_transcript": "/7/transcript.jsonl",
+      "content_hash": "/7/content_hash.txt",
       "prompt": ""
     }
   ],
