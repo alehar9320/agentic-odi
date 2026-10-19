@@ -112,7 +112,7 @@ layout, updates, and release automation.
 | [Local LLM Backend](docs/local-llm.md) | Running a local OpenAI-compatible model with tool calling |
 | [Development](docs/development.md) | Lint, format, type checks, frontend checks, tests and the coverage map |
 | [Installation](docs/installation.md) | Binary install, updater behavior, and release automation |
-| [Deployment](docs/deployment.md) | Hosted chat UI and the MCP server endpoint |
+| [Deployment](docs/deployment.md) | Hosted chat UI, the MCP server endpoint, and the free-plan Cloudflare Worker |
 | [Roadmap](docs/roadmap.md) | Completed and upcoming milestones |
 | [Superpowers](docs/superpowers.md) | Pi, OpenCode, and Freebuff integration |
 
