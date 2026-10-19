@@ -3,7 +3,7 @@
   "checkpoint_id": "01M5AP5R5YHGJQJTGSJVW6ZCRY",
   "strategy": "manual-commit",
   "branch": "test/raise-coverage-to-90",
-  "checkpoints_count": 2,
+  "checkpoints_count": 3,
   "files_touched": [
     "client/tests/test_run_main.py",
     "core/tests/test_intent_store.py",
@@ -26,6 +26,13 @@
       "compact_transcript": "/1/transcript.jsonl",
       "content_hash": "/1/content_hash.txt",
       "prompt": "/1/prompt.txt"
+    },
+    {
+      "metadata": "/2/metadata.json",
+      "transcript": "/2/full.jsonl",
+      "compact_transcript": "/2/transcript.jsonl",
+      "content_hash": "/2/content_hash.txt",
+      "prompt": "/2/prompt.txt"
     }
   ],
   "token_usage": {
