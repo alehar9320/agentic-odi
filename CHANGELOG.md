@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.6.0](https://github.com/alehar9320/agentic-odi/compare/v0.5.0...v0.6.0) (2026-10-19)
+
+
+### Features
+
+* **website:** design system colors typography spacing grid motion focus-visible ([1707932](https://github.com/alehar9320/agentic-odi/commit/1707932622072b3ebf118ec079f89745f43120e5))
+* **website:** GitHub Pages site with progressive loading, ghost elements, and dual-interaction experience ([7a574d4](https://github.com/alehar9320/agentic-odi/commit/7a574d4b4ad2343a777769fe0d243d1795297296))
+* **website:** reproducible OG image generator with committed art ([e5aa4a8](https://github.com/alehar9320/agentic-odi/commit/e5aa4a8b71a51a29056f9dee80dbdc4710ae44d0))
+
+
+### Bug Fixes
+
+* **website:** run site checks in main CI ([402f0a5](https://github.com/alehar9320/agentic-odi/commit/402f0a5e8cd7bb939d31246dd1b1f99290595250))
+
 ## [0.5.0](https://github.com/alehar9320/agentic-odi/compare/v0.4.0...v0.5.0) (2026-10-19)
 
 
