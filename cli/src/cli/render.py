@@ -45,7 +45,10 @@ def render_customer_outcome(outcome: dict[str, Any], *, as_json: bool) -> str:
         ("object", customer.get("object_of_control", "")),
         ("importance", _num(customer.get("importance", ""))),
         ("satisfaction", _num(customer.get("satisfaction", ""))),
-        ("opportunity", _num(outcome.get("opportunity_score", customer.get("opportunity_score", "")))),
+        (
+            "opportunity",
+            _num(outcome.get("opportunity_score", customer.get("opportunity_score", ""))),
+        ),
         ("category", business.get("category", "")),
         ("business", business.get("statement", "")),
     ]
