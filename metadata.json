@@ -3,7 +3,7 @@
   "checkpoint_id": "01M5AEGAE0ENB12ZWPWWBA667K",
   "strategy": "manual-commit",
   "branch": "fix/cli-main-hardening",
-  "checkpoints_count": 9,
+  "checkpoints_count": 10,
   "files_touched": [
     "README.md",
     "cli/tests/test_render.py"
@@ -63,6 +63,13 @@
       "transcript": "/7/full.jsonl",
       "compact_transcript": "/7/transcript.jsonl",
       "content_hash": "/7/content_hash.txt",
+      "prompt": ""
+    },
+    {
+      "metadata": "/8/metadata.json",
+      "transcript": "/8/full.jsonl",
+      "compact_transcript": "/8/transcript.jsonl",
+      "content_hash": "/8/content_hash.txt",
       "prompt": ""
     }
   ],
