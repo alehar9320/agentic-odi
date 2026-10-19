@@ -88,3 +88,22 @@ def test_score_json_and_human():
     assert render_score(8, 2, 14.0, as_json=False) == "Opportunity score: 14.00"
     payload = json.loads(render_score(8, 2, 14.0, as_json=True))
     assert payload["opportunity_score"] == 14.0
+
+
+def test_saved_dict_can_be_rendered_as_json():
+    payload = json.loads(render_saved("created", _outcome(), as_json=True))
+
+    assert payload["id"] == "abc"
+
+
+def test_json_keeps_plain_strings_unchanged():
+    assert render_customer_outcome("not json", as_json=True) == "not json"
+
+
+def test_score_renderer_passes_through_non_numeric_values():
+    outcome = _outcome(customer_value={"statement": "s", "importance": True, "satisfaction": "n/a"})
+
+    rendered = render_customer_outcome(outcome, as_json=False)
+
+    assert "True" in rendered
+    assert "n/a" in rendered

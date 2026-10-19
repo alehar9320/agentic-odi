@@ -170,3 +170,149 @@ def test_score_top_level_and_alias(tmp_path):
 def test_score_json(tmp_path):
     result = runner.invoke(app, ["score", "8", "2", "--json"])
     assert json.loads(result.output)["opportunity_score"] == 14.0
+
+
+def test_add_stores_contextual_clarifier_and_step_id(tmp_path):
+    db = str(tmp_path / "odi.db")
+    result = runner.invoke(
+        app,
+        _add(db) + ["--contextual-clarifier", "on mobile", "--step-id", "step-1"],
+    )
+
+    assert result.exit_code == 0, result.output
+    stored = json.loads(
+        runner.invoke(
+            app, ["--backend", "local", "--db", db, "customer-outcomes", "list", "--json"]
+        ).output
+    )[0]
+    assert stored["customer_value"]["contextual_clarifier"] == "on mobile"
+    assert stored["step_id"] == "step-1"
+
+
+def test_list_filters_by_job_id(tmp_path):
+    db = str(tmp_path / "odi.db")
+    runner.invoke(app, _add(db))
+
+    matching = runner.invoke(
+        app,
+        [
+            "--backend",
+            "local",
+            "--db",
+            db,
+            "customer-outcomes",
+            "list",
+            "--job-id",
+            "job-1",
+            "--json",
+        ],
+    )
+    missing = runner.invoke(
+        app,
+        [
+            "--backend",
+            "local",
+            "--db",
+            db,
+            "customer-outcomes",
+            "list",
+            "--job-id",
+            "other",
+            "--json",
+        ],
+    )
+
+    assert len(json.loads(matching.output)) == 1
+    assert json.loads(missing.output) == []
+
+
+def test_update_accepts_every_field(tmp_path):
+    db = str(tmp_path / "odi.db")
+    runner.invoke(app, _add(db))
+    outcome_id = json.loads(
+        runner.invoke(
+            app, ["--backend", "local", "--db", db, "customer-outcomes", "list", "--json"]
+        ).output
+    )[0]["id"]
+
+    result = runner.invoke(
+        app,
+        [
+            "--backend",
+            "local",
+            "--db",
+            db,
+            "customer-outcomes",
+            "update",
+            outcome_id,
+            "--step-id",
+            "step-1",
+            "--importance",
+            "9",
+            "--satisfaction",
+            "2",
+            "--direction",
+            "maximize",
+            "--unit-of-measure",
+            "hours",
+            "--object-of-control",
+            "throughput",
+            "--contextual-clarifier",
+            "during onboarding",
+            "--statement",
+            "Maximize onboarding throughput",
+            "--category",
+            "retention",
+            "--business-statement",
+            "Keeps customers",
+            "--detail",
+            "Expansion revenue",
+            "--estimated-annual-value",
+            "120000",
+            "--confidence",
+            "0.8",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    stored = json.loads(
+        runner.invoke(
+            app,
+            ["--backend", "local", "--db", db, "customer-outcomes", "get", outcome_id, "--json"],
+        ).output
+    )
+    assert stored["step_id"] == "step-1"
+    assert stored["customer_value"]["direction"] == "maximize"
+    assert stored["customer_value"]["unit_of_measure"] == "hours"
+    assert stored["customer_value"]["object_of_control"] == "throughput"
+    assert stored["customer_value"]["contextual_clarifier"] == "during onboarding"
+    assert stored["customer_value"]["statement"] == "Maximize onboarding throughput"
+    assert stored["customer_value"]["importance"] == 9.0
+    assert stored["customer_value"]["satisfaction"] == 2.0
+    assert stored["business_value"]["category"] == "retention"
+    assert stored["business_value"]["statement"] == "Keeps customers"
+    assert stored["business_value"]["detail"] == "Expansion revenue"
+    assert stored["business_value"]["estimated_annual_value"] == 120000.0
+    assert stored["business_value"]["confidence"] == 0.8
+
+
+def test_delete_confirmation_can_abort_or_proceed(tmp_path):
+    db = str(tmp_path / "odi.db")
+    runner.invoke(app, _add(db))
+    outcome_id = json.loads(
+        runner.invoke(
+            app, ["--backend", "local", "--db", db, "customer-outcomes", "list", "--json"]
+        ).output
+    )[0]["id"]
+    delete_args = ["--backend", "local", "--db", db, "customer-outcomes", "delete", outcome_id]
+
+    aborted = runner.invoke(app, delete_args, input="n\n")
+    still_there = runner.invoke(
+        app, ["--backend", "local", "--db", db, "customer-outcomes", "list", "--json"]
+    )
+    confirmed = runner.invoke(app, delete_args, input="y\n")
+
+    assert aborted.exit_code == 0
+    assert len(json.loads(still_there.output)) == 1
+    assert confirmed.exit_code == 0
+    assert "Deleted customer outcome" in _strip(confirmed.output)

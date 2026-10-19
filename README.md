@@ -493,7 +493,7 @@ CI runs the suite on Python **3.10, 3.11, and 3.12**, combines each package's co
 
 The Codecov upload authenticates with the `CODECOV_TOKEN` repository secret and is non-blocking (`fail_ci_if_error: false`), so a Codecov outage or a fork PR without secrets cannot fail the test job. The badge at the top of this README tracks `main`, which is the baseline every PR is compared against:
 
-- **Project** status holds `main` at its current level (`target: auto`) and tolerates a 1% dip from `codecov.yml`.
+- **Project** status requires at least **90%** coverage (`target: 90%`) and tolerates a 1% dip from `codecov.yml`.
 - **Patch** status is informational for now, so new code can land while the suite catches up.
 
 To reproduce the combined report locally, run each package with its own coverage file and merge them the way CI does:
@@ -517,18 +517,37 @@ uv run coverage xml -o coverage.xml && uv run coverage report
 |---|---|
 | `core/tests/test_models.py` | Domain models and ODI opportunity-score computation |
 | `core/tests/test_service.py` | `ODIService` jobs/steps/outcomes and Customer Outcome CRUD |
+| `core/tests/test_sqlite_repository.py` | SQLite event-sourced repository: snapshot reload, updates, deletes, and clear |
+| `core/tests/test_intent_store.py` | Append-only Intent Store reads, clear, and legacy blank payloads |
+| `core/tests/test_repository.py` | In-memory repository filtering and update/delete edge cases |
+| `core/tests/test_messages.py` | Shared framework guidelines and not-found helpers |
 | `mcp_server/tests/test_odi.py` | Full ODI workflow (add job → steps → outcomes → retrieval) + capabilities tool |
 | `mcp_server/tests/test_customer_outcomes.py` | Customer Outcomes CRUD, filtering, computed opportunity scores, and tool validation |
 | `mcp_server/tests/test_server_tools.py` | Error handling and retrieval for the MCP tools |
+| `mcp_server/tests/test_tool_branches.py` | Prompt registration, tool validation errors, full updates, and HTTP transport startup |
 | `mcp_server/tests/test_tools.py` | Tool response-shape contract for `add_job` |
 | `local_server/tests/test_api.py` | Local FastAPI health endpoint |
 | `local_server/tests/test_studio_api.py` | Living Studio sidecar API (config, health, canvas, SSE chat, steps/outcomes) |
+| `local_server/tests/test_app_spa.py` | SPA fallback, asset mounting, and the uvicorn entrypoint |
+| `local_server/tests/test_studio_mcp_data.py` | MCP canvas hydration, seed fallback, and tool passthrough errors |
+| `local_server/tests/test_studio_probes.py` | Endpoint probing and LLM health classification |
+| `local_server/tests/test_studio_chat_branches.py` | Streaming tool-loop argument and failure branches |
+| `local_server/tests/test_studio_router.py` | Successful step/outcome passthrough responses |
 | `client/tests/test_run.py` | Dev launcher helpers (port checks, mcp + sidecar commands) |
+| `client/tests/test_run_main.py` | Launcher lifecycle: startup errors, polling, signal handlers, and shutdown |
 | `studio/src/**/*.test.ts` | SPA units: ODI math, transport bridge, SSE parser, sidecar client |
 | `cli/tests/test_cli.py` | CLI `--version`/`version`, help, global options, and unknown-backend handling |
 | `cli/tests/test_backend.py` | Local SQLite backend CRUD, remote MCP parsing/errors/timeouts, backend resolution |
+| `cli/tests/test_backend_edges.py` | Backend validation messages, full updates, parsing edges, and MCP call failures |
+| `cli/tests/test_chat_runtime.py` | Interactive chat loop, streaming, tool-call recovery, and exit paths |
 | `cli/tests/test_customer_outcomes_cli.py` | `customer-outcomes` CRUD against SQLite, aliases, human/`--json` output, error exit codes |
 | `cli/tests/test_connectors_cli.py` | CLI `connectors` add/list/health/ingest adapter and call timeouts |
+| `cli/tests/test_connectors_edges.py` | Connector wrappers, config path resolution, catalog auth types, and error exits |
+| `cli/tests/test_onboard.py` | First-run signal extraction, confidence inference, and onboarding gating |
+| `cli/tests/test_profile.py` | Baseline load/save/backup, timestamps, and corrupt-file handling |
+| `cli/tests/test_update_edges.py` | Update locking, atomic swaps, download failures, and auto-update gating |
+| `cli/tests/test_cli_edges.py` | Terminal launch, chat command wiring, and re-exec behavior |
+| `cli/tests/test_context.py` | Global backend option and environment fallback |
 | `cli/tests/test_render.py` | Human/JSON rendering, truncation, and unicode safety |
 | `cli/tests/test_startup_perf.py` | `--version`/`--help` avoid importing fastmcp, connectors, core, and openai |
 | `connectors/tests/test_registry.py` | JSON connector registry persist/load and kind checks |
