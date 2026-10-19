@@ -1,0 +1,38 @@
+You are implementing Task 5 of the GitHub Pages site plan: the GitHub Actions workflow + CI.
+
+## Task Description
+
+Read your task brief first: /home/alexa/repos/agentic-odi/.superpowers/sdd/2026-10-18-github-pages/task-5-brief.md
+It is your requirements, with exact values to use verbatim.
+
+## Context
+
+Work from: /home/alexa/repos/agentic-odi/.worktrees/gh-pages (branch feature/gh-pages, HEAD after Task 4). uv workspace; Python 3.11 via `uv run` / `UV_PYTHON=3.11`.
+
+Tasks 1–4 are complete (make_og.py, site structure, design system, README sync). This task adds the GitHub Actions workflow that builds and deploys the site.
+
+Key constraints from the planning session (binding, Jobs-level bar):
+1. **Deploy dir** = `_site/` — rsync from `website/` to `_site/` in the workflow.
+2. **Workflow trigger** on `push` to `feature/gh-pages` and `pull_request` targeting it.
+3. **Jobs**: lint (ruff), typecheck (mypy — scoped to website/), security (bandit), test (pytest website/tests), build (rsync), and a final "CI green" aggregate.
+4. **rsync command**: `rsync -av website/ _site/` with `--exclude='tests/' --exclude='tools/'` (per brief).
+5. **Accessibility & performance budget**: the workflow must include a step that comments the budget results (2s TTI, <300KB gzipped OG, etc.) as a workflow annotation or summary.
+6. **Pages source** = `/(root)` — set in workflow `settings`; the workflow artifact `_site/` is published as the GitHub Pages site.
+7. **No external API keys** in the workflow YAML (the OG generator uses locally committed art; the site has no auth-requiring features).
+8. The workflow file path: `.github/workflows/website.yml`.
+
+## Your Job
+
+1. Create `.github/workflows/website.yml` per the brief exactly — do NOT add steps or fields outside the brief.
+2. TDD: the brief doesn't prescribe a pytest test for the workflow YAML itself (workflows aren't easily pytest-tested), but you should verify the workflow runs by checking syntax with `yaml` module or `act` if available; alternatively, ensure the existing repo CI structure is not broken.
+3. Run repo-wide gates: `uv run ruff check .`, `uv run ruff format --check .`, `uv run mypy .` (just the cli package; website/ is HTML/CSS/JS so mypy isn't relevant there, but check ruff covers it).
+4. Commit with the brief's commit message
+5. Self-review, report
+
+## You Do Not Dispatch Subagents
+
+## Report Format
+
+Write your full report to /home/alexa/repos/agentic-odi/.superpowers/sdd/2026-10-18-github-pages/task-5-report.md
+
+Then report ONLY (under 15 lines): Status, commits, one-line test summary, concerns, report path.
