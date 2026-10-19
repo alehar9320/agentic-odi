@@ -1,0 +1,79 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M5AKH1NVE2K80SSF1CPNPZ8N",
+  "session_id": "ses_eaadde49fffes4f9MXaocNI94N",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-19T17:32:20.661244205Z",
+  "branch": "topic/minimalistic-gui",
+  "checkpoints_count": 1,
+  "save_step_count": 1,
+  "files_touched": [],
+  "agent": "OpenCode",
+  "model": "deepseek-v4.1-flash-free",
+  "turn_id": "15d4edfad690",
+  "checkpoint_transcript_start": 20,
+  "transcript_lines_at_start": 20,
+  "compact_transcript_start": 20,
+  "token_usage": {
+    "input_tokens": 207742,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 1810944,
+    "output_tokens": 2937,
+    "api_call_count": 18
+  },
+  "session_metrics": {
+    "turn_count": 1
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 5718,
+      "user_lines_removed": 195,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        ".freebuff/project-id": 1,
+        ".opencode/plans/ci-green-pr7-pr8.md": 103,
+        ".pi/git/.gitignore": 2,
+        "cli/src/cli/cli.py": 34,
+        "cli/src/cli/onboard.py": 253,
+        "cli/src/cli/profile.py": 122,
+        "cli/tests/test_profile.py": 51,
+        "docs/superpowers/plans/2026-10-15-cli-odi-entity-parity.md": 1123,
+        "docs/superpowers/plans/2026-10-16-first-run-onboarding.md": 669,
+        "docs/superpowers/plans/2026-10-18-github-pages.md": 742,
+        "docs/superpowers/plans/2026-10-18-user-facing-changelog.md": 1412,
+        "docs/superpowers/specs/2026-10-15-cli-odi-entity-parity-design.md": 219,
+        "docs/superpowers/specs/2026-10-16-first-run-onboarding-design.md": 151,
+        "docs/superpowers/specs/2026-10-18-github-pages-design.md": 398,
+        "docs/superpowers/specs/2026-10-18-user-facing-changelog-design.md": 241,
+        "pyproject.toml": 3,
+        "studio/src/App.tsx": 42,
+        "studio/src/components/canvas/CanvasTabs.tsx": 44,
+        "studio/src/components/canvas/OpportunityLandscape.tsx": 1,
+        "studio/src/components/chat/ChatCopilot.tsx": 41,
+        "studio/src/state/StudioContext.tsx": 25,
+        "uv.lock": 41
+      },
+      "user_removed_per_file": {
+        "cli/src/cli/cli.py": 151,
+        "studio/src/App.tsx": 3,
+        "studio/src/components/canvas/CanvasTabs.tsx": 36,
+        "studio/src/components/canvas/OpportunityLandscape.tsx": 1,
+        "studio/src/components/chat/ChatCopilot.tsx": 4
+      }
+    },
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 106,
+      "user_lines_removed": 0,
+      "agent_lines_added": 5459,
+      "agent_lines_removed": 151,
+      "user_added_per_file": {
+        ".freebuff/project-id": 1,
+        ".opencode/plans/ci-green-pr7-pr8.md": 103,
+        ".pi/git/.gitignore": 2
+      }
+    }
+  ]
+}
