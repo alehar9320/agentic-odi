@@ -57,6 +57,9 @@ jobs:
       - name: Run Mypy (connectors)
         run: uv run --directory connectors mypy .
 
+      - name: Run Mypy (website)
+        run: uv run --directory website mypy .
+
   security:
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -66,6 +69,9 @@ jobs:
 
       - name: Run Bandit
         run: uv run bandit -c pyproject.toml -r core/src mcp_server/src local_server/src cli/src client/src connectors/src
+
+      - name: Run Bandit (website)
+        run: uv run bandit -c pyproject.toml -r website/
 
   test:
     runs-on: ubuntu-latest
@@ -237,6 +243,21 @@ jobs:
           wait "$RUN_PID"
           echo "OK: both services stopped cleanly"
 
+  website:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup
+
+      - name: Pytest (website)
+        run: uv run --directory website pytest tests/
+
+      - name: Build site (rsync)
+        run: |
+          mkdir -p _site
+          rsync -av website/ _site/ --exclude='tests/' --exclude='tools/'
+
   studio:
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -363,7 +384,7 @@ jobs:
   ci-green:
     name: CI green
     runs-on: ubuntu-latest
-    needs: [lint, typecheck, security, test, smoke, studio, tauri-check, tauri-build]
+    needs: [lint, typecheck, security, test, smoke, website, studio, tauri-check, tauri-build]
     if: always()
     steps:
       - name: Verify all required jobs succeeded
