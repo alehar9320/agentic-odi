@@ -41,7 +41,9 @@ def defaults() -> dict[str, str]:
     """
     profile = _load_profile_fallback()
     return {
-        "base_url": os.getenv("AGENTIC_ODI_BASE_URL") or profile.get("base_url") or DEFAULT_BASE_URL,
+        "base_url": os.getenv("AGENTIC_ODI_BASE_URL")
+        or profile.get("base_url")
+        or DEFAULT_BASE_URL,
         "api_key": os.getenv("AGENTIC_ODI_API_KEY") or profile.get("api_key") or DEFAULT_API_KEY,
         "model_name": os.getenv("AGENTIC_ODI_MODEL") or profile.get("model") or DEFAULT_MODEL,
         "mcp_url": os.getenv("AGENTIC_ODI_MCP_URL") or profile.get("mcp_url") or DEFAULT_MCP_URL,
