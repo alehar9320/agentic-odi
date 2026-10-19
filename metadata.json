@@ -3,7 +3,7 @@
   "checkpoint_id": "01M59CPE40CY433KW8KE1RRGPV",
   "strategy": "manual-commit",
   "branch": "feature/gh-pages",
-  "checkpoints_count": 11,
+  "checkpoints_count": 12,
   "files_touched": [
     "website/404.html",
     "website/assets/favicon.svg",
@@ -87,13 +87,20 @@
       "compact_transcript": "/10/transcript.jsonl",
       "content_hash": "/10/content_hash.txt",
       "prompt": "/10/prompt.txt"
+    },
+    {
+      "metadata": "/11/metadata.json",
+      "transcript": "/11/full.jsonl",
+      "compact_transcript": "/11/transcript.jsonl",
+      "content_hash": "/11/content_hash.txt",
+      "prompt": ""
     }
   ],
   "token_usage": {
-    "input_tokens": 3841486,
+    "input_tokens": 4230047,
     "cache_creation_tokens": 0,
-    "cache_read_tokens": 10055760,
-    "output_tokens": 48319,
-    "api_call_count": 183
+    "cache_read_tokens": 10552512,
+    "output_tokens": 53724,
+    "api_call_count": 191
   }
 }
