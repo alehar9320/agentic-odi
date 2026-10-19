@@ -1,0 +1,5 @@
+Topic branch Topic/minimalistic-gui is totally fucked up by commits from another PR. Rebase against main and remove all old commits from yesterday's run, that aren't related to the topic.
+
+---
+
+Continue
