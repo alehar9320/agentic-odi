@@ -1,0 +1,29 @@
+codecov:
+  require_ci_to_pass: true
+
+coverage:
+  precision: 2
+  round: down
+  range: "50...90"
+
+  status:
+    # Baseline: hold the project at its current level (allow a 1% dip) instead of
+    # demanding a fixed target before we know where we stand.
+    project:
+      default:
+        target: auto
+        threshold: 1%
+    # Patch coverage is advisory while the suite is still being built out.
+    patch:
+      default:
+        informational: true
+
+comment:
+  layout: "header, diff, files"
+  require_changes: true
+  branches:
+    - main
+
+ignore:
+  - "**/tests/**"
+  - "studio/**"
