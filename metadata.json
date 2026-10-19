@@ -3,7 +3,7 @@
   "checkpoint_id": "01M5AEANFWTZBGQBPNND0G3DRY",
   "strategy": "manual-commit",
   "branch": "fix/cli-main-hardening",
-  "checkpoints_count": 5,
+  "checkpoints_count": 7,
   "files_touched": [
     "cli/src/cli/cli.py"
   ],
@@ -35,13 +35,20 @@
       "compact_transcript": "/3/transcript.jsonl",
       "content_hash": "/3/content_hash.txt",
       "prompt": ""
+    },
+    {
+      "metadata": "/4/metadata.json",
+      "transcript": "/4/full.jsonl",
+      "compact_transcript": "/4/transcript.jsonl",
+      "content_hash": "/4/content_hash.txt",
+      "prompt": "/4/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 0,
+    "input_tokens": 261165,
     "cache_creation_tokens": 0,
-    "cache_read_tokens": 0,
-    "output_tokens": 0,
-    "api_call_count": 0
+    "cache_read_tokens": 7397600,
+    "output_tokens": 21155,
+    "api_call_count": 59
   }
 }
