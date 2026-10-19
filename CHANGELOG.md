@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.5.0](https://github.com/alehar9320/agentic-odi/compare/v0.4.0...v0.5.0) (2026-10-19)
+
+
+### Features
+
+* minimalistic conversational GUI ([c4ef8f5](https://github.com/alehar9320/agentic-odi/commit/c4ef8f55a559319a633fd147484fc8837db86d4a))
+
+
+### Bug Fixes
+
+* **studio:** wire engagement level into studio context ([0aaa54e](https://github.com/alehar9320/agentic-odi/commit/0aaa54efa616e5eb791847e7cad52e48a41bda95))
+
 ## [0.4.0](https://github.com/alehar9320/agentic-odi/compare/v0.3.0...v0.4.0) (2026-10-19)
 
 
