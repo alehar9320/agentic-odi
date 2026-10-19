@@ -3,8 +3,16 @@
   "checkpoint_id": "01M5AF9TF402SBXBA2TGQ6RB93",
   "strategy": "manual-commit",
   "branch": "topic/cli-hardening",
-  "checkpoints_count": 5,
-  "files_touched": null,
+  "checkpoints_count": 6,
+  "files_touched": [
+    "cli/tests/test_backend.py",
+    "cli/tests/test_backend_selection.py",
+    "cli/tests/test_cli.py",
+    "cli/tests/test_connectors_cli.py",
+    "cli/tests/test_customer_outcomes_cli.py",
+    "cli/tests/test_render.py",
+    "cli/tests/test_startup_perf.py"
+  ],
   "sessions": [
     {
       "metadata": "/0/metadata.json",
@@ -33,6 +41,13 @@
       "compact_transcript": "/3/transcript.jsonl",
       "content_hash": "/3/content_hash.txt",
       "prompt": "/3/prompt.txt"
+    },
+    {
+      "metadata": "/4/metadata.json",
+      "transcript": "/4/full.jsonl",
+      "compact_transcript": "/4/transcript.jsonl",
+      "content_hash": "/4/content_hash.txt",
+      "prompt": ""
     }
   ],
   "token_usage": {
