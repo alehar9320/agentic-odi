@@ -3,7 +3,7 @@
   "checkpoint_id": "01M5AE0EVRPT4GZHB9ZXFEHJ2N",
   "strategy": "manual-commit",
   "branch": "fix/cli-main-hardening",
-  "checkpoints_count": 12,
+  "checkpoints_count": 13,
   "files_touched": [
     "cli/src/cli/connectors.py",
     "cli/src/cli/outcomes.py",
@@ -86,6 +86,13 @@
       "transcript": "/10/full.jsonl",
       "compact_transcript": "/10/transcript.jsonl",
       "content_hash": "/10/content_hash.txt",
+      "prompt": ""
+    },
+    {
+      "metadata": "/11/metadata.json",
+      "transcript": "/11/full.jsonl",
+      "compact_transcript": "/11/transcript.jsonl",
+      "content_hash": "/11/content_hash.txt",
       "prompt": ""
     }
   ],
