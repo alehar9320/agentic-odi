@@ -1,0 +1,1 @@
+[Image 1] Act as a world-class principal ux designer and software architect in one. Your objective is to ensure that the experience of using the GUI is as seamless as using something like Saba Labs. We keep a minimalistic impression that starts very simple, and then surface key details, as part of a conversational experience, just like we've started upon.
