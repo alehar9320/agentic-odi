@@ -1,0 +1,40 @@
+You are implementing Task 6: final verification / PR for the GitHub Pages site plan.
+
+## Task Description
+
+Read your task brief first: /home/alexa/repos/agentic-odi/.worktrees/gh-pages/.superpowers/sdd/2026-10-18-github-pages/task-6-brief.md
+It is your requirements, with exact values to use verbatim.
+
+## Context
+
+Work from: /home/alexa/repos/agentic-odi/.worktrees/gh-pages (branch feature/gh-pages). Tasks 1–5 are complete (make_og.py, site structure, design system, README sync, CI workflow). All gates pass: 34 website tests, ruff lint/format clean, repo parity clean.
+
+This task is the final verification before the PR. It has two parts:
+
+### Part A: Verification
+1. Run the full suite: `uv run pytest website/tests -q` → all must pass
+2. Run repo-wide lint: `uv run ruff check .` and `uv run ruff format --check .` → clean
+3. Verify the site generates correctly: check that `website/index.html` exists, has the correct social meta tags (og:type, og:title, og:description, og:image pointing to `website/assets/og.png`, og:url), honesty contract strings (experimental, free prefect account, all rights reserved, strategyn, your roadmap is a guess., we don't publish dates, open an issue, http://localhost:8000/mcp), and the sticky CTA.
+4. Verify the 404 page is self-contained.
+5. Verify the OG image `website/assets/og.png` is the committed art from Task 1 and matches the generator output (programmatic check from Task 1's test).
+
+### Part B: PR Preparation
+1. Stage exactly the Task 1–5 deliverables (no new files outside those created in those tasks)
+2. Commit message per the plan's final task convention
+3. Open a PR against `main` via `gh pr create --base main --head feature/gh-pages --title "..." --body "..."`  
+   - Title: `feat(website): GitHub Pages site with progressive loading, ghost elements, and dual-interaction experience` (or similar, per the original living-studio-gui work)
+   - Body: summarize what was built (5 tasks, key features: OG images, design system, responsive structure, honesty contract, CI workflow)
+4. Ensure the PR's Checks pane will show all green (lint, typecheck, security, tests, CI-green aggregate)
+
+### Part C: Definition of Done
+- PR pushed, all GitHub Actions checks green (lint, typecheck, security, test, CI-green)
+- All five previous tasks' deliverables are present and unmodified (no regressions)
+- The `website/` directory is the sole source of the site; `README.md` sync is verified
+
+## You Do Not Dispatch Subagents
+
+## Report Format
+
+Write your full report to /home/alexa/repos/agentic-odi/.superpowers/sdd/2026-10-18-github-pages/task-6-report.md
+
+Then report ONLY (under 15 lines): Status, commits, one-line test summary, concerns, report path.
