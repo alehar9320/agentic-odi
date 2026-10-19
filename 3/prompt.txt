@@ -1,0 +1,1 @@
+Go over the CLI experience on main and harden it in terms of ensuring performance, quality, etc. so that we deliver a stellar user experience

@@ -1,0 +1,70 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M5AFC2FBB7FH5WKY2R2K22E1",
+  "session_id": "ses_ead37972effe4j8djrdWAbCHX5",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-19T16:20:08.382476771Z",
+  "branch": "topic/cli-hardening",
+  "checkpoints_count": 2,
+  "save_step_count": 1,
+  "files_touched": [],
+  "agent": "OpenCode",
+  "model": "deepseek-v4.1-flash-free",
+  "turn_id": "168a07979c70",
+  "checkpoint_transcript_start": 21,
+  "transcript_lines_at_start": 21,
+  "compact_transcript_start": 21,
+  "token_usage": {
+    "input_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 0,
+    "output_tokens": 0,
+    "api_call_count": 0
+  },
+  "session_metrics": {
+    "turn_count": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 5565,
+      "user_lines_removed": 151,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        ".freebuff/project-id": 1,
+        ".opencode/plans/ci-green-pr7-pr8.md": 103,
+        ".pi/git/.gitignore": 2,
+        "cli/src/cli/cli.py": 34,
+        "cli/src/cli/onboard.py": 253,
+        "cli/src/cli/profile.py": 122,
+        "cli/tests/test_profile.py": 51,
+        "docs/superpowers/plans/2026-10-15-cli-odi-entity-parity.md": 1123,
+        "docs/superpowers/plans/2026-10-16-first-run-onboarding.md": 669,
+        "docs/superpowers/plans/2026-10-18-github-pages.md": 742,
+        "docs/superpowers/plans/2026-10-18-user-facing-changelog.md": 1412,
+        "docs/superpowers/specs/2026-10-15-cli-odi-entity-parity-design.md": 219,
+        "docs/superpowers/specs/2026-10-16-first-run-onboarding-design.md": 151,
+        "docs/superpowers/specs/2026-10-18-github-pages-design.md": 398,
+        "docs/superpowers/specs/2026-10-18-user-facing-changelog-design.md": 241,
+        "pyproject.toml": 3,
+        "uv.lock": 41
+      },
+      "user_removed_per_file": {
+        "cli/src/cli/cli.py": 151
+      }
+    },
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 106,
+      "user_lines_removed": 0,
+      "agent_lines_added": 5459,
+      "agent_lines_removed": 151,
+      "user_added_per_file": {
+        ".freebuff/project-id": 1,
+        ".opencode/plans/ci-green-pr7-pr8.md": 103,
+        ".pi/git/.gitignore": 2
+      }
+    }
+  ]
+}
