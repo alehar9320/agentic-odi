@@ -17,7 +17,20 @@ def _strip(text: str) -> str:
     return ANSI.sub("", text)
 
 
+def _seed_parents(db_path: str) -> None:
+    """Customer Outcomes validate their Job and Step, so seed both up front."""
+    from core import Job, Step
+    from core.sqlite_repository import SQLiteRepository
+
+    repo = SQLiteRepository(db_path=db_path)
+    if repo.get_job("job-1") is None:
+        repo.add_job(Job(id="job-1", name="Onboard customers"))
+    if repo.get_step("step-1") is None:
+        repo.add_step(Step(id="step-1", job_id="job-1", name="Prepare", order=1))
+
+
 def _add(db_path: str, *, alias: str = "customer-outcomes") -> list[str]:
+    _seed_parents(db_path)
     return [
         "--backend",
         "local",
@@ -316,3 +329,57 @@ def test_delete_confirmation_can_abort_or_proceed(tmp_path):
     assert len(json.loads(still_there.output)) == 1
     assert confirmed.exit_code == 0
     assert "Deleted customer outcome" in _strip(confirmed.output)
+
+
+_METRIC = (
+    '{"name":"m","direction":"maximize","unit_of_measure":"s","importance":8,"satisfaction":3}'
+)
+
+
+def test_customer_outcome_add_with_value_metrics(tmp_path):
+    db = str(tmp_path / "odi.db")
+    result = runner.invoke(app, [*_add(db), "--value-metric", _METRIC, "--json"])
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["customer_value"]["value_metrics"][0]["name"] == "m"
+
+
+def test_customer_outcome_add_rejects_bad_metric_json(tmp_path):
+    db = str(tmp_path / "odi.db")
+    result = runner.invoke(app, [*_add(db), "--value-metric", "not-json"])
+
+    assert result.exit_code != 0
+    # Highlighted terminals (e.g. CI) split option tokens with ANSI codes, so
+    # strip styling before matching on the option name.
+    assert "value-metric" in _strip(result.output).lower()
+
+
+def test_customer_outcome_update_replaces_value_metrics(tmp_path):
+    db = str(tmp_path / "odi.db")
+    created = runner.invoke(app, [*_add(db), "--value-metric", _METRIC, "--json"])
+    outcome_id = json.loads(created.output)["id"]
+    replacement = (
+        '{"name":"m2","direction":"maximize","unit_of_measure":"s","importance":9,"satisfaction":3}'
+    )
+
+    updated = runner.invoke(
+        app,
+        [
+            "--backend",
+            "local",
+            "--db",
+            db,
+            "customer-outcomes",
+            "update",
+            outcome_id,
+            "--value-metric",
+            replacement,
+            "--json",
+        ],
+    )
+
+    assert updated.exit_code == 0, updated.output
+    payload = json.loads(updated.output)
+    names = [metric["name"] for metric in payload["customer_value"]["value_metrics"]]
+    assert names == ["m2"]

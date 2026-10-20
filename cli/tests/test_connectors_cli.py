@@ -85,11 +85,73 @@ def test_connectors_add_rejects_duplicate(tmp_path: Path) -> None:
     assert "already exists" in _strip(result.output)
 
 
+def test_connectors_add_rest_with_headers(tmp_path: Path) -> None:
+    config = tmp_path / "connectors.json"
+    result = runner.invoke(
+        app,
+        [
+            "connectors",
+            "add",
+            "rest",
+            "--name",
+            "jira",
+            "--url",
+            "https://jira.example/api/issues",
+            "--header",
+            "Authorization=Bearer token",
+            "--records-key",
+            "result.issues",
+            "--config",
+            str(config),
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(config.read_text(encoding="utf-8"))
+    settings = payload["connectors"][0]["settings"]
+    assert settings["url"] == "https://jira.example/api/issues"
+    assert settings["headers"] == {"Authorization": "Bearer token"}
+    assert settings["records_key"] == "result.issues"
+
+
+def test_connectors_add_rejects_bad_header(tmp_path: Path) -> None:
+    config = tmp_path / "connectors.json"
+    result = runner.invoke(
+        app,
+        [
+            "connectors",
+            "add",
+            "rest",
+            "--name",
+            "jira",
+            "--url",
+            "https://jira.example/api/issues",
+            "--header",
+            "broken",
+            "--config",
+            str(config),
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "KEY=VALUE" in _strip(result.output)
+
+
 def test_connectors_add_rejects_unknown_kind(tmp_path: Path) -> None:
     config = tmp_path / "connectors.json"
     result = runner.invoke(
         app,
-        ["connectors", "add", "rest", "--name", "jira", "--config", str(config)],
+        [
+            "connectors",
+            "add",
+            "salesforce",
+            "--name",
+            "crm",
+            "--url",
+            "https://example.test",
+            "--config",
+            str(config),
+        ],
     )
 
     assert result.exit_code == 1
@@ -322,3 +384,67 @@ def test_connectors_health_times_out(tmp_path: Path, monkeypatch) -> None:
 
     assert result.exit_code == 1
     assert "timed out" in _strip(result.output)
+
+
+def test_connectors_ingest_maps_records_to_evidence(tmp_path: Path, monkeypatch) -> None:
+    config = tmp_path / "connectors.json"
+    db = str(tmp_path / "odi.db")
+    runner.invoke(
+        app,
+        [
+            "connectors",
+            "add",
+            "mcp",
+            "--name",
+            "gong",
+            "--url",
+            "http://localhost:9000/mcp",
+            "--config",
+            str(config),
+        ],
+    )
+    job_result = runner.invoke(app, ["--db", db, "jobs", "add", "--name", "J", "--json"])
+    job_id = json.loads(job_result.output)["id"]
+    batch = IngestBatch(
+        connector_name="gong",
+        records=[
+            IngestRecord(
+                source_name="gong",
+                source_kind="mcp",
+                item_type="catalog",
+                name="mcp-catalog",
+                content="{}",
+            ),
+            IngestRecord(
+                source_name="gong",
+                source_kind="mcp",
+                item_type="resource",
+                name="feedback",
+                content="Onboarding is slow",
+            ),
+        ],
+    )
+    monkeypatch.setattr("cli.connectors.build_connector", lambda _config: _FakeConnector(batch))
+
+    result = runner.invoke(
+        app,
+        [
+            "--db",
+            db,
+            "connectors",
+            "ingest",
+            "--name",
+            "gong",
+            "--job-id",
+            job_id,
+            "--config",
+            str(config),
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "Evidence created" in result.output
+    listed = runner.invoke(app, ["--db", db, "evidence", "list", "--job-id", job_id, "--json"])
+    payload = json.loads(listed.output)
+    assert [item["content"] for item in payload] == ["Onboarding is slow"]
+    assert all(item["name"] != "mcp-catalog" for item in payload)

@@ -45,7 +45,7 @@ build, tests, and layout:
 | **`local_server/`** (`agentic-odi-local-server`) | The FastAPI **Living Studio sidecar**. It talks to the MCP server on the client's behalf and serves the Studio API — configuration, health probes, canvas data, MCP mutations, and streaming (SSE) chat with the LLM tool-loop — plus the built SPA when `studio/dist` exists. |
 | **`client/`** (`agentic-odi-client`) | The local dev **launcher** (`run.py` / `python -m client.run`) that starts the MCP server and the Studio sidecar together. |
 | **`studio/`** (React + TypeScript + Vite) | **The Living Studio** front end — a spatial, conversational GUI for Outcome-Driven Innovation with an interactive Opportunity Landscape, Universal Job Map, WYSIWYG Impact Simulation, and Causal Lineage inspection, paired with an autonomous copilot. Ships as a browser SPA and as a **Tauri 2 desktop app** (`studio/src-tauri/`). |
-| **`cli/`** (`agentic-odi-cli`) | A [`Typer`](https://github.com/fastapi/typer)-based command-line interface with an interactive chat mode plus `version`, `update`, `connectors`, and `customer-outcomes` (alias `outcomes`) commands. Data commands are local-first (`--backend local`, default) or remote (`--backend mcp`), with readable tables, `--json`, and a top-level `score`. |
+| **`cli/`** (`agentic-odi-cli`) | A [`Typer`](https://github.com/fastapi/typer)-based command-line interface with an interactive chat mode plus `version`, `update`, `schema`, `jobs`, `steps`, `desired-outcomes`, `customer-outcomes` (alias `outcomes`), `evidence`, and `connectors` commands. Every ODI entity has full create/read/update/delete parity with the MCP tools. Data commands are local-first (`--backend local`, default) or remote (`--backend mcp`), with readable tables, `--json`, and a top-level `score`. |
 | **`connectors/`** (`agentic-odi-connectors`) | Pluggable external integrations. The first kind is an **MCP client connector** that connects to a remote MCP server over HTTP, checks health, and ingests tools/resources into a local ingest sink. Additional kinds (REST, webhooks, and so on) can register against the same protocol later. |
 
 ## Quick Start
@@ -83,7 +83,12 @@ The CLI is local-first, so data commands work without a running server:
 python -m cli --version          # print the Agentic ODI version
 python -m cli --help             # show available options and commands
 python -m cli                    # start interactive chat in a terminal
+agentic-odi jobs list            # Jobs-to-be-Done
+agentic-odi steps list --job-id <id>
+agentic-odi desired-outcomes list --job-id <id>
 agentic-odi customer-outcomes list
+agentic-odi evidence list --job-id <id>
+agentic-odi schema               # canonical JSON schema for every entity
 agentic-odi score 8 2            # ODI opportunity score → 14.00
 ```
 
@@ -106,7 +111,7 @@ layout, updates, and release automation.
 
 | Guide | Contents |
 |---|---|
-| [CLI Reference](docs/cli.md) | Backends, interactive chat, `customer-outcomes`, `connectors`, scoring, environment variables |
+| [CLI Reference](docs/cli.md) | Backends, interactive chat, Jobs/Steps/desired Outcomes/Customer Outcomes/evidence, `connectors`, scoring, environment variables |
 | [External Connectors](docs/connectors.md) | The MCP ingest connector, presets, and the `Connector` protocol |
 | [Running The Living Studio](docs/living-studio.md) | Run modes, desktop signing and updates, agent-driven testing (`/dev`, `/test`) |
 | [Local LLM Backend](docs/local-llm.md) | Running a local OpenAI-compatible model with tool calling |

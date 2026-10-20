@@ -25,7 +25,15 @@ def _backend(tmp_path) -> backend.LocalBackend:
     return backend.LocalBackend(db_path=str(tmp_path / "odi.db"))
 
 
+def _seed_job(instance: backend.LocalBackend, job_id: str = "job-1") -> None:
+    """Customer Outcomes validate their parent Job, so seed one first."""
+    from core import Job
+
+    instance.service.repo.add_job(Job(id=job_id, name="Onboard customers"))
+
+
 def _add(instance: backend.LocalBackend) -> str:
+    _seed_job(instance)
     created = instance.call(
         "add_customer_outcome",
         {
@@ -73,11 +81,13 @@ def test_unknown_tool_raises_not_implemented(tmp_path) -> None:
 
 
 def test_add_rejects_invalid_customer_values(tmp_path) -> None:
+    instance = _backend(tmp_path)
+    _seed_job(instance)
     args = _add_args()
     args["customer_value"] = {**CUSTOMER_VALUE, "direction": "sideways"}
 
     with pytest.raises(backend.BackendError, match="Invalid customer outcome:"):
-        _backend(tmp_path).call("add_customer_outcome", args)
+        instance.call("add_customer_outcome", args)
 
 
 def test_add_maps_value_range_errors_to_backend_errors(tmp_path) -> None:

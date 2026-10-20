@@ -4,8 +4,17 @@ from typer.testing import CliRunner
 
 from cli.cli import app
 
+
+def _seed_job(db_path: str, job_id: str = "job-1") -> None:
+    """Customer Outcomes validate their parent Job, so seed one first."""
+    from core import Job
+    from core.sqlite_repository import SQLiteRepository
+
+    SQLiteRepository(db_path=db_path).add_job(Job(id=job_id, name="Onboard customers"))
+
+
 ADD_ARGS = [
-    "outcomes",
+    "customer-outcomes",
     "add",
     "--job-id",
     "job-1",
@@ -28,8 +37,9 @@ ADD_ARGS = [
 ]
 
 
-def test_outcomes_add_defaults_to_local(tmp_path, monkeypatch):
+def test_customer_outcomes_add_defaults_to_local(tmp_path, monkeypatch):
     monkeypatch.setenv("AGENTIC_ODI_DB", str(tmp_path / "odi.db"))
+    _seed_job(str(tmp_path / "odi.db"))
     runner = CliRunner()
     with patch("cli.backend._call_mcp") as mock_call:
         result = runner.invoke(app, ADD_ARGS)
@@ -37,7 +47,7 @@ def test_outcomes_add_defaults_to_local(tmp_path, monkeypatch):
     mock_call.assert_not_called()
 
 
-def test_outcomes_add_backend_mcp_calls_mcp(monkeypatch):
+def test_customer_outcomes_add_backend_mcp_calls_mcp(monkeypatch):
     monkeypatch.setenv("AGENTIC_ODI_DB", ":memory:")
     runner = CliRunner()
     with patch("cli.backend._call_mcp") as mock_call:
@@ -50,9 +60,19 @@ def test_outcomes_add_backend_mcp_calls_mcp(monkeypatch):
 def test_score_uses_local_backend_by_default(tmp_path, monkeypatch):
     monkeypatch.setenv("AGENTIC_ODI_DB", str(tmp_path / "odi.db"))
     runner = CliRunner()
-    result = runner.invoke(app, ["outcomes", "score", "8", "2"])
+    result = runner.invoke(app, ["score", "8", "2"])
     assert result.exit_code == 0
     assert "Opportunity score" in result.output
+
+
+def test_score_backend_mcp_calls_mcp(monkeypatch):
+    monkeypatch.setenv("AGENTIC_ODI_DB", ":memory:")
+    runner = CliRunner()
+    with patch("cli.backend._call_mcp") as mock_call:
+        mock_call.return_value = "Opportunity score: 14.00"
+        result = runner.invoke(app, ["--backend", "mcp", "score", "8", "2"])
+    assert result.exit_code == 0
+    mock_call.assert_called_once()
 
 
 def test_unknown_backend_exits_nonzero(tmp_path, monkeypatch):

@@ -7,6 +7,7 @@ server via ``--backend mcp``).
 
 from __future__ import annotations
 
+import json
 from enum import Enum
 from typing import Any
 
@@ -43,6 +44,22 @@ class CategoryOption(str, Enum):
 JSON_OPTION = typer.Option(False, "--json", help="Emit machine-readable JSON.")
 
 
+def _parse_value_metrics(values: list[str] | None) -> list[dict[str, Any]] | None:
+    """Parse repeated ``--value-metric`` JSON objects into value metrics."""
+    if not values:
+        return None
+    metrics: list[dict[str, Any]] = []
+    for raw in values:
+        try:
+            parsed = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            raise typer.BadParameter("must be valid JSON", param_hint="--value-metric") from exc
+        if not isinstance(parsed, dict):
+            raise typer.BadParameter("must be a JSON object", param_hint="--value-metric")
+        metrics.append(parsed)
+    return metrics
+
+
 @customer_outcomes_app.command("add")
 def add(
     job_id: str = typer.Option(..., help="Job ID the outcome belongs to"),
@@ -56,6 +73,9 @@ def add(
     business_statement: str = typer.Option(..., help="Business value statement"),
     contextual_clarifier: str | None = typer.Option(default=None),
     step_id: str | None = typer.Option(default=None),
+    value_metric: list[str] | None = typer.Option(  # noqa: B008
+        None, "--value-metric", help="Value metric as a JSON object. Repeatable."
+    ),
     json_output: bool = JSON_OPTION,
 ) -> None:
     """Add a Customer Outcome with customer and business value."""
@@ -69,6 +89,9 @@ def add(
     }
     if contextual_clarifier:
         customer_value["contextual_clarifier"] = contextual_clarifier
+    metrics = _parse_value_metrics(value_metric)
+    if metrics is not None:
+        customer_value["value_metrics"] = metrics
     args: dict[str, Any] = {
         "job_id": job_id,
         "customer_value": customer_value,
@@ -119,6 +142,9 @@ def update(
     estimated_annual_value: float | None = typer.Option(default=None),
     confidence: float | None = typer.Option(default=None),
     step_id: str | None = typer.Option(default=None),
+    value_metric: list[str] | None = typer.Option(  # noqa: B008
+        None, "--value-metric", help="Replace value metrics with these JSON objects."
+    ),
     json_output: bool = JSON_OPTION,
 ) -> None:
     """Update a Customer Outcome."""
@@ -149,6 +175,9 @@ def update(
         args["estimated_annual_value"] = estimated_annual_value
     if confidence is not None:
         args["confidence"] = confidence
+    metrics = _parse_value_metrics(value_metric)
+    if metrics is not None:
+        args["value_metrics"] = metrics
     result = run_tool("update_customer_outcome", args)
     typer.echo(render_saved("updated", result, as_json=json_output))
 
