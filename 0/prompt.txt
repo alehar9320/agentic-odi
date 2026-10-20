@@ -1,0 +1,15 @@
+Explore the codebase at /home/alexa/repos/agentic-odi to understand its structure. I need to understand:
+1. What kind of project this is (language, framework, etc.)
+2. CI/CD configuration (GitHub Actions, etc.)
+3. How dependabot is configured
+4. Any existing PR templates or workflow files
+5. The overall directory structure
+
+Please provide a comprehensive overview including:
+- Top-level directory listing
+- CI workflow files location and content
+- Dependabot configuration
+- Package manager and test setup
+- Any relevant configuration files
+
+Be very thorough - check .github/workflows/, package.json, setup.py, pyproject.toml, .github/dependabot.yml, etc.
