@@ -1,1 +1,1 @@
-In a new git worktree, ensure that we fix up CI so that dependabot PRs like #40 will go through successfully. Once you've got the solution, push a PR with the fix
+wtf do you mean? Did you commit and push something? The CI is still in red
