@@ -1,0 +1,40 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M5CZPZ9NTHBNZ6T3JWSMB0GK",
+  "session_id": "ses_eab1a0f2cffe61UJ6xqwgygQhO",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-20T15:43:40.697330326Z",
+  "branch": "topic/cli-odi-parity",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "cli/src/cli/cli.py"
+  ],
+  "agent": "OpenCode",
+  "model": "nemotron-3.5-lightning-free",
+  "turn_id": "e1467e993806",
+  "checkpoint_transcript_start": 12,
+  "transcript_lines_at_start": 12,
+  "compact_transcript_start": 12,
+  "token_usage": {
+    "input_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 0,
+    "output_tokens": 0,
+    "api_call_count": 0
+  },
+  "session_metrics": {
+    "turn_count": 1
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-10-20T15:43:40.680049176Z",
+    "agent_lines": 0,
+    "agent_removed": 0,
+    "human_added": 1953,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 1953,
+    "total_lines_changed": 1973,
+    "agent_percentage": 0,
+    "metric_version": 2
+  }
+}
