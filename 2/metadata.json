@@ -1,0 +1,120 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M5DB32GVKCNJ9XXF6DPE32K9",
+  "session_id": "ses_ea60a8492ffeYSSCUGYy7Gi0Yy",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-20T19:02:35.690678257Z",
+  "branch": "feat/studio-chat-first-shell",
+  "checkpoints_count": 3,
+  "save_step_count": 3,
+  "files_touched": [
+    "README.md",
+    "apps/studio/src/App.test.tsx",
+    "apps/studio/src/App.tsx",
+    "apps/studio/src/components/ErrorBoundary.tsx",
+    "apps/studio/src/components/SettingsPanel.tsx",
+    "apps/studio/src/components/Skeletons.tsx",
+    "apps/studio/src/components/StudioHeader.tsx",
+    "apps/studio/src/components/Toasts.tsx",
+    "apps/studio/src/components/canvas/CanvasTabs.tsx",
+    "apps/studio/src/components/canvas/DirectCapture.tsx",
+    "apps/studio/src/components/canvas/EvidenceStream.tsx",
+    "apps/studio/src/components/canvas/ImpactSim.tsx",
+    "apps/studio/src/components/canvas/JobMap.tsx",
+    "apps/studio/src/components/canvas/OpportunityLandscape.tsx",
+    "apps/studio/src/components/canvas/OutcomeCard.tsx",
+    "apps/studio/src/components/chat/ChatCopilot.tsx",
+    "apps/studio/src/components/chat/ChatStage.tsx",
+    "apps/studio/src/components/chat/Composer.tsx",
+    "apps/studio/src/components/chat/Conversation.tsx",
+    "apps/studio/src/components/chat/Hero.tsx",
+    "apps/studio/src/components/chat/Markdown.tsx",
+    "apps/studio/src/components/icons.tsx",
+    "apps/studio/src/components/layout/Sidebar.tsx",
+    "apps/studio/src/components/workspace/WorkspacePanel.tsx",
+    "apps/studio/src/components/workspace/panels.tsx",
+    "apps/studio/src/lib/greeting.test.ts",
+    "apps/studio/src/lib/greeting.ts",
+    "apps/studio/src/lib/markdown.test.ts",
+    "apps/studio/src/lib/markdown.ts",
+    "apps/studio/src/state/StudioContext.tsx",
+    "apps/studio/src/styles/theme.css",
+    "apps/studio/src/types.ts",
+    "docs/living-studio.md"
+  ],
+  "agent": "OpenCode",
+  "model": "deepseek-v4.1-flash-free",
+  "turn_id": "ba5254e38cba",
+  "checkpoint_transcript_start": 306,
+  "transcript_lines_at_start": 306,
+  "compact_transcript_start": 306,
+  "token_usage": {
+    "input_tokens": 914758,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 10678656,
+    "output_tokens": 25824,
+    "api_call_count": 110
+  },
+  "session_metrics": {
+    "turn_count": 5
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-10-20T19:02:35.457085305Z",
+    "agent_lines": 2627,
+    "agent_removed": 523,
+    "human_added": 0,
+    "human_modified": 516,
+    "human_removed": 121,
+    "total_committed": 3143,
+    "total_lines_changed": 3787,
+    "agent_percentage": 83.1792975970425,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0
+    },
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 460,
+      "user_lines_removed": 637,
+      "agent_lines_added": 1520,
+      "agent_lines_removed": 35,
+      "user_added_per_file": {
+        "apps/studio/src/App.tsx": 139,
+        "apps/studio/src/components/SettingsPanel.tsx": 137,
+        "apps/studio/src/components/canvas/ImpactSim.tsx": 38,
+        "apps/studio/src/components/canvas/JobMap.tsx": 43,
+        "apps/studio/src/components/canvas/OpportunityLandscape.tsx": 37,
+        "apps/studio/src/components/canvas/OutcomeCard.tsx": 39,
+        "apps/studio/src/lib/useMediaQuery.ts": 27
+      },
+      "user_removed_per_file": {
+        "apps/studio/src/App.tsx": 55,
+        "apps/studio/src/components/SettingsPanel.tsx": 132,
+        "apps/studio/src/components/StudioHeader.tsx": 31,
+        "apps/studio/src/components/canvas/CanvasTabs.tsx": 88,
+        "apps/studio/src/components/canvas/ImpactSim.tsx": 82,
+        "apps/studio/src/components/canvas/JobMap.tsx": 24,
+        "apps/studio/src/components/canvas/OpportunityLandscape.tsx": 40,
+        "apps/studio/src/components/canvas/OutcomeCard.tsx": 41,
+        "apps/studio/src/components/chat/ChatCopilot.tsx": 144
+      }
+    },
+    {
+      "checkpoint_number": 3,
+      "user_lines_added": 56,
+      "user_lines_removed": 0,
+      "agent_lines_added": 3551,
+      "agent_lines_removed": 1159,
+      "user_added_per_file": {
+        "apps/studio/src/lib/useMediaQuery.ts": 28,
+        "apps/studio/src/styles/theme.css": 28
+      }
+    }
+  ]
+}

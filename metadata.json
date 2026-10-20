@@ -3,7 +3,7 @@
   "checkpoint_id": "01M5DB32GVKCNJ9XXF6DPE32K9",
   "strategy": "manual-commit",
   "branch": "feat/studio-chat-first-shell",
-  "checkpoints_count": 10,
+  "checkpoints_count": 13,
   "files_touched": [
     "README.md",
     "apps/studio/src/App.test.tsx",
@@ -54,13 +54,20 @@
       "compact_transcript": "/1/transcript.jsonl",
       "content_hash": "/1/content_hash.txt",
       "prompt": "/1/prompt.txt"
+    },
+    {
+      "metadata": "/2/metadata.json",
+      "transcript": "/2/full.jsonl",
+      "compact_transcript": "/2/transcript.jsonl",
+      "content_hash": "/2/content_hash.txt",
+      "prompt": "/2/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 344676,
+    "input_tokens": 1259434,
     "cache_creation_tokens": 0,
-    "cache_read_tokens": 1127434,
-    "output_tokens": 4173,
-    "api_call_count": 34
+    "cache_read_tokens": 11806090,
+    "output_tokens": 29997,
+    "api_call_count": 144
   }
 }
