@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 from enum import Enum
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, computed_field
 
@@ -93,6 +94,26 @@ class BusinessValue(BaseModel):
     detail: str | None = None
     estimated_annual_value: float | None = Field(default=None, ge=0.0)
     confidence: float | None = Field(default=None, ge=0.0, le=1.0)
+
+
+EvidenceItemType = Literal["catalog", "resource", "tool_result", "manual", "note"]
+
+
+class Evidence(BaseModel):
+    """A captured research record linked (optionally) to ODI artifacts."""
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    source_name: str = Field(..., description="Connector or person that produced the record")
+    source_kind: str = Field(..., description="Connector kind, e.g. mcp, rest, webhook, manual")
+    item_type: EvidenceItemType = Field(
+        "manual", description="Normalized record kind produced by the connector"
+    )
+    name: str = Field(..., description="Short human-readable label for the record")
+    content: str = Field(..., description="Normalized text content of the record")
+    raw: dict[str, Any] = Field(default_factory=dict, description="Original record payload")
+    job_id: str | None = Field(None, description="Job this evidence supports")
+    step_id: str | None = Field(None, description="Job-map Step this evidence supports")
+    outcome_id: str | None = Field(None, description="Desired Outcome this evidence supports")
 
 
 class CustomerOutcome(BaseModel):

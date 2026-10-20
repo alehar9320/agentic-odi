@@ -4,12 +4,22 @@ from __future__ import annotations
 
 import pytest
 
-from core.models import BusinessImpactCategory, BusinessValue, CustomerValue, Direction
+from core.models import (
+    BusinessImpactCategory,
+    BusinessValue,
+    CustomerValue,
+    Direction,
+    Job,
+    Outcome,
+)
 from core.repository import InMemoryRepository
 from core.services import (
     CustomerOutcomeNotFoundError,
+    EvidenceNotFoundError,
     JobNotFoundError,
     ODIService,
+    OutcomeNotFoundError,
+    StepNotFoundError,
     ValueOutOfRangeError,
 )
 
@@ -119,6 +129,7 @@ def test_job_not_found_error_exposes_the_job_id() -> None:
 
 def test_add_customer_outcome_accepts_dict_payloads(service: ODIService) -> None:
     job = service.add_job("Onboard customers")
+    step = service.add_step(job.id, "Prepare", order=1)
 
     outcome = service.add_customer_outcome(
         job.id,
@@ -134,13 +145,120 @@ def test_add_customer_outcome_accepts_dict_payloads(service: ODIService) -> None
             "category": "revenue_growth",
             "statement": "Increase expansion revenue",
         },
-        step_id="step-1",
+        step_id=step.id,
     )
 
     assert outcome.customer_value.opportunity_score == 12.0
     assert outcome.business_value.category == BusinessImpactCategory.REVENUE_GROWTH
-    assert outcome.step_id == "step-1"
+    assert outcome.step_id == step.id
 
 
 def test_compute_opportunity_delegates_to_the_model(service: ODIService) -> None:
     assert service.compute_opportunity(8.0, 4.0) == 12.0
+
+
+def test_add_step_requires_existing_job(service: ODIService) -> None:
+    with pytest.raises(JobNotFoundError):
+        service.add_step("missing", "Step", order=1)
+
+
+def test_add_outcome_requires_existing_job_and_step(service: ODIService) -> None:
+    job = service.add_job("J")
+    with pytest.raises(JobNotFoundError):
+        service.add_outcome("missing", "Min x")
+    with pytest.raises(StepNotFoundError):
+        service.add_outcome(job.id, "Min x", step_id="missing")
+
+
+def test_update_outcome_recomputes_opportunity_score(service: ODIService) -> None:
+    job = service.add_job("J")
+    outcome = service.add_outcome(job.id, "Min x", importance=5.0, satisfaction=5.0)
+    assert outcome.opportunity_score == 5.0
+    updated = service.update_outcome(outcome.id, {"importance": 8.0})
+    assert updated.opportunity_score == 11.0
+    cleared = service.update_outcome(outcome.id, {"satisfaction": None})
+    assert cleared.opportunity_score is None
+
+
+def test_update_outcome_rejects_out_of_range_scores(service: ODIService) -> None:
+    job = service.add_job("J")
+    outcome = service.add_outcome(job.id, "Min x", importance=5.0, satisfaction=5.0)
+    with pytest.raises(ValueOutOfRangeError):
+        service.update_outcome(outcome.id, {"importance": 99})
+    stored = service.get_outcome(outcome.id)
+    assert stored is not None
+    assert stored.importance == 5.0
+
+
+def test_job_crud_and_cascade(service: ODIService) -> None:
+    job = service.add_job("J")
+    service.add_step(job.id, "Step", order=1)
+    assert service.update_job(job.id, {"name": "Renamed"}).name == "Renamed"
+    assert service.get_step(service.get_job_map(job.id)[0].id) is not None
+    service.delete_job(job.id)
+    assert service.get_job(job.id) is None
+    assert service.get_job_map(job.id) == []
+    with pytest.raises(JobNotFoundError):
+        service.delete_job(job.id)
+
+
+def test_update_unknown_ids_raise(service: ODIService) -> None:
+    with pytest.raises(JobNotFoundError):
+        service.update_job("missing", {"name": "x"})
+    with pytest.raises(StepNotFoundError):
+        service.update_step("missing", {"name": "x"})
+    with pytest.raises(OutcomeNotFoundError):
+        service.update_outcome("missing", {"statement": "x"})
+
+
+def test_add_evidence_resolves_and_validates_links(service: ODIService) -> None:
+    job = service.add_job("J")
+    step = service.add_step(job.id, "S", order=1)
+    outcome = service.add_outcome(job.id, "Min x", step_id=step.id)
+
+    evidence = service.add_evidence(
+        source_name="gong",
+        source_kind="mcp",
+        name="quote",
+        content="Lost hours",
+        step_id=step.id,
+        outcome_id=outcome.id,
+    )
+
+    assert evidence.job_id == job.id
+    assert service.list_evidence(job_id=job.id) == [evidence]
+    with pytest.raises(StepNotFoundError):
+        service.add_evidence("s", "mcp", "n", "c", step_id="missing")
+    with pytest.raises(OutcomeNotFoundError):
+        service.add_evidence("s", "mcp", "n", "c", outcome_id="missing")
+
+
+def test_evidence_delete_and_promote(service: ODIService) -> None:
+    evidence = service.add_evidence(
+        source_name="gong",
+        source_kind="rest",
+        item_type="tool_result",
+        name="quote",
+        content="Lost 2 hours on deploy",
+    )
+
+    job = service.promote_evidence(evidence.id, "job")
+    assert isinstance(job, Job)
+    assert job.name == "quote"
+
+    outcome = service.promote_evidence(
+        evidence.id, "outcome", job_id=job.id, importance=8, satisfaction=4
+    )
+    assert isinstance(outcome, Outcome)
+    assert outcome.statement == "quote"
+    assert outcome.opportunity_score == 12.0
+    with pytest.raises(ValueError):
+        service.promote_evidence(evidence.id, "outcome")
+    with pytest.raises(ValueError):
+        service.promote_evidence(evidence.id, "solution")
+
+    service.delete_evidence(evidence.id)
+    with pytest.raises(EvidenceNotFoundError):
+        service.delete_evidence(evidence.id)
+    with pytest.raises(EvidenceNotFoundError):
+        service.promote_evidence(evidence.id, "job")

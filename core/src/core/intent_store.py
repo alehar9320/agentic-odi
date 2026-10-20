@@ -6,9 +6,9 @@ from datetime import datetime
 
 
 class IntentStore:
-    def __init__(self, db_path: str = "intent_store.db") -> None:
+    def __init__(self, db_path: str = "intent_store.db", check_same_thread: bool = True) -> None:
         # Connect to SQLite in WAL mode for high-performance concurrency
-        self.conn = sqlite3.connect(db_path)
+        self.conn = sqlite3.connect(db_path, check_same_thread=check_same_thread)
         self.conn.execute("PRAGMA journal_mode=WAL;")
         self._init_db()
 
