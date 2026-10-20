@@ -1,0 +1,44 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M5DB32GVKCNJ9XXF6DPE32K9",
+  "strategy": "manual-commit",
+  "branch": "feat/studio-chat-first-shell",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "README.md",
+    "apps/studio/src/App.tsx",
+    "apps/studio/src/components/ErrorBoundary.tsx",
+    "apps/studio/src/components/SettingsPanel.tsx",
+    "apps/studio/src/components/Skeletons.tsx",
+    "apps/studio/src/components/StudioHeader.tsx",
+    "apps/studio/src/components/Toasts.tsx",
+    "apps/studio/src/components/canvas/CanvasTabs.tsx",
+    "apps/studio/src/components/canvas/DirectCapture.tsx",
+    "apps/studio/src/components/canvas/EvidenceStream.tsx",
+    "apps/studio/src/components/canvas/ImpactSim.tsx",
+    "apps/studio/src/components/canvas/JobMap.tsx",
+    "apps/studio/src/components/canvas/OpportunityLandscape.tsx",
+    "apps/studio/src/components/canvas/OutcomeCard.tsx",
+    "apps/studio/src/components/chat/ChatCopilot.tsx",
+    "apps/studio/src/state/StudioContext.tsx",
+    "apps/studio/src/styles/theme.css",
+    "apps/studio/src/types.ts",
+    "docs/living-studio.md"
+  ],
+  "sessions": [
+    {
+      "metadata": "/0/metadata.json",
+      "transcript": "/0/full.jsonl",
+      "compact_transcript": "/0/transcript.jsonl",
+      "content_hash": "/0/content_hash.txt",
+      "prompt": "/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 298267,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 841344,
+    "output_tokens": 3931,
+    "api_call_count": 19
+  }
+}
