@@ -1,0 +1,53 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M5DCMF5S7MEQQPYPVPCCSQ95",
+  "session_id": "ses_ea55b8aedffeujb9pW6ejmYP7s",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-20T19:29:32.82979565Z",
+  "branch": "feature/storage-provider-sync",
+  "checkpoints_count": 4,
+  "save_step_count": 2,
+  "files_touched": [],
+  "agent": "OpenCode",
+  "model": "nvidia/nemotron-3.5-lightning:free",
+  "turn_id": "fa63162bf69f",
+  "checkpoint_transcript_start": 44,
+  "transcript_lines_at_start": 44,
+  "compact_transcript_start": 44,
+  "token_usage": {
+    "input_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 0,
+    "output_tokens": 0,
+    "api_call_count": 0
+  },
+  "session_metrics": {
+    "turn_count": 6
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 197,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        "docs/superpowers/plans/2026-10-20-release-download-run-instructions.md": 197
+      }
+    },
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 197,
+      "agent_lines_removed": 0
+    },
+    {
+      "checkpoint_number": 3,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 197,
+      "agent_lines_removed": 0
+    }
+  ]
+}
