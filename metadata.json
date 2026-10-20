@@ -3,7 +3,7 @@
   "checkpoint_id": "01M5DFF5302FE0Z6PFY8JA5MTW",
   "strategy": "manual-commit",
   "branch": "feat/studio-delight-ux",
-  "checkpoints_count": 1,
+  "checkpoints_count": 10,
   "files_touched": [
     "apps/studio/src/api/studioApi.test.ts",
     "apps/studio/src/api/studioApi.ts",
@@ -19,6 +19,13 @@
       "transcript": "/0/full.jsonl",
       "compact_transcript": "/0/transcript.jsonl",
       "content_hash": "/0/content_hash.txt",
+      "prompt": ""
+    },
+    {
+      "metadata": "/1/metadata.json",
+      "transcript": "/1/full.jsonl",
+      "compact_transcript": "/1/transcript.jsonl",
+      "content_hash": "/1/content_hash.txt",
       "prompt": ""
     }
   ],
