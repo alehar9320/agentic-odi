@@ -221,10 +221,10 @@ def generate() -> None:
     html_lines.append('    <section id="run">')
     html_lines.append("      <h2>Run it in 60 seconds.</h2>")
     html_lines.append(
-        "      <pre><code>git clone https://github.com/alehar9320/agentic-odi.git\ncd agentic-odi\nuv sync --all-packages\npython -m client.run</code></pre>"
+        "      <pre><code>git clone https://github.com/alehar9320/agentic-odi.git\ncd agentic-odi\nuv sync --all-packages\npython scripts/dev.py</code></pre>"
     )
     html_lines.append(
-        "      <p>Endpoint chips: MCP http://localhost:8000/mcp · Studio http://localhost:8501</p>"
+        "      <p>Endpoint chips: MCP http://localhost:8000/mcp · Studio http://localhost:8100</p>"
     )
     html_lines.append("      <p>MCP client config snippet:</p>")
     html_lines.append("      <pre><code>{")

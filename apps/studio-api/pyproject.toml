@@ -1,0 +1,25 @@
+[project]
+name = "agentic-odi-studio-api"
+version = "0.1.0"
+description = "FastAPI sidecar for the Agentic ODI Living Studio."
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi",
+    "uvicorn",
+    "agentic-odi-core",
+    "fastmcp>=4.1.0",
+    "openai>=3.28.0",
+]
+
+[tool.uv.sources]
+agentic-odi-core = { workspace = true }
+
+[project.scripts]
+agentic-odi-studio-api = "agentic_odi_studio_api.main:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/agentic_odi_studio_api"]

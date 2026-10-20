@@ -19,11 +19,10 @@ resolution-markers = [
 members = [
     "agentic-odi",
     "agentic-odi-cli",
-    "agentic-odi-client",
     "agentic-odi-connectors",
     "agentic-odi-core",
-    "agentic-odi-local-server",
     "agentic-odi-mcp-server",
+    "agentic-odi-studio-api",
 ]
 
 [[package]]
@@ -60,7 +59,7 @@ dev = [
 [[package]]
 name = "agentic-odi-cli"
 version = "0.1.0"
-source = { editable = "cli" }
+source = { editable = "apps/cli" }
 dependencies = [
     { name = "agentic-odi-connectors" },
     { name = "agentic-odi-core" },
@@ -72,8 +71,8 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "agentic-odi-connectors", editable = "connectors" },
-    { name = "agentic-odi-core", editable = "core" },
+    { name = "agentic-odi-connectors", editable = "packages/connectors" },
+    { name = "agentic-odi-core", editable = "packages/core" },
     { name = "fastmcp" },
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "openai" },
@@ -81,14 +80,9 @@ requires-dist = [
 ]
 
 [[package]]
-name = "agentic-odi-client"
-version = "0.1.0"
-source = { editable = "client" }
-
-[[package]]
 name = "agentic-odi-connectors"
 version = "0.1.0"
-source = { editable = "connectors" }
+source = { editable = "packages/connectors" }
 dependencies = [
     { name = "fastmcp" },
     { name = "pydantic" },
@@ -103,7 +97,7 @@ requires-dist = [
 [[package]]
 name = "agentic-odi-core"
 version = "0.1.0"
-source = { editable = "core" }
+source = { editable = "packages/core" }
 dependencies = [
     { name = "pydantic" },
 ]
@@ -112,9 +106,26 @@ dependencies = [
 requires-dist = [{ name = "pydantic" }]
 
 [[package]]
-name = "agentic-odi-local-server"
+name = "agentic-odi-mcp-server"
 version = "0.1.0"
-source = { editable = "local_server" }
+source = { editable = "apps/mcp-server" }
+dependencies = [
+    { name = "agentic-odi-core" },
+    { name = "fastmcp" },
+    { name = "pydantic" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "agentic-odi-core", editable = "packages/core" },
+    { name = "fastmcp" },
+    { name = "pydantic" },
+]
+
+[[package]]
+name = "agentic-odi-studio-api"
+version = "0.1.0"
+source = { editable = "apps/studio-api" }
 dependencies = [
     { name = "agentic-odi-core" },
     { name = "fastapi" },
@@ -125,28 +136,11 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "agentic-odi-core", editable = "core" },
+    { name = "agentic-odi-core", editable = "packages/core" },
     { name = "fastapi" },
     { name = "fastmcp", specifier = ">=4.1.0" },
     { name = "openai", specifier = ">=3.28.0" },
     { name = "uvicorn" },
-]
-
-[[package]]
-name = "agentic-odi-mcp-server"
-version = "0.1.0"
-source = { editable = "mcp_server" }
-dependencies = [
-    { name = "agentic-odi-core" },
-    { name = "fastmcp" },
-    { name = "pydantic" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "agentic-odi-core", editable = "core" },
-    { name = "fastmcp" },
-    { name = "pydantic" },
 ]
 
 [[package]]

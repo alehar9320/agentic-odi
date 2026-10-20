@@ -1,11 +1,11 @@
 # -*- mode: python ; coding: utf-8 -*-
 """PyInstaller onedir spec for the odi CLI.
 
-Run from the ``cli/`` directory, e.g.::
+Run from the repository root, e.g.::
 
-    uv run --directory cli pyinstaller --clean --noconfirm \
-        --distpath ../dist --workpath ../build/odi \
-        ../packaging/pyinstaller/odi.spec
+    uv run pyinstaller --clean --noconfirm \
+        --distpath dist --workpath build/odi \
+        packaging/pyinstaller/odi.spec
 """
 
 import os
@@ -14,8 +14,8 @@ from PyInstaller.utils.hooks import collect_all
 
 _spec_dir = os.path.abspath(SPECPATH)
 _repo_root = os.path.dirname(os.path.dirname(_spec_dir))
-_cli_src = os.path.join(_repo_root, "cli", "src")
-_entry = os.path.join(_cli_src, "cli", "__main__.py")
+_cli_src = os.path.join(_repo_root, "apps", "cli", "src")
+_entry = os.path.join(_cli_src, "agentic_odi_cli", "__main__.py")
 
 datas = []
 binaries = []
@@ -36,16 +36,27 @@ for _pkg in (
     hiddenimports += _pkg_hiddenimports
 
 hiddenimports += [
-    "cli",
-    "cli.cli",
-    "cli.backend",
-    "cli.connectors",
-    "cli.context",
-    "cli.outcomes",
-    "cli.paths",
-    "cli.update",
-    "cli.version",
-    "cli._build_info",
+    "agentic_odi_connectors",
+    "agentic_odi_core",
+    "agentic_odi_cli",
+    "agentic_odi_cli.cli",
+    "agentic_odi_cli.backend",
+    "agentic_odi_cli.chat",
+    "agentic_odi_cli.connectors",
+    "agentic_odi_cli.context",
+    "agentic_odi_cli.customer_outcomes",
+    "agentic_odi_cli.desired_outcomes",
+    "agentic_odi_cli.evidence",
+    "agentic_odi_cli.jobs",
+    "agentic_odi_cli.onboard",
+    "agentic_odi_cli.paths",
+    "agentic_odi_cli.profile",
+    "agentic_odi_cli.render",
+    "agentic_odi_cli.steps",
+    "agentic_odi_cli.update",
+    "agentic_odi_cli.version",
+    "agentic_odi_cli.wizard",
+    "agentic_odi_cli._build_info",
 ]
 
 # Heavy optional dependencies pulled in transitively by fastmcp's optional

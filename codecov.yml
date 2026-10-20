@@ -26,4 +26,4 @@ comment:
 
 ignore:
   - "**/tests/**"
-  - "studio/**"
+  - "apps/studio/**"

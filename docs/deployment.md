@@ -28,18 +28,18 @@ the built SPA as Workers Static Assets and proxies `/api/*` to the sidecar
 through a free, account-less
 [Cloudflare Quick Tunnel](https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/).
 
-`wrangler.jsonc` publishes `studio/dist` with SPA fallback and runs the Worker
-first for `/api/*`; `cloudflare/worker.ts` forwards those calls to the
+`wrangler.jsonc` publishes `apps/studio/dist` with SPA fallback and runs the Worker
+first for `/api/*`; `infra/cloudflare/worker.ts` forwards those calls to the
 `SIDECAR_URL` secret. The browser only talks to the Worker origin, so the
 sidecar's CORS list is not involved.
 
 ```bash
 # 1. Build the SPA that the Worker uploads as static assets
-npm --prefix studio ci
-npm --prefix studio run build
+npm --prefix apps/studio ci
+npm --prefix apps/studio run build
 
 # 2. Terminal A — MCP server (:8000) + sidecar (:8100)
-python -m client.run
+python scripts/dev.py
 
 # 3. Terminal B — free public URL for the sidecar (no account required)
 cloudflared tunnel --url http://127.0.0.1:8100
@@ -55,7 +55,7 @@ Workers Builds settings (Workers & Pages → your Worker → Settings → Builds
 | Setting | Value |
 |---|---|
 | Root directory | `/` |
-| Build command | `npm --prefix studio ci && npm --prefix studio run build` |
+| Build command | `npm --prefix apps/studio ci && npm --prefix apps/studio run build` |
 | Deploy command | `npx wrangler deploy` |
 
 A Worker has no run command: the Worker script runs on Cloudflare. Set `name` in
@@ -63,7 +63,7 @@ A Worker has no run command: the Worker script runs on Cloudflare. Set `name` in
 
 > [!NOTE]
 > The sidecar runs on your machine, so the Worker only works while
-> `python -m client.run` and the Quick Tunnel are running. Quick Tunnel URLs
+> `python scripts/dev.py` and the Quick Tunnel are running. Quick Tunnel URLs
 > change on every restart — update the secret with
 > `npx wrangler secret put SIDECAR_URL`. Chat also needs a reachable
 > OpenAI-compatible endpoint in the Studio's **Settings**; the canvas, job map,

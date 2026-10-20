@@ -15,9 +15,9 @@ uv sync --all-packages
 ## Launching
 
 ```bash
-python -m cli --version   # print the Agentic ODI version
-python -m cli --help      # show available options and commands
-python -m cli             # start interactive chat in a terminal (help when piped)
+python -m agentic_odi_cli --version   # print the Agentic ODI version
+python -m agentic_odi_cli --help      # show available options and commands
+python -m agentic_odi_cli             # start interactive chat in a terminal (help when piped)
 ```
 
 A console script is also installed, so `agentic-odi --version` works the same way.
@@ -162,7 +162,7 @@ agentic-odi score 8 2         # ODI opportunity score → 14.00
 
 Customer Outcomes link customer value to business value. The `local` backend
 writes to the shared SQLite store with no server required; add `--backend mcp`
-to route through a running MCP server (`python -m mcp_server`). The group is also
+to route through a running MCP server (`python -m agentic_odi_mcp_server`). The group is also
 available under its historical name `outcomes`.
 
 ```bash
@@ -210,11 +210,11 @@ The `connectors` group manages external MCP integrations. See
 ingest behavior.
 
 ```bash
-python -m cli connectors catalog
-python -m cli connectors add mcp --preset github
-python -m cli connectors list
-python -m cli connectors health --name github
-python -m cli connectors ingest --name github
+python -m agentic_odi_cli connectors catalog
+python -m agentic_odi_cli connectors add mcp --preset github
+python -m agentic_odi_cli connectors list
+python -m agentic_odi_cli connectors health --name github
+python -m agentic_odi_cli connectors ingest --name github
 ```
 
 ## Updates

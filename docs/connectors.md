@@ -11,9 +11,9 @@ The fastest way to connect is a preset. `connectors catalog` lists every
 built-in preset, grouped by the capability area it serves:
 
 ```bash
-python -m cli connectors catalog                          # all presets
-python -m cli connectors catalog --area strategy-alignment
-python -m cli connectors catalog --json
+python -m agentic_odi_cli connectors catalog                          # all presets
+python -m agentic_odi_cli connectors catalog --area strategy-alignment
+python -m agentic_odi_cli connectors catalog --json
 ```
 
 | Capability area (`--area`) | Presets |
@@ -29,12 +29,12 @@ Register one with `--preset`; `--name` defaults to the preset id:
 ```bash
 # Token-based preset: export the variable it needs first
 export GITHUB_PERSONAL_ACCESS_TOKEN=ghp_...
-python -m cli connectors add mcp --preset github
-python -m cli connectors health --name github
-python -m cli connectors ingest --name github
+python -m agentic_odi_cli connectors add mcp --preset github
+python -m agentic_odi_cli connectors health --name github
+python -m agentic_odi_cli connectors ingest --name github
 
 # OAuth-based preset: the browser consent flow starts on first use
-python -m cli connectors add mcp --preset notion
+python -m agentic_odi_cli connectors add mcp --preset notion
 ```
 
 Credentials never enter the registry. Presets that use API keys store `${VAR}`
@@ -46,15 +46,15 @@ selects which tools to call during ingest.
 Custom servers keep working the same way:
 
 ```bash
-python -m cli connectors add mcp --name internal --url https://mcp.internal.example/mcp --tool latest_quote
-python -m cli connectors list
+python -m agentic_odi_cli connectors add mcp --name internal --url https://mcp.internal.example/mcp --tool latest_quote
+python -m agentic_odi_cli connectors list
 ```
 
 > [!NOTE]
 > Presets cover MCP servers with a hosted endpoint. Servers you run yourself
 > (Snowflake, BigQuery, Google Drive, Brave Search, and similar) are added with
 > an explicit `--url`. The catalog lives in
-> `connectors/src/connectors/catalog.py`.
+> `packages/connectors/src/agentic_odi_connectors/catalog.py`.
 
 > [!NOTE]
 > OAuth tokens are cached in memory for the life of one CLI process, so an OAuth

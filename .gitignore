@@ -122,6 +122,9 @@ celerybeat.pid
 # Local connector registry and ingest artifacts
 .agentic-odi/
 
+# Cloudflare Wrangler local state
+.wrangler/
+
 # Environments
 .env
 .venv
@@ -163,3 +166,13 @@ cython_debug/
 
 # VS Code
 .vscode/
+
+# Local development and agent harness state
+.worktrees/
+.opencode/plans/
+.opencode/node_modules/
+.pi/git/
+.superpowers/
+.entire/tmp/
+.freebuff/
+.qodo/

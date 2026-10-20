@@ -1,51 +1,52 @@
 ---
-description: Start the local dev stack and run end-to-end browser tests against the Streamlit UI
+description: Start the local dev stack and verify the Living Studio
 ---
 
 # Local Dev & Test Workflow
 
-Use this workflow whenever the user asks to:
-- Run the app locally
-- Test the agent/server/client stack end-to-end
-- Open the browser and interact with the Streamlit UI
+Use this workflow whenever the user asks to run the app locally or test the
+server/Studio stack end to end.
 
 ## Steps
 
-1. **Start the server** — Launch the FastMCP server as a background process.
+1. **Start both Python services** — The launcher starts the MCP server on
+   `:8000` and the Studio API sidecar on `:8100`.
 
-```
-python -m mcp_server
-```
-
-Run with `WaitMsBeforeAsync: 2000` so the server has time to bind port 8000 before continuing.
-Save the CommandId as `SERVER_CMD`.
-
-2. **Verify the server is healthy** — Check `SERVER_CMD` status. If it has exited with an error, stop and report the error to the user. Do not proceed.
-
-3. **Start the Streamlit client** — Launch the UI as a background process.
-
-```
-streamlit run client/src/client/app.py --server.headless true
+```bash
+uv run python scripts/dev.py
 ```
 
-Run with `WaitMsBeforeAsync: 3000`. Save the CommandId as `CLIENT_CMD`.
+Save the command ID and wait a few seconds for both ports to bind.
 
-4. **Verify the client is running** — Check `CLIENT_CMD` status. If it has exited, stop and report.
+2. **Verify the services**
 
-5. **Open the browser** — Use the `browser_subagent` tool to navigate to `http://localhost:8501` and visually confirm the Streamlit app loads correctly (title "Agentic ODI 🚀" is visible).
+```bash
+curl -sf http://127.0.0.1:8100/api/config
+curl -sfX POST http://127.0.0.1:8000/mcp \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","method":"initialize","id":1,"params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"dev","version":"1"}}}'
+```
 
-6. **Run end-to-end interaction** — Use `browser_subagent` to send a test message in the chat (e.g., "What can you do?") and confirm the assistant responds. Report what you see.
+3. **Open the Studio** — navigate to `http://localhost:8100`.
+   For hot reload instead, run `npm --prefix apps/studio run dev` in a second
+   terminal; Vite proxies `/api` to the sidecar.
 
-7. **Report results** — Use `notify_user` to summarize:
-   - Whether the server and client started cleanly
-   - What the browser showed
-   - Any errors encountered
+4. **Build the SPA when needed**
 
-8. **Teardown (when done)** — Terminate `SERVER_CMD` and `CLIENT_CMD` using `send_command_input` with `Terminate: true`.
+```bash
+npm --prefix apps/studio run build
+```
+
+The sidecar serves `apps/studio/dist` when it exists. Override the location with
+`AGENTIC_ODI_STUDIO_DIST`.
+
+5. **Teardown** — stop the launcher; it terminates both child processes.
 
 ## Notes
 
-- The MCP server runs on `http://localhost:8000/mcp`
-- The Streamlit UI runs on `http://localhost:8501`
-- All commands should be run from the project root (the `agentic-odi` workspace root).
-- The default LLM in the sidebar points to Ollama (`http://localhost:11434/v1`). If Ollama is not running, the chat won't complete but the UI will still load.
+- MCP server: `http://localhost:8000/mcp`
+- Studio API and SPA: `http://localhost:8100`
+- Vite dev server: `http://localhost:5173`
+- Chat requires an OpenAI-compatible endpoint. The default is
+  `http://localhost:8001/v1`; configure it in Studio Settings or with
+  `AGENTIC_ODI_BASE_URL`.
