@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.7.0](https://github.com/alehar9320/agentic-odi/compare/v0.6.0...v0.7.0) (2026-10-20)
+
+
+### Features
+
+* **cli:** offline-first REPL with /connect wizard and LLM profile persistence ([7aa01cf](https://github.com/alehar9320/agentic-odi/commit/7aa01cf42dc2dbbcb94e4b929a7e3dffcacaaf4c))
+* **deploy:** serve the Living Studio from a free Cloudflare Worker ([83e491e](https://github.com/alehar9320/agentic-odi/commit/83e491eee766b4a9c26710177b68ed4839a67d7d))
+
+
+### Bug Fixes
+
+* **cli:** resolve mypy and ruff CI failures ([5acc4fc](https://github.com/alehar9320/agentic-odi/commit/5acc4fc05ed6a29acd0df3586f8b9715e913254e))
+
 ## [0.6.0](https://github.com/alehar9320/agentic-odi/compare/v0.5.0...v0.6.0) (2026-10-19)
 
 
