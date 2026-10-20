@@ -26,16 +26,12 @@ import type {
   CanvasData,
   ChatMessage,
   StudioConfig,
+  WorkspacePanelId,
 } from "../types";
 
 const SETTINGS_KEY = "studio.settings";
 const CANVAS_KEY = "studio.canvas";
-const ENGAGEMENT_KEY = "studio.engagementLevel";
-
-export const WELCOME_MESSAGE =
-  "Welcome to **The Living Studio**. We have eliminated backlogs and Jira spreadsheets.\n\n" +
-  "You are looking at a living map of human progress. Tell me what your customers are struggling with, " +
-  "or click on any outcome on the canvas to inspect its causality.";
+const DISPLAY_NAME_KEY = "studio.displayName";
 
 export const EMPTY_CONFIG: StudioConfig = {
   base_url: "http://localhost:8001/v1",
@@ -61,8 +57,8 @@ export interface ToolActivity {
 export interface StudioContextValue {
   settings: StudioConfig;
   saveSettings: (config: StudioConfig) => void;
-  engagementLevel: number;
-  setEngagementLevel: (level: number) => void;
+  displayName: string;
+  setDisplayName: (name: string) => void;
   canvas: CanvasData | null;
   canvasLoading: boolean;
   canvasCached: boolean;
@@ -74,14 +70,16 @@ export interface StudioContextValue {
   thinkingPhase: string | null;
   toolActivity: ToolActivity[];
   sendMessage: (text: string) => Promise<void>;
+  stopStreaming: () => void;
   clearChat: () => void;
   addStep: (payload: Omit<AddStepPayload, "mcp_url">) => Promise<void>;
   addOutcome: (payload: Omit<AddOutcomePayload, "mcp_url">) => Promise<void>;
   pendingSimOutcome: string | null;
   requestSimulate: (outcomeId: string) => void;
   clearPendingSimOutcome: () => void;
-  activeTab: string;
-  setActiveTab: (tab: string) => void;
+  activePanel: WorkspacePanelId | null;
+  openPanel: (panel: WorkspacePanelId) => void;
+  closePanel: () => void;
   toasts: Toast[];
   pushToast: (kind: ToastKind, message: string) => void;
   dismissToast: (id: number) => void;
@@ -113,37 +111,31 @@ function loadCanvasCache(): CanvasData | null {
   return null;
 }
 
-function loadEngagementLevel(): number {
+function loadDisplayName(): string {
   try {
-    const raw = localStorage.getItem(ENGAGEMENT_KEY);
-    if (raw) {
-      return Math.max(0, Math.min(2, parseInt(raw, 10)));
-    }
+    return localStorage.getItem(DISPLAY_NAME_KEY) ?? "";
   } catch {
-    /* ignore malformed cache */
+    return "";
   }
-  return 0;
 }
 
 export function StudioProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<StudioConfig>(loadSettings);
+  const [displayName, setDisplayNameState] = useState<string>(loadDisplayName);
   const [canvas, setCanvas] = useState<CanvasData | null>(loadCanvasCache);
   const [canvasLoading, setCanvasLoading] = useState(false);
   const [canvasCached, setCanvasCached] = useState(() => loadCanvasCache() !== null);
-  const [engagementLevel, setEngagementLevel] = useState(() => loadEngagementLevel());
   const [llmHealth, setLlmHealth] = useState<{ healthy: boolean | null; message: string }>({
     healthy: null,
     message: "Health not checked yet.",
   });
   const [mcpReachable, setMcpReachable] = useState(false);
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    { role: "assistant", content: WELCOME_MESSAGE },
-  ]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [streaming, setStreaming] = useState(false);
   const [thinkingPhase, setThinkingPhase] = useState<string | null>(null);
   const [toolActivity, setToolActivity] = useState<ToolActivity[]>([]);
   const [pendingSimOutcome, setPendingSimOutcome] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState("landscape");
+  const [activePanel, setActivePanel] = useState<WorkspacePanelId | null>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const toastId = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
@@ -169,10 +161,10 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const saveEngagementLevel = useCallback((level: number) => {
-    setEngagementLevel(level);
+  const setDisplayName = useCallback((name: string) => {
+    setDisplayNameState(name);
     try {
-      localStorage.setItem(ENGAGEMENT_KEY, String(level));
+      localStorage.setItem(DISPLAY_NAME_KEY, name);
     } catch {
       /* storage unavailable */
     }
@@ -224,9 +216,19 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 
   const clearPendingSimOutcome = useCallback(() => setPendingSimOutcome(null), []);
 
+  const closePanel = useCallback(() => setActivePanel(null), []);
+
+  const openPanel = useCallback((panel: WorkspacePanelId) => {
+    setActivePanel(panel);
+  }, []);
+
   const requestSimulate = useCallback((outcomeId: string) => {
     setPendingSimOutcome(outcomeId);
-    setActiveTab("impact");
+    setActivePanel("impact");
+  }, []);
+
+  const stopStreaming = useCallback(() => {
+    abortRef.current?.abort();
   }, []);
 
   const sendMessage = useCallback(
@@ -303,8 +305,11 @@ export function StudioProvider({ children }: { children: ReactNode }) {
           controller.signal,
         );
       } catch (error) {
-        if ((error as Error).name !== "AbortError") {
+        const aborted = (error as Error).name === "AbortError";
+        if (!aborted) {
           pushToast("error", `Error during assistant completion: ${(error as Error).message}`);
+        }
+        if (!content) {
           setMessages((prev) => {
             const next = [...prev];
             if (next.length && next[next.length - 1].content === "") {
@@ -324,7 +329,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 
   const clearChat = useCallback(() => {
     abortRef.current?.abort();
-    setMessages([{ role: "assistant", content: WELCOME_MESSAGE }]);
+    setMessages([]);
     setToolActivity([]);
     setStreaming(false);
     setThinkingPhase(null);
@@ -378,8 +383,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     () => ({
       settings,
       saveSettings,
-      engagementLevel,
-      setEngagementLevel: saveEngagementLevel,
+      displayName,
+      setDisplayName,
       canvas,
       canvasLoading,
       canvasCached,
@@ -391,14 +396,16 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       thinkingPhase,
       toolActivity,
       sendMessage,
+      stopStreaming,
       clearChat,
       addStep,
       addOutcome,
       pendingSimOutcome,
       requestSimulate,
       clearPendingSimOutcome,
-      activeTab,
-      setActiveTab,
+      activePanel,
+      openPanel,
+      closePanel,
       toasts,
       pushToast,
       dismissToast,
@@ -406,6 +413,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     [
       settings,
       saveSettings,
+      displayName,
+      setDisplayName,
       canvas,
       canvasLoading,
       canvasCached,
@@ -417,15 +426,16 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       thinkingPhase,
       toolActivity,
       sendMessage,
+      stopStreaming,
       clearChat,
       addStep,
       addOutcome,
       pendingSimOutcome,
       requestSimulate,
       clearPendingSimOutcome,
-      activeTab,
-      engagementLevel,
-      saveEngagementLevel,
+      activePanel,
+      openPanel,
+      closePanel,
       toasts,
       pushToast,
       dismissToast,

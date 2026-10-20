@@ -1,66 +1,65 @@
-import { isUnderserved, opportunityPill } from "../../lib/odi";
+import { useState } from "react";
+
+import { formatOpportunityScore, isUnderserved, opportunityPill } from "../../lib/odi";
 import { useStudio } from "../../state/StudioContext";
 import type { Outcome } from "../../types";
 
 export function OutcomeCard({ outcome }: { outcome: Outcome }) {
-  const { requestSimulate, sendMessage, pushToast } = useStudio();
+  const { requestSimulate, sendMessage, closePanel } = useStudio();
+  const [showEvidence, setShowEvidence] = useState(false);
 
   const opp = outcome.opportunity_score;
-  const imp = outcome.importance;
-  const sat = outcome.satisfaction;
-  const statement = outcome.statement ?? "Untitled Outcome";
+  const statement = outcome.statement ?? "Untitled outcome";
   const outcomeId = outcome.id ?? "O";
   const underserved = isUnderserved(opp);
   const pill = opportunityPill(opp);
 
   return (
-    <>
-      <article
-        className={`outcome-card fade-in${underserved ? " pulsing-card" : ""}`}
-        aria-label={`Outcome ${outcomeId}`}
-      >
-        <div className="outcome-card__head">
-          <span className="outcome-card__id">{outcomeId}</span>
-          <span className={`studio-pill pill-${pill.variant}`}>{pill.label}</span>
-        </div>
-        <div className="outcome-card__statement">&quot;{statement}&quot;</div>
-        <div className="outcome-card__meta">
-          Importance: <b>{imp != null ? imp : "—"}/10</b> &nbsp;|&nbsp; Current Satisfaction:{" "}
-          <b>{sat != null ? sat : "—"}/10</b> &nbsp;|&nbsp; Formula: <i>Imp + max(Imp - Sat, 0)</i>
-        </div>
-      </article>
+    <article className={`card${underserved ? " card--hot" : ""}`} aria-label={`Outcome ${outcomeId}`}>
+      <header className="card__head">
+        <span className="card__id">{outcomeId}</span>
+        <span className={`badge badge--${pill.variant}`}>{pill.label}</span>
+      </header>
 
-      <div className="outcome-card__actions">
+      <p className="card__statement">{statement}</p>
+
+      <p className="card__meta">
+        Importance <b>{outcome.importance ?? "—"}</b>
+        <span aria-hidden="true"> · </span>
+        Satisfaction <b>{outcome.satisfaction ?? "—"}</b>
+        <span aria-hidden="true"> · </span>
+        Opportunity <b>{formatOpportunityScore(opp)}</b>
+      </p>
+
+      {showEvidence && (
+        <p className="card__evidence">
+          {outcome.evidence?.trim() || "No transcript is linked to this outcome yet."}
+        </p>
+      )}
+
+      <div className="card__actions">
         <button
           type="button"
-          className="studio-button"
-          onClick={() =>
-            pushToast(
-              "info",
-              `Customer Evidence Lineage:\n\n${outcome.evidence ?? "No transcript linked."}`,
-            )
-          }
+          className="quiet-action"
+          aria-expanded={showEvidence}
+          onClick={() => setShowEvidence((prev) => !prev)}
         >
-          🔍 Inspect Trace ({outcomeId})
+          {showEvidence ? "Hide evidence" : "Evidence"}
+        </button>
+        <button type="button" className="quiet-action" onClick={() => requestSimulate(outcomeId)}>
+          Simulate
         </button>
         <button
           type="button"
-          className="studio-button"
+          className="quiet-action"
           onClick={() => {
-            requestSimulate(outcomeId);
-            pushToast("success", `Outcome ${outcomeId} loaded into WYSIWYG Impact Simulator.`);
+            closePanel();
+            void sendMessage(`How should we solve outcome ${outcomeId}: "${statement}"?`);
           }}
         >
-          ⚡ Simulate Bet ({outcomeId})
-        </button>
-        <button
-          type="button"
-          className="studio-button"
-          onClick={() => void sendMessage(`How should we solve outcome ${outcomeId}: '${statement}'?`)}
-        >
-          💬 Ask Agent ({outcomeId})
+          Ask
         </button>
       </div>
-    </>
+    </article>
   );
 }

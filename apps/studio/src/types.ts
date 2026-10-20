@@ -50,6 +50,15 @@ export interface ChatMessage {
   content: string;
 }
 
+/** Secondary surfaces reachable from the drawer. Chat stays the primary stage. */
+export type WorkspacePanelId =
+  | "landscape"
+  | "jobmap"
+  | "impact"
+  | "evidence"
+  | "capture"
+  | "settings";
+
 export interface ChatStreamRequest {
   base_url: string;
   api_key: string;
