@@ -1,0 +1,95 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M5DBZZBXF0MPM86JREHC7CGD",
+  "session_id": "ses_ea5677a1affeSsRZRhXS0ixx8P",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-20T19:18:36.583639935Z",
+  "branch": "feature/storage-provider-sync",
+  "checkpoints_count": 9,
+  "files_touched": [
+    "docs/superpowers/plans/2026-10-20-storage-provider-sync.md",
+    "docs/superpowers/specs/2026-10-20-storage-provider-sync-design.md"
+  ],
+  "agent": "OpenCode",
+  "model": "qwen/qwen3.8-27b",
+  "turn_id": "24ca4a0b8205",
+  "checkpoint_transcript_start": 20,
+  "transcript_lines_at_start": 20,
+  "compact_transcript_start": 20,
+  "token_usage": {
+    "input_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 0,
+    "output_tokens": 0,
+    "api_call_count": 0
+  },
+  "session_metrics": {
+    "turn_count": 9
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-10-20T19:18:36.575892681Z",
+    "agent_lines": 783,
+    "agent_removed": 0,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 783,
+    "total_lines_changed": 783,
+    "agent_percentage": 100,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 2474,
+      "user_lines_removed": 206,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        "apps/studio-api/src/agentic_odi_studio_api/studio/chat.py": 69,
+        "apps/studio-api/src/agentic_odi_studio_api/studio/router.py": 140,
+        "apps/studio-api/src/agentic_odi_studio_api/studio/schemas.py": 38,
+        "apps/studio/src/App.tsx": 24,
+        "apps/studio/src/api/studioApi.ts": 67,
+        "apps/studio/src/components/SettingsPanel.tsx": 16,
+        "apps/studio/src/components/canvas/DirectCapture.tsx": 135,
+        "apps/studio/src/components/canvas/JobMap.tsx": 202,
+        "apps/studio/src/components/canvas/OutcomeCard.tsx": 19,
+        "apps/studio/src/components/chat/ChatStage.tsx": 131,
+        "apps/studio/src/components/chat/Composer.tsx": 98,
+        "apps/studio/src/components/chat/Conversation.tsx": 12,
+        "apps/studio/src/components/chat/Hero.tsx": 28,
+        "apps/studio/src/components/icons.tsx": 19,
+        "apps/studio/src/components/layout/Sidebar.tsx": 31,
+        "apps/studio/src/components/onboarding/Onboarding.tsx": 270,
+        "apps/studio/src/components/workspace/WorkspacePanel.tsx": 15,
+        "apps/studio/src/lib/commands.ts": 160,
+        "apps/studio/src/lib/greeting.ts": 18,
+        "apps/studio/src/state/StudioContext.tsx": 206,
+        "apps/studio/src/styles/theme.css": 454,
+        "apps/studio/src/types.ts": 21,
+        "docs/superpowers/plans/2026-10-20-release-download-run-instructions.md": 197,
+        "docs/superpowers/specs/2026-10-20-studio-first-run-ux-design.md": 104
+      },
+      "user_removed_per_file": {
+        "apps/studio-api/src/agentic_odi_studio_api/studio/chat.py": 26,
+        "apps/studio-api/src/agentic_odi_studio_api/studio/router.py": 1,
+        "apps/studio/src/App.tsx": 6,
+        "apps/studio/src/api/studioApi.ts": 2,
+        "apps/studio/src/components/canvas/DirectCapture.tsx": 69,
+        "apps/studio/src/components/canvas/JobMap.tsx": 33,
+        "apps/studio/src/components/canvas/OutcomeCard.tsx": 1,
+        "apps/studio/src/components/chat/ChatStage.tsx": 6,
+        "apps/studio/src/components/chat/Composer.tsx": 14,
+        "apps/studio/src/components/chat/Conversation.tsx": 1,
+        "apps/studio/src/components/chat/Hero.tsx": 5,
+        "apps/studio/src/components/layout/Sidebar.tsx": 5,
+        "apps/studio/src/components/workspace/WorkspacePanel.tsx": 9,
+        "apps/studio/src/lib/greeting.ts": 1,
+        "apps/studio/src/state/StudioContext.tsx": 3,
+        "apps/studio/src/styles/theme.css": 23,
+        "apps/studio/src/types.ts": 1
+      }
+    }
+  ]
+}
