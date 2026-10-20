@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 
 ItemType = Literal["resource", "tool_result", "catalog"]
 McpAuthMode = Literal["none", "oauth"]
+EvidenceItemType = Literal["catalog", "resource", "tool_result", "manual", "note"]
 
 
 class HealthStatus(BaseModel):
@@ -46,6 +47,16 @@ class McpConnectorSettings(BaseModel):
     auth: McpAuthMode = "none"
     headers: dict[str, str] = Field(default_factory=dict)
     env_vars: list[str] = Field(default_factory=list)
+
+
+class RestConnectorSettings(BaseModel):
+    url: str
+    method: Literal["GET", "POST"] = "GET"
+    headers: dict[str, str] = Field(default_factory=dict)
+    json_body: dict[str, Any] | None = None
+    records_key: str | None = None
+    timeout: float = 10.0
+    item_type: ItemType = "resource"
 
 
 class ConnectorConfig(BaseModel):

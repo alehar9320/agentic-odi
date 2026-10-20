@@ -59,9 +59,9 @@ def test_add_rejects_unknown_kind(tmp_path: Path) -> None:
     registry = _registry(tmp_path)
 
     with pytest.raises(UnknownConnectorKindError) as exc_info:
-        registry.add(ConnectorConfig(name="jira", kind="rest", settings={}))
+        registry.add(ConnectorConfig(name="jira", kind="salesforce", settings={}))
 
-    assert exc_info.value.kind == "rest"
+    assert exc_info.value.kind == "salesforce"
 
 
 def test_get_returns_matching_connector(tmp_path: Path) -> None:

@@ -5,9 +5,10 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from connectors.mcp.connector import MCPClientConnector
-from connectors.models import ConnectorConfig, McpConnectorSettings
+from connectors.models import ConnectorConfig, McpConnectorSettings, RestConnectorSettings
 from connectors.protocol import Connector
 from connectors.registry import UnknownConnectorKindError
+from connectors.rest.connector import RestConnector, WebhookConnector
 
 Builder = Callable[[ConnectorConfig], Connector]
 
@@ -36,4 +37,16 @@ def _build_mcp(config: ConnectorConfig) -> Connector:
     return MCPClientConnector(name=config.name, settings=settings)
 
 
+def _build_rest(config: ConnectorConfig) -> Connector:
+    settings = RestConnectorSettings.model_validate(config.settings)
+    return RestConnector(name=config.name, settings=settings)
+
+
+def _build_webhook(config: ConnectorConfig) -> Connector:
+    settings = RestConnectorSettings.model_validate(config.settings)
+    return WebhookConnector(name=config.name, settings=settings, kind="webhook")
+
+
 register_kind("mcp", _build_mcp)
+register_kind("rest", _build_rest)
+register_kind("webhook", _build_webhook)
