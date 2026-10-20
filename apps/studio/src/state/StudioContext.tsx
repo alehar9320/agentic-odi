@@ -13,11 +13,18 @@ import {
 import {
   addOutcome as apiAddOutcome,
   addStep as apiAddStep,
+  createJob as apiCreateJob,
+  deleteJob as apiDeleteJob,
+  deleteOutcome as apiDeleteOutcome,
+  deleteStep as apiDeleteStep,
   fetchCanvas,
   fetchConfig,
   healthLlm,
   healthMcp,
   streamChat,
+  updateJob as apiUpdateJob,
+  updateOutcome as apiUpdateOutcome,
+  updateStep as apiUpdateStep,
 } from "../api/studioApi";
 import type { RawSseEvent } from "../api/sse";
 import type {
@@ -25,6 +32,7 @@ import type {
   AddStepPayload,
   CanvasData,
   ChatMessage,
+  StudioBrief,
   StudioConfig,
   WorkspacePanelId,
 } from "../types";
@@ -32,6 +40,8 @@ import type {
 const SETTINGS_KEY = "studio.settings";
 const CANVAS_KEY = "studio.canvas";
 const DISPLAY_NAME_KEY = "studio.displayName";
+const BRIEF_KEY = "studio.brief";
+const SETUP_DISMISSED_KEY = "studio.setupDismissed";
 
 export const EMPTY_CONFIG: StudioConfig = {
   base_url: "http://localhost:8001/v1",
@@ -59,6 +69,12 @@ export interface StudioContextValue {
   saveSettings: (config: StudioConfig) => void;
   displayName: string;
   setDisplayName: (name: string) => void;
+  brief: StudioBrief | null;
+  saveBrief: (brief: StudioBrief) => void;
+  /** True while the first-run context conversation is open. Never a modal. */
+  setupOpen: boolean;
+  openSetup: () => void;
+  closeSetup: () => void;
   canvas: CanvasData | null;
   canvasLoading: boolean;
   canvasCached: boolean;
@@ -72,8 +88,20 @@ export interface StudioContextValue {
   sendMessage: (text: string) => Promise<void>;
   stopStreaming: () => void;
   clearChat: () => void;
+  pushNotice: (text: string) => void;
+  offlineReply: boolean;
   addStep: (payload: Omit<AddStepPayload, "mcp_url">) => Promise<void>;
   addOutcome: (payload: Omit<AddOutcomePayload, "mcp_url">) => Promise<void>;
+  createJob: (payload: { name: string; description?: string }) => Promise<string | null>;
+  updateJob: (jobId: string, payload: { name?: string; description?: string }) => Promise<void>;
+  deleteJob: (jobId: string) => Promise<void>;
+  updateStep: (stepId: string, payload: { name?: string; order?: number }) => Promise<void>;
+  deleteStep: (stepId: string) => Promise<void>;
+  updateOutcome: (
+    outcomeId: string,
+    payload: { statement?: string; importance?: number; satisfaction?: number },
+  ) => Promise<void>;
+  deleteOutcome: (outcomeId: string) => Promise<void>;
   pendingSimOutcome: string | null;
   requestSimulate: (outcomeId: string) => void;
   clearPendingSimOutcome: () => void;
@@ -111,6 +139,14 @@ function loadCanvasCache(): CanvasData | null {
   return null;
 }
 
+function loadSetupDismissed(): boolean {
+  try {
+    return localStorage.getItem(SETUP_DISMISSED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
 function loadDisplayName(): string {
   try {
     return localStorage.getItem(DISPLAY_NAME_KEY) ?? "";
@@ -119,9 +155,35 @@ function loadDisplayName(): string {
   }
 }
 
+function loadBrief(): StudioBrief | null {
+  try {
+    const raw = localStorage.getItem(BRIEF_KEY);
+    if (!raw) {
+      return null;
+    }
+    const parsed = JSON.parse(raw) as Partial<StudioBrief>;
+    const brief: StudioBrief = {
+      product_name: String(parsed.product_name ?? ""),
+      product_url: parsed.product_url ? String(parsed.product_url) : undefined,
+      target_user: String(parsed.target_user ?? ""),
+      job_statement: String(parsed.job_statement ?? ""),
+      core_problem: String(parsed.core_problem ?? ""),
+      job_id: parsed.job_id ? String(parsed.job_id) : undefined,
+    };
+    return brief.product_name || brief.job_statement ? brief : null;
+  } catch {
+    return null;
+  }
+}
+
 export function StudioProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<StudioConfig>(loadSettings);
   const [displayName, setDisplayNameState] = useState<string>(loadDisplayName);
+  const [brief, setBrief] = useState<StudioBrief | null>(loadBrief);
+  const [setupOpen, setSetupOpen] = useState<boolean>(
+    () => loadBrief() === null && !loadSetupDismissed(),
+  );
+  const [offlineReply, setOfflineReply] = useState(false);
   const [canvas, setCanvas] = useState<CanvasData | null>(loadCanvasCache);
   const [canvasLoading, setCanvasLoading] = useState(false);
   const [canvasCached, setCanvasCached] = useState(() => loadCanvasCache() !== null);
@@ -170,6 +232,42 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const saveBrief = useCallback((next: StudioBrief) => {
+    setBrief(next);
+    setSetupOpen(false);
+    try {
+      localStorage.setItem(BRIEF_KEY, JSON.stringify(next));
+      localStorage.removeItem(SETUP_DISMISSED_KEY);
+    } catch {
+      /* storage unavailable */
+    }
+  }, []);
+
+  const openSetup = useCallback(() => {
+    setActivePanel(null);
+    setSetupOpen(true);
+    try {
+      localStorage.removeItem(SETUP_DISMISSED_KEY);
+    } catch {
+      /* storage unavailable */
+    }
+  }, []);
+
+  // Skipping is a real choice: record it so the conversation does not reappear
+  // on reload, while the hero and drawer keep a quiet nudge available.
+  const closeSetup = useCallback(() => {
+    setSetupOpen(false);
+    try {
+      localStorage.setItem(SETUP_DISMISSED_KEY, "1");
+    } catch {
+      /* storage unavailable */
+    }
+  }, []);
+
+  const pushNotice = useCallback((text: string) => {
+    setMessages((prev) => [...prev, { role: "notice", content: text }]);
+  }, []);
+
   const refreshCanvas = useCallback(async () => {
     setCanvasLoading(true);
     try {
@@ -214,13 +312,120 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     [settings.mcp_url, pushToast, refreshCanvas],
   );
 
+  const createJob = useCallback(
+    async (payload: { name: string; description?: string }): Promise<string | null> => {
+      try {
+        const response = await apiCreateJob({ ...payload, mcp_url: settings.mcp_url });
+        pushToast("success", `Job created: ${payload.name}`);
+        await refreshCanvas();
+        if (response.result && typeof response.result === "object") {
+          return response.result.id ?? null;
+        }
+        return null;
+      } catch (error) {
+        pushToast("error", `Could not create the job: ${(error as Error).message}`);
+        return null;
+      }
+    },
+    [settings.mcp_url, pushToast, refreshCanvas],
+  );
+
+  const updateJob = useCallback(
+    async (jobId: string, payload: { name?: string; description?: string }) => {
+      try {
+        await apiUpdateJob(jobId, { ...payload, mcp_url: settings.mcp_url });
+        pushToast("success", "Job updated.");
+        await refreshCanvas();
+      } catch (error) {
+        pushToast("error", `Could not update the job: ${(error as Error).message}`);
+      }
+    },
+    [settings.mcp_url, pushToast, refreshCanvas],
+  );
+
+  const deleteJob = useCallback(
+    async (jobId: string) => {
+      try {
+        await apiDeleteJob(jobId, settings.mcp_url);
+        pushToast("success", "Job removed.");
+        await refreshCanvas();
+      } catch (error) {
+        pushToast("error", `Could not remove the job: ${(error as Error).message}`);
+      }
+    },
+    [settings.mcp_url, pushToast, refreshCanvas],
+  );
+
+  const updateStep = useCallback(
+    async (stepId: string, payload: { name?: string; order?: number }) => {
+      try {
+        await apiUpdateStep(stepId, { ...payload, mcp_url: settings.mcp_url });
+        pushToast("success", "Step updated.");
+        await refreshCanvas();
+      } catch (error) {
+        pushToast("error", `Could not update the step: ${(error as Error).message}`);
+      }
+    },
+    [settings.mcp_url, pushToast, refreshCanvas],
+  );
+
+  const deleteStep = useCallback(
+    async (stepId: string) => {
+      try {
+        await apiDeleteStep(stepId, settings.mcp_url);
+        pushToast("success", "Step removed.");
+        await refreshCanvas();
+      } catch (error) {
+        pushToast("error", `Could not remove the step: ${(error as Error).message}`);
+      }
+    },
+    [settings.mcp_url, pushToast, refreshCanvas],
+  );
+
+  const updateOutcome = useCallback(
+    async (
+      outcomeId: string,
+      payload: { statement?: string; importance?: number; satisfaction?: number },
+    ) => {
+      try {
+        await apiUpdateOutcome(outcomeId, { ...payload, mcp_url: settings.mcp_url });
+        pushToast("success", "Outcome updated.");
+        await refreshCanvas();
+      } catch (error) {
+        pushToast("error", `Could not update the outcome: ${(error as Error).message}`);
+      }
+    },
+    [settings.mcp_url, pushToast, refreshCanvas],
+  );
+
+  const deleteOutcome = useCallback(
+    async (outcomeId: string) => {
+      try {
+        await apiDeleteOutcome(outcomeId, settings.mcp_url);
+        pushToast("success", "Outcome removed.");
+        await refreshCanvas();
+      } catch (error) {
+        pushToast("error", `Could not remove the outcome: ${(error as Error).message}`);
+      }
+    },
+    [settings.mcp_url, pushToast, refreshCanvas],
+  );
+
   const clearPendingSimOutcome = useCallback(() => setPendingSimOutcome(null), []);
 
   const closePanel = useCallback(() => setActivePanel(null), []);
 
-  const openPanel = useCallback((panel: WorkspacePanelId) => {
-    setActivePanel(panel);
-  }, []);
+  const openPanel = useCallback(
+    (panel: WorkspacePanelId) => {
+      // Opening a surface is exploring: leave the setup conversation without
+      // trapping people back in it when they close the panel. The draft stays.
+      if (setupOpen) {
+        closeSetup();
+      }
+      setActivePanel(panel);
+    },
+    [setupOpen, closeSetup],
+  );
 
   const requestSimulate = useCallback((outcomeId: string) => {
     setPendingSimOutcome(outcomeId);
@@ -242,6 +447,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       setMessages([...history, { role: "assistant", content: "" }]);
       setStreaming(true);
       setThinkingPhase("health_check");
+      setOfflineReply(false);
       setToolActivity([]);
 
       const controller = new AbortController();
@@ -251,9 +457,14 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 
       const handleEvent = (event: RawSseEvent) => {
         switch (event.event) {
-          case "status":
-            setThinkingPhase(String(event.data.phase ?? ""));
+          case "status": {
+            const phase = String(event.data.phase ?? "");
+            setThinkingPhase(phase);
+            if (phase === "offline") {
+              setOfflineReply(true);
+            }
             break;
+          }
           case "delta": {
             content += String(event.data.text ?? "");
             setMessages((prev) => {
@@ -300,6 +511,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
             model: settings.model_name,
             mcp_url: settings.mcp_url,
             messages: history,
+            brief,
           },
           handleEvent,
           controller.signal,
@@ -324,15 +536,17 @@ export function StudioProvider({ children }: { children: ReactNode }) {
         abortRef.current = null;
       }
     },
-    [messages, streaming, settings, refreshCanvas, pushToast],
+    [messages, streaming, settings, brief, refreshCanvas, pushToast],
   );
 
   const clearChat = useCallback(() => {
     abortRef.current?.abort();
+    abortRef.current = null;
     setMessages([]);
     setToolActivity([]);
     setStreaming(false);
     setThinkingPhase(null);
+    setOfflineReply(false);
   }, []);
 
   // Initial hydration: env defaults, canvas, health probes.
@@ -385,6 +599,11 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       saveSettings,
       displayName,
       setDisplayName,
+      brief,
+      saveBrief,
+      setupOpen,
+      openSetup,
+      closeSetup,
       canvas,
       canvasLoading,
       canvasCached,
@@ -398,8 +617,17 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       sendMessage,
       stopStreaming,
       clearChat,
+      pushNotice,
+      offlineReply,
       addStep,
       addOutcome,
+      createJob,
+      updateJob,
+      deleteJob,
+      updateStep,
+      deleteStep,
+      updateOutcome,
+      deleteOutcome,
       pendingSimOutcome,
       requestSimulate,
       clearPendingSimOutcome,
@@ -415,6 +643,11 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       saveSettings,
       displayName,
       setDisplayName,
+      brief,
+      saveBrief,
+      setupOpen,
+      openSetup,
+      closeSetup,
       canvas,
       canvasLoading,
       canvasCached,
@@ -428,8 +661,17 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       sendMessage,
       stopStreaming,
       clearChat,
+      pushNotice,
+      offlineReply,
       addStep,
       addOutcome,
+      createJob,
+      updateJob,
+      deleteJob,
+      updateStep,
+      deleteStep,
+      updateOutcome,
+      deleteOutcome,
       pendingSimOutcome,
       requestSimulate,
       clearPendingSimOutcome,

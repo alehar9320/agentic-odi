@@ -46,8 +46,21 @@ export interface McpHealth {
 }
 
 export interface ChatMessage {
-  role: "user" | "assistant";
+  role: "user" | "assistant" | "notice";
   content: string;
+}
+
+/**
+ * The user's context, captured on first run. Kept in local storage and sent to
+ * the sidecar so every reply starts from the user's actual product and job.
+ */
+export interface StudioBrief {
+  product_name: string;
+  product_url?: string;
+  target_user: string;
+  job_statement: string;
+  core_problem: string;
+  job_id?: string;
 }
 
 /** Secondary surfaces reachable from the drawer. Chat stays the primary stage. */
@@ -65,6 +78,13 @@ export interface ChatStreamRequest {
   model: string;
   mcp_url: string;
   messages: ChatMessage[];
+  brief?: StudioBrief | null;
+}
+
+export interface CreateJobPayload {
+  name: string;
+  description?: string;
+  mcp_url: string;
 }
 
 export interface AddStepPayload {

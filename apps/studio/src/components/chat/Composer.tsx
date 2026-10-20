@@ -1,5 +1,6 @@
-import { useEffect, type RefObject } from "react";
+import { useEffect, useMemo, useState, type RefObject } from "react";
 
+import { isCommandDraft, matchCommands, type StudioCommand } from "../../lib/commands";
 import { useStudio } from "../../state/StudioContext";
 import { ArrowUpIcon, StopIcon } from "../icons";
 
@@ -7,10 +8,13 @@ interface ComposerProps {
   value: string;
   onChange: (value: string) => void;
   onSubmit: (text?: string) => void;
+  onCommand: (command: StudioCommand) => void;
   streaming: boolean;
   onStop: () => void;
   inputRef: RefObject<HTMLTextAreaElement | null>;
   autoFocus?: boolean;
+  /** Overrides the default placeholder, e.g. while setting up context. */
+  placeholder?: string;
 }
 
 const MAX_HEIGHT = 220;
@@ -19,12 +23,22 @@ export function Composer({
   value,
   onChange,
   onSubmit,
+  onCommand,
   streaming,
   onStop,
   inputRef,
   autoFocus = false,
+  placeholder,
 }: ComposerProps) {
-  const { settings, llmHealth } = useStudio();
+  const { settings, llmHealth, brief } = useStudio();
+  const [highlight, setHighlight] = useState(0);
+  // Remember which draft was dismissed, so typing again re-opens the palette
+  // without an effect that writes state on every keystroke.
+  const [dismissedFor, setDismissedFor] = useState<string | null>(null);
+
+  const offline = llmHealth.healthy === false;
+  const matches = useMemo(() => (isCommandDraft(value) ? matchCommands(value) : []), [value]);
+  const paletteOpen = isCommandDraft(value) && dismissedFor !== value;
 
   // Grow with the draft, then scroll once it gets tall.
   useEffect(() => {
@@ -55,9 +69,78 @@ export function Composer({
   }, [inputRef]);
 
   const canSend = value.trim().length > 0 && !streaming;
+  const activeIndex = Math.min(highlight, Math.max(matches.length - 1, 0));
+  const activeCommand = matches[activeIndex];
+
+  function choose(command: StudioCommand) {
+    onChange("");
+    setHighlight(0);
+    setDismissedFor("");
+    onCommand(command);
+    inputRef.current?.focus();
+  }
+
+  function onTextareaKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (paletteOpen) {
+      if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+        event.preventDefault();
+        if (!matches.length) {
+          return;
+        }
+        const delta = event.key === "ArrowDown" ? 1 : -1;
+        setHighlight((index) => (index + delta + matches.length) % matches.length);
+        return;
+      }
+      if ((event.key === "Enter" || event.key === "Tab") && activeCommand) {
+        event.preventDefault();
+        choose(activeCommand);
+        return;
+      }
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setDismissedFor(value);
+        return;
+      }
+    }
+
+    if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
+      event.preventDefault();
+      if (canSend) {
+        onSubmit();
+      }
+    }
+  }
 
   return (
     <div className="composer">
+      {paletteOpen && (
+        <div className="palette" role="listbox" id="studio-command-palette" aria-label="Commands">
+          {matches.length ? (
+            matches.map((command, index) => (
+              <button
+                key={command.id}
+                type="button"
+                role="option"
+                aria-selected={index === activeIndex}
+                className={`palette__item${index === activeIndex ? " is-active" : ""}`}
+                onMouseEnter={() => setHighlight(index)}
+                onClick={() => choose(command)}
+              >
+                <code className="palette__name">{command.name}</code>
+                <span className="palette__text">
+                  <span className="palette__label">{command.label}</span>
+                  <span className="palette__description">{command.description}</span>
+                </span>
+              </button>
+            ))
+          ) : (
+            <p className="palette__empty">
+              No command matches. Type <code>/help</code> for the full list.
+            </p>
+          )}
+        </div>
+      )}
+
       <form
         className="composer__shell"
         onSubmit={(event) => {
@@ -76,16 +159,17 @@ export function Composer({
           className="composer__input"
           rows={1}
           value={value}
-          placeholder="Ask about a job, an outcome, or what to build next…"
+          placeholder={
+            placeholder ??
+            (offline
+              ? "Model offline — type / for commands, or work in the panels…"
+              : "Ask about a job, an outcome, or what to build next…")
+          }
+          aria-expanded={paletteOpen}
+          aria-controls={paletteOpen ? "studio-command-palette" : undefined}
+          aria-autocomplete="list"
           onChange={(event) => onChange(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
-              event.preventDefault();
-              if (canSend) {
-                onSubmit();
-              }
-            }
-          }}
+          onKeyDown={onTextareaKeyDown}
         />
         <div className="composer__actions">
           {streaming ? (
@@ -111,10 +195,11 @@ export function Composer({
       </form>
       <p className="composer__hint">
         <span>
-          <kbd>Enter</kbd> to send · <kbd>Shift</kbd>+<kbd>Enter</kbd> for a new line
+          <kbd>Enter</kbd> to send · <kbd>/</kbd> for commands
+          {brief ? ` · ${brief.product_name || "your job"}` : ""}
         </span>
-        <span className={`composer__status${llmHealth.healthy === false ? " is-offline" : ""}`}>
-          {settings.model_name}
+        <span className={`composer__status${offline ? " is-offline" : ""}`}>
+          {offline ? "Local guidance" : settings.model_name}
         </span>
       </p>
     </div>

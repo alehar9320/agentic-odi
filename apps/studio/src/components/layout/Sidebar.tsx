@@ -1,20 +1,24 @@
 import { useStudio } from "../../state/StudioContext";
 import type { WorkspacePanelId } from "../../types";
-import { PanelLeftIcon, PlusIcon, SettingsIcon } from "../icons";
+import { PanelLeftIcon, PlusIcon, SettingsIcon, SparkIcon } from "../icons";
 import { WORKSPACE_PANELS } from "../workspace/panels";
 
 interface SidebarProps {
   collapsed: boolean;
   onToggle: () => void;
   onNavigate: () => void;
+  onHome: () => void;
 }
 
-export function Sidebar({ collapsed, onToggle, onNavigate }: SidebarProps) {
+export function Sidebar({ collapsed, onToggle, onNavigate, onHome }: SidebarProps) {
   const {
     activePanel,
     openPanel,
     closePanel,
     clearChat,
+    openSetup,
+    closeSetup,
+    brief,
     llmHealth,
     mcpReachable,
     settings,
@@ -38,6 +42,7 @@ export function Sidebar({ collapsed, onToggle, onNavigate }: SidebarProps) {
   function newConversation() {
     clearChat();
     closePanel();
+    closeSetup();
     onNavigate();
   }
 
@@ -46,10 +51,18 @@ export function Sidebar({ collapsed, onToggle, onNavigate }: SidebarProps) {
   return (
     <aside className={`sidebar${collapsed ? " sidebar--collapsed" : ""}`} aria-label="Studio">
       <div className="sidebar__top">
-        <span className="brand" aria-hidden={collapsed}>
-          <span className="brand__mark">◍</span>
+        <button
+          type="button"
+          className="brand brand--home"
+          onClick={onHome}
+          aria-label="Go to home"
+          title="Home"
+        >
+          <span className="brand__mark" aria-hidden="true">
+            ◍
+          </span>
           <span className="brand__wordmark">Living Studio</span>
-        </span>
+        </button>
         <button
           type="button"
           className="icon-button sidebar__toggle"
@@ -76,6 +89,21 @@ export function Sidebar({ collapsed, onToggle, onNavigate }: SidebarProps) {
         <p className="sidebar__label" id="workspace-label">
           Workspace
         </p>
+        <button
+          type="button"
+          className={`nav-item${brief ? "" : " nav-item--nudge"}`}
+          onClick={() => {
+            openSetup();
+            onNavigate();
+          }}
+          title="Your product, audience, and job"
+        >
+          <span className="nav-item__icon">
+            <SparkIcon size={16} />
+          </span>
+          <span className="nav-item__label">Your context</span>
+          {!brief && <span className="nav-item__dot" aria-hidden="true" />}
+        </button>
         {WORKSPACE_PANELS.map((panel) => {
           const count = counts[panel.id] ?? 0;
           const active = activePanel === panel.id;

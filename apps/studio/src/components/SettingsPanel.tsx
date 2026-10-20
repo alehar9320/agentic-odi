@@ -8,6 +8,8 @@ export function SettingsPanel() {
     saveSettings,
     displayName,
     setDisplayName,
+    brief,
+    openSetup,
     clearChat,
     refreshCanvas,
     llmHealth,
@@ -22,6 +24,20 @@ export function SettingsPanel() {
 
   return (
     <div className="settings">
+      <div className="settings__context">
+        <div>
+          <p className="settings__context-label">Your context</p>
+          <p className="settings__context-value">
+            {brief?.job_statement
+              ? `${brief.product_name || "Your product"} — ${brief.job_statement}`
+              : "Not set yet. The studio starts every reply from this."}
+          </p>
+        </div>
+        <button type="button" className="button button--ghost" onClick={openSetup}>
+          {brief ? "Edit context" : "Set up context"}
+        </button>
+      </div>
+
       <div className="field">
         <label htmlFor="display-name">
           Your name <span className="field__hint">optional — used in the greeting</span>

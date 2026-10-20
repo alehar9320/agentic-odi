@@ -77,12 +77,18 @@ sidecar, and Vite together on http://localhost:5173. For the desktop app, use
 `npm --prefix apps/studio run tauri dev`. See
 [Running The Living Studio](docs/living-studio.md).
 
-The Studio opens as a conversation: describe a job or a customer frustration, or
-use the left drawer to open the opportunity landscape, job map, impact
-simulation, evidence, and capture panels beside the chat.
+The first time you open the Studio it asks — conversationally, in the chat, and
+skippable at any point — for your product, audience, and the job your customers
+are trying to get done. Answer what you like; every reply starts from what you
+shared. After that it opens as a conversation: describe a job or a customer
+frustration, type `/` for commands that mirror the CLI, or use the drawer to
+open the opportunity landscape, job map, impact simulation, evidence, and
+capture surfaces full screen.
 
-The Studio needs an OpenAI-compatible LLM with tool-calling support to drive its
-agent — see the [Local LLM Backend](docs/local-llm.md).
+The Studio is better with an OpenAI-compatible LLM with tool-calling support
+(see the [Local LLM Backend](docs/local-llm.md)), but it does not depend on one:
+with no model reachable it says so and every job, step, and outcome remains
+editable by hand.
 
 ### CLI at a glance
 

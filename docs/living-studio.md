@@ -37,14 +37,59 @@ The Studio opens as a conversation, not a dashboard.
 
 | Surface | What it does |
 |---|---|
-| **Hero** | One rotating headline above the composer: a greeting (time of day, plus your name if you set one in Settings), what is already on the canvas, or what the studio can do. It cycles every few seconds and stays still under `prefers-reduced-motion`. |
-| **Suggestion pills** | Below the headline. Some open a workspace panel (landscape, simulate, capture), others start a conversation. They change as the canvas fills up. |
-| **Composer** | Docked at the bottom of the transcript. `Enter` sends, `Shift`+`Enter` adds a line, `Cmd/Ctrl`+`K` focuses it, and the send button becomes a stop button while a reply streams. |
-| **Drawer** (left) | New conversation, the five workspace panels, live model/MCP status, and Settings. Collapses to an icon rail with `Cmd/Ctrl`+`B`; becomes an overlay sheet on narrow screens. |
-| **Workspace panel** (right) | The classic UI — opportunity landscape, job map, impact simulation, evidence, direct capture, settings — opens beside the conversation, never on top of it. |
+| **First run** | A short conversation in the chat, not a form: what you are building, who feels the problem, the job they are trying to get done, then where it hurts. One question at a time, with a reflection before the next ask, quick replies, and **Explore on my own** always visible. Skipping is allowed; answers and progress are kept as a draft. Re-open it any time with `/start`, the sidebar's **Your context**, or Settings. |
+| **Hero** | One rotating headline above the composer: a greeting (time of day, plus your name if you set one in Settings), the product/job you set up, what is already on the canvas, or what the studio can do. It cycles every few seconds and stays still under `prefers-reduced-motion`. |
+| **Suggestion pills** | Below the headline. Some open a surface (landscape, simulate, capture), others start a conversation. They change as the canvas fills up. |
+| **Composer** | Docked at the bottom of the transcript. `Enter` sends, `Shift`+`Enter` adds a line, `Cmd/Ctrl`+`K` focuses it, and `/` opens the command palette. The send button becomes a stop button while a reply streams. |
+| **Drawer** (left) | The wordmark is a home button. Below it: new conversation, your context, the five workspace surfaces with counts, live model/MCP status, and Settings. Collapses to an icon rail with `Cmd/Ctrl`+`B`; becomes an overlay sheet on narrow screens. |
+| **Workspace surfaces** | The classic UI — opportunity landscape, job map, impact simulation, evidence, direct capture, settings — takes the whole stage while open. **Back to conversation** or `Esc` returns; the chat is never squeezed into a side column. |
 
 Replies render Markdown (headings, lists, emphasis, inline and fenced code).
 Tool calls appear inline as small trace chips while the agent works.
+
+### Slash commands
+
+Type `/` to open the palette. `Up`/`Down` move, `Enter` or `Tab` runs the
+selected command, `Esc` closes it. Commands are handled in the SPA and never call
+the model, so they work when it is offline.
+
+| Command | Effect |
+|---|---|
+| `/help` | Every command, as a notice in the transcript |
+| `/start` | Resume the context conversation |
+| `/new` | New conversation |
+| `/home` | Return to the empty stage |
+| `/jobs` | Job summary, then the job map |
+| `/landscape`, `/jobmap`, `/impact`, `/evidence`, `/capture`, `/settings` | Open that surface full screen |
+| `/status` | Model, MCP, context, and canvas status |
+
+Unknown commands produce a transcript notice pointing at `/help`.
+
+### Guidance, not gates
+
+The setup conversation is a nudge, never a prerequisite. If you skip it, the
+home stage keeps a dashed **Tell me what you're building** pill and the sidebar
+marks **Your context** with a dot; both reopen the conversation exactly where
+you left off. `/start` does the same. The conversation also understands a
+natural reply: say "skip", "not now", or "show me the landscape" and it reacts
+instead of recording it as an answer. When a brief exists, it opens on a review
+and asks what changed rather than asking everything again.
+
+### Without a model
+
+When the LLM is unreachable the Studio keeps working:
+
+- A **Working by hand** strip explains the state and offers capture, job map,
+  and context.
+- Messages still return deterministic ODI guidance from the sidecar, labelled
+  **Local guidance**.
+- Jobs can be created, renamed, and deleted; steps added, edited, and removed;
+  outcomes recorded, re-scored, and removed. All of it goes through the same
+  local repository the model uses.
+- Settings → Base URL and Model reconnect the assistant whenever you are ready.
+
+The user's context is sent with every chat request, so the assistant starts from
+the product, audience, job, and problem rather than asking for them again.
 
 ## 1. Web — production build (recommended for a quick look)
 

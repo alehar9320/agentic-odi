@@ -14,6 +14,8 @@ export interface GreetingContext {
   outcomeCount: number;
   underservedCount: number;
   llmHealthy?: boolean | null;
+  productName?: string | null;
+  jobStatement?: string | null;
 }
 
 export type GreetingKind = "greeting" | "insight" | "capability" | "status";
@@ -101,10 +103,25 @@ export function greetingCandidates(context: GreetingContext): Greeting[] {
     },
   );
 
+  const product = context.productName?.trim();
+  if (product && context.jobStatement?.trim()) {
+    candidates.push({
+      id: "context-job",
+      text: `${product} — ${context.jobStatement.trim()}`,
+      kind: "insight",
+    });
+  } else if (product) {
+    candidates.push({
+      id: "context-product",
+      text: `What job is ${product} hired to do?`,
+      kind: "insight",
+    });
+  }
+
   if (context.llmHealthy === false) {
     candidates.push({
       id: "status-offline",
-      text: "No model reachable right now. I can still walk you through the ODI playbook.",
+      text: "No model right now — the studio still works by hand.",
       kind: "status",
     });
   }

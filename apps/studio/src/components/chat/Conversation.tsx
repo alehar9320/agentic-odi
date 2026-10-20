@@ -39,11 +39,13 @@ function AssistantMessage({
   streaming,
   label,
   tools,
+  offline,
 }: {
   content: string;
   streaming: boolean;
   label: string;
   tools: { name: string; status: string; preview?: string }[];
+  offline?: boolean;
 }) {
   const { pushToast } = useStudio();
   const [copied, setCopied] = useState(false);
@@ -68,6 +70,7 @@ function AssistantMessage({
         <SparkIcon size={15} />
       </span>
       <div className="message__body">
+        {offline && content ? <span className="message__tag">Local guidance</span> : null}
         {content ? (
           <Markdown source={content} />
         ) : (
@@ -107,7 +110,7 @@ function AssistantMessage({
 }
 
 export function Conversation() {
-  const { messages, streaming, thinkingPhase, toolActivity } = useStudio();
+  const { messages, streaming, thinkingPhase, toolActivity, offlineReply } = useStudio();
   const lastIndex = messages.length - 1;
 
   return (
@@ -121,6 +124,13 @@ export function Conversation() {
             </article>
           );
         }
+        if (message.role === "notice") {
+          return (
+            <article className="message message--notice" key={index}>
+              <Markdown source={message.content} />
+            </article>
+          );
+        }
         return (
           <AssistantMessage
             key={index}
@@ -128,6 +138,7 @@ export function Conversation() {
             streaming={streaming && isLast}
             label={phaseLabel(thinkingPhase)}
             tools={isLast ? toolActivity : []}
+            offline={isLast && offlineReply}
           />
         );
       })}
