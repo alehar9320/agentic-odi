@@ -46,7 +46,9 @@ function StudioShellFull() {
   );
 }
 
-export function StudioShell({ engagementLevel }: { engagementLevel: number }) {
+/** Reads engagementLevel from context (must be rendered inside StudioProvider). */
+function StudioShell() {
+  const { engagementLevel } = useStudio();
   switch (engagementLevel) {
     case 0:
       return <StudioShellMinimal />;
@@ -59,11 +61,10 @@ export function StudioShell({ engagementLevel }: { engagementLevel: number }) {
 }
 
 export default function App() {
-  const { engagementLevel } = useStudio();
   return (
     <ErrorBoundary>
       <StudioProvider>
-        <StudioShell engagementLevel={engagementLevel} />
+        <StudioShell />
       </StudioProvider>
     </ErrorBoundary>
   );

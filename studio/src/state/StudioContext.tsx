@@ -80,6 +80,8 @@ export interface StudioContextValue {
   clearPendingSimOutcome: () => void;
   activeTab: string;
   setActiveTab: (tab: string) => void;
+  engagementLevel: number;
+  setEngagementLevel: (level: number) => void;
   toasts: Toast[];
   pushToast: (kind: ToastKind, message: string) => void;
   dismissToast: (id: number) => void;
@@ -395,6 +397,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       clearPendingSimOutcome,
       activeTab,
       setActiveTab,
+      engagementLevel,
+      setEngagementLevel: saveEngagementLevel,
       toasts,
       pushToast,
       dismissToast,
