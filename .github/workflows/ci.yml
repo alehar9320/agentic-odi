@@ -92,7 +92,7 @@ jobs:
       # One upload per run is enough; the 3.12 report is the canonical one.
       - name: Upload coverage to Codecov
         if: ${{ matrix.python-version == '3.12' }}
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v7
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml
