@@ -8,22 +8,17 @@ uv sync --all-packages
 
 ## Linting, Formatting & Type Checks
 
+Shared tooling lives in the root `pyproject.toml`, so one command covers every
+Python project:
+
 ```bash
-# Ruff lint and formatting checks (per-file config comes from each project's pyproject.toml)
 uv run ruff check .
 uv run ruff format --check .
-
-# Type checking (run per project so each project's config applies)
-uv run --directory core mypy .
-uv run --directory mcp_server mypy .
-uv run --directory local_server mypy .
-uv run --directory client mypy .
-uv run --directory cli mypy .
-uv run --directory connectors mypy .
+uv run mypy apps packages
 uv run --directory website mypy .
 
 # Security scanning
-uv run bandit -c pyproject.toml -r core/src mcp_server/src local_server/src cli/src client/src connectors/src website/
+uv run bandit -c pyproject.toml -r apps packages website/
 ```
 
 ## Frontend & Desktop Checks (studio)
@@ -31,11 +26,11 @@ uv run bandit -c pyproject.toml -r core/src mcp_server/src local_server/src cli/
 The SPA and Tauri shell mirror their CI jobs locally:
 
 ```bash
-npm --prefix studio run lint       # ESLint
-npm --prefix studio run typecheck  # tsc --noEmit
-npm --prefix studio test -- --run  # Vitest (run once)
-npm --prefix studio run build      # production build → studio/dist
-cd studio/src-tauri && cargo fmt --check && cargo clippy -- -D warnings && cargo check
+npm --prefix apps/studio run lint       # ESLint
+npm --prefix apps/studio run typecheck  # tsc --noEmit
+npm --prefix apps/studio test -- --run  # Vitest (run once)
+npm --prefix apps/studio run build      # production build → apps/studio/dist
+cd apps/studio/src-tauri && cargo fmt --check && cargo clippy -- -D warnings && cargo check
 ```
 
 ## Website Checks (GitHub Pages)
@@ -82,23 +77,27 @@ pre-commit run --all-files
 ## Testing
 
 Tests use **pytest** with **pytest-asyncio** (strict mode) and run entirely
-in-memory — no running server required. Each project owns its tests:
+in-memory — no running server required. Tests live next to the package they
+cover, and every test runs from the repository root:
 
 ```bash
-uv run --directory core pytest
-uv run --directory mcp_server pytest
-uv run --directory local_server pytest
-uv run --directory client pytest
-uv run --directory cli pytest
-uv run --directory connectors pytest
+uv run pytest                        # everything
+uv run pytest apps/cli               # one app
+uv run pytest packages/core          # one package
+uv run pytest tests/contract         # cross-package contracts
+uv run pytest tests/scripts          # dev launcher
 ```
+
+The MCP server contract test compares the live FastMCP registry with
+`packages/core/src/agentic_odi_core/contract.py`, so add or change a tool in
+both places. The CLI local-backend contract test keeps `_LOCAL_HANDLERS` aligned
+with the same tool names.
 
 ## Test Coverage
 
-CI runs the suite on Python **3.10, 3.11, and 3.12**, combines each package's
-coverage into one `coverage.xml`, and uploads it to
-[Codecov](https://codecov.io/gh/alehar9320/agentic-odi) from the 3.12 job. Each
-matrix job also stores its combined report as a build artifact.
+CI runs the suite on Python **3.10, 3.11, and 3.12** and uploads one combined
+`coverage.xml` from the 3.12 job to
+[Codecov](https://codecov.io/gh/alehar9320/agentic-odi).
 
 The Codecov upload authenticates with the `CODECOV_TOKEN` repository secret and
 is non-blocking (`fail_ci_if_error: false`), so a Codecov outage or a fork PR
@@ -110,73 +109,47 @@ tracks `main`, which is the baseline every PR is compared against:
 - **Patch** status is informational for now, so new code can land while the
   suite catches up.
 
-To reproduce the combined report locally, run each package with its own coverage
-file and merge them the way CI does:
+To reproduce the report locally:
 
 ```bash
-set -e
-for pkg in core mcp_server local_server client cli connectors; do
-  # Absolute path, so each package writes to the repo root rather than its own directory.
-  COVERAGE_FILE="$PWD/.coverage.$pkg" uv run --directory "$pkg" pytest --cov="$pkg" -q
-done
-uv run coverage combine .coverage.*
-uv run coverage xml -o coverage.xml && uv run coverage report
+uv run pytest \
+  --cov=agentic_odi_cli \
+  --cov=agentic_odi_connectors \
+  --cov=agentic_odi_core \
+  --cov=agentic_odi_mcp_server \
+  --cov=agentic_odi_studio_api \
+  --cov-report=term-missing \
+  --cov-report=xml:coverage.xml
 ```
 
 > [!NOTE]
-> Coverage is only collected for the Python packages. `studio/` and test
+> Coverage is only collected for the Python packages. `apps/studio/` and test
 > directories are excluded in `codecov.yml`.
 
 ### Conventions
 
 - Test files live under each project's `tests/` directory and are named
   `test_*.py`.
+- Root `tests/` is reserved for cross-package checks (`contract/` and
+  `scripts/`).
 - Every async test is decorated with `@pytest.mark.asyncio`.
 - Use `Client(mcp)` directly (no HTTP server needed) for fast, isolated tests.
-- The server's `reset_db` autouse fixture clears in-memory state before each
-  test.
+- The MCP server's `reset_db` autouse fixture clears in-memory state before
+  each test.
 
 ### Test Coverage Map
 
-| File | What it covers |
+| Area | What it covers |
 |---|---|
-| `core/tests/test_models.py` | Domain models and ODI opportunity-score computation |
-| `core/tests/test_service.py` | `ODIService` jobs/steps/outcomes and Customer Outcome CRUD |
-| `core/tests/test_sqlite_repository.py` | SQLite event-sourced repository: snapshot reload, updates, deletes, and clear |
-| `core/tests/test_intent_store.py` | Append-only Intent Store reads, clear, and legacy blank payloads |
-| `core/tests/test_repository.py` | In-memory repository filtering and update/delete edge cases |
-| `core/tests/test_messages.py` | Shared framework guidelines and not-found helpers |
-| `mcp_server/tests/test_odi.py` | Full ODI workflow (add job → steps → outcomes → retrieval) + capabilities tool |
-| `mcp_server/tests/test_customer_outcomes.py` | Customer Outcomes CRUD, filtering, computed opportunity scores, and tool validation |
-| `mcp_server/tests/test_server_tools.py` | Error handling and retrieval for the MCP tools |
-| `mcp_server/tests/test_tool_branches.py` | Prompt registration, tool validation errors, full updates, and HTTP transport startup |
-| `mcp_server/tests/test_tools.py` | Tool response-shape contract for `add_job` |
-| `local_server/tests/test_api.py` | Local FastAPI health endpoint |
-| `local_server/tests/test_studio_api.py` | Living Studio sidecar API (config, health, canvas, SSE chat, steps/outcomes) |
-| `local_server/tests/test_app_spa.py` | SPA fallback, asset mounting, and the uvicorn entrypoint |
-| `local_server/tests/test_studio_mcp_data.py` | MCP canvas hydration, seed fallback, and tool passthrough errors |
-| `local_server/tests/test_studio_probes.py` | Endpoint probing and LLM health classification |
-| `local_server/tests/test_studio_chat_branches.py` | Streaming tool-loop argument and failure branches |
-| `local_server/tests/test_studio_router.py` | Successful step/outcome passthrough responses |
-| `client/tests/test_run.py` | Dev launcher helpers (port checks, mcp + sidecar commands) |
-| `client/tests/test_run_main.py` | Launcher lifecycle: startup errors, polling, signal handlers, and shutdown |
-| `studio/src/**/*.test.ts` | SPA units: ODI math, transport bridge, SSE parser, sidecar client |
-| `cli/tests/test_cli.py` | CLI `--version`/`version`, help, global options, and unknown-backend handling |
-| `cli/tests/test_backend.py` | Local SQLite backend CRUD, remote MCP parsing/errors/timeouts, backend resolution |
-| `cli/tests/test_backend_edges.py` | Backend validation messages, full updates, parsing edges, and MCP call failures |
-| `cli/tests/test_chat_runtime.py` | Interactive chat loop, streaming, tool-call recovery, and exit paths |
-| `cli/tests/test_customer_outcomes_cli.py` | `customer-outcomes` CRUD against SQLite, aliases, human/`--json` output, error exit codes |
-| `cli/tests/test_connectors_cli.py` | CLI `connectors` add/list/health/ingest adapter and call timeouts |
-| `cli/tests/test_connectors_edges.py` | Connector wrappers, config path resolution, catalog auth types, and error exits |
-| `cli/tests/test_onboard.py` | First-run signal extraction, confidence inference, and onboarding gating |
-| `cli/tests/test_profile.py` | Baseline load/save/backup, timestamps, and corrupt-file handling |
-| `cli/tests/test_update_edges.py` | Update locking, atomic swaps, download failures, and auto-update gating |
-| `cli/tests/test_cli_edges.py` | Terminal launch, chat command wiring, and re-exec behavior |
-| `cli/tests/test_context.py` | Global backend option and environment fallback |
-| `cli/tests/test_render.py` | Human/JSON rendering, truncation, and unicode safety |
-| `cli/tests/test_startup_perf.py` | `--version`/`--help` avoid importing fastmcp, connectors, core, and openai |
-| `connectors/tests/test_registry.py` | JSON connector registry persist/load and kind checks |
-| `connectors/tests/test_mcp_connector.py` | In-memory FastMCP health and ingest records |
+| `packages/core/tests/` | Domain models, opportunity scoring, `ODIService`, repository implementations, SQLite persistence, schema, and repository factory |
+| `apps/mcp-server/tests/` | Full ODI workflow, entity parity, context tools, Customer Outcomes, evidence, tool errors, and HTTP transport startup |
+| `apps/studio-api/tests/` | Health, config, canvas, SSE chat, SPA fallback, MCP hydration, probes, and step/outcome passthrough |
+| `apps/cli/tests/` | Backend selection, local/remote CRUD, chat, wizard, onboarding, updates, rendering, connectors, and startup performance |
+| `packages/connectors/tests/` | Catalog presets, registry persistence, factory, MCP and REST connectors, evidence mapping, and sink |
+| `tests/contract/` | Live MCP tool surface and CLI local-handler parity |
+| `tests/scripts/` | `scripts/dev.py` startup, port checks, signals, and shutdown |
+| `apps/studio/src/**/*.test.ts` | SPA units: ODI math, transport bridge, SSE parser, sidecar client |
+| `website/tests/` | Static site integrity, OG art reproducibility, and README sync |
 
 > [!TIP]
 > Type `/test` in the AI assistant to have the agent run all tests and report the

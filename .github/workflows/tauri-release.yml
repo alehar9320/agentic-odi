@@ -65,17 +65,17 @@ jobs:
 
       - uses: swatinem/rust-cache@v2
         with:
-          workspaces: studio/src-tauri -> target
+          workspaces: apps/studio/src-tauri -> target
 
       - uses: actions/setup-node@v6
         with:
           node-version: "lts/*"
           cache: npm
-          cache-dependency-path: studio/package-lock.json
+          cache-dependency-path: apps/studio/package-lock.json
 
       - name: Install frontend dependencies
         run: npm ci
-        working-directory: studio
+        working-directory: apps/studio
 
       - name: Import Windows signing certificate
         if: matrix.platform == 'windows-latest'
@@ -113,7 +113,7 @@ jobs:
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         with:
-          projectPath: studio
+          projectPath: apps/studio
           tagName: ${{ inputs.tag || github.ref_name }}
           releaseName: ${{ inputs.tag || github.ref_name }}
           releaseDraft: false

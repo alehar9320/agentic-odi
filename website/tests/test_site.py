@@ -201,7 +201,9 @@ def test_no_emoji_on_site():
 
 
 def test_opportunity_formula_matches_core():
-    core = (ROOT / "core" / "src" / "core" / "models.py").read_text(encoding="utf-8")
+    core = (ROOT / "packages" / "core" / "src" / "agentic_odi_core" / "models.py").read_text(
+        encoding="utf-8"
+    )
     assert "importance + max(importance - satisfaction, 0)" in core  # repo truth guard
     page = (SITE / "index.html").read_text(encoding="utf-8")
     normalized = page.lower().replace("\u2212", "-").replace(" ", "")

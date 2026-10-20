@@ -34,19 +34,24 @@ We don't publish dates. This page changes when the code does.
 
 ## Code Overview
 
-A [uv workspace](https://docs.astral.sh/uv/concepts/projects/workspaces/) of six
-installable Python projects plus the React `studio/` front end, each with its own
-build, tests, and layout:
+A [uv workspace](https://docs.astral.sh/uv/concepts/projects/workspaces/) with
+shared tooling at the root. Packages live in `packages/`, runnable services in
+`apps/`, and deployment assets in `infra/`:
 
-| Package | Description |
-|---|---|
-| **`core/`** (`agentic-odi-core`) | Domain models, the `ODIService` business-logic layer, and repository implementations (in-memory and SQLite), including ODI opportunity-score computation. |
-| **`mcp_server/`** (`agentic-odi-mcp-server`) | A foundational MCP Server exposing an HTTP transport layer. It hosts tools for Jobs, Steps, Desired Outcomes, and Customer Outcomes (linking customer value to business value). |
-| **`local_server/`** (`agentic-odi-local-server`) | The FastAPI **Living Studio sidecar**. It talks to the MCP server on the client's behalf and serves the Studio API — configuration, health probes, canvas data, MCP mutations, and streaming (SSE) chat with the LLM tool-loop — plus the built SPA when `studio/dist` exists. |
-| **`client/`** (`agentic-odi-client`) | The local dev **launcher** (`run.py` / `python -m client.run`) that starts the MCP server and the Studio sidecar together. |
-| **`studio/`** (React + TypeScript + Vite) | **The Living Studio** front end — a spatial, conversational GUI for Outcome-Driven Innovation with an interactive Opportunity Landscape, Universal Job Map, WYSIWYG Impact Simulation, and Causal Lineage inspection, paired with an autonomous copilot. Ships as a browser SPA and as a **Tauri 2 desktop app** (`studio/src-tauri/`). |
-| **`cli/`** (`agentic-odi-cli`) | A [`Typer`](https://github.com/fastapi/typer)-based command-line interface with an interactive chat mode plus `version`, `update`, `schema`, `jobs`, `steps`, `desired-outcomes`, `customer-outcomes` (alias `outcomes`), `evidence`, and `connectors` commands. Every ODI entity has full create/read/update/delete parity with the MCP tools. Data commands are local-first (`--backend local`, default) or remote (`--backend mcp`), with readable tables, `--json`, and a top-level `score`. |
-| **`connectors/`** (`agentic-odi-connectors`) | Pluggable external integrations. The first kind is an **MCP client connector** that connects to a remote MCP server over HTTP, checks health, and ingests tools/resources into a local ingest sink. Additional kinds (REST, webhooks, and so on) can register against the same protocol later. |
+| Path | Distribution | Description |
+|---|---|---|
+| **`packages/core/`** | `agentic-odi-core` | Domain models, the `ODIService` business-logic layer, repository implementations (in-memory and SQLite), the shared MCP tool contract, and ODI opportunity-score computation. |
+| **`packages/connectors/`** | `agentic-odi-connectors` | Pluggable MCP and REST connectors with presets and an ingest sink. |
+| **`apps/mcp-server/`** | `agentic-odi-mcp-server` | FastMCP server exposing Jobs, Steps, Desired Outcomes, Customer Outcomes, Evidence, and context tools over HTTP. Persists to SQLite by default. |
+| **`apps/studio-api/`** | `agentic-odi-studio-api` | FastAPI **Living Studio sidecar**. Serves config, health, canvas data, local mutations, MCP passthrough, SSE chat, and the built SPA. |
+| **`apps/cli/`** | `agentic-odi-cli` | Typer CLI with interactive chat plus full entity CRUD, `schema`, `connectors`, and local-first (`--backend local`) or remote (`--backend mcp`) data access. |
+| **`apps/studio/`** | React + TypeScript + Vite | **The Living Studio** SPA and Tauri 2 desktop shell. |
+| **`infra/cloudflare/`** | Worker | Free-plan Workers Static Assets deployment and sidecar tunnel. |
+| **`scripts/`** | — | Dev launcher, binary build, installer tests. |
+| **`tests/contract/`** | — | Cross-package MCP contract tests. |
+
+See [Architecture](docs/architecture/README.md) for the dependency graph, data
+flow, and testing strategy.
 
 ## Quick Start
 
@@ -54,12 +59,12 @@ build, tests, and layout:
 manager.
 
 ```bash
-# Install the entire workspace (all six projects plus dev tooling)
+# Install the entire workspace (all five Python projects plus dev tooling)
 uv sync --all-packages
 
 # Build the Studio SPA, then launch the MCP server and Living Studio together
-npm --prefix studio run build
-python -m client.run
+npm --prefix apps/studio run build
+python scripts/dev.py
 ```
 
 | Service | URL |
@@ -67,9 +72,9 @@ python -m client.run
 | MCP Server | http://localhost:8000/mcp |
 | The Living Studio | http://127.0.0.1:8100 |
 
-For hot reload, `npm --prefix studio run dev:full` starts the MCP server, the
+For hot reload, `npm --prefix apps/studio run dev:full` starts the MCP server, the
 sidecar, and Vite together on http://localhost:5173. For the desktop app, use
-`npm --prefix studio run tauri dev`. See
+`npm --prefix apps/studio run tauri dev`. See
 [Running The Living Studio](docs/living-studio.md).
 
 The Studio needs an OpenAI-compatible LLM with tool-calling support to drive its
@@ -80,9 +85,9 @@ agent — see the [Local LLM Backend](docs/local-llm.md).
 The CLI is local-first, so data commands work without a running server:
 
 ```bash
-python -m cli --version          # print the Agentic ODI version
-python -m cli --help             # show available options and commands
-python -m cli                    # start interactive chat in a terminal
+python -m agentic_odi_cli --version          # print the Agentic ODI version
+python -m agentic_odi_cli --help             # show available options and commands
+python -m agentic_odi_cli       # start interactive chat in a terminal
 agentic-odi jobs list            # Jobs-to-be-Done
 agentic-odi steps list --job-id <id>
 agentic-odi desired-outcomes list --job-id <id>
@@ -93,7 +98,7 @@ agentic-odi score 8 2            # ODI opportunity score → 14.00
 ```
 
 Add `--backend mcp` to route data commands through a running MCP server
-(`python -m mcp_server`). See the [CLI Reference](docs/cli.md).
+(`python -m agentic_odi_mcp_server`). See the [CLI Reference](docs/cli.md).
 
 ### Install the binary
 
@@ -116,6 +121,7 @@ layout, updates, and release automation.
 | [Running The Living Studio](docs/living-studio.md) | Run modes, desktop signing and updates, agent-driven testing (`/dev`, `/test`) |
 | [Local LLM Backend](docs/local-llm.md) | Running a local OpenAI-compatible model with tool calling |
 | [Development](docs/development.md) | Lint, format, type checks, frontend checks, tests and the coverage map |
+| [Architecture](docs/architecture/README.md) | Workspace layout, dependency direction, data flow, and testing |
 | [Installation](docs/installation.md) | Binary install, updater behavior, and release automation |
 | [Deployment](docs/deployment.md) | Hosted chat UI, the MCP server endpoint, and the free-plan Cloudflare Worker |
 | [Roadmap](docs/roadmap.md) | Completed and upcoming milestones |

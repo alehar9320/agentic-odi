@@ -13,7 +13,7 @@ directly.
 
 ```text
 ┌────────────────────────────┐  /api (JSON)  ┌───────────────────────────────┐
-│  Living Studio SPA         │ ────────────▶ │  local_server (sidecar)       │
+│  Living Studio SPA         │ ────────────▶ │  apps/studio-api (sidecar)    │
 │  React + TS + Vite         │  /api/chat    │  FastAPI on 127.0.0.1:8100    │
 │  (browser or Tauri webview)│ ◀──────────── │  - config / health / canvas   │
 └────────────────────────────┘  SSE stream   │  - steps / outcomes (via MCP) │
@@ -22,7 +22,7 @@ directly.
                                                              │ MCP (HTTP)
                                                              ▼
                                              ┌───────────────────────────────┐
-                                             │  mcp_server  :8000/mcp        │
+                                             │  apps/mcp-server :8000/mcp    │
                                              └───────────────────────────────┘
                                                              ▲
                                                              │ OpenAI-compatible
@@ -34,8 +34,8 @@ directly.
 ## 1. Web — production build (recommended for a quick look)
 
 ```bash
-npm --prefix studio run build   # build the SPA into studio/dist
-python -m client.run            # starts MCP :8000 + sidecar :8100
+npm --prefix apps/studio run build   # build the SPA into apps/studio/dist
+python scripts/dev.py            # starts MCP :8000 + sidecar :8100
 ```
 
 | Service | URL |
@@ -43,7 +43,7 @@ python -m client.run            # starts MCP :8000 + sidecar :8100
 | MCP Server | http://localhost:8000/mcp |
 | Living Studio | http://127.0.0.1:8100 |
 
-`python -m client.run` starts both processes concurrently; press **Ctrl+C** to
+`python scripts/dev.py` starts both processes concurrently; press **Ctrl+C** to
 stop both.
 
 ## 2. Web — dev with hot reload
@@ -51,7 +51,7 @@ stop both.
 Vite proxies `/api` to the sidecar:
 
 ```bash
-npm --prefix studio run dev:full   # MCP + sidecar + Vite together
+npm --prefix apps/studio run dev:full   # MCP + sidecar + Vite together
 # open http://localhost:5173
 ```
 
@@ -60,8 +60,8 @@ npm --prefix studio run dev:full   # MCP + sidecar + Vite together
 The app spawns the MCP server and sidecar itself:
 
 ```bash
-npm --prefix studio run tauri dev     # dev window
-npm --prefix studio run tauri build   # bundles: .deb / .AppImage (Linux), .app / .dmg (macOS), .msi / .exe (Windows)
+npm --prefix apps/studio run tauri dev     # dev window
+npm --prefix apps/studio run tauri build   # bundles: .deb / .AppImage (Linux), .app / .dmg (macOS), .msi / .exe (Windows)
 ```
 
 > [!NOTE]
@@ -74,7 +74,7 @@ npm --prefix studio run tauri build   # bundles: .deb / .AppImage (Linux), .app 
 > ```
 >
 > The Tauri CLI ships as the `@tauri-apps/cli` npm dev dependency
-> (`npm --prefix studio run tauri`). The sidecar is launched with
+> (`npm --prefix apps/studio run tauri`). The sidecar is launched with
 > `uv run python -m …` from the repository root; if the app cannot locate the
 > repo root, set `AGENTIC_ODI_REPO_ROOT`.
 
@@ -86,7 +86,7 @@ Actions secrets.
 
 | Secret | Purpose |
 |---|---|
-| `TAURI_SIGNING_PRIVATE_KEY` | Signs updater artifacts (`.sig`) and the `latest.json` manifest. A tagged release fails loudly without it. Generate with `npm --prefix studio run tauri signer generate`. |
+| `TAURI_SIGNING_PRIVATE_KEY` | Signs updater artifacts (`.sig`) and the `latest.json` manifest. A tagged release fails loudly without it. Generate with `npm --prefix apps/studio run tauri signer generate`. |
 | `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | Password for the private key (optional when the key has none). |
 | `APPLE_CERTIFICATE` / `APPLE_CERTIFICATE_PASSWORD` | macOS Developer ID certificate (base64 `.p12`) and its password. |
 | `APPLE_SIGNING_IDENTITY` | macOS signing identity. |
@@ -101,7 +101,7 @@ is pushed. The desktop app checks for updates on startup and via
 
 The updater key pair authenticates release artifacts so an installed app can
 verify that an auto-update genuinely came from you. The **public** key is
-embedded in `studio/src-tauri/tauri.conf.json` (`plugins.updater.pubkey`) and is
+embedded in `apps/studio/src-tauri/tauri.conf.json` (`plugins.updater.pubkey`) and is
 safe to commit. The **private** key must never be committed, logged, printed in
 CI, or attached to a build artifact.
 
@@ -109,13 +109,13 @@ CI, or attached to a build artifact.
    passwordless key, or pass a password and remember it:
 
    ```bash
-   npm --prefix studio run tauri signer generate -- -w ./living-studio.key -p "" -f
+   npm --prefix apps/studio run tauri signer generate -- -w ./living-studio.key -p "" -f
    ```
 
    This writes `living-studio.key` (private, `0600`) and `living-studio.key.pub`
    (public).
 
-2. **Paste the public key** into `studio/src-tauri/tauri.conf.json`:
+2. **Paste the public key** into `apps/studio/src-tauri/tauri.conf.json`:
 
    ```jsonc
    {
@@ -166,12 +166,11 @@ CI, or attached to a build artifact.
 > pair, rotate the Actions secret, and publish a freshly signed release.
 
 > [!IMPORTANT]
-> **Migration note.** The Streamlit UI (`client/src/client/app.py`) has been
-> removed. The Living Studio now lives in `studio/` (browser SPA + Tauri desktop
-> app) and is served by the `local_server` sidecar on port **8100** (previously
-> Streamlit's `8501`). Start everything with `python -m client.run`. All
-> `AGENTIC_ODI_*` environment variable names, the demo dataset, and the ODI
-> formulas are unchanged.
+> **Migration note.** The Streamlit UI has been removed. The Living Studio now
+> lives in `apps/studio/` (browser SPA + Tauri desktop app) and is served by the
+> `apps/studio-api` sidecar on port **8100** (previously Streamlit's `8501`).
+> Start everything with `python scripts/dev.py`. All `AGENTIC_ODI_*` environment
+> variable names, the demo dataset, and the ODI formulas are unchanged.
 
 ## Connecting an LLM
 

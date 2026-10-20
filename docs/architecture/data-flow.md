@@ -1,0 +1,79 @@
+# Data Flow
+
+## Sources of Truth
+
+| Layer | Owns | Persists |
+|---|---|---|
+| `packages/core` | `Job`, `Step`, `Outcome`, `CustomerOutcome`, `ODIService`, repository protocol | SQLite event log + snapshots |
+| `apps/mcp-server` | MCP tool adapters over `ODIService` | `build_repository()` selects SQLite in production and in-memory for `AGENTIC_ODI_DB=:memory:` |
+| `apps/studio-api` | Studio API, canvas projection, chat tool loop | Via the same repository when the local backend is active |
+| `apps/studio` | Presentation state, optimistic canvas updates | Browser cache only |
+| `apps/cli` | Terminal rendering, local/remote backend selection | SQLite directly for `local`, no local writes for `mcp` |
+
+## Write Paths
+
+### Local CLI
+
+```text
+agentic-odi customer-outcomes add
+  -> LocalBackend
+  -> ODIService
+  -> SQLiteRepository
+  -> IntentStore (append) + snapshot refresh
+```
+
+### MCP
+
+```text
+MCP client / Studio MCP mode / CLI --backend mcp
+  -> FastMCP tool
+  -> ODIService
+  -> configured Repository
+```
+
+`apps/mcp-server` builds its repository once at import time with `build_repository()`. Production uses SQLite; tests set `AGENTIC_ODI_DB=:memory:` (the root test suite does this in `tests/conftest.py`).
+
+### Studio API
+
+```text
+apps/studio SPA
+  -> /api/canvas, /api/steps, /api/outcomes
+  -> backend=local: ODIService -> Repository
+  -> backend=mcp:   call_mcp_tool -> MCP server -> ODIService -> Repository
+
+apps/studio SPA
+  -> /api/chat
+  -> stream_chat -> OpenAI-compatible LLM -> MCP tool calls
+```
+
+The SPA sends `mcp_url` with every data request for compatibility. In `local` mode the sidecar ignores it; in `mcp` mode it is required for canvas and mutations.
+
+## Read Paths
+
+```text
+ODIService.get_jobs / get_job_map / get_outcomes
+  -> Repository read-through state
+  -> Pydantic models
+  -> JSON (CLI --json, MCP text payload, Studio canvas)
+```
+
+The Studio canvas falls back to the demo seed only in `mcp` mode when MCP is unreachable or returns no jobs. `local` mode returns exactly what is in the local database, including an empty canvas.
+
+## Configuration
+
+| Variable | Used by | Default |
+|---|---|---|
+| `AGENTIC_ODI_DB` | core SQLite repository | `~/.agentic-odi/odi.db` |
+| `AGENTIC_ODI_BACKEND` | CLI, Studio API | `local` |
+| `AGENTIC_ODI_MCP_URL` | CLI, Studio defaults | `http://localhost:8000/mcp` |
+| `AGENTIC_ODI_STUDIO_DIST` | Studio API, dev launcher | `apps/studio/dist` |
+| `AGENTIC_ODI_REPO_ROOT` | Tauri shell | auto-detected |
+| `AGENTIC_ODI_BASE_URL` | CLI chat, Studio chat | `http://localhost:8001/v1` |
+| `AGENTIC_ODI_MODEL` | CLI chat, Studio chat | `local-tools-model` |
+| `AGENTIC_ODI_API_KEY` | CLI chat, Studio chat | `local` |
+
+## Trust Boundaries
+
+- The SPA runs in a browser or Tauri webview and only trusts the sidecar origin.
+- The sidecar may reach MCP and the LLM; CORS is restricted to known Studio origins.
+- MCP is an HTTP service with no authentication in local development. Do not expose it directly to the internet; the Cloudflare setup tunnels the sidecar, not MCP.

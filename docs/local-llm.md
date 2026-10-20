@@ -67,7 +67,7 @@ You can either set these in your shell or adjust them in the Living Studio's
   If this request fails, fix your local LLM server configuration before
   debugging the MCP client/server.
 
-- Start the MCP server and Studio (via `python -m client.run` or one of the
+- Start the MCP server and Studio (via `python scripts/dev.py` or one of the
   [run modes](living-studio.md)).
 - In the browser UI, ask the assistant something that should use ODI tools, for
   example: *"Help me define a new Job-to-be-Done and add it to your ODI

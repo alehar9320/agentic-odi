@@ -2,7 +2,7 @@
 
 This file provides system instructions and guardrails for any AI agents (or LLMs) assisting with the development of the **Agentic ODI** project. Please adhere to these guidelines to maintain consistency and align with the project's vision.
 
-> **Source of Truth for ODI Methodology**: `knowledge/Strategyn_what_is_Outcome_Driven_Innovation.pdf` by Anthony W. Ulwick (Strategyn). All ODI concepts in this project are grounded in that document. When in doubt, refer agents back to its definitions.
+> **Source of Truth for ODI Methodology**: `docs/reference/Strategyn_what_is_Outcome_Driven_Innovation.pdf` by Anthony W. Ulwick (Strategyn). All ODI concepts in this project are grounded in that document. When in doubt, refer agents back to its definitions.
 
 ---
 
@@ -129,7 +129,7 @@ These are absolute constraints the agent must respect:
 - **MCP Framework**: `fastmcp` (Server and Client)
 - **ASGI Server**: `uvicorn`
 - **HTTP Client**: `httpx`
-- **UI / Chat Client**: `streamlit`
+- **UI / Chat Client**: React + Vite (`apps/studio`), FastAPI sidecar (`apps/studio-api`)
 - **LLM Client**: `openai` (OpenAI-compatible, used with Ollama locally)
 - **Concurrency**: `asyncio`
 - **Data Modeling / Validation**: `pydantic`
@@ -164,7 +164,7 @@ Update the relevant file whenever any of the following change:
 
 - ✅ **Update docs in the same task** as the change that triggered it — never defer to a follow-up.
 - ✅ **Keep README short**: it stays a high-level orientation page. Push detail into `docs/` and link to it rather than growing the README.
-- ✅ **Keep the Quick Start accurate**: always reflect `python -m client.run` as the recommended launch command.
+- ✅ **Keep the Quick Start accurate**: always reflect `uv run python scripts/dev.py` as the recommended launch command.
 - ✅ **Keep Prerequisites up to date**: add any new `pip install` dependency immediately.
 - ✅ **Mark Roadmap items `[x]` when completed** — do not leave stale unchecked items.
 - ❌ **Never leave the README or `docs/` in a stale state** where documented commands or files no longer match the codebase.
@@ -181,7 +181,7 @@ Update the relevant file whenever any of the following change:
 - **Tool Creation**: 
   - Register tools on the server using the `@mcp.tool` decorator.
   - **CRITICAL**: Provide comprehensive docstrings and strict Python type hints for every tool parameter. Explain exactly what the tool does and what data it expects, as this metadata is fed directly to the LLM for tool discovery.
-  - **Capability Synchronization**: Whenever you add, modify, or remove an MCP tool in `mcp_server/src/mcp_server/mcp_server.py`, you **MUST** simultaneously update the `get_capabilities` tool's human-readable return string to ensure the capability set exactly matches the code.
+  - **Contract Synchronization**: Whenever you add, modify, or remove an MCP tool in `apps/mcp-server/src/agentic_odi_mcp_server/mcp_server.py`, you **MUST** simultaneously update `packages/core/src/agentic_odi_core/contract.py` (`ToolName`, `TOOL_SPECS`) and the `get_capabilities` return string. `tests/contract/test_mcp_contract.py` enforces the surface.
 
 ### 2. Async / Client Practices
 - Use `asyncio` for client execution and IO-bound tool operations.
@@ -194,13 +194,13 @@ Update the relevant file whenever any of the following change:
 ### 4. General Philosophy
 - **Separation of Concerns**: Isolate the ODI data logic/retrieval from the MCP server tooling logic.
 - **Agentic Purpose**: Remember that the tools being built are meant to be consumed by autonomous agents. Design tool interfaces that are intuitive for an LLM to call and interpret.
-- **External connectors**: Integrations live in the `connectors/` workspace package. New kinds implement `connectors.protocol.Connector` and register via `register_kind`. Do not write ingested records into `jobs_db` / outcomes unless a later mapping task says so.
+- **External connectors**: Integrations live in the `packages/connectors` workspace package. New kinds implement `agentic_odi_connectors.protocol.Connector` and register via `register_kind`. Do not write ingested records into `jobs_db` / outcomes unless a later mapping task says so.
 - **MCP client vs ODI server**: The ODI FastMCP **server** exposes product tools. The MCP **client connector** uses `fastmcp.Client` over HTTP to ingest data from *external* MCP servers. Prefer in-memory `Client(server)` tests for that connector, same as server tests.
 
 ### 5. Testing Strategy (FastMCP)
 - **First-Class Documentation**: Treat tests as living documentation that demonstrate how features work while protecting against regressions.
 - **Speed & Isolation**: Tests must be fast (< 1s) and self-contained. Use `@pytest.mark.integration` or `@pytest.mark.client_process` for slower, integration, or resource-dependent tests.
-- **Structure**: This repo is a uv workspace. Mirror each project's code structure in its own `tests/` directory (e.g., `mcp_server/src/mcp_server/mcp_server.py` -> `mcp_server/tests/test_server_tools.py`, `connectors/src/connectors/mcp/connector.py` -> `connectors/tests/test_mcp_connector.py`).
+- **Structure**: This repo is a uv workspace. Mirror each project's code structure in its own `tests/` directory (e.g., `apps/mcp-server/src/agentic_odi_mcp_server/mcp_server.py` -> `apps/mcp-server/tests/test_server_tools.py`, `packages/connectors/src/agentic_odi_connectors/mcp/connector.py` -> `packages/connectors/tests/test_mcp_connector.py`).
 - **Atomic Tests**: Each test must verify exactly one specific behavior with clear intent in test names and assertions. Avoid multi-behavior tests.
 - **In-Memory Testing (Preferred)**: Favor testing functionality deterministically by passing the `FastMCP` server directly into the `Client(server)` instance. This runs in-memory without network overhead for deterministic and lightning-fast execution.
 - **Transport Testing (When Needed)**: For HTTP/SSE network transport tests, prefer the isolated in-process `fastmcp.utilities.tests.run_server_async(server)` context manager over subprocess testing (which uses `run_server_in_process` and is slower to debug).

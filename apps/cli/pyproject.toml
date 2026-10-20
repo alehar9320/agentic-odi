@@ -1,0 +1,27 @@
+[project]
+name = "agentic-odi-cli"
+version = "0.1.0"
+description = "Command-line interface for Agentic ODI."
+requires-python = ">=3.10"
+dependencies = [
+    "agentic-odi-connectors",
+    "typer",
+    "fastmcp",
+    "openai",
+    "agentic-odi-core",
+    "httpx>=0.28.1",
+]
+
+[tool.uv.sources]
+agentic-odi-connectors = { workspace = true }
+agentic-odi-core = { workspace = true }
+
+[project.scripts]
+agentic-odi = "agentic_odi_cli.cli:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/agentic_odi_cli"]

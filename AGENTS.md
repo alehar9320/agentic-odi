@@ -204,5 +204,6 @@ For the full Kiro tool reference including subagent dispatch patterns and git wo
 
 - Read `.agents/rules/agent_instructions.md` for the ODI domain guardrails, MCP conventions, testing strategy, and README maintenance rules.
 - Keep `README.md` current in the same task whenever code, commands, dependencies, or capabilities change.
+- Architecture and data-flow details live in `docs/architecture/`; update them when the package graph or runtime boundaries change.
 - Superpowers artifacts belong under `docs/superpowers/`: designs in `docs/superpowers/specs/YYYY-MM-DD-<topic>-design.md`, plans in `docs/superpowers/plans/YYYY-MM-DD-<topic>.md`.
-- Run the relevant package tests with `uv run --directory <package> pytest`; see `.agents/workflows/test.md` for the full command list.
+- Run `uv run pytest` from the root; see `.agents/workflows/test.md` and `docs/architecture/testing.md` for focused commands.
