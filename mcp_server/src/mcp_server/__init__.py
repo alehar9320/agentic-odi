@@ -3,6 +3,7 @@
 from mcp_server.mcp_server import (
     compute_opportunity,
     customer_outcomes_db,
+    evidence_db,
     jobs_db,
     mcp,
     outcomes_db,
@@ -12,6 +13,7 @@ from mcp_server.mcp_server import (
 __all__ = [
     "compute_opportunity",
     "customer_outcomes_db",
+    "evidence_db",
     "jobs_db",
     "mcp",
     "outcomes_db",

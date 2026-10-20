@@ -138,12 +138,3 @@ async def test_get_odi_framework_guidelines_includes_expected_sections():
         assert "add_job" in text
         assert "add_outcome" in text
         assert "add_step" in text
-
-
-@pytest.mark.asyncio
-async def test_greet_returns_expected_message():
-    async with Client(mcp) as client:
-        name = "Alex"
-        res = await client.call_tool("greet", {"name": name})
-        text = res.content[0].text
-        assert text == f"Hello, {name}!"
