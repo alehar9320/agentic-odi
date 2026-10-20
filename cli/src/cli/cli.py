@@ -1,6 +1,7 @@
 """Main CLI entry point."""
 
 import hashlib
+import json
 import os
 import sys
 import tempfile
@@ -11,8 +12,13 @@ from pathlib import Path
 import typer
 
 from cli import context, paths, update, version
+from cli.backend import run_tool
 from cli.connectors import connectors_app
 from cli.customer_outcomes import customer_outcomes_app, score
+from cli.desired_outcomes import desired_outcomes_app
+from cli.evidence import evidence_app
+from cli.jobs import jobs_app
+from cli.steps import steps_app
 from cli.version import __version__  # noqa: F401  (re-exported for tests)
 
 app = typer.Typer(
@@ -21,6 +27,10 @@ app = typer.Typer(
     no_args_is_help=False,
 )
 app.add_typer(connectors_app, name="connectors")
+app.add_typer(jobs_app, name="jobs", help="Manage Jobs-to-be-Done.")
+app.add_typer(steps_app, name="steps", help="Manage Job-map Steps.")
+app.add_typer(desired_outcomes_app, name="desired-outcomes", help="Manage desired Outcomes.")
+app.add_typer(evidence_app, name="evidence", help="Manage evidence captured from connectors.")
 app.add_typer(customer_outcomes_app, name="customer-outcomes", help="Manage Customer Outcomes")
 app.add_typer(
     customer_outcomes_app,
@@ -140,6 +150,12 @@ def _reexec_current() -> None:
     if "update" in argv:
         argv = argv[: argv.index("update")]
     os.execv(str(binary), [str(binary), *argv])  # nosec B606 - re-execs own verified binary
+
+
+@app.command(name="schema")
+def schema_cmd() -> None:
+    """Print the canonical JSON schema for every ODI entity."""
+    typer.echo(json.dumps(run_tool("get_odi_schema", {}), indent=2))
 
 
 @app.command(name="version")

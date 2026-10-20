@@ -41,6 +41,7 @@ _CUSTOMER_VALUE_FIELDS = (
     "statement",
     "importance",
     "satisfaction",
+    "value_metrics",
 )
 
 _BUSINESS_VALUE_FIELDS = {
@@ -105,6 +106,160 @@ class LocalBackend(Backend):
         if handler is None:
             raise NotImplementedError(f"Unknown tool: {tool_name}")
         return handler(self, args)
+
+    def _add_job(self, args: dict[str, Any]) -> dict[str, Any]:
+        job = self.service.add_job(name=args["name"], description=args.get("description"))
+        return job.model_dump()
+
+    def _get_jobs(self, args: dict[str, Any]) -> list[dict[str, Any]]:
+        return [job.model_dump() for job in self.service.get_jobs()]
+
+    def _get_job(self, args: dict[str, Any]) -> dict[str, Any]:
+        from core import job_not_found
+
+        job_id = args["job_id"]
+        job = self.service.get_job(job_id)
+        if job is None:
+            raise BackendError(job_not_found(job_id))
+        return job.model_dump()
+
+    def _update_job(self, args: dict[str, Any]) -> dict[str, Any]:
+        from core import JobNotFoundError, job_not_found
+
+        updates = {key: args[key] for key in ("name", "description") if key in args}
+        try:
+            job = self.service.update_job(args["job_id"], updates)
+        except JobNotFoundError:
+            raise BackendError(job_not_found(args["job_id"])) from None
+        return job.model_dump()
+
+    def _delete_job(self, args: dict[str, Any]) -> str:
+        from core import JobNotFoundError, job_not_found
+
+        job_id = args["job_id"]
+        try:
+            self.service.delete_job(job_id)
+        except JobNotFoundError:
+            raise BackendError(job_not_found(job_id)) from None
+        return job_id
+
+    def _add_step(self, args: dict[str, Any]) -> dict[str, Any]:
+        from core import JobNotFoundError, job_not_found
+
+        try:
+            step = self.service.add_step(
+                job_id=args["job_id"], name=args["name"], order=args["order"]
+            )
+        except JobNotFoundError:
+            raise BackendError(job_not_found(args["job_id"])) from None
+        return step.model_dump()
+
+    def _get_job_map(self, args: dict[str, Any]) -> list[dict[str, Any]]:
+        from core import job_not_found
+
+        job_id = args["job_id"]
+        if self.service.get_job(job_id) is None:
+            raise BackendError(job_not_found(job_id))
+        return [step.model_dump() for step in self.service.get_job_map(job_id)]
+
+    def _get_step(self, args: dict[str, Any]) -> dict[str, Any]:
+        from core import step_not_found
+
+        step_id = args["step_id"]
+        step = self.service.get_step(step_id)
+        if step is None:
+            raise BackendError(step_not_found(step_id))
+        return step.model_dump()
+
+    def _update_step(self, args: dict[str, Any]) -> dict[str, Any]:
+        from core import StepNotFoundError, step_not_found
+
+        updates = {key: args[key] for key in ("name", "order") if key in args}
+        try:
+            step = self.service.update_step(args["step_id"], updates)
+        except StepNotFoundError:
+            raise BackendError(step_not_found(args["step_id"])) from None
+        return step.model_dump()
+
+    def _delete_step(self, args: dict[str, Any]) -> str:
+        from core import StepNotFoundError, step_not_found
+
+        step_id = args["step_id"]
+        try:
+            self.service.delete_step(step_id)
+        except StepNotFoundError:
+            raise BackendError(step_not_found(step_id)) from None
+        return step_id
+
+    def _add_outcome(self, args: dict[str, Any]) -> dict[str, Any]:
+        from core import (
+            JobNotFoundError,
+            StepNotFoundError,
+            ValueOutOfRangeError,
+            job_not_found,
+            step_not_found,
+        )
+
+        step_id = args.get("step_id")
+        try:
+            outcome = self.service.add_outcome(
+                job_id=args["job_id"],
+                statement=args["statement"],
+                importance=args.get("importance"),
+                satisfaction=args.get("satisfaction"),
+                step_id=step_id,
+            )
+        except JobNotFoundError:
+            raise BackendError(job_not_found(args["job_id"])) from None
+        except StepNotFoundError:
+            raise BackendError(step_not_found(step_id)) from None
+        except ValueOutOfRangeError as exc:
+            raise BackendError(_VALUE_RANGE_ERROR) from exc
+        return outcome.model_dump()
+
+    def _get_outcomes(self, args: dict[str, Any]) -> list[dict[str, Any]]:
+        from core import job_not_found
+
+        job_id = args["job_id"]
+        if self.service.get_job(job_id) is None:
+            raise BackendError(job_not_found(job_id))
+        outcomes = self.service.get_outcomes(job_id=job_id, step_id=args.get("step_id"))
+        return [outcome.model_dump() for outcome in outcomes]
+
+    def _get_outcome(self, args: dict[str, Any]) -> dict[str, Any]:
+        from core import outcome_not_found
+
+        outcome_id = args["outcome_id"]
+        outcome = self.service.get_outcome(outcome_id)
+        if outcome is None:
+            raise BackendError(outcome_not_found(outcome_id))
+        return outcome.model_dump()
+
+    def _update_outcome(self, args: dict[str, Any]) -> dict[str, Any]:
+        from core import OutcomeNotFoundError, ValueOutOfRangeError, outcome_not_found
+
+        updates = {
+            key: args[key]
+            for key in ("statement", "importance", "satisfaction", "step_id")
+            if key in args
+        }
+        try:
+            outcome = self.service.update_outcome(args["outcome_id"], updates)
+        except OutcomeNotFoundError:
+            raise BackendError(outcome_not_found(args["outcome_id"])) from None
+        except ValueOutOfRangeError as exc:
+            raise BackendError(_VALUE_RANGE_ERROR) from exc
+        return outcome.model_dump()
+
+    def _delete_outcome(self, args: dict[str, Any]) -> str:
+        from core import OutcomeNotFoundError, outcome_not_found
+
+        outcome_id = args["outcome_id"]
+        try:
+            self.service.delete_outcome(outcome_id)
+        except OutcomeNotFoundError:
+            raise BackendError(outcome_not_found(outcome_id)) from None
+        return outcome_id
 
     def _add_customer_outcome(self, args: dict[str, Any]) -> dict[str, Any]:
         from core import ValueOutOfRangeError
@@ -182,6 +337,109 @@ class LocalBackend(Backend):
             raise BackendError(customer_outcome_not_found(outcome_id)) from None
         return outcome_id
 
+    def _add_evidence(self, args: dict[str, Any]) -> dict[str, Any]:
+        from core import (
+            EvidenceNotFoundError,  # noqa: F401  (kept for parity with sibling handlers)
+            JobNotFoundError,
+            OutcomeNotFoundError,
+            StepNotFoundError,
+            job_not_found,
+            outcome_not_found,
+            step_not_found,
+        )
+
+        try:
+            evidence = self.service.add_evidence(
+                source_name=args["source_name"],
+                source_kind=args["source_kind"],
+                name=args["name"],
+                content=args["content"],
+                item_type=args.get("item_type", "manual"),
+                raw=args.get("raw"),
+                job_id=args.get("job_id"),
+                step_id=args.get("step_id"),
+                outcome_id=args.get("outcome_id"),
+            )
+        except JobNotFoundError:
+            raise BackendError(job_not_found(args.get("job_id"))) from None
+        except StepNotFoundError:
+            raise BackendError(step_not_found(args.get("step_id"))) from None
+        except OutcomeNotFoundError:
+            raise BackendError(outcome_not_found(args.get("outcome_id"))) from None
+        except ValueError as exc:
+            raise BackendError(str(exc)) from None
+        return evidence.model_dump()
+
+    def _get_evidence(self, args: dict[str, Any]) -> dict[str, Any]:
+        from core import evidence_not_found
+
+        evidence_id = args["evidence_id"]
+        evidence = self.service.get_evidence(evidence_id)
+        if evidence is None:
+            raise BackendError(evidence_not_found(evidence_id))
+        return evidence.model_dump()
+
+    def _list_evidence(self, args: dict[str, Any]) -> list[dict[str, Any]]:
+        items = self.service.list_evidence(
+            job_id=args.get("job_id"),
+            step_id=args.get("step_id"),
+            outcome_id=args.get("outcome_id"),
+        )
+        return [item.model_dump() for item in items]
+
+    def _delete_evidence(self, args: dict[str, Any]) -> str:
+        from core import EvidenceNotFoundError, evidence_not_found
+
+        evidence_id = args["evidence_id"]
+        try:
+            self.service.delete_evidence(evidence_id)
+        except EvidenceNotFoundError:
+            raise BackendError(evidence_not_found(evidence_id)) from None
+        return evidence_id
+
+    def _promote_evidence(self, args: dict[str, Any]) -> dict[str, Any]:
+        from core import (
+            EvidenceNotFoundError,
+            JobNotFoundError,
+            OutcomeNotFoundError,
+            StepNotFoundError,
+            ValueOutOfRangeError,
+            evidence_not_found,
+            job_not_found,
+            outcome_not_found,
+            step_not_found,
+        )
+
+        evidence_id = args["evidence_id"]
+        try:
+            artifact = self.service.promote_evidence(
+                evidence_id,
+                args["target"],
+                job_id=args.get("job_id"),
+                statement=args.get("statement"),
+                name=args.get("name"),
+                importance=args.get("importance"),
+                satisfaction=args.get("satisfaction"),
+            )
+        except EvidenceNotFoundError:
+            raise BackendError(evidence_not_found(evidence_id)) from None
+        except JobNotFoundError:
+            raise BackendError(job_not_found(args.get("job_id"))) from None
+        except StepNotFoundError:
+            raise BackendError(step_not_found(args.get("step_id"))) from None
+        except OutcomeNotFoundError:
+            raise BackendError(outcome_not_found(args.get("outcome_id"))) from None
+        except ValueOutOfRangeError as exc:
+            raise BackendError(_VALUE_RANGE_ERROR) from exc
+        except ValueError as exc:
+            raise BackendError(str(exc)) from None
+        return artifact.model_dump()
+
+    def _get_odi_schema(self, args: dict[str, Any]) -> dict[str, Any]:
+        from core import odi_schema
+
+        return odi_schema()
+
     def _compute_opportunity(self, args: dict[str, Any]) -> float:
         from core import compute_opportunity_score
 
@@ -193,11 +451,32 @@ class LocalBackend(Backend):
 
 
 _LOCAL_HANDLERS = {
+    "add_job": LocalBackend._add_job,
+    "get_jobs": LocalBackend._get_jobs,
+    "get_job": LocalBackend._get_job,
+    "update_job": LocalBackend._update_job,
+    "delete_job": LocalBackend._delete_job,
+    "add_step": LocalBackend._add_step,
+    "get_job_map": LocalBackend._get_job_map,
+    "get_step": LocalBackend._get_step,
+    "update_step": LocalBackend._update_step,
+    "delete_step": LocalBackend._delete_step,
+    "add_outcome": LocalBackend._add_outcome,
+    "get_outcomes": LocalBackend._get_outcomes,
+    "get_outcome": LocalBackend._get_outcome,
+    "update_outcome": LocalBackend._update_outcome,
+    "delete_outcome": LocalBackend._delete_outcome,
     "add_customer_outcome": LocalBackend._add_customer_outcome,
     "get_customer_outcome": LocalBackend._get_customer_outcome,
     "list_customer_outcomes": LocalBackend._list_customer_outcomes,
     "update_customer_outcome": LocalBackend._update_customer_outcome,
     "delete_customer_outcome": LocalBackend._delete_customer_outcome,
+    "add_evidence": LocalBackend._add_evidence,
+    "get_evidence": LocalBackend._get_evidence,
+    "list_evidence": LocalBackend._list_evidence,
+    "delete_evidence": LocalBackend._delete_evidence,
+    "promote_evidence": LocalBackend._promote_evidence,
+    "get_odi_schema": LocalBackend._get_odi_schema,
     "compute_opportunity": LocalBackend._compute_opportunity,
 }
 
@@ -233,20 +512,43 @@ def _call_mcp(tool: str, args: dict[str, Any], mcp_url: str, timeout: float) -> 
         raise BackendError(f"could not reach MCP server at {mcp_url}: {exc}") from exc
 
 
+_FLOAT_TOOLS = frozenset({"compute_opportunity"})
+
+_ID_TOOLS = frozenset(
+    {
+        "delete_job",
+        "delete_step",
+        "delete_outcome",
+        "delete_customer_outcome",
+        "delete_evidence",
+    }
+)
+
+_LIST_TOOLS = frozenset(
+    {
+        "get_jobs",
+        "get_job_map",
+        "get_outcomes",
+        "list_customer_outcomes",
+        "list_evidence",
+    }
+)
+
+
 def _parse_remote(tool_name: str, text: str) -> Any:
     """Parse a tool result, raising ``BackendError`` on the server's error text."""
     stripped = text.strip()
     if stripped.startswith("Error:") or " not found:" in stripped:
         raise BackendError(stripped)
 
-    if tool_name == "compute_opportunity":
+    if tool_name in _FLOAT_TOOLS:
         return _extract_float(stripped)
-    if tool_name == "delete_customer_outcome":
+    if tool_name in _ID_TOOLS:
         return stripped.rsplit(": ", 1)[-1]
 
     payload = _extract_json(stripped)
-    if tool_name == "list_customer_outcomes":
-        return payload if isinstance(payload, list) else [payload]
+    if tool_name in _LIST_TOOLS and not isinstance(payload, list):
+        return [payload]
     return payload
 
 

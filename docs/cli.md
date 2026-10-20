@@ -92,6 +92,72 @@ The wizard can be cancelled at any step with Ctrl-C.
 > Chat is the only CLI mode that needs an LLM endpoint. The `customer-outcomes`
 > and `connectors` commands keep working without one.
 
+## Manage Jobs, Steps, and desired Outcomes
+
+Every ODI entity has the same create/read/update/delete surface in the CLI and
+the MCP server. Jobs hold Steps (the Job Map) and desired Outcomes; deleting a
+Job cascades to both.
+
+```bash
+# Jobs
+agentic-odi jobs add --name "Onboard a customer" --description "First 30 days"
+agentic-odi jobs list
+agentic-odi jobs get <job-id>
+agentic-odi jobs update <job-id> --name "Onboard a new customer"
+agentic-odi jobs delete <job-id> --yes
+
+# Steps (Job Map)
+agentic-odi steps add --job-id <job-id> --name "Prepare environment" --order 1
+agentic-odi steps list --job-id <job-id>
+agentic-odi steps get <step-id>
+agentic-odi steps update <step-id> --order 2
+agentic-odi steps delete <step-id> --yes
+
+# Desired Outcomes
+agentic-odi desired-outcomes add --job-id <job-id>   --statement "Minimize the time it takes to get a working environment"   --importance 8 --satisfaction 4
+agentic-odi desired-outcomes list --job-id <job-id>
+agentic-odi desired-outcomes get <outcome-id>
+agentic-odi desired-outcomes update <outcome-id> --satisfaction 6
+agentic-odi desired-outcomes delete <outcome-id> --yes
+```
+
+Add `--json` to any command for machine-readable output.
+
+## Evidence
+
+Evidence is research captured from connectors (or entered by hand) and linked to
+a Job, Step, or desired Outcome. Records can later be promoted into ODI
+artifacts — the bridge from research to the model, without hand-copying.
+
+```bash
+# Capture a record by hand
+agentic-odi evidence add \
+  --source-name "interview" --source-kind manual \
+  --name "Support lead" \
+  --content "Setup takes two days for every new engineer" \
+  --job-id <job-id>
+
+# Read and delete
+agentic-odi evidence list --job-id <job-id>
+agentic-odi evidence list --job-id <job-id> --json
+agentic-odi evidence get <evidence-id>
+agentic-odi evidence delete <evidence-id> --yes
+
+# Promote into the ODI model
+agentic-odi evidence promote <evidence-id> --to job
+agentic-odi evidence promote <evidence-id> --to outcome --job-id <job-id>
+```
+
+`connectors ingest --job-id <job-id>` maps every evidence-bearing record in the
+ingested batch into evidence in one step.
+
+## Schema and scoring
+
+```bash
+agentic-odi schema            # canonical JSON schema for every ODI entity
+agentic-odi score 8 2         # ODI opportunity score → 14.00
+```
+
 ## Manage Customer Outcomes
 
 Customer Outcomes link customer value to business value. The `local` backend
@@ -107,6 +173,14 @@ agentic-odi customer-outcomes add --job-id <job-id> \
   --importance 8.8 --satisfaction 3.2 \
   --category cost_reduction \
   --business-statement "Saves engineering hours and reduces early churn"
+
+# Attach value metrics: repeatable JSON objects
+agentic-odi customer-outcomes add --job-id <job-id> \
+  --direction minimize --unit "time" --object "to resolve setup errors" \
+  --statement "Minimize the time to resolve environment setup errors when onboarding" \
+  --importance 8.8 --satisfaction 3.2 --category cost_reduction \
+  --business-statement "Saves engineering hours" \
+  --value-metric '{"name":"first response","direction":"minimize","unit_of_measure":"minutes","importance":7,"satisfaction":3}'
 
 # List outcomes (optionally filtered, or as JSON)
 agentic-odi customer-outcomes list

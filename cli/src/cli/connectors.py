@@ -10,11 +10,15 @@ from typing import TYPE_CHECKING
 
 import typer
 
+from cli.backend import run_tool
+from cli.render import render_saved
+
 # The connectors package eagerly imports fastmcp via ``connectors/__init__``.
 # Import it lazily so that merely loading the CLI (e.g. ``odi --version``) does
 # not pay the fastmcp/mcp import cost. The wrappers below keep stable module
 # attributes for tests to monkeypatch.
 if TYPE_CHECKING:
+    from connectors.mapping import EvidenceDraft
     from connectors.models import ConnectorConfig
     from connectors.protocol import Connector
     from connectors.registry import ConnectorRegistry
@@ -39,6 +43,18 @@ def get_default_sink() -> IngestSink:
     return _get_default_sink()
 
 
+def drafts_from_batch(
+    batch,
+    *,
+    job_id: str | None = None,
+    step_id: str | None = None,
+    outcome_id: str | None = None,
+) -> list[EvidenceDraft]:
+    from connectors.mapping import drafts_from_batch as _drafts_from_batch
+
+    return _drafts_from_batch(batch, job_id=job_id, step_id=step_id, outcome_id=outcome_id)
+
+
 def _config_path(config: Path | None) -> Path:
     if config is not None:
         return config
@@ -52,6 +68,17 @@ def _registry(config: Path | None) -> ConnectorRegistry:
     from connectors.registry import ConnectorRegistry
 
     return ConnectorRegistry(_config_path(config))
+
+
+def _parse_headers(values: list[str] | None) -> dict[str, str]:
+    headers: dict[str, str] = {}
+    for raw in values or []:
+        key, separator, value = raw.partition("=")
+        if not separator or not key.strip():
+            typer.echo(f"Error: invalid header '{raw}', expected KEY=VALUE", err=True)
+            raise typer.Exit(code=1)
+        headers[key.strip()] = value.strip()
+    return headers
 
 
 ConfigOption = typer.Option(
@@ -169,12 +196,12 @@ def _mcp_connector_config(
 
 @connectors_app.command("add")
 def add_connector(
-    kind: str = typer.Argument(..., help="Connector kind (currently: mcp)."),
+    kind: str = typer.Argument(..., help="Connector kind (mcp, rest, or webhook)."),
     name: str | None = typer.Option(
         None, "--name", help="Unique connector name (defaults to the preset id)."
     ),
     url: str | None = typer.Option(
-        None, "--url", help="MCP server URL (required for kind mcp unless --preset is given)."
+        None, "--url", help="Endpoint URL (required unless --preset is given)."
     ),
     preset: str | None = typer.Option(
         None, "--preset", help="Preset id from 'connectors catalog'."
@@ -183,6 +210,13 @@ def add_connector(
         None,
         "--tool",
         help="MCP tool to call during ingest. Repeatable.",
+    ),
+    method: str | None = typer.Option(None, "--method", help="HTTP method for REST/webhook."),
+    header: list[str] | None = typer.Option(  # noqa: B008
+        None, "--header", help="HTTP header as KEY=VALUE. Repeatable."
+    ),
+    records_key: str | None = typer.Option(
+        None, "--records-key", help="Dot path to the record list in the response."
     ),
     config: Path | None = ConfigOption,
 ) -> None:
@@ -195,6 +229,22 @@ def add_connector(
         raise typer.Exit(code=1)
     if kind == "mcp":
         connector_config = _mcp_connector_config(name=name, url=url, preset_id=preset, tools=tool)
+    elif kind in {"rest", "webhook"}:
+        if not name:
+            typer.echo("Error: --name is required.", err=True)
+            raise typer.Exit(code=1)
+        if not url:
+            typer.echo(f"Error: --url is required for {kind.upper()} connectors.", err=True)
+            raise typer.Exit(code=1)
+        settings: dict[str, object] = {"url": url}
+        if method:
+            settings["method"] = method.upper()
+        headers = _parse_headers(header)
+        if headers:
+            settings["headers"] = headers
+        if records_key:
+            settings["records_key"] = records_key
+        connector_config = ConnectorConfig(name=name, kind=kind, settings=settings)
     else:
         if not name:
             typer.echo("Error: --name is required.", err=True)
@@ -239,9 +289,14 @@ def health_connector(
 @connectors_app.command("ingest")
 def ingest_connector(
     name: str = typer.Option(..., "--name", help="Connector name."),
+    job_id: str | None = typer.Option(None, "--job-id", help="Link evidence to a Job."),
+    step_id: str | None = typer.Option(None, "--step-id", help="Link evidence to a Step."),
+    outcome_id: str | None = typer.Option(
+        None, "--outcome-id", help="Link evidence to a desired Outcome."
+    ),
     config: Path | None = ConfigOption,
 ) -> None:
-    """Ingest data from an external connector into the local ingest sink."""
+    """Ingest connector records and optionally map them into ODI evidence."""
     from connectors.registry import ConnectorNotFoundError, UnknownConnectorKindError
 
     try:
@@ -253,3 +308,28 @@ def ingest_connector(
     batch = _run(connector.ingest(), name)
     get_default_sink().append(batch)
     typer.echo(batch.model_dump_json())
+    if job_id is None and step_id is None and outcome_id is None:
+        return
+    drafts = drafts_from_batch(batch, job_id=job_id, step_id=step_id, outcome_id=outcome_id)
+    for draft in drafts:
+        typer.echo(
+            render_saved(
+                "created",
+                run_tool(
+                    "add_evidence",
+                    {
+                        "source_name": draft.source_name,
+                        "source_kind": draft.source_kind,
+                        "item_type": draft.item_type,
+                        "name": draft.name,
+                        "content": draft.content,
+                        "raw": draft.raw,
+                        "job_id": draft.job_id,
+                        "step_id": draft.step_id,
+                        "outcome_id": draft.outcome_id,
+                    },
+                ),
+                as_json=False,
+                noun="Evidence",
+            )
+        )
