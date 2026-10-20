@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.8.0](https://github.com/alehar9320/agentic-odi/compare/v0.7.0...v0.8.0) (2026-10-20)
+
+
+### Features
+
+* add Kiro CLI superpowers integration ([8af114f](https://github.com/alehar9320/agentic-odi/commit/8af114f977bf7b849e176dbd3648e8a93310c97a))
+* **cli:** entity parity commands for jobs, steps, outcomes, and evidence ([b89388d](https://github.com/alehar9320/agentic-odi/commit/b89388d854dcaaca1afe3b1950fabc02e115d121))
+* **connectors:** REST connector and evidence mapping ([c02e2fc](https://github.com/alehar9320/agentic-odi/commit/c02e2fc594bba0d14c00b2d782785fa569b728e2))
+* **core:** full entity CRUD over a shared SQLite store ([ff3336f](https://github.com/alehar9320/agentic-odi/commit/ff3336f3a94bdfca14dba91405bed093edb2d61d))
+* **mcp:** CRUD tool parity, shared store, and evidence tools ([b4d170f](https://github.com/alehar9320/agentic-odi/commit/b4d170f721883418b9a372f014703dccc7ce2866))
+
 ## [0.7.0](https://github.com/alehar9320/agentic-odi/compare/v0.6.0...v0.7.0) (2026-10-20)
 
 
