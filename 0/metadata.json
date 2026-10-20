@@ -1,0 +1,60 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M5DF0KFTGQVX9CWFYD22R1DF",
+  "session_id": "ses_ea52e5a00ffeEE9QCwNjQ1vfGr",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-20T20:11:07.355695458Z",
+  "branch": "feat/studio-delight-ux",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "apps/studio-api/src/agentic_odi_studio_api/studio/chat.py",
+    "apps/studio-api/src/agentic_odi_studio_api/studio/mcp_data.py",
+    "apps/studio-api/src/agentic_odi_studio_api/studio/router.py",
+    "apps/studio-api/src/agentic_odi_studio_api/studio/schemas.py",
+    "apps/studio-api/src/agentic_odi_studio_api/studio/seed.py",
+    "apps/studio-api/tests/test_studio_brief.py",
+    "apps/studio-api/tests/test_studio_chat_branches.py",
+    "apps/studio-api/tests/test_studio_manual_crud.py",
+    "apps/studio-api/tests/test_studio_mcp_data.py"
+  ],
+  "agent": "OpenCode",
+  "model": "nvidia/nemotron-3.5-lightning:free",
+  "turn_id": "e50e43624ea9",
+  "checkpoint_transcript_start": 15,
+  "transcript_lines_at_start": 15,
+  "compact_transcript_start": 15,
+  "token_usage": {
+    "input_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 0,
+    "output_tokens": 0,
+    "api_call_count": 0
+  },
+  "session_metrics": {
+    "turn_count": 1
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-10-20T20:11:07.347954394Z",
+    "agent_lines": 0,
+    "agent_removed": 0,
+    "human_added": 606,
+    "human_modified": 30,
+    "human_removed": 0,
+    "total_committed": 606,
+    "total_lines_changed": 636,
+    "agent_percentage": 0,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 197,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        "docs/superpowers/plans/2026-10-20-release-download-run-instructions.md": 197
+      }
+    }
+  ]
+}
