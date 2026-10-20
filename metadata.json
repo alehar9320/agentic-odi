@@ -3,7 +3,7 @@
   "checkpoint_id": "01M5DEDJC8AWWS0R4G1PRZQJEX",
   "strategy": "manual-commit",
   "branch": "feat/studio-chat-first-shell",
-  "checkpoints_count": 2,
+  "checkpoints_count": 5,
   "files_touched": [
     ".github/dependabot.yml",
     ".github/workflows/ci.yml",
@@ -207,13 +207,20 @@
       "compact_transcript": "/1/transcript.jsonl",
       "content_hash": "/1/content_hash.txt",
       "prompt": "/1/prompt.txt"
+    },
+    {
+      "metadata": "/2/metadata.json",
+      "transcript": "/2/full.jsonl",
+      "compact_transcript": "/2/transcript.jsonl",
+      "content_hash": "/2/content_hash.txt",
+      "prompt": "/2/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 480160,
+    "input_tokens": 957416,
     "cache_creation_tokens": 0,
-    "cache_read_tokens": 1658928,
-    "output_tokens": 6611,
-    "api_call_count": 46
+    "cache_read_tokens": 14325056,
+    "output_tokens": 14407,
+    "api_call_count": 118
   }
 }
