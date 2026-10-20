@@ -12,6 +12,7 @@ from core.models import (
     CustomerOutcome,
     CustomerValue,
     Direction,
+    Evidence,
     Job,
     Outcome,
     Step,
@@ -162,3 +163,216 @@ def test_closing_the_store_prevents_further_reads(tmp_path) -> None:
 
     with pytest.raises(sqlite3.ProgrammingError):
         repo.store.get_stream()
+
+
+def _linked_customer_outcome(id: str, job_id: str, step_id: str | None = None) -> CustomerOutcome:
+    return CustomerOutcome(
+        id=id,
+        job_id=job_id,
+        step_id=step_id,
+        customer_value=CustomerValue(
+            direction=Direction.MINIMIZE,
+            unit_of_measure="minutes",
+            object_of_control="support team",
+            statement="Minimize resolution time",
+            importance=9.0,
+            satisfaction=3.0,
+        ),
+        business_value=BusinessValue(
+            category=BusinessImpactCategory.COST_REDUCTION,
+            statement="Reduce support cost",
+        ),
+    )
+
+
+def test_round_trips_all_entity_types(tmp_path):
+    db = str(tmp_path / "odi.db")
+    repo = SQLiteRepository(db_path=db)
+    repo.add_job(Job(id="j1", name="Job", description="d"))
+    repo.add_step(Step(id="s1", job_id="j1", name="Step", order=1))
+    repo.add_outcome(
+        Outcome(
+            id="o1",
+            job_id="j1",
+            step_id="s1",
+            statement="Min x",
+            importance=8.0,
+            satisfaction=4.0,
+            opportunity_score=12.0,
+        )
+    )
+
+    reopened = SQLiteRepository(db_path=db)
+    assert reopened.get_job("j1").name == "Job"  # type: ignore[union-attr]
+    assert reopened.get_step("s1").order == 1  # type: ignore[union-attr]
+    assert reopened.get_outcome("o1").opportunity_score == 12.0  # type: ignore[union-attr]
+
+
+def test_concurrent_writer_is_visible(tmp_path):
+    db = str(tmp_path / "odi.db")
+    reader = SQLiteRepository(db_path=db)
+    writer = SQLiteRepository(db_path=db)
+    writer.add_job(Job(id="j1", name="Job"))
+    assert reader.get_job("j1") is not None  # read-through sees the other connection's write
+
+
+def test_delete_job_cascades_after_reopen(tmp_path):
+    db = str(tmp_path / "odi.db")
+    repo = SQLiteRepository(db_path=db)
+    repo.add_job(Job(id="j1", name="Job"))
+    repo.add_step(Step(id="s1", job_id="j1", name="Step", order=1))
+    repo.add_outcome(Outcome(id="o1", job_id="j1", step_id="s1", statement="Min x"))
+    repo.delete_job("j1")
+
+    reopened = SQLiteRepository(db_path=db)
+    assert reopened.get_job("j1") is None
+    assert reopened.get_step("s1") is None
+    assert reopened.get_outcome("o1") is None
+
+
+def test_update_outcome_persists(tmp_path):
+    db = str(tmp_path / "odi.db")
+    repo = SQLiteRepository(db_path=db)
+    repo.add_outcome(Outcome(id="o1", job_id="j1", statement="Min x"))
+    repo.update_outcome("o1", {"statement": "Max y", "opportunity_score": 5.0})
+    assert SQLiteRepository(db_path=db).get_outcome("o1").statement == "Max y"  # type: ignore[union-attr]
+
+
+def test_update_job_and_step_merge_or_return_none_when_missing(tmp_path):
+    db = str(tmp_path / "odi.db")
+    repo = SQLiteRepository(db_path=db)
+    repo.add_job(Job(id="j1", name="Job"))
+    repo.add_step(Step(id="s1", job_id="j1", name="Step", order=1))
+
+    updated_job = repo.update_job("j1", {"name": "Renamed"})
+    assert updated_job is not None and updated_job.name == "Renamed"
+    updated_step = repo.update_step("s1", {"name": "Renamed step"})
+    assert updated_step is not None and updated_step.name == "Renamed step"
+    assert repo.update_job("nope", {"name": "x"}) is None
+    assert repo.update_step("nope", {"name": "x"}) is None
+
+    reopened = SQLiteRepository(db_path=db)
+    assert reopened.get_job("j1").name == "Renamed"  # type: ignore[union-attr]
+    assert reopened.get_step("s1").name == "Renamed step"  # type: ignore[union-attr]
+
+
+def test_delete_missing_returns_false_and_cascade_events_replay(tmp_path):
+    db = str(tmp_path / "odi.db")
+    repo = SQLiteRepository(db_path=db)
+    assert repo.delete_job("nope") is False
+    assert repo.delete_step("nope") is False
+    assert repo.delete_outcome("nope") is False
+
+    repo.add_job(Job(id="j1", name="Job"))
+    repo.add_step(Step(id="s1", job_id="j1", name="Step", order=1))
+    repo.add_outcome(Outcome(id="o1", job_id="j1", step_id="s1", statement="Min x"))
+    repo.add_outcome(Outcome(id="o2", job_id="j1", statement="Unbound"))
+    assert repo.delete_step("s1") is True
+    assert repo.delete_outcome("o2") is True
+    assert repo.delete_job("j1") is True
+    assert repo.delete_job("j1") is False
+
+    reopened = SQLiteRepository(db_path=db)
+    assert reopened.get_step("s1") is None
+    assert reopened.get_outcome("o1") is None
+    assert reopened.get_outcome("o2") is None
+    assert reopened.get_job("j1") is None
+
+
+def test_read_through_sees_update_and_delete_from_other_connection(tmp_path):
+    db = str(tmp_path / "odi.db")
+    reader = SQLiteRepository(db_path=db)
+    writer = SQLiteRepository(db_path=db)
+    writer.add_job(Job(id="j1", name="Job"))
+    assert reader.get_job("j1").name == "Job"  # type: ignore[union-attr]
+
+    writer.update_job("j1", {"name": "Renamed"})
+    assert reader.get_job("j1").name == "Renamed"  # type: ignore[union-attr]
+
+    writer.delete_job("j1")
+    assert reader.get_job("j1") is None
+    assert reader.list_jobs() == []
+
+
+def test_customer_outcome_update_and_delete_persist(tmp_path):
+    db = str(tmp_path / "odi.db")
+    repo = SQLiteRepository(db_path=db)
+    repo.add_customer_outcome(_linked_customer_outcome("co1", job_id="j1"))
+    updated = repo.update_customer_outcome("co1", {"job_id": "j2"})
+    assert updated is not None and updated.job_id == "j2"
+    assert repo.update_customer_outcome("nope", {"job_id": "x"}) is None
+
+    other = SQLiteRepository(db_path=db)
+    assert other.get_customer_outcome("co1").job_id == "j2"  # type: ignore[union-attr]
+    assert other.delete_customer_outcome("co1") is True
+    assert other.delete_customer_outcome("co1") is False
+
+    reopened = SQLiteRepository(db_path=db)
+    assert reopened.get_customer_outcome("co1") is None
+
+
+def test_delete_job_cascades_customer_outcomes_after_reopen(tmp_path):
+    db = str(tmp_path / "odi.db")
+    repo = SQLiteRepository(db_path=db)
+    repo.add_job(Job(id="j1", name="Job"))
+    repo.add_step(Step(id="s1", job_id="j1", name="Step", order=1))
+    repo.add_customer_outcome(_linked_customer_outcome("co1", job_id="j1", step_id="s1"))
+    repo.add_customer_outcome(_linked_customer_outcome("co2", job_id="other"))
+    assert repo.delete_job("j1") is True
+
+    reopened = SQLiteRepository(db_path=db)
+    assert reopened.get_customer_outcome("co1") is None
+    assert reopened.get_customer_outcome("co2") is not None
+
+
+def _evidence(id: str, **overrides) -> Evidence:
+    payload = {
+        "id": id,
+        "source_name": "gong",
+        "source_kind": "mcp",
+        "item_type": "resource",
+        "name": "feedback",
+        "content": "Lost hours on deploy",
+    }
+    payload.update(overrides)
+    return Evidence(**payload)
+
+
+def test_evidence_round_trips_and_filters(tmp_path):
+    db = str(tmp_path / "odi.db")
+    repo = SQLiteRepository(db_path=db)
+    repo.add_evidence(_evidence("e1", job_id="j1", step_id="s1", outcome_id="o1"))
+    repo.add_evidence(_evidence("e2", job_id="j1"))
+
+    reopened = SQLiteRepository(db_path=db)
+    assert reopened.get_evidence("e1").name == "feedback"  # type: ignore[union-attr]
+    assert len(reopened.list_evidence(job_id="j1")) == 2
+    assert [item.id for item in reopened.list_evidence(step_id="s1")] == ["e1"]
+    assert [item.id for item in reopened.list_evidence(outcome_id="o1")] == ["e1"]
+    assert reopened.delete_evidence("e1") is True
+    assert reopened.delete_evidence("e1") is False
+    assert SQLiteRepository(db_path=db).get_evidence("e1") is None
+
+
+def test_delete_job_cascades_evidence_after_reopen(tmp_path):
+    db = str(tmp_path / "odi.db")
+    repo = SQLiteRepository(db_path=db)
+    repo.add_job(Job(id="j1", name="Job"))
+    repo.add_evidence(_evidence("e1", job_id="j1"))
+    repo.add_evidence(_evidence("e2", job_id="other"))
+
+    assert repo.delete_job("j1") is True
+
+    reopened = SQLiteRepository(db_path=db)
+    assert reopened.get_evidence("e1") is None
+    assert reopened.get_evidence("e2") is not None
+
+
+def test_clear_removes_everything(tmp_path):
+    db = str(tmp_path / "odi.db")
+    repo = SQLiteRepository(db_path=db)
+    repo.add_job(Job(id="j1", name="Job"))
+    repo.clear()
+
+    assert repo.get_job("j1") is None
+    assert SQLiteRepository(db_path=db).get_job("j1") is None

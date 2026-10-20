@@ -19,6 +19,7 @@ Follow this sequence when guiding a user through the ODI process:
 - **Tools to use**:
   - `add_outcome(job_id, statement, importance, satisfaction)` — Capture each desired outcome with scores.
   - `get_outcomes(job_id)` — Review all outcomes captured for a Job.
+  - `evaluate_outcome(statement, job_id?)` — Check that a statement starts with Minimize/Maximize, names a metric, and states its context before saving it.
 
 ### Stage 3: Calculate Opportunity Scores
 - **When**: After outcomes have importance and satisfaction scores.
@@ -32,6 +33,11 @@ Follow this sequence when guiding a user through the ODI process:
 - **Tools to use**:
   - `add_step(job_id, name, order)` — Add each chronological step.
   - `get_job_map(job_id)` — View the complete ordered job map.
+
+### Supporting Tools
+- `add_evidence(...)` / `list_evidence(job_id?)` — Attach customer research records from connectors to a Job, Step, or Outcome without altering the ODI artifacts.
+- `promote_evidence(evidence_id, target, job_id?)` — Turn a captured record into a Job or desired Outcome when it is ready.
+- `get_odi_schema()` — Return the canonical JSON schema for every ODI entity.
 
 ### General Rule
 Never skip stages. Always confirm the user has a Job defined (Stage 1) before capturing Outcomes (Stage 2), and always capture Outcomes (Stage 2) before building the Job Map (Stage 4)."""
@@ -47,7 +53,10 @@ CAPABILITIES = """Here is what I can help you with as your Agentic ODI assistant
 🗺️ **Build Job Maps**: Break down a Job into ordered Steps.
 📊 **Track Desired Outcomes**: Record outcomes with importance/satisfaction scores and calculate Opportunity Scores.
 📊 **Customer Outcomes**: Manage ODI-aligned customer outcomes with customer value, business value, and opportunity scoring.
+🧪 **Evaluate Outcomes**: Call `evaluate_outcome(statement)` to check a statement against the ODI format before saving it.
+🧾 **Evidence**: Capture and promote research records from connectors with `add_evidence`, `list_evidence`, and `promote_evidence`.
 📖 **ODI Framework Guidelines**: Call `get_odi_framework_guidelines()` to see which tool to use at each ODI stage.
+🧬 **Schema**: Call `get_odi_schema()` for the canonical JSON schema of every ODI entity.
 
 💡 **Tip**: Ask me to 'get started' and I will guide you step-by-step through the ODI process from intent to opportunity scoring!"""
 
@@ -58,3 +67,15 @@ def job_not_found(job_id: str) -> str:
 
 def customer_outcome_not_found(outcome_id: str) -> str:
     return f"Customer outcome not found: {outcome_id}"
+
+
+def step_not_found(step_id: str | None) -> str:
+    return f"Step not found: {step_id}"
+
+
+def outcome_not_found(outcome_id: str | None) -> str:
+    return f"Outcome not found: {outcome_id}"
+
+
+def evidence_not_found(evidence_id: str | None) -> str:
+    return f"Evidence not found: {evidence_id}"
