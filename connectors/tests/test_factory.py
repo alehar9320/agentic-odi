@@ -5,6 +5,7 @@ from connectors.mcp.connector import MCPClientConnector
 from connectors.models import ConnectorConfig, HealthStatus, IngestBatch
 from connectors.protocol import Connector
 from connectors.registry import UnknownConnectorKindError
+from connectors.rest.connector import RestConnector, WebhookConnector
 
 
 class _StubConnector(Connector):
@@ -32,8 +33,31 @@ def test_build_mcp_connector() -> None:
     assert connector.settings.url == "http://localhost:9000/mcp"
 
 
+def test_build_rest_connector() -> None:
+    config = ConnectorConfig(
+        name="jira", kind="rest", settings={"url": "https://jira.example/api/issues"}
+    )
+
+    connector = build_connector(config)
+
+    assert isinstance(connector, RestConnector)
+    assert connector.kind == "rest"
+    assert connector.settings.url == "https://jira.example/api/issues"
+
+
+def test_build_webhook_connector() -> None:
+    config = ConnectorConfig(
+        name="feedback", kind="webhook", settings={"url": "https://hooks.example/inbox"}
+    )
+
+    connector = build_connector(config)
+
+    assert isinstance(connector, WebhookConnector)
+    assert connector.kind == "webhook"
+
+
 def test_build_unknown_kind_raises() -> None:
-    config = ConnectorConfig(name="jira", kind="rest", settings={})
+    config = ConnectorConfig(name="jira", kind="salesforce", settings={})
 
     with pytest.raises(UnknownConnectorKindError):
         build_connector(config)
