@@ -1,0 +1,9 @@
+Act as a Principal Software Architect with world-class experience. The current repository structure isn't exactly the most human and AI friendly as it becomes hard to decipher what each folder in the repository does and what its functional value brings. With respect to python monorepo best practices, I'd like for you to review and define a new structure. Before you conclude, I'd like you to iterate on the original proposal by envisioning that you asked one of your most distinguished engineer peers for feedback, and once you've incorporated that, you confirm with me, before we proceed.
+
+---
+
+Go
+
+---
+
+Continue if you have next steps, or stop and ask for clarification if you are unsure how to proceed.
