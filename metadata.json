@@ -3,7 +3,7 @@
   "checkpoint_id": "01M5DD4HJBRCR5MSMMMSMF5BZP",
   "strategy": "manual-commit",
   "branch": "feature/storage-provider-sync",
-  "checkpoints_count": 4,
+  "checkpoints_count": 13,
   "files_touched": [
     "packages/core/src/agentic_odi_core/intent_store.py",
     "packages/core/src/agentic_odi_core/sqlite_repository.py"
@@ -22,6 +22,13 @@
       "compact_transcript": "/1/transcript.jsonl",
       "content_hash": "/1/content_hash.txt",
       "prompt": "/1/prompt.txt"
+    },
+    {
+      "metadata": "/2/metadata.json",
+      "transcript": "/2/full.jsonl",
+      "compact_transcript": "/2/transcript.jsonl",
+      "content_hash": "/2/content_hash.txt",
+      "prompt": ""
     }
   ],
   "token_usage": {
