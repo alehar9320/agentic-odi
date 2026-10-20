@@ -1,0 +1,85 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M5DDNRPA779YK6CAQ9DHR65C",
+  "session_id": "ses_ea5677a1affeSsRZRhXS0ixx8P",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-20T19:48:02.573671021Z",
+  "branch": "feat/studio-first-run-ux",
+  "checkpoints_count": 9,
+  "files_touched": [
+    "README.md",
+    "apps/studio-api/src/agentic_odi_studio_api/studio/chat.py",
+    "apps/studio-api/src/agentic_odi_studio_api/studio/router.py",
+    "apps/studio-api/src/agentic_odi_studio_api/studio/schemas.py",
+    "apps/studio-api/tests/test_studio_api.py",
+    "apps/studio-api/tests/test_studio_brief.py",
+    "apps/studio-api/tests/test_studio_manual_crud.py",
+    "apps/studio/src/App.test.tsx",
+    "apps/studio/src/App.tsx",
+    "apps/studio/src/api/studioApi.ts",
+    "apps/studio/src/components/SettingsPanel.tsx",
+    "apps/studio/src/components/canvas/DirectCapture.tsx",
+    "apps/studio/src/components/canvas/JobMap.tsx",
+    "apps/studio/src/components/canvas/OutcomeCard.tsx",
+    "apps/studio/src/components/chat/ChatStage.tsx",
+    "apps/studio/src/components/chat/Composer.tsx",
+    "apps/studio/src/components/chat/Conversation.tsx",
+    "apps/studio/src/components/chat/Hero.tsx",
+    "apps/studio/src/components/chat/OfflineNotice.tsx",
+    "apps/studio/src/components/icons.tsx",
+    "apps/studio/src/components/layout/Sidebar.tsx",
+    "apps/studio/src/components/setup/SetupConversation.tsx",
+    "apps/studio/src/components/workspace/WorkspacePanel.tsx",
+    "apps/studio/src/lib/commands.test.ts",
+    "apps/studio/src/lib/commands.ts",
+    "apps/studio/src/lib/greeting.ts",
+    "apps/studio/src/lib/setup.test.ts",
+    "apps/studio/src/lib/setup.ts",
+    "apps/studio/src/state/StudioContext.tsx",
+    "apps/studio/src/styles/theme.css",
+    "apps/studio/src/test/setup.ts",
+    "apps/studio/src/types.ts",
+    "docs/living-studio.md",
+    "docs/superpowers/specs/2026-10-20-studio-first-run-ux-design.md"
+  ],
+  "agent": "OpenCode",
+  "model": "qwen/qwen3.8-27b",
+  "turn_id": "3c10b15567c9",
+  "checkpoint_transcript_start": 20,
+  "transcript_lines_at_start": 20,
+  "compact_transcript_start": 20,
+  "token_usage": {
+    "input_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 0,
+    "output_tokens": 0,
+    "api_call_count": 0
+  },
+  "session_metrics": {
+    "turn_count": 9
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-10-20T19:48:02.562525352Z",
+    "agent_lines": 0,
+    "agent_removed": 10,
+    "human_added": 3248,
+    "human_modified": 267,
+    "human_removed": 0,
+    "total_committed": 3290,
+    "total_lines_changed": 3525,
+    "agent_percentage": 0.28368794326241137,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 197,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        "docs/superpowers/plans/2026-10-20-release-download-run-instructions.md": 197
+      }
+    }
+  ]
+}
