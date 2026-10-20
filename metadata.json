@@ -3,9 +3,10 @@
   "checkpoint_id": "01M5DB32GVKCNJ9XXF6DPE32K9",
   "strategy": "manual-commit",
   "branch": "feat/studio-chat-first-shell",
-  "checkpoints_count": 1,
+  "checkpoints_count": 10,
   "files_touched": [
     "README.md",
+    "apps/studio/src/App.test.tsx",
     "apps/studio/src/App.tsx",
     "apps/studio/src/components/ErrorBoundary.tsx",
     "apps/studio/src/components/SettingsPanel.tsx",
@@ -20,6 +21,20 @@
     "apps/studio/src/components/canvas/OpportunityLandscape.tsx",
     "apps/studio/src/components/canvas/OutcomeCard.tsx",
     "apps/studio/src/components/chat/ChatCopilot.tsx",
+    "apps/studio/src/components/chat/ChatStage.tsx",
+    "apps/studio/src/components/chat/Composer.tsx",
+    "apps/studio/src/components/chat/Conversation.tsx",
+    "apps/studio/src/components/chat/Hero.tsx",
+    "apps/studio/src/components/chat/Markdown.tsx",
+    "apps/studio/src/components/icons.tsx",
+    "apps/studio/src/components/layout/Sidebar.tsx",
+    "apps/studio/src/components/workspace/WorkspacePanel.tsx",
+    "apps/studio/src/components/workspace/panels.tsx",
+    "apps/studio/src/lib/greeting.test.ts",
+    "apps/studio/src/lib/greeting.ts",
+    "apps/studio/src/lib/markdown.test.ts",
+    "apps/studio/src/lib/markdown.ts",
+    "apps/studio/src/lib/useMediaQuery.ts",
     "apps/studio/src/state/StudioContext.tsx",
     "apps/studio/src/styles/theme.css",
     "apps/studio/src/types.ts",
@@ -32,13 +47,20 @@
       "compact_transcript": "/0/transcript.jsonl",
       "content_hash": "/0/content_hash.txt",
       "prompt": "/0/prompt.txt"
+    },
+    {
+      "metadata": "/1/metadata.json",
+      "transcript": "/1/full.jsonl",
+      "compact_transcript": "/1/transcript.jsonl",
+      "content_hash": "/1/content_hash.txt",
+      "prompt": "/1/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 298267,
+    "input_tokens": 344676,
     "cache_creation_tokens": 0,
-    "cache_read_tokens": 841344,
-    "output_tokens": 3931,
-    "api_call_count": 19
+    "cache_read_tokens": 1127434,
+    "output_tokens": 4173,
+    "api_call_count": 34
   }
 }
