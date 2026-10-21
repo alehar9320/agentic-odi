@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import asyncio
-import contextlib
 import json
+import logging
 from typing import Any
 
 from agentic_odi_core import ODIService, ToolName
@@ -14,6 +14,8 @@ from fastmcp import Client as McpClient
 from agentic_odi_studio_api.studio.probes import is_endpoint_reachable
 from agentic_odi_studio_api.studio.seed import seed_payload
 
+log = logging.getLogger(__name__)
+
 MCP_CALL_TIMEOUT = 3.0
 
 
@@ -22,11 +24,13 @@ async def fetch_canvas(mcp_url: str) -> dict[str, Any]:
     jobs: list[dict[str, Any]] = []
     outcomes: list[dict[str, Any]] = []
     steps: list[dict[str, Any]] = []
+    warnings: list[str] = []
 
     if not is_endpoint_reachable(mcp_url, timeout=0.3):
-        return {**seed_payload(), "source": "seed"}
+        log.warning("MCP endpoint unreachable at %s — falling back to seed data", mcp_url)
+        return {**seed_payload(), "source": "seed", "warnings": ["MCP endpoint unreachable"]}
 
-    with contextlib.suppress(Exception):
+    try:
         mcp_client = McpClient(mcp_url)
         async with mcp_client:
             raw_jobs = await asyncio.wait_for(
@@ -36,7 +40,8 @@ async def fetch_canvas(mcp_url: str) -> dict[str, Any]:
                 parsed_jobs = json.loads(str(raw_jobs))
                 if isinstance(parsed_jobs, list):
                     jobs = parsed_jobs
-            except Exception:  # noqa: BLE001
+            except Exception as exc:  # noqa: BLE001
+                log.warning("Failed to parse jobs from MCP: %s", exc)
                 jobs = []
 
             for job in jobs:
@@ -44,7 +49,7 @@ async def fetch_canvas(mcp_url: str) -> dict[str, Any]:
                 if not job_id:
                     continue
 
-                with contextlib.suppress(Exception):
+                try:
                     raw_steps = await asyncio.wait_for(
                         mcp_client.call_tool(ToolName.GET_JOB_MAP.value, {"job_id": job_id}),
                         timeout=1.0,
@@ -52,8 +57,12 @@ async def fetch_canvas(mcp_url: str) -> dict[str, Any]:
                     parsed_steps = json.loads(str(raw_steps))
                     if isinstance(parsed_steps, list):
                         steps.extend(parsed_steps)
+                except Exception as exc:  # noqa: BLE001
+                    msg = f"Failed to fetch steps for job {job_id}: {exc}"
+                    log.warning(msg)
+                    warnings.append(msg)
 
-                with contextlib.suppress(Exception):
+                try:
                     raw_outcomes = await asyncio.wait_for(
                         mcp_client.call_tool(ToolName.GET_OUTCOMES.value, {"job_id": job_id}),
                         timeout=1.0,
@@ -61,11 +70,24 @@ async def fetch_canvas(mcp_url: str) -> dict[str, Any]:
                     parsed_outcomes = json.loads(str(raw_outcomes))
                     if isinstance(parsed_outcomes, list):
                         outcomes.extend(parsed_outcomes)
+                except Exception as exc:  # noqa: BLE001
+                    msg = f"Failed to fetch outcomes for job {job_id}: {exc}"
+                    log.warning(msg)
+                    warnings.append(msg)
+    except Exception as exc:  # noqa: BLE001
+        log.warning("MCP canvas hydration failed entirely: %s", exc)
+        warnings.append(f"MCP hydration error: {exc}")
 
     if not jobs:
-        return {**seed_payload(), "source": "seed"}
+        return {**seed_payload(), "source": "seed", "warnings": ["No jobs returned from MCP"]}
 
-    return {"jobs": jobs, "steps": steps, "outcomes": outcomes, "source": "mcp"}
+    return {
+        "jobs": jobs,
+        "steps": steps,
+        "outcomes": outcomes,
+        "source": "mcp",
+        "warnings": warnings,
+    }
 
 
 def fetch_local_canvas(service: ODIService) -> dict[str, Any]:
