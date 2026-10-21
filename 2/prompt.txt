@@ -1,0 +1,11 @@
+Explore the repository at /home/alexa/repos/agentic-odi and find everything related to the CHAT USER INTERFACE (the thing a human user talks to). Be "very thorough".
+
+I need to know:
+1. Which files implement the chat UI / chat client (Streamlit? web? CLI?). Give full paths.
+2. How a user message gets from the UI into the ODI agent (the call chain).
+3. How a user types a message today — what widget/component, what function, what file/line numbers.
+4. Any existing audio/voice/mic/speech/recording/transcription/STT/whisper code already present (search for keywords: mic, audio, voice, record, transcribe, whisper, speech, stt, tts, speech_recognition, sounddevice, pyaudio, microphone, MediaRecorder, getUserMedia).
+5. The chat client dependency list (pyproject.toml files in the repo) and the python version constraints.
+6. The test layout for the chat client package.
+
+Report back with: file paths + line numbers, the message-send call chain, and a precise list of any pre-existing audio capability. Do not modify anything.
