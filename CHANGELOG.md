@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.11.0](https://github.com/alehar9320/agentic-odi/compare/v0.10.0...v0.11.0) (2026-10-21)
+
+
+### Features
+
+* add feature flags accessible via CLI and Studio settings ([#72](https://github.com/alehar9320/agentic-odi/issues/72)) ([52b2273](https://github.com/alehar9320/agentic-odi/commit/52b2273c477fa2c7f36882e24f3d52b23d048ccb))
+* **studio:** add discrete changelog drawer with Steve Jobs quality experience ([#60](https://github.com/alehar9320/agentic-odi/issues/60)) ([01dc737](https://github.com/alehar9320/agentic-odi/commit/01dc737dbf3ce6a8742e26ffe45e66254cc987cf))
+* **studio:** add feature-flagged first-run wizard ([#69](https://github.com/alehar9320/agentic-odi/issues/69)) ([3d07761](https://github.com/alehar9320/agentic-odi/commit/3d077618db0cb9cc3498af5d99b38cadf8ab2608))
+* **studio:** add intent and outcome notification catch-up experience ([#58](https://github.com/alehar9320/agentic-odi/issues/58)) ([b89e8f4](https://github.com/alehar9320/agentic-odi/commit/b89e8f419610954d6a9caeddf6b746076723c220))
+* **studio:** introduce 20 micro interactions and animations ([#61](https://github.com/alehar9320/agentic-odi/issues/61)) ([1fc5411](https://github.com/alehar9320/agentic-odi/commit/1fc5411db724b465040cd79db56c3a5713543959))
+
+
+### Bug Fixes
+
+* **deploy:** add required previews block for Worker previews ([#74](https://github.com/alehar9320/agentic-odi/issues/74)) ([00e3943](https://github.com/alehar9320/agentic-odi/commit/00e39436001bd0555405c637e05d71748447bdb7))
+* **pages:** deploy the website from main again ([#73](https://github.com/alehar9320/agentic-odi/issues/73)) ([f806382](https://github.com/alehar9320/agentic-odi/commit/f8063826cf827cb37fb108e564abd62439f1b7a8))
+
 ## [0.10.0](https://github.com/alehar9320/agentic-odi/compare/v0.9.0...v0.10.0) (2026-10-21)
 
 
