@@ -1,0 +1,64 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M5FRNX1CWNNTBR6Y9826S18P",
+  "session_id": "ses_ea0b42653ffe0UQRXIP1RLRAKa",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-21T17:38:44.161254631Z",
+  "branch": "fix/github-pages-deploy",
+  "checkpoints_count": 1,
+  "files_touched": [
+    ".github/workflows/pages.yml",
+    "website/tests/test_pages_deploy.py"
+  ],
+  "agent": "OpenCode",
+  "model": "nvidia/nemotron-3.5-lightning:free",
+  "turn_id": "83afd8bd2cd1",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 132457,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 771328,
+    "output_tokens": 5024,
+    "api_call_count": 20
+  },
+  "session_metrics": {
+    "turn_count": 1
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-10-21T17:38:44.143995854Z",
+    "agent_lines": 100,
+    "agent_removed": 0,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 100,
+    "total_lines_changed": 100,
+    "agent_percentage": 100,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 1446,
+      "user_lines_removed": 7,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        ".agents/rules/agent_instructions.md": 6,
+        "docs/superpowers/plans/2026-10-20-release-download-run-instructions.md": 220,
+        "docs/superpowers/plans/2026-10-21-conversational-generative-ui.md": 97,
+        "docs/superpowers/plans/2026-10-21-intent-first-pm-experience.md": 149,
+        "docs/superpowers/plans/2026-10-21-living-studio-ux.md": 133,
+        "docs/superpowers/specs/2026-10-21-conversational-generative-ui-design.md": 239,
+        "docs/superpowers/specs/2026-10-21-first-run-wizard-design.md": 145,
+        "docs/superpowers/specs/2026-10-21-intent-first-pm-experience-design.md": 156,
+        "docs/superpowers/specs/2026-10-21-living-studio-ux-design.md": 97,
+        "docs/superpowers/specs/2026-10-21-mcp-studio-connectors-design.md": 204
+      },
+      "user_removed_per_file": {
+        ".agents/rules/agent_instructions.md": 6,
+        ".agents/skills/using-superpowers/SKILL.md": 1
+      }
+    }
+  ]
+}

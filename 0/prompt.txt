@@ -1,0 +1,16 @@
+Explore the repository at /home/alexa/repos/agentic-odi thoroughly. I need to understand:
+1. The overall project structure (top-level directories and files)
+2. What the project does (read README, package.json, etc.)
+3. Any configuration related to MCP, local-tool-model, or connecting experiences
+4. Any branches, PR configurations, CI setup
+5. The git status and any existing branches
+
+Please provide a comprehensive overview including:
+- Directory tree (top 3 levels)
+- Key files and their purposes
+- Any references to MCP, connecting, local-tool-model
+- Git branch information
+- CI/CD configuration
+- Test setup
+
+Be very thorough - read multiple files to understand the project.
