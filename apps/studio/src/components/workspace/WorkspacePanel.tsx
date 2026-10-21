@@ -21,7 +21,10 @@ export function WorkspacePanel() {
         <div className="panel__heading">
           <span className="panel__icon">{panel.icon}</span>
           <div className="panel__heading-text">
-            <h2 className="panel__title">{panel.title}</h2>
+            {/* The panel content owns the document outline (both canvas
+                panels render their own <h2>), so the chrome title is a label,
+                not a second heading with the same accessible name. */}
+            <p className="panel__title">{panel.title}</p>
             <p className="panel__blurb">{panel.blurb}</p>
           </div>
         </div>
