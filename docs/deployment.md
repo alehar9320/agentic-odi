@@ -20,6 +20,22 @@ Integrate via the MCP protocol at:
 > out to the maintainers to obtain the necessary credentials before connecting a
 > client.
 
+## Hosted Studio
+
+The Living Studio SPA is deployed to Cloudflare Workers:
+
+| Environment | URL |
+|---|---|
+| Production (`main`) | **[https://agentic-odi.alehar.workers.dev/](https://agentic-odi.alehar.workers.dev/)** |
+| Pull request preview | Posted automatically by Cloudflare Workers Builds as a PR comment |
+
+Production deploys on every push to `main`. The Worker is `agentic-odi`; keep
+`name` in `wrangler.jsonc` aligned with the Worker connected in the dashboard.
+Preview builds run for non-production branches and are ephemeral: the Cloudflare
+PR comment is the source of truth, so do not copy a preview URL into docs. The
+hosted UI loads without a backend; canvas data, chat, and mutations need the
+sidecar tunnel described below.
+
 ## Living Studio on a Free Cloudflare Worker
 
 Workers Containers — the only way to run the Python sidecar entirely on
@@ -54,12 +70,36 @@ Workers Builds settings (Workers & Pages → your Worker → Settings → Builds
 
 | Setting | Value |
 |---|---|
+| Production branch | `main` |
 | Root directory | `/` |
 | Build command | `npm --prefix apps/studio ci && npm --prefix apps/studio run build` |
 | Deploy command | `npx wrangler deploy` |
+| Preview command | `npx wrangler preview` |
 
 A Worker has no run command: the Worker script runs on Cloudflare. Set `name` in
 `wrangler.jsonc` to the Worker you created before the first deploy.
+
+### Pull request previews
+
+Workers Builds posts the build status and Preview URL to the pull request
+automatically. To enable it:
+
+1. Open the Worker → **Settings** → **Build** → **Branch control**.
+2. Keep the production branch set to `main` and enable **Preview Builds**.
+3. If Cloudflare shows **Set up Worker Previews**, complete the one-time switch.
+   This cannot be reversed.
+4. Confirm the Preview command is `npx wrangler preview`.
+
+Previews do not inherit production settings. The SPA loads from a Preview, but
+`/api/*` returns `502 SIDECAR_URL is not configured` until a preview-specific
+`SIDECAR_URL` secret is configured. Previews are ephemeral, and pull requests
+from forks may not receive one. If Cloudflare does not comment, paste the URL
+into the PR's **Deployment** section.
+
+The `cf` CLI can inspect build triggers and recent builds (`cf builds triggers
+list`, `cf builds list`) and create a Preview (`cf previews deploy`), but it does
+not post GitHub PR comments. The Workers Builds Git integration owns the PR link;
+`cf` is only an optional verification tool and requires `cf auth login`.
 
 > [!NOTE]
 > The sidecar runs on your machine, so the Worker only works while

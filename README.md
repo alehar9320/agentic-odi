@@ -32,6 +32,12 @@ communication streams, built on [`FastMCP`](https://github.com/jlowin/fastmcp).
 
 We don't publish dates. This page changes when the code does.
 
+**Hosted Studio:** the experimental Living Studio UI runs at
+**[agentic-odi.alehar.workers.dev](https://agentic-odi.alehar.workers.dev/)**.
+It loads without a backend; live data needs the sidecar tunnel described in
+[Deployment](docs/deployment.md). Pull requests get preview URLs from Cloudflare
+Workers Builds.
+
 ## Code Overview
 
 A [uv workspace](https://docs.astral.sh/uv/concepts/projects/workspaces/) with
@@ -153,7 +159,7 @@ layout, updates, and release automation.
 | [Development](docs/development.md) | Lint, format, type checks, frontend checks, tests and the coverage map |
 | [Architecture](docs/architecture/README.md) | Workspace layout, dependency direction, data flow, and testing |
 | [Installation](docs/installation.md) | Binary install, updater behavior, and release automation |
-| [Deployment](docs/deployment.md) | Hosted chat UI, the MCP server endpoint, and the free-plan Cloudflare Worker |
+| [Deployment](docs/deployment.md) | Hosted Studio and PR preview URLs, the MCP server endpoint, and the free-plan Cloudflare Worker |
 | [Roadmap](docs/roadmap.md) | Completed and upcoming milestones |
 | [Superpowers](docs/superpowers.md) | Pi, OpenCode, and Freebuff integration |
 
