@@ -3,7 +3,7 @@
   "checkpoint_id": "01M5FRNX1CWNNTBR6Y9826S18P",
   "strategy": "manual-commit",
   "branch": "fix/github-pages-deploy",
-  "checkpoints_count": 8,
+  "checkpoints_count": 11,
   "files_touched": [
     ".github/workflows/pages.yml",
     "website/tests/test_pages_deploy.py"
@@ -50,6 +50,13 @@
       "compact_transcript": "/5/transcript.jsonl",
       "content_hash": "/5/content_hash.txt",
       "prompt": ""
+    },
+    {
+      "metadata": "/6/metadata.json",
+      "transcript": "/6/full.jsonl",
+      "compact_transcript": "/6/transcript.jsonl",
+      "content_hash": "/6/content_hash.txt",
+      "prompt": "/6/prompt.txt"
     }
   ],
   "token_usage": {
@@ -57,6 +64,6 @@
     "cache_creation_tokens": 0,
     "cache_read_tokens": 771328,
     "output_tokens": 5024,
-    "api_call_count": 20
+    "api_call_count": 21
   }
 }
