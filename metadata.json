@@ -3,7 +3,7 @@
   "checkpoint_id": "01M5FPPAMX19YCSF6RR8XWTD5T",
   "strategy": "manual-commit",
   "branch": "feat/conversation-first-studio",
-  "checkpoints_count": 12,
+  "checkpoints_count": 13,
   "files_touched": [
     "README.md",
     "apps/studio-api/src/agentic_odi_studio_api/studio/chat.py",
@@ -86,6 +86,13 @@
       "compact_transcript": "/9/transcript.jsonl",
       "content_hash": "/9/content_hash.txt",
       "prompt": "/9/prompt.txt"
+    },
+    {
+      "metadata": "/10/metadata.json",
+      "transcript": "/10/full.jsonl",
+      "compact_transcript": "/10/transcript.jsonl",
+      "content_hash": "/10/content_hash.txt",
+      "prompt": ""
     }
   ],
   "token_usage": {
