@@ -8,7 +8,7 @@ from typing import Any
 
 from pydantic import BaseModel, ValidationError
 
-from agentic_odi_core.events import DEFAULT_WORKSPACE, DEFAULT_DEVICE
+from agentic_odi_core.events import DEFAULT_DEVICE, DEFAULT_WORKSPACE, Event
 from agentic_odi_core.intent_store import IntentStore
 from agentic_odi_core.models import CustomerOutcome, Evidence, Job, Outcome, Step
 from agentic_odi_core.repository import Repository
@@ -25,7 +25,9 @@ class SQLiteRepository(Repository):
             db_path = os.environ.get("AGENTIC_ODI_DB", os.path.expanduser("~/.agentic-odi/odi.db"))
         os.makedirs(os.path.dirname(db_path) or ".", exist_ok=True)
         self._lock = threading.RLock()
-        self._workspace_id = workspace_id or os.environ.get("AGENTIC_ODI_WORKSPACE", DEFAULT_WORKSPACE)
+        self._workspace_id = workspace_id or os.environ.get(
+            "AGENTIC_ODI_WORKSPACE", DEFAULT_WORKSPACE
+        )
         self._device_id = device_id or os.environ.get("AGENTIC_ODI_DEVICE_ID", DEFAULT_DEVICE)
         self.store = IntentStore(db_path, check_same_thread=False)
         self._last_event_id = 0
@@ -46,7 +48,7 @@ class SQLiteRepository(Repository):
             if ev["id"] > self._last_event_id:
                 self._apply_event(ev)
 
-    def _apply_event(self, ev: dict) -> None:
+    def _apply_event(self, ev: Event) -> None:
         et = ev["type"]
         p = ev["payload"]
         if et == "JOB_CREATED":
@@ -381,11 +383,11 @@ class SQLiteRepository(Repository):
             self._sync()
             if outcome_id in self.customer_outcomes:
                 self.store.append(
-                "CUSTOMER_OUTCOME_DELETED",
-                {"id": outcome_id},
-                workspace_id=self._workspace_id,
-                device_id=self._device_id,
-            )
+                    "CUSTOMER_OUTCOME_DELETED",
+                    {"id": outcome_id},
+                    workspace_id=self._workspace_id,
+                    device_id=self._device_id,
+                )
                 self._sync()
                 return True
             return False

@@ -5,8 +5,6 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
-import pytest
-
 from agentic_odi_core.intent_store import IntentStore
 
 

@@ -68,9 +68,7 @@ class IntentStore:
             )
 
     def _migrate_events_table(self) -> None:
-        existing = {
-            row[1] for row in self.conn.execute("PRAGMA table_info(events)").fetchall()
-        }
+        existing = {row[1] for row in self.conn.execute("PRAGMA table_info(events)").fetchall()}
         for column, definition in _COLUMNS.items():
             if column not in existing:
                 self.conn.execute(f"ALTER TABLE events ADD COLUMN {column} {definition}")
@@ -149,14 +147,14 @@ class IntentStore:
             order = "ORDER BY id ASC"
 
         cursor = self.conn.cursor()
-        cursor.execute(
-            f"""
-            SELECT id, event_id, workspace_id, device_id, timestamp,
-                   event_type, payload, server_seq
-            FROM events {where} {order}
-            """,
-            params,
+        # `where` and `order` are assembled from the literal fragments above, so
+        # interpolating them cannot inject SQL; every caller value is bound.
+        sql = (
+            "SELECT id, event_id, workspace_id, device_id, timestamp, "
+            "event_type, payload, server_seq FROM events "
+            f"{where} {order}"  # nosec B608 - static fragments, bound values
         )
+        cursor.execute(sql, params)
         return [self._to_event(row) for row in cursor.fetchall()]
 
     @staticmethod
@@ -275,9 +273,7 @@ class IntentStore:
                 self.conn.execute("DELETE FROM sync_state")
             else:
                 self.conn.execute("DELETE FROM events WHERE workspace_id = ?", (workspace_id,))
-                self.conn.execute(
-                    "DELETE FROM sync_state WHERE workspace_id = ?", (workspace_id,)
-                )
+                self.conn.execute("DELETE FROM sync_state WHERE workspace_id = ?", (workspace_id,))
 
     def close(self) -> None:
         self.conn.close()
