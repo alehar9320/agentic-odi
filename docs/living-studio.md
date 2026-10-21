@@ -31,6 +31,21 @@ directly.
                                              └───────────────────────────────┘
 ```
 
+## Interface
+
+The Studio opens as a conversation, not a dashboard.
+
+| Surface | What it does |
+|---|---|
+| **Hero** | One rotating headline above the composer: a greeting (time of day, plus your name if you set one in Settings), what is already on the canvas, or what the studio can do. It cycles every few seconds and stays still under `prefers-reduced-motion`. |
+| **Suggestion pills** | Below the headline. Some open a workspace panel (landscape, simulate, capture), others start a conversation. They change as the canvas fills up. |
+| **Composer** | Docked at the bottom of the transcript. `Enter` sends, `Shift`+`Enter` adds a line, `Cmd/Ctrl`+`K` focuses it, and the send button becomes a stop button while a reply streams. |
+| **Drawer** (left) | New conversation, the five workspace panels, live model/MCP status, and Settings. Collapses to an icon rail with `Cmd/Ctrl`+`B`; becomes an overlay sheet on narrow screens. |
+| **Workspace panel** (right) | The classic UI — opportunity landscape, job map, impact simulation, evidence, direct capture, settings — opens beside the conversation, never on top of it. |
+
+Replies render Markdown (headings, lists, emphasis, inline and fenced code).
+Tool calls appear inline as small trace chips while the agent works.
+
 ## 1. Web — production build (recommended for a quick look)
 
 ```bash

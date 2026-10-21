@@ -40,82 +40,79 @@ export function DirectCapture() {
   }
 
   return (
-    <section>
-      <h2 className="section-title">Direct Capture: Jobs &amp; Outcomes</h2>
-      <p className="caption">
-        Prefer direct entry over conversational typing? Add artifacts directly to the MCP
-        repository.
-      </p>
-
-      <form onSubmit={submit}>
-        <div className="studio-field">
-          <label htmlFor="dc-job">Select Job</label>
-          <select
-            id="dc-job"
-            className="studio-select"
-            value={activeJobId}
-            onChange={(event) => setJobId(event.target.value)}
-          >
-            {jobs.map((job) => (
+    <form onSubmit={submit} className="form">
+      <div className="field">
+        <label htmlFor="dc-job">Job</label>
+        <select
+          id="dc-job"
+          className="select"
+          value={activeJobId}
+          onChange={(event) => setJobId(event.target.value)}
+        >
+          {jobs.length ? (
+            jobs.map((job) => (
               <option key={job.id} value={job.id}>
                 {job.id}: {job.name ?? ""}
               </option>
-            ))}
-          </select>
-        </div>
+            ))
+          ) : (
+            <option value="">No job yet</option>
+          )}
+        </select>
+      </div>
 
-        <div className="studio-field">
-          <label htmlFor="dc-statement">Desired Outcome Statement</label>
-          <input
-            id="dc-statement"
-            className="studio-input"
-            placeholder="Minimize the time it takes to..."
-            value={statement}
-            onChange={(event) => setStatement(event.target.value)}
-          />
-          <p className="caption" style={{ marginTop: 4 }}>
-            Format: [Direction] + [Unit of Measure] + [Object of Control] + [Contextual Clarifier]
-          </p>
-        </div>
-
-        <div className="studio-form-grid">
-          <div className="studio-field">
-            <label htmlFor="dc-importance">Importance Score (1-10): {importance.toFixed(1)}</label>
-            <input
-              id="dc-importance"
-              type="range"
-              min={1}
-              max={10}
-              step={0.1}
-              value={importance}
-              onChange={(event) => setImportance(Number(event.target.value))}
-            />
-          </div>
-          <div className="studio-field">
-            <label htmlFor="dc-satisfaction">
-              Current Satisfaction (1-10): {satisfaction.toFixed(1)}
-            </label>
-            <input
-              id="dc-satisfaction"
-              type="range"
-              min={1}
-              max={10}
-              step={0.1}
-              value={satisfaction}
-              onChange={(event) => setSatisfaction(Number(event.target.value))}
-            />
-          </div>
-        </div>
-
-        <p className="toast toast--info" role="status" style={{ marginBottom: 12 }}>
-          📊 <b>Calculated Opportunity Score</b>: <code>{calcOpp.toFixed(2)}</code> (
-          {isUnderserved(calcOpp) ? "🔥 Underserved" : "Appropriately Served"})
+      <div className="field">
+        <label htmlFor="dc-statement">Desired outcome</label>
+        <input
+          id="dc-statement"
+          className="input"
+          placeholder="Minimize the time it takes to…"
+          value={statement}
+          onChange={(event) => setStatement(event.target.value)}
+        />
+        <p className="field__hint">
+          Direction + unit of measure + object of control + contextual clarifier.
         </p>
+      </div>
 
-        <button type="submit" className="studio-button" disabled={busy || !statement.trim()}>
-          Record Desired Outcome
-        </button>
-      </form>
-    </section>
+      <div className="field">
+        <label htmlFor="dc-importance">Importance · {importance.toFixed(1)}</label>
+        <input
+          id="dc-importance"
+          type="range"
+          min={1}
+          max={10}
+          step={0.1}
+          value={importance}
+          onChange={(event) => setImportance(Number(event.target.value))}
+        />
+      </div>
+
+      <div className="field">
+        <label htmlFor="dc-satisfaction">Current satisfaction · {satisfaction.toFixed(1)}</label>
+        <input
+          id="dc-satisfaction"
+          type="range"
+          min={1}
+          max={10}
+          step={0.1}
+          value={satisfaction}
+          onChange={(event) => setSatisfaction(Number(event.target.value))}
+        />
+      </div>
+
+      <p className="score-preview">
+        Opportunity <b>{calcOpp.toFixed(2)}</b>
+        <span>{isUnderserved(calcOpp) ? "underserved" : "appropriately served"}</span>
+      </p>
+
+      <button
+        type="submit"
+        className="button button--block"
+        disabled={busy || !statement.trim() || !activeJobId}
+      >
+        Record outcome
+      </button>
+    </form>
   );
 }
