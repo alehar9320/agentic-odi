@@ -1,0 +1,53 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M5FHEWR3JT99ANZEDX2X1D5V",
+  "session_id": "ses_ea2c0d0b4ffe5pFu21zQZXTDvE",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-21T15:32:40.066963942Z",
+  "branch": "docs/deployment-links",
+  "checkpoints_count": 1,
+  "save_step_count": 2,
+  "files_touched": [
+    "README.md",
+    "docs/deployment.md",
+    "docs/living-studio.md",
+    "website/tests/test_site.py"
+  ],
+  "agent": "OpenCode",
+  "model": "poolside/laguna-s-2.1:free",
+  "turn_id": "bc107a7466a8",
+  "checkpoint_transcript_start": 310,
+  "transcript_lines_at_start": 310,
+  "compact_transcript_start": 310,
+  "token_usage": {
+    "input_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 0,
+    "output_tokens": 0,
+    "api_call_count": 0
+  },
+  "session_metrics": {
+    "turn_count": 2
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-10-21T15:32:39.897062368Z",
+    "agent_lines": 0,
+    "agent_removed": 8,
+    "human_added": 209,
+    "human_modified": 102,
+    "human_removed": 0,
+    "total_committed": 306,
+    "total_lines_changed": 321,
+    "agent_percentage": 2.4922118380062304,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0
+    }
+  ]
+}
