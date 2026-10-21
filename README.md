@@ -146,9 +146,8 @@ opening a pull request.
 
 ## License
 
-No license has been specified for this repository yet. Until one is added, all
-rights reserved by the maintainers. Please reach out before reuse or
-redistribution.
+This project is licensed under the terms of the MIT License — see
+[LICENSE](LICENSE) for details.
 
 ---
 
