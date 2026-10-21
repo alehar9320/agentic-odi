@@ -255,6 +255,10 @@ def maybe_run_first_launch(
     if invoked_subcommand and invoked_subcommand in {"setup", "profile", "version", "help"}:
         return
 
-    # Show the confirmation card (implementation-specific; this is a stub)
-    typer.echo("First-run onboarding card would appear here.")
+    typer.echo("First-run onboarding card")
+    typer.echo("=" * 60)
+    for line in CARD_LINES:
+        typer.echo(line)
+    typer.echo("=" * 60)
     typer.echo("".join(HONESTY_CONTRACT_LINES))
+    typer.echo("Run `agentic-odi setup` to configure your product baseline interactively.")
