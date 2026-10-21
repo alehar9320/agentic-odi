@@ -1,16 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
-  addConnector,
   addOutcome,
   addStep,
-  checkConnectorHealth,
-  deleteConnector,
   fetchCanvas,
-  fetchChangelog,
   fetchConfig,
-  fetchConnectorCatalog,
-  fetchConnectors,
   healthLlm,
   healthMcp,
   streamChat,
@@ -43,15 +37,6 @@ describe("fetchConfig", () => {
       base_url: "http://llm",
       model_name: "m",
     });
-  });
-});
-
-describe("fetchChangelog", () => {
-  it("returns the parsed changelog data", async () => {
-    mockJson({ releases: [{ version: "0.8.0", date: "2026-10-20", categories: [] }] });
-
-    const data = await fetchChangelog();
-    expect(data.releases[0].version).toBe("0.8.0");
   });
 });
 
@@ -161,50 +146,5 @@ describe("streamChat", () => {
         () => {},
       ),
     ).rejects.toThrow();
-  });
-});
-
-describe("connectors", () => {
-  it("fetchConnectorCatalog returns the preset list", async () => {
-    mockJson([{ id: "notion", label: "Notion", is_recommended: true }]);
-
-    await expect(fetchConnectorCatalog()).resolves.toMatchObject([{ id: "notion", is_recommended: true }]);
-  });
-
-  it("fetchConnectors returns registered connectors", async () => {
-    mockJson([{ name: "gong", kind: "mcp", enabled: true }]);
-
-    await expect(fetchConnectors()).resolves.toMatchObject([{ name: "gong", kind: "mcp" }]);
-  });
-
-  it("addConnector posts name and url", async () => {
-    mockJson({ ok: true, name: "gong" });
-
-    await expect(addConnector({ name: "gong", url: "http://localhost:9000/mcp" })).resolves.toEqual({
-      ok: true,
-      name: "gong",
-    });
-    expect(fetch).toHaveBeenCalledWith(
-      "/api/connectors",
-      expect.objectContaining({ method: "POST", body: JSON.stringify({ name: "gong", url: "http://localhost:9000/mcp" }) }),
-    );
-  });
-
-  it("deleteConnector sends a DELETE to the named route", async () => {
-    mockJson({ ok: true, name: "gong" });
-
-    await deleteConnector("gong");
-
-    expect(fetch).toHaveBeenCalledWith("/api/connectors/gong", expect.objectContaining({ method: "DELETE" }));
-  });
-
-  it("checkConnectorHealth posts to the health route", async () => {
-    mockJson({ ok: true, message: "ok" });
-
-    await expect(checkConnectorHealth("gong")).resolves.toEqual({ ok: true, message: "ok" });
-    expect(fetch).toHaveBeenCalledWith(
-      "/api/connectors/gong/health",
-      expect.objectContaining({ method: "POST" }),
-    );
   });
 });

@@ -13,7 +13,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from agentic_odi_studio_api.studio.connectors import ConnectorService
 from agentic_odi_studio_api.studio.router import router as studio_router
 
 CORS_ORIGINS = [
@@ -39,18 +38,13 @@ def default_spa_dist() -> Path:
 SPA_DIST = default_spa_dist()
 
 
-def create_app(
-    repo: Repository | None = None,
-    backend: str | None = None,
-    connectors: ConnectorService | None = None,
-) -> FastAPI:
+def create_app(repo: Repository | None = None, backend: str | None = None) -> FastAPI:
     if repo is None:
         repo = SQLiteRepository()
     service = ODIService(repo)
     app = FastAPI(title="Agentic ODI Studio API")
     app.state.service = service
     app.state.backend = backend or os.environ.get("AGENTIC_ODI_BACKEND") or DEFAULT_BACKEND
-    app.state.connectors = connectors or ConnectorService()
 
     app.add_middleware(
         CORSMiddleware,
