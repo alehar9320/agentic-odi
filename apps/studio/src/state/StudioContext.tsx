@@ -42,6 +42,7 @@ import type {
   ConnectorPreset,
   StudioBrief,
   StudioConfig,
+  StudioNotification,
   WorkspacePanelId,
 } from "../types";
 import { catalogManifest } from "../ui/catalog";
@@ -52,6 +53,7 @@ const CANVAS_KEY = "studio.canvas";
 const DISPLAY_NAME_KEY = "studio.displayName";
 const BRIEF_KEY = "studio.brief";
 const SETUP_DISMISSED_KEY = "studio.setupDismissed";
+const NOTIFICATIONS_KEY = "studio.notifications";
 
 export const EMPTY_CONFIG: StudioConfig = {
   base_url: "http://localhost:8001/v1",
@@ -73,6 +75,43 @@ export interface ToolActivity {
   status: string;
   preview?: string;
 }
+
+const SEED_NOTIFICATIONS: StudioNotification[] = [
+  {
+    id: "NOTIF-101",
+    title: "Opportunity Score Shift Identified",
+    message: "Minimize time to propagate secrets (O-1) opportunity score reached 15.3 (High Priority).",
+    category: "outcome",
+    timestamp: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
+    read: false,
+    targetPanel: "landscape",
+    targetId: "O-1",
+    actionText: "View Landscape",
+    chatPrompt: "How can we address the high opportunity score for secret propagation?",
+  },
+  {
+    id: "NOTIF-102",
+    title: "Friction Collapse Simulation Complete",
+    message: "Background simulation calculated a 68% deployment velocity increase upon automation.",
+    category: "simulation",
+    timestamp: new Date(Date.now() - 45 * 60 * 1000).toISOString(),
+    read: false,
+    targetPanel: "impact",
+    actionText: "View Simulation",
+    chatPrompt: "Summarize the friction collapse simulation results.",
+  },
+  {
+    id: "NOTIF-103",
+    title: "New Customer Telemetry Signal",
+    message: "Evidence ingested: 'Config key mismatches account for 40% of deployment rollbacks'.",
+    category: "evidence",
+    timestamp: new Date(Date.now() - 120 * 60 * 1000).toISOString(),
+    read: true,
+    targetPanel: "evidence",
+    actionText: "View Evidence",
+    chatPrompt: "What evidence do we have regarding deployment config errors?",
+  },
+];
 
 export interface StudioContextValue {
   settings: StudioConfig;
@@ -129,6 +168,13 @@ export interface StudioContextValue {
   deleteConnector: (name: string) => Promise<void>;
   connectorSuggestions: string[];
   dismissConnectorSuggestion: (preset: string) => void;
+  notifications: StudioNotification[];
+  unreadNotificationCount: number;
+  markNotificationAsRead: (id: string) => void;
+  markAllNotificationsAsRead: () => void;
+  dismissNotification: (id: string) => void;
+  addNotification: (notification: Omit<StudioNotification, "id" | "timestamp" | "read">) => void;
+  simulateBackgroundEvent: () => void;
 }
 
 const StudioContext = createContext<StudioContextValue | null>(null);
@@ -194,6 +240,18 @@ function loadBrief(): StudioBrief | null {
   }
 }
 
+function loadNotifications(): StudioNotification[] {
+  try {
+    const raw = localStorage.getItem(NOTIFICATIONS_KEY);
+    if (raw) {
+      return JSON.parse(raw) as StudioNotification[];
+    }
+  } catch {
+    /* ignore malformed cache */
+  }
+  return SEED_NOTIFICATIONS;
+}
+
 export function StudioProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<StudioConfig>(loadSettings);
   const [displayName, setDisplayNameState] = useState<string>(loadDisplayName);
@@ -220,8 +278,57 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [connectors, setConnectors] = useState<ConnectorListItem[]>([]);
   const [presets, setPresets] = useState<ConnectorPreset[]>([]);
   const [connectorSuggestions, setConnectorSuggestions] = useState<string[]>([]);
+  const [notifications, setNotifications] = useState<StudioNotification[]>(loadNotifications);
   const toastId = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
+
+  const saveNotifications = useCallback((items: StudioNotification[]) => {
+    setNotifications(items);
+    try {
+      localStorage.setItem(NOTIFICATIONS_KEY, JSON.stringify(items));
+    } catch {
+      /* storage unavailable */
+    }
+  }, []);
+
+  const unreadNotificationCount = useMemo(
+    () => notifications.filter((n) => !n.read).length,
+    [notifications],
+  );
+
+  const markNotificationAsRead = useCallback(
+    (id: string) => {
+      const next = notifications.map((n) => (n.id === id ? { ...n, read: true } : n));
+      saveNotifications(next);
+    },
+    [notifications, saveNotifications],
+  );
+
+  const markAllNotificationsAsRead = useCallback(() => {
+    const next = notifications.map((n) => ({ ...n, read: true }));
+    saveNotifications(next);
+  }, [notifications, saveNotifications]);
+
+  const dismissNotification = useCallback(
+    (id: string) => {
+      const next = notifications.filter((n) => n.id !== id);
+      saveNotifications(next);
+    },
+    [notifications, saveNotifications],
+  );
+
+  const addNotification = useCallback(
+    (item: Omit<StudioNotification, "id" | "timestamp" | "read">) => {
+      const newNotif: StudioNotification = {
+        ...item,
+        id: `NOTIF-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        timestamp: new Date().toISOString(),
+        read: false,
+      };
+      saveNotifications([newNotif, ...notifications]);
+    },
+    [notifications, saveNotifications],
+  );
 
   const pushToast = useCallback((kind: ToastKind, message: string) => {
     const id = (toastId.current += 1);
@@ -285,6 +392,39 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     [pushToast, refreshConnectors],
   );
 
+  const simulateBackgroundEvent = useCallback(() => {
+    const events: Array<Omit<StudioNotification, "id" | "timestamp" | "read">> = [
+      {
+        title: "Telemetry Ingestion Complete",
+        message: "Analyzed workflow traces: 82% of users report friction during cluster config.",
+        category: "evidence",
+        targetPanel: "evidence",
+        actionText: "Review Evidence",
+        chatPrompt: "What friction was reported during cluster config?",
+      },
+      {
+        title: "New Opportunity Uncovered",
+        message: "Automating validation rules elevated satisfaction target by +2.4 points.",
+        category: "outcome",
+        targetPanel: "landscape",
+        actionText: "Explore Landscape",
+        chatPrompt: "Show me details on the validation rules opportunity.",
+      },
+      {
+        title: "AI Job Step Insight",
+        message: "Suggested adding 'Verify secret parity across clusters' to Phase 4 of Job Map.",
+        category: "job",
+        targetPanel: "jobmap",
+        actionText: "Open Job Map",
+        chatPrompt: "Why is verifying secret parity across clusters recommended?",
+      },
+    ];
+
+    const chosen = events[Math.floor(Math.random() * events.length)];
+    addNotification(chosen);
+    pushToast("info", `Background Activity: ${chosen.title}`);
+  }, [addNotification, pushToast]);
+
   const saveSettings = useCallback((config: StudioConfig) => {
     setSettings(config);
     try {
@@ -324,8 +464,6 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // Skipping is a real choice: record it so the conversation does not reappear
-  // on reload, while the hero and drawer keep a quiet nudge available.
   const closeSetup = useCallback(() => {
     setSetupOpen(false);
     try {
@@ -488,8 +626,6 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 
   const openPanel = useCallback(
     (panel: WorkspacePanelId) => {
-      // Opening a surface is exploring: leave the setup conversation without
-      // trapping people back in it when they close the panel. The draft stays.
       if (setupOpen) {
         closeSetup();
       }
@@ -762,6 +898,13 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       deleteConnector,
       connectorSuggestions,
       dismissConnectorSuggestion,
+      notifications,
+      unreadNotificationCount,
+      markNotificationAsRead,
+      markAllNotificationsAsRead,
+      dismissNotification,
+      addNotification,
+      simulateBackgroundEvent,
     }),
     [
       settings,
@@ -814,6 +957,13 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       deleteConnector,
       connectorSuggestions,
       dismissConnectorSuggestion,
+      notifications,
+      unreadNotificationCount,
+      markNotificationAsRead,
+      markAllNotificationsAsRead,
+      dismissNotification,
+      addNotification,
+      simulateBackgroundEvent,
     ],
   );
 

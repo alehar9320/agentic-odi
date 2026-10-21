@@ -23,9 +23,11 @@ export function Sidebar({ collapsed, onToggle, onNavigate, onHome }: SidebarProp
     mcpReachable,
     settings,
     canvas,
+    unreadNotificationCount,
   } = useStudio();
 
   const counts: Partial<Record<WorkspacePanelId, number>> = {
+    catchup: unreadNotificationCount,
     landscape: canvas?.outcomes.length ?? 0,
     jobmap: canvas?.steps.length ?? 0,
   };

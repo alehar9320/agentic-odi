@@ -82,7 +82,23 @@ export type WorkspacePanelId =
   | "impact"
   | "evidence"
   | "capture"
+  | "catchup"
   | "settings";
+
+export type NotificationCategory = "outcome" | "simulation" | "evidence" | "job" | "insight";
+
+export interface StudioNotification {
+  id: string;
+  title: string;
+  message: string;
+  category: NotificationCategory;
+  timestamp: string;
+  read: boolean;
+  targetPanel?: WorkspacePanelId;
+  targetId?: string;
+  actionText?: string;
+  chatPrompt?: string;
+}
 
 export interface ChatStreamRequest {
   base_url: string;

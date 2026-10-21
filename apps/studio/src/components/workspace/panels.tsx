@@ -6,8 +6,10 @@ import { EvidenceStream } from "../canvas/EvidenceStream";
 import { ImpactSim } from "../canvas/ImpactSim";
 import { JobMap } from "../canvas/JobMap";
 import { OpportunityLandscape } from "../canvas/OpportunityLandscape";
+import { CatchUpFeed } from "../notifications/CatchUpFeed";
 import { SettingsPanel } from "../SettingsPanel";
 import {
+  BellIcon,
   BoltIcon,
   CaptureIcon,
   CompassIcon,
@@ -27,6 +29,14 @@ export interface PanelDefinition {
 }
 
 export const WORKSPACE_PANELS: PanelDefinition[] = [
+  {
+    id: "catchup",
+    label: "Catch up",
+    title: "Activity & Catch Up",
+    blurb: "Seamlessly catch up on outcome shifts, simulations, and telemetry signals while you were away.",
+    icon: <BellIcon />,
+    render: () => <CatchUpFeed />,
+  },
   {
     id: "landscape",
     label: "Landscape",
