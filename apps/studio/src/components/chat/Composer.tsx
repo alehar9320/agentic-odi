@@ -181,6 +181,7 @@ export function Composer({
           id="studio-composer"
           ref={inputRef}
           className="composer__input"
+          title="Press ⌘K to focus the composer"
           rows={1}
           value={value}
           placeholder={
