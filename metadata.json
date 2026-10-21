@@ -3,7 +3,7 @@
   "checkpoint_id": "01M5FQ721N53H76EVNZK62TKB2",
   "strategy": "manual-commit",
   "branch": "fix/error-handling-hardening",
-  "checkpoints_count": 10,
+  "checkpoints_count": 11,
   "files_touched": [
     ".github/dependabot.yml",
     ".github/workflows/tauri-release.yml",
@@ -24,6 +24,7 @@
     "apps/studio/src/App.tsx",
     "apps/studio/src/api/studioApi.ts",
     "apps/studio/src/components/SettingsPanel.tsx",
+    "apps/studio/src/components/StudioHeader.test.tsx",
     "apps/studio/src/components/StudioHeader.tsx",
     "apps/studio/src/components/canvas/CanvasTabs.tsx",
     "apps/studio/src/components/canvas/DirectCapture.tsx",
@@ -35,6 +36,17 @@
     "apps/studio/src/components/canvas/OpportunityLandscape.tsx",
     "apps/studio/src/components/canvas/OutcomeCard.tsx",
     "apps/studio/src/components/chat/ChatCopilot.tsx",
+    "apps/studio/src/features/flags.test.ts",
+    "apps/studio/src/onboarding/FirstRunWizard.test.tsx",
+    "apps/studio/src/onboarding/OnboardingProvider.tsx",
+    "apps/studio/src/onboarding/content.ts",
+    "apps/studio/src/onboarding/context.ts",
+    "apps/studio/src/onboarding/icons.tsx",
+    "apps/studio/src/onboarding/index.ts",
+    "apps/studio/src/onboarding/machine.test.ts",
+    "apps/studio/src/onboarding/machine.ts",
+    "apps/studio/src/onboarding/onboarding.css",
+    "apps/studio/src/onboarding/storage.ts",
     "apps/studio/src/state/StudioContext.tsx",
     "apps/studio/src/styles/theme.css",
     "apps/studio/src/test/setup.ts",
@@ -109,6 +121,13 @@
       "compact_transcript": "/7/transcript.jsonl",
       "content_hash": "/7/content_hash.txt",
       "prompt": "/7/prompt.txt"
+    },
+    {
+      "metadata": "/8/metadata.json",
+      "transcript": "/8/full.jsonl",
+      "compact_transcript": "/8/transcript.jsonl",
+      "content_hash": "/8/content_hash.txt",
+      "prompt": "/8/prompt.txt"
     }
   ],
   "token_usage": {
