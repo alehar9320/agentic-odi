@@ -3,7 +3,7 @@
   "checkpoint_id": "01M5FPPAMX19YCSF6RR8XWTD5T",
   "session_id": "ses_ea0dc312dffeiIk1YOuHOdwvKy",
   "strategy": "manual-commit",
-  "created_at": "2026-10-21T17:04:00.292315915Z",
+  "created_at": "2026-10-21T17:10:14.84647587Z",
   "branch": "feat/conversation-first-studio",
   "checkpoints_count": 1,
   "save_step_count": 1,
@@ -33,14 +33,14 @@
     "turn_count": 1
   },
   "initial_attribution": {
-    "calculated_at": "2026-10-21T17:04:00.25973858Z",
+    "calculated_at": "2026-10-21T17:10:14.803293713Z",
     "agent_lines": 0,
     "agent_removed": 0,
-    "human_added": 2090,
-    "human_modified": 1645,
+    "human_added": 2305,
+    "human_modified": 1628,
     "human_removed": 0,
-    "total_committed": 2658,
-    "total_lines_changed": 4181,
+    "total_committed": 2873,
+    "total_lines_changed": 4379,
     "agent_percentage": 0,
     "metric_version": 2
   },
