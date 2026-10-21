@@ -2,6 +2,8 @@
 
 # Agentic ODI
 
+[![Open the Living Studio](https://img.shields.io/badge/Open%20the%20Living%20Studio-F38020?style=for-the-badge&logo=cloudflare&logoColor=white)](https://agentic-odi.alehar.workers.dev/)
+
 [![CI](https://github.com/alehar9320/agentic-odi/actions/workflows/ci.yml/badge.svg)](https://github.com/alehar9320/agentic-odi/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/alehar9320/agentic-odi/branch/main/graph/badge.svg)](https://codecov.io/gh/alehar9320/agentic-odi)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
@@ -19,6 +21,11 @@
 
 ---
 
+> **See it live:** **[agentic-odi.alehar.workers.dev](https://agentic-odi.alehar.workers.dev/)**.
+> No install required; the interface loads immediately, while live data, chat, and
+> mutations need the local sidecar ([Deployment](docs/deployment.md)). To run the
+> full stack yourself, jump to [Quick Start](#quick-start).
+
 **Agentic ODI** explores how the [Model Context Protocol](https://modelcontextprotocol.io)
 can turn [Outcome-Driven Innovation](https://strategyn.com/outcome-driven-innovation/)
 into a live, agent-queryable source of context. Instead of feeding LLMs
@@ -31,12 +38,6 @@ This repository is an experimental testbed for understanding server–client MCP
 communication streams, built on [`FastMCP`](https://github.com/jlowin/fastmcp).
 
 We don't publish dates. This page changes when the code does.
-
-**Hosted Studio:** the experimental Living Studio UI runs at
-**[agentic-odi.alehar.workers.dev](https://agentic-odi.alehar.workers.dev/)**.
-It loads without a backend; live data needs the sidecar tunnel described in
-[Deployment](docs/deployment.md). Pull requests get preview URLs from Cloudflare
-Workers Builds.
 
 ## Code Overview
 
