@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.10.0](https://github.com/alehar9320/agentic-odi/compare/v0.9.0...v0.10.0) (2026-10-21)
+
+
+### Features
+
+* MCP ↔ Living Studio connectors (presets, REST API, SSE suggestions) ([#56](https://github.com/alehar9320/agentic-odi/issues/56)) ([9b4c5aa](https://github.com/alehar9320/agentic-odi/commit/9b4c5aa1d56a44d225f1676a91abede120722fad))
+* **studio:** render agent-composed surfaces inline in chat ([#55](https://github.com/alehar9320/agentic-odi/issues/55)) ([97f7e95](https://github.com/alehar9320/agentic-odi/commit/97f7e95f7da831e6b78ef297895beef1330ddf12))
+
 ## [0.9.0](https://github.com/alehar9320/agentic-odi/compare/v0.8.0...v0.9.0) (2026-10-21)
 
 
