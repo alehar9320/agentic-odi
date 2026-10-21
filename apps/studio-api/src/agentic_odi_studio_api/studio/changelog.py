@@ -71,9 +71,7 @@ def parse_changelog_markdown(content: str) -> list[dict]:
     formatted_releases = []
     for rel in releases:
         cats = [
-            {"name": name, "items": items}
-            for name, items in rel["categories"].items()
-            if items
+            {"name": name, "items": items} for name, items in rel["categories"].items() if items
         ]
         formatted_releases.append(
             {

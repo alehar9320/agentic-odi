@@ -408,6 +408,7 @@ def test_post_outcome_uses_local_service() -> None:
     assert response.status_code == 200
     assert ODIService(repo).get_outcomes(job.id)[0].statement == "Minimize effort"
 
+
 # ---------------------------------------------------------------------------
 # /api/changelog
 # ---------------------------------------------------------------------------
