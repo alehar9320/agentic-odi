@@ -233,9 +233,7 @@ PRESETS: tuple[ConnectorPreset, ...] = (
 )
 
 
-def list_presets(
-    area: str | None = None, recommended: bool = False
-) -> list[ConnectorPreset]:
+def list_presets(area: str | None = None, recommended: bool = False) -> list[ConnectorPreset]:
     """Return presets, optionally filtered by capability area or recommendation."""
     presets = list(PRESETS)
     if area is not None:

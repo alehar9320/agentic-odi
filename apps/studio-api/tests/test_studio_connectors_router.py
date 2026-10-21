@@ -54,7 +54,9 @@ def test_add_from_preset_persists(tmp_path) -> None:
 def test_add_custom_url(tmp_path) -> None:
     client = _app(tmp_path)
 
-    response = client.post("/api/connectors", json={"name": "gong", "url": "http://localhost:9000/mcp"})
+    response = client.post(
+        "/api/connectors", json={"name": "gong", "url": "http://localhost:9000/mcp"}
+    )
 
     assert response.status_code == 200
     assert response.json() == {"ok": True, "name": "gong"}

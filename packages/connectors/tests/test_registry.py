@@ -12,7 +12,9 @@ from agentic_odi_connectors.registry import (
 
 def test_delete_removes_connector(tmp_path: Path) -> None:
     registry = _registry(tmp_path)
-    registry.add(ConnectorConfig(name="gong", kind="mcp", settings={"url": "http://localhost:1/mcp"}))
+    registry.add(
+        ConnectorConfig(name="gong", kind="mcp", settings={"url": "http://localhost:1/mcp"})
+    )
 
     assert registry.delete("gong") is True
     assert registry.list_all() == []

@@ -167,9 +167,7 @@ def test_add_connector_tool_is_advertised() -> None:
 def test_apply_add_connector_registers_and_emits_event(tmp_path) -> None:
     service = ConnectorService(tmp_path / "connectors.json")
 
-    result_str, events = chat._apply_add_connector(
-        {"name": "gong", "preset": "gong"}, service
-    )
+    result_str, events = chat._apply_add_connector({"name": "gong", "preset": "gong"}, service)
 
     assert events[0]["event"] == "connector"
     assert events[0]["data"]["action"] == "registered"
@@ -193,7 +191,15 @@ def test_stream_chat_handles_add_connector_locally(monkeypatch, tmp_path) -> Non
     _install(
         monkeypatch,
         [
-            _FakeStream([_chunk(tool_calls=[_tool_call('{"name":"gong","preset":"gong"}', name="add_connector")])]),
+            _FakeStream(
+                [
+                    _chunk(
+                        tool_calls=[
+                            _tool_call('{"name":"gong","preset":"gong"}', name="add_connector")
+                        ]
+                    )
+                ]
+            ),
             _FakeStream([_chunk(content="registered it")]),
         ],
     )
@@ -213,7 +219,9 @@ def test_stream_chat_add_connector_unknown_preset_emits_error(monkeypatch, tmp_p
     _install(
         monkeypatch,
         [
-            _FakeStream([_chunk(tool_calls=[_tool_call('{"preset":"nope"}', name="add_connector")])]),
+            _FakeStream(
+                [_chunk(tool_calls=[_tool_call('{"preset":"nope"}', name="add_connector")])]
+            ),
             _FakeStream([_chunk(content="ok")]),
         ],
     )
@@ -222,4 +230,3 @@ def test_stream_chat_add_connector_unknown_preset_emits_error(monkeypatch, tmp_p
 
     assert json.loads(events["connector"][0])["status"] == "error"
     assert service.list() == []
-

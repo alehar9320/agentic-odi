@@ -197,7 +197,7 @@ def test_render_ui_is_offered_to_the_model_with_the_catalog(monkeypatch) -> None
     _collect(_request())
 
     tools = HOLDER["completions"].calls[0]["tools"]
-    assert [tool["function"]["name"] for tool in tools] == ["render_ui"]
+    assert [tool["function"]["name"] for tool in tools] == ["render_ui", "add_connector"]
     assert tools[0]["function"]["parameters"]["properties"]["type"]["enum"] == ["outcome-card"]
     assert "outcome-card" in tools[0]["function"]["description"]
 
@@ -213,7 +213,8 @@ def test_api_is_absent_when_the_client_sends_no_catalog(monkeypatch) -> None:
 
     events = _events(_collect(_request(catalog=None)))
 
-    assert HOLDER["completions"].calls[0]["tools"] is None
+    tools = HOLDER["completions"].calls[0]["tools"]
+    assert [tool["function"]["name"] for tool in tools] == ["add_connector"]
     assert "ui" not in events
     assert json.loads(events["tool"][1])["status"] == "error"
 

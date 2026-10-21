@@ -16,6 +16,7 @@ from typing import Any
 from fastmcp import Client as McpClient
 from openai import AsyncOpenAI
 
+from agentic_odi_studio_api.studio.connectors import ConnectorService
 from agentic_odi_studio_api.studio.probes import check_llm_health
 from agentic_odi_studio_api.studio.schemas import ChatRequest, StudioBrief
 from agentic_odi_studio_api.studio.ui_spec import RENDER_UI_TOOL, UiCatalog
