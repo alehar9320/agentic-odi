@@ -1,52 +1,51 @@
 ---
-description: Start the local dev stack and verify the Living Studio
+description: Start the local dev stack and run end-to-end tests against the Living Studio SPA
 ---
 
 # Local Dev & Test Workflow
 
-Use this workflow whenever the user asks to run the app locally or test the
-server/Studio stack end to end.
+Use this workflow whenever the user asks to:
+- Run the app locally
+- Test the agent/server/client stack end-to-end
+- Open the browser and interact with the Living Studio SPA
 
 ## Steps
 
-1. **Start both Python services** — The launcher starts the MCP server on
-   `:8000` and the Studio API sidecar on `:8100`.
+1. **Start the server** — Launch the FastMCP server and the Living Studio sidecar as a
+   single background process using the dev launcher.
 
-```bash
-uv run python scripts/dev.py
-```
+   ```
+   uv run python scripts/dev.py
+   ```
 
-Save the command ID and wait a few seconds for both ports to bind.
+   Run with `WaitMsBeforeAsync: 2000` so the server has time to bind its port before
+   continuing. Save the CommandId as `SERVER_CMD`.
 
-2. **Verify the services**
+2. **Verify the server is healthy** — Check `SERVER_CMD` status. If it has exited with an
+   error, stop and report the error to the user. Do not proceed.
 
-```bash
-curl -sf http://127.0.0.1:8100/api/config
-curl -sfX POST http://127.0.0.1:8000/mcp \
-  -H 'Content-Type: application/json' \
-  -d '{"jsonrpc":"2.0","method":"initialize","id":1,"params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"dev","version":"1"}}}'
-```
+3. **Verify the studio is running** — Confirm the studio sidecar has started by checking
+   for the "Living Studio" URL printout (`http://localhost:8100`).
 
-3. **Open the Studio** — navigate to `http://localhost:8100`.
-   For hot reload instead, run `npm --prefix apps/studio run dev` in a second
-   terminal; Vite proxies `/api` to the sidecar.
+4. **Open the browser** — Use the `browser_subagent` tool to navigate to
+   `http://localhost:8100` and visually confirm the Living Studio SPA loads correctly.
 
-4. **Build the SPA when needed**
+5. **Run end-to-end interaction** — Use `browser_subagent` to exercise a feature
+   (e.g., explore the Opportunity Landscape or query job maps) and confirm the UI
+   responds correctly. Report what you see.
 
-```bash
-npm --prefix apps/studio run build
-```
+6. **Report results** — Use `notify_user` to summarize:
+   - Whether the MCP server and studio sidecar started cleanly
+   - What the browser showed
+   - Any errors encountered
 
-The sidecar serves `apps/studio/dist` when it exists. Override the location with
-`AGENTIC_ODI_STUDIO_DIST`.
-
-5. **Teardown** — stop the launcher; it terminates both child processes.
+7. **Teardown (when done)** — Terminate `SERVER_CMD` using `send_command_input` with
+   `Terminate: true`.
 
 ## Notes
 
-- MCP server: `http://localhost:8000/mcp`
-- Studio API and SPA: `http://localhost:8100`
-- Vite dev server: `http://localhost:5173`
-- Chat requires an OpenAI-compatible endpoint. The default is
-  `http://localhost:8001/v1`; configure it in Studio Settings or with
-  `AGENTIC_ODI_BASE_URL`.
+- The MCP server runs on `http://localhost:8000/mcp`
+- The Living Studio runs on `http://localhost:8100`
+- All commands should be run from the project root (the `agentic-odi` workspace root).
+- The MCP server does not require an LLM. The studio SPA is a static build; if the
+  frontend is not built, the dev launcher prints a hint with the build command.

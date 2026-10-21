@@ -555,3 +555,75 @@ a {
   outline: 2px solid var(--studio-indigo);
   outline-offset: 2px;
 }
+
+/* ------------------------------------------------------------------ */
+/* Apple-inspired polish & Glassmorphism refinements                   */
+/* ------------------------------------------------------------------ */
+
+.outcome-card {
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  background: var(--studio-surface);
+  border: 1px solid var(--studio-border);
+  border-radius: var(--studio-radius);
+  padding: 16px;
+  backdrop-filter: blur(12px);
+}
+
+.outcome-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), 0 0 1px rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+.pulsing-card {
+  box-shadow: 0 0 20px rgba(251, 191, 36, 0.15);
+  border-color: rgba(251, 191, 36, 0.3);
+}
+
+.studio-button {
+  transition: all 0.15s ease-in-out;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+.studio-button:hover:not(:disabled) {
+  transform: scale(1.02);
+  opacity: 0.95;
+}
+
+.studio-button:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.studio-button--primary {
+  background: linear-gradient(135deg, var(--studio-indigo) 0%, var(--studio-indigo-strong) 100%);
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
+}
+
+.studio-metric {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--studio-border);
+  border-radius: 10px;
+  padding: 14px;
+  backdrop-filter: blur(8px);
+}
+
+/* Custom scrollbar for data density tables */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}

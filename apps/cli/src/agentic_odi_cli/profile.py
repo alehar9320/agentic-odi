@@ -194,7 +194,7 @@ def load_llm_config_dict() -> dict[str, str]:
     """
     try:
         p = load_llm_profile()
-    except Exception:  # noqa: BLE001
+    except (ValueError, OSError):
         return {}
     if p is None:
         return {}

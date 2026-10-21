@@ -59,6 +59,7 @@ def test_fetch_canvas_hydrates_jobs_steps_and_outcomes(monkeypatch) -> None:
         "steps": [{"id": "step-1", "job_id": "job-1"}],
         "outcomes": [{"id": "outcome-1", "job_id": "job-1"}],
         "source": "mcp",
+        "warnings": [],
     }
     assert _FakeClient.calls == [
         ("get_jobs", {}),
