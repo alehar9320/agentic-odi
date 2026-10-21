@@ -56,9 +56,14 @@
 def test_legacy_db_backfills_unique_event_ids(tmp_path):
     db = tmp_path / "odi.db"
     conn = sqlite3.connect(db)
-    conn.execute("CREATE TABLE events (id INTEGER PRIMARY KEY AUTOINCREMENT, timestamp TEXT NOT NULL, event_type TEXT NOT NULL, payload TEXT NOT NULL)")
-    conn.execute("INSERT INTO events (timestamp, event_type, payload) VALUES ('2026-01-01T00:00:00', 'JOB_CREATED', '{\"id\": \"j1\"}')")
-    conn.commit(); conn.close()
+    conn.execute(
+        "CREATE TABLE events (id INTEGER PRIMARY KEY AUTOINCREMENT, timestamp TEXT NOT NULL, event_type TEXT NOT NULL, payload TEXT NOT NULL)"
+    )
+    conn.execute(
+        "INSERT INTO events (timestamp, event_type, payload) VALUES ('2026-01-01T00:00:00', 'JOB_CREATED', '{\"id\": \"j1\"}')"
+    )
+    conn.commit()
+    conn.close()
 
     store = IntentStore(str(db))
     events = store.get_stream()
@@ -222,10 +227,12 @@ git commit -m "feat(core): scope repositories to a workspace"
 ```python
 def test_d1_client_posts_query_to_rest_api():
     seen = {}
+
     def handler(request):
         seen["url"] = str(request.url)
         seen["json"] = json.loads(request.content)
         return httpx.Response(200, json={"success": True, "result": [{"results": [{"id": 1}]}]})
+
     config = D1Config(account_id="acct", database_id="db", api_token="token")
     client = D1Client(config, client=httpx.Client(transport=httpx.MockTransport(handler)))
     assert client.query("SELECT 1", ()) == [{"id": 1}]
@@ -304,9 +311,15 @@ def test_push_marks_events_synced_and_is_idempotent(tmp_path):
 def test_pull_reloads_in_server_order(tmp_path):
     store = IntentStore(str(tmp_path / "e.db"))
     local_evt = store.append("JOB_CREATED", {"id": "mine"})
-    remote = {"event_id": "remote-1", "workspace_id": "local", "device_id": "d2",
-              "timestamp": "2026-01-01T00:00:00+00:00", "type": "JOB_CREATED",
-              "payload": {"id": "theirs"}, "server_seq": 1}
+    remote = {
+        "event_id": "remote-1",
+        "workspace_id": "local",
+        "device_id": "d2",
+        "timestamp": "2026-01-01T00:00:00+00:00",
+        "type": "JOB_CREATED",
+        "payload": {"id": "theirs"},
+        "server_seq": 1,
+    }
     transport = FakeTransport(pull_events=[remote])
     sync = SyncService(store, transport, "local")
     assert sync.pull() == 1
@@ -375,6 +388,7 @@ def test_sync_status_reports_local_provider(tmp_path, monkeypatch):
     result = CliRunner().invoke(app, ["sync", "status"])
     assert result.exit_code == 0
     assert "sqlite" in result.output.lower()
+
 
 def test_sync_push_requires_url_and_token(tmp_path, monkeypatch):
     monkeypatch.setenv("AGENTIC_ODI_DB", str(tmp_path / "odi.db"))
@@ -508,6 +522,7 @@ def test_studio_defaults_to_local(tmp_path, monkeypatch):
     body = client.get("/api/storage").json()
     assert body["provider"] == "local"
     assert "token" not in json.dumps(body).lower()
+
 
 def test_forced_local_beats_d1_env(tmp_path, monkeypatch):
     monkeypatch.setenv("AGENTIC_ODI_DB", str(tmp_path / "odi.db"))
