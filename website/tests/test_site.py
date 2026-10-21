@@ -33,13 +33,8 @@ PAGES_URL = "https://alehar9320.github.io/agentic-odi/"
 ALLOWED_EXTERNAL_PREFIXES = (
     # The project itself.
     "https://github.com/alehar9320/agentic-odi",
-    "https://github.com/",
-    "https://alehar9320.github.io/agentic-odi/",
-    "https://alehar9320.github.io",
-    "https://agentic-odi.alehar.workers.dev/",
-    "https://agentic-odi.fastmcp.app/mcp",
+    "https://github.com/alehar9320/agentic-odi/issues",
     "https://horizon.prefect.io/alhase/servers/agentic-odi/chat",
-    # Tooling the guides mention.
     "https://docs.astral.sh/uv/",
     "https://modelcontextprotocol.io",
     "https://www.python.org/downloads/",

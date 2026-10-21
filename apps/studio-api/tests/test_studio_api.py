@@ -180,9 +180,9 @@ def test_canvas_falls_back_to_seed_when_mcp_unreachable() -> None:
 @pytest.mark.parametrize(
     ("prompt", "expected"),
     [
-        ("Give me the ODI Stage-by-Stage guidelines.", "ODI, stage by stage"),
-        ("Simulate the impact of an Auto-Sync Agent.", "Simulate the bet by hand"),
-        ("Show me the evidence from a customer call.", "Evidence needs a source"),
+        ("Give me the ODI Stage-by-Stage guidelines.", "Stage 1"),
+        ("Simulate the impact of an Auto-Sync Agent.", "WYSIWYG Impact Simulation Result"),
+        ("Show me the evidence from a customer call.", "Causal Lineage"),
     ],
 )
 def test_chat_offline_fallbacks_stream_deltas_and_message(prompt: str, expected: str) -> None:
@@ -196,13 +196,12 @@ def test_chat_offline_fallbacks_stream_deltas_and_message(prompt: str, expected:
     assert streamed == content
 
 
-def test_chat_offline_default_points_at_manual_work() -> None:
+def test_chat_offline_default_echoes_intent() -> None:
     events = _stream("/api/chat", _chat_body("hello world"))
 
     content = json.loads(events["message"][-1])["content"]
-    assert "no model is reachable" in content
-    assert "/capture" in content
-    assert "/help" in content
+    assert '"hello world"' in content
+    assert "Opportunity Score of 15.3" in content
 
 
 def _delta_chunk(content: str | None = None, tool_calls: list[Any] | None = None) -> Any:
@@ -409,127 +408,3 @@ def test_post_outcome_uses_local_service() -> None:
 
     assert response.status_code == 200
     assert ODIService(repo).get_outcomes(job.id)[0].statement == "Minimize effort"
-
-
-# ---------------------------------------------------------------------------
-# /api/changelog
-# ---------------------------------------------------------------------------
-
-
-def test_get_changelog_returns_parsed_or_fallback_data() -> None:
-    response = _client().get("/api/changelog")
-    assert response.status_code == 200
-    data = response.json()
-    assert "releases" in data
-    assert len(data["releases"]) > 0
-    release = data["releases"][0]
-    assert "version" in release
-    assert "date" in release
-    assert "categories" in release
-
-
-# ---------------------------------------------------------------------------
-# /api/memory and /api/conversations
-# ---------------------------------------------------------------------------
-
-
-def _stream_with(client: TestClient, path: str, payload: dict[str, Any]) -> dict[str, list[str]]:
-    with client.stream("POST", path, json=payload) as response:
-        assert response.status_code == 200
-        return _sse_events("".join(response.iter_text()))
-
-
-def test_memory_observation_crud() -> None:
-    client = _client()
-
-    created = client.post(
-        "/api/memory/observations",
-        json={"kind": "career", "text": "Owns activation."},
-    )
-    assert created.status_code == 200
-    observation = created.json()["observation"]
-    assert observation["status"] == "suggested"
-
-    listed = client.get("/api/memory/observations").json()["observations"]
-    assert [item["id"] for item in listed] == [observation["id"]]
-
-    patched = client.patch(
-        f"/api/memory/observations/{observation['id']}",
-        json={"status": "confirmed", "text": "Owns activation end to end."},
-    )
-    assert patched.status_code == 200
-    assert patched.json()["observation"]["status"] == "confirmed"
-    assert patched.json()["observation"]["text"] == "Owns activation end to end."
-
-    assert client.delete(f"/api/memory/observations/{observation['id']}").status_code == 200
-    assert client.get("/api/memory/observations").json()["observations"] == []
-    assert client.delete(f"/api/memory/observations/{observation['id']}").status_code == 404
-
-
-def test_memory_rejects_unknown_kind_and_blank_text() -> None:
-    client = _client()
-
-    assert (
-        client.post("/api/memory/observations", json={"kind": "nonsense", "text": "x"}).status_code
-        == 422
-    )
-    assert (
-        client.post("/api/memory/observations", json={"kind": "career", "text": "   "}).status_code
-        == 422
-    )
-
-
-def test_pm_authored_context_can_start_confirmed() -> None:
-    client = _client()
-    response = client.post(
-        "/api/memory/observations",
-        json={"kind": "opportunity", "text": "Activation is the bet.", "confirmed": True},
-    )
-    assert response.status_code == 200
-    assert response.json()["observation"]["status"] == "confirmed"
-
-
-def test_conversation_endpoints_and_chat_persistence() -> None:
-    client = _client()
-
-    assert client.get("/api/conversations/latest").json() == {
-        "conversation": None,
-        "turns": [],
-    }
-
-    events = _stream_with(client, "/api/chat", _chat_body("hello there"))
-    conversation = json.loads(events["conversation"][0])
-    assert conversation["id"]
-    assert conversation["title"] == "hello there"
-
-    latest = client.get("/api/conversations/latest").json()
-    assert latest["conversation"]["id"] == conversation["id"]
-    assert [turn["role"] for turn in latest["turns"]] == ["user", "assistant"]
-
-
-def test_chat_resumes_an_existing_conversation() -> None:
-    client = _client()
-    created = client.post("/api/conversations").json()["conversation"]
-
-    events = _stream_with(
-        client,
-        "/api/chat",
-        {**_chat_body("second message"), "conversation_id": created["id"]},
-    )
-    conversation = json.loads(events["conversation"][0])
-    assert conversation["id"] == created["id"]
-    latest = client.get("/api/conversations/latest").json()
-    assert len(latest["turns"]) == 2
-
-
-def test_clear_memory_removes_conversations_and_observations() -> None:
-    client = _client()
-    _stream_with(client, "/api/chat", _chat_body("hello"))
-    client.post("/api/memory/observations", json={"kind": "career", "text": "Owns activation."})
-
-    assert client.delete("/api/memory").status_code == 200
-    assert client.get("/api/conversations/latest").json() == {
-        "conversation": None,
-        "turns": [],
-    }
-    assert client.get("/api/memory/observations").json()["observations"] == []

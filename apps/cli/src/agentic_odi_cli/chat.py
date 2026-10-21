@@ -10,8 +10,6 @@ from __future__ import annotations
 import asyncio
 import json
 import os
-import sys
-import traceback
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any, Literal, Protocol
@@ -530,8 +528,6 @@ async def _run_chat(config: ChatConfig) -> int:
             except Exception as exc:  # noqa: BLE001
                 typer.echo()
                 typer.echo(f"Error: {exc}", err=True)
-                if os.environ.get("AGENTIC_ODI_DEBUG"):
-                    typer.echo(traceback.format_exc(), err=True)
                 continue
             typer.echo()
             if not printed:

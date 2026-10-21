@@ -1,19 +1,9 @@
 import { apiUrl } from "../bridge/desktopBridge";
 import type {
-  AddConnectorPayload,
   AddOutcomePayload,
   AddStepPayload,
   CanvasData,
-  ChangelogData,
   ChatStreamRequest,
-  ConnectorHealth,
-  ConnectorListItem,
-  ConnectorOperationResponse,
-  ConnectorPreset,
-  Conversation,
-  CreateJobPayload,
-  Job,
-  LatestConversation,
   LlmHealth,
   McpHealth,
   Observation,
@@ -93,26 +83,11 @@ async function getJson<T>(path: string): Promise<T> {
   return (await response.json()) as T;
 }
 
-async function sendJson<T>(method: "POST" | "PATCH", path: string, body: unknown): Promise<T> {
+async function postJson<T>(path: string, body: unknown): Promise<T> {
   const response = await fetch(apiUrl(path), {
-    method,
+    method: "POST",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
     body: JSON.stringify(body),
-  });
-  if (!response.ok) {
-    throw await studioError(response);
-  }
-  return (await response.json()) as T;
-}
-
-async function postJson<T>(path: string, body: unknown): Promise<T> {
-  return sendJson<T>("POST", path, body);
-}
-
-async function deleteJson<T>(path: string): Promise<T> {
-  const response = await fetch(apiUrl(path), {
-    method: "DELETE",
-    headers: { Accept: "application/json" },
   });
   if (!response.ok) {
     throw await studioError(response);
@@ -123,10 +98,6 @@ async function deleteJson<T>(path: string): Promise<T> {
 export async function fetchConfig(): Promise<StudioConfig> {
   const body = await getJson<{ defaults: StudioConfig }>("/api/config");
   return body.defaults;
-}
-
-export function fetchChangelog(): Promise<ChangelogData> {
-  return getJson<ChangelogData>("/api/changelog");
 }
 
 export function fetchCanvas(mcpUrl: string): Promise<CanvasData> {
@@ -153,77 +124,6 @@ export function addOutcome(payload: AddOutcomePayload): Promise<Outcome> {
   return postJson<Outcome>("/api/outcomes", payload);
 }
 
-export function createJob(payload: CreateJobPayload): Promise<Job> {
-  return postJson<Job>("/api/jobs", payload);
-}
-
-export function updateJob(
-  jobId: string,
-  payload: { name?: string; description?: string; mcp_url: string },
-): Promise<Job> {
-  return sendJson<Job>("PATCH", `/api/jobs/${encodeURIComponent(jobId)}`, payload);
-}
-
-export function deleteJob(jobId: string, mcpUrl: string): Promise<{ deleted: string }> {
-  return deleteJson<{ deleted: string }>(
-    `/api/jobs/${encodeURIComponent(jobId)}?mcp_url=${encodeURIComponent(mcpUrl)}`,
-  );
-}
-
-export function updateStep(
-  stepId: string,
-  payload: { name?: string; order?: number; mcp_url: string },
-): Promise<Step> {
-  return sendJson<Step>("PATCH", `/api/steps/${encodeURIComponent(stepId)}`, payload);
-}
-
-export function deleteStep(stepId: string, mcpUrl: string): Promise<{ deleted: string }> {
-  return deleteJson<{ deleted: string }>(
-    `/api/steps/${encodeURIComponent(stepId)}?mcp_url=${encodeURIComponent(mcpUrl)}`,
-  );
-}
-
-export function updateOutcome(
-  outcomeId: string,
-  payload: { statement?: string; importance?: number; satisfaction?: number; mcp_url: string },
-): Promise<Outcome> {
-  return sendJson<Outcome>(
-    "PATCH",
-    `/api/outcomes/${encodeURIComponent(outcomeId)}`,
-    payload,
-  );
-}
-
-export function deleteOutcome(outcomeId: string, mcpUrl: string): Promise<{ deleted: string }> {
-  return deleteJson<{ deleted: string }>(
-    `/api/outcomes/${encodeURIComponent(outcomeId)}?mcp_url=${encodeURIComponent(mcpUrl)}`,
-  );
-}
-
-export function fetchConnectorCatalog(): Promise<ConnectorPreset[]> {
-  return getJson<ConnectorPreset[]>("/api/connectors/catalog");
-}
-
-export function fetchConnectors(): Promise<ConnectorListItem[]> {
-  return getJson<ConnectorListItem[]>("/api/connectors");
-}
-
-export function addConnector(payload: AddConnectorPayload): Promise<ConnectorOperationResponse> {
-  return postJson<ConnectorOperationResponse>("/api/connectors", payload);
-}
-
-export async function deleteConnector(name: string): Promise<ConnectorOperationResponse> {
-  const response = await fetch(apiUrl(`/api/connectors/${encodeURIComponent(name)}`), {
-    method: "DELETE",
-    headers: { Accept: "application/json" },
-  });
-  if (!response.ok) throw await studioError(response);
-  return (await response.json()) as ConnectorOperationResponse;
-}
-
-export function checkConnectorHealth(name: string): Promise<ConnectorHealth> {
-  return postJson<ConnectorHealth>(`/api/connectors/${encodeURIComponent(name)}/health`, {});
-}
 export type ChatEventHandler = (event: RawSseEvent) => void;
 
 export async function streamChat(

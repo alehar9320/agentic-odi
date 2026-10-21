@@ -153,26 +153,7 @@ def test_mcp_backend_parses_opportunity_score(monkeypatch):
     assert backend.call("compute_opportunity", {"importance": 8, "satisfaction": 2}) == 14.0
 
 
-def test_mcp_backend_reports_unreachable_server(monkeypatch):
-    """An unreachable server must surface as a clear BackendError.
-
-    The transport is stubbed: dialing a real port makes this test depend on
-    whether the host refuses or silently drops the connection, which decided
-    between the connection-failure and timeout messages on different runners.
-    """
-
-    class _UnreachableClient:
-        def __init__(self, *args, **kwargs):
-            pass
-
-        async def __aenter__(self):
-            raise ConnectionError("connection refused")
-
-        async def __aexit__(self, *exc):
-            return False
-
-    monkeypatch.setattr("fastmcp.Client", _UnreachableClient)
-
+def test_mcp_backend_reports_unreachable_server():
     backend = MCPBackend(mcp_url="http://127.0.0.1:9/mcp", timeout=0.5)
     with pytest.raises(BackendError, match="could not reach MCP server"):
         backend.call("get_customer_outcome", {"outcome_id": "x"})

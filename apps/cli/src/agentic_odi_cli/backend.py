@@ -352,6 +352,7 @@ class LocalBackend(Backend):
 
     def _add_evidence(self, args: dict[str, Any]) -> dict[str, Any]:
         from agentic_odi_core import (
+            EvidenceNotFoundError,  # noqa: F401  (kept for parity with sibling handlers)
             JobNotFoundError,
             OutcomeNotFoundError,
             StepNotFoundError,

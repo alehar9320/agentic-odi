@@ -1,0 +1,7 @@
+{
+  "name": "agentic-odi-root",
+  "private": true,
+  "scripts": {
+    "build": "npm --prefix apps/studio run build"
+  }
+}
