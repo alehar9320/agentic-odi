@@ -1358,7 +1358,7 @@ a {
   width: 100%;
   padding: 8px 10px;
   border: 1px solid var(--line);
-  border-radius: 9px;
+  border-radius: 999px;
   background: rgba(0, 0, 0, 0.25);
   color: var(--text);
   font-size: 0.84rem;
@@ -2005,6 +2005,71 @@ input[type="range"] {
   color: var(--muted);
   font-size: 0.8rem;
   line-height: 1.45;
+}
+
+/* ------------------------------------------------------------------ */
+/* Bell & Notification Badges                                         */
+/* ------------------------------------------------------------------ */
+
+.bell-badge {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  display: grid;
+  place-items: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--accent-strong);
+  color: #ffffff;
+  font-size: 0.62rem;
+  font-weight: 700;
+  box-shadow: 0 0 8px rgba(99, 102, 241, 0.6);
+  animation: pulse-badge 2s infinite ease-in-out;
+}
+
+@keyframes pulse-badge {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 6px rgba(99, 102, 241, 0.5);
+  }
+  50% {
+    transform: scale(1.1);
+    box-shadow: 0 0 12px rgba(139, 140, 248, 0.8);
+  }
+}
+
+.catchup-feed {
+  animation: fade-in 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.catchup-summary {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(255, 255, 255, 0.01) 100%);
+  border-color: rgba(139, 140, 248, 0.25);
+  backdrop-filter: blur(12px);
+}
+
+.catchup-summary__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.catchup-card {
+  position: relative;
+  transition: all 0.2s ease-in-out;
+}
+
+.catchup-card:hover {
+  transform: translateY(-1px);
+  border-color: var(--line-strong);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+}
+
+.catchup-card.is-unread {
+  border-left: 3px solid var(--accent);
+  background: rgba(99, 102, 241, 0.04);
 }
 
 @media (max-width: 1023px) {

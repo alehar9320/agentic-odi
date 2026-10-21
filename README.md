@@ -87,9 +87,8 @@ The first time you open the Studio it asks — conversationally, in the chat, an
 skippable at any point — for your product, audience, and the job your customers
 are trying to get done. Answer what you like; every reply starts from what you
 shared. After that it opens as a conversation: describe a job or a customer
-frustration, type `/` for commands that mirror the CLI, or use the drawer to
-open the opportunity landscape, job map, impact simulation, evidence, and
-capture surfaces full screen.
+frustration, type `/` for commands that mirror the CLI, use the top bar bell icon
+or drawer to **catch up on background outcome shifts, simulations, and telemetry signals while you were away**, or open the opportunity landscape, job map, impact simulation, evidence, and capture surfaces full screen.
 
 The Studio is better with an OpenAI-compatible LLM with tool-calling support
 (see the [Local LLM Backend](docs/local-llm.md)), but it does not depend on one:

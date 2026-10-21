@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 
 import { ChatStage } from "./components/chat/ChatStage";
 import { ErrorBoundary } from "./components/ErrorBoundary";
-import { MenuIcon, SettingsIcon } from "./components/icons";
+import { BellIcon, MenuIcon, SettingsIcon } from "./components/icons";
 import { Sidebar } from "./components/layout/Sidebar";
 import { Toasts } from "./components/Toasts";
 import { WorkspacePanel } from "./components/workspace/WorkspacePanel";
@@ -25,7 +25,7 @@ function loadCollapsed(): boolean {
 }
 
 function StudioShell() {
-  const { activePanel, closePanel, openPanel, llmHealth, clearChat, closeSetup } = useStudio();
+  const { activePanel, closePanel, openPanel, llmHealth, clearChat, closeSetup, unreadNotificationCount } = useStudio();
   const [desktopCollapsed, setDesktopCollapsed] = useState(loadCollapsed);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const isMobile = useMediaQuery(MOBILE_QUERY);
@@ -127,6 +127,22 @@ function StudioShell() {
           <div className="bar__right">
             <button
               type="button"
+              className="icon-button bar__bell"
+              aria-label="Catch up notifications"
+              title="Activity & Catch Up"
+              onClick={() => openPanel("catchup")}
+              style={{ position: "relative" }}
+            >
+              <BellIcon size={18} />
+              {unreadNotificationCount > 0 && (
+                <span className="bell-badge" aria-hidden="true">
+                  {unreadNotificationCount}
+                </span>
+              )}
+            </button>
+
+            <button
+              type="button"
               className="bar__health"
               onClick={() => openPanel("settings")}
               title={llmHealth.message}
@@ -142,6 +158,7 @@ function StudioShell() {
                   ? "Live"
                   : "Local mode"}
             </button>
+
             <button
               type="button"
               className="icon-button"
