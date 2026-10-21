@@ -1,12 +1,10 @@
 {
   // Free-plan deployment: the Worker uploads the built SPA as static assets and
   // forwards /api/* to the Python sidecar through a Cloudflare Quick Tunnel.
-  "name": "agentic-odi",
+  // Change "name" to the Worker name you created in the dashboard.
+  "name": "agentic-odi-studio",
   "main": "./infra/cloudflare/worker.ts",
   "compatibility_date": "2026-10-19",
-  "build": {
-    "command": "npm --prefix apps/studio install && npm --prefix apps/studio run build"
-  },
   "assets": {
     "directory": "./apps/studio/dist",
     "binding": "ASSETS",
