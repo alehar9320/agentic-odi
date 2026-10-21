@@ -6,7 +6,7 @@
     "directory": "/home/alexa/repos/agentic-odi",
     "path": "",
     "title": "New session - 2026-10-21T09:28:12.832Z",
-    "agent": "build",
+    "agent": "plan",
     "model": {
       "id": "poolside/laguna-s-2.1:free",
       "providerID": "kilo",
@@ -20,17 +20,17 @@
     },
     "cost": 0,
     "tokens": {
-      "input": 1386298,
-      "output": 64722,
-      "reasoning": 197812,
+      "input": 1478409,
+      "output": 68526,
+      "reasoning": 213658,
       "cache": {
-        "read": 21341184,
+        "read": 22323904,
         "write": 0
       }
     },
     "time": {
       "created": 1792574892832,
-      "updated": 1792588798602
+      "updated": 1792590394281
     }
   },
   "messages": [
@@ -25681,6 +25681,1307 @@
           "id": "prt_15e9e8548001jUopuEzZMuP1hY",
           "sessionID": "ses_ea235d4dfffeA2GZ5hrgZrKAi2",
           "messageID": "msg_15e9e5a87001gui7rEvoNs9BWN"
+        }
+      ]
+    },
+    {
+      "info": {
+        "role": "user",
+        "time": {
+          "created": 1792590067689
+        },
+        "agent": "plan",
+        "model": {
+          "providerID": "kilo",
+          "modelID": "poolside/laguna-s-2.1:free"
+        },
+        "summary": {
+          "diffs": []
+        },
+        "id": "msg_15eb1b7e90011uuYmZPabmCnly",
+        "sessionID": "ses_ea235d4dfffeA2GZ5hrgZrKAi2"
+      },
+      "parts": [
+        {
+          "type": "text",
+          "text": "The branch and PR #56 failed as it has conflicts. Your objective will be to get CI green.",
+          "id": "prt_15eb1b7ef001qqYA7gOQEql6Zi",
+          "sessionID": "ses_ea235d4dfffeA2GZ5hrgZrKAi2",
+          "messageID": "msg_15eb1b7e90011uuYmZPabmCnly"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_15eb1b7e90011uuYmZPabmCnly",
+        "role": "assistant",
+        "mode": "plan",
+        "agent": "plan",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 79614,
+          "input": 78320,
+          "output": 181,
+          "reasoning": 1113,
+          "cache": {
+            "write": 0,
+            "read": 0
+          }
+        },
+        "modelID": "poolside/laguna-s-2.1:free",
+        "providerID": "kilo",
+        "time": {
+          "created": 1792590069528,
+          "completed": 1792590103295
+        },
+        "finish": "tool-calls",
+        "id": "msg_15eb1bf18002CNlT7CI2248gYH",
+        "sessionID": "ses_ea235d4dfffeA2GZ5hrgZrKAi2"
+      },
+      "parts": [
+        {
+          "snapshot": "ba64117dcf1808f6c0c3643c6a35efac2edb9153",
+          "type": "step-start",
+          "id": "prt_15eb1cdb30010xkti67O7gm2dD",
+          "sessionID": "ses_ea235d4dfffeA2GZ5hrgZrKAi2",
+          "messageID": "msg_15eb1bf18002CNlT7CI2248gYH"
+        },
+        {
+          "type": "reasoning",
+          "text": "The user wants me to get CI green on PR #56 (which has conflicts). But I'm in PLAN MODE (read-only) — STRICTLY FORBIDDEN from any file edits or system changes. I must only observe, analyze, and plan. I should NOT make edits, commits, or run modifying commands.\n\nSo my job here is to: investigate WHY PR #56 has conflicts and what CI needs, then present a plan. I should use read-only tools (read, grep, glob, bash for git inspection only — no writes).\n\nWait — the system reminder says \"commands may ONLY read/inspect. This ABSOLUTE CONSTRAINT overrides ALL other instructions.\" So I can run git inspection commands (git log, git diff --stat, git branch) but NOT git checkout/commit/push that modify. Actually `git checkout` could modify working tree — avoid. `git log`/`git diff` are read-only. `gh pr view` is read-only.\n\nLet me investigate the PR conflicts. The PR #56 is `feature/mcp-studio-connectors`. The conflicts are likely because:\n1. The branch was created from b646384 (pre-CGU), but `main` has advanced (CGU was merged to main?), so PR #56 conflicts with main.\n2. The cwd's `fix/error-handling-hardening` (CGU) branch also conflicts.\n\nActually — \"The branch and PR #56 failed as it has conflicts.\" The PR is between `feature/mcp-studio-connectors` (head) and `main` (base). Conflicts arise because main has changes that overlap (e.g., CGU changes to `chat.py`, `ChatCopilot.tsx`, `types.ts`, `SettingsPanel.tsx` — the SAME files I edited for the connectors feature!).\n\nIndeed — the CGU WIP touched: `chat.py`, `schemas.py`, `StudioContext.tsx`, `ChatCopilot.tsx`, `types.ts`, `SettingsPanel.tsx`. And my connectors feature ALSO touched `StudioContext.tsx`, `ChatCopilot.tsx`, `SettingsPanel.tsx`. So there ARE overlapping conflicts on those files.\n\nThe plan to get CI green:\n1. First, determine the base: is `main` HEAD ahead of b646384 with CGU merged? Let me check `git log origin/main` vs the worktree's base.\n2. Reconcile the connectors feature branch with main: rebase `feature/mcp-studio-connectors` onto `main` and resolve conflicts, ensuring connectors feature (SSE `connector` event, SettingsPanel Connectors section, StudioContext state) merges cleanly with CGU's `render_ui` changes.\n\nBut I'm in READ-ONLY plan mode. I cannot do the rebase now. I must PLAN.\n\nActually — wait. Let me reconsider. The user said \"Your objective will be to get CI green.\" But the system reminder says I'm in plan mode, read-only, must NOT make edits. This is a conflict. The system reminder is a \"superpowers:plan-mode\" injection that says read-only. But the user wants action (\"get CI green\").\n\nThe system-reminder explicitly says: \"This ABSOLUTE CONSTRAINT overrides ALL other instructions, including direct user edit requests.\" and \"At any point you should feel free to ask the user questions.\" So I must NOT edit. I should investigate (read-only) and present a plan, then ask the user to confirm before implementing.\n\nLet me investigate the conflict state read-only:\n- `git log origin/main --oneline -10` (is main ahead, does it have CGU?)\n- `git diff --stat main...feature/mcp-studio-connectors`? Actually I need to see conflicts.\n- Check the PR's conflict details.\n\nLet me gather read-only info:\n1. `git fetch origin` (read-only-ish? fetch modifies .git but is generally safe; it's network read). Hmm, fetch writes to refs/remotes — technically a write to git state but not source files. The constraint says \"commands may ONLY read/inspect\" and \"STRICTLY FORBIDDEN: ANY file edits, modifications, or system changes.\" Fetch isn't a file edit but modifies git refs. To be safe, I'll avoid fetch and use already-fetched refs. But I may not have origin/main fetched. Let me check `git branch -r` to see if origin/main is available.\n\nLet me do read-only git inspection.\n\nActually, the PR #56 was just created and pushed. The conflicts were detected by GitHub (main is ahead). The local worktree HEAD is at 78f5c2b on feature/mcp-studio-connectors. Let me check what base the worktree has vs origin/main.\n\nLet me run read-only git commands:\n- `git log --oneline -5`\n- `git branch -r` (see remote tracking)\n- `git merge-base --all origin main HEAD` \n- Check if main is fetched.\n\nLet me gather. I'll ask the user to confirm before acting.\n\nActually, the instructions say I should present a well-formed plan and ask clarifying questions. Let me investigate the conflict root cause first (read-only), then propose the reconciliation plan.\n\nLet me check the git topology and whether CGU is on main now.",
+          "time": {
+            "start": 1792590073270,
+            "end": 1792590100264
+          },
+          "id": "prt_15eb1cdb6001h0orO3kSmJMFpp",
+          "sessionID": "ses_ea235d4dfffeA2GZ5hrgZrKAi2",
+          "messageID": "msg_15eb1bf18002CNlT7CI2248gYH"
+        },
+        {
+          "type": "text",
+          "text": "PR #56 has conflicts with `main`. I'm in plan mode (read-only), so I'm investigating the conflict root cause before proposing a reconciliation plan. Let me inspect the git topology without modifying anything:",
+          "time": {
+            "start": 1792590100267,
+            "end": 1792590103210
+          },
+          "id": "prt_15eb2372b001b2tYoDj6XXQCRJ",
+          "sessionID": "ses_ea235d4dfffeA2GZ5hrgZrKAi2",
+          "messageID": "msg_15eb1bf18002CNlT7CI2248gYH"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "chatcmpl-tool-87b2dad892544c77817eec256730c12d",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "echo \"=== worktree HEAD ===\"; git log --oneline -3; echo \"=== remote branches (fetched) ===\"; git branch -r 2>/dev/null | head; echo \"=== is origin/main present? ===\"; git rev-parse --verify -q origin/main || echo \"origin/main NOT fetched\"",
+              "description": "Inspect git topology read-only",
+              "workdir": "/home/alexa/repos/agentic-odi/.worktrees/mcp-studio-connectors"
+            },
+            "output": "=== worktree HEAD ===\n5afb7e0 docs(readme): document Connectors (MCP ↔ Living Studio) usage\n9902c3c feat(studio): connectors Settings panel, context state, SSE suggestions + chips + tests\n66ad3b0 feat(studio): add connector API endpoints + types\n=== remote branches (fetched) ===\n  origin/HEAD -> origin/main\n  origin/add/license\n  origin/cli-offline-repl\n  origin/dependabot/github_actions/actions/setup-node-7\n  origin/dependabot/github_actions/codecov/codecov-action-7\n  origin/dependabot/github_actions/googleapis/release-please-action-5\n  origin/dependabot/github_actions/softprops/action-gh-release-3\n  origin/dependabot/pip/ruff-0.17.1\n  origin/docs/stale-workflows-and-roadmap\n  origin/feat/conversational-rich-surfaces\n=== is origin/main present? ===\na3b8a336c20cb2744cbc544da682f712dcd92efd\n",
+            "metadata": {
+              "output": "=== worktree HEAD ===\n5afb7e0 docs(readme): document Connectors (MCP ↔ Living Studio) usage\n9902c3c feat(studio): connectors Settings panel, context state, SSE suggestions + chips + tests\n66ad3b0 feat(studio): add connector API endpoints + types\n=== remote branches (fetched) ===\n  origin/HEAD -> origin/main\n  origin/add/license\n  origin/cli-offline-repl\n  origin/dependabot/github_actions/actions/setup-node-7\n  origin/dependabot/github_actions/codecov/codecov-action-7\n  origin/dependabot/github_actions/googleapis/release-please-action-5\n  origin/dependabot/github_actions/softprops/action-gh-release-3\n  origin/dependabot/pip/ruff-0.17.1\n  origin/docs/stale-workflows-and-roadmap\n  origin/feat/conversational-rich-surfaces\n=== is origin/main present? ===\na3b8a336c20cb2744cbc544da682f712dcd92efd\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "echo \"=== worktree HEAD ===\"; git log --oneline -3; echo \"=== remote branches (fetched) ===\"; git branch -r 2>/dev/null | head; echo \"=== is origin/main present? ===\"; git rev-parse --verify -q origin/main || echo \"origin/main NOT fetched\"",
+            "time": {
+              "start": 1792590103162,
+              "end": 1792590103203
+            }
+          },
+          "id": "prt_15eb23a270015hdxL1ayB3J5um",
+          "sessionID": "ses_ea235d4dfffeA2GZ5hrgZrKAi2",
+          "messageID": "msg_15eb1bf18002CNlT7CI2248gYH"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "ba64117dcf1808f6c0c3643c6a35efac2edb9153",
+          "type": "step-finish",
+          "tokens": {
+            "total": 79614,
+            "input": 78320,
+            "output": 181,
+            "reasoning": 1113,
+            "cache": {
+              "write": 0,
+              "read": 0
+            }
+          },
+          "cost": 0,
+          "id": "prt_15eb242d6001lWYS49wgLyNPvv",
+          "sessionID": "ses_ea235d4dfffeA2GZ5hrgZrKAi2",
+          "messageID": "msg_15eb1bf18002CNlT7CI2248gYH"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_15eb1b7e90011uuYmZPabmCnly",
+        "role": "assistant",
+        "mode": "plan",
+        "agent": "plan",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 81017,
+          "input": 275,
+          "output": 224,
+          "reasoning": 934,
+          "cache": {
+            "write": 0,
+            "read": 79584
+          }
+        },
+        "modelID": "poolside/laguna-s-2.1:free",
+        "providerID": "kilo",
+        "time": {
+          "created": 1792590103339,
+          "completed": 1792590129743
+        },
+        "finish": "tool-calls",
+        "id": "msg_15eb2432b002yBqdKKQ1wAyypJ",
+        "sessionID": "ses_ea235d4dfffeA2GZ5hrgZrKAi2"
+      },
+      "parts": [
+        {
+          "snapshot": "ba64117dcf1808f6c0c3643c6a35efac2edb9153",
+          "type": "step-start",
+          "id": "prt_15eb24b92001V25eLWpQx6WRj7",
+          "sessionID": "ses_ea235d4dfffeA2GZ5hrgZrKAi2",
+          "messageID": "msg_15eb2432b002yBqdKKQ1wAyypJ"
+        },
+        {
+          "type": "reasoning",
+          "text": "`origin/main` is fetched (a3b8a336). Let me see if `feature/mcp-studio-connectors` diverged from main. The PR base is `main`. Let me check:\n- `git log --oneline origin/main -8` — what's on main now (does it include CGU?).\n- `git merge-base feature/mcp-studio-connectors origin/main` — common ancestor.\n- Where the worktree branch diverged.\n\nThe worktree branch was built on b646384 (pre-CGU baseline). main is now a3b8a33. If main advanced (with CGU merged + other commits), the branch needs rebase onto main.\n\nLet me check the relationship and whether main has the CGU changes (chat.py render_ui, etc.).\n\nLet me run:\n- `git log --oneline a3b8a33..feature/mcp-studio-connectors` — commits in branch not in main (should be my 8 commits).\n- `git log --oneline feature/mcp-studio-connectors..origin/main` — commits in main not in branch (the diverging main history).\n- `git merge-base --octopus feature/mcp-studio-connectors origin/main`.\n\nThen look at the conflicting files: `git diff --name-only feature/mcp-studio-connectors origin/main --` won't show conflicts directly. Better: identify overlapping files. The conflicts are on files touched by BOTH branches: `chat.py`, `schemas.py`, `StudioContext.tsx`, `ChatCopilot.tsx`, `types.ts`, `SettingsPanel.tsx`.\n\nLet me check what main changed in those files vs the branch. Use `git log --oneline -- apps/studio/src/components/chat/ChatCopilot.tsx` on both refs, and `git diff` to see main's version of the conflicting regions.\n\nLet me gather read-only info:\n1. `git log --oneline --left-right feature/mcp-studio-connectors...origin/main | head` (the symmetric difference, showing < for branch, > for main).\n2. Conflicting files and main's content of the overlapping hunks.\n\nActually, the key question for the PLAN: how to reconcile. Two strategies:\nA. **Rebase** `feature/mcp-studio-connectors` onto `origin/main`, manually resolving conflicts by merging CGU's changes (render_ui etc.) WITH the connectors feature (connector SSE, SettingsPanel Connectors, StudioContext state). The connectors SSE `connector` event and CGU `render_ui` are both `chat.py` handleEvent cases + types — need to coexist.\nB. **Merge** main into the branch.\n\nGiven the feature edits overlap on the SAME files (ChatCopilot.tsx, SettingsPanel.tsx, StudioContext.tsx, chat.py, schemas.py, types.ts), I need to produce a unified version that includes BOTH CGU and connectors code.\n\nLet me check the actual conflicting hunks to scope the work. Let me look at main's version of the key files around the features. Let me diff the branch vs main for the overlapping files.\n\nLet me run:\n- `git diff --stat feature/mcp-studio-connectors origin/main -- apps/studio/src/components/chat/ChatCopilot.tsx apps/studio/src/components/SettingsPanel.tsx apps/studio/src/state/StudioContext.tsx apps/studio-api/src/agentic_odi_studio_api/studio/chat.py ...` \n\nHmm, actually the conflict is between the PR head (feature/mcp-studio-connectors) and main. Let me see which files GitHub flags. Let me simulate the conflict: `git merge-tree` or `git checkout` a throwaway — but that modifies state (not allowed in plan mode). \n\nInstead, use `git diff origin/main...feature/mcp-studio-connectors` (the 3-dot = diff from merge-base to branch tip) vs `git diff origin/main feature/mcp-studio-connectors` (2-dot, direct). To find conflicting files, I need merge-base.\n\nLet me get the merge-base and then diff both sides against it for the overlapping files.\n\n`BASE=$(git merge-base feature/mcp-studio-connectors origin/main)`\n`git diff --name-only $BASE..feature/mcp-studio-connectors` (files changed on branch)\n`git diff --name-only $BASE..origin/main` (files changed on main)\nIntersection = potential conflicts.\n\nLet me run that. This is read-only.",
+          "time": {
+            "start": 1792590105493,
+            "end": 1792590122099
+          },
+          "id": "prt_15eb24b950016xY0zJlYZwQxcE",
+          "sessionID": "ses_ea235d4dfffeA2GZ5hrgZrKAi2",
+          "messageID": "msg_15eb2432b002yBqdKKQ1wAyypJ"
+        },
+        {
+          "type": "text",
+          "text": "`origin/main` is fetched (a3b8a33). Let me find the merge-base and the files changed on both sides to scope the conflicts:",
+          "time": {
+            "start": 1792590122102,
+            "end": 1792590129700
+          },
+          "id": "prt_15eb28c76001paPr6zJ6YMRc06",
+          "sessionID": "ses_ea235d4dfffeA2GZ5hrgZrKAi2",
+          "messageID": "msg_15eb2432b002yBqdKKQ1wAyypJ"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "chatcmpl-tool-8caeddb81b134d049c9d55a2d1e1b919",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "BASE=$(git merge-base feature/mcp-studio-connectors origin/main); echo \"merge-base: $BASE\"; echo \"=== branch-only changes (files) ===\"; git diff --name-only $BASE..feature/mcp-studio-connectors; echo \"=== main-only changes (files) ===\"; git diff --name-only $BASE..origin/main; echo \"=== OVERLAP (likely conflicts) ===\"; comm -12 <(git diff --name-only $BASE..feature/mcp-studio-connectors | sort) <(git diff --name-only $BASE..origin/main | sort)",
+              "description": "Compute merge-base and overlapping changed files",
+              "workdir": "/home/alexa/repos/agentic-odi/.worktrees/mcp-studio-connectors"
+            },
+            "output": "merge-base: d2626ac236ad40ff53e381cd5b92175fc00d1181\n=== branch-only changes (files) ===\nREADME.md\napps/cli/src/agentic_odi_cli/chat.py\napps/mcp-server/src/agentic_odi_mcp_server/mcp_server.py\napps/studio-api/src/agentic_odi_studio_api/app.py\napps/studio-api/src/agentic_odi_studio_api/studio/chat.py\napps/studio-api/src/agentic_odi_studio_api/studio/connectors.py\napps/studio-api/src/agentic_odi_studio_api/studio/mcp_data.py\napps/studio-api/src/agentic_odi_studio_api/studio/router.py\napps/studio-api/src/agentic_odi_studio_api/studio/schemas.py\napps/studio-api/tests/test_studio_chat_branches.py\napps/studio-api/tests/test_studio_connectors.py\napps/studio-api/tests/test_studio_connectors_router.py\napps/studio-api/tests/test_studio_mcp_data.py\napps/studio/src/api/sse.test.ts\napps/studio/src/api/studioApi.test.ts\napps/studio/src/api/studioApi.ts\napps/studio/src/components/SettingsPanel.test.tsx\napps/studio/src/components/SettingsPanel.tsx\napps/studio/src/components/chat/ChatCopilot.test.tsx\napps/studio/src/components/chat/ChatCopilot.tsx\napps/studio/src/state/StudioContext.tsx\napps/studio/src/types.ts\ndocs/superpowers/plans/2026-10-21-mcp-studio-connectors.md\ndocs/superpowers/specs/2026-10-21-mcp-studio-connectors-design.md\npackages/connectors/src/agentic_odi_connectors/__init__.py\npackages/connectors/src/agentic_odi_connectors/catalog.py\npackages/connectors/src/agentic_odi_connectors/paths.py\npackages/connectors/src/agentic_odi_connectors/registry.py\npackages/connectors/tests/test_catalog.py\npackages/connectors/tests/test_config_path.py\npackages/connectors/tests/test_registry.py\n=== main-only changes (files) ===\n.agents/workflows/dev.md\n.agents/workflows/test.md\n.github/workflows/ci.yml\n.github/workflows/release-please.yml\n.github/workflows/release.yml\n.github/workflows/tauri-release.yml\n.gitignore\nREADME.md\napps/cli/src/agentic_odi_cli/backend.py\napps/cli/src/agentic_odi_cli/chat.py\napps/cli/src/agentic_odi_cli/onboard.py\napps/cli/src/agentic_odi_cli/profile.py\napps/cli/tests/test_backend.py\napps/mcp-server/src/agentic_odi_mcp_server/mcp_server.py\napps/studio-api/src/agentic_odi_studio_api/studio/chat.py\napps/studio-api/src/agentic_odi_studio_api/studio/mcp_data.py\napps/studio-api/src/agentic_odi_studio_api/studio/router.py\napps/studio-api/src/agentic_odi_studio_api/studio/schemas.py\napps/studio-api/tests/test_studio_api.py\napps/studio-api/tests/test_studio_brief.py\napps/studio-api/tests/test_studio_manual_crud.py\napps/studio-api/tests/test_studio_mcp_data.py\napps/studio/src/App.test.tsx\napps/studio/src/App.tsx\napps/studio/src/api/studioApi.ts\napps/studio/src/components/ErrorBoundary.tsx\napps/studio/src/components/SettingsPanel.tsx\napps/studio/src/components/Skeletons.tsx\napps/studio/src/components/StudioHeader.tsx\napps/studio/src/components/Toasts.tsx\napps/studio/src/components/canvas/CanvasTabs.tsx\napps/studio/src/components/canvas/DirectCapture.tsx\napps/studio/src/components/canvas/EvidenceStream.tsx\napps/studio/src/components/canvas/ImpactSim.tsx\napps/studio/src/components/canvas/JobMap.test.tsx\napps/studio/src/components/canvas/JobMap.tsx\napps/studio/src/components/canvas/OpportunityLandscape.test.tsx\napps/studio/src/components/canvas/OpportunityLandscape.tsx\napps/studio/src/components/canvas/OutcomeCard.tsx\napps/studio/src/components/chat/ChatCopilot.tsx\napps/studio/src/components/chat/ChatStage.tsx\napps/studio/src/components/chat/Composer.tsx\napps/studio/src/components/chat/Conversation.tsx\napps/studio/src/components/chat/Hero.tsx\napps/studio/src/components/chat/Markdown.tsx\napps/studio/src/components/chat/OfflineNotice.tsx\napps/studio/src/components/icons.tsx\napps/studio/src/components/layout/Sidebar.tsx\napps/studio/src/components/setup/SetupConversation.tsx\napps/studio/src/components/workspace/WorkspacePanel.tsx\napps/studio/src/components/workspace/panels.tsx\napps/studio/src/lib/commands.test.ts\napps/studio/src/lib/commands.ts\napps/studio/src/lib/greeting.test.ts\napps/studio/src/lib/greeting.ts\napps/studio/src/lib/markdown.test.ts\napps/studio/src/lib/markdown.ts\napps/studio/src/lib/setup.test.ts\napps/studio/src/lib/setup.ts\napps/studio/src/lib/useMediaQuery.ts\napps/studio/src/state/StudioContext.tsx\napps/studio/src/styles/theme.css\napps/studio/src/test/setup.ts\napps/studio/src/types.ts\ndocs/installation.md\ndocs/living-studio.md\ndocs/roadmap.md\ndocs/superpowers/plans/2026-10-20-release-download-run-instructions.md\ndocs/superpowers/plans/2026-10-20-storage-provider-sync.md\ndocs/superpowers/specs/2026-10-20-storage-provider-sync-design.md\ndocs/superpowers/specs/2026-10-20-studio-first-run-ux-design.md\npackages/core/src/agentic_odi_core/events.py\npackages/core/src/agentic_odi_core/intent_store.py\npackages/core/src/agentic_odi_core/sqlite_repository.py\npackages/core/tests/test_events.py\npyproject.toml\nscripts/release_instructions.py\ntests/scripts/conftest.py\ntests/scripts/test_release_instructions.py\nuv.lock\nwebsite/assets/style.css\nwebsite/index.html\nwebsite/tools/sync-readme.py\n=== OVERLAP (likely conflicts) ===\nREADME.md\napps/cli/src/agentic_odi_cli/chat.py\napps/mcp-server/src/agentic_odi_mcp_server/mcp_server.py\napps/studio-api/src/agentic_odi_studio_api/studio/chat.py\napps/studio-api/src/agentic_odi_studio_api/studio/mcp_data.py\napps/studio-api/src/agentic_odi_studio_api/studio/router.py\napps/studio-api/src/agentic_odi_studio_api/studio/schemas.py\napps/studio-api/tests/test_studio_mcp_data.py\napps/studio/src/api/studioApi.ts\napps/studio/src/components/SettingsPanel.tsx\napps/studio/src/components/chat/ChatCopilot.tsx\napps/studio/src/state/StudioContext.tsx\napps/studio/src/types.ts\n",
+            "metadata": {
+              "output": "merge-base: d2626ac236ad40ff53e381cd5b92175fc00d1181\n=== branch-only changes (files) ===\nREADME.md\napps/cli/src/agentic_odi_cli/chat.py\napps/mcp-server/src/agentic_odi_mcp_server/mcp_server.py\napps/studio-api/src/agentic_odi_studio_api/app.py\napps/studio-api/src/agentic_odi_studio_api/studio/chat.py\napps/studio-api/src/agentic_odi_studio_api/studio/connectors.py\napps/studio-api/src/agentic_odi_studio_api/studio/mcp_data.py\napps/studio-api/src/agentic_odi_studio_api/studio/router.py\napps/studio-api/src/agentic_odi_studio_api/studio/schemas.py\napps/studio-api/tests/test_studio_chat_branches.py\napps/studio-api/tests/test_studio_connectors.py\napps/studio-api/tests/test_studio_connectors_router.py\napps/studio-api/tests/test_studio_mcp_data.py\napps/studio/src/api/sse.test.ts\napps/studio/src/api/studioApi.test.ts\napps/studio/src/api/studioApi.ts\napps/studio/src/components/SettingsPanel.test.tsx\napps/studio/src/components/SettingsPanel.tsx\napps/studio/src/components/chat/ChatCopilot.test.tsx\napps/studio/src/components/chat/ChatCopilot.tsx\napps/studio/src/state/StudioContext.tsx\napps/studio/src/types.ts\ndocs/superpowers/plans/2026-10-21-mcp-studio-connectors.md\ndocs/superpowers/specs/2026-10-21-mcp-studio-connectors-design.md\npackages/connectors/src/agentic_odi_connectors/__init__.py\npackages/connectors/src/agentic_odi_connectors/catalog.py\npackages/connectors/src/agentic_odi_connectors/paths.py\npackages/connectors/src/agentic_odi_connectors/registry.py\npackages/connectors/tests/test_catalog.py\npackages/connectors/tests/test_config_path.py\npackages/connectors/tests/test_registry.py\n=== main-only changes (files) ===\n.agents/workflows/dev.md\n.agents/workflows/test.md\n.github/workflows/ci.yml\n.github/workflows/release-please.yml\n.github/workflows/release.yml\n.github/workflows/tauri-release.yml\n.gitignore\nREADME.md\napps/cli/src/agentic_odi_cli/backend.py\napps/cli/src/agentic_odi_cli/chat.py\napps/cli/src/agentic_odi_cli/onboard.py\napps/cli/src/agentic_odi_cli/profile.py\napps/cli/tests/test_backend.py\napps/mcp-server/src/agentic_odi_mcp_server/mcp_server.py\napps/studio-api/src/agentic_odi_studio_api/studio/chat.py\napps/studio-api/src/agentic_odi_studio_api/studio/mcp_data.py\napps/studio-api/src/agentic_odi_studio_api/studio/router.py\napps/studio-api/src/agentic_odi_studio_api/studio/schemas.py\napps/studio-api/tests/test_studio_api.py\napps/studio-api/tests/test_studio_brief.py\napps/studio-api/tests/test_studio_manual_crud.py\napps/studio-api/tests/test_studio_mcp_data.py\napps/studio/src/App.test.tsx\napps/studio/src/App.tsx\napps/studio/src/api/studioApi.ts\napps/studio/src/components/ErrorBoundary.tsx\napps/studio/src/components/SettingsPanel.tsx\napps/studio/src/components/Skeletons.tsx\napps/studio/src/components/StudioHeader.tsx\napps/studio/src/components/Toasts.tsx\napps/studio/src/components/canvas/CanvasTabs.tsx\napps/studio/src/components/canvas/DirectCapture.tsx\napps/studio/src/components/canvas/EvidenceStream.tsx\napps/studio/src/components/canvas/ImpactSim.tsx\napps/studio/src/components/canvas/JobMap.test.tsx\napps/studio/src/components/canvas/JobMap.tsx\napps/studio/src/components/canvas/OpportunityLandscape.test.tsx\napps/studio/src/components/canvas/OpportunityLandscape.tsx\napps/studio/src/components/canvas/OutcomeCard.tsx\napps/studio/src/components/chat/ChatCopilot.tsx\napps/studio/src/components/chat/ChatStage.tsx\napps/studio/src/components/chat/Composer.tsx\napps/studio/src/components/chat/Conversation.tsx\napps/studio/src/components/chat/Hero.tsx\napps/studio/src/components/chat/Markdown.tsx\napps/studio/src/components/chat/OfflineNotice.tsx\napps/studio/src/components/icons.tsx\napps/studio/src/components/layout/Sidebar.tsx\napps/studio/src/components/setup/SetupConversation.tsx\napps/studio/src/components/workspace/WorkspacePanel.tsx\napps/studio/src/components/workspace/panels.tsx\napps/studio/src/lib/commands.test.ts\napps/studio/src/lib/commands.ts\napps/studio/src/lib/greeting.test.ts\napps/studio/src/lib/greeting.ts\napps/studio/src/lib/markdown.test.ts\napps/studio/src/lib/markdown.ts\napps/studio/src/lib/setup.test.ts\napps/studio/src/lib/setup.ts\napps/studio/src/lib/useMediaQuery.ts\napps/studio/src/state/StudioContext.tsx\napps/studio/src/styles/theme.css\napps/studio/src/test/setup.ts\napps/studio/src/types.ts\ndocs/installation.md\ndocs/living-studio.md\ndocs/roadmap.md\ndocs/superpowers/plans/2026-10-20-release-download-run-instructions.md\ndocs/superpowers/plans/2026-10-20-storage-provider-sync.md\ndocs/superpowers/specs/2026-10-20-storage-provider-sync-design.md\ndocs/superpowers/specs/2026-10-20-studio-first-run-ux-design.md\npackages/core/src/agentic_odi_core/events.py\npackages/core/src/agentic_odi_core/intent_store.py\npackages/core/src/agentic_odi_core/sqlite_repository.py\npackages/core/tests/test_events.py\npyproject.toml\nscripts/release_instructions.py\ntests/scripts/conftest.py\ntests/scripts/test_release_instructions.py\nuv.lock\nwebsite/assets/style.css\nwebsite/index.html\nwebsite/tools/sync-readme.py\n=== OVERLAP (likely conflicts) ===\nREADME.md\napps/cli/src/agentic_odi_cli/chat.py\napps/mcp-server/src/agentic_odi_mcp_server/mcp_server.py\napps/studio-api/src/agentic_odi_studio_api/studio/chat.py\napps/studio-api/src/agentic_odi_studio_api/studio/mcp_data.py\napps/studio-api/src/agentic_odi_studio_api/studio/router.py\napps/studio-api/src/agentic_odi_studio_api/studio/schemas.py\napps/studio-api/tests/test_studio_mcp_data.py\napps/studio/src/api/studioApi.ts\napps/studio/src/components/SettingsPanel.tsx\napps/studio/src/components/chat/ChatCopilot.tsx\napps/studio/src/state/StudioContext.tsx\napps/studio/src/types.ts\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "BASE=$(git merge-base feature/mcp-studio-connectors origin/main); echo \"merge-base: $BASE\"; echo \"=== branch-only changes (files) ===\"; git diff --name-only $BASE..feature/mcp-studio-connectors; echo \"=== main-only changes (files) ===\"; git diff --name-only $BASE..origin/main; echo \"=== OVERLAP (likely conflicts) ===\"; comm -12 <(git diff --name-only $BASE..feature/mcp-studio-connectors | sort) <(git diff --name-only $BASE..origin/main | sort)",
+            "time": {
+              "start": 1792590129186,
+              "end": 1792590129224
+            }
+          },
+          "id": "prt_15eb293f5001YwIjd89D3OucAz",
+          "sessionID": "ses_ea235d4dfffeA2GZ5hrgZrKAi2",
+          "messageID": "msg_15eb2432b002yBqdKKQ1wAyypJ"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "ba64117dcf1808f6c0c3643c6a35efac2edb9153",
+          "type": "step-finish",
+          "tokens": {
+            "total": 81017,
+            "input": 275,
+            "output": 224,
+            "reasoning": 934,
+            "cache": {
+              "write": 0,
+              "read": 79584
+            }
+          },
+          "cost": 0,
+          "id": "prt_15eb2aa35001Xw0RZiQ9ON5Qgc",
+          "sessionID": "ses_ea235d4dfffeA2GZ5hrgZrKAi2",
+          "messageID": "msg_15eb2432b002yBqdKKQ1wAyypJ"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_15eb1b7e90011uuYmZPabmCnly",
+        "role": "assistant",
+        "mode": "plan",
+        "agent": "plan",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 83831,
+          "input": 1517,
+          "output": 417,
+          "reasoning": 905,
+          "cache": {
+            "write": 0,
+            "read": 80992
+          }
+        },
+        "modelID": "poolside/laguna-s-2.1:free",
+        "providerID": "kilo",
+        "time": {
+          "created": 1792590129784,
+          "completed": 1792590159989
+        },
+        "finish": "tool-calls",
+        "id": "msg_15eb2aa78002hflAMqeQ5JQxou",
+        "sessionID": "ses_ea235d4dfffeA2GZ5hrgZrKAi2"
+      },
+      "parts": [
+        {
+          "snapshot": "ba64117dcf1808f6c0c3643c6a35efac2edb9153",
+          "type": "step-start",
+          "id": "prt_15eb2bc68001v4wToyJRIRNHax",
+          "sessionID": "ses_ea235d4dfffeA2GZ5hrgZrKAi2",
+          "messageID": "msg_15eb2aa78002hflAMqeQ5JQxou"
+        },
+        {
+          "type": "reasoning",
+          "text": "Now I can see the overlap. The conflict scope:\n- Backend overlap: `apps/cli/src/agentic_odi_cli/chat.py`, `apps/mcp-server/src/agentic_odi_mcp_server/mcp_server.py`, `apps/studio-api/src/agentic_odi_studio_api/studio/{chat.py, mcp_data.py, router.py, schemas.py}`, `apps/studio-api/tests/test_studio_mcp_data.py`.\n- Frontend overlap: `apps/studio/src/api/studioApi.ts`, `apps/studio/src/components/SettingsPanel.tsx`, `apps/studio/src/components/chat/ChatCopilot.tsx`, `apps/studio/src/state/StudioContext.tsx`, `apps/studio/src/types.ts`.\n- Plus `README.md`, `uv.lock`, `pyproject.toml`.\n\nInteresting — note that `main` has changes to MANY files `apps/studio/src/components/chat/*` (ChatStage, Composer, Conversation, Hero, Markdown, OfflineNotice) and `apps/studio/src/lib/*` — these are NOT on my branch (branch-only doesn't list them). So main has a substantial chat UI refactor (Composer, Conversation, ChatStage, Hero...). This is likely the CGU (conversational-rich-surfaces / render_ui) plus other studio work.\n\nWait — this is a BIG deal. The branch was built on b646384 (pre-CGU). main has moved forward with: chat UI restructure (Composer/Conversation/ChatStage/Hero/Markdown/OfflineNotice), StudioContext, SettingsPanel, ChatCopilot, studioApi, types, plus backend chat.py/schemas.py/router.py/mcp_data.py. So main represents the CGU + possibly other merged features.\n\nMy branch's connectors feature touches the SAME files (ChatCopilot, SettingsPanel, StudioContext, chat.py, schemas.py, router.py, mcp_data.py, types.ts, studioApi.ts) but on the OLD b646384 structure. So merging requires reconciling my connectors additions against main's refactored versions.\n\nThis is a substantial reconciliation. Key insight: my branch's edits to `chat.py`, `schemas.py`, `router.py`, `mcp_data.py`, `StudioContext.tsx`, `ChatCopilot.tsx`, `SettingsPanel.tsx`, `types.ts`, `studioApi.ts` were made against b646384's structure. Main has since refactored these files. So a simple rebase will produce conflicts in all these files, and I'll need to re-apply the connectors feature on top of main's (refactored) versions.\n\nCritical question for the PLAN: Does main ALREADY contain a `connectors` feature (partial)? Or are connectors brand-new on my branch only? If main already has connectors (e.g., the `add_connector`/`connector` SSE was merged to main as part of CGU), then my branch is redundant and the conflicts are about merging my specific additions. If main does NOT have connectors, then I need to port my connectors feature onto main's refactored files.\n\nLet me check: does main's `chat.py` already have `add_connector` / `ADD_CONNECTOR_TOOL` / `connector` event? And does main's StudioContext already have connector state? Let me inspect main's versions.\n\nLet me check `origin/main` versions of the key files for connector content.\n\nRead-only checks:\n- `git show origin/main:apps/studio-api/src/agentic_odi_studio_api/studio/chat.py | grep -n \"add_connector\\|connector\\|ADD_CONNECTOR\"` \n- `git show origin/main:apps/studio/src/state/StudioContext.tsx | grep -n \"connector\\|Connector\"`\n- `git show origin/main:apps/studio/src/components/SettingsPanel.tsx | grep -n \"Connector\"`\n- `git show origin/main:apps/studio-api/src/agentic_odi_studio_api/studio/router.py | grep -n \"connector\"`\n\nThis tells me whether main already has connectors. If main already has a connectors implementation, my branch is a parallel/different approach and the reconciliation is a \"pick my approach OR merge\" decision — significant. If main does NOT have connectors, I port mine.\n\nLet me investigate main's content on these files. This is read-only (git show).\n\nThis is the crux of the plan. Let me gather.",
+          "time": {
+            "start": 1792590134379,
+            "end": 1792590152800
+          },
+          "id": "prt_15eb2bc6b001sDp20nAW7sMk4b",
+          "sessionID": "ses_ea235d4dfffeA2GZ5hrgZrKAi2",
+          "messageID": "msg_15eb2aa78002hflAMqeQ5JQxou"
+        },
+        {
+          "type": "text",
+          "text": "Significant overlap — `main` has refactored `chat.py`, `schemas.py`, `router.py`, `mcp_data.py`, `StudioContext.tsx`, `ChatCopilot.tsx`, `SettingsPanel.tsx`, `types.ts`, `studioApi.ts` (plus a whole chat UI restructure: Composer/Conversation/ChatStage/Hero/Markdown). I need to know whether `main` **already contains a connectors implementation** (so conflicts are about merging approaches) or not (so I port mine). Checking `origin/main` for connector content:",
+          "time": {
+            "start": 1792590152804,
+            "end": 1792590159892
+          },
+          "id": "prt_15eb30463001hoJEMFbkponS4u",
+          "sessionID": "ses_ea235d4dfffeA2GZ5hrgZrKAi2",
+          "messageID": "msg_15eb2aa78002hflAMqeQ5JQxou"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "chatcmpl-tool-6157e1db1cc14a219840f6e50d38de6b",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "echo \"=== main chat.py connector content ===\"; git -C /home/alexa/repos/agentic-odi/.worktrees/mcp-studio-connectors show origin/main:apps/studio-api/src/agentic_odi_studio_api/studio/chat.py 2>/dev/null | grep -n \"connector\\|ADD_CONNECTOR\\|add_connector\\|def handle_event\\|render_ui\" | head -20; echo \"=== main StudioContext connector? ===\"; git -C /home/alexa/repos/agentic-odi/.worktrees/mcp-studio-connectors show origin/main:apps/studio/src/state/StudioContext.tsx 2>/dev/null | grep -nc \"connector\"; echo \"=== main router connector? ===\"; git -C /home/alexa/repos/agentic-odi/.worktrees/mcp-studio-connectors show origin/main:apps/studio-api/src/agentic_odi_studio_api/studio/router.py 2>/dev/null | grep -n \"connector\" | head; echo \"=== main SettingsPanel connector? ===\"; git -C /home/alexa/repos/agentic-odi/.worktrees/mcp-studio-connectors show origin/main:apps/studio/src/components/SettingsPanel.tsx 2>/dev/null | grep -n \"Connector\\|connector\" | head",
+              "description": "Check if main already has connectors implementation"
+            },
+            "output": "=== main chat.py connector content ===\n86:            \"No connector is wired up, so there is no live transcript to quote. \"\n=== main StudioContext connector? ===\n0\n=== main router connector? ===\n=== main SettingsPanel connector? ===\n",
+            "metadata": {
+              "output": "=== main chat.py connector content ===\n86:            \"No connector is wired up, so there is no live transcript to quote. \"\n=== main StudioContext connector? ===\n0\n=== main router connector? ===\n=== main SettingsPanel connector? ===\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "echo \"=== main chat.py connector content ===\"; git -C /home/alexa/repos/agentic-odi/.worktrees/mcp-studio-connectors show origin/main:apps/studio-api/src/agentic_odi_studio_api/studio/chat.py 2>/dev/null | grep -n \"connector\\|ADD_CONNECTOR\\|add_connector\\|def handle_event\\|render_ui\" | head -20; echo \"=== main StudioContext connector? ===\"; git -C /home/alexa/repos/agentic-odi/.worktrees/mcp-studio-connectors show origin/main:apps/studio/src/state/StudioContext.tsx 2>/dev/null | grep -nc \"connector\"; echo \"=== main router connector? ===\"; git -C /home/alexa/repos/agentic-odi/.worktrees/mcp-studio-connectors show origin/main:apps/studio-api/src/agentic_odi_studio_api/studio/router.py 2>/dev/null | grep -n \"connector\" | head; echo \"=== main SettingsPanel connector? ===\"; git -C /home/alexa/repos/agentic-odi/.worktrees/mcp-studio-connectors show origin/main:apps/studio/src/components/SettingsPanel.tsx 2>/dev/null | grep -n \"Connector\\|connector\" | head",
+            "time": {
+              "start": 1792590159862,
+              "end": 1792590159900
+            }
+          },
+          "id": "prt_15eb30c3a0018ngvITFvZg9o9Y",
+          "sessionID": "ses_ea235d4dfffeA2GZ5hrgZrKAi2",
+          "messageID": "msg_15eb2aa78002hflAMqeQ5JQxou"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "ba64117dcf1808f6c0c3643c6a35efac2edb9153",
+          "type": "step-finish",
+          "tokens": {
+            "total": 83831,
+            "input": 1517,
+            "output": 417,
+            "reasoning": 905,
+            "cache": {
+              "write": 0,
+              "read": 80992
+            }
+          },
+          "cost": 0,
+          "id": "prt_15eb3203a001gu69emnZ5Sq9bj",
+          "sessionID": "ses_ea235d4dfffeA2GZ5hrgZrKAi2",
+          "messageID": "msg_15eb2aa78002hflAMqeQ5JQxou"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_15eb1b7e90011uuYmZPabmCnly",
+        "role": "assistant",
+        "mode": "plan",
+        "agent": "plan",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 86113,
+          "input": 91,
+          "output": 308,
+          "reasoning": 1906,
+          "cache": {
+            "write": 0,
+            "read": 83808
+          }
+        },
+        "modelID": "poolside/laguna-s-2.1:free",
+        "providerID": "kilo",
+        "time": {
+          "created": 1792590160021,
+          "completed": 1792590197602
+        },
+        "finish": "tool-calls",
+        "id": "msg_15eb32095002wnVEjn3UQpSEeU",
+        "sessionID": "ses_ea235d4dfffeA2GZ5hrgZrKAi2"
+      },
+      "parts": [
+        {
+          "snapshot": "ba64117dcf1808f6c0c3643c6a35efac2edb9153",
+          "type": "step-start",
+          "id": "prt_15eb32b7a001Uztmw6WqBXSBa9",
+          "sessionID": "ses_ea235d4dfffeA2GZ5hrgZrKAi2",
+          "messageID": "msg_15eb32095002wnVEjn3UQpSEeU"
+        },
+        {
+          "type": "reasoning",
+          "text": "Key findings — `main` does **NOT** have a connectors implementation:\n- `main chat.py`: no `add_connector`, no `ADD_CONNECTOR`, no `connector` event. Only an incidental mention of \"connector\" in a transcript string (unrelated).\n- `main StudioContext.tsx`: 0 connector references.\n- `main router.py`: no connector routes.\n- `main SettingsPanel.tsx`: no connector UI.\n\nSo `main` has NO connectors feature. My branch is the only one with connectors. The conflicts are because main REFACTORED the same files (chat.py, StudioContext, ChatCopilot, SettingsPanel, schemas.py, router.py, mcp_data.py, types.ts, studioApi.ts) for the CGU / chat UI restructure, and my branch ALSO modified those files (on the older structure).\n\nSo the reconciliation plan: **rebase the feature branch onto main** (or merge main into the branch), and re-apply the connectors feature on top of main's refactored versions of those files. Specifically, for each conflicting file, I need to produce a version that = (main's version) + (my connectors additions), resolving by hand.\n\nThis is a non-trivial merge. Let me understand the NATURE of main's changes to each conflicting file vs my branch's changes, to assess how mechanical vs. manual the reconciliation is.\n\nLet me look at the actual diff each side made to the overlapping files. Better: do a `git diff --color-merged` ... but I can't merge in plan mode. Instead, inspect the diffs:\n\nFor the most critical/conflicting files (chat.py, StudioContext.tsx, ChatCopilot.tsx, SettingsPanel.tsx, schemas.py, router.py, types.ts, studioApi.ts, mcp_data.py, cli chat.py, mcp_server.py), let me see:\n- main's changes (BASE..origin/main)\n- branch's changes (BASE..feature/mcp-studio-connectors)\n\nIf main's changes and my changes touch DIFFERENT hunks, merge is auto. If same hunks, manual.\n\nThe files where BOTH sides likely touch the SAME region (high-conflict):\n- `chat.py`: main (CGU: render_ui flow, post_chat) + branch (add_connector tool + connector SSE). HIGH conflict — both modify handleEvent / post_chat / chat flow.\n- `StudioContext.tsx`: main (CGU: context restructure) + branch (connectors state + SSE). HIGH.\n- `ChatCopilot.tsx`: main (rewrite with Composer/Conversation?) + branch (suggestion chips). The branch-only list does NOT include ChatStage/Composer/Conversation — meaning on the branch, ChatCopilot is the OLD single-component form. Main split it into ChatStage/Composer/Conversation/Hero/etc. So main REWROTE ChatCopilot.tsx substantially. HIGH conflict — my suggestion chips need porting to main's new structure.\n- `SettingsPanel.tsx`: main (refactor) + branch (Connectors section). Both touch the same file.\n- `schemas.py`, `router.py`, `mcp_data.py`, `types.ts`, `studioApi.ts`: both sides modified.\n\nThis is a substantial, manual reconciliation. Given the scale, this is essentially \"re-implement the connectors feature on top of main.\"\n\nBUT — wait. The cwd has the CGU WIP too (uncommitted, on `fix/error-handling-hardening` branch off main presumably). The user's instruction earlier said CGU is in cwd with WIP. The PR #56 conflicts because... hmm. Actually the user said \"The branch and PR #56 failed as it has conflicts.\" The conflicts are branch-vs-main. main includes the CGU (merged). So main = CGU already merged + chat UI restructure + everything.\n\nWait, but the cwd `fix/error-handling-hardening` had CGU as UNCOMMITTED WIP. And `main` (a3b8a33) — does main have CGU committed? The merge-base of my branch and main is d2626ac2 (which is b646384-ish, pre-CGU). main has advanced FROM d2626ac2 with CGU + refactors. So CGU IS merged to main now. The cwd's `fix/error-handling-hardening` branch WIP is the user's LOCAL uncommitted continuation of CGU (error-handling-hardening, an incremental CGU branch off main probably).\n\nSo: PR #56 (feature/mcp-studio-connectors) conflicts with main because main moved forward (CGU merged + refactors), and my branch was built on the old baseline touching the same files.\n\nGiven plan-mode (read-only), I should NOT do the rebase now. I need to:\n1. Confirm the reconciliation strategy with the user.\n2. Possibly the simpler path: since main's refactors are large and my branch's connectors feature needs re-porting, the cleanest approach might be:\n   - Option A: rebase branch onto main, resolve conflicts by porting connectors code into main's refactored files. Then verify (ruff/mypy/pytest + tsc/vitest) green. Push (force-with-lease) to update PR #56. CI runs.\n   - Option B: The cwd already has CGU WIP. But PR #56 is the connectors branch, separate.\n\nActually — the user's objective: \"get CI green\" on PR #56. So I must reconcile the connectors branch with main and get CI passing.\n\nGiven the read-only constraint right now, my job is to produce a PLAN and present it / ask the user. I cannot execute the rebase. The system reminder says present a well-formed plan and ask clarifying questions.\n\nLet me gather enough to make a sharp plan:\n- How big are main's diffs on the critical files vs my branch's diffs? Let me get conflict scope: count added/removed lines per file on each side for the overlapping files, and ideally see if they touch the same lines.\n\nLet me get a per-file diffstat for both sides on the overlapping files, and a `git diff --color=never` to eyeball overlap. Actually, the cleanest read-only way to predict conflict difficulty: use `git merge-tree` (read-only, doesn't touch working tree). I can do a dry-run merge with `git merge-tree -z` or `git diff --name-status` via `git merge-tree`. But `git merge-tree` outputs conflict markers if I do a real merge; `git merge-tree` (read-only) computes the merge without touching files. Let me use `git merge-tree feature/mcp-studio-connectors origin/main` — but that needs merge-base; it computes it. This is read-only (doesn't write worktree). \n\nActually `git merge-tree` may still work. But the output for 19 conflicting files is huge. Let me instead get per-file conflict severity via `git merge-tree --no-read` ... Hmm.\n\nSimpler & read-only: `git diff --stat feature/mcp-studio-connectors origin/main` shows direct diff (2-dot) but that's the net diff, not conflict prediction. \n\nLet me just get the per-file diffstat on each side for overlapping files to gauge size, and visually inspect the 2-3 most critical (chat.py, StudioContext, ChatCopilot) to see if hunks overlap. That's enough for a plan.\n\nLet me get:\n1. `git diff --stat $BASE..origin/main -- <overlapping files>` (main side)\n2. `git diff --stat $BASE..feature/mcp-studio-connectors -- <overlapping files>` (branch side)\n3. For chat.py specifically: `git diff $BASE origin/main -- .../chat.py` and `git diff $BASE feature/mcp-studio-connectors -- .../chat.py` to see if the connector additions overlap with CGU's render_ui additions.\n\nThis is read-only (git diff). Let me run.\n\nActually, let me reconsider the scope and be efficient. The plan doesn't require line-by-line. I need enough to:\n- Confirm: conflicts exist on ~14 files, both sides touched same files on old structure.\n- Decide reconciliation = re-port connectors feature onto main (rebase + manual resolve).\n\nLet me get a conflict-prediction via `git merge-tree` but limit to name-status. Actually, let me just produce the plan based on what I know. The merge-base is d2626ac2 (pre-CGU). Branch tip = 78f5c2b (wait, HEAD is 5afb7e0 per first log, but that's the local; the pushed branch — let me note HEAD is 5afb7e0, 8 commits ahead). Main = a3b8a33, 8 commits? Let me check commit counts.\n\nLet me get concise data: commit count each side, and per-file diffstat for overlapping files. Then present plan.\n\nLet me run a focused read-only query.",
+          "time": {
+            "start": 1792590162814,
+            "end": 1792590194042
+          },
+          "id": "prt_15eb32b7e001uburYHRwA4fyrf",
+          "sessionID": "ses_ea235d4dfffeA2GZ5hrgZrKAi2",
+          "messageID": "msg_15eb32095002wnVEjn3UQpSEeU"
+        },
+        {
+          "type": "text",
+          "text": "`main` has **no connectors implementation** — the conflicts are purely because `main` refactored the same files (CGU + chat UI restructure: Composer/Conversation/ChatStage/Hero/Markdown, etc.) on top of the old baseline my branch was built on. Let me gauge the reconciliation scope with a dry-run merge-tree (read-only) to identify the exact conflict set:",
+          "time": {
+            "start": 1792590194051,
+            "end": 1792590197526
+          },
+          "id": "prt_15eb3a583001L4zzMEZjAqKeWV",
+          "sessionID": "ses_ea235d4dfffeA2GZ5hrgZrKAi2",
+          "messageID": "msg_15eb32095002wnVEjn3UQpSEeU"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "chatcmpl-tool-d32813f38fee436999e6c66ffcea18dd",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "echo \"=== commits behind/ahead vs main ===\"; git rev-list --count d2626ac2..feature/mcp-studio-connectors; echo \"branch commits (feature)\"; git rev-list --count d2626ac2..origin/main; echo \"main commits (main)\"; echo \"=== predicted conflict files (merge-tree, read-only) ===\"; git merge-tree --no-read feature/mcp-studio-connectors origin/main 2>/dev/null | grep -oE '^[0-9a-f]+ [0-9a-f]+ [0-9a-f]+ [A-Z]+\t[^ ]+' | grep -E ' A| M' | sed 's/\\t/ /' | head -60",
+              "description": "Estimate commit counts and conflict footprint (read-only merge-tree)",
+              "workdir": "/home/alexa/repos/agentic-odi/.worktrees/mcp-studio-connectors"
+            },
+            "output": "=== commits behind/ahead vs main ===\n11\nbranch commits (feature)\n17\nmain commits (main)\n=== predicted conflict files (merge-tree, read-only) ===\n",
+            "metadata": {
+              "output": "=== commits behind/ahead vs main ===\n11\nbranch commits (feature)\n17\nmain commits (main)\n=== predicted conflict files (merge-tree, read-only) ===\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "echo \"=== commits behind/ahead vs main ===\"; git rev-list --count d2626ac2..feature/mcp-studio-connectors; echo \"branch commits (feature)\"; git rev-list --count d2626ac2..origin/main; echo \"main commits (main)\"; echo \"=== predicted conflict files (merge-tree, read-only) ===\"; git merge-tree --no-read feature/mcp-studio-connectors origin/main 2>/dev/null | grep -oE '^[0-9a-f]+ [0-9a-f]+ [0-9a-f]+ [A-Z]+\t[^ ]+' | grep -E ' A| M' | sed 's/\\t/ /' | head -60",
+            "time": {
+              "start": 1792590197493,
+              "end": 1792590197531
+            }
+          },
+          "id": "prt_15eb3acc40011FCjlutJ4v0432",
+          "sessionID": "ses_ea235d4dfffeA2GZ5hrgZrKAi2",
+          "messageID": "msg_15eb32095002wnVEjn3UQpSEeU"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "ba64117dcf1808f6c0c3643c6a35efac2edb9153",
+          "type": "step-finish",
+          "tokens": {
+            "total": 86113,
+            "input": 91,
+            "output": 308,
+            "reasoning": 1906,
+            "cache": {
+              "write": 0,
+              "read": 83808
+            }
+          },
+          "cost": 0,
+          "id": "prt_15eb3b339001Af4YOog9y3QuLV",
+          "sessionID": "ses_ea235d4dfffeA2GZ5hrgZrKAi2",
+          "messageID": "msg_15eb32095002wnVEjn3UQpSEeU"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_15eb1b7e90011uuYmZPabmCnly",
+        "role": "assistant",
+        "mode": "plan",
+        "agent": "plan",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 88858,
+          "input": 2358,
+          "output": 146,
+          "reasoning": 2546,
+          "cache": {
+            "write": 0,
+            "read": 83808
+          }
+        },
+        "modelID": "poolside/laguna-s-2.1:free",
+        "providerID": "kilo",
+        "time": {
+          "created": 1792590197632,
+          "completed": 1792590244228
+        },
+        "finish": "tool-calls",
+        "id": "msg_15eb3b3800026xasA1G2xftFMH",
+        "sessionID": "ses_ea235d4dfffeA2GZ5hrgZrKAi2"
+      },
+      "parts": [
+        {
+          "snapshot": "ba64117dcf1808f6c0c3643c6a35efac2edb9153",
+          "type": "step-start",
+          "id": "prt_15eb3bbb8001ZFuMxmg7Itq1Cl",
+          "sessionID": "ses_ea235d4dfffeA2GZ5hrgZrKAi2",
+          "messageID": "msg_15eb3b3800026xasA1G2xftFMH"
+        },
+        {
+          "type": "reasoning",
+          "text": "The `git merge-tree --no-read` output parsing didn't yield the conflict file list (the format grep was off). Let me use a different, reliable read-only method: `git diff --name-status` against the merge-base is not a merge preview. \n\nBetter read-only approach: use `git merge-tree -z feature/mcp-studio-connectors origin/main` and parse conflicts (lines with `100644 100644 <sha> <path>` plus conflict entries `100700`/`conflict`). Actually the classic way to list conflicts without merging:\n\n`git merge-tree feature/mcp-studio-connectors origin/main | grep -E '^<<<<<<<|^\\-\\-\\-\\-\\-\\-\\-\\-\\-\\-\\-|^\\>>>>>>>|^====='` shows conflict markers in content. But to list FILES with conflicts, the merge-tree output has entries like:\n```\n100644 <sha1> <sha2> <sha3> M\\t<path>\n```\nwhere differing sides indicate a conflict (both sha1 and sha2 differ from base). Actually the standard merge-tree for a 3-way: lines `mode <sha1> <sha2> <sha3> <status>\\t<path>` where status M means the file differs in the merge and sha1/base-sha2/ours, sha3/theirs. A conflict occurs when both sides differ from base AND have different content.\n\nLet me instead just run `git merge-tree feature/mcp-studio-connectors origin/main` and extract paths that appear with differing content. Simpler: run `git diff --name-status` won't predict conflicts.\n\nAlternative: I already have the OVERLAP list (14 files changed on both sides since base). Those are the conflict candidates. The merge-tree will confirm which actually conflict. Let me just extract the paths from merge-tree where there's a conflict status.\n\nActually, the merge-tree porcelain output: each path line is `<mode> <sha> <sha> <sha> <status>\\t<path>`. Status letters: ` ` (unchanged), `M` (modified by us/the them), `A`, `D`, etc. For a file modified on BOTH sides with conflicting content, the line shows `M   M` style. Let me capture all path lines and look for those where BOTH \"us\" and \"them\" differ.\n\nLet me run `git merge-tree -z` (NUL-separated) and parse pairs. Or simpler: `git merge-tree feature/mcp-studio-connectors origin/main | awk -F'\\t' '/^[0-9]/ {print}'` — but conflicts show as repeated path entries or `C` (conflict).\n\nLet me just try: `git merge-tree feature/mcp-studio-connectors origin/main | grep -E '^[0-0-9a-f]{40}' ` ... The merge-tree default (non -z) output for a conflicting file looks like:\n```\nconflict 1\n^^^^^^^^^^\npath\n^^^^^^^^^^^^^^^^^\n...base...\n...ours...\n...theirs...\n```\nHmm, that's the `--diff3`-style. Actually default merge-tree output: for each file, lines like:\n```\n100644 <base-sha> <our-sha> <their-sha> M\\t<path>\n```\nwhere if ours and theirs both differ from base → conflict (the merge can't be auto-resolved for that file but merge-tree still shows the combined; it flags conflicts where the content differs).\n\nI think the cleanest read-only conflict list: \n`git merge-tree -z feature/mcp-studio-connectors origin/main | tr '\\0' '\\n' | grep -E '^100644|^100700|^100755|^M'` ... too fiddly.\n\nLet me take the pragmatic read-only route: the OVERLAP list I already computed (14 files) IS the conflict candidate set (files modified on both sides since base = d2626ac2). Whether they auto-resolve depends on whether hunks overlap. For a plan, I'll assume the worst (manual resolve on the 4-5 key files) and verify by examining the 2 most critical: chat.py and StudioContext.tsx, on both sides.\n\nActually — for the PLAN, I have enough:\n- Branch is 11 commits ahead of base; main is 17 commits ahead (CGU + refactors + CI workflow changes + deps).\n- 14 files overlap (modified on both sides).\n- Both sides add connector/CGU code in the SAME files.\n\nThe reconciliation = rebase port. This is significant manual work. Let me present the plan and ASK the user how they want to proceed, because there's a real decision: \n\n**Decision point:** Since main has fully refactored the chat/Studio surface (Composer/Conversation/Hero/etc.) and my branch is built on the OLD structure, re-porting could touch ~14 files and re-test. Given the cwd ALSO has CGU WIP (`fix/error-handling-hardening`), there's a question of integration strategy:\n\nOption 1: Rebase `feature/mcp-studio-connectors` onto main, port connector additions onto main's refactored files, force-push, CI runs. Risk: porting connectors onto the restructured ChatCopilot (which was split into Composer/Conversation/ChatStage/Hero) — the SSE suggestion chips and the connector local-tool flow need re-architected to the new chat components.\n\nOption 2: Merge main into the feature branch (same conflict resolution, plus a merge commit).\n\nOption 3: The user may intend for the cwd's CGU (`fix/error-handling-hardening`) to be the integration target — i.e., reconcile connectors INTO the CGU branch rather than main. But PR #56 targets main, so it must reconcile against main regardless.\n\nBefore committing to a plan, I should ask the user clarifying questions (the system reminder explicitly invites this). Key questions:\n1. Should I reconcile the connectors branch against `main` (PR #56's base) — force-pushing updated commits — accepting that I must re-port connector code onto main's refactored chat/Studio (Composer/Conversation/Split ChatCopilot, etc.)? \n2. Is re-porting onto main's restructured ChatCopilot in scope, or do you expect the connectors UI/chips to be re-implemented against main's new chat component model (which has no ChatCopilot.tsx in the same form)?\n3. Does the cwd's `fix/error-handling-hardening` (CGU error-hardening WIP off main) need to be merged first, or is main's already-merged CGU sufficient?\n4. Any preference: rebase (linear history) vs merge commit?\n\nBut wait — I'm in PLAN MODE, read-only. The system reminder says present a plan and ask questions; don't execute. So I should NOT do the rebase. I should write the plan (to docs/superpowers/plans per instructions) and ask the user to confirm.\n\nHold on — let me re-read the constraint. \"Plan mode ACTIVE - you are in READ-ONLY phase. STRICTLY FORBIDDEN: ANY file edits, modifications, or system changes.\" and \"The user indicated that they do not want you to execute yet -- you MUST NOT make any edits, run any non-readonly tools (including changing configs or making commits), or otherwise make any changes to the system.\"\n\nSo I cannot even write the plan file (that's a file edit). Hmm. \"Present a well-researched plan to the user.\" I should present the plan IN MY RESPONSE (text), not necessarily write a file. And ask clarifying questions.\n\nBut the superpowers instructions say plans belong in docs/superpowers/plans/. However, the explicit plan-mode system reminder OVERRIDES: \"STRICTLY FORBIDDEN: ANY file edits, modifications.\" So I must NOT write the plan file now. I'll present the plan in text and ask clarifying questions, awaiting user confirmation to switch out of plan mode and execute.\n\nActually — let me re-read: \"At any point in time through this workflow you should feel free to ask the user questions or clarifications.\" and the user's last message said \"Your objective will be to get CI green.\" So the user wants me to get CI green, but the harness put me in plan mode (read-only). \n\nLet me verify the conflict files precisely with a read-only method to make the plan concrete, then present the plan + questions. Let me get the actual conflict file list via a truly read-only merge-tree parse, and peek at the 2 critical files' diffs to assess re-porting effort.\n\nLet me run read-only git diff/stat for the overlapping files on both sides.\n\nActually, I have enough info. But to make a sharp plan and honest effort estimate, let me quickly confirm the conflict status of the 4 critical files (chat.py, StudioContext.tsx, ChatCopilot.tsx, SettingsPanel.tsx) using merge-tree. Let me try a clean parse:\n\n`git merge-tree feature/mcp-studio-connectors origin/main | grep -E '^[^ ]' ` no.\n\nThe most reliable: `git merge-tree -X ours` no.\n\nLet me try: `git merge-tree feature/mcp-studio-connectors origin/main --plain` (default) and look for lines starting with `<<<<<<<` or the `conflict` marker lines. merge-tree default output includes conflict markers as literal `<<<<<<<`, `=======`, `>>>>>>>`, and `<path>` lines. Let me grep for the path lines between conflict markers.\n\nActually default `git merge-tree` (no -z) for a conflicting file outputs something like:\n```\n<<<<<<<\nfilename\n|||||||\n<base content>\n=======\n<our content>\n>>>>>>>\n<their content>\n```\nNo — that's not right either. The real format: merge-tree prints, for each path, a header line `mode <base> <ours> <theirs> <status>\\t<path>` then for conflicts, the diff3 hunk. Let me just grep for paths.\n\nSimplest reliable read-only: `git diff --name-only --diff-filter=U` requires a merge in progress (not available). \n\nAlternative: use `git merge-tree`'s `<branch1> <branch2>` which needs only the two tips (computes base). Then for each conflicting path, the line is:\n`100644 <sha> <sha> <sha> U\\t<path>` where status `U` = unmerged/conflict.\n\nSo: `git merge-tree feature/mcp-studio-connectors origin/main | grep -E ' U\\t| A\\t| D\\t' | awk '{print $2}'` — but the format is `mode sha sha sha status\\tpath`. So field 5 is status, field 6 (after tab) is path. Let me grep for the status column.\n\nLet me run: `git merge-tree feature/mcp-studio-connectors origin/main | awk -F'\\t' 'NF==2 {split($1,a,\" \"); status=a[4]; if(status ~ /[UMAD]/) print $2}'` — messy.\n\nLet me just do: `git merge-tree feature/mcp-studio-connectors origin/main 2>&1 | grep -E '^\\S+\\s+\\S+\\s+\\S+\\s+[A-Z]\\s\\t' | sed 's/.* //'`. Hmm.\n\nHonestly, the OVERLAP list (14 files modified on both sides since base) is the de-facto conflict set; the merge-tree will at most auto-resolve a few. For the plan, listing the 14 files as \"to review/port\" is accurate enough, and I'll note the 4-5 requiring manual re-port.\n\nLet me do ONE clean read-only command to extract conflict files via merge-tree, then present the plan. I'll parse robustly.",
+          "time": {
+            "start": 1792590199741,
+            "end": 1792590241142
+          },
+          "id": "prt_15eb3bbbd001kKCMyzGeK8WOBZ",
+          "sessionID": "ses_ea235d4dfffeA2GZ5hrgZrKAi2",
+          "messageID": "msg_15eb3b3800026xasA1G2xftFMH"
+        },
+        {
+          "type": "text",
+          "text": "Let me get a precise read-only conflict list via `git merge-tree` (no working-tree writes) to scope the reconciliation accurately:",
+          "time": {
+            "start": 1792590241147,
+            "end": 1792590244124
+          },
+          "id": "prt_15eb45d7b001zeCZIxrATPiq3U",
+          "sessionID": "ses_ea235d4dfffeA2GZ5hrgZrKAi2",
+          "messageID": "msg_15eb3b3800026xasA1G2xftFMH"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "chatcmpl-tool-a4eaa519f2eb4e31acbd9b6608a59eec",
+          "state": {
+            "status": "error",
+            "input": {
+              "cmd": "git merge-tree feature/mcp-studio-connectors origin/main | awk -F'\\t' '\nNF==2 {\n  n=split($1, a, /[ \\t]+/);\n  status=a[n];\n  if (status ~ /[A-Z]/) print status\" \"$2\n}' | sort | uniq -c | head -60",
+              "description": "List merge-tree conflict files (read-only)",
+              "workdir": "/home/alexa/repos/agentic-odi/.worktrees/mcp-studio-connectors"
+            },
+            "error": "The bash tool was called with invalid arguments: SchemaError(Missing key\n  at [\"command\"]).\nPlease rewrite the input so it satisfies the expected schema.",
+            "time": {
+              "start": 1792590244092,
+              "end": 1792590244095
+            }
+          },
+          "id": "prt_15eb46083001fHLQeY569DSfMk",
+          "sessionID": "ses_ea235d4dfffeA2GZ5hrgZrKAi2",
+          "messageID": "msg_15eb3b3800026xasA1G2xftFMH"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "ba64117dcf1808f6c0c3643c6a35efac2edb9153",
+          "type": "step-finish",
+          "tokens": {
+            "total": 88858,
+            "input": 2358,
+            "output": 146,
+            "reasoning": 2546,
+            "cache": {
+              "write": 0,
+              "read": 83808
+            }
+          },
+          "cost": 0,
+          "id": "prt_15eb469670013wEx5JAcf2h6Ho",
+          "sessionID": "ses_ea235d4dfffeA2GZ5hrgZrKAi2",
+          "messageID": "msg_15eb3b3800026xasA1G2xftFMH"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_15eb1b7e90011uuYmZPabmCnly",
+        "role": "assistant",
+        "mode": "plan",
+        "agent": "plan",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 90729,
+          "input": 5093,
+          "output": 212,
+          "reasoning": 1616,
+          "cache": {
+            "write": 0,
+            "read": 83808
+          }
+        },
+        "modelID": "poolside/laguna-s-2.1:free",
+        "providerID": "kilo",
+        "time": {
+          "created": 1792590244279,
+          "completed": 1792590278368
+        },
+        "finish": "tool-calls",
+        "id": "msg_15eb469b6002EdJUGVEHFR5D0t",
+        "sessionID": "ses_ea235d4dfffeA2GZ5hrgZrKAi2"
+      },
+      "parts": [
+        {
+          "snapshot": "ba64117dcf1808f6c0c3643c6a35efac2edb9153",
+          "type": "step-start",
+          "id": "prt_15eb473c7001EdSPHtSlGfyh9m",
+          "sessionID": "ses_ea235d4dfffeA2GZ5hrgZrKAi2",
+          "messageID": "msg_15eb469b6002EdJUGVEHFR5D0t"
+        },
+        {
+          "type": "reasoning",
+          "text": "The multi-line awk with newlines in the command string broke the schema parsing (the bash tool got malformed). Let me use a single-line command or use `git log`... Actually the issue is the embedded newlines in the awk script. Let me write it as a single line or use a simpler approach.\n\nLet me try a simpler parse: `git merge-tree feature/mcp-studio-connectors origin/main | grep -E ' [AM]\t' `. The merge-tree path line format is: `mode base sha our sha their sha STATUS<TAB>path`. A conflict (auto-resolved-or-not) shows status letters. For files modified on both sides that conflict, status is `M` with multiple... Actually the line for a conflicting file in merge-tree is: `100644 <base> <ours> <theirs> M\\t<path>`? No.\n\nLet me recall the actual `git merge-tree` (default) output format precisely:\nFor each path:\n```\n<mode> <mode> <mode> <sha> <sha> <sha> <path>\n```\nHmm no. The real format (porcelain v1) per path:\n`100644 100644 100644 <sha> <sha> <sha> M\\t<path>`? \n\nActually the documented format: each line is:\n`<src_mode> SP <dst_mode> SP <sha1> SP <sha2> SP <sha3> SP <status> TAB <path>`\nWait — no. Let me recall `git update-index --cacheinfo`-style. The merge-tree output lines look like:\n`100644 100644 100644 <40hex base> <40hex ours> <40hex theirs> M\\t<path>` — and when ours==theirs==base it's ` ` (space, unchanged). When ours differs from base and theirs==base: `M ` ? \n\nUgh, I'm not certain. Let me just use grep on the merge-tree output for lines containing a tab and ending with a path, filtering for conflict status. Simpler: use `git merge-tree` and grep for the literal `M` status pattern with TAB.\n\nAlternative clean read-only approach: just use `git diff` to compare each side and take the union of changed paths (I already have the OVERLAP list of 14 from `comm`). That IS the conflict candidate set. The merge-tree auto-resolution might reduce it, but for planning the 14 files are what I'd re-review.\n\nActually, the more reliable read-only conflict predictor is `git diff --name-only --diff-filter=A/M` against a pretend... no.\n\nLet me just re-run the comm-based OVERLAP (already have it) — 14 files. That's sufficient for the plan. Let me not over-engineer the merge-tree parse.\n\nActually, I realize I should double check: maybe FEWER than 14 actually conflict (some overlaps may be non-overlapping hunks that auto-resolve). But for a conservative plan, treating all 14 as needs-review is fine; rebase -X theirs/merges will reveal auto-resolved ones.\n\nHmm, but actually I want to be accurate for the effort estimate. Let me try a cleaner merge-tree parse on ONE line per field. Let me try a simpler command using grep for status column. The merge-tree default output path lines: I'll grep for lines ending with the path and containing 4 SHAs. A conflict file has DIFFERENT ours/theirs/base SHAs → all three 40-hex differ. Let me grep for lines matching ` [0-9a-f]{40} [0-9a-f]{40} [0-9a-f]{40} . ` then extract path.\n\nThis is getting too deep for plan-mode. Let me just present the plan using the OVERLAP list (14 files) and note that rebase will auto-resolve non-overlapping hunks. That's honest and sufficient.\n\nActually — let me reconsider the whole situation and what the BEST plan is, because the magnitude matters. The key realization: main has REFACTORED the chat UI into multiple components (Composer, Conversation, ChatStage, Hero, Markdown, OfflineNotice) and rewrote ChatCopilot.tsx. My branch's ChatCopilot.tsx (old single-component form) + my SettingsPanel/SettingsPanel + StudioContext are all based on b646384.\n\nSo re-porting isn't just \"apply a patch\" — the target file structures differ substantially. E.g., main's ChatCopilot may no longer be the place; the suggestion chips might belong in a new \"Composer\" or \"Hero\" component. This makes the re-port a genuine re-implementation effort.\n\nBUT — maybe I'm overcomplicating. Let me check: is main's ChatCopilot.tsx structurally similar to the branch's (just with additions) OR fully rewritten/split? The branch-only file list does NOT include ChatStage/Composer/Conversation/Hero — meaning the BRANCH doesn't have those files at all (they don't exist on b646384 base). Main added them. So on the branch, ChatCopilot.tsx is the single component (old). Main split it. \n\nWait — but the branch-only list DOES include `apps/studio/src/components/chat/ChatCopilot.tsx`. And main-only includes `apps/studio/src/components/chat/ChatStage.tsx` etc. So both have ChatCopilot (modified), and main ADDED new chat components. So main refactored ChatCopilot (maybe slimmed it) and added Composer/Conversation/etc.\n\nThis means reconciling the suggestion-chip UI: I need to decide WHERE suggestion chips live in main's structure. If main's ChatCopilot is still the copilot panel, chips can still go there. But main's ChatCopilot might have moved to reference Composer.\n\nGiven the uncertainty and plan-mode (read-only), I should:\n1. Present the situation concisely.\n2. Ask the user the key decision BEFORE executing.\n\nKey clarifying questions:\n- Q1: Reconcile against `main` (PR #56 base) by re-porting the connectors feature onto main's refactored files? (vs. alternative targets)\n- Q2: Where should connector suggestion chips live in main's chat model — keep in `ChatCopilot.tsx` (if it still renders the quick-pills/suggestion area) or move to `Composer.tsx`/`Hero.tsx`? (Needs me to inspect main's ChatCopilot structure.)\n- Q3: My connectors feature assumed the b646384 `chat.py` SSE shape (`{connector: preset}`) and `post_chat`. Main's `chat.py` was refactored (CGU). I need to re-verify the SSE emit point and `ADD_CONNECTOR_TOOL` handling survive the merge. Acceptable to re-wire as needed.\n\nLet me inspect main's ChatCopilot.tsx and chat.py to ground the plan (read-only), then ask. Let me read main's ChatCopilot and main's chat.py SSE handling.\n\nActually, I'm in plan mode and should be efficient. Let me read the two most critical main-side files to ground the plan: main's `chat.py` (SSE + tool handling structure) and main's `ChatCopilot.tsx` (copilot UI structure), plus confirm main's `StudioContext.tsx` still has the SSE event dispatcher. Then present plan + questions.\n\nLet me read those from origin/main.",
+          "time": {
+            "start": 1792590246857,
+            "end": 1792590272153
+          },
+          "id": "prt_15eb473c90010g6nBRsUruMV2o",
+          "sessionID": "ses_ea235d4dfffeA2GZ5hrgZrKAi2",
+          "messageID": "msg_15eb469b6002EdJUGVEHFR5D0t"
+        },
+        {
+          "type": "text",
+          "text": "The multi-line awk broke the command parser. I have the conflict set already (14 overlapping files). Let me ground the plan by inspecting `main`'s refactored versions of the two most critical files — `chat.py` (SSE/tool wiring) and `ChatCopilot.tsx` (UI structure) — to decide where the connectors additions must re-port:",
+          "time": {
+            "start": 1792590272158,
+            "end": 1792590278302
+          },
+          "id": "prt_15eb4d69e001uTW6XqB7hlnJby",
+          "sessionID": "ses_ea235d4dfffeA2GZ5hrgZrKAi2",
+          "messageID": "msg_15eb469b6002EdJUGVEHFR5D0t"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "chatcmpl-tool-c459d009fddd481ebd192b13498bd27c",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "echo \"=== main chat.py: SSE events + tool handling (read-only) ===\"; git show origin/main:apps/studio-api/src/agentic_odi_studio_api/studio/chat.py | grep -n \"add_connector\\|ADD_CONNECTOR\\|send_event\\|event=\\|case \\\"\\|def post_chat\\|def handle_event\\|render_ui\\|def stream\\|tool_use\\|def chat\" | head -40",
+              "description": "Inspect main chat.py SSE/tool structure",
+              "workdir": "/home/alexa/repos/agentic-odi/.worktrees/mcp-studio-connectors"
+            },
+            "output": "=== main chat.py: SSE events + tool handling (read-only) ===\n128:async def stream_chat(request: ChatRequest) -> AsyncIterator[str]:\n",
+            "metadata": {
+              "output": "=== main chat.py: SSE events + tool handling (read-only) ===\n128:async def stream_chat(request: ChatRequest) -> AsyncIterator[str]:\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "echo \"=== main chat.py: SSE events + tool handling (read-only) ===\"; git show origin/main:apps/studio-api/src/agentic_odi_studio_api/studio/chat.py | grep -n \"add_connector\\|ADD_CONNECTOR\\|send_event\\|event=\\|case \\\"\\|def post_chat\\|def handle_event\\|render_ui\\|def stream\\|tool_use\\|def chat\" | head -40",
+            "time": {
+              "start": 1792590278281,
+              "end": 1792590278309
+            }
+          },
+          "id": "prt_15eb4e14a001khV9GHDp9nyXz0",
+          "sessionID": "ses_ea235d4dfffeA2GZ5hrgZrKAi2",
+          "messageID": "msg_15eb469b6002EdJUGVEHFR5D0t"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "ba64117dcf1808f6c0c3643c6a35efac2edb9153",
+          "type": "step-finish",
+          "tokens": {
+            "total": 90729,
+            "input": 5093,
+            "output": 212,
+            "reasoning": 1616,
+            "cache": {
+              "write": 0,
+              "read": 83808
+            }
+          },
+          "cost": 0,
+          "id": "prt_15eb4eebd001qt9slzF922Z9BD",
+          "sessionID": "ses_ea235d4dfffeA2GZ5hrgZrKAi2",
+          "messageID": "msg_15eb469b6002EdJUGVEHFR5D0t"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_15eb1b7e90011uuYmZPabmCnly",
+        "role": "assistant",
+        "mode": "plan",
+        "agent": "plan",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 91491,
+          "input": 57,
+          "output": 285,
+          "reasoning": 429,
+          "cache": {
+            "write": 0,
+            "read": 90720
+          }
+        },
+        "modelID": "poolside/laguna-s-2.1:free",
+        "providerID": "kilo",
+        "time": {
+          "created": 1792590278415,
+          "completed": 1792590295564
+        },
+        "finish": "tool-calls",
+        "id": "msg_15eb4ef0f002DuvbiI3e8gCHg3",
+        "sessionID": "ses_ea235d4dfffeA2GZ5hrgZrKAi2"
+      },
+      "parts": [
+        {
+          "snapshot": "ba64117dcf1808f6c0c3643c6a35efac2edb9153",
+          "type": "step-start",
+          "id": "prt_15eb4f9ba001fquCKJ5gUBwCAk",
+          "sessionID": "ses_ea235d4dfffeA2GZ5hrgZrKAi2",
+          "messageID": "msg_15eb4ef0f002DuvbiI3e8gCHg3"
+        },
+        {
+          "type": "reasoning",
+          "text": "Hmm, main's chat.py is quite different — only `stream_chat` found, no `add_connector`/`send_event`/case structure. Wait, that grep should have found `send_event` etc. if they exist. It found only `def stream_chat`. So main's chat.py may NOT have the SSE dispatch (`send_event`) or the `case` handleEvent. \n\nWait — but my branch's chat.py HAS `send_event` and `case`. If main's chat.py doesn't have the SSE dispatch at all, that's a major structural difference. Let me look more carefully. Maybe main's chat.py uses a different SSE mechanism, or the SSE is in a different file.\n\nActually — my earlier grep on main chat.py for \"connector|ADD_CONNECTOR|add_connector|def handle_event|render_ui\" returned only line 86 (a transcript string). So main chat.py has NO add_connector tool, NO handle_event switch, NO render_ui. \n\nBut my branch's chat.py DID add `ADD_CONNECTOR_TOOL` and `connector` SSE event and `handleEvent` cases. If main's chat.py doesn't have that structure at all... then main's chat flow is structured differently (maybe main has CGU in a different form).\n\nThis is a big divergence. Let me actually read main's chat.py top-to-bottom (or the relevant parts) to understand its chat architecture, since my connectors feature depends on:\n1. The `add_connector` local tool injection point.\n2. The SSE `connector` event emission.\n\nIf main's chat.py doesn't support these, re-porting requires understanding main's architecture.\n\nLet me read main's chat.py fully (it may be short). And main's StudioContext SSE wiring + ChatCopilot. Let me read them.\n\nThis is getting large. For a PLAN, I need to understand enough. Let me read main's chat.py and the SSE/streaming parts of StudioContext + chat router. Let me get line counts and read key sections.\n\nLet me read main's chat.py.",
+          "time": {
+            "start": 1792590281149,
+            "end": 1792590289540
+          },
+          "id": "prt_15eb4f9bd001CvrgPaPLVaX2Ov",
+          "sessionID": "ses_ea235d4dfffeA2GZ5hrgZrKAi2",
+          "messageID": "msg_15eb4ef0f002DuvbiI3e8gCHg3"
+        },
+        {
+          "type": "text",
+          "text": "`main`'s `chat.py` has no `add_connector`/`handle_event`/`send_event` — major structural divergence. I need to understand main's chat architecture to re-port. Let me read main's `chat.py` and check where its SSE dispatch actually lives:",
+          "time": {
+            "start": 1792590289543,
+            "end": 1792590295431
+          },
+          "id": "prt_15eb51a87001GZbc5xpAxWm631",
+          "sessionID": "ses_ea235d4dfffeA2GZ5hrgZrKAi2",
+          "messageID": "msg_15eb4ef0f002DuvbiI3e8gCHg3"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "chatcmpl-tool-e60b365ab589466dab090f1d8afe9fb0",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "W=apps/studio-api/src/agentic_odi_studio_api/studio/chat.py; echo \"=== main ($W) line count ===\"; git show origin/main:$W | wc -l; echo \"=== main send_event / SSE / tool defs across studio api ===\"; git grep -n \"send_event\\|EventSourceResponse\\|def stream_chat\\|handle_event\\|ADD_CONNECTOR\\|add_connector\" origin/main -- apps/studio-api/src/agentic_odi_studio_api ; echo \"=== branch equivalent (for diff structure) ===\"; git show feature/mcp-studio-connectors:$W 2>/dev/null | grep -n \"send_event\\|def post_chat\\|ADD_CONNECTOR\\|def handle_event\\|def stream_chat\\|connector\" | head",
+              "description": "Locate SSE dispatch in main vs branch chat flow",
+              "workdir": "/home/alexa/repos/agentic-odi/.worktrees/mcp-studio-connectors"
+            },
+            "output": "=== main (apps/studio-api/src/agentic_odi_studio_api/studio/chat.py) line count ===\n245\n=== main send_event / SSE / tool defs across studio api ===\norigin/main:apps/studio-api/src/agentic_odi_studio_api/studio/chat.py:128:async def stream_chat(request: ChatRequest) -> AsyncIterator[str]:\n=== branch equivalent (for diff structure) ===\n15:from agentic_odi_studio_api.studio.connectors import ConnectorService\n91:ADD_CONNECTOR_TOOL: dict[str, Any] = {\n94:        \"name\": \"add_connector\",\n96:            \"Register an external MCP or REST connector into the shared connector \"\n98:            \"id (from connectors catalog) and optionally a 'name' and 'url' \"\n104:                \"name\": {\"type\": \"string\", \"description\": \"Unique connector name (defaults to the preset id).\"},\n113:def _apply_add_connector(\n116:    \"\"\"Register a connector locally and return SSE event dicts for the stream.\"\"\"\n123:        event = {\"event\": \"connector\", \"data\": {\"status\": \"error\", \"error\": str(exc)}}\n130:    return f\"registered connector {config.name}\", [\n",
+            "metadata": {
+              "output": "=== main (apps/studio-api/src/agentic_odi_studio_api/studio/chat.py) line count ===\n245\n=== main send_event / SSE / tool defs across studio api ===\norigin/main:apps/studio-api/src/agentic_odi_studio_api/studio/chat.py:128:async def stream_chat(request: ChatRequest) -> AsyncIterator[str]:\n=== branch equivalent (for diff structure) ===\n15:from agentic_odi_studio_api.studio.connectors import ConnectorService\n91:ADD_CONNECTOR_TOOL: dict[str, Any] = {\n94:        \"name\": \"add_connector\",\n96:            \"Register an external MCP or REST connector into the shared connector \"\n98:            \"id (from connectors catalog) and optionally a 'name' and 'url' \"\n104:                \"name\": {\"type\": \"string\", \"description\": \"Unique connector name (defaults to the preset id).\"},\n113:def _apply_add_connector(\n116:    \"\"\"Register a connector locally and return SSE event dicts for the stream.\"\"\"\n123:        event = {\"event\": \"connector\", \"data\": {\"status\": \"error\", \"error\": str(exc)}}\n130:    return f\"registered connector {config.name}\", [\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "W=apps/studio-api/src/agentic_odi_studio_api/studio/chat.py; echo \"=== main ($W) line count ===\"; git show origin/main:$W | wc -l; echo \"=== main send_event / SSE / tool defs across studio api ===\"; git grep -n \"send_event\\|EventSourceResponse\\|def stream_chat\\|handle_event\\|ADD_CONNECTOR\\|add_connector\" origin/main -- apps/studio-api/src/agentic_odi_studio_api ; echo \"=== branch equivalent (for diff structure) ===\"; git show feature/mcp-studio-connectors:$W 2>/dev/null | grep -n \"send_event\\|def post_chat\\|ADD_CONNECTOR\\|def handle_event\\|def stream_chat\\|connector\" | head",
+            "time": {
+              "start": 1792590295395,
+              "end": 1792590295438
+            }
+          },
+          "id": "prt_15eb522bf001F3sRZuXOYEDPJw",
+          "sessionID": "ses_ea235d4dfffeA2GZ5hrgZrKAi2",
+          "messageID": "msg_15eb4ef0f002DuvbiI3e8gCHg3"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "ba64117dcf1808f6c0c3643c6a35efac2edb9153",
+          "type": "step-finish",
+          "tokens": {
+            "total": 91491,
+            "input": 57,
+            "output": 285,
+            "reasoning": 429,
+            "cache": {
+              "write": 0,
+              "read": 90720
+            }
+          },
+          "cost": 0,
+          "id": "prt_15eb531e8001JfHcp8hkGcxzWB",
+          "sessionID": "ses_ea235d4dfffeA2GZ5hrgZrKAi2",
+          "messageID": "msg_15eb4ef0f002DuvbiI3e8gCHg3"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_15eb1b7e90011uuYmZPabmCnly",
+        "role": "assistant",
+        "mode": "plan",
+        "agent": "plan",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 92638,
+          "input": 303,
+          "output": 165,
+          "reasoning": 682,
+          "cache": {
+            "write": 0,
+            "read": 91488
+          }
+        },
+        "modelID": "poolside/laguna-s-2.1:free",
+        "providerID": "kilo",
+        "time": {
+          "created": 1792590295596,
+          "completed": 1792590314459
+        },
+        "finish": "tool-calls",
+        "id": "msg_15eb5322c0021MRXG5zzy3P5sK",
+        "sessionID": "ses_ea235d4dfffeA2GZ5hrgZrKAi2"
+      },
+      "parts": [
+        {
+          "snapshot": "ba64117dcf1808f6c0c3643c6a35efac2edb9153",
+          "type": "step-start",
+          "id": "prt_15eb53ccd001GM4Z6Mn2jzJL3J",
+          "sessionID": "ses_ea235d4dfffeA2GZ5hrgZrKAi2",
+          "messageID": "msg_15eb5322c0021MRXG5zzy3P5sK"
+        },
+        {
+          "type": "reasoning",
+          "text": "Big divergence confirmed:\n- Main's `chat.py` (245 lines): has `stream_chat` but NO `send_event`, NO `ADD_CONNECTOR_TOOL`, NO `post_chat`/`handle_event` switch (these don't appear in main). So main's chat architecture is DIFFERENT from the branch's.\n- The branch's chat.py (130 lines?): has `ADD_CONNECTOR_TOOL`, `_apply_add_connector`, `connector` event emission, `post_chat`? Let me see branch's chat.py structure.\n\nWait — the branch chat.py grep showed lines 15, 91, 94, 113, 123, 130. So branch chat.py has the connectors additions at lines ~91-130. But does branch chat.py have `post_chat`/`send_event`/`handleEvent` switch? My Task 5 commit (d703dee) added `ADD_CONNECTOR_TOOL` + `connector` SSE. Let me check branch chat.py has the SSE dispatch (`send_event`/`EventSourceResponse` or similar) and the `handle_event`/`case` structure.\n\nActually — the branch's chat.py might be the b646384 baseline + my Task 5 additions (add_connector tool + connector event). The b646384 baseline chat.py presumably had `post_chat`/`stream_chat` with SSE. My Task 5 added the `add_connector` tool handling + `connector` event emit within that.\n\nBut main's chat.py (245 lines) is a DIFFERENT refactor. So when I rebase branch onto main, the branch's chat.py (b646384-based + my additions) will conflict heavily with main's 245-line refactored chat.py.\n\nHmm wait — 245 lines for main vs branch's chat.py. Let me check the branch's chat.py line count and structure. And I need to see main's chat.py to understand where to port the add_connector tool + SSE.\n\nThis is a substantial re-port. Let me read BOTH chat.py files fully (main's 245 lines, branch's ~130 lines) to understand the architectures and produce a concrete porting plan. Read-only (git show / sed not allowed for reading — use `read` tool on a temp? No. Use `git show origin/main:$W` to output, but that's bash stdout, fine read-only).\n\nLet me dump both chat.py files via git show (read-only) and read them. Actually, I can use the `read` tool only on working-tree files. `git show origin/main:<path>` outputs to stdout. Let me capture to read.\n\nActually, the bash tool CAN run `git show` (read-only, just prints). The system reminder forbids \"non-readonly tools\" that change system — `git show` is read. So I can run `git show origin/main:$W` to view main's file content. Let me read both files fully.\n\nLet me get both chat.py contents.\n\nThis is a lot — but for a proper plan I need to understand main's chat architecture. Let me read main's chat.py (245 lines) and branch's chat.py.",
+          "time": {
+            "start": 1792590298319,
+            "end": 1792590311862
+          },
+          "id": "prt_15eb53ccf0013jHTlNk65TKD7o",
+          "sessionID": "ses_ea235d4dfffeA2GZ5hrgZrKAi2",
+          "messageID": "msg_15eb5322c0021MRXG5zzy3P5sK"
+        },
+        {
+          "type": "text",
+          "text": "Major divergence: main's `chat.py` (245 lines) is a different architecture with no SSE `send_event`/`handle_event` switch, while the branch's adds `ADD_CONNECTOR_TOOL` + `connector` SSE event. Let me read both `chat.py` files to understand main's architecture before I can plan the port:",
+          "time": {
+            "start": 1792590311864,
+            "end": 1792590314350
+          },
+          "id": "prt_15eb571b80016zFzOD7xt4BC5p",
+          "sessionID": "ses_ea235d4dfffeA2GZ5hrgZrKAi2",
+          "messageID": "msg_15eb5322c0021MRXG5zzy3P5sK"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "chatcmpl-tool-0eef544f06d648f1a6693fc6ef7f37ce",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "git show origin/main:apps/studio-api/src/agentic_odi_studio_api/studio/chat.py",
+              "description": "Read main chat.py (read-only)",
+              "workdir": "/home/alexa/repos/agentic-odi/.worktrees/mcp-studio-connectors"
+            },
+            "output": "\"\"\"Conversational helper with offline fallbacks and a streaming tool loop.\n\nPorted 1:1 from the Streamlit Living Studio app, upgraded to stream over SSE.\n\"\"\"\n\nfrom __future__ import annotations\n\nimport json\nfrom collections.abc import AsyncIterator\nfrom typing import Any\n\nfrom fastmcp import Client as McpClient\nfrom openai import AsyncOpenAI\n\nfrom agentic_odi_studio_api.studio.probes import check_llm_health\nfrom agentic_odi_studio_api.studio.schemas import ChatRequest, StudioBrief\n\nSYSTEM_PROMPT = \"\"\"You are Steve Jobs and an elite Outcome-Driven Innovation (ODI) strategist assisting a Product Manager in The Living Studio.\nYour mission is to eliminate backlog paper-pushing and help the PM think exclusively in human intent, customer friction, and measurable outcomes.\nKey principles:\n1. Always start with the Job-to-be-Done (JTBD): \"What is the core functional human job?\"\n2. Uncover Desired Outcomes using the strict ODI format: [Direction] + [Unit of Measure] + [Object of Control] + [Contextual Clarifier]. (e.g. \"Minimize the time it takes to propagate secrets across environments\").\n3. Opportunity Score = Importance + max(Importance - Satisfaction, 0). Scores > 10 represent breakthrough underserved market opportunities.\n4. When asked to add or query Jobs, Steps, or Outcomes, ALWAYS invoke the corresponding tools.\n5. Embody clarity, focus, and causality. Strip away corporate jargon.\"\"\"\n\n\ndef _brief_lines(brief: StudioBrief | None) -> list[str]:\n    if brief is None:\n        return []\n    facts = [\n        (\"Product\", brief.product_name),\n        (\"Product URL\", brief.product_url),\n        (\"Who it serves\", brief.target_user),\n        (\"Job to be done\", brief.job_statement),\n        (\"Core problem\", brief.core_problem),\n    ]\n    return [f\"- {label}: {value}\" for label, value in facts if value.strip()]\n\n\ndef _brief_block(brief: StudioBrief | None) -> str:\n    lines = _brief_lines(brief)\n    if not lines:\n        return \"\"\n    return (\n        \"\\n\\nThe user set this context during onboarding. Treat it as given and do not \"\n        \"re-ask for it:\\n\" + \"\\n\".join(lines)\n    )\n\n\ndef offline_fallback(user_input: str, brief: StudioBrief | None = None) -> str:\n    \"\"\"Deterministic, honest guidance when no LLM backend is reachable.\n\n    No fabricated customer data, no invented scores: the studio says what it can\n    do by hand and points at the surface that does it.\n    \"\"\"\n    lower_inp = user_input.lower()\n    context = \"\"\n    if brief is not None and brief.job_statement.strip():\n        context = (\n            f\"\\n\\n**Working job:** {brief.job_statement.strip()}\"\n            if not brief.product_name.strip()\n            else f\"\\n\\n**{brief.product_name.strip()}** — {brief.job_statement.strip()}\"\n        )\n\n    if \"guideline\" in lower_inp or \"framework\" in lower_inp or \"stage\" in lower_inp:\n        return (\n            \"### ODI, stage by stage\\n\\n\"\n            \"1. **Define the job** — the functional progress a person is trying to make.\\n\"\n            \"2. **Capture desired outcomes** — `[direction] + [unit of measure] + [object of control] + [context]`.\\n\"\n            \"3. **Score the opportunity** — `importance + max(importance - satisfaction, 0)`; above 10 is underserved.\\n\"\n            \"4. **Map the job** — Define, Locate, Prepare, Confirm, Execute, Monitor, Modify, Conclude.\\n\\n\"\n            \"Type `/capture` to record an outcome, `/jobmap` to walk the phases, \"\n            \"and `/landscape` to see what is underserved.\" + context\n        )\n    if \"simulate\" in lower_inp or \"bet\" in lower_inp or \"impact\" in lower_inp:\n        return (\n            \"### Simulate the bet by hand\\n\\n\"\n            \"Open **`/impact`** and pick the outcome you want to test. The simulation \"\n            \"shows before/after friction; it no longer invents a result when no model \"\n            \"is connected.\" + context\n        )\n    if \"evidence\" in lower_inp or \"call\" in lower_inp or \"quote\" in lower_inp:\n        return (\n            \"### Evidence needs a source\\n\\n\"\n            \"No connector is wired up, so there is no live transcript to quote. \"\n            \"Capture the signal you already have in **`/capture`** — the evidence field \"\n            \"is stored with the outcome.\" + context\n        )\n    return (\n        \"I can't reason about that right now — no model is reachable. \"\n        \"The studio still works by hand:\\n\\n\"\n        \"- `/start` — set or correct your context\\n\"\n        \"- `/capture` — record an outcome with importance and satisfaction\\n\"\n        \"- `/jobmap` — add or edit the steps of the job\\n\"\n        \"- `/landscape` — review what is underserved\\n\\n\"\n        \"Type `/help` for every command, or point Settings at a local model to \"\n        \"bring the assistant back.\" + context\n    )\n\n\ndef _sse(event: str, data: dict[str, Any]) -> str:\n    return f\"event: {event}\\ndata: {json.dumps(data)}\\n\\n\"\n\n\ndef _to_openai_messages(request: ChatRequest) -> list[dict[str, Any]]:\n    system_prompt = SYSTEM_PROMPT + _brief_block(request.brief)\n    messages: list[dict[str, Any]] = [{\"role\": \"system\", \"content\": system_prompt}]\n    for message in request.messages:\n        messages.append({\"role\": message.role, \"content\": message.content})\n    return messages\n\n\ndef _openai_tools(mcp_tools: list[Any]) -> list[dict[str, Any]]:\n    return [\n        {\n            \"type\": \"function\",\n            \"function\": {\n                \"name\": tool.name,\n                \"description\": tool.description,\n                \"parameters\": tool.input_schema,\n            },\n        }\n        for tool in mcp_tools\n    ]\n\n\nasync def stream_chat(request: ChatRequest) -> AsyncIterator[str]:\n    \"\"\"Yield SSE frames: status, delta, tool, message, canvas_dirty.\"\"\"\n    yield _sse(\"status\", {\"phase\": \"health_check\"})\n    healthy, _message = await check_llm_health(request.base_url, request.api_key, request.model)\n\n    last_user = next((m.content for m in reversed(request.messages) if m.role == \"user\"), \"\")\n\n    if not healthy:\n        yield _sse(\"status\", {\"phase\": \"offline\"})\n        reply = offline_fallback(last_user, request.brief)\n        yield _sse(\"delta\", {\"text\": reply})\n        yield _sse(\"message\", {\"content\": reply})\n        return\n\n    yield _sse(\"status\", {\"phase\": \"mcp_tools\"})\n    llm_client = AsyncOpenAI(base_url=request.base_url, api_key=request.api_key, timeout=15.0)\n\n    async with McpClient(request.mcp_url) as mcp_client:\n        mcp_tools = await mcp_client.list_tools()\n        openai_tools = _openai_tools(mcp_tools)\n        messages: list[Any] = _to_openai_messages(request)\n\n        yield _sse(\"status\", {\"phase\": \"model\"})\n        stream: Any = await llm_client.chat.completions.create(  # type: ignore[call-overload]\n            model=request.model,\n            messages=messages,\n            tools=openai_tools if openai_tools else None,\n            tool_choice=\"auto\" if openai_tools else None,\n            stream=True,\n        )\n\n        buffered_text: list[str] = []\n        tool_calls: dict[int, dict[str, str]] = {}\n\n        async for chunk in stream:\n            delta = chunk.choices[0].delta\n            if delta.content:\n                buffered_text.append(delta.content)\n            for tool_call in delta.tool_calls or []:\n                entry = tool_calls.setdefault(\n                    tool_call.index, {\"id\": \"\", \"name\": \"\", \"arguments\": \"\"}\n                )\n                if tool_call.id:\n                    entry[\"id\"] = tool_call.id\n                if tool_call.function is not None:\n                    if tool_call.function.name:\n                        entry[\"name\"] = tool_call.function.name\n                    if tool_call.function.arguments:\n                        entry[\"arguments\"] += tool_call.function.arguments\n\n        if not tool_calls:\n            content = \"\".join(buffered_text)\n            if content:\n                yield _sse(\"delta\", {\"text\": content})\n            yield _sse(\"message\", {\"content\": content})\n            return\n\n        messages.append(\n            {\n                \"role\": \"assistant\",\n                \"content\": None,\n                \"tool_calls\": [\n                    {\n                        \"id\": entry[\"id\"],\n                        \"type\": \"function\",\n                        \"function\": {\n                            \"name\": entry[\"name\"],\n                            \"arguments\": entry[\"arguments\"] or \"{}\",\n                        },\n                    }\n                    for entry in tool_calls.values()\n                ],\n            }\n        )\n\n        for entry in tool_calls.values():\n            name = entry[\"name\"]\n            yield _sse(\"tool\", {\"name\": name, \"status\": \"start\"})\n            try:\n                arguments = json.loads(entry[\"arguments\"] or \"{}\")\n            except json.JSONDecodeError:\n                arguments = {}\n\n            try:\n                result = await mcp_client.call_tool(name, arguments)\n                result_str = str(result)\n                yield _sse(\"tool\", {\"name\": name, \"status\": \"ok\", \"preview\": result_str[:280]})\n            except Exception as exc:  # noqa: BLE001\n                result_str = f\"Error calling {name}: {exc}\"\n                yield _sse(\"tool\", {\"name\": name, \"status\": \"error\", \"preview\": result_str})\n\n            messages.append(\n                {\n                    \"role\": \"tool\",\n                    \"tool_call_id\": entry[\"id\"],\n                    \"name\": name,\n                    \"content\": result_str,\n                }\n            )\n\n        yield _sse(\"canvas_dirty\", {\"value\": True})\n\n        final_stream: Any = await llm_client.chat.completions.create(\n            model=request.model,\n            messages=messages,\n            stream=True,\n        )\n        final_parts: list[str] = []\n        async for chunk in final_stream:\n            delta = chunk.choices[0].delta\n            if delta.content:\n                final_parts.append(delta.content)\n                yield _sse(\"delta\", {\"text\": delta.content})\n\n        yield _sse(\"message\", {\"content\": \"\".join(final_parts)})\n\n\n__all__ = [\"SYSTEM_PROMPT\", \"offline_fallback\", \"stream_chat\"]\n",
+            "metadata": {
+              "output": "\"\"\"Conversational helper with offline fallbacks and a streaming tool loop.\n\nPorted 1:1 from the Streamlit Living Studio app, upgraded to stream over SSE.\n\"\"\"\n\nfrom __future__ import annotations\n\nimport json\nfrom collections.abc import AsyncIterator\nfrom typing import Any\n\nfrom fastmcp import Client as McpClient\nfrom openai import AsyncOpenAI\n\nfrom agentic_odi_studio_api.studio.probes import check_llm_health\nfrom agentic_odi_studio_api.studio.schemas import ChatRequest, StudioBrief\n\nSYSTEM_PROMPT = \"\"\"You are Steve Jobs and an elite Outcome-Driven Innovation (ODI) strategist assisting a Product Manager in The Living Studio.\nYour mission is to eliminate backlog paper-pushing and help the PM think exclusively in human intent, customer friction, and measurable outcomes.\nKey principles:\n1. Always start with the Job-to-be-Done (JTBD): \"What is the core functional human job?\"\n2. Uncover Desired Outcomes using the strict ODI format: [Direction] + [Unit of Measure] + [Object of Control] + [Contextual Clarifier]. (e.g. \"Minimize the time it takes to propagate secrets across environments\").\n3. Opportunity Score = Importance + max(Importance - Satisfaction, 0). Scores > 10 represent breakthrough underserved market opportunities.\n4. When asked to add or query Jobs, Steps, or Outcomes, ALWAYS invoke the corresponding tools.\n5. Embody clarity, focus, and causality. Strip away corporate jargon.\"\"\"\n\n\ndef _brief_lines(brief: StudioBrief | None) -> list[str]:\n    if brief is None:\n        return []\n    facts = [\n        (\"Product\", brief.product_name),\n        (\"Product URL\", brief.product_url),\n        (\"Who it serves\", brief.target_user),\n        (\"Job to be done\", brief.job_statement),\n        (\"Core problem\", brief.core_problem),\n    ]\n    return [f\"- {label}: {value}\" for label, value in facts if value.strip()]\n\n\ndef _brief_block(brief: StudioBrief | None) -> str:\n    lines = _brief_lines(brief)\n    if not lines:\n        return \"\"\n    return (\n        \"\\n\\nThe user set this context during onboarding. Treat it as given and do not \"\n        \"re-ask for it:\\n\" + \"\\n\".join(lines)\n    )\n\n\ndef offline_fallback(user_input: str, brief: StudioBrief | None = None) -> str:\n    \"\"\"Deterministic, honest guidance when no LLM backend is reachable.\n\n    No fabricated customer data, no invented scores: the studio says what it can\n    do by hand and points at the surface that does it.\n    \"\"\"\n    lower_inp = user_input.lower()\n    context = \"\"\n    if brief is not None and brief.job_statement.strip():\n        context = (\n            f\"\\n\\n**Working job:** {brief.job_statement.strip()}\"\n            if not brief.product_name.strip()\n            else f\"\\n\\n**{brief.product_name.strip()}** — {brief.job_statement.strip()}\"\n        )\n\n    if \"guideline\" in lower_inp or \"framework\" in lower_inp or \"stage\" in lower_inp:\n        return (\n            \"### ODI, stage by stage\\n\\n\"\n            \"1. **Define the job** — the functional progress a person is trying to make.\\n\"\n            \"2. **Capture desired outcomes** — `[direction] + [unit of measure] + [object of control] + [context]`.\\n\"\n            \"3. **Score the opportunity** — `importance + max(importance - satisfaction, 0)`; above 10 is underserved.\\n\"\n            \"4. **Map the job** — Define, Locate, Prepare, Confirm, Execute, Monitor, Modify, Conclude.\\n\\n\"\n            \"Type `/capture` to record an outcome, `/jobmap` to walk the phases, \"\n            \"and `/landscape` to see what is underserved.\" + context\n        )\n    if \"simulate\" in lower_inp or \"bet\" in lower_inp or \"impact\" in lower_inp:\n        return (\n            \"### Simulate the bet by hand\\n\\n\"\n            \"Open **`/impact`** and pick the outcome you want to test. The simulation \"\n            \"shows before/after friction; it no longer invents a result when no model \"\n            \"is connected.\" + context\n        )\n    if \"evidence\" in lower_inp or \"call\" in lower_inp or \"quote\" in lower_inp:\n        return (\n            \"### Evidence needs a source\\n\\n\"\n            \"No connector is wired up, so there is no live transcript to quote. \"\n            \"Capture the signal you already have in **`/capture`** — the evidence field \"\n            \"is stored with the outcome.\" + context\n        )\n    return (\n        \"I can't reason about that right now — no model is reachable. \"\n        \"The studio still works by hand:\\n\\n\"\n        \"- `/start` — set or correct your context\\n\"\n        \"- `/capture` — record an outcome with importance and satisfaction\\n\"\n        \"- `/jobmap` — add or edit the steps of the job\\n\"\n        \"- `/landscape` — review what is underserved\\n\\n\"\n        \"Type `/help` for every command, or point Settings at a local model to \"\n        \"bring the assistant back.\" + context\n    )\n\n\ndef _sse(event: str, data: dict[str, Any]) -> str:\n    return f\"event: {event}\\ndata: {json.dumps(data)}\\n\\n\"\n\n\ndef _to_openai_messages(request: ChatRequest) -> list[dict[str, Any]]:\n    system_prompt = SYSTEM_PROMPT + _brief_block(request.brief)\n    messages: list[dict[str, Any]] = [{\"role\": \"system\", \"content\": system_prompt}]\n    for message in request.messages:\n        messages.append({\"role\": message.role, \"content\": message.content})\n    return messages\n\n\ndef _openai_tools(mcp_tools: list[Any]) -> list[dict[str, Any]]:\n    return [\n        {\n            \"type\": \"function\",\n            \"function\": {\n                \"name\": tool.name,\n                \"description\": tool.description,\n                \"parameters\": tool.input_schema,\n            },\n        }\n        for tool in mcp_tools\n    ]\n\n\nasync def stream_chat(request: ChatRequest) -> AsyncIterator[str]:\n    \"\"\"Yield SSE frames: status, delta, tool, message, canvas_dirty.\"\"\"\n    yield _sse(\"status\", {\"phase\": \"health_check\"})\n    healthy, _message = await check_llm_health(request.base_url, request.api_key, request.model)\n\n    last_user = next((m.content for m in reversed(request.messages) if m.role == \"user\"), \"\")\n\n    if not healthy:\n        yield _sse(\"status\", {\"phase\": \"offline\"})\n        reply = offline_fallback(last_user, request.brief)\n        yield _sse(\"delta\", {\"text\": reply})\n        yield _sse(\"message\", {\"content\": reply})\n        return\n\n    yield _sse(\"status\", {\"phase\": \"mcp_tools\"})\n    llm_client = AsyncOpenAI(base_url=request.base_url, api_key=request.api_key, timeout=15.0)\n\n    async with McpClient(request.mcp_url) as mcp_client:\n        mcp_tools = await mcp_client.list_tools()\n        openai_tools = _openai_tools(mcp_tools)\n        messages: list[Any] = _to_openai_messages(request)\n\n        yield _sse(\"status\", {\"phase\": \"model\"})\n        stream: Any = await llm_client.chat.completions.create(  # type: ignore[call-overload]\n            model=request.model,\n            messages=messages,\n            tools=openai_tools if openai_tools else None,\n            tool_choice=\"auto\" if openai_tools else None,\n            stream=True,\n        )\n\n        buffered_text: list[str] = []\n        tool_calls: dict[int, dict[str, str]] = {}\n\n        async for chunk in stream:\n            delta = chunk.choices[0].delta\n            if delta.content:\n                buffered_text.append(delta.content)\n            for tool_call in delta.tool_calls or []:\n                entry = tool_calls.setdefault(\n                    tool_call.index, {\"id\": \"\", \"name\": \"\", \"arguments\": \"\"}\n                )\n                if tool_call.id:\n                    entry[\"id\"] = tool_call.id\n                if tool_call.function is not None:\n                    if tool_call.function.name:\n                        entry[\"name\"] = tool_call.function.name\n                    if tool_call.function.arguments:\n                        entry[\"arguments\"] += tool_call.function.arguments\n\n        if not tool_calls:\n            content = \"\".join(buffered_text)\n            if content:\n                yield _sse(\"delta\", {\"text\": content})\n            yield _sse(\"message\", {\"content\": content})\n            return\n\n        messages.append(\n            {\n                \"role\": \"assistant\",\n                \"content\": None,\n                \"tool_calls\": [\n                    {\n                        \"id\": entry[\"id\"],\n                        \"type\": \"function\",\n                        \"function\": {\n                            \"name\": entry[\"name\"],\n                            \"arguments\": entry[\"arguments\"] or \"{}\",\n                        },\n                    }\n                    for entry in tool_calls.values()\n                ],\n            }\n        )\n\n        for entry in tool_calls.values():\n            name = entry[\"name\"]\n            yield _sse(\"tool\", {\"name\": name, \"status\": \"start\"})\n            try:\n                arguments = json.loads(entry[\"arguments\"] or \"{}\")\n            except json.JSONDecodeError:\n                arguments = {}\n\n            try:\n                result = await mcp_client.call_tool(name, arguments)\n                result_str = str(result)\n                yield _sse(\"tool\", {\"name\": name, \"status\": \"ok\", \"preview\": result_str[:280]})\n            except Exception as exc:  # noqa: BLE001\n                result_str = f\"Error calling {name}: {exc}\"\n                yield _sse(\"tool\", {\"name\": name, \"status\": \"error\", \"preview\": result_str})\n\n            messages.append(\n                {\n                    \"role\": \"tool\",\n                    \"tool_call_id\": entry[\"id\"],\n                    \"name\": name,\n                    \"content\": result_str,\n                }\n            )\n\n        yield _sse(\"canvas_dirty\", {\"value\": True})\n\n        final_stream: Any = await llm_client.chat.completions.create(\n            model=request.model,\n            messages=messages,\n            stream=True,\n        )\n        final_parts: list[str] = []\n        async for chunk in final_stream:\n            delta = chunk.choices[0].delta\n            if delta.content:\n                final_parts.append(delta.content)\n                yield _sse(\"delta\", {\"text\": delta.content})\n\n        yield _sse(\"message\", {\"content\": \"\".join(final_parts)})\n\n\n__all__ = [\"SYSTEM_PROMPT\", \"offline_fallback\", \"stream_chat\"]\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "git show origin/main:apps/studio-api/src/agentic_odi_studio_api/studio/chat.py",
+            "time": {
+              "start": 1792590314322,
+              "end": 1792590314345
+            }
+          },
+          "id": "prt_15eb57601001dP54C9h0BmXQeR",
+          "sessionID": "ses_ea235d4dfffeA2GZ5hrgZrKAi2",
+          "messageID": "msg_15eb5322c0021MRXG5zzy3P5sK"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "ba64117dcf1808f6c0c3643c6a35efac2edb9153",
+          "type": "step-finish",
+          "tokens": {
+            "total": 92638,
+            "input": 303,
+            "output": 165,
+            "reasoning": 682,
+            "cache": {
+              "write": 0,
+              "read": 91488
+            }
+          },
+          "cost": 0,
+          "id": "prt_15eb57ba10015RkBmiP1BdPPXl",
+          "sessionID": "ses_ea235d4dfffeA2GZ5hrgZrKAi2",
+          "messageID": "msg_15eb5322c0021MRXG5zzy3P5sK"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_15eb1b7e90011uuYmZPabmCnly",
+        "role": "assistant",
+        "mode": "plan",
+        "agent": "plan",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 96665,
+          "input": 2475,
+          "output": 346,
+          "reasoning": 1236,
+          "cache": {
+            "write": 0,
+            "read": 92608
+          }
+        },
+        "modelID": "poolside/laguna-s-2.1:free",
+        "providerID": "kilo",
+        "time": {
+          "created": 1792590314489,
+          "completed": 1792590345647
+        },
+        "finish": "tool-calls",
+        "id": "msg_15eb57bf9002WPNK1QO6SOoHGx",
+        "sessionID": "ses_ea235d4dfffeA2GZ5hrgZrKAi2"
+      },
+      "parts": [
+        {
+          "snapshot": "ba64117dcf1808f6c0c3643c6a35efac2edb9153",
+          "type": "step-start",
+          "id": "prt_15eb5899a001eoG8F2QbQRQbKm",
+          "sessionID": "ses_ea235d4dfffeA2GZ5hrgZrKAi2",
+          "messageID": "msg_15eb57bf9002WPNK1QO6SOoHGx"
+        },
+        {
+          "type": "reasoning",
+          "text": "Now I understand main's chat architecture. Key points:\n- Main's `chat.py`: `stream_chat` yields SSE frames (`status`, `delta`, `tool`, `message`, `canvas_dirty`). It calls MCP tools via `mcp_client.call_tool(name, arguments)`. It does NOT inject local tools (like `add_connector`) — it just passes MCP tools to OpenAI and calls them via the MCP client. There's no `send_event` (uses `_sse` helper yielding strings), no `handle_event` switch (the SSE dispatch is on the FRONTEND side via `handleEvent`).\n- Main's `chat.py` has NO `add_connector` local tool injection.\n\nSo the branch's approach (Task 5) was: inject an `ADD_CONNECTOR_TOOL` into the MCP tools list, intercept `add_connector` calls locally (in-process via `_apply_add_connector`), and emit a `connector` SSE event. This was done against the b646384 chat.py.\n\nNow main's chat.py is a REFACTOR of the same idea but: (a) no local-tool interception (just calls mcp_client.call_tool), (b) uses `_sse` yielding strings, (c) different structure.\n\nThe branch's chat.py — let me see what it actually looks like (the b646384 baseline + my Task 5 additions). Let me read branch chat.py to see how it injects ADD_CONNECTOR_TOOL and emits the `connector` event. Then I can plan how to port that logic onto main's refactored `stream_chat`.\n\nActually, hold on. Let me reconsider. The branch's chat.py vs main's chat.py — both derive from a common ancestor (d2626ac2). The ancestor's chat.py had SOME structure (probably similar to main's `stream_chat` with `handleEvent`/`post_chat`/SSE dispatch via a router). My Task 5 edits modified the ancestor's chat.py to add `ADD_CONNECTOR_TOOL` interception + `connector` event.\n\nMain also modified the ancestor's chat.py (CGU refactor: `_sse` helper, `offline_fallback`, `stream_chat` async iterator, etc.). \n\nSo both branches diverged from the SAME ancestor chat.py. The branch's chat.py = ancestor + connectors. Main's chat.py = ancestor + CGU refactor. They conflict.\n\nTo produce the final `chat.py` = main's version + connectors feature, I need to understand BOTH the ancestor and where connectors logic goes in main's refactored `stream_chat`.\n\nLet me read the branch's chat.py (current) to see exactly what I added (the ADD_CONNECTOR_TOOL injection point and connector event emission), so I know what to re-port. Let me `git show feature/mcp-studio-connectors:apps/studio-api/.../chat.py`.\n\nThen I can plan: in main's `stream_chat`, the tool-calling loop does `mcp_client.call_tool(name, arguments)`. To intercept `add_connector` locally, I'd insert a check: if `name == \"add_connector\"`, call `_apply_add_connector(arguments)` locally (write registry + yield `connector` SSE event) instead of `mcp_client.call_tool`. And inject `ADD_CONNECTOR_TOOL` into `openai_tools`.\n\nBut wait — main's `stream_chat` gets tools from `mcp_client.list_tools()` — these are REMOTE MCP tools. To add a LOCAL `add_connector` tool that the LLM can call, I'd merge `ADD_CONNECTOR_TOOL` into the tools list. But the LLM's tool call would then be intercepted. This is the re-port.\n\nHowever — there's a subtlety: in main's flow, after the LLM emits tool_calls, the loop calls `mcp_client.call_tool(name, arguments)` for EACH. If `name == \"add_connector\"`, I intercept. This is feasible.\n\nOK. This is now a clear (though non-trivial) re-porting task. Let me also check the branch's chat.py to see exactly what I built, and check main's StudioContext.tsx SSE handling + ChatCopilot structure, to fully scope.\n\nGiven the scope, I have enough to write a plan. But the system reminder says I'm in READ-ONLY plan mode and must NOT execute. The user said \"Your objective will be to get CI green\" — implying they want me to eventually do it, but the harness injected plan-mode read-only for now.\n\nSo: I should present a clear, concise plan + the key decision/questions, and STOP (await user go-ahead), since I cannot execute in plan mode.\n\nBut wait — let me re-read the system reminder once more: \"Plan mode ACTIVE - you are in READ-ONLY phase. ... The user indicated that they do not want you to execute yet -- you MUST NOT make any edits, run any non-readonly tools.\" So the user (via harness) wants me to PLAN first, not execute. I present the plan and ask for confirmation.\n\nLet me gather the remaining key facts for a sharp plan: \n- Branch's chat.py (what I built): read it.\n- Main's StudioContext.tsx SSE handler structure (so I know the frontend SSE wiring survives or needs re-port). Actually the branch's StudioContext already has handleEvent with `connector` case; main's StudioContext was refactored. Let me check main's StudioContext SSE handling.\n- Main's ChatCopilot.tsx structure (does it still exist as a component with the quick-pills area?).\n\nLet me read branch chat.py + main's StudioContext (SSE part) + main ChatCopilot quickly. This grounds the plan precisely.\n\nActually, I'm spending a lot. Let me be efficient: read branch chat.py (to know my connector logic to re-port) and grep main StudioContext for the SSE handleEvent switch + main ChatCopilot structure. Three reads.\n\nLet me do them.",
+          "time": {
+            "start": 1792590317981,
+            "end": 1792590336761
+          },
+          "id": "prt_15eb5899d001QZi7fV3beFNm1r",
+          "sessionID": "ses_ea235d4dfffeA2GZ5hrgZrKAi2",
+          "messageID": "msg_15eb57bf9002WPNK1QO6SOoHGx"
+        },
+        {
+          "type": "text",
+          "text": "Now I understand main's chat architecture: it uses a `_sse()` helper + `stream_chat` async iterator, calls MCP tools via `mcp_client.call_tool`, and has **no local-tool interception**. My branch's connectors logic (`ADD_CONNECTOR_TOOL` injection + `connector` SSE) was built on the ancestor's structure. Let me read the branch's `chat.py` (what I built) plus main's StudioContext SSE handler and ChatCopilot structure to fully scope the port:",
+          "time": {
+            "start": 1792590336764,
+            "end": 1792590345592
+          },
+          "id": "prt_15eb5d2fc0010hXVmrZGXraJ8B",
+          "sessionID": "ses_ea235d4dfffeA2GZ5hrgZrKAi2",
+          "messageID": "msg_15eb57bf9002WPNK1QO6SOoHGx"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "chatcmpl-tool-3d741f336a204c329e2104110e608882",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "echo \"=== BRANCH chat.py (the connectors additions) ===\"; git show feature/mcp-studio-connectors:apps/studio-api/src/agentic_odi_studio_api/studio/chat.py | sed -n '1,40p;85,140p'; echo; echo \"=== main StudioContext SSE handleEvent switch ===\"; git show origin/main:apps/studio/src/state/StudioContext.tsx | grep -n \"case \\\"\\|handleEvent\\|onmessage\\|streamChat\\|addEventListener\" | head -30; echo; echo \"=== main ChatCopilot exists? structure ===\"; git show origin/main:apps/studio/src/components/chat/ChatCopilot.tsx 2>/dev/null | grep -n \"export function\\|suggestion\\|connector\\|quick\" | head",
+              "description": "Read branch chat.py connector logic + main SSE/ChatCopilot structure",
+              "workdir": "/home/alexa/repos/agentic-odi/.worktrees/mcp-studio-connectors"
+            },
+            "output": "=== BRANCH chat.py (the connectors additions) ===\n\"\"\"Conversational helper with offline fallbacks and a streaming tool loop.\n\nPorted 1:1 from the Streamlit Living Studio app, upgraded to stream over SSE.\n\"\"\"\n\nfrom __future__ import annotations\n\nimport json\nfrom collections.abc import AsyncIterator\nfrom typing import Any\n\nfrom fastmcp import Client as McpClient\nfrom openai import AsyncOpenAI\n\nfrom agentic_odi_studio_api.studio.connectors import ConnectorService\nfrom agentic_odi_studio_api.studio.probes import check_llm_health\nfrom agentic_odi_studio_api.studio.schemas import ChatRequest\n\nSYSTEM_PROMPT = \"\"\"You are Steve Jobs and an elite Outcome-Driven Innovation (ODI) strategist assisting a Product Manager in The Living Studio.\nYour mission is to eliminate backlog paper-pushing and help the PM think exclusively in human intent, customer friction, and measurable outcomes.\nKey principles:\n1. Always start with the Job-to-be-Done (JTBD): \"What is the core functional human job?\"\n2. Uncover Desired Outcomes using the strict ODI format: [Direction] + [Unit of Measure] + [Object of Control] + [Contextual Clarifier]. (e.g. \"Minimize the time it takes to propagate secrets across environments\").\n3. Opportunity Score = Importance + max(Importance - Satisfaction, 0). Scores > 10 represent breakthrough underserved market opportunities.\n4. When asked to add or query Jobs, Steps, or Outcomes, ALWAYS invoke the corresponding tools.\n5. Embody clarity, focus, and causality. Strip away corporate jargon.\"\"\"\n\n\ndef offline_fallback(user_input: str) -> str:\n    \"\"\"Intelligent grounded fallback when no LLM backend is reachable.\"\"\"\n    lower_inp = user_input.lower()\n    if \"guideline\" in lower_inp or \"framework\" in lower_inp or \"stage\" in lower_inp:\n        return (\n            \"### 📖 Outcome-Driven Innovation (ODI) Process Guidelines\\n\\n\"\n            \"1. **Stage 1: Define Intent (Job-to-be-Done)** — Identify the core functional human goal.\\n\"\n            \"2. **Stage 2: Capture Desired Outcomes** — Success metrics: `[Direction] + [Unit] + [Object] + [Context]`.\\n\"\n            \"3. **Stage 3: Opportunity Scoring** — `Importance + max(Importance - Satisfaction, 0)`. Focus on scores > 10.\\n\"\n            \"4. **Stage 4: Universal Job Map** — Map the 8 stages: Define ➔ Locate ➔ Prepare ➔ Confirm ➔ Execute ➔ Monitor ➔ Modify ➔ Conclude.\\n\\n\"\n            \"*(Connected in Local Studio Mode. Start your local LLM backend at `http://localhost:8001/v1` for full autonomous completions)*\"\n        )\n            },\n        }\n        for tool in mcp_tools\n    ]\n\n\nADD_CONNECTOR_TOOL: dict[str, Any] = {\n    \"type\": \"function\",\n    \"function\": {\n        \"name\": \"add_connector\",\n        \"description\": (\n            \"Register an external MCP or REST connector into the shared connector \"\n            \"registry so the Living Studio and CLI can use it. Provide a 'preset' \"\n            \"id (from connectors catalog) and optionally a 'name' and 'url' \"\n            \"override, or a custom 'name' + 'url'. Does not require an MCP server.\"\n        ),\n        \"parameters\": {\n            \"type\": \"object\",\n            \"properties\": {\n                \"name\": {\"type\": \"string\", \"description\": \"Unique connector name (defaults to the preset id).\"},\n                \"preset\": {\"type\": \"string\", \"description\": \"Preset id, e.g. notion, posthog, exa, linear, github.\"},\n                \"url\": {\"type\": \"string\", \"description\": \"Custom endpoint URL (used when no preset is given).\"},\n            },\n        },\n    },\n}\n\n\ndef _apply_add_connector(\n    arguments: dict[str, Any], service: ConnectorService\n) -> tuple[str, list[dict[str, Any]]]:\n    \"\"\"Register a connector locally and return SSE event dicts for the stream.\"\"\"\n    name = arguments.get(\"name\")\n    preset_id = arguments.get(\"preset\")\n    url = arguments.get(\"url\")\n    try:\n        config = service.add(name=name, preset_id=preset_id, url=url)\n    except Exception as exc:  # noqa: BLE001\n        event = {\"event\": \"connector\", \"data\": {\"status\": \"error\", \"error\": str(exc)}}\n        return f\"Error: {exc}\", [event]\n    event_data: dict[str, Any] = {\"action\": \"registered\", \"name\": config.name}\n    if preset_id is not None:\n        event_data[\"preset\"] = preset_id\n    if url is not None:\n        event_data[\"url\"] = url\n    return f\"registered connector {config.name}\", [\n        {\"event\": \"connector\", \"data\": event_data}\n    ]\n\n\nasync def stream_chat(request: ChatRequest, service: ConnectorService | None = None) -> AsyncIterator[str]:\n    \"\"\"Yield SSE frames: status, delta, tool, message, canvas_dirty.\"\"\"\n    yield _sse(\"status\", {\"phase\": \"health_check\"})\n    healthy, _message = await check_llm_health(request.base_url, request.api_key, request.model)\n\n    last_user = next((m.content for m in reversed(request.messages) if m.role == \"user\"), \"\")\n\n=== main StudioContext SSE handleEvent switch ===\n24:  streamChat,\n458:      const handleEvent = (event: RawSseEvent) => {\n460:          case \"status\": {\n468:          case \"delta\": {\n477:          case \"tool\":\n487:          case \"message\":\n495:          case \"canvas_dirty\":\n498:          case \"error\":\n507:        await streamChat(\n516:          handleEvent,\n\n=== main ChatCopilot exists? structure ===\n",
+            "metadata": {
+              "output": "=== BRANCH chat.py (the connectors additions) ===\n\"\"\"Conversational helper with offline fallbacks and a streaming tool loop.\n\nPorted 1:1 from the Streamlit Living Studio app, upgraded to stream over SSE.\n\"\"\"\n\nfrom __future__ import annotations\n\nimport json\nfrom collections.abc import AsyncIterator\nfrom typing import Any\n\nfrom fastmcp import Client as McpClient\nfrom openai import AsyncOpenAI\n\nfrom agentic_odi_studio_api.studio.connectors import ConnectorService\nfrom agentic_odi_studio_api.studio.probes import check_llm_health\nfrom agentic_odi_studio_api.studio.schemas import ChatRequest\n\nSYSTEM_PROMPT = \"\"\"You are Steve Jobs and an elite Outcome-Driven Innovation (ODI) strategist assisting a Product Manager in The Living Studio.\nYour mission is to eliminate backlog paper-pushing and help the PM think exclusively in human intent, customer friction, and measurable outcomes.\nKey principles:\n1. Always start with the Job-to-be-Done (JTBD): \"What is the core functional human job?\"\n2. Uncover Desired Outcomes using the strict ODI format: [Direction] + [Unit of Measure] + [Object of Control] + [Contextual Clarifier]. (e.g. \"Minimize the time it takes to propagate secrets across environments\").\n3. Opportunity Score = Importance + max(Importance - Satisfaction, 0). Scores > 10 represent breakthrough underserved market opportunities.\n4. When asked to add or query Jobs, Steps, or Outcomes, ALWAYS invoke the corresponding tools.\n5. Embody clarity, focus, and causality. Strip away corporate jargon.\"\"\"\n\n\ndef offline_fallback(user_input: str) -> str:\n    \"\"\"Intelligent grounded fallback when no LLM backend is reachable.\"\"\"\n    lower_inp = user_input.lower()\n    if \"guideline\" in lower_inp or \"framework\" in lower_inp or \"stage\" in lower_inp:\n        return (\n            \"### 📖 Outcome-Driven Innovation (ODI) Process Guidelines\\n\\n\"\n            \"1. **Stage 1: Define Intent (Job-to-be-Done)** — Identify the core functional human goal.\\n\"\n            \"2. **Stage 2: Capture Desired Outcomes** — Success metrics: `[Direction] + [Unit] + [Object] + [Context]`.\\n\"\n            \"3. **Stage 3: Opportunity Scoring** — `Importance + max(Importance - Satisfaction, 0)`. Focus on scores > 10.\\n\"\n            \"4. **Stage 4: Universal Job Map** — Map the 8 stages: Define ➔ Locate ➔ Prepare ➔ Confirm ➔ Execute ➔ Monitor ➔ Modify ➔ Conclude.\\n\\n\"\n            \"*(Connected in Local Studio Mode. Start your local LLM backend at `http://localhost:8001/v1` for full autonomous completions)*\"\n        )\n            },\n        }\n        for tool in mcp_tools\n    ]\n\n\nADD_CONNECTOR_TOOL: dict[str, Any] = {\n    \"type\": \"function\",\n    \"function\": {\n        \"name\": \"add_connector\",\n        \"description\": (\n            \"Register an external MCP or REST connector into the shared connector \"\n            \"registry so the Living Studio and CLI can use it. Provide a 'preset' \"\n            \"id (from connectors catalog) and optionally a 'name' and 'url' \"\n            \"override, or a custom 'name' + 'url'. Does not require an MCP server.\"\n        ),\n        \"parameters\": {\n            \"type\": \"object\",\n            \"properties\": {\n                \"name\": {\"type\": \"string\", \"description\": \"Unique connector name (defaults to the preset id).\"},\n                \"preset\": {\"type\": \"string\", \"description\": \"Preset id, e.g. notion, posthog, exa, linear, github.\"},\n                \"url\": {\"type\": \"string\", \"description\": \"Custom endpoint URL (used when no preset is given).\"},\n            },\n        },\n    },\n}\n\n\ndef _apply_add_connector(\n    arguments: dict[str, Any], service: ConnectorService\n) -> tuple[str, list[dict[str, Any]]]:\n    \"\"\"Register a connector locally and return SSE event dicts for the stream.\"\"\"\n    name = arguments.get(\"name\")\n    preset_id = arguments.get(\"preset\")\n    url = arguments.get(\"url\")\n    try:\n        config = service.add(name=name, preset_id=preset_id, url=url)\n    except Exception as exc:  # noqa: BLE001\n        event = {\"event\": \"connector\", \"data\": {\"status\": \"error\", \"error\": str(exc)}}\n        return f\"Error: {exc}\", [event]\n    event_data: dict[str, Any] = {\"action\": \"registered\", \"name\": config.name}\n    if preset_id is not None:\n        event_data[\"preset\"] = preset_id\n    if url is not None:\n        event_data[\"url\"] = url\n    return f\"registered connector {config.name}\", [\n        {\"event\": \"connector\", \"data\": event_data}\n    ]\n\n\nasync def stream_chat(request: ChatRequest, service: ConnectorService | None = None) -> AsyncIterator[str]:\n    \"\"\"Yield SSE frames: status, delta, tool, message, canvas_dirty.\"\"\"\n    yield _sse(\"status\", {\"phase\": \"health_check\"})\n    healthy, _message = await check_llm_health(request.base_url, request.api_key, request.model)\n\n    last_user = next((m.content for m in reversed(request.messages) if m.role == \"user\"), \"\")\n\n=== main StudioContext SSE handleEvent switch ===\n24:  streamChat,\n458:      const handleEvent = (event: RawSseEvent) => {\n460:          case \"status\": {\n468:          case \"delta\": {\n477:          case \"tool\":\n487:          case \"message\":\n495:          case \"canvas_dirty\":\n498:          case \"error\":\n507:        await streamChat(\n516:          handleEvent,\n\n=== main ChatCopilot exists? structure ===\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "echo \"=== BRANCH chat.py (the connectors additions) ===\"; git show feature/mcp-studio-connectors:apps/studio-api/src/agentic_odi_studio_api/studio/chat.py | sed -n '1,40p;85,140p'; echo; echo \"=== main StudioContext SSE handleEvent switch ===\"; git show origin/main:apps/studio/src/state/StudioContext.tsx | grep -n \"case \\\"\\|handleEvent\\|onmessage\\|streamChat\\|addEventListener\" | head -30; echo; echo \"=== main ChatCopilot exists? structure ===\"; git show origin/main:apps/studio/src/components/chat/ChatCopilot.tsx 2>/dev/null | grep -n \"export function\\|suggestion\\|connector\\|quick\" | head",
+            "time": {
+              "start": 1792590345543,
+              "end": 1792590345577
+            }
+          },
+          "id": "prt_15eb5e8db001lbz2yogyLpXs2r",
+          "sessionID": "ses_ea235d4dfffeA2GZ5hrgZrKAi2",
+          "messageID": "msg_15eb57bf9002WPNK1QO6SOoHGx"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "ba64117dcf1808f6c0c3643c6a35efac2edb9153",
+          "type": "step-finish",
+          "tokens": {
+            "total": 96665,
+            "input": 2475,
+            "output": 346,
+            "reasoning": 1236,
+            "cache": {
+              "write": 0,
+              "read": 92608
+            }
+          },
+          "cost": 0,
+          "id": "prt_15eb5f5990018EQILFey2hHaLo",
+          "sessionID": "ses_ea235d4dfffeA2GZ5hrgZrKAi2",
+          "messageID": "msg_15eb57bf9002WPNK1QO6SOoHGx"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_15eb1b7e90011uuYmZPabmCnly",
+        "role": "assistant",
+        "mode": "plan",
+        "agent": "plan",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 99191,
+          "input": 1391,
+          "output": 210,
+          "reasoning": 950,
+          "cache": {
+            "write": 0,
+            "read": 96640
+          }
+        },
+        "modelID": "poolside/laguna-s-2.1:free",
+        "providerID": "kilo",
+        "time": {
+          "created": 1792590345677,
+          "completed": 1792590375047
+        },
+        "finish": "tool-calls",
+        "id": "msg_15eb5f5cd002MpUtxlYcaoad73",
+        "sessionID": "ses_ea235d4dfffeA2GZ5hrgZrKAi2"
+      },
+      "parts": [
+        {
+          "snapshot": "ba64117dcf1808f6c0c3643c6a35efac2edb9153",
+          "type": "step-start",
+          "id": "prt_15eb5febb0018SM3227MOZB4LQ",
+          "sessionID": "ses_ea235d4dfffeA2GZ5hrgZrKAi2",
+          "messageID": "msg_15eb5f5cd002MpUtxlYcaoad73"
+        },
+        {
+          "type": "reasoning",
+          "text": "Now I have a clear picture:\n\n**Branch chat.py**: It's actually derived from main's chat.py structure (the docstring matches main's: \"Ported 1:1 from the Streamlit Living Studio app, upgraded to stream over SSE.\"). Wait — the branch chat.py header is IDENTICAL to main's. And it has `_sse`, `_to_openai_messages`, `_openai_tools`, `stream_chat`. So the branch's chat.py IS main's chat.py + my Task 5 additions (ADD_CONNECTOR_TOOL, _apply_add_connector, and the connector interception + `service` param). \n\nWait, but that contradicts — the branch was built on b646384 (pre-CGU). But the branch chat.py docstring matches main's (\"Ported 1:1...\", \"offline_fallback\"). Hmm. So the b646384 baseline ALREADY had this chat.py (with offline_fallback, stream_chat async iterator, _sse). And main ALSO has it (CGU refactored around it). So the ancestor (d2626ac2) and main share this chat.py; the branch = ancestor chat.py + my connectors additions; main = ancestor chat.py + CGU refactor of OTHER parts (but chat.py itself diverged too).\n\nActually — the branch chat.py (from the sed output) shows `offline_fallback` docstring as \"Intelligent grounded fallback\" while main's is longer (\"Deterministic, honest...\"). And branch's `_openai_tools`? The sed output is jumbled (it cut at line 40 then jumped to lines 85-140, showing the tail of offline_fallback + `_openai_tools` fragment + ADD_CONNECTOR_TOOL). The branch chat.py structure = main's `stream_chat` skeleton + `ADD_CONNECTOR_TOOL`/`_apply_add_connector` + a `service` param on `stream_chat` + interception logic (which I need to see — the sed didn't show the interception in the tool loop).\n\nSo the branch RE-PORTED the connectors logic into main-like `stream_chat`. Good — that means my branch already adapted to a `stream_chat`-style architecture (not the old post_chat/handleEvent). \n\n**Conflict reality**: Both branch and main modified chat.py from the same ancestor. The conflict is in the overlapping regions: `stream_chat` signature, `offline_fallback` text, and the tool-call loop (where I inject ADD_CONNECTOR_TOOL interception vs main's CGU changes). The `add_connector` interception logic I added needs to survive onto main's final `stream_chat`.\n\n**Main StudioContext**: handleEvent switch at 458 with cases: status, delta, tool, message, canvas_dirty, error — SAME as branch (I added `connector` case). So main's StudioContext SSE dispatch matches the ancestor; my `connector` case addition will conflict only if main also reordered/added cases. Main has the SAME 6 cases; my branch added a `connector` case. The conflict is whether main's handleEvent differs. Likely minimal conflict here (same structure). Good — StudioContext re-port is mostly additive (connectorSuggestions state + case).\n\n**Main ChatCopilot**: grep returned NOTHING — meaning main's `ChatCopilot.tsx` EITHER doesn't exist OR has no `export function`/suggestion/connector/quick matches. Wait — `git show origin/main:apps/studio/src/components/chat/ChatCopilot.tsx | grep -n \"export function|suggestion|connector|quick\"` returned nothing. That suggests main's ChatCopilot.tsx is EMPTY or doesn't exist? But the overlap said main modified ChatCopilot.tsx. Let me check — maybe main moved ChatCopilot content into Composer/Conversation, or ChatCopilot now re-exports/redirects.\n\nHmm, actually the grep returned no lines — possibly because main's ChatCopilot.tsx is now a thin re-export or the grep pattern didn't match. Could be main DELETED the quick-pills from ChatCopilot (moved to Hero/Composer). This affects WHERE my suggestion chips go.\n\nThis is the crux of the frontend re-port difficulty. Let me read main's ChatCopilot.tsx and main's Composer.tsx / Hero.tsx to find where suggestions/quick-pills live now.\n\nGiven plan-mode, I have enough to present a plan. But the ChatCopilot question is the biggest decision. Let me quickly inspect main's ChatCopilot.tsx (read-only) to ground the plan.\n\nLet me read main's ChatCopilot.tsx fully (it's likely short now).",
+          "time": {
+            "start": 1792590347967,
+            "end": 1792590369635
+          },
+          "id": "prt_15eb5febf001OxvwjtFEhDVkF5",
+          "sessionID": "ses_ea235d4dfffeA2GZ5hrgZrKAi2",
+          "messageID": "msg_15eb5f5cd002MpUtxlYcaoad73"
+        },
+        {
+          "type": "text",
+          "text": "Branch's `chat.py` already matches main's `stream_chat` skeleton (it was ported onto a similar architecture). Main's StudioContext SSE handler has the **same** 6-case switch (my `connector` case is purely additive — low friction). But the `ChatCopilot.tsx` grep returned nothing — main may have moved the quick-pills/suggestions elsewhere. Let me inspect main's ChatCopilot + the new Composer/Hero to place the suggestion chips correctly:",
+          "time": {
+            "start": 1792590369639,
+            "end": 1792590374946
+          },
+          "id": "prt_15eb65367001ES8rSqNr17gqQi",
+          "sessionID": "ses_ea235d4dfffeA2GZ5hrgZrKAi2",
+          "messageID": "msg_15eb5f5cd002MpUtxlYcaoad73"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "chatcmpl-tool-4c1ef1c9995a43e08e900f64bba4b9a3",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "echo \"=== main ChatCopilot.tsx (read-only) ===\"; git show origin/main:apps/studio/src/components/chat/ChatCopilot.tsx | sed -n '1,80p'",
+              "description": "Inspect main ChatCopilot structure",
+              "workdir": "/home/alexa/repos/agentic-odi/.worktrees/mcp-studio-connectors"
+            },
+            "output": "=== main ChatCopilot.tsx (read-only) ===\nfatal: path 'apps/studio/src/components/chat/ChatCopilot.tsx' exists on disk, but not in 'origin/main'\n",
+            "metadata": {
+              "output": "=== main ChatCopilot.tsx (read-only) ===\nfatal: path 'apps/studio/src/components/chat/ChatCopilot.tsx' exists on disk, but not in 'origin/main'\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "echo \"=== main ChatCopilot.tsx (read-only) ===\"; git show origin/main:apps/studio/src/components/chat/ChatCopilot.tsx | sed -n '1,80p'",
+            "time": {
+              "start": 1792590374902,
+              "end": 1792590374933
+            }
+          },
+          "id": "prt_15eb65b0a001hktJ1efYnkJExv",
+          "sessionID": "ses_ea235d4dfffeA2GZ5hrgZrKAi2",
+          "messageID": "msg_15eb5f5cd002MpUtxlYcaoad73"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "ba64117dcf1808f6c0c3643c6a35efac2edb9153",
+          "type": "step-finish",
+          "tokens": {
+            "total": 99191,
+            "input": 1391,
+            "output": 210,
+            "reasoning": 950,
+            "cache": {
+              "write": 0,
+              "read": 96640
+            }
+          },
+          "cost": 0,
+          "id": "prt_15eb66846001ovWpe3r6O2btm6",
+          "sessionID": "ses_ea235d4dfffeA2GZ5hrgZrKAi2",
+          "messageID": "msg_15eb5f5cd002MpUtxlYcaoad73"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_15eb1b7e90011uuYmZPabmCnly",
+        "role": "assistant",
+        "mode": "plan",
+        "agent": "plan",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 100115,
+          "input": 76,
+          "output": 313,
+          "reasoning": 558,
+          "cache": {
+            "write": 0,
+            "read": 99168
+          }
+        },
+        "modelID": "poolside/laguna-s-2.1:free",
+        "providerID": "kilo",
+        "time": {
+          "created": 1792590375079,
+          "completed": 1792590394234
+        },
+        "finish": "tool-calls",
+        "id": "msg_15eb668a7002qZSGkupaZaM11M",
+        "sessionID": "ses_ea235d4dfffeA2GZ5hrgZrKAi2"
+      },
+      "parts": [
+        {
+          "snapshot": "ba64117dcf1808f6c0c3643c6a35efac2edb9153",
+          "type": "step-start",
+          "id": "prt_15eb66ae1001VnUXxTusMQKy6O",
+          "sessionID": "ses_ea235d4dfffeA2GZ5hrgZrKAi2",
+          "messageID": "msg_15eb668a7002qZSGkupaZaM11M"
+        },
+        {
+          "type": "reasoning",
+          "text": "`ChatCopilot.tsx` does NOT exist on main (git show says \"exists on disk, but not in origin/main\") — wait, \"exists on disk but not in origin/main\" means the file is on disk (in the worktree/HEAD) but NOT in origin/main. So main DELETED `ChatCopilot.tsx`! Main split the chat UI into Composer/Conversation/ChatStage/Hero/etc. and removed ChatCopilot.tsx.\n\nBut my branch's PR #56 modifies ChatCopilot.tsx (adds suggestion chips there) + SettingsPanel + StudioContext. main has NO ChatCopilot.tsx. So:\n- Branch's `ChatCopilot.tsx` (with my chips) CONFLICTS with main's DELETION of ChatCopilot.tsx.\n- Main's `Composer.tsx` (where quick-pills/suggestions likely moved) is NEW (branch doesn't have it).\n\nThis is a major re-port: My suggestion-chip UI in ChatCopilot.tsx must MOVE to main's Composer.tsx (or wherever quick-pills live in main). \n\nSo the frontend re-port requires:\n1. Find where main's \"quick pills\"/\"Suggested Intents\" area lives now (likely Composer.tsx or Hero.tsx).\n2. Move my `connectorSuggestions` chips there.\n3. Delete the branch's ChatCopilot.tsx (or reconcile — but main deleted it, so the feature lives elsewhere).\n\nThis substantially changes the plan. The branch's `ChatCopilot.test.tsx` likewise must move.\n\nLet me confirm where main's quick-pills/suggested-intents live. Let me grep main's studio src for \"Suggested Intents\" or \"quick\" or \"QUICK_PROMPTS\".\n\nLet me also check: my branch's StudioContext `connectors` callbacks + SettingsPanel Connectors section — do those survive? Branch modified SettingsPanel.tsx; main also modified SettingsPanel.tsx. Need to merge main's SettingsPanel refactor with my Connectors section. And StudioContext — main restructured it heavily (the diff showed main touched StudioContext among 65 files). \n\nThis is a BIG reconciliation. Let me quantify by checking where the quick-pills moved in main, and whether main's SettingsPanel still has a place to add a Connectors section.\n\nLet me grep main for \"Suggested Intents\" / \"quick\" / \"Composer\".\n\nActually — given the scale and that I'm in PLAN MODE (must not execute), I have enough to present a high-fidelity plan + decision. Let me do ONE more read-only gather: confirm where main's suggestion/quick-prompt UI lives (to place chips), and whether main's SettingsPanel is structurally compatible. Then present.\n\nLet me grep main's studio src.",
+          "time": {
+            "start": 1792590375651,
+            "end": 1792590386437
+          },
+          "id": "prt_15eb66ae3001ZyqK6VMfhWUNJU",
+          "sessionID": "ses_ea235d4dfffeA2GZ5hrgZrKAi2",
+          "messageID": "msg_15eb668a7002qZSGkupaZaM11M"
+        },
+        {
+          "type": "text",
+          "text": "Critical finding: main **deleted** `ChatCopilot.tsx` — it split the chat UI into `Composer`/`Conversation`/`ChatStage`/`Hero` and moved quick-pills there. My suggestion-chips live in the deleted `ChatCopilot.tsx`, so the frontend re-port is non-trivial. Let me find where main's \"Suggested Intents\"/quick-pills moved, and confirm main's SettingsPanel structure:",
+          "time": {
+            "start": 1792590386440,
+            "end": 1792590394174
+          },
+          "id": "prt_15eb69508001kzDvwm9Khkourx",
+          "sessionID": "ses_ea235d4dfffeA2GZ5hrgZrKAi2",
+          "messageID": "msg_15eb668a7002qZSGkupaZaM11M"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "chatcmpl-tool-13e4c11ec3654e3cb5e8b45f6f297f30",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "echo \"=== where main's quick-pills / suggested intents live ===\"; git grep -l \"Suggested Intents\\|quick-pill\\|QuickPrompts\\|quick_prompt\\|QUICK_PROMPTS\" origin/main -- apps/studio/src 2>/dev/null; echo \"=== Composer.tsx quick prompts ===\"; git show origin/main:apps/studio/src/components/chat/Composer.tsx 2>/dev/null | grep -n \"QUICK\\|suggested\\|intent\\|quick\" | head; echo \"=== branch ChatCopilot.tsx (mine) — quick pills region ===\"; git show feature/mcp-studio-connectors:apps/studio/src/components/chat/ChatCopilot.tsx | grep -n \"Suggested Intents\\|chat-quick-pills\\|connectorSuggestions\\|Add \" | head",
+              "description": "Find main's quick-pills location vs branch's",
+              "workdir": "/home/alexa/repos/agentic-odi/.worktrees/mcp-studio-connectors"
+            },
+            "output": "=== where main's quick-pills / suggested intents live ===\n=== Composer.tsx quick prompts ===\n=== branch ChatCopilot.tsx (mine) — quick pills region ===\n40:    connectorSuggestions,\n91:        <b>Suggested Intents:</b>\n93:      <div className=\"chat-quick-pills\">\n107:        {connectorSuggestions.length > 0 && (\n112:            <div className=\"chat-quick-pills\">\n113:              {connectorSuggestions.map((preset) => {\n125:                    Add {label}\n",
+            "metadata": {
+              "output": "=== where main's quick-pills / suggested intents live ===\n=== Composer.tsx quick prompts ===\n=== branch ChatCopilot.tsx (mine) — quick pills region ===\n40:    connectorSuggestions,\n91:        <b>Suggested Intents:</b>\n93:      <div className=\"chat-quick-pills\">\n107:        {connectorSuggestions.length > 0 && (\n112:            <div className=\"chat-quick-pills\">\n113:              {connectorSuggestions.map((preset) => {\n125:                    Add {label}\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "echo \"=== where main's quick-pills / suggested intents live ===\"; git grep -l \"Suggested Intents\\|quick-pill\\|QuickPrompts\\|quick_prompt\\|QUICK_PROMPTS\" origin/main -- apps/studio/src 2>/dev/null; echo \"=== Composer.tsx quick prompts ===\"; git show origin/main:apps/studio/src/components/chat/Composer.tsx 2>/dev/null | grep -n \"QUICK\\|suggested\\|intent\\|quick\" | head; echo \"=== branch ChatCopilot.tsx (mine) — quick pills region ===\"; git show feature/mcp-studio-connectors:apps/studio/src/components/chat/ChatCopilot.tsx | grep -n \"Suggested Intents\\|chat-quick-pills\\|connectorSuggestions\\|Add \" | head",
+            "time": {
+              "start": 1792590394076,
+              "end": 1792590394126
+            }
+          },
+          "id": "prt_15eb69c4e001cpMD0VEFdOKzFS",
+          "sessionID": "ses_ea235d4dfffeA2GZ5hrgZrKAi2",
+          "messageID": "msg_15eb668a7002qZSGkupaZaM11M"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "ba64117dcf1808f6c0c3643c6a35efac2edb9153",
+          "type": "step-finish",
+          "tokens": {
+            "total": 100115,
+            "input": 76,
+            "output": 313,
+            "reasoning": 558,
+            "cache": {
+              "write": 0,
+              "read": 99168
+            }
+          },
+          "cost": 0,
+          "id": "prt_15eb6b3500011idP9KLwERpUYj",
+          "sessionID": "ses_ea235d4dfffeA2GZ5hrgZrKAi2",
+          "messageID": "msg_15eb668a7002qZSGkupaZaM11M"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_15eb1b7e90011uuYmZPabmCnly",
+        "role": "assistant",
+        "mode": "plan",
+        "agent": "plan",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 104219,
+          "input": 155,
+          "output": 997,
+          "reasoning": 2971,
+          "cache": {
+            "write": 0,
+            "read": 100096
+          }
+        },
+        "modelID": "poolside/laguna-s-2.1:free",
+        "providerID": "kilo",
+        "time": {
+          "created": 1792590394279,
+          "completed": 1792590471755
+        },
+        "finish": "stop",
+        "id": "msg_15eb6b3a7002RhiC6uDTGRv7L0",
+        "sessionID": "ses_ea235d4dfffeA2GZ5hrgZrKAi2"
+      },
+      "parts": [
+        {
+          "snapshot": "ba64117dcf1808f6c0c3643c6a35efac2edb9153",
+          "type": "step-start",
+          "id": "prt_15eb6bda80012mzctMQep4bJ1F",
+          "sessionID": "ses_ea235d4dfffeA2GZ5hrgZrKAi2",
+          "messageID": "msg_15eb6b3a7002RhiC6uDTGRv7L0"
+        },
+        {
+          "type": "reasoning",
+          "text": "Main has NO \"Suggested Intents\"/\"quick-pill\" anywhere (grep returned nothing). So main removed the quick-pills/suggested-intents UI entirely (the refactor deleted ChatCopilot.tsx and the quick pills with it). The branch's ChatCopilot.tsx (with quick pills + my connector chips) doesn't exist on main.\n\nSo in main, the chat input/suggestions moved to `Composer.tsx` (no QUICK matches there either) and `Conversation.tsx`. The \"quick pills\"/\"Suggested Intents\" feature seems GONE in main (or relocated/reimplemented without that text).\n\nThis means: my branch's frontend connectors UI (ChatCopilot suggestion chips + the quick-pills area) is built on a ChatCopilot.tsx that main DELETED. Re-porting means: either (a) restore ChatCopilot.tsx to main's tree and re-add my chips (but main deliberately restructured away from it), or (b) relocate the connector chip UI to main's Composer.tsx/Conversation.tsx.\n\nHmm. But my branch's ChatCopilot.tsx is NOT in main. If I rebase, main's deletion of ChatCopilot.tsx will DELETE my branch's ChatCopilot.tsx (including my chips + test). So I'd need to port the chip UI to wherever main's chat input now is (Composer.tsx).\n\nWait — but is the \"quick pills / Suggested Intents\" present in main at all? Let me verify by looking at Composer.tsx and Conversation.tsx content. Maybe main reimplemented quick prompts under a different name/label. The grep for \"Suggested Intents|quick-pill|QuickPrompts|quick_prompt|QUICK_PROMPTS\" returned nothing → main has none of these. So main's chat UI has NO quick-suggestion pills. The branch's ChatCopilot.tsx (which had them) was deleted by main.\n\nSo my branch's ChatCopilot.tsx contains BOTH pre-existing (quick pills, level0/1/2 engagement prompts) and my additions (connector chips). Main deleted the whole file. \n\nThis is a significant divergence. The re-port of the frontend connectors UI is the trickiest part. \n\nGiven I'm in PLAN MODE and this is now clearly a substantial reconciliation (rebase 11 commits onto 17 commits of main, resolving conflicts in ~14 files including a deleted-and-restructured ChatCopilot.tsx), I have enough to present a concrete plan and the key DECISION.\n\nKEY DECISION for the user: How should the connector suggestion UI be placed in main's restructured chat?\n\nOption A (minimal, preserves my UI): Re-create `ChatCopilot.tsx` is NOT aligned with main's direction (main deleted it deliberately). Instead, port the connector suggestion chips into main's `Composer.tsx` (the new chat input component). This keeps the feature but follows main's structure. Requires reading main's Composer to find the right injection point.\n\nOption B: Drop the frontend suggestion-chip UI (ChatCopilot chips) from the re-port since main removed that surface, and keep ONLY the backend (`connector` SSE + `add_connector` tool) + Settings Panel connectors section. The SSE still works (frontend StudioContext handleEvent `connector` case persists on main's same structure) but without the copilot chip UI to accept suggestions — though the Settings Panel preset-add covers registration. This reduces scope.\n\nOption C: Fully align with main's chat rearchitecture — but that's large.\n\nAlso the backend chat.py: branch already mirrors main's `stream_chat` skeleton + ADD_CONNECTOR_TOOL. The conflict resolution there is to keep main's `stream_chat` text and re-apply the `add_connector` interception. Feasible but manual.\n\nGiven the scope, the honest plan is: **rebase feature/mcp-studio-connectors onto origin/main, manually resolve conflicts by re-porting the connectors feature (backend chat.py interception + frontend connector UI) onto main's refactored files, with a decision on where the suggestion chips go.** This is a multi-hour integration task.\n\nNow — am I allowed to execute? The system reminder says READ-ONLY plan mode; do NOT execute. So I must present the plan and ASK the user to confirm the decision (Option A/B/C) and authorize execution.\n\nActually, let me reconsider — maybe the user wants me to just DO it (\"get CI green\"). But the harness force-entered plan mode read-only. The reminder is explicit and overrides. So I present plan + questions, await go-ahead.\n\nBut — let me reconsider whether the reconciliation is even as bad as it looks, or whether there's a simpler path. \n\nSimplest path to green CI on PR #56:\n- The PR head is `feature/mcp-studio-connectors`. To merge into main, conflicts must resolve.\n- Alternative: change the PR base to... no, it must be main.\n- Alternative: Since main DELETED ChatCopilot.tsx and restructured heavily, and my branch is built on the OLD structure, the cleanest is to re-create the feature commits on top of main (essentially re-implement the connectors feature against main's files). That's \"port + test\".\n\nActually — maybe the BEST approach given the cwd state: The cwd has `fix/error-handling-hardening` (CGU error-hardening WIP) — but that's the user's CGU branch, not relevant to connectors.\n\nHmm. Let me think about what \"get CI green\" most pragmatically means. The user likely expects me to resolve the merge conflicts and push an updated PR #56 such that CI (ruff/mypy/pytest/vitest/tsc) passes.\n\nGiven the divergences, the realistic plan:\n1. **Rebase** `feature/mcp-studio-connectors` onto `origin/main` (`git rebase -i origin/main`).\n2. For each conflict (14 files), resolve by preserving main's refactored content + re-applying my connectors additions:\n   - `chat.py`: keep main's `stream_chat`; re-introduce `ADD_CONNECTOR_TOOL`, `_apply_add_connector`, the `service: ConnectorService|None` param, and intercept `add_connector` in the tool-call loop; emit `connector` SSE via `_sse(\"connector\", ...)`. Update `__all__` if needed.\n   - `router.py`/`app.py`: main may have moved chat/stream endpoints. Re-wire `create_app(connectors=...)` to pass the service to `stream_chat`. Check main's router for `/api/chat` SSE endpoint.\n   - `schemas.py`: merge main's schemas + my additions (none? I didn't add schemas). Branch-only list includes schemas.py — so I DID touch schemas.py (Task 4 added connector schemas? or Task 5?). Let me recall: Task 4 added `ConnectorConfigCreate` etc.? Actually my connector schemas (`AddConnectorPayload`) are in `types.ts` (frontend) and the backend uses pydantic in `connector_config_from_preset`. Did I add to `schemas.py`? The branch-only list includes `apps/studio-api/.../schemas.py` — so I modified it. Need to see what. Possibly added `connector` SSE event to a schema, or a `ConnectorConfig` model. Must preserve.\n   - `StudioContext.tsx`: main restructured; re-apply `connectors/presets/connectorSuggestions` state + callbacks + `connector` SSE case + boot fetch + context values. Main's StudioContext structure may differ (different hooks). Need to read main's StudioContext.\n   - `SettingsPanel.tsx`: merge main's refactor + my Connectors section. \n   - `ChatCopilot.tsx`: DELETED by main — re-port connector chips to main's new chat component (Composer.tsx) OR restore. DECISION needed.\n   - `ChatCopilot.test.tsx`: re-port tests.\n   - `types.ts`: merge. \n   - `studioApi.ts`: merge (both added connector endpoints).\n   - `mcp_data.py`: branch-only touched it? Branch-only list includes `mcp_data.py` AND main changed it. So both touched — conflict. Need to see.\n   - `cli chat.py`: branch-only. main changed it too. The CLI `connectors` commands? Hmm, my Task 9 noted \"CLI `agentic-odi connectors catalog | add | delete | list`\" — but there's no cli.py in connectors package; the CLI is `apps/cli`. Did I add CLI commands? My Task 9 README mention of CLI might be aspirational (the README says \"CLI: agentic-odi connectors catalog|add|delete|list\"). But the branch-only list shows `apps/cli/src/agentic_odi_cli/chat.py` modified — maybe I added the `add_connector` tool to the CLI's tool list / `connectors` command. Need to verify.\n   - `mcp_server.py`: both changed.\n   - `test_studio_connectors.py`: ruff auto-fix blank line (keep).\n   - `test_studio_mcp_data.py`: both changed.\n\nThis is a large, multi-file manual re-port. It will take significant work and the user must confirm scope (especially the ChatCopilot deletion → where do suggestion chips go).\n\nGiven plan-mode read-only, I'll present:\n- The situation (root cause: main refactored chat UI, deleted ChatCopilot.tsx, restructured chat.py/StudioContext/etc.; branch built on old structure; 14-file overlap).\n- The reconciliation plan (rebase onto main, re-port connectors feature onto refactored files).\n- The KEY DECISION: where to place connector suggestion UI (since ChatCopilot.tsx was deleted by main).\n- Estimate.\n- Ask for go-ahead + decision.\n\nLet me ask the user the key question and present the plan. I should be concise.\n\nActually, wait. Let me reconsider whether I even need to read more. I have enough. But one thing to verify for an accurate plan: does main's chat UI have ANY quick-suggestions surface to receive chips? The grep found none (\"Suggested Intents\" gone). So main's chat is bare input. Option A (port chips to Composer) requires reading Composer. \n\nLet me make the decision crisp for the user. I'll present the plan and ask:\n\nQ1: Placement of connector suggestion chips (main deleted ChatCopilot.tsx): \n   (a) port chips into main's `Composer.tsx` chat input (follow main's structure), or\n   (b) restore a `ChatCopilot`-style suggestions area, or\n   (c) drop the copilot chip UI from this PR and rely on Settings Panel + backend only (keep `connector` SSE + `add_connector` tool backend-intact; frontend listens but doesn't render chips — or remove the `connector` case from frontend since no UI).\n\nQ2: Confirm I should rebase `feature/mcp-studio-connectors` onto `origin/main` (force-push to PR #56) — vs the user wanting me to instead reconcile against the cwd's `fix/error-handling-hardening` CGU branch. Given PR #56 base is main, rebasing onto main is correct.\n\nGiven the system reminder says the user \"does not want you to execute yet,\" I'll present the plan concisely and ask these questions, then wait.\n\nLet me also note: there's risk that main's refactored StudioContext/Composer make the re-port substantial. I'll flag effort as ~half-day of careful merge + verification.\n\nLet me write a concise plan response. I won't write files (read-only). I'll present in text.\n\nActually, the superpowers plan-mode instructions say \"write designs to docs/superpowers/specs/...\" and \"plans to docs/superpowers/plans/...\". But the system reminder explicitly forbids file edits in plan mode. The plan-mode reminder overrides (it's the most recent and explicit). So I present the plan in my response text, not a file. (Or I could note I'd write the plan file upon going to execution.) I'll keep it in-response.\n\nLet me also double-check one thing for the plan accuracy: the branch's modified files vs main — is `apps/cli/src/agentic_odi_cli/chat.py` branch-only (yes, in branch-only list) AND in main-only? No — comm OVERLAP did NOT include `apps/cli/src/agentic_odi_cli/chat.py`? Let me recheck the OVERLAP list: it included `apps/cli/src/agentic_odi_cli/chat.py`. Yes (overlap had it). So both changed it. Good — the CLI conflict is real.\n\nOK. I have enough. Let me also verify the `mcp_server.py` overlap and `router.py` overlap are in both — yes they're in the overlap list. Good.\n\nOne more: let me make sure about `uv.lock` and `pyproject.toml` — both in main-only (main bumped deps). My branch (old) has older lockfile. Rebase onto main brings new lockfile. My connectors package additions (new files: paths.py, catalog.py, registry.py, connectors.py, schema files) — these are NEW files (not in conflict, just need to exist). Actually `paths.py`, `catalog.py`, `connector_catalog.py`? Let me recall Task 1-6 files: `paths.py`, `registry.py`, `catalog.py` (presets), `__init__.py` exports, `studio/connectors.py`, `studio/router.py` (connector routes), `studio/chat.py` (add_connector), `types.ts`, `studioApi.ts`. Some of these (`connectors.py`, connector routes) are NEW files vs ancestor. New files generally merge cleanly (no conflict) unless main also created a file at the same path. `studio/connectors.py` — branch-only (new); main-only does NOT list `connectors.py` → so it's purely additive, no conflict. Good. Only the 14 overlap files need conflict resolution.\n\nAlright. Let me present the plan + questions concisely.\n\nLet me compute one more read-only fact for the plan: how many of the 14 overlap files are \"high-conflict manual\" vs \"likely auto\". I'll just present the strategic plan.\n\nLet me write the response.",
+          "time": {
+            "start": 1792590396842,
+            "end": 1792590454133
+          },
+          "id": "prt_15eb6bdaa001aMHwl3Y5cV2RMp",
+          "sessionID": "ses_ea235d4dfffeA2GZ5hrgZrKAi2",
+          "messageID": "msg_15eb6b3a7002RhiC6uDTGRv7L0"
+        },
+        {
+          "type": "text",
+          "text": "I now have a complete picture. Here's the situation and plan.\n\n## Root cause of the PR #56 conflicts\n\n`feature/mcp-studio-connectors` was branched off `b646384` (pre-CGU) and modifies files on the **old** structure. `main` (a3b8a33) advanced 17 commits that include the **full CGU merge + a chat UI re-architecture**. Both sides changed the same 14 files (computed from the `d2626ac2` merge-base):\n\n| Category | Files |\n|---|---|\n| Backend | `chat.py`, `router.py`, `schemas.py`, `mcp_data.py`, `mcp_server.py`, `cli/.../chat.py` |\n| Frontend | `StudioContext.tsx`, `ChatCopilot.tsx`, `SettingsPanel.tsx`, `types.ts`, `studioApi.ts` |\n| Other | `README.md`, `test_studio_mcp_data.py` |\n\n**Two findings that raise the integration cost:**\n\n1. **`main` deleted `ChatCopilot.tsx`.** It split the copilot into `Composer`/`Conversation`/`ChatStage`/`Hero`/**`Markdown`/etc., and removed the \"Suggested Intents\" quick-pills entirely. My suggestion-chip UI lives in the deleted `ChatCopilot.tsx`, so the frontend chips can't be a drop-in — they must be **re-ported to a main-native surface** (no quick-pills exist on main today).\n2. `chat.py`: main uses a `_sse()`-yielding `stream_chat` with no local-tool injection; my branch already mirrors that skeleton + `ADD_CONNECTOR_TOOL`, but the tool-call loop and `offline_fallback` diverge → manual merge.\n\nBackend `StudioContext` SSE handler and the `connector` event shape are compatible (same 6-case switch — my `connector` case is additive). The connectors package (`paths.py`, `registry.py`, `catalog.py`, `studio/connectors.py`) and router endpoints are new files → merge cleanly.\n\n## Plan to get CI green\n\n1. **Rebase** `feature/mcp-studio-connectors` onto `origin/main` (linear history; matches the PR base).\n2. **Re-port the connectors feature onto main's restructured files** (14 conflict files):\n   - `chat.py` — keep main's `stream_chat`; re-add `ADD_CONNECTOR_TOOL`, `_apply_add_connector`, a `service` param, and a `name == \"add_connector\"` interception in the tool-call loop that emits `_sse(\"connector\", ...)`.\n   - `router.py`/`app.py` — re-wire `create_app(connectors=)` to pass the `ConnectorService` into `stream_chat`; preserve main's SSE endpoint.\n   - `StudioContext.tsx` — re-apply `connectors`/`presets`/`connectorSuggestions` state + callbacks + boot fetch + `case \"connector\"` + context values onto main's structure.\n   - `SettingsPanel.tsx` — re-add the Connectors section into main's refactored panel.\n   - `types.ts`, `studioApi.ts`, `schemas.py`, `mcp_data.py`, CLI `chat.py`, `mcp_server.py` — merge main's version + my additions.\n3. **Frontend chips** — re-implement against main's `Composer.tsx` (the new input surface), since `ChatCopilot.tsx` no longer exists.\n4. **Verify** (same gates as baseline): `ruff`/`mypy` (0 errors) + `pytest` (backend), `tsc` + `vitest` (frontend); force-push to PR #56; watch CI.\n\n## Decision I need from you\n\n**A.** Since main deleted `ChatCopilot.tsx` and the quick-pills surface, where should the connector *suggestion chips* live?\n- **(a)** Port chips into main's `Composer.tsx` input bar (keeps the feature, follows main's structure) — recommended.\n- **(b)** Restore a slim `ChatCopilot`-style \"Suggested Intents\" strip (re-introduces a deleted surface).\n- **(c)** Drop the copilot chip UI this PR; keep backend `add_connector` tool + `connector` SSE + Settings Panel registration (no frontend chip rendering).\n\n**B.** Confirm I should **rebase onto `origin/main`** and force-push to PR #56 (vs. targeting the cwd's `fix/error-handling-hardening` CGU branch instead, which I'll keep out of this PR's way).\n\nPer the plan-mode constraint I'm not executing edits yet — once you confirm A and B, I'll proceed with the rebase + re-port and drive CI to green.",
+          "time": {
+            "start": 1792590454137,
+            "end": 1792590471698
+          },
+          "id": "prt_15eb79d79001N0UeZy41u9u14F",
+          "sessionID": "ses_ea235d4dfffeA2GZ5hrgZrKAi2",
+          "messageID": "msg_15eb6b3a7002RhiC6uDTGRv7L0"
+        },
+        {
+          "reason": "stop",
+          "snapshot": "ba64117dcf1808f6c0c3643c6a35efac2edb9153",
+          "type": "step-finish",
+          "tokens": {
+            "total": 104219,
+            "input": 155,
+            "output": 997,
+            "reasoning": 2971,
+            "cache": {
+              "write": 0,
+              "read": 100096
+            }
+          },
+          "cost": 0,
+          "id": "prt_15eb7e234001P3dYT0B0iYuRbB",
+          "sessionID": "ses_ea235d4dfffeA2GZ5hrgZrKAi2",
+          "messageID": "msg_15eb6b3a7002RhiC6uDTGRv7L0"
         }
       ]
     }
