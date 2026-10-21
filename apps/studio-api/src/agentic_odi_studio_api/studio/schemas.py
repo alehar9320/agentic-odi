@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -74,6 +74,13 @@ class StudioBrief(BaseModel):
     core_problem: str = ""
 
 
+class UiCatalogRequest(BaseModel):
+    """What the calling client can render. Omitted by non-visual clients."""
+
+    version: int = 1
+    components: list[dict[str, Any]] = Field(default_factory=list)
+
+
 class ChatRequest(BaseModel):
     base_url: str
     api_key: str = ""
@@ -81,3 +88,4 @@ class ChatRequest(BaseModel):
     mcp_url: str
     messages: list[ChatMessage] = Field(default_factory=list)
     brief: StudioBrief | None = None
+    ui_catalog: UiCatalogRequest | None = None

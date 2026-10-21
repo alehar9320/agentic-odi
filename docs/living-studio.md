@@ -91,6 +91,61 @@ When the LLM is unreachable the Studio keeps working:
 The user's context is sent with every chat request, so the assistant starts from
 the product, audience, job, and problem rather than asking for them again.
 
+## Rich responses
+
+The copilot does not only talk. When a surface carries the evidence better than a
+paragraph, the agent renders one **inline in the conversation**: a scored
+outcome, a ranked opportunity board, a before/after simulation of a bet, a
+customer quote with its lineage, the eight-stage job map, or a decision record.
+Three properties keep this safe and cheap to extend:
+
+- **The catalog is closed and owned by the SPA.**
+  `apps/studio/src/ui/catalog.ts` declares nine primitives and six cards, their
+  JSON Schema props, and the description the model reads. There is no HTML, no
+  eval, and no third-party component in the path. Prose is rendered by the same
+  `Markdown` component the transcript already used.
+- **The sidecar is catalog-agnostic.** The SPA sends the catalog with each turn;
+  the sidecar derives the `render_ui` tool schema from it, validates what comes
+  back, and streams a `ui` SSE event. Invalid props return to the model as a tool
+  result naming the exact violation, and the loop offers the tool again, so a
+  fumbled prop is corrected in the same reply. A client that sends no catalog
+  never sees the tool.
+- **Cards are views, never actors.** Every button is an `intent` string that the
+  agent receives as the user's next message — one authority, one audit trail.
+
+A surface is one node tree, streamed as one event:
+
+```json
+{
+  "type": "outcome-card",
+  "props": {
+    "id": "O-1",
+    "statement": "Minimize the time it takes to propagate secrets across environments",
+    "importance": 9,
+    "satisfaction": 3
+  }
+}
+```
+
+The conversation keeps the order the agent produced: a `delta` appends to the
+open prose part, a `ui` event opens a card, and the next `delta` opens a new
+paragraph after it. The opportunity score is computed from importance and
+satisfaction when the agent omits it, so the ODI formula has exactly one home
+(`src/lib/odi.ts`). Unknown component types degrade to a quiet fallback; a tree
+that fails validation is dropped whole, and the surrounding prose still reads.
+
+### Adding a surface
+
+1. Add an entry to `CATALOG` in `apps/studio/src/ui/catalog.ts` — props as a
+   JSON Schema subset, plus the description the model will read.
+2. Register the component in `apps/studio/src/ui/registry.ts`.
+3. Implement it in `apps/studio/src/ui/cards.tsx` (domain shape) or
+   `apps/studio/src/ui/primitives.tsx` (composition).
+4. Run `npm --prefix apps/studio test`. The `registry parity` test fails if the
+   catalog and the registry drift apart.
+
+No server change is needed, and no new dependency.
+
 ## 1. Web — production build (recommended for a quick look)
 
 ```bash

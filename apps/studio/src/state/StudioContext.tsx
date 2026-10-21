@@ -32,10 +32,13 @@ import type {
   AddStepPayload,
   CanvasData,
   ChatMessage,
+  ChatPart,
   StudioBrief,
   StudioConfig,
   WorkspacePanelId,
 } from "../types";
+import { catalogManifest } from "../ui/catalog";
+import { parseUiSpec } from "../ui/protocol";
 
 const SETTINGS_KEY = "studio.settings";
 const CANVAS_KEY = "studio.canvas";
@@ -444,7 +447,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       }
 
       const history: ChatMessage[] = [...messages, { role: "user", content: trimmed }];
-      setMessages([...history, { role: "assistant", content: "" }]);
+      setMessages([...history, { role: "assistant", content: "", parts: [] }]);
       setStreaming(true);
       setThinkingPhase("health_check");
       setOfflineReply(false);
@@ -454,6 +457,30 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       abortRef.current = controller;
 
       let content = "";
+      let parts: ChatPart[] = [];
+
+      // Prose is appended to the open text part; a surface opens a new one, so
+      // the transcript keeps the agent's order instead of gathering all prose
+      // above all cards.
+      const appendText = (text: string) => {
+        if (!text) {
+          return;
+        }
+        content += text;
+        const last = parts[parts.length - 1];
+        parts =
+          last?.kind === "text"
+            ? [...parts.slice(0, -1), { kind: "text", text: last.text + text }]
+            : [...parts, { kind: "text", text }];
+      };
+
+      const publish = () => {
+        setMessages((prev) => {
+          const next = [...prev];
+          next[next.length - 1] = { role: "assistant", content, parts: [...parts] };
+          return next;
+        });
+      };
 
       const handleEvent = (event: RawSseEvent) => {
         switch (event.event) {
@@ -466,12 +493,21 @@ export function StudioProvider({ children }: { children: ReactNode }) {
             break;
           }
           case "delta": {
-            content += String(event.data.text ?? "");
-            setMessages((prev) => {
-              const next = [...prev];
-              next[next.length - 1] = { role: "assistant", content };
-              return next;
-            });
+            appendText(String(event.data.text ?? ""));
+            publish();
+            break;
+          }
+          case "ui": {
+            // Validate again on arrival: the connection is local but the
+            // renderer must never trust a shape it has not checked.
+            const parsed = parseUiSpec(event.data.spec, catalogManifest());
+            if (parsed.ok) {
+              parts = [
+                ...parts,
+                { kind: "ui", id: String(event.data.id ?? `ui-${parts.length}`), node: parsed.node },
+              ];
+              publish();
+            }
             break;
           }
           case "tool":
@@ -484,14 +520,15 @@ export function StudioProvider({ children }: { children: ReactNode }) {
               },
             ]);
             break;
-          case "message":
+          case "message": {
             content = String(event.data.content ?? content);
-            setMessages((prev) => {
-              const next = [...prev];
-              next[next.length - 1] = { role: "assistant", content };
-              return next;
-            });
+            const hasSurfaces = parts.some((part) => part.kind === "ui");
+            if (!hasSurfaces) {
+              parts = content ? [{ kind: "text", text: content }] : [];
+            }
+            publish();
             break;
+          }
           case "canvas_dirty":
             void refreshCanvas();
             break;
@@ -512,6 +549,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
             mcp_url: settings.mcp_url,
             messages: history,
             brief,
+            ui_catalog: catalogManifest(),
           },
           handleEvent,
           controller.signal,

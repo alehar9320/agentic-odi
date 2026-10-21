@@ -1,6 +1,9 @@
 import { useState } from "react";
 
 import { useStudio } from "../../state/StudioContext";
+import type { ChatPart } from "../../types";
+import { UiActionContext } from "../../ui/actions";
+import { UiRenderer } from "../../ui/UiRenderer";
 import { CheckIcon, CopyIcon, SparkIcon } from "../icons";
 import { Markdown } from "./Markdown";
 
@@ -34,14 +37,34 @@ function Typing({ label }: { label: string }) {
   );
 }
 
+/**
+ * Prose and surfaces in the order the agent produced them. A text part is
+ * markdown; a `ui` part is a validated node tree rendered by the catalog.
+ */
+function MessageParts({ parts }: { parts: ChatPart[] }) {
+  return (
+    <>
+      {parts.map((part, index) =>
+        part.kind === "text" ? (
+          <Markdown source={part.text} key={index} />
+        ) : (
+          <UiRenderer node={part.node} key={part.id || index} />
+        ),
+      )}
+    </>
+  );
+}
+
 function AssistantMessage({
   content,
+  parts,
   streaming,
   label,
   tools,
   offline,
 }: {
   content: string;
+  parts: ChatPart[];
   streaming: boolean;
   label: string;
   tools: { name: string; status: string; preview?: string }[];
@@ -60,7 +83,7 @@ function AssistantMessage({
     }
   }
 
-  if (!content && !streaming) {
+  if (!content && !streaming && parts.length === 0) {
     return null;
   }
 
@@ -71,7 +94,9 @@ function AssistantMessage({
       </span>
       <div className="message__body">
         {offline && content ? <span className="message__tag">Local guidance</span> : null}
-        {content ? (
+        {parts.length > 0 ? (
+          <MessageParts parts={parts} />
+        ) : content ? (
           <Markdown source={content} />
         ) : (
           <Typing label={label} />
@@ -110,38 +135,41 @@ function AssistantMessage({
 }
 
 export function Conversation() {
-  const { messages, streaming, thinkingPhase, toolActivity, offlineReply } = useStudio();
+  const { messages, streaming, thinkingPhase, toolActivity, offlineReply, sendMessage } = useStudio();
   const lastIndex = messages.length - 1;
 
   return (
-    <div className="conversation" role="log" aria-live="polite" aria-label="Conversation">
-      {messages.map((message, index) => {
-        const isLast = index === lastIndex;
-        if (message.role === "user") {
+    <UiActionContext.Provider value={{ onIntent: (intent) => void sendMessage(intent), busy: streaming }}>
+      <div className="conversation" role="log" aria-live="polite" aria-label="Conversation">
+        {messages.map((message, index) => {
+          const isLast = index === lastIndex;
+          if (message.role === "user") {
+            return (
+              <article className="message message--user" key={index}>
+                <div className="message__bubble">{message.content}</div>
+              </article>
+            );
+          }
+          if (message.role === "notice") {
+            return (
+              <article className="message message--notice" key={index}>
+                <Markdown source={message.content} />
+              </article>
+            );
+          }
           return (
-            <article className="message message--user" key={index}>
-              <div className="message__bubble">{message.content}</div>
-            </article>
+            <AssistantMessage
+              key={index}
+              content={message.content}
+              parts={message.parts ?? []}
+              streaming={streaming && isLast}
+              label={phaseLabel(thinkingPhase)}
+              tools={isLast ? toolActivity : []}
+              offline={isLast && offlineReply}
+            />
           );
-        }
-        if (message.role === "notice") {
-          return (
-            <article className="message message--notice" key={index}>
-              <Markdown source={message.content} />
-            </article>
-          );
-        }
-        return (
-          <AssistantMessage
-            key={index}
-            content={message.content}
-            streaming={streaming && isLast}
-            label={phaseLabel(thinkingPhase)}
-            tools={isLast ? toolActivity : []}
-            offline={isLast && offlineReply}
-          />
-        );
-      })}
-    </div>
+        })}
+      </div>
+    </UiActionContext.Provider>
   );
 }

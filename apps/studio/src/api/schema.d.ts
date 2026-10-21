@@ -106,6 +106,44 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Job
+         * @description Create a Job — works with the model offline because it is manual.
+         */
+        post: operations["post_job_api_jobs_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/jobs/{job_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Job */
+        delete: operations["delete_job_api_jobs__job_id__delete"];
+        options?: never;
+        head?: never;
+        /** Patch Job */
+        patch: operations["patch_job_api_jobs__job_id__patch"];
+        trace?: never;
+    };
     "/api/steps": {
         parameters: {
             query?: never;
@@ -121,6 +159,24 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/steps/{step_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Step */
+        delete: operations["delete_step_api_steps__step_id__delete"];
+        options?: never;
+        head?: never;
+        /** Patch Step */
+        patch: operations["patch_step_api_steps__step_id__patch"];
         trace?: never;
     };
     "/api/outcomes": {
@@ -140,6 +196,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/outcomes/{outcome_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Outcome */
+        delete: operations["delete_outcome_api_outcomes__outcome_id__delete"];
+        options?: never;
+        head?: never;
+        /** Patch Outcome */
+        patch: operations["patch_outcome_api_outcomes__outcome_id__patch"];
+        trace?: never;
+    };
     "/api/chat": {
         parameters: {
             query?: never;
@@ -151,6 +225,23 @@ export interface paths {
         put?: never;
         /** Post Chat */
         post: operations["post_chat_api_chat_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/{full_path}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Spa Fallback */
+        get: operations["spa_fallback__full_path__get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -213,6 +304,23 @@ export interface components {
             mcp_url: string;
             /** Messages */
             messages?: components["schemas"]["ChatMessage"][];
+            brief?: components["schemas"]["StudioBrief"] | null;
+            ui_catalog?: components["schemas"]["UiCatalogRequest"] | null;
+        };
+        /**
+         * CreateJobRequest
+         * @description Create a Job by hand, with or without the model.
+         */
+        CreateJobRequest: {
+            /** Name */
+            name: string;
+            /** Description */
+            description?: string | null;
+            /**
+             * Mcp Url
+             * @default
+             */
+            mcp_url: string;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -237,6 +345,90 @@ export interface components {
         /** McpHealthRequest */
         McpHealthRequest: {
             /** Mcp Url */
+            mcp_url: string;
+        };
+        /**
+         * StudioBrief
+         * @description The user's context, captured during first-run onboarding.
+         */
+        StudioBrief: {
+            /**
+             * Product Name
+             * @default
+             */
+            product_name: string;
+            /**
+             * Product Url
+             * @default
+             */
+            product_url: string;
+            /**
+             * Target User
+             * @default
+             */
+            target_user: string;
+            /**
+             * Job Statement
+             * @default
+             */
+            job_statement: string;
+            /**
+             * Core Problem
+             * @default
+             */
+            core_problem: string;
+        };
+        /**
+         * UiCatalogRequest
+         * @description What the calling client can render. Omitted by non-visual clients.
+         */
+        UiCatalogRequest: {
+            /**
+             * Version
+             * @default 1
+             */
+            version: number;
+            /** Components */
+            components?: {
+                [key: string]: unknown;
+            }[];
+        };
+        /** UpdateJobRequest */
+        UpdateJobRequest: {
+            /** Name */
+            name?: string | null;
+            /** Description */
+            description?: string | null;
+            /**
+             * Mcp Url
+             * @default
+             */
+            mcp_url: string;
+        };
+        /** UpdateOutcomeRequest */
+        UpdateOutcomeRequest: {
+            /** Statement */
+            statement?: string | null;
+            /** Importance */
+            importance?: number | null;
+            /** Satisfaction */
+            satisfaction?: number | null;
+            /**
+             * Mcp Url
+             * @default
+             */
+            mcp_url: string;
+        };
+        /** UpdateStepRequest */
+        UpdateStepRequest: {
+            /** Name */
+            name?: string | null;
+            /** Order */
+            order?: number | null;
+            /**
+             * Mcp Url
+             * @default
+             */
             mcp_url: string;
         };
         /** ValidationError */
@@ -399,14 +591,121 @@ export interface operations {
     };
     get_canvas_api_canvas_get: {
         parameters: {
-            query: {
-                mcp_url: string;
+            query?: {
+                mcp_url?: string | null;
             };
             header?: never;
             path?: never;
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_job_api_jobs_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateJobRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_job_api_jobs__job_id__delete: {
+        parameters: {
+            query?: {
+                mcp_url?: string | null;
+            };
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patch_job_api_jobs__job_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateJobRequest"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
@@ -440,6 +739,78 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["AddStepRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_step_api_steps__step_id__delete: {
+        parameters: {
+            query?: {
+                mcp_url?: string | null;
+            };
+            header?: never;
+            path: {
+                step_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patch_step_api_steps__step_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                step_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateStepRequest"];
             };
         };
         responses: {
@@ -500,6 +871,78 @@ export interface operations {
             };
         };
     };
+    delete_outcome_api_outcomes__outcome_id__delete: {
+        parameters: {
+            query?: {
+                mcp_url?: string | null;
+            };
+            header?: never;
+            path: {
+                outcome_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patch_outcome_api_outcomes__outcome_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                outcome_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateOutcomeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     post_chat_api_chat_post: {
         parameters: {
             query?: never;
@@ -512,6 +955,37 @@ export interface operations {
                 "application/json": components["schemas"]["ChatRequest"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    spa_fallback__full_path__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                full_path: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {
