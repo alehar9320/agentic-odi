@@ -3,7 +3,7 @@
   "checkpoint_id": "01M5FKCHGTJ3JS32D48AMEH03B",
   "strategy": "manual-commit",
   "branch": "docs/readme-live-studio",
-  "checkpoints_count": 10,
+  "checkpoints_count": 11,
   "files_touched": [
     "README.md"
   ],
@@ -63,6 +63,13 @@
       "compact_transcript": "/7/transcript.jsonl",
       "content_hash": "/7/content_hash.txt",
       "prompt": ""
+    },
+    {
+      "metadata": "/8/metadata.json",
+      "transcript": "/8/full.jsonl",
+      "compact_transcript": "/8/transcript.jsonl",
+      "content_hash": "/8/content_hash.txt",
+      "prompt": "/8/prompt.txt"
     }
   ],
   "token_usage": {
