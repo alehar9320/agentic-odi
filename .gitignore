@@ -169,6 +169,9 @@ cython_debug/
 
 # Local development and agent harness state
 .worktrees/
+
+# GitHub Pages build output (see .github/workflows/pages.yml)
+_site/
 .opencode/plans/
 .opencode/node_modules/
 .pi/git/
