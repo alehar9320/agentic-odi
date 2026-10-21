@@ -5,7 +5,7 @@
   "main": "./infra/cloudflare/worker.ts",
   "compatibility_date": "2026-10-19",
   "build": {
-    "command": "npm --prefix apps/studio run build"
+    "command": "npm --prefix apps/studio install && npm --prefix apps/studio run build"
   },
   "assets": {
     "directory": "./apps/studio/dist",
