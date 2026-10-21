@@ -108,7 +108,7 @@ Register MCP or REST connectors that the copilot can discover and invoke.
 - **API**: `GET/POST/DELETE /api/connectors`, `GET /api/connectors/catalog`, and
   `GET /api/connectors/{name}/health` (the catalog honors
   `?area=<capability>` and `?recommended=true`).
-- **CLI**: `agentic-odi connectors catalog | add <preset> | delete <name> | list`.
+- **CLI**: `agentic-odi connectors catalog | add <preset> | list | health <name> | ingest <name>`.
 
 ### CLI at a glance
 
