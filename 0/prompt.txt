@@ -1,0 +1,1 @@
+Your objective is to optimize the git repo experience so that we drive maximum adoption. To do this, we need to ensure that the instructions for how to get started are super easy to pick up and act on. Create these changes on a separate git worktree. Push to topic branch, and when CI is green, you're done.
