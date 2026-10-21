@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 
+import { ChangelogModal } from "./components/ChangelogModal";
 import { ChatStage } from "./components/chat/ChatStage";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { BellIcon, MenuIcon, SettingsIcon } from "./components/icons";
@@ -28,6 +29,7 @@ function StudioShell() {
   const { activePanel, closePanel, openPanel, llmHealth, clearChat, closeSetup, unreadNotificationCount } = useStudio();
   const [desktopCollapsed, setDesktopCollapsed] = useState(loadCollapsed);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [showChangelog, setShowChangelog] = useState(false);
   const isMobile = useMediaQuery(MOBILE_QUERY);
 
   // The drawer is a rail on desktop and a full overlay sheet on phones.
@@ -127,6 +129,14 @@ function StudioShell() {
           <div className="bar__right">
             <button
               type="button"
+              className="studio-pill pill-changelog"
+              onClick={() => setShowChangelog(true)}
+              aria-label="Open What's New changelog"
+            >
+              ✨ What's New
+            </button>
+            <button
+              type="button"
               className="icon-button bar__bell"
               aria-label="Catch up notifications"
               title="Activity & Catch Up"
@@ -140,7 +150,6 @@ function StudioShell() {
                 </span>
               )}
             </button>
-
             <button
               type="button"
               className="bar__health"
@@ -177,6 +186,8 @@ function StudioShell() {
       </main>
 
       <Toasts />
+
+      <ChangelogModal isOpen={showChangelog} onClose={() => setShowChangelog(false)} />
     </div>
   );
 }
