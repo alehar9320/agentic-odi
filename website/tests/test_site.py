@@ -11,7 +11,6 @@ ALLOWED_EXTERNAL = {
     "https://github.com/alehar9320/agentic-odi",
     "https://github.com/alehar9320/agentic-odi/issues",
     "https://horizon.prefect.io/alhase/servers/agentic-odi/chat",
-    "https://agentic-odi.alehar.workers.dev/",
     "https://docs.astral.sh/uv/",
     "https://modelcontextprotocol.io",
     PAGES_URL,

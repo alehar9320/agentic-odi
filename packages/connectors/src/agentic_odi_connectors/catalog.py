@@ -61,7 +61,6 @@ class ConnectorPreset(BaseModel):
     headers: dict[str, str] = Field(default_factory=dict)
     docs: str
     tools: list[str] = Field(default_factory=list)
-    is_recommended: bool = False
 
     def referenced_env_vars(self) -> set[str]:
         """Environment variables the URL or headers interpolate with ``${VAR}``."""
@@ -76,7 +75,6 @@ PRESETS: tuple[ConnectorPreset, ...] = (
     ConnectorPreset(
         id="notion",
         label="Notion",
-        is_recommended=True,
         area="voice-of-customer",
         summary="Interview notes, feedback logs, and PRDs from Notion pages.",
         url="https://mcp.notion.com/mcp",
@@ -123,7 +121,6 @@ PRESETS: tuple[ConnectorPreset, ...] = (
     ConnectorPreset(
         id="posthog",
         label="PostHog",
-        is_recommended=True,
         area="quantitative-data",
         summary="Feature usage, funnels, and drop-off rates for outcome scoring.",
         url="https://mcp.posthog.com/mcp",
@@ -152,7 +149,6 @@ PRESETS: tuple[ConnectorPreset, ...] = (
     ConnectorPreset(
         id="exa",
         label="Exa",
-        is_recommended=True,
         area="market-intelligence",
         summary="Semantic web search for competitor launches and market gaps.",
         url="https://mcp.exa.ai/mcp?exaApiKey=${EXA_API_KEY}",
@@ -172,7 +168,6 @@ PRESETS: tuple[ConnectorPreset, ...] = (
     ConnectorPreset(
         id="linear",
         label="Linear",
-        is_recommended=True,
         area="strategy-alignment",
         summary="Cross-reference prioritized outcomes with the existing backlog.",
         url="https://mcp.linear.app/mcp",
@@ -182,7 +177,6 @@ PRESETS: tuple[ConnectorPreset, ...] = (
     ConnectorPreset(
         id="github",
         label="GitHub",
-        is_recommended=True,
         area="strategy-alignment",
         summary="Issues, projects, and PRs to draft tickets from outcomes.",
         url="https://api.githubcopilot.com/mcp/",
@@ -233,16 +227,13 @@ PRESETS: tuple[ConnectorPreset, ...] = (
 )
 
 
-def list_presets(area: str | None = None, recommended: bool = False) -> list[ConnectorPreset]:
-    """Return presets, optionally filtered by capability area or recommendation."""
-    presets = list(PRESETS)
-    if area is not None:
-        if area not in AREA_LABELS:
-            raise UnknownAreaError(area)
-        presets = [preset for preset in presets if preset.area == area]
-    if recommended:
-        presets = [preset for preset in presets if preset.is_recommended]
-    return presets
+def list_presets(area: str | None = None) -> list[ConnectorPreset]:
+    """Return presets, optionally filtered by capability area."""
+    if area is None:
+        return list(PRESETS)
+    if area not in AREA_LABELS:
+        raise UnknownAreaError(area)
+    return [preset for preset in PRESETS if preset.area == area]
 
 
 def get_preset(preset_id: str) -> ConnectorPreset:

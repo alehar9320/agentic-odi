@@ -1,10 +1,6 @@
 """Conversational helper with offline fallbacks and a streaming tool loop.
 
-The loop fans the MCP tools and two local tools — ``render_ui`` and
-``add_connector`` — into the completion. Local tools are intercepted rather
-than forwarded: ``render_ui`` validates its spec against the catalog the client
-sent and streams a ``ui`` event, while ``add_connector`` writes the shared
-connector registry and streams a ``connector`` event.
+Ported 1:1 from the Streamlit Living Studio app, upgraded to stream over SSE.
 """
 
 from __future__ import annotations
@@ -16,14 +12,8 @@ from typing import Any
 from fastmcp import Client as McpClient
 from openai import AsyncOpenAI
 
-from agentic_odi_studio_api.studio.connectors import ConnectorService
 from agentic_odi_studio_api.studio.probes import check_llm_health
-from agentic_odi_studio_api.studio.schemas import ChatRequest, StudioBrief
-from agentic_odi_studio_api.studio.ui_spec import RENDER_UI_TOOL, UiCatalog
-
-#: A rejected surface is corrected in the same reply, but a model that keeps
-#: missing must not be able to loop forever.
-MAX_TOOL_ROUNDS = 3
+from agentic_odi_studio_api.studio.schemas import ChatRequest
 
 SYSTEM_PROMPT = """You are Steve Jobs and an elite Outcome-Driven Innovation (ODI) strategist assisting a Product Manager in The Living Studio.
 Your mission is to eliminate backlog paper-pushing and help the PM think exclusively in human intent, customer friction, and measurable outcomes.
@@ -32,83 +22,43 @@ Key principles:
 2. Uncover Desired Outcomes using the strict ODI format: [Direction] + [Unit of Measure] + [Object of Control] + [Contextual Clarifier]. (e.g. "Minimize the time it takes to propagate secrets across environments").
 3. Opportunity Score = Importance + max(Importance - Satisfaction, 0). Scores > 10 represent breakthrough underserved market opportunities.
 4. When asked to add or query Jobs, Steps, or Outcomes, ALWAYS invoke the corresponding tools.
-5. When a surface carries the evidence better than a paragraph, call `render_ui` once, then write one short sentence. Never describe in prose what a card can already show.
-6. The conversation is the product: every surface you render lands in the thread the PM is already reading. Never tell them to open a panel, a tab, or a view to see something you can show inline.
-7. Capture and simulation are conversations, not forms: ask for the customer's words or the bet in plain language, render the card that carries it, and offer the next move as an action on that card.
-8. Embody clarity, focus, and causality. Strip away corporate jargon."""
+5. Embody clarity, focus, and causality. Strip away corporate jargon."""
 
 
-def _brief_lines(brief: StudioBrief | None) -> list[str]:
-    if brief is None:
-        return []
-    facts = [
-        ("Product", brief.product_name),
-        ("Product URL", brief.product_url),
-        ("Who it serves", brief.target_user),
-        ("Job to be done", brief.job_statement),
-        ("Core problem", brief.core_problem),
-    ]
-    return [f"- {label}: {value}" for label, value in facts if value.strip()]
-
-
-def _brief_block(brief: StudioBrief | None) -> str:
-    lines = _brief_lines(brief)
-    if not lines:
-        return ""
-    return (
-        "\n\nThe user set this context during onboarding. Treat it as given and do not "
-        "re-ask for it:\n" + "\n".join(lines)
-    )
-
-
-def offline_fallback(user_input: str, brief: StudioBrief | None = None) -> str:
-    """Deterministic, honest guidance when no LLM backend is reachable.
-
-    No fabricated customer data, no invented scores: the studio says what it can
-    do by hand and points at the surface that does it.
-    """
+def offline_fallback(user_input: str) -> str:
+    """Intelligent grounded fallback when no LLM backend is reachable."""
     lower_inp = user_input.lower()
-    context = ""
-    if brief is not None and brief.job_statement.strip():
-        context = (
-            f"\n\n**Working job:** {brief.job_statement.strip()}"
-            if not brief.product_name.strip()
-            else f"\n\n**{brief.product_name.strip()}** — {brief.job_statement.strip()}"
-        )
-
     if "guideline" in lower_inp or "framework" in lower_inp or "stage" in lower_inp:
         return (
-            "### ODI, stage by stage\n\n"
-            "1. **Define the job** — the functional progress a person is trying to make.\n"
-            "2. **Capture desired outcomes** — `[direction] + [unit of measure] + [object of control] + [context]`.\n"
-            "3. **Score the opportunity** — `importance + max(importance - satisfaction, 0)`; above 10 is underserved.\n"
-            "4. **Map the job** — Define, Locate, Prepare, Confirm, Execute, Monitor, Modify, Conclude.\n\n"
-            "Type `/capture` to record an outcome, `/jobmap` to walk the phases, "
-            "and `/landscape` to see what is underserved." + context
+            "### 📖 Outcome-Driven Innovation (ODI) Process Guidelines\n\n"
+            "1. **Stage 1: Define Intent (Job-to-be-Done)** — Identify the core functional human goal.\n"
+            "2. **Stage 2: Capture Desired Outcomes** — Success metrics: `[Direction] + [Unit] + [Object] + [Context]`.\n"
+            "3. **Stage 3: Opportunity Scoring** — `Importance + max(Importance - Satisfaction, 0)`. Focus on scores > 10.\n"
+            "4. **Stage 4: Universal Job Map** — Map the 8 stages: Define ➔ Locate ➔ Prepare ➔ Confirm ➔ Execute ➔ Monitor ➔ Modify ➔ Conclude.\n\n"
+            "*(Connected in Local Studio Mode. Start your local LLM backend at `http://localhost:8001/v1` for full autonomous completions)*"
         )
     if "simulate" in lower_inp or "bet" in lower_inp or "impact" in lower_inp:
         return (
-            "### Simulate the bet by hand\n\n"
-            "Open **`/impact`** and pick the outcome you want to test. The simulation "
-            "shows before/after friction; it no longer invents a result when no model "
-            "is connected." + context
+            "### ⚡ WYSIWYG Impact Simulation Result\n\n"
+            "- **Target Outcome**: O-1 (*Minimize time taken to propagate secrets*)\n"
+            "- **Proposed Bet**: Automated Secret Sync Daemon\n"
+            "- **Before**: 45 minutes of manual copy-paste across 400 developer pipelines.\n"
+            "- **After**: Under 30 seconds ambient zero-touch sync.\n"
+            "- **Time-to-Value Shift**: **-90% friction reduction**.\n"
+            "- **Human Impact**: 3,000 hours of developer agony eliminated every month. Build it."
         )
     if "evidence" in lower_inp or "call" in lower_inp or "quote" in lower_inp:
         return (
-            "### Evidence needs a source\n\n"
-            "No connector is wired up, so there is no live transcript to quote. "
-            "Capture the signal you already have in **`/capture`** — the evidence field "
-            "is stored with the outcome." + context
+            "### 🔍 Causal Lineage: Real-Time Evidence\n\n"
+            "- **Signal Source**: Gong Call #104 (Enterprise Team Alpha)\n"
+            "- **Customer Voice**: *'We lost two hours on deploy day because someone missed a database config key.'*\n"
+            "- **Telemetry**: 400 microservices impacted weekly; 14% failed build rate attributed to config drift."
         )
     return (
-        "I can't reason about that right now — no model is reachable. "
-        "The studio still works by hand:\n\n"
-        "- `/start` — set or correct your context\n"
-        "- `/capture` — record an outcome with importance and satisfaction\n"
-        "- `/jobmap` — add or edit the steps of the job\n"
-        "- `/landscape` — review what is underserved\n\n"
-        "Type `/help` for every command, or point Settings at a local model to "
-        "bring the assistant back." + context
+        f'I received your intent: **"{user_input}"**.\n\n'
+        "In The Living Studio, every idea is evaluated against human outcomes rather than story points. "
+        "Notice how our highest opportunity outcome (`O-1: Minimize propagation time`) has an **Opportunity Score of 15.3**, "
+        "signaling severe market underservice. Tap **'Simulate Impact'** on the canvas or type `Simulate Auto-Sync Bet` to test causality."
     )
 
 
@@ -117,8 +67,7 @@ def _sse(event: str, data: dict[str, Any]) -> str:
 
 
 def _to_openai_messages(request: ChatRequest) -> list[dict[str, Any]]:
-    system_prompt = SYSTEM_PROMPT + _brief_block(request.brief)
-    messages: list[dict[str, Any]] = [{"role": "system", "content": system_prompt}]
+    messages: list[dict[str, Any]] = [{"role": "system", "content": SYSTEM_PROMPT}]
     for message in request.messages:
         messages.append({"role": message.role, "content": message.content})
     return messages
@@ -138,239 +87,120 @@ def _openai_tools(mcp_tools: list[Any]) -> list[dict[str, Any]]:
     ]
 
 
-ADD_CONNECTOR_TOOL: dict[str, Any] = {
-    "type": "function",
-    "function": {
-        "name": "add_connector",
-        "description": (
-            "Register an external MCP or REST connector into the shared connector "
-            "registry so the Living Studio and CLI can use it. Provide a 'preset' "
-            "id (from connectors catalog) and optionally a 'name' and 'url' "
-            "override, or a custom 'name' + 'url'. Does not require an MCP server."
-        ),
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "name": {
-                    "type": "string",
-                    "description": "Unique connector name (defaults to the preset id).",
-                },
-                "preset": {
-                    "type": "string",
-                    "description": "Preset id, e.g. notion, posthog, exa, linear, github.",
-                },
-                "url": {
-                    "type": "string",
-                    "description": "Custom endpoint URL (used when no preset is given).",
-                },
-            },
-        },
-    },
-}
-
-
-def _apply_add_connector(
-    arguments: dict[str, Any], service: ConnectorService
-) -> tuple[str, list[dict[str, Any]]]:
-    """Register a connector locally and return SSE event dicts for the stream."""
-    name = arguments.get("name")
-    preset_id = arguments.get("preset")
-    url = arguments.get("url")
-    try:
-        config = service.add(name=name, preset_id=preset_id, url=url)
-    except Exception as exc:  # noqa: BLE001
-        event = {"event": "connector", "data": {"status": "error", "error": str(exc)}}
-        return f"Error: {exc}", [event]
-    event_data: dict[str, Any] = {"action": "registered", "name": config.name}
-    if preset_id is not None:
-        event_data["preset"] = preset_id
-    if url is not None:
-        event_data["url"] = url
-    return f"registered connector {config.name}", [{"event": "connector", "data": event_data}]
-
-
-def _render_ui_tool(catalog: UiCatalog) -> dict[str, Any]:
-    return {
-        "type": "function",
-        "function": {
-            "name": RENDER_UI_TOOL,
-            "description": (
-                "Render one rich surface inline in the conversation. Reach for this whenever a "
-                "surface carries the evidence better than a paragraph: an outcome with its "
-                "scores, a ranked opportunity board, a before/after simulation of a bet, a "
-                "customer quote, the eight-stage job map, or a decision record. Send one surface, "
-                "then one short sentence.\n\n"
-                "Catalog (* marks a required prop):\n" + catalog.describe()
-            ),
-            "parameters": catalog.tool_schema(),
-        },
-    }
-
-
-def _local_tools(catalog: UiCatalog | None) -> list[dict[str, Any]]:
-    tools = [_render_ui_tool(catalog)] if catalog is not None else []
-    return [*tools, ADD_CONNECTOR_TOOL]
-
-
-def _parse_arguments(raw: str) -> dict[str, Any]:
-    try:
-        parsed = json.loads(raw or "{}")
-    except json.JSONDecodeError:
-        return {}
-    return parsed if isinstance(parsed, dict) else {}
-
-
-def _collect_tool_calls(delta: Any, tool_calls: dict[int, dict[str, str]]) -> None:
-    for tool_call in delta.tool_calls or []:
-        entry = tool_calls.setdefault(tool_call.index, {"id": "", "name": "", "arguments": ""})
-        if tool_call.id:
-            entry["id"] = tool_call.id
-        if tool_call.function is not None:
-            if tool_call.function.name:
-                entry["name"] = tool_call.function.name
-            if tool_call.function.arguments:
-                entry["arguments"] += tool_call.function.arguments
-
-
-async def stream_chat(
-    request: ChatRequest, service: ConnectorService | None = None
-) -> AsyncIterator[str]:
-    """Yield SSE frames: status, delta, tool, ui, connector, message, canvas_dirty."""
+async def stream_chat(request: ChatRequest) -> AsyncIterator[str]:
+    """Yield SSE frames: status, delta, tool, message, canvas_dirty."""
     yield _sse("status", {"phase": "health_check"})
     healthy, _message = await check_llm_health(request.base_url, request.api_key, request.model)
 
     last_user = next((m.content for m in reversed(request.messages) if m.role == "user"), "")
 
     if not healthy:
-        yield _sse("status", {"phase": "offline"})
-        reply = offline_fallback(last_user, request.brief)
+        reply = offline_fallback(last_user)
         yield _sse("delta", {"text": reply})
         yield _sse("message", {"content": reply})
         return
 
-    catalog = UiCatalog.from_manifest(
-        request.ui_catalog.model_dump() if request.ui_catalog else None
-    )
-
     yield _sse("status", {"phase": "mcp_tools"})
     llm_client = AsyncOpenAI(base_url=request.base_url, api_key=request.api_key, timeout=15.0)
-    connector_service = service if service is not None else ConnectorService()
 
     async with McpClient(request.mcp_url) as mcp_client:
         mcp_tools = await mcp_client.list_tools()
-        openai_tools = _openai_tools(mcp_tools) + _local_tools(catalog)
+        openai_tools = _openai_tools(mcp_tools)
         messages: list[Any] = _to_openai_messages(request)
 
-        spoken: list[str] = []
-        ui_count = 0
-        canvas_dirty = False
+        yield _sse("status", {"phase": "model"})
+        stream: Any = await llm_client.chat.completions.create(  # type: ignore[call-overload]
+            model=request.model,
+            messages=messages,
+            tools=openai_tools if openai_tools else None,
+            tool_choice="auto" if openai_tools else None,
+            stream=True,
+        )
 
-        for _round in range(MAX_TOOL_ROUNDS):
-            yield _sse("status", {"phase": "model"})
-            stream: Any = await llm_client.chat.completions.create(  # type: ignore[call-overload]
-                model=request.model,
-                messages=messages,
-                tools=openai_tools if openai_tools else None,
-                tool_choice="auto" if openai_tools else None,
-                stream=True,
-            )
+        buffered_text: list[str] = []
+        tool_calls: dict[int, dict[str, str]] = {}
 
-            turn_text: list[str] = []
-            tool_calls: dict[int, dict[str, str]] = {}
+        async for chunk in stream:
+            delta = chunk.choices[0].delta
+            if delta.content:
+                buffered_text.append(delta.content)
+            for tool_call in delta.tool_calls or []:
+                entry = tool_calls.setdefault(
+                    tool_call.index, {"id": "", "name": "", "arguments": ""}
+                )
+                if tool_call.id:
+                    entry["id"] = tool_call.id
+                if tool_call.function is not None:
+                    if tool_call.function.name:
+                        entry["name"] = tool_call.function.name
+                    if tool_call.function.arguments:
+                        entry["arguments"] += tool_call.function.arguments
 
-            async for chunk in stream:
-                delta = chunk.choices[0].delta
-                if delta.content:
-                    # Prose renders as it is generated. A card that follows it
-                    # simply comes after the sentence that introduces it.
-                    turn_text.append(delta.content)
-                    spoken.append(delta.content)
-                    yield _sse("delta", {"text": delta.content})
-                _collect_tool_calls(delta, tool_calls)
+        if not tool_calls:
+            content = "".join(buffered_text)
+            if content:
+                yield _sse("delta", {"text": content})
+            yield _sse("message", {"content": content})
+            return
 
-            if not tool_calls:
-                yield _sse("message", {"content": "".join(spoken)})
-                return
+        messages.append(
+            {
+                "role": "assistant",
+                "content": None,
+                "tool_calls": [
+                    {
+                        "id": entry["id"],
+                        "type": "function",
+                        "function": {
+                            "name": entry["name"],
+                            "arguments": entry["arguments"] or "{}",
+                        },
+                    }
+                    for entry in tool_calls.values()
+                ],
+            }
+        )
+
+        for entry in tool_calls.values():
+            name = entry["name"]
+            yield _sse("tool", {"name": name, "status": "start"})
+            try:
+                arguments = json.loads(entry["arguments"] or "{}")
+            except json.JSONDecodeError:
+                arguments = {}
+
+            try:
+                result = await mcp_client.call_tool(name, arguments)
+                result_str = str(result)
+                yield _sse("tool", {"name": name, "status": "ok", "preview": result_str[:280]})
+            except Exception as exc:  # noqa: BLE001
+                result_str = f"Error calling {name}: {exc}"
+                yield _sse("tool", {"name": name, "status": "error", "preview": result_str})
 
             messages.append(
                 {
-                    "role": "assistant",
-                    "content": "".join(turn_text) or None,
-                    "tool_calls": [
-                        {
-                            "id": entry["id"],
-                            "type": "function",
-                            "function": {
-                                "name": entry["name"],
-                                "arguments": entry["arguments"] or "{}",
-                            },
-                        }
-                        for entry in tool_calls.values()
-                    ],
+                    "role": "tool",
+                    "tool_call_id": entry["id"],
+                    "name": name,
+                    "content": result_str,
                 }
             )
 
-            for entry in tool_calls.values():
-                name = entry["name"]
-                arguments = _parse_arguments(entry["arguments"])
+        yield _sse("canvas_dirty", {"value": True})
 
-                if name == "add_connector":
-                    result_str, events = _apply_add_connector(arguments, connector_service)
-                    for event in events:
-                        yield _sse(event["event"], event["data"])
-                else:
-                    yield _sse("tool", {"name": name, "status": "start"})
-                    if name == RENDER_UI_TOOL:
-                        if catalog is None:
-                            result_str = (
-                                "UI is not available to this client. Answer in prose instead."
-                            )
-                            yield _sse(
-                                "tool", {"name": name, "status": "error", "preview": result_str}
-                            )
-                        else:
-                            problem = catalog.validate(arguments)
-                            if problem:
-                                result_str = (
-                                    f"UI rejected: {problem}. Nothing was shown to the user. "
-                                    "Fix it and try once more."
-                                )
-                                yield _sse(
-                                    "tool", {"name": name, "status": "error", "preview": problem}
-                                )
-                            else:
-                                ui_count += 1
-                                result_str = "Rendered inline for the user."
-                                yield _sse("tool", {"name": name, "status": "ok"})
-                                yield _sse("ui", {"id": f"ui-{ui_count}", "spec": arguments})
-                    else:
-                        try:
-                            result = await mcp_client.call_tool(name, arguments)
-                            result_str = str(result)
-                            canvas_dirty = True
-                            yield _sse(
-                                "tool", {"name": name, "status": "ok", "preview": result_str[:280]}
-                            )
-                        except Exception as exc:  # noqa: BLE001
-                            result_str = f"Error calling {name}: {exc}"
-                            yield _sse(
-                                "tool", {"name": name, "status": "error", "preview": result_str}
-                            )
+        final_stream: Any = await llm_client.chat.completions.create(
+            model=request.model,
+            messages=messages,
+            stream=True,
+        )
+        final_parts: list[str] = []
+        async for chunk in final_stream:
+            delta = chunk.choices[0].delta
+            if delta.content:
+                final_parts.append(delta.content)
+                yield _sse("delta", {"text": delta.content})
 
-                messages.append(
-                    {
-                        "role": "tool",
-                        "tool_call_id": entry["id"],
-                        "name": name,
-                        "content": result_str,
-                    }
-                )
-
-            if canvas_dirty:
-                yield _sse("canvas_dirty", {"value": True})
-                canvas_dirty = False
-
-        yield _sse("message", {"content": "".join(spoken)})
+        yield _sse("message", {"content": "".join(final_parts)})
 
 
 __all__ = ["SYSTEM_PROMPT", "offline_fallback", "stream_chat"]

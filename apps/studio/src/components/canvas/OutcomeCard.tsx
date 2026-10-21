@@ -1,161 +1,69 @@
-import { useState } from "react";
-
-import {
-  formatOpportunityScore,
-  isUnderserved,
-  opportunityPill,
-  opportunityScore,
-} from "../../lib/odi";
+import { isUnderserved, opportunityPill } from "../../lib/odi";
 import { useStudio } from "../../state/StudioContext";
 import type { Outcome } from "../../types";
 
 export function OutcomeCard({ outcome }: { outcome: Outcome }) {
-  const { ask, deleteOutcome, updateOutcome } = useStudio();
-  const [showEvidence, setShowEvidence] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState(false);
-  const [editing, setEditing] = useState(false);
-  const [importance, setImportance] = useState(outcome.importance ?? 5);
-  const [satisfaction, setSatisfaction] = useState(outcome.satisfaction ?? 5);
-  const [saving, setSaving] = useState(false);
+  const { requestSimulate, sendMessage, pushToast } = useStudio();
 
   const opp = outcome.opportunity_score;
-  const statement = outcome.statement ?? "Untitled outcome";
+  const imp = outcome.importance;
+  const sat = outcome.satisfaction;
+  const statement = outcome.statement ?? "Untitled Outcome";
   const outcomeId = outcome.id ?? "O";
   const underserved = isUnderserved(opp);
   const pill = opportunityPill(opp);
 
   return (
-    <article className={`card${underserved ? " card--hot" : ""}`} aria-label={`Outcome ${outcomeId}`}>
-      <header className="card__head">
-        <span className="card__id">{outcomeId}</span>
-        <span className={`badge badge--${pill.variant}`}>{pill.label}</span>
-      </header>
+    <>
+      <article
+        className={`outcome-card fade-in${underserved ? " pulsing-card" : ""}`}
+        aria-label={`Outcome ${outcomeId}`}
+      >
+        <div className="outcome-card__head">
+          <span className="outcome-card__id">{outcomeId}</span>
+          <span className={`studio-pill pill-${pill.variant}`}>{pill.label}</span>
+        </div>
+        <div className="outcome-card__statement">&quot;{statement}&quot;</div>
+        <div className="outcome-card__meta">
+          Importance: <b>{imp != null ? imp : "—"}/10</b> &nbsp;|&nbsp; Current Satisfaction:{" "}
+          <b>{sat != null ? sat : "—"}/10</b> &nbsp;|&nbsp; Formula: <i>Imp + max(Imp - Sat, 0)</i>
+        </div>
+      </article>
 
-      <p className="card__statement">{statement}</p>
-
-      <p className="card__meta">
-        Importance <b>{outcome.importance ?? "—"}</b>
-        <span aria-hidden="true"> · </span>
-        Satisfaction <b>{outcome.satisfaction ?? "—"}</b>
-        <span aria-hidden="true"> · </span>
-        Opportunity <b>{formatOpportunityScore(opp)}</b>
-      </p>
-
-      {showEvidence && (
-        <p className="card__evidence">
-          {outcome.evidence?.trim() || "No transcript is linked to this outcome yet."}
-        </p>
-      )}
-
-      {editing && (
-        <form
-          className="card__edit"
-          onSubmit={(event) => {
-            event.preventDefault();
-            if (!outcome.id || saving) {
-              return;
-            }
-            setSaving(true);
-            void updateOutcome(outcomeId, { importance, satisfaction }).finally(() => {
-              setSaving(false);
-              setEditing(false);
-            });
-          }}
-        >
-          <label className="card__slider" htmlFor={`importance-${outcomeId}`}>
-            Importance · {importance.toFixed(1)}
-            <input
-              id={`importance-${outcomeId}`}
-              type="range"
-              min={1}
-              max={10}
-              step={0.1}
-              value={importance}
-              onChange={(event) => setImportance(Number(event.target.value))}
-            />
-          </label>
-          <label className="card__slider" htmlFor={`satisfaction-${outcomeId}`}>
-            Satisfaction · {satisfaction.toFixed(1)}
-            <input
-              id={`satisfaction-${outcomeId}`}
-              type="range"
-              min={1}
-              max={10}
-              step={0.1}
-              value={satisfaction}
-              onChange={(event) => setSatisfaction(Number(event.target.value))}
-            />
-          </label>
-          <p className="score-preview">
-            Opportunity <b>{opportunityScore(importance, satisfaction).toFixed(2)}</b>
-          </p>
-          <div className="card__edit-actions">
-            <button type="submit" className="button button--ghost" disabled={saving}>
-              {saving ? "Saving…" : "Save scores"}
-            </button>
-            <button type="button" className="quiet-action" onClick={() => setEditing(false)}>
-              Cancel
-            </button>
-          </div>
-        </form>
-      )}
-
-      <div className="card__actions">
+      <div className="outcome-card__actions">
         <button
           type="button"
-          className="quiet-action"
-          aria-expanded={showEvidence}
-          onClick={() => setShowEvidence((prev) => !prev)}
-        >
-          {showEvidence ? "Hide evidence" : "Evidence"}
-        </button>
-        <button
-          type="button"
-          className="quiet-action"
+          className="studio-button"
+          title="Inspect customer interview transcripts and evidence line"
           onClick={() =>
-            ask(
-              `Simulate the impact of a bet on ${outcomeId}: "${statement}". ` +
-                "What has to be true, and what changes if we ship it?",
+            pushToast(
+              "info",
+              `Customer Evidence Lineage:\n\n${outcome.evidence ?? "No transcript linked."}`,
             )
           }
         >
-          Simulate
+          🔍 Inspect Trace ({outcomeId})
         </button>
-        {outcome.id && (
-          <button
-            type="button"
-            className="quiet-action"
-            aria-expanded={editing}
-            onClick={() => setEditing((prev) => !prev)}
-          >
-            {editing ? "Stop editing" : "Adjust scores"}
-          </button>
-        )}
         <button
           type="button"
-          className="quiet-action"
-          onClick={() => ask(`How should we solve outcome ${outcomeId}: "${statement}"?`)}
+          className="studio-button"
+          title="Simulate time savings and impact in simulator"
+          onClick={() => {
+            requestSimulate(outcomeId);
+            pushToast("success", `Outcome ${outcomeId} loaded into WYSIWYG Impact Simulator.`);
+          }}
         >
-          Ask
+          ⚡ Simulate Bet ({outcomeId})
         </button>
-        {outcome.id && (
-          <button
-            type="button"
-            className="quiet-action quiet-action--danger"
-            disabled={!outcome.id}
-            onClick={() => {
-              if (!confirmDelete) {
-                setConfirmDelete(true);
-                return;
-              }
-              setConfirmDelete(false);
-              void deleteOutcome(outcomeId);
-            }}
-          >
-            {confirmDelete ? "Confirm remove" : "Remove"}
-          </button>
-        )}
+        <button
+          type="button"
+          className="studio-button"
+          title="Consult AI Copilot on strategic solutions for this outcome"
+          onClick={() => void sendMessage(`How should we solve outcome ${outcomeId}: '${statement}'?`)}
+        >
+          💬 Ask Agent ({outcomeId})
+        </button>
       </div>
-    </article>
+    </>
   );
 }
