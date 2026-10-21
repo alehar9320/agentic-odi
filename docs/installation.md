@@ -69,6 +69,10 @@ Releases are cut and published by CI with no approval step:
 3. The merge cuts tag `vX.Y.Z` and the GitHub Release; the tag starts the
    `release` and `Tauri Release` workflows, which attach the CLI archives,
    `checksums.txt`, the install scripts, and the desktop bundles to it.
+   The `release-instructions` job then appends an end-user "## 📦 Download &
+   Run" section to the release page, listing the per-platform archives,
+   `checksums.txt`, and the install scripts, plus one-line install and
+   quick-run commands (idempotent on re-runs).
 4. `e2e-install` runs after `release` succeeds and installs the published binary
    on Linux, macOS, and Windows.
 

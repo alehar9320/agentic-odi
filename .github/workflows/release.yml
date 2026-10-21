@@ -110,3 +110,20 @@ jobs:
           files: |
             scripts/install.sh
             scripts/install.ps1
+
+  release-instructions:
+    needs: [checksums, upload-installers]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Setup uv
+        uses: ./.github/actions/setup
+        with:
+          python-version: "3.11"
+      - name: Publish download & run instructions on the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python scripts/release_instructions.py \
+            --tag "${{ github.ref_name }}" \
+            --repo "${{ github.repository }}"
