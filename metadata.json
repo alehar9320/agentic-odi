@@ -3,7 +3,7 @@
   "checkpoint_id": "01M5FKBT8859MSET62N9MFTTDH",
   "strategy": "manual-commit",
   "branch": "pr60",
-  "checkpoints_count": 7,
+  "checkpoints_count": 8,
   "files_touched": [
     "apps/studio-api/tests/test_studio_api.py"
   ],
@@ -42,13 +42,20 @@
       "compact_transcript": "/4/transcript.jsonl",
       "content_hash": "/4/content_hash.txt",
       "prompt": "/4/prompt.txt"
+    },
+    {
+      "metadata": "/5/metadata.json",
+      "transcript": "/5/full.jsonl",
+      "compact_transcript": "/5/transcript.jsonl",
+      "content_hash": "/5/content_hash.txt",
+      "prompt": "/5/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 663961,
+    "input_tokens": 908076,
     "cache_creation_tokens": 0,
-    "cache_read_tokens": 2439840,
-    "output_tokens": 9378,
-    "api_call_count": 41
+    "cache_read_tokens": 3621152,
+    "output_tokens": 14417,
+    "api_call_count": 63
   }
 }
