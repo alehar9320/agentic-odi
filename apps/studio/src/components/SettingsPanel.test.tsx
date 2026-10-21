@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+import { OnboardingProvider } from "../onboarding/OnboardingProvider";
 import { SettingsPanel } from "./SettingsPanel";
 
 vi.mock("../state/StudioContext", () => ({
@@ -56,12 +57,20 @@ const stubContext = (overrides: Record<string, unknown> = {}) =>
     ...overrides,
   }) as unknown as StudioContextValue;
 
+function renderPanel() {
+  return render(
+    <OnboardingProvider enabled={false}>
+      <SettingsPanel />
+    </OnboardingProvider>,
+  );
+}
+
 describe("SettingsPanel connectors", () => {
   it("renders registered connectors and removes one on click", () => {
     const del = vi.fn().mockResolvedValue({ ok: true, name: "notion" });
     vi.mocked(useStudio).mockReturnValue(stubContext({ deleteConnector: del }));
 
-    render(<SettingsPanel />);
+    renderPanel();
 
     expect(screen.getByText(/notion/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /remove notion/i }));
@@ -74,7 +83,7 @@ describe("SettingsPanel connectors", () => {
       stubContext({ addConnector: add, connectors: [] }),
     );
 
-    render(<SettingsPanel />);
+    renderPanel();
 
     fireEvent.change(screen.getByRole("combobox", { name: /add preset/i }), {
       target: { value: "notion" },
@@ -86,7 +95,7 @@ describe("SettingsPanel connectors", () => {
   it("shows an empty state when no connectors are registered", () => {
     vi.mocked(useStudio).mockReturnValue(stubContext({ connectors: [] }));
 
-    render(<SettingsPanel />);
+    renderPanel();
 
     expect(screen.getByText(/no connectors registered/i)).toBeInTheDocument();
   });

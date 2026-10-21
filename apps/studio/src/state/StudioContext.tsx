@@ -113,6 +113,12 @@ const SEED_NOTIFICATIONS: StudioNotification[] = [
   },
 ];
 
+export interface ConnectionReport {
+  sidecarReachable: boolean;
+  mcpReachable: boolean;
+  llmHealthy: boolean;
+}
+
 export interface StudioContextValue {
   settings: StudioConfig;
   saveSettings: (config: StudioConfig) => void;
@@ -130,6 +136,9 @@ export interface StudioContextValue {
   refreshCanvas: () => Promise<void>;
   llmHealth: { healthy: boolean | null; message: string };
   mcpReachable: boolean;
+  sidecarReachable: boolean | null;
+  /** Probe the sidecar, MCP server, and model. Optionally against unsaved config. */
+  checkConnections: (override?: Partial<StudioConfig>) => Promise<ConnectionReport>;
   messages: ChatMessage[];
   streaming: boolean;
   thinkingPhase: string | null;
@@ -268,6 +277,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     message: "Health not checked yet.",
   });
   const [mcpReachable, setMcpReachable] = useState(false);
+  const [sidecarReachable, setSidecarReachable] = useState<boolean | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [streaming, setStreaming] = useState(false);
   const [thinkingPhase, setThinkingPhase] = useState<string | null>(null);
@@ -476,6 +486,34 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const pushNotice = useCallback((text: string) => {
     setMessages((prev) => [...prev, { role: "notice", content: text }]);
   }, []);
+
+  const checkConnections = useCallback(
+    async (override: Partial<StudioConfig> = {}): Promise<ConnectionReport> => {
+      const target = { ...settings, ...override };
+      const [sidecar, mcp, llm] = await Promise.all([
+        fetchConfig()
+          .then(() => true)
+          .catch(() => false),
+        healthMcp(target.mcp_url)
+          .then((result) => result.reachable)
+          .catch(() => false),
+        healthLlm({
+          base_url: target.base_url,
+          api_key: target.api_key,
+          model: target.model_name,
+        }).catch((error: unknown) => ({
+          healthy: false,
+          message: (error as Error).message || "The model did not answer.",
+        })),
+      ]);
+
+      setSidecarReachable(sidecar);
+      setMcpReachable(mcp);
+      setLlmHealth(llm);
+      return { sidecarReachable: sidecar, mcpReachable: mcp, llmHealthy: llm.healthy };
+    },
+    [settings],
+  );
 
   const refreshCanvas = useCallback(async () => {
     setCanvasLoading(true);
@@ -807,11 +845,16 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     async function boot() {
       try {
         const defaults = await fetchConfig();
-        if (!cancelled && localStorage.getItem(SETTINGS_KEY) === null) {
-          saveSettings(defaults);
+        if (!cancelled) {
+          setSidecarReachable(true);
+          if (localStorage.getItem(SETTINGS_KEY) === null) {
+            saveSettings(defaults);
+          }
         }
       } catch {
-        /* sidecar not reachable; keep local fallback defaults */
+        if (!cancelled) {
+          setSidecarReachable(false);
+        }
       }
       if (cancelled) {
         return;
@@ -863,6 +906,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       refreshCanvas,
       llmHealth,
       mcpReachable,
+      sidecarReachable,
+      checkConnections,
       messages,
       streaming,
       thinkingPhase,
@@ -922,6 +967,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       refreshCanvas,
       llmHealth,
       mcpReachable,
+      sidecarReachable,
+      checkConnections,
       messages,
       streaming,
       thinkingPhase,

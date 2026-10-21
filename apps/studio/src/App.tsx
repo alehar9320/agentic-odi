@@ -7,6 +7,7 @@ import { Sidebar } from "./components/layout/Sidebar";
 import { Toasts } from "./components/Toasts";
 import { WorkspacePanel } from "./components/workspace/WorkspacePanel";
 import { useMediaQuery } from "./lib/useMediaQuery";
+import { FirstRunWizard, OnboardingProvider } from "./onboarding";
 import { StudioProvider, useStudio } from "./state/StudioContext";
 
 const COLLAPSED_KEY = "studio.sidebarCollapsed";
@@ -185,7 +186,10 @@ export default function App() {
   return (
     <ErrorBoundary>
       <StudioProvider>
-        <StudioShell />
+        <OnboardingProvider>
+          <StudioShell />
+          <FirstRunWizard />
+        </OnboardingProvider>
       </StudioProvider>
     </ErrorBoundary>
   );
