@@ -1,0 +1,43 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M5FB7K9AWZKBSWECSPQ4B5PN",
+  "session_id": "ses_ea2c048d7ffe3pYrqgOIj0RYBo",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-21T13:43:31.780621921Z",
+  "branch": "feat/conversational-rich-surfaces",
+  "checkpoints_count": 1,
+  "save_step_count": 1,
+  "files_touched": [
+    "README.md",
+    "docs/development.md",
+    "docs/living-studio.md"
+  ],
+  "agent": "OpenCode",
+  "model": "poolside/laguna-s-2.1:free",
+  "turn_id": "949423ee84cf",
+  "checkpoint_transcript_start": 18,
+  "transcript_lines_at_start": 18,
+  "compact_transcript_start": 18,
+  "token_usage": {
+    "input_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 0,
+    "output_tokens": 0,
+    "api_call_count": 0
+  },
+  "session_metrics": {
+    "turn_count": 1
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-10-21T13:43:31.733752579Z",
+    "agent_lines": 141,
+    "agent_removed": 4,
+    "human_added": 4995,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 5136,
+    "total_lines_changed": 5273,
+    "agent_percentage": 2.7498577659776218,
+    "metric_version": 2
+  }
+}
