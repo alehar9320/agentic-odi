@@ -90,11 +90,24 @@ automatically. To enable it:
    This cannot be reversed.
 4. Confirm the Preview command is `npx wrangler preview`.
 
+`wrangler.jsonc` must keep a `previews` block, even an empty one: the
+`wrangler preview` command fails the build with "Your Wrangler configuration is
+missing a `previews` block" without it. Assets and compatibility settings stay
+at the top level, so `"previews": {}` is enough while Previews need no extra
+settings. If a future Preview needs vars or bindings, add them under `previews`
+with Preview-safe values.
+
 Previews do not inherit production settings. The SPA loads from a Preview, but
 `/api/*` returns `502 SIDECAR_URL is not configured` until a preview-specific
-`SIDECAR_URL` secret is configured. Previews are ephemeral, and pull requests
-from forks may not receive one. If Cloudflare does not comment, paste the URL
-into the PR's **Deployment** section.
+`SIDECAR_URL` secret is configured:
+
+```bash
+npx wrangler preview secret put SIDECAR_URL --name <branch>
+```
+
+When `--name` is omitted it defaults to the current git branch. Previews are
+ephemeral, and pull requests from forks may not receive one. If Cloudflare does
+not comment, paste the URL into the PR's **Deployment** section.
 
 The `cf` CLI can inspect build triggers and recent builds (`cf builds triggers
 list`, `cf builds list`) and create a Preview (`cf previews deploy`), but it does
