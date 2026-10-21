@@ -11,14 +11,18 @@ import {
 } from "react";
 
 import {
+  addConnector as apiAddConnector,
   addOutcome as apiAddOutcome,
   addStep as apiAddStep,
   createJob as apiCreateJob,
+  deleteConnector as apiDeleteConnector,
   deleteJob as apiDeleteJob,
   deleteOutcome as apiDeleteOutcome,
   deleteStep as apiDeleteStep,
   fetchCanvas,
   fetchConfig,
+  fetchConnectorCatalog,
+  fetchConnectors,
   healthLlm,
   healthMcp,
   streamChat,
@@ -28,11 +32,14 @@ import {
 } from "../api/studioApi";
 import type { RawSseEvent } from "../api/sse";
 import type {
+  AddConnectorPayload,
   AddOutcomePayload,
   AddStepPayload,
   CanvasData,
   ChatMessage,
   ChatPart,
+  ConnectorListItem,
+  ConnectorPreset,
   StudioBrief,
   StudioConfig,
   WorkspacePanelId,
@@ -114,6 +121,14 @@ export interface StudioContextValue {
   toasts: Toast[];
   pushToast: (kind: ToastKind, message: string) => void;
   dismissToast: (id: number) => void;
+  connectors: ConnectorListItem[];
+  presets: ConnectorPreset[];
+  refreshConnectors: () => Promise<void>;
+  refreshPresets: () => Promise<void>;
+  addConnector: (payload: AddConnectorPayload) => Promise<void>;
+  deleteConnector: (name: string) => Promise<void>;
+  connectorSuggestions: string[];
+  dismissConnectorSuggestion: (preset: string) => void;
 }
 
 const StudioContext = createContext<StudioContextValue | null>(null);
@@ -202,6 +217,9 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [pendingSimOutcome, setPendingSimOutcome] = useState<string | null>(null);
   const [activePanel, setActivePanel] = useState<WorkspacePanelId | null>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
+  const [connectors, setConnectors] = useState<ConnectorListItem[]>([]);
+  const [presets, setPresets] = useState<ConnectorPreset[]>([]);
+  const [connectorSuggestions, setConnectorSuggestions] = useState<string[]>([]);
   const toastId = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -216,6 +234,56 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const dismissToast = useCallback((id: number) => {
     setToasts((prev) => prev.filter((toast) => toast.id !== id));
   }, []);
+
+  const dismissConnectorSuggestion = useCallback((preset: string) => {
+    setConnectorSuggestions((prev) => prev.filter((s) => s !== preset));
+  }, []);
+
+  const refreshConnectors = useCallback(async () => {
+    try {
+      setConnectors(await fetchConnectors());
+    } catch {
+      setConnectors([]);
+    }
+  }, []);
+
+  const refreshPresets = useCallback(async () => {
+    try {
+      setPresets(await fetchConnectorCatalog());
+    } catch {
+      setPresets([]);
+    }
+  }, []);
+
+  const addConnector = useCallback(
+    async (payload: AddConnectorPayload) => {
+      try {
+        const response = await apiAddConnector(payload);
+        if (response.ok) {
+          pushToast("success", `Added connector ${response.name}`);
+        }
+        await refreshConnectors();
+      } catch (error) {
+        pushToast("error", `Error adding connector: ${(error as Error).message}`);
+      }
+    },
+    [pushToast, refreshConnectors],
+  );
+
+  const deleteConnector = useCallback(
+    async (name: string) => {
+      try {
+        const response = await apiDeleteConnector(name);
+        if (response.ok) {
+          pushToast("success", `Removed connector ${response.name}`);
+        }
+        await refreshConnectors();
+      } catch (error) {
+        pushToast("error", `Error removing connector: ${(error as Error).message}`);
+      }
+    },
+    [pushToast, refreshConnectors],
+  );
 
   const saveSettings = useCallback((config: StudioConfig) => {
     setSettings(config);
@@ -532,6 +600,15 @@ export function StudioProvider({ children }: { children: ReactNode }) {
           case "canvas_dirty":
             void refreshCanvas();
             break;
+          case "connector":
+            setConnectorSuggestions((prev) => {
+              const id = String(event.data?.preset ?? event.data?.name ?? "");
+              if (!id || prev.includes(id)) {
+                return prev;
+              }
+              return [...prev, id];
+            });
+            break;
           case "error":
             pushToast("error", String(event.data.message ?? "Unknown chat error"));
             break;
@@ -604,6 +681,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
         return;
       }
       void refreshCanvas();
+      void refreshConnectors();
+      void refreshPresets();
       void healthMcp(settings.mcp_url)
         .then((result) => {
           if (!cancelled) {
@@ -675,6 +754,14 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       toasts,
       pushToast,
       dismissToast,
+      connectors,
+      presets,
+      refreshConnectors,
+      refreshPresets,
+      addConnector,
+      deleteConnector,
+      connectorSuggestions,
+      dismissConnectorSuggestion,
     }),
     [
       settings,
@@ -719,6 +806,14 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       toasts,
       pushToast,
       dismissToast,
+      connectors,
+      presets,
+      refreshConnectors,
+      refreshPresets,
+      addConnector,
+      deleteConnector,
+      connectorSuggestions,
+      dismissConnectorSuggestion,
     ],
   );
 
