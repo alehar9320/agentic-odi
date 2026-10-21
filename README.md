@@ -90,6 +90,26 @@ The Studio is better with an OpenAI-compatible LLM with tool-calling support
 with no model reachable it says so and every job, step, and outcome remains
 editable by hand.
 
+### Connectors (MCP ↔ Living Studio)
+
+Register MCP or REST connectors that the copilot can discover and invoke.
+
+- **Where they live**: a shared `connectors.json` registry. Override its location
+  with `AGENTIC_ODI_CONNECTORS_CONFIG`; by default it is
+  `~/.config/agentic-odi/connectors.json`. See
+  [External Connectors](docs/connectors.md).
+- **In the Living Studio**: open the **Settings** drawer → **Connectors** to list,
+  remove, or add one of the recommended presets (Notion, PostHog, Exa, Linear,
+  GitHub).
+- **Conversationally**: tell the copilot "use Notion" / "add the GitHub connector".
+  It emits an `add_connector` local tool (handled in-process) that writes the
+  preset to the registry, plus a `connector` SSE event the Studio surfaces as a
+  suggestion chip. Dismissing or accepting the chip also refreshes the list.
+- **API**: `GET/POST/DELETE /api/connectors`, `GET /api/connectors/catalog`, and
+  `GET /api/connectors/{name}/health` (the catalog honors
+  `?area=<capability>` and `?recommended=true`).
+- **CLI**: `agentic-odi connectors catalog | add <preset> | list | health <name> | ingest <name>`.
+
 ### CLI at a glance
 
 The CLI is local-first, so data commands work without a running server:

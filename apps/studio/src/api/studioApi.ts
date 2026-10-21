@@ -1,9 +1,14 @@
 import { apiUrl } from "../bridge/desktopBridge";
 import type {
+  AddConnectorPayload,
   AddOutcomePayload,
   AddStepPayload,
   CanvasData,
   ChatStreamRequest,
+  ConnectorHealth,
+  ConnectorListItem,
+  ConnectorOperationResponse,
+  ConnectorPreset,
   CreateJobPayload,
   LlmHealth,
   McpHealth,
@@ -135,6 +140,30 @@ export function deleteOutcome(outcomeId: string, mcpUrl: string): Promise<{ ok: 
   );
 }
 
+export function fetchConnectorCatalog(): Promise<ConnectorPreset[]> {
+  return getJson<ConnectorPreset[]>("/api/connectors/catalog");
+}
+
+export function fetchConnectors(): Promise<ConnectorListItem[]> {
+  return getJson<ConnectorListItem[]>("/api/connectors");
+}
+
+export function addConnector(payload: AddConnectorPayload): Promise<ConnectorOperationResponse> {
+  return postJson<ConnectorOperationResponse>("/api/connectors", payload);
+}
+
+export async function deleteConnector(name: string): Promise<ConnectorOperationResponse> {
+  const response = await fetch(apiUrl(`/api/connectors/${encodeURIComponent(name)}`), {
+    method: "DELETE",
+    headers: { Accept: "application/json" },
+  });
+  if (!response.ok) throw new Error(await errorDetail(response));
+  return (await response.json()) as ConnectorOperationResponse;
+}
+
+export function checkConnectorHealth(name: string): Promise<ConnectorHealth> {
+  return postJson<ConnectorHealth>(`/api/connectors/${encodeURIComponent(name)}/health`, {});
+}
 export type ChatEventHandler = (event: RawSseEvent) => void;
 
 export async function streamChat(

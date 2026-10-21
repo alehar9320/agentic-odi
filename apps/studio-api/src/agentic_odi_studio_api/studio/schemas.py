@@ -89,3 +89,20 @@ class ChatRequest(BaseModel):
     messages: list[ChatMessage] = Field(default_factory=list)
     brief: StudioBrief | None = None
     ui_catalog: UiCatalogRequest | None = None
+
+
+class AddConnectorRequest(BaseModel):
+    name: str | None = None
+    preset: str | None = None
+    url: str | None = None
+
+
+class ConnectorListItem(BaseModel):
+    name: str
+    kind: str
+    enabled: bool = True
+
+
+class ConnectorOperationResponse(BaseModel):
+    ok: bool
+    name: str

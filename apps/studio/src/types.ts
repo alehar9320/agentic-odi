@@ -115,3 +115,40 @@ export interface AddOutcomePayload {
   importance: number;
   satisfaction: number;
 }
+
+export interface ConnectorPreset {
+  id: string;
+  label: string;
+  area: string;
+  summary: string;
+  url: string;
+  auth: "none" | "oauth";
+  env_vars: string[];
+  headers: Record<string, string>;
+  docs: string;
+  tools: string[];
+  is_recommended: boolean;
+}
+
+export interface ConnectorListItem {
+  name: string;
+  kind: string;
+  enabled: boolean;
+}
+
+export interface ConnectorHealth {
+  ok: boolean;
+  message: string;
+  details: Record<string, unknown>;
+}
+
+export interface ConnectorOperationResponse {
+  ok: boolean;
+  name: string;
+}
+
+export interface AddConnectorPayload {
+  name?: string;
+  preset?: string;
+  url?: string;
+}

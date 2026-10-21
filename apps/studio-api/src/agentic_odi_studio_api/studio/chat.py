@@ -1,9 +1,10 @@
 """Conversational helper with offline fallbacks and a streaming tool loop.
 
-The loop fans the MCP tools *and* one local tool — ``render_ui`` — into the
-completion. ``render_ui`` is intercepted rather than forwarded: the spec is
-validated against the catalog the client sent and streamed back as a ``ui``
-event, so the agent can hand the user a surface instead of describing one.
+The loop fans the MCP tools and two local tools — ``render_ui`` and
+``add_connector`` — into the completion. Local tools are intercepted rather
+than forwarded: ``render_ui`` validates its spec against the catalog the client
+sent and streams a ``ui`` event, while ``add_connector`` writes the shared
+connector registry and streams a ``connector`` event.
 """
 
 from __future__ import annotations
@@ -15,6 +16,7 @@ from typing import Any
 from fastmcp import Client as McpClient
 from openai import AsyncOpenAI
 
+from agentic_odi_studio_api.studio.connectors import ConnectorService
 from agentic_odi_studio_api.studio.probes import check_llm_health
 from agentic_odi_studio_api.studio.schemas import ChatRequest, StudioBrief
 from agentic_odi_studio_api.studio.ui_spec import RENDER_UI_TOOL, UiCatalog
@@ -134,6 +136,57 @@ def _openai_tools(mcp_tools: list[Any]) -> list[dict[str, Any]]:
     ]
 
 
+ADD_CONNECTOR_TOOL: dict[str, Any] = {
+    "type": "function",
+    "function": {
+        "name": "add_connector",
+        "description": (
+            "Register an external MCP or REST connector into the shared connector "
+            "registry so the Living Studio and CLI can use it. Provide a 'preset' "
+            "id (from connectors catalog) and optionally a 'name' and 'url' "
+            "override, or a custom 'name' + 'url'. Does not require an MCP server."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "description": "Unique connector name (defaults to the preset id).",
+                },
+                "preset": {
+                    "type": "string",
+                    "description": "Preset id, e.g. notion, posthog, exa, linear, github.",
+                },
+                "url": {
+                    "type": "string",
+                    "description": "Custom endpoint URL (used when no preset is given).",
+                },
+            },
+        },
+    },
+}
+
+
+def _apply_add_connector(
+    arguments: dict[str, Any], service: ConnectorService
+) -> tuple[str, list[dict[str, Any]]]:
+    """Register a connector locally and return SSE event dicts for the stream."""
+    name = arguments.get("name")
+    preset_id = arguments.get("preset")
+    url = arguments.get("url")
+    try:
+        config = service.add(name=name, preset_id=preset_id, url=url)
+    except Exception as exc:  # noqa: BLE001
+        event = {"event": "connector", "data": {"status": "error", "error": str(exc)}}
+        return f"Error: {exc}", [event]
+    event_data: dict[str, Any] = {"action": "registered", "name": config.name}
+    if preset_id is not None:
+        event_data["preset"] = preset_id
+    if url is not None:
+        event_data["url"] = url
+    return f"registered connector {config.name}", [{"event": "connector", "data": event_data}]
+
+
 def _render_ui_tool(catalog: UiCatalog) -> dict[str, Any]:
     return {
         "type": "function",
@@ -153,7 +206,8 @@ def _render_ui_tool(catalog: UiCatalog) -> dict[str, Any]:
 
 
 def _local_tools(catalog: UiCatalog | None) -> list[dict[str, Any]]:
-    return [_render_ui_tool(catalog)] if catalog is not None else []
+    tools = [_render_ui_tool(catalog)] if catalog is not None else []
+    return [*tools, ADD_CONNECTOR_TOOL]
 
 
 def _parse_arguments(raw: str) -> dict[str, Any]:
@@ -176,8 +230,10 @@ def _collect_tool_calls(delta: Any, tool_calls: dict[int, dict[str, str]]) -> No
                 entry["arguments"] += tool_call.function.arguments
 
 
-async def stream_chat(request: ChatRequest) -> AsyncIterator[str]:
-    """Yield SSE frames: status, delta, tool, ui, message, canvas_dirty."""
+async def stream_chat(
+    request: ChatRequest, service: ConnectorService | None = None
+) -> AsyncIterator[str]:
+    """Yield SSE frames: status, delta, tool, ui, connector, message, canvas_dirty."""
     yield _sse("status", {"phase": "health_check"})
     healthy, _message = await check_llm_health(request.base_url, request.api_key, request.model)
 
@@ -196,6 +252,7 @@ async def stream_chat(request: ChatRequest) -> AsyncIterator[str]:
 
     yield _sse("status", {"phase": "mcp_tools"})
     llm_client = AsyncOpenAI(base_url=request.base_url, api_key=request.api_key, timeout=15.0)
+    connector_service = service if service is not None else ConnectorService()
 
     async with McpClient(request.mcp_url) as mcp_client:
         mcp_tools = await mcp_client.list_tools()
@@ -253,39 +310,50 @@ async def stream_chat(request: ChatRequest) -> AsyncIterator[str]:
 
             for entry in tool_calls.values():
                 name = entry["name"]
-                yield _sse("tool", {"name": name, "status": "start"})
                 arguments = _parse_arguments(entry["arguments"])
 
-                if name == RENDER_UI_TOOL:
-                    if catalog is None:
-                        result_str = "UI is not available to this client. Answer in prose instead."
-                        yield _sse("tool", {"name": name, "status": "error", "preview": result_str})
-                    else:
-                        problem = catalog.validate(arguments)
-                        if problem:
+                if name == "add_connector":
+                    result_str, events = _apply_add_connector(arguments, connector_service)
+                    for event in events:
+                        yield _sse(event["event"], event["data"])
+                else:
+                    yield _sse("tool", {"name": name, "status": "start"})
+                    if name == RENDER_UI_TOOL:
+                        if catalog is None:
                             result_str = (
-                                f"UI rejected: {problem}. Nothing was shown to the user. "
-                                "Fix it and try once more."
+                                "UI is not available to this client. Answer in prose instead."
                             )
                             yield _sse(
-                                "tool", {"name": name, "status": "error", "preview": problem}
+                                "tool", {"name": name, "status": "error", "preview": result_str}
                             )
                         else:
-                            ui_count += 1
-                            result_str = "Rendered inline for the user."
-                            yield _sse("tool", {"name": name, "status": "ok"})
-                            yield _sse("ui", {"id": f"ui-{ui_count}", "spec": arguments})
-                else:
-                    try:
-                        result = await mcp_client.call_tool(name, arguments)
-                        result_str = str(result)
-                        canvas_dirty = True
-                        yield _sse(
-                            "tool", {"name": name, "status": "ok", "preview": result_str[:280]}
-                        )
-                    except Exception as exc:  # noqa: BLE001
-                        result_str = f"Error calling {name}: {exc}"
-                        yield _sse("tool", {"name": name, "status": "error", "preview": result_str})
+                            problem = catalog.validate(arguments)
+                            if problem:
+                                result_str = (
+                                    f"UI rejected: {problem}. Nothing was shown to the user. "
+                                    "Fix it and try once more."
+                                )
+                                yield _sse(
+                                    "tool", {"name": name, "status": "error", "preview": problem}
+                                )
+                            else:
+                                ui_count += 1
+                                result_str = "Rendered inline for the user."
+                                yield _sse("tool", {"name": name, "status": "ok"})
+                                yield _sse("ui", {"id": f"ui-{ui_count}", "spec": arguments})
+                    else:
+                        try:
+                            result = await mcp_client.call_tool(name, arguments)
+                            result_str = str(result)
+                            canvas_dirty = True
+                            yield _sse(
+                                "tool", {"name": name, "status": "ok", "preview": result_str[:280]}
+                            )
+                        except Exception as exc:  # noqa: BLE001
+                            result_str = f"Error calling {name}: {exc}"
+                            yield _sse(
+                                "tool", {"name": name, "status": "error", "preview": result_str}
+                            )
 
                 messages.append(
                     {

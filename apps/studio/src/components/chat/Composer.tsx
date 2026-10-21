@@ -30,7 +30,8 @@ export function Composer({
   autoFocus = false,
   placeholder,
 }: ComposerProps) {
-  const { settings, llmHealth, brief } = useStudio();
+  const { settings, llmHealth, brief, connectorSuggestions, presets, dismissConnectorSuggestion, refreshConnectors } =
+    useStudio();
   const [highlight, setHighlight] = useState(0);
   // Remember which draft was dismissed, so typing again re-opens the palette
   // without an effect that writes state on every keystroke.
@@ -138,6 +139,29 @@ export function Composer({
               No command matches. Type <code>/help</code> for the full list.
             </p>
           )}
+        </div>
+      )}
+
+      {connectorSuggestions.length > 0 && (
+        <div className="composer__suggestions" aria-label="Connector suggestions">
+          {connectorSuggestions.map((id) => {
+            const label = presets.find((preset) => preset.id === id)?.label ?? id;
+            return (
+              <button
+                key={id}
+                type="button"
+                className="composer__suggestion"
+                aria-label={`Added ${label}, dismiss`}
+                onClick={() => {
+                  dismissConnectorSuggestion(id);
+                  void refreshConnectors();
+                }}
+              >
+                <span>Added {label}</span>
+                <span aria-hidden>✕</span>
+              </button>
+            );
+          })}
         </div>
       )}
 
