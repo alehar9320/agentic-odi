@@ -1,0 +1,58 @@
+My CloudFlare deployment fails due to the follwing log 2026-10-20T17:42:26.648Z	Initializing build environment...
+2026-10-20T17:42:28.463Z	Success: Finished initializing build environment
+2026-10-20T17:42:29.236Z	Cloning repository...
+2026-10-20T17:42:31.266Z	No build output detected to cache. Skipping.
+2026-10-20T17:42:31.266Z	No dependencies detected to cache. Skipping.
+2026-10-20T17:42:31.268Z	Detected the following tools from environment: 
+2026-10-20T17:42:31.271Z	Installing project dependencies: uv sync
+2026-10-20T17:42:31.707Z	Using CPython 3.14.8 interpreter at: /opt/buildhome/.asdf/installs/python/3.14.8/bin/python3
+2026-10-20T17:42:31.708Z	Creating virtual environment at: .venv
+2026-10-20T17:42:31.733Z	Resolved 124 packages in 15ms
+2026-10-20T17:42:31.845Z	Downloading pygments (1.2MiB)
+2026-10-20T17:42:31.847Z	Downloading mypy (14.7MiB)
+2026-10-20T17:42:31.852Z	Downloading ast-serialize (1.3MiB)
+2026-10-20T17:42:31.853Z	Downloading pillow (6.6MiB)
+2026-10-20T17:42:31.854Z	Downloading ruff (9.9MiB)
+2026-10-20T17:42:32.060Z	 Downloaded ast-serialize
+2026-10-20T17:42:32.115Z	 Downloaded pygments
+2026-10-20T17:42:32.260Z	 Downloaded pillow
+2026-10-20T17:42:32.320Z	 Downloaded ruff
+2026-10-20T17:42:32.428Z	 Downloaded mypy
+2026-10-20T17:42:32.429Z	Prepared 26 packages in 694ms
+2026-10-20T17:42:32.530Z	Installed 26 packages in 99ms
+2026-10-20T17:42:32.530Z	 + altgraph==0.17.5
+2026-10-20T17:42:32.530Z	 + ast-serialize==0.12.1
+2026-10-20T17:42:32.530Z	 + bandit==1.9.4
+2026-10-20T17:42:32.530Z	 + coverage==7.16.2
+2026-10-20T17:42:32.530Z	 + iniconfig==2.3.1
+2026-10-20T17:42:32.530Z	 + librt==0.16.0
+2026-10-20T17:42:32.531Z	 + markdown-it-py==4.2.0
+2026-10-20T17:42:32.531Z	 + mdurl==0.1.2
+2026-10-20T17:42:32.531Z	 + mypy==2.4.0
+2026-10-20T17:42:32.531Z	 + mypy-extensions==1.1.0
+2026-10-20T17:42:32.531Z	 + packaging==26.3
+2026-10-20T17:42:32.531Z	 + pathspec==1.1.1
+2026-10-20T17:42:32.531Z	 + pillow==12.3.0
+2026-10-20T17:42:32.531Z	 + pluggy==1.6.0
+2026-10-20T17:42:32.531Z	 + pygments==2.21.0
+2026-10-20T17:42:32.533Z	 + pyinstaller==6.22.3
+2026-10-20T17:42:32.533Z	 + pyinstaller-hooks-contrib==2026.8
+2026-10-20T17:42:32.534Z	 + pytest==9.1.1
+2026-10-20T17:42:32.534Z	 + pytest-asyncio==1.4.0
+2026-10-20T17:42:32.534Z	 + pytest-cov==7.1.0
+2026-10-20T17:42:32.534Z	 + pyyaml==6.0.3
+2026-10-20T17:42:32.534Z	 + rich==15.0.0
+2026-10-20T17:42:32.534Z	 + ruff==0.17.0
+2026-10-20T17:42:32.536Z	 + setuptools==84.0.0
+2026-10-20T17:42:32.540Z	 + stevedore==5.9.1
+2026-10-20T17:42:32.540Z	 + typing-extensions==4.16.0
+2026-10-20T17:42:33.154Z	Executing user build command: npm run build
+2026-10-20T17:42:33.781Z	npm error code ENOENT
+2026-10-20T17:42:33.782Z	npm error syscall open
+2026-10-20T17:42:33.782Z	npm error path /opt/buildhome/repo/package.json
+2026-10-20T17:42:33.782Z	npm error errno -2
+2026-10-20T17:42:33.782Z	npm error enoent Could not read package.json: Error: ENOENT: no such file or directory, open '/opt/buildhome/repo/package.json'
+2026-10-20T17:42:33.782Z	npm error enoent This is related to npm not being able to find a file.
+2026-10-20T17:42:33.783Z	npm error enoent
+2026-10-20T17:42:33.784Z	npm error A complete log of this run can be found in: /opt/buildhome/.npm/_logs/2026-10-20T17_42_33_661Z-debug-0.log
+2026-10-20T17:42:33.799Z	Failed: error occurred while running build command wrt build configuration "Build configuration Build command npm run build Deploy command npx wrangler deploy Root directory /". Identify what it'll take to ensure that it will build successfully. Instruct me if I need to make any changes to support you.
