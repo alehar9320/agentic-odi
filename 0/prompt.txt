@@ -1,0 +1,1 @@
+Your objective is to merge all open PRs after they have green CI. If they don't have green CI, you open a new git worktree, fix the issues, rebase against main, and push again. Once CI green, you merge.
