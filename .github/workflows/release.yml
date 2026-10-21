@@ -73,7 +73,7 @@ jobs:
           path: checksums-${{ matrix.target }}.txt
           if-no-files-found: error
       - name: Upload assets
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: |
             odi_*.tar.gz
@@ -96,7 +96,7 @@ jobs:
           echo "checksums.txt"
           cat checksums.txt
       - name: Upload checksums.txt
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: checksums.txt
 
@@ -105,7 +105,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: Upload install scripts
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: |
             scripts/install.sh
