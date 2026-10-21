@@ -35,7 +35,7 @@ cd apps/studio/src-tauri && cargo fmt --check && cargo clippy -- -D warnings && 
 
 ### Conversational UI coverage
 
-The agent-composed surfaces are covered at three levels:
+The agent-composed surfaces and the first-run tour are covered at these levels:
 
 | File | What it covers |
 |---|---|
@@ -44,6 +44,10 @@ The agent-composed surfaces are covered at three levels:
 | `apps/studio/src/components/chat/Conversation.test.tsx` | Prose and surfaces interleaved in the agent's order; card actions become messages |
 | `apps/studio-api/tests/test_studio_ui_spec.py` | Catalog validation and `render_ui` tool-schema generation |
 | `apps/studio-api/tests/test_studio_chat_ui.py` | `render_ui` interception, `ui` SSE events, and the correction fed back to the model |
+| `apps/studio/src/features/flags.test.ts` | Flag precedence (query → storage → env → default), value parsing, local overrides |
+| `apps/studio/src/onboarding/machine.test.ts` | Tour transitions, no forward motion without a goal, versioned storage, malformed records |
+| `apps/studio/src/onboarding/FirstRunWizard.test.tsx` | Auto-open, full flow to a destination, skip/Escape, focus trap, resume, replay, inline model repair, flag off |
+| `apps/studio/src/App.test.tsx` | First-run ordering: tour over the context conversation, job handoff, chosen surface opens, flag off in shell tests |
 
 ## Website Checks (GitHub Pages)
 

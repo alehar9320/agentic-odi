@@ -37,6 +37,7 @@ The Studio opens as a conversation, not a dashboard.
 
 | Surface | What it does |
 |---|---|
+| **First-run tour** | A four-step, skippable welcome on the very first visit: what the studio is, which of four starting points you want, the live state of your sidecar/MCP/model (with inline repair when the model is down), and the first move. Finishing opens the chosen surface; **Name the job** hands off to the context conversation. Replay it from **Settings → Replay the welcome tour**. |
 | **First run** | A short conversation in the chat, not a form: what you are building, who feels the problem, the job they are trying to get done, then where it hurts. One question at a time, with a reflection before the next ask, quick replies, and **Explore on my own** always visible. Skipping is allowed; answers and progress are kept as a draft. Re-open it any time with `/start`, the sidebar's **Your context**, or Settings. |
 | **Hero** | One rotating headline above the composer: a greeting (time of day, plus your name if you set one in Settings), the product/job you set up, what is already on the canvas, or what the studio can do. It cycles every few seconds and stays still under `prefers-reduced-motion`. |
 | **Suggestion pills** | Below the headline. Some open a surface (landscape, simulate, capture), others start a conversation. They change as the canvas fills up. |
@@ -64,6 +65,42 @@ the model, so they work when it is offline.
 | `/status` | Model, MCP, context, and canvas status |
 
 Unknown commands produce a transcript notice pointing at `/help`.
+
+### The welcome tour
+
+The tour is the front door, the context conversation is the first room. It is
+skippable at every step (`Skip the tour` or `Escape`), resumable (progress is
+stored after every transition in `localStorage["studio.onboarding"]`), and
+replayable from Settings.
+
+Everything lives in `apps/studio/src/onboarding/`:
+
+| File | Role |
+|---|---|
+| `content.ts` | Steps and goal copy as typed data — the only place the words live |
+| `machine.ts` | Pure state transitions, no React or storage |
+| `storage.ts` | Versioned, defensive `localStorage` persistence |
+| `OnboardingProvider.tsx` | Auto-open, persistence, replay |
+| `FirstRunWizard.tsx`, `steps.tsx`, `onboarding.css` | The dialog |
+| `../features/flags.ts` | The `firstRunWizard` toggle |
+
+`App.tsx` only wires the provider and the wizard around the existing shell;
+the chat, canvas, and sidecar code are untouched.
+
+#### Toggling the tour
+
+`firstRunWizard` defaults to on. Resolution order, highest first:
+
+| Source | Example | Use |
+|---|---|---|
+| Query parameter | `?flags=firstRunWizard:off` | QA a build without rebuilding |
+| Local override | `localStorage["studio.flags.firstRunWizard"] = "off"` | Per-browser opt-out |
+| Build environment | `VITE_STUDIO_FIRST_RUN_WIZARD=off npm --prefix apps/studio run build` | Ship it dark |
+| Default | on | |
+
+Accepted values are `1`/`0`, `true`/`false`, `on`/`off`, `yes`/`no`, and
+`enabled`/`disabled`. With the flag off, no dialog renders, no onboarding state
+is written, and Settings hides the replay action.
 
 ### Guidance, not gates
 
