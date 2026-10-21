@@ -233,6 +233,9 @@ def generate() -> None:
     html_lines.append(
         "      <p>Endpoint chips: MCP http://localhost:8000/mcp · Studio http://localhost:8100</p>"
     )
+    html_lines.append(
+        '      <p><strong>Hosted Studio:</strong> <a href="https://agentic-odi.alehar.workers.dev/">agentic-odi.alehar.workers.dev</a> (experimental UI; live data needs the sidecar)</p>'
+    )
     html_lines.append("      <p>MCP client config snippet:</p>")
     html_lines.append("      <pre><code>{")
     html_lines.append('  "mcpServers": {')

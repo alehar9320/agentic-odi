@@ -5,9 +5,9 @@ an interactive Opportunity Landscape, Universal Job Map, WYSIWYG Impact
 Simulation, and Causal Lineage inspection, paired with an autonomous agent
 connected to the MCP server.
 
-The Studio runs three ways. All of them serve the same SPA, which talks only to
-the sidecar on `http://127.0.0.1:8100` — the SPA never contacts MCP or the LLM
-directly.
+The Studio runs three ways locally, plus a hosted deployment. All of them serve
+the same SPA, which talks only to the sidecar on `http://127.0.0.1:8100` — the
+SPA never contacts MCP or the LLM directly.
 
 ## Architecture
 
@@ -145,6 +145,14 @@ that fails validation is dropped whole, and the surrounding prose still reads.
    catalog and the registry drift apart.
 
 No server change is needed, and no new dependency.
+
+## Hosted (experimental)
+
+The built SPA is also served from Cloudflare Workers at
+**[https://agentic-odi.alehar.workers.dev/](https://agentic-odi.alehar.workers.dev/)**.
+The UI loads without a backend; canvas data, chat, and mutations need the local
+sidecar and MCP server. Pull requests get preview URLs from Cloudflare Workers
+Builds. See [Deployment](deployment.md) for the Worker setup.
 
 ## 1. Web — production build (recommended for a quick look)
 
