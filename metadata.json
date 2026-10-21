@@ -3,7 +3,7 @@
   "checkpoint_id": "01M5FB7K9AWZKBSWECSPQ4B5PN",
   "strategy": "manual-commit",
   "branch": "feat/conversational-rich-surfaces",
-  "checkpoints_count": 2,
+  "checkpoints_count": 3,
   "files_touched": [
     "README.md",
     "apps/studio-api/src/agentic_odi_studio_api/studio/chat.py",
@@ -29,6 +29,13 @@
       "compact_transcript": "/1/transcript.jsonl",
       "content_hash": "/1/content_hash.txt",
       "prompt": ""
+    },
+    {
+      "metadata": "/2/metadata.json",
+      "transcript": "/2/full.jsonl",
+      "compact_transcript": "/2/transcript.jsonl",
+      "content_hash": "/2/content_hash.txt",
+      "prompt": "/2/prompt.txt"
     }
   ],
   "token_usage": {
