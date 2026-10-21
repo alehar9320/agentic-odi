@@ -1,0 +1,100 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M5FWMMDK972JZGTJ0VQQWWD3",
+  "session_id": "ses_ea0c08be9ffetTzlah3R3QhF04",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-21T18:47:54.806485164Z",
+  "branch": "fix/cloudflare-previews-config",
+  "checkpoints_count": 1,
+  "save_step_count": 2,
+  "files_touched": [],
+  "agent": "OpenCode",
+  "model": "deepseek-ai/deepseek-v4.1-flash",
+  "turn_id": "cb309f6bd505",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 72688,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 79424,
+    "output_tokens": 614,
+    "api_call_count": 6
+  },
+  "session_metrics": {
+    "turn_count": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 1446,
+      "user_lines_removed": 7,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        ".agents/rules/agent_instructions.md": 6,
+        "docs/superpowers/plans/2026-10-20-release-download-run-instructions.md": 220,
+        "docs/superpowers/plans/2026-10-21-conversational-generative-ui.md": 97,
+        "docs/superpowers/plans/2026-10-21-intent-first-pm-experience.md": 149,
+        "docs/superpowers/plans/2026-10-21-living-studio-ux.md": 133,
+        "docs/superpowers/specs/2026-10-21-conversational-generative-ui-design.md": 239,
+        "docs/superpowers/specs/2026-10-21-first-run-wizard-design.md": 145,
+        "docs/superpowers/specs/2026-10-21-intent-first-pm-experience-design.md": 156,
+        "docs/superpowers/specs/2026-10-21-living-studio-ux-design.md": 97,
+        "docs/superpowers/specs/2026-10-21-mcp-studio-connectors-design.md": 204
+      },
+      "user_removed_per_file": {
+        ".agents/rules/agent_instructions.md": 6,
+        ".agents/skills/using-superpowers/SKILL.md": 1
+      }
+    },
+    {
+      "checkpoint_number": 3,
+      "user_lines_added": 1657,
+      "user_lines_removed": 27,
+      "agent_lines_added": 2139380,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        ".freebuff/project-id": 1,
+        ".opencode/plans/ci-green-pr7-pr8.md": 103,
+        ".pi/git/.gitignore": 2,
+        ".wrangler/cache/cf.json": 1,
+        "docs/superpowers/plans/2026-10-21-conversational-generative-ui.md": 97,
+        "docs/superpowers/plans/2026-10-21-intent-first-pm-experience.md": 149,
+        "docs/superpowers/plans/2026-10-21-living-studio-ux.md": 133,
+        "docs/superpowers/plans/2026-10-21-voice-chat-mic.md": 287,
+        "docs/superpowers/specs/2026-10-21-first-run-wizard-design.md": 145,
+        "docs/superpowers/specs/2026-10-21-intent-first-pm-experience-design.md": 156,
+        "docs/superpowers/specs/2026-10-21-living-studio-ux-design.md": 97,
+        "docs/superpowers/specs/2026-10-21-voice-chat-mic-design.md": 486
+      },
+      "user_removed_per_file": {
+        "apps/studio/node_modules/.bin/acorn": 1,
+        "apps/studio/node_modules/.bin/baseline-browser-mapping": 1,
+        "apps/studio/node_modules/.bin/browserslist": 1,
+        "apps/studio/node_modules/.bin/conc": 1,
+        "apps/studio/node_modules/.bin/concurrently": 1,
+        "apps/studio/node_modules/.bin/eslint": 1,
+        "apps/studio/node_modules/.bin/js-yaml": 1,
+        "apps/studio/node_modules/.bin/jsesc": 1,
+        "apps/studio/node_modules/.bin/json5": 1,
+        "apps/studio/node_modules/.bin/lz-string": 1,
+        "apps/studio/node_modules/.bin/nanoid": 1,
+        "apps/studio/node_modules/.bin/node-which": 1,
+        "apps/studio/node_modules/.bin/openapi-typescript": 1,
+        "apps/studio/node_modules/.bin/parser": 1,
+        "apps/studio/node_modules/.bin/rolldown": 1,
+        "apps/studio/node_modules/.bin/semver": 1,
+        "apps/studio/node_modules/.bin/specificity": 1,
+        "apps/studio/node_modules/.bin/tauri": 1,
+        "apps/studio/node_modules/.bin/tldts": 1,
+        "apps/studio/node_modules/.bin/tree-kill": 1,
+        "apps/studio/node_modules/.bin/tsc": 1,
+        "apps/studio/node_modules/.bin/tsserver": 1,
+        "apps/studio/node_modules/.bin/update-browserslist-db": 1,
+        "apps/studio/node_modules/.bin/vite": 1,
+        "apps/studio/node_modules/.bin/vitest": 1,
+        "apps/studio/node_modules/.bin/why-is-node-running": 1,
+        "apps/studio/node_modules/@typescript-eslint/typescript-estree/node_modules/.bin/semver": 1
+      }
+    }
+  ]
+}
