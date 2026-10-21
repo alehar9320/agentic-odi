@@ -228,7 +228,7 @@ def generate() -> None:
     html_lines.append('    <section id="run">')
     html_lines.append("      <h2>Run it in 60 seconds.</h2>")
     html_lines.append(
-        "      <pre><code>git clone https://github.com/alehar9320/agentic-odi.git\ncd agentic-odi\nuv sync --all-packages\npython scripts/dev.py</code></pre>"
+        '      <pre><code>git clone https://github.com/alehar9320/agentic-odi.git\ncd agentic-odi\nuv sync --all-packages\npython scripts/dev.py</code><button class="copy_btn" type="button">Copy</button></pre>'
     )
     html_lines.append(
         "      <p>Endpoint chips: MCP http://localhost:8000/mcp · Studio http://localhost:8100</p>"
@@ -238,7 +238,7 @@ def generate() -> None:
     html_lines.append('  "mcpServers": {')
     html_lines.append('    "agentic-odi": { "url": "http://localhost:8000/mcp" }')
     html_lines.append("  }")
-    html_lines.append("}</code></p>")
+    html_lines.append('}</code><button class="copy_btn" type="button">Copy</button></pre>')
     html_lines.append(
         '      <p>Hosted credentials come from the maintainers — <a href="https://github.com/alehar9320/agentic-odi/issues">open an issue</a>. <strong>requires a free Prefect account</strong>.</p>'
     )
