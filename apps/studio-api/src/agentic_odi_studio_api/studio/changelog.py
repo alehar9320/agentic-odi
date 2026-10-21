@@ -93,7 +93,7 @@ def get_changelog() -> dict:
             if releases:
                 return {"releases": releases}
         except Exception:  # noqa: BLE001
-            pass
+            releases = []
 
     # Fallback if CHANGELOG.md is missing or unparseable
     return {
