@@ -1,5 +1,22 @@
 # Deployment
 
+## Project Site (GitHub Pages)
+
+The static site in `website/` is published to
+**[https://alehar9320.github.io/agentic-odi/](https://alehar9320.github.io/agentic-odi/)**
+by [`.github/workflows/pages.yml`](../.github/workflows/pages.yml).
+
+- A push to `main` runs the website tests, builds `_site` from `website/`, and
+  deploys the artifact with `actions/deploy-pages`.
+- `workflow_dispatch` republishes the site from the Actions tab without a code
+  change.
+- Pages is configured with the "GitHub Actions" source, so there is no
+  `gh-pages` branch. Removing `pages.yml` stops all publishing and the site
+  returns 404.
+- The `github-pages` environment only allows deployments from `main`.
+
+## Hosted MCP Server
+
 The server is deployed via **[Horizon Prefect](https://www.prefect.io/horizon)**,
 Prefect's managed infrastructure for hosting MCP-compatible agents.
 
