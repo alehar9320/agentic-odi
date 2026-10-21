@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import App from "../../App";
@@ -49,7 +49,7 @@ describe("Catch Up & Notification System", () => {
     const bellBtn = await screen.findByRole("button", { name: /catch up notifications/i });
     expect(bellBtn).toBeInTheDocument();
     // Default seed notifications include 2 unread
-    expect(screen.getByText("2")).toBeInTheDocument();
+    expect(within(bellBtn).getByText("2")).toBeInTheDocument();
 
     fireEvent.click(bellBtn);
 
