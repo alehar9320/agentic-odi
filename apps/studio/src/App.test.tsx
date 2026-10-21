@@ -1,7 +1,8 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import App from "./App";
+import { healthLlm } from "./api/studioApi";
 
 vi.mock("./api/studioApi", () => ({
   fetchConfig: vi.fn(async () => ({
@@ -29,6 +30,13 @@ vi.mock("./api/studioApi", () => ({
   healthLlm: vi.fn(async () => ({ healthy: true, message: "LLM backend is reachable." })),
   addStep: vi.fn(async () => ({ ok: true, result: "created" })),
   addOutcome: vi.fn(async () => ({ ok: true, result: "created" })),
+  createJob: vi.fn(async () => ({ ok: true, result: { id: "JOB-NEW" } })),
+  updateJob: vi.fn(async () => ({ ok: true })),
+  deleteJob: vi.fn(async () => ({ ok: true })),
+  updateStep: vi.fn(async () => ({ ok: true })),
+  deleteStep: vi.fn(async () => ({ ok: true })),
+  updateOutcome: vi.fn(async () => ({ ok: true })),
+  deleteOutcome: vi.fn(async () => ({ ok: true })),
   streamChat: vi.fn(
     async (
       _request: unknown,
@@ -41,6 +49,32 @@ vi.mock("./api/studioApi", () => ({
   ),
 }));
 
+const BRIEF = {
+  product_name: "Ambient",
+  target_user: "Platform engineers",
+  job_statement: "Get a service from commit to production",
+  core_problem: "A missed config key costs hours",
+  job_id: "JOB-402",
+};
+
+beforeEach(() => {
+  for (const key of [
+    "studio.brief",
+    "studio.settings",
+    "studio.canvas",
+    "studio.displayName",
+    "studio.setupDismissed",
+    "studio.setupDraft",
+  ]) {
+    window.localStorage.removeItem(key);
+  }
+  window.localStorage.setItem("studio.brief", JSON.stringify(BRIEF));
+  vi.mocked(healthLlm).mockResolvedValue({
+    healthy: true,
+    message: "LLM backend is reachable.",
+  });
+});
+
 describe("studio shell", () => {
   it("opens as a conversation with a greeting and suggestion pills", async () => {
     render(<App />);
@@ -50,11 +84,11 @@ describe("studio shell", () => {
     ).toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: /message the studio/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /define a job/i })).toBeInTheDocument();
-    // The classic UI is secondary: no workspace panel until you ask for one.
+    // The classic UI is secondary: no workspace surface until you ask for one.
     expect(screen.queryByRole("heading", { name: /opportunity landscape/i })).toBeNull();
   });
 
-  it("opens a workspace panel from the drawer and closes it again", async () => {
+  it("opens a full-screen workspace surface and returns to the conversation", async () => {
     render(<App />);
 
     fireEvent.click(await screen.findByRole("button", { name: /^landscape/i }));
@@ -62,11 +96,27 @@ describe("studio shell", () => {
     expect(
       await screen.findByRole("heading", { name: /opportunity landscape/i }),
     ).toBeInTheDocument();
+    // The conversation gives up the whole stage while a surface is open.
+    expect(screen.queryByRole("textbox", { name: /message the studio/i })).toBeNull();
 
-    fireEvent.click(screen.getByRole("button", { name: /close panel/i }));
+    fireEvent.click(screen.getByRole("button", { name: /back to conversation/i }));
+
+    expect(await screen.findByRole("textbox", { name: /message the studio/i })).toBeInTheDocument();
+  });
+
+  it("adjusts outcome scores by hand from the landscape", async () => {
+    const { updateOutcome } = await import("./api/studioApi");
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole("button", { name: /^landscape/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /adjust scores/i }));
+    fireEvent.click(screen.getByRole("button", { name: /save scores/i }));
 
     await waitFor(() => {
-      expect(screen.queryByRole("heading", { name: /opportunity landscape/i })).toBeNull();
+      expect(updateOutcome).toHaveBeenCalledWith(
+        "O-1",
+        expect.objectContaining({ importance: expect.any(Number), satisfaction: expect.any(Number) }),
+      );
     });
   });
 
@@ -82,7 +132,60 @@ describe("studio shell", () => {
     expect(screen.getByRole("button", { name: /copy reply/i })).toBeInTheDocument();
   });
 
-  it("puts the composer back in the hero after starting a new conversation", async () => {
+  it("returns home from the wordmark", async () => {
+    render(<App />);
+
+    const composer = await screen.findByRole("textbox", { name: /message the studio/i });
+    fireEvent.change(composer, { target: { value: "Where do I start?" } });
+    fireEvent.click(screen.getByRole("button", { name: /send message/i }));
+    await screen.findByText("Where do I start?");
+
+    fireEvent.click(screen.getByRole("button", { name: /go to home/i }));
+
+    await waitFor(() => {
+      expect(screen.queryByText("Where do I start?")).toBeNull();
+    });
+    expect(
+      screen.getByRole("heading", { name: /^Good (morning|afternoon|evening)/ }),
+    ).toBeInTheDocument();
+  });
+
+  it("runs a slash command locally and opens its surface", async () => {
+    render(<App />);
+
+    const composer = await screen.findByRole("textbox", { name: /message the studio/i });
+    fireEvent.change(composer, { target: { value: "/" } });
+
+    expect(await screen.findByRole("listbox", { name: /commands/i })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("option", { name: /capture an outcome/i }));
+
+    expect(
+      await screen.findByRole("heading", { name: /^capture an outcome$/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("answers a slash command with a transcript notice", async () => {
+    render(<App />);
+
+    const composer = await screen.findByRole("textbox", { name: /message the studio/i });
+    fireEvent.change(composer, { target: { value: "/help" } });
+    fireEvent.keyDown(composer, { key: "Enter" });
+
+    expect(await screen.findByText(/handled here/i, { selector: "p" })).toBeInTheDocument();
+  });
+
+  it("shows manual work when the model is offline", async () => {
+    vi.mocked(healthLlm).mockResolvedValueOnce({ healthy: false, message: "offline" });
+    render(<App />);
+
+    expect(await screen.findByText(/working by hand/i)).toBeInTheDocument();
+    expect(
+      screen.getAllByRole("button", { name: /capture an outcome/i }).length,
+    ).toBeGreaterThan(0);
+    expect(screen.getByText("Local guidance")).toBeInTheDocument();
+  });
+
+  it("starts a new conversation from the drawer", async () => {
     render(<App />);
 
     const composer = await screen.findByRole("textbox", { name: /message the studio/i });
@@ -95,8 +198,121 @@ describe("studio shell", () => {
     await waitFor(() => {
       expect(screen.queryByText("Where do I start?")).toBeNull();
     });
+  });
+});
+
+describe("first run", () => {
+  it("asks for context conversationally and creates the job when accepted", async () => {
+    window.localStorage.removeItem("studio.brief");
+    const { createJob } = await import("./api/studioApi");
+    render(<App />);
+
+    // No modal: the questions arrive as chat, with the composer ready.
     expect(
-      screen.getByRole("heading", { name: /^Good (morning|afternoon|evening)/ }),
+      await screen.findByText("What are you building?", { selector: "strong" }),
     ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /explore on my own/i })).toBeInTheDocument();
+
+    const composer = screen.getByRole("textbox", { name: /message the studio/i });
+    fireEvent.change(composer, { target: { value: "Ambient" } });
+    fireEvent.keyDown(composer, { key: "Enter" });
+
+    expect(
+      await screen.findByText("Who feels the problem most?", { selector: "strong" }),
+    ).toBeInTheDocument();
+    fireEvent.change(composer, { target: { value: "Platform engineers" } });
+    fireEvent.keyDown(composer, { key: "Enter" });
+
+    expect(
+      await screen.findByText("What job are they trying to get done?", { selector: "strong" }),
+    ).toBeInTheDocument();
+    fireEvent.change(composer, { target: { value: "Get a service from commit to production" } });
+    fireEvent.keyDown(composer, { key: "Enter" });
+
+    expect(
+      await screen.findByText("Where does it hurt most?", { selector: "strong" }),
+    ).toBeInTheDocument();
+    fireEvent.change(composer, { target: { value: "A missed config key costs hours" } });
+    fireEvent.keyDown(composer, { key: "Enter" });
+
+    expect(
+      await screen.findByText(/Here is what I will hold/i, { selector: "p" }),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /looks right/i }));
+
+    await waitFor(() => {
+      expect(createJob).toHaveBeenCalledWith(
+        expect.objectContaining({ name: "Get a service from commit to production" }),
+      );
+    });
+    expect(await screen.findByText(/Living Studio · Ambient/i)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /explore on my own/i })).toBeNull();
+  });
+
+  it("lets people explore instead of answering, and remembers that choice", async () => {
+    window.localStorage.removeItem("studio.brief");
+    const { unmount } = render(<App />);
+
+    fireEvent.click(await screen.findByRole("button", { name: /explore on my own/i }));
+
+    expect(
+      await screen.findByRole("heading", { name: /^Good (morning|afternoon|evening)/ }),
+    ).toBeInTheDocument();
+    expect(window.localStorage.getItem("studio.setupDismissed")).toBe("1");
+
+    unmount();
+    render(<App />);
+
+    expect(
+      await screen.findByRole("heading", { name: /^Good (morning|afternoon|evening)/ }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("What are you building?", { selector: "strong" })).toBeNull();
+  });
+
+  it("lets a workspace surface take over from the setup conversation", async () => {
+    window.localStorage.removeItem("studio.brief");
+    render(<App />);
+
+    expect(
+      await screen.findByText("What are you building?", { selector: "strong" }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /^landscape/i }));
+    expect(
+      await screen.findByRole("heading", { name: /opportunity landscape/i }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /back to conversation/i }));
+
+    // Closing the surface returns to the home stage, not back into setup.
+    expect(
+      await screen.findByRole("heading", { name: /^Good (morning|afternoon|evening)/ }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("What are you building?", { selector: "strong" })).toBeNull();
+  });
+
+  it("edits an existing context as a conversation", async () => {
+    const { updateJob } = await import("./api/studioApi");
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole("button", { name: /edit context/i }));
+
+    expect(
+      await screen.findByText(/Here is what I will hold/i, { selector: "p" }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /change product/i }));
+    const composer = screen.getByRole("textbox", { name: /message the studio/i });
+    fireEvent.change(composer, { target: { value: "Ambient Two" } });
+    fireEvent.keyDown(composer, { key: "Enter" });
+
+    fireEvent.click(await screen.findByRole("button", { name: /save context/i }));
+
+    await waitFor(() => {
+      expect(updateJob).toHaveBeenCalledWith(
+        "JOB-402",
+        expect.objectContaining({ name: "Get a service from commit to production" }),
+      );
+    });
   });
 });

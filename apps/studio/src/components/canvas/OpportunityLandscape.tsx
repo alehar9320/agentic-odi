@@ -61,9 +61,9 @@ export function OpportunityLandscape() {
     <section className="fade-in">
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: 12 }}>
         <div>
-          <h2 className="section-title" style={{ margin: 0, fontSize: "1.4rem", fontWeight: 700, letterSpacing: "-0.02em" }}>
+          <p className="section-title" style={{ margin: 0, fontSize: "1.4rem", fontWeight: 700, letterSpacing: "-0.02em" }}>
             Opportunity Landscape
-          </h2>
+          </p>
           <p className="caption" style={{ marginTop: 4, margin: 0, color: "var(--studio-muted)" }}>
             Interactive 2D Opportunity Matrix mapping Importance vs. Satisfaction. High Opportunity (&gt;10) targets pulse as primary innovation levers.
           </p>

@@ -1,17 +1,41 @@
 import { useEffect, useRef, useState } from "react";
 
+import { HELP_TEXT, STUDIO_COMMANDS, isSlashCommand, type StudioCommand } from "../../lib/commands";
 import { useStudio } from "../../state/StudioContext";
+import type { WorkspacePanelId } from "../../types";
+import { SetupConversation } from "../setup/SetupConversation";
 import { Composer } from "./Composer";
 import { Conversation } from "./Conversation";
 import { Hero } from "./Hero";
+import { OfflineNotice } from "./OfflineNotice";
 
-/**
- * The main stage: a conversation first, with the classic UI one drawer-click
- * away. Everything here is centred on one readable column, the way modern chat
- * surfaces behave.
- */
+const PANEL_COMMANDS = new Set<string>([
+  "landscape",
+  "jobmap",
+  "impact",
+  "evidence",
+  "capture",
+  "settings",
+]);
+
 export function ChatStage() {
-  const { messages, streaming, sendMessage, stopStreaming } = useStudio();
+  const {
+    messages,
+    streaming,
+    sendMessage,
+    stopStreaming,
+    openPanel,
+    closePanel,
+    clearChat,
+    pushNotice,
+    openSetup,
+    setupOpen,
+    canvas,
+    brief,
+    settings,
+    mcpReachable,
+    llmHealth,
+  } = useStudio();
   const [draft, setDraft] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -19,6 +43,65 @@ export function ChatStage() {
   const refocus = useRef(false);
 
   const empty = messages.length === 0;
+
+  function runCommand(command: StudioCommand) {
+    if (PANEL_COMMANDS.has(command.id)) {
+      openPanel(command.id as WorkspacePanelId);
+      return;
+    }
+    switch (command.id) {
+      case "help":
+        pushNotice(HELP_TEXT);
+        return;
+      case "new":
+      case "home":
+        clearChat();
+        closePanel();
+        return;
+      case "start":
+        openSetup();
+        return;
+      case "jobs": {
+        const jobs = canvas?.jobs ?? [];
+        const lines = jobs.length
+          ? jobs.map((job) => `- **${job.id}** — ${job.name ?? "Untitled job"}`)
+          : ["- Nothing captured yet. Use `/start` to name the job."];
+        pushNotice(
+          [
+            `**${jobs.length} job${jobs.length === 1 ? "" : "s"} on the canvas**`,
+            ...lines,
+            "",
+            brief?.job_statement ? `Working job: ${brief.job_statement}` : "",
+          ]
+            .filter(Boolean)
+            .join("\n"),
+        );
+        openPanel("jobmap");
+        return;
+      }
+      case "status":
+        pushNotice(
+          [
+            "**Studio status**",
+            `- Model: ${settings.model_name} at ${settings.base_url} — ${
+              llmHealth.healthy === null
+                ? "checking"
+                : llmHealth.healthy
+                  ? "reachable"
+                  : "offline"
+            }`,
+            `- MCP: ${mcpReachable ? "connected" : "offline"} (${settings.mcp_url})`,
+            `- Context: ${
+              brief ? `${brief.product_name || "named job"} — ${brief.job_statement}` : "not set"
+            }`,
+            `- Canvas: ${canvas?.jobs.length ?? 0} jobs, ${canvas?.outcomes.length ?? 0} outcomes`,
+          ].join("\n"),
+        );
+        return;
+      default:
+        return;
+    }
+  }
 
   function submit(text?: string) {
     const value = (text ?? draft).trim();
@@ -30,6 +113,18 @@ export function ChatStage() {
     }
     pinned.current = true;
     refocus.current = true;
+
+    if (isSlashCommand(value)) {
+      const token = value.split(/\s+/)[0].toLowerCase();
+      const command = STUDIO_COMMANDS.find((entry) => entry.name === token);
+      if (command) {
+        runCommand(command);
+      } else {
+        pushNotice(`Unknown command: \`${token}\`. Type \`/help\` for the full list.`);
+      }
+      return;
+    }
+
     void sendMessage(value);
   }
 
@@ -52,9 +147,14 @@ export function ChatStage() {
     }
   }, [empty]);
 
+  if (setupOpen) {
+    return <SetupConversation />;
+  }
+
   if (empty) {
     return (
       <section className="chat chat--empty" aria-label="Studio conversation">
+        <OfflineNotice />
         <div className="chat__welcome">
           <div className="chat__welcome-inner">
             <Hero onSubmit={submit} />
@@ -62,6 +162,7 @@ export function ChatStage() {
               value={draft}
               onChange={setDraft}
               onSubmit={submit}
+              onCommand={runCommand}
               streaming={streaming}
               onStop={stopStreaming}
               inputRef={inputRef}
@@ -75,6 +176,7 @@ export function ChatStage() {
 
   return (
     <section className="chat" aria-label="Studio conversation">
+      <OfflineNotice />
       <div
         ref={scrollRef}
         className="chat__scroll"
@@ -93,6 +195,7 @@ export function ChatStage() {
           value={draft}
           onChange={setDraft}
           onSubmit={submit}
+          onCommand={runCommand}
           streaming={streaming}
           onStop={stopStreaming}
           inputRef={inputRef}

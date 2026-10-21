@@ -30,7 +30,8 @@ interface HeroPill {
 }
 
 export function Hero({ onSubmit }: { onSubmit: (text: string) => void }) {
-  const { displayName, canvas, llmHealth, openPanel, streaming } = useStudio();
+  const { displayName, canvas, llmHealth, openPanel, streaming, brief, openSetup } =
+    useStudio();
   const [now, setNow] = useState(() => new Date());
   const [currentId, setCurrentId] = useState<string | null>(null);
 
@@ -49,8 +50,19 @@ export function Hero({ onSubmit }: { onSubmit: (text: string) => void }) {
         outcomeCount: outcomes,
         underservedCount: underserved,
         llmHealthy: llmHealth.healthy,
+        productName: brief?.product_name,
+        jobStatement: brief?.job_statement,
       }),
-    [now, displayName, jobs, outcomes, underserved, llmHealth.healthy],
+    [
+      now,
+      displayName,
+      jobs,
+      outcomes,
+      underserved,
+      llmHealth.healthy,
+      brief?.product_name,
+      brief?.job_statement,
+    ],
   );
 
   const current = candidates.find((candidate) => candidate.id === currentId) ?? candidates[0];
@@ -114,13 +126,16 @@ export function Hero({ onSubmit }: { onSubmit: (text: string) => void }) {
 
   return (
     <div className="hero">
-      <p className="hero__eyebrow">Living Studio</p>
+      <p className="hero__eyebrow">
+        {brief?.product_name ? `Living Studio · ${brief.product_name}` : "Living Studio"}
+      </p>
       <h1 className="hero__line" key={current?.id ?? "greeting"}>
         {current?.text ?? "Good morning"}
       </h1>
       <p className="hero__sub">
-        Think in outcomes, not tickets — I&apos;ll map the job, score what&apos;s underserved, and
-        show the impact before you build.
+        {brief?.target_user
+          ? `For ${brief.target_user}. Tell me where they get stuck, and we will turn it into a measurable outcome.`
+          : "Think in outcomes, not tickets. Tell me what you're building and I'll keep it in mind — or just start anywhere."}
       </p>
       <div className="hero__pills" aria-label="Suggested next steps">
         {pills.map((pill) => (
@@ -135,6 +150,14 @@ export function Hero({ onSubmit }: { onSubmit: (text: string) => void }) {
             {pill.label}
           </button>
         ))}
+        <button
+          type="button"
+          className="suggestion suggestion--quiet"
+          onClick={openSetup}
+          title="Tell me about your product, audience, and job"
+        >
+          {brief ? "Edit context" : "Tell me what you're building"}
+        </button>
       </div>
     </div>
   );

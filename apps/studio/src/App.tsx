@@ -25,7 +25,7 @@ function loadCollapsed(): boolean {
 }
 
 function StudioShell() {
-  const { activePanel, closePanel, openPanel, llmHealth } = useStudio();
+  const { activePanel, closePanel, openPanel, llmHealth, clearChat, closeSetup } = useStudio();
   const [desktopCollapsed, setDesktopCollapsed] = useState(loadCollapsed);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const isMobile = useMediaQuery(MOBILE_QUERY);
@@ -45,6 +45,13 @@ function StudioShell() {
     if (isMobile) {
       setDrawerOpen(false);
     }
+  }
+
+  function goHome() {
+    clearChat();
+    closePanel();
+    closeSetup();
+    setDrawerOpen(false);
   }
 
   useEffect(() => {
@@ -81,7 +88,12 @@ function StudioShell() {
 
   return (
     <div className={`studio-app${collapsed ? " studio-app--collapsed" : ""}`}>
-      <Sidebar collapsed={collapsed} onToggle={toggleDrawer} onNavigate={closeDrawer} />
+      <Sidebar
+        collapsed={collapsed}
+        onToggle={toggleDrawer}
+        onNavigate={closeDrawer}
+        onHome={goHome}
+      />
 
       {isMobile && drawerOpen && (
         <button
@@ -92,7 +104,7 @@ function StudioShell() {
         />
       )}
 
-      <main className={`stage${activePanel ? " stage--panel" : ""}`}>
+      <main className="stage">
         <header className="bar">
           <div className="bar__left">
             {collapsed && (
@@ -106,7 +118,11 @@ function StudioShell() {
                 <MenuIcon size={18} />
               </button>
             )}
-            {collapsed && <span className="bar__brand">Living Studio</span>}
+            {collapsed && (
+              <button type="button" className="bar__brand" onClick={goHome}>
+                Living Studio
+              </button>
+            )}
           </div>
           <div className="bar__right">
             <button
@@ -139,8 +155,7 @@ function StudioShell() {
         </header>
 
         <div className="stage__body">
-          <ChatStage />
-          <WorkspacePanel />
+          {activePanel ? <WorkspacePanel /> : <ChatStage />}
         </div>
       </main>
 

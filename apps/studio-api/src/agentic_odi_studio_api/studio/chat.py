@@ -13,7 +13,7 @@ from fastmcp import Client as McpClient
 from openai import AsyncOpenAI
 
 from agentic_odi_studio_api.studio.probes import check_llm_health
-from agentic_odi_studio_api.studio.schemas import ChatRequest
+from agentic_odi_studio_api.studio.schemas import ChatRequest, StudioBrief
 
 SYSTEM_PROMPT = """You are Steve Jobs and an elite Outcome-Driven Innovation (ODI) strategist assisting a Product Manager in The Living Studio.
 Your mission is to eliminate backlog paper-pushing and help the PM think exclusively in human intent, customer friction, and measurable outcomes.
@@ -25,40 +25,77 @@ Key principles:
 5. Embody clarity, focus, and causality. Strip away corporate jargon."""
 
 
-def offline_fallback(user_input: str) -> str:
-    """Intelligent grounded fallback when no LLM backend is reachable."""
+def _brief_lines(brief: StudioBrief | None) -> list[str]:
+    if brief is None:
+        return []
+    facts = [
+        ("Product", brief.product_name),
+        ("Product URL", brief.product_url),
+        ("Who it serves", brief.target_user),
+        ("Job to be done", brief.job_statement),
+        ("Core problem", brief.core_problem),
+    ]
+    return [f"- {label}: {value}" for label, value in facts if value.strip()]
+
+
+def _brief_block(brief: StudioBrief | None) -> str:
+    lines = _brief_lines(brief)
+    if not lines:
+        return ""
+    return (
+        "\n\nThe user set this context during onboarding. Treat it as given and do not "
+        "re-ask for it:\n" + "\n".join(lines)
+    )
+
+
+def offline_fallback(user_input: str, brief: StudioBrief | None = None) -> str:
+    """Deterministic, honest guidance when no LLM backend is reachable.
+
+    No fabricated customer data, no invented scores: the studio says what it can
+    do by hand and points at the surface that does it.
+    """
     lower_inp = user_input.lower()
+    context = ""
+    if brief is not None and brief.job_statement.strip():
+        context = (
+            f"\n\n**Working job:** {brief.job_statement.strip()}"
+            if not brief.product_name.strip()
+            else f"\n\n**{brief.product_name.strip()}** — {brief.job_statement.strip()}"
+        )
+
     if "guideline" in lower_inp or "framework" in lower_inp or "stage" in lower_inp:
         return (
-            "### 📖 Outcome-Driven Innovation (ODI) Process Guidelines\n\n"
-            "1. **Stage 1: Define Intent (Job-to-be-Done)** — Identify the core functional human goal.\n"
-            "2. **Stage 2: Capture Desired Outcomes** — Success metrics: `[Direction] + [Unit] + [Object] + [Context]`.\n"
-            "3. **Stage 3: Opportunity Scoring** — `Importance + max(Importance - Satisfaction, 0)`. Focus on scores > 10.\n"
-            "4. **Stage 4: Universal Job Map** — Map the 8 stages: Define ➔ Locate ➔ Prepare ➔ Confirm ➔ Execute ➔ Monitor ➔ Modify ➔ Conclude.\n\n"
-            "*(Connected in Local Studio Mode. Start your local LLM backend at `http://localhost:8001/v1` for full autonomous completions)*"
+            "### ODI, stage by stage\n\n"
+            "1. **Define the job** — the functional progress a person is trying to make.\n"
+            "2. **Capture desired outcomes** — `[direction] + [unit of measure] + [object of control] + [context]`.\n"
+            "3. **Score the opportunity** — `importance + max(importance - satisfaction, 0)`; above 10 is underserved.\n"
+            "4. **Map the job** — Define, Locate, Prepare, Confirm, Execute, Monitor, Modify, Conclude.\n\n"
+            "Type `/capture` to record an outcome, `/jobmap` to walk the phases, "
+            "and `/landscape` to see what is underserved." + context
         )
     if "simulate" in lower_inp or "bet" in lower_inp or "impact" in lower_inp:
         return (
-            "### ⚡ WYSIWYG Impact Simulation Result\n\n"
-            "- **Target Outcome**: O-1 (*Minimize time taken to propagate secrets*)\n"
-            "- **Proposed Bet**: Automated Secret Sync Daemon\n"
-            "- **Before**: 45 minutes of manual copy-paste across 400 developer pipelines.\n"
-            "- **After**: Under 30 seconds ambient zero-touch sync.\n"
-            "- **Time-to-Value Shift**: **-90% friction reduction**.\n"
-            "- **Human Impact**: 3,000 hours of developer agony eliminated every month. Build it."
+            "### Simulate the bet by hand\n\n"
+            "Open **`/impact`** and pick the outcome you want to test. The simulation "
+            "shows before/after friction; it no longer invents a result when no model "
+            "is connected." + context
         )
     if "evidence" in lower_inp or "call" in lower_inp or "quote" in lower_inp:
         return (
-            "### 🔍 Causal Lineage: Real-Time Evidence\n\n"
-            "- **Signal Source**: Gong Call #104 (Enterprise Team Alpha)\n"
-            "- **Customer Voice**: *'We lost two hours on deploy day because someone missed a database config key.'*\n"
-            "- **Telemetry**: 400 microservices impacted weekly; 14% failed build rate attributed to config drift."
+            "### Evidence needs a source\n\n"
+            "No connector is wired up, so there is no live transcript to quote. "
+            "Capture the signal you already have in **`/capture`** — the evidence field "
+            "is stored with the outcome." + context
         )
     return (
-        f'I received your intent: **"{user_input}"**.\n\n'
-        "In The Living Studio, every idea is evaluated against human outcomes rather than story points. "
-        "Notice how our highest opportunity outcome (`O-1: Minimize propagation time`) has an **Opportunity Score of 15.3**, "
-        "signaling severe market underservice. Tap **'Simulate Impact'** on the canvas or type `Simulate Auto-Sync Bet` to test causality."
+        "I can't reason about that right now — no model is reachable. "
+        "The studio still works by hand:\n\n"
+        "- `/start` — set or correct your context\n"
+        "- `/capture` — record an outcome with importance and satisfaction\n"
+        "- `/jobmap` — add or edit the steps of the job\n"
+        "- `/landscape` — review what is underserved\n\n"
+        "Type `/help` for every command, or point Settings at a local model to "
+        "bring the assistant back." + context
     )
 
 
@@ -67,7 +104,8 @@ def _sse(event: str, data: dict[str, Any]) -> str:
 
 
 def _to_openai_messages(request: ChatRequest) -> list[dict[str, Any]]:
-    messages: list[dict[str, Any]] = [{"role": "system", "content": SYSTEM_PROMPT}]
+    system_prompt = SYSTEM_PROMPT + _brief_block(request.brief)
+    messages: list[dict[str, Any]] = [{"role": "system", "content": system_prompt}]
     for message in request.messages:
         messages.append({"role": message.role, "content": message.content})
     return messages
@@ -95,7 +133,8 @@ async def stream_chat(request: ChatRequest) -> AsyncIterator[str]:
     last_user = next((m.content for m in reversed(request.messages) if m.role == "user"), "")
 
     if not healthy:
-        reply = offline_fallback(last_user)
+        yield _sse("status", {"phase": "offline"})
+        reply = offline_fallback(last_user, request.brief)
         yield _sse("delta", {"text": reply})
         yield _sse("message", {"content": reply})
         return

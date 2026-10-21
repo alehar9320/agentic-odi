@@ -4,6 +4,7 @@ import type {
   AddStepPayload,
   CanvasData,
   ChatStreamRequest,
+  CreateJobPayload,
   LlmHealth,
   McpHealth,
   StudioConfig,
@@ -27,11 +28,26 @@ async function getJson<T>(path: string): Promise<T> {
   return (await response.json()) as T;
 }
 
-async function postJson<T>(path: string, body: unknown): Promise<T> {
+async function sendJson<T>(method: "POST" | "PATCH", path: string, body: unknown): Promise<T> {
   const response = await fetch(apiUrl(path), {
-    method: "POST",
+    method,
     headers: { "Content-Type": "application/json", Accept: "application/json" },
     body: JSON.stringify(body),
+  });
+  if (!response.ok) {
+    throw new Error(await errorDetail(response));
+  }
+  return (await response.json()) as T;
+}
+
+async function postJson<T>(path: string, body: unknown): Promise<T> {
+  return sendJson<T>("POST", path, body);
+}
+
+async function deleteJson<T>(path: string): Promise<T> {
+  const response = await fetch(apiUrl(path), {
+    method: "DELETE",
+    headers: { Accept: "application/json" },
   });
   if (!response.ok) {
     throw new Error(await errorDetail(response));
@@ -68,6 +84,55 @@ export function addOutcome(
   payload: AddOutcomePayload,
 ): Promise<{ ok: boolean; result: string }> {
   return postJson<{ ok: boolean; result: string }>("/api/outcomes", payload);
+}
+
+export function createJob(
+  payload: CreateJobPayload,
+): Promise<{ ok: boolean; result: { id?: string } | string }> {
+  return postJson<{ ok: boolean; result: { id?: string } | string }>("/api/jobs", payload);
+}
+
+export function updateJob(
+  jobId: string,
+  payload: { name?: string; description?: string; mcp_url: string },
+): Promise<{ ok: boolean }> {
+  return sendJson<{ ok: boolean }>("PATCH", `/api/jobs/${encodeURIComponent(jobId)}`, payload);
+}
+
+export function deleteJob(jobId: string, mcpUrl: string): Promise<{ ok: boolean }> {
+  return deleteJson<{ ok: boolean }>(
+    `/api/jobs/${encodeURIComponent(jobId)}?mcp_url=${encodeURIComponent(mcpUrl)}`,
+  );
+}
+
+export function updateStep(
+  stepId: string,
+  payload: { name?: string; order?: number; mcp_url: string },
+): Promise<{ ok: boolean }> {
+  return sendJson<{ ok: boolean }>("PATCH", `/api/steps/${encodeURIComponent(stepId)}`, payload);
+}
+
+export function deleteStep(stepId: string, mcpUrl: string): Promise<{ ok: boolean }> {
+  return deleteJson<{ ok: boolean }>(
+    `/api/steps/${encodeURIComponent(stepId)}?mcp_url=${encodeURIComponent(mcpUrl)}`,
+  );
+}
+
+export function updateOutcome(
+  outcomeId: string,
+  payload: { statement?: string; importance?: number; satisfaction?: number; mcp_url: string },
+): Promise<{ ok: boolean }> {
+  return sendJson<{ ok: boolean }>(
+    "PATCH",
+    `/api/outcomes/${encodeURIComponent(outcomeId)}`,
+    payload,
+  );
+}
+
+export function deleteOutcome(outcomeId: string, mcpUrl: string): Promise<{ ok: boolean }> {
+  return deleteJson<{ ok: boolean }>(
+    `/api/outcomes/${encodeURIComponent(outcomeId)}?mcp_url=${encodeURIComponent(mcpUrl)}`,
+  );
 }
 
 export type ChatEventHandler = (event: RawSseEvent) => void;

@@ -15,26 +15,52 @@ const UNIVERSAL_PHASES = [
   { id: "conclude", name: "8. Conclude", desc: "Finish and store outputs" },
 ];
 
+/** Spread any number of steps across the eight phases, wrapping by order. */
+function phaseIndexFor(order: number, stepCount: number): number {
+  return Math.min(Math.max(Math.floor(((order - 1) / Math.max(stepCount, 8)) * 8), 0), 7);
+}
+
 export function JobMap() {
-  const { canvas, canvasLoading, addStep } = useStudio();
+  const {
+    canvas,
+    canvasLoading,
+    addStep,
+    updateStep,
+    deleteStep,
+    updateJob,
+    deleteJob,
+  } = useStudio();
+  const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [stepName, setStepName] = useState("");
   const [stepOrder, setStepOrder] = useState<number | null>(null);
+  const [editingStepId, setEditingStepId] = useState<string | null>(null);
+  const [editStepName, setEditStepName] = useState("");
+  const [editStepOrder, setEditStepOrder] = useState(1);
+  const [jobName, setJobName] = useState("");
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [busy, setBusy] = useState(false);
   const [selectedPhaseIndex, setSelectedPhaseIndex] = useState<number | null>(null);
 
-  const steps = canvas?.steps ?? [];
   const jobs = canvas?.jobs ?? [];
-  const activeJobId = jobs[0]?.id ?? "JOB-402";
+  const activeJob = jobs.find((job) => job.id === selectedJobId) ?? jobs[0];
+  const activeJobId = activeJob?.id ?? "";
+  const steps = (canvas?.steps ?? []).filter(
+    (step) => !activeJobId || !step.job_id || step.job_id === activeJobId,
+  );
   const defaultOrder = steps.length + 1;
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
-    if (!stepName.trim() || busy) {
+    if (!stepName.trim() || busy || !activeJobId) {
       return;
     }
     setBusy(true);
     try {
-      await addStep({ job_id: activeJobId, name: stepName.trim(), order: stepOrder ?? defaultOrder });
+      await addStep({
+        job_id: activeJobId,
+        name: stepName.trim(),
+        order: stepOrder ?? defaultOrder,
+      });
       setStepName("");
       setStepOrder(null);
     } finally {
@@ -42,29 +68,82 @@ export function JobMap() {
     }
   }
 
+  async function saveStep(stepId: string) {
+    if (!editStepName.trim()) {
+      return;
+    }
+    setBusy(true);
+    try {
+      await updateStep(stepId, { name: editStepName.trim(), order: editStepOrder });
+      setEditingStepId(null);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveJob(event: React.FormEvent) {
+    event.preventDefault();
+    if (!activeJobId || !jobName.trim()) {
+      return;
+    }
+    setBusy(true);
+    try {
+      await updateJob(activeJobId, { name: jobName.trim() });
+      setJobName("");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   // Map steps to 8 phases evenly or by order
   const stepPhaseMapping = useMemo(() => {
-    const buckets: Array<{ phase: typeof UNIVERSAL_PHASES[0]; steps: typeof steps }> = UNIVERSAL_PHASES.map((phase) => ({
-      phase,
-      steps: [],
-    }));
+    const buckets: Array<{ phase: (typeof UNIVERSAL_PHASES)[0]; steps: typeof steps }> =
+      UNIVERSAL_PHASES.map((phase) => ({ phase, steps: [] }));
 
     steps.forEach((step, idx) => {
       const order = step.order ?? idx + 1;
-      // Distribute 1..8 or wrap around
-      const phaseIdx = Math.min(Math.max(Math.floor(((order - 1) / Math.max(steps.length, 8)) * 8), 0), 7);
-      buckets[phaseIdx].steps.push(step);
+      buckets[phaseIndexFor(order, steps.length)].steps.push(step);
     });
 
     return buckets;
   }, [steps]);
 
+  const visibleSteps =
+    selectedPhaseIndex === null
+      ? steps
+      : steps.filter((step, idx) => {
+          const order = step.order ?? idx + 1;
+          return phaseIndexFor(order, steps.length) === selectedPhaseIndex;
+        });
+
   return (
     <section className="fade-in">
-      <h2 className="section-title">Universal Job Map (8 Process Phases)</h2>
+      <p className="section-title">Universal Job Map (8 Process Phases)</p>
       <p className="caption">
-        Ulwick Universal Job Steps: Deconstruct human execution into 8 predictable phases to uncover latent friction.
+        Ulwick Universal Job Steps: Deconstruct human execution into 8 predictable phases to uncover
+        latent friction.
       </p>
+
+      {jobs.length > 1 && (
+        <div className="field">
+          <label htmlFor="jm-job">Job</label>
+          <select
+            id="jm-job"
+            className="select"
+            value={activeJobId}
+            onChange={(event) => {
+              setSelectedJobId(event.target.value);
+              setEditingStepId(null);
+            }}
+          >
+            {jobs.map((job) => (
+              <option key={job.id} value={job.id}>
+                {job.id}: {job.name ?? "Untitled job"}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
       {/* Visual Phase Pipeline Flow */}
       <div
@@ -89,13 +168,13 @@ export function JobMap() {
                 background: isSelected
                   ? "rgba(129, 140, 248, 0.2)"
                   : hasSteps
-                  ? "rgba(255, 255, 255, 0.04)"
-                  : "rgba(255, 255, 255, 0.01)",
+                    ? "rgba(255, 255, 255, 0.04)"
+                    : "rgba(255, 255, 255, 0.01)",
                 border: isSelected
                   ? "1px solid var(--studio-indigo)"
                   : hasSteps
-                  ? "1px solid var(--studio-border)"
-                  : "1px dashed rgba(255, 255, 255, 0.05)",
+                    ? "1px solid var(--studio-border)"
+                    : "1px dashed rgba(255, 255, 255, 0.05)",
                 borderRadius: 8,
                 padding: "10px 12px",
                 cursor: "pointer",
@@ -103,10 +182,24 @@ export function JobMap() {
                 position: "relative",
               }}
             >
-              <div style={{ fontSize: "0.78rem", fontWeight: 700, color: hasSteps ? "var(--studio-text)" : "var(--studio-muted)" }}>
+              <div
+                style={{
+                  fontSize: "0.78rem",
+                  fontWeight: 700,
+                  color: hasSteps ? "var(--studio-text)" : "var(--studio-muted)",
+                }}
+              >
                 {phase.name}
               </div>
-              <div style={{ fontSize: "0.7rem", color: "var(--studio-muted)", marginTop: 2, height: 28, overflow: "hidden" }}>
+              <div
+                style={{
+                  fontSize: "0.7rem",
+                  color: "var(--studio-muted)",
+                  marginTop: 2,
+                  height: 28,
+                  overflow: "hidden",
+                }}
+              >
                 {phase.desc}
               </div>
               <div
@@ -138,14 +231,11 @@ export function JobMap() {
         <GhostJobSteps />
       ) : steps.length ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {steps
-            .filter((_, idx) => {
-              if (selectedPhaseIndex === null) return true;
-              const order = steps[idx].order ?? idx + 1;
-              const phaseIdx = Math.min(Math.max(Math.floor(((order - 1) / Math.max(steps.length, 8)) * 8), 0), 7);
-              return phaseIdx === selectedPhaseIndex;
-            })
-            .map((step, index) => (
+          {visibleSteps.map((step) => {
+            const index = steps.indexOf(step);
+            const order = step.order ?? index + 1;
+
+            return (
               <div
                 className="step-row fade-in"
                 key={step.id ?? index}
@@ -153,27 +243,101 @@ export function JobMap() {
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "space-between",
+                  gap: 12,
                   background: "var(--studio-surface)",
                   border: "1px solid var(--studio-border)",
                   borderRadius: 8,
                   padding: "10px 14px",
                 }}
               >
-                <div>
-                  <span style={{ color: "var(--studio-indigo)", fontWeight: 700, marginRight: 8 }}>
-                    Step {step.order ?? ""}
-                  </span>
-                  <span style={{ color: "var(--studio-text)" }}>{step.name ?? ""}</span>
-                </div>
-                <span style={{ fontSize: "0.78rem", color: "var(--studio-muted)", fontStyle: "italic" }}>
-                  Phase {Math.min(Math.max(Math.floor((((step.order ?? index + 1) - 1) / Math.max(steps.length, 8)) * 8) + 1, 1), 8)}
-                </span>
+                {editingStepId === step.id ? (
+                  <div className="step__edit">
+                    <input
+                      className="input"
+                      aria-label={`Step ${index + 1} name`}
+                      value={editStepName}
+                      onChange={(event) => setEditStepName(event.target.value)}
+                    />
+                    <input
+                      className="input input--order"
+                      type="number"
+                      min={1}
+                      max={20}
+                      aria-label={`Step ${index + 1} position`}
+                      value={editStepOrder}
+                      onChange={(event) => setEditStepOrder(Number(event.target.value))}
+                    />
+                    <button
+                      type="button"
+                      className="quiet-action"
+                      disabled={busy}
+                      onClick={() => void saveStep(step.id ?? "")}
+                    >
+                      Save
+                    </button>
+                    <button
+                      type="button"
+                      className="quiet-action"
+                      onClick={() => setEditingStepId(null)}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <div>
+                      <span
+                        style={{ color: "var(--studio-indigo)", fontWeight: 700, marginRight: 8 }}
+                      >
+                        Step {order}
+                      </span>
+                      <span style={{ color: "var(--studio-text)" }}>{step.name ?? ""}</span>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <span
+                        style={{
+                          fontSize: "0.78rem",
+                          color: "var(--studio-muted)",
+                          fontStyle: "italic",
+                        }}
+                      >
+                        Phase {phaseIndexFor(order, steps.length) + 1}
+                      </span>
+                      {step.id && (
+                        <span className="step__actions">
+                          <button
+                            type="button"
+                            className="quiet-action"
+                            onClick={() => {
+                              setEditingStepId(step.id ?? null);
+                              setEditStepName(step.name ?? "");
+                              setEditStepOrder(order);
+                            }}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            className="quiet-action"
+                            disabled={busy}
+                            onClick={() => void deleteStep(step.id ?? "")}
+                          >
+                            Remove
+                          </button>
+                        </span>
+                      )}
+                    </div>
+                  </>
+                )}
               </div>
-            ))}
+            );
+          })}
         </div>
       ) : (
         <p className="toast toast--info" role="status">
-          No job steps registered yet. Ask the AI assistant to decompose the active job!
+          {selectedPhaseIndex === null
+            ? "No job steps registered yet. Ask the AI assistant to decompose the active job, or add the first one below."
+            : "No steps land in this phase yet."}
         </p>
       )}
 
@@ -183,7 +347,9 @@ export function JobMap() {
         </summary>
         <form onSubmit={submit} style={{ marginTop: 12 }}>
           <div className="studio-field">
-            <label htmlFor="step-name">Step Description (e.g., &apos;3. Prepare secrets payload&apos;)</label>
+            <label htmlFor="step-name">
+              Step Description (e.g., &apos;3. Prepare secrets payload&apos;)
+            </label>
             <input
               id="step-name"
               className="studio-input"
@@ -208,6 +374,44 @@ export function JobMap() {
           </button>
         </form>
       </details>
+
+      {activeJobId && (
+        <details className="disclosure" style={{ marginTop: 12 }}>
+          <summary>Manage this job</summary>
+          <form onSubmit={saveJob} className="form">
+            <div className="field">
+              <label htmlFor="jm-rename">Rename job</label>
+              <input
+                id="jm-rename"
+                className="input"
+                placeholder={activeJob?.name ?? "Job name"}
+                value={jobName}
+                onChange={(event) => setJobName(event.target.value)}
+              />
+            </div>
+            <button type="submit" className="button button--ghost" disabled={busy || !jobName.trim()}>
+              Save name
+            </button>
+          </form>
+          <div className="settings__actions">
+            <button
+              type="button"
+              className="button button--danger"
+              disabled={busy}
+              onClick={() => {
+                if (!confirmDelete) {
+                  setConfirmDelete(true);
+                  return;
+                }
+                setConfirmDelete(false);
+                void deleteJob(activeJobId);
+              }}
+            >
+              {confirmDelete ? "Confirm delete job" : "Delete job"}
+            </button>
+          </div>
+        </details>
+      )}
     </section>
   );
 }

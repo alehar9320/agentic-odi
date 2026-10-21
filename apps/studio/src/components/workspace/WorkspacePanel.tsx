@@ -1,10 +1,10 @@
 import { useStudio } from "../../state/StudioContext";
-import { CloseIcon } from "../icons";
+import { ArrowLeftIcon } from "../icons";
 import { findPanel } from "./panels";
 
 /**
- * The secondary surface: classic UI (landscape, job map, impact, evidence,
- * capture, settings) opening beside the conversation, never replacing it.
+ * A workspace surface takes the whole stage while it is open. The conversation
+ * is one click away, and nothing is squeezed into a narrow side column.
  */
 export function WorkspacePanel() {
   const { activePanel, closePanel } = useStudio();
@@ -16,23 +16,29 @@ export function WorkspacePanel() {
   const panel = findPanel(activePanel);
 
   return (
-    <aside className="panel" aria-label={panel.title} key={panel.id}>
+    <section className="panel" aria-label={panel.title} key={panel.id}>
       <header className="panel__head">
+        <button type="button" className="back" onClick={closePanel}>
+          <ArrowLeftIcon size={16} />
+          Back to conversation
+        </button>
         <div className="panel__heading">
           <span className="panel__icon">{panel.icon}</span>
           <div className="panel__heading-text">
-            {/* The panel content owns the document outline (both canvas
-                panels render their own <h2>), so the chrome title is a label,
-                not a second heading with the same accessible name. */}
-            <p className="panel__title">{panel.title}</p>
+            {/* The panel chrome owns the heading. Canvas content that repeats
+                the same title renders it as a label, so no panel exposes two
+                headings with the same accessible name. */}
+            <h2 className="panel__title">{panel.title}</h2>
             <p className="panel__blurb">{panel.blurb}</p>
           </div>
         </div>
-        <button type="button" className="icon-button" aria-label="Close panel" onClick={closePanel}>
-          <CloseIcon />
-        </button>
+        <span className="panel__hint">
+          <kbd>Esc</kbd> to return
+        </span>
       </header>
-      <div className="panel__body">{panel.render()}</div>
-    </aside>
+      <div className="panel__body">
+        <div className="panel__content">{panel.render()}</div>
+      </div>
+    </section>
   );
 }

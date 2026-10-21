@@ -37,9 +37,47 @@ class AddOutcomeRequest(BaseModel):
     satisfaction: float
 
 
+class CreateJobRequest(BaseModel):
+    """Create a Job by hand, with or without the model."""
+
+    name: str = Field(min_length=1)
+    description: str | None = None
+    mcp_url: str = ""
+
+
+class UpdateJobRequest(BaseModel):
+    name: str | None = None
+    description: str | None = None
+    mcp_url: str = ""
+
+
+class UpdateStepRequest(BaseModel):
+    name: str | None = None
+    order: int | None = None
+    mcp_url: str = ""
+
+
+class UpdateOutcomeRequest(BaseModel):
+    statement: str | None = None
+    importance: float | None = None
+    satisfaction: float | None = None
+    mcp_url: str = ""
+
+
+class StudioBrief(BaseModel):
+    """The user's context, captured during first-run onboarding."""
+
+    product_name: str = ""
+    product_url: str = ""
+    target_user: str = ""
+    job_statement: str = ""
+    core_problem: str = ""
+
+
 class ChatRequest(BaseModel):
     base_url: str
     api_key: str = ""
     model: str
     mcp_url: str
     messages: list[ChatMessage] = Field(default_factory=list)
+    brief: StudioBrief | None = None

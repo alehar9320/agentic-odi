@@ -1,12 +1,23 @@
 import { useState } from "react";
 
-import { formatOpportunityScore, isUnderserved, opportunityPill } from "../../lib/odi";
+import {
+  formatOpportunityScore,
+  isUnderserved,
+  opportunityPill,
+  opportunityScore,
+} from "../../lib/odi";
 import { useStudio } from "../../state/StudioContext";
 import type { Outcome } from "../../types";
 
 export function OutcomeCard({ outcome }: { outcome: Outcome }) {
-  const { requestSimulate, sendMessage, closePanel } = useStudio();
+  const { requestSimulate, sendMessage, closePanel, deleteOutcome, updateOutcome } =
+    useStudio();
   const [showEvidence, setShowEvidence] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [importance, setImportance] = useState(outcome.importance ?? 5);
+  const [satisfaction, setSatisfaction] = useState(outcome.satisfaction ?? 5);
+  const [saving, setSaving] = useState(false);
 
   const opp = outcome.opportunity_score;
   const statement = outcome.statement ?? "Untitled outcome";
@@ -37,6 +48,59 @@ export function OutcomeCard({ outcome }: { outcome: Outcome }) {
         </p>
       )}
 
+      {editing && (
+        <form
+          className="card__edit"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (!outcome.id || saving) {
+              return;
+            }
+            setSaving(true);
+            void updateOutcome(outcomeId, { importance, satisfaction }).finally(() => {
+              setSaving(false);
+              setEditing(false);
+            });
+          }}
+        >
+          <label className="card__slider" htmlFor={`importance-${outcomeId}`}>
+            Importance · {importance.toFixed(1)}
+            <input
+              id={`importance-${outcomeId}`}
+              type="range"
+              min={1}
+              max={10}
+              step={0.1}
+              value={importance}
+              onChange={(event) => setImportance(Number(event.target.value))}
+            />
+          </label>
+          <label className="card__slider" htmlFor={`satisfaction-${outcomeId}`}>
+            Satisfaction · {satisfaction.toFixed(1)}
+            <input
+              id={`satisfaction-${outcomeId}`}
+              type="range"
+              min={1}
+              max={10}
+              step={0.1}
+              value={satisfaction}
+              onChange={(event) => setSatisfaction(Number(event.target.value))}
+            />
+          </label>
+          <p className="score-preview">
+            Opportunity <b>{opportunityScore(importance, satisfaction).toFixed(2)}</b>
+          </p>
+          <div className="card__edit-actions">
+            <button type="submit" className="button button--ghost" disabled={saving}>
+              {saving ? "Saving…" : "Save scores"}
+            </button>
+            <button type="button" className="quiet-action" onClick={() => setEditing(false)}>
+              Cancel
+            </button>
+          </div>
+        </form>
+      )}
+
       <div className="card__actions">
         <button
           type="button"
@@ -49,6 +113,16 @@ export function OutcomeCard({ outcome }: { outcome: Outcome }) {
         <button type="button" className="quiet-action" onClick={() => requestSimulate(outcomeId)}>
           Simulate
         </button>
+        {outcome.id && (
+          <button
+            type="button"
+            className="quiet-action"
+            aria-expanded={editing}
+            onClick={() => setEditing((prev) => !prev)}
+          >
+            {editing ? "Stop editing" : "Adjust scores"}
+          </button>
+        )}
         <button
           type="button"
           className="quiet-action"
@@ -59,6 +133,23 @@ export function OutcomeCard({ outcome }: { outcome: Outcome }) {
         >
           Ask
         </button>
+        {outcome.id && (
+          <button
+            type="button"
+            className="quiet-action quiet-action--danger"
+            disabled={!outcome.id}
+            onClick={() => {
+              if (!confirmDelete) {
+                setConfirmDelete(true);
+                return;
+              }
+              setConfirmDelete(false);
+              void deleteOutcome(outcomeId);
+            }}
+          >
+            {confirmDelete ? "Confirm remove" : "Remove"}
+          </button>
+        )}
       </div>
     </article>
   );
