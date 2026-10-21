@@ -3,7 +3,7 @@
   "checkpoint_id": "01M5FQ721N53H76EVNZK62TKB2",
   "strategy": "manual-commit",
   "branch": "fix/error-handling-hardening",
-  "checkpoints_count": 11,
+  "checkpoints_count": 12,
   "files_touched": [
     ".github/dependabot.yml",
     ".github/workflows/tauri-release.yml",
@@ -38,6 +38,7 @@
     "apps/studio/src/components/chat/ChatCopilot.tsx",
     "apps/studio/src/features/flags.test.ts",
     "apps/studio/src/onboarding/FirstRunWizard.test.tsx",
+    "apps/studio/src/onboarding/FirstRunWizard.tsx",
     "apps/studio/src/onboarding/OnboardingProvider.tsx",
     "apps/studio/src/onboarding/content.ts",
     "apps/studio/src/onboarding/context.ts",
@@ -46,6 +47,7 @@
     "apps/studio/src/onboarding/machine.test.ts",
     "apps/studio/src/onboarding/machine.ts",
     "apps/studio/src/onboarding/onboarding.css",
+    "apps/studio/src/onboarding/steps.tsx",
     "apps/studio/src/onboarding/storage.ts",
     "apps/studio/src/state/StudioContext.tsx",
     "apps/studio/src/styles/theme.css",
@@ -128,6 +130,13 @@
       "compact_transcript": "/8/transcript.jsonl",
       "content_hash": "/8/content_hash.txt",
       "prompt": "/8/prompt.txt"
+    },
+    {
+      "metadata": "/9/metadata.json",
+      "transcript": "/9/full.jsonl",
+      "compact_transcript": "/9/transcript.jsonl",
+      "content_hash": "/9/content_hash.txt",
+      "prompt": "/9/prompt.txt"
     }
   ],
   "token_usage": {
