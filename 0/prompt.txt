@@ -1,0 +1,9 @@
+Your objective is to optimize the experience so that we hide away complexities like underlying connecting, local-tool-model, MCP, etc. We should still have that available so an advanced user can find it, and it sohuld properly reflet status, but it should not clutter the general experience. Optimize for what Steve Jobs would have approved. You're done when I have the changes available in a new topic branch PR and its CI is green.
+
+---
+
+LGTME. Let's go.
+
+---
+
+LGTME. Let's go.
