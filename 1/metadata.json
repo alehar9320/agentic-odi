@@ -1,0 +1,26 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M5ENYJ7QVN48KXJJWXQTMP60",
+  "session_id": "ses_ea2c0d0b4ffe5pFu21zQZXTDvE",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-21T07:31:35.848488752Z",
+  "branch": "fix/website-hardening",
+  "checkpoints_count": 1,
+  "files_touched": [],
+  "agent": "OpenCode",
+  "model": "poolside/laguna-s-2.1:free",
+  "turn_id": "bc107a7466a8",
+  "checkpoint_transcript_start": 92,
+  "transcript_lines_at_start": 92,
+  "compact_transcript_start": 92,
+  "token_usage": {
+    "input_tokens": 182213,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 5362784,
+    "output_tokens": 7955,
+    "api_call_count": 77
+  },
+  "session_metrics": {
+    "turn_count": 1
+  }
+}
