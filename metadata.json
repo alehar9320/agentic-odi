@@ -3,7 +3,7 @@
   "checkpoint_id": "01M5FGC40G1Q9YMBCED6ZV2W31",
   "strategy": "manual-commit",
   "branch": "pr56/rebased",
-  "checkpoints_count": 5,
+  "checkpoints_count": 6,
   "files_touched": [
     "README.md"
   ],
@@ -28,6 +28,13 @@
       "compact_transcript": "/2/transcript.jsonl",
       "content_hash": "/2/content_hash.txt",
       "prompt": "/2/prompt.txt"
+    },
+    {
+      "metadata": "/3/metadata.json",
+      "transcript": "/3/full.jsonl",
+      "compact_transcript": "/3/transcript.jsonl",
+      "content_hash": "/3/content_hash.txt",
+      "prompt": ""
     }
   ],
   "token_usage": {
