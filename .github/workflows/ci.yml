@@ -307,22 +307,24 @@ jobs:
         run: npm ci
         working-directory: apps/studio
 
-      - name: Configure updater artifacts
-        working-directory: apps/studio
-        env:
-          SIGNING_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-        run: |
-          if [ -z "$SIGNING_KEY" ]; then
-            echo 'TAURI_CONFIG={"bundle":{"createUpdaterArtifacts":false}}' >> "$GITHUB_ENV"
-            echo "No TAURI_SIGNING_PRIVATE_KEY provided — building without signed updater artifacts."
-          fi
-
+      # Dependabot PRs cannot read repository secrets, so the signing key is
+      # empty there. Export it only when present and disable updater artifacts
+      # otherwise; passing an empty key makes the bundler try (and fail) to
+      # decode it.
       - name: Build desktop bundle
         working-directory: apps/studio
         env:
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        run: npm run tauri build
+          SIGNING_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          SIGNING_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          if [ -n "$SIGNING_KEY" ]; then
+            export TAURI_SIGNING_PRIVATE_KEY="$SIGNING_KEY"
+            export TAURI_SIGNING_PRIVATE_KEY_PASSWORD="$SIGNING_KEY_PASSWORD"
+            npm run tauri -- build
+          else
+            echo "No TAURI_SIGNING_PRIVATE_KEY provided — building without signed updater artifacts."
+            npm run tauri -- build --config '{"bundle":{"createUpdaterArtifacts":false}}'
+          fi
 
       - name: Upload desktop bundles
         uses: actions/upload-artifact@v7
