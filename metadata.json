@@ -3,7 +3,7 @@
   "checkpoint_id": "01M5FRC3HZQWTJG7RT8N6DK6JR",
   "strategy": "manual-commit",
   "branch": "fix/github-pages-deploy",
-  "checkpoints_count": 5,
+  "checkpoints_count": 6,
   "files_touched": [
     ".gitignore"
   ],
@@ -27,6 +27,13 @@
       "transcript": "/2/full.jsonl",
       "compact_transcript": "/2/transcript.jsonl",
       "content_hash": "/2/content_hash.txt",
+      "prompt": ""
+    },
+    {
+      "metadata": "/3/metadata.json",
+      "transcript": "/3/full.jsonl",
+      "compact_transcript": "/3/transcript.jsonl",
+      "content_hash": "/3/content_hash.txt",
       "prompt": ""
     }
   ],
