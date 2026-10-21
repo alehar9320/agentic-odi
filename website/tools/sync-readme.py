@@ -36,32 +36,16 @@ def _extract_title(text: str) -> str:
 
 def _extract_description(text: str) -> str:
     lines = text.splitlines()
-    in_code_block = False
     for line in lines:
         stripped = line.strip()
-        if stripped.startswith("```"):
-            in_code_block = not in_code_block
-            continue
         if (
             stripped
             and not stripped.startswith(">")
             and not stripped.startswith("---")
-            and not stripped.startswith("#")
-            and not stripped.startswith("<")
-            and not stripped.startswith("[")
-            and not in_code_block
+            and not stripped.startswith("##")
         ):
-            return _strip_markdown(stripped)
+            return stripped
     return "Experimental MCP server for Outcome-Driven Innovation"
-
-
-def _strip_markdown(text: str) -> str:
-    import re
-
-    text = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", text)
-    text = re.sub(r"\*\*([^\*]+)\*\*", r"\1", text)
-    text = re.sub(r"\*([^\*]+)\*", r"\1", text)
-    return text
 
 
 def _extract_status(text: str):
@@ -158,7 +142,7 @@ def generate() -> None:
     html_lines.append(
         '      <blockquote>"Agents fluent in everything, grounded in nothing." — A model will confidently invent your customer.</blockquote>'
     )
-    html_lines.append("      <p>Add it up and the roadmap isn't a plan. It's a guess.</p>")
+    html_lines.append("      <p>Add it up and the roadmap isnt a plan. Its a guess.</p>")
     html_lines.append("    </section>")
 
     # Insight section
@@ -203,6 +187,15 @@ def generate() -> None:
     html_lines.append("      <ol>")
     for step in how_steps:
         html_lines.append(f"        <li><strong>{step}</strong></li>")
+    html_lines.append(
+        "        <li><strong>Capture</strong> — jobs, steps, and desired outcomes with importance/satisfaction scores, via CLI, connectors, or The Living Studio.</li>"
+    )
+    html_lines.append(
+        "        <li><strong>Query</strong> — agents call MCP tools for job maps and opportunity scores at decision time, local or hosted.</li>"
+    )
+    html_lines.append(
+        "        <li><strong>Steer</strong> — The Living Studio shows the Opportunity Landscape, Universal Job Map, and Impact Simulation so the team decides from the same picture.</li>"
+    )
     html_lines.append("      </ol>")
     html_lines.append("      <figure>")
     html_lines.append(
@@ -210,7 +203,7 @@ def generate() -> None:
     )
     html_lines.append('          <rect width="200" height="80" fill="#f5f5f7" rx="999"/>')
     html_lines.append('          <g fill="#0071e3">')
-    html_lines.append('            <rect x="20" y="10" width="40" height="30" rx="3"/>')
+    html_lines.append('            <rect x="20" y="10" width "40" height="30" rx="3"/>')
     html_lines.append('            <rect x="80" y="20" width="50" height="20" rx="3"/>')
     html_lines.append('            <rect x="150" y="10" width="40" height="30" rx="3"/>')
     html_lines.append("          </g>")
@@ -228,20 +221,17 @@ def generate() -> None:
     html_lines.append('    <section id="run">')
     html_lines.append("      <h2>Run it in 60 seconds.</h2>")
     html_lines.append(
-        '      <pre><code>git clone https://github.com/alehar9320/agentic-odi.git\ncd agentic-odi\nuv sync --all-packages\npython scripts/dev.py</code><button class="copy_btn" type="button">Copy</button></pre>'
+        "      <pre><code>git clone https://github.com/alehar9320/agentic-odi.git\ncd agentic-odi\nuv sync --all-packages\npython scripts/dev.py</code></pre>"
     )
     html_lines.append(
         "      <p>Endpoint chips: MCP http://localhost:8000/mcp · Studio http://localhost:8100</p>"
-    )
-    html_lines.append(
-        '      <p><strong>Hosted Studio:</strong> <a href="https://agentic-odi.alehar.workers.dev/">agentic-odi.alehar.workers.dev</a> (experimental UI; live data needs the sidecar)</p>'
     )
     html_lines.append("      <p>MCP client config snippet:</p>")
     html_lines.append("      <pre><code>{")
     html_lines.append('  "mcpServers": {')
     html_lines.append('    "agentic-odi": { "url": "http://localhost:8000/mcp" }')
     html_lines.append("  }")
-    html_lines.append('}</code><button class="copy_btn" type="button">Copy</button></pre>')
+    html_lines.append("}</code></p>")
     html_lines.append(
         '      <p>Hosted credentials come from the maintainers — <a href="https://github.com/alehar9320/agentic-odi/issues">open an issue</a>. <strong>requires a free Prefect account</strong>.</p>'
     )
@@ -256,7 +246,7 @@ def generate() -> None:
     if no_dates_text:
         html_lines.append(f"      <p>{no_dates_text}</p>")
     html_lines.append(
-        "      <p><strong>What's next:</strong> Curated from the README roadmap: map ingested evidence onto ODI artifacts, more connector kinds, ODI schema definition, context tooling, persistence layer, agentic integration.</p>"
+        "      <p><strong>Whats next:</strong> Curated from the README roadmap: map ingested evidence onto ODI artifacts, more connector kinds, ODI schema definition, context tooling, persistence layer, agentic integration.</p>"
     )
     html_lines.append(
         '      <p>Questions? <a href="https://github.com/alehar9320/agentic-odi/issues">Open an issue</a>.</p>'

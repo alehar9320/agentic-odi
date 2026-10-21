@@ -20,7 +20,6 @@ from agentic_odi_connectors.models import (
     McpConnectorSettings,
     RestConnectorSettings,
 )
-from agentic_odi_connectors.paths import config_path
 from agentic_odi_connectors.protocol import Connector
 from agentic_odi_connectors.registry import (
     ConnectorNotFoundError,
@@ -50,7 +49,6 @@ __all__ = [
     "UnknownConnectorKindError",
     "UnknownPresetError",
     "build_connector",
-    "config_path",
     "connector_config_from_preset",
     "drafts_from_batch",
     "get_default_sink",

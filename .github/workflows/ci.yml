@@ -92,7 +92,7 @@ jobs:
       # One upload per run is enough; the 3.12 report is the canonical one.
       - name: Upload coverage to Codecov
         if: ${{ matrix.python-version == '3.12' }}
-        uses: codecov/codecov-action@v7
+        uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml
@@ -220,7 +220,7 @@ jobs:
         working-directory: apps/studio
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@v6
         with:
           node-version: "lts/*"
           cache: npm
@@ -291,7 +291,7 @@ jobs:
           sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file \
             libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev patchelf
 
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@v6
         with:
           node-version: "lts/*"
           cache: npm
@@ -307,24 +307,22 @@ jobs:
         run: npm ci
         working-directory: apps/studio
 
-      # Dependabot PRs cannot read repository secrets, so the signing key is
-      # empty there. Export it only when present and disable updater artifacts
-      # otherwise; passing an empty key makes the bundler try (and fail) to
-      # decode it.
-      - name: Build desktop bundle
+      - name: Configure updater artifacts
         working-directory: apps/studio
         env:
           SIGNING_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          SIGNING_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: |
-          if [ -n "$SIGNING_KEY" ]; then
-            export TAURI_SIGNING_PRIVATE_KEY="$SIGNING_KEY"
-            export TAURI_SIGNING_PRIVATE_KEY_PASSWORD="$SIGNING_KEY_PASSWORD"
-            npm run tauri -- build
-          else
+          if [ -z "$SIGNING_KEY" ]; then
+            echo 'TAURI_CONFIG={"bundle":{"createUpdaterArtifacts":false}}' >> "$GITHUB_ENV"
             echo "No TAURI_SIGNING_PRIVATE_KEY provided — building without signed updater artifacts."
-            npm run tauri -- build --config '{"bundle":{"createUpdaterArtifacts":false}}'
           fi
+
+      - name: Build desktop bundle
+        working-directory: apps/studio
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: npm run tauri build
 
       - name: Upload desktop bundles
         uses: actions/upload-artifact@v7

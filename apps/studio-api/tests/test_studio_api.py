@@ -180,9 +180,9 @@ def test_canvas_falls_back_to_seed_when_mcp_unreachable() -> None:
 @pytest.mark.parametrize(
     ("prompt", "expected"),
     [
-        ("Give me the ODI Stage-by-Stage guidelines.", "ODI, stage by stage"),
-        ("Simulate the impact of an Auto-Sync Agent.", "Simulate the bet by hand"),
-        ("Show me the evidence from a customer call.", "Evidence needs a source"),
+        ("Give me the ODI Stage-by-Stage guidelines.", "Stage 1"),
+        ("Simulate the impact of an Auto-Sync Agent.", "WYSIWYG Impact Simulation Result"),
+        ("Show me the evidence from a customer call.", "Causal Lineage"),
     ],
 )
 def test_chat_offline_fallbacks_stream_deltas_and_message(prompt: str, expected: str) -> None:
@@ -196,13 +196,12 @@ def test_chat_offline_fallbacks_stream_deltas_and_message(prompt: str, expected:
     assert streamed == content
 
 
-def test_chat_offline_default_points_at_manual_work() -> None:
+def test_chat_offline_default_echoes_intent() -> None:
     events = _stream("/api/chat", _chat_body("hello world"))
 
     content = json.loads(events["message"][-1])["content"]
-    assert "no model is reachable" in content
-    assert "/capture" in content
-    assert "/help" in content
+    assert '"hello world"' in content
+    assert "Opportunity Score of 15.3" in content
 
 
 def _delta_chunk(content: str | None = None, tool_calls: list[Any] | None = None) -> Any:

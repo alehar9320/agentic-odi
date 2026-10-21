@@ -176,4 +176,3 @@ cython_debug/
 .entire/tmp/
 .freebuff/
 .qodo/
-node_modules/

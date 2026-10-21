@@ -3,20 +3,19 @@ import { useMemo, useState } from "react";
 import { useStudio } from "../../state/StudioContext";
 
 export function ImpactSim() {
-  const { canvas, sendMessage, pushToast, pendingSimOutcome, clearPendingSimOutcome, closePanel } =
-    useStudio();
+  const { canvas, sendMessage, pushToast, pendingSimOutcome, clearPendingSimOutcome } = useStudio();
 
   const outcomes = useMemo(() => canvas?.outcomes ?? [], [canvas]);
   const options = useMemo(
     () =>
       outcomes.map(
-        (outcome) => `${outcome.id ?? "O"}: ${outcome.statement ?? "Untitled outcome"}`,
+        (outcome) => `${outcome.id ?? "O"}: ${outcome.statement ?? "Untitled Outcome"}`,
       ),
     [outcomes],
   );
 
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
-  const [bet, setBet] = useState("Automated secret sync daemon (zero-touch)");
+  const [bet, setBet] = useState("Automated Secret Sync Daemon (Zero-Touch Ambient Sync)");
 
   const pendingOption = useMemo(
     () =>
@@ -26,8 +25,7 @@ export function ImpactSim() {
     [pendingSimOutcome, options],
   );
   const selected =
-    pendingOption ??
-    (selectedOption && options.includes(selectedOption) ? selectedOption : options[0] ?? "");
+    pendingOption ?? (selectedOption && options.includes(selectedOption) ? selectedOption : options[0] ?? "");
 
   function onSelect(value: string) {
     setSelectedOption(value);
@@ -37,8 +35,6 @@ export function ImpactSim() {
   }
 
   async function declare() {
-    // Hand the stage back to the conversation so the reply is visible.
-    closePanel();
     await sendMessage(
       `Draft a Product Decision Record (PDR) for approved bet: '${bet}' target outcome '${selected}'.`,
     );
@@ -46,72 +42,117 @@ export function ImpactSim() {
   }
 
   return (
-    <section className="stack">
-      <div className="field">
-        <label htmlFor="sim-outcome">Target outcome</label>
+    <section>
+      <h2 className="section-title">WYSIWYG of Human Impact</h2>
+      <p className="caption">
+        What You See Is What They Experience. Simulate the collapse of human friction before writing
+        code.
+      </p>
+
+      <div className="studio-field">
+        <label htmlFor="sim-outcome">Target Desired Outcome</label>
         <select
           id="sim-outcome"
-          className="select"
+          className="studio-select"
           value={selected}
           onChange={(event) => onSelect(event.target.value)}
         >
-          {options.length ? (
-            options.map((option) => (
-              <option key={option} value={option}>
-                {option}
-              </option>
-            ))
-          ) : (
-            <option value="">No outcomes captured yet</option>
-          )}
+          {options.map((option) => (
+            <option key={option} value={option}>
+              {option}
+            </option>
+          ))}
         </select>
       </div>
 
-      <div className="field">
-        <label htmlFor="sim-bet">Bet you want to test</label>
+      <div className="studio-field">
+        <label htmlFor="sim-bet">Feature Bet / Concept</label>
         <input
           id="sim-bet"
-          className="input"
+          className="studio-input"
           value={bet}
           onChange={(event) => setBet(event.target.value)}
         />
       </div>
 
-      <div className="before-after">
-        <div className="compare compare--before">
-          <span className="compare__label">Before</span>
-          <ul>
+      <h3 className="section-title" style={{ fontSize: "0.95rem" }}>
+        Reality Simulation Preview
+      </h3>
+      <div className="studio-form-grid">
+        <div
+          className="fade-in"
+          style={{
+            background: "rgba(239, 68, 68, 0.08)",
+            border: "1px solid rgba(239, 68, 68, 0.2)",
+            padding: 14,
+            borderRadius: 8,
+          }}
+        >
+          <span
+            className="studio-pill"
+            style={{ background: "rgba(239,68,68,0.2)", color: "#f87171" }}
+          >
+            BEFORE (Current Reality)
+          </span>
+          <ul style={{ marginTop: 8, fontSize: "0.88rem", color: "#cbd5e1" }}>
             <li>
-              <b>45 minutes</b> of manual copy-paste across environments.
+              <b>45 minutes</b> manual copy-paste across staging and production.
             </li>
             <li>
-              <b>14%</b> of deploys fail from configuration drift.
+              <b>14% deploy failure</b> caused by key configuration drift.
             </li>
-            <li>400 teams feel the friction every week.</li>
+            <li>400 engineering teams suffer daily friction.</li>
           </ul>
         </div>
-        <div className="compare compare--after">
-          <span className="compare__label">After</span>
-          <ul>
+        <div
+          className="fade-in"
+          style={{
+            background: "rgba(16, 185, 129, 0.08)",
+            border: "1px solid rgba(16, 185, 129, 0.2)",
+            padding: 14,
+            borderRadius: 8,
+          }}
+        >
+          <span className="studio-pill pill-green">AFTER (Simulated Value)</span>
+          <ul style={{ marginTop: 8, fontSize: "0.88rem", color: "#cbd5e1" }}>
             <li>
-              <b>&lt; 30 seconds</b>, propagated in the background.
+              <b>&lt; 30 seconds</b> automated background propagation.
             </li>
             <li>
-              <b>Zero</b> human steps. Ambient credentials.
+              <b>Zero human steps</b>. Ambient credential synchronization.
             </li>
             <li>
-              <b>3,000 hours</b> of agony removed per month.
+              <b>3,000 hours</b> of team agony eliminated per month.
             </li>
           </ul>
         </div>
       </div>
 
-      <p className="empty-note">
-        Figures are illustrative until evidence is connected — the shape of the story is the point.
-      </p>
+      <div className="metric-grid" style={{ marginTop: 16 }}>
+        <div className="studio-metric">
+          <div className="studio-metric__label">Time-to-Value Shift</div>
+          <div className="studio-metric__value">-90%</div>
+          <div className="studio-metric__delta">Friction Eliminated</div>
+        </div>
+        <div className="studio-metric">
+          <div className="studio-metric__label">Satisfaction Projection</div>
+          <div className="studio-metric__value">8.9 / 10</div>
+          <div className="studio-metric__delta">+5.8 pts</div>
+        </div>
+        <div className="studio-metric">
+          <div className="studio-metric__label">Implementation Risk</div>
+          <div className="studio-metric__value">Low</div>
+          <div className="studio-metric__delta">Non-breaking</div>
+        </div>
+      </div>
 
-      <button type="button" className="button button--block" onClick={() => void declare()}>
-        Approve bet and draft the PDR
+      <button
+        type="button"
+        className="studio-button"
+        style={{ width: "100%", marginTop: 12 }}
+        onClick={() => void declare()}
+      >
+        🚀 Declare Intent -&gt; Approve Bet &amp; Draft PDR
       </button>
     </section>
   );
