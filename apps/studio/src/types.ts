@@ -168,3 +168,18 @@ export interface AddConnectorPayload {
   preset?: string;
   url?: string;
 }
+
+export interface ChangelogCategory {
+  name: string;
+  items: string[];
+}
+
+export interface ChangelogRelease {
+  version: string;
+  date: string;
+  categories: ChangelogCategory[];
+}
+
+export interface ChangelogData {
+  releases: ChangelogRelease[];
+}

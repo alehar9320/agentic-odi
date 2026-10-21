@@ -407,3 +407,20 @@ def test_post_outcome_uses_local_service() -> None:
 
     assert response.status_code == 200
     assert ODIService(repo).get_outcomes(job.id)[0].statement == "Minimize effort"
+
+
+# ---------------------------------------------------------------------------
+# /api/changelog
+# ---------------------------------------------------------------------------
+
+
+def test_get_changelog_returns_parsed_or_fallback_data() -> None:
+    response = _client().get("/api/changelog")
+    assert response.status_code == 200
+    data = response.json()
+    assert "releases" in data
+    assert len(data["releases"]) > 0
+    release = data["releases"][0]
+    assert "version" in release
+    assert "date" in release
+    assert "categories" in release

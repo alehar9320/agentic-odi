@@ -2941,3 +2941,179 @@ input[type="range"] {
 .message__body > .ui-surface {
   margin: 12px 0;
 }
+
+/* ------------------------------------------------------------------ */
+/* Discrete Changelog Modal (Steve Jobs Quality)                     */
+/* ------------------------------------------------------------------ */
+.pill-changelog {
+  background: rgba(129, 140, 248, 0.18);
+  color: #a5b4fc;
+  border: 1px solid rgba(129, 140, 248, 0.4);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.pill-changelog:hover {
+  background: rgba(129, 140, 248, 0.3);
+  border-color: #818cf8;
+  color: #ffffff;
+  box-shadow: 0 0 12px rgba(129, 140, 248, 0.25);
+}
+
+.changelog-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(11, 13, 19, 0.75);
+  backdrop-filter: blur(12px);
+  padding: 20px;
+}
+
+.changelog-modal {
+  width: 100%;
+  max-width: 680px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(145deg, rgba(26, 32, 48, 0.95), rgba(15, 20, 32, 0.98));
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.6), 0 0 1px rgba(255, 255, 255, 0.2) inset;
+  overflow: hidden;
+}
+
+.changelog-modal__header {
+  padding: 20px 24px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  border-bottom: 1px solid var(--studio-border);
+}
+
+.changelog-modal__badge {
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  color: #818cf8;
+  margin-bottom: 4px;
+}
+
+.changelog-modal__title {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--studio-text);
+}
+
+.changelog-modal__close {
+  background: transparent;
+  border: none;
+  color: var(--studio-muted);
+  font-size: 1.1rem;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.changelog-modal__close:hover {
+  color: var(--studio-text);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.changelog-modal__body {
+  padding: 24px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.changelog-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.changelog-release {
+  display: grid;
+  grid-template-columns: 100px 1fr;
+  gap: 16px;
+  position: relative;
+}
+
+@media (max-width: 600px) {
+  .changelog-release {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+}
+
+.changelog-release__meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.changelog-release__version {
+  font-weight: 700;
+  font-size: 1rem;
+  color: #818cf8;
+}
+
+.changelog-release__date {
+  font-size: 0.78rem;
+  color: var(--studio-muted);
+}
+
+.changelog-release__content {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.changelog-category__title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #a5b4fc;
+  margin: 0 0 6px;
+}
+
+.changelog-category__list {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.changelog-category__item {
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: #cbd5e1;
+}
+
+.changelog-modal__footer {
+  padding: 16px 24px;
+  border-top: 1px solid var(--studio-border);
+  background: rgba(0, 0, 0, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.changelog-modal__quote {
+  font-size: 0.78rem;
+  font-style: italic;
+  color: var(--studio-muted);
+}
+
+.changelog-modal__loading,
+.changelog-modal__error {
+  padding: 24px 0;
+}

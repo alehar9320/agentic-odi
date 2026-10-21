@@ -4,6 +4,7 @@ import type {
   AddOutcomePayload,
   AddStepPayload,
   CanvasData,
+  ChangelogData,
   ChatStreamRequest,
   ConnectorHealth,
   ConnectorListItem,
@@ -63,6 +64,10 @@ async function deleteJson<T>(path: string): Promise<T> {
 export async function fetchConfig(): Promise<StudioConfig> {
   const body = await getJson<{ defaults: StudioConfig }>("/api/config");
   return body.defaults;
+}
+
+export function fetchChangelog(): Promise<ChangelogData> {
+  return getJson<ChangelogData>("/api/changelog");
 }
 
 export function fetchCanvas(mcpUrl: string): Promise<CanvasData> {

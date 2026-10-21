@@ -7,6 +7,7 @@ import {
   checkConnectorHealth,
   deleteConnector,
   fetchCanvas,
+  fetchChangelog,
   fetchConfig,
   fetchConnectorCatalog,
   fetchConnectors,
@@ -42,6 +43,15 @@ describe("fetchConfig", () => {
       base_url: "http://llm",
       model_name: "m",
     });
+  });
+});
+
+describe("fetchChangelog", () => {
+  it("returns the parsed changelog data", async () => {
+    mockJson({ releases: [{ version: "0.8.0", date: "2026-10-20", categories: [] }] });
+
+    const data = await fetchChangelog();
+    expect(data.releases[0].version).toBe("0.8.0");
   });
 });
 

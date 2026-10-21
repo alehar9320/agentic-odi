@@ -21,6 +21,7 @@ from agentic_odi_core import (
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 
+from agentic_odi_studio_api.studio.changelog import get_changelog
 from agentic_odi_studio_api.studio.chat import stream_chat
 from agentic_odi_studio_api.studio.connectors import ConnectorService
 from agentic_odi_studio_api.studio.mcp_data import call_mcp_tool, fetch_canvas, fetch_local_canvas
@@ -73,6 +74,11 @@ def _connectors(request: Request) -> ConnectorService:
 @router.get("/config")
 def get_config() -> dict:
     return {"defaults": defaults()}
+
+
+@router.get("/changelog")
+def get_changelog_route() -> dict:
+    return get_changelog()
 
 
 @router.post("/health/mcp")
