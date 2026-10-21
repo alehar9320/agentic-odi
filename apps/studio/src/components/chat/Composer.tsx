@@ -186,8 +186,8 @@ export function Composer({
           placeholder={
             placeholder ??
             (offline
-              ? "Model offline — type / for commands, or work in the panels…"
-              : "Ask about a job, an outcome, or what to build next…")
+              ? "Model offline — type / for commands, or capture what you know…"
+              : "What do you want to make happen?")
           }
           aria-expanded={paletteOpen}
           aria-controls={paletteOpen ? "studio-command-palette" : undefined}

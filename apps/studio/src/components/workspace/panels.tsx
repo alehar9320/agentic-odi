@@ -3,39 +3,46 @@ import type { ReactNode } from "react";
 import type { WorkspacePanelId } from "../../types";
 import { DirectCapture } from "../canvas/DirectCapture";
 import { EvidenceStream } from "../canvas/EvidenceStream";
-import { ImpactSim } from "../canvas/ImpactSim";
 import { JobMap } from "../canvas/JobMap";
 import { OpportunityLandscape } from "../canvas/OpportunityLandscape";
 import { CatchUpFeed } from "../notifications/CatchUpFeed";
 import { SettingsPanel } from "../SettingsPanel";
-import {
-  BellIcon,
-  BoltIcon,
-  CaptureIcon,
-  CompassIcon,
-  RouteIcon,
-  SettingsIcon,
-  SignalIcon,
-} from "../icons";
+import { BellIcon, CaptureIcon, CompassIcon, RouteIcon, SettingsIcon, SignalIcon } from "../icons";
+
+export interface PanelTalk {
+  label: string;
+  /** Sent to the agent when the user leaves the lens. */
+  intent: string;
+}
 
 export interface PanelDefinition {
   id: WorkspacePanelId;
-  /** Short label used by the drawer and pills. */
+  /** Short label used by the rail and the lens header. */
   label: string;
   title: string;
   blurb: string;
   icon: ReactNode;
   render: () => ReactNode;
+  /** The one sentence that takes the user back into the thread. */
+  talk?: PanelTalk;
 }
 
+/**
+ * Every entry is a lens on what the conversation has already produced. None of
+ * them owns an input the agent could take more naturally as a message.
+ */
 export const WORKSPACE_PANELS: PanelDefinition[] = [
   {
     id: "catchup",
     label: "Catch up",
-    title: "Activity & Catch Up",
-    blurb: "Seamlessly catch up on outcome shifts, simulations, and telemetry signals while you were away.",
+    title: "Catch up",
+    blurb: "What moved while you were away, and what each signal asks of you.",
     icon: <BellIcon />,
     render: () => <CatchUpFeed />,
+    talk: {
+      label: "Talk through what changed",
+      intent: "What changed since I was last here, and what should I do about it?",
+    },
   },
   {
     id: "landscape",
@@ -44,6 +51,10 @@ export const WORKSPACE_PANELS: PanelDefinition[] = [
     blurb: "Every outcome scored. Anything above 10 is underserved.",
     icon: <CompassIcon />,
     render: () => <OpportunityLandscape />,
+    talk: {
+      label: "Ask which to chase",
+      intent: "Looking at my landscape, which opportunity should I chase first, and why?",
+    },
   },
   {
     id: "jobmap",
@@ -52,30 +63,37 @@ export const WORKSPACE_PANELS: PanelDefinition[] = [
     blurb: "The eight phases of the job, in the order customers live them.",
     icon: <RouteIcon />,
     render: () => <JobMap />,
-  },
-  {
-    id: "impact",
-    label: "Impact",
-    title: "Simulate impact",
-    blurb: "What you see is what they experience. Preview the friction collapse.",
-    icon: <BoltIcon />,
-    render: () => <ImpactSim />,
+    talk: {
+      label: "Walk me through the job",
+      intent:
+        "Walk me through the job step by step, and show me where the work breaks down today.",
+    },
   },
   {
     id: "evidence",
     label: "Evidence",
     title: "Customer evidence",
-    blurb: "Sample signals only — no connectors are wired up yet.",
+    blurb: "What customers actually said, and what it does and does not prove.",
     icon: <SignalIcon />,
     render: () => <EvidenceStream />,
+    talk: {
+      label: "Weigh the evidence",
+      intent:
+        "What does the evidence I have actually support, and what is still a guess? Tell me what to go find next.",
+    },
   },
   {
     id: "capture",
     label: "Capture",
-    title: "Capture an outcome",
-    blurb: "Prefer typing into a form? This writes to the same MCP repository.",
+    title: "Capture by hand",
+    blurb: "The offline path. With a model, just tell the studio what you heard.",
     icon: <CaptureIcon />,
     render: () => <DirectCapture />,
+    talk: {
+      label: "Capture it in conversation",
+      intent:
+        "I heard something from a customer that I want to capture as an outcome. Ask me what they said.",
+    },
   },
 ];
 

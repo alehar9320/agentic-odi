@@ -100,7 +100,12 @@ export function Hero({ onSubmit }: { onSubmit: (text: string) => void }) {
           id: "impact",
           label: "Simulate a bet",
           icon: <BoltIcon size={15} />,
-          run: () => openPanel("impact"),
+          run: () =>
+            onSubmit(
+              "Simulate the impact of a bet on my most underserved opportunity. " +
+                "Ask me what the bet is, then show me what changes before and after.",
+            ),
+          conversational: true,
         }
       : {
           id: "guidelines",
@@ -114,7 +119,14 @@ export function Hero({ onSubmit }: { onSubmit: (text: string) => void }) {
           id: "capture",
           label: "Capture an outcome",
           icon: <CaptureIcon size={15} />,
-          run: () => openPanel("capture"),
+          run: () =>
+            llmHealth.healthy === false
+              ? openPanel("capture")
+              : onSubmit(
+                  "I want to capture an outcome I heard from a customer. " +
+                    "Ask me what they said, then help me sharpen it.",
+                ),
+          conversational: true,
         }
       : {
           id: "jobmap",

@@ -91,7 +91,7 @@ describe("studio shell", () => {
     expect(screen.queryByRole("heading", { name: /opportunity landscape/i })).toBeNull();
   });
 
-  it("opens a full-screen workspace surface and returns to the conversation", async () => {
+  it("opens a workspace view beside the conversation and keeps the composer", async () => {
     render(<App />);
 
     fireEvent.click(await screen.findByRole("button", { name: /^landscape/i }));
@@ -99,12 +99,33 @@ describe("studio shell", () => {
     expect(
       await screen.findByRole("heading", { name: /opportunity landscape/i }),
     ).toBeInTheDocument();
-    // The conversation gives up the whole stage while a surface is open.
-    expect(screen.queryByRole("textbox", { name: /message the studio/i })).toBeNull();
+    // The conversation keeps the stage: the composer never leaves.
+    expect(screen.getByRole("textbox", { name: /message the studio/i })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /back to conversation/i }));
+    fireEvent.click(screen.getByRole("button", { name: /close workspace view/i }));
 
-    expect(await screen.findByRole("textbox", { name: /message the studio/i })).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.queryByRole("heading", { name: /opportunity landscape/i })).toBeNull();
+    });
+    expect(screen.getByRole("textbox", { name: /message the studio/i })).toBeInTheDocument();
+  });
+
+  it("keeps the transcript on screen while a view is open", async () => {
+    render(<App />);
+
+    const composer = await screen.findByRole("textbox", { name: /message the studio/i });
+    fireEvent.change(composer, { target: { value: "Where do I start?" } });
+    fireEvent.click(screen.getByRole("button", { name: /send message/i }));
+    await screen.findByText("Where do I start?");
+
+    fireEvent.click(screen.getByRole("button", { name: /^landscape/i }));
+
+    expect(
+      await screen.findByRole("heading", { name: /opportunity landscape/i }),
+    ).toBeInTheDocument();
+    // The lens makes room; it never hides what the user was reading.
+    expect(screen.getByText("Where do I start?")).toBeInTheDocument();
+    expect(screen.getByText("job")).toBeInTheDocument();
   });
 
   it("adjusts outcome scores by hand from the landscape", async () => {
@@ -153,7 +174,7 @@ describe("studio shell", () => {
     ).toBeInTheDocument();
   });
 
-  it("runs a slash command locally and opens its surface", async () => {
+  it("runs a slash command as a conversation when a model is live", async () => {
     render(<App />);
 
     const composer = await screen.findByRole("textbox", { name: /message the studio/i });
@@ -162,8 +183,9 @@ describe("studio shell", () => {
     expect(await screen.findByRole("listbox", { name: /commands/i })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("option", { name: /capture an outcome/i }));
 
+    // Capture is a sentence, not a form: the request lands in the transcript.
     expect(
-      await screen.findByRole("heading", { name: /^capture an outcome$/i }),
+      await screen.findByText(/I want to capture an outcome I heard from a customer/i),
     ).toBeInTheDocument();
   });
 
@@ -349,7 +371,7 @@ describe("first run", () => {
       await screen.findByRole("heading", { name: /opportunity landscape/i }),
     ).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /back to conversation/i }));
+    fireEvent.click(screen.getByRole("button", { name: /close workspace view/i }));
 
     // Closing the surface returns to the home stage, not back into setup.
     expect(

@@ -1,6 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 
-import { HELP_TEXT, STUDIO_COMMANDS, isSlashCommand, type StudioCommand } from "../../lib/commands";
+import {
+  HELP_TEXT,
+  IMPACT_PROMPT,
+  STUDIO_COMMANDS,
+  isSlashCommand,
+  type StudioCommand,
+} from "../../lib/commands";
 import { useStudio } from "../../state/StudioContext";
 import type { WorkspacePanelId } from "../../types";
 import { SetupConversation } from "../setup/SetupConversation";
@@ -9,14 +15,7 @@ import { Conversation } from "./Conversation";
 import { Hero } from "./Hero";
 import { OfflineNotice } from "./OfflineNotice";
 
-const PANEL_COMMANDS = new Set<string>([
-  "landscape",
-  "jobmap",
-  "impact",
-  "evidence",
-  "capture",
-  "settings",
-]);
+const VIEW_COMMANDS = new Set<string>(["landscape", "jobmap", "evidence", "settings"]);
 
 export function ChatStage() {
   const {
@@ -45,7 +44,7 @@ export function ChatStage() {
   const empty = messages.length === 0;
 
   function runCommand(command: StudioCommand) {
-    if (PANEL_COMMANDS.has(command.id)) {
+    if (VIEW_COMMANDS.has(command.id)) {
       openPanel(command.id as WorkspacePanelId);
       return;
     }
@@ -79,6 +78,20 @@ export function ChatStage() {
         openPanel("jobmap");
         return;
       }
+      case "impact":
+        void sendMessage(IMPACT_PROMPT);
+        return;
+      case "capture":
+        // With a model, capture is a sentence. Without one, the offline form
+        // is the only honest path that still writes to the repository.
+        if (llmHealth.healthy === false) {
+          openPanel("capture");
+          return;
+        }
+        void sendMessage(
+          "I want to capture an outcome I heard from a customer. Ask me what they said.",
+        );
+        return;
       case "status":
         pushNotice(
           [

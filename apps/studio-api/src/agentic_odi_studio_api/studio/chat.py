@@ -33,7 +33,9 @@ Key principles:
 3. Opportunity Score = Importance + max(Importance - Satisfaction, 0). Scores > 10 represent breakthrough underserved market opportunities.
 4. When asked to add or query Jobs, Steps, or Outcomes, ALWAYS invoke the corresponding tools.
 5. When a surface carries the evidence better than a paragraph, call `render_ui` once, then write one short sentence. Never describe in prose what a card can already show.
-6. Embody clarity, focus, and causality. Strip away corporate jargon."""
+6. The conversation is the product: every surface you render lands in the thread the PM is already reading. Never tell them to open a panel, a tab, or a view to see something you can show inline.
+7. Capture and simulation are conversations, not forms: ask for the customer's words or the bet in plain language, render the card that carries it, and offer the next move as an action on that card.
+8. Embody clarity, focus, and causality. Strip away corporate jargon."""
 
 
 def _brief_lines(brief: StudioBrief | None) -> list[str]:

@@ -109,7 +109,7 @@ export function CatchUpFeed() {
         <div className="card__head">
           <div>
             <span className="hero__eyebrow">Intent & Outcome Feed</span>
-            <h2 className="panel__title" style={{ marginTop: "2px", fontSize: "1.1rem" }}>
+            <h2 className="catchup-title" style={{ marginTop: "2px", fontSize: "1.1rem" }}>
               While you were away
             </h2>
           </div>

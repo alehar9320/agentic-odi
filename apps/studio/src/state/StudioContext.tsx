@@ -96,8 +96,7 @@ const SEED_NOTIFICATIONS: StudioNotification[] = [
     category: "simulation",
     timestamp: new Date(Date.now() - 45 * 60 * 1000).toISOString(),
     read: false,
-    targetPanel: "impact",
-    actionText: "View Simulation",
+    actionText: "Talk it through",
     chatPrompt: "Summarize the friction collapse simulation results.",
   },
   {
@@ -160,12 +159,11 @@ export interface StudioContextValue {
     payload: { statement?: string; importance?: number; satisfaction?: number },
   ) => Promise<void>;
   deleteOutcome: (outcomeId: string) => Promise<void>;
-  pendingSimOutcome: string | null;
-  requestSimulate: (outcomeId: string) => void;
-  clearPendingSimOutcome: () => void;
   activePanel: WorkspacePanelId | null;
   openPanel: (panel: WorkspacePanelId) => void;
   closePanel: () => void;
+  /** Close any open lens and hand the intent to the agent. One gesture. */
+  ask: (intent: string) => void;
   toasts: Toast[];
   pushToast: (kind: ToastKind, message: string) => void;
   dismissToast: (id: number) => void;
@@ -282,7 +280,6 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [streaming, setStreaming] = useState(false);
   const [thinkingPhase, setThinkingPhase] = useState<string | null>(null);
   const [toolActivity, setToolActivity] = useState<ToolActivity[]>([]);
-  const [pendingSimOutcome, setPendingSimOutcome] = useState<string | null>(null);
   const [activePanel, setActivePanel] = useState<WorkspacePanelId | null>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [connectors, setConnectors] = useState<ConnectorListItem[]>([]);
@@ -658,8 +655,6 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     [settings.mcp_url, pushToast, refreshCanvas],
   );
 
-  const clearPendingSimOutcome = useCallback(() => setPendingSimOutcome(null), []);
-
   const closePanel = useCallback(() => setActivePanel(null), []);
 
   const openPanel = useCallback(
@@ -671,11 +666,6 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     },
     [setupOpen, closeSetup],
   );
-
-  const requestSimulate = useCallback((outcomeId: string) => {
-    setPendingSimOutcome(outcomeId);
-    setActivePanel("impact");
-  }, []);
 
   const stopStreaming = useCallback(() => {
     abortRef.current?.abort();
@@ -828,6 +818,15 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     [messages, streaming, settings, brief, refreshCanvas, pushToast],
   );
 
+  /** The single conversational exit from any lens. */
+  const ask = useCallback(
+    (intent: string) => {
+      setActivePanel(null);
+      void sendMessage(intent);
+    },
+    [sendMessage],
+  );
+
   const clearChat = useCallback(() => {
     abortRef.current?.abort();
     abortRef.current = null;
@@ -926,12 +925,10 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       deleteStep,
       updateOutcome,
       deleteOutcome,
-      pendingSimOutcome,
-      requestSimulate,
-      clearPendingSimOutcome,
       activePanel,
       openPanel,
       closePanel,
+      ask,
       toasts,
       pushToast,
       dismissToast,
@@ -987,12 +984,10 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       deleteStep,
       updateOutcome,
       deleteOutcome,
-      pendingSimOutcome,
-      requestSimulate,
-      clearPendingSimOutcome,
       activePanel,
       openPanel,
       closePanel,
+      ask,
       toasts,
       pushToast,
       dismissToast,

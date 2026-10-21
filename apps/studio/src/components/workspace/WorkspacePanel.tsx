@@ -1,13 +1,21 @@
 import { useStudio } from "../../state/StudioContext";
-import { ArrowLeftIcon } from "../icons";
+import { useMediaQuery } from "../../lib/useMediaQuery";
+import { CloseIcon } from "../icons";
 import { findPanel } from "./panels";
 
+const MOBILE_QUERY = "(max-width: 1023px)";
+
 /**
- * A workspace surface takes the whole stage while it is open. The conversation
- * is one click away, and nothing is squeezed into a narrow side column.
+ * A lens on the conversation, not a place you go.
+ *
+ * On a wide screen it docks to the right and the thread keeps the stage: the
+ * composer is still there, still focused, still usable. On a narrow screen
+ * there is no room for both, so it becomes a sheet over the thread with a scrim
+ * and a close control.
  */
 export function WorkspacePanel() {
-  const { activePanel, closePanel } = useStudio();
+  const { activePanel, closePanel, sendMessage } = useStudio();
+  const isMobile = useMediaQuery(MOBILE_QUERY);
 
   if (!activePanel) {
     return null;
@@ -15,30 +23,65 @@ export function WorkspacePanel() {
 
   const panel = findPanel(activePanel);
 
+  function talk() {
+    if (!panel.talk) {
+      return;
+    }
+    closePanel();
+    void sendMessage(panel.talk.intent);
+  }
+
   return (
-    <section className="panel" aria-label={panel.title} key={panel.id}>
-      <header className="panel__head">
-        <button type="button" className="back" onClick={closePanel}>
-          <ArrowLeftIcon size={16} />
-          Back to conversation
-        </button>
-        <div className="panel__heading">
-          <span className="panel__icon">{panel.icon}</span>
-          <div className="panel__heading-text">
-            {/* The panel chrome owns the heading. Canvas content that repeats
-                the same title renders it as a label, so no panel exposes two
-                headings with the same accessible name. */}
-            <h2 className="panel__title">{panel.title}</h2>
-            <p className="panel__blurb">{panel.blurb}</p>
+    <>
+      {isMobile && (
+        <button
+          type="button"
+          className="scrim"
+          aria-label="Close workspace view"
+          onClick={closePanel}
+        />
+      )}
+      <aside
+        className="lens"
+        role={isMobile ? "dialog" : "complementary"}
+        aria-modal={isMobile || undefined}
+        aria-label={panel.title}
+        key={panel.id}
+      >
+        <header className="lens__head">
+          <div className="lens__heading">
+            <span className="lens__icon" aria-hidden="true">
+              {panel.icon}
+            </span>
+            <div>
+              <h2 className="lens__title">{panel.title}</h2>
+              <p className="lens__blurb">{panel.blurb}</p>
+            </div>
           </div>
+          <button
+            type="button"
+            className="icon-button"
+            aria-label="Close workspace view"
+            title="Close"
+            onClick={closePanel}
+          >
+            <CloseIcon size={16} />
+          </button>
+        </header>
+
+        <div className="lens__body">
+          <div className="lens__content">{panel.render()}</div>
         </div>
-        <span className="panel__hint">
-          <kbd>Esc</kbd> to return
-        </span>
-      </header>
-      <div className="panel__body">
-        <div className="panel__content">{panel.render()}</div>
-      </div>
-    </section>
+
+        {panel.talk && (
+          <footer className="lens__foot">
+            <p className="lens__note">A lens on the conversation, not a separate place.</p>
+            <button type="button" className="button button--block" onClick={talk}>
+              {panel.talk.label}
+            </button>
+          </footer>
+        )}
+      </aside>
+    </>
   );
 }
