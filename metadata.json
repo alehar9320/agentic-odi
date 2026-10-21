@@ -3,13 +3,14 @@
   "checkpoint_id": "01M5FG71V036TN8VZQTKF0AWVZ",
   "strategy": "manual-commit",
   "branch": "tmp/rebased",
-  "checkpoints_count": 4,
+  "checkpoints_count": 5,
   "files_touched": [
     "README.md",
     "apps/studio-api/src/agentic_odi_studio_api/studio/chat.py",
     "apps/studio-api/src/agentic_odi_studio_api/studio/schemas.py",
     "apps/studio/src/state/StudioContext.tsx",
-    "apps/studio/src/types.ts"
+    "apps/studio/src/types.ts",
+    "docs/superpowers/specs/2026-10-21-mcp-studio-connectors-design.md"
   ],
   "sessions": [
     {
@@ -25,13 +26,20 @@
       "compact_transcript": "/1/transcript.jsonl",
       "content_hash": "/1/content_hash.txt",
       "prompt": "/1/prompt.txt"
+    },
+    {
+      "metadata": "/2/metadata.json",
+      "transcript": "/2/full.jsonl",
+      "compact_transcript": "/2/transcript.jsonl",
+      "content_hash": "/2/content_hash.txt",
+      "prompt": "/2/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 884272,
+    "input_tokens": 976383,
     "cache_creation_tokens": 0,
-    "cache_read_tokens": 3551744,
-    "output_tokens": 26687,
-    "api_call_count": 59
+    "cache_read_tokens": 4534464,
+    "output_tokens": 30491,
+    "api_call_count": 71
   }
 }
