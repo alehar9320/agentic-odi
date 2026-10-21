@@ -45,7 +45,7 @@ shared tooling at the root. Packages live in `packages/`, runnable services in
 | **`apps/mcp-server/`** | `agentic-odi-mcp-server` | FastMCP server exposing Jobs, Steps, Desired Outcomes, Customer Outcomes, Evidence, and context tools over HTTP. Persists to SQLite by default. |
 | **`apps/studio-api/`** | `agentic-odi-studio-api` | FastAPI **Living Studio sidecar**. Serves config, health, canvas data, local mutations, MCP passthrough, SSE chat, and the built SPA. |
 | **`apps/cli/`** | `agentic-odi-cli` | Typer CLI with interactive chat plus full entity CRUD, `schema`, `connectors`, and local-first (`--backend local`) or remote (`--backend mcp`) data access. |
-| **`apps/studio/`** | React + TypeScript + Vite | **The Living Studio** SPA and Tauri 2 desktop shell. |
+| **`apps/studio/`** | React + TypeScript + Vite | **The Living Studio** SPA and Tauri 2 desktop shell. The copilot renders **agent-composed surfaces inline** — scored outcomes, opportunity boards, bet simulations — from a closed catalog the SPA owns. |
 | **`infra/cloudflare/`** | Worker | Free-plan Workers Static Assets deployment and sidecar tunnel. |
 | **`scripts/`** | — | Dev launcher, binary build, installer tests. |
 | **`tests/contract/`** | — | Cross-package MCP contract tests. |
@@ -128,7 +128,7 @@ layout, updates, and release automation.
 |---|---|
 | [CLI Reference](docs/cli.md) | Backends, interactive chat, Jobs/Steps/desired Outcomes/Customer Outcomes/evidence, `connectors`, scoring, environment variables |
 | [External Connectors](docs/connectors.md) | The MCP ingest connector, presets, and the `Connector` protocol |
-| [Running The Living Studio](docs/living-studio.md) | Run modes, desktop signing and updates, agent-driven testing (`/dev`, `/test`) |
+| [Running The Living Studio](docs/living-studio.md) | Interface, rich inline responses and the UI catalog, run modes, desktop signing and updates, agent-driven testing (`/dev`, `/test`) |
 | [Local LLM Backend](docs/local-llm.md) | Running a local OpenAI-compatible model with tool calling |
 | [Development](docs/development.md) | Lint, format, type checks, frontend checks, tests and the coverage map |
 | [Architecture](docs/architecture/README.md) | Workspace layout, dependency direction, data flow, and testing |

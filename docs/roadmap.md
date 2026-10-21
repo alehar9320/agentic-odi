@@ -4,6 +4,9 @@ As we validate the feasibility of this architecture, our next milestones include
 
 - [x] **External MCP client connector**: Pluggable connectors package with an
   HTTP MCP ingest client, CLI adapter, and in-memory tests.
+- [x] **Conversational rich surfaces**: the studio agent composes validated
+  cards inline from a closed, client-owned catalog instead of describing them
+  in prose.
 - [x] **Map ingested evidence onto ODI artifacts**: Turn connector records into
   jobs, outcomes, or evidence without mixing connector plumbing into the ODI
   store.

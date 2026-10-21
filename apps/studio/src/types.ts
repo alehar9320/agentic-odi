@@ -1,3 +1,5 @@
+import type { UiCatalogManifest, UiNode } from "./ui/protocol";
+
 export interface Job {
   id: string;
   name?: string;
@@ -45,9 +47,19 @@ export interface McpHealth {
   reachable: boolean;
 }
 
+export type ChatPart =
+  | { kind: "text"; text: string }
+  | { kind: "ui"; id: string; node: UiNode };
+
 export interface ChatMessage {
   role: "user" | "assistant" | "notice";
   content: string;
+  /**
+   * Assistant turns only: prose and surfaces in the order the agent produced
+   * them, so a card sits between the paragraphs that frame it. `content` stays
+   * the combined prose because that is what gets replayed as history.
+   */
+  parts?: ChatPart[];
 }
 
 /**
@@ -79,6 +91,8 @@ export interface ChatStreamRequest {
   mcp_url: string;
   messages: ChatMessage[];
   brief?: StudioBrief | null;
+  /** What this client can render. Omitted by clients that only read prose. */
+  ui_catalog?: UiCatalogManifest;
 }
 
 export interface CreateJobPayload {
