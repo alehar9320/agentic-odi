@@ -1,0 +1,11 @@
+Explore the /home/alexa/repos/agentic-odi repository thoroughly. I need to understand:
+
+1. What is this project? (read README.md, AGENTS.md, any docs)
+2. What is the directory structure? (list all directories and key files)
+3. What technology stack is used? (check for package.json, pyproject.toml, requirements.txt, etc.)
+4. What are the main components/modules?
+5. Is there a frontend, backend, or both?
+6. What testing frameworks are used?
+7. Are there any MCP-related files or configurations?
+
+Provide a comprehensive summary of the project, its structure, and technology stack. Be very thorough - check all directories and files.
