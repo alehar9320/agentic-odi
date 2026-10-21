@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.0](https://github.com/alehar9320/agentic-odi/compare/v0.11.0...v0.12.0) (2026-10-21)
+
+
+### Features
+
+* **studio:** keep the conversation on stage while a view is open ([#71](https://github.com/alehar9320/agentic-odi/issues/71)) ([ab6db19](https://github.com/alehar9320/agentic-odi/commit/ab6db196d0f8e533a69c580b3fc89e480b6ab971))
+
 ## [0.11.0](https://github.com/alehar9320/agentic-odi/compare/v0.10.0...v0.11.0) (2026-10-21)
 
 
