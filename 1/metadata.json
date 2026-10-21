@@ -3,22 +3,22 @@
   "checkpoint_id": "01M5EPVEFKANA3PHJQM9HSSQZ6",
   "session_id": "ses_ea2c0d0b4ffe5pFu21zQZXTDvE",
   "strategy": "manual-commit",
-  "created_at": "2026-10-21T07:47:22.370558327Z",
+  "created_at": "2026-10-21T07:52:05.351884706Z",
   "branch": "fix/website-hardening",
   "checkpoints_count": 1,
   "files_touched": [],
   "agent": "OpenCode",
   "model": "poolside/laguna-s-2.1:free",
   "turn_id": "bc107a7466a8",
-  "checkpoint_transcript_start": 169,
-  "transcript_lines_at_start": 169,
-  "compact_transcript_start": 169,
+  "checkpoint_transcript_start": 282,
+  "transcript_lines_at_start": 282,
+  "compact_transcript_start": 282,
   "token_usage": {
-    "input_tokens": 81877,
+    "input_tokens": 5716,
     "cache_creation_tokens": 0,
-    "cache_read_tokens": 13948000,
-    "output_tokens": 13622,
-    "api_call_count": 113
+    "cache_read_tokens": 2579680,
+    "output_tokens": 2021,
+    "api_call_count": 17
   },
   "session_metrics": {
     "turn_count": 1
