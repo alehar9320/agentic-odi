@@ -1,0 +1,349 @@
+You are a talented senior full-stack engineer (React 19 + TypeScript + Vite frontend, FastAPI/Pydantic Python backend, Tauri 2 desktop shell). You've been handed a design document and asked to put together a plan to build what it describes. You will not be able to talk to the person who wrote it.
+
+Read the design document at this path (it does NOT exist on disk yet — the full text is reproduced below, since plan mode prevented writing it):
+
+---
+# Voice Chat — speaking to the copilot — design
+
+**Status:** approved for implementation
+**Date:** 2026-10-21
+**Scope:** `apps/studio` (React SPA + Tauri 2 shell) and `apps/studio-api` (FastAPI sidecar)
+
+## Intent
+
+The Living Studio's copilot already accepts a typed prompt and answers with evidence. The friction is the keyboard. A PM describing a customer struggle is often mid-thought, mid-call, or hands-busy; typing the sentence costs more than saying it. The studio should let a person **speak** to the copilot and get the same agent behaviour they get from typing.
+
+The non-negotiable property: **speech enters through the same door as text.** A spoken message becomes a plain user string in the chat transcript, reviewed in the same textarea, and sent by the same `sendMessage` call. Nothing about the agent, the MCP tools, the tool-loop, or the ODI domain changes. Voice is an input device, not a feature of the agent.
+
+Today the repository contains **zero** audio capability — no mic, no recording, no speech-to-text, in the working tree, in any of the 30+ `.worktrees/` checkouts, or anywhere in git history. This is built from scratch.
+
+## Goals
+
+1. The user can record speech from the chat input and get the transcript placed in the textarea for review, then send it like any other message.
+2. Audio never reaches the LLM as audio. Transcription happens in the sidecar, against the OpenAI-compatible backend the studio already talks to.
+3. The mic works in the browser SPA **and** in the Tauri desktop shell, or it fails with a message that says exactly why.
+4. The whole feature degrades to "type your message" if any part of it is unavailable — no dead buttons, no half-states.
+5. Zero new runtime dependencies on the Python side beyond what the workspace already resolves (`python-multipart` is already in the lockfile via `fastmcp`/`starlette`; it is promoted to a direct dependency of the sidecar so the intent is explicit).
+
+## Non-goals
+
+- **No speech-to-text of the agent's reply.** The copilot stays text-only on the way out. TTS is a separate decision with its own latency and voice selection problems.
+- **No streaming/partial transcripts.** The user asked for *record → transcribe → review → send*. A live partial transcript needs a streaming STT endpoint, is noisier, and buys little for a 5–30 second PM utterance.
+- **No push-to-talk, no auto-send.** Nothing is sent to the agent without an explicit Send press. This matches the existing rule that cards are views, never actors: the human keeps the single authority and the single audit trail. A mis-transcribed auto-send would create ODI records nobody meant to create.
+- **No mic in the CLI REPL** (`apps/cli`). The CLI's entry point is `input("you › ")`; giving it a mic means a Python audio-capture dependency and a second transcription path for a surface that is explicitly the terminal fallback.
+- **No vendored or bundled speech model.** Transcription is delegated to whatever OpenAI-compatible `/audio/transcriptions` endpoint the user points the studio at. The studio does not download weights.
+
+## Architecture
+
+Four pieces and one rule: **the SPA never talks to the model directly.** Voice follows the same boundary that `base_url` / `api_key` / `model` already obey.
+
+```
+┌──────────────────────── apps/studio (React 19 + TS) ─────────────────────────┐
+│                                                                              │
+│  components/chat/MicButton.tsx          lib/recorder.ts                     │
+│  ┌──────────────────────────────┐      ┌──────────────────────────────┐      │
+│  │ idle │ recording │ transcribing│      │ getUserMedia + MediaRecorder│      │
+│  │ disabled when unsupported     │─────▶│ → Blob (audio/webm)          │      │
+│  └──────────────────────────────┘      │ → SpeechRecognition (if any) │      │
+│         │                             └──────────────────────────────┘      │
+│         │ transcript lands in the textarea draft                            │
+│         ▼                                                                    │
+│  ChatCopilot.tsx  <textarea onChange → setDraft>  (unchanged contract)       │
+│                                                                              │
+│  api/studioApi.ts                                                          │
+│    transcribeAudio(blob) ──POST /api/transcribe (multipart)──┐              │
+└──────────────────────────────────────────────────────────────┼──────────────┘
+                                                               │
+                          ┌────────────────────────────────────▼─────────────┐
+                          │ apps/studio-api (FastAPI sidecar)                │
+                          │  studio/router.py   POST /api/transcribe        │
+                          │  studio/transcribe.py                            │
+                          │    ├─ path A: browser SpeechRecognition           │
+                          │    │    (client-side, no request at all)         │
+                          │    └─ path B: POST audio → OpenAI-compatible     │
+                          │         /audio/transcriptions (whisper-1, …)     │
+                          └──────────────────────────────────────────────────┘
+```
+
+### The two transcription paths
+
+The user chose **"both, with fallback"**. The SPA tries the cheapest path first and falls back to the second when it is unavailable.
+
+**Path A — browser `SpeechRecognition` (no network round-trip).**
+`window.SpeechRecognition` / `webkitSpeechRecognition` is present in Chrome, Edge, and Safari 14.1+. It streams interim results and yields a final transcript with no upload to us. It is **not** present in Firefox, and it is **not** reliably present in the Tauri WKWebView on Linux.
+
+**Path B — sidecar transcription (works everywhere the mic works).**
+The SPA records audio with `getUserMedia` + `MediaRecorder`, POSTs the blob as `multipart/form-data` to `/api/transcribe`, and the sidecar forwards it to `{base_url}/audio/transcriptions` using the studio's existing `api_key`. The sidecar returns `{"text": "..."}`.
+
+The SPA picks Path A when `SpeechRecognition` exists **and** the user is in a browser context; otherwise it uses Path B. If Path A fails at runtime, the button offers Path B explicitly rather than silently dying. The user can always override the choice in Settings.
+
+Why the sidecar owns Path B rather than the SPA calling the model endpoint directly: the studio's existing rule is that the SPA never holds the model credential path for anything but what the sidecar already proxies (`/api/chat`, `/api/health/llm`). Audio is a bigger secret and a bigger payload than a prompt; it should not be a new egress path from the browser.
+
+## Data flow
+
+### Recording (Path B)
+
+1. User clicks the mic button. The button enters `recording` state.
+2. `lib/recorder.ts` calls `navigator.mediaDevices.getUserMedia({ audio: true })`.
+   - Rejection (permission denied, no device, insecure context) → toast with a specific reason, button returns to `idle`.
+3. `MediaRecorder` starts with a MIME type chosen from a capability probe
+   (`audio/webm;codecs=opus` first, then `audio/webm`, then `audio/mp4`, then
+   browser default). Safari only offers `audio/mp4`; Whisper accepts both.
+4. Chunks accumulate. A live elapsed-time indicator shows in the button.
+5. User clicks again (or presses `Escape`). Recording stops, the stream's
+   tracks are stopped, and the `Blob` is assembled.
+6. The blob is POSTed to `/api/transcribe`.
+
+### Sidecar transcription
+
+`POST /api/transcribe`
+
+| Field | Type | Notes |
+|---|---|---|
+| `audio` | file (multipart) | The recorded blob. |
+| `base_url` | str | Reuses the studio's LLM base URL. |
+| `api_key` | str | Reuses the studio's LLM API key. |
+| `model` | str | Transcription model, e.g. `whisper-1`. |
+| `language` | str | Optional ISO code; omitted means "auto-detect". |
+
+Response `200`: `{"text": "<transcript>", "model": "<model>"}`
+
+Failures:
+
+| Status | Meaning |
+|---|---|
+| `400` | No audio, or the audio was empty. |
+| `415` | Unsupported audio type. |
+| `502` | The transcription backend refused or was unreachable. The upstream message is passed through in `detail` so the user can see what the backend said. |
+| `413` | Audio exceeds the size cap (see below). |
+
+The sidecar uses `openai.AsyncOpenAI(base_url=...).audio.transcriptions.create(...)`
+with the file tuple `("<name>", bytes, "<mime>")` and `response_format="text"`.
+It passes the upstream error text through rather than swallowing it — a
+misconfigured `base_url` is the most likely failure and the user needs the
+backend's own words to fix it.
+
+**Size cap:** 20 MB per request, enforced by the sidecar before the upload is
+forwarded. A 20 MB cap is roughly 30+ minutes of opus audio; a PM utterance is
+seconds. The cap exists to stop a runaway recording from becoming an
+unbounded upload.
+
+### Back in the SPA
+
+The transcript is appended to the textarea draft (not to the transcript), the
+textarea is focused, and the caret is placed at the end. The user reads it,
+fixes it if the recognizer mangled a product term, and presses Send — the
+existing `submit` path, unchanged.
+
+If the transcript is empty, the draft is untouched and a toast says the
+recording produced no speech.
+
+## Configuration
+
+Reuse the studio's existing `base_url` and `api_key`. **One new field:**
+
+| Setting | Env var | Default | Meaning |
+|---|---|---|---|
+| `transcription_model` | `AGENTIC_ODI_TRANSCRIBE_MODEL` | `whisper-1` | Model name sent to `/audio/transcriptions`. |
+
+The transcription endpoint is derived: `{base_url}/audio/transcriptions`. This
+is the OpenAI-compatible convention, and it means any backend that serves
+chat completions at `base_url` and Whisper at the standard path works with no
+extra configuration — `llama-cpp-python`, LocalAI, faster-whisper-server,
+Ollama, vLLM, or OpenAI itself.
+
+The sidecar's `defaults()` (in `studio/probes.py`) gains the new key so
+`GET /api/config` returns it and the SPA's settings panel can prefill it.
+`StudioConfig` in `apps/studio/src/types.ts` gains the matching field, and
+`EMPTY_CONFIG` gains the default. The setting is persisted in the same
+`localStorage["studio.settings"]` blob as the rest, so it survives restarts
+without a new storage key.
+
+**Requirement this creates:** the backend must serve `/audio/transcriptions`.
+A backend that serves only chat completions will fail transcription with a
+clear `502` naming the missing route. The Settings panel and the docs both
+state this requirement, and the mic button is disabled with an explanatory
+tooltip when the transcription model is blank.
+
+## Desktop (Tauri) specifics
+
+The Tauri shell currently declares only `core:default` and `updater:default`
+in `apps/studio/src-tauri/capabilities/default.json`. Microphone access needs
+three things.
+
+**1. A permission handler.** Tauri 2 exposes
+`Builder::on_permission_request(|webview, kind| ...)`, and
+`PermissionKind::Microphone` is a first-class variant. The handler returns
+`PermissionResponse::Allow` for `Microphone` and `Default` for everything
+else, so the webview's own behaviour is preserved for other permission kinds.
+Tauri documents this path as "Fully supported" on macOS (via
+`WKUIDelegate::requestMediaCapturePermission`), Linux (via WebKitGTK's
+`permission-request` signal), and Windows (via WebView2's
+`PermissionRequested` event).
+
+**2. macOS bundle metadata.** A `Info.plist` with `NSMicrophoneUsageDescription`
+so macOS can ask the user, and — for the notarized/sandboxed build — a
+separate entitlements file carrying `com.apple.security.device.microphone` and
+`com.apple.security.device.audio-input`. Both are referenced from
+`tauri.conf.json` under `bundle.macOS.infoPlist` and `bundle.macOS.entitlements`.
+
+The entitlements file must be **separate** from the `Info.plist`. Tauri issue
+#8314 documents that putting the `com.apple.security.device.*` keys in the
+`Info.plist` merges them into the bundle's plist where they have no effect,
+and that moving them to a dedicated entitlements file is what made
+`getUserMedia` work in a signed build. `bundle.macOS.entitlements` expects a
+path relative to the `tauri.conf.json` directory.
+
+**3. Linux.** The WebKitGTK `permission-request` signal fires the handler, but
+the underlying PulseAudio/PipeWire capture still needs the OS-level
+permission. On Wayland this is the desktop portal. Tauri issue #15277 records
+a case where the Rust-side `allow()` was not sufficient on Wayland; the
+reported cause was the caller's own integration path rather than an upstream
+Tauri defect, and the issue was closed. The design therefore does not
+promise a one-click Linux desktop experience, and the docs say so plainly.
+
+**Known asymmetry between dev and release.** On macOS, `getUserMedia` behaves
+differently in `tauri dev` versus a packaged `.app`: `Info.plist` is only
+honoured inside a real bundle, and in dev the *terminal* process inherits the
+microphone TCC permission instead of the app. Tauri issue #10878 documents
+this. The desktop mic must be verified against a **packaged build**
+(`npm --prefix apps/studio run tauri build`), not only `tauri dev`.
+
+## Interaction states
+
+The mic button is a single control that changes appearance and label:
+
+| State | Appearance | Meaning |
+|---|---|---|
+| `idle` | Mic icon, "Record" label | Ready. |
+| `recording` | Pulsing red dot, elapsed time, "Stop" label | Capturing. |
+| `transcribing` | Spinner, "Transcribing…" label | Audio uploaded, awaiting text. |
+| `unsupported` | Mic icon, disabled, tooltip explains | No mic, or no secure context, or no transcription model configured. |
+
+Keyboard: `Escape` while recording stops it and discards the audio.
+
+Accessibility: the button carries `aria-label` that changes with state
+("Record voice message" / "Stop recording" / "Transcribing voice message"),
+and `aria-live="polite"` on the elapsed-time region so a screen reader
+announces the recording state without spamming.
+
+Disabled while a reply is streaming (`streaming === true`) — the studio is
+one conversation, and a half-finished reply should not be interrupted by a
+recording.
+
+## Failure handling
+
+Every failure mode has one specific message, because a mic that fails
+vaguely is a mic nobody trusts.
+
+| Condition | Message |
+|---|---|
+| `navigator.mediaDevices` missing | "This browser cannot record audio. Use the desktop app or a Chromium browser." |
+| Insecure context (not `https:` or `localhost`) | "Recording needs a secure connection. Open the studio over https or on localhost." |
+| Permission denied | "Microphone access was denied. Allow it in your browser's site settings." |
+| No audio device | "No microphone was found." |
+| `MediaRecorder` unsupported | "This browser cannot record audio." |
+| Backend has no `/audio/transcriptions` | "The configured model backend has no transcription endpoint (/audio/transcriptions)." |
+| Backend unreachable | "Could not reach the transcription backend." |
+| Empty transcript | "No speech was detected in that recording." |
+
+Errors surface as a toast (`pushToast("error", …)` in `StudioContext`), which
+is the studio's existing error channel, and the button returns to `idle`.
+
+## What does not change
+
+- `StudioContext.sendMessage` — untouched. Voice produces a string; the string
+  path is the text path.
+- The SSE chat protocol, the tool loop, the MCP client, the ODI domain, the
+  `render_ui` catalog — untouched.
+- The CLI — untouched.
+- The MCP server — untouched. Voice is not a tool; it is an input device.
+
+## Testing strategy
+
+**Sidecar (`apps/studio-api/tests/`)**
+
+- `/api/transcribe` returns the upstream text for a small fake audio upload.
+- A missing `audio` part returns `400`.
+- An oversized upload returns `413` without contacting the backend.
+- An upstream failure returns `502` with the upstream message in `detail`.
+- `defaults()` exposes the transcription model and honours
+  `AGENTIC_ODI_TRANSCRIBE_MODEL`.
+- The transcription call is made against `{base_url}/audio/transcriptions`
+  with the studio's `api_key` — asserted on the fake client, not by hitting a
+  network.
+
+**SPA (`apps/studio/src/`)**
+
+- `lib/recorder.ts`: mime-type selection falls back correctly; a failed
+  `getUserMedia` rejects with a typed reason; the blob is assembled from
+  chunks; tracks are stopped on stop.
+- `MicButton`: renders the right label per state; click starts and stops;
+  `Escape` stops; the button is disabled while `streaming`; the transcript is
+  written into the draft and the textarea is focused.
+- Path selection: `SpeechRecognition` present → Path A; absent → Path B; Path A
+  runtime failure → the user is offered Path B.
+- `studioApi.transcribeAudio` posts multipart and returns the text.
+
+jsdom implements neither `MediaRecorder` nor `getUserMedia`, so both are
+stubbed in the tests, following the existing pattern in
+`apps/studio/src/test/setup.ts` (which already polyfills `scrollTo` and
+`localStorage` for the same reason).
+
+**Desktop**
+
+- `tauri.conf.json` references an `Info.plist` containing
+  `NSMicrophoneUsageDescription` and an entitlements file containing the
+  microphone keys. Asserted by a test that parses the JSON/plist files, so a
+  typo in the bundle metadata fails in CI rather than at a user's first mic
+  click.
+- The Rust permission handler returns `Allow` for `Microphone` and `Default`
+  otherwise. Asserted by a Rust unit test.
+
+**Manual verification** (cannot be automated): grant the mic in a browser, in a
+packaged Tauri build on macOS, and confirm the transcript lands in the
+textarea.
+
+## Documentation
+
+- `README.md` — Code Overview gains the voice capability; Prerequisites
+  unchanged (no new install step).
+- `docs/living-studio.md` — a "Speaking to the copilot" section: the two
+  paths, the `whisper-1` requirement, the settings field, and the per-platform
+  desktop caveats (macOS needs a packaged build; Linux needs portal
+  permission).
+- `docs/local-llm.md` — the backend requirement: serving chat completions is
+  no longer sufficient; `/audio/transcriptions` must exist too.
+- `docs/roadmap.md` — a completed item for voice input.
+- `docs/development.md` — the new test files in the coverage map.
+
+## Open questions for the builder
+
+None that block implementation. The following were decided by the human
+partner and are recorded here as their decisions, not the agent's:
+
+- Transcription runs in the sidecar against an OpenAI-compatible endpoint,
+  with the browser `SpeechRecognition` API tried first.
+- The mic ships in both the browser SPA and the Tauri desktop app.
+- The interaction is record → transcribe → review → send; nothing auto-sends.
+- Configuration reuses the LLM `base_url` and `api_key`, with one new model
+  field.
+---
+
+Additional context you need about the existing codebase (verify anything you're unsure about by reading the files at /home/alexa/repos/agentic-odi):
+
+- The SPA is a React 19 + TS + Vite app at `apps/studio/`. The chat input is `apps/studio/src/components/chat/ChatCopilot.tsx` (a `<textarea>` + Send button in a `<form>`), with `draft`/`setDraft` local state. The API client is `apps/studio/src/api/studioApi.ts`. Global state is `apps/studio/src/state/StudioContext.tsx` (a context with `settings`, `sendMessage`, `pushToast`, `streaming`, `saveSettings`). Types are in `apps/studio/src/types.ts`.
+- The FastAPI sidecar is `apps/studio-api/src/agentic_odi_studio_api/`. Router: `studio/router.py`. Pydantic schemas: `studio/schemas.py`. `defaults()`/env config: `studio/probes.py`. Chat SSE: `studio/chat.py`.
+- The Tauri shell is `apps/studio/src-tauri/` (`Cargo.toml`, `src/lib.rs`, `capabilities/default.json`, `tauri.conf.json`).
+- TypeScript is 5.9.3 with `lib: ["ES2022","DOM","DOM.Iterable"]`. Note: TypeScript's `lib.dom.d.ts` does NOT declare the `SpeechRecognition` interface or the `webkitSpeechRecognition` global — only `SpeechRecognitionAlternative`, `SpeechRecognitionResult`, `SpeechRecognitionResultList` exist. So Path A requires local ambient type declarations.
+- `MediaRecorder`, `MediaDevices.getUserMedia`, and `MediaRecorder.isTypeSupported` ARE in `lib.dom.d.ts`.
+- Python side: `openai` 3.35.1 is a dependency of `apps/studio-api`. `AsyncOpenAI(...).audio.transcriptions.create(file=(name, bytes, mime), model=..., response_format="text")` is available. `python-multipart` 0.0.32 is installed in the venv (transitively) but is NOT a declared dependency of `apps/studio-api` — FastAPI's `UploadFile`/`File(...)` requires it, so it must be added to `apps/studio-api/pyproject.toml` and `uv.lock` updated.
+- Tests: Vitest for the SPA (`apps/studio/vite.config.ts`, jsdom env, setup file `apps/studio/src/test/setup.ts`), pytest for Python. Python tests are in `apps/studio-api/tests/`.
+- `apps/studio/openapi.json` is a committed OpenAPI snapshot and CI runs `npm run gen:api-types` then `git diff --exit-code -- src/api/schema.d.ts`, so adding an endpoint requires regenerating `apps/studio/openapi.json` and `src/api/schema.d.ts`. Note the committed `openapi.json` is ALREADY stale relative to the current app (it lacks the `/api/conversations`, `/api/memory` endpoints and the `ui_catalog` field that exist in code) — so regenerating it will produce a large diff. Consider whether to regenerate the whole file or hand-add only the new endpoint.
+- Rust: `tauri` 2.12.4 with `tauri-plugin-updater` 2. `Builder::on_permission_request` exists on `tauri::Builder` (in `app.rs`).
+
+Report only the questions you'd still need answered before you could plan this well: places where you'd have to guess and a wrong guess would matter. For each, give the question and why the answer changes the plan. Rank them by importance.
+
+Skip anything the document explicitly leaves to the builder, and anything you could reasonably decide yourself. Skip nitpicks about wording.
+
+If nothing important is left, say "nothing important left".
