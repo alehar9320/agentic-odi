@@ -3,7 +3,7 @@
   "checkpoint_id": "01M5FPPAMX19YCSF6RR8XWTD5T",
   "session_id": "ses_ea0c4947bffeY2stQ1wHPfgQTm",
   "strategy": "manual-commit",
-  "created_at": "2026-10-21T17:03:55.273280608Z",
+  "created_at": "2026-10-21T17:10:10.07588145Z",
   "branch": "feat/conversation-first-studio",
   "checkpoints_count": 1,
   "save_step_count": 1,
@@ -22,26 +22,28 @@
   "agent": "OpenCode",
   "model": "minimax-m3.1-flash",
   "turn_id": "53c815b93701",
-  "compact_transcript_start": 0,
+  "checkpoint_transcript_start": 90,
+  "transcript_lines_at_start": 90,
+  "compact_transcript_start": 90,
   "token_usage": {
-    "input_tokens": 93435,
+    "input_tokens": 0,
     "cache_creation_tokens": 0,
-    "cache_read_tokens": 5457412,
-    "output_tokens": 125363,
-    "api_call_count": 89
+    "cache_read_tokens": 0,
+    "output_tokens": 0,
+    "api_call_count": 0
   },
   "session_metrics": {
     "turn_count": 1
   },
   "initial_attribution": {
-    "calculated_at": "2026-10-21T17:03:55.209785942Z",
+    "calculated_at": "2026-10-21T17:10:09.999257478Z",
     "agent_lines": 0,
     "agent_removed": 0,
-    "human_added": 2210,
-    "human_modified": 1961,
+    "human_added": 2425,
+    "human_modified": 1944,
     "human_removed": 0,
-    "total_committed": 2210,
-    "total_lines_changed": 4425,
+    "total_committed": 2425,
+    "total_lines_changed": 4623,
     "agent_percentage": 0,
     "metric_version": 2
   },
