@@ -65,7 +65,7 @@ export function OpportunityLandscape() {
             Opportunity Landscape
           </p>
           <p className="caption" style={{ marginTop: 4, margin: 0, color: "var(--studio-muted)" }}>
-            Interactive 2D Opportunity Matrix mapping Importance vs. Satisfaction. High Opportunity (&gt;10) targets pulse as primary innovation levers.
+            Interactive 2D Opportunity Matrix mapping Importance vs. Satisfaction. Scores above 10 mark underserved market needs and pulse as primary innovation levers.
           </p>
         </div>
 
