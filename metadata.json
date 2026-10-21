@@ -3,7 +3,7 @@
   "checkpoint_id": "01M5FQ721N53H76EVNZK62TKB2",
   "strategy": "manual-commit",
   "branch": "fix/error-handling-hardening",
-  "checkpoints_count": 7,
+  "checkpoints_count": 9,
   "files_touched": [
     ".github/dependabot.yml",
     ".github/workflows/tauri-release.yml",
@@ -95,13 +95,20 @@
       "compact_transcript": "/5/transcript.jsonl",
       "content_hash": "/5/content_hash.txt",
       "prompt": "/5/prompt.txt"
+    },
+    {
+      "metadata": "/6/metadata.json",
+      "transcript": "/6/full.jsonl",
+      "compact_transcript": "/6/transcript.jsonl",
+      "content_hash": "/6/content_hash.txt",
+      "prompt": "/6/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 763872,
+    "input_tokens": 1252874,
     "cache_creation_tokens": 0,
-    "cache_read_tokens": 9217952,
-    "output_tokens": 23409,
-    "api_call_count": 74
+    "cache_read_tokens": 22515232,
+    "output_tokens": 100472,
+    "api_call_count": 197
   }
 }
