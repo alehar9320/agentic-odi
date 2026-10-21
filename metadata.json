@@ -3,7 +3,7 @@
   "checkpoint_id": "01M5FQ721N53H76EVNZK62TKB2",
   "strategy": "manual-commit",
   "branch": "fix/error-handling-hardening",
-  "checkpoints_count": 13,
+  "checkpoints_count": 14,
   "files_touched": [
     ".github/dependabot.yml",
     ".github/workflows/tauri-release.yml",
@@ -62,6 +62,7 @@
     "docs/living-studio.md",
     "docs/local-llm.md",
     "docs/roadmap.md",
+    "packages/core/uv.lock",
     "packaging/pyinstaller/odi.spec",
     "pyproject.toml",
     "scripts/build_binary.sh",
@@ -144,6 +145,13 @@
       "compact_transcript": "/10/transcript.jsonl",
       "content_hash": "/10/content_hash.txt",
       "prompt": "/10/prompt.txt"
+    },
+    {
+      "metadata": "/11/metadata.json",
+      "transcript": "/11/full.jsonl",
+      "compact_transcript": "/11/transcript.jsonl",
+      "content_hash": "/11/content_hash.txt",
+      "prompt": "/11/prompt.txt"
     }
   ],
   "token_usage": {
