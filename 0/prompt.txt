@@ -1,0 +1,18 @@
+Explore the repository at /home/alexa/repos/agentic-odi and report on the following, "very thorough" level:
+
+1. The `studio/` React app: read `studio/src/App.tsx`, `studio/src/main.tsx`, `studio/src/components/StudioHeader.tsx`, `studio/src/components/chat/ChatCopilot.tsx`, `studio/src/components/canvas/*.tsx`, `studio/src/components/SettingsPanel.tsx`, `studio/src/state/StudioContext.tsx`, `studio/src/bridge/desktopBridge.ts`, `studio/src/api/studioApi.ts`. Report:
+   - The overall app layout and what the user sees on first load
+   - All user-visible interactive elements (buttons, inputs, tabs) with their exact visible text/labels and any `data-testid` attributes (check if testids exist at all)
+   - What the app does when the sidecar API is unreachable (error states, empty states, skeleton loaders)
+   - Whether the app is usable in a plain browser (web) or requires Tauri desktop bridge — check `desktopBridge.ts` for fallbacks to fetch
+   - What the landing/first-load screen renders, in terms of testable DOM elements
+
+2. The `local_server` package: what HTTP endpoints it exposes (read `local_server/src/local_server/main.py` and related), what the payload shapes are, especially `/api/config`, `/api/health/mcp`, `/api/canvas`, and any chat/SSE endpoint. Note the exact request/response shapes.
+
+3. The `mcp_server` package: the full list of MCP tools exposed (names + short purpose) and any test/dev fixtures or seed data that let a fresh server start with a populated database. Is there a way to seed the DB (e.g., a scripts/ helper, a `--seed` flag, a fixtures file)?
+
+4. `scripts/` directory: list all files and describe what each does, especially anything that boots services locally or seeds data.
+
+5. `client/src/client/run.py` (or equivalent): what `python -m client.run` starts, on which ports, and how it shuts down.
+
+Report concrete file paths and line numbers. Include short code excerpts of the key parts (App.tsx render tree, endpoint handlers, tool list). Do NOT modify any files.
