@@ -75,11 +75,13 @@ export interface StudioBrief {
   job_id?: string;
 }
 
-/** Secondary surfaces reachable from the drawer. Chat stays the primary stage. */
+/**
+ * Lenses reachable from the rail and the bar. Chat is always the primary
+ * stage; a lens makes room for itself and never replaces the thread.
+ */
 export type WorkspacePanelId =
   | "landscape"
   | "jobmap"
-  | "impact"
   | "evidence"
   | "capture"
   | "catchup"

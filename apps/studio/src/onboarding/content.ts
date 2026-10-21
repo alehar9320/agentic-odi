@@ -1,3 +1,4 @@
+import { IMPACT_PROMPT } from "../lib/commands";
 import type { WorkspacePanelId } from "../types";
 
 /**
@@ -9,7 +10,8 @@ export type GoalId = "name-job" | "landscape" | "impact" | "capture";
 
 export type GoalDestination =
   | { kind: "setup" }
-  | { kind: "panel"; panel: WorkspacePanelId };
+  | { kind: "panel"; panel: WorkspacePanelId }
+  | { kind: "chat"; prompt: string };
 
 export type GoalIconName = "job" | "landscape" | "impact" | "capture";
 
@@ -93,8 +95,8 @@ export const GOALS: OnboardingGoal[] = [
     title: "Simulate a bet",
     blurb: "Preview the friction collapse before you spend a sprint.",
     result: "A before-and-after impact simulation for one bet.",
-    destination: { kind: "panel", panel: "impact" },
-    destinationLabel: "The impact simulator opens full-screen.",
+    destination: { kind: "chat", prompt: IMPACT_PROMPT },
+    destinationLabel: "The studio asks what the bet is and shows what changes.",
     cta: "Open impact",
     icon: "impact",
   },

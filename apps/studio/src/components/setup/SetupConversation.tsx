@@ -40,7 +40,6 @@ interface Turn {
 const PANEL_COMMANDS = new Set<string>([
   "landscape",
   "jobmap",
-  "impact",
   "evidence",
   "capture",
   "settings",
@@ -125,6 +124,7 @@ export function SetupConversation() {
     closeSetup,
     openPanel,
     pushToast,
+    sendMessage,
     llmHealth,
   } = useStudio();
 
@@ -235,6 +235,11 @@ export function SetupConversation() {
       }
       if (intent.kind === "explore") {
         closeSetup();
+        return;
+      }
+      if (intent.kind === "talk") {
+        closeSetup();
+        void sendMessage(intent.text);
         return;
       }
       openPanel(intent.panel);
@@ -362,6 +367,14 @@ export function SetupConversation() {
   function handleCommand(command: StudioCommand) {
     if (PANEL_COMMANDS.has(command.id)) {
       openPanel(command.id as WorkspacePanelId);
+      return;
+    }
+    if (command.id === "impact") {
+      closeSetup();
+      void sendMessage(
+        "Simulate the impact of a bet on my most underserved opportunity. " +
+          "Ask me what the bet is, then show me what changes before and after.",
+      );
       return;
     }
     if (command.id === "help") {

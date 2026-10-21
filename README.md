@@ -97,9 +97,15 @@ sidecar, and Vite together on http://localhost:5173. For the desktop app, use
 The first time you open the Studio it asks — conversationally, in the chat, and
 skippable at any point — for your product, audience, and the job your customers
 are trying to get done. Answer what you like; every reply starts from what you
-shared. After that it opens as a conversation: describe a job or a customer
-frustration, type `/` for commands that mirror the CLI, use the top bar bell icon
-or drawer to **catch up on background outcome shifts, simulations, and telemetry signals while you were away**, or open the opportunity landscape, job map, impact simulation, evidence, and capture surfaces full screen.
+shared. After that it opens as one room: the transcript and the composer never
+leave the screen. Describe a job or a customer frustration, or type `/` for
+commands that mirror the CLI. Whatever the thread produces — scored outcomes, a
+job map, customer evidence — arrives as an inline surface, and a quiet rail
+above the conversation opens it in a lens that docks beside the thread instead
+of replacing it. Capture and simulation are conversations too: tell the studio
+what a customer said, or what bet you are weighing, and it renders the card. Use
+the bell to **catch up on outcome shifts, simulations, and telemetry signals
+while you were away**.
 
 The Studio is better with an OpenAI-compatible LLM with tool-calling support
 (see the [Local LLM Backend](docs/local-llm.md)), but it does not depend on one:

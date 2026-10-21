@@ -3,192 +3,64 @@ import { useEffect, useState } from "react";
 import { ChangelogModal } from "./components/ChangelogModal";
 import { ChatStage } from "./components/chat/ChatStage";
 import { ErrorBoundary } from "./components/ErrorBoundary";
-import { BellIcon, MenuIcon, SettingsIcon } from "./components/icons";
-import { Sidebar } from "./components/layout/Sidebar";
+import { StudioBar } from "./components/layout/StudioBar";
 import { Toasts } from "./components/Toasts";
+import { WorkbenchRail } from "./components/workspace/WorkbenchRail";
 import { WorkspacePanel } from "./components/workspace/WorkspacePanel";
-import { useMediaQuery } from "./lib/useMediaQuery";
 import { FirstRunWizard, OnboardingProvider } from "./onboarding";
 import { StudioProvider, useStudio } from "./state/StudioContext";
 
-const COLLAPSED_KEY = "studio.sidebarCollapsed";
-const MOBILE_QUERY = "(max-width: 1023px)";
-
-function loadCollapsed(): boolean {
-  try {
-    const stored = localStorage.getItem(COLLAPSED_KEY);
-    if (stored !== null) {
-      return stored === "1";
-    }
-  } catch {
-    /* storage unavailable */
-  }
-  return false;
-}
-
+/**
+ * One room, one intelligence.
+ *
+ * The conversation owns the stage at every moment. The rail above it is the
+ * only navigation, and it is derived from what the thread has produced. A
+ * workspace view docks beside the thread instead of replacing it, so the
+ * composer never leaves the screen.
+ */
 function StudioShell() {
-  const { activePanel, closePanel, openPanel, llmHealth, clearChat, closeSetup, unreadNotificationCount } = useStudio();
-  const [desktopCollapsed, setDesktopCollapsed] = useState(loadCollapsed);
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  const { closePanel, clearChat, closeSetup } = useStudio();
   const [showChangelog, setShowChangelog] = useState(false);
-  const isMobile = useMediaQuery(MOBILE_QUERY);
-
-  // The drawer is a rail on desktop and a full overlay sheet on phones.
-  const collapsed = isMobile ? !drawerOpen : desktopCollapsed;
-
-  function toggleDrawer() {
-    if (isMobile) {
-      setDrawerOpen((prev) => !prev);
-    } else {
-      setDesktopCollapsed((prev) => !prev);
-    }
-  }
-
-  function closeDrawer() {
-    if (isMobile) {
-      setDrawerOpen(false);
-    }
-  }
 
   function goHome() {
     clearChat();
     closePanel();
     closeSetup();
-    setDrawerOpen(false);
+  }
+
+  function newConversation() {
+    clearChat();
+    closePanel();
   }
 
   useEffect(() => {
-    if (isMobile) {
-      return;
-    }
-    try {
-      localStorage.setItem(COLLAPSED_KEY, desktopCollapsed ? "1" : "0");
-    } catch {
-      /* storage unavailable */
-    }
-  }, [desktopCollapsed, isMobile]);
-
-  useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "b") {
-        event.preventDefault();
-        if (isMobile) {
-          setDrawerOpen((prev) => !prev);
-        } else {
-          setDesktopCollapsed((prev) => !prev);
-        }
-      }
       if (event.key === "Escape") {
         closePanel();
-        if (isMobile) {
-          setDrawerOpen(false);
-        }
       }
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [closePanel, isMobile]);
+  }, [closePanel]);
 
   return (
-    <div className={`studio-app${collapsed ? " studio-app--collapsed" : ""}`}>
-      <Sidebar
-        collapsed={collapsed}
-        onToggle={toggleDrawer}
-        onNavigate={closeDrawer}
-        onHome={goHome}
-      />
-
-      {isMobile && drawerOpen && (
-        <button
-          type="button"
-          className="scrim"
-          aria-label="Close navigation"
-          onClick={closeDrawer}
-        />
-      )}
-
+    <div className="studio-app">
       <main className="stage">
-        <header className="bar">
-          <div className="bar__left">
-            {collapsed && (
-              <button
-                type="button"
-                className="icon-button"
-                aria-label="Open navigation"
-                title="Open navigation"
-                onClick={toggleDrawer}
-              >
-                <MenuIcon size={18} />
-              </button>
-            )}
-            {collapsed && (
-              <button type="button" className="bar__brand" onClick={goHome}>
-                Living Studio
-              </button>
-            )}
+        <StudioBar
+          onHome={goHome}
+          onNew={newConversation}
+          onChangelog={() => setShowChangelog(true)}
+        />
+        <div className="stage__split">
+          <div className="stage__thread">
+            <WorkbenchRail />
+            <ChatStage />
           </div>
-          <div className="bar__right">
-            <button
-              type="button"
-              className="studio-pill pill-changelog"
-              onClick={() => setShowChangelog(true)}
-              aria-label="Open What's New changelog"
-            >
-              ✨ What's New
-            </button>
-            <button
-              type="button"
-              className="icon-button bar__bell"
-              aria-label="Catch up notifications"
-              title="Activity & Catch Up"
-              onClick={() => openPanel("catchup")}
-              style={{ position: "relative" }}
-            >
-              <BellIcon size={18} />
-              {unreadNotificationCount > 0 && (
-                <span className="bell-badge" aria-hidden="true">
-                  {unreadNotificationCount}
-                </span>
-              )}
-            </button>
-            <button
-              type="button"
-              className="bar__health"
-              onClick={() => openPanel("settings")}
-              title={llmHealth.message}
-            >
-              <span
-                className={`status-dot${llmHealth.healthy === false ? " is-warn" : ""}${
-                  llmHealth.healthy === null ? " is-unknown" : ""
-                }`}
-              />
-              {llmHealth.healthy === null
-                ? "Connecting"
-                : llmHealth.healthy
-                  ? "Live"
-                  : "Local mode"}
-            </button>
-
-            <button
-              type="button"
-              className="icon-button"
-              aria-label="Open settings"
-              title="Settings"
-              onClick={() => openPanel("settings")}
-            >
-              <SettingsIcon size={18} />
-            </button>
-          </div>
-        </header>
-
-        <div className="stage__body">
-          {activePanel ? <WorkspacePanel /> : <ChatStage />}
+          <WorkspacePanel />
         </div>
       </main>
-
-      <Toasts />
-
       <ChangelogModal isOpen={showChangelog} onClose={() => setShowChangelog(false)} />
+      <Toasts />
     </div>
   );
 }

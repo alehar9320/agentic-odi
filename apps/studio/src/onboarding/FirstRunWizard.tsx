@@ -28,6 +28,7 @@ export function FirstRunWizard() {
     checkConnections,
     openPanel,
     openSetup,
+    sendMessage,
   } = useStudio();
 
   const panelRef = useRef<HTMLDivElement>(null);
@@ -195,6 +196,10 @@ export function FirstRunWizard() {
     complete();
     if (activeGoal.destination.kind === "setup") {
       openSetup();
+    } else if (activeGoal.destination.kind === "chat") {
+      // Some starting points are a conversation, not a view: the stage stays
+      // the stage and the studio asks the first question.
+      void sendMessage(activeGoal.destination.prompt);
     } else {
       openPanel(activeGoal.destination.panel);
     }

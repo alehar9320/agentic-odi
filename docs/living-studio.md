@@ -38,12 +38,13 @@ The Studio opens as a conversation, not a dashboard.
 | Surface | What it does |
 |---|---|
 | **First-run tour** | A four-step, skippable welcome on the very first visit: what the studio is, which of four starting points you want, the live state of your sidecar/MCP/model (with inline repair when the model is down), and the first move. Finishing opens the chosen surface; **Name the job** hands off to the context conversation. Replay it from **Settings → Replay the welcome tour**. |
-| **First run** | A short conversation in the chat, not a form: what you are building, who feels the problem, the job they are trying to get done, then where it hurts. One question at a time, with a reflection before the next ask, quick replies, and **Explore on my own** always visible. Skipping is allowed; answers and progress are kept as a draft. Re-open it any time with `/start`, the sidebar's **Your context**, or Settings. |
+| **First run** | A short conversation in the chat, not a form: what you are building, who feels the problem, the job they are trying to get done, then where it hurts. One question at a time, with a reflection before the next ask, quick replies, and **Explore on my own** always visible. Skipping is allowed; answers and progress are kept as a draft. Re-open it any time with `/start`, the home stage's context pill, or Settings. |
 | **Hero** | One rotating headline above the composer: a greeting (time of day, plus your name if you set one in Settings), the product/job you set up, what is already on the canvas, or what the studio can do. It cycles every few seconds and stays still under `prefers-reduced-motion`. |
-| **Suggestion pills** | Below the headline. Some open a surface (landscape, simulate, capture), others start a conversation. They change as the canvas fills up. |
+| **Suggestion pills** | Below the headline. Some start a conversation (define a job, simulate a bet, capture what a customer said), others open a lens (landscape, job map). They change as the canvas fills up. |
 | **Composer** | Docked at the bottom of the transcript. `Enter` sends, `Shift`+`Enter` adds a line, `Cmd/Ctrl`+`K` focuses it, and `/` opens the command palette. The send button becomes a stop button while a reply streams. |
-| **Drawer** (left) | The wordmark is a home button. Below it: new conversation, your context, the five workspace surfaces with counts, live model/MCP status, and Settings. Collapses to an icon rail with `Cmd/Ctrl`+`B`; becomes an overlay sheet on narrow screens. |
-| **Workspace surfaces** | The classic UI — opportunity landscape, job map, impact simulation, evidence, direct capture, settings — takes the whole stage while open. **Back to conversation** or `Esc` returns; the chat is never squeezed into a side column. |
+| **Bar** | The only persistent chrome: home, new conversation, catch-up, live model status, and settings. There is no navigation drawer to compete with the thread. |
+| **Rail** | Above the conversation, and only once the thread has produced something: `Landscape · N`, `Job map · N`, `Evidence · N`. Every item is derived from the canvas, so the strip is a record of the work rather than a fixed menu. |
+| **Lens** | A view docks to the right of the thread on wide screens and becomes a full-height sheet on narrow ones. The transcript and the composer stay on screen and stay usable; `Esc`, **Close**, or the rail chip closes it. Every lens ends in one sentence that re-enters the conversation — *Ask which to chase*, *Walk me through the job*, *Weigh the evidence* — so leaving a view is never a return to a menu. Settings and catch-up use the same lens. |
 
 Replies render Markdown (headings, lists, emphasis, inline and fenced code).
 Tool calls appear inline as small trace chips while the agent works.
@@ -61,7 +62,8 @@ the model, so they work when it is offline.
 | `/new` | New conversation |
 | `/home` | Return to the empty stage |
 | `/jobs` | Job summary, then the job map |
-| `/landscape`, `/jobmap`, `/impact`, `/evidence`, `/capture`, `/settings` | Open that surface full screen |
+| `/landscape`, `/jobmap`, `/evidence`, `/settings` | Open that lens beside the conversation |
+| `/impact`, `/capture` | Start the conversation that produces the card. `/capture` falls back to the offline form when no model answers. |
 | `/status` | Model, MCP, context, and canvas status |
 
 Unknown commands produce a transcript notice pointing at `/help`.
@@ -105,9 +107,8 @@ is written, and Settings hides the replay action.
 ### Guidance, not gates
 
 The setup conversation is a nudge, never a prerequisite. If you skip it, the
-home stage keeps a dashed **Tell me what you're building** pill and the sidebar
-marks **Your context** with a dot; both reopen the conversation exactly where
-you left off. `/start` does the same. The conversation also understands a
+home stage keeps a dashed **Tell me what you're building** pill; it reopens the
+conversation exactly where you left off. `/start` and Settings do the same. The conversation also understands a
 natural reply: say "skip", "not now", or "show me the landscape" and it reacts
 instead of recording it as an answer. When a brief exists, it opens on a review
 and asks what changed rather than asking everything again.
@@ -127,6 +128,18 @@ When the LLM is unreachable the Studio keeps working:
 
 The user's context is sent with every chat request, so the assistant starts from
 the product, audience, job, and problem rather than asking for them again.
+
+### The thread is the room
+
+Capture, scoring, simulation, and decisions are conversations. The storefront
+never asks the PM to leave the thread to do work: the agent asks for the
+customer's words or the bet in plain language, then renders the surface that
+carries it. A lens exists for reading and for people who prefer a click, not for
+doing the work.
+
+That is also enforced in the agent's system prompt: it is told to keep every
+artifact in the conversation, never to send the PM to a panel, and to end each
+reply with the next move as an action on the surface.
 
 ## Rich responses
 
