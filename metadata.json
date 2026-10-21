@@ -3,13 +3,14 @@
   "checkpoint_id": "01M5FKFWPE2K7A5P70BHQJAP4Q",
   "strategy": "manual-commit",
   "branch": "feat/studio-first-run-wizard",
-  "checkpoints_count": 8,
+  "checkpoints_count": 9,
   "files_touched": [
     "README.md",
     "apps/studio/src/App.tsx",
     "apps/studio/src/components/SettingsPanel.tsx",
     "apps/studio/src/features/flags.test.ts",
     "apps/studio/src/onboarding/FirstRunWizard.test.tsx",
+    "apps/studio/src/onboarding/FirstRunWizard.tsx",
     "apps/studio/src/onboarding/OnboardingProvider.tsx",
     "apps/studio/src/onboarding/content.ts",
     "apps/studio/src/onboarding/context.ts",
@@ -17,6 +18,7 @@
     "apps/studio/src/onboarding/machine.test.ts",
     "apps/studio/src/onboarding/machine.ts",
     "apps/studio/src/onboarding/onboarding.css",
+    "apps/studio/src/onboarding/steps.tsx",
     "apps/studio/src/onboarding/storage.ts",
     "apps/studio/src/state/StudioContext.tsx",
     "apps/studio/src/vite-env.d.ts",
@@ -66,6 +68,13 @@
       "compact_transcript": "/5/transcript.jsonl",
       "content_hash": "/5/content_hash.txt",
       "prompt": "/5/prompt.txt"
+    },
+    {
+      "metadata": "/6/metadata.json",
+      "transcript": "/6/full.jsonl",
+      "compact_transcript": "/6/transcript.jsonl",
+      "content_hash": "/6/content_hash.txt",
+      "prompt": "/6/prompt.txt"
     }
   ],
   "token_usage": {
