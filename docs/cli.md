@@ -15,12 +15,13 @@ uv sync --all-packages
 ## Launching
 
 ```bash
-python -m agentic_odi_cli --version   # print the Agentic ODI version
-python -m agentic_odi_cli --help      # show available options and commands
-python -m agentic_odi_cli             # start interactive chat in a terminal (help when piped)
+python -m agentic_odi_cli --version            # print the Agentic ODI version
+python -m agentic_odi_cli --version --verbose  # print version with build metadata
+python -m agentic_odi_cli --help               # show available options and commands
+python -m agentic_odi_cli                      # start interactive chat in a terminal (help when piped)
 ```
 
-A console script is also installed, so `agentic-odi --version` works the same way.
+A console script is also installed, so `agentic-odi --version` and `agentic-odi version --verbose` work the same way.
 
 ## Global options
 

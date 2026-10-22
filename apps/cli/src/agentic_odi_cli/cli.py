@@ -193,9 +193,19 @@ def capabilities_cmd() -> None:
 
 
 @app.command(name="version")
-def version_cmd() -> None:
+def version_cmd(
+    verbose: bool = typer.Option(
+        False,
+        "--verbose",
+        "-v",
+        help="Show verbose version information (including build metadata).",
+    ),
+) -> None:
     """Show CLI version."""
-    typer.echo(version.build_summary())
+    if verbose:
+        typer.echo(version.verbose_summary())
+    else:
+        typer.echo(version.build_summary())
 
 
 @app.command(name="wizard")
