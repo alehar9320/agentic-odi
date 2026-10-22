@@ -3,19 +3,34 @@
   "checkpoint_id": "01M5HZ4CJ2RMBD0RQ2ZJNWEA41",
   "strategy": "manual-commit",
   "branch": "feature/gh-pages-redesign",
-  "checkpoints_count": 2,
+  "checkpoints_count": 3,
   "files_touched": [
     "website/assets/style.css",
     "website/content/nav.json",
     "website/dist/assets/style.css",
+    "website/dist/docs/architecture/index.html",
+    "website/dist/docs/cli/index.html",
+    "website/dist/docs/connectors/index.html",
+    "website/dist/docs/deployment/index.html",
+    "website/dist/docs/development/index.html",
+    "website/dist/docs/index.html",
+    "website/dist/docs/installation/index.html",
+    "website/dist/docs/local-llm/index.html",
+    "website/dist/docs/mcp/index.html",
+    "website/dist/docs/quick-start/index.html",
+    "website/dist/docs/roadmap/index.html",
+    "website/dist/docs/studio/index.html",
     "website/dist/sitemap.xml",
     "website/templates/_mcp_reference.html",
     "website/templates/_quick_start.html",
     "website/templates/doc.html",
     "website/templates/docs_index.html",
     "website/templates/landing.html",
+    "website/tests/test_content_sync.py",
+    "website/tests/test_docs_render.py",
     "website/tests/test_site.py",
-    "website/tools/build_site.py"
+    "website/tools/build_site.py",
+    "website/tools/markdown_render.py"
   ],
   "sessions": [
     {
@@ -24,13 +39,20 @@
       "compact_transcript": "/0/transcript.jsonl",
       "content_hash": "/0/content_hash.txt",
       "prompt": "/0/prompt.txt"
+    },
+    {
+      "metadata": "/1/metadata.json",
+      "transcript": "/1/full.jsonl",
+      "compact_transcript": "/1/transcript.jsonl",
+      "content_hash": "/1/content_hash.txt",
+      "prompt": ""
     }
   ],
   "token_usage": {
-    "input_tokens": 121799,
+    "input_tokens": 402615,
     "cache_creation_tokens": 0,
-    "cache_read_tokens": 924672,
-    "output_tokens": 4665,
-    "api_call_count": 19
+    "cache_read_tokens": 19832568,
+    "output_tokens": 34780,
+    "api_call_count": 88
   }
 }
