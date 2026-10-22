@@ -220,6 +220,8 @@ export interface StudioContextValue {
   dismissToast: (id: number) => void;
   connectors: ConnectorListItem[];
   presets: ConnectorPreset[];
+  /** The failure behind an unreachable connector catalog, if any. */
+  presetError: StudioError | null;
   refreshConnectors: () => Promise<void>;
   refreshPresets: () => Promise<void>;
   addConnector: (payload: AddConnectorPayload) => Promise<void>;
@@ -340,6 +342,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [connectors, setConnectors] = useState<ConnectorListItem[]>([]);
   const [presets, setPresets] = useState<ConnectorPreset[]>([]);
+  const [presetError, setPresetError] = useState<StudioError | null>(null);
   const [connectorSuggestions, setConnectorSuggestions] = useState<string[]>([]);
   const [notifications, setNotifications] = useState<StudioNotification[]>(loadNotifications);
   const toastId = useRef(0);
@@ -418,9 +421,13 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const refreshPresets = useCallback(async () => {
+    setPresetError(null);
     try {
       setPresets(await fetchConnectorCatalog());
-    } catch {
+    } catch (error) {
+      // An unreachable catalog is a failure, not an empty catalog: the settings
+      // panel says so instead of offering a select with nothing in it.
+      setPresetError(asStudioError(error));
       setPresets([]);
     }
   }, []);
@@ -603,28 +610,21 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 
   const addOutcome = useCallback(
     async (payload: Omit<AddOutcomePayload, "mcp_url">) => {
-      try {
-        await apiAddOutcome({ ...payload, mcp_url: settings.mcp_url });
-        pushToast("success", "Outcome captured successfully!");
-        await refreshCanvas();
-      } catch (error) {
-        pushToast("error", `Error capturing outcome: ${(error as Error).message}`);
-      }
+      // The form that asked for this shows the failure where the user typed
+      // it, so the error travels up instead of disappearing into a toast.
+      await apiAddOutcome({ ...payload, mcp_url: settings.mcp_url });
+      pushToast("success", "Outcome captured successfully!");
+      await refreshCanvas();
     },
     [settings.mcp_url, pushToast, refreshCanvas],
   );
 
   const createJob = useCallback(
     async (payload: { name: string; description?: string }): Promise<string | null> => {
-      try {
-        const job = await apiCreateJob({ ...payload, mcp_url: settings.mcp_url });
-        pushToast("success", `Job created: ${payload.name}`);
-        await refreshCanvas();
-        return job.id ?? null;
-      } catch (error) {
-        pushToast("error", `Could not create the job: ${(error as Error).message}`);
-        return null;
-      }
+      const job = await apiCreateJob({ ...payload, mcp_url: settings.mcp_url });
+      pushToast("success", `Job created: ${payload.name}`);
+      await refreshCanvas();
+      return job.id ?? null;
     },
     [settings.mcp_url, pushToast, refreshCanvas],
   );
@@ -1177,6 +1177,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       dismissToast,
       connectors,
       presets,
+      presetError,
       refreshConnectors,
       refreshPresets,
       addConnector,
@@ -1246,6 +1247,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       dismissToast,
       connectors,
       presets,
+      presetError,
       refreshConnectors,
       refreshPresets,
       addConnector,
