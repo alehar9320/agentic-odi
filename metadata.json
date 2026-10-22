@@ -3,7 +3,7 @@
   "checkpoint_id": "01M5HPRT6BN90HTJGDZVZVZDYK",
   "strategy": "manual-commit",
   "branch": "feature/gh-pages-redesign",
-  "checkpoints_count": 3,
+  "checkpoints_count": 7,
   "files_touched": [
     ".gitignore",
     "website/content/landing.json",
@@ -40,6 +40,13 @@
       "compact_transcript": "/1/transcript.jsonl",
       "content_hash": "/1/content_hash.txt",
       "prompt": "/1/prompt.txt"
+    },
+    {
+      "metadata": "/2/metadata.json",
+      "transcript": "/2/full.jsonl",
+      "compact_transcript": "/2/transcript.jsonl",
+      "content_hash": "/2/content_hash.txt",
+      "prompt": "/2/prompt.txt"
     }
   ],
   "token_usage": {
