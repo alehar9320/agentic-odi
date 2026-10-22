@@ -90,7 +90,6 @@ class ChatRequest(BaseModel):
     brief: StudioBrief | None = None
     ui_catalog: UiCatalogRequest | None = None
     conversation_id: str | None = None
-    request_id: str | None = None
 
 
 class AddConnectorRequest(BaseModel):

@@ -1800,8 +1800,20 @@ input[type="range"] {
   word-break: break-word;
 }
 
+/* Why the board is not what the server holds. */
+.canvas-warnings {
+  margin: 12px 0 0;
+  padding: 8px 12px 8px 28px;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-radius: 8px;
+  background: rgba(245, 158, 11, 0.08);
+  color: #f0b45a;
+  font-size: 0.78rem;
+}
+
 /* An empty canvas is an invitation, not a board of zeroes. */
-.studio-empty {  margin-top: 16px;
+.studio-empty {
+  margin-top: 16px;
   padding: 28px 20px;
   text-align: center;
   background: var(--studio-surface);

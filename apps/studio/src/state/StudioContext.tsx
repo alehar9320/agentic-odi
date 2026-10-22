@@ -222,6 +222,8 @@ export interface StudioContextValue {
   presets: ConnectorPreset[];
   /** The failure behind an unreachable connector catalog, if any. */
   presetError: StudioError | null;
+  /** The failure behind an unreachable connector list, if any. */
+  connectorsError: StudioError | null;
   refreshConnectors: () => Promise<void>;
   refreshPresets: () => Promise<void>;
   addConnector: (payload: AddConnectorPayload) => Promise<void>;
@@ -343,6 +345,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [connectors, setConnectors] = useState<ConnectorListItem[]>([]);
   const [presets, setPresets] = useState<ConnectorPreset[]>([]);
   const [presetError, setPresetError] = useState<StudioError | null>(null);
+  const [connectorsError, setConnectorsError] = useState<StudioError | null>(null);
   const [connectorSuggestions, setConnectorSuggestions] = useState<string[]>([]);
   const [notifications, setNotifications] = useState<StudioNotification[]>(loadNotifications);
   const toastId = useRef(0);
@@ -413,9 +416,12 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const refreshConnectors = useCallback(async () => {
+    setConnectorsError(null);
     try {
       setConnectors(await fetchConnectors());
-    } catch {
+    } catch (error) {
+      // A list that could not be fetched is not an empty list.
+      setConnectorsError(asStudioError(error));
       setConnectors([]);
     }
   }, []);
@@ -748,6 +754,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       let parts: ChatPart[] = [];
       let failure: StudioError | null = null;
       let terminal = false;
+      let stopped = false;
 
       // Prose is appended to the open text part; a surface opens a new one, so
       // the transcript keeps the agent's order instead of gathering all prose
@@ -894,8 +901,9 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       } catch (error) {
         const aborted = (error as Error).name === "AbortError";
         if (aborted) {
-          // An abort is the user's own doing: drop the empty placeholder, but
-          // never the question they asked.
+          // An abort is the user's own doing: drop the empty placeholder, keep
+          // the question, and report no failure — the assistant did not break.
+          stopped = true;
           setMessages((prev) => {
             const next = [...prev];
             if (next.length && next[next.length - 1].role === "assistant" && !next[next.length - 1].content) {
@@ -909,7 +917,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
           publish();
         }
       } finally {
-        if (!terminal && !failure) {
+        if (!terminal && !failure && !stopped) {
           // The stream ended without a message or an error: something failed
           // silently, and the user must still be told.
           failure = {
@@ -1176,6 +1184,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       pushToast,
       dismissToast,
       connectors,
+      connectorsError,
       presets,
       presetError,
       refreshConnectors,
@@ -1246,6 +1255,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       pushToast,
       dismissToast,
       connectors,
+      connectorsError,
       presets,
       presetError,
       refreshConnectors,

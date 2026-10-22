@@ -52,6 +52,12 @@ def log_turn(**fields: Any) -> None:
 
     Sensitive fields are dropped outright: the line says what happened in the
     turn, and it must not name a secret any more than it carries its value.
+    Nested mappings are redacted rather than dropped, so a context that is
+    worth keeping can still be logged.
     """
-    payload = {key: value for key, value in fields.items() if not _is_sensitive(str(key))}
+    payload: dict[str, Any] = {}
+    for key, value in fields.items():
+        if _is_sensitive(str(key)):
+            continue
+        payload[key] = redact(value) if isinstance(value, Mapping) else value
     log.info(json.dumps(payload, default=str, sort_keys=True))

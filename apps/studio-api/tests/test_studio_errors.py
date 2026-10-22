@@ -90,3 +90,50 @@ def test_unknown_api_route_is_not_swallowed_by_the_spa(monkeypatch, tmp_path) ->
 
     assert response.status_code == 404
     assert response.json()["error"]["code"] == "not_found"
+
+
+def test_chat_request_id_comes_from_the_header_not_the_body() -> None:
+    client = _client(create_app(InMemoryRepository()))
+
+    response = client.post(
+        "/api/chat",
+        json={
+            "base_url": "http://llm/v1",
+            "api_key": "k",
+            "model": "m",
+            "mcp_url": "http://mcp",
+            "messages": [{"role": "user", "content": "hi"}],
+            "request_id": "client-supplied",  # ignored: the header owns the id
+        },
+        headers={"X-Request-ID": "header-id"},
+    )
+
+    assert response.status_code == 200
+    assert response.headers["X-Request-ID"] == "header-id"
+    assert "client-supplied" not in response.text
+    assert "header-id" in response.text
+
+
+def test_an_unusable_request_id_is_replaced() -> None:
+    client = _client(create_app(InMemoryRepository()))
+
+    response = client.get(
+        "/api/does-not-exist",
+        headers={"X-Request-ID": "a" * 300},
+    )
+
+    assert response.status_code == 404
+    body = response.json()
+    assert body["error"]["request_id"] != "a" * 300
+    assert body["error"]["request_id"] == response.headers["X-Request-ID"]
+
+
+def test_the_spa_fallback_404_body_carries_the_request_id() -> None:
+    from agentic_odi_studio_api import app as app_module
+
+    client = _client(create_app(InMemoryRepository()))
+    response = client.get("/api/does-not-exist", headers={"X-Request-ID": "req-9"})
+
+    assert response.status_code == 404
+    assert response.json()["error"]["request_id"] == "req-9"
+    assert app_module is not None

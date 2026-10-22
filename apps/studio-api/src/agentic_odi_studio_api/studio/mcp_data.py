@@ -15,6 +15,7 @@ from agentic_odi_core.remote import (
     tool_result_text,
 )
 from fastmcp import Client as McpClient
+from fastmcp.exceptions import ToolError
 
 from agentic_odi_studio_api.studio.errors import StudioHTTPError
 from agentic_odi_studio_api.studio.probes import is_endpoint_reachable
@@ -43,7 +44,7 @@ async def fetch_canvas(mcp_url: str) -> dict[str, Any]:
                 mcp_client.call_tool(ToolName.GET_JOBS.value, {}), timeout=1.5
             )
             try:
-                parsed_jobs = json.loads(str(raw_jobs))
+                parsed_jobs = json.loads(tool_result_text(raw_jobs))
                 if isinstance(parsed_jobs, list):
                     jobs = parsed_jobs
             except Exception as exc:  # noqa: BLE001
@@ -60,7 +61,7 @@ async def fetch_canvas(mcp_url: str) -> dict[str, Any]:
                         mcp_client.call_tool(ToolName.GET_JOB_MAP.value, {"job_id": job_id}),
                         timeout=1.0,
                     )
-                    parsed_steps = json.loads(str(raw_steps))
+                    parsed_steps = json.loads(tool_result_text(raw_steps))
                     if isinstance(parsed_steps, list):
                         steps.extend(parsed_steps)
                 except Exception as exc:  # noqa: BLE001
@@ -73,7 +74,7 @@ async def fetch_canvas(mcp_url: str) -> dict[str, Any]:
                         mcp_client.call_tool(ToolName.GET_OUTCOMES.value, {"job_id": job_id}),
                         timeout=1.0,
                     )
-                    parsed_outcomes = json.loads(str(raw_outcomes))
+                    parsed_outcomes = json.loads(tool_result_text(raw_outcomes))
                     if isinstance(parsed_outcomes, list):
                         outcomes.extend(parsed_outcomes)
                 except Exception as exc:  # noqa: BLE001
@@ -126,6 +127,16 @@ async def call_mcp_tool(mcp_url: str, tool: str, arguments: dict[str, Any]) -> s
             )
     except StudioHTTPError:
         raise
+    except ToolError as exc:
+        # The tool ran and refused: that is the tool's failure, not the
+        # server's, and it is not worth retrying.
+        raise StudioHTTPError(
+            StudioError(
+                code=StudioErrorCode.MCP_TOOL_FAILED,
+                message=f"The {tool} tool failed: {exc}",
+                retryable=False,
+            )
+        ) from exc
     except Exception as exc:  # noqa: BLE001
         raise StudioHTTPError(
             StudioError(

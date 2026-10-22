@@ -29,6 +29,8 @@ export interface CanvasData {
   steps: Step[];
   outcomes: Outcome[];
   source: "mcp" | "seed" | "local";
+  /** Why the board is not what the server actually holds, when the sidecar knows. */
+  warnings?: string[];
 }
 
 /**

@@ -17,10 +17,15 @@ export function FailurePanel({
   return (
     <div className="failure" role="alert">
       <p className="failure__message">{error.message}</p>
-      {error.detail ? (
+      {error.detail || error.request_id ? (
         <details className="failure__detail">
           <summary>Details</summary>
-          <pre>{error.detail}</pre>
+          {error.detail ? <pre>{error.detail}</pre> : null}
+          {error.request_id ? (
+            <p className="failure__request">
+              Request id: <code>{error.request_id}</code>
+            </p>
+          ) : null}
         </details>
       ) : null}
       {error.suggestion ? <p className="failure__suggestion">{error.suggestion}</p> : null}

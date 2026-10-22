@@ -67,3 +67,38 @@ def test_log_turn_never_writes_secrets_or_quotations(caplog) -> None:
     assert "quote" not in text
     assert "customer words" not in text
     assert "request_id" in text
+
+
+def test_log_turn_records_the_error_code_of_a_failed_turn(caplog) -> None:
+    with caplog.at_level(logging.INFO, logger="agentic_odi_studio_api.studio.observability"):
+        log_turn(
+            request_id="req-1",
+            model="m",
+            rounds=0,
+            tool_calls=0,
+            tool_errors=0,
+            duration_ms=5,
+            outcome="failed",
+            error_code="mcp_unreachable",
+        )
+
+    payload = json.loads(caplog.records[0].getMessage())
+    assert payload["error_code"] == "mcp_unreachable"
+
+
+def test_log_turn_redacts_nested_values(caplog) -> None:
+    with caplog.at_level(logging.INFO, logger="agentic_odi_studio_api.studio.observability"):
+        log_turn(
+            request_id="req-1",
+            model="m",
+            rounds=0,
+            tool_calls=0,
+            tool_errors=0,
+            duration_ms=1,
+            outcome="completed",
+            context={"api_key": "sk-live", "name": "studio"},
+        )
+
+    payload = json.loads(caplog.records[0].getMessage())
+    assert payload["context"]["api_key"] == "[redacted]"
+    assert payload["context"]["name"] == "studio"

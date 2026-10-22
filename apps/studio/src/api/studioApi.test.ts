@@ -90,14 +90,14 @@ describe("health probes", () => {
 
 describe("mcp passthrough writes", () => {
   it("adds a step", async () => {
-    mockJson({ ok: true, result: "created" });
+    mockJson({ id: "STEP-1", job_id: "JOB-402", name: "9. Ship", order: 9 });
     await expect(
       addStep({ mcp_url: "u", job_id: "JOB-402", name: "9. Ship", order: 9 }),
-    ).resolves.toMatchObject({ ok: true });
+    ).resolves.toMatchObject({ id: "STEP-1" });
   });
 
   it("adds an outcome", async () => {
-    mockJson({ ok: true, result: "created" });
+    mockJson({ id: "O-1", statement: "Minimize time", opportunity_score: 12 });
     await expect(
       addOutcome({
         mcp_url: "u",
@@ -106,7 +106,7 @@ describe("mcp passthrough writes", () => {
         importance: 8.5,
         satisfaction: 3.5,
       }),
-    ).resolves.toMatchObject({ ok: true });
+    ).resolves.toMatchObject({ id: "O-1" });
   });
 });
 

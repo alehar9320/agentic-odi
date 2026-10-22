@@ -20,9 +20,11 @@ export function SettingsPanel() {
     mcpReachable,
     pushToast,
     connectors,
+    connectorsError,
     presets,
     presetError,
     refreshPresets,
+    refreshConnectors,
     addConnector,
     deleteConnector,
   } = useStudio();
@@ -152,7 +154,13 @@ export function SettingsPanel() {
       </ul>
 
       <h3 className="settings__title">Connectors</h3>
-      {connectors.length === 0 ? (
+      {connectorsError ? (
+        <FailurePanel
+          error={connectorsError}
+          retryText="reload"
+          onRetry={() => void refreshConnectors()}
+        />
+      ) : connectors.length === 0 ? (
         <p className="muted">No connectors registered. Pick a preset to add one.</p>
       ) : (
         <ul className="connection-list">

@@ -135,6 +135,7 @@ describe("Conversation failures", () => {
     expect(container.textContent).toContain("The MCP server is unreachable.");
     expect(container.textContent).toContain("Check that the MCP server is running");
     expect(container.querySelector('[role="alert"]')).not.toBeNull();
+    expect(container.textContent).toContain("req-1");
 
     const retry = screen.getByRole("button", { name: /retry/i });
     fireEvent.click(retry);

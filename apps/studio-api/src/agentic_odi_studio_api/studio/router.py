@@ -201,7 +201,10 @@ async def post_job(body: CreateJobRequest, request: Request) -> dict:
             {"name": body.name, "description": body.description},
         )
         return _payload_from_text(result)
-    job = _service(request).add_job(name=body.name, description=body.description)
+    try:
+        job = _service(request).add_job(name=body.name, description=body.description)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
     return job.model_dump(mode="json")
 
 
@@ -245,7 +248,10 @@ async def post_step(body: AddStepRequest, request: Request) -> dict:
             {"job_id": body.job_id, "name": body.name, "order": body.order},
         )
         return _payload_from_text(result)
-    step = _service(request).add_step(job_id=body.job_id, name=body.name, order=body.order)
+    try:
+        step = _service(request).add_step(job_id=body.job_id, name=body.name, order=body.order)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
     return step.model_dump(mode="json")
 
 
@@ -294,12 +300,15 @@ async def post_outcome(body: AddOutcomeRequest, request: Request) -> dict:
             },
         )
         return _payload_from_text(result)
-    outcome = _service(request).add_outcome(
-        job_id=body.job_id,
-        statement=body.statement,
-        importance=body.importance,
-        satisfaction=body.satisfaction,
-    )
+    try:
+        outcome = _service(request).add_outcome(
+            job_id=body.job_id,
+            statement=body.statement,
+            importance=body.importance,
+            satisfaction=body.satisfaction,
+        )
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
     return outcome.model_dump(mode="json")
 
 
@@ -414,7 +423,10 @@ def create_conversation(request: Request) -> ConversationResponse:
 
 @router.post("/chat")
 async def post_chat(request: Request, body: ChatRequest) -> StreamingResponse:
-    request_id = body.request_id or request_id_for(request)
+    # The request id is the server's: the header the client sent (or one the
+    # server minted), never one the body claims, so the id in the frames, the
+    # header, and the log line are always the same one.
+    request_id = request_id_for(request)
     return StreamingResponse(
         stream_chat(
             body,

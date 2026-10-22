@@ -19,6 +19,7 @@ from agentic_odi_studio_api.studio.errors import (
     RequestIdMiddleware,
     StudioHTTPError,
     register_error_handlers,
+    request_id_for,
 )
 from agentic_odi_studio_api.studio.memory import StudioMemory
 from agentic_odi_studio_api.studio.router import router as studio_router
@@ -98,7 +99,11 @@ def create_app(
             index = SPA_DIST / "index.html"
             if index.is_file():
                 return FileResponse(index)
-            error = StudioError(code=StudioErrorCode.NOT_FOUND, message="Not Found")
+            error = StudioError(
+                code=StudioErrorCode.NOT_FOUND,
+                message="Not Found",
+                request_id=request_id_for(request),
+            )
             return JSONResponse({"error": error.model_dump(mode="json")}, status_code=404)
 
     return app

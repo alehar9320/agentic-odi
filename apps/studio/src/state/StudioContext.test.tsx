@@ -46,6 +46,7 @@ const DEFAULT_CHAT_STREAM =
 
 let chatStream: string | null = null;
 let canvasFails = false;
+let chatAborts = false;
 let chatFailure: Error | null = null;
 let connectorFetches = 0;
 let llmHealthFetches = 0;
@@ -55,6 +56,11 @@ function route(input: RequestInfo | URL, init?: RequestInit): Response {
 
   if (url === "/api/chat") {
     chatBody = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
+    if (chatAborts) {
+      const error = new Error("The user aborted a request.");
+      error.name = "AbortError";
+      throw error;
+    }
     if (chatFailure) {
       throw chatFailure;
     }
@@ -131,6 +137,7 @@ describe("StudioContext memory and resume", () => {
     chatBody = null;
     chatStream = null;
     chatFailure = null;
+    chatAborts = false;
     canvasFails = false;
     connectorFetches = 0;
     llmHealthFetches = 0;
@@ -185,6 +192,7 @@ describe("StudioContext failures", () => {
     chatBody = null;
     chatStream = null;
     chatFailure = null;
+    chatAborts = false;
     canvasFails = false;
     connectorFetches = 0;
     llmHealthFetches = 0;
@@ -262,6 +270,7 @@ describe("StudioContext health polling", () => {
     chatBody = null;
     chatStream = null;
     chatFailure = null;
+    chatAborts = false;
     canvasFails = false;
     connectorFetches = 0;
     llmHealthFetches = 0;
@@ -301,6 +310,7 @@ describe("StudioContext canvas state", () => {
     chatBody = null;
     chatStream = null;
     chatFailure = null;
+    chatAborts = false;
     canvasFails = false;
     connectorFetches = 0;
     llmHealthFetches = 0;
@@ -325,5 +335,37 @@ describe("StudioContext canvas state", () => {
 
     await waitFor(() => expect(result.current.canvasState.kind).toBe("empty"));
     expect(result.current.canvasError).toBeNull();
+  });
+});
+
+describe("StudioContext stopped turns", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    chatBody = null;
+    chatStream = null;
+    chatFailure = null;
+    chatAborts = false;
+    canvasFails = false;
+    connectorFetches = 0;
+    llmHealthFetches = 0;
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("keeps the question but shows no failure when the user stops the turn", async () => {
+    chatAborts = true;
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
+
+    await act(async () => {
+      await result.current.sendMessage("list the jobs");
+    });
+
+    const messages = result.current.messages;
+    expect(messages.some((message) => message.role === "user" && message.content === "list the jobs")).toBe(true);
+    expect(messages.at(-1)?.error).toBeUndefined();
   });
 });

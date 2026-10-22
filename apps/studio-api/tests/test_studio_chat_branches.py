@@ -277,7 +277,8 @@ def test_list_tools_failure_emits_one_error_event(monkeypatch) -> None:
     assert "message" not in events
     error = json.loads(events["error"][0])["error"]
     assert error["code"] == "mcp_unreachable"
-    assert "mcp died" in error["message"]
+    # The reason belongs in the log, not in the client's hands.
+    assert "mcp died" not in error["message"]
 
 
 def test_llm_failure_emits_one_error_event(monkeypatch) -> None:
@@ -298,7 +299,7 @@ def test_llm_failure_emits_one_error_event(monkeypatch) -> None:
     assert "message" not in events
     error = json.loads(events["error"][0])["error"]
     assert error["code"] == "llm_unreachable"
-    assert "llm exploded" in error["message"]
+    assert "llm exploded" not in error["message"]
 
 
 def test_exhausted_tool_rounds_emit_a_message(monkeypatch) -> None:
@@ -354,3 +355,39 @@ def test_every_event_carries_the_request_id(monkeypatch) -> None:
     for name, payloads in events.items():
         for payload in payloads:
             assert json.loads(payload)["request_id"] == "req-1", name
+
+
+def test_an_unexpected_failure_does_not_leak_internals_to_the_client(monkeypatch) -> None:
+    class _ExplodingCompletions:
+        async def create(self, **kwargs: Any) -> Any:
+            raise RuntimeError("secret internal detail")
+
+    class _ExplodingOpenAI:
+        def __init__(self, **kwargs: Any) -> None:
+            self.chat = SimpleNamespace(completions=_ExplodingCompletions())
+
+    _install(monkeypatch, [])
+    monkeypatch.setattr(chat, "AsyncOpenAI", lambda **kwargs: _ExplodingOpenAI(**kwargs))
+
+    frames = _collect(_request())
+    events = _events(frames)
+
+    error = json.loads(events["error"][0])["error"]
+    assert error["code"] == "llm_unreachable"
+    assert "secret internal detail" not in json.dumps(error)
+
+
+def test_a_dead_mcp_server_does_not_leak_internals_to_the_client(monkeypatch) -> None:
+    class _DeadMcp(_Mcp):
+        async def __aenter__(self) -> _DeadMcp:
+            raise RuntimeError("secret mcp detail")
+
+    _install(monkeypatch, [])
+    monkeypatch.setattr(chat, "McpClient", _DeadMcp)
+
+    frames = _collect(_request())
+    events = _events(frames)
+
+    error = json.loads(events["error"][0])["error"]
+    assert error["code"] == "mcp_unreachable"
+    assert "secret mcp detail" not in json.dumps(error)

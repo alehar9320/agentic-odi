@@ -12,6 +12,7 @@ sidecar agree on what a failure is; this module owns the HTTP mapping.
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any
 from uuid import uuid4
 
@@ -26,6 +27,10 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 logger = logging.getLogger(__name__)
 
 REQUEST_ID_HEADER = "X-Request-ID"
+
+#: A request id is echoed in responses and written to logs, so it must be a
+#: short, boring token. Anything else is replaced with a fresh one.
+REQUEST_ID_PATTERN = re.compile(r"^[A-Za-z0-9._-]{1,128}$")
 
 STATUS_FOR_CODE: dict[StudioErrorCode, int] = {
     StudioErrorCode.NOT_FOUND: 404,
@@ -131,6 +136,13 @@ def unhandled_error_handler(request: Request, exc: Exception) -> JSONResponse:
     return _error_response(request, error, 500)
 
 
+def _safe_request_id(candidate: str | None) -> str:
+    """Return the client's request id when it is safe to echo, else a fresh one."""
+    if candidate and REQUEST_ID_PATTERN.match(candidate):
+        return candidate
+    return uuid4().hex
+
+
 class RequestIdMiddleware:
     """Accept or mint an ``X-Request-ID`` and echo it on the response."""
 
@@ -142,7 +154,7 @@ class RequestIdMiddleware:
             await self.app(scope, receive, send)
             return
 
-        request_id = Headers(scope=scope).get(REQUEST_ID_HEADER) or uuid4().hex
+        request_id = _safe_request_id(Headers(scope=scope).get(REQUEST_ID_HEADER))
         scope.setdefault("state", {})["request_id"] = request_id
 
         async def send_with_request_id(message: Message) -> None:

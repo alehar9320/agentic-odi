@@ -106,6 +106,17 @@ describe("OpportunityLandscape canvas states", () => {
     expect(screen.queryByText("Active Job Map Contexts")).toBeNull();
   });
 
+  it("shows why the seed board is standing in when the canvas says so", () => {
+    harness.state.canvasState = {
+      kind: "ready",
+      data: { ...mockCanvasData, warnings: ["MCP endpoint unreachable"] },
+    } as unknown as CanvasState;
+
+    render(<OpportunityLandscape />);
+
+    expect(screen.getByText(/mcp endpoint unreachable/i)).toBeInTheDocument();
+  });
+
   it("shows the skeleton while a warm canvas reloads", () => {
     harness.state.canvasState = {
       kind: "loading",

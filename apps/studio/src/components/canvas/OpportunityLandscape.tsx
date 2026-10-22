@@ -108,6 +108,12 @@ export function OpportunityLandscape() {
           onRetry={() => void refreshCanvas()}
           retryText="reload"
         />
+      ) : canvas?.warnings?.length ? (
+        <ul className="canvas-warnings" role="status">
+          {canvas.warnings.map((warning) => (
+            <li key={warning}>{warning}</li>
+          ))}
+        </ul>
       ) : isEmpty ? (
         <div className="studio-empty" role="status">
           <p className="studio-empty__title">No opportunities yet</p>

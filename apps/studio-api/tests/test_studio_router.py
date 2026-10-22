@@ -207,3 +207,41 @@ def test_json_payload_text_is_parsed_into_an_object() -> None:
     assert _payload_from_text('Outcome created successfully: {"id": "O-1"}') == {"id": "O-1"}
     assert _payload_from_text("Deleted job: job-1") == {"result": "Deleted job: job-1"}
     assert json.loads('{"id": "O-1"}') == {"id": "O-1"}
+
+
+def test_local_create_routes_map_domain_errors() -> None:
+    client = _client("local")
+    job = client.post("/api/jobs", json={"name": "Ship a service"}).json()
+
+    out_of_range = client.post(
+        "/api/outcomes",
+        json={
+            "mcp_url": "",
+            "job_id": job["id"],
+            "statement": "Minimize the time to ship",
+            "importance": 42,
+            "satisfaction": 3,
+        },
+    )
+    assert out_of_range.status_code == 422
+    assert out_of_range.json()["error"]["code"] == "out_of_range"
+
+    missing_job = client.post(
+        "/api/steps",
+        json={"mcp_url": "", "job_id": "JOB-NOPE", "name": "Ship it", "order": 1},
+    )
+    assert missing_job.status_code == 404
+    assert missing_job.json()["error"]["code"] == "not_found"
+
+    missing_job_outcome = client.post(
+        "/api/outcomes",
+        json={
+            "mcp_url": "",
+            "job_id": "JOB-NOPE",
+            "statement": "Minimize the time to ship",
+            "importance": 8,
+            "satisfaction": 3,
+        },
+    )
+    assert missing_job_outcome.status_code == 404
+    assert missing_job_outcome.json()["error"]["code"] == "not_found"

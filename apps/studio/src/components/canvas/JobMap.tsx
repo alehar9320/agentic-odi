@@ -87,6 +87,20 @@ export function JobMap() {
           return phaseIndexFor(order, steps.length) === selectedPhaseIndex;
         });
 
+  if (canvasState.kind === "error") {
+    // A failed canvas must not render as eight empty phases.
+    return (
+      <section className="fade-in">
+        <p className="section-title">Universal Job Map (8 Process Phases)</p>
+        <FailurePanel
+          error={canvasState.error}
+          onRetry={() => void refreshCanvas()}
+          retryText="reload"
+        />
+      </section>
+    );
+  }
+
   return (
     <section className="fade-in">
       <p className="section-title">Universal Job Map (8 Process Phases)</p>
@@ -198,13 +212,7 @@ export function JobMap() {
         })}
       </div>
 
-      {canvasState.kind === "error" ? (
-        <FailurePanel
-          error={canvasState.error}
-          onRetry={() => void refreshCanvas()}
-          retryText="reload"
-        />
-      ) : canvasState.kind === "loading" ? (
+      {canvasState.kind === "loading" ? (
         <GhostJobSteps />
       ) : steps.length ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>

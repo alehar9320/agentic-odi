@@ -26,11 +26,13 @@ class _FakeClient:
     async def __aexit__(self, *exc: Any) -> bool:
         return False
 
-    async def call_tool(self, name: str, arguments: dict[str, Any]) -> str:
+    async def call_tool(self, name: str, arguments: dict[str, Any]) -> Any:
         self.calls.append((name, arguments))
         if self.error is not None:
             raise self.error
-        return str(self.payloads.get(name, "[]"))
+        payload = str(self.payloads.get(name, "[]"))
+        # FastMCP hands back a CallToolResult, whose str() is a repr.
+        return SimpleNamespace(content=[SimpleNamespace(text=payload)])
 
 
 def test_fetch_canvas_falls_back_to_seed_when_unreachable(monkeypatch) -> None:
@@ -160,3 +162,29 @@ def test_call_mcp_tool_wraps_client_errors(monkeypatch) -> None:
     assert exc_info.value.error.code.value == "mcp_unreachable"
     assert exc_info.value.error.retryable is True
     assert "Error calling get_jobs: boom" in exc_info.value.error.message
+
+
+def test_fetch_canvas_reports_why_the_seed_is_standing_in(monkeypatch) -> None:
+    monkeypatch.setattr(mcp_data, "is_endpoint_reachable", lambda url, timeout: False)
+
+    payload = asyncio.run(mcp_data.fetch_canvas("http://mcp"))
+
+    assert payload["source"] == "seed"
+    assert payload["warnings"] == ["MCP endpoint unreachable"]
+
+
+def test_call_mcp_tool_reports_a_tool_error_as_a_tool_failure(monkeypatch) -> None:
+    from fastmcp.exceptions import ToolError
+
+    class _FailingClient(_FakeClient):
+        async def call_tool(self, name: str, arguments: dict[str, Any]) -> Any:
+            raise ToolError("the tool refused")
+
+    monkeypatch.setattr(mcp_data, "is_endpoint_reachable", lambda url, timeout: True)
+    monkeypatch.setattr(mcp_data, "McpClient", _FailingClient)
+
+    with pytest.raises(StudioHTTPError) as exc_info:
+        asyncio.run(mcp_data.call_mcp_tool("http://mcp", "add_job", {}))
+
+    assert exc_info.value.status_code == 500
+    assert exc_info.value.error.code.value == "mcp_tool_failed"

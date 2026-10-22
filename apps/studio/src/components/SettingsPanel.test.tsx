@@ -144,3 +144,24 @@ describe("SettingsPanel connector catalog failures", () => {
     expect(screen.getByRole("button", { name: /add preset/i })).toBeDisabled();
   });
 });
+
+describe("SettingsPanel connector list failures", () => {
+  it("shows the failure instead of claiming there are no connectors", () => {
+    vi.mocked(useStudio).mockReturnValue(
+      stubContext({
+        connectors: [],
+        connectorsError: {
+          code: "mcp_unreachable",
+          message: "The connector list is unreachable.",
+          suggestion: "Check that the sidecar is running, then try again.",
+          retryable: true,
+        },
+      }),
+    );
+
+    renderPanel();
+
+    expect(screen.getByRole("alert").textContent).toContain("The connector list is unreachable.");
+    expect(screen.queryByText(/no connectors registered/i)).toBeNull();
+  });
+});

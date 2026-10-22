@@ -13,6 +13,7 @@ and come back to the same thread and the same working context.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import time
@@ -395,7 +396,9 @@ async def _turn_frames(
         request.ui_catalog.model_dump() if request.ui_catalog else None
     )
 
-    if not is_endpoint_reachable(request.mcp_url, timeout=0.3):
+    # The probe is a blocking socket check: keep it off the event loop.
+    mcp_reachable = await asyncio.to_thread(is_endpoint_reachable, request.mcp_url, 0.3)
+    if not mcp_reachable:
         raise _TurnFailure(
             StudioError(
                 code=StudioErrorCode.MCP_UNREACHABLE,
@@ -415,10 +418,12 @@ async def _turn_frames(
             mcp_client = await stack.enter_async_context(McpClient(request.mcp_url))
             mcp_tools = await mcp_client.list_tools()
         except Exception as exc:  # noqa: BLE001
+            # The reason stays in the log: the client gets the request id.
+            log.exception("MCP server unavailable (request_id=%s)", request_id)
             raise _TurnFailure(
                 StudioError(
                     code=StudioErrorCode.MCP_UNREACHABLE,
-                    message=f"MCP server unavailable at {request.mcp_url}: {exc}",
+                    message="The MCP server is not serving tools.",
                     suggestion="Check that the MCP server is running, then try again.",
                     retryable=True,
                 )
@@ -443,10 +448,11 @@ async def _turn_frames(
                     stream=True,
                 )
             except Exception as exc:  # noqa: BLE001
+                log.exception("The model could not be reached (request_id=%s)", request_id)
                 raise _TurnFailure(
                     StudioError(
                         code=StudioErrorCode.LLM_UNREACHABLE,
-                        message=f"The model could not be reached: {exc}",
+                        message="The model could not be reached.",
                         suggestion="Check the model settings, then try again.",
                         retryable=True,
                     )
@@ -466,10 +472,12 @@ async def _turn_frames(
                         yield frame("delta", {"text": delta.content})
                     _collect_tool_calls(delta, tool_calls)
             except Exception as exc:  # noqa: BLE001
+                log.exception("The model stopped responding (request_id=%s)", request_id)
                 raise _TurnFailure(
                     StudioError(
                         code=StudioErrorCode.LLM_UNREACHABLE,
-                        message=f"The model stopped responding: {exc}",
+                        message="The model stopped responding.",
+                        suggestion="Try again — your question is still here.",
                         retryable=True,
                     )
                 ) from exc
@@ -618,6 +626,7 @@ async def stream_chat(
     started = time.monotonic()
     counters = {"rounds": 0, "tool_calls": 0, "tool_errors": 0, "rounds_exhausted": 0}
     outcome = "failed"
+    error_code: str | None = None
     try:
         async for chunk in _turn_frames(request, service, memory, rid, counters):
             yield chunk
@@ -629,13 +638,14 @@ async def stream_chat(
     except _TurnFailure as failure:
         yield _error_frame(failure.error, rid)
         outcome = "failed"
-    except Exception as exc:  # noqa: BLE001
+        error_code = failure.error.code.value
+    except Exception:  # noqa: BLE001
         log.exception("chat turn failed (request_id=%s)", rid)
         yield _error_frame(
             StudioError(
                 code=StudioErrorCode.INTERNAL,
                 message="The turn failed unexpectedly.",
-                detail=str(exc),
+                suggestion="Try again — your question is still here.",
             ),
             rid,
         )
@@ -649,6 +659,7 @@ async def stream_chat(
             tool_errors=counters["tool_errors"],
             duration_ms=int((time.monotonic() - started) * 1000),
             outcome=outcome,
+            error_code=error_code,
         )
 
 
