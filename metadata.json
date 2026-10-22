@@ -3,7 +3,7 @@
   "checkpoint_id": "01M5J0R8ZGXPR12S5RD8RDYA69",
   "strategy": "manual-commit",
   "branch": "feat/odi-mascot",
-  "checkpoints_count": 10,
+  "checkpoints_count": 12,
   "files_touched": [
     "docs/superpowers/plans/2026-10-21-odi-mascot.md",
     "docs/superpowers/specs/2026-10-21-odi-mascot-design.md"
@@ -77,6 +77,13 @@
       "transcript": "/9/full.jsonl",
       "compact_transcript": "/9/transcript.jsonl",
       "content_hash": "/9/content_hash.txt",
+      "prompt": ""
+    },
+    {
+      "metadata": "/10/metadata.json",
+      "transcript": "/10/full.jsonl",
+      "compact_transcript": "/10/transcript.jsonl",
+      "content_hash": "/10/content_hash.txt",
       "prompt": ""
     }
   ],
