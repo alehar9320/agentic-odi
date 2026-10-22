@@ -87,6 +87,8 @@ class Repository(Protocol):
     def delete_evidence(self, evidence_id: str) -> bool: ...
     def clear(self) -> None: ...
     def reload(self) -> None: ...
+    def commit(self) -> None: ...
+    def close(self) -> None: ...
 
 
 class InMemoryRepository:
@@ -289,3 +291,9 @@ class InMemoryRepository:
     def reload(self) -> None:
         """Reset in-memory state; there is no external store to re-read."""
         self.clear()
+
+    def commit(self) -> None:
+        """No-op: an in-memory store has nothing to flush."""
+
+    def close(self) -> None:
+        """No-op: an in-memory store holds no resources."""

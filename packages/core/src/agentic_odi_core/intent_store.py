@@ -34,6 +34,7 @@ class IntentStore:
         # "database is locked" the moment the lock is taken.
         self.conn.execute("PRAGMA journal_mode=WAL;")
         self.conn.execute("PRAGMA busy_timeout=5000;")
+        self._closed = False
         self._init_db()
 
     def _init_db(self) -> None:
@@ -281,5 +282,19 @@ class IntentStore:
                 self.conn.execute("DELETE FROM events WHERE workspace_id = ?", (workspace_id,))
                 self.conn.execute("DELETE FROM sync_state WHERE workspace_id = ?", (workspace_id,))
 
+    def commit(self) -> None:
+        """Flush any open transaction to disk.
+
+        :meth:`append` already commits every event as it is written, so this is
+        normally a no-op. It exists so a shutdown path can assert durability
+        explicitly rather than assuming it.
+        """
+        self.conn.commit()
+
     def close(self) -> None:
+        """Close the connection. Safe to call more than once."""
+        if self._closed:
+            return
+        self._closed = True
+        self.conn.commit()
         self.conn.close()
