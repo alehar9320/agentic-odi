@@ -123,6 +123,7 @@ def _install(monkeypatch, streams: list[_FakeStream]) -> None:
     HOLDER.clear()
     monkeypatch.setattr(chat, "check_llm_health", _healthy)
     monkeypatch.setattr(chat, "McpClient", _Mcp)
+    monkeypatch.setattr(chat, "is_endpoint_reachable", lambda url, timeout: True)
     monkeypatch.setattr(chat, "AsyncOpenAI", lambda **kwargs: _FakeOpenAI(streams, **kwargs))
 
 

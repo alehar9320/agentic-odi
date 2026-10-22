@@ -29,7 +29,11 @@ from fastapi.responses import StreamingResponse
 from agentic_odi_studio_api.studio.changelog import get_changelog
 from agentic_odi_studio_api.studio.chat import stream_chat
 from agentic_odi_studio_api.studio.connectors import ConnectorService
-from agentic_odi_studio_api.studio.errors import StudioHTTPError, code_for_status
+from agentic_odi_studio_api.studio.errors import (
+    StudioHTTPError,
+    code_for_status,
+    request_id_for,
+)
 from agentic_odi_studio_api.studio.mcp_data import call_mcp_tool, fetch_canvas, fetch_local_canvas
 from agentic_odi_studio_api.studio.memory import ObservationNotFoundError, StudioMemory
 from agentic_odi_studio_api.studio.probes import check_llm_health, defaults, is_endpoint_reachable
@@ -410,8 +414,14 @@ def create_conversation(request: Request) -> ConversationResponse:
 
 @router.post("/chat")
 async def post_chat(request: Request, body: ChatRequest) -> StreamingResponse:
+    request_id = body.request_id or request_id_for(request)
     return StreamingResponse(
-        stream_chat(body, service=request.app.state.connectors, memory=request.app.state.memory),
+        stream_chat(
+            body,
+            service=request.app.state.connectors,
+            memory=request.app.state.memory,
+            request_id=request_id,
+        ),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
