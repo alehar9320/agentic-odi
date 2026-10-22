@@ -3,8 +3,10 @@
   "checkpoint_id": "01M5HPJF3YJNJVPQ90FJF7A9KJ",
   "strategy": "manual-commit",
   "branch": "feat/intent-first-pm-experience",
-  "checkpoints_count": 1,
+  "checkpoints_count": 5,
   "files_touched": [
+    "apps/studio-api/src/agentic_odi_studio_api/studio/chat.py",
+    "apps/studio-api/tests/test_studio_memory.py",
     "pyproject.toml"
   ],
   "sessions": [
@@ -14,6 +16,13 @@
       "compact_transcript": "/0/transcript.jsonl",
       "content_hash": "/0/content_hash.txt",
       "prompt": "/0/prompt.txt"
+    },
+    {
+      "metadata": "/1/metadata.json",
+      "transcript": "/1/full.jsonl",
+      "compact_transcript": "/1/transcript.jsonl",
+      "content_hash": "/1/content_hash.txt",
+      "prompt": ""
     }
   ],
   "token_usage": {
