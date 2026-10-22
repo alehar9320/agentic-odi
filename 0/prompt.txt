@@ -1,0 +1,23 @@
+Explore the git branch `origin/main` of the repository at /home/alexa/repos/agentic-odi. The frontend lives at `apps/studio/`. Use `git show origin/main:<path>` to read files (the working tree is on an older commit, so you MUST read via git show, not the filesystem).
+
+Goal: produce a precise map of the Living Studio SPA's user-facing structure at origin/main, for writing Playwright E2E tests. Report:
+
+1. **App shell**: Read `apps/studio/src/App.tsx` and `apps/studio/src/main.tsx`. What is the top-level component tree? Is there still a `StudioProvider`/context? Where does it live (e.g. `src/state/`)?
+
+2. **Navigation**: Read `apps/studio/src/components/workspace/WorkbenchRail.tsx`, `apps/studio/src/components/workspace/WorkspacePanel.tsx`, and `apps/studio/src/components/workspace/panels.tsx`. List EVERY distinct view/tab/panel the user can navigate to. For each: the visible label text, the DOM element (button? role? aria-*?), and any test-visible identifiers. Note especially `role=`, `aria-label`, `aria-selected`, `data-*` attributes.
+
+3. **Chat**: Read `apps/studio/src/components/chat/ChatStage.tsx`, `Composer.tsx`, `Conversation.tsx`, `Hero.tsx`, `OfflineNotice.tsx`, `Markdown.tsx`. What are the accessible names/placeholders of the chat input, send button, message bubbles, and any quick-prompt/suggestion buttons? What role does the message log have?
+
+4. **Canvas/outcomes UI**: Is there still an Opportunity Landscape / outcome cards / job map? Search for "Opportunity Score", "Underserved", "outcome-card", "outcome_score". Read whatever renders desired outcomes. Report accessible names for outcome cards, score pills, and any filter/sort checkboxes.
+
+5. **Direct capture / CRUD forms**: Read `apps/studio/src/components/canvas/DirectCapture.tsx` and `JobMap.tsx` and any manual-crud components. Report form field labels (`<label for>`), input types (esp. range inputs), button labels, and success/error toast text.
+
+6. **Settings**: Read `apps/studio/src/components/SettingsPanel.tsx`. Report field labels, buttons, and the toggle for the settings panel.
+
+7. **Toasts/notifications**: Find the toast component. Report the text of success vs error toasts for key actions (capture outcome, add step, sync canvas).
+
+8. **State/data flow**: Read `apps/studio/src/state/*` (whatever files exist) and `apps/studio/src/api/studioApi.ts`. What API endpoints does the SPA call? Does it poll, and on what interval? Does it use a cached value in localStorage? What are the exact fetch paths?
+
+9. **Feature flags**: Read `apps/studio/src/features/flags.ts`. What flags exist and how do they gate UI? This matters for which views appear in a default/E2E configuration.
+
+Return a detailed, factual report with EXACT strings (label text, aria-labels, role names, button names) that a Playwright test could use as locators. Quote the relevant JSX snippets. Do not speculate — only report what the code at origin/main actually says. If something does not exist (e.g. no Opportunity Landscape), say so explicitly.
