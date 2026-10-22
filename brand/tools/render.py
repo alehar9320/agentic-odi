@@ -10,6 +10,7 @@ The generator is the single source of truth. Nothing under ``brand/assets``,
 from __future__ import annotations
 
 import argparse
+import json
 import re
 import sys
 from pathlib import Path
@@ -61,8 +62,11 @@ export function OdiMascot({{
 
 def _cli_module() -> bytes:
     """Return the CLI banner module."""
-    ascii_banner = odi_mascot.ascii_banner()
-    ansi_banner = odi_mascot.ascii_banner_ansi()
+    # JSON string literals are valid Python and already use the double quotes
+    # that `ruff format` prefers, so the generated module survives a format
+    # run byte for byte.
+    ascii_banner = json.dumps(odi_mascot.ascii_banner(), ensure_ascii=False)
+    ansi_banner = json.dumps(odi_mascot.ascii_banner_ansi(), ensure_ascii=False)
     return f'''"""{GENERATED_HEADER}
 
 Run `uv run python brand/tools/render.py` to regenerate.
@@ -74,9 +78,9 @@ import os
 import sys
 from typing import Protocol
 
-MASCOT_ASCII = {ascii_banner!r}
+MASCOT_ASCII = {ascii_banner}
 
-MASCOT_ANSI = {ansi_banner!r}
+MASCOT_ANSI = {ansi_banner}
 
 
 def render_banner(color: bool = True) -> str:
