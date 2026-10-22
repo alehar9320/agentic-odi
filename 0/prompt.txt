@@ -1,0 +1,1 @@
+Your objective is to complete the addition of posthog. We've just had the Posthog agent finish the npx -y @posthog/wizard@latest execution. The wizard is now waiting for events to properly verify installation. However, we haven't still merged or deploy the code.
