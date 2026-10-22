@@ -1,0 +1,19 @@
+Read-only research task. Be very thorough. Do NOT modify, fetch, push, or commit anything; use the already-fetched refs.
+
+Repo: /home/alexa/repos/agentic-odi (alehar9320/agentic-odi). origin/main is 5286b6eb (includes mascot PR #100).
+
+Goal: produce a per-PR rebase/repair recipe for PRs #62, #63, #64, #65, #66, #70, #76 so each can be rebased onto origin/main and pass CI with its intended value.
+
+For each PR:
+- number, title, head branch, current mergeable state, CI checks (`gh pr view <n> --json ...`), URL
+- the commit list on the branch vs merge-base with origin/main (`git log --oneline origin/main...origin/<branch>`)
+- which commits are clean feature work vs bot "fix"/revert churn (use `git show --stat`, diffs)
+- files changed by the good commits, and conflicts with origin/main 5286b6eb
+- whether it touches apps/studio/openapi.json and apps/studio/src/api/schema.d.ts
+- existing local worktree if any (.worktrees/pr62-cloud-scheduling, pr63-ux-copy, pr64-v2mom, pr65-on-device-router, pr66-mobile-ux, pr70-signals-evidence, studio-auto-update)
+- exact recommended recipe: base commit, cherry-pick list, expected conflict files/resolution, tests/checks to run, push command (force-with-lease only if the good commits replace revert churn)
+- dependencies/ordering between PRs, especially shared files (openapi.json, schema.d.ts, wrangler.jsonc, README, studio CSS/state)
+
+Context from the interrupted session: the diagnosis was that each branch's first commit is clean and CI-green, while later bot commits reverted ~20k lines of main and stripped wrangler.jsonc "previews": {}. Verify this per PR rather than assuming.
+
+Return a compact table plus detailed per-PR notes. No code changes.
