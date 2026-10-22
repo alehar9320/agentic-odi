@@ -21,7 +21,6 @@ from agentic_odi_core import (
     ValueOutOfRangeError,
     error_status,
 )
-from agentic_odi_core.errors import OdiError, error_status
 from agentic_odi_core.remote import StudioError, StudioErrorCode
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
