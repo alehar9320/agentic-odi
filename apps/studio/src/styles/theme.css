@@ -2849,12 +2849,12 @@ details[open] summary {
 .brand__mark {
   display: grid;
   place-items: center;
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   flex: none;
+  overflow: hidden;
   border-radius: 9px;
-  color: #d6d7ff;
-  background: linear-gradient(140deg, rgba(99, 102, 241, 0.55), rgba(139, 92, 246, 0.25));
+  background: var(--odi-tile, #131722);
   border: 1px solid rgba(139, 140, 248, 0.35);
 }
 
