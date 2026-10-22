@@ -1,0 +1,27 @@
+Read-only research task. Be very thorough. Do NOT modify any files.
+
+Goal: produce an implementation-ready analysis for GitHub issue #91 in /home/alexa/repos/agentic-odi (repo alehar9320/agentic-odi). The issue is a specification for surfacing errors across the Studio. Read it fully with `gh issue view 91` (body ~long; capture all 13 numbered problems and the acceptance criteria).
+
+Then inspect the actual code and validate each claim. Key areas:
+- apps/studio-api/src/agentic_odi_studio_api/studio/router.py, chat.py, probes.py, mcp_data.py
+- apps/mcp-server/src/agentic_odi_mcp_server/mcp_server.py
+- apps/cli/src/agentic_odi_cli/backend.py
+- apps/studio/src/state/StudioContext.tsx, src/api/sse.ts, components (OpportunityLandscape, DirectCapture, WorkspacePanel, ErrorBoundary, UiRenderer, SettingsPanel, Composer)
+- existing tests: tests/, apps/studio/src/**/*.test.tsx, apps/studio/e2e/
+
+For EACH of the 13 problems, return:
+1. Confirmed / partially true / inaccurate, with exact file:line evidence.
+2. What the current failure looks like to the user.
+3. Concrete proposed fix (function signatures, event JSON shape, React state, UI copy) that fits existing conventions.
+4. Tests to add (pytest / vitest / Playwright), with file paths.
+
+Also return:
+- A recommended implementation order grouped into small commits/PR-sized chunks.
+- Any existing partial fixes or things that would conflict with origin/main at 5286b6eb.
+- A short list of open design decisions that need the user (if any).
+
+Do not write code or commit. Return a structured report only.
+
+---
+
+Continue if you have next steps, or stop and ask for clarification if you are unsure how to proceed.
