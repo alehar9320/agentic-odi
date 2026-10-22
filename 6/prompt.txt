@@ -1,0 +1,1 @@
+Your objective is to add posthog Product Analytics, Session Replay, and Web Analytics support to the project. We're guided by posthog to use "npx -y @posthog/wizard@latest" to get a guided AI wizard.
