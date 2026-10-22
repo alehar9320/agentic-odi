@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Roadmap &amp; Next Steps</title>
+  <meta name="description" content="What has shipped, and what is queued.">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#0a0b0e">
+
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Agentic ODI">
+  <meta property="og:title" content="Roadmap &amp; Next Steps">
+  <meta property="og:description" content="What has shipped, and what is queued.">
+  <meta property="og:url" content="https://alehar9320.github.io/agentic-odi/docs/roadmap/index.html">
+  <meta property="og:image" content="https://alehar9320.github.io/agentic-odi/assets/og.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Roadmap &amp; Next Steps">
+  <meta name="twitter:description" content="What has shipped, and what is queued.">
+  <meta name="twitter:image" content="https://alehar9320.github.io/agentic-odi/assets/og.png">
+
+  <link rel="canonical" href="https://alehar9320.github.io/agentic-odi/docs/roadmap/index.html">
+  <link rel="stylesheet" href="../../assets/tokens.css">
+  <link rel="stylesheet" href="../../assets/style.css">
+  <link rel="icon" type="image/svg+xml" href="../../assets/favicon.svg">
+  <link rel="icon" type="image/png" href="../../assets/favicon.png" sizes="32x32">
+  <link rel="sitemap" type="application/xml" href="https://alehar9320.github.io/agentic-odi/sitemap.xml">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <header class="site-header">
+    <div class="site-header__inner">
+      <a class="brand" href="https://alehar9320.github.io/agentic-odi/">
+        <img src="../../assets/mark.svg" alt="" width="24" height="24" aria-hidden="true">
+        <span class="brand__name">Agentic&nbsp;ODI</span>
+      </a>
+      <nav class="site-nav" aria-label="Primary">
+        <a href="https://alehar9320.github.io/agentic-odi/#studio">The&nbsp;Studio</a>
+        <a href="https://alehar9320.github.io/agentic-odi/#how">How&nbsp;it&nbsp;works</a>
+        <a href="https://alehar9320.github.io/agentic-odi/docs/">Docs</a>
+      </nav>
+      <a class="btn btn--primary btn--sm" href="https://alehar9320.github.io/agentic-odi/#run">Run it in 60 seconds</a>
+    </div>
+  </header>
+
+  <main id="main">
+<div class="doc">
+  <aside class="doc__nav" aria-label="Documentation">
+    <a class="doc__back" href="https://alehar9320.github.io/agentic-odi/">← Agentic ODI</a>
+    <div class="doc__group">
+      <p class="doc__group-title">Get started</p>
+      <ul class="doc__list">
+        <li>
+          <a class="doc__link"
+             href="https://alehar9320.github.io/agentic-odi/docs/quick-start/">Quick start</a>
+        </li>
+        <li>
+          <a class="doc__link"
+             href="https://alehar9320.github.io/agentic-odi/docs/installation/">Installation</a>
+        </li>
+        <li>
+          <a class="doc__link"
+             href="https://alehar9320.github.io/agentic-odi/docs/studio/">The Living Studio</a>
+        </li>
+        <li>
+          <a class="doc__link"
+             href="https://alehar9320.github.io/agentic-odi/docs/local-llm/">Local LLM backend</a>
+        </li>
+      </ul>
+    </div>
+    <div class="doc__group">
+      <p class="doc__group-title">Build</p>
+      <ul class="doc__list">
+        <li>
+          <a class="doc__link"
+             href="https://alehar9320.github.io/agentic-odi/docs/cli/">CLI reference</a>
+        </li>
+        <li>
+          <a class="doc__link"
+             href="https://alehar9320.github.io/agentic-odi/docs/connectors/">Connectors</a>
+        </li>
+        <li>
+          <a class="doc__link"
+             href="https://alehar9320.github.io/agentic-odi/docs/mcp/">MCP tool reference</a>
+        </li>
+        <li>
+          <a class="doc__link"
+             href="https://alehar9320.github.io/agentic-odi/docs/architecture/">Architecture</a>
+        </li>
+      </ul>
+    </div>
+    <div class="doc__group">
+      <p class="doc__group-title">Operate</p>
+      <ul class="doc__list">
+        <li>
+          <a class="doc__link"
+             href="https://alehar9320.github.io/agentic-odi/docs/deployment/">Deployment</a>
+        </li>
+        <li>
+          <a class="doc__link"
+             href="https://alehar9320.github.io/agentic-odi/docs/development/">Development</a>
+        </li>
+        <li>
+          <a class="doc__link is-current"
+             href="https://alehar9320.github.io/agentic-odi/docs/roadmap/">Roadmap</a>
+        </li>
+      </ul>
+    </div>
+  </aside>
+
+  <article class="doc__body">
+    <header class="doc__head">
+      <p class="eyebrow">Operate</p>
+      <h1 class="doc__title">Roadmap &amp; Next Steps</h1>
+<p class="lead">What has shipped, and what is queued.</p>    </header>
+
+    <div class="prose">
+      <p>As we validate the feasibility of this architecture, our next milestones include:</p>
+<ul>
+<li>[x] <strong>External MCP client connector</strong>: Pluggable connectors package with an
+HTTP MCP ingest client, CLI adapter, and in-memory tests.</li>
+<li>[x] <strong>Conversational rich surfaces</strong>: the studio agent composes validated
+cards inline from a closed, client-owned catalog instead of describing them
+in prose.</li>
+<li>[x] <strong>Map ingested evidence onto ODI artifacts</strong>: Turn connector records into
+jobs, outcomes, or evidence without mixing connector plumbing into the ODI
+store.</li>
+<li>[x] <strong>First-run wizard</strong>: A skippable, resumable four-step tour with inline
+connection repair, ending in the chosen surface or a handoff to the context
+conversation — isolated in <code>apps/studio/src/onboarding/</code> behind the
+<code>firstRunWizard</code> flag.</li>
+<li>[x] <strong>Additional connector kinds</strong>: REST/webhooks and similar integrations
+implementing the same <code>Connector</code> protocol.</li>
+<li>[x] <strong>ODI Schema Definition</strong>: Define standardized Pydantic models for <em>Jobs</em>,
+<em>Steps</em>, and <em>Outcomes</em>.</li>
+<li>[x] <strong>CLI Dataset Commands</strong>: Extend <code>apps/cli</code> so the ODI dataset can be
+created, queried, and scored from the terminal, in addition to the current
+MCP path.</li>
+<li>[x] <strong>Context Tooling</strong>: Replace the dummy <code>greet</code> tool with capabilities like
+<code>get_job_map(job_id)</code>, <code>get_outcomes(job_id)</code>, <code>get_step(step_id)</code>,
+<code>get_outcome(outcome_id)</code>, or <code>evaluate_outcome(statement)</code>.</li>
+<li>[x] <strong>Data Persistence Layer</strong>: Connect the FastMCP server to a lightweight
+SQLite repository containing actual user research data.</li>
+<li>[x] <strong>Agentic Integration</strong>: Hook the CLI chat up to an LLM (via the
+<code>openai</code> package) so the LLM can <em>discover</em> the ODI tools and intelligently
+request customer insights when ideating features.</li>
+</ul>
+
+<p class="prose__source">Source of truth: <code>docs/roadmap.md</code> &mdash; <a href="https://github.com/alehar9320/agentic-odi/blob/main/docs/roadmap.md">view on GitHub</a></p>
+    </div>
+
+
+    <nav class="doc__pager" aria-label="Documentation">
+      <a class="doc__pager-link doc__pager-link--prev" href="https://alehar9320.github.io/agentic-odi/docs/development/">
+        <span class="doc__pager-label">Previous</span>
+        <span class="doc__pager-title">Development</span>
+      </a>
+    </nav>
+  </article>
+</div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="shell">
+      <div class="site-footer__top">
+        <div class="site-footer__brand">
+          <img src="../../assets/mark.svg" alt="" width="24" height="24" aria-hidden="true">
+          <span class="brand__name">Agentic&nbsp;ODI</span>
+        </div>
+        <p class="site-footer__tagline">Built with outcomes, not guesses.</p>
+      </div>
+      <nav class="site-footer__nav" aria-label="Footer">
+        <a href="https://github.com/alehar9320/agentic-odi">GitHub</a>
+        <a href="https://github.com/alehar9320/agentic-odi/issues">Issues</a>
+        <a href="https://alehar9320.github.io/agentic-odi/docs/">Docs</a>
+        <a href="https://agentic-odi.alehar.workers.dev/">Hosted Studio</a>
+        <a href="https://horizon.prefect.io/alhase/servers/agentic-odi/chat">Test chat</a>
+      </nav>
+      <p class="site-footer__legal">
+        &copy; 2026 Agentic ODI maintainers &middot; All rights reserved
+      </p>
+      <p class="site-footer__note">
+        Experimental. We don't publish dates &mdash; this page changes when the code does.
+      </p>
+    </div>
+  </footer>
+
+  <script defer src="../../assets/main.js"></script>
+</body>
+</html>

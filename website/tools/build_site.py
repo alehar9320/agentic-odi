@@ -21,6 +21,7 @@ from typing import Any
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 import extract
+import markdown_render
 
 ROOT = Path(__file__).resolve().parents[2]
 SITE = ROOT / "website"
@@ -163,66 +164,159 @@ def _page_context(**extra: Any) -> dict[str, Any]:
     return context
 
 
-def _pages(env: Environment) -> list[tuple[str, str]]:
-    """Every page as ``(output path relative to dist, template name)``.
+def _flat_guides(nav: dict[str, Any]) -> list[tuple[dict[str, Any], dict[str, Any]]]:
+    """Every guide, in navigation order, with its group."""
+    return [
+        (group, guide)
+        for group in nav.get("groups", [])
+        for guide in group.get("guides", [])
+    ]
 
-    The pages that need the docs machinery are added once the docs pipeline
-    exists; the landing page and the 404 page are always present.
+
+def _guide_body(
+    env: Environment,
+    guide: dict[str, Any],
+    context: dict[str, Any],
+) -> tuple[str, list[dict[str, str]], str | None]:
+    """A guide's rendered body, its table of contents, and its own title.
+
+    A guide with a ``source`` is rendered from the repository's markdown. The
+    two without one — the quick start and the MCP reference — are generated,
+    because they are joins the repository cannot express.
     """
-    pages: list[tuple[str, str]] = [("index.html", "landing.html"), ("404.html", "404.html")]
-    for name in sorted(p.name for p in TEMPLATES.glob("*.html")):
-        # A leading underscore marks a partial, not a page.
-        if name.startswith("_"):
-            continue
-        if name in {"base.html", "landing.html", "404.html"}:
-            continue
-        pages.append((name, name))
-    return pages
+    slug = guide["slug"]
+
+    if slug == "quick-start":
+        body = env.get_template("_quick_start.html").render(**context)
+        return body, [], None
+
+    if slug == "mcp":
+        body = env.get_template("_mcp_reference.html").render(**context)
+        return body, [], None
+
+    source = guide.get("source")
+    if not source:
+        return "", [], None
+
+    path = ROOT / source
+    if not path.is_file():
+        raise FileNotFoundError(f"the guide {source} does not exist")
+    raw, title = markdown_render.take_title(path.read_text(encoding="utf-8"))
+    body = markdown_render.render(raw, source_path=source)
+    return body, markdown_render.headings(body), title
+
+
+def _render_docs(env: Environment, nav: dict[str, Any], context: dict[str, Any]) -> dict[str, str]:
+    """Every docs page, keyed by its path relative to the site root."""
+    guides = _flat_guides(nav)
+    rendered: dict[str, str] = {}
+
+    for index, (group, guide) in enumerate(guides):
+        slug = guide["slug"]
+        output = f"docs/{slug}/index.html"
+        page_context = dict(context)
+        page_context["nav"] = nav
+        page_context["page"] = {
+            "title": guide["title"],
+            "description": guide.get("blurb", ""),
+            "path": output,
+            "depth": 2,
+            "slug": slug,
+            "group_title": group["title"],
+            "blurb": guide.get("blurb", ""),
+            "previous": guides[index - 1][1] if index else None,
+            "next": guides[index + 1][1] if index + 1 < len(guides) else None,
+        }
+        body, toc, own_title = _guide_body(env, guide, page_context)
+        if own_title:
+            # The guide's own top-level heading is its title.
+            page_context["page"]["title"] = own_title
+        page_context["page"]["body"] = body
+        page_context["page"]["toc"] = toc
+        page_context["prefix"] = "../../"
+        rendered[output] = env.get_template("doc.html").render(**page_context)
+
+    return rendered
+
+
+def _render_docs_index(env: Environment, nav: dict[str, Any], context: dict[str, Any]) -> str:
+    """The hub index: every guide, grouped by the job it does."""
+    page_context = dict(context)
+    page_context["nav"] = nav
+    page_context["page"] = {
+        "title": "Documentation",
+        "description": (
+            "Every guide, the CLI reference, the connector catalog, and the full "
+            "MCP tool reference."
+        ),
+        "path": "docs/index.html",
+        "depth": 1,
+        "slug": "",
+        "group_title": "Documentation",
+        "blurb": "",
+        "previous": None,
+        "next": None,
+        "body": "",
+        "toc": [],
+    }
+    page_context["prefix"] = "../"
+    return env.get_template("docs_index.html").render(**page_context)
 
 
 def _render_pages(env: Environment) -> dict[str, str]:
     """Render every page, returning output path -> HTML."""
     landing = _load_json("landing.json")
     demo = _load_json("demo.json")
+    nav = _load_json("nav.json")
     connectors = extract.read_connectors(CATALOG_PY)
     tools = extract.read_tools(MCP_SERVER_PY, CONTRACT_PY)
     cards = extract.read_catalog_cards(CATALOG_TS)
     roadmap_pending = extract.read_roadmap_pending(ROADMAP_MD)
     formula_base, formula_gap = _formula_parts()
+
+    context = _page_context(
+        page={
+            "title": SITE_NAME,
+            "description": "",
+            "path": "index.html",
+            "depth": 0,
+        },
+        landing=landing,
+        content=landing,
+        demo=demo,
+        nav=nav,
+        connectors=connectors,
+        connector_areas=extract.group_connectors_by_area(connectors),
+        tools=tools,
+        tool_by_name={tool["name"]: tool for tool in tools},
+        tool_signatures={tool["name"]: _signature(tool) for tool in tools},
+        catalog_cards=cards,
+        works_today=_works_today(tools, cards, connectors),
+        roadmap_pending=roadmap_pending,
+        formula_base=formula_base,
+        formula_gap=formula_gap,
+    )
+
     rendered: dict[str, str] = {}
 
-    for output, template in _pages(env):
-        context = _page_context(
-            page={
-                "title": SITE_NAME,
-                "description": "",
-                "path": output,
-                "depth": 0,
-            },
-            landing=landing,
-            content=landing,
-            demo=demo,
-            connectors=connectors,
-            connector_areas=extract.group_connectors_by_area(connectors),
-            tools={tool["name"]: tool for tool in tools},
-            tool_signatures={tool["name"]: _signature(tool) for tool in tools},
-            catalog_cards=cards,
-            works_today=_works_today(tools, cards, connectors),
-            roadmap_pending=roadmap_pending,
-            formula_base=formula_base,
-            formula_gap=formula_gap,
-        )
-        if template == "landing.html":
-            context["page"] = {
-                "title": f"{SITE_NAME} — Ground agents in verified customer outcomes",
-                "description": (
-                    "An MCP server that hands your agents verified customer outcomes, "
-                    "and the evidence behind them."
-                ),
-                "path": output,
-                "depth": 0,
-            }
-        rendered[output] = env.get_template(template).render(**context)
+    landing_context = dict(context)
+    landing_context["page"] = {
+        "title": f"{SITE_NAME} — Ground agents in verified customer outcomes",
+        "description": (
+            "An MCP server that hands your agents verified customer outcomes, "
+            "and the evidence behind them."
+        ),
+        "path": "index.html",
+        "depth": 0,
+    }
+    rendered["index.html"] = env.get_template("landing.html").render(**landing_context)
+
+    rendered["docs/index.html"] = _render_docs_index(env, nav, context)
+    rendered.update(_render_docs(env, nav, context))
+
+    not_found = env.get_template("404.html").render(**context)
+    rendered["404.html"] = not_found
+
     return rendered
 
 
@@ -267,7 +361,12 @@ def build(out_dir: Path, *, check: bool = False) -> int:
     rendered = _render_pages(env)
 
     files: dict[str, bytes] = {name: html.encode("utf-8") for name, html in rendered.items()}
-    files["sitemap.xml"] = _sitemap(["/"] + [f"/{name}" for name in sorted(rendered) if name.endswith(".html") and name not in {"index.html", "404.html"}]).encode("utf-8")
+    urls = ["/"]
+    for name in sorted(rendered):
+        if name in {"index.html", "404.html"}:
+            continue
+        urls.append("/" + name[: -len("index.html")])
+    files["sitemap.xml"] = _sitemap(urls).encode("utf-8")
     files["robots.txt"] = _robots().encode("utf-8")
     files["assets/tokens.css"] = _tokens_css().encode("utf-8")
 

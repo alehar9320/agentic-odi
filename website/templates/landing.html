@@ -340,7 +340,7 @@
       {% for name in landing.tools.peek %}
       <article class="tool" data-reveal>
         <span class="tool__name">{{ name }}</span>
-        <p class="tool__purpose">{{ tools[name].purpose }}</p>
+        <p class="tool__purpose">{{ tool_by_name[name].purpose }}</p>
         <code class="tool__sig">{{ tool_signatures[name] }}</code>
       </article>
       {% endfor %}

@@ -1,0 +1,157 @@
+"""Render the repository's guides as web pages.
+
+The guides in ``docs/`` are written for people reading them in the
+repository. They are the single source of truth, and the site renders them
+verbatim rather than keeping a second copy.
+
+Raw HTML in a guide is not passed through: the guides are repository
+content, and a page that renders unfiltered markup from a file is a page
+that can be injected into. Fenced code is highlighted here, at build time,
+so highlighting costs no client-side JavaScript.
+"""
+
+from __future__ import annotations
+
+import re
+from pathlib import Path
+
+from markdown_it import MarkdownIt
+from pygments import highlight
+from pygments.formatters import HtmlFormatter
+from pygments.lexers import get_lexer_by_name, guess_lexer
+from pygments.util import ClassNotFound
+
+REPO_URL = "https://github.com/alehar9320/agentic-odi/blob/main"
+
+_MARKDOWN = MarkdownIt("commonmark", {"html": False, "linkify": True})
+_MARKDOWN.enable("table")
+_MARKDOWN.enable("strikethrough")
+
+_STYLE = "monokai"
+_FORMATTER = HtmlFormatter(style=_STYLE, nowrap=True)
+
+
+def _highlight_code(code: str, language: str) -> str:
+    """Highlight a fenced code block, falling back to plain text."""
+    lexer = None
+    if language:
+        try:
+            lexer = get_lexer_by_name(language, stripall=False)
+        except ClassNotFound:
+            lexer = None
+    if lexer is None:
+        try:
+            lexer = guess_lexer(code)
+        except ClassNotFound:
+            lexer = None
+    if lexer is None:
+        return ""
+    return highlight(code, lexer, _FORMATTER)
+
+
+def _fence_renderer(markdown: MarkdownIt) -> None:
+    """Render fenced code with server-side syntax highlighting."""
+
+    def render(tokens: list, index: int, options, env, **kwargs) -> str:  # noqa: ANN001
+        token = tokens[index]
+        info = (token.info or "").strip()
+        language = info.split()[0] if info else ""
+        markup = _highlight_code(token.content, language)
+        if not markup:
+            return ""
+        return f'<pre class="highlight"><code class="language-{language}">{markup}</code></pre>'
+
+    markdown.renderer.rules["fence"] = render
+
+
+def _heading_renderer(markdown: MarkdownIt) -> None:
+    """Give every heading a stable anchor, the way GitHub does.
+
+    A guide's own top-level heading is the page's title, and the template
+    renders it. So a level-one heading inside the body is demoted to level
+    two, and the page keeps exactly one ``<h1>``.
+    """
+
+    def render(tokens: list, index: int, options, env, **kwargs) -> str:  # noqa: ANN001
+        token = tokens[index]
+        level = int(token.tag[1])
+        if level == 1:
+            level = 2
+        # The heading's text is in the inline token that follows the open tag.
+        text = token.content
+        if not text and index + 1 < len(tokens):
+            text = tokens[index + 1].content
+        anchor = _unique_anchor(env, text)
+        return f'<h{level} id="{anchor}">'
+
+    markdown.renderer.rules["heading_open"] = render
+
+
+def _unique_anchor(env: dict, text: str) -> str:
+    """A heading anchor, unique within the page."""
+    counts = env.setdefault("heading_anchors", {})
+    base = slugify(text)
+    count = counts.get(base, 0)
+    counts[base] = count + 1
+    return base if not count else f"{base}-{count}"
+
+
+_fence_renderer(_MARKDOWN)
+_heading_renderer(_MARKDOWN)
+
+
+def slugify(text: str) -> str:
+    """A GitHub-compatible heading anchor."""
+    anchor = text.strip().lower()
+    anchor = re.sub(r"[^\w\- ]+", "", anchor)
+    return re.sub(r"[\s_]+", "-", anchor).strip("-")
+
+
+def render(md: str, *, source_path: str | None = None) -> str:
+    """A guide's prose, as HTML, with a link back to its source."""
+    html = _MARKDOWN.render(md)
+
+    if source_path:
+        html += (
+            '\n<p class="prose__source">Source of truth: '
+            f"<code>{source_path}</code> &mdash; "
+            f'<a href="{REPO_URL}/{source_path}">view on GitHub</a></p>'
+        )
+    return html
+
+
+def headings(html: str) -> list[dict[str, str]]:
+    """The headings in a rendered page, for a table of contents."""
+    found: list[dict[str, str]] = []
+    for match in re.finditer(r'<h([23]) id="([^"]+)">(.*?)</h\1>', html, re.DOTALL):
+        found.append(
+            {
+                "level": match.group(1),
+                "anchor": match.group(2),
+                "text": re.sub(r"<[^>]+>", "", match.group(3)).strip(),
+            }
+        )
+    return found
+
+
+def read_guide(path: Path) -> str:
+    """The raw markdown of a guide."""
+    return path.read_text(encoding="utf-8")
+
+
+def take_title(md: str) -> tuple[str, str | None]:
+    """A guide's own title, and the body without it.
+
+    The template renders the page's ``<h1>``. When the guide opens with its
+    own top-level heading, that heading *is* the page title, so it is lifted
+    out of the body rather than rendered a second time.
+    """
+    lines = md.splitlines()
+    for index, line in enumerate(lines):
+        if line.startswith("# "):
+            title = line[2:].strip()
+            del lines[index]
+            return "\n".join(lines), title
+        if line.strip():
+            break
+    return md, None

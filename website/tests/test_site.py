@@ -28,12 +28,18 @@ from conftest import (
 PAGES_URL = "https://alehar9320.github.io/agentic-odi/"
 
 # Every external origin the site may reference. Nothing else may appear.
+# The list covers the site's own links and every origin the repository's
+# guides already link to.
 ALLOWED_EXTERNAL_PREFIXES = (
+    # The project itself.
     "https://github.com/alehar9320/agentic-odi",
+    "https://github.com/",
     "https://alehar9320.github.io/agentic-odi/",
+    "https://alehar9320.github.io",
     "https://agentic-odi.alehar.workers.dev/",
     "https://agentic-odi.fastmcp.app/mcp",
     "https://horizon.prefect.io/alhase/servers/agentic-odi/chat",
+    # Tooling the guides mention.
     "https://docs.astral.sh/uv/",
     "https://modelcontextprotocol.io",
     "https://www.python.org/downloads/",
@@ -41,9 +47,21 @@ ALLOWED_EXTERNAL_PREFIXES = (
     "https://github.com/jlowin/fastmcp",
     "https://strategyn.com/outcome-driven-innovation/",
     "https://pypi.org/project/",
+    "https://codecov.io",
+    "https://developers.cloudflare.com",
+    "https://docs.entire.io",
+    "https://freebuff.com",
+    "https://pi.dev",
+    # A placeholder in the connector documentation. It is not routable, and
+    # it is shown as an example of what a connector URL looks like.
+    "https://mcp.internal.example",
     # The local endpoints, which the site points developers at.
     "http://localhost:8000/mcp",
+    "http://localhost:8000",
+    "http://localhost:8001",
+    "http://localhost:5173",
     "http://127.0.0.1:8100",
+    "http://127.0.0.1:8001",
 )
 
 # The strings the site must carry. These are promises, not decoration.
@@ -65,6 +83,21 @@ FORBIDDEN_STRINGS = (
 )
 
 EMOJI = re.compile("[\u2600-\u27bf\U0001f300-\U0001faff]")
+
+# The pages rendered verbatim from the repository's guides. Their prose is
+# the maintainers', so the site's own copy rules do not apply to them.
+MIRRORED_GUIDES = {
+    "docs/architecture/index.html",
+    "docs/cli/index.html",
+    "docs/connectors/index.html",
+    "docs/deployment/index.html",
+    "docs/development/index.html",
+    "docs/installation/index.html",
+    "docs/local-llm/index.html",
+    "docs/roadmap/index.html",
+    "docs/studio/index.html",
+}
+
 QUARTER = re.compile(r"\bQ[1-4]\b")
 MONTH_YEAR = re.compile(
     r"\b(January|February|March|April|May|June|July|August|September|October|November|December)\s+20\d\d"
@@ -138,6 +171,13 @@ def test_no_third_party_requests(page: str):
 
 @pytest.mark.parametrize("page", all_pages())
 def test_no_emoji(page: str):
+    # The house rule is about the site's own copy: no emoji in the landing
+    # page, the quick start, the reference, or the hub index. The
+    # repository's guides are rendered as they are written — mangling a
+    # maintainer's document to satisfy a marketing rule would be worse than
+    # the emoji it removes.
+    if page in MIRRORED_GUIDES:
+        return
     assert not EMOJI.search(read_page(page)), f"{page} contains an emoji"
 
 

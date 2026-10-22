@@ -1110,6 +1110,432 @@ body::before {
 }
 
 /* ---------------------------------------------------------------- */
+/* Documentation                                                     */
+/* ---------------------------------------------------------------- */
+
+.doc {
+  display: grid;
+  gap: clamp(32px, 5vw, 64px);
+  grid-template-columns: minmax(0, 1fr);
+  max-width: var(--w-wide);
+  margin-inline: auto;
+  padding: clamp(40px, 6vw, 72px) var(--gutter) clamp(72px, 9vw, 140px);
+}
+
+@media (min-width: 900px) {
+  .doc {
+    grid-template-columns: 230px minmax(0, 1fr);
+  }
+}
+
+.doc__nav {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+@media (min-width: 900px) {
+  .doc__nav {
+    position: sticky;
+    top: 96px;
+    align-self: start;
+    max-height: calc(100vh - 140px);
+    overflow-y: auto;
+  }
+}
+
+.doc__back {
+  font-size: 0.8125rem;
+  color: var(--muted);
+}
+
+.doc__back:hover {
+  color: var(--text);
+}
+
+.doc__group-title {
+  margin-bottom: 10px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+.doc__list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.doc__link {
+  display: block;
+  padding: 6px 10px;
+  border-radius: var(--r-sm);
+  color: var(--muted);
+  font-size: 0.875rem;
+  transition: background-color 0.15s var(--ease-tactile), color 0.15s var(--ease-tactile);
+}
+
+.doc__link:hover {
+  background: var(--surface);
+  color: var(--text);
+}
+
+.doc__link.is-current {
+  background: var(--surface-hover);
+  color: var(--text);
+  font-weight: 600;
+}
+
+.doc__body {
+  min-width: 0;
+}
+
+.doc__head {
+  margin-bottom: 40px;
+  padding-bottom: 32px;
+  border-bottom: 1px solid var(--line);
+}
+
+.doc__title {
+  font-size: clamp(2rem, 4.5vw, 3rem);
+  font-weight: 600;
+  letter-spacing: -0.035em;
+  line-height: 1.05;
+  text-wrap: balance;
+}
+
+.doc__lede {
+  max-width: 62ch;
+  margin-bottom: 32px;
+  color: var(--muted);
+  font-size: 1.0625rem;
+  line-height: 1.6;
+}
+
+.prose__source {
+  margin-top: 48px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+  font-size: 0.875rem;
+  color: var(--faint);
+}
+
+.doc__toc {
+  margin-top: 48px;
+  padding: 20px 24px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--surface);
+}
+
+.doc__toc-title {
+  margin-bottom: 10px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+.doc__toc ul {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.doc__toc-item a {
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.doc__toc-item a:hover {
+  color: var(--text);
+}
+
+.doc__toc-item--3 {
+  padding-left: 14px;
+}
+
+.doc__pager {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 56px;
+  padding-top: 28px;
+  border-top: 1px solid var(--line);
+}
+
+.doc__pager-link {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 20px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  transition: border-color 0.15s var(--ease-tactile), transform 0.15s var(--ease-tactile);
+}
+
+.doc__pager-link:hover {
+  border-color: var(--line-strong);
+  transform: translateY(-1px);
+}
+
+.doc__pager-link--next {
+  margin-left: auto;
+  text-align: right;
+}
+
+.doc__pager-label {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+.doc__pager-title {
+  color: var(--text);
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+/* The docs index. */
+.doc-index__group + .doc-index__group {
+  margin-top: 48px;
+}
+
+.doc-index__title {
+  margin-bottom: 18px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+.doc-index__card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  color: var(--text);
+  transition:
+    transform 0.2s var(--ease-apple-out),
+    border-color 0.2s var(--ease-apple-out);
+}
+
+.doc-index__card:hover {
+  transform: translateY(-2px);
+  border-color: var(--line-strong);
+}
+
+.doc-index__name {
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+.doc-index__blurb {
+  color: var(--muted);
+  font-size: 0.8125rem;
+  line-height: 1.55;
+}
+
+.doc-index__note {
+  margin-top: 48px;
+  color: var(--muted);
+  font-size: 0.9375rem;
+}
+
+/* The tool reference. */
+.tool-index {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 44px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--surface);
+}
+
+.tool-index__link {
+  padding: 4px 10px;
+  border-radius: var(--r-pill);
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.tool-index__link:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.tool-doc {
+  padding-top: 32px;
+  border-top: 1px solid var(--line);
+  scroll-margin-top: 96px;
+}
+
+.tool-doc + .tool-doc {
+  margin-top: 40px;
+}
+
+.tool-doc__name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  font-family: var(--mono);
+  font-size: 1.0625rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.tool-doc__purpose {
+  margin: 10px 0 16px;
+  color: var(--muted);
+  font-size: 0.9375rem;
+}
+
+.tool-doc__args {
+  width: 100%;
+  margin-top: 16px;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+}
+
+.tool-doc__args th,
+.tool-doc__args td {
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+
+.tool-doc__args th {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+.tool-doc__args code {
+  font-family: var(--mono);
+  color: var(--text);
+}
+
+/* The quick start. */
+.quickstart {
+  display: flex;
+  flex-direction: column;
+  gap: 40px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: quickstart;
+}
+
+.quickstart__step {
+  counter-increment: quickstart;
+}
+
+.quickstart__title {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 12px;
+  font-size: 1.25rem;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+
+.quickstart__title::before {
+  content: counter(quickstart, decimal-leading-zero);
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  color: var(--accent);
+}
+
+.quickstart__body {
+  max-width: 62ch;
+  margin-bottom: 16px;
+  color: var(--muted);
+  font-size: 0.9375rem;
+  line-height: 1.65;
+}
+
+.quickstart__aside {
+  max-width: 62ch;
+  margin-top: 14px;
+  color: var(--faint);
+  font-size: 0.875rem;
+  line-height: 1.6;
+}
+
+.quickstart__table {
+  width: 100%;
+  margin-top: 16px;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.quickstart__table th,
+.quickstart__table td {
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+}
+
+.quickstart__table th {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+.quickstart__table code {
+  font-family: var(--mono);
+  color: var(--text);
+}
+
+.quickstart__heading {
+  margin-top: 56px;
+  margin-bottom: 16px;
+  font-size: 1.25rem;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+
+.quickstart__links {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--muted);
+  font-size: 0.9375rem;
+}
+
+/* ---------------------------------------------------------------- */
 /* Surfaces — the six catalog cards                                  */
 /* ---------------------------------------------------------------- */
 
@@ -1473,6 +1899,7 @@ body::before {
 
 .codeblock code {
   font-family: var(--mono);
+  white-space: pre;
 }
 
 .copy-btn {
@@ -1524,6 +1951,7 @@ body::before {
 
 .highlight code {
   font-family: var(--mono);
+  white-space: pre;
 }
 
 /* ---------------------------------------------------------------- */
