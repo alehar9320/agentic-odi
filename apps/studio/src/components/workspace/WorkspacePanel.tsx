@@ -1,9 +1,18 @@
 import { useStudio } from "../../state/StudioContext";
 import { useMediaQuery } from "../../lib/useMediaQuery";
 import { CloseIcon } from "../icons";
-import { findPanel } from "./panels";
+import { PanelBoundary } from "./PanelBoundary";
+import { findPanel, type PanelDefinition } from "./panels";
 
 const MOBILE_QUERY = "(max-width: 1023px)";
+
+/**
+ * The lens body as its own component, so a lens that throws while rendering is
+ * caught by the panel boundary instead of by the app.
+ */
+function PanelBody({ panel }: { panel: PanelDefinition }) {
+  return <>{panel.render()}</>;
+}
 
 /**
  * A lens on the conversation, not a place you go.
@@ -70,7 +79,11 @@ export function WorkspacePanel() {
         </header>
 
         <div className="lens__body">
-          <div className="lens__content">{panel.render()}</div>
+          <div className="lens__content">
+            <PanelBoundary name={panel.id}>
+              <PanelBody panel={panel} />
+            </PanelBoundary>
+          </div>
         </div>
 
         {panel.talk && (

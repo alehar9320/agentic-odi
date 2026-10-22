@@ -1,5 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+const brokenPanel = vi.hoisted(() => ({ renders: 0, fail: true }));
 
 const studio = vi.hoisted(() => ({
   activePanel: "landscape" as string | null,
@@ -29,10 +31,37 @@ vi.mock("../../state/StudioContext", () => ({
   useStudio: () => studio,
 }));
 
+vi.mock("./panels", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./panels")>();
+  return {
+    ...actual,
+    findPanel: (id: string) => {
+      if (id !== "broken") {
+        return actual.findPanel(id as never);
+      }
+      return {
+        id: "broken" as never,
+        label: "Broken",
+        title: "Broken lens",
+        blurb: "A lens that throws.",
+        icon: null,
+        render: () => {
+          brokenPanel.renders += 1;
+          if (brokenPanel.fail) {
+            throw new Error("the lens exploded");
+          }
+          return <p>The lens recovered.</p>;
+        },
+      };
+    },
+  };
+});
+
 import { WorkspacePanel } from "./WorkspacePanel";
 
 describe("WorkspacePanel", () => {
   beforeEach(() => {
+    brokenPanel.renders = 0;
     studio.activePanel = "landscape";
     studio.closePanel.mockClear();
     studio.sendMessage.mockClear();
@@ -92,5 +121,35 @@ describe("WorkspacePanel", () => {
     const { container } = render(<WorkspacePanel />);
 
     expect(container).toBeEmptyDOMElement();
+  });
+});
+
+describe("WorkspacePanel with a broken lens", () => {
+  beforeEach(() => {
+    brokenPanel.renders = 0;
+    brokenPanel.fail = true;
+    studio.activePanel = "broken";
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("contains the failure to the panel instead of the whole studio", () => {
+    render(<WorkspacePanel />);
+
+    expect(screen.getByRole("alert")).toBeInTheDocument();
+    expect(screen.queryByText(/reload the studio/i)).toBeNull();
+    expect(screen.getByRole("button", { name: /retry/i })).toBeInTheDocument();
+  });
+
+  it("recovers when the panel is retried", () => {
+    render(<WorkspacePanel />);
+    brokenPanel.fail = false;
+
+    fireEvent.click(screen.getByRole("button", { name: /retry/i }));
+
+    expect(screen.getByText("The lens recovered.")).toBeInTheDocument();
   });
 });

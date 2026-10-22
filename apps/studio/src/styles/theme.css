@@ -1779,9 +1779,29 @@ input[type="range"] {
   backdrop-filter: blur(8px);
 }
 
+/* A lens that threw, contained to its own panel. */
+.panel-failure {
+  padding: 14px 16px;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  border-radius: 10px;
+  background: rgba(239, 68, 68, 0.08);
+}
+
+.panel-failure__message {
+  margin: 0;
+  color: #fca5a5;
+  font-size: 0.84rem;
+}
+
+.panel-failure__detail {
+  margin: 4px 0 0;
+  color: var(--studio-muted);
+  font-size: 0.75rem;
+  word-break: break-word;
+}
+
 /* An empty canvas is an invitation, not a board of zeroes. */
-.studio-empty {
-  margin-top: 16px;
+.studio-empty {  margin-top: 16px;
   padding: 28px 20px;
   text-align: center;
   background: var(--studio-surface);
