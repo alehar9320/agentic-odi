@@ -1,0 +1,44 @@
+{
+  "hero": {
+    "id": "top",
+    "eyebrow": "Experimental",
+    "title": "Your roadmap is a guess.",
+    "sub": "An MCP server that hands your agents verified customer outcomes — and the evidence behind them.",
+    "primary": { "label": "Run it in 60 seconds", "href": "#run" },
+    "secondary": { "label": "Open the Living Studio", "href": "https://agentic-odi.alehar.workers.dev/" },
+    "tertiary": { "label": "View on GitHub", "href": "https://github.com/alehar9320/agentic-odi" }
+  },
+  "problem": {
+    "id": "problem",
+    "eyebrow": "The problem",
+    "title": "Opinion is expensive.",
+    "beats": [
+      {
+        "quote": "Roadmaps set by whoever talks loudest.",
+        "support": "Decisions default to seniority, not evidence."
+      },
+      {
+        "quote": "Features for customers who never asked.",
+        "support": "Nobody validated the outcome; only the idea."
+      },
+      {
+        "quote": "Agents fluent in everything, grounded in nothing.",
+        "support": "A model will confidently invent your customer."
+      }
+    ],
+    "closer": "Add it up and the roadmap isn't a plan. It's a guess."
+  },
+  "insight": {
+    "id": "insight",
+    "eyebrow": "The method",
+    "title": "Ask for outcomes, not opinions.",
+    "paragraphs": [
+      "Outcome-Driven Innovation asks customers how much each desired outcome matters and how satisfied they are with it today.",
+      "The gap between importance and satisfaction is where products win or die.",
+      "Agentic ODI stores those outcomes, scores them, and serves them to any agent over MCP."
+    ],
+    "formula_label": "Opportunity =",
+    "stat": "86% innovation success rate",
+    "stat_source": "as reported in ODI literature (Strategyn)"
+  }
+}
