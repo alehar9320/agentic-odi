@@ -400,3 +400,13 @@ class SQLiteRepository(Repository):
     def reload(self) -> None:
         """Re‑load the local snapshot from the event store."""
         self._load_snapshot()
+
+    def commit(self) -> None:
+        """Flush any open transaction in the event store to disk."""
+        with self._lock:
+            self.store.commit()
+
+    def close(self) -> None:
+        """Flush and close the event store."""
+        with self._lock:
+            self.store.close()
