@@ -1,5 +1,6 @@
 import { useStudio } from "../../state/StudioContext";
-import { BellIcon, PlusIcon, SettingsIcon, SparkIcon } from "../icons";
+import { BellIcon, PlusIcon, SettingsIcon } from "../icons";
+import { OdiMascot } from "../OdiMascot";
 
 /**
  * The only persistent chrome: where you are, how to start again, whether the
@@ -31,7 +32,7 @@ export function StudioBar({
           title="Home"
         >
           <span className="brand__mark" aria-hidden="true">
-            <SparkIcon size={15} />
+            <OdiMascot size={32} />
           </span>
           <span className="brand__wordmark">Living Studio</span>
         </button>
