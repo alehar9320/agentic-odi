@@ -1,0 +1,26 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M5HZCMJP14CMM6AFQJAJHFAW",
+  "session_id": "ses_ea010d520ffey3MEP7OOljNz5r",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-22T14:15:23.075992211Z",
+  "branch": "feature/gh-pages-redesign",
+  "checkpoints_count": 1,
+  "files_touched": [],
+  "agent": "OpenCode",
+  "model": "minimax-m3.1-flash",
+  "turn_id": "f5da3eb9ddb0",
+  "checkpoint_transcript_start": 279,
+  "transcript_lines_at_start": 279,
+  "compact_transcript_start": 279,
+  "token_usage": {
+    "input_tokens": 1553,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 6640135,
+    "output_tokens": 4096,
+    "api_call_count": 18
+  },
+  "session_metrics": {
+    "turn_count": 3
+  }
+}
