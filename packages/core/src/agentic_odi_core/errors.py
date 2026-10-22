@@ -25,12 +25,20 @@ class ValidationError(OdiError, ValueError):
 
 
 class NotFoundError(OdiError):
-    """A referenced resource does not exist."""
+    """A referenced resource does not exist.
 
-    def __init__(self, resource_id: str, kind: str) -> None:
+    ``hint`` is an optional sentence telling the caller what to do next. It is
+    appended to the message so it survives into user-facing output.
+    """
+
+    def __init__(self, resource_id: str, kind: str, hint: str | None = None) -> None:
         self.resource_id = resource_id
         self.kind = kind
-        super().__init__(f"{kind} not found: {resource_id}")
+        self.hint = hint or ""
+        message = f"{kind} not found: {resource_id}"
+        if self.hint:
+            message = f"{message}. {self.hint}"
+        super().__init__(message)
 
 
 class ConflictError(OdiError):

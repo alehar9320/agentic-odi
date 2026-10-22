@@ -44,10 +44,16 @@ class CustomerOutcomeNotFoundError(NotFoundError):
         super().__init__(outcome_id, "customer_outcome")
 
 
-class EvidenceNotFoundError(NotFoundError):
-    def __init__(self, evidence_id: str) -> None:
+class EvidenceNotFoundError(NotFoundError, ValueError):
+    """Raised when an evidence record cannot be located.
+
+    Also a :class:`ValueError`, because the caller supplied an id that does not
+    resolve — an invalid argument value.
+    """
+
+    def __init__(self, evidence_id: str, hint: str | None = None) -> None:
         self.evidence_id = evidence_id
-        super().__init__(evidence_id, "evidence")
+        super().__init__(evidence_id, "evidence", hint)
 
 
 class ValueOutOfRangeError(ValidationError):
@@ -281,7 +287,10 @@ class ODIService:
 
     def delete_evidence(self, evidence_id: str) -> None:
         if not self.repo.delete_evidence(evidence_id):
-            raise EvidenceNotFoundError(evidence_id)
+            raise EvidenceNotFoundError(
+                evidence_id,
+                "List the stored records with list_evidence() to find a valid id.",
+            )
 
     def promote_evidence(
         self,
@@ -295,7 +304,10 @@ class ODIService:
     ) -> Job | Outcome:
         evidence = self.repo.get_evidence(evidence_id)
         if evidence is None:
-            raise EvidenceNotFoundError(evidence_id)
+            raise EvidenceNotFoundError(
+                evidence_id,
+                "List the stored records with list_evidence() to find a valid id.",
+            )
         if target == "job":
             label = (
                 (name or evidence.name).strip() or _first_line(evidence.content) or "Imported job"
