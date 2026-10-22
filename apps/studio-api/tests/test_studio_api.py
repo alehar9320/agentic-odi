@@ -516,7 +516,8 @@ def test_chat_resumes_an_existing_conversation() -> None:
     )
     conversation = json.loads(events["conversation"][0])
     assert conversation["id"] == created["id"]
-    assert len(client.app.state.memory.list_turns(created["id"])) == 2
+    latest = client.get("/api/conversations/latest").json()
+    assert len(latest["turns"]) == 2
 
 
 def test_clear_memory_removes_conversations_and_observations() -> None:

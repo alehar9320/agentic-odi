@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
+
 import pytest
 from agentic_odi_studio_api.studio.memory import (
     OBSERVATION_KINDS,
@@ -13,7 +15,7 @@ from agentic_odi_studio_api.studio.memory import (
 
 
 @pytest.fixture()
-def memory() -> StudioMemory:
+def memory() -> Iterator[StudioMemory]:
     store = StudioMemory(":memory:")
     yield store
     store.close()

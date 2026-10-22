@@ -437,12 +437,12 @@ async def stream_chat(
                         yield _sse(event["event"], event["data"])
                 elif name == "remember":
                     yield _sse("tool", {"name": name, "status": "start"})
-                    result_str, event = _apply_remember(arguments, memory)
-                    if event is None:
+                    result_str, memory_event = _apply_remember(arguments, memory)
+                    if memory_event is None:
                         yield _sse("tool", {"name": name, "status": "error", "preview": result_str})
                     else:
                         yield _sse("tool", {"name": name, "status": "ok"})
-                        yield _sse("memory", event)
+                        yield _sse("memory", memory_event)
                 else:
                     yield _sse("tool", {"name": name, "status": "start"})
                     if name == RENDER_UI_TOOL:
