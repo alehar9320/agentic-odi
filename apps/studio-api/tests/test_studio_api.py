@@ -468,15 +468,11 @@ def test_memory_rejects_unknown_kind_and_blank_text() -> None:
     client = _client()
 
     assert (
-        client.post(
-            "/api/memory/observations", json={"kind": "nonsense", "text": "x"}
-        ).status_code
+        client.post("/api/memory/observations", json={"kind": "nonsense", "text": "x"}).status_code
         == 422
     )
     assert (
-        client.post(
-            "/api/memory/observations", json={"kind": "career", "text": "   "}
-        ).status_code
+        client.post("/api/memory/observations", json={"kind": "career", "text": "   "}).status_code
         == 422
     )
 

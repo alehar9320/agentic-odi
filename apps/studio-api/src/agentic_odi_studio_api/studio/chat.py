@@ -125,9 +125,7 @@ def _sse(event: str, data: dict[str, Any]) -> str:
     return f"event: {event}\ndata: {json.dumps(data)}\n\n"
 
 
-def _to_openai_messages(
-    request: ChatRequest, memory_context: str = ""
-) -> list[dict[str, Any]]:
+def _to_openai_messages(request: ChatRequest, memory_context: str = "") -> list[dict[str, Any]]:
     system_prompt = SYSTEM_PROMPT + _brief_block(request.brief)
     if memory_context:
         system_prompt += "\n\n" + memory_context
@@ -342,9 +340,7 @@ async def stream_chat(
     conversation_id: str | None = None
     if memory is not None:
         conversation = (
-            memory.get_conversation(request.conversation_id)
-            if request.conversation_id
-            else None
+            memory.get_conversation(request.conversation_id) if request.conversation_id else None
         )
         if conversation is None:
             conversation = memory.create_conversation()
@@ -443,9 +439,7 @@ async def stream_chat(
                     yield _sse("tool", {"name": name, "status": "start"})
                     result_str, event = _apply_remember(arguments, memory)
                     if event is None:
-                        yield _sse(
-                            "tool", {"name": name, "status": "error", "preview": result_str}
-                        )
+                        yield _sse("tool", {"name": name, "status": "error", "preview": result_str})
                     else:
                         yield _sse("tool", {"name": name, "status": "ok"})
                         yield _sse("memory", event)

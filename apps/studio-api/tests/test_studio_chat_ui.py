@@ -197,7 +197,11 @@ def test_render_ui_is_offered_to_the_model_with_the_catalog(monkeypatch) -> None
     _collect(_request())
 
     tools = HOLDER["completions"].calls[0]["tools"]
-    assert [tool["function"]["name"] for tool in tools] == ["render_ui", "remember", "add_connector"]
+    assert [tool["function"]["name"] for tool in tools] == [
+        "render_ui",
+        "remember",
+        "add_connector",
+    ]
     assert tools[0]["function"]["parameters"]["properties"]["type"]["enum"] == ["outcome-card"]
     assert "outcome-card" in tools[0]["function"]["description"]
 

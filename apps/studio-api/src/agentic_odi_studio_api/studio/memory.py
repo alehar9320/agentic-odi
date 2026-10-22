@@ -231,8 +231,7 @@ class StudioMemory:
         )
         with self._lock, self._connection:
             self._connection.execute(
-                "INSERT INTO conversations (id, title, created_at, updated_at) "
-                "VALUES (?, ?, ?, ?)",
+                "INSERT INTO conversations (id, title, created_at, updated_at) VALUES (?, ?, ?, ?)",
                 (
                     conversation.id,
                     conversation.title,
@@ -437,7 +436,10 @@ class StudioMemory:
     @staticmethod
     def _conversation_from_row(row: sqlite3.Row) -> Conversation:
         return Conversation(
-            id=row["id"], title=row["title"], created_at=row["created_at"], updated_at=row["updated_at"]
+            id=row["id"],
+            title=row["title"],
+            created_at=row["created_at"],
+            updated_at=row["updated_at"],
         )
 
     @staticmethod

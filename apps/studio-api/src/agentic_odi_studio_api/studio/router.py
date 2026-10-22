@@ -318,9 +318,7 @@ def list_observations(request: Request) -> ObservationListResponse:
 
 
 @router.post("/memory/observations", response_model=ObservationResponse)
-def create_observation(
-    body: ObservationCreateRequest, request: Request
-) -> ObservationResponse:
+def create_observation(body: ObservationCreateRequest, request: Request) -> ObservationResponse:
     try:
         observation = _memory(request).add_observation(
             kind=body.kind,
