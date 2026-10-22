@@ -1,0 +1,16 @@
+Explore the Living Studio frontend at `/home/alexa/repos/agentic-odi/apps/studio/` on the `origin/main` branch (note: the working tree is 57 commits behind, so use `git show origin/main:<path>` to read files, or check if files exist on disk first).
+
+I need to extract the complete DESIGN SYSTEM of this React+TypeScript Studio app so a marketing website can share the same visual DNA. Report on:
+
+1. **Theme/CSS**: Find the main theme CSS file (e.g. `src/styles/theme.css`). Report its COMPLETE contents — every CSS custom property: exact color hex values, spacing scale, border radii, shadows, font stacks, font sizes, transition timings, z-index scale, breakpoints.
+2. **Typography**: What font families are used? Any web fonts loaded (Google Fonts, fontsource, @font-face)? What are the type scale values and weights?
+3. **Component library**: What UI primitives exist? (e.g. shadcn/ui, radix, headlessui, custom). List the component directories under src/components.
+4. **Motion/animation**: What animation patterns exist? Any framer-motion? CSS keyframes? Micro-interactions? List the named keyframes and durations.
+5. **Iconography**: What icon library (lucide-react, heroicons, etc.)? 
+6. **Layout & shell**: Describe the app shell layout — sidebar? rail? panels? How is the chat/composer/canvas arrangement structured? Is there a "lens" concept (dock beside thread)?
+7. **The inline surfaces catalog**: There's a mention of "agent-composed surfaces" from a "closed catalog the SPA owns". Find that catalog file and list every surface type it defines (name, description, fields rendered).
+8. **The design tokens as a coherent palette**: Summarize the actual brand color (indigo?) and its shades, the neutral/background colors, semantic colors (success/warn/danger), and border/hairline colors. I want to be able to reproduce this palette exactly on a static site.
+9. **Any "glass"/blur/gradient/backdrop** effects.
+10. **package.json**: exact dependencies list (I want to know if framer-motion, lucide, tailwind, etc. are used and their versions).
+
+Report exact hex values and file paths. Quote the theme.css verbatim in full - it is the most important artifact.
