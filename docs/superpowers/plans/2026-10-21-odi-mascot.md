@@ -826,3 +826,36 @@ Run: `gh pr checks --watch`
 Expected: every check green — lint, typecheck, security, test, smoke, website, studio, tauri-check, tauri-build, and the `CI green` aggregate.
 
 If the `tauri-build` job fails for an environment reason unrelated to this PR (missing WebKitGTK, no signing key), say so in the PR rather than weakening the change.
+
+---
+
+## Outcome and deviations
+
+Shipped as seven commits on `feat/odi-mascot`. What changed from the plan, and
+why:
+
+1. **The generator has no third-party imports.** The plan had Pillow writing
+   the PNG and the ICO. `brand/src/odi_mascot.py` instead writes both with
+   `zlib` and `struct` from the standard library, so the art can be
+   regenerated on any machine with a Python 3.10+ interpreter and nothing
+   else. Pillow is no longer needed by anything in `brand/`.
+2. **`render_svg` grew an `rle` flag.** One `<rect>` per pixel produced a
+   55 KB favicon; run-length encoding the horizontal runs brings it to 9 KB
+   with a pixel-identical result. `render_svg_rle` is a thin alias.
+3. **The brand tests import the generator through `pythonpath`,** not through
+   a `brand/tests/conftest.py`. A second `conftest.py` collides with
+   `apps/mcp-server/tests/conftest.py` under `mypy apps brand packages`.
+   Adding `brand/src` to the root `pythonpath` solves both.
+4. **`should_show_banner` takes a protocol, not `TextIO`,** and `NO_COLOR`
+   only decides the colour, never whether the banner appears. A banner in a
+   pipe or a CI log is a defect, not a feature.
+5. **The plain (monochrome) banner renders the full silhouette** with
+   `█`/`▀`/`▄`, not just the top half of every cell — the first version
+   dropped every other row of the artwork.
+6. **The Tauri icon command also emitted `android/` and `ios/` directories.**
+   The project ships a desktop app only, so those were removed and the diff
+   kept to the icons `tauri.conf.json` actually references.
+7. **The golden-ratio table in the spec was corrected against the rendered
+   pixels.** Nose width is `W / φ³` = 5, muzzle height is `(W / φ²) / φ` = 5,
+   ear radius is `W / 4φ` = 3, and the body is `0.85 × W` = 17. The spec now
+   states the values the generator actually produces, and the tests pin them.
