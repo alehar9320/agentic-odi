@@ -150,6 +150,18 @@ Register MCP or REST connectors that the copilot can discover and invoke.
   `?area=<capability>` and `?recommended=true`).
 - **CLI**: `agentic-odi connectors catalog | add <preset> | list | health <name> | ingest <name>`.
 
+### When something fails
+
+Failures are shown where they happen, not dressed up as empty results. Every
+HTTP error from the Living Studio sidecar carries one body —
+`{"error": {"code", "message", "detail", "suggestion", "retryable", "request_id"}}` —
+and the Studio renders it in place with a **Retry** button that keeps your
+question. A chat turn always ends with exactly one reply or one error, the
+canvas shows an invitation when there is nothing yet and a failure panel when
+the fetch failed, and a broken lens is contained to that lens. Quote the
+`request_id` when you report a failure: it is echoed on the response header and
+on every streamed frame, and it is the id in the sidecar's per-turn log line.
+
 ### CLI at a glance
 
 The CLI is local-first, so data commands work without a running server:
