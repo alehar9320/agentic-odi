@@ -46,7 +46,7 @@ def test_spa_fallback_returns_404_without_index(monkeypatch, tmp_path) -> None:
     response = _client().get("/missing")
 
     assert response.status_code == 404
-    assert response.json() == {"detail": "Not Found"}
+    assert response.json()["error"]["code"] == "not_found"
 
 
 def test_spa_fallback_can_be_disabled(monkeypatch, tmp_path) -> None:
@@ -57,7 +57,7 @@ def test_spa_fallback_can_be_disabled(monkeypatch, tmp_path) -> None:
     response = _client().get("/missing")
 
     assert response.status_code == 404
-    assert response.json() == {"detail": "Not Found"}
+    assert response.json()["error"]["code"] == "not_found"
 
 
 def test_spa_assets_are_mounted(monkeypatch, tmp_path) -> None:

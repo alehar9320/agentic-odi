@@ -338,7 +338,7 @@ def test_add_step_surfaces_mcp_failure_as_502() -> None:
     )
 
     assert response.status_code == 502
-    assert "detail" in response.json()
+    assert response.json()["error"]["code"] == "mcp_unreachable"
 
 
 def test_add_outcome_surfaces_mcp_failure_as_502() -> None:
@@ -354,7 +354,7 @@ def test_add_outcome_surfaces_mcp_failure_as_502() -> None:
     )
 
     assert response.status_code == 502
-    assert "detail" in response.json()
+    assert response.json()["error"]["code"] == "mcp_unreachable"
 
 
 # ---------------------------------------------------------------------------

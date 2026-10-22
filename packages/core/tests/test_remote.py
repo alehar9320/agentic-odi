@@ -21,9 +21,7 @@ def test_parse_not_found() -> None:
 
 
 def test_parse_out_of_range() -> None:
-    problem = parse_tool_result(
-        "Error: importance and satisfaction must be between 1.0 and 10.0"
-    )
+    problem = parse_tool_result("Error: importance and satisfaction must be between 1.0 and 10.0")
 
     assert problem is not None
     assert problem.code is StudioErrorCode.OUT_OF_RANGE
@@ -47,7 +45,7 @@ def test_parse_generic_tool_error() -> None:
 
 
 def test_success_text_is_not_an_error() -> None:
-    assert parse_tool_result("Job created successfully: {\"id\": \"JOB-1\"}") is None
+    assert parse_tool_result('Job created successfully: {"id": "JOB-1"}') is None
     assert parse_tool_result("[]") is None
     assert parse_tool_result("") is None
 
