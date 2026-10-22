@@ -2,7 +2,7 @@ import { useMemo, type ReactNode } from "react";
 
 import { useStudio } from "../../state/StudioContext";
 import type { WorkspacePanelId } from "../../types";
-import { CompassIcon, RouteIcon, SignalIcon } from "../icons";
+import { CompassIcon, RouteIcon, SignalIcon, SparkIcon } from "../icons";
 
 interface RailItem {
   id: WorkspacePanelId;
@@ -21,7 +21,7 @@ interface RailItem {
  * people who prefer it; the conversation stays exactly where it was.
  */
 export function WorkbenchRail() {
-  const { canvas, activePanel, openPanel, closePanel } = useStudio();
+  const { canvas, memory, activePanel, openPanel, closePanel } = useStudio();
 
   const items = useMemo<RailItem[]>(() => {
     const outcomes = canvas?.outcomes ?? [];
@@ -56,8 +56,17 @@ export function WorkbenchRail() {
         icon: <SignalIcon size={14} />,
       });
     }
+    if (memory.length > 0) {
+      rail.push({
+        id: "memory",
+        label: "What I know",
+        count: memory.length,
+        noun: memory.length === 1 ? "note" : "notes",
+        icon: <SparkIcon size={14} />,
+      });
+    }
     return rail;
-  }, [canvas]);
+  }, [canvas, memory]);
 
   if (items.length === 0) {
     return null;

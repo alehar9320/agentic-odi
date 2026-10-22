@@ -3092,3 +3092,134 @@ details[open] summary {
   font-weight: 600;
   letter-spacing: -0.01em;
 }
+
+
+/* ------------------------------------------------------------------ */
+/* Memory: what the agent believes, open to correction                */
+/* ------------------------------------------------------------------ */
+.memory-panel {
+  gap: 22px;
+}
+
+.memory-empty {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 0.86rem;
+  line-height: 1.55;
+}
+
+.memory-empty__title {
+  margin: 0;
+  color: var(--text);
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.memory-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.memory-group__title {
+  margin: 0;
+  color: var(--faint);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.memory-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.memory-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.memory-item--suggested {
+  border-color: rgba(240, 179, 74, 0.28);
+  background: rgba(240, 179, 74, 0.05);
+}
+
+.memory-item__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.memory-item__kind {
+  margin: 0;
+  color: var(--faint);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.memory-item__text {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.memory-item__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.memory-item__button {
+  padding: 5px 10px;
+  font-size: 0.78rem;
+}
+
+.memory-foot {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.memory-foot__note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+.memory-foot__confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  color: var(--text);
+  font-size: 0.86rem;
+}
+
+.memory-foot__confirm p {
+  margin: 0;
+}
+
+.memory-foot__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
