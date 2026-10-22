@@ -1,0 +1,18 @@
+Explore the repository snapshot at /tmp/opencode/aodi (this is the `origin/main` state of the `agentic-odi` project — a Python uv-workspace monorepo for Outcome-Driven Innovation, with a React/TS "Living Studio" front end).
+
+Be VERY THOROUGH. Your job is to produce a detailed capability inventory and gap analysis.
+
+Focus on:
+1. `packages/core/src/agentic_odi_core/` — read models.py, services.py, repository.py, sqlite_repository.py, intent_store.py, contract.py, evaluation.py, events.py, schema.py, factory.py, messages.py. List EVERY domain entity and every service/repository method. Note what ODI methodology concepts are modeled (Job, Step, Desired Outcome, Customer Outcome, Opportunity Score, Intent, Evidence, Observation, V2MOM, etc.).
+2. `packages/core/src/agentic_odi_core/evaluation.py` and `contract.py` — what evaluation/contract logic exists? Is there an outcome-statement format validator? Is there an opportunity scoring implementation? Where exactly?
+3. `apps/mcp-server/src/agentic_odi_mcp_server/mcp_server.py` — list EVERY MCP tool (exact tool names), their parameters, and what they do. Note the system prompt content and how it enforces the ODI methodology guardrails. Note whether `get_capabilities` is in sync.
+4. `packages/connectors/src/agentic_odi_connectors/` — the Connector protocol, catalog (list all presets and their areas), mapping.py (how records map to ODI artifacts), sink.py, rest/connector.py, mcp/connector.py. What is normalized and what is NOT yet written to the ODI store?
+5. `apps/cli/src/agentic_odi_cli/` — list every CLI command group and subcommand, and what backend seam exists.
+
+Report back:
+- A precise inventory of tools/entities/commands (use exact names).
+- Concrete gaps you can see between the ODI methodology (as described in the repo's own `.agents/rules/agent_instructions.md` in /tmp/opencode/aodi) and what the code actually enforces. E.g. is the outcome statement format `[Direction] + [Unit] + [Object] + [Context]` validated anywhere? Is the Universal Job Map enforced? Is `Importance`/`Satisfaction` mandatory?
+- Anything that looks half-finished, mocked, stubbed, or marked TODO/NotImplemented.
+- File paths with line numbers for the most important findings.
+
+Be concrete and cite file:line. Do not write any files.
