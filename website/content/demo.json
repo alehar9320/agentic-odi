@@ -1,0 +1,71 @@
+{
+  "label": "Scripted preview",
+  "disclaimer": "These are canned responses from a fixed script. The live Studio talks to a real MCP server.",
+  "live_url": "https://agentic-odi.alehar.workers.dev/",
+  "chips": [
+    "A customer still reconciles invoices by hand",
+    "Which of these should we build first?",
+    "Show me the job behind that"
+  ],
+  "exchanges": [
+    {
+      "prompt": "A customer told us they still reconcile invoices by hand every Friday.",
+      "reply": "That is a job with a real running cost. Here is the outcome underneath it.",
+      "card": {
+        "type": "outcome-card",
+        "data": {
+          "id": "OUT-1",
+          "statement": "Reconcile invoices without manual effort",
+          "importance": 8,
+          "satisfaction": 3,
+          "opportunity": 13.0
+        }
+      }
+    },
+    {
+      "prompt": "Which of these should we build first?",
+      "reply": "Ranked by opportunity, these three are furthest from satisfied.",
+      "card": {
+        "type": "opportunity-board",
+        "data": {
+          "outcomes": [
+            {
+              "statement": "Reconcile invoices without manual effort",
+              "importance": 8,
+              "satisfaction": 3,
+              "opportunity": 13.0
+            },
+            {
+              "statement": "Catch a failed payment before it churns",
+              "importance": 9,
+              "satisfaction": 6,
+              "opportunity": 12.0
+            },
+            {
+              "statement": "Hand a refund back in one step",
+              "importance": 6,
+              "satisfaction": 5,
+              "opportunity": 7.0
+            }
+          ]
+        }
+      }
+    },
+    {
+      "prompt": "Show me the job behind that.",
+      "reply": "Here it is, step by step.",
+      "card": {
+        "type": "job-map",
+        "data": {
+          "job": "Reconcile invoices",
+          "steps": [
+            { "order": 1, "name": "Collect the statements" },
+            { "order": 2, "name": "Match each line" },
+            { "order": 3, "name": "Review the exceptions" },
+            { "order": 4, "name": "File and close" }
+          ]
+        }
+      }
+    }
+  ]
+}
