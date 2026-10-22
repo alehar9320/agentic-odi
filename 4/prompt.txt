@@ -1,0 +1,13 @@
+Explore the `/home/alexa/repos/agentic-odi/website/` directory very thoroughly. This is a GitHub Pages site for the "agentic-odi" project (an Open Data Interface / agentic software project).
+
+I need a comprehensive report on:
+1. Full file tree of `website/` (use `find` or `ls -R`), including any assets, CSS, JS, images, fonts
+2. The complete content/structure of the main entry point(s) — is it HTML, Jekyll, Astro, plain static? Read the main HTML file and report its full section-by-section structure (nav, hero, sections, footer)
+3. Any build tooling: package.json, _config.yml, astro.config, tailwind config, etc. Report exact contents of build config files
+4. Any existing styling approach - CSS variables, design tokens, fonts, color palette used
+5. Any existing JS interactions
+6. Whether there's a CNAME, .nojekyll, robots.txt, sitemap
+7. Any deploy workflow related to pages in `.github/workflows/` — report the exact YAML of any pages/deploy workflow
+8. Any images/screenshots/assets and their filenames and dimensions
+
+Report file paths precisely and quote key content. Be exhaustive about the website/ directory since I'm redesigning it entirely.
