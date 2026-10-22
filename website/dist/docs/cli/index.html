@@ -124,10 +124,11 @@ required, and switch to a remote MCP server with <code>--backend mcp</code>.</p>
 <p>Install the workspace first if you have not already:</p>
 <pre class="highlight"><code class="language-bash">uv<span class="w"> </span>sync<span class="w"> </span>--all-packages
 </code></pre><h2 id="launching">Launching</h2>
-<pre class="highlight"><code class="language-bash">python<span class="w"> </span>-m<span class="w"> </span>agentic_odi_cli<span class="w"> </span>--version<span class="w">   </span><span class="c1"># print the Agentic ODI version</span>
-python<span class="w"> </span>-m<span class="w"> </span>agentic_odi_cli<span class="w"> </span>--help<span class="w">      </span><span class="c1"># show available options and commands</span>
-python<span class="w"> </span>-m<span class="w"> </span>agentic_odi_cli<span class="w">             </span><span class="c1"># start interactive chat in a terminal (help when piped)</span>
-</code></pre><p>A console script is also installed, so <code>agentic-odi --version</code> works the same way.</p>
+<pre class="highlight"><code class="language-bash">python<span class="w"> </span>-m<span class="w"> </span>agentic_odi_cli<span class="w"> </span>--version<span class="w">            </span><span class="c1"># print the Agentic ODI version</span>
+python<span class="w"> </span>-m<span class="w"> </span>agentic_odi_cli<span class="w"> </span>--version<span class="w"> </span>--verbose<span class="w">  </span><span class="c1"># print version with build metadata</span>
+python<span class="w"> </span>-m<span class="w"> </span>agentic_odi_cli<span class="w"> </span>--help<span class="w">               </span><span class="c1"># show available options and commands</span>
+python<span class="w"> </span>-m<span class="w"> </span>agentic_odi_cli<span class="w">                      </span><span class="c1"># start interactive chat in a terminal (help when piped)</span>
+</code></pre><p>A console script is also installed, so <code>agentic-odi --version</code> and <code>agentic-odi version --verbose</code> work the same way.</p>
 <h2 id="global-options">Global options</h2>
 <table>
 <thead>
