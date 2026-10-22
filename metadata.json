@@ -1,0 +1,36 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M5HZ4CJ2RMBD0RQ2ZJNWEA41",
+  "strategy": "manual-commit",
+  "branch": "feature/gh-pages-redesign",
+  "checkpoints_count": 2,
+  "files_touched": [
+    "website/assets/style.css",
+    "website/content/nav.json",
+    "website/dist/assets/style.css",
+    "website/dist/sitemap.xml",
+    "website/templates/_mcp_reference.html",
+    "website/templates/_quick_start.html",
+    "website/templates/doc.html",
+    "website/templates/docs_index.html",
+    "website/templates/landing.html",
+    "website/tests/test_site.py",
+    "website/tools/build_site.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/0/metadata.json",
+      "transcript": "/0/full.jsonl",
+      "compact_transcript": "/0/transcript.jsonl",
+      "content_hash": "/0/content_hash.txt",
+      "prompt": "/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 121799,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 924672,
+    "output_tokens": 4665,
+    "api_call_count": 19
+  }
+}
