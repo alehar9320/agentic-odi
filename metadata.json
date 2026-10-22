@@ -3,7 +3,7 @@
   "checkpoint_id": "01M5HQVS4S76HQB1MY9VWRQHRR",
   "strategy": "manual-commit",
   "branch": "feat/intent-first-pm-experience",
-  "checkpoints_count": 6,
+  "checkpoints_count": 10,
   "files_touched": [
     "apps/studio-api/src/agentic_odi_studio_api/studio/memory.py"
   ],
@@ -48,6 +48,13 @@
       "transcript": "/5/full.jsonl",
       "compact_transcript": "/5/transcript.jsonl",
       "content_hash": "/5/content_hash.txt",
+      "prompt": ""
+    },
+    {
+      "metadata": "/6/metadata.json",
+      "transcript": "/6/full.jsonl",
+      "compact_transcript": "/6/transcript.jsonl",
+      "content_hash": "/6/content_hash.txt",
       "prompt": ""
     }
   ],
