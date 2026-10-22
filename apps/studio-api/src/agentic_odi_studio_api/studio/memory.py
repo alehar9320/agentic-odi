@@ -383,7 +383,8 @@ class StudioMemory:
                 updates["updated_at"] = _now()
                 assignments = ", ".join(f"{column} = ?" for column in updates)
                 self._connection.execute(
-                    f"UPDATE observations SET {assignments} WHERE id = ?",
+                    # Column names come from the fixed keys above, not user input.
+                    f"UPDATE observations SET {assignments} WHERE id = ?",  # nosec B608
                     (*updates.values(), observation_id),
                 )
             row = self._connection.execute(
