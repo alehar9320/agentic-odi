@@ -106,10 +106,15 @@ class LocalBackend(Backend):
         return self._service
 
     def call(self, tool_name: str, args: dict[str, Any]) -> Any:
+        from agentic_odi_core import OdiError
+
         handler = _LOCAL_HANDLERS.get(tool_name)
         if handler is None:
             raise NotImplementedError(f"Unknown tool: {tool_name}")
-        return handler(self, args)
+        try:
+            return handler(self, args)
+        except OdiError as exc:
+            raise BackendError(str(exc)) from exc
 
     def _add_job(self, args: dict[str, Any]) -> dict[str, Any]:
         job = self.service.add_job(name=args["name"], description=args.get("description"))
