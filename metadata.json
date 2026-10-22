@@ -3,7 +3,7 @@
   "checkpoint_id": "01M5JD8ZA2GY6DM98P0V8RMZB7",
   "strategy": "manual-commit",
   "branch": "feat/issue-91-error-surfacing",
-  "checkpoints_count": 2,
+  "checkpoints_count": 4,
   "files_touched": [
     "packages/core/src/agentic_odi_core/__init__.py",
     "packages/core/src/agentic_odi_core/remote.py",
@@ -23,13 +23,20 @@
       "compact_transcript": "/1/transcript.jsonl",
       "content_hash": "/1/content_hash.txt",
       "prompt": "/1/prompt.txt"
+    },
+    {
+      "metadata": "/2/metadata.json",
+      "transcript": "/2/full.jsonl",
+      "compact_transcript": "/2/transcript.jsonl",
+      "content_hash": "/2/content_hash.txt",
+      "prompt": "/2/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 518232,
+    "input_tokens": 1067193,
     "cache_creation_tokens": 0,
-    "cache_read_tokens": 6664192,
-    "output_tokens": 43558,
-    "api_call_count": 74
+    "cache_read_tokens": 27495936,
+    "output_tokens": 89988,
+    "api_call_count": 291
   }
 }
