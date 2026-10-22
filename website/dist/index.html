@@ -45,13 +45,100 @@
   </header>
 
   <main id="main">
+
+<!-- ── Hero ─────────────────────────────────────────────────────── -->
 <section id="top" class="hero">
   <div class="shell">
-    <p class="eyebrow">Experimental</p>
-    <h1 class="hero__title">Your roadmap is a guess.</h1>
-    <p class="hero__sub">An MCP server that hands your agents verified customer outcomes — and the evidence behind them.</p>
+    <div class="hero__inner">
+      <p class="eyebrow eyebrow--pill hero__eyebrow">Experimental</p>
+      <h1 class="hero__title">Your roadmap is a guess.</h1>
+      <p class="hero__sub">An MCP server that hands your agents verified customer outcomes — and the evidence behind them.</p>
+      <div class="hero__actions">
+        <a class="btn btn--primary" href="#run">Run it in 60 seconds</a>
+        <a class="btn btn--ghost" href="https://agentic-odi.alehar.workers.dev/">Open the Living Studio</a>
+      </div>
+      <a class="hero__cue" href="#problem"><span></span>Keep reading</a>
+    </div>
   </div>
 </section>
+
+<!-- ── Problem ──────────────────────────────────────────────────── -->
+<section id="problem" class="section" aria-labelledby="problem-title">
+  <div class="shell">
+    <div class="section__head" data-reveal>
+      <p class="eyebrow">The problem</p>
+      <h2 id="problem-title" class="section__title">Opinion is expensive.</h2>
+    </div>
+
+    <div class="beats">
+      <article class="beat" data-reveal>
+        <p class="beat__quote">Roadmaps set by whoever talks loudest.</p>
+        <p class="beat__support">Decisions default to seniority, not evidence.</p>
+      </article>
+      <article class="beat" data-reveal>
+        <p class="beat__quote">Features for customers who never asked.</p>
+        <p class="beat__support">Nobody validated the outcome; only the idea.</p>
+      </article>
+      <article class="beat" data-reveal>
+        <p class="beat__quote">Agents fluent in everything, grounded in nothing.</p>
+        <p class="beat__support">A model will confidently invent your customer.</p>
+      </article>
+    </div>
+
+    <p class="closer" data-reveal>Add it up and the roadmap isn&#39;t a plan. It&#39;s a guess.</p>
+  </div>
+</section>
+
+<!-- ── Insight ──────────────────────────────────────────────────── -->
+<section id="insight" class="section" aria-labelledby="insight-title">
+  <div class="shell">
+    <div class="section__head" data-reveal>
+      <p class="eyebrow">The method</p>
+      <h2 id="insight-title" class="section__title">Ask for outcomes, not opinions.</h2>
+    </div>
+
+    <div class="insight">
+      <div class="stack" data-reveal>
+        <p class="lead">Outcome-Driven Innovation asks customers how much each desired outcome matters and how satisfied they are with it today.</p>
+        <p class="lead">The gap between importance and satisfaction is where products win or die.</p>
+        <p class="lead">Agentic ODI stores those outcomes, scores them, and serves them to any agent over MCP.</p>
+
+        <p class="formula">
+          <span class="formula__label">Opportunity =</span>
+          <span class="formula__expr">importance + <span class="formula__gap">max(importance - satisfaction, 0)</span></span>
+        </p>
+
+        <p class="statline">
+          <span class="statline__value">86% innovation success rate</span>
+          <span class="statline__source">— as reported in ODI literature (Strategyn)</span>
+        </p>
+      </div>
+
+      <figure class="gap" data-reveal>
+        <div class="gap__row">
+          <span>Importance</span>
+          <span class="gap__track"><span class="gap__fill" style="width: 80%"></span></span>
+          <span class="gap__value">8</span>
+        </div>
+        <div class="gap__row">
+          <span>Satisfaction</span>
+          <span class="gap__track"><span class="gap__fill gap__fill--satisfaction" style="width: 30%"></span></span>
+          <span class="gap__value">3</span>
+        </div>
+        <div class="gap__row">
+          <span>Opportunity</span>
+          <span class="gap__track"><span class="gap__fill" style="width: 100%"></span></span>
+          <span class="gap__value">13.0</span>
+        </div>
+        <figcaption class="gap__note">
+          Illustrative scores. The gap between importance and satisfaction is the
+          opportunity: 8 + max(8 &minus; 3, 0) = 13.0.
+        </figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
   </main>
 
   <footer class="site-footer">

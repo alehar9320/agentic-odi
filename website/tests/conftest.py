@@ -31,18 +31,28 @@ SCHEMA_PY = ROOT / "packages" / "core" / "src" / "agentic_odi_core" / "schema.py
 CORE_MODELS_PY = ROOT / "packages" / "core" / "src" / "agentic_odi_core" / "models.py"
 
 _BUILT: Path | None = None
+_TMP: tempfile.TemporaryDirectory | None = None
 
 
-@pytest.fixture(scope="session", autouse=True)
-def _build_the_site():
-    """Build the site once per session; the tests read that build."""
-    global _BUILT
+def _build_the_site() -> Path:
+    """Build the site once, at import, so collection can list the pages.
+
+    The build happens at import rather than in a fixture because the tests
+    are parametrised over the pages that exist, and parametrisation is
+    resolved during collection — before any fixture runs.
+    """
+    global _BUILT, _TMP
+    if _BUILT is not None:
+        return _BUILT
     import build_site
 
-    with tempfile.TemporaryDirectory() as tmp:
-        _BUILT = Path(tmp)
-        build_site.build(_BUILT)
-        yield _BUILT
+    _TMP = tempfile.TemporaryDirectory()
+    _BUILT = Path(_TMP.name)
+    build_site.build(_BUILT)
+    return _BUILT
+
+
+_build_the_site()
 
 
 def read_page(page: str) -> str:

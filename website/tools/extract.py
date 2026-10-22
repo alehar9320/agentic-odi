@@ -46,11 +46,20 @@ def read_easings(studio_theme: Path) -> dict[str, str]:
 
 
 def read_odi_formula(core_models: Path) -> str:
-    """The source text of the opportunity formula, as the core computes it."""
+    """The opportunity formula, exactly as the core module computes it.
+
+    The expression appears twice in ``models.py`` — in the docstring and in
+    the return statement. Both are matched, so the site quotes the code
+    rather than a transcription of it.
+    """
     source = core_models.read_text(encoding="utf-8")
+    pattern = re.compile(
+        r"importance\s*\+\s*max\(\s*importance\s*-\s*satisfaction\s*,\s*0(?:\.0)?\s*\)"
+    )
     for line in source.splitlines():
-        if "importance + max(importance - satisfaction, 0)" in line:
-            return line.strip().rstrip("),")
+        match = pattern.search(line)
+        if match:
+            return match.group(0)
     raise ValueError("the opportunity formula was not found in the core models")
 
 

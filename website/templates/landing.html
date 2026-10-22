@@ -1,11 +1,92 @@
 {% extends "base.html" %}
 
 {% block body %}
+
+<!-- ── Hero ─────────────────────────────────────────────────────── -->
 <section id="top" class="hero">
   <div class="shell">
-    <p class="eyebrow">{{ landing.hero.eyebrow }}</p>
-    <h1 class="hero__title">{{ landing.hero.title }}</h1>
-    <p class="hero__sub">{{ landing.hero.sub }}</p>
+    <div class="hero__inner">
+      <p class="eyebrow eyebrow--pill hero__eyebrow">{{ landing.hero.eyebrow }}</p>
+      <h1 class="hero__title">{{ landing.hero.title }}</h1>
+      <p class="hero__sub">{{ landing.hero.sub }}</p>
+      <div class="hero__actions">
+        <a class="btn btn--primary" href="{{ landing.hero.primary.href }}">{{ landing.hero.primary.label }}</a>
+        <a class="btn btn--ghost" href="{{ landing.hero.secondary.href }}">{{ landing.hero.secondary.label }}</a>
+      </div>
+      <a class="hero__cue" href="#problem"><span></span>Keep reading</a>
+    </div>
   </div>
 </section>
+
+<!-- ── Problem ──────────────────────────────────────────────────── -->
+<section id="problem" class="section" aria-labelledby="problem-title">
+  <div class="shell">
+    <div class="section__head" data-reveal>
+      <p class="eyebrow">{{ landing.problem.eyebrow }}</p>
+      <h2 id="problem-title" class="section__title">{{ landing.problem.title }}</h2>
+    </div>
+
+    <div class="beats">
+      {% for beat in landing.problem.beats %}
+      <article class="beat" data-reveal>
+        <p class="beat__quote">{{ beat.quote }}</p>
+        <p class="beat__support">{{ beat.support }}</p>
+      </article>
+      {% endfor %}
+    </div>
+
+    <p class="closer" data-reveal>{{ landing.problem.closer }}</p>
+  </div>
+</section>
+
+<!-- ── Insight ──────────────────────────────────────────────────── -->
+<section id="insight" class="section" aria-labelledby="insight-title">
+  <div class="shell">
+    <div class="section__head" data-reveal>
+      <p class="eyebrow">{{ landing.insight.eyebrow }}</p>
+      <h2 id="insight-title" class="section__title">{{ landing.insight.title }}</h2>
+    </div>
+
+    <div class="insight">
+      <div class="stack" data-reveal>
+        {% for paragraph in landing.insight.paragraphs %}
+        <p class="lead">{{ paragraph }}</p>
+        {% endfor %}
+
+        <p class="formula">
+          <span class="formula__label">{{ landing.insight.formula_label }}</span>
+          <span class="formula__expr">{{ formula_base }} + <span class="formula__gap">{{ formula_gap }}</span></span>
+        </p>
+
+        <p class="statline">
+          <span class="statline__value">{{ landing.insight.stat }}</span>
+          <span class="statline__source">— {{ landing.insight.stat_source }}</span>
+        </p>
+      </div>
+
+      <figure class="gap" data-reveal>
+        <div class="gap__row">
+          <span>Importance</span>
+          <span class="gap__track"><span class="gap__fill" style="width: 80%"></span></span>
+          <span class="gap__value">8</span>
+        </div>
+        <div class="gap__row">
+          <span>Satisfaction</span>
+          <span class="gap__track"><span class="gap__fill gap__fill--satisfaction" style="width: 30%"></span></span>
+          <span class="gap__value">3</span>
+        </div>
+        <div class="gap__row">
+          <span>Opportunity</span>
+          <span class="gap__track"><span class="gap__fill" style="width: 100%"></span></span>
+          <span class="gap__value">13.0</span>
+        </div>
+        <figcaption class="gap__note">
+          Illustrative scores. The gap between importance and satisfaction is the
+          opportunity: 8 + max(8 &minus; 3, 0) = 13.0.
+        </figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
 {% endblock %}

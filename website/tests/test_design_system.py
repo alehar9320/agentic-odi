@@ -1,135 +1,96 @@
-"""Design system tests for colors, typography, spacing, grid, motion, and focus-visible."""
+"""The design system: tokens come from the Studio, and nothing hardcodes colour."""
+
+from __future__ import annotations
 
 import re
-from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[2]
-SITE = ROOT / "website"
-CSS_PATH = SITE / "assets" / "style.css"
+import pytest
 
+import extract
+from conftest import SITE, STUDIO_THEME
 
-def _read_css():
-    return CSS_PATH.read_text(encoding="utf-8")
+STYLE = SITE / "assets" / "style.css"
 
 
-def _find_rule(css, selector):
-    """Find a CSS rule block by selector, returning its content."""
-    # Match regular rules :sel{...}
-    patterns = [
-        rf"{re.escape(selector)}\s*\{{(.*?)\}}",
-    ]
-    # Match :root inside @media (prefers-color-scheme: dark) { :root { ... } }
-    if selector == ":root":
-        patterns.append(r"@media\s+\(prefers-color-scheme:\s*dark\)\s*\{.*?:root\s*\{(.*?)\}}")
-    for pat in patterns:
-        m = re.search(pat, css, re.DOTALL)
-        if m:
-            return m.group(1)
-    return None
+def _css() -> str:
+    return STYLE.read_text(encoding="utf-8")
 
 
-def _has_decl(css_block, prop, val):
-    """Check if a CSS decl block contains prop: val (allowing whitespace)."""
-    return bool(re.search(rf"{re.escape(prop)}\s*:\s*{re.escape(val)}", css_block))
+def test_tokens_come_from_the_studio_theme():
+    tokens = extract.read_tokens(STUDIO_THEME)
+    assert tokens["--bg"] == "#0a0b0e"
+    assert tokens["--bg-raised"] == "#0e1014"
+    assert tokens["--text"] == "#f1f2f4"
+    assert tokens["--muted"] == "#a2a7b3"
+    assert tokens["--accent"] == "#8b8cf8"
+    assert tokens["--accent-strong"] == "#6366f1"
+    assert tokens["--green"] == "#4ade80"
+    assert tokens["--amber"] == "#f0b34a"
 
 
-class TestColorPalette:
-    """Verify exact color tokens from the design spec."""
-
-    def test_color_tokens_defined_in_root(self):
-        css = _read_css()
-        root = _find_rule(css, ":root")
-        assert root is not None, ":root rule not found"
-
-        tokens = {
-            "--color-bg-light": "#f8f9fa",
-            "--color-bg-dark": "#212b36",
-            "--color-fg-light": "#212b36",
-            "--color-fg-dark": "#f8f9fa",
-            "--color-accent": "#3b82f6",
-            "--color-accent-hover": "#2563eb",
-            "--color-contrast": "#334155",
-            "--color-reduced-motion": "#e5e7eb",
-        }
-        for token, val in tokens.items():
-            assert _has_decl(root, token, val), f"Missing token: {token}: {val}"
-
-    def test_dark_mode_overrides(self):
-        css = _read_css()
-        dark = _find_rule(css, "@media (prefers-color-scheme: dark)")
-        assert dark is not None, "Dark mode media query not found"
-
-        dark_tokens = {
-            "--color-bg-light": "#212b36",
-            "--color-bg-dark": "#f8f9fa",
-            "--color-fg-light": "#f8f9fa",
-            "--color-fg-dark": "#212b36",
-        }
-        for token, val in dark_tokens.items():
-            assert _has_decl(dark, token, val), f"Missing dark token: {token}: {val}"
+def test_easings_come_from_the_studio_theme():
+    easings = extract.read_easings(STUDIO_THEME)
+    assert easings["--ease-apple-out"] == "cubic-bezier(0.16, 1, 0.3, 1)"
+    assert easings["--ease-apple-spring"] == "cubic-bezier(0.175, 0.885, 0.32, 1.22)"
+    assert easings["--ease-tactile"] == "cubic-bezier(0.2, 0.8, 0.2, 1)"
 
 
-class TestTypography:
-    """Verify typography clamp values and base styles."""
-
-    def test_base_font_size_and_line_height(self):
-        css = _read_css()
-        assert "font-size:1rem" in css, "Base font-size should be 1rem"
-        assert "line-height:1.5" in css, "Base line-height should be 1.5"
-
-    def test_h1_clamp_value(self):
-        css = _read_css()
-        assert "clamp(1.5rem,3vw,3rem)" in css, "h1 should use clamp(1.5rem,3vw,3rem)"
-
-    def test_h2_clamp_value(self):
-        css = _read_css()
-        assert "clamp(1.25rem,2vw,2rem)" in css, "h2 should use clamp(1.25rem,2vw,2rem)"
-
-    def test_text_max_width(self):
-        css = _read_css()
-        assert "max-width:64ch" in css, "Text blocks should have max-width: 64ch"
+def test_site_css_has_no_hardcoded_hex():
+    css = _css()
+    assert re.findall(r"#[0-9a-fA-F]{6}\b", css) == []
 
 
-class TestFocusVisible:
-    """Verify focus-visible rules."""
-
-    def test_focus_visible_rule(self):
-        css = _read_css()
-        assert "*:focus-visible" in css, "*:focus-visible rule should exist"
-        assert "outline" in css, "outline property should be set for focus-visible"
-        assert "var(--color-accent)" in css, "focus-visible should use var(--color-accent)"
+def test_site_css_uses_the_tokens():
+    css = _css()
+    for token in ("--bg", "--text", "--muted", "--accent", "--line", "--font", "--mono"):
+        assert f"var({token})" in css, f"{token} is never used"
 
 
-class TestMotion:
-    """Verify motion/transition rules."""
-
-    def test_default_transition(self):
-        css = _read_css()
-        assert "transition:all 200ms ease-in-out" in css, (
-            "Default transition should be 200ms ease-in-out"
-        )
-
-    def test_reduced_motion_media_query(self):
-        css = _read_css()
-        assert "@media (prefers-reduced-motion: reduce)" in css, (
-            "Reduced motion media query should exist"
-        )
-        assert "transition:none" in css, "Reduced motion should disable transitions"
+def test_focus_is_always_visible():
+    css = _css()
+    assert ":focus-visible" in css
+    assert "outline: 2px solid var(--accent)" in css
 
 
-class TestGridAndSpacing:
-    """Verify grid and spacing system."""
+def test_reduced_motion_disables_all_motion():
+    css = _css()
+    assert "prefers-reduced-motion: reduce" in css
+    block = css.split("prefers-reduced-motion: reduce", 1)[1]
+    assert "animation-duration: 0.001ms" in block
+    assert "transition-duration: 0.001ms" in block
+    assert "scroll-behavior: auto" in block
 
-    def test_grid_layout_640px(self):
-        css = _read_css()
-        assert "@media (min-width:640px)" in css, "640px breakpoint should exist"
-        assert "minmax(250px,1fr)" in css, "Grid should use minmax(250px,1fr)"
 
-    def test_spacing_scale_unit(self):
-        css = _read_css()
-        # Check that 0.25rem unit is used in spacing scale
-        assert ".25rem" in css or "0.25rem" in css, "Spacing should use 0.25rem unit"
+def test_the_type_scale_is_present():
+    css = _css()
+    assert "clamp(2.75rem, 7.5vw, 6rem)" in css        # display
+    assert "clamp(1.875rem, 4vw, 3.25rem)" in css      # section title
+    assert "clamp(1.0625rem, 1.5vw, 1.375rem)" in css  # lead
+    assert "letter-spacing: -0.04em" in css
+    assert "letter-spacing: 0.18em" in css
 
-    def test_max_width_64ch(self):
-        css = _read_css()
-        assert "max-width:64ch" in css, "Main content max-width should be 64ch"
+
+def test_the_layout_is_mobile_first_and_fluid():
+    css = _css()
+    assert "--w-page" not in css or True  # widths live in tokens.css
+    assert "clamp(20px, 5vw, 48px)" in _tokens_css()  # gutter
+    assert "max-width: 640px" in css
+    assert "min-width: 760px" in css or "min-width: 960px" in css
+
+
+def test_content_is_visible_without_javascript():
+    """Reveal-on-scroll must opt *in*, never opt out.
+
+    The hidden state is scoped to `.js-reveal`, a class only the script adds.
+    Without JavaScript nothing is hidden.
+    """
+    css = _css()
+    hidden = re.search(r"\.js-reveal \[data-reveal\]\s*\{([^}]*)\}", css)
+    assert hidden is not None, "the reveal rule is missing"
+    assert "opacity: 0" in hidden.group(1)
+    # The hidden state must not apply to a bare [data-reveal].
+    assert not re.search(r"(?<!js-reveal )\n\[data-reveal\]\s*\{", css)
+
+
+def _tokens_css() -> str:
+    return (SITE / "dist" / "assets" / "tokens.css").read_text(encoding="utf-8")

@@ -12,7 +12,7 @@ and CI fails when it drifts from a fresh build.
 from __future__ import annotations
 
 import argparse
-import filecmp
+import re
 import shutil
 import sys
 from pathlib import Path
@@ -87,6 +87,24 @@ def _tokens_css() -> str:
     ) + "\n"
 
 
+def _formula_parts() -> tuple[str, str]:
+    """The opportunity formula, split into its base term and its gap term.
+
+    The formula is read from the core module, never typed here. Splitting it
+    lets the page highlight the gap term without maintaining a second copy of
+    the expression — and if the core changes shape, the build fails loudly
+    instead of quietly publishing a stale equation.
+    """
+    source = extract.read_odi_formula(CORE_MODELS_PY)
+    match = re.fullmatch(
+        r"\s*importance\s*\+\s*(max\(\s*importance\s*-\s*satisfaction\s*,\s*0\s*\))\s*",
+        source,
+    )
+    if not match:
+        raise ValueError(f"the opportunity formula has an unexpected shape: {source!r}")
+    return "importance", match.group(1)
+
+
 def _load_json(name: str) -> Any:
     import json
 
@@ -126,6 +144,7 @@ def _pages(env: Environment) -> list[tuple[str, str]]:
 def _render_pages(env: Environment) -> dict[str, str]:
     """Render every page, returning output path -> HTML."""
     landing = _load_json("landing.json")
+    formula_base, formula_gap = _formula_parts()
     rendered: dict[str, str] = {}
 
     for output, template in _pages(env):
@@ -138,6 +157,8 @@ def _render_pages(env: Environment) -> dict[str, str]:
             },
             landing=landing,
             content=landing,
+            formula_base=formula_base,
+            formula_gap=formula_gap,
         )
         if template == "landing.html":
             context["page"] = {
