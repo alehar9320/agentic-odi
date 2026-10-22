@@ -1,0 +1,26 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M5HZCMJP14CMM6AFQJAJHFAW",
+  "session_id": "ses_ea0194675ffeaGNtGEL8ei8WV7",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-22T14:15:30.947946986Z",
+  "branch": "feature/gh-pages-redesign",
+  "checkpoints_count": 2,
+  "files_touched": [],
+  "agent": "OpenCode",
+  "model": "deepseek-ai/deepseek-v4.1-flash",
+  "turn_id": "e4a9a434c9bf",
+  "checkpoint_transcript_start": 83,
+  "transcript_lines_at_start": 83,
+  "compact_transcript_start": 83,
+  "token_usage": {
+    "input_tokens": 2764,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 2583105,
+    "output_tokens": 9359,
+    "api_call_count": 14
+  },
+  "session_metrics": {
+    "turn_count": 3
+  }
+}

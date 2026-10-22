@@ -3,7 +3,7 @@
   "checkpoint_id": "01M5HZCMJP14CMM6AFQJAJHFAW",
   "strategy": "manual-commit",
   "branch": "feature/gh-pages-redesign",
-  "checkpoints_count": 2,
+  "checkpoints_count": 4,
   "files_touched": [
     "website/assets/mark.svg"
   ],
@@ -21,13 +21,20 @@
       "compact_transcript": "/1/transcript.jsonl",
       "content_hash": "/1/content_hash.txt",
       "prompt": ""
+    },
+    {
+      "metadata": "/2/metadata.json",
+      "transcript": "/2/full.jsonl",
+      "compact_transcript": "/2/transcript.jsonl",
+      "content_hash": "/2/content_hash.txt",
+      "prompt": ""
     }
   ],
   "token_usage": {
-    "input_tokens": 6764,
+    "input_tokens": 9528,
     "cache_creation_tokens": 0,
-    "cache_read_tokens": 10128807,
-    "output_tokens": 8279,
-    "api_call_count": 30
+    "cache_read_tokens": 12711912,
+    "output_tokens": 17638,
+    "api_call_count": 44
   }
 }
