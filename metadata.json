@@ -3,7 +3,7 @@
   "checkpoint_id": "01M5JKWEH7BXFN35TM7S43H860",
   "strategy": "manual-commit",
   "branch": "feat/issue-122-graceful-shutdown",
-  "checkpoints_count": 5,
+  "checkpoints_count": 6,
   "files_touched": [
     "apps/mcp-server/src/agentic_odi_mcp_server/mcp_server.py",
     "apps/mcp-server/tests/test_graceful_shutdown.py",
@@ -32,6 +32,13 @@
       "compact_transcript": "/2/transcript.jsonl",
       "content_hash": "/2/content_hash.txt",
       "prompt": "/2/prompt.txt"
+    },
+    {
+      "metadata": "/3/metadata.json",
+      "transcript": "/3/full.jsonl",
+      "compact_transcript": "/3/transcript.jsonl",
+      "content_hash": "/3/content_hash.txt",
+      "prompt": ""
     }
   ],
   "token_usage": {
