@@ -3,7 +3,7 @@
   "checkpoint_id": "01M5HPMSZPTD0WKWBV796XT7DP",
   "session_id": "ses_ea009fd61ffevUiZjPMdMZEQbV",
   "strategy": "manual-commit",
-  "created_at": "2026-10-22T11:42:15.405728771Z",
+  "created_at": "2026-10-22T11:43:36.820018074Z",
   "branch": "docs/opportunity-specs-index",
   "checkpoints_count": 1,
   "files_touched": [
@@ -26,7 +26,7 @@
     "turn_count": 1
   },
   "initial_attribution": {
-    "calculated_at": "2026-10-22T11:42:15.386158453Z",
+    "calculated_at": "2026-10-22T11:43:36.796050094Z",
     "agent_lines": 0,
     "agent_removed": 0,
     "human_added": 186,
