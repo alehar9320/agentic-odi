@@ -1,0 +1,50 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M5HPMK79K013X7TQXTWBS2HM",
+  "session_id": "ses_ea010d520ffey3MEP7OOljNz5r",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-22T11:41:45.028536402Z",
+  "branch": "feature/gh-pages-redesign",
+  "checkpoints_count": 1,
+  "save_step_count": 1,
+  "files_touched": [
+    "pyproject.toml"
+  ],
+  "agent": "OpenCode",
+  "model": "minimax-m3.1-flash",
+  "turn_id": "02b8a4265cd9",
+  "checkpoint_transcript_start": 219,
+  "transcript_lines_at_start": 219,
+  "compact_transcript_start": 219,
+  "token_usage": {
+    "input_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 0,
+    "output_tokens": 0,
+    "api_call_count": 0
+  },
+  "session_metrics": {
+    "turn_count": 3
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-10-22T11:41:44.677719043Z",
+    "agent_lines": 41,
+    "agent_removed": 4,
+    "human_added": 2096,
+    "human_modified": 1,
+    "human_removed": 0,
+    "total_committed": 2138,
+    "total_lines_changed": 2142,
+    "agent_percentage": 2.100840336134454,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0
+    }
+  ]
+}
