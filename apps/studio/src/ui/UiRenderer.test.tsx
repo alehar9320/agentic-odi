@@ -63,6 +63,32 @@ describe("UiRenderer", () => {
     expect(meters[0]).toHaveAttribute("aria-valuemax", "10");
   });
 
+  it("renders an opportunity thesis in plain language", () => {
+    renderSpec({
+      type: "opportunity-thesis",
+      props: {
+        title: "Own activation without a guided setup",
+        importance: 9,
+        satisfaction: 3,
+        gap: "New users stall on the first empty state.",
+        thesis: "We treat setup as a checklist when people need a first win.",
+        next_move: "Prototype a one-step first win and test it with five new accounts.",
+      },
+    });
+
+    expect(
+      screen.getByLabelText("Opportunity thesis: Own activation without a guided setup"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Underserved · 15.0")).toBeInTheDocument();
+    expect(screen.getByText("New users stall on the first empty state.")).toBeInTheDocument();
+    expect(
+      screen.getByText("We treat setup as a checklist when people need a first win."),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Prototype a one-step first win and test it with five new accounts."),
+    ).toBeInTheDocument();
+  });
+
   it("ranks an opportunity board by opportunity score", () => {
     renderSpec({
       type: "opportunity-board",

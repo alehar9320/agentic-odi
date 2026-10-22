@@ -100,6 +100,62 @@ export function OutcomeCard({ node }: NodeProps) {
 }
 
 /* ------------------------------------------------------------------ */
+/* opportunity-thesis                                                  */
+/* ------------------------------------------------------------------ */
+
+export function OpportunityThesis({ node }: NodeProps) {
+  const title = str(node.props, "title");
+  const importance = num(node.props, "importance", 0);
+  const satisfaction = num(node.props, "satisfaction", 0);
+  const gap = str(node.props, "gap");
+  const thesis = str(node.props, "thesis");
+  const nextMove = str(node.props, "next_move") || str(node.props, "nextMove");
+  const score = scoreOf(node.props);
+
+  return (
+    <article
+      className={`ui-card ui-card--thesis${isUnderserved(score) ? " ui-card--urgent" : ""}`}
+      aria-label={`Opportunity thesis: ${title}`}
+    >
+      <header className="ui-card__head">
+        <span className="ui-card__id">Opportunity thesis</span>
+        <ScorePill tone={bandTone(score)}>{bandLabel(score)}</ScorePill>
+      </header>
+
+      <h4 className="ui-card__title">{title}</h4>
+
+      <div className="ui-card__meters">
+        <MeterBar label="Importance" value={importance} tone="info" />
+        <MeterBar label="Satisfaction today" value={satisfaction} tone={bandTone(score)} />
+      </div>
+
+      {gap ? (
+        <p className="ui-thesis__gap">
+          <b>The gap:</b> {gap}
+        </p>
+      ) : null}
+
+      {thesis ? (
+        <blockquote className="ui-thesis__claim">
+          <Markdown source={thesis} />
+        </blockquote>
+      ) : null}
+
+      {nextMove ? (
+        <aside className="ui-callout ui-callout--info">
+          <div className="ui-callout__body">
+            <div className="ui-callout__title">Next move</div>
+            <Markdown source={nextMove} />
+          </div>
+        </aside>
+      ) : null}
+
+      <ActionRow actions={readActions(node.props)} />
+    </article>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /* opportunity-board                                                   */
 /* ------------------------------------------------------------------ */
 
