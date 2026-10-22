@@ -554,9 +554,12 @@ _LIST_TOOLS = frozenset(
 
 def _parse_remote(tool_name: str, text: str) -> Any:
     """Parse a tool result, raising ``BackendError`` on the server's error text."""
+    from agentic_odi_core.remote import parse_tool_result
+
     stripped = text.strip()
-    if stripped.startswith("Error:") or " not found:" in stripped:
-        raise BackendError(stripped)
+    problem = parse_tool_result(stripped)
+    if problem is not None:
+        raise BackendError(problem.message)
 
     if tool_name in _FLOAT_TOOLS:
         return _extract_float(stripped)

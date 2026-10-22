@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pytest
+from agentic_odi_cli import backend as backend_module
 from agentic_odi_cli.backend import (
     BackendConfig,
     BackendError,
@@ -273,3 +274,42 @@ def test_mcp_backend_parses_job_and_step_payloads(monkeypatch):
         lambda tool, args, url, timeout: "Job deleted successfully: job-1",
     )
     assert backend.call("delete_job", {"job_id": "job-1"}) == "job-1"
+
+
+@pytest.mark.parametrize(
+    ("text", "expected_message"),
+    [
+        ("Error: Job with ID X not found.", "Job with ID X not found."),
+        (
+            "Error: importance and satisfaction must be between 1.0 and 10.0",
+            "importance and satisfaction must be between 1.0 and 10.0",
+        ),
+    ],
+)
+def test_parse_remote_raises_backend_error_for_error_text(text, expected_message):
+    with pytest.raises(BackendError) as exc_info:
+        backend_module._parse_remote("get_jobs", text)
+
+    assert exc_info.value.args[0] == expected_message
+
+
+def test_parse_remote_returns_payload_for_success_text():
+    assert backend_module._parse_remote("get_jobs", "[]") == []
+
+
+def test_parse_remote_uses_the_shared_parser(monkeypatch):
+    from agentic_odi_core import remote
+    from agentic_odi_core.remote import StudioError, StudioErrorCode
+
+    seen: list[str] = []
+
+    def _spy(text: str):
+        seen.append(text)
+        return StudioError(code=StudioErrorCode.NOT_FOUND, message="nope")
+
+    monkeypatch.setattr(remote, "parse_tool_result", _spy)
+
+    with pytest.raises(BackendError, match="nope"):
+        backend_module._parse_remote("get_jobs", "Error: Job with ID X not found.")
+
+    assert seen == ["Error: Job with ID X not found."]
