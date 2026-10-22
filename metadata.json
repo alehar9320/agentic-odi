@@ -1,0 +1,26 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M5JJHE2AA7BRHD011M1J57DG",
+  "strategy": "manual-commit",
+  "branch": "feature/posthog-analytics",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "apps/studio-api/tests/test_posthog_integration.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/0/metadata.json",
+      "transcript": "/0/full.jsonl",
+      "compact_transcript": "/0/transcript.jsonl",
+      "content_hash": "/0/content_hash.txt",
+      "prompt": ""
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 1747,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 1793454,
+    "output_tokens": 4974,
+    "api_call_count": 10
+  }
+}
