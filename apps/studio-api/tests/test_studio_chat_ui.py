@@ -197,7 +197,7 @@ def test_render_ui_is_offered_to_the_model_with_the_catalog(monkeypatch) -> None
     _collect(_request())
 
     tools = HOLDER["completions"].calls[0]["tools"]
-    assert [tool["function"]["name"] for tool in tools] == ["render_ui", "add_connector"]
+    assert [tool["function"]["name"] for tool in tools] == ["render_ui", "remember", "add_connector"]
     assert tools[0]["function"]["parameters"]["properties"]["type"]["enum"] == ["outcome-card"]
     assert "outcome-card" in tools[0]["function"]["description"]
 
@@ -214,7 +214,7 @@ def test_api_is_absent_when_the_client_sends_no_catalog(monkeypatch) -> None:
     events = _events(_collect(_request(catalog=None)))
 
     tools = HOLDER["completions"].calls[0]["tools"]
-    assert [tool["function"]["name"] for tool in tools] == ["add_connector"]
+    assert [tool["function"]["name"] for tool in tools] == ["remember", "add_connector"]
     assert "ui" not in events
     assert json.loads(events["tool"][1])["status"] == "error"
 
@@ -249,3 +249,73 @@ def test_plain_reply_streams_each_delta(monkeypatch) -> None:
 
     assert [json.loads(delta)["text"] for delta in events["delta"]] == ["Just ", "talking."]
     assert json.loads(events["message"][-1])["content"] == "Just talking."
+
+
+def _named_tool_call(name: str, arguments: dict[str, Any]) -> Any:
+    return SimpleNamespace(
+        index=0,
+        id="call-1",
+        function=SimpleNamespace(name=name, arguments=json.dumps(arguments)),
+    )
+
+
+def test_remember_stores_a_suggested_observation(monkeypatch) -> None:
+    from agentic_odi_studio_api.studio.memory import StudioMemory
+
+    memory = StudioMemory(":memory:")
+    _install(
+        monkeypatch,
+        [
+            _FakeStream(
+                [
+                    _chunk(
+                        tool_calls=[
+                            _named_tool_call(
+                                "remember", {"kind": "career", "text": "Owns activation."}
+                            )
+                        ]
+                    )
+                ]
+            ),
+            _FakeStream([_chunk("I'll keep that in mind.")]),
+        ],
+    )
+
+    async def _run() -> list[str]:
+        return [frame async for frame in chat.stream_chat(_request(), memory=memory)]
+
+    events = _events(asyncio.run(_run()))
+
+    assert "memory" in events
+    payload = json.loads(events["memory"][0])["observation"]
+    assert payload["status"] == "suggested"
+    assert payload["kind"] == "career"
+    observations = memory.list_observations()
+    assert [item.text for item in observations] == ["Owns activation."]
+    assert json.loads(events["message"][-1])["content"] == "I'll keep that in mind."
+    memory.close()
+
+
+def test_remember_rejects_an_invalid_kind(monkeypatch) -> None:
+    from agentic_odi_studio_api.studio.memory import StudioMemory
+
+    memory = StudioMemory(":memory:")
+    _install(
+        monkeypatch,
+        [
+            _FakeStream(
+                [_chunk(tool_calls=[_named_tool_call("remember", {"kind": "x", "text": "y"})])]
+            ),
+            _FakeStream([_chunk("Sorry.")]),
+        ],
+    )
+
+    async def _run() -> list[str]:
+        return [frame async for frame in chat.stream_chat(_request(), memory=memory)]
+
+    events = _events(asyncio.run(_run()))
+
+    assert "memory" not in events
+    assert any(json.loads(item)["status"] == "error" for item in events["tool"])
+    assert memory.list_observations() == []
+    memory.close()

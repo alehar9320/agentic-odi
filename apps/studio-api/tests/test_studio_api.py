@@ -424,3 +424,113 @@ def test_get_changelog_returns_parsed_or_fallback_data() -> None:
     assert "version" in release
     assert "date" in release
     assert "categories" in release
+
+
+# ---------------------------------------------------------------------------
+# /api/memory and /api/conversations
+# ---------------------------------------------------------------------------
+
+
+def _stream_with(client: TestClient, path: str, payload: dict[str, Any]) -> dict[str, list[str]]:
+    with client.stream("POST", path, json=payload) as response:
+        assert response.status_code == 200
+        return _sse_events("".join(response.iter_text()))
+
+
+def test_memory_observation_crud() -> None:
+    client = _client()
+
+    created = client.post(
+        "/api/memory/observations",
+        json={"kind": "career", "text": "Owns activation."},
+    )
+    assert created.status_code == 200
+    observation = created.json()["observation"]
+    assert observation["status"] == "suggested"
+
+    listed = client.get("/api/memory/observations").json()["observations"]
+    assert [item["id"] for item in listed] == [observation["id"]]
+
+    patched = client.patch(
+        f"/api/memory/observations/{observation['id']}",
+        json={"status": "confirmed", "text": "Owns activation end to end."},
+    )
+    assert patched.status_code == 200
+    assert patched.json()["observation"]["status"] == "confirmed"
+    assert patched.json()["observation"]["text"] == "Owns activation end to end."
+
+    assert client.delete(f"/api/memory/observations/{observation['id']}").status_code == 200
+    assert client.get("/api/memory/observations").json()["observations"] == []
+    assert client.delete(f"/api/memory/observations/{observation['id']}").status_code == 404
+
+
+def test_memory_rejects_unknown_kind_and_blank_text() -> None:
+    client = _client()
+
+    assert (
+        client.post(
+            "/api/memory/observations", json={"kind": "nonsense", "text": "x"}
+        ).status_code
+        == 422
+    )
+    assert (
+        client.post(
+            "/api/memory/observations", json={"kind": "career", "text": "   "}
+        ).status_code
+        == 422
+    )
+
+
+def test_pm_authored_context_can_start_confirmed() -> None:
+    client = _client()
+    response = client.post(
+        "/api/memory/observations",
+        json={"kind": "opportunity", "text": "Activation is the bet.", "confirmed": True},
+    )
+    assert response.status_code == 200
+    assert response.json()["observation"]["status"] == "confirmed"
+
+
+def test_conversation_endpoints_and_chat_persistence() -> None:
+    client = _client()
+
+    assert client.get("/api/conversations/latest").json() == {
+        "conversation": None,
+        "turns": [],
+    }
+
+    events = _stream_with(client, "/api/chat", _chat_body("hello there"))
+    conversation = json.loads(events["conversation"][0])
+    assert conversation["id"]
+    assert conversation["title"] == "hello there"
+
+    latest = client.get("/api/conversations/latest").json()
+    assert latest["conversation"]["id"] == conversation["id"]
+    assert [turn["role"] for turn in latest["turns"]] == ["user", "assistant"]
+
+
+def test_chat_resumes_an_existing_conversation() -> None:
+    client = _client()
+    created = client.post("/api/conversations").json()["conversation"]
+
+    events = _stream_with(
+        client,
+        "/api/chat",
+        {**_chat_body("second message"), "conversation_id": created["id"]},
+    )
+    conversation = json.loads(events["conversation"][0])
+    assert conversation["id"] == created["id"]
+    assert len(client.app.state.memory.list_turns(created["id"])) == 2
+
+
+def test_clear_memory_removes_conversations_and_observations() -> None:
+    client = _client()
+    _stream_with(client, "/api/chat", _chat_body("hello"))
+    client.post("/api/memory/observations", json={"kind": "career", "text": "Owns activation."})
+
+    assert client.delete("/api/memory").status_code == 200
+    assert client.get("/api/conversations/latest").json() == {
+        "conversation": None,
+        "turns": [],
+    }
+    assert client.get("/api/memory/observations").json()["observations"] == []

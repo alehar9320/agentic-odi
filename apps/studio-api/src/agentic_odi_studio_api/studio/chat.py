@@ -1,10 +1,14 @@
 """Conversational helper with offline fallbacks and a streaming tool loop.
 
-The loop fans the MCP tools and two local tools — ``render_ui`` and
-``add_connector`` — into the completion. Local tools are intercepted rather
-than forwarded: ``render_ui`` validates its spec against the catalog the client
-sent and streams a ``ui`` event, while ``add_connector`` writes the shared
-connector registry and streams a ``connector`` event.
+The loop fans the MCP tools and three local tools — ``render_ui``,
+``remember``, and ``add_connector`` — into the completion. Local tools are
+intercepted rather than forwarded: ``render_ui`` validates its spec against the
+catalog the client sent and streams a ``ui`` event, ``remember`` stores a
+suggested observation and streams a ``memory`` event, and ``add_connector``
+writes the shared connector registry and streams a ``connector`` event.
+
+The conversation is persisted when a memory store is supplied, so a PM can leave
+and come back to the same thread and the same working context.
 """
 
 from __future__ import annotations
@@ -17,6 +21,7 @@ from fastmcp import Client as McpClient
 from openai import AsyncOpenAI
 
 from agentic_odi_studio_api.studio.connectors import ConnectorService
+from agentic_odi_studio_api.studio.memory import OBSERVATION_KINDS, StudioMemory
 from agentic_odi_studio_api.studio.probes import check_llm_health
 from agentic_odi_studio_api.studio.schemas import ChatRequest, StudioBrief
 from agentic_odi_studio_api.studio.ui_spec import RENDER_UI_TOOL, UiCatalog
@@ -25,17 +30,21 @@ from agentic_odi_studio_api.studio.ui_spec import RENDER_UI_TOOL, UiCatalog
 #: missing must not be able to loop forever.
 MAX_TOOL_ROUNDS = 3
 
-SYSTEM_PROMPT = """You are Steve Jobs and an elite Outcome-Driven Innovation (ODI) strategist assisting a Product Manager in The Living Studio.
-Your mission is to eliminate backlog paper-pushing and help the PM think exclusively in human intent, customer friction, and measurable outcomes.
-Key principles:
-1. Always start with the Job-to-be-Done (JTBD): "What is the core functional human job?"
-2. Uncover Desired Outcomes using the strict ODI format: [Direction] + [Unit of Measure] + [Object of Control] + [Contextual Clarifier]. (e.g. "Minimize the time it takes to propagate secrets across environments").
-3. Opportunity Score = Importance + max(Importance - Satisfaction, 0). Scores > 10 represent breakthrough underserved market opportunities.
-4. When asked to add or query Jobs, Steps, or Outcomes, ALWAYS invoke the corresponding tools.
-5. When a surface carries the evidence better than a paragraph, call `render_ui` once, then write one short sentence. Never describe in prose what a card can already show.
-6. The conversation is the product: every surface you render lands in the thread the PM is already reading. Never tell them to open a panel, a tab, or a view to see something you can show inline.
-7. Capture and simulation are conversations, not forms: ask for the customer's words or the bet in plain language, render the card that carries it, and offer the next move as an action on that card.
-8. Embody clarity, focus, and causality. Strip away corporate jargon."""
+SYSTEM_PROMPT = """You are an elite product strategist working inside The Living Studio, a room built for product managers.
+Your job is to help the PM choose and win the next opportunity that matters — to customers, the business, and their career.
+Outcome-Driven Innovation (ODI) is your private engine, not the conversation. Translate the PM's ambition into jobs, outcomes, and evidence silently, and speak in the PM's language.
+
+How to work:
+1. Start with the person and the stakes. Ask what opportunity they are chasing, who it is for, and what winning would change. One good question at a time.
+2. Mirror their words back, then offer a sharp hypothesis they can correct.
+3. When they give you context worth keeping — a career goal, a constraint, a stakeholder, a belief — call `remember` with the smallest useful observation. Do not ask permission first; the UI lets them confirm, edit, or dismiss it.
+4. Use ODI when it earns its keep: a job statement clarifies, a desired outcome sharpens, an opportunity score compares. Never lead with the framework or lecture about stages.
+5. Opportunity Score = Importance + max(Importance - Satisfaction, 0). Above 10 means underserved.
+6. When a surface carries the evidence better than a paragraph, call `render_ui` once, then write one short sentence. Never describe in prose what a card can already show.
+7. The conversation is the product: every surface you render lands in the thread the PM is already reading. Never tell them to open a panel, a tab, or a view to see something you can show inline.
+8. Capture and simulation are conversations, not forms: ask for the customer's words or the bet in plain language, render the card that carries it, and offer the next move as an action on that card.
+9. When asked to add or query Jobs, Steps, or Outcomes, ALWAYS invoke the corresponding tools.
+10. Be warm, direct, and specific. Short sentences. No corporate jargon, no therapy-speak, no emojis."""
 
 
 def _brief_lines(brief: StudioBrief | None) -> list[str]:
@@ -116,8 +125,12 @@ def _sse(event: str, data: dict[str, Any]) -> str:
     return f"event: {event}\ndata: {json.dumps(data)}\n\n"
 
 
-def _to_openai_messages(request: ChatRequest) -> list[dict[str, Any]]:
+def _to_openai_messages(
+    request: ChatRequest, memory_context: str = ""
+) -> list[dict[str, Any]]:
     system_prompt = SYSTEM_PROMPT + _brief_block(request.brief)
+    if memory_context:
+        system_prompt += "\n\n" + memory_context
     messages: list[dict[str, Any]] = [{"role": "system", "content": system_prompt}]
     for message in request.messages:
         messages.append({"role": message.role, "content": message.content})
@@ -169,6 +182,47 @@ ADD_CONNECTOR_TOOL: dict[str, Any] = {
 }
 
 
+REMEMBER_TOOL: dict[str, Any] = {
+    "type": "function",
+    "function": {
+        "name": "remember",
+        "description": (
+            "Save one durable observation about the product manager or their work so "
+            "you can use it in later conversations: a career goal, the opportunity "
+            "they are chasing, a business constraint, a stakeholder, a piece of "
+            "evidence, or a working preference. Send the smallest useful sentence. "
+            "The PM will see it in 'What I've learned' and can confirm, edit, or "
+            "dismiss it. Do not call this for transient details of the current task."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "kind": {
+                    "type": "string",
+                    "enum": sorted(OBSERVATION_KINDS),
+                    "description": "The area of context this observation belongs to.",
+                },
+                "text": {
+                    "type": "string",
+                    "description": "One plain-language sentence in the PM's own terms.",
+                },
+                "confidence": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1,
+                    "description": "How sure you are. Defaults to 0.6.",
+                },
+                "data": {
+                    "type": "object",
+                    "description": "Optional structured details, such as a job id.",
+                },
+            },
+            "required": ["kind", "text"],
+        },
+    },
+}
+
+
 def _apply_add_connector(
     arguments: dict[str, Any], service: ConnectorService
 ) -> tuple[str, list[dict[str, Any]]]:
@@ -189,6 +243,34 @@ def _apply_add_connector(
     return f"registered connector {config.name}", [{"event": "connector", "data": event_data}]
 
 
+def _apply_remember(
+    arguments: dict[str, Any], memory: StudioMemory | None
+) -> tuple[str, dict[str, Any] | None]:
+    """Store one suggested observation without asking the PM first."""
+    if memory is None:
+        return "Memory is not available to this client.", None
+
+    kind = str(arguments.get("kind", ""))
+    text = str(arguments.get("text", ""))
+    data = arguments.get("data")
+    try:
+        confidence = float(arguments.get("confidence", 0.6))
+    except (TypeError, ValueError):
+        confidence = 0.6
+
+    try:
+        observation = memory.add_observation(
+            kind=kind,
+            text=text,
+            data=data if isinstance(data, dict) else None,
+            status="suggested",
+            confidence=confidence,
+        )
+    except ValueError as exc:
+        return f"Could not remember that: {exc}", None
+    return "Saved for the user to review.", {"observation": observation.to_dict()}
+
+
 def _render_ui_tool(catalog: UiCatalog) -> dict[str, Any]:
     return {
         "type": "function",
@@ -196,10 +278,10 @@ def _render_ui_tool(catalog: UiCatalog) -> dict[str, Any]:
             "name": RENDER_UI_TOOL,
             "description": (
                 "Render one rich surface inline in the conversation. Reach for this whenever a "
-                "surface carries the evidence better than a paragraph: an outcome with its "
-                "scores, a ranked opportunity board, a before/after simulation of a bet, a "
-                "customer quote, the eight-stage job map, or a decision record. Send one surface, "
-                "then one short sentence.\n\n"
+                "surface carries the evidence better than a paragraph: an opportunity thesis, "
+                "an outcome with its scores, a ranked opportunity board, a before/after "
+                "simulation of a bet, a customer quote, the eight-stage job map, or a decision "
+                "record. Send one surface, then one short sentence.\n\n"
                 "Catalog (* marks a required prop):\n" + catalog.describe()
             ),
             "parameters": catalog.tool_schema(),
@@ -209,7 +291,7 @@ def _render_ui_tool(catalog: UiCatalog) -> dict[str, Any]:
 
 def _local_tools(catalog: UiCatalog | None) -> list[dict[str, Any]]:
     tools = [_render_ui_tool(catalog)] if catalog is not None else []
-    return [*tools, ADD_CONNECTOR_TOOL]
+    return [*tools, REMEMBER_TOOL, ADD_CONNECTOR_TOOL]
 
 
 def _parse_arguments(raw: str) -> dict[str, Any]:
@@ -232,20 +314,56 @@ def _collect_tool_calls(delta: Any, tool_calls: dict[int, dict[str, str]]) -> No
                 entry["arguments"] += tool_call.function.arguments
 
 
+def _persist_turn(
+    memory: StudioMemory | None, conversation_id: str | None, role: str, content: str
+) -> None:
+    """Record a turn, tolerating a duplicate retry and never breaking the reply."""
+    if memory is None or conversation_id is None or not content.strip():
+        return
+    try:
+        turns = memory.list_turns(conversation_id)
+        if turns and turns[-1].role == role and turns[-1].content == content:
+            return
+        memory.append_turn(conversation_id, role, content)
+    except Exception:  # noqa: BLE001
+        return
+
+
 async def stream_chat(
-    request: ChatRequest, service: ConnectorService | None = None
+    request: ChatRequest,
+    service: ConnectorService | None = None,
+    memory: StudioMemory | None = None,
 ) -> AsyncIterator[str]:
-    """Yield SSE frames: status, delta, tool, ui, connector, message, canvas_dirty."""
+    """Yield SSE frames: status, conversation, delta, tool, ui, memory, connector, message, canvas_dirty."""
     yield _sse("status", {"phase": "health_check"})
-    healthy, _message = await check_llm_health(request.base_url, request.api_key, request.model)
 
     last_user = next((m.content for m in reversed(request.messages) if m.role == "user"), "")
+
+    conversation_id: str | None = None
+    if memory is not None:
+        conversation = (
+            memory.get_conversation(request.conversation_id)
+            if request.conversation_id
+            else None
+        )
+        if conversation is None:
+            conversation = memory.create_conversation()
+        conversation_id = conversation.id
+        _persist_turn(memory, conversation_id, "user", last_user)
+        updated = memory.get_conversation(conversation_id) or conversation
+        yield _sse(
+            "conversation",
+            {"id": updated.id, "title": updated.title},
+        )
+
+    healthy, _message = await check_llm_health(request.base_url, request.api_key, request.model)
 
     if not healthy:
         yield _sse("status", {"phase": "offline"})
         reply = offline_fallback(last_user, request.brief)
         yield _sse("delta", {"text": reply})
         yield _sse("message", {"content": reply})
+        _persist_turn(memory, conversation_id, "assistant", reply)
         return
 
     catalog = UiCatalog.from_manifest(
@@ -255,11 +373,12 @@ async def stream_chat(
     yield _sse("status", {"phase": "mcp_tools"})
     llm_client = AsyncOpenAI(base_url=request.base_url, api_key=request.api_key, timeout=15.0)
     connector_service = service if service is not None else ConnectorService()
+    memory_context = memory.memory_context() if memory is not None else ""
 
     async with McpClient(request.mcp_url) as mcp_client:
         mcp_tools = await mcp_client.list_tools()
         openai_tools = _openai_tools(mcp_tools) + _local_tools(catalog)
-        messages: list[Any] = _to_openai_messages(request)
+        messages: list[Any] = _to_openai_messages(request, memory_context)
 
         spoken: list[str] = []
         ui_count = 0
@@ -289,7 +408,9 @@ async def stream_chat(
                 _collect_tool_calls(delta, tool_calls)
 
             if not tool_calls:
-                yield _sse("message", {"content": "".join(spoken)})
+                final = "".join(spoken)
+                yield _sse("message", {"content": final})
+                _persist_turn(memory, conversation_id, "assistant", final)
                 return
 
             messages.append(
@@ -318,6 +439,16 @@ async def stream_chat(
                     result_str, events = _apply_add_connector(arguments, connector_service)
                     for event in events:
                         yield _sse(event["event"], event["data"])
+                elif name == "remember":
+                    yield _sse("tool", {"name": name, "status": "start"})
+                    result_str, event = _apply_remember(arguments, memory)
+                    if event is None:
+                        yield _sse(
+                            "tool", {"name": name, "status": "error", "preview": result_str}
+                        )
+                    else:
+                        yield _sse("tool", {"name": name, "status": "ok"})
+                        yield _sse("memory", event)
                 else:
                     yield _sse("tool", {"name": name, "status": "start"})
                     if name == RENDER_UI_TOOL:
@@ -370,7 +501,14 @@ async def stream_chat(
                 yield _sse("canvas_dirty", {"value": True})
                 canvas_dirty = False
 
-        yield _sse("message", {"content": "".join(spoken)})
+        final = "".join(spoken)
+        yield _sse("message", {"content": final})
+        _persist_turn(memory, conversation_id, "assistant", final)
 
 
-__all__ = ["SYSTEM_PROMPT", "offline_fallback", "stream_chat"]
+__all__ = [
+    "REMEMBER_TOOL",
+    "SYSTEM_PROMPT",
+    "offline_fallback",
+    "stream_chat",
+]
