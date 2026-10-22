@@ -1,0 +1,21 @@
+Explore the repository snapshot at /tmp/opencode/aodi (this is the `origin/main` state of the `agentic-odi` project — a Python uv-workspace monorepo for Outcome-Driven Innovation with a React/TS "Living Studio" front end).
+
+Be VERY THOROUGH. Focus on the Living Studio: the conversational experience, the agent loop, signals/notifications, and the UI surfaces.
+
+Read:
+- `apps/studio-api/src/agentic_odi_studio_api/app.py`, `main.py`, and `studio/chat.py` (the SSE chat tool-loop — how the LLM calls MCP tools, how the system prompt is built, how errors/retries are handled, streaming format, memory events, `remember` tool).
+- `apps/studio-api/src/agentic_odi_studio_api/studio/router.py`, `schemas.py`, `mcp_data.py`, `probes.py`, `seed.py`, `ui_spec.py`, `connectors.py`, `changelog.py`.
+- `apps/studio/src/` — App.tsx, state/StudioContext.tsx, components/chat/*, components/canvas/*, components/notifications/CatchUpFeed.tsx, components/workspace/*, components/setup/*, onboarding/*, ui/* (UiRenderer, protocol, cards, registry, actions), lib/commands.ts, features/flags.ts, api/studioApi.ts, api/sse.ts, types.ts, bridge/desktopBridge.ts.
+- `apps/studio/src-tauri/src/lib.rs` and `tauri.conf.json` — desktop shell capabilities, sidecar spawning.
+- `docs/architecture/notifications.md`, `docs/architecture/data-flow.md`, `docs/living-studio.md`.
+
+Report back:
+- The full picture of the conversation UX: what the user can say, what the agent does, what gets persisted, what surfaces exist.
+- The notifications/signals architecture: what "CatchUpFeed" actually does, what triggers it, is it a real signal system or a stub?
+- The `ui_spec` / UiRenderer / registry / cards system — how does the agent compose surfaces? Is it a real generative UI protocol with an action system? What are the action types and how are they executed?
+- The feature-flag system: list the flags and what they gate.
+- Concrete gaps: places where the UI is a placeholder, where the agent's tools are hardcoded, where state is local-only, where there is no error/empty/loading state, accessibility gaps, test gaps.
+- The studio-api endpoints: list every route with method + path + purpose.
+- File paths with line numbers for the most important findings.
+
+Be concrete and cite file:line. Do not write any files.
