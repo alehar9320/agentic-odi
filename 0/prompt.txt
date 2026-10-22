@@ -1,0 +1,13 @@
+Explore the codebase at /home/alexa/repos/agentic-odi to understand:
+1. The overall project structure (top-level directories, key files)
+2. What kind of project this is (language, framework, purpose)
+3. Look for any existing issue templates, issue tracking files, or PR references
+4. Check for any existing issue lists, issue definitions, or task lists in the repo
+5. Look at the README.md to understand the project
+
+Return a comprehensive summary of:
+- Project type and purpose
+- Directory structure (top 2-3 levels)
+- Any existing issue/PR tracking files and their locations
+- Key files and their purposes
+- The content of README.md (first 500 words)
