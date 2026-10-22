@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import asyncio
 import json
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
 from agentic_odi_studio_api.studio import mcp_data
-from fastapi import HTTPException
+from agentic_odi_studio_api.studio.errors import StudioHTTPError
 
 
 class _FakeClient:
@@ -92,11 +93,13 @@ def test_fetch_canvas_skips_invalid_json_and_jobs_without_ids(monkeypatch) -> No
 def test_call_mcp_tool_rejects_unreachable_endpoints(monkeypatch) -> None:
     monkeypatch.setattr(mcp_data, "is_endpoint_reachable", lambda url, timeout: False)
 
-    with pytest.raises(HTTPException) as exc_info:
+    with pytest.raises(StudioHTTPError) as exc_info:
         asyncio.run(mcp_data.call_mcp_tool("http://mcp", "get_jobs", {}))
 
     assert exc_info.value.status_code == 502
-    assert "unreachable" in exc_info.value.detail
+    assert exc_info.value.error.code.value == "mcp_unreachable"
+    assert exc_info.value.error.retryable is True
+    assert "unreachable" in exc_info.value.error.message.lower()
 
 
 def test_call_mcp_tool_returns_the_result_text(monkeypatch) -> None:
@@ -112,16 +115,36 @@ def test_call_mcp_tool_returns_the_result_text(monkeypatch) -> None:
     assert _FakeClient.calls == [("get_jobs", {})]
 
 
-def test_call_mcp_tool_reraises_http_errors(monkeypatch) -> None:
-    _FakeClient.calls = []
-    _FakeClient.error = HTTPException(status_code=418, detail="teapot")
+def test_call_mcp_tool_reads_the_text_of_a_call_tool_result(monkeypatch) -> None:
+    class _ResultClient(_FakeClient):
+        async def call_tool(self, name: str, arguments: dict[str, Any]) -> Any:
+            return SimpleNamespace(
+                content=[SimpleNamespace(text='Outcome created successfully: {"id": "O-1"}')]
+            )
+
     monkeypatch.setattr(mcp_data, "is_endpoint_reachable", lambda url, timeout: True)
-    monkeypatch.setattr(mcp_data, "McpClient", _FakeClient)
+    monkeypatch.setattr(mcp_data, "McpClient", _ResultClient)
 
-    with pytest.raises(HTTPException) as exc_info:
-        asyncio.run(mcp_data.call_mcp_tool("http://mcp", "get_jobs", {}))
+    result = asyncio.run(mcp_data.call_mcp_tool("http://mcp", "add_outcome", {}))
 
-    assert exc_info.value.status_code == 418
+    assert result == 'Outcome created successfully: {"id": "O-1"}'
+
+
+def test_call_mcp_tool_raises_a_typed_error_for_an_error_text(monkeypatch) -> None:
+    class _ResultClient(_FakeClient):
+        async def call_tool(self, name: str, arguments: dict[str, Any]) -> Any:
+            return SimpleNamespace(
+                content=[SimpleNamespace(text="Error: Job with ID JOB-1 not found.")]
+            )
+
+    monkeypatch.setattr(mcp_data, "is_endpoint_reachable", lambda url, timeout: True)
+    monkeypatch.setattr(mcp_data, "McpClient", _ResultClient)
+
+    with pytest.raises(StudioHTTPError) as exc_info:
+        asyncio.run(mcp_data.call_mcp_tool("http://mcp", "get_job", {}))
+
+    assert exc_info.value.status_code == 404
+    assert exc_info.value.error.code.value == "not_found"
 
 
 def test_call_mcp_tool_wraps_client_errors(monkeypatch) -> None:
@@ -130,8 +153,10 @@ def test_call_mcp_tool_wraps_client_errors(monkeypatch) -> None:
     monkeypatch.setattr(mcp_data, "is_endpoint_reachable", lambda url, timeout: True)
     monkeypatch.setattr(mcp_data, "McpClient", _FakeClient)
 
-    with pytest.raises(HTTPException) as exc_info:
+    with pytest.raises(StudioHTTPError) as exc_info:
         asyncio.run(mcp_data.call_mcp_tool("http://mcp", "get_jobs", {}))
 
     assert exc_info.value.status_code == 502
-    assert "Error calling get_jobs: boom" in exc_info.value.detail
+    assert exc_info.value.error.code.value == "mcp_unreachable"
+    assert exc_info.value.error.retryable is True
+    assert "Error calling get_jobs: boom" in exc_info.value.error.message

@@ -8,9 +8,15 @@ import logging
 from typing import Any
 
 from agentic_odi_core import ODIService, ToolName
-from fastapi import HTTPException
+from agentic_odi_core.remote import (
+    StudioError,
+    StudioErrorCode,
+    parse_tool_result,
+    tool_result_text,
+)
 from fastmcp import Client as McpClient
 
+from agentic_odi_studio_api.studio.errors import StudioHTTPError
 from agentic_odi_studio_api.studio.probes import is_endpoint_reachable
 from agentic_odi_studio_api.studio.seed import seed_payload
 
@@ -103,17 +109,34 @@ def fetch_local_canvas(service: ODIService) -> dict[str, Any]:
 
 
 async def call_mcp_tool(mcp_url: str, tool: str, arguments: dict[str, Any]) -> str:
-    """Invoke an MCP tool, surfacing failures as HTTP 502."""
+    """Invoke an MCP tool, surfacing failures as typed HTTP errors."""
     if not is_endpoint_reachable(mcp_url, timeout=0.3):
-        raise HTTPException(status_code=502, detail=f"MCP server unreachable at {mcp_url}")
+        raise StudioHTTPError(
+            StudioError(
+                code=StudioErrorCode.MCP_UNREACHABLE,
+                message=f"MCP server unreachable at {mcp_url}",
+                retryable=True,
+            )
+        )
 
     try:
         async with McpClient(mcp_url) as mcp_client:
             result = await asyncio.wait_for(
                 mcp_client.call_tool(tool, arguments), timeout=MCP_CALL_TIMEOUT
             )
-            return str(result)
-    except HTTPException:
+    except StudioHTTPError:
         raise
     except Exception as exc:  # noqa: BLE001
-        raise HTTPException(status_code=502, detail=f"Error calling {tool}: {exc}") from exc
+        raise StudioHTTPError(
+            StudioError(
+                code=StudioErrorCode.MCP_UNREACHABLE,
+                message=f"Error calling {tool}: {exc}",
+                retryable=True,
+            )
+        ) from exc
+
+    text = tool_result_text(result)
+    problem = parse_tool_result(text)
+    if problem is not None:
+        raise StudioHTTPError(problem)
+    return text
