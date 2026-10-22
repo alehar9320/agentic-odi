@@ -3,7 +3,7 @@
   "checkpoint_id": "01M5HN0DCA4Z816A9KEAA0JRSJ",
   "strategy": "manual-commit",
   "branch": "feat/intent-first-pm-experience",
-  "checkpoints_count": 9,
+  "checkpoints_count": 10,
   "files_touched": null,
   "sessions": [
     {
@@ -61,13 +61,20 @@
       "compact_transcript": "/7/transcript.jsonl",
       "content_hash": "/7/content_hash.txt",
       "prompt": "/7/prompt.txt"
+    },
+    {
+      "metadata": "/8/metadata.json",
+      "transcript": "/8/full.jsonl",
+      "compact_transcript": "/8/transcript.jsonl",
+      "content_hash": "/8/content_hash.txt",
+      "prompt": "/8/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 3795598,
+    "input_tokens": 4050597,
     "cache_creation_tokens": 0,
-    "cache_read_tokens": 67142449,
-    "output_tokens": 1210548,
-    "api_call_count": 430
+    "cache_read_tokens": 67613617,
+    "output_tokens": 1215390,
+    "api_call_count": 445
   }
 }
