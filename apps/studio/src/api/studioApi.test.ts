@@ -2,10 +2,17 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   addConnector,
+  addObservation,
   addOutcome,
   addStep,
   checkConnectorHealth,
+  clearMemory,
+  createConversation,
   deleteConnector,
+  deleteObservation,
+  fetchLatestConversation,
+  fetchMemory,
+  updateObservation,
   fetchCanvas,
   fetchChangelog,
   fetchConfig,
@@ -205,6 +212,114 @@ describe("connectors", () => {
     expect(fetch).toHaveBeenCalledWith(
       "/api/connectors/gong/health",
       expect.objectContaining({ method: "POST" }),
+    );
+  });
+});
+
+
+describe("memory", () => {
+  const observation = {
+    id: "o-1",
+    kind: "career",
+    text: "Owns activation.",
+    data: {},
+    status: "suggested",
+    confidence: 0.8,
+    source_turn: 1,
+    created_at: "2026-10-22T10:00:00+00:00",
+    updated_at: "2026-10-22T10:00:00+00:00",
+  };
+
+  it("fetchMemory unwraps the observations array", async () => {
+    mockJson({ observations: [observation] });
+    await expect(fetchMemory()).resolves.toEqual([observation]);
+    expect(fetch).toHaveBeenCalledWith("/api/memory/observations", expect.objectContaining({ headers: expect.any(Object) }));
+  });
+
+  it("addObservation posts the observation", async () => {
+    mockJson({ observation });
+    await expect(
+      addObservation({ kind: "career", text: "Owns activation.", confirmed: true }),
+    ).resolves.toEqual(observation);
+    expect(fetch).toHaveBeenCalledWith(
+      "/api/memory/observations",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ kind: "career", text: "Owns activation.", confirmed: true }),
+      }),
+    );
+  });
+
+  it("updateObservation patches by id", async () => {
+    mockJson({ observation: { ...observation, status: "confirmed" } });
+    await expect(updateObservation("o-1", { status: "confirmed" })).resolves.toMatchObject({
+      status: "confirmed",
+    });
+    expect(fetch).toHaveBeenCalledWith(
+      "/api/memory/observations/o-1",
+      expect.objectContaining({ method: "PATCH" }),
+    );
+  });
+
+  it("deleteObservation and clearMemory send DELETE", async () => {
+    mockJson({ ok: true });
+    await deleteObservation("o-1");
+    expect(fetch).toHaveBeenCalledWith(
+      "/api/memory/observations/o-1",
+      expect.objectContaining({ method: "DELETE" }),
+    );
+    await clearMemory();
+    expect(fetch).toHaveBeenCalledWith("/api/memory", expect.objectContaining({ method: "DELETE" }));
+  });
+});
+
+describe("conversations", () => {
+  const conversation = {
+    id: "c-1",
+    title: "Activation",
+    created_at: "2026-10-22T10:00:00+00:00",
+    updated_at: "2026-10-22T10:00:00+00:00",
+  };
+
+  it("fetchLatestConversation returns the conversation and turns", async () => {
+    mockJson({ conversation, turns: [{ id: 1, conversation_id: "c-1", role: "user", content: "hi", created_at: "x" }] });
+    const latest = await fetchLatestConversation();
+    expect(latest.conversation).toEqual(conversation);
+    expect(latest.turns).toHaveLength(1);
+  });
+
+  it("createConversation unwraps the conversation", async () => {
+    mockJson({ conversation });
+    await expect(createConversation()).resolves.toEqual(conversation);
+    expect(fetch).toHaveBeenCalledWith(
+      "/api/conversations",
+      expect.objectContaining({ method: "POST" }),
+    );
+  });
+
+  it("streamChat forwards conversation_id", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response("", { status: 200, headers: { "Content-Type": "text/event-stream" } })),
+    );
+
+    await streamChat(
+      {
+        base_url: "",
+        api_key: "",
+        model: "",
+        mcp_url: "",
+        messages: [],
+        conversation_id: "c-1",
+      },
+      () => {},
+    );
+
+    expect(fetch).toHaveBeenCalledWith(
+      "/api/chat",
+      expect.objectContaining({
+        body: expect.stringContaining('"conversation_id":"c-1"'),
+      }),
     );
   });
 });
