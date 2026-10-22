@@ -48,8 +48,11 @@ def _outcome_not_found(outcome_id: str | None) -> str:
     return f"Error: Outcome with ID {outcome_id} not found."
 
 
-def _evidence_not_found(evidence_id: str) -> str:
-    return f"Error: Evidence with ID {evidence_id} not found."
+def _evidence_not_found(evidence_id: str, hint: str | None = None) -> str:
+    message = f"Error: Evidence with ID {evidence_id} not found."
+    if hint:
+        message = f"{message} {hint}"
+    return message
 
 
 @mcp.prompt
@@ -394,7 +397,10 @@ def add_evidence(
 def get_evidence(evidence_id: str) -> str:
     evidence = service.get_evidence(evidence_id)
     if evidence is None:
-        return _evidence_not_found(evidence_id)
+        return _evidence_not_found(
+            evidence_id,
+            "List the stored records with list_evidence() to find a valid id.",
+        )
     return evidence.model_dump_json()
 
 
@@ -412,8 +418,8 @@ def list_evidence(
 def delete_evidence(evidence_id: str) -> str:
     try:
         service.delete_evidence(evidence_id)
-    except EvidenceNotFoundError:
-        return _evidence_not_found(evidence_id)
+    except EvidenceNotFoundError as exc:
+        return _evidence_not_found(evidence_id, exc.hint)
     return f"Evidence deleted successfully: {evidence_id}"
 
 
@@ -437,8 +443,8 @@ def promote_evidence(
             importance=importance,
             satisfaction=satisfaction,
         )
-    except EvidenceNotFoundError:
-        return _evidence_not_found(evidence_id)
+    except EvidenceNotFoundError as exc:
+        return _evidence_not_found(evidence_id, exc.hint)
     except JobNotFoundError:
         return job_not_found(job_id or "")
     except StepNotFoundError:

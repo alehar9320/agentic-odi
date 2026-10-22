@@ -388,7 +388,12 @@ class LocalBackend(Backend):
         evidence_id = args["evidence_id"]
         evidence = self.service.get_evidence(evidence_id)
         if evidence is None:
-            raise BackendError(evidence_not_found(evidence_id))
+            raise BackendError(
+                evidence_not_found(
+                    evidence_id,
+                    "List the stored records with list_evidence() to find a valid id.",
+                )
+            )
         return evidence.model_dump()
 
     def _list_evidence(self, args: dict[str, Any]) -> list[dict[str, Any]]:
@@ -405,8 +410,8 @@ class LocalBackend(Backend):
         evidence_id = args["evidence_id"]
         try:
             self.service.delete_evidence(evidence_id)
-        except EvidenceNotFoundError:
-            raise BackendError(evidence_not_found(evidence_id)) from None
+        except EvidenceNotFoundError as exc:
+            raise BackendError(evidence_not_found(evidence_id, exc.hint)) from None
         return evidence_id
 
     def _promote_evidence(self, args: dict[str, Any]) -> dict[str, Any]:
@@ -433,8 +438,8 @@ class LocalBackend(Backend):
                 importance=args.get("importance"),
                 satisfaction=args.get("satisfaction"),
             )
-        except EvidenceNotFoundError:
-            raise BackendError(evidence_not_found(evidence_id)) from None
+        except EvidenceNotFoundError as exc:
+            raise BackendError(evidence_not_found(evidence_id, exc.hint)) from None
         except JobNotFoundError:
             raise BackendError(job_not_found(args.get("job_id") or "")) from None
         except StepNotFoundError:
