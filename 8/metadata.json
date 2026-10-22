@@ -1,0 +1,44 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M5HZWN3M8TAF9496B2D3VNQV",
+  "session_id": "ses_ea0104393ffeSmvBMrYc9AzM5g",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-22T14:24:26.123806338Z",
+  "branch": "feat/odi-mascot",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "apps/studio/index.html",
+    "apps/studio/src/components/OdiMascot.test.tsx",
+    "apps/studio/src/components/layout/StudioBar.test.tsx",
+    "apps/studio/src/components/layout/StudioBar.tsx",
+    "apps/studio/src/styles/theme.css"
+  ],
+  "agent": "OpenCode",
+  "model": "minimax-m3.1-flash",
+  "turn_id": "a628d0bc0bde",
+  "checkpoint_transcript_start": 110,
+  "transcript_lines_at_start": 110,
+  "compact_transcript_start": 110,
+  "token_usage": {
+    "input_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 0,
+    "output_tokens": 0,
+    "api_call_count": 0
+  },
+  "session_metrics": {
+    "turn_count": 1
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-10-22T14:24:26.064786031Z",
+    "agent_lines": 75,
+    "agent_removed": 7,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 75,
+    "total_lines_changed": 82,
+    "agent_percentage": 100,
+    "metric_version": 2
+  }
+}
