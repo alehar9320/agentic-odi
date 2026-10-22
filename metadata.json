@@ -3,7 +3,7 @@
   "checkpoint_id": "01M5HN7W8TKSNW7WZ2A60T6MRM",
   "strategy": "manual-commit",
   "branch": "wip/preserve-local-work-2026-10-22",
-  "checkpoints_count": 8,
+  "checkpoints_count": 9,
   "files_touched": [
     "README.md"
   ],
@@ -63,13 +63,20 @@
       "compact_transcript": "/7/transcript.jsonl",
       "content_hash": "/7/content_hash.txt",
       "prompt": "/7/prompt.txt"
+    },
+    {
+      "metadata": "/8/metadata.json",
+      "transcript": "/8/full.jsonl",
+      "compact_transcript": "/8/transcript.jsonl",
+      "content_hash": "/8/content_hash.txt",
+      "prompt": "/8/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 340117,
+    "input_tokens": 437638,
     "cache_creation_tokens": 0,
-    "cache_read_tokens": 4684520,
-    "output_tokens": 81361,
-    "api_call_count": 83
+    "cache_read_tokens": 5971280,
+    "output_tokens": 92391,
+    "api_call_count": 96
   }
 }
