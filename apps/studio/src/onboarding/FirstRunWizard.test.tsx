@@ -17,6 +17,8 @@ const studio = vi.hoisted(() => ({
   checkConnections: vi.fn(),
   openPanel: vi.fn(),
   openSetup: vi.fn(),
+  closeSetup: vi.fn(),
+  sendMessage: vi.fn(),
 }));
 
 vi.mock("../state/StudioContext", () => ({
@@ -63,6 +65,8 @@ describe("FirstRunWizard", () => {
     });
     studio.openPanel.mockClear();
     studio.openSetup.mockClear();
+    studio.closeSetup.mockClear();
+    studio.sendMessage.mockClear();
   });
 
   it("greets a first-time user and focuses the step heading", () => {
@@ -70,7 +74,7 @@ describe("FirstRunWizard", () => {
 
     expect(screen.getByRole("dialog")).toHaveAttribute("aria-modal", "true");
     const heading = screen.getByRole("heading", { level: 2 });
-    expect(heading).toHaveTextContent("People don't buy products.");
+    expect(heading).toHaveTextContent("What do you want to win?");
     expect(heading).toHaveFocus();
   });
 
@@ -79,11 +83,11 @@ describe("FirstRunWizard", () => {
 
     fireEvent.click(continueButton());
     expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent(
-      "Where do you want to begin?",
+      "What's on your mind?",
     );
     expect(continueButton()).toBeDisabled();
 
-    fireEvent.click(screen.getByRole("button", { name: /Read the landscape/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Help me find the next one/ }));
     expect(continueButton()).toBeEnabled();
     fireEvent.click(continueButton());
 
@@ -93,31 +97,40 @@ describe("FirstRunWizard", () => {
     fireEvent.click(continueButton());
 
     expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent("Your first move.");
-    expect(screen.getByText("The opportunity landscape opens full-screen.")).toBeInTheDocument();
+    expect(
+      screen.getByText("We start in the conversation. Tell me what you already know."),
+    ).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Open the landscape" }));
+    fireEvent.click(screen.getByRole("button", { name: "Find my next opportunity" }));
 
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
-    expect(studio.openPanel).toHaveBeenCalledWith("landscape");
+    expect(studio.sendMessage).toHaveBeenCalledWith(
+      expect.stringContaining("I need to find the next opportunity"),
+    );
+    expect(studio.openPanel).not.toHaveBeenCalled();
     expect(studio.openSetup).not.toHaveBeenCalled();
     expect(stored()).toMatchObject({
       status: "done",
       step: 3,
-      goal: "landscape",
+      goal: "find-opportunity",
       version: 1,
     });
   });
 
-  it("hands the job path to the context conversation", () => {
+  it("starts the conversation from the chosen door", () => {
     renderWizard();
 
     fireEvent.click(continueButton());
-    fireEvent.click(screen.getByRole("button", { name: /Name the job/ }));
+    fireEvent.click(screen.getByRole("button", { name: /I have one in mind/ }));
     fireEvent.click(continueButton());
     fireEvent.click(continueButton());
-    fireEvent.click(screen.getByRole("button", { name: "Set up my context" }));
+    fireEvent.click(screen.getByRole("button", { name: "Sharpen my opportunity" }));
 
-    expect(studio.openSetup).toHaveBeenCalledTimes(1);
+    expect(studio.closeSetup).toHaveBeenCalledTimes(1);
+    expect(studio.sendMessage).toHaveBeenCalledWith(
+      expect.stringContaining("I have an opportunity in mind"),
+    );
+    expect(studio.openSetup).not.toHaveBeenCalled();
     expect(studio.openPanel).not.toHaveBeenCalled();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
@@ -167,7 +180,7 @@ describe("FirstRunWizard", () => {
   });
 
   it("resumes an unfinished tour where it stopped", () => {
-    seed({ status: "active", step: 2, goal: "name-job", version: 1 });
+    seed({ status: "active", step: 2, goal: "have-opportunity", version: 1 });
 
     renderWizard();
 
@@ -177,7 +190,7 @@ describe("FirstRunWizard", () => {
   });
 
   it("does not reappear after completion", () => {
-    seed({ status: "done", step: 3, goal: "name-job", version: 1 });
+    seed({ status: "done", step: 3, goal: "have-opportunity", version: 1 });
 
     renderWizard();
 
@@ -209,7 +222,7 @@ describe("FirstRunWizard", () => {
     renderWizard();
 
     fireEvent.click(continueButton());
-    fireEvent.click(screen.getByRole("button", { name: /Name the job/ }));
+    fireEvent.click(screen.getByRole("button", { name: /I have one in mind/ }));
     fireEvent.click(continueButton());
 
     await waitFor(() => expect(studio.checkConnections).toHaveBeenCalled());
@@ -220,7 +233,7 @@ describe("FirstRunWizard", () => {
     renderWizard();
 
     fireEvent.click(continueButton());
-    fireEvent.click(screen.getByRole("button", { name: /Name the job/ }));
+    fireEvent.click(screen.getByRole("button", { name: /I have one in mind/ }));
     fireEvent.click(continueButton());
 
     expect(screen.getByText("Connection refused")).toBeInTheDocument();
@@ -243,7 +256,7 @@ describe("FirstRunWizard", () => {
   });
 
   it("can be replayed from anywhere in the app", async () => {
-    seed({ status: "done", step: 3, goal: "name-job", version: 1 });
+    seed({ status: "done", step: 3, goal: "have-opportunity", version: 1 });
 
     function Replay() {
       const { restart } = useOnboarding();
@@ -265,7 +278,7 @@ describe("FirstRunWizard", () => {
     fireEvent.click(screen.getByRole("button", { name: "Replay tour" }));
 
     expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent(
-      "People don't buy products.",
+      "What do you want to win?",
     );
     await waitFor(() =>
       expect(stored()).toMatchObject({ status: "active", step: 0, goal: null }),

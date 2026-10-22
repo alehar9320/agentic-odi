@@ -64,7 +64,7 @@ describe("onboarding machine", () => {
     const onGoal = advanceTour(createOnboardingState());
     expect(advanceTour(onGoal)).toEqual(onGoal);
 
-    const chosen = selectGoal(onGoal, "landscape");
+    const chosen = selectGoal(onGoal, "find-opportunity");
     expect(advanceTour(chosen).step).toBe(2);
   });
 
@@ -73,20 +73,20 @@ describe("onboarding machine", () => {
     const atEnd = {
       ...createOnboardingState(),
       step: LAST_STEP_INDEX,
-      goal: "name-job" as const,
+      goal: "have-opportunity" as const,
     };
     expect(advanceTour(atEnd).step).toBe(LAST_STEP_INDEX);
   });
 
   it("freezes finished tours", () => {
-    const done = finishTour({ ...createOnboardingState(), step: 2, goal: "name-job" });
+    const done = finishTour({ ...createOnboardingState(), step: 2, goal: "have-opportunity" });
     expect(done).toMatchObject({ status: "done", step: LAST_STEP_INDEX });
     expect(advanceTour(done)).toBe(done);
     expect(retreatTour(done)).toBe(done);
   });
 
   it("restarts from the top with no carried-over goal", () => {
-    const done = finishTour({ ...createOnboardingState(), goal: "name-job" });
+    const done = finishTour({ ...createOnboardingState(), goal: "have-opportunity" });
     expect(startTour(done)).toEqual({
       status: "active",
       step: 0,
@@ -99,7 +99,7 @@ describe("onboarding machine", () => {
 describe("onboarding storage", () => {
   it("round-trips a state", () => {
     const storage = memoryStorage();
-    const state = finishTour({ ...createOnboardingState(), goal: "impact", step: 3 });
+    const state = finishTour({ ...createOnboardingState(), goal: "pressure-test", step: 3 });
 
     writeOnboardingState(state, storage);
     expect(readOnboardingState(storage)).toEqual(state);
@@ -119,7 +119,7 @@ describe("onboarding storage", () => {
       [ONBOARDING_STORAGE_KEY]: JSON.stringify({
         status: "done",
         step: 3,
-        goal: "name-job",
+        goal: "have-opportunity",
         version: 99,
       }),
     });
@@ -128,8 +128,8 @@ describe("onboarding storage", () => {
 
   it("rejects unknown steps, statuses, and goals", () => {
     const cases = [
-      { status: "done", step: 9, goal: "name-job", version: 1 },
-      { status: "sleeping", step: 1, goal: "name-job", version: 1 },
+      { status: "done", step: 9, goal: "have-opportunity", version: 1 },
+      { status: "sleeping", step: 1, goal: "have-opportunity", version: 1 },
       { status: "done", step: 3, goal: "define-everything", version: 1 },
       { status: "done", step: 2, goal: null, version: 1 },
     ];

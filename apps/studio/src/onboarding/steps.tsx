@@ -1,11 +1,6 @@
 import { useId, type ReactNode } from "react";
 
-import {
-  BoltIcon,
-  CaptureIcon,
-  CompassIcon,
-  SparkIcon,
-} from "../components/icons";
+import { BoltIcon, CompassIcon, SignalIcon, SparkIcon } from "../components/icons";
 import { GOALS, type GoalIconName, type GoalId, type OnboardingGoal } from "./content";
 
 /* ------------------------------------------------------------------ */
@@ -13,10 +8,10 @@ import { GOALS, type GoalIconName, type GoalId, type OnboardingGoal } from "./co
 /* ------------------------------------------------------------------ */
 
 const ICONS: Record<GoalIconName, ReactNode> = {
-  job: <SparkIcon size={18} />,
-  landscape: <CompassIcon size={18} />,
-  impact: <BoltIcon size={18} />,
-  capture: <CaptureIcon size={18} />,
+  spark: <SparkIcon size={18} />,
+  bolt: <BoltIcon size={18} />,
+  compass: <CompassIcon size={18} />,
+  signal: <SignalIcon size={18} />,
 };
 
 function GoalIcon({ name }: { name: GoalIconName }) {
@@ -34,18 +29,18 @@ function GoalIcon({ name }: { name: GoalIconName }) {
 const MOVES = [
   {
     index: "01",
-    title: "Map the job",
-    detail: "The eight phases every job passes through, in the order customers live them.",
+    title: "Name the opportunity",
+    detail: "Say it the way you'd say it to your boss. We'll make it precise.",
   },
   {
     index: "02",
-    title: "Score the outcomes",
-    detail: "Rate importance against how well it is served. The gap is the opportunity.",
+    title: "Find the evidence",
+    detail: "See what customers actually feel, and where the gap is widest.",
   },
   {
     index: "03",
-    title: "Test the bet",
-    detail: "Simulate the friction collapse before you commit a sprint.",
+    title: "Choose and defend",
+    detail: "Leave with a thesis, a next move, and what would change your mind.",
   },
 ];
 
@@ -109,8 +104,8 @@ export function GoalStep({
       </div>
       <p className="wizard-hint">
         {goal
-          ? "Continue when you are ready. Everything else stays in the sidebar."
-          : "Pick one to continue."}
+          ? "Continue when you are ready. Everything stays one message away."
+          : "Pick one to start."}
       </p>
     </>
   );
