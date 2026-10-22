@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
+from typing import Any
 
 from markdown_it import MarkdownIt
 from pygments import highlight
@@ -61,7 +62,8 @@ def _fence_renderer(markdown: MarkdownIt) -> None:
             return ""
         return f'<pre class="highlight"><code class="language-{language}">{markup}</code></pre>'
 
-    markdown.renderer.rules["fence"] = render
+    renderer: Any = markdown.renderer
+    renderer.rules["fence"] = render
 
 
 def _heading_renderer(markdown: MarkdownIt) -> None:
@@ -84,7 +86,8 @@ def _heading_renderer(markdown: MarkdownIt) -> None:
         anchor = _unique_anchor(env, text)
         return f'<h{level} id="{anchor}">'
 
-    markdown.renderer.rules["heading_open"] = render
+    renderer: Any = markdown.renderer
+    renderer.rules["heading_open"] = render
 
 
 def _unique_anchor(env: dict, text: str) -> str:

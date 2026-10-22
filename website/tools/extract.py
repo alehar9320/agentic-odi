@@ -72,7 +72,8 @@ def read_odi_schema(schema_py: Path) -> dict[str, Any]:
     import importlib.util
 
     spec = importlib.util.spec_from_file_location("odi_schema_module", schema_py)
-    assert spec is not None and spec.loader is not None
+    if spec is None or spec.loader is None:
+        raise ValueError(f"could not load the ODI schema from {schema_py}")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module.odi_schema()
@@ -222,11 +223,15 @@ def _read_area_labels(tree: ast.Module) -> dict[str, str]:
     """The ``AREA_LABELS`` mapping: capability area -> human label."""
     for node in tree.body:
         if isinstance(node, ast.AnnAssign) and getattr(node.target, "id", "") == "AREA_LABELS":
-            return {
-                key.value: value.value
-                for key, value in zip(node.value.keys, node.value.values, strict=True)
-                if isinstance(key, ast.Constant) and isinstance(value, ast.Constant)
-            }
+            mapping = node.value
+            if not isinstance(mapping, ast.Dict):
+                break
+            labels: dict[str, str] = {}
+            for key, value in zip(mapping.keys, mapping.values, strict=True):
+                if isinstance(key, ast.Constant) and isinstance(value, ast.Constant):
+                    labels[str(key.value)] = str(value.value)
+            if labels:
+                return labels
     raise ValueError("AREA_LABELS was not found in the connector catalog")
 
 

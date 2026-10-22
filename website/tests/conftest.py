@@ -12,8 +12,6 @@ import sys
 import tempfile
 from pathlib import Path
 
-import pytest
-
 SITE = Path(__file__).resolve().parents[1]
 ROOT = SITE.parents[0]
 TOOLS = SITE / "tools"

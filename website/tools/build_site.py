@@ -12,16 +12,16 @@ and CI fails when it drifts from a fresh build.
 from __future__ import annotations
 
 import argparse
+import json
 import re
 import shutil
 import sys
 from pathlib import Path
 from typing import Any
 
-from jinja2 import Environment, FileSystemLoader, select_autoescape
-
 import extract
 import markdown_render
+from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 ROOT = Path(__file__).resolve().parents[2]
 SITE = ROOT / "website"
@@ -40,6 +40,7 @@ CLI_PY = ROOT / "apps" / "cli" / "src" / "agentic_odi_cli" / "cli.py"
 CATALOG_TS = ROOT / "apps" / "studio" / "src" / "ui" / "catalog.ts"
 ROADMAP_MD = ROOT / "docs" / "roadmap.md"
 CORE_MODELS_PY = ROOT / "packages" / "core" / "src" / "agentic_odi_core" / "models.py"
+SCHEMA_PY = ROOT / "packages" / "core" / "src" / "agentic_odi_core" / "schema.py"
 
 SITE_NAME = "Agentic ODI"
 
@@ -80,14 +81,17 @@ def _tokens_css() -> str:
         body = "\n".join(f"  {name}: {value};" for name, value in pairs.items())
         return f":root {{\n{body}\n}}"
 
-    return "\n\n".join(
-        [
-            "/* Generated from apps/studio/src/styles/theme.css. Do not edit by hand. */",
-            block(tokens),
-            block(easings),
-            block(site_only),
-        ]
-    ) + "\n"
+    return (
+        "\n\n".join(
+            [
+                "/* Generated from apps/studio/src/styles/theme.css. Do not edit by hand. */",
+                block(tokens),
+                block(easings),
+                block(site_only),
+            ]
+        )
+        + "\n"
+    )
 
 
 def _formula_parts() -> tuple[str, str]:
@@ -166,11 +170,7 @@ def _page_context(**extra: Any) -> dict[str, Any]:
 
 def _flat_guides(nav: dict[str, Any]) -> list[tuple[dict[str, Any], dict[str, Any]]]:
     """Every guide, in navigation order, with its group."""
-    return [
-        (group, guide)
-        for group in nav.get("groups", [])
-        for guide in group.get("guides", [])
-    ]
+    return [(group, guide) for group in nav.get("groups", []) for guide in group.get("guides", [])]
 
 
 def _guide_body(
@@ -272,6 +272,7 @@ def _render_pages(env: Environment) -> dict[str, str]:
     tools = extract.read_tools(MCP_SERVER_PY, CONTRACT_PY)
     cards = extract.read_catalog_cards(CATALOG_TS)
     roadmap_pending = extract.read_roadmap_pending(ROADMAP_MD)
+    odi_schema = extract.read_odi_schema(SCHEMA_PY)
     formula_base, formula_gap = _formula_parts()
 
     context = _page_context(
@@ -291,6 +292,8 @@ def _render_pages(env: Environment) -> dict[str, str]:
         tool_by_name={tool["name"]: tool for tool in tools},
         tool_signatures={tool["name"]: _signature(tool) for tool in tools},
         catalog_cards=cards,
+        odi_schema=odi_schema,
+        odi_schema_json=json.dumps(odi_schema, indent=2, sort_keys=True),
         works_today=_works_today(tools, cards, connectors),
         roadmap_pending=roadmap_pending,
         formula_base=formula_base,
@@ -331,12 +334,7 @@ def _sitemap(urls: list[str]) -> str:
 
 
 def _robots() -> str:
-    return (
-        "User-agent: *\n"
-        "Allow: /\n"
-        "\n"
-        f"Sitemap: {PAGES_URL}sitemap.xml\n"
-    )
+    return f"User-agent: *\nAllow: /\n\nSitemap: {PAGES_URL}sitemap.xml\n"
 
 
 def _tree(root: Path) -> dict[str, bytes]:
@@ -377,9 +375,7 @@ def build(out_dir: Path, *, check: bool = False) -> int:
     if check:
         committed = _tree(out_dir)
         stale = sorted(
-            name
-            for name in set(committed) | set(files)
-            if committed.get(name) != files.get(name)
+            name for name in set(committed) | set(files) if committed.get(name) != files.get(name)
         )
         if stale:
             print("The committed site is out of date. Run: build_site.py", file=sys.stderr)

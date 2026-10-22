@@ -1132,6 +1132,700 @@
   </div>
 </section>
 
+<section class="tool-doc" id="odi-schema">
+  <h2 class="tool-doc__name">
+    <code>odi_schema</code>
+    <span class="pill">8 entities</span>
+  </h2>
+  <p class="tool-doc__purpose">
+    The canonical JSON schema for every ODI entity. The server returns it from
+    <code>get_odi_schema</code>, and an agent can read it to learn the shape of
+    the data before it writes anything.
+  </p>
+  <details class="schema">
+    <summary class="schema__summary">Show the schema</summary>
+    <div class="codeblock">
+      <button class="copy-btn" type="button" data-copy>Copy</button>
+      <code>{
+  &#34;BusinessValue&#34;: {
+    &#34;$defs&#34;: {
+      &#34;BusinessImpactCategory&#34;: {
+        &#34;enum&#34;: [
+          &#34;revenue_growth&#34;,
+          &#34;cost_reduction&#34;,
+          &#34;retention&#34;,
+          &#34;risk_mitigation&#34;,
+          &#34;operational_efficiency&#34;,
+          &#34;compliance&#34;,
+          &#34;brand_reputation&#34;,
+          &#34;other&#34;
+        ],
+        &#34;title&#34;: &#34;BusinessImpactCategory&#34;,
+        &#34;type&#34;: &#34;string&#34;
+      }
+    },
+    &#34;properties&#34;: {
+      &#34;category&#34;: {
+        &#34;$ref&#34;: &#34;#/$defs/BusinessImpactCategory&#34;
+      },
+      &#34;confidence&#34;: {
+        &#34;anyOf&#34;: [
+          {
+            &#34;maximum&#34;: 1.0,
+            &#34;minimum&#34;: 0.0,
+            &#34;type&#34;: &#34;number&#34;
+          },
+          {
+            &#34;type&#34;: &#34;null&#34;
+          }
+        ],
+        &#34;default&#34;: null,
+        &#34;title&#34;: &#34;Confidence&#34;
+      },
+      &#34;detail&#34;: {
+        &#34;anyOf&#34;: [
+          {
+            &#34;type&#34;: &#34;string&#34;
+          },
+          {
+            &#34;type&#34;: &#34;null&#34;
+          }
+        ],
+        &#34;default&#34;: null,
+        &#34;title&#34;: &#34;Detail&#34;
+      },
+      &#34;estimated_annual_value&#34;: {
+        &#34;anyOf&#34;: [
+          {
+            &#34;minimum&#34;: 0.0,
+            &#34;type&#34;: &#34;number&#34;
+          },
+          {
+            &#34;type&#34;: &#34;null&#34;
+          }
+        ],
+        &#34;default&#34;: null,
+        &#34;title&#34;: &#34;Estimated Annual Value&#34;
+      },
+      &#34;statement&#34;: {
+        &#34;title&#34;: &#34;Statement&#34;,
+        &#34;type&#34;: &#34;string&#34;
+      }
+    },
+    &#34;required&#34;: [
+      &#34;category&#34;,
+      &#34;statement&#34;
+    ],
+    &#34;title&#34;: &#34;BusinessValue&#34;,
+    &#34;type&#34;: &#34;object&#34;
+  },
+  &#34;CustomerOutcome&#34;: {
+    &#34;$defs&#34;: {
+      &#34;BusinessImpactCategory&#34;: {
+        &#34;enum&#34;: [
+          &#34;revenue_growth&#34;,
+          &#34;cost_reduction&#34;,
+          &#34;retention&#34;,
+          &#34;risk_mitigation&#34;,
+          &#34;operational_efficiency&#34;,
+          &#34;compliance&#34;,
+          &#34;brand_reputation&#34;,
+          &#34;other&#34;
+        ],
+        &#34;title&#34;: &#34;BusinessImpactCategory&#34;,
+        &#34;type&#34;: &#34;string&#34;
+      },
+      &#34;BusinessValue&#34;: {
+        &#34;properties&#34;: {
+          &#34;category&#34;: {
+            &#34;$ref&#34;: &#34;#/$defs/BusinessImpactCategory&#34;
+          },
+          &#34;confidence&#34;: {
+            &#34;anyOf&#34;: [
+              {
+                &#34;maximum&#34;: 1.0,
+                &#34;minimum&#34;: 0.0,
+                &#34;type&#34;: &#34;number&#34;
+              },
+              {
+                &#34;type&#34;: &#34;null&#34;
+              }
+            ],
+            &#34;default&#34;: null,
+            &#34;title&#34;: &#34;Confidence&#34;
+          },
+          &#34;detail&#34;: {
+            &#34;anyOf&#34;: [
+              {
+                &#34;type&#34;: &#34;string&#34;
+              },
+              {
+                &#34;type&#34;: &#34;null&#34;
+              }
+            ],
+            &#34;default&#34;: null,
+            &#34;title&#34;: &#34;Detail&#34;
+          },
+          &#34;estimated_annual_value&#34;: {
+            &#34;anyOf&#34;: [
+              {
+                &#34;minimum&#34;: 0.0,
+                &#34;type&#34;: &#34;number&#34;
+              },
+              {
+                &#34;type&#34;: &#34;null&#34;
+              }
+            ],
+            &#34;default&#34;: null,
+            &#34;title&#34;: &#34;Estimated Annual Value&#34;
+          },
+          &#34;statement&#34;: {
+            &#34;title&#34;: &#34;Statement&#34;,
+            &#34;type&#34;: &#34;string&#34;
+          }
+        },
+        &#34;required&#34;: [
+          &#34;category&#34;,
+          &#34;statement&#34;
+        ],
+        &#34;title&#34;: &#34;BusinessValue&#34;,
+        &#34;type&#34;: &#34;object&#34;
+      },
+      &#34;CustomerValue&#34;: {
+        &#34;properties&#34;: {
+          &#34;contextual_clarifier&#34;: {
+            &#34;anyOf&#34;: [
+              {
+                &#34;type&#34;: &#34;string&#34;
+              },
+              {
+                &#34;type&#34;: &#34;null&#34;
+              }
+            ],
+            &#34;default&#34;: null,
+            &#34;title&#34;: &#34;Contextual Clarifier&#34;
+          },
+          &#34;direction&#34;: {
+            &#34;$ref&#34;: &#34;#/$defs/Direction&#34;
+          },
+          &#34;importance&#34;: {
+            &#34;maximum&#34;: 10.0,
+            &#34;minimum&#34;: 1.0,
+            &#34;title&#34;: &#34;Importance&#34;,
+            &#34;type&#34;: &#34;number&#34;
+          },
+          &#34;object_of_control&#34;: {
+            &#34;title&#34;: &#34;Object Of Control&#34;,
+            &#34;type&#34;: &#34;string&#34;
+          },
+          &#34;satisfaction&#34;: {
+            &#34;maximum&#34;: 10.0,
+            &#34;minimum&#34;: 1.0,
+            &#34;title&#34;: &#34;Satisfaction&#34;,
+            &#34;type&#34;: &#34;number&#34;
+          },
+          &#34;statement&#34;: {
+            &#34;title&#34;: &#34;Statement&#34;,
+            &#34;type&#34;: &#34;string&#34;
+          },
+          &#34;unit_of_measure&#34;: {
+            &#34;title&#34;: &#34;Unit Of Measure&#34;,
+            &#34;type&#34;: &#34;string&#34;
+          },
+          &#34;value_metrics&#34;: {
+            &#34;items&#34;: {
+              &#34;$ref&#34;: &#34;#/$defs/ValueMetric&#34;
+            },
+            &#34;title&#34;: &#34;Value Metrics&#34;,
+            &#34;type&#34;: &#34;array&#34;
+          }
+        },
+        &#34;required&#34;: [
+          &#34;direction&#34;,
+          &#34;unit_of_measure&#34;,
+          &#34;object_of_control&#34;,
+          &#34;statement&#34;,
+          &#34;importance&#34;,
+          &#34;satisfaction&#34;
+        ],
+        &#34;title&#34;: &#34;CustomerValue&#34;,
+        &#34;type&#34;: &#34;object&#34;
+      },
+      &#34;Direction&#34;: {
+        &#34;enum&#34;: [
+          &#34;minimize&#34;,
+          &#34;maximize&#34;
+        ],
+        &#34;title&#34;: &#34;Direction&#34;,
+        &#34;type&#34;: &#34;string&#34;
+      },
+      &#34;ValueMetric&#34;: {
+        &#34;properties&#34;: {
+          &#34;direction&#34;: {
+            &#34;$ref&#34;: &#34;#/$defs/Direction&#34;
+          },
+          &#34;importance&#34;: {
+            &#34;maximum&#34;: 10.0,
+            &#34;minimum&#34;: 1.0,
+            &#34;title&#34;: &#34;Importance&#34;,
+            &#34;type&#34;: &#34;number&#34;
+          },
+          &#34;name&#34;: {
+            &#34;title&#34;: &#34;Name&#34;,
+            &#34;type&#34;: &#34;string&#34;
+          },
+          &#34;satisfaction&#34;: {
+            &#34;maximum&#34;: 10.0,
+            &#34;minimum&#34;: 1.0,
+            &#34;title&#34;: &#34;Satisfaction&#34;,
+            &#34;type&#34;: &#34;number&#34;
+          },
+          &#34;unit_of_measure&#34;: {
+            &#34;title&#34;: &#34;Unit Of Measure&#34;,
+            &#34;type&#34;: &#34;string&#34;
+          }
+        },
+        &#34;required&#34;: [
+          &#34;name&#34;,
+          &#34;direction&#34;,
+          &#34;unit_of_measure&#34;,
+          &#34;importance&#34;,
+          &#34;satisfaction&#34;
+        ],
+        &#34;title&#34;: &#34;ValueMetric&#34;,
+        &#34;type&#34;: &#34;object&#34;
+      }
+    },
+    &#34;properties&#34;: {
+      &#34;business_value&#34;: {
+        &#34;$ref&#34;: &#34;#/$defs/BusinessValue&#34;
+      },
+      &#34;customer_value&#34;: {
+        &#34;$ref&#34;: &#34;#/$defs/CustomerValue&#34;
+      },
+      &#34;id&#34;: {
+        &#34;title&#34;: &#34;Id&#34;,
+        &#34;type&#34;: &#34;string&#34;
+      },
+      &#34;job_id&#34;: {
+        &#34;description&#34;: &#34;The ID of the Job this outcome relates to&#34;,
+        &#34;title&#34;: &#34;Job Id&#34;,
+        &#34;type&#34;: &#34;string&#34;
+      },
+      &#34;step_id&#34;: {
+        &#34;anyOf&#34;: [
+          {
+            &#34;type&#34;: &#34;string&#34;
+          },
+          {
+            &#34;type&#34;: &#34;null&#34;
+          }
+        ],
+        &#34;default&#34;: null,
+        &#34;description&#34;: &#34;The ID of the specific Step, if applicable&#34;,
+        &#34;title&#34;: &#34;Step Id&#34;
+      }
+    },
+    &#34;required&#34;: [
+      &#34;job_id&#34;,
+      &#34;customer_value&#34;,
+      &#34;business_value&#34;
+    ],
+    &#34;title&#34;: &#34;CustomerOutcome&#34;,
+    &#34;type&#34;: &#34;object&#34;
+  },
+  &#34;CustomerValue&#34;: {
+    &#34;$defs&#34;: {
+      &#34;Direction&#34;: {
+        &#34;enum&#34;: [
+          &#34;minimize&#34;,
+          &#34;maximize&#34;
+        ],
+        &#34;title&#34;: &#34;Direction&#34;,
+        &#34;type&#34;: &#34;string&#34;
+      },
+      &#34;ValueMetric&#34;: {
+        &#34;properties&#34;: {
+          &#34;direction&#34;: {
+            &#34;$ref&#34;: &#34;#/$defs/Direction&#34;
+          },
+          &#34;importance&#34;: {
+            &#34;maximum&#34;: 10.0,
+            &#34;minimum&#34;: 1.0,
+            &#34;title&#34;: &#34;Importance&#34;,
+            &#34;type&#34;: &#34;number&#34;
+          },
+          &#34;name&#34;: {
+            &#34;title&#34;: &#34;Name&#34;,
+            &#34;type&#34;: &#34;string&#34;
+          },
+          &#34;satisfaction&#34;: {
+            &#34;maximum&#34;: 10.0,
+            &#34;minimum&#34;: 1.0,
+            &#34;title&#34;: &#34;Satisfaction&#34;,
+            &#34;type&#34;: &#34;number&#34;
+          },
+          &#34;unit_of_measure&#34;: {
+            &#34;title&#34;: &#34;Unit Of Measure&#34;,
+            &#34;type&#34;: &#34;string&#34;
+          }
+        },
+        &#34;required&#34;: [
+          &#34;name&#34;,
+          &#34;direction&#34;,
+          &#34;unit_of_measure&#34;,
+          &#34;importance&#34;,
+          &#34;satisfaction&#34;
+        ],
+        &#34;title&#34;: &#34;ValueMetric&#34;,
+        &#34;type&#34;: &#34;object&#34;
+      }
+    },
+    &#34;properties&#34;: {
+      &#34;contextual_clarifier&#34;: {
+        &#34;anyOf&#34;: [
+          {
+            &#34;type&#34;: &#34;string&#34;
+          },
+          {
+            &#34;type&#34;: &#34;null&#34;
+          }
+        ],
+        &#34;default&#34;: null,
+        &#34;title&#34;: &#34;Contextual Clarifier&#34;
+      },
+      &#34;direction&#34;: {
+        &#34;$ref&#34;: &#34;#/$defs/Direction&#34;
+      },
+      &#34;importance&#34;: {
+        &#34;maximum&#34;: 10.0,
+        &#34;minimum&#34;: 1.0,
+        &#34;title&#34;: &#34;Importance&#34;,
+        &#34;type&#34;: &#34;number&#34;
+      },
+      &#34;object_of_control&#34;: {
+        &#34;title&#34;: &#34;Object Of Control&#34;,
+        &#34;type&#34;: &#34;string&#34;
+      },
+      &#34;satisfaction&#34;: {
+        &#34;maximum&#34;: 10.0,
+        &#34;minimum&#34;: 1.0,
+        &#34;title&#34;: &#34;Satisfaction&#34;,
+        &#34;type&#34;: &#34;number&#34;
+      },
+      &#34;statement&#34;: {
+        &#34;title&#34;: &#34;Statement&#34;,
+        &#34;type&#34;: &#34;string&#34;
+      },
+      &#34;unit_of_measure&#34;: {
+        &#34;title&#34;: &#34;Unit Of Measure&#34;,
+        &#34;type&#34;: &#34;string&#34;
+      },
+      &#34;value_metrics&#34;: {
+        &#34;items&#34;: {
+          &#34;$ref&#34;: &#34;#/$defs/ValueMetric&#34;
+        },
+        &#34;title&#34;: &#34;Value Metrics&#34;,
+        &#34;type&#34;: &#34;array&#34;
+      }
+    },
+    &#34;required&#34;: [
+      &#34;direction&#34;,
+      &#34;unit_of_measure&#34;,
+      &#34;object_of_control&#34;,
+      &#34;statement&#34;,
+      &#34;importance&#34;,
+      &#34;satisfaction&#34;
+    ],
+    &#34;title&#34;: &#34;CustomerValue&#34;,
+    &#34;type&#34;: &#34;object&#34;
+  },
+  &#34;Evidence&#34;: {
+    &#34;description&#34;: &#34;A captured research record linked (optionally) to ODI artifacts.&#34;,
+    &#34;properties&#34;: {
+      &#34;content&#34;: {
+        &#34;description&#34;: &#34;Normalized text content of the record&#34;,
+        &#34;title&#34;: &#34;Content&#34;,
+        &#34;type&#34;: &#34;string&#34;
+      },
+      &#34;id&#34;: {
+        &#34;title&#34;: &#34;Id&#34;,
+        &#34;type&#34;: &#34;string&#34;
+      },
+      &#34;item_type&#34;: {
+        &#34;default&#34;: &#34;manual&#34;,
+        &#34;description&#34;: &#34;Normalized record kind produced by the connector&#34;,
+        &#34;enum&#34;: [
+          &#34;catalog&#34;,
+          &#34;resource&#34;,
+          &#34;tool_result&#34;,
+          &#34;manual&#34;,
+          &#34;note&#34;
+        ],
+        &#34;title&#34;: &#34;Item Type&#34;,
+        &#34;type&#34;: &#34;string&#34;
+      },
+      &#34;job_id&#34;: {
+        &#34;anyOf&#34;: [
+          {
+            &#34;type&#34;: &#34;string&#34;
+          },
+          {
+            &#34;type&#34;: &#34;null&#34;
+          }
+        ],
+        &#34;default&#34;: null,
+        &#34;description&#34;: &#34;Job this evidence supports&#34;,
+        &#34;title&#34;: &#34;Job Id&#34;
+      },
+      &#34;name&#34;: {
+        &#34;description&#34;: &#34;Short human-readable label for the record&#34;,
+        &#34;title&#34;: &#34;Name&#34;,
+        &#34;type&#34;: &#34;string&#34;
+      },
+      &#34;outcome_id&#34;: {
+        &#34;anyOf&#34;: [
+          {
+            &#34;type&#34;: &#34;string&#34;
+          },
+          {
+            &#34;type&#34;: &#34;null&#34;
+          }
+        ],
+        &#34;default&#34;: null,
+        &#34;description&#34;: &#34;Desired Outcome this evidence supports&#34;,
+        &#34;title&#34;: &#34;Outcome Id&#34;
+      },
+      &#34;raw&#34;: {
+        &#34;additionalProperties&#34;: true,
+        &#34;description&#34;: &#34;Original record payload&#34;,
+        &#34;title&#34;: &#34;Raw&#34;,
+        &#34;type&#34;: &#34;object&#34;
+      },
+      &#34;source_kind&#34;: {
+        &#34;description&#34;: &#34;Connector kind, e.g. mcp, rest, webhook, manual&#34;,
+        &#34;title&#34;: &#34;Source Kind&#34;,
+        &#34;type&#34;: &#34;string&#34;
+      },
+      &#34;source_name&#34;: {
+        &#34;description&#34;: &#34;Connector or person that produced the record&#34;,
+        &#34;title&#34;: &#34;Source Name&#34;,
+        &#34;type&#34;: &#34;string&#34;
+      },
+      &#34;step_id&#34;: {
+        &#34;anyOf&#34;: [
+          {
+            &#34;type&#34;: &#34;string&#34;
+          },
+          {
+            &#34;type&#34;: &#34;null&#34;
+          }
+        ],
+        &#34;default&#34;: null,
+        &#34;description&#34;: &#34;Job-map Step this evidence supports&#34;,
+        &#34;title&#34;: &#34;Step Id&#34;
+      }
+    },
+    &#34;required&#34;: [
+      &#34;source_name&#34;,
+      &#34;source_kind&#34;,
+      &#34;name&#34;,
+      &#34;content&#34;
+    ],
+    &#34;title&#34;: &#34;Evidence&#34;,
+    &#34;type&#34;: &#34;object&#34;
+  },
+  &#34;Job&#34;: {
+    &#34;properties&#34;: {
+      &#34;description&#34;: {
+        &#34;anyOf&#34;: [
+          {
+            &#34;type&#34;: &#34;string&#34;
+          },
+          {
+            &#34;type&#34;: &#34;null&#34;
+          }
+        ],
+        &#34;default&#34;: null,
+        &#34;description&#34;: &#34;Detailed description of the Job&#34;,
+        &#34;title&#34;: &#34;Description&#34;
+      },
+      &#34;id&#34;: {
+        &#34;title&#34;: &#34;Id&#34;,
+        &#34;type&#34;: &#34;string&#34;
+      },
+      &#34;name&#34;: {
+        &#34;description&#34;: &#34;The name of the Job-to-be-Done&#34;,
+        &#34;title&#34;: &#34;Name&#34;,
+        &#34;type&#34;: &#34;string&#34;
+      }
+    },
+    &#34;required&#34;: [
+      &#34;name&#34;
+    ],
+    &#34;title&#34;: &#34;Job&#34;,
+    &#34;type&#34;: &#34;object&#34;
+  },
+  &#34;Outcome&#34;: {
+    &#34;properties&#34;: {
+      &#34;id&#34;: {
+        &#34;title&#34;: &#34;Id&#34;,
+        &#34;type&#34;: &#34;string&#34;
+      },
+      &#34;importance&#34;: {
+        &#34;anyOf&#34;: [
+          {
+            &#34;maximum&#34;: 10.0,
+            &#34;minimum&#34;: 1.0,
+            &#34;type&#34;: &#34;number&#34;
+          },
+          {
+            &#34;type&#34;: &#34;null&#34;
+          }
+        ],
+        &#34;default&#34;: null,
+        &#34;description&#34;: &#34;Importance score (1-10)&#34;,
+        &#34;title&#34;: &#34;Importance&#34;
+      },
+      &#34;job_id&#34;: {
+        &#34;description&#34;: &#34;The ID of the Job this outcome relates to&#34;,
+        &#34;title&#34;: &#34;Job Id&#34;,
+        &#34;type&#34;: &#34;string&#34;
+      },
+      &#34;opportunity_score&#34;: {
+        &#34;anyOf&#34;: [
+          {
+            &#34;type&#34;: &#34;number&#34;
+          },
+          {
+            &#34;type&#34;: &#34;null&#34;
+          }
+        ],
+        &#34;default&#34;: null,
+        &#34;description&#34;: &#34;Opportunity score (Importance + max(Importance - Satisfaction, 0))&#34;,
+        &#34;title&#34;: &#34;Opportunity Score&#34;
+      },
+      &#34;satisfaction&#34;: {
+        &#34;anyOf&#34;: [
+          {
+            &#34;maximum&#34;: 10.0,
+            &#34;minimum&#34;: 1.0,
+            &#34;type&#34;: &#34;number&#34;
+          },
+          {
+            &#34;type&#34;: &#34;null&#34;
+          }
+        ],
+        &#34;default&#34;: null,
+        &#34;description&#34;: &#34;Current satisfaction score (1-10)&#34;,
+        &#34;title&#34;: &#34;Satisfaction&#34;
+      },
+      &#34;statement&#34;: {
+        &#34;description&#34;: &#34;The desired outcome statement (e.g., &#39;Minimize the time it takes to...&#39;)&#34;,
+        &#34;title&#34;: &#34;Statement&#34;,
+        &#34;type&#34;: &#34;string&#34;
+      },
+      &#34;step_id&#34;: {
+        &#34;anyOf&#34;: [
+          {
+            &#34;type&#34;: &#34;string&#34;
+          },
+          {
+            &#34;type&#34;: &#34;null&#34;
+          }
+        ],
+        &#34;default&#34;: null,
+        &#34;description&#34;: &#34;The ID of the specific Step, if applicable&#34;,
+        &#34;title&#34;: &#34;Step Id&#34;
+      }
+    },
+    &#34;required&#34;: [
+      &#34;job_id&#34;,
+      &#34;statement&#34;
+    ],
+    &#34;title&#34;: &#34;Outcome&#34;,
+    &#34;type&#34;: &#34;object&#34;
+  },
+  &#34;Step&#34;: {
+    &#34;properties&#34;: {
+      &#34;id&#34;: {
+        &#34;title&#34;: &#34;Id&#34;,
+        &#34;type&#34;: &#34;string&#34;
+      },
+      &#34;job_id&#34;: {
+        &#34;description&#34;: &#34;The ID of the Job this step belongs to&#34;,
+        &#34;title&#34;: &#34;Job Id&#34;,
+        &#34;type&#34;: &#34;string&#34;
+      },
+      &#34;name&#34;: {
+        &#34;description&#34;: &#34;The name of the job step&#34;,
+        &#34;title&#34;: &#34;Name&#34;,
+        &#34;type&#34;: &#34;string&#34;
+      },
+      &#34;order&#34;: {
+        &#34;description&#34;: &#34;The chronological order of this step in the job map&#34;,
+        &#34;title&#34;: &#34;Order&#34;,
+        &#34;type&#34;: &#34;integer&#34;
+      }
+    },
+    &#34;required&#34;: [
+      &#34;job_id&#34;,
+      &#34;name&#34;,
+      &#34;order&#34;
+    ],
+    &#34;title&#34;: &#34;Step&#34;,
+    &#34;type&#34;: &#34;object&#34;
+  },
+  &#34;ValueMetric&#34;: {
+    &#34;$defs&#34;: {
+      &#34;Direction&#34;: {
+        &#34;enum&#34;: [
+          &#34;minimize&#34;,
+          &#34;maximize&#34;
+        ],
+        &#34;title&#34;: &#34;Direction&#34;,
+        &#34;type&#34;: &#34;string&#34;
+      }
+    },
+    &#34;properties&#34;: {
+      &#34;direction&#34;: {
+        &#34;$ref&#34;: &#34;#/$defs/Direction&#34;
+      },
+      &#34;importance&#34;: {
+        &#34;maximum&#34;: 10.0,
+        &#34;minimum&#34;: 1.0,
+        &#34;title&#34;: &#34;Importance&#34;,
+        &#34;type&#34;: &#34;number&#34;
+      },
+      &#34;name&#34;: {
+        &#34;title&#34;: &#34;Name&#34;,
+        &#34;type&#34;: &#34;string&#34;
+      },
+      &#34;satisfaction&#34;: {
+        &#34;maximum&#34;: 10.0,
+        &#34;minimum&#34;: 1.0,
+        &#34;title&#34;: &#34;Satisfaction&#34;,
+        &#34;type&#34;: &#34;number&#34;
+      },
+      &#34;unit_of_measure&#34;: {
+        &#34;title&#34;: &#34;Unit Of Measure&#34;,
+        &#34;type&#34;: &#34;string&#34;
+      }
+    },
+    &#34;required&#34;: [
+      &#34;name&#34;,
+      &#34;direction&#34;,
+      &#34;unit_of_measure&#34;,
+      &#34;importance&#34;,
+      &#34;satisfaction&#34;
+    ],
+    &#34;title&#34;: &#34;ValueMetric&#34;,
+    &#34;type&#34;: &#34;object&#34;
+  }
+}</code>
+    </div>
+  </details>
+</section>
     </div>
 
 

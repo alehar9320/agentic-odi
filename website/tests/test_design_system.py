@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import re
 
-import pytest
-
 import extract
 from conftest import SITE, STUDIO_THEME
 
@@ -63,8 +61,8 @@ def test_reduced_motion_disables_all_motion():
 
 def test_the_type_scale_is_present():
     css = _css()
-    assert "clamp(2.75rem, 7.5vw, 6rem)" in css        # display
-    assert "clamp(1.875rem, 4vw, 3.25rem)" in css      # section title
+    assert "clamp(2.75rem, 7.5vw, 6rem)" in css  # display
+    assert "clamp(1.875rem, 4vw, 3.25rem)" in css  # section title
     assert "clamp(1.0625rem, 1.5vw, 1.375rem)" in css  # lead
     assert "letter-spacing: -0.04em" in css
     assert "letter-spacing: 0.18em" in css

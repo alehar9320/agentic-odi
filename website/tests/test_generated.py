@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-import pytest
-
 import build_site
+import pytest
 from conftest import DIST
 
 

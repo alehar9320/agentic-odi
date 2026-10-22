@@ -104,8 +104,13 @@ def _draw_pill(draw: ImageDraw.ImageDraw, label: str, right: int, cy: int) -> No
     draw.text(((x0 + x1) / 2, cy), label, font=font, fill=BADGE_FG, anchor="mm")
 
 
-def _wash(size: tuple[int, int], color: tuple[int, int, int], center: tuple[float, float],
-          radius: float, strength: int) -> tuple[Image.Image, Image.Image]:
+def _wash(
+    size: tuple[int, int],
+    color: tuple[int, int, int],
+    center: tuple[float, float],
+    radius: float,
+    strength: int,
+) -> tuple[Image.Image, Image.Image, tuple[int, int]]:
     """A soft radial wash, drawn small and scaled up.
 
     The site's canvas carries two of these. Reproducing them keeps the social
@@ -128,7 +133,7 @@ def _wash(size: tuple[int, int], color: tuple[int, int, int], center: tuple[floa
             ),
             fill=value,
         )
-    mask = mask.resize(size, Image.LANCZOS)
+    mask = mask.resize(size, Image.Resampling.LANCZOS)
     layer = Image.new("RGB", size, color)
     offset = (
         int(center[0] * size[0] - small * radius / 2),

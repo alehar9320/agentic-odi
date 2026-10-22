@@ -11,15 +11,14 @@ import html as html_module
 import json
 import re
 
-import pytest
-
 import extract
+import pytest
 from conftest import (
+    CATALOG_PY,
     CATALOG_TS,
     CONTRACT_PY,
-    MCP_SERVER_PY,
-    CATALOG_PY,
     CORE_MODELS_PY,
+    MCP_SERVER_PY,
     all_pages,
     h1_text,
     read_page,
@@ -105,9 +104,7 @@ MONTH_YEAR = re.compile(
 
 
 def _meta(html: str, name: str) -> str | None:
-    match = re.search(
-        rf'<meta\s+(?:name|property)="{re.escape(name)}"\s+content="([^"]*)"', html
-    )
+    match = re.search(rf'<meta\s+(?:name|property)="{re.escape(name)}"\s+content="([^"]*)"', html)
     return match.group(1) if match else None
 
 

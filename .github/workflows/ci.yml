@@ -206,13 +206,17 @@ jobs:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
 
+      # The site is generated and committed so a reviewer can read the
+      # rendered HTML in a pull request. If the committed copy no longer
+      # matches a fresh build, the site has drifted and the PR is not ready.
+      - name: Check the committed site matches a fresh build
+        run: uv run python website/tools/build_site.py --check
+
       - name: Pytest (website)
         run: uv run --directory website pytest tests/
 
-      - name: Build site (rsync)
-        run: |
-          mkdir -p _site
-          rsync -av website/ _site/ --exclude='tests/' --exclude='tools/'
+      - name: Build site
+        run: uv run python website/tools/build_site.py --out _site
 
   studio:
     runs-on: ubuntu-latest

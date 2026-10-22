@@ -17,6 +17,7 @@ from conftest import (
     CONTRACT_PY,
     MCP_SERVER_PY,
     ROADMAP_MD,
+    SCHEMA_PY,
     SITE,
     read_page,
 )
@@ -81,6 +82,14 @@ def test_the_landing_counts_match_the_source():
     assert f"{len(tools)} MCP tools" in text
     assert f"{len(cards)} agent-composed surfaces" in text
     assert f"{len(connectors)} connector presets" in text
+
+
+def test_the_odi_schema_on_the_site_matches_the_core():
+    schema = extract.read_odi_schema(SCHEMA_PY)
+    html = read_page("docs/mcp/index.html")
+    assert 'id="odi-schema"' in html
+    for entity in schema:
+        assert entity in html, f"{entity} is missing from the schema on the site"
 
 
 def test_every_guide_in_the_navigation_exists_on_disk():
