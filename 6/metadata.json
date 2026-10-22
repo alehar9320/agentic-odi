@@ -1,0 +1,40 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M5HPMSZPTD0WKWBV796XT7DP",
+  "session_id": "ses_ea0104393ffeSmvBMrYc9AzM5g",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-22T11:42:26.3766544Z",
+  "branch": "docs/opportunity-specs-index",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "docs/superpowers/specs/2026-10-22-opportunity-issues-design.md"
+  ],
+  "agent": "OpenCode",
+  "model": "minimax-m3.1-flash",
+  "turn_id": "a628d0bc0bde",
+  "checkpoint_transcript_start": 110,
+  "transcript_lines_at_start": 110,
+  "compact_transcript_start": 110,
+  "token_usage": {
+    "input_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 0,
+    "output_tokens": 0,
+    "api_call_count": 0
+  },
+  "session_metrics": {
+    "turn_count": 1
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-10-22T11:42:26.337302743Z",
+    "agent_lines": 0,
+    "agent_removed": 0,
+    "human_added": 186,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 186,
+    "total_lines_changed": 186,
+    "agent_percentage": 0,
+    "metric_version": 2
+  }
+}
