@@ -94,6 +94,7 @@ def read_connectors(catalog_py: Path) -> list[dict[str, Any]]:
         if not _is_connector_preset(node):
             continue
         fields = {kw.arg: _literal(kw.value) for kw in node.keywords if kw.arg}
+        env_vars = list(fields.get("env_vars", []))
         presets.append(
             {
                 "id": fields.get("id", ""),
@@ -102,13 +103,114 @@ def read_connectors(catalog_py: Path) -> list[dict[str, Any]]:
                 "area_label": area_labels.get(fields.get("area", ""), ""),
                 "summary": fields.get("summary", ""),
                 "url": fields.get("url", ""),
-                "auth": fields.get("auth", "none"),
-                "env_vars": list(fields.get("env_vars", [])),
+                "auth": _auth_label(fields.get("auth", "none"), env_vars),
+                "env_vars": env_vars,
+                "recommended": bool(fields.get("is_recommended", False)),
+                "docs": fields.get("docs", ""),
             }
         )
     if not presets:
         raise ValueError("no connector presets were found in the catalog")
     return presets
+
+
+def _auth_label(auth: str, env_vars: list[str]) -> str:
+    """How a preset authenticates, in the CLI's own words.
+
+    Mirrors ``agentic-odi connectors catalog`` so the site and the terminal
+    say the same thing.
+    """
+    if auth == "oauth":
+        return "oauth"
+    if env_vars:
+        return "api key"
+    return "none"
+
+
+def read_catalog_cards(catalog_ts: Path) -> list[dict[str, str]]:
+    """The ODI cards the agent may compose, with their descriptions.
+
+    The catalog is TypeScript, so it is read as text rather than imported.
+    The file separates primitives from cards with a marker comment; only the
+    top-level ``entry(...)`` calls after that marker are the shapes worth
+    naming. Nested entries — the job stages, for instance — are not cards.
+    """
+    source = catalog_ts.read_text(encoding="utf-8")
+    marker = re.search(r"//\s*-+\s*cards\s*$", source, re.MULTILINE)
+    if marker is None:
+        raise ValueError("the cards section was not found in the UI catalog")
+    body = source[marker.end() :]
+
+    cards: list[dict[str, str]] = []
+    for call in _balanced_calls(body, "entry"):
+        arguments = _string_arguments(call)
+        if len(arguments) >= 3:
+            cards.append(
+                {
+                    "type": arguments[0],
+                    "kind": arguments[1],
+                    "description": arguments[2],
+                }
+            )
+    if not cards:
+        raise ValueError("no ODI cards were found in the UI catalog")
+    return cards
+
+
+def _balanced_calls(body: str, name: str) -> list[str]:
+    """The bodies of every top-level ``name(...)`` call in a block of source."""
+    calls: list[str] = []
+    for match in re.finditer(rf"\b{name}\s*\(", body):
+        start = match.end()
+        depth = 1
+        index = start
+        while index < len(body) and depth:
+            char = body[index]
+            if char == "(":
+                depth += 1
+            elif char == ")":
+                depth -= 1
+            index += 1
+        if depth == 0:
+            calls.append(body[start : index - 1])
+    return calls
+
+
+def _string_arguments(call: str) -> list[str]:
+    """The leading string arguments of a call body."""
+    arguments: list[str] = []
+    for match in re.finditer(r'"((?:[^"\\]|\\.)*)"', call):
+        arguments.append(match.group(1))
+        if len(arguments) == 3:
+            break
+    return arguments
+
+
+def read_roadmap_pending(roadmap_md: Path) -> list[str]:
+    """The roadmap items that are not yet done.
+
+    An empty list means nothing is queued — the site says so rather than
+    inventing something to look forward to.
+    """
+    source = roadmap_md.read_text(encoding="utf-8")
+    pending = []
+    for line in source.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("- [ ]"):
+            pending.append(stripped[5:].strip())
+    return pending
+
+
+def group_connectors_by_area(presets: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Group the presets by capability area, in the catalog's own order."""
+    areas: dict[str, dict[str, Any]] = {}
+    for preset in presets:
+        area = areas.setdefault(
+            preset["area"],
+            {"area": preset["area"], "label": preset["area_label"], "connectors": []},
+        )
+        area["connectors"].append(preset)
+    return list(areas.values())
 
 
 def _is_connector_preset(node: ast.Call) -> bool:
@@ -190,15 +292,18 @@ def read_tools(mcp_server_py: Path, contract_py: Path) -> list[dict[str, Any]]:
 
 
 def _is_mcp_tool(decorator: ast.AST) -> bool:
-    """Whether a decorator is the ``@mcp.tool`` marker."""
-    if not isinstance(decorator, ast.Call):
-        return False
-    func = decorator.func
+    """Whether a decorator is the ``@mcp.tool`` marker.
+
+    The server writes it bare (``@mcp.tool``); the call form
+    (``@mcp.tool()``) is accepted too.
+    """
+    if isinstance(decorator, ast.Call):
+        decorator = decorator.func
     return (
-        isinstance(func, ast.Attribute)
-        and func.attr == "tool"
-        and isinstance(func.value, ast.Name)
-        and func.value.id == "mcp"
+        isinstance(decorator, ast.Attribute)
+        and decorator.attr == "tool"
+        and isinstance(decorator.value, ast.Name)
+        and decorator.value.id == "mcp"
     )
 
 

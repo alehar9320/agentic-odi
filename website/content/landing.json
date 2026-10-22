@@ -4,9 +4,18 @@
     "eyebrow": "Experimental",
     "title": "Your roadmap is a guess.",
     "sub": "An MCP server that hands your agents verified customer outcomes — and the evidence behind them.",
-    "primary": { "label": "Run it in 60 seconds", "href": "#run" },
-    "secondary": { "label": "Open the Living Studio", "href": "https://agentic-odi.alehar.workers.dev/" },
-    "tertiary": { "label": "View on GitHub", "href": "https://github.com/alehar9320/agentic-odi" }
+    "primary": {
+      "label": "Run it in 60 seconds",
+      "href": "#run"
+    },
+    "secondary": {
+      "label": "Open the Living Studio",
+      "href": "https://agentic-odi.alehar.workers.dev/"
+    },
+    "tertiary": {
+      "label": "View on GitHub",
+      "href": "https://github.com/alehar9320/agentic-odi"
+    }
   },
   "problem": {
     "id": "problem",
@@ -40,5 +49,198 @@
     "formula_label": "Opportunity =",
     "stat": "86% innovation success rate",
     "stat_source": "as reported in ODI literature (Strategyn)"
+  },
+  "surfaces": {
+    "id": "surfaces",
+    "eyebrow": "The surfaces",
+    "title": "The agent composes, it does not describe.",
+    "blurb": "The studio answers with a card from a closed catalog, rendered inline in the conversation. Six shapes, each one a thing you can act on.",
+    "cards": [
+      {
+        "type": "outcome-card",
+        "title": "Outcome",
+        "blurb": "A desired outcome with its importance, its satisfaction, and the gap between them.",
+        "data": {
+          "id": "OUT-1",
+          "statement": "Reconcile invoices without manual effort",
+          "importance": 8,
+          "satisfaction": 3,
+          "opportunity": 13.0
+        }
+      },
+      {
+        "type": "opportunity-board",
+        "title": "Opportunity board",
+        "blurb": "Several scored outcomes, ranked by the opportunity each one leaves open.",
+        "data": {
+          "outcomes": [
+            {
+              "statement": "Reconcile invoices without manual effort",
+              "importance": 8,
+              "satisfaction": 3,
+              "opportunity": 13.0
+            },
+            {
+              "statement": "Catch a failed payment before it churns",
+              "importance": 9,
+              "satisfaction": 6,
+              "opportunity": 12.0
+            },
+            {
+              "statement": "Hand a refund back in one step",
+              "importance": 6,
+              "satisfaction": 5,
+              "opportunity": 7.0
+            }
+          ]
+        }
+      },
+      {
+        "type": "impact-simulation",
+        "title": "Impact simulation",
+        "blurb": "What changes if you take the bet, set against what happens if you do not.",
+        "data": {
+          "statement": "Auto-match invoices against receipts",
+          "before": "Two hours a week, per finance lead, matching lines by hand.",
+          "after": "Exceptions only. The team reviews what did not match."
+        }
+      },
+      {
+        "type": "evidence-quote",
+        "title": "Evidence",
+        "blurb": "The customer words behind a score, with where they came from.",
+        "data": {
+          "quote": "I spend every Friday matching invoices to receipts. It is the part of the job I dread.",
+          "source": "Support call",
+          "captured": "Call transcript, ingested 12 March"
+        }
+      },
+      {
+        "type": "job-map",
+        "title": "Job map",
+        "blurb": "The steps of the job-to-be-done, in the order the customer does them.",
+        "data": {
+          "job": "Reconcile invoices",
+          "steps": [
+            {
+              "order": 1,
+              "name": "Collect the statements"
+            },
+            {
+              "order": 2,
+              "name": "Match each line"
+            },
+            {
+              "order": 3,
+              "name": "Review the exceptions"
+            },
+            {
+              "order": 4,
+              "name": "File and close"
+            }
+          ]
+        }
+      },
+      {
+        "type": "decision-record",
+        "title": "Decision",
+        "blurb": "What was decided, and the evidence it rests on.",
+        "data": {
+          "decision": "Automate invoice matching before we build a refund flow",
+          "status": "Decided",
+          "rationale": "Opportunity 13.0 against 7.0, and two evidence quotes in the last quarter."
+        }
+      }
+    ]
+  },
+  "how": {
+    "id": "how",
+    "eyebrow": "How it works",
+    "title": "Three moves, one loop.",
+    "steps": [
+      {
+        "title": "Talk",
+        "body": "One room. Describe a job, or paste what a customer said. The studio captures jobs, steps, and desired outcomes from plain language — and every score stays editable by hand."
+      },
+      {
+        "title": "Ask",
+        "body": "Any agent calls the same MCP tools the studio uses: job maps, outcomes, evidence, opportunity scores. Thirty tools, at decision time, from your own machine or the hosted server."
+      },
+      {
+        "title": "Steer",
+        "body": "The team decides from the same picture. Scored outcomes, opportunity boards, and bet simulations, composed inline by the agent and reviewable by a human."
+      }
+    ]
+  },
+  "run": {
+    "id": "run",
+    "eyebrow": "Run it",
+    "title": "Run it in 60 seconds.",
+    "lede": "Clone the workspace, or install the binary. Either way you get the MCP server and the Living Studio.",
+    "tabs": [
+      {
+        "id": "uv",
+        "label": "uv workspace",
+        "language": "bash",
+        "code": "git clone https://github.com/alehar9320/agentic-odi.git\ncd agentic-odi\nuv sync --all-packages\nnpm --prefix apps/studio run build\npython scripts/dev.py"
+      },
+      {
+        "id": "binary",
+        "label": "Prebuilt binary",
+        "language": "bash",
+        "code": "curl -fsSL https://github.com/alehar9320/agentic-odi/releases/latest/download/install.sh | sh\nagentic-odi --version"
+      }
+    ],
+    "mcp_config": "{\n  \"mcpServers\": {\n    \"agentic-odi\": { \"url\": \"http://localhost:8000/mcp\" }\n  }\n}",
+    "endpoints": [
+      {
+        "name": "MCP server",
+        "url": "http://localhost:8000/mcp",
+        "note": "Runs with scripts/dev.py. The same tools the studio uses."
+      },
+      {
+        "name": "The Living Studio",
+        "url": "http://127.0.0.1:8100",
+        "note": "Runs with scripts/dev.py. The chat-first interface."
+      },
+      {
+        "name": "Hosted MCP server",
+        "url": "https://agentic-odi.fastmcp.app/mcp",
+        "note": "Authentication required. Ask the maintainers for credentials, and point any MCP client at it."
+      },
+      {
+        "name": "Hosted Studio",
+        "url": "https://agentic-odi.alehar.workers.dev/",
+        "note": "The public interface. Live data needs the local sidecar."
+      },
+      {
+        "name": "Test chat",
+        "url": "https://horizon.prefect.io/alhase/servers/agentic-odi/chat",
+        "note": "Talk to the hosted MCP server in a browser. Requires a free Prefect account."
+      }
+    ]
+  },
+  "tools": {
+    "id": "tools",
+    "eyebrow": "The MCP surface",
+    "title": "Thirty tools. One contract.",
+    "blurb": "Every tool the server exposes is listed, with its arguments, in the reference. A few of them:",
+    "peek": [
+      "get_job_map",
+      "get_outcomes",
+      "compute_opportunity",
+      "evaluate_outcome",
+      "add_evidence",
+      "promote_evidence"
+    ]
+  },
+  "status": {
+    "id": "status",
+    "eyebrow": "Status",
+    "title": "Experimental",
+    "works_title": "What works today",
+    "next_title": "What's next",
+    "note": "We don't publish dates.",
+    "questions": "Questions? Open an issue."
   }
 }

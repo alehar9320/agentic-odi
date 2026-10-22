@@ -36,6 +36,8 @@ MCP_SERVER_PY = ROOT / "apps" / "mcp-server" / "src" / "agentic_odi_mcp_server" 
 CONTRACT_PY = ROOT / "packages" / "core" / "src" / "agentic_odi_core" / "contract.py"
 CATALOG_PY = ROOT / "packages" / "connectors" / "src" / "agentic_odi_connectors" / "catalog.py"
 CLI_PY = ROOT / "apps" / "cli" / "src" / "agentic_odi_cli" / "cli.py"
+CATALOG_TS = ROOT / "apps" / "studio" / "src" / "ui" / "catalog.ts"
+ROADMAP_MD = ROOT / "docs" / "roadmap.md"
 CORE_MODELS_PY = ROOT / "packages" / "core" / "src" / "agentic_odi_core" / "models.py"
 
 SITE_NAME = "Agentic ODI"
@@ -105,6 +107,40 @@ def _formula_parts() -> tuple[str, str]:
     return "importance", match.group(1)
 
 
+def _signature(tool: dict[str, Any]) -> str:
+    """A tool's signature, the way the MCP server declares it."""
+    parts = []
+    for param in tool["params"]:
+        text = param["name"]
+        if param["annotation"]:
+            text += f": {param['annotation']}"
+        if param["default"] is not None:
+            text += f" = {param['default']}"
+        parts.append(text)
+    return f"{tool['name']}({', '.join(parts)})"
+
+
+def _works_today(
+    tools: list[dict[str, Any]],
+    cards: list[dict[str, str]],
+    connectors: list[dict[str, Any]],
+) -> list[str]:
+    """What the product actually does today.
+
+    The counts are read from the source; the sentences are editorial.
+    """
+    return [
+        f"{len(tools)} MCP tools over jobs, steps, desired outcomes, customer outcomes, and evidence.",
+        f"{len(cards)} agent-composed surfaces, from a closed catalog the studio owns.",
+        f"{len(connectors)} connector presets — Notion, Gong, PostHog, Linear, GitHub, and more.",
+        "A local-first CLI: full entity CRUD, interactive chat, `schema`, and `score`.",
+        "A SQLite store, so the data outlives the session.",
+        "The Living Studio, as a web app and as a Tauri desktop app.",
+        "A hosted MCP server, for testing and verifying MCP over the wire.",
+        "A hosted Studio on Cloudflare Workers.",
+    ]
+
+
 def _load_json(name: str) -> Any:
     import json
 
@@ -135,6 +171,9 @@ def _pages(env: Environment) -> list[tuple[str, str]]:
     """
     pages: list[tuple[str, str]] = [("index.html", "landing.html"), ("404.html", "404.html")]
     for name in sorted(p.name for p in TEMPLATES.glob("*.html")):
+        # A leading underscore marks a partial, not a page.
+        if name.startswith("_"):
+            continue
         if name in {"base.html", "landing.html", "404.html"}:
             continue
         pages.append((name, name))
@@ -144,6 +183,11 @@ def _pages(env: Environment) -> list[tuple[str, str]]:
 def _render_pages(env: Environment) -> dict[str, str]:
     """Render every page, returning output path -> HTML."""
     landing = _load_json("landing.json")
+    demo = _load_json("demo.json")
+    connectors = extract.read_connectors(CATALOG_PY)
+    tools = extract.read_tools(MCP_SERVER_PY, CONTRACT_PY)
+    cards = extract.read_catalog_cards(CATALOG_TS)
+    roadmap_pending = extract.read_roadmap_pending(ROADMAP_MD)
     formula_base, formula_gap = _formula_parts()
     rendered: dict[str, str] = {}
 
@@ -157,6 +201,14 @@ def _render_pages(env: Environment) -> dict[str, str]:
             },
             landing=landing,
             content=landing,
+            demo=demo,
+            connectors=connectors,
+            connector_areas=extract.group_connectors_by_area(connectors),
+            tools={tool["name"]: tool for tool in tools},
+            tool_signatures={tool["name"]: _signature(tool) for tool in tools},
+            catalog_cards=cards,
+            works_today=_works_today(tools, cards, connectors),
+            roadmap_pending=roadmap_pending,
             formula_base=formula_base,
             formula_gap=formula_gap,
         )

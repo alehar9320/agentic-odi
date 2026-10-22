@@ -7,12 +7,23 @@ honest, and that nothing on it is a dead end.
 
 from __future__ import annotations
 
+import html as html_module
+import json
 import re
 
 import pytest
 
 import extract
-from conftest import CORE_MODELS_PY, all_pages, h1_text, read_page
+from conftest import (
+    CATALOG_TS,
+    CONTRACT_PY,
+    MCP_SERVER_PY,
+    CATALOG_PY,
+    CORE_MODELS_PY,
+    all_pages,
+    h1_text,
+    read_page,
+)
 
 PAGES_URL = "https://alehar9320.github.io/agentic-odi/"
 
@@ -30,6 +41,9 @@ ALLOWED_EXTERNAL_PREFIXES = (
     "https://github.com/jlowin/fastmcp",
     "https://strategyn.com/outcome-driven-innovation/",
     "https://pypi.org/project/",
+    # The local endpoints, which the site points developers at.
+    "http://localhost:8000/mcp",
+    "http://127.0.0.1:8100",
 )
 
 # The strings the site must carry. These are promises, not decoration.
@@ -117,8 +131,8 @@ def test_in_page_anchors_resolve(page: str):
 
 @pytest.mark.parametrize("page", all_pages())
 def test_no_third_party_requests(page: str):
-    html = read_page(page)
-    for url in re.findall(r'https?://[^"\')\s]+', html):
+    html = html_module.unescape(read_page(page))
+    for url in re.findall(r'https?://[^"\')\s<]+', html):
         assert url.startswith(ALLOWED_EXTERNAL_PREFIXES), f"{page}: unexpected {url}"
 
 
@@ -176,6 +190,165 @@ def test_the_formula_is_not_typed_into_the_content_file():
 
     content = (SITE / "content" / "landing.json").read_text(encoding="utf-8")
     assert "importance - satisfaction" not in content
+
+
+# ---------------------------------------------------------------- run & status
+
+
+def test_run_section_labels_every_hosted_surface():
+    html = read_page("index.html")
+    assert "http://localhost:8000/mcp" in html
+    assert "http://127.0.0.1:8100" in html
+    assert "agentic-odi.fastmcp.app/mcp" in html
+    assert "agentic-odi.alehar.workers.dev" in html
+    assert "horizon.prefect.io" in html
+    assert "requires a free prefect account" in html.lower()
+
+
+def test_the_run_section_has_install_tabs():
+    html = read_page("index.html")
+    assert 'role="tablist"' in html
+    assert 'role="tab"' in html
+    assert "install.sh" in html
+
+
+def test_the_status_section_publishes_no_dates():
+    html = read_page("index.html")
+    assert not re.search(r"\bQ[1-4]\b", html)
+    assert not re.search(
+        r"\b(January|February|March|April|May|June|July|August|September|October|November|December)\s+20\d\d",
+        html,
+    )
+
+
+def test_the_tools_section_peeks_at_the_tool_surface():
+    html = read_page("index.html")
+    assert "get_job_map" in html
+    assert "compute_opportunity" in html
+
+
+def test_the_tool_count_on_the_page_matches_the_contract():
+    tools = extract.read_tools(MCP_SERVER_PY, CONTRACT_PY)
+    text = re.sub(r"\s+", " ", _visible_text(read_page("index.html")))
+    assert f"See all {len(tools)} tools" in text
+
+
+def test_the_status_list_reports_what_ships():
+    text = re.sub(r"\s+", " ", _visible_text(read_page("index.html")))
+    tools = extract.read_tools(MCP_SERVER_PY, CONTRACT_PY)
+    connectors = extract.read_connectors(CATALOG_PY)
+    cards = extract.read_catalog_cards(CATALOG_TS)
+    assert f"{len(tools)} MCP tools" in text
+    assert f"{len(cards)} agent-composed surfaces" in text
+    assert f"{len(connectors)} connector presets" in text
+
+
+def test_the_landing_sections_are_in_the_designed_order():
+    html = read_page("index.html")
+    order = [
+        "top",
+        "studio",
+        "problem",
+        "insight",
+        "surfaces",
+        "how",
+        "connectors",
+        "run",
+        "tools",
+        "status",
+    ]
+    positions = [html.index(f'id="{anchor}"') for anchor in order]
+    assert positions == sorted(positions), "the landing sections are out of order"
+
+
+# ---------------------------------------------------------------- surfaces
+
+
+def test_surfaces_section_shows_all_six_catalog_cards():
+    html = read_page("index.html")
+    for card in (
+        "outcome-card",
+        "opportunity-board",
+        "impact-simulation",
+        "evidence-quote",
+        "job-map",
+        "decision-record",
+    ):
+        assert card in html
+
+
+def test_connectors_section_lists_every_preset():
+    presets = extract.read_connectors(CATALOG_PY)
+    html = read_page("index.html")
+    for preset in presets:
+        assert f'id="connector-{preset["id"]}"' in html
+
+
+def test_landing_never_names_a_canvas_view():
+    html = read_page("index.html").lower()
+    assert "opportunity landscape" not in html
+    assert "opportunity thesis" not in html
+
+
+def test_the_connector_count_on_the_page_matches_the_catalog():
+    presets = extract.read_connectors(CATALOG_PY)
+    text = re.sub(r"\s+", " ", _visible_text(read_page("index.html")))
+    assert f"{len(presets)} presets ship today" in text
+
+
+# ---------------------------------------------------------------- demo
+
+
+def test_demo_is_labeled_as_scripted():
+    html = read_page("index.html")
+    assert "scripted preview" in html.lower()
+
+
+def test_demo_transcript_is_server_rendered():
+    html = read_page("index.html")
+    # All three scripted exchanges are present in the static HTML, so a
+    # reader without JavaScript still sees the whole story.
+    for fragment in (
+        "reconcile invoices by hand",
+        "which of these should we build first",
+        "show me the job behind that",
+    ):
+        assert fragment in html.lower()
+
+
+def test_demo_controls_are_buttons():
+    html = read_page("index.html")
+    assert 'type="button"' in html
+    assert "demo__chip" in html
+    assert "<textarea" in html
+
+
+def test_demo_javascript_is_deferred_and_leaves_the_transcript_intact():
+    html = read_page("index.html")
+    tags = re.findall(r"<script[^>]*demo\.js[^>]*>", html)
+    assert tags, "demo.js is not loaded"
+    assert "defer" in tags[0], "demo.js must be deferred"
+    # The live panel starts hidden; the script is what reveals it.
+    assert "data-demo-live" in html
+    assert re.search(r"data-demo-live[^>]*hidden", html)
+
+
+def test_demo_scores_match_the_opportunity_formula():
+    from conftest import SITE
+
+    demo = json.loads((SITE / "content" / "demo.json").read_text(encoding="utf-8"))
+    for exchange in demo["exchanges"]:
+        card = exchange["card"]
+        if card["type"] == "outcome-card":
+            data = card["data"]
+            assert data["opportunity"] == data["importance"] + max(
+                data["importance"] - data["satisfaction"], 0
+            )
+        if card["type"] == "opportunity-board":
+            for row in card["data"]["outcomes"]:
+                assert row["opportunity"] == row["importance"] + max(
+                    row["importance"] - row["satisfaction"], 0
+                )
 
 
 # ---------------------------------------------------------------- metadata
