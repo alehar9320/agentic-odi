@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import build_site
 import pytest
-from conftest import DIST
+from site_support import DIST
 
 
 def _tree(root):

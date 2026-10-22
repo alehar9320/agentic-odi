@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 
 import extract
-from conftest import SITE, STUDIO_THEME
+from site_support import SITE, STUDIO_THEME
 
 STYLE = SITE / "assets" / "style.css"
 

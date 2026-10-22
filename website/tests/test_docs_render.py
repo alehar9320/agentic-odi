@@ -60,3 +60,25 @@ def test_the_rendered_guide_links_to_its_source():
     html = markdown_render.render("Prose.\n", source_path="docs/cli.md")
     assert "docs/cli.md" in html
     assert "https://github.com/alehar9320/agentic-odi/blob/main/docs/cli.md" in html
+
+
+def test_guide_links_resolve_to_the_rendered_pages():
+    html = markdown_render.render(
+        "See [the studio](living-studio.md#the-room).\n",
+        source_path="docs/local-llm.md",
+        link_map={"docs/living-studio.md": "docs/studio/index.html"},
+        page_path="docs/local-llm/index.html",
+    )
+    assert 'href="../studio/#the-room"' in html
+
+
+def test_unpublished_guides_link_back_to_the_repository():
+    html = markdown_render.render(
+        "See [data flow](data-flow.md).\n",
+        source_path="docs/architecture/README.md",
+        link_map={"docs/architecture/README.md": "docs/architecture/index.html"},
+        page_path="docs/architecture/index.html",
+    )
+    assert (
+        "https://github.com/alehar9320/agentic-odi/blob/main/docs/architecture/data-flow.md" in html
+    )

@@ -12,6 +12,7 @@ so highlighting costs no client-side JavaScript.
 
 from __future__ import annotations
 
+import posixpath
 import re
 from pathlib import Path
 from typing import Any
@@ -110,9 +111,62 @@ def slugify(text: str) -> str:
     return re.sub(r"[\s_]+", "-", anchor).strip("-")
 
 
-def render(md: str, *, source_path: str | None = None) -> str:
+def _rewrite_links(
+    html: str,
+    *,
+    source_path: str,
+    link_map: dict[str, str],
+    page_path: str,
+) -> str:
+    """Point a guide's relative links at the site, or at GitHub.
+
+    The guides are written for the repository, so they link to ``.md`` files.
+    On the site those files are pages under a different URL. Resolve the
+    link relative to the guide that contains it, map it to the rendered page
+    when one exists, and fall back to the repository for guides the site does
+    not publish. Absolute links and in-page anchors are left alone.
+    """
+    source_dir = posixpath.dirname(source_path)
+    page_dir = posixpath.dirname(page_path)
+
+    def replace(match: re.Match[str]) -> str:
+        href = match.group(1)
+        if re.match(r"^(?:[a-z][a-z0-9+.-]*:|//|#)", href, re.IGNORECASE):
+            return match.group(0)
+
+        target, _, fragment = href.partition("#")
+        target = target.split("?", 1)[0]
+        resolved = posixpath.normpath(posixpath.join(source_dir, target))
+        suffix = f"#{fragment}" if fragment else ""
+
+        if resolved in link_map:
+            destination = posixpath.relpath(link_map[resolved], page_dir)
+            if destination.endswith("index.html"):
+                destination = destination[: -len("index.html")]
+            return f'href="{destination}{suffix}"'
+
+        return f'href="{REPO_URL}/{resolved}{suffix}"'
+
+    return re.sub(r'href="([^"]+)"', replace, html)
+
+
+def render(
+    md: str,
+    *,
+    source_path: str | None = None,
+    link_map: dict[str, str] | None = None,
+    page_path: str | None = None,
+) -> str:
     """A guide's prose, as HTML, with a link back to its source."""
     html = _MARKDOWN.render(md)
+
+    if source_path and link_map is not None and page_path is not None:
+        html = _rewrite_links(
+            html,
+            source_path=source_path,
+            link_map=link_map,
+            page_path=page_path,
+        )
 
     if source_path:
         html += (

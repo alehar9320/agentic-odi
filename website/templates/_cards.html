@@ -1,5 +1,5 @@
 {#
-  The six ODI cards the agent may compose, rendered as the shipped catalog
+  The seven ODI cards the agent may compose, rendered as the shipped catalog
   renders them. These are the agent's closed catalog — a stable contract —
   not the Studio's canvas view names, which are in flux.
 #}
@@ -103,6 +103,19 @@
 </article>
 {% endmacro %}
 
+{% macro opportunity_thesis(data) %}
+<article class="surface" data-surface="opportunity-thesis">
+  <div class="surface__head">
+    <span class="surface__id">Opportunity</span>
+    <span class="pill pill--accent">Gap {{ data.importance - data.satisfaction }}</span>
+  </div>
+  <p class="surface__statement">{{ data.title }}</p>
+  <p class="evidence__meta">{{ data.gap }}</p>
+  <p class="surface__statement">{{ data.thesis }}</p>
+  <p class="surface__scores">Next move: {{ data.next_move }}</p>
+</article>
+{% endmacro %}
+
 {% macro decision_record(data) %}
 <article class="surface" data-surface="decision-record">
   <div class="surface__head">
@@ -125,6 +138,7 @@
   {% elif card.type == "job-map" %}{{ job_map(card.data) }}
   {% elif card.type == "impact-simulation" %}{{ impact_simulation(card.data) }}
   {% elif card.type == "evidence-quote" %}{{ evidence_quote(card.data) }}
+  {% elif card.type == "opportunity-thesis" %}{{ opportunity_thesis(card.data) }}
   {% elif card.type == "decision-record" %}{{ decision_record(card.data) }}
   {% endif %}
 {% endmacro %}

@@ -130,6 +130,7 @@ SPA never contacts MCP or the LLM directly.</p>
 │  (browser or Tauri webview)│ ◀──────────── │  - config / health / canvas   │
 └────────────────────────────┘  SSE stream   │  - steps / outcomes (via MCP) │
                                              │  - /api/chat (LLM tool-loop)  │
+                                             │  - conversations + PM memory  │
                                              └───────────────┬───────────────┘
                                                              │ MCP (HTTP)
                                                              ▼
@@ -153,7 +154,7 @@ SPA never contacts MCP or the LLM directly.</p>
 <tbody>
 <tr>
 <td><strong>First-run tour</strong></td>
-<td>A four-step, skippable welcome on the very first visit: what the studio is, which of four starting points you want, the live state of your sidecar/MCP/model (with inline repair when the model is down), and the first move. Finishing opens the chosen surface; <strong>Name the job</strong> hands off to the context conversation. Replay it from <strong>Settings → Replay the welcome tour</strong>.</td>
+<td>A four-step, skippable welcome on the very first visit: what the studio is, which ambition brought you here, the live state of your sidecar/MCP/model (with inline repair when the model is down), and the first move. The four doors are <strong>I have one in mind</strong>, <strong>My boss handed me a priority</strong>, <strong>Help me find the next one</strong>, and <strong>Pressure-test a bet</strong>; each starts the matching conversation. Replay it from <strong>Settings → Replay the welcome tour</strong>.</td>
 </tr>
 <tr>
 <td><strong>First run</strong></td>
@@ -161,11 +162,11 @@ SPA never contacts MCP or the LLM directly.</p>
 </tr>
 <tr>
 <td><strong>Hero</strong></td>
-<td>One rotating headline above the composer: a greeting (time of day, plus your name if you set one in Settings), the product/job you set up, what is already on the canvas, or what the studio can do. It cycles every few seconds and stays still under <code>prefers-reduced-motion</code>.</td>
+<td>One rotating headline above the composer: a greeting (time of day, plus your name if you set one in Settings), the product/job you set up, what is already on the canvas, or an intent-first prompt such as <em>What are you trying to win this quarter?</em> It cycles every few seconds and stays still under <code>prefers-reduced-motion</code>.</td>
 </tr>
 <tr>
 <td><strong>Suggestion pills</strong></td>
-<td>Below the headline. Some start a conversation (define a job, simulate a bet, capture what a customer said), others open a lens (landscape, job map). They change as the canvas fills up.</td>
+<td>Below the headline. <strong>Sharpen an opportunity</strong> always starts a conversation; the next pill becomes <strong>Pressure-test a bet</strong> once outcomes exist, or <strong>Find the next opportunity</strong> before that. <strong>Capture what you heard</strong> replaces the landscape pill once a job exists. They change as the canvas fills up.</td>
 </tr>
 <tr>
 <td><strong>Composer</strong></td>
@@ -177,7 +178,7 @@ SPA never contacts MCP or the LLM directly.</p>
 </tr>
 <tr>
 <td><strong>Rail</strong></td>
-<td>Above the conversation, and only once the thread has produced something: <code>Landscape · N</code>, <code>Job map · N</code>, <code>Evidence · N</code>. Every item is derived from the canvas, so the strip is a record of the work rather than a fixed menu.</td>
+<td>Above the conversation, and only once the thread has produced something: <code>Landscape · N</code>, <code>Job map · N</code>, <code>Evidence · N</code>, <code>What I know · N</code>. Every item is derived from the canvas and the memory, so the strip is a record of the work rather than a fixed menu.</td>
 </tr>
 <tr>
 <td><strong>Lens</strong></td>
@@ -342,15 +343,113 @@ doing the work.</p>
 <p>That is also enforced in the agent's system prompt: it is told to keep every
 artifact in the conversation, never to send the PM to a panel, and to end each
 reply with the next move as an action on the surface.</p>
+<h3 id="what-it-remembers">What it remembers</h3>
+<p>The studio keeps a small, local, editable model of the person it is helping. It
+is not a profile and not a transcript index; it is the handful of things that
+change the next answer.</p>
+<table>
+<thead>
+<tr>
+<th>Kind</th>
+<th>What it captures</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>career</code></td>
+<td>The PM's role, remit, and what success looks like for them</td>
+</tr>
+<tr>
+<td><code>opportunity</code></td>
+<td>The opportunity or bet currently in play</td>
+</tr>
+<tr>
+<td><code>business</code></td>
+<td>Goals, metrics, and commercial constraints</td>
+</tr>
+<tr>
+<td><code>stakeholder</code></td>
+<td>Who else matters and what they care about</td>
+</tr>
+<tr>
+<td><code>constraint</code></td>
+<td>Time, budget, policy, or technical limits</td>
+</tr>
+<tr>
+<td><code>evidence</code></td>
+<td>What has actually been heard or measured</td>
+</tr>
+<tr>
+<td><code>preference</code></td>
+<td>How the PM likes to work and be spoken to</td>
+</tr>
+</tbody>
+</table>
+<p>Each note is <code>suggested</code> or <code>confirmed</code>. Suggested notes appear first under
+<strong>What I know</strong> with <strong>Yes, that's right</strong>, <strong>That's not it</strong>, and <strong>Edit</strong>;
+confirmed notes can be edited or forgotten. The PM can also add a note by hand.
+Nothing is silently promoted: the agent may propose, but the person decides.</p>
+<p>The agent writes notes through a <code>remember</code> tool during a normal reply. The
+sidecar applies it, emits a <code>memory</code> SSE event, and the panel updates without a
+refresh. Memory writes are best-effort — a database failure never turns a good
+answer into an error.</p>
+<p>Storage is a separate SQLite file from the ODI repository:
+<code>~/.agentic-odi/studio.db</code>, overridable with <code>AGENTIC_ODI_STUDIO_DB</code>
+(<code>:memory:</code> is supported and is what the tests use). The API is small:</p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Path</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>GET</code></td>
+<td><code>/api/memory/observations</code></td>
+<td>Everything the agent believes</td>
+</tr>
+<tr>
+<td><code>POST</code></td>
+<td><code>/api/memory/observations</code></td>
+<td>Add a note by hand</td>
+</tr>
+<tr>
+<td><code>PATCH</code></td>
+<td><code>/api/memory/observations/{id}</code></td>
+<td>Edit text, confidence, or status</td>
+</tr>
+<tr>
+<td><code>DELETE</code></td>
+<td><code>/api/memory/observations/{id}</code></td>
+<td>Forget one note</td>
+</tr>
+<tr>
+<td><code>DELETE</code></td>
+<td><code>/api/memory</code></td>
+<td>Forget all notes and conversations</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Forget everything</strong> is a two-step confirmation and also clears the visible
+thread, because the server deletes the conversations behind it.</p>
+<h3 id="the-thread-comes-back">The thread comes back</h3>
+<p>Conversations are stored beside the memory. On launch the SPA asks
+<code>GET /api/conversations/latest</code>, restores that thread's user and assistant
+turns, and continues with the same <code>conversation_id</code> on the next message. <strong>New
+conversation</strong> starts a fresh one without touching the memory; <strong>Forget
+everything</strong> removes both. The composer stays usable while the restore is in
+flight, and a restore failure simply leaves the room empty.</p>
 <h2 id="rich-responses">Rich responses</h2>
 <p>The copilot does not only talk. When a surface carries the evidence better than a
 paragraph, the agent renders one <strong>inline in the conversation</strong>: a scored
 outcome, a ranked opportunity board, a before/after simulation of a bet, a
-customer quote with its lineage, the eight-stage job map, or a decision record.
+customer quote with its lineage, the eight-stage job map, an opportunity thesis, or a decision record.
 Three properties keep this safe and cheap to extend:</p>
 <ul>
 <li><strong>The catalog is closed and owned by the SPA.</strong>
-<code>apps/studio/src/ui/catalog.ts</code> declares nine primitives and six cards, their
+<code>apps/studio/src/ui/catalog.ts</code> declares nine primitives and seven cards, their
 JSON Schema props, and the description the model reads. There is no HTML, no
 eval, and no third-party component in the path. Prose is rendered by the same
 <code>Markdown</code> component the transcript already used.</li>
@@ -373,7 +472,11 @@ agent receives as the user's next message — one authority, one audit trail.</l
 <span class="w">    </span><span class="nt">"satisfaction"</span><span class="p">:</span><span class="w"> </span><span class="mi">3</span>
 <span class="w">  </span><span class="p">}</span>
 <span class="p">}</span>
-</code></pre><p>The conversation keeps the order the agent produced: a <code>delta</code> appends to the
+</code></pre><p>The opportunity thesis is the intent-first card: one opportunity with its
+importance, satisfaction, the gap in plain words, the thesis itself, and the
+smallest next move. It is the shape the agent reaches for when the PM is deciding
+what to chase, rather than when they are inspecting a single score.</p>
+<p>The conversation keeps the order the agent produced: a <code>delta</code> appends to the
 open prose part, a <code>ui</code> event opens a card, and the next <code>delta</code> opens a new
 paragraph after it. The opportunity score is computed from importance and
 satisfaction when the agent omits it, so the ODI formula has exactly one home
@@ -395,7 +498,7 @@ catalog and the registry drift apart.</li>
 <strong><a href="https://agentic-odi.alehar.workers.dev/">https://agentic-odi.alehar.workers.dev/</a></strong>.
 The UI loads without a backend; canvas data, chat, and mutations need the local
 sidecar and MCP server. Pull requests get preview URLs from Cloudflare Workers
-Builds. See <a href="deployment.md">Deployment</a> for the Worker setup.</p>
+Builds. See <a href="../deployment/">Deployment</a> for the Worker setup.</p>
 <h2 id="1-web-production-build-recommended-for-a-quick-look">1. Web — production build (recommended for a quick look)</h2>
 <pre class="highlight"><code class="language-bash">npm<span class="w"> </span>--prefix<span class="w"> </span>apps/studio<span class="w"> </span>run<span class="w"> </span>build<span class="w">   </span><span class="c1"># build the SPA into apps/studio/dist</span>
 python<span class="w"> </span>scripts/dev.py<span class="w">            </span><span class="c1"># starts MCP :8000 + sidecar :8100</span>
@@ -548,7 +651,7 @@ variable names, the demo dataset, and the ODI formulas are unchanged.</p>
 <h2 id="connecting-an-llm">Connecting an LLM</h2>
 <p>The Studio needs an OpenAI-compatible LLM backend with tool-calling support to
 drive the agent. For a fully local setup, see
-<a href="local-llm.md">Local LLM Backend</a>.</p>
+<a href="../local-llm/">Local LLM Backend</a>.</p>
 <h2 id="agent-driven-testing">Agent-Driven Testing</h2>
 <p>Type <code>/dev</code> in the AI assistant to trigger the full automated workflow: it starts
 both processes, opens the browser, sends a test message, and reports the results.</p>
@@ -581,6 +684,12 @@ automatically.</p>
         </li>
         <li class="doc__toc-item doc__toc-item--3">
           <a href="#the-thread-is-the-room">The thread is the room</a>
+        </li>
+        <li class="doc__toc-item doc__toc-item--3">
+          <a href="#what-it-remembers">What it remembers</a>
+        </li>
+        <li class="doc__toc-item doc__toc-item--3">
+          <a href="#the-thread-comes-back">The thread comes back</a>
         </li>
         <li class="doc__toc-item doc__toc-item--2">
           <a href="#rich-responses">Rich responses</a>

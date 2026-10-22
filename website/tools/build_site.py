@@ -177,6 +177,7 @@ def _guide_body(
     env: Environment,
     guide: dict[str, Any],
     context: dict[str, Any],
+    link_map: dict[str, str],
 ) -> tuple[str, list[dict[str, str]], str | None]:
     """A guide's rendered body, its table of contents, and its own title.
 
@@ -202,7 +203,12 @@ def _guide_body(
     if not path.is_file():
         raise FileNotFoundError(f"the guide {source} does not exist")
     raw, title = markdown_render.take_title(path.read_text(encoding="utf-8"))
-    body = markdown_render.render(raw, source_path=source)
+    body = markdown_render.render(
+        raw,
+        source_path=source,
+        link_map=link_map,
+        page_path=f"docs/{slug}/index.html",
+    )
     return body, markdown_render.headings(body), title
 
 
@@ -210,6 +216,11 @@ def _render_docs(env: Environment, nav: dict[str, Any], context: dict[str, Any])
     """Every docs page, keyed by its path relative to the site root."""
     guides = _flat_guides(nav)
     rendered: dict[str, str] = {}
+    link_map = {
+        guide["source"]: f"docs/{guide['slug']}/index.html"
+        for _, guide in guides
+        if guide.get("source")
+    }
 
     for index, (group, guide) in enumerate(guides):
         slug = guide["slug"]
@@ -227,7 +238,7 @@ def _render_docs(env: Environment, nav: dict[str, Any], context: dict[str, Any])
             "previous": guides[index - 1][1] if index else None,
             "next": guides[index + 1][1] if index + 1 < len(guides) else None,
         }
-        body, toc, own_title = _guide_body(env, guide, page_context)
+        body, toc, own_title = _guide_body(env, guide, page_context, link_map)
         if own_title:
             # The guide's own top-level heading is its title.
             page_context["page"]["title"] = own_title

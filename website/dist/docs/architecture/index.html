@@ -147,6 +147,9 @@ apps/cli ──────────────▶ packages/connectors
 <ul>
 <li><code>SQLiteRepository</code> is the production default for the CLI, MCP server, and Studio API.</li>
 <li>The default database is <code>~/.agentic-odi/odi.db</code>, overridable with <code>AGENTIC_ODI_DB</code>.</li>
+<li>Studio conversation history and PM memory use a separate SQLite database,
+<code>~/.agentic-odi/studio.db</code>, overridable with <code>AGENTIC_ODI_STUDIO_DB</code>. They are
+sidecar-local and never enter the ODI repository or the MCP contract.</li>
 <li><code>build_repository()</code> chooses SQLite by default and <code>InMemoryRepository</code> when <code>AGENTIC_ODI_DB=:memory:</code>, which is what tests use.</li>
 <li>The CLI selects its backend with <code>--backend local|mcp</code> or <code>AGENTIC_ODI_BACKEND</code>.</li>
 <li>The Studio API selects <code>local</code> (direct service calls) or <code>mcp</code> (passthrough) with <code>AGENTIC_ODI_BACKEND</code> or <code>create_app(backend=...)</code>.</li>
@@ -182,8 +185,8 @@ apps/cli ──────────────▶ packages/connectors
 </table>
 <h2 id="related">Related</h2>
 <ul>
-<li><a href="data-flow.md">Data flow</a></li>
-<li><a href="testing.md">Testing</a></li>
+<li><a href="https://github.com/alehar9320/agentic-odi/blob/main/docs/architecture/data-flow.md">Data flow</a></li>
+<li><a href="https://github.com/alehar9320/agentic-odi/blob/main/docs/architecture/testing.md">Testing</a></li>
 </ul>
 
 <p class="prose__source">Source of truth: <code>docs/architecture/README.md</code> &mdash; <a href="https://github.com/alehar9320/agentic-odi/blob/main/docs/architecture/README.md">view on GitHub</a></p>

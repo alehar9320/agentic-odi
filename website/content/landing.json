@@ -3,7 +3,7 @@
     "id": "top",
     "eyebrow": "Experimental",
     "title": "Your roadmap is a guess.",
-    "sub": "An MCP server that hands your agents verified customer outcomes — and the evidence behind them.",
+    "sub": "An MCP server that hands your agents verified customer outcomes \u2014 and the evidence behind them.",
     "primary": {
       "label": "Run it in 60 seconds",
       "href": "#run"
@@ -54,7 +54,7 @@
     "id": "surfaces",
     "eyebrow": "The surfaces",
     "title": "The agent composes, it does not describe.",
-    "blurb": "The studio answers with a card from a closed catalog, rendered inline in the conversation. Six shapes, each one a thing you can act on.",
+    "blurb": "The studio answers with a card from a closed catalog, rendered inline in the conversation. Seven shapes, each one a thing you can act on.",
     "cards": [
       {
         "type": "outcome-card",
@@ -142,6 +142,19 @@
         }
       },
       {
+        "type": "opportunity-thesis",
+        "title": "Thesis",
+        "blurb": "One opportunity argued in plain language: the scores, the gap, the thesis, and the next move.",
+        "data": {
+          "title": "Reconcile invoices without manual effort",
+          "importance": 8,
+          "satisfaction": 3,
+          "gap": "Finance leads spend two hours a week matching lines by hand.",
+          "thesis": "The work is not the matching. It is the exceptions nobody has time to chase.",
+          "next_move": "Run a one-week pilot with the three highest-volume vendors."
+        }
+      },
+      {
         "type": "decision-record",
         "title": "Decision",
         "blurb": "What was decided, and the evidence it rests on.",
@@ -160,7 +173,7 @@
     "steps": [
       {
         "title": "Talk",
-        "body": "One room. Describe a job, or paste what a customer said. The studio captures jobs, steps, and desired outcomes from plain language — and every score stays editable by hand."
+        "body": "One room. Describe a job, or paste what a customer said. The studio captures jobs, steps, and desired outcomes from plain language \u2014 and every score stays editable by hand."
       },
       {
         "title": "Ask",

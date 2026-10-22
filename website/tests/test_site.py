@@ -13,12 +13,13 @@ import re
 
 import extract
 import pytest
-from conftest import (
+from site_support import (
     CATALOG_PY,
     CATALOG_TS,
     CONTRACT_PY,
     CORE_MODELS_PY,
     MCP_SERVER_PY,
+    _built_root,
     all_pages,
     h1_text,
     read_page,
@@ -223,7 +224,7 @@ def test_the_rendered_formula_is_generated_from_the_core_source():
 
 
 def test_the_formula_is_not_typed_into_the_content_file():
-    from conftest import SITE
+    from site_support import SITE
 
     content = (SITE / "content" / "landing.json").read_text(encoding="utf-8")
     assert "importance - satisfaction" not in content
@@ -301,7 +302,7 @@ def test_the_landing_sections_are_in_the_designed_order():
 # ---------------------------------------------------------------- surfaces
 
 
-def test_surfaces_section_shows_all_six_catalog_cards():
+def test_surfaces_section_shows_every_catalog_card():
     html = read_page("index.html")
     for card in (
         "outcome-card",
@@ -309,6 +310,7 @@ def test_surfaces_section_shows_all_six_catalog_cards():
         "impact-simulation",
         "evidence-quote",
         "job-map",
+        "opportunity-thesis",
         "decision-record",
     ):
         assert card in html
@@ -371,7 +373,7 @@ def test_demo_javascript_is_deferred_and_leaves_the_transcript_intact():
 
 
 def test_demo_scores_match_the_opportunity_formula():
-    from conftest import SITE
+    from site_support import SITE
 
     demo = json.loads((SITE / "content" / "demo.json").read_text(encoding="utf-8"))
     for exchange in demo["exchanges"]:
@@ -457,3 +459,24 @@ def test_the_404_page_is_self_contained():
     assert "<link" not in html
     assert "<script" not in html
     assert "<img" not in html
+
+
+# ---------------------------------------------------------------- weight & links
+
+
+@pytest.mark.parametrize("page", all_pages())
+def test_every_page_resolves_its_own_assets(page: str):
+    html = read_page(page)
+    for ref in re.findall(r'(?:src|href)="((?!https?:|#|mailto:)[^"]+)"', html):
+        if ref.endswith((".html", "/")):
+            continue
+        target = ref.split("#", 1)[0].split("?", 1)[0]
+        assert _built_root(page).parent.joinpath(target).resolve().is_file(), (
+            f"{page}: {ref} does not resolve"
+        )
+
+
+@pytest.mark.parametrize("page", all_pages())
+def test_page_weights_are_within_budget(page: str):
+    size = _built_root(page).stat().st_size
+    assert size <= 60 * 1024, f"{page}: {size} bytes"

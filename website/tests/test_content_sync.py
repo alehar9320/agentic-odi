@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 
 import extract
-from conftest import (
+from site_support import (
     CATALOG_PY,
     CATALOG_TS,
     CLI_PY,
