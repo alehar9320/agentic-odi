@@ -1,0 +1,50 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M5HPJF3YJNJVPQ90FJF7A9KJ",
+  "session_id": "ses_ea010d520ffey3MEP7OOljNz5r",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-22T11:40:25.346295209Z",
+  "branch": "feat/intent-first-pm-experience",
+  "checkpoints_count": 1,
+  "save_step_count": 1,
+  "files_touched": [
+    "pyproject.toml"
+  ],
+  "agent": "OpenCode",
+  "model": "minimax-m3.1-flash",
+  "turn_id": "02b8a4265cd9",
+  "checkpoint_transcript_start": 212,
+  "transcript_lines_at_start": 212,
+  "compact_transcript_start": 212,
+  "token_usage": {
+    "input_tokens": 327636,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 1933434,
+    "output_tokens": 25430,
+    "api_call_count": 7
+  },
+  "session_metrics": {
+    "turn_count": 3
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-10-22T11:40:25.085998093Z",
+    "agent_lines": 39,
+    "agent_removed": 4,
+    "human_added": 2,
+    "human_modified": 3,
+    "human_removed": 0,
+    "total_committed": 44,
+    "total_lines_changed": 49,
+    "agent_percentage": 87.75510204081633,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0
+    }
+  ]
+}
