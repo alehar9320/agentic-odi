@@ -20,6 +20,9 @@ const studio = vi.hoisted(() => ({
     source: "seed" as const,
   },
   canvasLoading: false,
+  canvasState: { kind: "ready", data: null } as unknown,
+  canvasError: null,
+  refreshCanvas: vi.fn(),
 }));
 
 vi.mock("../../state/StudioContext", () => ({
@@ -33,6 +36,23 @@ describe("WorkspacePanel", () => {
     studio.activePanel = "landscape";
     studio.closePanel.mockClear();
     studio.sendMessage.mockClear();
+    studio.canvasState = {
+      kind: "ready",
+      data: {
+        jobs: [],
+        steps: [],
+        outcomes: [
+          {
+            id: "O-1",
+            statement: "Minimize the time it takes to ship",
+            importance: 9,
+            satisfaction: 3,
+            opportunity_score: 15,
+          },
+        ],
+        source: "seed",
+      },
+    } as unknown;
   });
 
   it("renders the view as a lens, not a takeover", () => {

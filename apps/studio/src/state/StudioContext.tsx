@@ -46,6 +46,7 @@ import type {
   AddOutcomePayload,
   AddStepPayload,
   CanvasData,
+  CanvasState,
   ChatMessage,
   ChatPart,
   ConnectorListItem,
@@ -167,6 +168,10 @@ export interface StudioContextValue {
   canvas: CanvasData | null;
   canvasLoading: boolean;
   canvasCached: boolean;
+  /** What the canvas is: loading, ready, empty, or failed. */
+  canvasState: CanvasState;
+  /** The failure behind `canvasState.kind === "error"`, if any. */
+  canvasError: StudioError | null;
   refreshCanvas: () => Promise<void>;
   llmHealth: { healthy: boolean | null; message: string };
   mcpReachable: boolean;
@@ -313,8 +318,10 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     () => loadBrief() === null && !loadSetupDismissed(),
   );
   const [offlineReply, setOfflineReply] = useState(false);
-  const [canvas, setCanvas] = useState<CanvasData | null>(loadCanvasCache);
-  const [canvasLoading, setCanvasLoading] = useState(false);
+  const [canvasState, setCanvasState] = useState<CanvasState>(() => {
+    const cached = loadCanvasCache();
+    return cached ? { kind: "loading", data: cached } : { kind: "loading", data: null };
+  });
   const [canvasCached, setCanvasCached] = useState(() => loadCanvasCache() !== null);
   const [llmHealth, setLlmHealth] = useState<{ healthy: boolean | null; message: string }>({
     healthy: null,
@@ -562,10 +569,11 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   );
 
   const refreshCanvas = useCallback(async () => {
-    setCanvasLoading(true);
+    setCanvasState((prev) => ({ kind: "loading", data: prev.data }));
     try {
       const data = await fetchCanvas(settings.mcp_url);
-      setCanvas(data);
+      const isEmpty = !data.jobs.length && !data.steps.length && !data.outcomes.length;
+      setCanvasState({ kind: isEmpty ? "empty" : "ready", data });
       setCanvasCached(false);
       try {
         localStorage.setItem(CANVAS_KEY, JSON.stringify(data));
@@ -573,11 +581,12 @@ export function StudioProvider({ children }: { children: ReactNode }) {
         /* storage unavailable */
       }
     } catch (error) {
-      pushToast("error", `Canvas sync failed: ${(error as Error).message}`);
-    } finally {
-      setCanvasLoading(false);
+      // A failed canvas is a failure, not an empty canvas: the studio shows
+      // what went wrong instead of a zeroed-out board.
+      const problem = asStudioError(error);
+      setCanvasState((prev) => ({ kind: "error", error: problem, data: prev.data }));
     }
-  }, [settings.mcp_url, pushToast]);
+  }, [settings.mcp_url]);
 
   const addStep = useCallback(
     async (payload: Omit<AddStepPayload, "mcp_url">) => {
@@ -1106,6 +1115,12 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     };
   }, [checkConnections]);
 
+  // The canvas is one state, not four booleans: an empty board and a failed
+  // board must never look the same.
+  const canvas = canvasState.data;
+  const canvasLoading = canvasState.kind === "loading";
+  const canvasError = canvasState.kind === "error" ? canvasState.error : null;
+
   const value = useMemo<StudioContextValue>(
     () => ({
       settings,
@@ -1120,6 +1135,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       canvas,
       canvasLoading,
       canvasCached,
+      canvasState,
+      canvasError,
       refreshCanvas,
       llmHealth,
       mcpReachable,
@@ -1187,6 +1204,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       canvas,
       canvasLoading,
       canvasCached,
+      canvasState,
+      canvasError,
       refreshCanvas,
       llmHealth,
       mcpReachable,

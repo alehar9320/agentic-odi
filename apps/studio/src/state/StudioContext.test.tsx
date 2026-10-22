@@ -45,6 +45,7 @@ const DEFAULT_CHAT_STREAM =
   'event: message\ndata: {"content":"Hi"}\n\n';
 
 let chatStream: string | null = null;
+let canvasFails = false;
 let chatFailure: Error | null = null;
 let connectorFetches = 0;
 let llmHealthFetches = 0;
@@ -65,6 +66,12 @@ function route(input: RequestInfo | URL, init?: RequestInit): Response {
     });
   }
   if (url.startsWith("/api/canvas")) {
+    if (canvasFails) {
+      return new Response(JSON.stringify({ error: { code: "mcp_unreachable", message: "The MCP server is unreachable.", retryable: true } }), {
+        status: 502,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
     return json({ jobs: [], steps: [], outcomes: [], source: "local" });
   }
   if (url === "/api/connectors/catalog") {
@@ -124,6 +131,7 @@ describe("StudioContext memory and resume", () => {
     chatBody = null;
     chatStream = null;
     chatFailure = null;
+    canvasFails = false;
     connectorFetches = 0;
     llmHealthFetches = 0;
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
@@ -177,6 +185,7 @@ describe("StudioContext failures", () => {
     chatBody = null;
     chatStream = null;
     chatFailure = null;
+    canvasFails = false;
     connectorFetches = 0;
     llmHealthFetches = 0;
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
@@ -253,6 +262,7 @@ describe("StudioContext health polling", () => {
     chatBody = null;
     chatStream = null;
     chatFailure = null;
+    canvasFails = false;
     connectorFetches = 0;
     llmHealthFetches = 0;
     vi.useFakeTimers();
@@ -282,5 +292,38 @@ describe("StudioContext health polling", () => {
     });
     expect(llmHealthFetches).toBeGreaterThan(afterInterval);
     expect(result.current.llmHealth.healthy).toBe(true);
+  });
+});
+
+describe("StudioContext canvas state", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    chatBody = null;
+    chatStream = null;
+    chatFailure = null;
+    canvasFails = false;
+    connectorFetches = 0;
+    llmHealthFetches = 0;
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("reports a failed canvas as an error state, not as an empty canvas", async () => {
+    canvasFails = true;
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+
+    await waitFor(() => expect(result.current.canvasState.kind).toBe("error"));
+    expect(result.current.canvasError?.code).toBe("mcp_unreachable");
+    expect(result.current.canvasLoading).toBe(false);
+  });
+
+  it("reports a canvas with no work as empty, not as ready", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+
+    await waitFor(() => expect(result.current.canvasState.kind).toBe("empty"));
+    expect(result.current.canvasError).toBeNull();
   });
 });

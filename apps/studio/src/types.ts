@@ -32,6 +32,17 @@ export interface CanvasData {
 }
 
 /**
+ * What the canvas currently is. A union, not four booleans: "no work yet" and
+ * "the fetch failed" look identical if you only track emptiness, and a failed
+ * canvas must never render as an empty one.
+ */
+export type CanvasState =
+  | { kind: "loading"; data: CanvasData | null }
+  | { kind: "ready"; data: CanvasData }
+  | { kind: "empty"; data: CanvasData }
+  | { kind: "error"; error: StudioError; data: CanvasData | null };
+
+/**
  * The one failure shape the sidecar reports. Every HTTP error arrives as
  * `{"error": StudioError}`, so the UI can show what went wrong, what to do
  * about it, and whether a retry is worth trying.

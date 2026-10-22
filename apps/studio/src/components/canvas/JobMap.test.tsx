@@ -15,8 +15,8 @@ const mockCanvasData = {
 
 vi.mock("../../state/StudioContext", () => ({
   useStudio: () => ({
-    canvas: mockCanvasData,
-    canvasLoading: false,
+    canvasState: { kind: "ready", data: mockCanvasData },
+    refreshCanvas: vi.fn(),
     addStep: vi.fn(),
   }),
 }));

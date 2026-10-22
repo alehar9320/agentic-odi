@@ -24,11 +24,11 @@ export function FailurePanel({
         </details>
       ) : null}
       {error.suggestion ? <p className="failure__suggestion">{error.suggestion}</p> : null}
-      {onRetry && retryText ? (
+      {onRetry ? (
         <button
           type="button"
           className="quiet-action failure__retry"
-          onClick={() => onRetry(retryText)}
+          onClick={() => onRetry(retryText ?? "")}
         >
           Retry
         </button>

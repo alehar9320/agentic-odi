@@ -1779,6 +1779,29 @@ input[type="range"] {
   backdrop-filter: blur(8px);
 }
 
+/* An empty canvas is an invitation, not a board of zeroes. */
+.studio-empty {
+  margin-top: 16px;
+  padding: 28px 20px;
+  text-align: center;
+  background: var(--studio-surface);
+  border: 1px solid var(--studio-border);
+  border-radius: 10px;
+}
+
+.studio-empty__title {
+  margin: 0;
+  color: var(--studio-text);
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.studio-empty__body {
+  margin: 6px 0 0;
+  color: var(--studio-muted);
+  font-size: 0.8rem;
+}
+
 /* Custom scrollbar for data density tables */
 ::-webkit-scrollbar {
   width: 8px;
