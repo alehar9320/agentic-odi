@@ -1,0 +1,43 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M5JJ4XYZ1S9Z5P6VZN3Z82CZ",
+  "session_id": "ses_e9b0497bbffeCryvobfxXQjsNj",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-22T19:42:15.209729349Z",
+  "branch": "feature/posthog-analytics",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "apps/studio-api/src/agentic_odi_studio_api/app.py",
+    "apps/studio-api/src/agentic_odi_studio_api/posthog_analytics.py",
+    "apps/studio-api/src/agentic_odi_studio_api/studio/router.py",
+    "apps/studio-api/tests/test_posthog_integration.py"
+  ],
+  "agent": "OpenCode",
+  "model": "minimax-m3.1-flash",
+  "turn_id": "631816e4d2d9",
+  "checkpoint_transcript_start": 130,
+  "transcript_lines_at_start": 130,
+  "compact_transcript_start": 130,
+  "token_usage": {
+    "input_tokens": 2492,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 2547731,
+    "output_tokens": 5953,
+    "api_call_count": 15
+  },
+  "session_metrics": {
+    "turn_count": 1
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-10-22T19:42:15.074824299Z",
+    "agent_lines": 133,
+    "agent_removed": 5,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 133,
+    "total_lines_changed": 138,
+    "agent_percentage": 100,
+    "metric_version": 2
+  }
+}
