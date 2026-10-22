@@ -3,7 +3,7 @@
   "checkpoint_id": "01M5HZHHBYF0GVCM34JBWQ7NMG",
   "strategy": "manual-commit",
   "branch": "feat/odi-mascot",
-  "checkpoints_count": 8,
+  "checkpoints_count": 9,
   "files_touched": [
     "apps/studio/src-tauri/icons/128x128.png",
     "apps/studio/src-tauri/icons/128x128@2x.png",
@@ -78,6 +78,13 @@
       "transcript": "/7/full.jsonl",
       "compact_transcript": "/7/transcript.jsonl",
       "content_hash": "/7/content_hash.txt",
+      "prompt": ""
+    },
+    {
+      "metadata": "/8/metadata.json",
+      "transcript": "/8/full.jsonl",
+      "compact_transcript": "/8/transcript.jsonl",
+      "content_hash": "/8/content_hash.txt",
       "prompt": ""
     }
   ],
