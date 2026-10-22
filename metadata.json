@@ -3,7 +3,7 @@
   "checkpoint_id": "01M5JMFHM15HQHVRWKPT6YJKG4",
   "strategy": "manual-commit",
   "branch": "feat/issue-111-evidence-not-found",
-  "checkpoints_count": 7,
+  "checkpoints_count": 9,
   "files_touched": [
     "apps/cli/src/agentic_odi_cli/backend.py",
     "apps/mcp-server/src/agentic_odi_mcp_server/mcp_server.py",
@@ -47,6 +47,13 @@
       "compact_transcript": "/4/transcript.jsonl",
       "content_hash": "/4/content_hash.txt",
       "prompt": ""
+    },
+    {
+      "metadata": "/5/metadata.json",
+      "transcript": "/5/full.jsonl",
+      "compact_transcript": "/5/transcript.jsonl",
+      "content_hash": "/5/content_hash.txt",
+      "prompt": "/5/prompt.txt"
     }
   ],
   "token_usage": {
