@@ -3,7 +3,7 @@
   "checkpoint_id": "01M5HZQ8XYHQP4631849H7YP2B",
   "strategy": "manual-commit",
   "branch": "feature/gh-pages-redesign",
-  "checkpoints_count": 1,
+  "checkpoints_count": 2,
   "files_touched": [
     ".github/workflows/ci.yml",
     ".github/workflows/pages.yml",
@@ -33,13 +33,20 @@
       "compact_transcript": "/0/transcript.jsonl",
       "content_hash": "/0/content_hash.txt",
       "prompt": ""
+    },
+    {
+      "metadata": "/1/metadata.json",
+      "transcript": "/1/full.jsonl",
+      "compact_transcript": "/1/transcript.jsonl",
+      "content_hash": "/1/content_hash.txt",
+      "prompt": ""
     }
   ],
   "token_usage": {
-    "input_tokens": 3981,
+    "input_tokens": 5165,
     "cache_creation_tokens": 0,
-    "cache_read_tokens": 9537367,
-    "output_tokens": 8062,
-    "api_call_count": 30
+    "cache_read_tokens": 11111239,
+    "output_tokens": 8718,
+    "api_call_count": 35
   }
 }
