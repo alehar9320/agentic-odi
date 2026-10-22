@@ -15,6 +15,7 @@ import {
   addObservation as apiAddObservation,
   addOutcome as apiAddOutcome,
   addStep as apiAddStep,
+  asStudioError,
   clearMemory as apiClearMemory,
   createConversation as apiCreateConversation,
   createJob as apiCreateJob,
@@ -52,11 +53,32 @@ import type {
   Observation,
   StudioBrief,
   StudioConfig,
+  StudioError,
   StudioNotification,
   WorkspacePanelId,
 } from "../types";
 import { catalogManifest } from "../ui/catalog";
 import { parseUiSpec } from "../ui/protocol";
+
+/** Read the failure the sidecar reported on an SSE `error` event. */
+function readStudioError(raw: unknown): StudioError {
+  if (raw && typeof raw === "object" && "code" in raw) {
+    const error = raw as Partial<StudioError>;
+    return {
+      code: String(error.code ?? "internal"),
+      message: String(error.message ?? "The assistant could not finish this turn."),
+      detail: error.detail ?? null,
+      suggestion: error.suggestion ?? null,
+      retryable: Boolean(error.retryable),
+      request_id: error.request_id ?? null,
+    };
+  }
+  return {
+    code: "internal",
+    message: "The assistant could not finish this turn.",
+    retryable: true,
+  };
+}
 
 const SETTINGS_KEY = "studio.settings";
 const CANVAS_KEY = "studio.canvas";
@@ -64,6 +86,9 @@ const DISPLAY_NAME_KEY = "studio.displayName";
 const BRIEF_KEY = "studio.brief";
 const SETUP_DISMISSED_KEY = "studio.setupDismissed";
 const NOTIFICATIONS_KEY = "studio.notifications";
+
+/** How often the studio re-probes the model and the MCP server. */
+const HEALTH_POLL_INTERVAL_MS = 30_000;
 
 export const EMPTY_CONFIG: StudioConfig = {
   base_url: "http://localhost:8001/v1",
@@ -700,6 +725,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       }
 
       const history: ChatMessage[] = [...messages, { role: "user", content: trimmed }];
+      const assistantIndex = history.length;
       setMessages([...history, { role: "assistant", content: "", parts: [] }]);
       setStreaming(true);
       setThinkingPhase("health_check");
@@ -711,6 +737,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 
       let content = "";
       let parts: ChatPart[] = [];
+      let failure: StudioError | null = null;
+      let terminal = false;
 
       // Prose is appended to the open text part; a surface opens a new one, so
       // the transcript keeps the agent's order instead of gathering all prose
@@ -730,7 +758,12 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       const publish = () => {
         setMessages((prev) => {
           const next = [...prev];
-          next[next.length - 1] = { role: "assistant", content, parts: [...parts] };
+          next[assistantIndex] = {
+            role: "assistant",
+            content,
+            parts: [...parts],
+            ...(failure ? { error: failure, retryText: trimmed } : {}),
+          };
           return next;
         });
       };
@@ -774,6 +807,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
             ]);
             break;
           case "message": {
+            terminal = true;
             content = String(event.data.content ?? content);
             const hasSurfaces = parts.some((part) => part.kind === "ui");
             if (!hasSurfaces) {
@@ -803,18 +837,31 @@ export function StudioProvider({ children }: { children: ReactNode }) {
           case "canvas_dirty":
             void refreshCanvas();
             break;
-          case "connector":
-            setConnectorSuggestions((prev) => {
-              const id = String(event.data?.preset ?? event.data?.name ?? "");
-              if (!id || prev.includes(id)) {
-                return prev;
-              }
-              return [...prev, id];
-            });
+          case "connector": {
+            if (String(event.data.status ?? "") === "error") {
+              const reason = String(event.data.error ?? "The connector could not be added.");
+              setMessages((prev) => [
+                ...prev,
+                { role: "notice", content: `Connector failed: ${reason}` },
+              ]);
+            } else {
+              setConnectorSuggestions((prev) => {
+                const id = String(event.data?.preset ?? event.data?.name ?? "");
+                if (!id || prev.includes(id)) {
+                  return prev;
+                }
+                return [...prev, id];
+              });
+            }
+            void refreshConnectors();
             break;
-          case "error":
-            pushToast("error", String(event.data.message ?? "Unknown chat error"));
+          }
+          case "error": {
+            terminal = true;
+            failure = readStudioError(event.data.error);
+            publish();
             break;
+          }
           default:
             break;
         }
@@ -837,25 +884,47 @@ export function StudioProvider({ children }: { children: ReactNode }) {
         );
       } catch (error) {
         const aborted = (error as Error).name === "AbortError";
-        if (!aborted) {
-          pushToast("error", `Error during assistant completion: ${(error as Error).message}`);
-        }
-        if (!content) {
+        if (aborted) {
+          // An abort is the user's own doing: drop the empty placeholder, but
+          // never the question they asked.
           setMessages((prev) => {
             const next = [...prev];
-            if (next.length && next[next.length - 1].content === "") {
+            if (next.length && next[next.length - 1].role === "assistant" && !next[next.length - 1].content) {
               next.pop();
             }
             return next;
           });
+        } else {
+          terminal = true;
+          failure = asStudioError(error);
+          publish();
         }
       } finally {
+        if (!terminal && !failure) {
+          // The stream ended without a message or an error: something failed
+          // silently, and the user must still be told.
+          failure = {
+            code: "internal",
+            message: "The assistant stopped before answering.",
+            suggestion: "Try again — your question is still here.",
+            retryable: true,
+          };
+          publish();
+        }
         setStreaming(false);
         setThinkingPhase(null);
         abortRef.current = null;
       }
     },
-    [messages, streaming, settings, brief, conversationId, refreshCanvas, pushToast],
+    [
+      messages,
+      streaming,
+      settings,
+      brief,
+      conversationId,
+      refreshCanvas,
+      refreshConnectors,
+    ],
   );
 
   /** The single conversational exit from any lens. */
@@ -1018,6 +1087,24 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Health polling: the studio must notice that the model or the MCP server
+  // came back without a reload, so the bar leaves "Local mode" on its own.
+  useEffect(() => {
+    const poll = () => {
+      if (document.visibilityState === "visible") {
+        void checkConnections();
+      }
+    };
+
+    const timer = window.setInterval(poll, HEALTH_POLL_INTERVAL_MS);
+    document.addEventListener("visibilitychange", poll);
+
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", poll);
+    };
+  }, [checkConnections]);
 
   const value = useMemo<StudioContextValue>(
     () => ({

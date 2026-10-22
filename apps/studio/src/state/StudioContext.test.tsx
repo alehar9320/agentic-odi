@@ -38,17 +38,26 @@ function sse(body: string): Response {
 
 let chatBody: Record<string, unknown> | null = null;
 
+const DEFAULT_CHAT_STREAM =
+  'event: conversation\ndata: {"id":"c-2","title":"hello"}\n\n' +
+  'event: memory\ndata: {"observation":{"id":"o-2","kind":"preference","text":"Prefers short updates.","data":{},"status":"suggested","confidence":0.7,"source_turn":null,"created_at":"2026-10-22T10:01:00+00:00","updated_at":"2026-10-22T10:01:00+00:00"}}\n\n' +
+  'event: delta\ndata: {"text":"Hi"}\n\n' +
+  'event: message\ndata: {"content":"Hi"}\n\n';
+
+let chatStream: string | null = null;
+let chatFailure: Error | null = null;
+let connectorFetches = 0;
+let llmHealthFetches = 0;
+
 function route(input: RequestInfo | URL, init?: RequestInit): Response {
   const url = String(input);
 
   if (url === "/api/chat") {
     chatBody = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
-    return sse(
-      'event: conversation\ndata: {"id":"c-2","title":"hello"}\n\n' +
-        'event: memory\ndata: {"observation":{"id":"o-2","kind":"preference","text":"Prefers short updates.","data":{},"status":"suggested","confidence":0.7,"source_turn":null,"created_at":"2026-10-22T10:01:00+00:00","updated_at":"2026-10-22T10:01:00+00:00"}}\n\n' +
-        'event: delta\ndata: {"text":"Hi"}\n\n' +
-        'event: message\ndata: {"content":"Hi"}\n\n',
-    );
+    if (chatFailure) {
+      throw chatFailure;
+    }
+    return sse(chatStream ?? DEFAULT_CHAT_STREAM);
   }
   if (url === "/api/config") {
     return json({
@@ -62,6 +71,7 @@ function route(input: RequestInfo | URL, init?: RequestInit): Response {
     return json([]);
   }
   if (url === "/api/connectors") {
+    connectorFetches += 1;
     return json([]);
   }
   if (url === "/api/memory/observations") {
@@ -102,6 +112,7 @@ function route(input: RequestInfo | URL, init?: RequestInit): Response {
     return json({ reachable: true });
   }
   if (url === "/api/health/llm") {
+    llmHealthFetches += 1;
     return json({ healthy: true, message: "ok" });
   }
   return json({});
@@ -111,6 +122,10 @@ describe("StudioContext memory and resume", () => {
   beforeEach(() => {
     localStorage.clear();
     chatBody = null;
+    chatStream = null;
+    chatFailure = null;
+    connectorFetches = 0;
+    llmHealthFetches = 0;
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
   });
 
@@ -153,5 +168,119 @@ describe("StudioContext memory and resume", () => {
 
     expect(result.current.messages).toEqual([]);
     await waitFor(() => expect(result.current.conversationId).toBe("c-new"));
+  });
+});
+
+describe("StudioContext failures", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    chatBody = null;
+    chatStream = null;
+    chatFailure = null;
+    connectorFetches = 0;
+    llmHealthFetches = 0;
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("keeps the question and the failed turn when the stream reports an error", async () => {
+    chatStream =
+      'event: error\ndata: {"error":{"code":"mcp_unreachable","message":"MCP server unreachable","retryable":true,"request_id":"req-1"}}\n\n';
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
+
+    await act(async () => {
+      await result.current.sendMessage("list the jobs");
+    });
+
+    const messages = result.current.messages;
+    expect(messages.some((message) => message.role === "user" && message.content === "list the jobs")).toBe(true);
+    const last = messages.at(-1);
+    expect(last?.role).toBe("assistant");
+    expect(last?.error?.code).toBe("mcp_unreachable");
+    expect(last?.retryText).toBe("list the jobs");
+  });
+
+  it("keeps the question when the request itself fails", async () => {
+    chatFailure = new Error("network down");
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
+
+    await act(async () => {
+      await result.current.sendMessage("list the jobs");
+    });
+
+    const messages = result.current.messages;
+    expect(messages.some((message) => message.role === "user" && message.content === "list the jobs")).toBe(true);
+    expect(messages.at(-1)?.error?.code).toBe("internal");
+  });
+
+  it("reports a stream that ends without a message as an internal failure", async () => {
+    chatStream = 'event: status\ndata: {"phase":"model"}\n\n';
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
+
+    await act(async () => {
+      await result.current.sendMessage("list the jobs");
+    });
+
+    expect(result.current.messages.at(-1)?.error?.code).toBe("internal");
+  });
+
+  it("keeps a connector failure as a notice and refreshes the connectors", async () => {
+    chatStream =
+      'event: connector\ndata: {"status":"error","error":"preset not found"}\n\n' +
+      'event: message\ndata: {"content":"Sorry."}\n\n';
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
+    const before = connectorFetches;
+
+    await act(async () => {
+      await result.current.sendMessage("add the connector");
+    });
+
+    expect(result.current.messages.some((message) => message.role === "notice")).toBe(true);
+    expect(connectorFetches).toBeGreaterThan(before);
+  });
+});
+
+describe("StudioContext health polling", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    chatBody = null;
+    chatStream = null;
+    chatFailure = null;
+    connectorFetches = 0;
+    llmHealthFetches = 0;
+    vi.useFakeTimers();
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it("re-probes the model every 30 seconds and when the window comes back", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    const initial = llmHealthFetches;
+
+    await act(async () => {
+      vi.advanceTimersByTime(30_000);
+    });
+    expect(llmHealthFetches).toBeGreaterThan(initial);
+
+    const afterInterval = llmHealthFetches;
+    await act(async () => {
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+    expect(llmHealthFetches).toBeGreaterThan(afterInterval);
+    expect(result.current.llmHealth.healthy).toBe(true);
   });
 });

@@ -1389,6 +1389,44 @@ input[type="range"] {
   text-transform: uppercase;
 }
 
+/* A failure shown in place of the thing that failed. */
+.failure {
+  margin-top: 8px;
+  padding: 10px 12px;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  border-radius: 10px;
+  background: rgba(239, 68, 68, 0.08);
+}
+
+.failure__message {
+  margin: 0;
+  color: #fca5a5;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.failure__detail {
+  margin-top: 6px;
+  color: #d6d3d1;
+  font-size: 0.72rem;
+}
+
+.failure__detail pre {
+  margin: 4px 0 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.failure__suggestion {
+  margin: 6px 0 0;
+  color: #e7e5e4;
+  font-size: 0.78rem;
+}
+
+.failure__retry {
+  margin-top: 8px;
+}
+
 /* ------------------------------------------------------------------ */
 /* Setup conversation                                                 */
 /* ------------------------------------------------------------------ */

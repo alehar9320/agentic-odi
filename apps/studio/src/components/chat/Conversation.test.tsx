@@ -1,4 +1,4 @@
-import { fireEvent, render } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import type { ChatMessage } from "../../types";
@@ -108,5 +108,37 @@ describe("Conversation", () => {
     fireEvent.click(document.querySelector("button.ui-action") as HTMLButtonElement);
 
     expect(harness.state.sendMessage).toHaveBeenCalledWith("Simulate O-1");
+  });
+});
+
+describe("Conversation failures", () => {
+  it("shows the failure, the suggestion, and a retry that re-sends the question", () => {
+    harness.state.sendMessage = vi.fn<(text: string) => Promise<void>>();
+    const { container } = renderTurn([
+      { role: "user", content: "list the jobs" },
+      {
+        role: "assistant",
+        content: "",
+        parts: [],
+        error: {
+          code: "mcp_unreachable",
+          message: "The MCP server is unreachable.",
+          detail: "connection refused",
+          suggestion: "Check that the MCP server is running, then try again.",
+          retryable: true,
+          request_id: "req-1",
+        },
+        retryText: "list the jobs",
+      },
+    ]);
+
+    expect(container.textContent).toContain("The MCP server is unreachable.");
+    expect(container.textContent).toContain("Check that the MCP server is running");
+    expect(container.querySelector('[role="alert"]')).not.toBeNull();
+
+    const retry = screen.getByRole("button", { name: /retry/i });
+    fireEvent.click(retry);
+
+    expect(harness.state.sendMessage).toHaveBeenCalledWith("list the jobs");
   });
 });

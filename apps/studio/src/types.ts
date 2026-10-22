@@ -74,6 +74,13 @@ export interface ChatMessage {
    * the combined prose because that is what gets replayed as history.
    */
   parts?: ChatPart[];
+  /**
+   * Assistant turns only: the failure that ended this turn, so the transcript
+   * can show it in place instead of losing the question.
+   */
+  error?: StudioError;
+  /** The question this turn answered, kept so a failed turn can be retried. */
+  retryText?: string;
 }
 
 /**
