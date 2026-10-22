@@ -12,23 +12,32 @@ import {
 
 import {
   addConnector as apiAddConnector,
+  addObservation as apiAddObservation,
   addOutcome as apiAddOutcome,
   addStep as apiAddStep,
+  clearMemory as apiClearMemory,
+  createConversation as apiCreateConversation,
   createJob as apiCreateJob,
   deleteConnector as apiDeleteConnector,
   deleteJob as apiDeleteJob,
+  deleteObservation as apiDeleteObservation,
   deleteOutcome as apiDeleteOutcome,
   deleteStep as apiDeleteStep,
   fetchCanvas,
   fetchConfig,
   fetchConnectorCatalog,
   fetchConnectors,
+  fetchLatestConversation,
+  fetchMemory,
   healthLlm,
   healthMcp,
   streamChat,
   updateJob as apiUpdateJob,
+  updateObservation as apiUpdateObservation,
   updateOutcome as apiUpdateOutcome,
   updateStep as apiUpdateStep,
+  type AddObservationPayload,
+  type UpdateObservationPayload,
 } from "../api/studioApi";
 import type { RawSseEvent } from "../api/sse";
 import type {
@@ -40,6 +49,7 @@ import type {
   ChatPart,
   ConnectorListItem,
   ConnectorPreset,
+  Observation,
   StudioBrief,
   StudioConfig,
   StudioNotification,
@@ -145,6 +155,17 @@ export interface StudioContextValue {
   sendMessage: (text: string) => Promise<void>;
   stopStreaming: () => void;
   clearChat: () => void;
+  conversationId: string | null;
+  memory: Observation[];
+  memoryLoading: boolean;
+  refreshMemory: () => Promise<void>;
+  addObservation: (payload: AddObservationPayload) => Promise<Observation | null>;
+  updateObservation: (
+    observationId: string,
+    payload: UpdateObservationPayload,
+  ) => Promise<Observation | null>;
+  deleteObservation: (observationId: string) => Promise<void>;
+  clearMemory: () => Promise<void>;
   pushNotice: (text: string) => void;
   offlineReply: boolean;
   addStep: (payload: Omit<AddStepPayload, "mcp_url">) => Promise<void>;
@@ -277,6 +298,9 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [mcpReachable, setMcpReachable] = useState(false);
   const [sidecarReachable, setSidecarReachable] = useState<boolean | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [memory, setMemory] = useState<Observation[]>([]);
+  const [memoryLoading, setMemoryLoading] = useState(false);
   const [streaming, setStreaming] = useState(false);
   const [thinkingPhase, setThinkingPhase] = useState<string | null>(null);
   const [toolActivity, setToolActivity] = useState<ToolActivity[]>([]);
@@ -761,6 +785,24 @@ export function StudioProvider({ children }: { children: ReactNode }) {
             publish();
             break;
           }
+          case "conversation": {
+            const id = String(event.data.id ?? "");
+            if (id) {
+              setConversationId(id);
+            }
+            break;
+          }
+          case "memory": {
+            const observation = event.data.observation as Observation | undefined;
+            if (observation?.id) {
+              setMemory((prev) =>
+                prev.some((item) => item.id === observation.id)
+                  ? prev.map((item) => (item.id === observation.id ? observation : item))
+                  : [...prev, observation],
+              );
+            }
+            break;
+          }
           case "canvas_dirty":
             void refreshCanvas();
             break;
@@ -791,6 +833,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
             messages: history,
             brief,
             ui_catalog: catalogManifest(),
+            conversation_id: conversationId,
           },
           handleEvent,
           controller.signal,
@@ -815,7 +858,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
         abortRef.current = null;
       }
     },
-    [messages, streaming, settings, brief, refreshCanvas, pushToast],
+    [messages, streaming, settings, brief, conversationId, refreshCanvas, pushToast],
   );
 
   /** The single conversational exit from any lens. */
@@ -827,6 +870,73 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     [sendMessage],
   );
 
+  const refreshMemory = useCallback(async () => {
+    setMemoryLoading(true);
+    try {
+      setMemory(await fetchMemory());
+    } catch {
+      /* memory is a convenience; the studio keeps working without it */
+    } finally {
+      setMemoryLoading(false);
+    }
+  }, []);
+
+  const addObservation = useCallback(
+    async (payload: AddObservationPayload) => {
+      try {
+        const observation = await apiAddObservation(payload);
+        setMemory((prev) => [...prev, observation]);
+        return observation;
+      } catch {
+        pushToast("error", "I couldn't save that context.");
+        return null;
+      }
+    },
+    [pushToast],
+  );
+
+  const updateObservation = useCallback(
+    async (observationId: string, payload: UpdateObservationPayload) => {
+      try {
+        const observation = await apiUpdateObservation(observationId, payload);
+        setMemory((prev) =>
+          observation.status === "dismissed"
+            ? prev.filter((item) => item.id !== observationId)
+            : prev.map((item) => (item.id === observationId ? observation : item)),
+        );
+        return observation;
+      } catch {
+        pushToast("error", "I couldn't update that context.");
+        return null;
+      }
+    },
+    [pushToast],
+  );
+
+  const deleteObservation = useCallback(
+    async (observationId: string) => {
+      try {
+        await apiDeleteObservation(observationId);
+        setMemory((prev) => prev.filter((item) => item.id !== observationId));
+      } catch {
+        pushToast("error", "I couldn't forget that.");
+      }
+    },
+    [pushToast],
+  );
+
+  const clearMemory = useCallback(async () => {
+    try {
+      await apiClearMemory();
+      setMemory([]);
+      setConversationId(null);
+      setMessages([]);
+      setToolActivity([]);
+    } catch {
+      pushToast("error", "I couldn't clear what I've learned.");
+    }
+  }, [pushToast]);
+
   const clearChat = useCallback(() => {
     abortRef.current?.abort();
     abortRef.current = null;
@@ -835,6 +945,12 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     setStreaming(false);
     setThinkingPhase(null);
     setOfflineReply(false);
+    setConversationId(null);
+    void apiCreateConversation()
+      .then((conversation) =>
+        setConversationId((current) => current ?? conversation.id),
+      )
+      .catch(() => undefined);
   }, []);
 
   // Initial hydration: env defaults, canvas, health probes.
@@ -861,6 +977,24 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       void refreshCanvas();
       void refreshConnectors();
       void refreshPresets();
+      void refreshMemory();
+      void fetchLatestConversation()
+        .then(({ conversation, turns }) => {
+          if (cancelled || !conversation || turns.length === 0) {
+            return;
+          }
+          setConversationId(conversation.id);
+          setMessages(
+            turns
+              .filter((turn) => turn.role === "user" || turn.role === "assistant")
+              .map((turn) => ({
+                role: turn.role as "user" | "assistant",
+                content: turn.content,
+                parts: turn.content ? [{ kind: "text", text: turn.content }] : [],
+              })),
+          );
+        })
+        .catch(() => undefined);
       void healthMcp(settings.mcp_url)
         .then((result) => {
           if (!cancelled) {
@@ -914,6 +1048,14 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       sendMessage,
       stopStreaming,
       clearChat,
+      conversationId,
+      memory,
+      memoryLoading,
+      refreshMemory,
+      addObservation,
+      updateObservation,
+      deleteObservation,
+      clearMemory,
       pushNotice,
       offlineReply,
       addStep,
@@ -973,6 +1115,14 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       sendMessage,
       stopStreaming,
       clearChat,
+      conversationId,
+      memory,
+      memoryLoading,
+      refreshMemory,
+      addObservation,
+      updateObservation,
+      deleteObservation,
+      clearMemory,
       pushNotice,
       offlineReply,
       addStep,
