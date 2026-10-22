@@ -1,0 +1,5 @@
+Your objective is to implement https://github.com/alehar9320/agentic-odi/issues/91. Do this on a new git worktree. When PR is pushed and CI is green, you're done.
+
+---
+
+Also tag the issue in PR so we close it when closing the PR
