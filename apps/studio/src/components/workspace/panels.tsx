@@ -4,10 +4,19 @@ import type { WorkspacePanelId } from "../../types";
 import { DirectCapture } from "../canvas/DirectCapture";
 import { EvidenceStream } from "../canvas/EvidenceStream";
 import { JobMap } from "../canvas/JobMap";
+import { MemoryPanel } from "../canvas/MemoryPanel";
 import { OpportunityLandscape } from "../canvas/OpportunityLandscape";
 import { CatchUpFeed } from "../notifications/CatchUpFeed";
 import { SettingsPanel } from "../SettingsPanel";
-import { BellIcon, CaptureIcon, CompassIcon, RouteIcon, SettingsIcon, SignalIcon } from "../icons";
+import {
+  BellIcon,
+  CaptureIcon,
+  CompassIcon,
+  RouteIcon,
+  SettingsIcon,
+  SignalIcon,
+  SparkIcon,
+} from "../icons";
 
 export interface PanelTalk {
   label: string;
@@ -80,6 +89,19 @@ export const WORKSPACE_PANELS: PanelDefinition[] = [
       label: "Weigh the evidence",
       intent:
         "What does the evidence I have actually support, and what is still a guess? Tell me what to go find next.",
+    },
+  },
+  {
+    id: "memory",
+    label: "What I know",
+    title: "What I've learned",
+    blurb: "What I've picked up about you and the work, and what I'm still guessing.",
+    icon: <SparkIcon />,
+    render: () => <MemoryPanel />,
+    talk: {
+      label: "Correct what you know",
+      intent:
+        "Here's what you've learned about me and the work so far. Ask me what's wrong or missing, and update your notes.",
     },
   },
   {

@@ -10,9 +10,14 @@ import type {
   ConnectorListItem,
   ConnectorOperationResponse,
   ConnectorPreset,
+  Conversation,
   CreateJobPayload,
+  LatestConversation,
   LlmHealth,
   McpHealth,
+  Observation,
+  ObservationKind,
+  ObservationStatus,
   StudioConfig,
 } from "../types";
 import { createSseParser, type RawSseEvent } from "./sse";
@@ -200,4 +205,61 @@ export async function streamChat(
       onEvent(event);
     }
   }
+}
+
+
+export async function fetchMemory(): Promise<Observation[]> {
+  const body = await getJson<{ observations: Observation[] }>("/api/memory/observations");
+  return body.observations;
+}
+
+export interface AddObservationPayload {
+  kind: ObservationKind;
+  text: string;
+  data?: Record<string, unknown>;
+  confidence?: number;
+  confirmed?: boolean;
+}
+
+export async function addObservation(payload: AddObservationPayload): Promise<Observation> {
+  const body = await postJson<{ observation: Observation }>("/api/memory/observations", payload);
+  return body.observation;
+}
+
+export interface UpdateObservationPayload {
+  text?: string;
+  status?: ObservationStatus;
+  data?: Record<string, unknown>;
+  confidence?: number;
+}
+
+export async function updateObservation(
+  observationId: string,
+  payload: UpdateObservationPayload,
+): Promise<Observation> {
+  const body = await sendJson<{ observation: Observation }>(
+    "PATCH",
+    `/api/memory/observations/${encodeURIComponent(observationId)}`,
+    payload,
+  );
+  return body.observation;
+}
+
+export function deleteObservation(observationId: string): Promise<{ ok: boolean }> {
+  return deleteJson<{ ok: boolean }>(
+    `/api/memory/observations/${encodeURIComponent(observationId)}`,
+  );
+}
+
+export function clearMemory(): Promise<{ ok: boolean }> {
+  return deleteJson<{ ok: boolean }>("/api/memory");
+}
+
+export function fetchLatestConversation(): Promise<LatestConversation> {
+  return getJson<LatestConversation>("/api/conversations/latest");
+}
+
+export async function createConversation(): Promise<Conversation> {
+  const body = await postJson<{ conversation: Conversation }>("/api/conversations", {});
+  return body.conversation;
 }

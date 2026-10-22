@@ -28,6 +28,7 @@ export function FirstRunWizard() {
     checkConnections,
     openPanel,
     openSetup,
+    closeSetup,
     sendMessage,
   } = useStudio();
 
@@ -197,8 +198,9 @@ export function FirstRunWizard() {
     if (activeGoal.destination.kind === "setup") {
       openSetup();
     } else if (activeGoal.destination.kind === "chat") {
-      // Some starting points are a conversation, not a view: the stage stays
-      // the stage and the studio asks the first question.
+      // Some starting points are a conversation, not a view: close the setup
+      // questions so the chosen thread has the stage.
+      closeSetup();
       void sendMessage(activeGoal.destination.prompt);
     } else {
       openPanel(activeGoal.destination.panel);

@@ -84,6 +84,7 @@ export type WorkspacePanelId =
   | "jobmap"
   | "evidence"
   | "capture"
+  | "memory"
   | "catchup"
   | "settings";
 
@@ -111,6 +112,52 @@ export interface ChatStreamRequest {
   brief?: StudioBrief | null;
   /** What this client can render. Omitted by clients that only read prose. */
   ui_catalog?: UiCatalogManifest;
+  /** Continue an existing thread instead of starting a new one. */
+  conversation_id?: string | null;
+}
+
+export type ObservationKind =
+  | "career"
+  | "opportunity"
+  | "business"
+  | "stakeholder"
+  | "constraint"
+  | "evidence"
+  | "preference";
+
+export type ObservationStatus = "suggested" | "confirmed" | "dismissed";
+
+/** One thing the agent believes about the PM, shown for correction. */
+export interface Observation {
+  id: string;
+  kind: ObservationKind;
+  text: string;
+  data: Record<string, unknown>;
+  status: ObservationStatus;
+  confidence: number;
+  source_turn: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Conversation {
+  id: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ConversationTurn {
+  id: number;
+  conversation_id: string;
+  role: "user" | "assistant" | "system" | "tool";
+  content: string;
+  created_at: string;
+}
+
+export interface LatestConversation {
+  conversation: Conversation | null;
+  turns: ConversationTurn[];
 }
 
 export interface CreateJobPayload {

@@ -27,6 +27,18 @@ vi.mock("../../api/studioApi", () => ({
   deleteStep: vi.fn(async () => ({ ok: true })),
   updateOutcome: vi.fn(async () => ({ ok: true })),
   deleteOutcome: vi.fn(async () => ({ ok: true })),
+  fetchMemory: vi.fn(async () => []),
+  fetchLatestConversation: vi.fn(async () => ({ conversation: null, turns: [] })),
+  createConversation: vi.fn(async () => ({
+    id: "c-new",
+    title: "",
+    created_at: "2026-10-22T10:00:00+00:00",
+    updated_at: "2026-10-22T10:00:00+00:00",
+  })),
+  addObservation: vi.fn(),
+  updateObservation: vi.fn(),
+  deleteObservation: vi.fn(async () => ({ ok: true })),
+  clearMemory: vi.fn(async () => ({ ok: true })),
   streamChat: vi.fn(async () => undefined),
 }));
 

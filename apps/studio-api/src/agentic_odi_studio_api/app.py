@@ -14,6 +14,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from agentic_odi_studio_api.studio.connectors import ConnectorService
+from agentic_odi_studio_api.studio.memory import StudioMemory
 from agentic_odi_studio_api.studio.router import router as studio_router
 
 CORS_ORIGINS = [
@@ -43,6 +44,7 @@ def create_app(
     repo: Repository | None = None,
     backend: str | None = None,
     connectors: ConnectorService | None = None,
+    memory: StudioMemory | None = None,
 ) -> FastAPI:
     if repo is None:
         repo = SQLiteRepository()
@@ -51,6 +53,7 @@ def create_app(
     app.state.service = service
     app.state.backend = backend or os.environ.get("AGENTIC_ODI_BACKEND") or DEFAULT_BACKEND
     app.state.connectors = connectors or ConnectorService()
+    app.state.memory = memory or StudioMemory()
 
     app.add_middleware(
         CORSMiddleware,

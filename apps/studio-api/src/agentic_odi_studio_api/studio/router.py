@@ -25,6 +25,7 @@ from agentic_odi_studio_api.studio.changelog import get_changelog
 from agentic_odi_studio_api.studio.chat import stream_chat
 from agentic_odi_studio_api.studio.connectors import ConnectorService
 from agentic_odi_studio_api.studio.mcp_data import call_mcp_tool, fetch_canvas, fetch_local_canvas
+from agentic_odi_studio_api.studio.memory import ObservationNotFoundError, StudioMemory
 from agentic_odi_studio_api.studio.probes import check_llm_health, defaults, is_endpoint_reachable
 from agentic_odi_studio_api.studio.schemas import (
     AddConnectorRequest,
@@ -33,9 +34,15 @@ from agentic_odi_studio_api.studio.schemas import (
     ChatRequest,
     ConnectorListItem,
     ConnectorOperationResponse,
+    ConversationResponse,
     CreateJobRequest,
+    LatestConversationResponse,
     LlmHealthRequest,
     McpHealthRequest,
+    ObservationCreateRequest,
+    ObservationListResponse,
+    ObservationResponse,
+    ObservationUpdateRequest,
     UpdateJobRequest,
     UpdateOutcomeRequest,
     UpdateStepRequest,
@@ -69,6 +76,10 @@ def _as_http_error(exc: Exception) -> HTTPException:
 
 def _connectors(request: Request) -> ConnectorService:
     return request.app.state.connectors
+
+
+def _memory(request: Request) -> StudioMemory:
+    return request.app.state.memory
 
 
 @router.get("/config")
@@ -298,10 +309,84 @@ async def delete_outcome(
     return {"ok": True}
 
 
+@router.get("/memory/observations", response_model=ObservationListResponse)
+def list_observations(request: Request) -> ObservationListResponse:
+    observations = _memory(request).list_observations()
+    return ObservationListResponse(
+        observations=[observation.to_dict() for observation in observations]
+    )
+
+
+@router.post("/memory/observations", response_model=ObservationResponse)
+def create_observation(body: ObservationCreateRequest, request: Request) -> ObservationResponse:
+    try:
+        observation = _memory(request).add_observation(
+            kind=body.kind,
+            text=body.text,
+            data=body.data,
+            status="confirmed" if body.confirmed else "suggested",
+            confidence=body.confidence,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return ObservationResponse(observation=observation.to_dict())
+
+
+@router.patch("/memory/observations/{observation_id}", response_model=ObservationResponse)
+def update_observation(
+    observation_id: str, body: ObservationUpdateRequest, request: Request
+) -> ObservationResponse:
+    try:
+        observation = _memory(request).update_observation(
+            observation_id,
+            text=body.text,
+            status=body.status,
+            data=body.data,
+            confidence=body.confidence,
+        )
+    except ObservationNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return ObservationResponse(observation=observation.to_dict())
+
+
+@router.delete("/memory/observations/{observation_id}")
+def delete_observation(observation_id: str, request: Request) -> dict:
+    try:
+        _memory(request).delete_observation(observation_id)
+    except ObservationNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return {"ok": True}
+
+
+@router.delete("/memory")
+def clear_memory(request: Request) -> dict:
+    _memory(request).clear_memory()
+    return {"ok": True}
+
+
+@router.get("/conversations/latest", response_model=LatestConversationResponse)
+def latest_conversation(request: Request) -> LatestConversationResponse:
+    memory = _memory(request)
+    conversation = memory.latest_conversation()
+    if conversation is None:
+        return LatestConversationResponse(conversation=None, turns=[])
+    return LatestConversationResponse(
+        conversation=conversation.to_dict(),
+        turns=[turn.to_dict() for turn in memory.list_turns(conversation.id)],
+    )
+
+
+@router.post("/conversations", response_model=ConversationResponse)
+def create_conversation(request: Request) -> ConversationResponse:
+    return ConversationResponse(conversation=_memory(request).create_conversation().to_dict())
+
+
 @router.post("/chat")
 async def post_chat(request: Request, body: ChatRequest) -> StreamingResponse:
     return StreamingResponse(
-        stream_chat(body, service=request.app.state.connectors),
+        stream_chat(body, service=request.app.state.connectors, memory=request.app.state.memory),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )

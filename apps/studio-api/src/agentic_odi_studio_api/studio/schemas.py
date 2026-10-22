@@ -89,6 +89,7 @@ class ChatRequest(BaseModel):
     messages: list[ChatMessage] = Field(default_factory=list)
     brief: StudioBrief | None = None
     ui_catalog: UiCatalogRequest | None = None
+    conversation_id: str | None = None
 
 
 class AddConnectorRequest(BaseModel):
@@ -106,3 +107,74 @@ class ConnectorListItem(BaseModel):
 class ConnectorOperationResponse(BaseModel):
     ok: bool
     name: str
+
+
+ObservationKind = Literal[
+    "career",
+    "opportunity",
+    "business",
+    "stakeholder",
+    "constraint",
+    "evidence",
+    "preference",
+]
+ObservationStatus = Literal["suggested", "confirmed", "dismissed"]
+
+
+class ObservationModel(BaseModel):
+    id: str
+    kind: str
+    text: str
+    data: dict[str, Any] = Field(default_factory=dict)
+    status: str
+    confidence: float
+    source_turn: int | None = None
+    created_at: str
+    updated_at: str
+
+
+class ObservationListResponse(BaseModel):
+    observations: list[ObservationModel]
+
+
+class ObservationResponse(BaseModel):
+    observation: ObservationModel
+
+
+class ObservationCreateRequest(BaseModel):
+    kind: ObservationKind
+    text: str = Field(min_length=1, max_length=2000)
+    data: dict[str, Any] | None = None
+    confidence: float = Field(default=0.6, ge=0, le=1)
+    confirmed: bool = False
+
+
+class ObservationUpdateRequest(BaseModel):
+    text: str | None = Field(default=None, min_length=1, max_length=2000)
+    status: ObservationStatus | None = None
+    data: dict[str, Any] | None = None
+    confidence: float | None = Field(default=None, ge=0, le=1)
+
+
+class ConversationModel(BaseModel):
+    id: str
+    title: str
+    created_at: str
+    updated_at: str
+
+
+class ConversationResponse(BaseModel):
+    conversation: ConversationModel
+
+
+class TurnModel(BaseModel):
+    id: int
+    conversation_id: str
+    role: str
+    content: str
+    created_at: str
+
+
+class LatestConversationResponse(BaseModel):
+    conversation: ConversationModel | None = None
+    turns: list[TurnModel] = Field(default_factory=list)

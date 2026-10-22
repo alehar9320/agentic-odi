@@ -6,6 +6,7 @@ import {
   ImpactSimulation,
   JobMap,
   OpportunityBoard,
+  OpportunityThesis,
   OutcomeCard,
 } from "./cards";
 import {
@@ -39,6 +40,7 @@ export const NODE_COMPONENTS: Record<string, ComponentType<NodeProps>> = {
 
   "outcome-card": OutcomeCard,
   "opportunity-board": OpportunityBoard,
+  "opportunity-thesis": OpportunityThesis,
   "impact-simulation": ImpactSimulation,
   "evidence-quote": EvidenceQuote,
   "job-map": JobMap,

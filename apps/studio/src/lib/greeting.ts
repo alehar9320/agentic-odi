@@ -87,18 +87,18 @@ export function greetingCandidates(context: GreetingContext): Greeting[] {
 
   candidates.push(
     {
-      id: "capability-job",
-      text: "What job should we get done today?",
+      id: "capability-win",
+      text: "What are you trying to win this quarter?",
       kind: "capability",
     },
     {
-      id: "capability-friction",
-      text: "Tell me where your customers get stuck.",
+      id: "capability-opportunity",
+      text: "What opportunity is on your mind?",
       kind: "capability",
     },
     {
-      id: "capability-outcomes",
-      text: "I turn complaints into measurable outcomes — then find the underserved ones.",
+      id: "capability-bet",
+      text: "Tell me the bet you're weighing. I'll tell you what would have to be true.",
       kind: "capability",
     },
   );

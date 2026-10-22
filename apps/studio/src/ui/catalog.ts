@@ -300,6 +300,22 @@ export const CATALOG: readonly UiCatalogEntry[] = [
     ["job", "steps"],
   ),
   entry(
+    "opportunity-thesis",
+    "leaf",
+    "One opportunity argued in plain language: the scores, the gap, the thesis, and the next move. Use when the PM is deciding what to chase.",
+    {
+      title: { type: "string", description: "The opportunity named as an outcome, not a feature." },
+      ...outcomeScores,
+      gap: { type: "string", description: "The customer or business gap in one sentence." },
+      thesis: {
+        type: "string",
+        description: "Why this is the opportunity worth winning, in plain words. No framework jargon.",
+      },
+      next_move: { type: "string", description: "The smallest concrete step that would test it." },
+    },
+    ["title", "importance", "satisfaction", "thesis"],
+  ),
+  entry(
     "decision-record",
     "leaf",
     "A Product Decision Record: the bet, the outcome it serves, and why it was chosen.",

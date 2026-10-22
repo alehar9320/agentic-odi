@@ -8,6 +8,7 @@ const studio = vi.hoisted(() => ({
     outcomes: { id: string; evidence?: string }[];
     source: "seed";
   },
+  memory: [] as { id: string; text: string }[],
   activePanel: null as string | null,
   openPanel: vi.fn(),
   closePanel: vi.fn(),
@@ -32,6 +33,7 @@ function canvas(overrides: Partial<NonNullable<typeof studio.canvas>> = {}) {
 describe("WorkbenchRail", () => {
   beforeEach(() => {
     studio.canvas = null;
+    studio.memory = [];
     studio.activePanel = null;
     studio.openPanel.mockClear();
     studio.closePanel.mockClear();
@@ -54,6 +56,19 @@ describe("WorkbenchRail", () => {
     expect(screen.getByRole("button", { name: "Landscape, 2 opportunities" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Job map, 1 step" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Evidence, 1 signal" })).toBeInTheDocument();
+  });
+
+  it("shows what the agent has learned once it has a note", () => {
+    studio.canvas = canvas();
+    studio.memory = [
+      { id: "o-1", text: "Owns activation." },
+      { id: "o-2", text: "Prefers short updates." },
+    ];
+
+    render(<WorkbenchRail />);
+
+    fireEvent.click(screen.getByRole("button", { name: "What I know, 2 notes" }));
+    expect(studio.openPanel).toHaveBeenCalledWith("memory");
   });
 
   it("omits a view that has nothing to show", () => {
