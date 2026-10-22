@@ -1,0 +1,27 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M5JDDQT8R5NPMT4M0G1N96CJ",
+  "strategy": "manual-commit",
+  "branch": "feat/issue-91-error-surfacing",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "apps/cli/src/agentic_odi_cli/backend.py",
+    "apps/cli/tests/test_backend.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/0/metadata.json",
+      "transcript": "/0/full.jsonl",
+      "compact_transcript": "/0/transcript.jsonl",
+      "content_hash": "/0/content_hash.txt",
+      "prompt": ""
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 0,
+    "output_tokens": 0,
+    "api_call_count": 0
+  }
+}
