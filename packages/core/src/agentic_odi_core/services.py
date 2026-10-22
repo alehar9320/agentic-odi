@@ -5,6 +5,7 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
+from agentic_odi_core.errors import NotFoundError, ValidationError
 from agentic_odi_core.models import (
     BusinessValue,
     CustomerOutcome,
@@ -19,37 +20,37 @@ from agentic_odi_core.models import (
 from agentic_odi_core.repository import Repository
 
 
-class JobNotFoundError(Exception):
+class JobNotFoundError(NotFoundError):
     def __init__(self, job_id: str) -> None:
         self.job_id = job_id
-        super().__init__(job_id)
+        super().__init__(job_id, "job")
 
 
-class StepNotFoundError(Exception):
+class StepNotFoundError(NotFoundError):
     def __init__(self, step_id: str) -> None:
         self.step_id = step_id
-        super().__init__(step_id)
+        super().__init__(step_id, "step")
 
 
-class OutcomeNotFoundError(Exception):
+class OutcomeNotFoundError(NotFoundError):
     def __init__(self, outcome_id: str) -> None:
         self.outcome_id = outcome_id
-        super().__init__(outcome_id)
+        super().__init__(outcome_id, "outcome")
 
 
-class CustomerOutcomeNotFoundError(Exception):
+class CustomerOutcomeNotFoundError(NotFoundError):
     def __init__(self, outcome_id: str) -> None:
         self.outcome_id = outcome_id
-        super().__init__(outcome_id)
+        super().__init__(outcome_id, "customer_outcome")
 
 
-class EvidenceNotFoundError(Exception):
+class EvidenceNotFoundError(NotFoundError):
     def __init__(self, evidence_id: str) -> None:
         self.evidence_id = evidence_id
-        super().__init__(evidence_id)
+        super().__init__(evidence_id, "evidence")
 
 
-class ValueOutOfRangeError(Exception):
+class ValueOutOfRangeError(ValidationError):
     pass
 
 
@@ -240,7 +241,7 @@ class ODIService:
             if resolved_job_id is None:
                 resolved_job_id = step.job_id
             elif step.job_id != resolved_job_id:
-                raise ValueError("step_id does not belong to job_id")
+                raise ValidationError("step_id does not belong to job_id")
         if outcome_id is not None:
             outcome = self.repo.get_outcome(outcome_id)
             if outcome is None:
@@ -248,9 +249,9 @@ class ODIService:
             if resolved_job_id is None:
                 resolved_job_id = outcome.job_id
             elif outcome.job_id != resolved_job_id:
-                raise ValueError("outcome_id does not belong to job_id")
+                raise ValidationError("outcome_id does not belong to job_id")
             if step_id is not None and outcome.step_id not in (None, step_id):
-                raise ValueError("outcome_id does not belong to step_id")
+                raise ValidationError("outcome_id does not belong to step_id")
         if resolved_job_id is not None and self.repo.get_job(resolved_job_id) is None:
             raise JobNotFoundError(resolved_job_id)
         evidence = Evidence(
@@ -303,7 +304,7 @@ class ODIService:
         if target == "outcome":
             target_job_id = job_id or evidence.job_id
             if target_job_id is None:
-                raise ValueError("job_id is required to promote evidence to an outcome")
+                raise ValidationError("job_id is required to promote evidence to an outcome")
             text = (
                 statement
                 or evidence.name.strip()
@@ -317,7 +318,7 @@ class ODIService:
                 satisfaction=satisfaction,
                 step_id=evidence.step_id,
             )
-        raise ValueError(f"Unknown promotion target: {target}")
+        raise ValidationError(f"Unknown promotion target: {target}")
 
     def compute_opportunity(self, importance: float, satisfaction: float) -> float:
         return compute_opportunity_score(importance, satisfaction)

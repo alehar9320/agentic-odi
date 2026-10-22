@@ -11,6 +11,7 @@ from agentic_odi_core import (
     EvidenceItemType,
     EvidenceNotFoundError,
     JobNotFoundError,
+    OdiError,
     ODIService,
     OutcomeNotFoundError,
     StepNotFoundError,
@@ -384,7 +385,7 @@ def add_evidence(
         return _step_not_found(step_id)
     except OutcomeNotFoundError:
         return _outcome_not_found(outcome_id)
-    except ValueError as exc:
+    except (OdiError, ValueError) as exc:
         return f"Error: {exc}"
     return f"Evidence created successfully: {evidence.model_dump_json()}"
 
@@ -446,7 +447,7 @@ def promote_evidence(
         return _outcome_not_found(None)
     except ValueOutOfRangeError:
         return "Error: importance and satisfaction must be between 1.0 and 10.0"
-    except ValueError as exc:
+    except (OdiError, ValueError) as exc:
         return f"Error: {exc}"
     label = "Job" if target == "job" else "Outcome"
     return f"{label} created successfully: {artifact.model_dump_json()}"
