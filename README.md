@@ -60,9 +60,9 @@ shared tooling at the root. Packages live in `packages/`, runnable services in
 | **`packages/core/`** | `agentic-odi-core` | Domain models, the `ODIService` business-logic layer, repository implementations (in-memory and SQLite), the shared MCP tool contract, and ODI opportunity-score computation. |
 | **`packages/connectors/`** | `agentic-odi-connectors` | Pluggable MCP and REST connectors with presets and an ingest sink. |
 | **`apps/mcp-server/`** | `agentic-odi-mcp-server` | FastMCP server exposing Jobs, Steps, Desired Outcomes, Customer Outcomes, Evidence, and context tools over HTTP. Persists to SQLite by default. |
-| **`apps/studio-api/`** | `agentic-odi-studio-api` | FastAPI **Living Studio sidecar**. Serves config, health, canvas data, local mutations, MCP passthrough, SSE chat, and the built SPA. |
+| **`apps/studio-api/`** | `agentic-odi-studio-api` | FastAPI **Living Studio sidecar**. Serves config, health, canvas data, local mutations, MCP passthrough, SSE chat, conversation history, and the PM memory store, plus the built SPA. |
 | **`apps/cli/`** | `agentic-odi-cli` | Typer CLI with interactive chat plus full entity CRUD, `schema`, `connectors`, and local-first (`--backend local`) or remote (`--backend mcp`) data access. |
-| **`apps/studio/`** | React + TypeScript + Vite | **The Living Studio** SPA and Tauri 2 desktop shell. The copilot renders **agent-composed surfaces inline** — scored outcomes, opportunity boards, bet simulations — from a closed catalog the SPA owns. A feature-flagged **four-step first-run tour** hands a new user off to the context conversation or straight to a surface. |
+| **`apps/studio/`** | React + TypeScript + Vite | **The Living Studio** SPA and Tauri 2 desktop shell. The copilot renders **agent-composed surfaces inline** — scored outcomes, opportunity theses, bet simulations — from a closed catalog the SPA owns. A feature-flagged **four-step first-run tour** starts from the PM's ambition, and a local memory records what matters across sessions. |
 | **`infra/cloudflare/`** | Worker | Free-plan Workers Static Assets deployment and sidecar tunnel. |
 | **`scripts/`** | — | Dev launcher, binary build, installer tests. |
 | **`tests/contract/`** | — | Cross-package MCP contract tests. |
@@ -94,18 +94,29 @@ sidecar, and Vite together on http://localhost:5173. For the desktop app, use
 `npm --prefix apps/studio run tauri dev`. See
 [Running The Living Studio](docs/living-studio.md).
 
-The first time you open the Studio it asks — conversationally, in the chat, and
-skippable at any point — for your product, audience, and the job your customers
-are trying to get done. Answer what you like; every reply starts from what you
-shared. After that it opens as one room: the transcript and the composer never
-leave the screen. Describe a job or a customer frustration, or type `/` for
-commands that mirror the CLI. Whatever the thread produces — scored outcomes, a
-job map, customer evidence — arrives as an inline surface, and a quiet rail
-above the conversation opens it in a lens that docks beside the thread instead
-of replacing it. Capture and simulation are conversations too: tell the studio
-what a customer said, or what bet you are weighing, and it renders the card. Use
-the bell to **catch up on outcome shifts, simulations, and telemetry signals
-while you were away**.
+The first time you open the Studio, the tour asks what you want to win: an
+opportunity you already have in mind, a priority your boss handed you, finding
+the next opportunity, or pressure-testing a bet. Pick one and the conversation
+starts there — no form, no framework speech. It still asks for your product and
+audience when it needs them, and everything you say is optional and skippable.
+
+After that it opens as one room: the transcript and the composer never leave the
+screen. Describe a job or a customer frustration, or type `/` for commands that
+mirror the CLI. Whatever the thread produces — scored outcomes, an opportunity
+thesis, a job map, customer evidence — arrives as an inline surface, and a quiet
+rail above the conversation opens it in a lens that docks beside the thread
+instead of replacing it. Capture and simulation are conversations too: tell the
+studio what a customer said, or what bet you are weighing, and it renders the
+card. Use the bell to **catch up on outcome shifts, simulations, and telemetry
+signals while you were away**.
+
+The studio also remembers the person, not just the canvas. As you talk it notes
+what matters — your role, the opportunity, business constraints, stakeholders,
+evidence, how you like to work — and shows each note under **What I know** so you
+can confirm, correct, add, or forget it. The thread and those notes resume on the
+next launch. Memory lives in `~/.agentic-odi/studio.db` (override with
+`AGENTIC_ODI_STUDIO_DB`, or use `:memory:` for tests) and never blocks a reply if
+it fails. **Forget everything** clears the notes and the thread.
 
 The Studio is better with an OpenAI-compatible LLM with tool-calling support
 (see the [Local LLM Backend](docs/local-llm.md)), but it does not depend on one:
@@ -170,7 +181,7 @@ layout, updates, and release automation.
 |---|---|
 | [CLI Reference](docs/cli.md) | Backends, interactive chat, Jobs/Steps/desired Outcomes/Customer Outcomes/evidence, `connectors`, scoring, environment variables |
 | [External Connectors](docs/connectors.md) | The MCP ingest connector, presets, and the `Connector` protocol |
-| [Running The Living Studio](docs/living-studio.md) | First-run tour and its flag, interface, rich inline responses and the UI catalog, run modes, desktop signing and updates, agent-driven testing (`/dev`, `/test`) |
+| [Running The Living Studio](docs/living-studio.md) | First-run tour and its flag, local memory and conversation resume, interface, rich inline responses and the UI catalog, run modes, desktop signing and updates, agent-driven testing (`/dev`, `/test`) |
 | [Local LLM Backend](docs/local-llm.md) | Running a local OpenAI-compatible model with tool calling |
 | [Development](docs/development.md) | Lint, format, type checks, frontend checks, tests and the coverage map |
 | [Architecture](docs/architecture/README.md) | Workspace layout, dependency direction, data flow, and testing |

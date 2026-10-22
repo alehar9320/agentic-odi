@@ -18,6 +18,7 @@ SPA never contacts MCP or the LLM directly.
 │  (browser or Tauri webview)│ ◀──────────── │  - config / health / canvas   │
 └────────────────────────────┘  SSE stream   │  - steps / outcomes (via MCP) │
                                              │  - /api/chat (LLM tool-loop)  │
+                                             │  - conversations + PM memory  │
                                              └───────────────┬───────────────┘
                                                              │ MCP (HTTP)
                                                              ▼
@@ -37,13 +38,13 @@ The Studio opens as a conversation, not a dashboard.
 
 | Surface | What it does |
 |---|---|
-| **First-run tour** | A four-step, skippable welcome on the very first visit: what the studio is, which of four starting points you want, the live state of your sidecar/MCP/model (with inline repair when the model is down), and the first move. Finishing opens the chosen surface; **Name the job** hands off to the context conversation. Replay it from **Settings → Replay the welcome tour**. |
+| **First-run tour** | A four-step, skippable welcome on the very first visit: what the studio is, which ambition brought you here, the live state of your sidecar/MCP/model (with inline repair when the model is down), and the first move. The four doors are **I have one in mind**, **My boss handed me a priority**, **Help me find the next one**, and **Pressure-test a bet**; each starts the matching conversation. Replay it from **Settings → Replay the welcome tour**. |
 | **First run** | A short conversation in the chat, not a form: what you are building, who feels the problem, the job they are trying to get done, then where it hurts. One question at a time, with a reflection before the next ask, quick replies, and **Explore on my own** always visible. Skipping is allowed; answers and progress are kept as a draft. Re-open it any time with `/start`, the home stage's context pill, or Settings. |
-| **Hero** | One rotating headline above the composer: a greeting (time of day, plus your name if you set one in Settings), the product/job you set up, what is already on the canvas, or what the studio can do. It cycles every few seconds and stays still under `prefers-reduced-motion`. |
-| **Suggestion pills** | Below the headline. Some start a conversation (define a job, simulate a bet, capture what a customer said), others open a lens (landscape, job map). They change as the canvas fills up. |
+| **Hero** | One rotating headline above the composer: a greeting (time of day, plus your name if you set one in Settings), the product/job you set up, what is already on the canvas, or an intent-first prompt such as *What are you trying to win this quarter?* It cycles every few seconds and stays still under `prefers-reduced-motion`. |
+| **Suggestion pills** | Below the headline. **Sharpen an opportunity** always starts a conversation; the next pill becomes **Pressure-test a bet** once outcomes exist, or **Find the next opportunity** before that. **Capture what you heard** replaces the landscape pill once a job exists. They change as the canvas fills up. |
 | **Composer** | Docked at the bottom of the transcript. `Enter` sends, `Shift`+`Enter` adds a line, `Cmd/Ctrl`+`K` focuses it, and `/` opens the command palette. The send button becomes a stop button while a reply streams. |
 | **Bar** | The only persistent chrome: home, new conversation, catch-up, live model status, and settings. There is no navigation drawer to compete with the thread. |
-| **Rail** | Above the conversation, and only once the thread has produced something: `Landscape · N`, `Job map · N`, `Evidence · N`. Every item is derived from the canvas, so the strip is a record of the work rather than a fixed menu. |
+| **Rail** | Above the conversation, and only once the thread has produced something: `Landscape · N`, `Job map · N`, `Evidence · N`, `What I know · N`. Every item is derived from the canvas and the memory, so the strip is a record of the work rather than a fixed menu. |
 | **Lens** | A view docks to the right of the thread on wide screens and becomes a full-height sheet on narrow ones. The transcript and the composer stay on screen and stay usable; `Esc`, **Close**, or the rail chip closes it. Every lens ends in one sentence that re-enters the conversation — *Ask which to chase*, *Walk me through the job*, *Weigh the evidence* — so leaving a view is never a return to a menu. Settings and catch-up use the same lens. |
 
 Replies render Markdown (headings, lists, emphasis, inline and fenced code).
@@ -141,16 +142,66 @@ That is also enforced in the agent's system prompt: it is told to keep every
 artifact in the conversation, never to send the PM to a panel, and to end each
 reply with the next move as an action on the surface.
 
+### What it remembers
+
+The studio keeps a small, local, editable model of the person it is helping. It
+is not a profile and not a transcript index; it is the handful of things that
+change the next answer.
+
+| Kind | What it captures |
+|---|---|
+| `career` | The PM's role, remit, and what success looks like for them |
+| `opportunity` | The opportunity or bet currently in play |
+| `business` | Goals, metrics, and commercial constraints |
+| `stakeholder` | Who else matters and what they care about |
+| `constraint` | Time, budget, policy, or technical limits |
+| `evidence` | What has actually been heard or measured |
+| `preference` | How the PM likes to work and be spoken to |
+
+Each note is `suggested` or `confirmed`. Suggested notes appear first under
+**What I know** with **Yes, that's right**, **That's not it**, and **Edit**;
+confirmed notes can be edited or forgotten. The PM can also add a note by hand.
+Nothing is silently promoted: the agent may propose, but the person decides.
+
+The agent writes notes through a `remember` tool during a normal reply. The
+sidecar applies it, emits a `memory` SSE event, and the panel updates without a
+refresh. Memory writes are best-effort — a database failure never turns a good
+answer into an error.
+
+Storage is a separate SQLite file from the ODI repository:
+`~/.agentic-odi/studio.db`, overridable with `AGENTIC_ODI_STUDIO_DB`
+(`:memory:` is supported and is what the tests use). The API is small:
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/api/memory/observations` | Everything the agent believes |
+| `POST` | `/api/memory/observations` | Add a note by hand |
+| `PATCH` | `/api/memory/observations/{id}` | Edit text, confidence, or status |
+| `DELETE` | `/api/memory/observations/{id}` | Forget one note |
+| `DELETE` | `/api/memory` | Forget all notes and conversations |
+
+**Forget everything** is a two-step confirmation and also clears the visible
+thread, because the server deletes the conversations behind it.
+
+### The thread comes back
+
+Conversations are stored beside the memory. On launch the SPA asks
+`GET /api/conversations/latest`, restores that thread's user and assistant
+turns, and continues with the same `conversation_id` on the next message. **New
+conversation** starts a fresh one without touching the memory; **Forget
+everything** removes both. The composer stays usable while the restore is in
+flight, and a restore failure simply leaves the room empty.
+
 ## Rich responses
 
 The copilot does not only talk. When a surface carries the evidence better than a
 paragraph, the agent renders one **inline in the conversation**: a scored
 outcome, a ranked opportunity board, a before/after simulation of a bet, a
-customer quote with its lineage, the eight-stage job map, or a decision record.
+customer quote with its lineage, the eight-stage job map, an opportunity thesis, or a decision record.
 Three properties keep this safe and cheap to extend:
 
 - **The catalog is closed and owned by the SPA.**
-  `apps/studio/src/ui/catalog.ts` declares nine primitives and six cards, their
+  `apps/studio/src/ui/catalog.ts` declares nine primitives and seven cards, their
   JSON Schema props, and the description the model reads. There is no HTML, no
   eval, and no third-party component in the path. Prose is rendered by the same
   `Markdown` component the transcript already used.
@@ -176,6 +227,11 @@ A surface is one node tree, streamed as one event:
   }
 }
 ```
+
+The opportunity thesis is the intent-first card: one opportunity with its
+importance, satisfaction, the gap in plain words, the thesis itself, and the
+smallest next move. It is the shape the agent reaches for when the PM is deciding
+what to chase, rather than when they are inspecting a single score.
 
 The conversation keeps the order the agent produced: a `delta` appends to the
 open prose part, a `ui` event opens a card, and the next `delta` opens a new
