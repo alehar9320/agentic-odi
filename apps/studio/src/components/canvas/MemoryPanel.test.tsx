@@ -5,6 +5,7 @@ import type { Observation } from "../../types";
 import { MemoryPanel } from "./MemoryPanel";
 
 const mocks = vi.hoisted(() => ({
+  addObservation: vi.fn().mockResolvedValue({}),
   updateObservation: vi.fn().mockResolvedValue({}),
   deleteObservation: vi.fn().mockResolvedValue(undefined),
   clearMemory: vi.fn().mockResolvedValue(undefined),
@@ -72,6 +73,40 @@ describe("MemoryPanel", () => {
     expect(screen.getByText("What I'm working from")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Forget Prefers short updates." }));
     expect(mocks.deleteObservation).toHaveBeenCalledWith("o-1");
+  });
+
+  it("edits a note", () => {
+    mockMemory = [observation({ status: "confirmed", text: "Owns activation." })];
+    render(<MemoryPanel />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    fireEvent.change(screen.getByLabelText("Edit this note"), {
+      target: { value: "Owns activation and retention." },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(mocks.updateObservation).toHaveBeenCalledWith("o-1", {
+      text: "Owns activation and retention.",
+    });
+  });
+
+  it("adds a note the PM types", () => {
+    render(<MemoryPanel />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Add something" }));
+    fireEvent.change(screen.getByLabelText("What kind of note?"), {
+      target: { value: "constraint" },
+    });
+    fireEvent.change(screen.getByLabelText("What should I remember?"), {
+      target: { value: "We can't change pricing this quarter." },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+
+    expect(mocks.addObservation).toHaveBeenCalledWith({
+      kind: "constraint",
+      text: "We can't change pricing this quarter.",
+      confirmed: true,
+    });
   });
 
   it("clears everything only after a second confirmation", () => {

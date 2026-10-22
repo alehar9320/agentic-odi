@@ -3223,3 +3223,66 @@ details[open] summary {
   flex-wrap: wrap;
   gap: 8px;
 }
+
+
+.ui-card--thesis .ui-card__title {
+  font-size: 1.05rem;
+  line-height: 1.4;
+}
+
+.ui-thesis__gap {
+  margin: 0;
+  color: var(--studio-muted);
+  font-size: 0.86rem;
+  line-height: 1.5;
+}
+
+.ui-thesis__claim {
+  margin: 0;
+  padding: 10px 12px;
+  border-left: 2px solid var(--studio-indigo);
+  background: rgba(139, 140, 248, 0.06);
+  font-size: 0.92rem;
+  line-height: 1.55;
+}
+
+.memory-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.memory-edit__input,
+.memory-add textarea,
+.memory-add select {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg-raised);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.86rem;
+}
+
+.memory-add {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.memory-add__field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.memory-item__head .memory-item__actions {
+  margin-top: 0;
+}
