@@ -1,0 +1,60 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M5HXW05ESGV4670Z0F10E0HR",
+  "session_id": "ses_ea0194675ffeaGNtGEL8ei8WV7",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-22T13:48:25.472820316Z",
+  "branch": "feature/gh-pages-redesign",
+  "checkpoints_count": 2,
+  "files_touched": [
+    "website/assets/style.css",
+    "website/dist/assets/style.css"
+  ],
+  "agent": "OpenCode",
+  "model": "deepseek-ai/deepseek-v4.1-flash",
+  "turn_id": "e4a9a434c9bf",
+  "checkpoint_transcript_start": 18,
+  "transcript_lines_at_start": 18,
+  "compact_transcript_start": 18,
+  "token_usage": {
+    "input_tokens": 197498,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 1546102,
+    "output_tokens": 19450,
+    "api_call_count": 20
+  },
+  "session_metrics": {
+    "turn_count": 3
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-10-22T13:48:25.419176286Z",
+    "agent_lines": 3530,
+    "agent_removed": 136,
+    "human_added": 0,
+    "human_modified": 4,
+    "human_removed": 6,
+    "total_committed": 3530,
+    "total_lines_changed": 3676,
+    "agent_percentage": 99.72796517954298,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 194,
+      "user_lines_removed": 6,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        "docs/superpowers/plans/2026-10-21-conversational-generative-ui.md": 97,
+        "docs/superpowers/todos.md": 55,
+        "website/assets/style.css": 21,
+        "website/dist/assets/style.css": 21
+      },
+      "user_removed_per_file": {
+        "website/assets/style.css": 3,
+        "website/dist/assets/style.css": 3
+      }
+    }
+  ]
+}
