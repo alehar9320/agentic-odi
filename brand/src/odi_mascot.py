@@ -432,11 +432,25 @@ def _ansi_bg(color: _Color) -> str:
 
 
 def ascii_banner(raster: Raster | None = None) -> str:
-    """Render the plain half-block banner, one character per two pixels."""
+    """Render the plain half-block banner, one character per two pixels.
+
+    Without colour the two pixels of a cell cannot be shown separately, so a
+    filled cell becomes a full block. The silhouette is what carries the
+    character, and it survives the loss of colour.
+    """
     source = raster if raster is not None else bust_raster()
     lines = []
     for line in _banner_cells(source):
-        rendered = "".join("▀" if top or bottom else " " for top, bottom in line)
+        rendered = ""
+        for top, bottom in line:
+            if top and bottom:
+                rendered += "█"
+            elif top:
+                rendered += "▀"
+            elif bottom:
+                rendered += "▄"
+            else:
+                rendered += " "
         lines.append(rendered.rstrip())
     return "\n".join(lines)
 

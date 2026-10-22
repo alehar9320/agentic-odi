@@ -158,3 +158,23 @@ def test_ascii_banner_is_sixteen_rows_of_thirty_two_columns():
     assert all(len(line) <= 32 for line in lines)
     assert max(len(line) for line in lines) > 20
     assert any("▀" in line for line in lines)
+
+
+def test_ascii_banner_decodes_back_to_the_artwork():
+    """The plain banner must carry the same silhouette as the bust."""
+    lines = (ASSETS / "odi-ascii.txt").read_text(encoding="utf-8").splitlines()
+    bust = odi_mascot.bust_raster()
+    for row, line in enumerate(lines):
+        for column, glyph in enumerate(line):
+            top = glyph in "▀█"
+            bottom = glyph in "▄█"
+            assert top == (bust.get(column, row * 2) is not None), (row, column)
+            assert bottom == (bust.get(column, row * 2 + 1) is not None), (row, column)
+
+
+def test_ansi_banner_covers_the_same_silhouette_as_the_plain_one():
+    ansi = odi_mascot.ascii_banner_ansi()
+    plain = odi_mascot.ascii_banner()
+    plain_cells = sum(1 for line in plain.splitlines() for glyph in line if glyph != " ")
+    assert ansi.count("▀") == plain_cells
+    assert "\x1b[0m" in ansi

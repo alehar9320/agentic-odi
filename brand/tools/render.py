@@ -72,7 +72,7 @@ from __future__ import annotations
 
 import os
 import sys
-from typing import TextIO
+from typing import Protocol
 
 MASCOT_ASCII = {ascii_banner!r}
 
@@ -84,7 +84,16 @@ def render_banner(color: bool = True) -> str:
     return MASCOT_ANSI if color else MASCOT_ASCII
 
 
-def should_show_banner(stream: TextIO) -> bool:
+class BannerStream(Protocol):
+    """The part of a text stream the banner needs."""
+
+    @property
+    def encoding(self) -> str: ...
+
+    def isatty(self) -> bool: ...
+
+
+def should_show_banner(stream: BannerStream) -> bool:
     """Return True when the banner belongs on this stream.
 
     The banner is decoration: it is shown on a real terminal that can render

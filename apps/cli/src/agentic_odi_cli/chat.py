@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import sys
 import traceback
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -19,6 +20,8 @@ import typer
 from agentic_odi_core import ODI_ASSISTANT_PROMPT
 from fastmcp import Client
 from openai import AsyncOpenAI
+
+from agentic_odi_cli.mascot import render_banner, should_show_banner, wants_color
 
 DEFAULT_BASE_URL = "http://localhost:8001/v1"
 DEFAULT_API_KEY = "local"
@@ -405,6 +408,8 @@ def _print_tool(name: str, arguments: dict[str, Any]) -> None:
 
 
 async def _run_chat(config: ChatConfig) -> int:
+    if should_show_banner(sys.stdout):
+        typer.echo(render_banner(color=wants_color()))
     typer.echo("Agentic ODI · interactive")
 
     llm: Any | None = None
