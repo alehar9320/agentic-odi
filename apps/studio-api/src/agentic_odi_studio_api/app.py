@@ -80,6 +80,8 @@ def create_app(
 
         @app.get("/{full_path:path}", response_model=None)
         def spa_fallback(full_path: str) -> FileResponse | JSONResponse:
+            if full_path.startswith("api/"):
+                return JSONResponse({"detail": "Not Found"}, status_code=404)
             candidate = (SPA_DIST / full_path).resolve()
             if full_path and candidate.is_file() and candidate.is_relative_to(SPA_DIST.resolve()):
                 return FileResponse(candidate)
