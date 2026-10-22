@@ -1,0 +1,25 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M5HZDBKMQVWF30MKE3QEVB5N",
+  "session_id": "ses_ea010d520ffey3MEP7OOljNz5r",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-22T14:15:35.825670117Z",
+  "branch": "feat/odi-mascot",
+  "checkpoints_count": 1,
+  "save_step_count": 1,
+  "files_touched": [],
+  "agent": "OpenCode",
+  "model": "minimax-m3.1-flash",
+  "turn_id": "f5da3eb9ddb0",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 4094207,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 84780739,
+    "output_tokens": 1121324,
+    "api_call_count": 291
+  },
+  "session_metrics": {
+    "turn_count": 3
+  }
+}

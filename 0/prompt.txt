@@ -1,0 +1,74 @@
+Your goal is add E2E testing, with respect to industry best practice, state of the art methods, but with constraints of ensuring that we can run this for free as individual developer. Based on what we can learn from the context from the otehr AI agent, create a new CI step for e2e testing, but make it so that we can disable it later, if we see that it starts causing trouble. We should ensure that it adds to the existing stack, and does not cause duplication. create this on separate git worktree. create new branch, commit, and push as PR. When CI is green, we're done. Recommendations on options, from other AI research agent:  Yes, there are systems designed to be significantly more seamless. The friction you're sensing comes from trying to **force standard deterministic CI runners (like Playwright or FlaUI) to act like autonomous agents**, requiring you to hand-code glue scripts, prompt wrappers, and vision-parsing pipelines.
+
+If you want a truly seamless experience where an AI agent tests your local app natively, the industry has evolved toward **Vision-Language Native Computer Use Frameworks** and **Intent-Driven Locators**.
+
+---
+
+### The Most Seamless Open-Source Solutions
+
+Instead of writing test steps or building custom agent loops, these modern open-source systems allow you to describe high-level test intents while handling screen vision, desktop inputs, and assertions automatically.
+
+#### 1. Midscene.js (Best for Electron / Web-Tech Desktop Apps)
+
+* **What it is:** An open-source, vision-native testing engine built on LLM computer use.
+* **Why it’s seamless:** You completely eliminate traditional CSS/XPath selectors. You write natural language directly inside standard test code:
+```typescript
+// Seamless natural language actions & assertions
+await agent.aiAction("Click the 'Sign In' button and type 'testuser' into the username input");
+await agent.aiAssert("The dashboard screen is visible and displays a welcome banner");
+
+```
+
+
+* **Seamlessness factor:** It includes an automatic visual debugger interface that lets you inspect every vision step, click box, and reason without manual screenshot logging.
+
+#### 2. UI-TARS Desktop & Agent S3 (Best for Native Windows/Mac/Linux Desktop Apps)
+
+* **What it is:** ByteDance's open-source **UI-TARS** (and frameworks like **Agent S3**) are multimodal "computer-use" AI systems specifically trained to directly perceive desktop GUIs and operate mouse/keyboard controls natively.
+* **Why it’s seamless:** They skip accessibility APIs altogether. The agent looks at the rendered screen image (like a human), calculates target click coordinates natively, and executes actions directly on your OS desktop.
+
+#### 3. Stagehand (Open-Source Intent-Based Automation)
+
+* **What it is:** A lightweight open-source framework designed to replace brittle test scripts with 3 core agentic primitives: `.act()`, `.extract()`, and `.observe()`.
+* **Why it’s seamless:** It operates seamlessly inside standard Node/Python environments without complex setups:
+```typescript
+await stagehand.act("Open the file menu and click Export as PDF");
+const status = await stagehand.extract("What is the export status message?");
+
+```
+
+
+
+---
+
+### Why Commercial QA Agents *Feel* More Seamless (and the Catch)
+
+Platforms like **QA.tech**, **testRigor**, or **Momentic** offer turnkey "zero-code" autonomous agents. You type an intent like *"Verify a new user can complete checkout,"* and their cloud agent navigates the app, auto-heals broken flows, and sends a report to GitHub.
+
+* **The catch:** They are closed-source, cloud-hosted SaaS tools with subscription fees. Furthermore, cloud-based browser agents struggle to access a local desktop application running on your developer machine or local network without complex cloud tunneling.
+
+---
+
+### The Ultimate "Zero-Friction" Setup for Your Local App
+
+To achieve maximum seamlessness **for free** on your local machine:
+
+1. **Locally:** Use **Midscene.js** or **Stagehand** connected to **Ollama** running a local vision-capable model (like `Qwen2.5-VL` or `LLaVA`).
+2. **In CI:** Run your app inside a GitHub Actions container with **xvfb** (virtual display).
+3. **The Workflow:** Write 5-line intent scripts instead of 200-line DOM locator suites. When your app's UI changes, the agent continues passing the test without you updating a single line of test code.
+
+---
+
+Are you ready with the spec?
+
+---
+
+Continue if you have next steps, or stop and ask for clarification if you are unsure how to proceed.
+
+---
+
+a) fix. just ensure that youre on separate git worktree and that we start off from origin/main b) go with latest rather local
+
+---
+
+Proceed
