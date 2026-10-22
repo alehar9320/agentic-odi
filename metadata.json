@@ -3,7 +3,7 @@
   "checkpoint_id": "01M5HPMSZPTD0WKWBV796XT7DP",
   "strategy": "manual-commit",
   "branch": "docs/opportunity-specs-index",
-  "checkpoints_count": 7,
+  "checkpoints_count": 11,
   "files_touched": [
     "docs/superpowers/specs/2026-10-22-opportunity-issues-design.md"
   ],
@@ -56,13 +56,20 @@
       "compact_transcript": "/6/transcript.jsonl",
       "content_hash": "/6/content_hash.txt",
       "prompt": ""
+    },
+    {
+      "metadata": "/7/metadata.json",
+      "transcript": "/7/full.jsonl",
+      "compact_transcript": "/7/transcript.jsonl",
+      "content_hash": "/7/content_hash.txt",
+      "prompt": "/7/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 170635,
+    "input_tokens": 2657957,
     "cache_creation_tokens": 0,
-    "cache_read_tokens": 4439001,
-    "output_tokens": 75489,
-    "api_call_count": 25
+    "cache_read_tokens": 35438495,
+    "output_tokens": 266982,
+    "api_call_count": 355
   }
 }
