@@ -3,7 +3,7 @@
   "checkpoint_id": "01M5JJ8ZP83SGS6K02PG6Z640K",
   "strategy": "manual-commit",
   "branch": "feat/issue-91-error-surfacing",
-  "checkpoints_count": 5,
+  "checkpoints_count": 6,
   "files_touched": [
     "apps/studio/src/components/workspace/PanelBoundary.tsx",
     "apps/studio/src/components/workspace/WorkspacePanel.test.tsx",
@@ -30,6 +30,13 @@
       "transcript": "/2/full.jsonl",
       "compact_transcript": "/2/transcript.jsonl",
       "content_hash": "/2/content_hash.txt",
+      "prompt": ""
+    },
+    {
+      "metadata": "/3/metadata.json",
+      "transcript": "/3/full.jsonl",
+      "compact_transcript": "/3/transcript.jsonl",
+      "content_hash": "/3/content_hash.txt",
       "prompt": ""
     }
   ],
