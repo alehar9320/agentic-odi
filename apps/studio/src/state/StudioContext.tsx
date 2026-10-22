@@ -583,13 +583,10 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const createJob = useCallback(
     async (payload: { name: string; description?: string }): Promise<string | null> => {
       try {
-        const response = await apiCreateJob({ ...payload, mcp_url: settings.mcp_url });
+        const job = await apiCreateJob({ ...payload, mcp_url: settings.mcp_url });
         pushToast("success", `Job created: ${payload.name}`);
         await refreshCanvas();
-        if (response.result && typeof response.result === "object") {
-          return response.result.id ?? null;
-        }
-        return null;
+        return job.id ?? null;
       } catch (error) {
         pushToast("error", `Could not create the job: ${(error as Error).message}`);
         return null;

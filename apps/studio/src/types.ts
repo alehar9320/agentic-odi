@@ -31,6 +31,20 @@ export interface CanvasData {
   source: "mcp" | "seed" | "local";
 }
 
+/**
+ * The one failure shape the sidecar reports. Every HTTP error arrives as
+ * `{"error": StudioError}`, so the UI can show what went wrong, what to do
+ * about it, and whether a retry is worth trying.
+ */
+export interface StudioError {
+  code: string;
+  message: string;
+  detail?: string | null;
+  suggestion?: string | null;
+  retryable: boolean;
+  request_id?: string | null;
+}
+
 export interface StudioConfig {
   base_url: string;
   api_key: string;
