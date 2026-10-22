@@ -1,0 +1,45 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M5HZQ8XYHQP4631849H7YP2B",
+  "strategy": "manual-commit",
+  "branch": "feature/gh-pages-redesign",
+  "checkpoints_count": 1,
+  "files_touched": [
+    ".github/workflows/ci.yml",
+    ".github/workflows/pages.yml",
+    ".gitignore",
+    "README.md",
+    "website/assets/style.css",
+    "website/dist/assets/style.css",
+    "website/dist/docs/mcp/index.html",
+    "website/templates/_mcp_reference.html",
+    "website/tests/conftest.py",
+    "website/tests/test_content_sync.py",
+    "website/tests/test_design_system.py",
+    "website/tests/test_generated.py",
+    "website/tests/test_pages_deploy.py",
+    "website/tests/test_site.py",
+    "website/tests/test_sync_readme.py",
+    "website/tools/build_site.py",
+    "website/tools/extract.py",
+    "website/tools/make_og.py",
+    "website/tools/markdown_render.py",
+    "website/tools/sync-readme.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/0/metadata.json",
+      "transcript": "/0/full.jsonl",
+      "compact_transcript": "/0/transcript.jsonl",
+      "content_hash": "/0/content_hash.txt",
+      "prompt": ""
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 3981,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 9537367,
+    "output_tokens": 8062,
+    "api_call_count": 30
+  }
+}
