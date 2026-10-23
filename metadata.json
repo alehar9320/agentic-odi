@@ -1,0 +1,28 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M5MEVZH0949H8TXW4FS1YMCJ",
+  "strategy": "manual-commit",
+  "branch": "feat/studio-first-impression",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "website/dist/docs/development/index.html",
+    "website/dist/docs/roadmap/index.html",
+    "website/dist/docs/studio/index.html"
+  ],
+  "sessions": [
+    {
+      "metadata": "/0/metadata.json",
+      "transcript": "/0/full.jsonl",
+      "compact_transcript": "/0/transcript.jsonl",
+      "content_hash": "/0/content_hash.txt",
+      "prompt": "/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 539684,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 4368320,
+    "output_tokens": 15505,
+    "api_call_count": 44
+  }
+}

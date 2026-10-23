@@ -1,0 +1,5 @@
+Read-only research. Do not edit any files. Analyze the React/TypeScript Studio at apps/studio/src (ignore node_modules, dist, src-tauri/target). Goal: find concrete, high-value product opportunities that each deliver a distinct user-visible increment and could be implemented by a junior agent in 2-4 hours. Focus on: onboarding/first-run, chat/composer, inline UI surfaces/cards, workbench/panels, catch-up/notifications, settings/connectors, memory, error/empty/loading states, accessibility/keyboard, mobile/responsive, copy/microcopy, performance, and any placeholder/TODO/dead-end flows. Read App.tsx, state/StudioContext.tsx, components/*, ui/*, lib/*, onboarding/*, api/*. Look for real gaps, not generic 'add tests'. Return 18 candidate opportunities, each with: title (short outcome), user value, exact files/lines to touch, what 'done' looks like, rough effort, and any overlap with an existing GitHub issue/PR if obvious. Prefer small, self-contained, verifiable increments. Be concrete and cite file_path:line_number.
+
+---
+
+Continue if you have next steps, or stop and ask for clarification if you are unsure how to proceed.
