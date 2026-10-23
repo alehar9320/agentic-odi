@@ -116,7 +116,7 @@ function AssistantMessage({
         {streaming && content && <span className="caret" aria-hidden="true" />}
 
         {tools.length > 0 && (
-          <ul className="traces" aria-label="Tools used">
+          <ul className="traces" aria-label="Tools used" aria-live="polite">
             {tools.map((tool, index) => (
               <li className="trace" key={`${tool.name}-${index}`}>
                 <span className="trace__dot" aria-hidden="true" />

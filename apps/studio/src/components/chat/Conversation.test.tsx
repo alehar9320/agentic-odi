@@ -111,6 +111,17 @@ describe("Conversation", () => {
   });
 });
 
+describe("Conversation live regions", () => {
+  it("announces tool traces politely as they arrive", () => {
+    harness.state.toolActivity = [{ name: "list_jobs", status: "ok" }];
+    renderTurn([{ role: "assistant", content: "Working", parts: [{ kind: "text", text: "Working" }] }]);
+
+    const traces = screen.getByRole("list", { name: /tools used/i });
+    expect(traces).toHaveAttribute("aria-live", "polite");
+    harness.state.toolActivity = [];
+  });
+});
+
 describe("Conversation failures", () => {
   it("shows the failure, the suggestion, and a retry that re-sends the question", () => {
     harness.state.sendMessage = vi.fn<(text: string) => Promise<void>>();
