@@ -22,6 +22,19 @@ export function GhostOpportunityCards({ count = 3 }: { count?: number }) {
   );
 }
 
+export function GhostMemory({ count = 4 }: { count?: number }) {
+  return (
+    <div className="memory-list" aria-hidden="true">
+      {Array.from({ length: count }, (_, index) => (
+        <div className="memory-item" key={index}>
+          <div className="skeleton skeleton--line" style={{ width: 72 }} />
+          <div className="skeleton skeleton--line" style={{ width: "86%" }} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function GhostJobSteps({ count = 4 }: { count?: number }) {
   return (
     <div aria-hidden="true">
