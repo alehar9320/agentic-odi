@@ -28,6 +28,7 @@ export interface CanvasData {
   jobs: Job[];
   steps: Step[];
   outcomes: Outcome[];
+  scheduled_work?: ScheduledWork[];
   source: "mcp" | "seed" | "local";
   /** Why the board is not what the server actually holds, when the sidecar knows. */
   warnings?: string[];
@@ -120,6 +121,7 @@ export type WorkspacePanelId =
   | "capture"
   | "memory"
   | "catchup"
+  | "schedule"
   | "settings";
 
 export type NotificationCategory = "outcome" | "simulation" | "evidence" | "job" | "insight";
@@ -265,4 +267,18 @@ export interface ChangelogRelease {
 
 export interface ChangelogData {
   releases: ChangelogRelease[];
+}
+
+export interface ScheduledWork {
+  id: string;
+  name: string;
+  agent_id: string;
+  trigger_type: "oneshot" | "cron" | "interval";
+  schedule_expression: string;
+  payload?: Record<string, unknown>;
+  status: "pending" | "scheduled" | "running" | "completed" | "failed" | "cancelled";
+  job_id?: string | null;
+  created_at: string;
+  last_run_at?: string | null;
+  result_summary?: string | null;
 }

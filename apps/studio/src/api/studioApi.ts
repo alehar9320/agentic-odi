@@ -256,8 +256,6 @@ export async function streamChat(
     }
   }
 }
-
-
 export async function fetchMemory(): Promise<Observation[]> {
   const body = await getJson<{ observations: Observation[] }>("/api/memory/observations");
   return body.observations;
@@ -312,4 +310,30 @@ export function fetchLatestConversation(): Promise<LatestConversation> {
 export async function createConversation(): Promise<Conversation> {
   const body = await postJson<{ conversation: Conversation }>("/api/conversations", {});
   return body.conversation;
+}
+
+export function scheduleWork(payload: {
+  name: string;
+  schedule_expression: string;
+  agent_id?: string;
+  trigger_type?: string;
+  payload?: Record<string, unknown>;
+  job_id?: string;
+  mcp_url: string;
+}): Promise<{ ok: boolean; result: unknown }> {
+  return postJson("/api/schedule", payload);
+}
+
+export function triggerScheduledWork(
+  workId: string,
+  mcpUrl: string,
+): Promise<{ ok: boolean; result: unknown }> {
+  return postJson(`/api/schedule/${encodeURIComponent(workId)}/trigger?mcp_url=${encodeURIComponent(mcpUrl)}`, {});
+}
+
+export function cancelScheduledWork(
+  workId: string,
+  mcpUrl: string,
+): Promise<{ ok: boolean; result: unknown }> {
+  return postJson(`/api/schedule/${encodeURIComponent(workId)}/cancel?mcp_url=${encodeURIComponent(mcpUrl)}`, {});
 }

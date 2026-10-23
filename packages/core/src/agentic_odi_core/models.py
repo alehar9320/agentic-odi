@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Literal
 
@@ -129,3 +130,46 @@ class CustomerOutcome(BaseModel):
     @property
     def opportunity_score(self) -> float:
         return self.customer_value.opportunity_score
+
+
+class ScheduledWorkStatus(str, Enum):
+    PENDING = "pending"
+    SCHEDULED = "scheduled"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
+class ScheduledWorkTriggerType(str, Enum):
+    ONESHOT = "oneshot"
+    CRON = "cron"
+    INTERVAL = "interval"
+
+
+class ScheduledWork(BaseModel):
+    """A scheduled task or agent run in the cloud."""
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str = Field(..., description="Name or title of the scheduled work task")
+    agent_id: str = Field(
+        "default-agent", description="ID/alias of the agent assigned to run the work"
+    )
+    trigger_type: ScheduledWorkTriggerType = Field(
+        ScheduledWorkTriggerType.ONESHOT, description="Trigger mechanism (oneshot, cron, interval)"
+    )
+    schedule_expression: str = Field(
+        ...,
+        description="ISO timestamp, relative delay, or cron expression (e.g. '0 * * * *' or '+1h')",
+    )
+    payload: dict[str, Any] = Field(
+        default_factory=dict, description="Parameters or prompt for the cloud task"
+    )
+    status: ScheduledWorkStatus = Field(
+        ScheduledWorkStatus.SCHEDULED, description="Current status of the task"
+    )
+    job_id: str | None = Field(None, description="Associated ODI Job ID, if any")
+    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    last_run_at: str | None = Field(None, description="ISO timestamp of last execution")
+    next_run_at: str | None = Field(None, description="ISO timestamp of next scheduled execution")
+    result_summary: str | None = Field(None, description="Execution outcome or error summary")

@@ -282,3 +282,45 @@ def render_score(importance: float, satisfaction: float, score: float, *, as_jso
             {"importance": importance, "satisfaction": satisfaction, "opportunity_score": score}
         )
     return f"Opportunity score: {score:.2f}"
+
+
+def render_scheduled_work(item: Any, *, as_json: bool) -> str:
+    if not isinstance(item, dict):
+        return _json(item) if as_json else str(item)
+    if as_json:
+        return _json(item)
+    return _block(
+        [
+            ("id", item.get("id", "")),
+            ("name", item.get("name", "")),
+            ("agent_id", item.get("agent_id", "")),
+            ("trigger_type", item.get("trigger_type", "")),
+            ("expression", item.get("schedule_expression", "")),
+            ("status", item.get("status", "")),
+            ("job_id", item.get("job_id") or ""),
+            ("last_run_at", item.get("last_run_at") or ""),
+            ("result", item.get("result_summary") or ""),
+        ]
+    )
+
+
+def render_scheduled_work_list(items: Any, *, as_json: bool) -> str:
+    if not isinstance(items, list):
+        return _json(items) if as_json else str(items)
+    if as_json:
+        return _json(items)
+    return _table(
+        ("id", "name", "agent_id", "trigger_type", "expression", "status"),
+        [
+            (
+                str(item.get("id", "")),
+                _truncate(str(item.get("name", ""))),
+                str(item.get("agent_id", "")),
+                str(item.get("trigger_type", "")),
+                str(item.get("schedule_expression", "")),
+                str(item.get("status", "")),
+            )
+            for item in items
+        ],
+        empty="No scheduled work found.",
+    )
