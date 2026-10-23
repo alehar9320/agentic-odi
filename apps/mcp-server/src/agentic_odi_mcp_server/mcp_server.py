@@ -14,6 +14,7 @@ from agentic_odi_core import (
     OdiError,
     ODIService,
     OutcomeNotFoundError,
+    ScheduledWorkNotFoundError,
     StepNotFoundError,
     ValueOutOfRangeError,
     build_repository,
@@ -21,6 +22,7 @@ from agentic_odi_core import (
     evaluate_outcome_statement,
     job_not_found,
     odi_schema,
+    scheduled_work_not_found,
 )
 from agentic_odi_core import (
     customer_outcome_not_found as _cust_not_found,
@@ -457,6 +459,67 @@ def promote_evidence(
         return f"Error: {exc}"
     label = "Job" if target == "job" else "Outcome"
     return f"{label} created successfully: {artifact.model_dump_json()}"
+
+
+@mcp.tool
+def schedule_work(
+    name: str,
+    schedule_expression: str,
+    agent_id: str = "default-agent",
+    trigger_type: str = "oneshot",
+    payload: dict[str, Any] | None = None,
+    job_id: str | None = None,
+) -> str:
+    try:
+        work = service.schedule_work(
+            name=name,
+            schedule_expression=schedule_expression,
+            agent_id=agent_id,
+            trigger_type=trigger_type,
+            payload=payload,
+            job_id=job_id,
+        )
+    except JobNotFoundError:
+        return job_not_found(job_id or "")
+    except ValueError as exc:
+        return f"Error: {exc}"
+    return f"Scheduled work created successfully: {work.model_dump_json()}"
+
+
+@mcp.tool
+def get_scheduled_work(work_id: str) -> str:
+    try:
+        work = service.get_scheduled_work(work_id)
+    except ScheduledWorkNotFoundError:
+        return scheduled_work_not_found(work_id)
+    return work.model_dump_json()
+
+
+@mcp.tool
+def list_scheduled_work(
+    job_id: str | None = None,
+    status: str | None = None,
+) -> str:
+    items = service.list_scheduled_work(job_id=job_id, status=status)
+    return json.dumps([item.model_dump() for item in items])
+
+
+@mcp.tool
+def cancel_scheduled_work(work_id: str) -> str:
+    try:
+        work = service.cancel_scheduled_work(work_id)
+    except ScheduledWorkNotFoundError:
+        return scheduled_work_not_found(work_id)
+    return f"Scheduled work cancelled successfully: {work.model_dump_json()}"
+
+
+@mcp.tool
+def trigger_scheduled_work(work_id: str) -> str:
+    try:
+        work = service.trigger_scheduled_work(work_id)
+    except ScheduledWorkNotFoundError:
+        return scheduled_work_not_found(work_id)
+    return f"Scheduled work triggered successfully: {work.model_dump_json()}"
 
 
 @mcp.tool

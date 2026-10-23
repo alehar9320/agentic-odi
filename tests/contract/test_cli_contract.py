@@ -33,6 +33,11 @@ LOCAL_TOOLS = {
     "promote_evidence",
     "get_odi_schema",
     "compute_opportunity",
+    "schedule_work",
+    "get_scheduled_work",
+    "list_scheduled_work",
+    "cancel_scheduled_work",
+    "trigger_scheduled_work",
 }
 
 

@@ -28,6 +28,7 @@ from agentic_odi_core.messages import (
     evidence_not_found,
     job_not_found,
     outcome_not_found,
+    scheduled_work_not_found,
     step_not_found,
 )
 from agentic_odi_core.models import (
@@ -40,6 +41,9 @@ from agentic_odi_core.models import (
     EvidenceItemType,
     Job,
     Outcome,
+    ScheduledWork,
+    ScheduledWorkStatus,
+    ScheduledWorkTriggerType,
     Step,
     ValueMetric,
     compute_opportunity_score,
@@ -58,11 +62,17 @@ from agentic_odi_core.services import (
     JobNotFoundError,
     ODIService,
     OutcomeNotFoundError,
+    ScheduledWorkNotFoundError,
     StepNotFoundError,
     ValueOutOfRangeError,
 )
 
 __all__ = [
+    "ScheduledWork",
+    "ScheduledWorkNotFoundError",
+    "ScheduledWorkStatus",
+    "ScheduledWorkTriggerType",
+    "scheduled_work_not_found",
     "BusinessImpactCategory",
     "BusinessValue",
     "CAPABILITIES",

@@ -14,6 +14,9 @@ from agentic_odi_core.models import (
     EvidenceItemType,
     Job,
     Outcome,
+    ScheduledWork,
+    ScheduledWorkStatus,
+    ScheduledWorkTriggerType,
     Step,
     compute_opportunity_score,
 )
@@ -44,14 +47,16 @@ class CustomerOutcomeNotFoundError(NotFoundError):
         super().__init__(outcome_id, "customer_outcome")
 
 
-class EvidenceNotFoundError(NotFoundError, ValueError):
-    """Raised when an evidence record cannot be located.
+class ScheduledWorkNotFoundError(Exception):
+    def __init__(self, work_id: str) -> None:
+        self.work_id = work_id
+        super().__init__(work_id)
 
-    Also a :class:`ValueError`, because the caller supplied an id that does not
-    resolve — an invalid argument value.
-    """
 
-    def __init__(self, evidence_id: str, hint: str | None = None) -> None:
+class EvidenceNotFoundError(Exception):
+    def __init__(self, evidence_id: str) -> None:
+        self.evidence_id = evidence_id
+        super().__init__(evidence_id, "evidence", hint)
         self.evidence_id = evidence_id
         super().__init__(evidence_id, "evidence", hint)
 
@@ -334,3 +339,67 @@ class ODIService:
 
     def compute_opportunity(self, importance: float, satisfaction: float) -> float:
         return compute_opportunity_score(importance, satisfaction)
+
+    def schedule_work(
+        self,
+        name: str,
+        schedule_expression: str,
+        agent_id: str = "default-agent",
+        trigger_type: ScheduledWorkTriggerType | str = ScheduledWorkTriggerType.ONESHOT,
+        payload: dict[str, Any] | None = None,
+        job_id: str | None = None,
+    ) -> ScheduledWork:
+        if job_id is not None and self.repo.get_job(job_id) is None:
+            raise JobNotFoundError(job_id)
+        if isinstance(trigger_type, str):
+            trigger_type = ScheduledWorkTriggerType(trigger_type)
+        work = ScheduledWork(
+            id=str(uuid.uuid4()),
+            name=name,
+            agent_id=agent_id,
+            trigger_type=trigger_type,
+            schedule_expression=schedule_expression,
+            payload=payload or {},
+            status=ScheduledWorkStatus.SCHEDULED,
+            job_id=job_id,
+        )
+        return self.repo.add_scheduled_work(work)
+
+    def get_scheduled_work(self, work_id: str) -> ScheduledWork:
+        work = self.repo.get_scheduled_work(work_id)
+        if work is None:
+            raise ScheduledWorkNotFoundError(work_id)
+        return work
+
+    def list_scheduled_work(
+        self, job_id: str | None = None, status: str | None = None
+    ) -> list[ScheduledWork]:
+        return self.repo.list_scheduled_work(job_id=job_id, status=status)
+
+    def cancel_scheduled_work(self, work_id: str) -> ScheduledWork:
+        work = self.repo.get_scheduled_work(work_id)
+        if work is None:
+            raise ScheduledWorkNotFoundError(work_id)
+        updated = self.repo.update_scheduled_work(
+            work_id, {"status": ScheduledWorkStatus.CANCELLED}
+        )
+        if updated is None:
+            raise ScheduledWorkNotFoundError(work_id)
+        return updated
+
+    def trigger_scheduled_work(self, work_id: str) -> ScheduledWork:
+        from datetime import datetime, timezone
+
+        work = self.repo.get_scheduled_work(work_id)
+        if work is None:
+            raise ScheduledWorkNotFoundError(work_id)
+        now_str = datetime.now(timezone.utc).isoformat()
+        updates = {
+            "status": ScheduledWorkStatus.COMPLETED,
+            "last_run_at": now_str,
+            "result_summary": f"Executed mock cloud agent task '{work.name}' successfully at {now_str}.",
+        }
+        updated = self.repo.update_scheduled_work(work_id, updates)
+        if updated is None:
+            raise ScheduledWorkNotFoundError(work_id)
+        return updated

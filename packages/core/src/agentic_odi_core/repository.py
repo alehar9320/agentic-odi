@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from agentic_odi_core.models import CustomerOutcome, Evidence, Job, Outcome, Step
+from agentic_odi_core.models import CustomerOutcome, Evidence, Job, Outcome, ScheduledWork, Step
 
 
 class Repository(Protocol):
@@ -13,6 +13,7 @@ class Repository(Protocol):
     outcomes: dict[str, Outcome]
     customer_outcomes: dict[str, CustomerOutcome]
     evidence: dict[str, Evidence]
+    scheduled_work: dict[str, ScheduledWork]
 
     def add_job(self, job: Job) -> Job: ...
     def list_jobs(self) -> list[Job]: ...
@@ -43,6 +44,14 @@ class Repository(Protocol):
         outcome_id: str | None = None,
     ) -> list[Evidence]: ...
     def delete_evidence(self, evidence_id: str) -> bool: ...
+    def add_scheduled_work(self, work: ScheduledWork) -> ScheduledWork: ...
+    def get_scheduled_work(self, work_id: str) -> ScheduledWork | None: ...
+    def list_scheduled_work(
+        self, job_id: str | None = None, status: str | None = None
+    ) -> list[ScheduledWork]: ...
+    def update_scheduled_work(self, work_id: str, updates: dict) -> ScheduledWork | None: ...
+    def delete_scheduled_work(self, work_id: str) -> bool: ...
+
     def clear(self) -> None: ...
 
 
@@ -53,6 +62,7 @@ class InMemoryRepository:
         self.outcomes: dict[str, Outcome] = {}
         self.customer_outcomes: dict[str, CustomerOutcome] = {}
         self.evidence: dict[str, Evidence] = {}
+        self.scheduled_work: dict[str, ScheduledWork] = {}
 
     def add_job(self, job: Job) -> Job:
         self.jobs[job.id] = job
@@ -218,8 +228,42 @@ class InMemoryRepository:
             return True
         return False
 
+    def add_scheduled_work(self, work: ScheduledWork) -> ScheduledWork:
+        self.scheduled_work[work.id] = work
+        return work
+
+    def get_scheduled_work(self, work_id: str) -> ScheduledWork | None:
+        return self.scheduled_work.get(work_id)
+
+    def list_scheduled_work(
+        self, job_id: str | None = None, status: str | None = None
+    ) -> list[ScheduledWork]:
+        items = list(self.scheduled_work.values())
+        if job_id is not None:
+            items = [item for item in items if item.job_id == job_id]
+        if status is not None:
+            items = [item for item in items if item.status == status]
+        return items
+
+    def update_scheduled_work(self, work_id: str, updates: dict) -> ScheduledWork | None:
+        work = self.scheduled_work.get(work_id)
+        if not work:
+            return None
+        current = work.model_dump(exclude_unset=True)
+        current.update(updates)
+        new_work = work.model_validate(current)
+        self.scheduled_work[work_id] = new_work
+        return new_work
+
+    def delete_scheduled_work(self, work_id: str) -> bool:
+        if work_id in self.scheduled_work:
+            del self.scheduled_work[work_id]
+            return True
+        return False
+
     def clear(self) -> None:
         self.jobs.clear()
+        self.scheduled_work.clear()
         self.steps.clear()
         self.outcomes.clear()
         self.customer_outcomes.clear()

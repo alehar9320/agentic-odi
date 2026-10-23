@@ -178,3 +178,13 @@ class TurnModel(BaseModel):
 class LatestConversationResponse(BaseModel):
     conversation: ConversationModel | None = None
     turns: list[TurnModel] = Field(default_factory=list)
+
+
+class ScheduleWorkRequest(BaseModel):
+    mcp_url: str = ""
+    name: str
+    schedule_expression: str
+    agent_id: str = "default-agent"
+    trigger_type: str = "oneshot"
+    payload: dict[str, Any] = Field(default_factory=dict)
+    job_id: str | None = None
