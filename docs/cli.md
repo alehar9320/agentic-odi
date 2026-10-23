@@ -151,12 +151,19 @@ agentic-odi evidence promote <evidence-id> --to outcome --job-id <job-id>
 `connectors ingest --job-id <job-id>` maps every evidence-bearing record in the
 ingested batch into evidence in one step.
 
-## Schema and scoring
+## Schema, scoring, and guidance
 
 ```bash
 agentic-odi schema            # canonical JSON schema for every ODI entity
 agentic-odi score 8 2         # ODI opportunity score → 14.00
+agentic-odi evaluate "Minimize the time to ship when onboarding"  # outcome-format check
+agentic-odi evaluate --json "Minimize the time to ship when onboarding"
+agentic-odi guidelines        # the ODI stage-by-stage guide
+agentic-odi capabilities      # what the assistant can do
 ```
+
+`evaluate` returns the same verdict the `evaluate_outcome` MCP tool does, so the
+check works with or without a running server.
 
 ## Manage Customer Outcomes
 

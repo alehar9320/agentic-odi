@@ -33,6 +33,9 @@ LOCAL_TOOLS = {
     "promote_evidence",
     "get_odi_schema",
     "compute_opportunity",
+    "evaluate_outcome",
+    "get_odi_framework_guidelines",
+    "get_capabilities",
 }
 
 

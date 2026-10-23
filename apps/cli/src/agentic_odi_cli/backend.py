@@ -452,6 +452,36 @@ class LocalBackend(Backend):
 
         return odi_schema()
 
+    def _evaluate_outcome(self, args: dict[str, Any]) -> str:
+        from agentic_odi_core import job_not_found
+        from agentic_odi_core.evaluation import evaluate_outcome_statement
+
+        result = evaluate_outcome_statement(args["statement"])
+        job_id = args.get("job_id")
+        if job_id is not None:
+            if self.service.get_job(job_id) is None:
+                return json.dumps({**result, "job_id": job_id, "error": job_not_found(job_id)})
+            result["job_id"] = job_id
+            result["existing_outcomes"] = [
+                {
+                    "id": outcome.id,
+                    "statement": outcome.statement,
+                    "opportunity_score": outcome.opportunity_score,
+                }
+                for outcome in self.service.get_outcomes(job_id)
+            ]
+        return json.dumps(result)
+
+    def _get_odi_framework_guidelines(self, args: dict[str, Any]) -> str:
+        from agentic_odi_core import ODI_FRAMEWORK_GUIDELINES
+
+        return ODI_FRAMEWORK_GUIDELINES
+
+    def _get_capabilities(self, args: dict[str, Any]) -> str:
+        from agentic_odi_core import CAPABILITIES
+
+        return CAPABILITIES
+
     def _compute_opportunity(self, args: dict[str, Any]) -> float:
         from agentic_odi_core import compute_opportunity_score
 
@@ -490,6 +520,9 @@ _LOCAL_HANDLERS = {
     "promote_evidence": LocalBackend._promote_evidence,
     "get_odi_schema": LocalBackend._get_odi_schema,
     "compute_opportunity": LocalBackend._compute_opportunity,
+    "evaluate_outcome": LocalBackend._evaluate_outcome,
+    "get_odi_framework_guidelines": LocalBackend._get_odi_framework_guidelines,
+    "get_capabilities": LocalBackend._get_capabilities,
 }
 
 

@@ -164,6 +164,9 @@ agentic-odi desired-outcomes list --job-id <id>
 agentic-odi customer-outcomes list
 agentic-odi evidence list --job-id <id>
 agentic-odi schema               # canonical JSON schema for every entity
+agentic-odi evaluate "Minimize the time to ship when onboarding"  # outcome-format check
+agentic-odi guidelines           # the ODI stage-by-stage guide
+agentic-odi capabilities         # what the assistant can do
 agentic-odi score 8 2            # ODI opportunity score → 14.00
 ```
 

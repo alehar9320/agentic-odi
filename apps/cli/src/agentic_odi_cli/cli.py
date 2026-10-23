@@ -158,6 +158,39 @@ def schema_cmd() -> None:
     typer.echo(json.dumps(run_tool("get_odi_schema", {}), indent=2))
 
 
+@app.command(name="evaluate")
+def evaluate_cmd(
+    statement: str = typer.Argument(..., help="Outcome statement to check"),
+    job_id: str | None = typer.Option(default=None, help="Job to compare against"),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
+) -> None:
+    """Check whether a statement reads as a well-formed ODI desired outcome."""
+    args: dict[str, object] = {"statement": statement}
+    if job_id is not None:
+        args["job_id"] = job_id
+    result = run_tool("evaluate_outcome", args)
+    if json_output:
+        typer.echo(result if isinstance(result, str) else json.dumps(result))
+        return
+    parsed = json.loads(result) if isinstance(result, str) else result
+    verdict = "passes" if parsed.get("valid") else "needs work"
+    typer.echo(f"{verdict}: {statement}")
+    for problem in parsed.get("issues", []):
+        typer.echo(f"  - {problem}")
+
+
+@app.command(name="guidelines")
+def guidelines_cmd() -> None:
+    """Print the ODI framework guidelines."""
+    typer.echo(run_tool("get_odi_framework_guidelines", {}))
+
+
+@app.command(name="capabilities")
+def capabilities_cmd() -> None:
+    """Print what the assistant can do."""
+    typer.echo(run_tool("get_capabilities", {}))
+
+
 @app.command(name="version")
 def version_cmd() -> None:
     """Show CLI version."""
