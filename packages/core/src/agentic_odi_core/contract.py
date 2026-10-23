@@ -42,6 +42,11 @@ class ToolName(str, Enum):
     COMPUTE_OPPORTUNITY = "compute_opportunity"
     GET_FRAMEWORK_GUIDELINES = "get_odi_framework_guidelines"
     GET_CAPABILITIES = "get_capabilities"
+    SCHEDULE_WORK = "schedule_work"
+    GET_SCHEDULED_WORK = "get_scheduled_work"
+    LIST_SCHEDULED_WORK = "list_scheduled_work"
+    CANCEL_SCHEDULED_WORK = "cancel_scheduled_work"
+    TRIGGER_SCHEDULED_WORK = "trigger_scheduled_work"
 
 
 @dataclass(frozen=True)
@@ -137,6 +142,14 @@ TOOL_SPECS: dict[str, ToolSpec] = {
     ),
     ToolName.GET_FRAMEWORK_GUIDELINES.value: ToolSpec(),
     ToolName.GET_CAPABILITIES.value: ToolSpec(),
+    ToolName.SCHEDULE_WORK.value: ToolSpec(
+        ("name", "schedule_expression", "agent_id", "trigger_type", "payload", "job_id"),
+        ("name", "schedule_expression"),
+    ),
+    ToolName.GET_SCHEDULED_WORK.value: ToolSpec(("work_id",), ("work_id",)),
+    ToolName.LIST_SCHEDULED_WORK.value: ToolSpec(("job_id", "status")),
+    ToolName.CANCEL_SCHEDULED_WORK.value: ToolSpec(("work_id",), ("work_id",)),
+    ToolName.TRIGGER_SCHEDULED_WORK.value: ToolSpec(("work_id",), ("work_id",)),
 }
 
 TOOL_NAMES: tuple[str, ...] = tuple(TOOL_SPECS)

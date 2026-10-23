@@ -482,5 +482,7 @@ def test_every_page_resolves_its_own_assets(page: str):
 def test_page_weights_are_within_budget(page: str):
     size = _built_root(page).stat().st_size
     # The MCP reference is the long pole: every tool's argument table lives on
-    # that one page, so it grows with each paginated list tool we add.
-    assert size <= 64 * 1024, f"{page}: {size} bytes"
+    # that one page, so it grows with each tool we add. Scheduling added five
+    # tools (schedule/get/list/cancel/trigger), which is the same growth the
+    # paginated list tools caused when the budget moved from 60 to 64 KiB.
+    assert size <= 80 * 1024, f"{page}: {size} bytes"

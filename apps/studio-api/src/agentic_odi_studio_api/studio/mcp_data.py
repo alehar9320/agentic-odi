@@ -32,6 +32,7 @@ async def fetch_canvas(mcp_url: str) -> dict[str, Any]:
     outcomes: list[dict[str, Any]] = []
     steps: list[dict[str, Any]] = []
     evidence: list[dict[str, Any]] = []
+    scheduled_work: list[dict[str, Any]] = []
     warnings: list[str] = []
 
     if not is_endpoint_reachable(mcp_url, timeout=0.3):
@@ -51,6 +52,17 @@ async def fetch_canvas(mcp_url: str) -> dict[str, Any]:
             except Exception as exc:  # noqa: BLE001
                 log.warning("Failed to parse jobs from MCP: %s", exc)
                 jobs = []
+
+            try:
+                raw_scheduled = await asyncio.wait_for(
+                    mcp_client.call_tool(ToolName.LIST_SCHEDULED_WORK.value, {}),
+                    timeout=1.0,
+                )
+                parsed_scheduled = json.loads(str(raw_scheduled))
+                if isinstance(parsed_scheduled, list):
+                    scheduled_work = parsed_scheduled
+            except Exception as exc:  # noqa: BLE001
+                log.warning("Failed to fetch scheduled work from MCP: %s", exc)
 
             for job in jobs:
                 job_id = job.get("id")
@@ -106,6 +118,7 @@ async def fetch_canvas(mcp_url: str) -> dict[str, Any]:
         "steps": steps,
         "outcomes": outcomes,
         "evidence": evidence,
+        "scheduled_work": scheduled_work,
         "source": "mcp",
         "warnings": warnings,
     }
@@ -126,6 +139,14 @@ def fetch_local_canvas(service: ODIService) -> dict[str, Any]:
         "steps": steps,
         "outcomes": outcomes,
         "evidence": evidence,
+        "source": "local",
+    }
+    scheduled_work = [item.model_dump() for item in service.list_scheduled_work()]
+    return {
+        "jobs": jobs,
+        "steps": steps,
+        "outcomes": outcomes,
+        "scheduled_work": scheduled_work,
         "source": "local",
     }
 
