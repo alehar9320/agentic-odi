@@ -1,6 +1,7 @@
 import pytest
-from agentic_odi_core.router import ModelRouter, ModelTier, RoutingMode
+from agentic_odi_core.router import ModelRouter, ModelTier, OnDeviceLLMEngine, RoutingMode
 from agentic_odi_core.steve_jobs import (
+    format_opportunity_score_insight,
     generate_steve_jobs_response,
 )
 
@@ -38,3 +39,36 @@ async def test_fallback_stream():
         chunks.append(chunk)
     full_text = "".join(chunks)
     assert 'I received your intent: **"hello"**.' in full_text
+
+
+@pytest.mark.asyncio
+async def test_steve_jobs_full_branches():
+    router = ModelRouter(mode=RoutingMode.AUTO)
+    # Test formula formatting
+    res1 = format_opportunity_score_insight(10.0, 10.0, "Maintain outcome")
+    assert "Appropriately Served" in res1
+    assert "Maintain outcome" in res1
+
+    res2 = format_opportunity_score_insight(6.0, 9.0)
+    assert "Overserved Target" in res2
+
+    # Test Steve Jobs generator keyword paths
+    assert "Causal Lineage" in generate_steve_jobs_response("evidence from calls")
+    assert "Outcome-Driven Innovation" in generate_steve_jobs_response(
+        "how does this stage framework work"
+    )
+    assert "Impact Simulation" in generate_steve_jobs_response("simulate friction bet")
+
+    # Test OnDeviceLLMEngine stream
+    engine = OnDeviceLLMEngine()
+    assert engine.is_available() is True
+    chunks = []
+    async for c in engine.generate_stream("hi"):
+        chunks.append(c)
+    assert len(chunks) > 0
+
+    # Test fallback stream for ON_DEVICE_LLM tier
+    on_device_chunks = []
+    async for c in router.generate_fallback_stream("test on device", ModelTier.ON_DEVICE_LLM):
+        on_device_chunks.append(c)
+    assert len(on_device_chunks) > 0

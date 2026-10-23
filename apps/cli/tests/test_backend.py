@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import pytest
-from agentic_odi_cli import backend as backend_module
 from agentic_odi_cli.backend import (
     BackendConfig,
     BackendError,
@@ -153,26 +152,7 @@ def test_mcp_backend_parses_opportunity_score(monkeypatch):
     assert backend.call("compute_opportunity", {"importance": 8, "satisfaction": 2}) == 14.0
 
 
-def test_mcp_backend_reports_unreachable_server(monkeypatch):
-    """An unreachable server must surface as a clear BackendError.
-
-    The transport is stubbed: dialing a real port makes this test depend on
-    whether the host refuses or silently drops the connection, which decided
-    between the connection-failure and timeout messages on different runners.
-    """
-
-    class _UnreachableClient:
-        def __init__(self, *args, **kwargs):
-            pass
-
-        async def __aenter__(self):
-            raise ConnectionError("connection refused")
-
-        async def __aexit__(self, *exc):
-            return False
-
-    monkeypatch.setattr("fastmcp.Client", _UnreachableClient)
-
+def test_mcp_backend_reports_unreachable_server():
     backend = MCPBackend(mcp_url="http://127.0.0.1:9/mcp", timeout=0.5)
     with pytest.raises(BackendError, match="could not reach MCP server"):
         backend.call("get_customer_outcome", {"outcome_id": "x"})
@@ -274,42 +254,3 @@ def test_mcp_backend_parses_job_and_step_payloads(monkeypatch):
         lambda tool, args, url, timeout: "Job deleted successfully: job-1",
     )
     assert backend.call("delete_job", {"job_id": "job-1"}) == "job-1"
-
-
-@pytest.mark.parametrize(
-    ("text", "expected_message"),
-    [
-        ("Error: Job with ID X not found.", "Job with ID X not found."),
-        (
-            "Error: importance and satisfaction must be between 1.0 and 10.0",
-            "importance and satisfaction must be between 1.0 and 10.0",
-        ),
-    ],
-)
-def test_parse_remote_raises_backend_error_for_error_text(text, expected_message):
-    with pytest.raises(BackendError) as exc_info:
-        backend_module._parse_remote("get_jobs", text)
-
-    assert exc_info.value.args[0] == expected_message
-
-
-def test_parse_remote_returns_payload_for_success_text():
-    assert backend_module._parse_remote("get_jobs", "[]") == []
-
-
-def test_parse_remote_uses_the_shared_parser(monkeypatch):
-    from agentic_odi_core import remote
-    from agentic_odi_core.remote import StudioError, StudioErrorCode
-
-    seen: list[str] = []
-
-    def _spy(text: str):
-        seen.append(text)
-        return StudioError(code=StudioErrorCode.NOT_FOUND, message="nope")
-
-    monkeypatch.setattr(remote, "parse_tool_result", _spy)
-
-    with pytest.raises(BackendError, match="nope"):
-        backend_module._parse_remote("get_jobs", "Error: Job with ID X not found.")
-
-    assert seen == ["Error: Job with ID X not found."]

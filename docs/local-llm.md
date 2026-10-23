@@ -89,4 +89,4 @@ Agentic ODI includes a built-in multi-tier **Model Router** (`agentic_odi_core.r
 - **Tier 1 (`on_device_llm`)**: Local on-device LLM runner for standalone offline experience.
 - **Tier 2 (`remote_llm`)**: Smartest remote or local OpenAI-compatible LLM endpoint.
 
-In default **`auto`** mode, the system automatically routes requests to the smartest available tier, falling back silently and instantly when remote models are unreachable. The mode is a field on the chat request (`routing_mode` in the `/api/chat` payload) and accepts `auto`, `rule_based`, `on_device` or `remote`; the studio sends `auto` unless a caller overrides it.
+In default **`auto`** mode, the system automatically routes requests to the smartest available tier, falling back silently and instantly when remote models are unreachable. Advanced users can override the routing mode via Settings or configuration files (`auto`, `rule_based`, `on_device`, `remote`).
