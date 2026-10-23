@@ -136,22 +136,11 @@ export function SettingsPanel() {
           <span>Local FastMCP server</span>
           <span className="connection-list__value">{mcpReachable ? "connected" : "offline"}</span>
         </li>
-        <li>
-          <span className="status-dot is-unknown" />
-          <span>Gong transcripts</span>
-          <span className="connection-list__value">not connected</span>
-        </li>
-        <li>
-          <span className="status-dot is-unknown" />
-          <span>Slack friction stream</span>
-          <span className="connection-list__value">not connected</span>
-        </li>
-        <li>
-          <span className="status-dot is-unknown" />
-          <span>Product telemetry</span>
-          <span className="connection-list__value">not connected</span>
-        </li>
       </ul>
+      <p className="muted">
+        Only the model and MCP server above are live. No data source is connected yet — add one
+        from the presets below.
+      </p>
 
       <h3 className="settings__title">Connectors</h3>
       {connectorsError ? (
