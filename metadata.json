@@ -3,7 +3,7 @@
   "checkpoint_id": "01M5N9CZ87N9JKM4MQ1DK8PJWQ",
   "strategy": "manual-commit",
   "branch": "slay/885b5b09-doc-mypy",
-  "checkpoints_count": 2,
+  "checkpoints_count": 3,
   "files_touched": [
     "website/dist/docs/development/index.html"
   ],
@@ -20,6 +20,13 @@
       "transcript": "/1/full.jsonl",
       "compact_transcript": "/1/transcript.jsonl",
       "content_hash": "/1/content_hash.txt",
+      "prompt": ""
+    },
+    {
+      "metadata": "/2/metadata.json",
+      "transcript": "/2/full.jsonl",
+      "compact_transcript": "/2/transcript.jsonl",
+      "content_hash": "/2/content_hash.txt",
       "prompt": ""
     }
   ],
