@@ -31,6 +31,7 @@ from fastmcp import Client as McpClient
 from openai import AsyncOpenAI
 
 from agentic_odi_studio_api.studio.connectors import ConnectorService
+from agentic_odi_studio_api.studio.mcp_data import result_text
 from agentic_odi_studio_api.studio.memory import OBSERVATION_KINDS, StudioMemory
 from agentic_odi_studio_api.studio.observability import log_turn
 from agentic_odi_studio_api.studio.probes import check_llm_health, is_endpoint_reachable
@@ -556,7 +557,11 @@ async def _turn_frames(
                     else:
                         try:
                             result = await mcp_client.call_tool(name, arguments)
-                            result_str = tool_result_text(result)
+                            result_str = result_text(result)
+                            canvas_dirty = True
+                            yield _sse(
+                                "tool", {"name": name, "status": "ok", "preview": result_str[:280]}
+                            )
                         except Exception as exc:  # noqa: BLE001
                             result_str = f"Error calling {name}: {exc}"
                             counters["tool_errors"] += 1
