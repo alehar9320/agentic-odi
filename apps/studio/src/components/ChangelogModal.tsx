@@ -8,10 +8,45 @@ interface ChangelogModalProps {
   onClose: () => void;
 }
 
+const SEEN_KEY = "studio.changelog.seen";
+
+/** Versions the reader has already opened the changelog for. */
+function readSeenVersions(): Set<string> {
+  try {
+    const raw = window.localStorage.getItem(SEEN_KEY);
+    const parsed: unknown = raw ? JSON.parse(raw) : [];
+    return new Set(
+      Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === "string") : [],
+    );
+  } catch {
+    return new Set();
+  }
+}
+
+function rememberVersions(versions: string[]): void {
+  try {
+    const merged = new Set([...readSeenVersions(), ...versions]);
+    window.localStorage.setItem(SEEN_KEY, JSON.stringify([...merged]));
+  } catch {
+    // Storage can be full or blocked; the badge is a nicety, not state to lose.
+  }
+}
+
 export function ChangelogModal({ isOpen, onClose }: ChangelogModalProps) {
   const [changelog, setChangelog] = useState<ChangelogData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  // Re-read on every render so a reopen in the same session reflects the close.
+  const seenVersions = readSeenVersions();
+
+  // Closing the drawer counts as reading: the badge is for releases the reader
+  // has not seen yet.
+  useEffect(() => {
+    if (isOpen || !changelog) {
+      return;
+    }
+    rememberVersions(changelog.releases.map((release) => release.version));
+  }, [isOpen, changelog]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -100,6 +135,14 @@ export function ChangelogModal({ isOpen, onClose }: ChangelogModalProps) {
                     <span className="changelog-release__version">
                       v{release.version}
                     </span>
+                    {!seenVersions.has(release.version) && (
+                      <span
+                        className="changelog-release__new"
+                        aria-label={`New in ${release.version}`}
+                      >
+                        New
+                      </span>
+                    )}
                     <time className="changelog-release__date">{release.date}</time>
                   </div>
 
