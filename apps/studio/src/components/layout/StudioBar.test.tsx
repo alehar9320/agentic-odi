@@ -1,4 +1,4 @@
-import { render } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("../../state/StudioContext", () => ({
@@ -24,6 +24,20 @@ describe("StudioBar", () => {
     const svg = container.querySelector(".brand__mark svg");
     expect(svg?.getAttribute("width")).toBe("32");
     expect(svg?.getAttribute("height")).toBe("32");
+  });
+
+  it("labels the model health control with its state and message", () => {
+    vi.mocked(useStudio).mockReturnValue(
+      stubContext({
+        llmHealth: { healthy: false, message: "No model is reachable." },
+        openPanel: vi.fn(),
+      }) as never,
+    );
+    render(<StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />);
+
+    expect(
+      screen.getByRole("button", { name: /model status: local mode\. no model is reachable\./i }),
+    ).toBeInTheDocument();
   });
 
   it("keeps the brand mark decorative and labels the home control in text", () => {
