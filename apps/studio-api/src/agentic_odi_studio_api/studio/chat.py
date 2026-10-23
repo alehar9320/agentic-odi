@@ -1,14 +1,14 @@
 """Conversational helper with offline fallbacks and a streaming tool loop.
 
-The loop fans the MCP tools and three local tools — ``render_ui``,
-``remember``, and ``add_connector`` — into the completion. Local tools are
-intercepted rather than forwarded: ``render_ui`` validates its spec against the
-catalog the client sent and streams a ``ui`` event, ``remember`` stores a
-suggested observation and streams a ``memory`` event, and ``add_connector``
-writes the shared connector registry and streams a ``connector`` event.
+The loop fans the MCP tools and two local tools — ``render_ui`` and
+``add_connector`` — into the completion. Local tools are intercepted rather
+than forwarded: ``render_ui`` validates its spec against the catalog the client
+sent and streams a ``ui`` event, while ``add_connector`` writes the shared
+connector registry and streams a ``connector`` event.
 
-The conversation is persisted when a memory store is supplied, so a PM can leave
-and come back to the same thread and the same working context.
+Which model answers is decided by a tiered router: the remote LLM when it is
+reachable, an on-device model when the caller asks for one, and the studio's own
+deterministic guidance when nothing is reachable.
 """
 
 from __future__ import annotations
@@ -21,6 +21,7 @@ from collections.abc import AsyncIterator
 from contextlib import AsyncExitStack
 from typing import Any
 
+from agentic_odi_core import ModelRouter, ModelTier, RoutingMode
 from agentic_odi_core.remote import (
     StudioError,
     StudioErrorCode,
@@ -354,12 +355,16 @@ def _persist_turn(
         return
 
 
-async def _turn_frames(
-    request: ChatRequest,
-    service: ConnectorService | None,
-    memory: StudioMemory | None,
-    request_id: str,
-    counters: dict[str, int],
+def _routing_mode(value: str | None) -> RoutingMode:
+    """Map the requested routing mode onto the router's modes."""
+    try:
+        return RoutingMode((value or RoutingMode.AUTO.value).strip().lower())
+    except ValueError:
+        return RoutingMode.AUTO
+
+
+async def stream_chat(
+    request: ChatRequest, service: ConnectorService | None = None
 ) -> AsyncIterator[str]:
     """Yield the frames of one turn, raising ``_TurnFailure`` on a fatal error."""
 
@@ -384,12 +389,32 @@ async def _turn_frames(
 
     healthy, _message = await check_llm_health(request.base_url, request.api_key, request.model)
 
-    if not healthy:
-        yield frame("status", {"phase": "offline"})
+    routing_mode = _routing_mode(request.routing_mode)
+    router = ModelRouter(mode=routing_mode)
+    target_tier = router.resolve_tier(remote_available=healthy)
+    if target_tier == ModelTier.ON_DEVICE_LLM and routing_mode == RoutingMode.AUTO:
+        # Automatic routing keeps the studio's own deterministic guidance as the
+        # floor: honest, useful answers beat a placeholder model's guess.
+        target_tier = ModelTier.RULE_BASED
+    if target_tier == ModelTier.REMOTE_LLM and not healthy:
+        # A forced remote tier still has to answer when the backend is down.
+        target_tier = ModelTier.RULE_BASED
+
+    if target_tier == ModelTier.RULE_BASED:
+        yield _sse("status", {"phase": "offline"})
         reply = offline_fallback(last_user, request.brief)
         yield frame("delta", {"text": reply})
         yield frame("message", {"content": reply})
         _persist_turn(memory, conversation_id, "assistant", reply)
+        return
+
+    if target_tier == ModelTier.ON_DEVICE_LLM:
+        yield _sse("status", {"phase": "fallback_tier", "tier": target_tier.value})
+        chunks: list[str] = []
+        async for chunk in router.generate_fallback_stream(last_user, target_tier):
+            chunks.append(chunk)
+            yield _sse("delta", {"text": chunk})
+        yield _sse("message", {"content": "".join(chunks)})
         return
 
     catalog = UiCatalog.from_manifest(

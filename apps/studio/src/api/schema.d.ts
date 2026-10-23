@@ -55,6 +55,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/changelog": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Changelog Route */
+        get: operations["get_changelog_route_api_changelog_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health/mcp": {
         parameters: {
             query?: never;
@@ -363,6 +380,11 @@ export interface components {
             model: string;
             /** Mcp Url */
             mcp_url: string;
+            /**
+             * Routing Mode
+             * @default auto
+             */
+            routing_mode: string;
             /** Messages */
             messages?: components["schemas"]["ChatMessage"][];
             brief?: components["schemas"]["StudioBrief"] | null;
@@ -589,6 +611,28 @@ export interface operations {
         };
     };
     get_config_api_config_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    get_changelog_route_api_changelog_get: {
         parameters: {
             query?: never;
             header?: never;

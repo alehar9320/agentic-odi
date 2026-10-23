@@ -51,6 +51,7 @@ from agentic_odi_core.remote import (
     tool_result_text,
 )
 from agentic_odi_core.repository import InMemoryRepository, Repository
+from agentic_odi_core.router import ModelRouter, ModelTier, OnDeviceLLMEngine, RoutingMode
 from agentic_odi_core.schema import odi_schema
 from agentic_odi_core.services import (
     CustomerOutcomeNotFoundError,
@@ -60,6 +61,10 @@ from agentic_odi_core.services import (
     OutcomeNotFoundError,
     StepNotFoundError,
     ValueOutOfRangeError,
+)
+from agentic_odi_core.steve_jobs import (
+    format_opportunity_score_insight,
+    generate_steve_jobs_response,
 )
 
 __all__ = [
@@ -110,4 +115,10 @@ __all__ = [
     "parse_tool_result",
     "step_not_found",
     "tool_result_text",
+    "ModelRouter",
+    "ModelTier",
+    "OnDeviceLLMEngine",
+    "RoutingMode",
+    "format_opportunity_score_insight",
+    "generate_steve_jobs_response",
 ]

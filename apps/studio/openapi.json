@@ -65,6 +65,26 @@
         }
       }
     },
+    "/api/changelog": {
+      "get": {
+        "summary": "Get Changelog Route",
+        "operationId": "get_changelog_route_api_changelog_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Get Changelog Route Api Changelog Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/health/mcp": {
       "post": {
         "summary": "Post Mcp Health",
@@ -972,6 +992,11 @@
           "mcp_url": {
             "type": "string",
             "title": "Mcp Url"
+          },
+          "routing_mode": {
+            "type": "string",
+            "title": "Routing Mode",
+            "default": "auto"
           },
           "messages": {
             "items": {
