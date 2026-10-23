@@ -41,14 +41,9 @@ communication streams, built on [`FastMCP`](https://github.com/jlowin/fastmcp).
 
 We don't publish dates. This page changes when the code does.
 
-**Project site:** the site lives at
-**[alehar9320.github.io/agentic-odi](https://alehar9320.github.io/agentic-odi/)**,
-with a documentation hub at
-**[alehar9320.github.io/agentic-odi/docs/](https://alehar9320.github.io/agentic-odi/docs/)**.
-It is republished by the `Pages` workflow on every push to `main`. The site is
-generated from this repository — the MCP tool reference, the connector catalog,
-the CLI tree, and the ODI schema are read from the code that ships, so they
-cannot drift from it.
+**Project site:** the static page lives at
+**[alehar9320.github.io/agentic-odi](https://alehar9320.github.io/agentic-odi/)**
+and is republished by the `Pages` workflow on every push to `main`.
 
 **Hosted Studio:** the experimental Living Studio UI runs at
 **[agentic-odi.alehar.workers.dev](https://agentic-odi.alehar.workers.dev/)**.
@@ -150,18 +145,6 @@ Register MCP or REST connectors that the copilot can discover and invoke.
   `?area=<capability>` and `?recommended=true`).
 - **CLI**: `agentic-odi connectors catalog | add <preset> | list | health <name> | ingest <name>`.
 
-### When something fails
-
-Failures are shown where they happen, not dressed up as empty results. Every
-HTTP error from the Living Studio sidecar carries one body —
-`{"error": {"code", "message", "detail", "suggestion", "retryable", "request_id"}}` —
-and the Studio renders it in place with a **Retry** button that keeps your
-question. A chat turn always ends with exactly one reply or one error, the
-canvas shows an invitation when there is nothing yet and a failure panel when
-the fetch failed, and a broken lens is contained to that lens. Quote the
-`request_id` when you report a failure: it is echoed on the response header and
-on every streamed frame, and it is the id in the sidecar's per-turn log line.
-
 ### CLI at a glance
 
 The CLI is local-first, so data commands work without a running server:
@@ -208,11 +191,6 @@ layout, updates, and release automation.
 | [Deployment](docs/deployment.md) | Project site on GitHub Pages, Hosted Studio and PR preview URLs, the MCP server endpoint, and the free-plan Cloudflare Worker |
 | [Roadmap](docs/roadmap.md) | Completed and upcoming milestones |
 | [Superpowers](docs/superpowers.md) | Pi, OpenCode, and Freebuff integration |
-
-Every guide above is also published on the
-[project site](https://alehar9320.github.io/agentic-odi/docs/), rendered from
-these files. The site adds a quick start, a generated MCP tool reference, and
-the connector catalog.
 
 ## Contributing
 

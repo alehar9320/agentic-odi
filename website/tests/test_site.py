@@ -1,482 +1,219 @@
-"""The site's contract: structure, metadata, honesty, and links.
-
-Every page the generator produces is checked here. The site is a product
-surface, so the tests care about two things above all: that the structure is
-honest, and that nothing on it is a dead end.
-"""
-
-from __future__ import annotations
-
-import html as html_module
-import json
+# website/tests/test_site.py
 import re
+from html.parser import HTMLParser
+from pathlib import Path
 
-import extract
-import pytest
-from site_support import (
-    CATALOG_PY,
-    CATALOG_TS,
-    CONTRACT_PY,
-    CORE_MODELS_PY,
-    MCP_SERVER_PY,
-    _built_root,
-    all_pages,
-    h1_text,
-    read_page,
-)
-
+ROOT = Path(__file__).resolve().parents[2]
+SITE = ROOT / "website"
 PAGES_URL = "https://alehar9320.github.io/agentic-odi/"
 
-# Every external origin the site may reference. Nothing else may appear.
-# The list covers the site's own links and every origin the repository's
-# guides already link to.
-ALLOWED_EXTERNAL_PREFIXES = (
-    # The project itself.
+ALLOWED_EXTERNAL = {
     "https://github.com/alehar9320/agentic-odi",
-    "https://github.com/",
-    "https://alehar9320.github.io/agentic-odi/",
-    "https://alehar9320.github.io",
-    "https://agentic-odi.alehar.workers.dev/",
-    "https://agentic-odi.fastmcp.app/mcp",
+    "https://github.com/alehar9320/agentic-odi/issues",
     "https://horizon.prefect.io/alhase/servers/agentic-odi/chat",
-    # Tooling the guides mention.
+    "https://agentic-odi.alehar.workers.dev/",
     "https://docs.astral.sh/uv/",
     "https://modelcontextprotocol.io",
-    "https://www.python.org/downloads/",
-    "https://www.prefect.io/horizon",
-    "https://github.com/jlowin/fastmcp",
-    "https://strategyn.com/outcome-driven-innovation/",
-    "https://pypi.org/project/",
-    "https://codecov.io",
-    "https://developers.cloudflare.com",
-    "https://docs.entire.io",
-    "https://freebuff.com",
-    "https://pi.dev",
-    # A placeholder in the connector documentation. It is not routable, and
-    # it is shown as an example of what a connector URL looks like.
-    "https://mcp.internal.example",
-    # The local endpoints, which the site points developers at.
-    "http://localhost:8000/mcp",
-    "http://localhost:8000",
-    "http://localhost:8001",
-    "http://localhost:5173",
-    "http://127.0.0.1:8100",
-    "http://127.0.0.1:8001",
-)
+    PAGES_URL,
+}
 
-# The strings the site must carry. These are promises, not decoration.
-REQUIRED_STRINGS = (
-    "experimental",
-    "your roadmap is a guess.",
-    "we don't publish dates",
-    "all rights reserved",
-    "strategyn",
-    "free prefect account",
-    "open an issue",
-    "http://localhost:8000/mcp",
-)
-
-# Strings the site must never carry.
-FORBIDDEN_STRINGS = (
-    "discord",
-    "mailto:",
+MILESTONE_DATE = re.compile(
+    r"\b(Q[1-4]|Jan(uary)?|Feb(ruary)?|Mar(ch)?|Apr(il)?|May|Jun(e)?|"
+    r"Jul(y)?|Aug(ust)?|Sep(t(ember)?)?|Oct(ober)?|Nov(ember)?|Dec(ember)?)[ -]20\d\d\b"
 )
 
 EMOJI = re.compile("[\u2600-\u27bf\U0001f300-\U0001faff]")
 
-# The pages rendered verbatim from the repository's guides. Their prose is
-# the maintainers', so the site's own copy rules do not apply to them.
-MIRRORED_GUIDES = {
-    "docs/architecture/index.html",
-    "docs/cli/index.html",
-    "docs/connectors/index.html",
-    "docs/deployment/index.html",
-    "docs/development/index.html",
-    "docs/installation/index.html",
-    "docs/local-llm/index.html",
-    "docs/roadmap/index.html",
-    "docs/studio/index.html",
-}
 
-QUARTER = re.compile(r"\bQ[1-4]\b")
-MONTH_YEAR = re.compile(
-    r"\b(January|February|March|April|May|June|July|August|September|October|November|December)\s+20\d\d"
-)
-
-
-def _meta(html: str, name: str) -> str | None:
-    match = re.search(rf'<meta\s+(?:name|property)="{re.escape(name)}"\s+content="([^"]*)"', html)
-    return match.group(1) if match else None
-
-
-def _visible_text(html: str) -> str:
-    """The page's text, with the markup removed."""
-    return re.sub(r"<[^>]+>", "", html)
-
-
-def _all_html() -> str:
-    return "\n".join(read_page(page) for page in all_pages())
-
-
-# ---------------------------------------------------------------- basics
-
-
-@pytest.mark.parametrize("page", all_pages())
-def test_page_has_the_required_basics(page: str):
-    html = read_page(page)
-    assert 'lang="en"' in html
-    assert '<meta charset="utf-8">' in html
-    assert "width=device-width" in html
-
-
-@pytest.mark.parametrize("page", all_pages())
-def test_page_has_exactly_one_h1(page: str):
-    html = read_page(page)
-    assert html.count("<h1") == 1, f"{page} must have exactly one <h1>"
-
-
-@pytest.mark.parametrize("page", all_pages())
-def test_page_headings_never_skip_a_level(page: str):
-    html = read_page(page)
-    levels = [int(level) for level in re.findall(r"<h([1-6])\b", html)]
-    assert levels, f"{page} has no headings"
-    assert levels[0] == 1, f"{page} must start at <h1>"
-    for previous, current in zip(levels, levels[1:], strict=False):
-        assert current <= previous + 1, f"{page} skips from <h{previous}> to <h{current}>"
-
-
-@pytest.mark.parametrize("page", all_pages())
-def test_page_has_the_landmarks(page: str):
-    html = read_page(page)
-    for landmark in ("<header", "<main", "<footer"):
-        assert landmark in html, f"{page} is missing {landmark}>"
-
-
-@pytest.mark.parametrize("page", all_pages())
-def test_in_page_anchors_resolve(page: str):
-    html = read_page(page)
-    ids = set(re.findall(r'id="([^"]+)"', html))
-    for anchor in re.findall(r'href="#([^"]+)"', html):
-        assert anchor in ids, f"{page}: #{anchor} does not resolve"
-
-
-@pytest.mark.parametrize("page", all_pages())
-def test_no_third_party_requests(page: str):
-    html = html_module.unescape(read_page(page))
-    for url in re.findall(r'https?://[^"\')\s<]+', html):
-        assert url.startswith(ALLOWED_EXTERNAL_PREFIXES), f"{page}: unexpected {url}"
-
-
-@pytest.mark.parametrize("page", all_pages())
-def test_no_emoji(page: str):
-    # The house rule is about the site's own copy: no emoji in the landing
-    # page, the quick start, the reference, or the hub index. The
-    # repository's guides are rendered as they are written — mangling a
-    # maintainer's document to satisfy a marketing rule would be worse than
-    # the emoji it removes.
-    if page in MIRRORED_GUIDES:
-        return
-    assert not EMOJI.search(read_page(page)), f"{page} contains an emoji"
-
-
-@pytest.mark.parametrize("page", all_pages())
-def test_no_milestone_dates(page: str):
-    html = read_page(page)
-    assert not QUARTER.search(html), f"{page} contains a quarter"
-    assert not MONTH_YEAR.search(html), f"{page} contains a month and year"
-
-
-@pytest.mark.parametrize("page", all_pages())
-def test_decorative_svg_is_hidden_from_assistive_tech(page: str):
-    html = read_page(page)
-    for tag in re.findall(r"<svg\b[^>]*>", html):
-        assert "aria-hidden" in tag or "role=" in tag, f"{page}: {tag}"
-
-
-# ---------------------------------------------------------------- landing
-
-
-def test_landing_has_exactly_one_h1_inside_main():
-    html = read_page("index.html")
-    assert h1_text(html) == "Your roadmap is a guess."
-    main = html.split("<main", 1)[1].split("</main>", 1)[0]
-    assert "<h1" in main
-
-
-def test_landing_sections_have_stable_ids():
-    html = read_page("index.html")
-    for anchor in ("top", "problem", "insight", "run", "status"):
-        assert f'id="{anchor}"' in html
-
-
-def test_opportunity_formula_matches_the_core_source():
-    compact = re.sub(r"\s+", "", _visible_text(read_page("index.html"))).lower()
-    assert "importance+max(importance-satisfaction,0)" in compact
-
-
-def test_the_rendered_formula_is_generated_from_the_core_source():
-    # The page must not merely *contain* the formula — it must contain the
-    # formula the core module actually computes, read from the source.
-    source = extract.read_odi_formula(CORE_MODELS_PY)
-    assert "importance + max(importance - satisfaction, 0)" in source
-    compact = re.sub(r"\s+", "", _visible_text(read_page("index.html"))).lower()
-    assert re.sub(r"\s+", "", source).lower() in compact
-
-
-def test_the_formula_is_not_typed_into_the_content_file():
-    from site_support import SITE
-
-    content = (SITE / "content" / "landing.json").read_text(encoding="utf-8")
-    assert "importance - satisfaction" not in content
-
-
-# ---------------------------------------------------------------- run & status
-
-
-def test_run_section_labels_every_hosted_surface():
-    html = read_page("index.html")
-    assert "http://localhost:8000/mcp" in html
-    assert "http://127.0.0.1:8100" in html
-    assert "agentic-odi.fastmcp.app/mcp" in html
-    assert "agentic-odi.alehar.workers.dev" in html
-    assert "horizon.prefect.io" in html
-    assert "requires a free prefect account" in html.lower()
-
-
-def test_the_run_section_has_install_tabs():
-    html = read_page("index.html")
-    assert 'role="tablist"' in html
-    assert 'role="tab"' in html
-    assert "install.sh" in html
-
-
-def test_the_status_section_publishes_no_dates():
-    html = read_page("index.html")
-    assert not re.search(r"\bQ[1-4]\b", html)
-    assert not re.search(
-        r"\b(January|February|March|April|May|June|July|August|September|October|November|December)\s+20\d\d",
-        html,
-    )
-
-
-def test_the_tools_section_peeks_at_the_tool_surface():
-    html = read_page("index.html")
-    assert "get_job_map" in html
-    assert "compute_opportunity" in html
-
-
-def test_the_tool_count_on_the_page_matches_the_contract():
-    tools = extract.read_tools(MCP_SERVER_PY, CONTRACT_PY)
-    text = re.sub(r"\s+", " ", _visible_text(read_page("index.html")))
-    assert f"See all {len(tools)} tools" in text
-
-
-def test_the_status_list_reports_what_ships():
-    text = re.sub(r"\s+", " ", _visible_text(read_page("index.html")))
-    tools = extract.read_tools(MCP_SERVER_PY, CONTRACT_PY)
-    connectors = extract.read_connectors(CATALOG_PY)
-    cards = extract.read_catalog_cards(CATALOG_TS)
-    assert f"{len(tools)} MCP tools" in text
-    assert f"{len(cards)} agent-composed surfaces" in text
-    assert f"{len(connectors)} connector presets" in text
-
-
-def test_the_landing_sections_are_in_the_designed_order():
-    html = read_page("index.html")
-    order = [
-        "top",
-        "studio",
-        "problem",
-        "insight",
-        "surfaces",
-        "how",
-        "connectors",
-        "run",
-        "tools",
-        "status",
-    ]
-    positions = [html.index(f'id="{anchor}"') for anchor in order]
-    assert positions == sorted(positions), "the landing sections are out of order"
-
-
-# ---------------------------------------------------------------- surfaces
-
-
-def test_surfaces_section_shows_every_catalog_card():
-    html = read_page("index.html")
-    for card in (
-        "outcome-card",
-        "opportunity-board",
-        "impact-simulation",
-        "evidence-quote",
-        "job-map",
-        "opportunity-thesis",
-        "decision-record",
-    ):
-        assert card in html
-
-
-def test_connectors_section_lists_every_preset():
-    presets = extract.read_connectors(CATALOG_PY)
-    html = read_page("index.html")
-    for preset in presets:
-        assert f'id="connector-{preset["id"]}"' in html
-
-
-def test_landing_never_names_a_canvas_view():
-    html = read_page("index.html").lower()
-    assert "opportunity landscape" not in html
-    assert "opportunity thesis" not in html
-
-
-def test_the_connector_count_on_the_page_matches_the_catalog():
-    presets = extract.read_connectors(CATALOG_PY)
-    text = re.sub(r"\s+", " ", _visible_text(read_page("index.html")))
-    assert f"{len(presets)} presets ship today" in text
-
-
-# ---------------------------------------------------------------- demo
-
-
-def test_demo_is_labeled_as_scripted():
-    html = read_page("index.html")
-    assert "scripted preview" in html.lower()
-
-
-def test_demo_transcript_is_server_rendered():
-    html = read_page("index.html")
-    # All three scripted exchanges are present in the static HTML, so a
-    # reader without JavaScript still sees the whole story.
-    for fragment in (
-        "reconcile invoices by hand",
-        "which of these should we build first",
-        "show me the job behind that",
-    ):
-        assert fragment in html.lower()
-
-
-def test_demo_controls_are_buttons():
-    html = read_page("index.html")
-    assert 'type="button"' in html
-    assert "demo__chip" in html
-    assert "<textarea" in html
-
-
-def test_demo_javascript_is_deferred_and_leaves_the_transcript_intact():
-    html = read_page("index.html")
-    tags = re.findall(r"<script[^>]*demo\.js[^>]*>", html)
-    assert tags, "demo.js is not loaded"
-    assert "defer" in tags[0], "demo.js must be deferred"
-    # The live panel starts hidden; the script is what reveals it.
-    assert "data-demo-live" in html
-    assert re.search(r"data-demo-live[^>]*hidden", html)
-
-
-def test_demo_scores_match_the_opportunity_formula():
-    from site_support import SITE
-
-    demo = json.loads((SITE / "content" / "demo.json").read_text(encoding="utf-8"))
-    for exchange in demo["exchanges"]:
-        card = exchange["card"]
-        if card["type"] == "outcome-card":
-            data = card["data"]
-            assert data["opportunity"] == data["importance"] + max(
-                data["importance"] - data["satisfaction"], 0
-            )
-        if card["type"] == "opportunity-board":
-            for row in card["data"]["outcomes"]:
-                assert row["opportunity"] == row["importance"] + max(
-                    row["importance"] - row["satisfaction"], 0
-                )
-
-
-# ---------------------------------------------------------------- metadata
-
-
-def test_the_landing_carries_complete_social_metadata():
-    html = read_page("index.html")
-    assert _meta(html, "og:type") == "website"
-    assert _meta(html, "og:site_name") == "Agentic ODI"
-    assert _meta(html, "og:url") == PAGES_URL
-    assert _meta(html, "og:image") == PAGES_URL + "assets/og.png"
-    assert _meta(html, "twitter:card") == "summary_large_image"
-    assert _meta(html, "twitter:title")
-    assert _meta(html, "twitter:description")
-    assert _meta(html, "twitter:image") == PAGES_URL + "assets/og.png"
-    assert f'<link rel="canonical" href="{PAGES_URL}">' in html
-    assert html.count('name="theme-color"') == 1
-
-
-def test_the_title_and_description_are_well_formed():
-    html = read_page("index.html")
-    title = re.search(r"<title>(.*?)</title>", html).group(1).strip()
-    assert "Agentic ODI" in title
-    assert len(title) <= 60
-    description = _meta(html, "description")
-    assert description
-    assert len(description) <= 160
-    assert description.endswith(".") or description.endswith("them.")
-
-
-# ---------------------------------------------------------------- honesty
-
-
-def test_the_required_strings_are_present():
-    html = _all_html().lower()
-    for string in REQUIRED_STRINGS:
-        assert string in html, f"the site is missing {string!r}"
-
-
-def test_the_forbidden_strings_are_absent():
-    html = _all_html().lower()
-    for string in FORBIDDEN_STRINGS:
-        assert string not in html, f"the site contains {string!r}"
-
-
-def test_the_auth_gated_surfaces_are_labeled_before_the_link():
-    html = read_page("index.html")
-    for url in ("agentic-odi.fastmcp.app/mcp", "horizon.prefect.io"):
-        position = html.index(url)
-        window = html[position : position + 600].lower()
-        assert "auth" in window or "prefect account" in window, f"{url} is not labeled"
-
-
-def test_the_three_hosted_surfaces_are_distinguished():
-    html = read_page("index.html")
-    assert "agentic-odi.fastmcp.app/mcp" in html
-    assert "agentic-odi.alehar.workers.dev" in html
-    assert "horizon.prefect.io" in html
-
-
-# ---------------------------------------------------------------- 404
-
-
-def test_the_404_page_is_self_contained():
-    html = read_page("404.html")
-    assert 'lang="en"' in html
-    assert "<h1" in html
-    assert PAGES_URL in html
-    assert "<link" not in html
-    assert "<script" not in html
-    assert "<img" not in html
-
-
-# ---------------------------------------------------------------- weight & links
-
-
-@pytest.mark.parametrize("page", all_pages())
-def test_every_page_resolves_its_own_assets(page: str):
-    html = read_page(page)
-    for ref in re.findall(r'(?:src|href)="((?!https?:|#|mailto:)[^"]+)"', html):
-        if ref.endswith((".html", "/")):
+class Doc(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__()
+        self.lang = None
+        self.charset = False
+        self.viewport = False
+        self.title = ""
+        self.ids: set[str] = set()
+        self.hrefs: list[str] = []
+        self.refs: list[str] = []
+        self.headings: list[tuple[int, str]] = []
+        self.tags: list[str] = []
+        self.metas: dict[str, str] = {}
+        self.theme_colors: list[tuple[str, str]] = []
+        self.text: list[str] = []
+        self._in_title = False
+        self._heading: tuple[int, list[str]] | None = None
+
+    def handle_starttag(self, tag, attrs):
+        a = dict(attrs)
+        self.tags.append(tag)
+        if tag == "html":
+            self.lang = a.get("lang")
+        elif tag == "title":
+            self._in_title = True
+        elif tag == "meta":
+            if a.get("charset"):
+                self.charset = True
+            if a.get("name") == "viewport":
+                self.viewport = True
+            if a.get("name") == "theme-color":
+                self.theme_colors.append((a.get("content", ""), a.get("media", "")))
+            key = a.get("property") or a.get("name")
+            if key:
+                self.metas[key] = a.get("content", "")
+        elif tag == "a" and a.get("href"):
+            self.hrefs.append(a["href"])
+        elif tag in ("link", "script", "img"):
+            ref = a.get("href") or a.get("src")
+            if ref:
+                self.refs.append(ref)
+        if a.get("id"):
+            self.ids.add(a["id"])
+        if re.fullmatch(r"h[1-6]", tag):
+            self._heading = (int(tag[1]), [])
+
+    def handle_endtag(self, tag):
+        if tag == "title":
+            self._in_title = False
+        elif self._heading and tag == f"h{self._heading[0]}":
+            level, parts = self._heading
+            self.headings.append((level, " ".join("".join(parts).split())))
+            self._heading = None
+
+    def handle_data(self, data):
+        self.text.append(data)
+        if self._in_title:
+            self.title += data
+        if self._heading:
+            self._heading[1].append(data)
+
+
+def parse(name: str) -> Doc:
+    doc = Doc()
+    doc.feed((SITE / name).read_text(encoding="utf-8"))
+    return doc
+
+
+def test_lang_charset_viewport():
+    doc = parse("index.html")
+    assert doc.lang == "en"
+    assert doc.charset
+    assert doc.viewport
+
+
+def test_title_and_description():
+    doc = parse("index.html")
+    assert "Agentic ODI" in doc.title
+    assert len(doc.title.strip()) <= 60
+    desc = doc.metas.get("description", "")
+    assert 0 < len(desc) <= 160
+
+
+def test_single_h1_and_ordered_headings():
+    levels = [lv for lv, _ in parse("index.html").headings]
+    assert levels.count(1) == 1
+    assert levels[0] == 1
+    for prev, cur in zip(levels, levels[1:], strict=False):
+        assert cur <= prev + 1
+
+
+def test_landmarks_and_section_ids():
+    doc = parse("index.html")
+    for landmark in ("header", "main", "footer"):
+        assert landmark in doc.tags
+    assert {"problem", "insight", "how", "run", "status"} <= doc.ids
+
+
+def test_no_dead_internal_anchors():
+    doc = parse("index.html")
+    internal = [h[1:] for h in doc.hrefs if h.startswith("#")]
+    assert internal, "expected in-page anchors"
+    assert set(internal) <= doc.ids
+
+
+def test_local_resources_exist_and_stylesheet_present():
+    doc = parse("index.html")
+    local = [r for r in doc.refs if not r.startswith(("http://", "https://"))]
+    assert local
+    for ref in local:
+        assert (SITE / ref).is_file(), f"missing resource: {ref}"
+    assert "assets/style.css" in local
+    assert "assets/favicon.svg" in local
+    assert "assets/favicon.png" in local
+
+
+def test_no_third_party_resources():
+    for ref in parse("index.html").refs:
+        if ref.startswith(("http://", "https://")):
+            assert ref in ALLOWED_EXTERNAL, f"off-allowlist resource: {ref}"
+        else:
+            assert ref.startswith("assets/"), f"unexpected resource: {ref}"
+
+
+def test_external_links_https_and_allowlisted():
+    for href in parse("index.html").hrefs:
+        if href.startswith("#"):
             continue
-        target = ref.split("#", 1)[0].split("?", 1)[0]
-        assert _built_root(page).parent.joinpath(target).resolve().is_file(), (
-            f"{page}: {ref} does not resolve"
-        )
+        assert href.startswith("https://"), href
+        assert href in ALLOWED_EXTERNAL, href
 
 
-@pytest.mark.parametrize("page", all_pages())
-def test_page_weights_are_within_budget(page: str):
-    size = _built_root(page).stat().st_size
-    assert size <= 60 * 1024, f"{page}: {size} bytes"
+def test_social_cards_and_theme_colors():
+    doc = parse("index.html")
+    m = doc.metas
+    assert m.get("og:type") == "website"
+    assert m.get("og:site_name") == "Agentic ODI"
+    assert m.get("og:title") and m.get("og:description")
+    assert m.get("og:url") == PAGES_URL
+    assert m.get("og:image") == PAGES_URL + "assets/og.png"
+    assert m.get("twitter:card") == "summary_large_image"
+    assert m.get("twitter:title") and m.get("twitter:description")
+    assert m.get("twitter:image") == PAGES_URL + "assets/og.png"
+    assert PAGES_URL in doc.refs  # rel=canonical
+    media = [m_ for _, m_ in doc.theme_colors]
+    assert len(doc.theme_colors) == 2
+    assert any("prefers-color-scheme: light" in x for x in media)
+    assert any("prefers-color-scheme: dark" in x for x in media)
+
+
+def test_honesty_contract():
+    text = (SITE / "index.html").read_text(encoding="utf-8")
+    low = text.lower()
+    assert "experimental" in low
+    assert "free prefect account" in low
+    assert "all rights reserved" in low
+    assert "strategyn" in low
+    assert "your roadmap is a guess." in low
+    assert "we don't publish dates" in low
+    assert "open an issue" in low
+    assert "http://localhost:8000/mcp" in text
+    assert "agentic-odi.fastmcp.app" not in text
+    assert "discord" not in low
+    assert "mailto:" not in low
+
+
+def test_no_milestone_dates():
+    text = (SITE / "index.html").read_text(encoding="utf-8")
+    assert not MILESTONE_DATE.search(text), "no dated milestones on an experimental product"
+
+
+def test_no_emoji_on_site():
+    text = (SITE / "index.html").read_text(encoding="utf-8")
+    assert not EMOJI.search(text)
+
+
+def test_opportunity_formula_matches_core():
+    core = (ROOT / "packages" / "core" / "src" / "agentic_odi_core" / "models.py").read_text(
+        encoding="utf-8"
+    )
+    assert "importance + max(importance - satisfaction, 0)" in core  # repo truth guard
+    page = (SITE / "index.html").read_text(encoding="utf-8")
+    normalized = page.lower().replace("\u2212", "-").replace(" ", "")
+    assert "importance+max(importance-satisfaction,0)" in normalized
+
+
+def test_404_is_self_contained():
+    doc = parse("404.html")
+    assert doc.lang == "en"
+    assert any(lv == 1 for lv, _ in doc.headings)
+    assert PAGES_URL in doc.hrefs
+    assert not doc.refs, "404.html must not depend on relative assets"
