@@ -632,6 +632,11 @@ export interface components {
             model: string;
             /** Mcp Url */
             mcp_url: string;
+            /**
+             * Routing Mode
+             * @default auto
+             */
+            routing_mode: string;
             /** Messages */
             messages?: components["schemas"]["ChatMessage"][];
             brief?: components["schemas"]["StudioBrief"] | null;

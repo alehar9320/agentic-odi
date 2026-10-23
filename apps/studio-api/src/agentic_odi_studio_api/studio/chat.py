@@ -27,6 +27,7 @@ from agentic_odi_core.remote import (
     parse_tool_result,
     tool_result_text,
 )
+from agentic_odi_core import ModelRouter, ModelTier, RoutingMode
 from fastmcp import Client as McpClient
 from openai import AsyncOpenAI
 
@@ -483,6 +484,14 @@ def _source_frame(counters: dict[str, int], name: str, result: str) -> dict[str,
     }
 
 
+def _routing_mode(value: str | None) -> RoutingMode:
+    """Map the requested routing mode onto the router's modes."""
+    try:
+        return RoutingMode((value or RoutingMode.AUTO.value).strip().lower())
+    except ValueError:
+        return RoutingMode.AUTO
+
+
 async def _turn_frames(
     request: ChatRequest,
     service: ConnectorService | None,
@@ -518,7 +527,18 @@ async def _turn_frames(
 
     healthy, _message = await check_llm_health(request.base_url, request.api_key, request.model)
 
-    if not healthy:
+    routing_mode = _routing_mode(request.routing_mode)
+    router = ModelRouter(mode=routing_mode)
+    target_tier = router.resolve_tier(remote_available=healthy)
+    if target_tier == ModelTier.ON_DEVICE_LLM and routing_mode == RoutingMode.AUTO:
+        # Automatic routing keeps the studio's own deterministic guidance as the
+        # floor: honest, useful answers beat a placeholder model's guess.
+        target_tier = ModelTier.RULE_BASED
+    if target_tier == ModelTier.REMOTE_LLM and not healthy:
+        # A forced remote tier still has to answer when the backend is down.
+        target_tier = ModelTier.RULE_BASED
+
+    if target_tier == ModelTier.RULE_BASED:
         yield frame("status", {"phase": "offline"})
         reply = offline_fallback(last_user, request.brief)
         yield frame("delta", {"text": reply})
@@ -531,6 +551,15 @@ async def _turn_frames(
             assistant_message_id,
             user_message_id,
         )
+        return
+
+    if target_tier == ModelTier.ON_DEVICE_LLM:
+        yield frame("status", {"phase": "fallback_tier", "tier": target_tier.value})
+        chunks: list[str] = []
+        async for chunk in router.generate_fallback_stream(last_user, target_tier):
+            chunks.append(chunk)
+            yield frame("delta", {"text": chunk})
+        yield frame("message", {"content": "".join(chunks)})
         return
 
     catalog = UiCatalog.from_manifest(

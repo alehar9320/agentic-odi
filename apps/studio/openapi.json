@@ -1552,6 +1552,11 @@
             "type": "string",
             "title": "Mcp Url"
           },
+          "routing_mode": {
+            "type": "string",
+            "title": "Routing Mode",
+            "default": "auto"
+          },
           "messages": {
             "items": {
               "$ref": "#/components/schemas/ChatMessage"
