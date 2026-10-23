@@ -3,7 +3,7 @@
   "checkpoint_id": "01M5N9FMPQDTZ9JV7EKFYXHK4N",
   "strategy": "manual-commit",
   "branch": "slay/6b1a0079-mcp-port-config",
-  "checkpoints_count": 2,
+  "checkpoints_count": 3,
   "files_touched": [
     "website/dist/docs/deployment/index.html"
   ],
@@ -20,6 +20,13 @@
       "transcript": "/1/full.jsonl",
       "compact_transcript": "/1/transcript.jsonl",
       "content_hash": "/1/content_hash.txt",
+      "prompt": ""
+    },
+    {
+      "metadata": "/2/metadata.json",
+      "transcript": "/2/full.jsonl",
+      "compact_transcript": "/2/transcript.jsonl",
+      "content_hash": "/2/content_hash.txt",
       "prompt": ""
     }
   ],
