@@ -71,6 +71,30 @@ describe("OpportunityLandscape Data Visualization", () => {
     expect(screen.getByLabelText(/Show Underserved Only/i)).toBeDisabled();
   });
 
+  it("selects an outcome from a keyboard-focused table row", () => {
+    render(<OpportunityLandscape />);
+    fireEvent.click(screen.getByText("📋 Table View"));
+
+    const row = screen.getByRole("row", { name: /Minimize time spent syncing secrets/i });
+    row.focus();
+    expect(row).toHaveFocus();
+
+    fireEvent.keyDown(row, { key: "Enter" });
+
+    expect(row).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("toggles table selection with Space", () => {
+    render(<OpportunityLandscape />);
+    fireEvent.click(screen.getByText("📋 Table View"));
+
+    const row = screen.getByRole("row", { name: /Minimize time spent syncing secrets/i });
+    fireEvent.keyDown(row, { key: " " });
+    expect(row).toHaveAttribute("aria-selected", "true");
+
+    fireEvent.keyDown(row, { key: " " });
+    expect(row).toHaveAttribute("aria-selected", "false");
+  });
   it("toggles underserved filter checkbox", () => {
     render(<OpportunityLandscape />);
     const checkbox = screen.getByLabelText(/Show Underserved Only/i);

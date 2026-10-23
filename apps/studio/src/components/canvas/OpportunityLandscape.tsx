@@ -481,7 +481,16 @@ function OpportunityTableView({
             return (
               <tr
                 key={outcome.id ?? idx}
+                role="row"
+                tabIndex={0}
+                aria-selected={isSelected}
                 onClick={() => outcome.id && onSelectOutcome(outcome.id)}
+                onKeyDown={(event) => {
+                  if ((event.key === "Enter" || event.key === " ") && outcome.id) {
+                    event.preventDefault();
+                    onSelectOutcome(outcome.id);
+                  }
+                }}
                 style={{
                   borderBottom: "1px solid var(--studio-border)",
                   cursor: "pointer",
