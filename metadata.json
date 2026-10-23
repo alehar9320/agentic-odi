@@ -3,7 +3,7 @@
   "checkpoint_id": "01M5N9EQZBEGR0BSE2ZKCXZBJJ",
   "strategy": "manual-commit",
   "branch": "slay/166b6b18-doc-wrangler",
-  "checkpoints_count": 5,
+  "checkpoints_count": 6,
   "files_touched": [
     "website/dist/docs/architecture/index.html"
   ],
@@ -34,6 +34,13 @@
       "transcript": "/3/full.jsonl",
       "compact_transcript": "/3/transcript.jsonl",
       "content_hash": "/3/content_hash.txt",
+      "prompt": ""
+    },
+    {
+      "metadata": "/4/metadata.json",
+      "transcript": "/4/full.jsonl",
+      "compact_transcript": "/4/transcript.jsonl",
+      "content_hash": "/4/content_hash.txt",
       "prompt": ""
     }
   ],
