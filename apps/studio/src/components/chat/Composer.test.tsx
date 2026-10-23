@@ -62,8 +62,9 @@ describe("Composer connector suggestions", () => {
 
     render(<Composer {...baseProps} />);
 
-    const chip = screen.getByRole("button", { name: /added gong/i });
+    const chip = screen.getByRole("button", { name: /dismiss suggestion: gong/i });
     expect(chip).toBeInTheDocument();
+    expect(chip).toHaveTextContent("Suggested: Gong");
     fireEvent.click(chip);
     expect(dismiss).toHaveBeenCalledWith("gong");
     expect(refresh).toHaveBeenCalled();
@@ -74,6 +75,6 @@ describe("Composer connector suggestions", () => {
 
     render(<Composer {...baseProps} />);
 
-    expect(screen.queryByRole("button", { name: /added gong/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /suggested: gong/i })).not.toBeInTheDocument();
   });
 });
