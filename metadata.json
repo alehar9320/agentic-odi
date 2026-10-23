@@ -3,7 +3,7 @@
   "checkpoint_id": "01M5N9DVMGDRXXJF0TATNBM309",
   "strategy": "manual-commit",
   "branch": "slay/45bb3c18-doc-streamlit",
-  "checkpoints_count": 1,
+  "checkpoints_count": 2,
   "files_touched": [
     "website/dist/docs/studio/index.html"
   ],
@@ -13,6 +13,13 @@
       "transcript": "/0/full.jsonl",
       "compact_transcript": "/0/transcript.jsonl",
       "content_hash": "/0/content_hash.txt",
+      "prompt": ""
+    },
+    {
+      "metadata": "/1/metadata.json",
+      "transcript": "/1/full.jsonl",
+      "compact_transcript": "/1/transcript.jsonl",
+      "content_hash": "/1/content_hash.txt",
       "prompt": ""
     }
   ],
