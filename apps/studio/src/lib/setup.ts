@@ -7,7 +7,7 @@
 
 import type { StudioBrief } from "../types";
 
-export type BriefField = "product_name" | "target_user" | "job_statement" | "core_problem";
+export type BriefField = "product_name" | "target_user" | "job_statement" | "core_problem" | "vision";
 
 export type SetupDraft = Record<BriefField, string>;
 
@@ -56,6 +56,13 @@ export const SETUP_QUESTIONS: SetupQuestion[] = [
       "It is hard to find what I need",
     ],
   },
+  {
+    field: "vision",
+    label: "Vision (V2MOM)",
+    ask: "What is your vision for this domain?",
+    hint: "What you want to achieve or create long-term.",
+    placeholder: "Empower developers to ship securely without friction",
+  },
 ];
 
 export const QUESTION_COUNT = SETUP_QUESTIONS.length;
@@ -69,6 +76,7 @@ export function emptyDraft(): SetupDraft {
     target_user: "",
     job_statement: "",
     core_problem: "",
+    vision: "",
   };
 }
 
@@ -78,6 +86,7 @@ export function draftFromBrief(brief: Partial<StudioBrief> | null): SetupDraft {
     target_user: brief?.target_user ?? "",
     job_statement: brief?.job_statement ?? "",
     core_problem: brief?.core_problem ?? "",
+    vision: brief?.v2mom?.vision ?? "",
   };
 }
 
@@ -98,6 +107,7 @@ const REFLECTIONS: Record<BriefField, (value: string) => string> = {
   target_user: (value) => `So it is for ${value}.`,
   job_statement: (value) => `That is the job: ${value}.`,
   core_problem: () => "Then that is where we start.",
+  vision: (value) => `Vision set: ${value}.`,
 };
 
 export function reflectionFor(field: BriefField, value: string): string {
@@ -140,6 +150,7 @@ const FIELD_HINTS: Array<{ field: BriefField; pattern: RegExp }> = [
   { field: "target_user", pattern: /\b(customer|audience|user|who it|who is|who feels)\b/i },
   { field: "job_statement", pattern: /\b(job|trying to do|progress|outcome)\b/i },
   { field: "core_problem", pattern: /\b(friction|pain|problem|hurt|stuck|frustrat)\b/i },
+  { field: "vision", pattern: /\b(vision|v2mom|aspiration|long term|future state)\b/i },
   { field: "product_name", pattern: /\b(product|building|service|tool|what it is)\b/i },
 ];
 

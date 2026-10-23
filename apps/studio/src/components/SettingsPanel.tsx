@@ -54,6 +54,11 @@ export function SettingsPanel() {
               ? `${brief.product_name || "Your product"} — ${brief.job_statement}`
               : "Not set yet. The studio starts every reply from this."}
           </p>
+          {brief?.v2mom?.vision && (
+            <p className="settings__context-value" style={{ marginTop: "0.25rem", opacity: 0.85 }}>
+              <strong>Vision:</strong> {brief.v2mom.vision}
+            </p>
+          )}
         </div>
         <button type="button" className="button button--ghost" onClick={openSetup}>
           {brief ? "Edit context" : "Set up context"}

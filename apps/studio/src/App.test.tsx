@@ -346,6 +346,12 @@ describe("first run", () => {
     fireEvent.keyDown(composer, { key: "Enter" });
 
     expect(
+      await screen.findByText("What is your vision for this domain?", { selector: "strong" }),
+    ).toBeInTheDocument();
+    fireEvent.change(composer, { target: { value: "Zero downtime deploys" } });
+    fireEvent.keyDown(composer, { key: "Enter" });
+
+    expect(
       await screen.findByText(/Here is what I will hold/i, { selector: "p" }),
     ).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /looks right/i }));

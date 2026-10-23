@@ -64,6 +64,16 @@ class UpdateOutcomeRequest(BaseModel):
     mcp_url: str = ""
 
 
+class V2MOM(BaseModel):
+    """V2MOM framework artifact: Vision, Values, Methods, Obstacles, Measures."""
+
+    vision: str = ""
+    values: list[str] = Field(default_factory=list)
+    methods: list[str] = Field(default_factory=list)
+    obstacles: list[str] = Field(default_factory=list)
+    measures: list[str] = Field(default_factory=list)
+
+
 class StudioBrief(BaseModel):
     """The user's context, captured during first-run onboarding."""
 
@@ -72,6 +82,7 @@ class StudioBrief(BaseModel):
     target_user: str = ""
     job_statement: str = ""
     core_problem: str = ""
+    v2mom: V2MOM | None = None
 
 
 class UiCatalogRequest(BaseModel):

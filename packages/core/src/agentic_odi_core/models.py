@@ -129,3 +129,21 @@ class CustomerOutcome(BaseModel):
     @property
     def opportunity_score(self) -> float:
         return self.customer_value.opportunity_score
+
+
+class V2MOM(BaseModel):
+    """V2MOM artifact capturing Vision, Values, Methods, Obstacles, and Measures."""
+
+    vision: str = Field("", description="What you want to achieve or create")
+    values: list[str] = Field(
+        default_factory=list, description="Principles and beliefs that guide decisions"
+    )
+    methods: list[str] = Field(
+        default_factory=list, description="Actions and strategies to achieve the vision"
+    )
+    obstacles: list[str] = Field(
+        default_factory=list, description="Challenges and risks that stand in the way"
+    )
+    measures: list[str] = Field(
+        default_factory=list, description="Metrics and key results to measure success"
+    )

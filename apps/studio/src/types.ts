@@ -100,6 +100,14 @@ export interface ChatMessage {
  * The user's context, captured on first run. Kept in local storage and sent to
  * the sidecar so every reply starts from the user's actual product and job.
  */
+export interface V2Mom {
+  vision?: string;
+  values?: string[];
+  methods?: string[];
+  obstacles?: string[];
+  measures?: string[];
+}
+
 export interface StudioBrief {
   product_name: string;
   product_url?: string;
@@ -107,6 +115,7 @@ export interface StudioBrief {
   job_statement: string;
   core_problem: string;
   job_id?: string;
+  v2mom?: V2Mom;
 }
 
 /**
