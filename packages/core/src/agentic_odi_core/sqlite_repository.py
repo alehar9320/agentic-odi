@@ -418,3 +418,8 @@ class SQLiteRepository(Repository):
     def reload(self) -> None:
         """Re‑load the local snapshot from the event store."""
         self._load_snapshot()
+
+    def close(self) -> None:
+        """Close the event store and let SQLite clean up its journal files."""
+        with self._lock:
+            self.store.close()
