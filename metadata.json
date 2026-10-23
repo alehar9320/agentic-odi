@@ -3,7 +3,7 @@
   "checkpoint_id": "01M5N4GFGF7NN46S06CV23BK39",
   "strategy": "manual-commit",
   "branch": "slay/ad127e0b-evidence-empty-state",
-  "checkpoints_count": 5,
+  "checkpoints_count": 6,
   "files_touched": [
     "apps/studio/src/components/canvas/EvidenceStream.test.tsx",
     "apps/studio/src/components/canvas/EvidenceStream.tsx",
@@ -37,6 +37,13 @@
       "compact_transcript": "/3/transcript.jsonl",
       "content_hash": "/3/content_hash.txt",
       "prompt": "/3/prompt.txt"
+    },
+    {
+      "metadata": "/4/metadata.json",
+      "transcript": "/4/full.jsonl",
+      "compact_transcript": "/4/transcript.jsonl",
+      "content_hash": "/4/content_hash.txt",
+      "prompt": ""
     }
   ],
   "token_usage": {
