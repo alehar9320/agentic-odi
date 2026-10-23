@@ -1,0 +1,55 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M5N89S9MKCKBG0137X6XDJN6",
+  "session_id": "ses_e9718d66dffeg4ohm9Q2vyCJdf",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-23T20:48:08.105378349Z",
+  "branch": "slay/655729cd-mcp-evaluate-error",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "apps/cli/tests/test_backend.py",
+    "apps/mcp-server/src/agentic_odi_mcp_server/mcp_server.py",
+    "apps/mcp-server/tests/test_parity.py"
+  ],
+  "agent": "OpenCode",
+  "model": "poolside/laguna-s-2.1:free",
+  "turn_id": "0f9d1998483c",
+  "checkpoint_transcript_start": 47,
+  "transcript_lines_at_start": 47,
+  "compact_transcript_start": 47,
+  "token_usage": {
+    "input_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 0,
+    "output_tokens": 0,
+    "api_call_count": 0
+  },
+  "session_metrics": {
+    "turn_count": 1
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-10-23T20:48:07.988634452Z",
+    "agent_lines": 0,
+    "agent_removed": 3,
+    "human_added": 70,
+    "human_modified": 10,
+    "human_removed": 0,
+    "total_committed": 72,
+    "total_lines_changed": 83,
+    "agent_percentage": 3.614457831325301,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 152,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        "docs/superpowers/plans/2026-10-21-conversational-generative-ui.md": 97,
+        "docs/superpowers/todos.md": 55
+      }
+    }
+  ]
+}
