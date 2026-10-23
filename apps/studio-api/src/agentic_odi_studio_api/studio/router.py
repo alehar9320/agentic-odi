@@ -23,6 +23,7 @@ from agentic_odi_core import (
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 
+from agentic_odi_studio_api.studio import chat as chat_module
 from agentic_odi_studio_api.studio.changelog import get_changelog
 from agentic_odi_studio_api.studio.chat import stream_chat
 from agentic_odi_studio_api.studio.connectors import ConnectorService
@@ -389,8 +390,19 @@ def create_conversation(request: Request) -> ConversationResponse:
 
 @router.post("/chat")
 async def post_chat(request: Request, body: ChatRequest) -> StreamingResponse:
+    # The tools live behind MCP, so a model that can answer without them means a
+    # missing MCP server is a failed request. When the model is offline the
+    # stream falls back to written guidance, which needs no MCP at all.
+    health = await chat_module.check_llm_health(body.base_url, body.api_key, body.model)
+    if health[0] and not is_endpoint_reachable(body.mcp_url):
+        raise HTTPException(status_code=502, detail=f"MCP server unreachable at {body.mcp_url}")
     return StreamingResponse(
-        stream_chat(body, service=request.app.state.connectors, memory=request.app.state.memory),
+        stream_chat(
+            body,
+            service=request.app.state.connectors,
+            memory=request.app.state.memory,
+            health=health,
+        ),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )

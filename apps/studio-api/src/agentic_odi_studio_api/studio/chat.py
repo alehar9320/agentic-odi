@@ -14,6 +14,7 @@ and come back to the same thread and the same working context.
 from __future__ import annotations
 
 import json
+import logging
 from collections.abc import AsyncIterator
 from typing import Any
 
@@ -25,6 +26,8 @@ from agentic_odi_studio_api.studio.memory import OBSERVATION_KINDS, StudioMemory
 from agentic_odi_studio_api.studio.probes import check_llm_health
 from agentic_odi_studio_api.studio.schemas import ChatRequest, StudioBrief
 from agentic_odi_studio_api.studio.ui_spec import RENDER_UI_TOOL, UiCatalog
+
+log = logging.getLogger(__name__)
 
 #: A rejected surface is corrected in the same reply, but a model that keeps
 #: missing must not be able to loop forever.
@@ -327,10 +330,36 @@ def _persist_turn(
         return
 
 
+def _stream_failure_message(exc: Exception) -> str:
+    """One sentence a person can act on when the stream dies mid-reply."""
+    detail = str(exc).strip()
+    return f"The assistant stopped: {detail}" if detail else "The assistant stopped unexpectedly."
+
+
 async def stream_chat(
     request: ChatRequest,
     service: ConnectorService | None = None,
     memory: StudioMemory | None = None,
+    health: tuple[bool, str] | None = None,
+) -> AsyncIterator[str]:
+    """Yield SSE frames, ending with an ``error`` frame if the loop breaks.
+
+    A failure after the first frame can no longer change the HTTP status, so it
+    is reported in-band instead of ending the response as if the reply finished.
+    """
+    try:
+        async for frame in _stream_chat(request, service, memory, health):
+            yield frame
+    except Exception as exc:  # noqa: BLE001
+        log.exception("chat stream failed")
+        yield _sse("error", {"message": _stream_failure_message(exc)})
+
+
+async def _stream_chat(
+    request: ChatRequest,
+    service: ConnectorService | None = None,
+    memory: StudioMemory | None = None,
+    health: tuple[bool, str] | None = None,
 ) -> AsyncIterator[str]:
     """Yield SSE frames: status, conversation, delta, tool, ui, memory, connector, message, canvas_dirty."""
     yield _sse("status", {"phase": "health_check"})
@@ -352,7 +381,11 @@ async def stream_chat(
             {"id": updated.id, "title": updated.title},
         )
 
-    healthy, _message = await check_llm_health(request.base_url, request.api_key, request.model)
+    healthy, _message = (
+        health
+        if health is not None
+        else await check_llm_health(request.base_url, request.api_key, request.model)
+    )
 
     if not healthy:
         yield _sse("status", {"phase": "offline"})

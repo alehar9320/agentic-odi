@@ -230,3 +230,43 @@ def test_stream_chat_add_connector_unknown_preset_emits_error(monkeypatch, tmp_p
 
     assert json.loads(events["connector"][0])["status"] == "error"
     assert service.list() == []
+
+
+class _BrokenMcp(_Mcp):
+    async def list_tools(self) -> list[Any]:
+        raise RuntimeError("mcp exploded")
+
+
+def test_stream_chat_emits_an_error_event_when_the_tool_list_cannot_load(monkeypatch) -> None:
+    _install(monkeypatch, [])
+    monkeypatch.setattr(chat, "McpClient", _BrokenMcp)
+
+    events = _events(_collect(_request()))
+
+    assert json.loads(events["error"][0])["message"] == "The assistant stopped: mcp exploded"
+    # The reply never finished, so the client must not see a completed message.
+    assert "message" not in events
+
+
+def test_stream_chat_ends_with_an_error_event_when_the_model_call_fails(monkeypatch) -> None:
+    async def _boom(*args: Any, **kwargs: Any) -> tuple[bool, str]:
+        return True, "ok"
+
+    class _FailingOpenAI:
+        def __init__(self, **kwargs: Any) -> None:
+            self.chat = SimpleNamespace(completions=self)
+
+        async def create(self, **kwargs: Any) -> Any:
+            raise RuntimeError("model unreachable")
+
+    _Mcp.calls = []
+    _Mcp.error = None
+    monkeypatch.setattr(chat, "check_llm_health", _boom)
+    monkeypatch.setattr(chat, "McpClient", _Mcp)
+    monkeypatch.setattr(chat, "AsyncOpenAI", _FailingOpenAI)
+
+    events = _events(_collect(_request()))
+
+    assert json.loads(events["error"][-1])["message"] == (
+        "The assistant stopped: model unreachable"
+    )
