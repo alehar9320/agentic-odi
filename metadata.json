@@ -3,7 +3,7 @@
   "checkpoint_id": "01M5N4GFGF7NN46S06CV23BK39",
   "strategy": "manual-commit",
   "branch": "slay/ad127e0b-evidence-empty-state",
-  "checkpoints_count": 2,
+  "checkpoints_count": 3,
   "files_touched": [
     "apps/studio/src/components/canvas/EvidenceStream.test.tsx",
     "apps/studio/src/components/canvas/EvidenceStream.tsx",
@@ -23,13 +23,20 @@
       "compact_transcript": "/1/transcript.jsonl",
       "content_hash": "/1/content_hash.txt",
       "prompt": "/1/prompt.txt"
+    },
+    {
+      "metadata": "/2/metadata.json",
+      "transcript": "/2/full.jsonl",
+      "compact_transcript": "/2/transcript.jsonl",
+      "content_hash": "/2/content_hash.txt",
+      "prompt": "/2/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 943619,
+    "input_tokens": 1588163,
     "cache_creation_tokens": 0,
-    "cache_read_tokens": 10413568,
-    "output_tokens": 40908,
-    "api_call_count": 92
+    "cache_read_tokens": 14318912,
+    "output_tokens": 55741,
+    "api_call_count": 136
   }
 }

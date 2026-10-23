@@ -1,0 +1,5 @@
+Read-only research. Do not edit any files. Analyze the Python side of /home/alexa/repos/agentic-odi: packages/core, packages/connectors, apps/cli, apps/mcp-server, apps/studio-api (ignore .venv, dist, caches). Goal: find 16 concrete, high-value developer opportunities that each deliver a distinct increment and could be implemented by a junior agent in 2-4 hours. Focus on: domain validation (ODI outcome statement format, job map stages, opportunity scores), data integrity/SQLite, import/export, CLI ergonomics, MCP tool contract, connector config/health/ingest, API error contracts, observability, security, idempotency, pagination, and missing tests around risky logic. Read README/docs/architecture and the code. Each candidate: title, user value, exact files/lines, acceptance criteria, rough effort, and overlaps with existing GitHub issues/PRs if known. Prefer small, self-contained, verifiable increments. Cite file_path:line_number.
+
+---
+
+Continue if you have next steps, or stop and ask for clarification if you are unsure how to proceed.
