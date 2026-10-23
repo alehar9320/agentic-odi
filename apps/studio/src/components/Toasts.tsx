@@ -10,16 +10,13 @@ export function Toasts() {
   return (
     <div className="toast-stack" role="status" aria-live="polite">
       {toasts.map((toast) => (
-        <div
-          className={`toast toast--${toast.kind}`}
-          key={toast.id}
-          role={toast.kind === "error" ? "alert" : undefined}
-        >
-          <span style={{ whiteSpace: "pre-wrap" }}>{toast.message}</span>
+        <div className={`toast toast--${toast.kind}`} key={toast.id}>
+          <span style={{ whiteSpace: "pre-wrap", flex: 1 }}>{toast.message}</span>
           <button
             type="button"
             aria-label="Dismiss notification"
             onClick={() => dismissToast(toast.id)}
+            style={{ minHeight: 44, minWidth: 44, padding: 0, fontSize: "1.2rem", lineHeight: 1 }}
           >
             ×
           </button>

@@ -127,7 +127,9 @@ export function DirectCapture() {
         </div>
 
         <div className="field">
-          <label htmlFor="dc-importance">Importance · {importance.toFixed(1)}</label>
+          <label htmlFor="dc-importance">
+            Importance · <b>{importance.toFixed(1)}</b>
+          </label>
           <input
             id="dc-importance"
             type="range"
@@ -140,7 +142,9 @@ export function DirectCapture() {
         </div>
 
         <div className="field">
-          <label htmlFor="dc-satisfaction">Current satisfaction · {satisfaction.toFixed(1)}</label>
+          <label htmlFor="dc-satisfaction">
+            Current satisfaction · <b>{satisfaction.toFixed(1)}</b>
+          </label>
           <input
             id="dc-satisfaction"
             type="range"
