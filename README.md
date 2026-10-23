@@ -70,7 +70,7 @@ shared tooling at the root. Packages live in `packages/`, runnable services in
 | **`apps/mcp-server/`** | `agentic-odi-mcp-server` | FastMCP server exposing Jobs, Steps, Desired Outcomes, Customer Outcomes, Evidence, and context tools over HTTP. Persists to SQLite by default. |
 | **`apps/studio-api/`** | `agentic-odi-studio-api` | FastAPI **Living Studio sidecar**. Serves config, health, canvas data, local mutations, MCP passthrough, SSE chat, conversation history, and the PM memory store, plus the built SPA. |
 | **`apps/cli/`** | `agentic-odi-cli` | Typer CLI with interactive chat — streamed replies and the model's thinking, no sidecar needed — plus full entity CRUD, `schema`, `connectors`, and local-first (`--backend local`) or remote (`--backend mcp`) data access. |
-| **`apps/studio/`** | React + TypeScript + Vite | **The Living Studio** SPA and Tauri 2 desktop shell. The conversation runs on **assistant-ui** — streaming, reasoning, tool calls, approvals, sources, attachments, branches, and suggestions are the library's runtime; the ODI intelligence and the **agent-composed surfaces** (scored outcomes, opportunity theses, bet simulations) are ours, from a closed catalog the SPA owns. A feature-flagged **four-step first-run tour** starts from the PM's ambition, and a local memory records what matters across sessions. `*.visual.test.tsx` files capture component states in Chromium for Chromatic visual review. |
+| **`apps/studio/`** | React + TypeScript + Vite | **The Living Studio** SPA and Tauri 2 desktop shell. The conversation runs on **assistant-ui** — streaming, reasoning, tool calls, approvals, sources, attachments, branches, and suggestions are the library's runtime; the ODI intelligence and the **agent-composed surfaces** (scored outcomes, opportunity theses, bet simulations) are ours, from a closed catalog the SPA owns. A feature-flagged **four-step first-run tour** starts from the PM's ambition, and a local memory records what matters across sessions. `*.visual.test.tsx` files capture component states in Chromium for Chromatic visual review. Its browser-level suite lives in `apps/studio/e2e/`. |
 | **`infra/cloudflare/`** | Worker | Worker script for the free-plan Workers Static Assets deployment and sidecar tunnel; its `wrangler.jsonc` lives at the repository root. |
 | **`scripts/`** | — | Dev launcher, binary build, installer tests. |
 | **`tests/contract/`** | — | Cross-package MCP contract tests. |
@@ -240,9 +240,16 @@ connector catalog, and client-side search over every page (`Ctrl`/`Cmd`+`K`).
 ## Contributing
 
 Contributions are welcome! This project uses [Ruff](https://docs.astral.sh/ruff/)
-for linting and formatting and [pytest](https://pytest.org/) for tests. Make sure
-your change passes the [lint, format, and test checks](docs/development.md) before
-opening a pull request.
+for linting and formatting, [pytest](https://pytest.org/) for the Python
+suites, [Vitest](https://vitest.dev/) for the SPA units, and
+[Playwright](https://playwright.dev) for the browser-level end-to-end suite.
+Make sure your change passes the
+[lint, format, and test checks](docs/development.md) before opening a pull
+request.
+
+The end-to-end suite runs in its own CI job and is deliberately
+non-blocking. To turn it off, set the repository variable `AGENTIC_ODI_E2E` to
+`false` — no code change, no pull request.
 
 ## PR Risk Classification
 

@@ -10,6 +10,7 @@ apps/
   mcp-server/     agentic_odi_mcp_server  FastMCP server over HTTP
   studio-api/     agentic_odi_studio_api  FastAPI sidecar for the Studio SPA
   studio/         React + TypeScript + Vite SPA and Tauri 2 shell
+                   e2e/         Browser-level Playwright suite
 packages/
   core/           agentic_odi_core        Domain, services, repositories, contract
   connectors/     agentic_odi_connectors  MCP client connectors and catalog
