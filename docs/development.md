@@ -35,7 +35,8 @@ cd apps/studio/src-tauri && cargo fmt --check && cargo clippy -- -D warnings && 
 
 ### Conversational UI coverage
 
-The agent-composed surfaces and the first-run tour are covered at these levels:
+The agent-composed surfaces, first-minute guidance, and the product tour are
+covered at these levels:
 
 | File | What it covers |
 |---|---|
@@ -46,8 +47,9 @@ The agent-composed surfaces and the first-run tour are covered at these levels:
 | `apps/studio-api/tests/test_studio_chat_ui.py` | `render_ui` interception, `ui` SSE events, and the correction fed back to the model |
 | `apps/studio/src/features/flags.test.ts` | Flag precedence (query → storage → env → default), value parsing, local overrides |
 | `apps/studio/src/onboarding/machine.test.ts` | Tour transitions, no forward motion without a goal, versioned storage, malformed records |
-| `apps/studio/src/onboarding/FirstRunWizard.test.tsx` | Auto-open, full flow to a destination, skip/Escape, focus trap, resume, replay, inline model repair, flag off |
-| `apps/studio/src/App.test.tsx` | First-run ordering: tour over the context conversation, job handoff, chosen surface opens, flag off in shell tests |
+| `apps/studio/src/onboarding/FirstRunWizard.test.tsx` | Never auto-opens, explicit open, full flow to a destination, skip/Escape, focus trap, resume, replay, inline model repair, flag off |
+| `apps/studio/src/lib/guidance.test.ts` | One hint at a time, context before evidence, silence before the first exchange, permanent dismissal, defensive storage |
+| `apps/studio/src/App.test.tsx` | First-minute ordering: no tour or interview over the stage, tour on request, context hint after the first reply, job handoff, chosen surface opens, flag off in shell tests |
 
 ## Website Checks (GitHub Pages)
 

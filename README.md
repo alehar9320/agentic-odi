@@ -69,7 +69,7 @@ shared tooling at the root. Packages live in `packages/`, runnable services in
 | **`apps/mcp-server/`** | `agentic-odi-mcp-server` | FastMCP server exposing Jobs, Steps, Desired Outcomes, Customer Outcomes, Evidence, and context tools over HTTP. Persists to SQLite by default. |
 | **`apps/studio-api/`** | `agentic-odi-studio-api` | FastAPI **Living Studio sidecar**. Serves config, health, canvas data, local mutations, MCP passthrough, SSE chat, conversation history, and the PM memory store, plus the built SPA. |
 | **`apps/cli/`** | `agentic-odi-cli` | Typer CLI with interactive chat plus full entity CRUD, `schema`, `connectors`, and local-first (`--backend local`) or remote (`--backend mcp`) data access. |
-| **`apps/studio/`** | React + TypeScript + Vite | **The Living Studio** SPA and Tauri 2 desktop shell. The copilot renders **agent-composed surfaces inline** — scored outcomes, opportunity theses, bet simulations — from a closed catalog the SPA owns. A feature-flagged **four-step first-run tour** starts from the PM's ambition, and a local memory records what matters across sessions. |
+| **`apps/studio/`** | React + TypeScript + Vite | **The Living Studio** SPA and Tauri 2 desktop shell. The copilot renders **agent-composed surfaces inline** — scored outcomes, opportunity theses, bet simulations — from a closed catalog the SPA owns. The first frame is a guided conversation, not a modal; a feature-flagged **four-step product tour** is available from the home stage, and a local memory records what matters across sessions. |
 | **`infra/cloudflare/`** | Worker | Free-plan Workers Static Assets deployment and sidecar tunnel. |
 | **`scripts/`** | — | Dev launcher, binary build, installer tests. |
 | **`tests/contract/`** | — | Cross-package MCP contract tests. |
@@ -101,11 +101,11 @@ sidecar, and Vite together on http://localhost:5173. For the desktop app, use
 `npm --prefix apps/studio run tauri dev`. See
 [Running The Living Studio](docs/living-studio.md).
 
-The first time you open the Studio, the tour asks what you want to win: an
-opportunity you already have in mind, a priority your boss handed you, finding
-the next opportunity, or pressure-testing a bet. Pick one and the conversation
-starts there — no form, no framework speech. It still asks for your product and
-audience when it needs them, and everything you say is optional and skippable.
+The Studio opens on one question — what do you want to win — with three starters
+and the composer already focused. Nothing covers it: no tour, no form, no
+required step. The optional four-step product tour lives behind **Show me
+around** (and Settings), and once the studio has answered something it may ask
+for your product and audience in a single quiet line you can dismiss forever.
 
 After that it opens as one room: the transcript and the composer never leave the
 screen. Describe a job or a customer frustration, or type `/` for commands that
@@ -188,7 +188,7 @@ layout, updates, and release automation.
 |---|---|
 | [CLI Reference](docs/cli.md) | Backends, interactive chat, Jobs/Steps/desired Outcomes/Customer Outcomes/evidence, `connectors`, scoring, environment variables |
 | [External Connectors](docs/connectors.md) | The MCP ingest connector, presets, and the `Connector` protocol |
-| [Running The Living Studio](docs/living-studio.md) | First-run tour and its flag, local memory and conversation resume, interface, rich inline responses and the UI catalog, run modes, desktop signing and updates, agent-driven testing (`/dev`, `/test`) |
+| [Running The Living Studio](docs/living-studio.md) | First-minute guidance and the optional product tour, local memory and conversation resume, interface, rich inline responses and the UI catalog, run modes, desktop signing and updates, agent-driven testing (`/dev`, `/test`) |
 | [Local LLM Backend](docs/local-llm.md) | Running a local OpenAI-compatible model with tool calling |
 | [Development](docs/development.md) | Lint, format, type checks, frontend checks, tests and the coverage map |
 | [Architecture](docs/architecture/README.md) | Workspace layout, dependency direction, data flow, and testing |

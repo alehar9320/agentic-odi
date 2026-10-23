@@ -136,7 +136,8 @@ npm<span class="w"> </span>--prefix<span class="w"> </span>apps/studio<span clas
 npm<span class="w"> </span>--prefix<span class="w"> </span>apps/studio<span class="w"> </span>run<span class="w"> </span>build<span class="w">      </span><span class="c1"># production build → apps/studio/dist</span>
 <span class="nb">cd</span><span class="w"> </span>apps/studio/src-tauri<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>cargo<span class="w"> </span>fmt<span class="w"> </span>--check<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>cargo<span class="w"> </span>clippy<span class="w"> </span>--<span class="w"> </span>-D<span class="w"> </span>warnings<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>cargo<span class="w"> </span>check
 </code></pre><h3 id="conversational-ui-coverage">Conversational UI coverage</h3>
-<p>The agent-composed surfaces and the first-run tour are covered at these levels:</p>
+<p>The agent-composed surfaces, first-minute guidance, and the product tour are
+covered at these levels:</p>
 <table>
 <thead>
 <tr>
@@ -175,11 +176,15 @@ npm<span class="w"> </span>--prefix<span class="w"> </span>apps/studio<span clas
 </tr>
 <tr>
 <td><code>apps/studio/src/onboarding/FirstRunWizard.test.tsx</code></td>
-<td>Auto-open, full flow to a destination, skip/Escape, focus trap, resume, replay, inline model repair, flag off</td>
+<td>Never auto-opens, explicit open, full flow to a destination, skip/Escape, focus trap, resume, replay, inline model repair, flag off</td>
+</tr>
+<tr>
+<td><code>apps/studio/src/lib/guidance.test.ts</code></td>
+<td>One hint at a time, context before evidence, silence before the first exchange, permanent dismissal, defensive storage</td>
 </tr>
 <tr>
 <td><code>apps/studio/src/App.test.tsx</code></td>
-<td>First-run ordering: tour over the context conversation, job handoff, chosen surface opens, flag off in shell tests</td>
+<td>First-minute ordering: no tour or interview over the stage, tour on request, context hint after the first reply, job handoff, chosen surface opens, flag off in shell tests</td>
 </tr>
 </tbody>
 </table>

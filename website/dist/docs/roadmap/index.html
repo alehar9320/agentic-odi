@@ -126,10 +126,13 @@ in prose.</li>
 <li>[x] <strong>Map ingested evidence onto ODI artifacts</strong>: Turn connector records into
 jobs, outcomes, or evidence without mixing connector plumbing into the ODI
 store.</li>
-<li>[x] <strong>First-run wizard</strong>: A skippable, resumable four-step tour with inline
-connection repair, ending in the chosen surface or a handoff to the context
-conversation — isolated in <code>apps/studio/src/onboarding/</code> behind the
-<code>firstRunWizard</code> flag.</li>
+<li>[x] <strong>First minute</strong>: The studio opens on a guided conversation, not a modal —
+one invitation, three starters, and a single dismissible hint that teaches the
+next thing in place.</li>
+<li>[x] <strong>Product tour</strong>: An optional, skippable, resumable four-step tour with
+inline connection repair, ending in the chosen surface or a handoff to the
+context conversation — isolated in <code>apps/studio/src/onboarding/</code> behind the
+<code>firstRunWizard</code> flag, and only opened on request.</li>
 <li>[x] <strong>Additional connector kinds</strong>: REST/webhooks and similar integrations
 implementing the same <code>Connector</code> protocol.</li>
 <li>[x] <strong>ODI Schema Definition</strong>: Define standardized Pydantic models for <em>Jobs</em>,
