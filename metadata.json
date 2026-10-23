@@ -3,7 +3,7 @@
   "checkpoint_id": "01M5N4QFE7YHH0TZ46SMJHVHCS",
   "strategy": "manual-commit",
   "branch": "slay/aa104018-close-setup-new-conversation",
-  "checkpoints_count": 3,
+  "checkpoints_count": 5,
   "files_touched": [
     "apps/studio/src/App.test.tsx",
     "apps/studio/src/App.tsx",
@@ -30,6 +30,13 @@
       "transcript": "/2/full.jsonl",
       "compact_transcript": "/2/transcript.jsonl",
       "content_hash": "/2/content_hash.txt",
+      "prompt": ""
+    },
+    {
+      "metadata": "/3/metadata.json",
+      "transcript": "/3/full.jsonl",
+      "compact_transcript": "/3/transcript.jsonl",
+      "content_hash": "/3/content_hash.txt",
       "prompt": ""
     }
   ],
