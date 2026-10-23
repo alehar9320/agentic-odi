@@ -87,6 +87,6 @@ async def test_get_capabilities():
 
         # Check that it returns a string with the expected categories
         assert "Here is what I can help you with" in result_text
-        assert "Manage Jobs-to-be-Done (JTBD)" in result_text
-        assert "Build Job Maps" in result_text
-        assert "Track Desired Outcomes" in result_text
+        assert "Stage 1: Define Intent (Jobs-to-be-Done)" in result_text
+        assert "Stage 4: Build Job Maps" in result_text
+        assert "Stage 2: Capture & Evaluate Desired Outcomes" in result_text

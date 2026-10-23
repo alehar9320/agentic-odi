@@ -11,13 +11,17 @@ from pathlib import Path
 
 import typer
 
-from agentic_odi_cli import context, paths, update, version
+from agentic_odi_cli import context, flags, paths, profile, update, version
 from agentic_odi_cli.backend import run_tool
+from agentic_odi_cli.capabilities import capabilities_app
 from agentic_odi_cli.connectors import connectors_app
 from agentic_odi_cli.customer_outcomes import customer_outcomes_app, score
 from agentic_odi_cli.desired_outcomes import desired_outcomes_app
 from agentic_odi_cli.evidence import evidence_app
 from agentic_odi_cli.jobs import jobs_app
+from agentic_odi_cli.onboard import maybe_run_first_launch
+from agentic_odi_cli.profile import setup_wizard
+from agentic_odi_cli.settings import settings_app
 from agentic_odi_cli.steps import steps_app
 from agentic_odi_cli.version import __version__  # noqa: F401  (re-exported for tests)
 
@@ -26,6 +30,7 @@ app = typer.Typer(
     help="Agentic ODI CLI - Tool for managing Jobs-to-be-Done (JTBD) and ODI workflows.",
     no_args_is_help=False,
 )
+app.add_typer(capabilities_app, name="capabilities", help="Explore capability surface.")
 app.add_typer(connectors_app, name="connectors")
 app.add_typer(jobs_app, name="jobs", help="Manage Jobs-to-be-Done.")
 app.add_typer(steps_app, name="steps", help="Manage Job-map Steps.")
@@ -38,6 +43,9 @@ app.add_typer(
     help="Alias for customer-outcomes.",
     hidden=True,
 )
+app.add_typer(settings_app, name="settings", help="Manage CLI settings and feature flags.")
+app.add_typer(profile.app, name="profile", help="Manage product baseline profile.")
+app.command(name="setup", help="Configure product baseline interactively.")(setup_wizard)
 app.command(name="score")(score)
 
 
@@ -84,6 +92,9 @@ def main(
     context.set_options(backend=backend, db_path=db, mcp_url=mcp_url)
     if not no_update:
         threading.Thread(target=_startup_auto_update, args=(no_update,), daemon=True).start()
+
+    if flags.is_enabled("developer_mode") or (sys.stdin.isatty() and sys.stdout.isatty()):
+        maybe_run_first_launch(invoked_subcommand=ctx.invoked_subcommand)
 
     if ctx.invoked_subcommand is None:
         # No subcommand: start the conversational experience when attached to a
