@@ -3,7 +3,7 @@
   "checkpoint_id": "01M5N89S9MKCKBG0137X6XDJN6",
   "strategy": "manual-commit",
   "branch": "slay/655729cd-mcp-evaluate-error",
-  "checkpoints_count": 3,
+  "checkpoints_count": 5,
   "files_touched": [
     "apps/cli/tests/test_backend.py",
     "apps/mcp-server/src/agentic_odi_mcp_server/mcp_server.py",
@@ -29,6 +29,13 @@
       "transcript": "/2/full.jsonl",
       "compact_transcript": "/2/transcript.jsonl",
       "content_hash": "/2/content_hash.txt",
+      "prompt": ""
+    },
+    {
+      "metadata": "/3/metadata.json",
+      "transcript": "/3/full.jsonl",
+      "compact_transcript": "/3/transcript.jsonl",
+      "content_hash": "/3/content_hash.txt",
       "prompt": ""
     }
   ],
