@@ -8,17 +8,18 @@ vi.mock("../state/StudioContext", () => ({
   useStudio: vi.fn(),
 }));
 vi.mock("./updater/useUpdater", () => ({
-  useUpdater: () => ({
+  useUpdater: vi.fn(() => ({
     checking: false,
     available: false,
     version: null,
     progress: null,
     error: null,
     check: vi.fn(),
-  }),
+  })),
 }));
 
 import { useStudio } from "../state/StudioContext";
+import { useUpdater } from "./updater/useUpdater";
 import type { StudioContextValue } from "../state/StudioContext";
 
 const stubContext = (overrides: Record<string, unknown> = {}) =>
@@ -90,6 +91,24 @@ describe("SettingsPanel connectors", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: /add preset/i }));
     expect(add).toHaveBeenCalledWith({ preset: "notion" });
+  });
+
+  it("leaves update errors inline instead of toasting them", () => {
+    const pushToast = vi.fn();
+    vi.mocked(useStudio).mockReturnValue(stubContext({ pushToast }));
+    vi.mocked(useUpdater).mockReturnValueOnce({
+      checking: false,
+      available: false,
+      version: null,
+      progress: null,
+      error: "Update check failed.",
+      check: vi.fn(),
+    });
+
+    renderPanel();
+    fireEvent.click(screen.getByRole("button", { name: /check for updates/i }));
+
+    expect(pushToast).not.toHaveBeenCalled();
   });
 
   it("shows an empty state when no connectors are registered", () => {
