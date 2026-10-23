@@ -1,0 +1,5 @@
+Read-only research. Do not edit files or GitHub. Repo: /home/alexa/repos/agentic-odi, remote alehar9320/agentic-odi. Use `gh` read-only commands. Analyze all open PRs (#62,63,64,65,66,70,76,101,102,104,125,126,127,129,130) and open issues (#77-#83,#84-#86,#88-#96,#97,#100-#104,#105-#124). Determine: what each PR actually changes and what is still missing around it; which issues are already covered by in-flight branches; and identify 10 concrete gaps that are NOT already open issues or PRs. Goal: 10-12 candidate small opportunities (2-4h junior work) that complement, rather than duplicate, the roadmap in flight. Each candidate: title, distinct user value, evidence (PR/issue/file), acceptance criteria, rough effort. Also flag any open issue whose scope is too big and could be split into a small first increment. Cite PR/issue numbers and file paths.
+
+---
+
+Continue if you have next steps, or stop and ask for clarification if you are unsure how to proceed.

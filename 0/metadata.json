@@ -1,0 +1,53 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M5N4GFGF7NN46S06CV23BK39",
+  "session_id": "ses_e9718b02effeE6KEcUvihFPYaG",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-23T19:41:40.786715811Z",
+  "branch": "slay/ad127e0b-evidence-empty-state",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "apps/studio/src/components/canvas/EvidenceStream.test.tsx",
+    "apps/studio/src/components/canvas/EvidenceStream.tsx",
+    "apps/studio/src/styles/theme.css"
+  ],
+  "agent": "OpenCode",
+  "model": "poolside/laguna-s-2.1:free",
+  "turn_id": "b93f076dcb80",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 579914,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 6612448,
+    "output_tokens": 32426,
+    "api_call_count": 59
+  },
+  "session_metrics": {
+    "turn_count": 1
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-10-23T19:41:40.726451896Z",
+    "agent_lines": 0,
+    "agent_removed": 0,
+    "human_added": 251,
+    "human_modified": 27,
+    "human_removed": 0,
+    "total_committed": 255,
+    "total_lines_changed": 278,
+    "agent_percentage": 0,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 152,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        "docs/superpowers/plans/2026-10-21-conversational-generative-ui.md": 97,
+        "docs/superpowers/todos.md": 55
+      }
+    }
+  ]
+}
