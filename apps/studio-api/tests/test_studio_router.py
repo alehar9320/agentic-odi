@@ -245,3 +245,97 @@ def test_local_create_routes_map_domain_errors() -> None:
     )
     assert missing_job_outcome.status_code == 404
     assert missing_job_outcome.json()["error"]["code"] == "not_found"
+
+
+def test_get_jobs_lists_what_was_created() -> None:
+    client = _client("local")
+    client.post("/api/jobs", json={"mcp_url": "", "name": "Ship faster"})
+
+    response = client.get("/api/jobs")
+
+    assert response.status_code == 200
+    jobs = response.json()["result"]
+    assert [job["name"] for job in jobs] == ["Ship faster"]
+
+
+def test_get_job_by_id_returns_the_job() -> None:
+    client = _client("local")
+    job_id = client.post("/api/jobs", json={"mcp_url": "", "name": "Ship"}).json()["id"]
+
+    response = client.get(f"/api/jobs/{job_id}")
+
+    assert response.status_code == 200
+    assert response.json()["result"]["id"] == job_id
+
+
+def test_get_job_by_unknown_id_is_404() -> None:
+    response = _client("local").get("/api/jobs/does-not-exist")
+
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "not_found"
+    assert "does-not-exist" in response.json()["error"]["message"]
+
+
+def test_get_steps_lists_a_job_map() -> None:
+    client = _client("local")
+    job_id = client.post("/api/jobs", json={"mcp_url": "", "name": "Ship"}).json()["id"]
+    client.post("/api/steps", json={"mcp_url": "", "job_id": job_id, "name": "Execute", "order": 1})
+
+    response = client.get("/api/steps", params={"job_id": job_id})
+
+    assert response.status_code == 200
+    steps = response.json()["result"]
+    assert [step["name"] for step in steps] == ["Execute"]
+
+
+def test_get_steps_without_a_job_lists_every_step() -> None:
+    client = _client("local")
+    first = client.post("/api/jobs", json={"mcp_url": "", "name": "One"}).json()["id"]
+    second = client.post("/api/jobs", json={"mcp_url": "", "name": "Two"}).json()["id"]
+    client.post("/api/steps", json={"mcp_url": "", "job_id": first, "name": "A", "order": 1})
+    client.post("/api/steps", json={"mcp_url": "", "job_id": second, "name": "B", "order": 1})
+
+    response = client.get("/api/steps")
+
+    assert response.status_code == 200
+    assert {step["name"] for step in response.json()["result"]} == {"A", "B"}
+
+
+def test_get_outcomes_lists_what_was_captured() -> None:
+    client = _client("local")
+    job_id = client.post("/api/jobs", json={"mcp_url": "", "name": "Ship"}).json()["id"]
+    client.post(
+        "/api/outcomes",
+        json={
+            "mcp_url": "",
+            "job_id": job_id,
+            "statement": "Minimize the time to ship",
+            "importance": 8.5,
+            "satisfaction": 3.5,
+        },
+    )
+
+    response = client.get("/api/outcomes", params={"job_id": job_id})
+
+    assert response.status_code == 200
+    assert [item["statement"] for item in response.json()["result"]] == [
+        "Minimize the time to ship"
+    ]
+
+
+def test_get_jobs_returns_the_parsed_mcp_payload(monkeypatch) -> None:
+    async def _call(mcp_url: str, tool: str, arguments: dict) -> str:
+        return '[{"id": "job-1", "name": "Ship"}]'
+
+    monkeypatch.setattr(router_module, "call_mcp_tool", _call)
+
+    response = _client().get("/api/jobs", params={"mcp_url": "http://mcp"})
+
+    assert response.status_code == 200
+    assert response.json()["result"] == [{"id": "job-1", "name": "Ship"}]
+
+
+def test_get_outcomes_on_mcp_requires_a_job(monkeypatch) -> None:
+    response = _client().get("/api/outcomes", params={"mcp_url": "http://mcp"})
+
+    assert response.status_code == 400
