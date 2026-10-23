@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 
 import { useStudio } from "../../state/StudioContext";
 import { GhostJobSteps } from "../Skeletons";
@@ -50,6 +50,22 @@ export function JobMap() {
     }
   }
 
+  /** Swap a step with its neighbour, so order changes without a mouse. */
+  async function moveStep(stepId: string, direction: -1 | 1) {
+    const index = steps.findIndex((step) => step.id === stepId);
+    const target = index + direction;
+    if (index < 0 || target < 0 || target >= steps.length) {
+      return;
+    }
+    setBusy(true);
+    try {
+      await updateStep(steps[index].id ?? "", { order: target + 1 });
+      await updateStep(steps[target].id ?? "", { order: index + 1 });
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function saveJob(event: React.FormEvent) {
     event.preventDefault();
     if (!activeJobId || !jobName.trim()) {
@@ -65,7 +81,7 @@ export function JobMap() {
   }
 
   // Map steps to 8 phases evenly or by order
-  const stepPhaseMapping = useMemo(() => {
+  const stepPhaseMapping = (() => {
     const buckets: Array<{ phase: (typeof UNIVERSAL_PHASES)[0]; steps: typeof steps }> =
       UNIVERSAL_PHASES.map((phase) => ({ phase, steps: [] }));
 
@@ -75,7 +91,7 @@ export function JobMap() {
     });
 
     return buckets;
-  }, [steps]);
+  })();
 
   const visibleSteps =
     selectedPhaseIndex === null
@@ -199,7 +215,11 @@ export function JobMap() {
       {canvasLoading && !canvas ? (
         <GhostJobSteps />
       ) : steps.length ? (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <div
+          role="list"
+          aria-label="Job steps"
+          style={{ display: "flex", flexDirection: "column", gap: 8 }}
+        >
           {visibleSteps.map((step) => {
             const index = steps.indexOf(step);
             const order = step.order ?? index + 1;
@@ -208,6 +228,21 @@ export function JobMap() {
               <div
                 className="step-row fade-in"
                 key={step.id ?? index}
+                role="listitem"
+                tabIndex={0}
+                aria-label={`Step ${order}: ${step.name ?? ""}`}
+                onKeyDown={(event) => {
+                  if (!step.id || busy || editingStepId === step.id) {
+                    return;
+                  }
+                  if (event.key === "ArrowUp") {
+                    event.preventDefault();
+                    void moveStep(step.id, -1);
+                  } else if (event.key === "ArrowDown") {
+                    event.preventDefault();
+                    void moveStep(step.id, 1);
+                  }
+                }}
                 style={{
                   display: "flex",
                   alignItems: "center",
