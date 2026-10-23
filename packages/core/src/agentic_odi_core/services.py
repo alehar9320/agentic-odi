@@ -5,7 +5,6 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
-from agentic_odi_core.errors import NotFoundError, ValidationError
 from agentic_odi_core.models import (
     BusinessValue,
     CustomerOutcome,
@@ -20,43 +19,37 @@ from agentic_odi_core.models import (
 from agentic_odi_core.repository import Repository
 
 
-class JobNotFoundError(NotFoundError):
+class JobNotFoundError(Exception):
     def __init__(self, job_id: str) -> None:
         self.job_id = job_id
-        super().__init__(job_id, "job")
+        super().__init__(job_id)
 
 
-class StepNotFoundError(NotFoundError):
+class StepNotFoundError(Exception):
     def __init__(self, step_id: str) -> None:
         self.step_id = step_id
-        super().__init__(step_id, "step")
+        super().__init__(step_id)
 
 
-class OutcomeNotFoundError(NotFoundError):
+class OutcomeNotFoundError(Exception):
     def __init__(self, outcome_id: str) -> None:
         self.outcome_id = outcome_id
-        super().__init__(outcome_id, "outcome")
+        super().__init__(outcome_id)
 
 
-class CustomerOutcomeNotFoundError(NotFoundError):
+class CustomerOutcomeNotFoundError(Exception):
     def __init__(self, outcome_id: str) -> None:
         self.outcome_id = outcome_id
-        super().__init__(outcome_id, "customer_outcome")
+        super().__init__(outcome_id)
 
 
-class EvidenceNotFoundError(NotFoundError, ValueError):
-    """Raised when an evidence record cannot be located.
-
-    Also a :class:`ValueError`, because the caller supplied an id that does not
-    resolve — an invalid argument value.
-    """
-
-    def __init__(self, evidence_id: str, hint: str | None = None) -> None:
+class EvidenceNotFoundError(Exception):
+    def __init__(self, evidence_id: str) -> None:
         self.evidence_id = evidence_id
-        super().__init__(evidence_id, "evidence", hint)
+        super().__init__(evidence_id)
 
 
-class ValueOutOfRangeError(ValidationError):
+class ValueOutOfRangeError(Exception):
     pass
 
 
@@ -247,7 +240,7 @@ class ODIService:
             if resolved_job_id is None:
                 resolved_job_id = step.job_id
             elif step.job_id != resolved_job_id:
-                raise ValidationError("step_id does not belong to job_id")
+                raise ValueError("step_id does not belong to job_id")
         if outcome_id is not None:
             outcome = self.repo.get_outcome(outcome_id)
             if outcome is None:
@@ -255,9 +248,9 @@ class ODIService:
             if resolved_job_id is None:
                 resolved_job_id = outcome.job_id
             elif outcome.job_id != resolved_job_id:
-                raise ValidationError("outcome_id does not belong to job_id")
+                raise ValueError("outcome_id does not belong to job_id")
             if step_id is not None and outcome.step_id not in (None, step_id):
-                raise ValidationError("outcome_id does not belong to step_id")
+                raise ValueError("outcome_id does not belong to step_id")
         if resolved_job_id is not None and self.repo.get_job(resolved_job_id) is None:
             raise JobNotFoundError(resolved_job_id)
         evidence = Evidence(
@@ -287,10 +280,7 @@ class ODIService:
 
     def delete_evidence(self, evidence_id: str) -> None:
         if not self.repo.delete_evidence(evidence_id):
-            raise EvidenceNotFoundError(
-                evidence_id,
-                "List the stored records with list_evidence() to find a valid id.",
-            )
+            raise EvidenceNotFoundError(evidence_id)
 
     def promote_evidence(
         self,
@@ -304,10 +294,7 @@ class ODIService:
     ) -> Job | Outcome:
         evidence = self.repo.get_evidence(evidence_id)
         if evidence is None:
-            raise EvidenceNotFoundError(
-                evidence_id,
-                "List the stored records with list_evidence() to find a valid id.",
-            )
+            raise EvidenceNotFoundError(evidence_id)
         if target == "job":
             label = (
                 (name or evidence.name).strip() or _first_line(evidence.content) or "Imported job"
@@ -316,7 +303,7 @@ class ODIService:
         if target == "outcome":
             target_job_id = job_id or evidence.job_id
             if target_job_id is None:
-                raise ValidationError("job_id is required to promote evidence to an outcome")
+                raise ValueError("job_id is required to promote evidence to an outcome")
             text = (
                 statement
                 or evidence.name.strip()
@@ -330,7 +317,7 @@ class ODIService:
                 satisfaction=satisfaction,
                 step_id=evidence.step_id,
             )
-        raise ValidationError(f"Unknown promotion target: {target}")
+        raise ValueError(f"Unknown promotion target: {target}")
 
     def compute_opportunity(self, importance: float, satisfaction: float) -> float:
         return compute_opportunity_score(importance, satisfaction)

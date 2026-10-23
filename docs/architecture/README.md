@@ -39,9 +39,6 @@ apps/cli ──────────────▶ packages/connectors
 
 - `SQLiteRepository` is the production default for the CLI, MCP server, and Studio API.
 - The default database is `~/.agentic-odi/odi.db`, overridable with `AGENTIC_ODI_DB`.
-- Studio conversation history and PM memory use a separate SQLite database,
-  `~/.agentic-odi/studio.db`, overridable with `AGENTIC_ODI_STUDIO_DB`. They are
-  sidecar-local and never enter the ODI repository or the MCP contract.
 - `build_repository()` chooses SQLite by default and `InMemoryRepository` when `AGENTIC_ODI_DB=:memory:`, which is what tests use.
 - The CLI selects its backend with `--backend local|mcp` or `AGENTIC_ODI_BACKEND`.
 - The Studio API selects `local` (direct service calls) or `mcp` (passthrough) with `AGENTIC_ODI_BACKEND` or `create_app(backend=...)`.

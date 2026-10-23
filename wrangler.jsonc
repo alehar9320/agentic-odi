@@ -1,21 +1,17 @@
 {
   // Free-plan deployment: the Worker uploads the built SPA as static assets and
   // forwards /api/* to the Python sidecar through a Cloudflare Quick Tunnel.
-  // Keep this aligned with the Worker connected in the Cloudflare dashboard.
-  "name": "agentic-odi",
+  "name": "agentic-odi-studio",
   "main": "./infra/cloudflare/worker.ts",
   "compatibility_date": "2026-10-19",
-  // `npx wrangler preview` (Workers Builds preview command) refuses to run
-  // without a `previews` block, even when Previews need no extra settings.
-  // Assets and compatibility settings stay at the top level; Previews do not
-  // inherit production vars or secrets, so set SIDECAR_URL per Preview with
-  // `npx wrangler preview secret put SIDECAR_URL`.
-  "previews": {},
+  "build": {
+    "command": "npm run build"
+  },
   "assets": {
     "directory": "./apps/studio/dist",
     "binding": "ASSETS",
     "not_found_handling": "single-page-application",
-    "run_worker_first": ["/api/*"]
+    "run_worker_first": true
   },
   "observability": {
     "enabled": true
