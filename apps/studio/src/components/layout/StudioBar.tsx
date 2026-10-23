@@ -1,6 +1,6 @@
 import { useStudio } from "../../state/StudioContext";
-import { BellIcon, PlusIcon, SettingsIcon } from "../icons";
-import { OdiMascot } from "../OdiMascot";
+import { useUpdateSnapshot } from "../../updater";
+import { BellIcon, PlusIcon, SettingsIcon, SparkIcon } from "../icons";
 
 /**
  * The only persistent chrome: where you are, how to start again, whether the
@@ -17,9 +17,16 @@ export function StudioBar({
   onChangelog: () => void;
 }) {
   const { llmHealth, unreadNotificationCount, openPanel } = useStudio();
+  const update = useUpdateSnapshot();
 
   const status =
     llmHealth.healthy === null ? "Connecting" : llmHealth.healthy ? "Live" : "Local mode";
+  const updateReady = update.phase === "ready";
+  const versionLabel = updateReady
+    ? "Update ready"
+    : update.currentVersion
+      ? `v${update.currentVersion}`
+      : null;
 
   return (
     <header className="bar">
@@ -86,6 +93,21 @@ export function StudioBar({
           />
           {status}
         </button>
+
+        {versionLabel && (
+          <button
+            type="button"
+            className={`bar__version${updateReady ? " is-accent" : ""}`}
+            onClick={() => openPanel("settings")}
+            title={
+              update.currentVersion
+                ? `Living Studio ${update.currentVersion} — open software update settings`
+                : "Open software update settings"
+            }
+          >
+            {versionLabel}
+          </button>
+        )}
 
         <button
           type="button"

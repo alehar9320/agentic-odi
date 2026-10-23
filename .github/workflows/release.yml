@@ -1,9 +1,14 @@
 name: release
 
+# release-please publishes the GitHub release via the API; that emits a
+# `release` event, not a tag push. Both paths are kept so hand-cut tags still
+# publish the CLI archives.
 on:
   push:
     tags:
       - "v*"
+  release:
+    types: [published]
 
 permissions:
   contents: write

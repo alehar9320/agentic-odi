@@ -2,20 +2,11 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { OnboardingProvider } from "../onboarding/OnboardingProvider";
+import { UpdateProvider, createUpdateService } from "../updater";
 import { SettingsPanel } from "./SettingsPanel";
 
 vi.mock("../state/StudioContext", () => ({
   useStudio: vi.fn(),
-}));
-vi.mock("./updater/useUpdater", () => ({
-  useUpdater: () => ({
-    checking: false,
-    available: false,
-    version: null,
-    progress: null,
-    error: null,
-    check: vi.fn(),
-  }),
 }));
 
 import { useStudio } from "../state/StudioContext";
@@ -58,10 +49,23 @@ const stubContext = (overrides: Record<string, unknown> = {}) =>
   }) as unknown as StudioContextValue;
 
 function renderPanel() {
+  const service = createUpdateService({
+    transport: {
+      supported: () => false,
+      currentVersion: async () => "0.11.0",
+      check: async () => null,
+      relaunch: async () => undefined,
+    },
+    storage: null,
+    document: null,
+  });
+
   return render(
-    <OnboardingProvider enabled={false}>
-      <SettingsPanel />
-    </OnboardingProvider>,
+    <UpdateProvider service={service}>
+      <OnboardingProvider enabled={false}>
+        <SettingsPanel />
+      </OnboardingProvider>
+    </UpdateProvider>,
   );
 }
 
