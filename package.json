@@ -8,6 +8,6 @@
     "apps/studio"
   ],
   "scripts": {
-    "build:studio": "npm --prefix apps/studio run build"
+    "build": "npm --prefix apps/studio run build"
   }
 }
