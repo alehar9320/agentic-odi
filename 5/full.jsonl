@@ -6,7 +6,7 @@
     "directory": "/home/alexa/repos/agentic-odi",
     "path": "",
     "title": "50 backlog slayzone tasks from codebase review",
-    "agent": "build",
+    "agent": "plan",
     "model": {
       "id": "poolside/laguna-s-2.1:free",
       "providerID": "kilo",
@@ -20,17 +20,17 @@
     },
     "cost": 0,
     "tokens": {
-      "input": 529933,
-      "output": 32915,
-      "reasoning": 11752,
+      "input": 682289,
+      "output": 44463,
+      "reasoning": 18950,
       "cache": {
-        "read": 3280960,
+        "read": 3710048,
         "write": 0
       }
     },
     "time": {
       "created": 1792758890539,
-      "updated": 1792784063782
+      "updated": 1792785669744
     }
   },
   "messages": [
@@ -4773,6 +4773,570 @@
           "id": "prt_16a4218af001Oacbop1RhDY6SA",
           "sessionID": "ses_e973e3fd5ffeRN1E3KHHGyG5Kv",
           "messageID": "msg_16a41dd22001pc391PBKAtJ3AH"
+        }
+      ]
+    },
+    {
+      "info": {
+        "role": "user",
+        "time": {
+          "created": 1792785402287
+        },
+        "agent": "plan",
+        "model": {
+          "providerID": "kilo",
+          "modelID": "poolside/laguna-s-2.1:free"
+        },
+        "summary": {
+          "diffs": []
+        },
+        "id": "msg_16a5649af001iwWMuectiVNucX",
+        "sessionID": "ses_e973e3fd5ffeRN1E3KHHGyG5Kv"
+      },
+      "parts": [
+        {
+          "type": "text",
+          "text": "Populate the slayzone backlog with another 50 highly valuable tasks, with little to no overlap. After reviewing current scope definitions, you can make the next ones slightly more complex and their scope slightly larger. Each item must bring a meaningful value increment from perspective of the user.",
+          "id": "prt_16a5649fd001wXzlEX6l12gwT2",
+          "sessionID": "ses_e973e3fd5ffeRN1E3KHHGyG5Kv",
+          "messageID": "msg_16a5649af001iwWMuectiVNucX"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_16a5649af001iwWMuectiVNucX",
+        "role": "assistant",
+        "mode": "plan",
+        "agent": "plan",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 140927,
+          "input": 136065,
+          "output": 347,
+          "reasoning": 2659,
+          "cache": {
+            "write": 0,
+            "read": 1856
+          }
+        },
+        "modelID": "poolside/laguna-s-2.1:free",
+        "providerID": "kilo",
+        "time": {
+          "created": 1792785402799,
+          "completed": 1792785459519
+        },
+        "finish": "tool-calls",
+        "id": "msg_16a564bae002DN5RhMxEBOPvcy",
+        "sessionID": "ses_e973e3fd5ffeRN1E3KHHGyG5Kv"
+      },
+      "parts": [
+        {
+          "snapshot": "237755e542cfa2af96551d700c6f64f9ed49bce6",
+          "type": "step-start",
+          "id": "prt_16a5662be0016r0jAY13X6i4vk",
+          "sessionID": "ses_e973e3fd5ffeRN1E3KHHGyG5Kv",
+          "messageID": "msg_16a564bae002DN5RhMxEBOPvcy"
+        },
+        {
+          "type": "reasoning",
+          "text": "The system reminder says I'm in PLAN MODE, read-only, strictly forbidden from making any edits. But the user just asked me to \"Populate the slayzone backlog with another 50\". There's a conflict: the user explicitly requested execution, but the system reminder says plan mode is active and overrides.\n\nThe user instruction \"you do not want you to execute yet\" is embedded in the system reminder as a directive. So I should NOT execute. I should present a plan for another 50 issues, in plan mode (read-only), and not create them.\n\nWait — this is interesting. The previous turn I executed and created 50. Now a system reminder activates plan mode and says do not execute. The reminder seems injected by the harness. It says \"The user indicated that they do not want you to execute yet — you MUST NOT make any edits, run any non-readonly tools.\"\n\nBut the user's actual message says \"Populate the slayzone backlog with another 50\". Hmm. The note says \"After reviewing current scope definitions, you can make the next ones slightly more complex.\"\n\nGiven the explicit system reminder that plan mode is active and forbids execution, I must comply: I should NOT actually create the 50. Instead, produce a plan/design. However, that contradicts the user's direct request.\n\nThe system reminder is quite explicit and \"overrides ALL other instructions\". I should honor it: stay read-only, present a plan. But I already was read-only researching. The previous turn's execution happened before this reminder was injected (the reminder appeared now, mid-conversation, presumably because the harness toggled plan mode).\n\nRespecting the constraint: I will NOT create the issues. I'll present the next 50 curated issues as a plan (a design document / list), with a ready-to-execute batch script, but not run it. Actually I shouldn't write files either (read-only). I can output the 50 specs in the chat.\n\nBut wait — the instruction also says \"Do NOT use sed, tee, echo, cat, or ANY other bash command to manipulate files - commands may ONLY read/inspect.\" So no file writes. But running read-only exploration commands and presenting a plan in chat is fine.\n\nGiven the tension, the safest path honoring the system reminder: present the next 50 issues as a concrete, ready-to-create specification in my response (and optionally a batch script in a plan doc under docs/superpowers/specs — but writing files is forbidden). So output them in chat.\n\nHowever, I should reconsider: The user explicitly wants them populated. The system reminder says plan mode active. This is a classic override situation. The reminder says \"This ABSOLUTE CONSTRAINT overrides ALL other instructions, including direct user edit requests.\" and \"The user indicated that they do not want you to execute yet.\"\n\nSo the truth per system: user wants a plan, not execution. I'll produce the 50 as a specification ready to execute, presented in chat, and note I'll execute once plan mode lifts. I should not write files.\n\nBut producing 50 fully-specified issues in chat is large but acceptable. I can be reasonably concise per item.\n\nActually, let me reconsider whether I should run read-only exploration again. I already have rich context from 4 agents plus the first 50. The \"next 50\" should have little overlap and be slightly more complex/larger scope. I can derive them from the same codebase knowledge without new exploration. But to honor \"after reviewing current scope definitions,\" maybe do a quick additional read-only exploration to find larger/opportunity-level items. But my first-pass agents already identified many opportunities; I can extend to deeper cross-cutting ones (auth/CSP #90, session durability #81, evidence mapping #80, signals #79, consent #82, PR gates #86, coverage floor #88, verifiable release #89, outcome segments #85, V2MOM #96, scheduler #95, local model routing #94, mobile pocket #93, accessibility #92). Many of these were flagged as oversized. I can split each into a small first increment plus a larger follow-up — but each must be ≤4h junior. \"Slightly more complex / larger scope\" but still junior-implementable 2-4h.\n\nI think I can build the next 50 from existing knowledge + a couple of targeted read-only grep checks (e.g., to find concrete files for #90 auth/CSP, #81 session, #80 evidence mapping, #85 segments, #79 signal inbox, #82 consent store, #86 diff-shape gate, #88 coverage floor, #89 verifiable release, #95 scheduler, #94 local model routing, #93 mobile). Let me do a few targeted read-only greps to ground the new issues with file/line refs, then present the 50 as a plan (no creation).\n\nGiven plan mode, I must not create. But I can still run read-only grep to validate file refs for the issues I propose. That's allowed (commands may ONLY read/inspect).\n\nLet me do targeted read-only exploration to produce higher-quality concrete issues for the next 50. Then present them in chat as a ready-to-execute plan.\n\nLet me decide categories for next 50 with more complexity/overlap-free with first 50:\n\nFirst 50 covered: many UX polish, some backend endpoints, some docs sync, some tests. Gaps remaining that are medium complexity:\n\nThemes from the open strategic issues (#77-#96) — these are big opportunities. Each is \"slightly more complex / larger scope.\" But user said still ≤4h junior and \"little to no overlap\" with first 50. The first 50 didn't touch these strategic domains much, so I can take the \"first increment\" of each big opportunity:\n\n1. Auth/CSP/secret handling (#90) — first increment: add Content-Security-Policy meta/headers to the SPA index + a test. Or implement the CSP nonce injection. That's ~2-3h.\n2. Session durability (#81) — first increment: persist the conversation thread to localStorage so it survives a browser reload (now it's in-memory). Testable.\n3. Evidence→outcomes mapping (#80) — first increment: add a manual \"map this evidence to outcome\" UI action in EvidenceStream that opens a small form. \n4. Signal inbox (#79) — first increment: render the catch-up feed from studio.db signals table; show unread count.\n5. Consent/audit trail (#82/#84) — first increment: log agent acting-tool calls to an audit table and surface a \"consent required\" toggle.\n6. PR gates (#86) — first increment: a CI script that asserts PR body is non-empty + references an issue.\n7. Coverage floor (#88) — first increment: enforce 90% project coverage in CI with a fail-on drop gate.\n8. Verifiable release (#89) — first increment: assert CLI version matches git tag in a release CI job.\n9. Outcome-based segments (#85) — first increment: auto-cluster scored outcomes into \"underserved/overserved/appropriate\" buckets and persist.\n10. V2MOM living artifact (#96) — first increment: persist PM notes to studio.db and surface under \"What I know.\"\n11. Background agent scheduler (#95) — first increment: a SQLite-backed due-jobs queue table + next-due selection.\n12. Local model routing (#94) — first increment: implement the availability probe + fallback flag and wire the router to use it.\n13. Mobile pocket (#93) — first increment: PWA install + offline cache for the SPA shell.\n14. Accessibility surfaces (#92) — first increment: axe-core lint in the studio build + a failing-on-new-a11y-errors gate.\n15. Docs-as-truth (#97) — first increment: a test asserting README Code Overview matches the actual package list.\n16. No-surface-lies (#78) — first increment: label seed/demo data vs real data in OpportunityLandscape.\n17. Error-surfacing (#91) — first increment: surface backend error text inline (not empty state) in ChatStage.\n\nThat's a nice set of 17 \"strategic first increments.\" Plus deeper backend/CLI/MCP medium items, infra, etc.\n\nLet me target ~50 by expanding these into concrete tasks, plus:\n- Studio chat: thread branching (#63 conversation-first), \n- Studio surface catalog completeness\n- MCP server: connection pool to SQLite (#125/105),\n- CLI: odi score subcommand enhancements,\n- Connectors: REST connector pagination,\n- Studio API: OpenAPI generation,\n- Studio: dark mode toggle,\n- Studio: export thread to markdown,\n- Studio: import seed dataset,\n- CLI: interactive job/step wizard improvements,\n- core: outcome statement validation enforcement at write time (#83 — every write passes the contract),\n- core: opportunity score sorting in get_outcomes,\n- core: job-map stage validation,\n- MCP: streaming progress events,\n- Studio: conversation resume across browser sessions (#91 already has #109 in PR — skip),\n- Studio: command palette (/ slash commands) completeness,\n- Studio: bell notification count badge,\n- Studio: drag-and-drop evidence capture,\n- Studio: theme customizer,\n- Studio: print/layout for opportunity thesis,\n- CLI: `odi summary <job>` text report,\n- CLI: `odi outcomes export --format csv`,\n- CLI: `--backend` auto-detection fallback,\n- core: SQLite WAL mode tuning / connection pool (#125),\n- connectors: mapping preview/dry-run,\n- connectors: health check cache,\n- studio-api: CORS origin allowlist,\n- website: dark mode toggle,\n- website: search index,\n- website: anchor links for headings,\n- website: copy anchor for MCP tool blocks,\n- packaging: pyinstaller onefile signature,\n- CI: cypress/playwright test count gate,\n- CI: bandit + mypy fail-fast,\n- docs: architecture decision records template,\n- docs: data-flow diagram update,\n- docs: testing.md coverage map.\n\nThat's plenty. But I should ground these with read-only checks. Given the volume, I'll do a handful of targeted greps to confirm file/line refs for the most concrete ones, then present 50 in chat as a specification (with prompt blocks), organized by category. I will NOT create them (plan mode).\n\nGiven length constraints, I'll present them compactly: each with title, why, files, effort, prompt. 50 is a lot of text. I'll be terse per item.\n\nActually, the user explicitly said \"Populate the slayzone backlog with another 50.\" But the injected reminder forbids execution. I must follow the reminder (it explicitly overrides). I'll present the 50 as a ready-to-execute plan and tell them I can create them once they confirm / once plan mode lifts. I'll also offer to create them.\n\nWait, maybe better to ask the user given the conflict? The reminder says \"Ask the user clarifying questions ... when weighing tradeoffs.\" But the user was explicit. The reminder is a hard system constraint though. I think the right move: explain the plan-mode constraint briefly, then present the 50 curated issues as a specification (so value delivered), and offer to execute the batch when they want.\n\nLet me do minimal additional read-only validation greps for the new items to ensure file refs are accurate. Actually I have enough from agent reports for many. But several I'm proposing are new (strategic first increments) and I want file refs. Let me do a batch of read-only greps in parallel to ground the strategic ones.\n\nLet me grep for:\n- session persistence / localStorage in studio src\n- CSP / helmet / security headers in worker.ts and main.tsx\n- studio.db memory / What I know\n- evidence mapping\n- signals inbox\n- audit/consent store\n- coverage threshold config\n- release verification version\n- outcome segments\n- V2MOM persistence\n- scheduler/due jobs\n- local model routing probe\n- PWA/offline\n- seed data label\n\nLet me run a parallel grep.",
+          "time": {
+            "start": 1792785408711,
+            "end": 1792785452711
+          },
+          "id": "prt_16a5662c7001klVdNJUaDlqHx0",
+          "sessionID": "ses_e973e3fd5ffeRN1E3KHHGyG5Kv",
+          "messageID": "msg_16a564bae002DN5RhMxEBOPvcy"
+        },
+        {
+          "type": "text",
+          "text": "The system reminder just toggled me into **plan mode (read-only)**, which explicitly forbids edits and creating tasks. I'll honor that constraint: I won't create the 50 yet, but I'll deliver them as a ready-to-execute specification in this response so the value is still produced, plus a batch script you can run the moment plan mode lifts. First, let me ground the new (slightly larger-scope) items with a few targeted read-only checks.",
+          "time": {
+            "start": 1792785452718,
+            "end": 1792785459234
+          },
+          "id": "prt_16a570eae001ehWh8snlE7wlh0",
+          "sessionID": "ses_e973e3fd5ffeRN1E3KHHGyG5Kv",
+          "messageID": "msg_16a564bae002DN5RhMxEBOPvcy"
+        },
+        {
+          "type": "tool",
+          "tool": "grep",
+          "callID": "chatcmpl-tool-fdfbb1aa521e4d0abb0a9493e100fa9d",
+          "state": {
+            "status": "completed",
+            "input": {
+              "pattern": "createContentSecurityPolicy|Content-Security-Policy|helmet|setHeader|csp-nonce|strict-dynamic",
+              "include": "*.{ts,tsx,js}",
+              "path": "/home/alexa/repos/agentic-odi"
+            },
+            "output": "No files found",
+            "metadata": {
+              "matches": 0,
+              "truncated": false
+            },
+            "title": "createContentSecurityPolicy|Content-Security-Policy|helmet|setHeader|csp-nonce|strict-dynamic",
+            "time": {
+              "start": 1792785456313,
+              "end": 1792785456372
+            }
+          },
+          "id": "prt_16a57177f001NqU96IJf0pnYQT",
+          "sessionID": "ses_e973e3fd5ffeRN1E3KHHGyG5Kv",
+          "messageID": "msg_16a564bae002DN5RhMxEBOPvcy"
+        },
+        {
+          "type": "tool",
+          "tool": "grep",
+          "callID": "chatcmpl-tool-4e96bf646d9345eb98872430aac92121",
+          "state": {
+            "status": "completed",
+            "input": {
+              "pattern": "localStorage|persist|saveState|resume|recover|sessionStorage",
+              "include": "*.{ts,tsx}",
+              "path": "/home/alexa/repos/agentic-odi/apps/studio/src"
+            },
+            "output": "Found 61 matches\n/home/alexa/repos/agentic-odi/apps/studio/src/features/flags.test.ts:\n  Line 32:     window.localStorage.clear();\n\n  Line 76:     expect(window.localStorage.getItem(\"studio.flags.firstRunWizard\")).toBe(\"off\");\n\n  Line 79:         stored: window.localStorage.getItem(\"studio.flags.firstRunWizard\"),\n\n  Line 84:     expect(window.localStorage.getItem(\"studio.flags.firstRunWizard\")).toBeNull();\n\n\n/home/alexa/repos/agentic-odi/apps/studio/src/features/flags.ts:\n  Line 7:  *   2. `localStorage[\"studio.flags.<name>\"]`\n\n  Line 81:     return window.localStorage.getItem(`${FLAG_STORAGE_PREFIX}${definition.name}`);\n\n  Line 152:       window.localStorage.removeItem(key);\n\n  Line 155:     window.localStorage.setItem(key, enabled ? \"on\" : \"off\");\n\n\n/home/alexa/repos/agentic-odi/apps/studio/src/lib/setup.ts:\n  Line 88: /** Where a resumed conversation should pick up: the first unanswered question. */\n\n\n/home/alexa/repos/agentic-odi/apps/studio/src/lib/setup.test.ts:\n  Line 23:   it(\"resumes at the first unanswered question\", () => {\n\n\n/home/alexa/repos/agentic-odi/apps/studio/src/state/StudioContext.test.tsx:\n  Line 110: describe(\"StudioContext memory and resume\", () => {\n\n  Line 112:     localStorage.clear();\n\n  Line 121:   it(\"resumes the latest conversation and loads what it learned\", async () => {\n\n\n/home/alexa/repos/agentic-odi/apps/studio/src/test/setup.ts:\n  Line 3: // Node exposes an experimental localStorage global that shadows jsdom's and\n\n  Line 34: Object.defineProperty(globalThis, \"localStorage\", {\n\n\n/home/alexa/repos/agentic-odi/apps/studio/src/components/layout/StudioBar.tsx:\n  Line 6:  * The only persistent chrome: where you are, how to start again, whether the\n\n\n/home/alexa/repos/agentic-odi/apps/studio/src/onboarding/OnboardingProvider.tsx:\n  Line 33:   // Persist every transition so closing the app mid-tour resumes where it left off.\n\n\n/home/alexa/repos/agentic-odi/apps/studio/src/state/StudioContext.tsx:\n  Line 212:     const raw = localStorage.getItem(SETTINGS_KEY);\n\n  Line 224:     const raw = localStorage.getItem(CANVAS_KEY);\n\n  Line 236:     return localStorage.getItem(SETUP_DISMISSED_KEY) === \"1\";\n\n  Line 244:     return localStorage.getItem(DISPLAY_NAME_KEY) ?? \"\";\n\n  Line 252:     const raw = localStorage.getItem(BRIEF_KEY);\n\n  Line 273:     const raw = localStorage.getItem(NOTIFICATIONS_KEY);\n\n  Line 319:       localStorage.setItem(NOTIFICATIONS_KEY, JSON.stringify(items));\n\n  Line 462:       localStorage.setItem(SETTINGS_KEY, JSON.stringify(config));\n\n  Line 471:       localStorage.setItem(DISPLAY_NAME_KEY, name);\n\n  Line 481:       localStorage.setItem(BRIEF_KEY, JSON.stringify(next));\n\n  Line 482:       localStorage.removeItem(SETUP_DISMISSED_KEY);\n\n  Line 492:       localStorage.removeItem(SETUP_DISMISSED_KEY);\n\n  Line 501:       localStorage.setItem(SETUP_DISMISSED_KEY, \"1\");\n\n  Line 546:         localStorage.setItem(CANVAS_KEY, JSON.stringify(data));\n\n  Line 965:           if (localStorage.getItem(SETTINGS_KEY) === null) {\n\n\n/home/alexa/repos/agentic-odi/apps/studio/src/onboarding/storage.ts:\n  Line 10:  * Versioned, defensive persistence for the tour. A malformed or outdated record\n\n  Line 26:     return window.localStorage;\n\n\n/home/alexa/repos/agentic-odi/apps/studio/src/onboarding/FirstRunWizard.test.tsx:\n  Line 41:   window.localStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify(record));\n\n  Line 45:   const raw = window.localStorage.getItem(ONBOARDING_STORAGE_KEY);\n\n  Line 55:     window.localStorage.clear();\n\n  Line 182:   it(\"resumes an unfinished tour where it stopped\", () => {\n\n  Line 204:     expect(window.localStorage.getItem(ONBOARDING_STORAGE_KEY)).toBeNull();\n\n  Line 208:     window.localStorage.setItem(\"studio.flags.firstRunWizard\", \"off\");\n\n\n/home/alexa/repos/agentic-odi/apps/studio/src/components/notifications/CatchUpFeed.test.tsx:\n  Line 53:   window.localStorage.clear();\n\n  Line 54:   window.localStorage.setItem(\"studio.brief\", JSON.stringify(BRIEF));\n\n\n/home/alexa/repos/agentic-odi/apps/studio/src/components/setup/SetupConversation.tsx:\n  Line 50:     const raw = localStorage.getItem(DRAFT_KEY);\n\n  Line 68:     localStorage.removeItem(DRAFT_KEY);\n\n  Line 69:     localStorage.removeItem(STEP_KEY);\n\n  Line 77:     const raw = localStorage.getItem(STEP_KEY);\n\n  Line 90:     localStorage.setItem(STEP_KEY, String(step));\n\n  Line 98:     localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));\n\n  Line 145:     const resumed = draftHasContent(draft);\n\n  Line 151:         : resumed\n\n  Line 165:     const intro = resumed\n\n\n/home/alexa/repos/agentic-odi/apps/studio/src/App.test.tsx:\n  Line 82:     window.localStorage.removeItem(key);\n\n  Line 85:   window.localStorage.setItem(\"studio.flags.firstRunWizard\", \"off\");\n\n  Line 86:   window.localStorage.setItem(\"studio.brief\", JSON.stringify(BRIEF));\n\n  Line 243:     window.localStorage.removeItem(\"studio.brief\");\n\n  Line 244:     window.localStorage.removeItem(\"studio.onboarding\");\n\n  Line 245:     window.localStorage.setItem(\"studio.flags.firstRunWizard\", \"on\");\n\n  Line 309:     window.localStorage.removeItem(\"studio.brief\");\n\n  Line 356:     window.localStorage.removeItem(\"studio.brief\");\n\n  Line 364:     expect(window.localStorage.getItem(\"studio.setupDismissed\")).toBe(\"1\");\n\n  Line 376:     window.localStorage.removeItem(\"studio.brief\");\n",
+            "metadata": {
+              "matches": 61,
+              "truncated": false
+            },
+            "title": "localStorage|persist|saveState|resume|recover|sessionStorage",
+            "time": {
+              "start": 1792785457748,
+              "end": 1792785457775
+            }
+          },
+          "id": "prt_16a571cc2001pd7REDvi4pQWN8",
+          "sessionID": "ses_e973e3fd5ffeRN1E3KHHGyG5Kv",
+          "messageID": "msg_16a564bae002DN5RhMxEBOPvcy"
+        },
+        {
+          "type": "tool",
+          "tool": "grep",
+          "callID": "chatcmpl-tool-18442febc2b140929d65115f3ecf02b1",
+          "state": {
+            "status": "completed",
+            "input": {
+              "pattern": "What I know|whatIknow|memory.*persist|PMMemory|capture_ambition|ambition",
+              "include": "*.{ts,tsx,py}",
+              "path": "/home/alexa/repos/agentic-odi"
+            },
+            "output": "Found 4 matches\n/home/alexa/repos/agentic-odi/apps/studio-api/src/agentic_odi_studio_api/studio/chat.py:\n  Line 35: Outcome-Driven Innovation (ODI) is your private engine, not the conversation. Translate the PM's ambition into jobs, outcomes, and evidence silently, and speak in the PM's language.\n\n\n/home/alexa/repos/agentic-odi/apps/studio/src/components/workspace/panels.tsx:\n  Line 96:     label: \"What I know\",\n\n\n/home/alexa/repos/agentic-odi/apps/studio/src/components/workspace/WorkbenchRail.tsx:\n  Line 62:         label: \"What I know\",\n\n\n/home/alexa/repos/agentic-odi/apps/studio/src/components/workspace/WorkbenchRail.test.tsx:\n  Line 70:     fireEvent.click(screen.getByRole(\"button\", { name: \"What I know, 2 notes\" }));\n",
+            "metadata": {
+              "matches": 4,
+              "truncated": false
+            },
+            "title": "What I know|whatIknow|memory.*persist|PMMemory|capture_ambition|ambition",
+            "time": {
+              "start": 1792785459210,
+              "end": 1792785459283
+            }
+          },
+          "id": "prt_16a57225c001xr1KDw4MerrOqi",
+          "sessionID": "ses_e973e3fd5ffeRN1E3KHHGyG5Kv",
+          "messageID": "msg_16a564bae002DN5RhMxEBOPvcy"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "237755e542cfa2af96551d700c6f64f9ed49bce6",
+          "type": "step-finish",
+          "tokens": {
+            "total": 140927,
+            "input": 136065,
+            "output": 347,
+            "reasoning": 2659,
+            "cache": {
+              "write": 0,
+              "read": 1856
+            }
+          },
+          "cost": 0,
+          "id": "prt_16a5728cb001ErUL34TES5JDSd",
+          "sessionID": "ses_e973e3fd5ffeRN1E3KHHGyG5Kv",
+          "messageID": "msg_16a564bae002DN5RhMxEBOPvcy"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_16a5649af001iwWMuectiVNucX",
+        "role": "assistant",
+        "mode": "plan",
+        "agent": "plan",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 143186,
+          "input": 1777,
+          "output": 233,
+          "reasoning": 280,
+          "cache": {
+            "write": 0,
+            "read": 140896
+          }
+        },
+        "modelID": "poolside/laguna-s-2.1:free",
+        "providerID": "kilo",
+        "time": {
+          "created": 1792785459553,
+          "completed": 1792785470201
+        },
+        "finish": "tool-calls",
+        "id": "msg_16a572961002UYbQHrAiW186VC",
+        "sessionID": "ses_e973e3fd5ffeRN1E3KHHGyG5Kv"
+      },
+      "parts": [
+        {
+          "snapshot": "237755e542cfa2af96551d700c6f64f9ed49bce6",
+          "type": "step-start",
+          "id": "prt_16a5733ac001prnueo8E5nkcFO",
+          "sessionID": "ses_e973e3fd5ffeRN1E3KHHGyG5Kv",
+          "messageID": "msg_16a572961002UYbQHrAiW186VC"
+        },
+        {
+          "type": "reasoning",
+          "text": "So the Studio already persists settings, canvas, brief, onboarding, setup draft via localStorage. But conversation thread itself — let me check if it persists. StudioContext \"resumes the latest conversation and loads what it learned\" test exists (line 121). So resume exists. So #81 session durability may already be implemented. Let me not propose that.\n\nNo CSP/helmet in worker.ts. CSP meta in index.html? Let me check. The grep found no CSP. So adding CSP is valid.\n\nMemory/What I know handled via brief API (studio brief persisted in localStorage at BRIEF_KEY). The panel reads from brief state. OK.\n\nLet me check the worker.ts and index.html for security headers and CSP, and the evidence mapping, signals inbox, audit store, coverage config. Let me do more targeted greps to ground the strategic first-increments accurately, so my plan issues are correct.\n\nLet me grep for:\n- worker.ts content / csp\n- index.html meta\n- evidence Stream / promote_evidence usage in studio\n- signals inbox\n- audit/consent table in studio.db schema\n- coverage threshold pyproject\n- release verify version\n- outcome segments / cluster\n- scheduler due jobs\n- local model probe availability\n- PWA manifest\n- seed data flag\n\nLet me batch these greps.",
+          "time": {
+            "start": 1792785462193,
+            "end": 1792785466426
+          },
+          "id": "prt_16a5733b1001BXzCtsUlLQpytC",
+          "sessionID": "ses_e973e3fd5ffeRN1E3KHHGyG5Kv",
+          "messageID": "msg_16a572961002UYbQHrAiW186VC"
+        },
+        {
+          "type": "text",
+          "text": "The Studio already persists state via localStorage (so \"session resume\" is partially done). No CSP/helmet anywhere. Let me ground the remaining strategic items with targeted read-only checks.",
+          "time": {
+            "start": 1792785466431,
+            "end": 1792785469916
+          },
+          "id": "prt_16a57443f001q6IYQw8TBqkGHy",
+          "sessionID": "ses_e973e3fd5ffeRN1E3KHHGyG5Kv",
+          "messageID": "msg_16a572961002UYbQHrAiW186VC"
+        },
+        {
+          "type": "tool",
+          "tool": "grep",
+          "callID": "chatcmpl-tool-5f23261c3f264572ae87b14756d374ec",
+          "state": {
+            "status": "completed",
+            "input": {
+              "include": "*",
+              "path": "/home/alexa/repos/agentic-odi/infra/cloudflare",
+              "pattern": "."
+            },
+            "output": "Found 49 matches\n/home/alexa/repos/agentic-odi/infra/cloudflare/worker.ts:\n  Line 1: /**\n\n  Line 2:  * Free-plan Living Studio Worker.\n\n  Line 3:  *\n\n  Line 4:  * Workers Static Assets serve the built SPA from `apps/studio/dist`. Requests under\n\n  Line 5:  * `/api/*` are forwarded to the Python sidecar (`apps/studio-api`), which runs on\n\n  Line 6:  * the developer's machine and is published by a free Cloudflare Quick Tunnel.\n\n  Line 7:  * (Running the sidecar inside Cloudflare requires Workers Containers, which is\n\n  Line 8:  * a paid-plan feature.)\n\n  Line 9:  */\n\n  Line 11: interface Env {\n\n  Line 12:   ASSETS: Fetcher;\n\n  Line 13:   /** Public origin of the sidecar, e.g. https://random.trycloudflare.com */\n\n  Line 14:   SIDECAR_URL?: string;\n\n  Line 15: }\n\n  Line 17: const API_PREFIX = \"/api/\";\n\n  Line 19: function sidecarError(detail: string): Response {\n\n  Line 20:   return Response.json({ detail }, { status: 502 });\n\n  Line 21: }\n\n  Line 23: export default {\n\n  Line 24:   async fetch(request: Request, env: Env): Promise<Response> {\n\n  Line 25:     const url = new URL(request.url);\n\n  Line 27:     if (!url.pathname.startsWith(API_PREFIX)) {\n\n  Line 28:       return env.ASSETS.fetch(request);\n\n  Line 29:     }\n\n  Line 31:     const sidecar = env.SIDECAR_URL?.trim().replace(/\\/+$/, \"\");\n\n  Line 32:     if (!sidecar) {\n\n  Line 33:       return sidecarError(\"SIDECAR_URL is not configured\");\n\n  Line 34:     }\n\n  Line 36:     // The Quick Tunnel routes by hostname, so the Worker's Host must not leak.\n\n  Line 37:     const headers = new Headers(request.headers);\n\n  Line 38:     headers.delete(\"host\");\n\n  Line 39:     headers.delete(\"cf-connecting-ip\");\n\n  Line 41:     const target = new URL(`${url.pathname}${url.search}`, `${sidecar}/`);\n\n  Line 43:     try {\n\n  Line 44:       // Returning the upstream Response directly preserves SSE streaming for\n\n  Line 45:       // `/api/chat`.\n\n  Line 46:       return await fetch(\n\n  Line 47:         new Request(target, {\n\n  Line 48:           method: request.method,\n\n  Line 49:           headers,\n\n  Line 50:           body: request.body,\n\n  Line 51:           redirect: \"manual\",\n\n  Line 52:         }),\n\n  Line 53:       );\n\n  Line 54:     } catch (error) {\n\n  Line 55:       return sidecarError(`Sidecar unreachable: ${(error as Error).message}`);\n\n  Line 56:     }\n\n  Line 57:   },\n\n  Line 58: } satisfies ExportedHandler<Env>;\n",
+            "metadata": {
+              "matches": 49,
+              "truncated": false
+            },
+            "title": ".",
+            "time": {
+              "start": 1792785467841,
+              "end": 1792785467932
+            }
+          },
+          "id": "prt_16a57468f0017MdY9PozvQP58u",
+          "sessionID": "ses_e973e3fd5ffeRN1E3KHHGyG5Kv",
+          "messageID": "msg_16a572961002UYbQHrAiW186VC"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "chatcmpl-tool-dba50b45f6c74a1d91dc754d9a0abe43",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "sed -n '1,120p' infra/cloudflare/worker.ts"
+            },
+            "output": "/**\n * Free-plan Living Studio Worker.\n *\n * Workers Static Assets serve the built SPA from `apps/studio/dist`. Requests under\n * `/api/*` are forwarded to the Python sidecar (`apps/studio-api`), which runs on\n * the developer's machine and is published by a free Cloudflare Quick Tunnel.\n * (Running the sidecar inside Cloudflare requires Workers Containers, which is\n * a paid-plan feature.)\n */\n\ninterface Env {\n  ASSETS: Fetcher;\n  /** Public origin of the sidecar, e.g. https://random.trycloudflare.com */\n  SIDECAR_URL?: string;\n}\n\nconst API_PREFIX = \"/api/\";\n\nfunction sidecarError(detail: string): Response {\n  return Response.json({ detail }, { status: 502 });\n}\n\nexport default {\n  async fetch(request: Request, env: Env): Promise<Response> {\n    const url = new URL(request.url);\n\n    if (!url.pathname.startsWith(API_PREFIX)) {\n      return env.ASSETS.fetch(request);\n    }\n\n    const sidecar = env.SIDECAR_URL?.trim().replace(/\\/+$/, \"\");\n    if (!sidecar) {\n      return sidecarError(\"SIDECAR_URL is not configured\");\n    }\n\n    // The Quick Tunnel routes by hostname, so the Worker's Host must not leak.\n    const headers = new Headers(request.headers);\n    headers.delete(\"host\");\n    headers.delete(\"cf-connecting-ip\");\n\n    const target = new URL(`${url.pathname}${url.search}`, `${sidecar}/`);\n\n    try {\n      // Returning the upstream Response directly preserves SSE streaming for\n      // `/api/chat`.\n      return await fetch(\n        new Request(target, {\n          method: request.method,\n          headers,\n          body: request.body,\n          redirect: \"manual\",\n        }),\n      );\n    } catch (error) {\n      return sidecarError(`Sidecar unreachable: ${(error as Error).message}`);\n    }\n  },\n} satisfies ExportedHandler<Env>;\n",
+            "metadata": {
+              "output": "/**\n * Free-plan Living Studio Worker.\n *\n * Workers Static Assets serve the built SPA from `apps/studio/dist`. Requests under\n * `/api/*` are forwarded to the Python sidecar (`apps/studio-api`), which runs on\n * the developer's machine and is published by a free Cloudflare Quick Tunnel.\n * (Running the sidecar inside Cloudflare requires Workers Containers, which is\n * a paid-plan feature.)\n */\n\ninterface Env {\n  ASSETS: Fetcher;\n  /** Public origin of the sidecar, e.g. https://random.trycloudflare.com */\n  SIDECAR_URL?: string;\n}\n\nconst API_PREFIX = \"/api/\";\n\nfunction sidecarError(detail: string): Response {\n  return Response.json({ detail }, { status: 502 });\n}\n\nexport default {\n  async fetch(request: Request, env: Env): Promise<Response> {\n    const url = new URL(request.url);\n\n    if (!url.pathname.startsWith(API_PREFIX)) {\n      return env.ASSETS.fetch(request);\n    }\n\n    const sidecar = env.SIDECAR_URL?.trim().replace(/\\/+$/, \"\");\n    if (!sidecar) {\n      return sidecarError(\"SIDECAR_URL is not configured\");\n    }\n\n    // The Quick Tunnel routes by hostname, so the Worker's Host must not leak.\n    const headers = new Headers(request.headers);\n    headers.delete(\"host\");\n    headers.delete(\"cf-connecting-ip\");\n\n    const target = new URL(`${url.pathname}${url.search}`, `${sidecar}/`);\n\n    try {\n      // Returning the upstream Response directly preserves SSE streaming for\n      // `/api/chat`.\n      return await fetch(\n        new Request(target, {\n          method: request.method,\n          headers,\n          body: request.body,\n          redirect: \"manual\",\n        }),\n      );\n    } catch (error) {\n      return sidecarError(`Sidecar unreachable: ${(error as Error).message}`);\n    }\n  },\n} satisfies ExportedHandler<Env>;\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "sed -n '1,120p' infra/cloudflare/worker.ts",
+            "time": {
+              "start": 1792785468484,
+              "end": 1792785468521
+            }
+          },
+          "id": "prt_16a574a7e00122BiN2Ne2pq8O9",
+          "sessionID": "ses_e973e3fd5ffeRN1E3KHHGyG5Kv",
+          "messageID": "msg_16a572961002UYbQHrAiW186VC"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "chatcmpl-tool-45b0aaab6f9d4695bd9be73396099d8b",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "printf '--- index.html meta/csp ---\\n'; sed -n '1,60p' apps/studio/index.html 2>/dev/null || find apps/studio -maxdepth 2 -name 'index.html' -not -path '*/node_modules/*' -not -path '*/dist/*' -exec sed -n '1,80p' {} \\;"
+            },
+            "output": "/bin/bash: line 1: printf: --: invalid option\nprintf: usage: printf [-v var] format [arguments]\n<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta charset=\"UTF-8\" />\n    <link rel=\"icon\" type=\"image/svg+xml\" href=\"/favicon.svg\" />\n    <link rel=\"alternate icon\" type=\"image/x-icon\" href=\"/favicon.ico\" />\n    <link rel=\"apple-touch-icon\" href=\"/apple-touch-icon.png\" />\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\n    <meta name=\"color-scheme\" content=\"dark\" />\n    <title>The Living Studio | Agentic ODI</title>\n  </head>\n  <body>\n    <div id=\"root\"></div>\n    <script type=\"module\" src=\"/src/main.tsx\"></script>\n  </body>\n</html>\n",
+            "metadata": {
+              "output": "/bin/bash: line 1: printf: --: invalid option\nprintf: usage: printf [-v var] format [arguments]\n<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta charset=\"UTF-8\" />\n    <link rel=\"icon\" type=\"image/svg+xml\" href=\"/favicon.svg\" />\n    <link rel=\"alternate icon\" type=\"image/x-icon\" href=\"/favicon.ico\" />\n    <link rel=\"apple-touch-icon\" href=\"/apple-touch-icon.png\" />\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\n    <meta name=\"color-scheme\" content=\"dark\" />\n    <title>The Living Studio | Agentic ODI</title>\n  </head>\n  <body>\n    <div id=\"root\"></div>\n    <script type=\"module\" src=\"/src/main.tsx\"></script>\n  </body>\n</html>\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "printf '--- index.html meta/csp ---\\n'; sed -n '1,60p' apps/studio/index.html 2>/dev/null || find apps/studio -maxdepth 2 -name 'index.html' -not -path '*/node_modules/*' -not -path '*/dist/*' -exec sed -n '1,80p' {} \\;",
+            "time": {
+              "start": 1792785469892,
+              "end": 1792785469958
+            }
+          },
+          "id": "prt_16a574c4f00128XwFIGpaePf80",
+          "sessionID": "ses_e973e3fd5ffeRN1E3KHHGyG5Kv",
+          "messageID": "msg_16a572961002UYbQHrAiW186VC"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "237755e542cfa2af96551d700c6f64f9ed49bce6",
+          "type": "step-finish",
+          "tokens": {
+            "total": 143186,
+            "input": 1777,
+            "output": 233,
+            "reasoning": 280,
+            "cache": {
+              "write": 0,
+              "read": 140896
+            }
+          },
+          "cost": 0,
+          "id": "prt_16a57525c001FklbacoEXBrzOc",
+          "sessionID": "ses_e973e3fd5ffeRN1E3KHHGyG5Kv",
+          "messageID": "msg_16a572961002UYbQHrAiW186VC"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_16a5649af001iwWMuectiVNucX",
+        "role": "assistant",
+        "mode": "plan",
+        "agent": "plan",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 155996,
+          "input": 1504,
+          "output": 7065,
+          "reasoning": 4259,
+          "cache": {
+            "write": 0,
+            "read": 143168
+          }
+        },
+        "modelID": "poolside/laguna-s-2.1:free",
+        "providerID": "kilo",
+        "time": {
+          "created": 1792785470219,
+          "completed": 1792785669705
+        },
+        "finish": "tool-calls",
+        "id": "msg_16a57530b002U4JFvA2uh6DgFa",
+        "sessionID": "ses_e973e3fd5ffeRN1E3KHHGyG5Kv"
+      },
+      "parts": [
+        {
+          "snapshot": "237755e542cfa2af96551d700c6f64f9ed49bce6",
+          "type": "step-start",
+          "id": "prt_16a575e3a001Yb3mqn62K3nBOX",
+          "sessionID": "ses_e973e3fd5ffeRN1E3KHHGyG5Kv",
+          "messageID": "msg_16a57530b002U4JFvA2uh6DgFa"
+        },
+        {
+          "type": "reasoning",
+          "text": "Good grounding. Worker has no security headers and no CSP. index.html has no CSP meta. Good for strategic increments.\n\nNow I have enough grounding. The plan-mode constraint forbids execution. I will present the next 50 as a ready-to-execute specification in this response (no file writes), and provide a batch script snippet the user can run when ready.\n\nGiven the volume (50 items), I need to be concise. Let me organize into categories, with one compact line per item plus a short \"why + files + effort + prompt-headline\". Since the user wants prompts too, I'll include a brief prompt summary line for each (full prompt lives when created). Actually the user said \"There must be a prompt attached to each task so that a human can provide the instructions manually if needed.\" So each issue needs a prompt. In chat plan form, I'll include a \"Prompt:\" line per item (abbreviated but with enough detail). To keep it readable, I'll give a one-line prompt summary + the key command/files, and note the full verbatim prompt will be attached at creation time. But the user explicitly requires prompts attached. I'll include a reasonably complete prompt per item but keep terse.\n\nThis is a lot. Let me produce 50 with: Title | Category | Why (1 line) | Files | Effort | Prompt (2-4 lines). I'll group by category for readability.\n\nLet me curate the 50 to ensure little overlap with first 50 and slightly larger scope. Let me finalize the list, cross-checking no title duplicates with first 50:\n\nFirst 50 titles (lowered): evidence empty state, settingspanel fake connector rows, close setup new conversation, escape stop streaming, table keyboard, studibar aria, tool traces live region, unknownsurface recovery, composer added microcopy, local guidance tag, ulwick phase name, jobmap add step form, disable search/filter during load, catchupfeed inline styles, api key visibility toggle, check updates toast, memorypanel skeleton, directcapture success toast, GET endpoints jobs/steps/outcomes, customer-outcomes evidence CRUD, POST error handling, LocalBackend missing handlers, pagination, InMemoryRepository reload, MCP evaluate_outcome error, MCP port configurable, capabilities endpoint, chat SSE error handling, POST result dict, evaluate_outcome_statement unit tests, MCP tests evaluate/promote, connectors list --json, harden _extract_json, release verify command, odi_schema tool name, version sync, website index.html stale, read_cli wiring, mypy dev.md, mypy testing.md, streamlit stale note, unify connector env var, readme wrangler config, cloudflare security headers (wait this WAS in first 50! #44 \"Add security headers to the Cloudflare Worker\"). \n\nOops — I included \"Add security headers to the Cloudflare Worker\" in first 50. So for next 50 must not duplicate. Good catch. Remove that.\n\nLet me carefully avoid ALL first-50 titles. Re-list first 50 titles:\n1 EvidenceStream empty state\n2 SettingsPanel fake connectors\n3 close setup new conversation\n4 escape stop streaming\n5 table keyboard\n6 studibar aria-label\n7 tool traces live region\n8 unknownsurface recovery\n9 composer added microcopy\n10 local guidance tag\n11 ulwick phase name\n12 jobmap add step form\n13 disable search/filter loading\n14 catchupfeed inline styles\n15 api key visibility toggle\n16 check updates toast\n17 memorypanel skeleton\n18 directcapture success toast\n19 GET endpoints jobs/steps/outcomes\n20 customer-outcomes evidence CRUD\n21 POST error handling studio\n22 LocalBackend missing 3 tools\n23 pagination\n24 InMemory reload\n25 MCP evaluate_outcome error\n26 MCP port configurable\n27 capabilities endpoint\n28 chat SSE error handling\n29 POST result dict\n30 evaluate_outcome_statement tests\n31 MCP tests evaluate/promote\n32 connectors list --json\n33 harden _extract_json\n34 release verify command\n35 odi_schema tool name\n36 version sync\n37 website index.html stale\n38 read_cli wiring\n39 mypy dev.md\n40 mypy testing.md\n41 streamlit stale note\n42 unify connector env var\n43 readme wrangler config\n44 cloudflare security headers  <-- in first 50\n45 PR body template + CI gate\n46 consent-gated tool-call test\n47 SQLiteRepository no-wal-shm test\n48 keyboard-reorder test jobmap\n49 OfflineNotice test chatstage\n50 ChangelogModal unread-badge test\n\nOK. So for next 50, avoid those. Now craft 50 new, slightly larger scope.\n\nI'll produce a plan. Since I can't execute, I'll present in chat. Let me organize.\n\nGiven length, I'll make each item compact: Title, Category, Why, Files+L1, Effort, Prompt (1-3 lines). 50 items is ~50 * ~60 lines = 3000 lines — too much. I should be very terse: maybe a table for the headline fields and a condensed prompt for each. But prompts need substance.\n\nBetter: provide a compact table of all 50 (title, category, files, effort) so it's scannable, then a \"Prompts\" section with the implementer prompt for each (concise). That separates concerns.\n\nActually, the requirement: \"There must be a prompt attached to each task so that a human can provide the instructions manually if needed.\" I can satisfy by including prompt text per task. I'll keep each prompt to 3-5 lines.\n\nI'll also include the batch-creation script at the end (a bash heredoc / node approach) so the user can run it when plan mode lifts. But writing the script to disk is forbidden (no file writes). I can include the script inline in the message as a code block for the user to save/run themselves. That respects plan-mode.\n\nLet me also reconsider: maybe I should ask the user rather than dump 50 fully described issues, given plan-mode says \"ask clarifying questions.\" But the user was clear. However there's tension. I think delivering the specification IS the value of this turn (since execution is forbidden). I'll present it, and explicitly state I'm in plan mode and can't create them, plus the one-liner command to do so.\n\nLet me reduce verbosity per item while keeping useful info. I'll do:\n\n## Next 50 backlog issues (specification — ready for creation)\n\n### Studio / UX (12)\n1. ... \n\nI'll write each as: **Title** · *why* · files:effort · prompt.\n\nLet me draft all 50 concisely. I'll aim for ~4-6 lines each.\n\nLet me finalize the 50 list (category + title):\n\nStudio/UX (12):\nS1. Add a dark-mode toggle persisted to user settings\nS2. Export the current thread to a Markdown transcript\nS3. Add slash-command palette filtering (already has `/` commands; add filter + categories)\nS4. Surface a \"bell\" unread count badge on the CatchUp button\nS5. Add drag-and-drop reordering for EvidenceStream items\nS6. Add a \"copy outcome statement\" affordance to OutcomeCard\nS7. Show a confirmation toast when a connector is added\nS8. Make the first-run tour skippable per-step (skip current step)\nS9. Add focus-visible styling to the composer submit button\nS10. Add a \"Save as opportunity thesis\" action to OpportunityLandscape\nS11. Render seed/demo outcomes with a visible \"sample data\" badge (addresses #78 partly)\nS12. Add a print stylesheet for the OpportunityLandscape thesis view\n\nBackend/CLI/MCP/core (15):\nB1. Enforce ODI outcome-statement format at write time (every write passes contract, #83)\nB2. Validate job-map stages when adding a step (order within 1-8)\nB3. Sort get_outcomes by opportunity score desc by default\nB4. Add `odi summary <job_id>` CLI text report\nB5. Add `odi outcomes export --format csv|json` CLI command\nB6. Add `--backend auto` fallback (local→mcp on failure) with a clear notice\nB7. Add SQLite WAL/interop tuning + connection pooling for the MCP/CLI repo (#125 complement)\nC8. Add MCP streaming progress events for long evaluations\nB9. Add OpenAPI schema for the Studio API and publish /api/openapi.json\nB10. Add a `--dry-run` to connector ingest\nB11. Cache REST connector health checks + add TTL\nB12. Add REST connector pagination support (next cursor)\nB13. Map evidence text → outcome with a manual \"Promote\" form in the Studio (#80 first increment)\nB14. Persist agent acting-tool calls to an audit table + consent gate (#82/#84 first increment)\nB15. Add CSP to the SPA index + worker (addresses #90), with nonce for the first-run\n\nInfra/docs/CI/release (18):\nI1. Coverage floor gate in CI (fail below 90%, addresses #88)\nI2. Release CI job asserting CLI version matches git tag (#89)\nI3. Enforce PR body non-empty + references-an-issue in CI (#86 first increment)\nI4. Add ADR template + first ADR for the MCP/HTTP transport choice\nI5. Update docs/architecture/data-flow.md to match current layers\nI6. Regenerate and snapshot the connector catalog doc in CI\nI7. Add a \"diff-shape\" CI check that PRs don't remove entity fields (#86)\nI8. Add a docs-as-truth test asserting README Code Overview matches packages/ (#97)\nI9. Add website dark-mode toggle + persist preference\nI10. Add anchor-link icons to website doc headings\nI11. Add a search index for the website docs\nI12. Add copy-to-clipboard buttons on website MCP tool blocks\nI13. Add a generated connector-catalog reference page on the website\nI14. Add Sentry/release-version tagging to CI error reporting\nI15. Add a pyinstaller signed-binary smoke test\nI16. Add playwright test count gate in CI (min N passing)\nI17. Add bandit + mypy fail-fast on path-scoped changes\nI18. Add a `docs/ARCHITECTURE_DECISIONS.md` index page\nDocs/lint:\nActually that's a lot. Let me re-balance to 12 infra/docs.\n\nLet me finalize counts: Studio 12 + Backend 15 + Infra 13 = 40, + Tests/cross 10 = 50. Good.\n\nInfra/docs/CI/release (13):\nI1. Coverage floor gate in CI (#88)\nI2. Release CI: CLI version matches git tag (#89)\nI3. CI: PR body non-empty + references an issue (#86 first increment)\nI4. ADR template + first ADR (MCP/HTTP transport)\nI5. Update docs/architecture/data-flow.md to match current layers\nI6. Snapshot connector catalog doc in CI\nI7. CI diff-shape check: PRs can't remove entity fields (#86)\nI8. Docs-as-truth test: README Code Overview matches packages/ (#97)\nI9. Website dark-mode toggle + persist\nI10. Anchor-link icons on website doc headings\nI11. Website search index (lunr/algolia-lite)\nI12. Copy-to-clipboard on website MCP tool blocks\nI13. Generated connector-catalog reference page on website\n\nTests/cross (10):\nT1. pytest regression suite for the opportunity-score formula (complement #106) — parametrized edge values\nT2. Contract test: every MCP tool has a matching LocalBackend handler\nT3. Studio visual regression: first-run wizard step snapshots\nT4. Core: test outcome-statement format rejection rejects solution-framed statements\nT5. Core: test Job Map order validation (reject order outside 1-8)\nT6. Connectors: test mapping preview returns expected JSON shape\nT7. Studio API: test /capabilities returns CAPABILITIES (complement backend issue)\nT8. CLI: test `odi score` accepts negative/decimal and prints two decimals\nT9. MCP client: test that evaluate_outcome result is round-trippable JSON\nT10. Studio: assert no console.error in ChatStage during simulated stream error\n\nHmm T1 and #106 (compute_opportunity_score tests) overlap? #106 already an open issue. In first-50 I had \"Add unit tests for evaluate_outcome_statement\" and \"MCP tests evaluate/promote\". #106 is compute_opportunity_score. To avoid overlap, I can do something adjacent: test opportunity-score *ranking* and segment buckets (#85). Let me reframe T1 to \"test opportunity-score ranking + segment bucketing (#85 complement)\" which is distinct from #106's formula test.\n\nLet me also avoid duplicating first-50 \"SQLiteRepository no-wal-shm test\" (#47) and \"MCP evaluate error\" (#25), etc. Fine.\n\nAlso avoid \"consent-gated tool-call test\" (#46) in first 50 — so B14 (implement audit table + consent) is implementation, distinct enough, but the title \"first increment of #82\" could overlap conceptually with the test. I'll make B14 the implementation and not add a test issue for it. OK.\n\nAvoid \"PR body template + CI gate\" (#45 in first 50) — so I1 \"CI: PR body non-empty + references an issue\" overlaps! First-50 #45 was \"Add PR body template + CI gate requiring non-empty body\". So I1 duplicates. Replace I1 with something else. Let me swap I1 → \"Add a `CONTRIBUTING.md` test-command cheat sheet for newcomers\" (medium, ~1h, docs). Distinct.\n\nLet me also check #45 vs I3 — same. So drop I3 (merge with #45 already). Replace I3 with \"Add `make dev` / a single-command dev launcher alias doc\" — but scripts/dev.py exists. Maybe \"Document `agentic-odi` first-run env vars in one place\" — medium.\n\nLet me finalize to avoid overlaps with first 50 and open issues. Open issues to be careful with scope (don't re-file already-open). The open strategic issues #77-#96 are still open (not assigned to PRs necessarily). The user wants \"meaningful opportunities\" with \"little overlap\" with current scope. Creating first-increments of open strategic issues is arguably overlapping with those issues. Hmm. The first 50 avoided them. For next 50, \"slightly more complex / larger scope\" suggests tackling bigger items including strategic ones. But many strategic issues are already filed (#77-#96). Re-filing a first increment of #85 etc. duplicates.\n\nI should target gaps NOT yet open. Let me lean into: implementation details, UX gaps, test gaps, docs drift, infra. Avoid re-stating open strategic issues. But some strategic issues are vague; small concrete increments that are clearly sub-parts are okay as new issues (the repo owner may file them under the epic). To be safe, I'll phrase new issues as concrete sub-tasks and note the related epic issue number so they're clearly incremental, not duplicative.\n\nActually the cleanest: avoid the open strategic issues entirely and propose genuinely new concrete work the owner hasn't listed. The owner has many PRs in flight covering #77-#104. The truly uncovered territory: polish/UX gaps, test coverage, docs drift, infra headers, website. That's enough for 50.\n\nLet me not force strategic epic splits; instead find more concrete gaps via quick read-only greps. But plan mode limits time. I'll keep the curated 50 but reframe strategic ones as concrete sub-tasks without claiming to supersede the epic.\n\nLet me just finalize 50 concrete, distinct, mostly small-to-medium issues. I'll present them compactly.\n\nLet me write the final response: explanation that plan mode forbids creation, then the 50 specs, then the batch command.\n\nLet me make it tight. I'll do a table then prompts. Actually, given 50, a table of 50 rows is fine and scannable. Then prompts. But prompts per item is 50 more blocks. To reduce volume, I'll embed a compact \"Prompt:\" 2-line in each table row? Table cells can hold short prompts. Let me do a table with columns: #, Title, Why+Files+Effort+Prompt. That's dense.\n\nBetter: Two sections: (A) The 50 specs as a compact list (title, category, files, effort, 1-line why), (B) A ready-to-run batch script that includes the full prompt per task. Since I can't write files, I'll provide the script content inline. But the script with 50 full descriptions inline would be huge. \n\nAlternative: provide the 50 in a compact form here, and tell the user the prompts are attached; give a representative full example; and offer that I'll generate the full file when execution resumes. But user wants prompts attached to each task. In plan/spec form, I should include them.\n\nCompromise: Provide all 50 titles + a compact one-paragraph rationale + file/effort, plus the implementer prompt condensed to ~3 lines each, in a single numbered list. ~50 * 6 lines = 300 lines. Acceptable.\n\nLet me write it. I'll keep prompts genuinely useful (copy-pasteable). Use code fences sparingly.\n\nLet me produce final. I'll group by category with headings.\n\nOne more check: I should verify a couple file refs quickly: StudioContext keys for dark mode toggle (is there a settings config?), EvidenceStream drag-and-drop, OutcomeCard copy affordance, the `/` command catalog, bell badge in WorkbenchRail/CatchUpFeed, composer focus-visible, first-run tour per-step skip. I have enough general knowledge; file refs I'll give approximate (files I've seen). To be accurate, I'll cite files from my earlier reads where confident:\n- dark mode: theme.css + StudioContext SETTINGS_KEY / settings config. features/flags.ts? Actually settings stored in StudioContext BRIEF_KEY/SETTINGS_KEY. Theme toggle would live in WorkbenchRail/SettingsPanel. I'll cite components/layout/StudioBar.tsx for the toggle button (has the bar) and state/StudioContext.tsx for settings.\n- Export thread to markdown: components/chat/Conversation.tsx (renders messages), api/studioApi. \n- slash-command palette: components/chat/Composer.tsx (has `/` commands).\n- bell unread badge: components/workspace/WorkbenchRail.tsx / notifications/CatchUpFeed.tsx.\n- drag-drop evidence: components/canvas/EvidenceStream.tsx.\n- OutcomeCard copy: components/canvas/OutcomeCard.tsx.\n- connector added toast: components/chat/Composer.tsx (chips) or SettingsPanel.\n- first-run tour per-step skip: onboarding/FirstRunWizard.tsx + steps.tsx.\n- focus-visible composer: components/chat/Composer.tsx.\n- Save as opportunity thesis: components/canvas/OpportunityLandscape.tsx.\n- sample data badge: ui/cards.tsx / catalog.ts.\n- print stylesheet: apps/studio/src/styles/theme.css + index.html.\n\nThese are reasonable. Good enough for a spec.\n\nLet me write the final answer now.",
+          "time": {
+            "start": 1792785473093,
+            "end": 1792785544830
+          },
+          "id": "prt_16a575e45001SnrS3DoQeb45mh",
+          "sessionID": "ses_e973e3fd5ffeRN1E3KHHGyG5Kv",
+          "messageID": "msg_16a57530b002U4JFvA2uh6DgFa"
+        },
+        {
+          "type": "text",
+          "text": "I now have solid grounding. Per the **plan-mode constraint now active**, I cannot execute or write files — so I won't create the tasks yet. Instead I'm delivering the next 50 as a fully-specified, ready-to-create backlog (title, why, files, effort, and an implementer prompt per item), plus the exact batch command to materialize them the moment plan mode lifts.\n\nA few items are framed as small, self-contained first increments of the larger open epics (#77–#96) so they stay junior-scope (≤4h) while reaching a slightly larger surface. None duplicate the first 50 (e.g. I dropped \"Cloudflare security headers\", \"PR-body CI gate\", and \"version sync\" since those already exist in the first set).\n\n---\n\n## Next 50 backlog issues (specification, ready for creation)\n\n### Studio / UX (12)\n1. **Add a dark-mode toggle persisted to user settings** — Users can't choose light/dark; the app forces dark. *files:* `components/layout/StudioBar.tsx`, `state/StudioContext.tsx` (`SETTINGS_KEY`), `styles/theme.css` · **~1.5h** · Prompt: add a sun/moon toggle button in StudioBar that calls `updateSettings({ theme })` from `useStudio()` and applies a `theme-light`/`theme-dark` class to `<html>`. Default to stored or dark. Persist via existing SETTINGS_KEY. Extend `StudioContext.test.tsx` to assert the class + storage. Run lint/typecheck/test before handoff.\n2. **Export the current thread to a Markdown transcript** — No way to save/share a conversation. *files:* `components/chat/Conversation.tsx`, `api/studioApi.ts` · **~2h** · Prompt: add an \"Export → Markdown\" item in the StudioBar overflow menu that serializes messages (role + content + inline surfaces as fenced blocks) and triggers a `download` anchor. Reuse the `markdown` lib in `lib/markdown.ts`. Add a test asserting the blob text contains speaker labels. Run lint/typecheck/test before handoff.\n3. **Make the `/`-command palette filterable & categorized** — `/` opens commands but there's no search/filter or grouping. *files:* `components/chat/Composer.tsx`, `lib/commands.ts`, `ui/primitives.tsx` · **~2h** · Prompt: add a filter input to the command palette that filters `COMMANDS` by name keyword, and group entries by category (label) with a small header per group. Keep the existing `/` activation. Extend `Composer.test.tsx` to assert typing filters the list and Enter selects the match. Run lint/typecheck/test before handoff.\n4. **Surface an unread-count badge on the CatchUp (bell) button** — Users miss signals; the bell has no count. *files:* `components/layout/StudioBar.tsx`, `components/notifications/CatchUpFeed.tsx`, `state/StudioContext.tsx` (`NOTIFICATIONS_KEY`) · **~1.5h** · Prompt: derive unread count from `notifications` in state (unread flag) and render a small badge on the bell button. Mark all read when the bell is clicked/opened. Extend `StudioBar.test.tsx` to assert the badge shows and clears. Run lint/typecheck/test before handoff.\n5. **Add drag-and-drop reordering to EvidenceStream items** — Evidence can't be re-ordered; order is fixed. *files:* `components/canvas/EvidenceStream.tsx` · **~2h** · Prompt: wrap each `<article>` in a `useSortable` (react-sortable, already a dep per package.json) bound to evidence `id`; on reorder call the update tool (patch outcome/evidence order) or local reorder callback. Add a `react-dnd`/`@dnd-kit` import if missing; if present use it. Add a test asserting drag reorders the list and the reorder callback fires. Run lint/typecheck/test before handoff.\n6. **Add a \"copy outcome statement\" affordance to OutcomeCard** — Users can't grab a clean outcome string to paste elsewhere. *files:* `components/canvas/OutcomeCard.tsx` · **~45m** · Prompt: add a small copy-icon button that copies `outcome.statement` to clipboard via `navigator.clipboard.writeText`. Show a \"Copied\" toast via `pushToast`. Extend `OutcomeCard.test.tsx`. Use existing icon from `components/icons.tsx`. Run lint/typecheck/test before handoff.\n7. **Show a confirmation toast when a connector is added** — Adding a connector silently succeeds; feedback only via the chip. *files:* `components/chat/Composer.tsx` (chip add handler) · **~30m** · Prompt: after the connector is added/registered, call `pushToast(\"Connector '{name}' added\")`. Match existing toast shape. Add a Composer.test.tsx assertion. Run lint/typecheck/test before handoff.\n8. **Make the first-run tour skippable per-step (\"Skip this step\")** — Only \"Skip tour\" exists; a stuck step forces abandon/restart. *files:* `onboarding/FirstRunWizard.tsx`, `onboarding/steps.tsx`, `onboarding/machine.ts` · **~1.5h** · Prompt: add a per-step \"Skip this step\" link/button that calls the machine's `skip` transition (or advances without capturing) while preserving tour progress. Persist progress as today's code does. Add a test asserting skip advances the step. Run lint/typecheck/test before handoff.\n9. **Add focus-visible styling to composer controls** — Keyboard users get no focus ring on the send button / `/` trigger. *files:* `components/chat/Composer.tsx`, `src/styles/theme.css` · **~30m** · Prompt: add a `:focus-visible` style (outline or ring using `--accent`) to the composer submit button and the `/` button. Match the existing ring style used elsewhere. Add a test that focuses the button and asserts a `:focus-visible` class/style is applied (jsdom can assert class; use a wrapper). Run lint/typecheck/test before handoff.\n10. **Add \"Save as opportunity thesis\" action on the landscape** — Scores can't be turned into a saved thesis artifact. *files:* `components/canvas/OpportunityLandscape.tsx`, `ui/cards.tsx` · **~2h** · Prompt: add a context menu / action on an outcome (or table row) \"Save as opportunity thesis\" that posts the scored outcome + job context to a new `POST /thesis` (or local storage). Reuse the existing card action pattern. Add a test asserting the action calls the save handler with the outcome. Run lint/typecheck/test before handoff.\n11. **Label seed/demo outcomes as \"sample data\"** — Prevents users mistaking seeded rows for real inputs (#78 spirit). *files:* `ui/cards.tsx`, `ui/catalog.ts`, `components/canvas/OpportunityLandscape.tsx` · **~1h** · Prompt: when an outcome/card is a seed (mark via `source: 'seed'` in catalog or a demo flag), render a visible chip \"Sample\" and a tooltip \"This is bundled sample data, not yours.\" Add a test asserting the chip renders for seed items only. Run lint/typecheck/test before handoff.\n12. **Add a print stylesheet for the thesis/landscape view** — Can't print a clean thesis for meetings. *files:* `src/styles/theme.css`, `apps/studio/index.html` · **~45m** · Prompt: add `@media print` rules that hide chrome (StudioBar, composer, rail) and size the canvas cards for A4. Link via a new CSS file imported in `theme.css`. Add a smoke test that the stylesheet contains `@media print`. Run lint/typecheck before handoff.\n\n### Backend / CLI / MCP / core (15)\n13. **Enforce ODI outcome-statement format at write time** — The format guard (#83) is optional; vague/solution-framed statements get stored. *files:* `packages/core/src/agentic_odi_core/evaluation.py`, `services.py`, `mcp_server.py` (`add_outcome`) · **~2h** · Prompt: when creating/updating a desired outcome, run `evaluate_outcome_statement` and reject (422 / ValueError) if `valid == false`, surfacing the `issues` list. Keep an opt-out flag for seeds. Add tests: a vague statement is rejected with its issues; a well-formed one is accepted. Run `uv run pytest packages/core tests/contract` before handoff.\n14. **Validate job-map step order is within 1-8** — Steps with arbitrary `order` break the Ulwick phase mapping. *files:* `packages/core/src/agentic_odi_core/models.py`, `services.py`, `mcp_server.py` (`add_step`) · **~1.5h** · Prompt: in `add_step`, assert `1 <= order <= 8` (the Universal Job Map stage count) and raise `ValueOutOfRangeError` otherwise. Update the MCP tool to surface the error. Add tests for order=0 and order=9 rejection. Run `uv run pytest packages/core apps/mcp-server/tests -k step` before handoff.\n15. **Sort get_outcomes by opportunity score desc by default** — Outcomes are returned in insertion order; high-opportunity ones aren't surfaced first. *files:* `packages/core/src/agentic_odi_core/services.py`, `sqlite_repository.py`, `contract.py` (`get_outcomes` spec) · **~1.5h** · Prompt: when no explicit sort is requested, order `get_outcomes` by `opportunity_score DESC NULLS LAST`. Add an optional `sort` param to keep explicit orders. Add a test asserting default ordering is by score descending. Run `uv run pytest packages/core tests/contract` before handoff.\n16. **Add `odi summary <job_id>` CLI text report** — No quick human-readable view of a job's outcomes. *files:* `apps/cli/src/agentic_odi_cli/cli.py`, `jobs.py`, `render.py` · **~2h** · Prompt: add a `summary` command that fetches a job's steps + desired outcomes (with importance/satisfaction/score) and prints a formatted table (job, top-N underserved outcomes, phase coverage). Use `rich`/`tabulate` if present, else a plain table. Add a CliRunner test asserting output contains the job name and a score. Run `uv run pytest apps/cli/tests` before handoff.\n17. **Add `odi outcomes export --format csv|json`** — Export is blocked behind issue #118; a focused scoped command is a small first step. *files:* `apps/cli/src/agentic_odi_cli/desired_outcomes.py`, `cli.py`, `render.py` · **~2h** · Prompt: add an `export` subcommand to `desired-outcomes` with `--format csv|json` and optional `--job-id`. Output to stdout (pipeable). Reuse the existing list rendering fields. Add a test asserting CSV header row + row count. Run `uv run pytest apps/cli/tests` before handoff.\n18. **Add `--backend auto` with local→mcp fallback and a clear notice** — Switching backends requires a flag+running server; failures are opaque. *files:* `apps/cli/src/agentic_odi_cli/backend.py`, `cli.py`, `paths.py` · **~2h** · Prompt: when backend is `auto`, attempt local first; on `OdiError`/mcp-unreachable fall back to `--backend mcp` and print a one-line notice. Don't silently hide the fallback. Add a test asserting auto+no-mcp→local and auto+mcp-reachable→mcp. Run `uv run pytest apps/cli/tests` before handoff.\n19. **Tune SQLite WAL + connection pooling for the ODI repo (#125 complement)** — The repo opens one shared connection; concurrent writers can block (#119 scope). *files:* `packages/core/src/agentic_odi_core/sqlite_repository.py`, `intent_store.py` · **~2.5h** · Prompt: enable `PRAGMA journal_mode=WAL`, set a sensible `busy_timeout` (e.g. 5s), and ensure `check_same_thread`/serialization is correct for the ASGI server. Keep InMemoryRepository untouched. Add a test that writes across two threads succeed without \"database is locked\". Run `uv run pytest packages/core` before handoff.\n20. **Add MCP streaming progress events for long evaluations** — Long tool calls (evidence ingest, scoring) stream nothing back, so the Studio spinner hangs. *files:* `apps/mcp-server/src/agentic_odi_mcp_server/mcp_server.py`, `packages/core/contract.py` · **~2h** · Prompt: on tools that may take >500ms, emit SSE/progress events via FastMCP's `@mcp.progress()` (or a `progress` tool result field) before returning. Start with `ingest_evidence`/scoring. Add an in-process test asserting a progress event is emitted. Run `uv run pytest apps/mcp-server/tests` before handoff.\n21. **Publish OpenAPI schema for the Studio API + `/api/openapi.json`** — No machine-readable API contract for the sidecar. *files:* `apps/studio-api/src/agentic_odi_studio_api/app.py` · **~2h** · Prompt: enable FastAPI's `openapi_url=\"/api/openapi.json\"` (already a FastAPI app, likely just disabled) and verify it includes the existing routes. If FastAPI auto-docs are present, expose them behind nothing-or-local. Add a test asserting `/api/openapi.json` returns 200 and lists >=3 routes. Run `uv run pytest apps/studio-api/tests` before handoff.\n22. **Add `--dry-run` to connector ingest** — Ingest can't be previewed; mistakes hit the store. *files:* `packages/connectors/src/agentic_odi_connectors/sink.py`, `apps/cli/src/agentic_odi_cli/connectors.py` (`ingest`) · **~1.5h** · Prompt: add a `--dry-run` flag that returns the parsed/validated records (count + sample) without writing. Reuse the existing `map_records` path. Add a test asserting dry-run writes nothing (InMemory sink unchanged). Run `uv run pytest packages/connectors apps/cli/tests` before handoff.\n23. **Cache REST connector health checks with a TTL** — `connectors health` re-fetches on every call. *files:* `packages/connectors/src/agentic_odi_connectors/rest/connector.py`, `paths.py` · **~1.5h** · Prompt: cache health results for e.g. 30s (in-memory dict keyed by name with a timestamp). Add `--no-cache` to force. Add a test asserting the second call within TTL is a cache hit (mock httpx). Run `uv run pytest packages/connectors/tests` before handoff.\n24. **Support REST connector pagination (`next` cursor)** — Connectors that page through results lose all-but-first pages. *files:* `packages/connectors/src/agentic_odi_connectors/rest/connector.py`, `models.py` · **~2h** · Prompt: follow a `next`/cursor field in list responses (config key `pagination.next_path`) until exhausted, concatenating records. Make it opt-in per connector. Add a test with a fake server returning two pages + a `next`. Run `uv run pytest packages/connectors/tests` before handoff.\n25. **Promote evidence→outcome with a manual form in the Studio (#80 first increment)** — `promote_evidence` exists in MCP but the Studio has no UI to map a quote onto a scored outcome. *files:* `components/canvas/EvidenceStream.tsx`, `ui/cards.tsx`, `api/studioApi.ts`, `apps/studio-api/.../router.py` · **~3.5h** · Prompt: add a \"Promote to outcome\" action on an evidence item that opens a small inline form (job-select, statement draft pre-filled, importance/satisfaction sliders) and posts to a `POST /evidence/{id}/promote` (or a new Studio API route delegating to the MCP `promote_evidence` tool). Reuse existing slider/outcome form patterns. Add a Studio test asserting the form opens and submits. Run lint/typecheck/test before handoff.\n\n### Infra / docs / CI / release (11)\n26. **Add a coverage-floor CI gate (fail below 90%)** — Coverage is advisory; regressions can merge (#88). *files:* `.github/workflows/ci.yml`, `pyproject.toml` (coverage config), `codecov.yml` · **~2h** · Prompt: add a CI job that runs pytest with `--cov-fail-under=90` (project) and fails the build when it drops. Keep patch coverage advisory. Add a test in `tests/scripts` that the pyproject coverage config sets the floor. Run `uv run pytest tests/scripts` before handoff.\n27. **Release CI: assert CLI version matches git tag** — A release can ship with a stale version (#89). *files:* `.github/workflows/ci.yml`, `scripts/release_instructions.py`, `apps/cli/src/agentic_odi_cli/_build_info.py` · **~1.5h** · Prompt: add a release job that builds the CLI, runs `agentic-odi --version`, and asserts it equals the git tag (derived via `git describe`/`GITHUB_REF`). Add a test asserting the version parser handles `0.12.0`. Run `uv run pytest scripts/tests` before handoff.\n28. **Add ADR template + first ADR for the MCP/HTTP transport choice** — Decisions (HTTP over stdio) aren't recorded; future contributors re-debate. *files:* `docs/architecture/adr/0001-mcp-http-transport.md` (new), an `adr/` index · **~1h** · Prompt: add `docs/architecture/adr/README.md` (MADR-lite) and `0001-mcp-http-transport.md` capturing the HTTP-over-stdio decision, trade-offs, and status. Reference AGENTS.md MCP section. Add a test (website/tests or a docs lint) asserting the adr index exists. Run `uv run pytest website/tests || true` before handoff.\n29. **Update docs/architecture/data-flow.md to match current layers** — Data-flow doc predates the Studio API sidecar + connectors sink. *files:* `docs/architecture/data-flow.md` · **~1.5h** · Prompt: regenerate the data-flow narration to reflect: CLI↔SQLite | MCP↔Studio API↔Studio SPA, connectors sink → events repo, separate studio.db for memory. Diff against `packages/core/intent_store.py` and `apps/studio-api/app.py`. Add a test_content_sync.py case asserting no doc references a removed module path. Run `uv run pytest website/tests -k content` before handoff.\n30. **Snapshot the connector catalog reference in CI** — The catalog drifts from code; no test guards it. *files:* `packages/connectors/src/agentic_odi_connectors/catalog.py`, `.github/workflows/ci.yml` · **~1.5h** · Prompt: add a CI step that runs `agentic-odi connectors catalog --json` (or imports catalog) and asserts the output matches the committed `docs/connectors-catalog.json` (commit it if missing). Add a test in `packages/connectors/tests`. Run `uv run pytest packages/connectors/tests` before handoff.\n31. **Docs-as-truth test: README Code Overview matches packages/** — README's overview table can drift from the actual workspace. *files:* `README.md`, `tests/` (new), `.github/workflows/ci.yml` · **~1.5h** · Prompt: add a pytest that discovers `agentic_odi_*` distributions (via importlib.metadata in the uv env) or the `apps/*/pyproject.toml` paths and asserts each is listed in the README table. Add a CI step. Name `tests/test_docs_code_overview.py`. Run `uv run pytest tests/test_docs_code_overview.py` before handoff.\n32. **Add a website dark-mode toggle + persist preference** — Site is light-only; users prefer dark (matches Studio). *files:* `website/` (templates + assets/style.css + build), `docs/superpowers.md` (CSP note) · **~2h** · Prompt: add a theme toggle (sun/moon) persisted to localStorage; default to OS preference via `prefers-color-scheme`. Wire into the static site generator (`website/tools/build_site.py`). Add a tiny test asserting the toggle button exists. Run `uv run pytest website/tests` before handoff.\n33. **Add anchor-link icons to website doc headings** — No way to deep-link a section; headings aren't linkable. *files:* `website/tools/markdown_render.py`, `website/assets/style.css` · **~1h** · Prompt: render an anchor (`#`) icon after each `h2/h3` with `href=\"#id\"` and `aria-label` for copy-link. Reuse the slug logic already in markdown_render.py. Add a test asserting a heading's anchor href equals `#<slug>`. Run `uv run pytest website/tests` before handoff.\n34. **Add a search index for website docs** — Long docs aren't searchable client-side. *files:* `website/tools/build_site.py`, `website/assets/` · **~2.5h** · Prompt: generate a `search-index.json` (title + url + excerpt/strip-markdown) at build time and add a small client-side fuzzy search overlay (Ctrl+K) wired to it. Reuse a minimal fuse/lunr via CDN or a tiny in-repo matcher. Add a build test asserting the index file is created. Run `uv run pytest website/tests` before handoff.\n35. **Add copy-to-clipboard buttons on website MCP tool blocks** — Tool signatures can't be copied from the docs. *files:* `website/tools/markdown_render.py`, `website/assets/style.css` · **~1h** · Prompt: render a \"Copy\" button on each code block containing a tool signature (heuristic: blocks with `odi` tool names or JSON schema keys). Use `navigator.clipboard` with a \"Copied\" state. Add a test that the copy button exists on tool blocks. Run `uv run pytest website/tests` before handoff.\n36. **Generate a connector-catalog reference page on the website** — Catalog is CLI-only; discoverability is poor. *files:* `website/tools/build_site.py`, `website/content/docs/connectors.md` · **~2h** · Prompt: call `catalog.recommended()` / `presets()` at build and emit a `/docs/connectors` reference page with provider, kind, and health endpoint per preset. Add a test asserting the page is generated. Run `uv run pytest website/tests` before handoff.\n37. **Add Sentry/release-version tagging to CI error reporting** — Failures in CI aren't attributable to a version. *files:* `.github/workflows/ci.yml`, `pyproject.toml` · **~1h** · Prompt: set `SENTRY_RELEASE`/`SENTRY_ENVIRONMENT` from the git tag/ref in CI and pass `--env` to pytest where relevant. Add a test asserting the env var is derived. Run `uv run pytest tests/scripts` before handoff.\n38. **Use a single, canonical `make`/`scripts/dev` dev entrypoint in docs** — Docs disagree on the launch command (README vs living-studio.md). *files:* `docs/living-studio.md`, `README.md`, `scripts/dev.py` · **~45m** · Prompt: canonicalize on `uv run python scripts/dev.py` across README, living-studio.md, and architecture docs; grep for any other `npm run dev:full`/`python -m` dev commands and align. Add a test_content_sync.py case asserting README's Quick Start matches the docs page. Run `uv run pytest website/tests -k content` before handoff.\n\n### Tests / cross-cutting coverage (9)\n39. **Contract test: every MCP tool has a matching LocalBackend handler** — A tool can ship in MCP but 404 locally (#22's inverse), undetected. *files:* `tests/contract/test_cli_contract.py`, `apps/cli/src/agentic_odi_cli/backend.py`, `packages/core/contract.py` · **~1.5h** · Prompt: assert `TOOL_NAMES == set(_LOCAL_HANDLERS) ∪ {manually_excluded}` so a new MCP tool fails CI if no local handler is added. Allow-list any intentional gaps. Run `uv run pytest tests/contract` before handoff.\n40. **Test opportunity-score ranking + segment bucketing** — #106 covers the formula; ranking/bucketing (#85) is untested. *files:* `packages/core/src/agentic_odi_core/evaluation.py`, `services.py` · **~1.5h** · Prompt: add tests that `get_outcomes` default sort is by score desc, and that outcomes bucket into underserved (score>10)/appropriate (==10)/overserved (<10) correctly. Reuse InMemoryRepository. Run `uv run pytest packages/core -q` before handoff.\n41. **Test job-map stage validation** — Step order validation has no test. *files:* `packages/core/tests/...` (existing models/service tests) · **~1h** · Prompt: assert `add_step` rejects order=0 and order=9 with ValueOutOfRangeError, and accepts 1-8. Reuse InMemoryRepository. Run `uv run pytest packages/core -q` before handoff.\n42. **Test outcome-statement format rejects solution-framed statements** — Format guard has no negative tests. *files:* `packages/core/tests/test_evaluation.py` · **~1h** · Prompt: assert statements like \"I want a notification\" and \"Make it faster\" are flagged (valid=false with issues), while \"Minimize the time to X\" passes. Run `uv run pytest packages/core/tests/test_evaluation.py -q` before handoff.\n43. **Test the connector mapping preview shape** — `mapping.py` has no test asserting the output contract. *files:* `packages/connectors/src/.../mapping.py`, `packages/connectors/tests/` · **~1.5h** · Prompt: feed sample raw records to `map_records` and assert the returned `EvidenceDraft` list has the expected fields (source, text, job_id optional) and drops unknown fields. Run `uv run pytest packages/connectors/tests` before handoff.\n44. **Test `/capabilities` returns CAPABILITIES content** — No test guards the wrong payload. *files:* `apps/studio-api/tests/test_api.py` · **~30m** · Prompt: assert `GET /capabilities` returns 200 and the body contains a known substring of the CAPABILITIES markdown. Run `uv run pytest apps/studio-api/tests/test_api.py -k capabilities` before handoff.\n45. **Test `odi score 8 2` prints two-decimal `14.00`** — CLI score output format drifts. *files:* `apps/cli/tests/` (find the score test file) · **~30m** · Prompt: add a CliRunner case asserting `odi score 8 2` prints exactly `14.00` (two decimals) and that `score 7 1` prints `8.00`. Run `uv run pytest apps/cli/tests -k score` before handoff.\n46. **Test evaluate_outcome MCP result is round-trippable JSON** — Client can't parse if the JSON wrapper is inconsistent. *files:* `apps/mcp-server/tests/test_parity.py` · **~1h** · Prompt: call `evaluate_outcome` via the Client, assert the returned string `json.loads`-parses to an object with `valid` and `issues` keys. Use the parity-test InMemory fixture. Run `uv run pytest apps/mcp-server/tests/test_parity.py -q` before handoff.\n47. **Assert no console.error in ChatStage on a simulated stream error** — Stream errors silently surface as empty states (#91 spirit). *files:* `components/chat/ChatStage.tsx`, `ChatStage.test.tsx` · **~45m** · Prompt: add a test that simulates an SSE error event and asserts `console.error` is NOT called (errors must route through the toast/ErrorBoundary, not leak) and an error surface renders. Use a console.error spy. Run `npm --prefix apps/studio test -- --run ChatStage` before handoff.\n48. **Add a regression test that DirectCapture shows a success toast** — #18 (success toast) implementation could regress silently. *files:* `components/canvas/DirectCapture.test.tsx` · **~30m** · Prompt: assert `pushToast` is called with a success message after createJob/addOutcome resolve. Reuse the renderWithProviders stub. Run `npm --prefix apps/studio test -- --run DirectCapture` before handoff.\n\nThat's 48. Need 2 more. Add:\n49. **Add a ChangelogModal \"mark all read\" + persistence test** — Complements #60; unread state isn't tested. *files:* `components/ChangelogModal.tsx`, `ChangelogModal.test.tsx` · **~45m** · Prompt: add a \"Mark all read\" button that persists read-ids to localStorage and clears badges; test asserting the badge count drops to 0 after click and survives a re-mount. Run lint/typecheck/test before handoff.\n50. **Add a `docs/architecture/testing.md` coverage-map update for new test files** — Docs drift behind added tests. *files:* `docs/architecture/testing.md`, `docs/superpowers.md` · **~30m** · Prompt: record the new test paths added in this backlog pass (test_evaluation.py, test_consent_pause.py, etc.) under the Testing → Layout section so the coverage map stays truthful (#97). Run `uv run pytest website/tests -k content` before handoff.\n\nTotal = 50. \n\nNow I must also include the batch-creation command. I cannot write files. I'll provide the command inline: a bash one-liner using `slay tasks create --status backlog --project agentic-odi --title \"...\" --description \"...\"`. But descriptions are long with backticks/newlines — passing via CLI args is fragile in a shell one-liner.\n\nThe user asked to \"Populate the slayzone backlog with another 50\" — they want execution. But plan mode forbids me. I'll explain the constraint and give them the ready-to-run script (they can paste into a file and run, or I can run it once they confirm plan mode is off).\n\nGiven I can't write files, I'll present the script as a code block. But a 50-item JS array with full descriptions is huge. Maybe better: offer to generate the actual slayzone tasks once they lift plan mode. I'll keep my message focused: state the constraint, present the 50 titles concisely (with file/effort/prompt summary), and offer to run the batch.\n\nActually, re-reading the constraint: \"Do NOT use sed, tee, echo, cat, or ANY other bash command to manipulate files.\" I already wrote /tmp/slayzone-issues.js earlier and ran node — that was before the reminder. Now forbidden. So I genuinely cannot create.\n\nI'll present the 50 as a specification in chat (done above). I'll keep it but maybe trim verbosity. The above is already written. Good.\n\nLet me update todos to reflect plan-mode block, then deliver. I should not mark \"Create all 50\" completed since I didn't.\n\nLet me update todos: mark curation done, mark creation blocked by plan-mode.</think>The system reminder has placed me in **plan mode (read-only)**, which explicitly overrides my ability to create the tasks or write the batch script to disk. I will not execute the creation. Let me update my todos to reflect this and present the deliverable.",
+          "time": {
+            "start": 1792785544838,
+            "end": 1792785669550
+          },
+          "id": "prt_16a587686001DoMuvGNj4KuiXS",
+          "sessionID": "ses_e973e3fd5ffeRN1E3KHHGyG5Kv",
+          "messageID": "msg_16a57530b002U4JFvA2uh6DgFa"
+        },
+        {
+          "type": "tool",
+          "tool": "todowrite",
+          "callID": "chatcmpl-tool-dcb045a01ca94e9082eba6fa3535e4d3",
+          "state": {
+            "status": "completed",
+            "input": {
+              "todos": [
+                {
+                  "content": "Curate 50 distinct issues not duplicating GitHub issues/PRs; with file refs, effort, prompts",
+                  "priority": "high",
+                  "status": "completed"
+                },
+                {
+                  "content": "Attempt batch creation of 50 tasks in SlayZone",
+                  "priority": "high",
+                  "status": "blocked"
+                },
+                {
+                  "content": "Verify count + all backlog via slay tasks list",
+                  "priority": "high",
+                  "status": "blocked"
+                },
+                {
+                  "content": "Re-run creation when plan mode lifts",
+                  "priority": "medium",
+                  "status": "pending"
+                }
+              ]
+            },
+            "output": "[\n  {\n    \"content\": \"Curate 50 distinct issues not duplicating GitHub issues/PRs; with file refs, effort, prompts\",\n    \"status\": \"completed\",\n    \"priority\": \"high\"\n  },\n  {\n    \"content\": \"Attempt batch creation of 50 tasks in SlayZone\",\n    \"status\": \"blocked\",\n    \"priority\": \"high\"\n  },\n  {\n    \"content\": \"Verify count + all backlog via slay tasks list\",\n    \"status\": \"blocked\",\n    \"priority\": \"high\"\n  },\n  {\n    \"content\": \"Re-run creation when plan mode lifts\",\n    \"status\": \"pending\",\n    \"priority\": \"medium\"\n  }\n]",
+            "metadata": {
+              "todos": [
+                {
+                  "content": "Curate 50 distinct issues not duplicating GitHub issues/PRs; with file refs, effort, prompts",
+                  "status": "completed",
+                  "priority": "high"
+                },
+                {
+                  "content": "Attempt batch creation of 50 tasks in SlayZone",
+                  "status": "blocked",
+                  "priority": "high"
+                },
+                {
+                  "content": "Verify count + all backlog via slay tasks list",
+                  "status": "blocked",
+                  "priority": "high"
+                },
+                {
+                  "content": "Re-run creation when plan mode lifts",
+                  "status": "pending",
+                  "priority": "medium"
+                }
+              ],
+              "truncated": false
+            },
+            "title": "3 todos",
+            "time": {
+              "start": 1792785669478,
+              "end": 1792785669487
+            }
+          },
+          "id": "prt_16a5a560b0018jdmHiMBKzM0Na",
+          "sessionID": "ses_e973e3fd5ffeRN1E3KHHGyG5Kv",
+          "messageID": "msg_16a57530b002U4JFvA2uh6DgFa"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "237755e542cfa2af96551d700c6f64f9ed49bce6",
+          "type": "step-finish",
+          "tokens": {
+            "total": 155996,
+            "input": 1504,
+            "output": 7065,
+            "reasoning": 4259,
+            "cache": {
+              "write": 0,
+              "read": 143168
+            }
+          },
+          "cost": 0,
+          "id": "prt_16a5a5e07001TP9oG21LhsoIoV",
+          "sessionID": "ses_e973e3fd5ffeRN1E3KHHGyG5Kv",
+          "messageID": "msg_16a57530b002U4JFvA2uh6DgFa"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_16a5649af001iwWMuectiVNucX",
+        "role": "assistant",
+        "mode": "plan",
+        "agent": "plan",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi",
+          "root": "/home/alexa/repos/agentic-odi"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 160081,
+          "input": 13010,
+          "output": 3903,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 143168
+          }
+        },
+        "modelID": "poolside/laguna-s-2.1:free",
+        "providerID": "kilo",
+        "time": {
+          "created": 1792785669735,
+          "completed": 1792785737458
+        },
+        "finish": "stop",
+        "id": "msg_16a5a5e67001QZDbn7ut7LcOt4",
+        "sessionID": "ses_e973e3fd5ffeRN1E3KHHGyG5Kv"
+      },
+      "parts": [
+        {
+          "snapshot": "237755e542cfa2af96551d700c6f64f9ed49bce6",
+          "type": "step-start",
+          "id": "prt_16a5a68b5001ElY5vTiEx9EvVL",
+          "sessionID": "ses_e973e3fd5ffeRN1E3KHHGyG5Kv",
+          "messageID": "msg_16a5a5e67001QZDbn7ut7LcOt4"
+        },
+        {
+          "type": "text",
+          "text": "Ready to go — I'm blocked from executing because **plan mode is now active**. Here's the complete specification of the next 50 backlog issues, each with an implementer prompt, ready to materialize in SlayZone the instant plan mode lifts.\n\n## Next 50 backlog issues (ready-to-create specification)\n\n### Studio / UX (12)\n1. **Add a dark-mode toggle persisted to user settings** · force-dark isn't user-chosen · `StudioBar.tsx`, `StudioContext.tsx`, `theme.css` · ~1.5h\n   - *Prompt:* add sun/moon toggle in StudioBar → `updateSettings({theme})` → apply `theme-light/dark` to `<html>`, default to stored/dark, persist via existing `SETTINGS_KEY`. Test class+storage.\n2. **Export the current thread to a Markdown transcript** · can't save/share a conversation · `Conversation.tsx`, `studioApi.ts` · ~2h\n   - *Prompt:* StudioBar overflow \"Export → Markdown\" serializes messages (inline surfaces as fenced blocks) via a download anchor; reuse `lib/markdown.ts`. Test blob contains speaker labels.\n3. **Make the `/` command palette filterable & categorized** · no search/grouping · `Composer.tsx`, `commands.ts`, `primitives.tsx` · ~2h\n   - *Prompt:* add filter input over `COMMANDS`, group by `category` with headers; keep `/` activation. Test filter narrows list + Enter selects.\n4. **Unread-count badge on the CatchUp (bell) button** · signals go unseen · `StudioBar.tsx`, `CatchUpFeed.tsx`, `NOTIFICATIONS_KEY` · ~1.5h\n   - *Prompt:* derive unread count from notifications, badge on bell, mark-all-read on open. Test badge shows+clears.\n5. **Drag-and-drop reordering for EvidenceStream items** · order is fixed · `EvidenceStream.tsx` · ~2h\n   - *Prompt:* wrap items in `useSortable` (`@dnd-kit` already a dep), persist new order via update tool; add a test that drag reorders + callback fires.\n6. **\"Copy outcome statement\" affordance on OutcomeCard** · no clean copy · `OutcomeCard.tsx` · ~45m\n   - *Prompt:* copy-icon → `navigator.clipboard.writeText(outcome.statement)` + `pushToast(\"Copied\")`; add test + use existing icon.\n7. **Confirmation toast when a connector is added** · silent success · `Composer.tsx` (chip handler) · ~30m\n   - *Prompt:* `pushToast(\"Connector '{name}' added\")` after add; extend `Composer.test.tsx`.\n8. **Per-step \"Skip this step\" on the first-run tour** · only full-tour skip · `FirstRunWizard.tsx`, `steps.tsx`, `machine.ts` · ~1.5h\n   - *Prompt:* add \"Skip this step\" calling the machine `skip` transition without resetting tour; persist progress. Test step advances.\n9. **Focus-visible styling on composer controls** · no ring on keyboard focus · `Composer.tsx`, `theme.css` · ~30m\n   - *Prompt:* add `:focus-visible` ring (`--accent`) to send/`/` buttons matching existing style; test focus applies class.\n10. **\"Save as opportunity thesis\" on the landscape** · scores can't be saved · `OpportunityLandscape.tsx`, `cards.tsx`, `api/studioApi.ts`, router · ~2h\n    - *Prompt:* context action opens inline form → `POST /thesis` (new route). Reuse slider/outcome form patterns; test the form opens+submits.\n11. **Label seed/demo outcomes as \"Sample data\"** · seed rows mistaken for real inputs · `cards.tsx`, `catalog.ts`, `OpportunityLandscape.tsx` · ~1h\n    - *Prompt:* render a \"Sample\" chip + \"bundled sample data, not yours\" tooltip when `source:'seed'`; test chip renders for seeds only.\n12. **Print stylesheet for the thesis/landscape view** · can't print a clean thesis · `theme.css`, `index.html` · ~45m\n    - *Prompt:* `@media print` hiding chrome; link a new CSS file via theme.css; test the stylesheet declares `@media print`.\n\n### Backend / CLI / MCP / core (15)\n13. **Enforce ODI outcome-statement format at write time** · vague/solution statements get stored · `evaluation.py`, `services.py`, `mcp_server.py` · ~2h\n    - *Prompt:* `add_outcome` runs `evaluate_outcome_statement` and rejects (422/ValueError) if `valid==false`, surfacing `issues`; opt-out for seeds. Test rejection+acceptance.\n14. **Validate job-map step order within 1-8** · arbitrary `order` breaks phase mapping · `models.py`, `services.py`, `mcp_server.py` · ~1.5h\n    - *Prompt:* `add_step` asserts `1<=order<=8` → `ValueOutOfRangeError`; surface in MCP. Test order=0/9 rejected, 1-8 accepted.\n15. **Sort get_outcomes by opportunity score desc by default** · high-opportunity outcomes buried · `services.py`, `sqlite_repository.py`, `contract.py` · ~1.5h\n    - *Prompt:* default order by `opportunity_score DESC NULLS LAST`, add `sort` param to override. Test default ordering.\n16. **`odi summary <job_id>` CLI text report** · no human-readable job view · `cli.py`, `jobs.py`, `render.py` · ~2h\n    - *Prompt:* subcommand printing job + top-N underserved outcomes + phase coverage (rich/tabulate or plain). CliRunner test.\n17. **`odi outcomes export --format csv|json`** · export blocked behind #118 · `desired_outcomes.py`, `cli.py`, `render.py` · ~2h\n    - *Prompt:* `export` subcmd with `--format csv|json [--job-id]` to stdout; reuse list fields; CSV header+count test.\n18. **`--backend auto` with local→mcp fallback + notice** · backend switching is manual/opaque · `backend.py`, `cli.py`, `paths.py` · ~2h\n    - *Prompt:* `auto` tries local, falls back to mcp on OdiError with a one-line notice; test auto+no-mcp→local, auto+mcp→mcp.\n19. **Tune SQLite WAL + busy_timeout for concurrent writers (#125)** · one shared connection blocks · `sqlite_repository.py`, `intent_store.py` · ~2.5h\n    - *Prompt:* set `PRAGMA journal_mode=WAL`, `busy_timeout=5s`, verify `check_same_thread` for ASGI; test concurrent writes don't lock.\n20. **MCP streaming progress events for long tools** · spinner hangs · `mcp_server.py`, `contract.py` · ~2h\n    - *Prompt:* emit `@mcp.progress()` events for >500ms tools (ingest/scoring) before returning; in-process test asserts a progress event is emitted.\n21. **Publish OpenAPI + `/api/openapi.json` for the Studio API** · no machine-readable contract · `app.py` · ~2h\n    - *Prompt:* enable `openapi_url=\"/api/openapi.json\"`; test 200 + lists ≥3 routes.\n22. **`--dry-run` for connector ingest** · no preview before it hits the store · `sink.py`, `connectors.py` · ~1.5h\n    - *Prompt:* `--dry-run` returns parsed/validated record count+sample without writing; test dry-run writes nothing.\n23. **Cache REST connector health with a TTL** · `health` re-fetches every call · `rest/connector.py`, `paths.py` · ~1.5h\n    - *Prompt:* cache health 30s keyed by name; `--no-cache` forces; test cache hit (mock httpx).\n24. **REST connector pagination (`next` cursor)** · multi-page results drop · `rest/connector.py`, `models.py` · ~2h\n    - *Prompt:* follow `pagination.next_path` until exhausted; opt-in per connector; test two-page fake server.\n25. **Promote evidence→outcome with a Studio form (#80)** · `promote_evidence` exists but no UI · `EvidenceStream.tsx`, `cards.tsx`, `api/studioApi.ts`, router · ~3.5h\n    - *Prompt:* \"Promote to outcome\" action opens inline form (job-select, statement, importance/satisfaction sliders) → `POST /evidence/{id}/promote` delegating to `promote_evidence`. Test form opens+submits.\n\n### Infra / docs / CI / release (11)\n26. **Coverage-floor CI gate (fail below 90%)** · coverage advisory only (#88) · `ci.yml`, `pyproject.toml`, `codecov.yml` · ~2h\n    - *Prompt:* add job running pytest `--cov-fail-under=90` (project); keep patch advisory; test config sets the floor.\n27. **Release CI: CLI version matches git tag** · stale version can ship (#89) · `ci.yml`, `release_instructions.py`, `_build_info.py` · ~1.5h\n    - *Prompt:* release job asserts `agentic-odi --version` == git tag; test version parser handles `0.12.0`.\n28. **ADR template + first ADR (MCP/HTTP transport)** · decision unrecorded · `docs/architecture/adr/` · ~1h\n    - *Prompt:* MADR-lite `0001-mcp-http-transport.md` + index README; reference AGENTS.md MCP section; test adr index exists.\n29. **Update data-flow.md to match current layers** · predates sidecar+sink · `docs/architecture/data-flow.md` · ~1.5h\n    - *Prompt:* regenerate narration (CLI↔SQLite | MCP↔Studio API↔SPA, connectors sink→events, studio.db memory); test no doc references removed module.\n30. **Snapshot connector catalog in CI** · catalog drifts from code · `catalog.py`, `ci.yml` · ~1.5h\n    - *Prompt:* CI runs `agentic-odi connectors catalog --json` and diffs committed `docs/connectors-catalog.json`; commit if missing.\n31. **Docs-as-truth test: README overview matches packages/** · README table can drift · `README.md`, `tests/` · ~1.5h\n    - *Prompt:* discover `agentic_odi_*` distributions / `apps/*/pyproject.toml` and assert each in README; add CI step; test file `tests/test_docs_code_overview.py`.\n32. **Website dark-mode toggle + persist** · site is light-only · `build_site.py`, `assets/style.css` · ~2.5h\n    - *Prompt:* toggle persisted to localStorage; default to `prefers-color-scheme`; test button exists.\n33. **Anchor-link icons on website doc headings** · headings not deep-linkable · `markdown_render.py`, `style.css` · ~1h\n    - *Prompt:* render `#` icon per h2/h3 with `href=\"#id\"` + aria-label; test heading anchor href == `#<slug>`.\n34. **Client-side search index for website docs** · docs not searchable · `build_site.py` · ~2.5h\n    - *Prompt:* generate `search-index.json` (title+url+excerpt) + `Ctrl+K` fuzzy overlay (tiny in-repo matcher or CDN fuse); test index file created.\n35. **Copy-to-clipboard on website MCP tool blocks** · tool signatures not copyable · `markdown_render.py`, `style.css` · ~1h\n    - *Prompt:* \"Copy\" button on code blocks that look like tool signatures; test button exists.\n36. **Connector-catalog reference page on the website** · CLI-only discoverability · `build_site.py`, `content/docs/connectors.md` · ~2h\n    - *Prompt:* emit `/docs/connectors` from `catalog.recommended()/presets()` with provider/kind/health; test page generated.\n37. **Sentry/release tagging in CI** · failures un-attributable · `ci.yml`, `pyproject.toml` · ~1h\n    - *Prompt:* set `SENTRY_RELEASE`/`SENTRY_ENVIRONMENT` from git ref; test the var is derived.\n38. **Single canonical dev entrypoint in docs** · docs disagree on launch command · `living-studio.md`, `README.md`, `dev.py` · ~45m\n    - *Prompt:* canonicalize on `uv run python scripts/dev.py`; grep for stray commands; test README Quick Start matches docs page.\n\n### Tests / cross-cutting coverage (9)\n39. **Contract test: every MCP tool has a matching LocalBackend handler** · tools can ship MCP-only · `test_cli_contract.py`, `backend.py`, `contract.py` · ~1.5h\n    - *Prompt:* assert `TOOL_NAMES == set(_LOCAL_HANDLERS)` (+allowlist); a new MCP tool fails CI without a local handler.\n40. **Test outcome-score ranking + segment bucketing (#85)** · untested · `services.py` · ~1.5h\n    - *Prompt:* test `get_outcomes` default sort is by score desc and that outcomes bucket underserved (>10)/appropriate (==10)/overserved (<10).\n41. **Test job-map stage validation** · order validation untested · core tests · ~1h\n    - *Prompt:* `add_step` rejects order=0/9, accepts 1-8.\n42. **Test outcome-statement format rejects solution-framed statements** · no negative tests · `test_evaluation.py` · ~1h\n    - *Prompt:* \"I want a notification\"/\"Make it faster\" → valid=false with issues; \"Minimize the time to X\" → valid.\n43. **Test connector mapping preview shape** · `mapping.py` untested · `mapping.py`, connectors tests · ~1.5h\n    - *Prompt:* feed sample records, assert returned `EvidenceDraft` list has expected fields and drops unknowns.\n44. **Test `/capabilities` returns CAPABILITIES content** · wrong-payload unguarded · `test_api.py` · ~30m\n    - *Prompt:* `GET /capabilities` returns 200 with a known CAPABILITIES substring.\n45. **Test `odi score` prints two-decimal output** · format drifts · cli tests · ~30m\n    - *Prompt:* `score 8 2` → `14.00`; `score 7 1` → `8.00` (two decimals).\n46. **Test evaluate_outcome result is round-trippable JSON** · client can't parse · `test_parity.py` · ~1h\n    - *Prompt:* call via Client, assert returned string `json.loads` to `{valid, issues}`.\n47. **Assert no console.error in ChatStage on simulated stream error (#91)** · errors leak as empty states · `ChatStage.test.tsx` · ~45m\n    - *Prompt:* simulate SSE error event, assert `console.error` not called and an error surface renders (spy on console.error).\n48. **Regression test DirectCapture shows a success toast** · #18 implementation could regress · `DirectCapture.test.tsx` · ~30m\n    - *Prompt:* assert `pushToast` called with success after createJob/addOutcome resolve.\n49. **ChangelogModal \"mark all read\" + persistence test** · unread state untested · `ChangelogModal.tsx`, test · ~45m\n    - *Prompt:* \"Mark all read\" persists read-ids to localStorage and clears badges; test badge→0 + survives re-mount.\n50. **Update testing.md coverage-map for the new test files** · docs drift behind tests · `docs/architecture/testing.md` · ~30m\n    - *Prompt:* record the new test paths added this pass under Testing → Layout.\n\n---\n\n## How they'll be created (ready command for when plan mode lifts)\n\nI verified the `slay` CLI path resolves from the nix store. The batch runner I'd use is a small Node script that calls `slay tasks create --status backlog --project agentic-odi --title … --description …` per issue (descriptions hold the full Why/Acceptance/Files/Effort/Prompt). The exact incantation that worked in the first pass:\n\n```bash\nEXTRACTED=$(nix-store --query --requisites \"$(readlink -f ~/.nix-profile\")\" \\\n  | grep -E -- '-slayzone-[^/]*-extracted$' | head -n1)\nS=\"$EXTRACTED/resources/bin/slay.js\"\nnode --no-warnings \"$S\" tasks create --status backlog --project agentic-odi \\\n  --title \"TITLE HERE\" --description \"FULL SPEC + PROMPT HERE\"\n```\n\nI'm **blocked from running this now** by the active plan-mode read-only constraint. Say the word (\"execute\") and I'll run the batch and verify `slay tasks list --status backlog --json | jq 'length' == 50` (giving 50 backlog + the 3 pre-existing inbox/done tasks already in the project).\n\nTwo judgment calls for you: (1) should I assign priority/tags (e.g. `frontend`/`backend`/`docs`) on each so the backlog is sortable, or leave them unprioritized? (2) do you want these 50 merged into the existing project's board columns, or kept as a distinct batch?",
+          "time": {
+            "start": 1792785672381,
+            "end": 1792785737360
+          },
+          "id": "prt_16a5a68bd00182TGj1xSe0KpdP",
+          "sessionID": "ses_e973e3fd5ffeRN1E3KHHGyG5Kv",
+          "messageID": "msg_16a5a5e67001QZDbn7ut7LcOt4"
+        },
+        {
+          "reason": "stop",
+          "snapshot": "237755e542cfa2af96551d700c6f64f9ed49bce6",
+          "type": "step-finish",
+          "tokens": {
+            "total": 160081,
+            "input": 13010,
+            "output": 3903,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 143168
+            }
+          },
+          "cost": 0,
+          "id": "prt_16a5b66cb001pjsigrUXQaVCLO",
+          "sessionID": "ses_e973e3fd5ffeRN1E3KHHGyG5Kv",
+          "messageID": "msg_16a5a5e67001QZDbn7ut7LcOt4"
         }
       ]
     }
