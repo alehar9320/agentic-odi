@@ -6,10 +6,11 @@
 uv run pytest                       # all packages + root contract/launcher tests
 uv run pytest packages/core         # one package
 uv run pytest tests/contract        # MCP contract only
-uv run mypy apps packages tests
+uv run mypy apps brand packages
 uv run ruff check .
 uv run ruff format --check .
 uv run bandit -c pyproject.toml -r apps packages
+uv run bandit -c pyproject.toml -r website/
 ```
 
 The root `pyproject.toml` owns pytest, coverage, ruff, mypy, and bandit configuration. There is no per-package test configuration to keep in sync.
