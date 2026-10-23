@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
+from agentic_odi_core import BusinessValue, CustomerValue, EvidenceItemType
 from pydantic import BaseModel, Field
 
 
@@ -74,6 +75,36 @@ class UpdateOutcomeRequest(BaseModel):
     importance: float | None = None
     satisfaction: float | None = None
     mcp_url: str = ""
+
+
+class AddCustomerOutcomeRequest(BaseModel):
+    mcp_url: str = ""
+    job_id: str
+    customer_value: CustomerValue
+    business_value: BusinessValue
+    step_id: str | None = None
+
+
+class UpdateCustomerOutcomeRequest(BaseModel):
+    """Both values are replaced wholesale — a partial score would be ambiguous."""
+
+    mcp_url: str = ""
+    customer_value: CustomerValue | None = None
+    business_value: BusinessValue | None = None
+    step_id: str | None = None
+
+
+class AddEvidenceRequest(BaseModel):
+    mcp_url: str = ""
+    source_name: str
+    source_kind: str
+    name: str
+    content: str
+    item_type: EvidenceItemType = "manual"
+    raw: dict[str, Any] = Field(default_factory=dict)
+    job_id: str | None = None
+    step_id: str | None = None
+    outcome_id: str | None = None
 
 
 class StudioBrief(BaseModel):
