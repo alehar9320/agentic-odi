@@ -106,15 +106,10 @@ class LocalBackend(Backend):
         return self._service
 
     def call(self, tool_name: str, args: dict[str, Any]) -> Any:
-        from agentic_odi_core import OdiError
-
         handler = _LOCAL_HANDLERS.get(tool_name)
         if handler is None:
             raise NotImplementedError(f"Unknown tool: {tool_name}")
-        try:
-            return handler(self, args)
-        except OdiError as exc:
-            raise BackendError(str(exc)) from exc
+        return handler(self, args)
 
     def _add_job(self, args: dict[str, Any]) -> dict[str, Any]:
         job = self.service.add_job(name=args["name"], description=args.get("description"))
@@ -388,12 +383,7 @@ class LocalBackend(Backend):
         evidence_id = args["evidence_id"]
         evidence = self.service.get_evidence(evidence_id)
         if evidence is None:
-            raise BackendError(
-                evidence_not_found(
-                    evidence_id,
-                    "List the stored records with list_evidence() to find a valid id.",
-                )
-            )
+            raise BackendError(evidence_not_found(evidence_id))
         return evidence.model_dump()
 
     def _list_evidence(self, args: dict[str, Any]) -> list[dict[str, Any]]:
@@ -410,8 +400,8 @@ class LocalBackend(Backend):
         evidence_id = args["evidence_id"]
         try:
             self.service.delete_evidence(evidence_id)
-        except EvidenceNotFoundError as exc:
-            raise BackendError(evidence_not_found(evidence_id, exc.hint)) from None
+        except EvidenceNotFoundError:
+            raise BackendError(evidence_not_found(evidence_id)) from None
         return evidence_id
 
     def _promote_evidence(self, args: dict[str, Any]) -> dict[str, Any]:
@@ -438,14 +428,14 @@ class LocalBackend(Backend):
                 importance=args.get("importance"),
                 satisfaction=args.get("satisfaction"),
             )
-        except EvidenceNotFoundError as exc:
-            raise BackendError(evidence_not_found(evidence_id, exc.hint)) from None
+        except EvidenceNotFoundError:
+            raise BackendError(evidence_not_found(evidence_id)) from None
         except JobNotFoundError:
             raise BackendError(job_not_found(args.get("job_id") or "")) from None
         except StepNotFoundError:
-            raise BackendError(step_not_found(args.get("step_id"))) from None
+            raise BackendError(step_not_found(None)) from None
         except OutcomeNotFoundError:
-            raise BackendError(outcome_not_found(args.get("outcome_id"))) from None
+            raise BackendError(outcome_not_found(None)) from None
         except ValueOutOfRangeError as exc:
             raise BackendError(_VALUE_RANGE_ERROR) from exc
         except ValueError as exc:
@@ -465,6 +455,41 @@ class LocalBackend(Backend):
         if not (1.0 <= importance <= 10.0) or not (1.0 <= satisfaction <= 10.0):
             raise BackendError(_VALUE_RANGE_ERROR)
         return compute_opportunity_score(importance, satisfaction)
+
+    def _evaluate_outcome(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import evaluate_outcome_statement, job_not_found
+
+        statement = args["statement"]
+        job_id = args.get("job_id")
+        result = evaluate_outcome_statement(statement)
+        if job_id is not None:
+            if self.service.get_job(job_id) is None:
+                raise BackendError(job_not_found(job_id))
+            result["job_id"] = job_id
+            result["existing_outcomes"] = [
+                {
+                    "id": outcome.id,
+                    "statement": outcome.statement,
+                    "opportunity_score": outcome.opportunity_score,
+                }
+                for outcome in self.service.get_outcomes(job_id)
+            ]
+        return result
+
+    def _get_odi_framework_guidelines(self, args: dict[str, Any]) -> str:
+        from agentic_odi_core import get_odi_framework_guidelines
+
+        return get_odi_framework_guidelines()
+
+    def _get_capabilities(self, args: dict[str, Any]) -> str:
+        from agentic_odi_core import capability_summary
+
+        return capability_summary()
+
+    def _get_capabilities_manifest(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import capability_manifest
+
+        return capability_manifest()
 
 
 _LOCAL_HANDLERS = {
@@ -493,8 +518,12 @@ _LOCAL_HANDLERS = {
     "list_evidence": LocalBackend._list_evidence,
     "delete_evidence": LocalBackend._delete_evidence,
     "promote_evidence": LocalBackend._promote_evidence,
+    "evaluate_outcome": LocalBackend._evaluate_outcome,
     "get_odi_schema": LocalBackend._get_odi_schema,
     "compute_opportunity": LocalBackend._compute_opportunity,
+    "get_odi_framework_guidelines": LocalBackend._get_odi_framework_guidelines,
+    "get_capabilities": LocalBackend._get_capabilities,
+    "get_capabilities_manifest": LocalBackend._get_capabilities_manifest,
 }
 
 
@@ -554,12 +583,9 @@ _LIST_TOOLS = frozenset(
 
 def _parse_remote(tool_name: str, text: str) -> Any:
     """Parse a tool result, raising ``BackendError`` on the server's error text."""
-    from agentic_odi_core.remote import parse_tool_result
-
     stripped = text.strip()
-    problem = parse_tool_result(stripped)
-    if problem is not None:
-        raise BackendError(problem.message)
+    if stripped.startswith("Error:") or " not found:" in stripped:
+        raise BackendError(stripped)
 
     if tool_name in _FLOAT_TOOLS:
         return _extract_float(stripped)
@@ -622,11 +648,26 @@ def require_backend() -> Backend:
 
 def run_tool(tool_name: str, args: dict[str, Any]) -> Any:
     """Call ``tool_name`` on the resolved backend, reporting failures cleanly."""
+    import time
+
+    from agentic_odi_cli import flags
+
+    dev_mode = flags.is_enabled("developer_mode")
+    if dev_mode:
+        typer.echo(f"[dev] Tool call: {tool_name} args={args}", err=True)
+
+    start = time.perf_counter()
     try:
-        return require_backend().call(tool_name, args)
+        res = require_backend().call(tool_name, args)
     except BackendError as exc:
         message = str(exc)
         if message.startswith("Error: "):
             message = message[len("Error: ") :]
         typer.secho(f"Error: {message}", fg="red", err=True)
         raise typer.Exit(code=1) from exc
+
+    if flags.is_enabled("advanced_metrics"):
+        elapsed_ms = (time.perf_counter() - start) * 1000
+        typer.echo(f"[metrics] Tool '{tool_name}' executed in {elapsed_ms:.2f}ms", err=True)
+
+    return res

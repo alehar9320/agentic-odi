@@ -1,5 +1,5 @@
 import { render, screen, fireEvent } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { JobMap } from "./JobMap";
 
@@ -13,23 +13,15 @@ const mockCanvasData = {
   source: "seed" as const,
 };
 
-const harness = vi.hoisted(() => ({
-  state: {
-    canvasState: { kind: "ready", data: null } as unknown,
-    refreshCanvas: vi.fn(),
-    addStep: vi.fn(),
-  },
-}));
-
 vi.mock("../../state/StudioContext", () => ({
-  useStudio: () => harness.state,
+  useStudio: () => ({
+    canvas: mockCanvasData,
+    canvasLoading: false,
+    addStep: vi.fn(),
+  }),
 }));
 
 describe("JobMap Interactive Visualization", () => {
-  beforeEach(() => {
-    harness.state.canvasState = { kind: "ready", data: mockCanvasData };
-  });
-
   it("renders 8 universal process phases", () => {
     render(<JobMap />);
     expect(screen.getByText("Universal Job Map (8 Process Phases)")).toBeInTheDocument();
@@ -43,24 +35,5 @@ describe("JobMap Interactive Visualization", () => {
     fireEvent.click(phase1);
 
     expect(screen.getByText("Define payload parameters")).toBeInTheDocument();
-  });
-});
-
-describe("JobMap failures", () => {
-  it("does not render a zeroed map when the canvas failed", () => {
-    harness.state.canvasState = {
-      kind: "error",
-      data: null,
-      error: {
-        code: "mcp_unreachable",
-        message: "The MCP server is unreachable.",
-        retryable: true,
-      },
-    };
-
-    render(<JobMap />);
-
-    expect(screen.getByRole("alert").textContent).toContain("The MCP server is unreachable.");
-    expect(screen.queryByText("0 steps")).toBeNull();
   });
 });

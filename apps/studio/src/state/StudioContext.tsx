@@ -15,7 +15,6 @@ import {
   addObservation as apiAddObservation,
   addOutcome as apiAddOutcome,
   addStep as apiAddStep,
-  asStudioError,
   clearMemory as apiClearMemory,
   createConversation as apiCreateConversation,
   createJob as apiCreateJob,
@@ -46,7 +45,6 @@ import type {
   AddOutcomePayload,
   AddStepPayload,
   CanvasData,
-  CanvasState,
   ChatMessage,
   ChatPart,
   ConnectorListItem,
@@ -54,32 +52,11 @@ import type {
   Observation,
   StudioBrief,
   StudioConfig,
-  StudioError,
   StudioNotification,
   WorkspacePanelId,
 } from "../types";
 import { catalogManifest } from "../ui/catalog";
 import { parseUiSpec } from "../ui/protocol";
-
-/** Read the failure the sidecar reported on an SSE `error` event. */
-function readStudioError(raw: unknown): StudioError {
-  if (raw && typeof raw === "object" && "code" in raw) {
-    const error = raw as Partial<StudioError>;
-    return {
-      code: String(error.code ?? "internal"),
-      message: String(error.message ?? "The assistant could not finish this turn."),
-      detail: error.detail ?? null,
-      suggestion: error.suggestion ?? null,
-      retryable: Boolean(error.retryable),
-      request_id: error.request_id ?? null,
-    };
-  }
-  return {
-    code: "internal",
-    message: "The assistant could not finish this turn.",
-    retryable: true,
-  };
-}
 
 const SETTINGS_KEY = "studio.settings";
 const CANVAS_KEY = "studio.canvas";
@@ -87,9 +64,6 @@ const DISPLAY_NAME_KEY = "studio.displayName";
 const BRIEF_KEY = "studio.brief";
 const SETUP_DISMISSED_KEY = "studio.setupDismissed";
 const NOTIFICATIONS_KEY = "studio.notifications";
-
-/** How often the studio re-probes the model and the MCP server. */
-const HEALTH_POLL_INTERVAL_MS = 30_000;
 
 export const EMPTY_CONFIG: StudioConfig = {
   base_url: "http://localhost:8001/v1",
@@ -168,10 +142,6 @@ export interface StudioContextValue {
   canvas: CanvasData | null;
   canvasLoading: boolean;
   canvasCached: boolean;
-  /** What the canvas is: loading, ready, empty, or failed. */
-  canvasState: CanvasState;
-  /** The failure behind `canvasState.kind === "error"`, if any. */
-  canvasError: StudioError | null;
   refreshCanvas: () => Promise<void>;
   llmHealth: { healthy: boolean | null; message: string };
   mcpReachable: boolean;
@@ -220,10 +190,6 @@ export interface StudioContextValue {
   dismissToast: (id: number) => void;
   connectors: ConnectorListItem[];
   presets: ConnectorPreset[];
-  /** The failure behind an unreachable connector catalog, if any. */
-  presetError: StudioError | null;
-  /** The failure behind an unreachable connector list, if any. */
-  connectorsError: StudioError | null;
   refreshConnectors: () => Promise<void>;
   refreshPresets: () => Promise<void>;
   addConnector: (payload: AddConnectorPayload) => Promise<void>;
@@ -322,10 +288,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     () => loadBrief() === null && !loadSetupDismissed(),
   );
   const [offlineReply, setOfflineReply] = useState(false);
-  const [canvasState, setCanvasState] = useState<CanvasState>(() => {
-    const cached = loadCanvasCache();
-    return cached ? { kind: "loading", data: cached } : { kind: "loading", data: null };
-  });
+  const [canvas, setCanvas] = useState<CanvasData | null>(loadCanvasCache);
+  const [canvasLoading, setCanvasLoading] = useState(false);
   const [canvasCached, setCanvasCached] = useState(() => loadCanvasCache() !== null);
   const [llmHealth, setLlmHealth] = useState<{ healthy: boolean | null; message: string }>({
     healthy: null,
@@ -344,8 +308,6 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [connectors, setConnectors] = useState<ConnectorListItem[]>([]);
   const [presets, setPresets] = useState<ConnectorPreset[]>([]);
-  const [presetError, setPresetError] = useState<StudioError | null>(null);
-  const [connectorsError, setConnectorsError] = useState<StudioError | null>(null);
   const [connectorSuggestions, setConnectorSuggestions] = useState<string[]>([]);
   const [notifications, setNotifications] = useState<StudioNotification[]>(loadNotifications);
   const toastId = useRef(0);
@@ -416,24 +378,17 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const refreshConnectors = useCallback(async () => {
-    setConnectorsError(null);
     try {
       setConnectors(await fetchConnectors());
-    } catch (error) {
-      // A list that could not be fetched is not an empty list.
-      setConnectorsError(asStudioError(error));
+    } catch {
       setConnectors([]);
     }
   }, []);
 
   const refreshPresets = useCallback(async () => {
-    setPresetError(null);
     try {
       setPresets(await fetchConnectorCatalog());
-    } catch (error) {
-      // An unreachable catalog is a failure, not an empty catalog: the settings
-      // panel says so instead of offering a select with nothing in it.
-      setPresetError(asStudioError(error));
+    } catch {
       setPresets([]);
     }
   }, []);
@@ -582,11 +537,10 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   );
 
   const refreshCanvas = useCallback(async () => {
-    setCanvasState((prev) => ({ kind: "loading", data: prev.data }));
+    setCanvasLoading(true);
     try {
       const data = await fetchCanvas(settings.mcp_url);
-      const isEmpty = !data.jobs.length && !data.steps.length && !data.outcomes.length;
-      setCanvasState({ kind: isEmpty ? "empty" : "ready", data });
+      setCanvas(data);
       setCanvasCached(false);
       try {
         localStorage.setItem(CANVAS_KEY, JSON.stringify(data));
@@ -594,12 +548,11 @@ export function StudioProvider({ children }: { children: ReactNode }) {
         /* storage unavailable */
       }
     } catch (error) {
-      // A failed canvas is a failure, not an empty canvas: the studio shows
-      // what went wrong instead of a zeroed-out board.
-      const problem = asStudioError(error);
-      setCanvasState((prev) => ({ kind: "error", error: problem, data: prev.data }));
+      pushToast("error", `Canvas sync failed: ${(error as Error).message}`);
+    } finally {
+      setCanvasLoading(false);
     }
-  }, [settings.mcp_url]);
+  }, [settings.mcp_url, pushToast]);
 
   const addStep = useCallback(
     async (payload: Omit<AddStepPayload, "mcp_url">) => {
@@ -616,21 +569,31 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 
   const addOutcome = useCallback(
     async (payload: Omit<AddOutcomePayload, "mcp_url">) => {
-      // The form that asked for this shows the failure where the user typed
-      // it, so the error travels up instead of disappearing into a toast.
-      await apiAddOutcome({ ...payload, mcp_url: settings.mcp_url });
-      pushToast("success", "Outcome captured successfully!");
-      await refreshCanvas();
+      try {
+        await apiAddOutcome({ ...payload, mcp_url: settings.mcp_url });
+        pushToast("success", "Outcome captured successfully!");
+        await refreshCanvas();
+      } catch (error) {
+        pushToast("error", `Error capturing outcome: ${(error as Error).message}`);
+      }
     },
     [settings.mcp_url, pushToast, refreshCanvas],
   );
 
   const createJob = useCallback(
     async (payload: { name: string; description?: string }): Promise<string | null> => {
-      const job = await apiCreateJob({ ...payload, mcp_url: settings.mcp_url });
-      pushToast("success", `Job created: ${payload.name}`);
-      await refreshCanvas();
-      return job.id ?? null;
+      try {
+        const response = await apiCreateJob({ ...payload, mcp_url: settings.mcp_url });
+        pushToast("success", `Job created: ${payload.name}`);
+        await refreshCanvas();
+        if (response.result && typeof response.result === "object") {
+          return response.result.id ?? null;
+        }
+        return null;
+      } catch (error) {
+        pushToast("error", `Could not create the job: ${(error as Error).message}`);
+        return null;
+      }
     },
     [settings.mcp_url, pushToast, refreshCanvas],
   );
@@ -740,7 +703,6 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       }
 
       const history: ChatMessage[] = [...messages, { role: "user", content: trimmed }];
-      const assistantIndex = history.length;
       setMessages([...history, { role: "assistant", content: "", parts: [] }]);
       setStreaming(true);
       setThinkingPhase("health_check");
@@ -752,9 +714,6 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 
       let content = "";
       let parts: ChatPart[] = [];
-      let failure: StudioError | null = null;
-      let terminal = false;
-      let stopped = false;
 
       // Prose is appended to the open text part; a surface opens a new one, so
       // the transcript keeps the agent's order instead of gathering all prose
@@ -774,12 +733,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       const publish = () => {
         setMessages((prev) => {
           const next = [...prev];
-          next[assistantIndex] = {
-            role: "assistant",
-            content,
-            parts: [...parts],
-            ...(failure ? { error: failure, retryText: trimmed } : {}),
-          };
+          next[next.length - 1] = { role: "assistant", content, parts: [...parts] };
           return next;
         });
       };
@@ -823,7 +777,6 @@ export function StudioProvider({ children }: { children: ReactNode }) {
             ]);
             break;
           case "message": {
-            terminal = true;
             content = String(event.data.content ?? content);
             const hasSurfaces = parts.some((part) => part.kind === "ui");
             if (!hasSurfaces) {
@@ -853,31 +806,18 @@ export function StudioProvider({ children }: { children: ReactNode }) {
           case "canvas_dirty":
             void refreshCanvas();
             break;
-          case "connector": {
-            if (String(event.data.status ?? "") === "error") {
-              const reason = String(event.data.error ?? "The connector could not be added.");
-              setMessages((prev) => [
-                ...prev,
-                { role: "notice", content: `Connector failed: ${reason}` },
-              ]);
-            } else {
-              setConnectorSuggestions((prev) => {
-                const id = String(event.data?.preset ?? event.data?.name ?? "");
-                if (!id || prev.includes(id)) {
-                  return prev;
-                }
-                return [...prev, id];
-              });
-            }
-            void refreshConnectors();
+          case "connector":
+            setConnectorSuggestions((prev) => {
+              const id = String(event.data?.preset ?? event.data?.name ?? "");
+              if (!id || prev.includes(id)) {
+                return prev;
+              }
+              return [...prev, id];
+            });
             break;
-          }
-          case "error": {
-            terminal = true;
-            failure = readStudioError(event.data.error);
-            publish();
+          case "error":
+            pushToast("error", String(event.data.message ?? "Unknown chat error"));
             break;
-          }
           default:
             break;
         }
@@ -900,48 +840,25 @@ export function StudioProvider({ children }: { children: ReactNode }) {
         );
       } catch (error) {
         const aborted = (error as Error).name === "AbortError";
-        if (aborted) {
-          // An abort is the user's own doing: drop the empty placeholder, keep
-          // the question, and report no failure — the assistant did not break.
-          stopped = true;
+        if (!aborted) {
+          pushToast("error", `Error during assistant completion: ${(error as Error).message}`);
+        }
+        if (!content) {
           setMessages((prev) => {
             const next = [...prev];
-            if (next.length && next[next.length - 1].role === "assistant" && !next[next.length - 1].content) {
+            if (next.length && next[next.length - 1].content === "") {
               next.pop();
             }
             return next;
           });
-        } else {
-          terminal = true;
-          failure = asStudioError(error);
-          publish();
         }
       } finally {
-        if (!terminal && !failure && !stopped) {
-          // The stream ended without a message or an error: something failed
-          // silently, and the user must still be told.
-          failure = {
-            code: "internal",
-            message: "The assistant stopped before answering.",
-            suggestion: "Try again — your question is still here.",
-            retryable: true,
-          };
-          publish();
-        }
         setStreaming(false);
         setThinkingPhase(null);
         abortRef.current = null;
       }
     },
-    [
-      messages,
-      streaming,
-      settings,
-      brief,
-      conversationId,
-      refreshCanvas,
-      refreshConnectors,
-    ],
+    [messages, streaming, settings, brief, conversationId, refreshCanvas, pushToast],
   );
 
   /** The single conversational exit from any lens. */
@@ -1105,30 +1022,6 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Health polling: the studio must notice that the model or the MCP server
-  // came back without a reload, so the bar leaves "Local mode" on its own.
-  useEffect(() => {
-    const poll = () => {
-      if (document.visibilityState === "visible") {
-        void checkConnections();
-      }
-    };
-
-    const timer = window.setInterval(poll, HEALTH_POLL_INTERVAL_MS);
-    document.addEventListener("visibilitychange", poll);
-
-    return () => {
-      window.clearInterval(timer);
-      document.removeEventListener("visibilitychange", poll);
-    };
-  }, [checkConnections]);
-
-  // The canvas is one state, not four booleans: an empty board and a failed
-  // board must never look the same.
-  const canvas = canvasState.data;
-  const canvasLoading = canvasState.kind === "loading";
-  const canvasError = canvasState.kind === "error" ? canvasState.error : null;
-
   const value = useMemo<StudioContextValue>(
     () => ({
       settings,
@@ -1143,8 +1036,6 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       canvas,
       canvasLoading,
       canvasCached,
-      canvasState,
-      canvasError,
       refreshCanvas,
       llmHealth,
       mcpReachable,
@@ -1184,9 +1075,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       pushToast,
       dismissToast,
       connectors,
-      connectorsError,
       presets,
-      presetError,
       refreshConnectors,
       refreshPresets,
       addConnector,
@@ -1214,8 +1103,6 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       canvas,
       canvasLoading,
       canvasCached,
-      canvasState,
-      canvasError,
       refreshCanvas,
       llmHealth,
       mcpReachable,
@@ -1255,9 +1142,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       pushToast,
       dismissToast,
       connectors,
-      connectorsError,
       presets,
-      presetError,
       refreshConnectors,
       refreshPresets,
       addConnector,

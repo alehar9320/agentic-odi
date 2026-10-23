@@ -38,13 +38,6 @@ vi.mock("./api/studioApi", () => ({
   updateOutcome: vi.fn(async () => ({ ok: true })),
   deleteOutcome: vi.fn(async () => ({ ok: true })),
   fetchMemory: vi.fn(async () => []),
-  fetchConnectorCatalog: vi.fn(async () => []),
-  fetchConnectors: vi.fn(async () => []),
-  asStudioError: (error: unknown) => ({
-    code: "internal",
-    message: error instanceof Error ? error.message : "Something went wrong.",
-    retryable: false,
-  }),
   fetchLatestConversation: vi.fn(async () => ({ conversation: null, turns: [] })),
   createConversation: vi.fn(async () => ({
     id: "c-new",

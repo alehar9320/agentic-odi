@@ -7,6 +7,7 @@ owns the former; ``customer-outcomes`` owns the latter.
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 import typer
@@ -108,3 +109,31 @@ def delete(
             noun="outcome",
         )
     )
+
+
+@desired_outcomes_app.command("evaluate")
+def evaluate(
+    statement: str = typer.Argument(..., help="Outcome statement to validate"),
+    job_id: str | None = typer.Option(None, help="Optional Job ID to check existing outcomes"),
+    json_output: bool = JSON_OPTION,
+) -> None:
+    """Evaluate an outcome statement against canonical ODI guidelines."""
+    args: dict[str, Any] = {"statement": statement}
+    if job_id is not None:
+        args["job_id"] = job_id
+    res = run_tool("evaluate_outcome", args)
+    if json_output:
+        typer.echo(json.dumps(res, indent=2))
+        return
+
+    is_valid = res.get("valid", False)
+    verdict = "VALID" if is_valid else "INVALID"
+    typer.secho(f"Verdict: {verdict}", fg="green" if is_valid else "red", bold=True)
+    if res.get("issues"):
+        typer.echo("\nIssues:")
+        for issue in res["issues"]:
+            typer.echo(f"  - {issue}")
+    if res.get("suggestions"):
+        typer.echo("\nSuggestions:")
+        for sugg in res["suggestions"]:
+            typer.echo(f"  - {sugg}")
