@@ -3,7 +3,7 @@
   "checkpoint_id": "01M5NC77W79MS2KKPRAAEYSBW2",
   "strategy": "manual-commit",
   "branch": "slay/5eb90cc2-capabilities",
-  "checkpoints_count": 3,
+  "checkpoints_count": 4,
   "files_touched": [
     "apps/studio-api/src/agentic_odi_studio_api/app.py"
   ],
@@ -28,13 +28,20 @@
       "compact_transcript": "/2/transcript.jsonl",
       "content_hash": "/2/content_hash.txt",
       "prompt": "/2/prompt.txt"
+    },
+    {
+      "metadata": "/3/metadata.json",
+      "transcript": "/3/full.jsonl",
+      "compact_transcript": "/3/transcript.jsonl",
+      "content_hash": "/3/content_hash.txt",
+      "prompt": "/3/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 1065752,
+    "input_tokens": 1230736,
     "cache_creation_tokens": 0,
-    "cache_read_tokens": 33009968,
-    "output_tokens": 61804,
-    "api_call_count": 191
+    "cache_read_tokens": 35063728,
+    "output_tokens": 72530,
+    "api_call_count": 204
   }
 }
