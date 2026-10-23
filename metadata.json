@@ -1,0 +1,27 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M5N7T69XD46MM44X1CZHPVTB",
+  "strategy": "manual-commit",
+  "branch": "slay/fa2cb3d9-sqlite-close",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "packages/core/src/agentic_odi_core/sqlite_repository.py",
+    "packages/core/tests/test_sqlite_repository.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/0/metadata.json",
+      "transcript": "/0/full.jsonl",
+      "compact_transcript": "/0/transcript.jsonl",
+      "content_hash": "/0/content_hash.txt",
+      "prompt": ""
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 0,
+    "output_tokens": 0,
+    "api_call_count": 0
+  }
+}
