@@ -40,9 +40,7 @@ def test_flags_get_set_reset_flow(tmp_path, monkeypatch) -> None:
     assert "enabled" in res_set.output
 
     # Get updated state
-    res_get_updated = runner.invoke(
-        app, ["settings", "flags", "get", "developer_mode", "--json"]
-    )
+    res_get_updated = runner.invoke(app, ["settings", "flags", "get", "developer_mode", "--json"])
     assert res_get_updated.exit_code == 0
     data = json.loads(res_get_updated.output)
     assert data["enabled"] is True
@@ -51,9 +49,7 @@ def test_flags_get_set_reset_flow(tmp_path, monkeypatch) -> None:
     res_reset = runner.invoke(app, ["settings", "flags", "reset", "developer_mode"])
     assert res_reset.exit_code == 0
 
-    res_get_reset = runner.invoke(
-        app, ["settings", "flags", "get", "developer_mode", "--json"]
-    )
+    res_get_reset = runner.invoke(app, ["settings", "flags", "get", "developer_mode", "--json"])
     assert res_get_reset.exit_code == 0
     data_reset = json.loads(res_get_reset.output)
     assert data_reset["enabled"] is False

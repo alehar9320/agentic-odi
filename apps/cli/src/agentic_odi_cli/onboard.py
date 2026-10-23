@@ -159,8 +159,7 @@ def _extract_signals(html: str, url: str) -> PageSignals:
     domain = parsed.hostname or "localhost"
 
     headings = [
-        h.group(1).strip()
-        for h in re.finditer(r"<h[12][^>]*>([^<]*)</h[12]>", html, re.IGNORECASE)
+        h.group(1).strip() for h in re.finditer(r"<h[12][^>]*>([^<]*)</h[12]>", html, re.IGNORECASE)
     ]
 
     text = (title + " " + meta_description + " " + " ".join(headings)).lower()

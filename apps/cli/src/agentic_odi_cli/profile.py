@@ -233,7 +233,9 @@ def save_llm_profile(p: LLMProfile) -> Path:
 
 
 @app.command("show")
-def show_profile(as_json: bool = typer.Option(False, "--json", help="Format output as JSON")) -> None:
+def show_profile(
+    as_json: bool = typer.Option(False, "--json", help="Format output as JSON"),
+) -> None:
     """Show current product baseline profile."""
     b = load_baseline()
     if b is None:
