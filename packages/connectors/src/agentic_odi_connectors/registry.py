@@ -57,14 +57,6 @@ class ConnectorRegistry:
                 return config
         raise ConnectorNotFoundError(name)
 
-    def delete(self, name: str) -> bool:
-        connectors = self._load()
-        kept = [config for config in connectors if config.name != name]
-        if len(kept) == len(connectors):
-            raise ConnectorNotFoundError(name)
-        self._save(kept)
-        return True
-
     def _load(self) -> list[ConnectorConfig]:
         if not self.path.exists():
             return []

@@ -1,23 +1,6 @@
-"""Agentic ODI Core package.
-
-The error hierarchy lives in :mod:`agentic_odi_core.errors`. Every member is
-re-exported here except :class:`~agentic_odi_core.errors.ValidationError`,
-which is intentionally left off the package root so that
-``from agentic_odi_core import ValidationError`` can never be confused with
-Pydantic's identically named class. Import it from
-``agentic_odi_core.errors`` instead.
-"""
+"""Agentic ODI Core package."""
 
 from agentic_odi_core.contract import TOOL_NAMES, TOOL_SPECS, ToolName, ToolSpec
-from agentic_odi_core.errors import (
-    ConflictError,
-    NotFoundError,
-    OdiError,
-    RateLimitError,
-    SerializationError,
-    StoreError,
-    error_status,
-)
 from agentic_odi_core.evaluation import evaluate_outcome_statement
 from agentic_odi_core.factory import build_repository
 from agentic_odi_core.messages import (
@@ -44,13 +27,8 @@ from agentic_odi_core.models import (
     ValueMetric,
     compute_opportunity_score,
 )
-from agentic_odi_core.remote import (
-    StudioError,
-    StudioErrorCode,
-    parse_tool_result,
-    tool_result_text,
-)
 from agentic_odi_core.repository import InMemoryRepository, Repository
+from agentic_odi_core.router import ModelRouter, ModelTier, OnDeviceLLMEngine, RoutingMode
 from agentic_odi_core.schema import odi_schema
 from agentic_odi_core.services import (
     CustomerOutcomeNotFoundError,
@@ -61,12 +39,15 @@ from agentic_odi_core.services import (
     StepNotFoundError,
     ValueOutOfRangeError,
 )
+from agentic_odi_core.steve_jobs import (
+    format_opportunity_score_insight,
+    generate_steve_jobs_response,
+)
 
 __all__ = [
     "BusinessImpactCategory",
     "BusinessValue",
     "CAPABILITIES",
-    "ConflictError",
     "CustomerOutcome",
     "CustomerOutcomeNotFoundError",
     "CustomerValue",
@@ -76,20 +57,13 @@ __all__ = [
     "EvidenceNotFoundError",
     "Job",
     "JobNotFoundError",
-    "NotFoundError",
     "ODIService",
     "ODI_ASSISTANT_PROMPT",
     "ODI_FRAMEWORK_GUIDELINES",
-    "OdiError",
     "Outcome",
     "OutcomeNotFoundError",
-    "RateLimitError",
-    "SerializationError",
     "Step",
     "StepNotFoundError",
-    "StoreError",
-    "StudioError",
-    "StudioErrorCode",
     "ValueMetric",
     "ValueOutOfRangeError",
     "InMemoryRepository",
@@ -101,13 +75,16 @@ __all__ = [
     "build_repository",
     "compute_opportunity_score",
     "customer_outcome_not_found",
-    "error_status",
     "evaluate_outcome_statement",
     "evidence_not_found",
     "job_not_found",
     "odi_schema",
     "outcome_not_found",
-    "parse_tool_result",
     "step_not_found",
-    "tool_result_text",
+    "ModelRouter",
+    "ModelTier",
+    "OnDeviceLLMEngine",
+    "RoutingMode",
+    "format_opportunity_score_insight",
+    "generate_steve_jobs_response",
 ]

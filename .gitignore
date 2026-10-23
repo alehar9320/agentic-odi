@@ -169,9 +169,6 @@ cython_debug/
 
 # Local development and agent harness state
 .worktrees/
-
-# GitHub Pages build output (see .github/workflows/pages.yml)
-_site/
 .opencode/plans/
 .opencode/node_modules/
 .pi/git/
@@ -179,11 +176,3 @@ _site/
 .entire/tmp/
 .freebuff/
 .qodo/
-node_modules/
-
-# The GitHub Pages site is generated but committed, so a reviewer can read the
-# rendered HTML in a pull request. The root `dist/` pattern would swallow it.
-!website/dist/
-
-# The Pages artifact is built in CI and never committed.
-_site/
