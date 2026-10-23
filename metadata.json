@@ -3,7 +3,7 @@
   "checkpoint_id": "01M5N4YX0JT6ZB59KZCEBQ0H8H",
   "strategy": "manual-commit",
   "branch": "slay/ee6050b2-table-keyboard",
-  "checkpoints_count": 5,
+  "checkpoints_count": 6,
   "files_touched": [
     "apps/studio/src/components/canvas/OpportunityLandscape.test.tsx",
     "apps/studio/src/components/canvas/OpportunityLandscape.tsx"
@@ -35,6 +35,13 @@
       "transcript": "/3/full.jsonl",
       "compact_transcript": "/3/transcript.jsonl",
       "content_hash": "/3/content_hash.txt",
+      "prompt": ""
+    },
+    {
+      "metadata": "/4/metadata.json",
+      "transcript": "/4/full.jsonl",
+      "compact_transcript": "/4/transcript.jsonl",
+      "content_hash": "/4/content_hash.txt",
       "prompt": ""
     }
   ],
