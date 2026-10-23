@@ -41,6 +41,12 @@ vi.mock("../../state/StudioContext", () => ({
   useStudio: () => harness.state,
 }));
 
+// Hero offers the tour when it is enabled; the provider itself is exercised by
+// FirstRunWizard.test.tsx, so here it only has to answer with "disabled".
+vi.mock("../../onboarding/context", () => ({
+  useOnboarding: () => ({ enabled: false, openTour: vi.fn() }),
+}));
+
 const FAILED_TURN: ChatMessage[] = [
   { id: "m-1", parentId: null, role: "user", content: "list the jobs" },
   {
