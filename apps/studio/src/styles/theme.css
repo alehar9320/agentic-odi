@@ -940,6 +940,16 @@ a {
   color: var(--muted);
 }
 
+.field__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.field__row .input {
+  flex: 1;
+}
+
 .field__hint {
   margin: 0;
   color: var(--faint);
