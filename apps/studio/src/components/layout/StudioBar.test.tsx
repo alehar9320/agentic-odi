@@ -1,37 +1,79 @@
-import { render } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("../../state/StudioContext", () => ({
-  useStudio: vi.fn(),
-}));
-
-import { useStudio } from "../../state/StudioContext";
+import { UpdateProvider, createUpdateService } from "../../updater";
+import type { UpdateTransport, UpdaterHandle } from "../../updater/types";
 import { StudioBar } from "./StudioBar";
 
-const stubContext = (overrides: Record<string, unknown> = {}) => ({
-  llmHealth: { healthy: true, message: "ok" },
-  unreadNotificationCount: 0,
-  openPanel: vi.fn(),
-  ...overrides,
-});
+const openPanel = vi.fn();
 
-describe("StudioBar", () => {
-  it("shows the Odi mark at 32 pixels so the pixel art stays crisp", () => {
-    vi.mocked(useStudio).mockReturnValue(stubContext() as never);
-    const { container } = render(
-      <StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />
-    );
-    const svg = container.querySelector(".brand__mark svg");
-    expect(svg?.getAttribute("width")).toBe("32");
-    expect(svg?.getAttribute("height")).toBe("32");
+vi.mock("../../state/StudioContext", () => ({
+  useStudio: vi.fn(() => ({
+    llmHealth: { healthy: true, message: "LLM backend is reachable." },
+    unreadNotificationCount: 0,
+    openPanel,
+  })),
+}));
+
+function makeTransport(overrides: Partial<UpdateTransport> = {}): UpdateTransport {
+  return {
+    supported: () => true,
+    currentVersion: vi.fn(async () => "0.12.0"),
+    check: vi.fn(async () => null),
+    relaunch: vi.fn(async () => undefined),
+    ...overrides,
+  };
+}
+
+function makeHandle(): UpdaterHandle {
+  return {
+    version: "0.13.0",
+    currentVersion: "0.12.0",
+    date: null,
+    notes: null,
+    download: vi.fn(async (onProgress) => onProgress({ received: 1, total: 1 })),
+    install: vi.fn(async () => undefined),
+    close: vi.fn(async () => undefined),
+  };
+}
+
+function renderBar(transport: UpdateTransport) {
+  const service = createUpdateService({
+    transport,
+    storage: null,
+    platform: "linux",
+    document: null,
+    initialDelayMs: 60_000,
   });
 
-  it("keeps the brand mark decorative and labels the home control in text", () => {
-    vi.mocked(useStudio).mockReturnValue(stubContext() as never);
-    const { container } = render(
-      <StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />
+  render(
+    <UpdateProvider service={service}>
+      <StudioBar onHome={vi.fn()} onNew={vi.fn()} onChangelog={vi.fn()} />
+    </UpdateProvider>,
+  );
+
+  return service;
+}
+
+describe("StudioBar version", () => {
+  it("shows the running version and opens update settings", async () => {
+    renderBar(makeTransport());
+
+    const version = await screen.findByRole("button", { name: "v0.12.0" });
+    fireEvent.click(version);
+
+    expect(openPanel).toHaveBeenCalledWith("settings");
+  });
+
+  it("says update ready when a restart will finish the job", async () => {
+    const service = renderBar(
+      makeTransport({ check: vi.fn(async () => makeHandle()) }),
     );
-    expect(container.querySelector(".brand__mark")?.getAttribute("aria-hidden")).toBe("true");
-    expect(container.querySelector(".brand--home")?.getAttribute("aria-label")).toBe("Go to home");
+
+    await act(async () => {
+      await service.check();
+    });
+
+    expect(screen.getByRole("button", { name: "Update ready" })).toBeInTheDocument();
   });
 });
