@@ -3,7 +3,7 @@
   "checkpoint_id": "01M5N60S1QZH55RYCHFCKSC497",
   "strategy": "manual-commit",
   "branch": "slay/77b8603f-landscape-loading-controls",
-  "checkpoints_count": 3,
+  "checkpoints_count": 5,
   "files_touched": [
     "apps/studio/src/components/canvas/OpportunityLandscape.test.tsx",
     "apps/studio/src/components/canvas/OpportunityLandscape.tsx"
@@ -28,6 +28,13 @@
       "transcript": "/2/full.jsonl",
       "compact_transcript": "/2/transcript.jsonl",
       "content_hash": "/2/content_hash.txt",
+      "prompt": ""
+    },
+    {
+      "metadata": "/3/metadata.json",
+      "transcript": "/3/full.jsonl",
+      "compact_transcript": "/3/transcript.jsonl",
+      "content_hash": "/3/content_hash.txt",
       "prompt": ""
     }
   ],
