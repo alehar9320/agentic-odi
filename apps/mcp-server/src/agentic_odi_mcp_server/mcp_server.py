@@ -1,6 +1,8 @@
 """Agentic ODI MCP Server (FastMCP)."""
 
+import argparse
 import json
+import os
 from typing import Any
 
 from agentic_odi_core import (
@@ -482,8 +484,32 @@ def get_odi_schema() -> str:
     return json.dumps(odi_schema())
 
 
-def main() -> None:
-    mcp.run(transport="http", port=8000)
+DEFAULT_PORT = 8000
+
+
+def resolve_port(cli_port: int | None = None) -> int:
+    """Return the HTTP port for the server: flag, then env var, then default."""
+    if cli_port is not None:
+        return cli_port
+    raw = os.environ.get("AGENTIC_ODI_MCP_PORT")
+    if raw is None or not raw.strip():
+        return DEFAULT_PORT
+    try:
+        return int(raw)
+    except ValueError as exc:
+        raise ValueError(f"AGENTIC_ODI_MCP_PORT must be an integer, got {raw!r}") from exc
+
+
+def main(argv: list[str] | None = None) -> None:
+    parser = argparse.ArgumentParser(description="Run the Agentic ODI MCP server over HTTP.")
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=None,
+        help=f"Port to listen on (default: $AGENTIC_ODI_MCP_PORT or {DEFAULT_PORT}).",
+    )
+    args = parser.parse_args(argv)
+    mcp.run(transport="http", port=resolve_port(args.port))
 
 
 if __name__ == "__main__":

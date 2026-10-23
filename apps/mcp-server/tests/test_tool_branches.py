@@ -183,6 +183,15 @@ def test_main_runs_the_http_transport(monkeypatch) -> None:
     calls: list[dict] = []
     monkeypatch.setattr(mcp, "run", lambda **kwargs: calls.append(kwargs))
 
-    server.main()
+    server.main([])
 
     assert calls == [{"transport": "http", "port": 8000}]
+
+
+def test_main_passes_an_explicit_port_through(monkeypatch) -> None:
+    calls: list[dict] = []
+    monkeypatch.setattr(mcp, "run", lambda **kwargs: calls.append(kwargs))
+
+    server.main(["--port", "8010"])
+
+    assert calls == [{"transport": "http", "port": 8010}]
