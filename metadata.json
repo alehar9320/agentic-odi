@@ -3,7 +3,7 @@
   "checkpoint_id": "01M5NBKS3AHB4R4JBN3NEDWZTT",
   "strategy": "manual-commit",
   "branch": "slay/b9415b2b-catchup-css",
-  "checkpoints_count": 3,
+  "checkpoints_count": 5,
   "files_touched": [
     "apps/studio/src/components/notifications/CatchUpFeed.tsx",
     "apps/studio/src/styles/theme.css"
@@ -28,6 +28,13 @@
       "transcript": "/2/full.jsonl",
       "compact_transcript": "/2/transcript.jsonl",
       "content_hash": "/2/content_hash.txt",
+      "prompt": ""
+    },
+    {
+      "metadata": "/3/metadata.json",
+      "transcript": "/3/full.jsonl",
+      "compact_transcript": "/3/transcript.jsonl",
+      "content_hash": "/3/content_hash.txt",
       "prompt": ""
     }
   ],
