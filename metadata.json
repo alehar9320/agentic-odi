@@ -1,0 +1,27 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M5N4V1M4YF76P2GC5BQWZ8ZP",
+  "strategy": "manual-commit",
+  "branch": "slay/2ada83ec-escape-stop-streaming",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "apps/studio/src/App.test.tsx",
+    "apps/studio/src/App.tsx"
+  ],
+  "sessions": [
+    {
+      "metadata": "/0/metadata.json",
+      "transcript": "/0/full.jsonl",
+      "compact_transcript": "/0/transcript.jsonl",
+      "content_hash": "/0/content_hash.txt",
+      "prompt": ""
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 0,
+    "output_tokens": 0,
+    "api_call_count": 0
+  }
+}
