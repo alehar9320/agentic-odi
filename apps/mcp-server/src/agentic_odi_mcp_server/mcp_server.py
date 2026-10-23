@@ -464,7 +464,7 @@ def evaluate_outcome(statement: str, job_id: str | None = None) -> str:
     result = evaluate_outcome_statement(statement)
     if job_id is not None:
         if service.get_job(job_id) is None:
-            return json.dumps({**result, "job_id": job_id, "error": job_not_found(job_id)})
+            return job_not_found(job_id)
         result["job_id"] = job_id
         result["existing_outcomes"] = [
             {
