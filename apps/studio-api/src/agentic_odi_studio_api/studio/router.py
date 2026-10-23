@@ -12,6 +12,7 @@ from agentic_odi_connectors.registry import (
     DuplicateConnectorError,
 )
 from agentic_odi_core import (
+    EvidenceNotFoundError,
     JobNotFoundError,
     OdiError,
     ODIService,
@@ -38,6 +39,8 @@ from agentic_odi_studio_api.studio.memory import ObservationNotFoundError, Studi
 from agentic_odi_studio_api.studio.probes import check_llm_health, defaults, is_endpoint_reachable
 from agentic_odi_studio_api.studio.schemas import (
     AddConnectorRequest,
+    AddCustomerOutcomeRequest,
+    AddEvidenceRequest,
     AddOutcomeRequest,
     AddStepRequest,
     ChatRequest,
@@ -52,6 +55,7 @@ from agentic_odi_studio_api.studio.schemas import (
     ObservationListResponse,
     ObservationResponse,
     ObservationUpdateRequest,
+    UpdateCustomerOutcomeRequest,
     UpdateJobRequest,
     UpdateOutcomeRequest,
     UpdateStepRequest,
@@ -79,6 +83,14 @@ def _require_mcp_url(mcp_url: str) -> str:
             status_code=400,
         )
     return mcp_url
+
+
+def _json_or_raw(value: str) -> Any:
+    """MCP answers in text; a JSON payload is returned as the object it encodes."""
+    try:
+        return json.loads(value)
+    except (TypeError, ValueError):
+        return value
 
 
 def _as_http_error(exc: Exception) -> StudioHTTPError:
@@ -344,6 +356,194 @@ async def delete_outcome(
     except Exception as exc:  # noqa: BLE001
         raise _as_http_error(exc) from exc
     return {"deleted": outcome_id}
+
+
+def _customer_outcome_args(body: AddCustomerOutcomeRequest) -> dict[str, Any]:
+    return {
+        "job_id": body.job_id,
+        "customer_value": body.customer_value.model_dump(mode="json"),
+        "business_value": body.business_value.model_dump(mode="json"),
+        "step_id": body.step_id,
+    }
+
+
+@router.get("/customer-outcomes")
+async def get_customer_outcomes(
+    request: Request,
+    job_id: str | None = Query(None),
+    mcp_url: str | None = Query(None),
+) -> dict:
+    if _uses_mcp(request):
+        arguments: dict[str, Any] = {}
+        if job_id:
+            arguments["job_id"] = job_id
+        result = await call_mcp_tool(
+            _require_mcp_url(mcp_url or ""), ToolName.LIST_CUSTOMER_OUTCOMES.value, arguments
+        )
+        return {"ok": True, "result": _json_or_raw(result)}
+    outcomes = _service(request).list_customer_outcomes(job_id)
+    return {"ok": True, "result": [item.model_dump(mode="json") for item in outcomes]}
+
+
+@router.get("/customer-outcomes/{outcome_id}")
+async def get_customer_outcome(
+    outcome_id: str, request: Request, mcp_url: str | None = Query(None)
+) -> dict:
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(mcp_url or ""),
+            ToolName.GET_CUSTOMER_OUTCOME.value,
+            {"outcome_id": outcome_id},
+        )
+        return {"ok": True, "result": _json_or_raw(result)}
+    try:
+        outcome = _service(request).get_customer_outcome(outcome_id)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return {"ok": True, "result": outcome.model_dump(mode="json")}
+
+
+@router.post("/customer-outcomes")
+async def post_customer_outcome(body: AddCustomerOutcomeRequest, request: Request) -> dict:
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            body.mcp_url, ToolName.ADD_CUSTOMER_OUTCOME.value, _customer_outcome_args(body)
+        )
+        return {"ok": True, "result": _json_or_raw(result)}
+    try:
+        outcome = _service(request).add_customer_outcome(
+            job_id=body.job_id,
+            customer_value=body.customer_value,
+            business_value=body.business_value,
+            step_id=body.step_id,
+        )
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return {"ok": True, "result": outcome.model_dump(mode="json")}
+
+
+@router.patch("/customer-outcomes/{outcome_id}")
+async def patch_customer_outcome(
+    outcome_id: str, body: UpdateCustomerOutcomeRequest, request: Request
+) -> dict:
+    updates = body.model_dump(exclude_none=True, exclude={"mcp_url"})
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(body.mcp_url),
+            ToolName.UPDATE_CUSTOMER_OUTCOME.value,
+            {"outcome_id": outcome_id, **updates},
+        )
+        return {"ok": True, "result": _json_or_raw(result)}
+    try:
+        outcome = _service(request).update_customer_outcome(outcome_id, updates)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return {"ok": True, "result": outcome.model_dump(mode="json")}
+
+
+@router.delete("/customer-outcomes/{outcome_id}")
+async def delete_customer_outcome(
+    outcome_id: str, request: Request, mcp_url: str | None = Query(None)
+) -> dict:
+    if _uses_mcp(request):
+        await call_mcp_tool(
+            _require_mcp_url(mcp_url or ""),
+            ToolName.DELETE_CUSTOMER_OUTCOME.value,
+            {"outcome_id": outcome_id},
+        )
+        return {"ok": True}
+    try:
+        _service(request).delete_customer_outcome(outcome_id)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return {"ok": True}
+
+
+@router.get("/evidence")
+async def get_evidence_records(
+    request: Request,
+    job_id: str | None = Query(None),
+    step_id: str | None = Query(None),
+    outcome_id: str | None = Query(None),
+    mcp_url: str | None = Query(None),
+) -> dict:
+    if _uses_mcp(request):
+        arguments = {
+            key: value
+            for key, value in {
+                "job_id": job_id,
+                "step_id": step_id,
+                "outcome_id": outcome_id,
+            }.items()
+            if value
+        }
+        result = await call_mcp_tool(
+            _require_mcp_url(mcp_url or ""), ToolName.LIST_EVIDENCE.value, arguments
+        )
+        return {"ok": True, "result": _json_or_raw(result)}
+    records = _service(request).list_evidence(job_id=job_id, step_id=step_id, outcome_id=outcome_id)
+    return {"ok": True, "result": [record.model_dump(mode="json") for record in records]}
+
+
+@router.get("/evidence/{evidence_id}")
+async def get_evidence(
+    evidence_id: str, request: Request, mcp_url: str | None = Query(None)
+) -> dict:
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(mcp_url or ""),
+            ToolName.GET_EVIDENCE.value,
+            {"evidence_id": evidence_id},
+        )
+        return {"ok": True, "result": _json_or_raw(result)}
+    record = _service(request).get_evidence(evidence_id)
+    if record is None:
+        raise _as_http_error(EvidenceNotFoundError(evidence_id))
+    return {"ok": True, "result": record.model_dump(mode="json")}
+
+
+@router.post("/evidence")
+async def post_evidence(body: AddEvidenceRequest, request: Request) -> dict:
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            body.mcp_url,
+            ToolName.ADD_EVIDENCE.value,
+            body.model_dump(exclude_none=True, exclude={"mcp_url"}),
+        )
+        return {"ok": True, "result": _json_or_raw(result)}
+    try:
+        record = _service(request).add_evidence(
+            source_name=body.source_name,
+            source_kind=body.source_kind,
+            name=body.name,
+            content=body.content,
+            item_type=body.item_type,
+            raw=body.raw,
+            job_id=body.job_id,
+            step_id=body.step_id,
+            outcome_id=body.outcome_id,
+        )
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return {"ok": True, "result": record.model_dump(mode="json")}
+
+
+@router.delete("/evidence/{evidence_id}")
+async def delete_evidence(
+    evidence_id: str, request: Request, mcp_url: str | None = Query(None)
+) -> dict:
+    if _uses_mcp(request):
+        await call_mcp_tool(
+            _require_mcp_url(mcp_url or ""),
+            ToolName.DELETE_EVIDENCE.value,
+            {"evidence_id": evidence_id},
+        )
+        return {"ok": True}
+    try:
+        _service(request).delete_evidence(evidence_id)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return {"ok": True}
 
 
 @router.get("/memory/observations", response_model=ObservationListResponse)
