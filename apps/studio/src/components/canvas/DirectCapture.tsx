@@ -1,27 +1,17 @@
 import { useMemo, useState } from "react";
 
-import { asStudioError } from "../../api/studioApi";
 import { isUnderserved, opportunityScore } from "../../lib/odi";
 import { useStudio } from "../../state/StudioContext";
-import type { StudioError } from "../../types";
-import { FailurePanel } from "../FailurePanel";
-
-/** Which field the failure belongs to, so the message lands next to it. */
-type FailureField = "statement" | "range" | "form";
 
 export function DirectCapture() {
-  const { canvas, addOutcome, createJob } = useStudio();
+  const { canvas, addOutcome, pushToast, setActiveTab } = useStudio();
   const jobs = canvas?.jobs ?? [];
 
   const [jobId, setJobId] = useState<string | null>(null);
-  const [jobName, setJobName] = useState("");
-  const [jobDescription, setJobDescription] = useState("");
-  const [creatingJob, setCreatingJob] = useState(false);
   const [statement, setStatement] = useState("");
   const [importance, setImportance] = useState(8.5);
   const [satisfaction, setSatisfaction] = useState(3.5);
   const [busy, setBusy] = useState(false);
-  const [failure, setFailure] = useState<{ error: StudioError; field: FailureField } | null>(null);
 
   const activeJobId = jobId ?? jobs[0]?.id ?? "";
 
@@ -30,37 +20,12 @@ export function DirectCapture() {
     [importance, satisfaction],
   );
 
-  async function createNewJob(event: React.FormEvent) {
-    event.preventDefault();
-    if (!jobName.trim() || creatingJob) {
-      return;
-    }
-    setCreatingJob(true);
-    setFailure(null);
-    try {
-      const id = await createJob({
-        name: jobName.trim(),
-        description: jobDescription.trim() || undefined,
-      });
-      if (id) {
-        setJobId(id);
-      }
-      setJobName("");
-      setJobDescription("");
-    } catch (error) {
-      setFailure({ error: asStudioError(error), field: "form" });
-    } finally {
-      setCreatingJob(false);
-    }
-  }
-
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     if (!statement.trim() || !activeJobId || busy) {
       return;
     }
     setBusy(true);
-    setFailure(null);
     try {
       await addOutcome({
         job_id: activeJobId,
@@ -69,143 +34,91 @@ export function DirectCapture() {
         satisfaction,
       });
       setStatement("");
-    } catch (error) {
-      const problem = asStudioError(error);
-      // A rejected score belongs to the score fields; anything else belongs to
-      // the statement the user wrote.
-      const field: FailureField =
-        problem.code === "out_of_range" || problem.code === "validation" ? "range" : "statement";
-      setFailure({ error: problem, field });
+      pushToast("success", "New desired outcome recorded successfully.");
+      setActiveTab("landscape");
     } finally {
       setBusy(false);
     }
   }
 
   return (
-    <div className="stack">
-      <form onSubmit={submit} className="form">
-        <div className="field">
-          <label htmlFor="dc-job">Job</label>
+    <section className="fade-in">
+      <h2 className="section-title">Direct Capture: Jobs &amp; Outcomes</h2>
+      <p className="caption">
+        Prefer direct entry over conversational typing? Add artifacts directly to the repository.
+      </p>
+
+      <form onSubmit={submit}>
+        <div className="studio-field">
+          <label htmlFor="dc-job">Select Job</label>
           <select
             id="dc-job"
-            className="select"
+            className="studio-select"
             value={activeJobId}
             onChange={(event) => setJobId(event.target.value)}
           >
-            {jobs.length ? (
-              jobs.map((job) => (
-                <option key={job.id} value={job.id}>
-                  {job.id}: {job.name ?? ""}
-                </option>
-              ))
-            ) : (
-              <option value="">No job yet</option>
-            )}
+            {jobs.map((job) => (
+              <option key={job.id} value={job.id}>
+                {job.id}: {job.name ?? ""}
+              </option>
+            ))}
           </select>
-          {!jobs.length && (
-            <p className="field__hint">
-              Add the job below first — an outcome is always a metric for a job.
-            </p>
-          )}
         </div>
 
-        <div className="field">
-          <label htmlFor="dc-statement">Desired outcome</label>
+        <div className="studio-field">
+          <label htmlFor="dc-statement">Desired Outcome Statement</label>
           <input
             id="dc-statement"
-            className="input"
-            placeholder="Minimize the time it takes to…"
+            className="studio-input"
+            placeholder="e.g. Minimize time required to..."
             value={statement}
             onChange={(event) => setStatement(event.target.value)}
           />
-          <p className="field__hint">
-            Direction + unit of measure + object of control + contextual clarifier.
+          <p className="caption" style={{ marginTop: 4, fontSize: "0.78rem" }}>
+            Format: [Direction] + [Unit of Measure] + [Object of Control] + [Contextual Clarifier]
           </p>
-          {failure?.field === "statement" ? (
-            <FailurePanel error={failure.error} />
-          ) : null}
         </div>
 
-        <div className="field">
-          <label htmlFor="dc-importance">
-            Importance · <b>{importance.toFixed(1)}</b>
-          </label>
-          <input
-            id="dc-importance"
-            type="range"
-            min={1}
-            max={10}
-            step={0.1}
-            value={importance}
-            onChange={(event) => setImportance(Number(event.target.value))}
-          />
-        </div>
-
-        <div className="field">
-          <label htmlFor="dc-satisfaction">
-            Current satisfaction · <b>{satisfaction.toFixed(1)}</b>
-          </label>
-          <input
-            id="dc-satisfaction"
-            type="range"
-            min={1}
-            max={10}
-            step={0.1}
-            value={satisfaction}
-            onChange={(event) => setSatisfaction(Number(event.target.value))}
-          />
-          {failure?.field === "range" ? <FailurePanel error={failure.error} /> : null}
-        </div>
-
-        <p className="score-preview">
-          Opportunity <b>{calcOpp.toFixed(2)}</b>
-          <span>{isUnderserved(calcOpp) ? "underserved" : "appropriately served"}</span>
-        </p>
-
-        <button
-          type="submit"
-          className="button button--block"
-          disabled={busy || !statement.trim() || !activeJobId}
-        >
-          Record outcome
-        </button>
-      </form>
-
-      <details className="disclosure" open={!jobs.length}>
-        <summary>Add a job</summary>
-        <form onSubmit={createNewJob} className="form">
-          <div className="field">
-            <label htmlFor="dc-new-job">Job name</label>
-            <input
-              id="dc-new-job"
-              className="input"
-              placeholder="Get a service from commit to production"
-              value={jobName}
-              onChange={(event) => setJobName(event.target.value)}
-            />
-          </div>
-          <div className="field">
-            <label htmlFor="dc-new-job-desc">
-              Who is doing it? <span className="field__hint">optional</span>
+        <div className="studio-form-grid">
+          <div className="studio-field">
+            <label htmlFor="dc-importance">
+              Importance Score (1-10): <b>{importance.toFixed(1)}</b>
             </label>
             <input
-              id="dc-new-job-desc"
-              className="input"
-              placeholder="Platform engineers shipping services"
-              value={jobDescription}
-              onChange={(event) => setJobDescription(event.target.value)}
+              id="dc-importance"
+              type="range"
+              min={1}
+              max={10}
+              step={0.1}
+              value={importance}
+              onChange={(event) => setImportance(Number(event.target.value))}
             />
           </div>
-          <button
-            type="submit"
-            className="button button--ghost"
-            disabled={creatingJob || !jobName.trim()}
-          >
-            {creatingJob ? "Adding…" : "Add job"}
-          </button>
-          {failure?.field === "form" ? <FailurePanel error={failure.error} /> : null}
-        </form>
-      </details>
-    </div>
+          <div className="studio-field">
+            <label htmlFor="dc-satisfaction">
+              Satisfaction (1-10): <b>{satisfaction.toFixed(1)}</b>
+            </label>
+            <input
+              id="dc-satisfaction"
+              type="range"
+              min={1}
+              max={10}
+              step={0.1}
+              value={satisfaction}
+              onChange={(event) => setSatisfaction(Number(event.target.value))}
+            />
+          </div>
+        </div>
+
+        <div className="toast toast--info" role="status" style={{ marginBottom: 16 }}>
+          📊 <b>Opportunity Score</b>: <code>{calcOpp.toFixed(2)}</code> (
+          {isUnderserved(calcOpp) ? "🔥 Underserved Target" : "Appropriately Served"})
+        </div>
+
+        <button type="submit" className="studio-button" style={{ width: "100%" }} disabled={busy || !statement.trim()}>
+          Record Desired Outcome
+        </button>
+      </form>
+    </section>
   );
 }

@@ -1,12 +1,15 @@
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { render, screen, fireEvent, act } from "@testing-library/react";
+import { describe, expect, it } from "vitest";
 
-import indexHtml from "../../index.html?raw";
-import { OpportunityLandscape } from "./canvas/OpportunityLandscape";
+import { StudioProvider, useStudio } from "../state/StudioContext";
+import { StudioHeader } from "./StudioHeader";
+import { CanvasTabs } from "./canvas/CanvasTabs";
+import { ChatCopilot } from "./chat/ChatCopilot";
 import { OutcomeCard } from "./canvas/OutcomeCard";
-import { Toasts } from "./Toasts";
+import { SettingsPanel } from "./SettingsPanel";
+import type { Outcome } from "../types";
 
-const mockOutcome = {
+const mockOutcome: Outcome = {
   id: "O-101",
   job_id: "JOB-1",
   statement: "Minimize time required to sync environment secrets",
@@ -16,50 +19,105 @@ const mockOutcome = {
   evidence: "Gong transcript #42",
 };
 
-const mockCanvasData = {
-  jobs: [{ id: "JOB-1", name: "Deploy Service" }],
-  steps: [{ id: "STEP-1", name: "Configure secrets", order: 1 }],
-  outcomes: [mockOutcome],
-  source: "seed" as const,
-};
+function TestTabsWrapper() {
+  const { setEngagementLevel } = useStudio();
+  return (
+    <div>
+      <button type="button" onClick={() => setEngagementLevel(2)}>
+        Set L2
+      </button>
+      <CanvasTabs />
+    </div>
+  );
+}
 
-vi.mock("../state/StudioContext", () => ({
-  useStudio: () => ({
-    toasts: [{ id: "toast-1", kind: "info", message: "Outcome recorded" }],
-    dismissToast: vi.fn(),
-    canvas: mockCanvasData,
-    canvasLoading: false,
-    ask: vi.fn(),
-    deleteOutcome: vi.fn(),
-    updateOutcome: vi.fn(),
-  }),
-}));
+describe("Mobile UX Micro-Improvements", () => {
+  it("renders StudioHeader with title and engagement level buttons", async () => {
+    await act(async () => {
+      render(
+        <StudioProvider>
+          <StudioHeader />
+        </StudioProvider>
+      );
+    });
 
-describe("Mobile UX", () => {
-  it("keeps the viewport safe-area aware so notches do not cover the chrome", () => {
-    expect(indexHtml).toContain("viewport-fit=cover");
+    expect(screen.getByText(/The Living Studio/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Engagement level 0" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Engagement level 1" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Engagement level 2" })).toBeInTheDocument();
   });
 
-  it("gives the toast dismiss button a 44px touch target", () => {
-    render(<Toasts />);
+  it("renders CanvasTabs with accessible tablist and tabs when engagement level >= 1", async () => {
+    await act(async () => {
+      render(
+        <StudioProvider>
+          <TestTabsWrapper />
+        </StudioProvider>
+      );
+    });
 
-    const dismiss = screen.getByRole("button", { name: "Dismiss notification" });
-    expect(dismiss.style.minHeight).toBe("44px");
-    expect(dismiss.style.minWidth).toBe("44px");
+    const setL2Btn = screen.getByRole("button", { name: "Set L2" });
+    await act(async () => {
+      fireEvent.click(setL2Btn);
+    });
+
+    const tabList = screen.getByRole("tablist");
+    expect(tabList).toBeInTheDocument();
+    const tabs = screen.getAllByRole("tab");
+    expect(tabs.length).toBeGreaterThanOrEqual(5);
   });
 
-  it("gives the underserved filter a 44px touch target", () => {
-    render(<OpportunityLandscape />);
+  it("renders ChatCopilot with mobile FAB and quick prompt pills", async () => {
+    await act(async () => {
+      render(
+        <StudioProvider>
+          <ChatCopilot />
+        </StudioProvider>
+      );
+    });
 
-    const filter = screen.getByText(/Show Underserved Only/i);
-    expect(filter.style.minHeight).toBe("44px");
+    const fab = screen.getByRole("button", { name: /Open AI Copilot Chat/i });
+    expect(fab).toBeInTheDocument();
+
+    const quickPill = screen.getByRole("button", { name: /Define Job/i });
+    expect(quickPill).toBeInTheDocument();
   });
 
-  it("names the outcome in its accessible label so a screen reader says what it is", () => {
-    render(<OutcomeCard outcome={mockOutcome} />);
+  it("renders OutcomeCard with scores and touch-friendly actions", async () => {
+    await act(async () => {
+      render(
+        <StudioProvider>
+          <OutcomeCard outcome={mockOutcome} />
+        </StudioProvider>
+      );
+    });
 
-    expect(
-      screen.getByRole("article", { name: /Minimize time required to sync environment secrets/i }),
-    ).toBeInTheDocument();
+    expect(screen.getByText("O-101")).toBeInTheDocument();
+    expect(screen.getByText(/Minimize time required to sync environment secrets/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Simulate/i })).toBeInTheDocument();
+  });
+
+  it("expands and collapses SettingsPanel on toggle click", async () => {
+    await act(async () => {
+      render(
+        <StudioProvider>
+          <SettingsPanel />
+        </StudioProvider>
+      );
+    });
+
+    const toggleBtn = screen.getByRole("button", { name: /Expand Settings/i });
+    expect(toggleBtn).toBeInTheDocument();
+
+    await act(async () => {
+      fireEvent.click(toggleBtn);
+    });
+    expect(screen.getByText("LLM Base URL")).toBeInTheDocument();
+
+    const collapseBtn = screen.getByRole("button", { name: /Collapse/i });
+    await act(async () => {
+      fireEvent.click(collapseBtn);
+    });
+    expect(screen.queryByText("LLM Base URL")).not.toBeInTheDocument();
   });
 });

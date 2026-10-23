@@ -11,7 +11,6 @@ from agentic_odi_core import (
     EvidenceItemType,
     EvidenceNotFoundError,
     JobNotFoundError,
-    OdiError,
     ODIService,
     OutcomeNotFoundError,
     StepNotFoundError,
@@ -48,11 +47,8 @@ def _outcome_not_found(outcome_id: str | None) -> str:
     return f"Error: Outcome with ID {outcome_id} not found."
 
 
-def _evidence_not_found(evidence_id: str, hint: str | None = None) -> str:
-    message = f"Error: Evidence with ID {evidence_id} not found."
-    if hint:
-        message = f"{message} {hint}"
-    return message
+def _evidence_not_found(evidence_id: str) -> str:
+    return f"Error: Evidence with ID {evidence_id} not found."
 
 
 @mcp.prompt
@@ -75,7 +71,7 @@ def get_jobs() -> str:
 @mcp.tool
 def get_job(job_id: str) -> str:
     job = service.get_job(job_id)
-    if job is None:
+    if not job:
         return f"Error: Job with ID {job_id} not found."
     return job.model_dump_json()
 
@@ -92,7 +88,7 @@ def add_step(job_id: str, name: str, order: int) -> str:
 @mcp.tool
 def get_job_map(job_id: str) -> str:
     job = service.get_job(job_id)
-    if job is None:
+    if not job:
         return f"Error: Job with ID {job_id} not found."
     steps = service.get_job_map(job_id)
     return json.dumps([step.model_dump() for step in steps])
@@ -126,7 +122,7 @@ def add_outcome(
 @mcp.tool
 def get_outcomes(job_id: str, step_id: str | None = None) -> str:
     job = service.get_job(job_id)
-    if job is None:
+    if not job:
         return f"Error: Job with ID {job_id} not found."
     outcomes = service.get_outcomes(job_id=job_id, step_id=step_id)
     return json.dumps([outcome.model_dump() for outcome in outcomes])
@@ -264,7 +260,7 @@ def get_capabilities() -> str:
 @mcp.tool
 def get_step(step_id: str) -> str:
     step = service.get_step(step_id)
-    if step is None:
+    if not step:
         return _step_not_found(step_id)
     return step.model_dump_json()
 
@@ -272,7 +268,7 @@ def get_step(step_id: str) -> str:
 @mcp.tool
 def get_outcome(outcome_id: str) -> str:
     outcome = service.get_outcome(outcome_id)
-    if outcome is None:
+    if not outcome:
         return _outcome_not_found(outcome_id)
     return outcome.model_dump_json()
 
@@ -388,7 +384,7 @@ def add_evidence(
         return _step_not_found(step_id)
     except OutcomeNotFoundError:
         return _outcome_not_found(outcome_id)
-    except (OdiError, ValueError) as exc:
+    except ValueError as exc:
         return f"Error: {exc}"
     return f"Evidence created successfully: {evidence.model_dump_json()}"
 
@@ -397,10 +393,7 @@ def add_evidence(
 def get_evidence(evidence_id: str) -> str:
     evidence = service.get_evidence(evidence_id)
     if evidence is None:
-        return _evidence_not_found(
-            evidence_id,
-            "List the stored records with list_evidence() to find a valid id.",
-        )
+        return _evidence_not_found(evidence_id)
     return evidence.model_dump_json()
 
 
@@ -418,8 +411,8 @@ def list_evidence(
 def delete_evidence(evidence_id: str) -> str:
     try:
         service.delete_evidence(evidence_id)
-    except EvidenceNotFoundError as exc:
-        return _evidence_not_found(evidence_id, exc.hint)
+    except EvidenceNotFoundError:
+        return _evidence_not_found(evidence_id)
     return f"Evidence deleted successfully: {evidence_id}"
 
 
@@ -443,8 +436,8 @@ def promote_evidence(
             importance=importance,
             satisfaction=satisfaction,
         )
-    except EvidenceNotFoundError as exc:
-        return _evidence_not_found(evidence_id, exc.hint)
+    except EvidenceNotFoundError:
+        return _evidence_not_found(evidence_id)
     except JobNotFoundError:
         return job_not_found(job_id or "")
     except StepNotFoundError:
@@ -453,7 +446,7 @@ def promote_evidence(
         return _outcome_not_found(None)
     except ValueOutOfRangeError:
         return "Error: importance and satisfaction must be between 1.0 and 10.0"
-    except (OdiError, ValueError) as exc:
+    except ValueError as exc:
         return f"Error: {exc}"
     label = "Job" if target == "job" else "Outcome"
     return f"{label} created successfully: {artifact.model_dump_json()}"
