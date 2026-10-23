@@ -3,7 +3,7 @@
   "checkpoint_id": "01M5N643VAMT4TNGKTM10315HY",
   "strategy": "manual-commit",
   "branch": "slay/f4e8fe30-api-key-toggle",
-  "checkpoints_count": 5,
+  "checkpoints_count": 6,
   "files_touched": [
     "apps/studio/src/components/SettingsPanel.test.tsx",
     "apps/studio/src/components/SettingsPanel.tsx",
@@ -36,6 +36,13 @@
       "transcript": "/3/full.jsonl",
       "compact_transcript": "/3/transcript.jsonl",
       "content_hash": "/3/content_hash.txt",
+      "prompt": ""
+    },
+    {
+      "metadata": "/4/metadata.json",
+      "transcript": "/4/full.jsonl",
+      "compact_transcript": "/4/transcript.jsonl",
+      "content_hash": "/4/content_hash.txt",
       "prompt": ""
     }
   ],
