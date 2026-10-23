@@ -31,6 +31,8 @@ export interface Evidence {
   item_type?: string;
   name?: string;
   content?: string;
+  /** Deep link back to the record in the tool that holds it, when it has one. */
+  url?: string | null;
   job_id?: string | null;
   step_id?: string | null;
   outcome_id?: string | null;

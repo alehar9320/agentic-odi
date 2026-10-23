@@ -98,4 +98,45 @@ def seed_payload() -> dict[str, Any]:
         "jobs": [dict(job) for job in DEMO_JOBS],
         "steps": [dict(step) for step in DEMO_STEPS],
         "outcomes": [dict(outcome) for outcome in DEMO_OUTCOMES],
+        "evidence": [dict(evd) for evd in DEMO_EVIDENCE],
     }
+
+
+DEMO_EVIDENCE: list[dict[str, Any]] = [
+    {
+        "id": "EVD-101",
+        "source_name": "gong",
+        "source_kind": "mcp",
+        "item_type": "resource",
+        "name": "Fintech Customer Call #104",
+        "content": "We had a junior engineer push code that broke staging because the Stripe secret wasn't copied over. Three senior engineers spent two hours on it. There has to be a better way than copy-pasting strings.",
+        "url": "https://app.gong.io/calls/104",
+        "job_id": "JOB-402",
+        "outcome_id": "O-1",
+        "raw": {"severity": "high", "speaker": "Tech Lead"},
+    },
+    {
+        "id": "EVD-102",
+        "source_name": "slack",
+        "source_kind": "mcp",
+        "item_type": "resource",
+        "name": "Slack #incident-deployments",
+        "content": "Third time this week staging broke after a secret rotation. We need automated synchronization across microservices.",
+        "url": "https://workspace.slack.com/archives/C0123/p169000222",
+        "job_id": "JOB-402",
+        "outcome_id": "O-2",
+        "raw": {"severity": "critical", "channel": "#incident-deployments"},
+    },
+    {
+        "id": "EVD-103",
+        "source_name": "notion",
+        "source_kind": "mcp",
+        "item_type": "resource",
+        "name": "Vault Migration RFC",
+        "content": "Developer survey shows 85% of time spent on deployment blockers is caused by missing env variables in microservice pipelines.",
+        "url": "https://notion.so/org/Vault-Migration-RFC-99812",
+        "job_id": "JOB-402",
+        "outcome_id": "O-1",
+        "raw": {"votes": 42},
+    },
+]

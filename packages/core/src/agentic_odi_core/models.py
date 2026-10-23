@@ -110,6 +110,9 @@ class Evidence(BaseModel):
     )
     name: str = Field(..., description="Short human-readable label for the record")
     content: str = Field(..., description="Normalized text content of the record")
+    url: str | None = Field(
+        None, description="External URL/link to the signal/evidence in the source system"
+    )
     raw: dict[str, Any] = Field(default_factory=dict, description="Original record payload")
     job_id: str | None = Field(None, description="Job this evidence supports")
     step_id: str | None = Field(None, description="Job-map Step this evidence supports")

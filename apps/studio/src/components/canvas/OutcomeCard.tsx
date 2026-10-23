@@ -11,7 +11,11 @@ import type { Outcome } from "../../types";
 import { CopyIcon } from "../icons";
 
 export function OutcomeCard({ outcome }: { outcome: Outcome }) {
-  const { ask, deleteOutcome, pushToast, saveThesis, updateOutcome } = useStudio();
+  const { ask, canvasState, deleteOutcome, pushToast, saveThesis, updateOutcome } = useStudio();
+  // Records captured against this outcome, with their way back to the source.
+  const linkedEvidence = (canvasState.data?.evidence ?? []).filter(
+    (item) => item.outcome_id === outcome.id,
+  );
   const [showEvidence, setShowEvidence] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -44,11 +48,31 @@ export function OutcomeCard({ outcome }: { outcome: Outcome }) {
         Opportunity <b>{formatOpportunityScore(opp)}</b>
       </p>
 
-      {showEvidence && (
-        <p className="card__evidence">
-          {outcome.evidence?.trim() || "No transcript is linked to this outcome yet."}
-        </p>
-      )}
+      {showEvidence &&
+        (linkedEvidence.length > 0 ? (
+          <div className="card__evidence">
+            {linkedEvidence.map((item) => (
+              <p key={item.id}>
+                {item.content ? `“${item.content}” ` : ""}
+                <span className="evidence__meta">
+                  {item.source_name ? `Via ${item.source_name}` : "Captured by hand"}
+                  {item.url && (
+                    <>
+                      {" · "}
+                      <a href={item.url} target="_blank" rel="noopener noreferrer">
+                        Source ↗
+                      </a>
+                    </>
+                  )}
+                </span>
+              </p>
+            ))}
+          </div>
+        ) : (
+          <p className="card__evidence">
+            {outcome.evidence?.trim() || "No transcript is linked to this outcome yet."}
+          </p>
+        ))}
 
       {editing && (
         <form
