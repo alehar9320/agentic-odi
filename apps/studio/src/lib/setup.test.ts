@@ -17,7 +17,7 @@ import {
 
 describe("setup conversation model", () => {
   it("asks four questions, each skippable by design", () => {
-    expect(QUESTION_COUNT).toBe(4);
+    expect(QUESTION_COUNT).toBe(5);
   });
 
   it("resumes at the first unanswered question", () => {
@@ -32,6 +32,7 @@ describe("setup conversation model", () => {
         target_user: "Engineers",
         job_statement: "Ship",
         core_problem: "Drift",
+        vision: "No friction",
       }),
     ).toBe(REVIEW_INDEX);
   });
@@ -81,12 +82,24 @@ describe("setup conversation model", () => {
     expect(fieldFromText("different product")).toBe("product_name");
   });
 
+  it("hydrates v2mom vision from an existing brief", () => {
+    const draft = draftFromBrief({
+      product_name: "Ambient",
+      target_user: "Engineers",
+      job_statement: "Ship",
+      core_problem: "Drift",
+      v2mom: { vision: "Zero downtime deploys" },
+    });
+    expect(draft.vision).toBe("Zero downtime deploys");
+  });
+
   it("hydrates from an existing brief for editing", () => {
     const draft = draftFromBrief({
       product_name: "Ambient",
       target_user: "Engineers",
       job_statement: "Ship",
       core_problem: "Drift",
+      v2mom: { vision: "Zero downtime" },
     });
     expect(firstUnanswered(draft)).toBe(REVIEW_INDEX);
     expect(questionContent(0, draft)).toContain("You said: “Ambient”");

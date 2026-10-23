@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
 
 import { useStudio } from "../../state/StudioContext";
-import { FailurePanel } from "../FailurePanel";
 import { GhostJobSteps } from "../Skeletons";
 
 // Ulwick Universal Job Process Phases (8 phases)
@@ -22,9 +21,18 @@ function phaseIndexFor(order: number, stepCount: number): number {
 }
 
 export function JobMap() {
-  const { canvasState, refreshCanvas, updateStep, deleteStep, updateJob, deleteJob } = useStudio();
-  const canvas = canvasState.data;
+  const {
+    canvas,
+    canvasLoading,
+    addStep,
+    updateStep,
+    deleteStep,
+    updateJob,
+    deleteJob,
+  } = useStudio();
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+  const [stepName, setStepName] = useState("");
+  const [stepOrder, setStepOrder] = useState<number | null>(null);
   const [editingStepId, setEditingStepId] = useState<string | null>(null);
   const [editStepName, setEditStepName] = useState("");
   const [editStepOrder, setEditStepOrder] = useState(1);
@@ -39,6 +47,27 @@ export function JobMap() {
   const steps = (canvas?.steps ?? []).filter(
     (step) => !activeJobId || !step.job_id || step.job_id === activeJobId,
   );
+  const defaultOrder = steps.length + 1;
+
+  async function submit(event: React.FormEvent) {
+    event.preventDefault();
+    if (!stepName.trim() || busy || !activeJobId) {
+      return;
+    }
+    setBusy(true);
+    try {
+      await addStep({
+        job_id: activeJobId,
+        name: stepName.trim(),
+        order: stepOrder ?? defaultOrder,
+      });
+      setStepName("");
+      setStepOrder(null);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function saveStep(stepId: string) {
     if (!editStepName.trim()) {
       return;
@@ -86,20 +115,6 @@ export function JobMap() {
           const order = step.order ?? idx + 1;
           return phaseIndexFor(order, steps.length) === selectedPhaseIndex;
         });
-
-  if (canvasState.kind === "error") {
-    // A failed canvas must not render as eight empty phases.
-    return (
-      <section className="fade-in">
-        <p className="section-title">Universal Job Map (8 Process Phases)</p>
-        <FailurePanel
-          error={canvasState.error}
-          onRetry={() => void refreshCanvas()}
-          retryText="reload"
-        />
-      </section>
-    );
-  }
 
   return (
     <section className="fade-in">
@@ -212,7 +227,7 @@ export function JobMap() {
         })}
       </div>
 
-      {canvasState.kind === "loading" ? (
+      {canvasLoading && !canvas ? (
         <GhostJobSteps />
       ) : steps.length ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -321,10 +336,44 @@ export function JobMap() {
       ) : (
         <p className="toast toast--info" role="status">
           {selectedPhaseIndex === null
-            ? "No steps captured yet. Ask the studio to walk you through the job."
+            ? "No job steps registered yet. Ask the AI assistant to decompose the active job, or add the first one below."
             : "No steps land in this phase yet."}
         </p>
       )}
+
+      <details style={{ marginTop: 18 }}>
+        <summary style={{ cursor: "pointer", fontWeight: 600, color: "var(--studio-indigo)" }}>
+          ➕ Add Step to Universal Job Map
+        </summary>
+        <form onSubmit={submit} style={{ marginTop: 12 }}>
+          <div className="studio-field">
+            <label htmlFor="step-name">
+              Step Description (e.g., &apos;3. Prepare secrets payload&apos;)
+            </label>
+            <input
+              id="step-name"
+              className="studio-input"
+              value={stepName}
+              onChange={(event) => setStepName(event.target.value)}
+            />
+          </div>
+          <div className="studio-field">
+            <label htmlFor="step-order">Step Chronological Order</label>
+            <input
+              id="step-order"
+              className="studio-input"
+              type="number"
+              min={1}
+              max={20}
+              value={stepOrder ?? defaultOrder}
+              onChange={(event) => setStepOrder(Number(event.target.value))}
+            />
+          </div>
+          <button type="submit" className="studio-button" disabled={busy || !stepName.trim()}>
+            Add Step to Map
+          </button>
+        </form>
+      </details>
 
       {activeJobId && (
         <details className="disclosure" style={{ marginTop: 12 }}>

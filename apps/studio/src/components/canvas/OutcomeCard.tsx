@@ -10,7 +10,8 @@ import { useStudio } from "../../state/StudioContext";
 import type { Outcome } from "../../types";
 
 export function OutcomeCard({ outcome }: { outcome: Outcome }) {
-  const { ask, deleteOutcome, updateOutcome } = useStudio();
+  const { requestSimulate, sendMessage, closePanel, deleteOutcome, updateOutcome } =
+    useStudio();
   const [showEvidence, setShowEvidence] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -109,16 +110,7 @@ export function OutcomeCard({ outcome }: { outcome: Outcome }) {
         >
           {showEvidence ? "Hide evidence" : "Evidence"}
         </button>
-        <button
-          type="button"
-          className="quiet-action"
-          onClick={() =>
-            ask(
-              `Simulate the impact of a bet on ${outcomeId}: "${statement}". ` +
-                "What has to be true, and what changes if we ship it?",
-            )
-          }
-        >
+        <button type="button" className="quiet-action" onClick={() => requestSimulate(outcomeId)}>
           Simulate
         </button>
         {outcome.id && (
@@ -134,7 +126,10 @@ export function OutcomeCard({ outcome }: { outcome: Outcome }) {
         <button
           type="button"
           className="quiet-action"
-          onClick={() => ask(`How should we solve outcome ${outcomeId}: "${statement}"?`)}
+          onClick={() => {
+            closePanel();
+            void sendMessage(`How should we solve outcome ${outcomeId}: "${statement}"?`);
+          }}
         >
           Ask
         </button>

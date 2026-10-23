@@ -5,9 +5,9 @@ an interactive Opportunity Landscape, Universal Job Map, WYSIWYG Impact
 Simulation, and Causal Lineage inspection, paired with an autonomous agent
 connected to the MCP server.
 
-The Studio runs three ways locally, plus a hosted deployment. All of them serve
-the same SPA, which talks only to the sidecar on `http://127.0.0.1:8100` — the
-SPA never contacts MCP or the LLM directly.
+The Studio runs three ways. All of them serve the same SPA, which talks only to
+the sidecar on `http://127.0.0.1:8100` — the SPA never contacts MCP or the LLM
+directly.
 
 ## Architecture
 
@@ -18,7 +18,6 @@ SPA never contacts MCP or the LLM directly.
 │  (browser or Tauri webview)│ ◀──────────── │  - config / health / canvas   │
 └────────────────────────────┘  SSE stream   │  - steps / outcomes (via MCP) │
                                              │  - /api/chat (LLM tool-loop)  │
-                                             │  - conversations + PM memory  │
                                              └───────────────┬───────────────┘
                                                              │ MCP (HTTP)
                                                              ▼
@@ -38,14 +37,12 @@ The Studio opens as a conversation, not a dashboard.
 
 | Surface | What it does |
 |---|---|
-| **First-run tour** | A four-step, skippable welcome on the very first visit: what the studio is, which ambition brought you here, the live state of your sidecar/MCP/model (with inline repair when the model is down), and the first move. The four doors are **I have one in mind**, **My boss handed me a priority**, **Help me find the next one**, and **Pressure-test a bet**; each starts the matching conversation. Replay it from **Settings → Replay the welcome tour**. |
-| **First run** | A short conversation in the chat, not a form: what you are building, who feels the problem, the job they are trying to get done, then where it hurts. One question at a time, with a reflection before the next ask, quick replies, and **Explore on my own** always visible. Skipping is allowed; answers and progress are kept as a draft. Re-open it any time with `/start`, the home stage's context pill, or Settings. |
-| **Hero** | One rotating headline above the composer: a greeting (time of day, plus your name if you set one in Settings), the product/job you set up, what is already on the canvas, or an intent-first prompt such as *What are you trying to win this quarter?* It cycles every few seconds and stays still under `prefers-reduced-motion`. |
-| **Suggestion pills** | Below the headline. **Sharpen an opportunity** always starts a conversation; the next pill becomes **Pressure-test a bet** once outcomes exist, or **Find the next opportunity** before that. **Capture what you heard** replaces the landscape pill once a job exists. They change as the canvas fills up. |
+| **First run** | A short conversation in the chat, not a form: what you are building, who feels the problem, the job they are trying to get done, then where it hurts. One question at a time, with a reflection before the next ask, quick replies, and **Explore on my own** always visible. Skipping is allowed; answers and progress are kept as a draft. Re-open it any time with `/start`, the sidebar's **Your context**, or Settings. |
+| **Hero** | One rotating headline above the composer: a greeting (time of day, plus your name if you set one in Settings), the product/job you set up, what is already on the canvas, or what the studio can do. It cycles every few seconds and stays still under `prefers-reduced-motion`. |
+| **Suggestion pills** | Below the headline. Some open a surface (landscape, simulate, capture), others start a conversation. They change as the canvas fills up. |
 | **Composer** | Docked at the bottom of the transcript. `Enter` sends, `Shift`+`Enter` adds a line, `Cmd/Ctrl`+`K` focuses it, and `/` opens the command palette. The send button becomes a stop button while a reply streams. |
-| **Bar** | The only persistent chrome: home, new conversation, catch-up, live model status, and settings. There is no navigation drawer to compete with the thread. |
-| **Rail** | Above the conversation, and only once the thread has produced something: `Landscape · N`, `Job map · N`, `Evidence · N`, `What I know · N`. Every item is derived from the canvas and the memory, so the strip is a record of the work rather than a fixed menu. |
-| **Lens** | A view docks to the right of the thread on wide screens and becomes a full-height sheet on narrow ones. The transcript and the composer stay on screen and stay usable; `Esc`, **Close**, or the rail chip closes it. Every lens ends in one sentence that re-enters the conversation — *Ask which to chase*, *Walk me through the job*, *Weigh the evidence* — so leaving a view is never a return to a menu. Settings and catch-up use the same lens. |
+| **Drawer** (left) | The wordmark is a home button. Below it: new conversation, your context, the five workspace surfaces with counts, live model/MCP status, and Settings. Collapses to an icon rail with `Cmd/Ctrl`+`B`; becomes an overlay sheet on narrow screens. |
+| **Workspace surfaces** | The classic UI — opportunity landscape, job map, impact simulation, evidence, direct capture, settings — takes the whole stage while open. **Back to conversation** or `Esc` returns; the chat is never squeezed into a side column. |
 
 Replies render Markdown (headings, lists, emphasis, inline and fenced code).
 Tool calls appear inline as small trace chips while the agent works.
@@ -63,53 +60,17 @@ the model, so they work when it is offline.
 | `/new` | New conversation |
 | `/home` | Return to the empty stage |
 | `/jobs` | Job summary, then the job map |
-| `/landscape`, `/jobmap`, `/evidence`, `/settings` | Open that lens beside the conversation |
-| `/impact`, `/capture` | Start the conversation that produces the card. `/capture` falls back to the offline form when no model answers. |
+| `/landscape`, `/jobmap`, `/impact`, `/evidence`, `/capture`, `/settings` | Open that surface full screen |
 | `/status` | Model, MCP, context, and canvas status |
 
 Unknown commands produce a transcript notice pointing at `/help`.
 
-### The welcome tour
-
-The tour is the front door, the context conversation is the first room. It is
-skippable at every step (`Skip the tour` or `Escape`), resumable (progress is
-stored after every transition in `localStorage["studio.onboarding"]`), and
-replayable from Settings.
-
-Everything lives in `apps/studio/src/onboarding/`:
-
-| File | Role |
-|---|---|
-| `content.ts` | Steps and goal copy as typed data — the only place the words live |
-| `machine.ts` | Pure state transitions, no React or storage |
-| `storage.ts` | Versioned, defensive `localStorage` persistence |
-| `OnboardingProvider.tsx` | Auto-open, persistence, replay |
-| `FirstRunWizard.tsx`, `steps.tsx`, `onboarding.css` | The dialog |
-| `../features/flags.ts` | The `firstRunWizard` toggle |
-
-`App.tsx` only wires the provider and the wizard around the existing shell;
-the chat, canvas, and sidecar code are untouched.
-
-#### Toggling the tour
-
-`firstRunWizard` defaults to on. Resolution order, highest first:
-
-| Source | Example | Use |
-|---|---|---|
-| Query parameter | `?flags=firstRunWizard:off` | QA a build without rebuilding |
-| Local override | `localStorage["studio.flags.firstRunWizard"] = "off"` | Per-browser opt-out |
-| Build environment | `VITE_STUDIO_FIRST_RUN_WIZARD=off npm --prefix apps/studio run build` | Ship it dark |
-| Default | on | |
-
-Accepted values are `1`/`0`, `true`/`false`, `on`/`off`, `yes`/`no`, and
-`enabled`/`disabled`. With the flag off, no dialog renders, no onboarding state
-is written, and Settings hides the replay action.
-
 ### Guidance, not gates
 
 The setup conversation is a nudge, never a prerequisite. If you skip it, the
-home stage keeps a dashed **Tell me what you're building** pill; it reopens the
-conversation exactly where you left off. `/start` and Settings do the same. The conversation also understands a
+home stage keeps a dashed **Tell me what you're building** pill and the sidebar
+marks **Your context** with a dot; both reopen the conversation exactly where
+you left off. `/start` does the same. The conversation also understands a
 natural reply: say "skip", "not now", or "show me the landscape" and it reacts
 instead of recording it as an answer. When a brief exists, it opens on a review
 and asks what changed rather than asking everything again.
@@ -129,136 +90,6 @@ When the LLM is unreachable the Studio keeps working:
 
 The user's context is sent with every chat request, so the assistant starts from
 the product, audience, job, and problem rather than asking for them again.
-
-### The thread is the room
-
-Capture, scoring, simulation, and decisions are conversations. The storefront
-never asks the PM to leave the thread to do work: the agent asks for the
-customer's words or the bet in plain language, then renders the surface that
-carries it. A lens exists for reading and for people who prefer a click, not for
-doing the work.
-
-That is also enforced in the agent's system prompt: it is told to keep every
-artifact in the conversation, never to send the PM to a panel, and to end each
-reply with the next move as an action on the surface.
-
-### What it remembers
-
-The studio keeps a small, local, editable model of the person it is helping. It
-is not a profile and not a transcript index; it is the handful of things that
-change the next answer.
-
-| Kind | What it captures |
-|---|---|
-| `career` | The PM's role, remit, and what success looks like for them |
-| `opportunity` | The opportunity or bet currently in play |
-| `business` | Goals, metrics, and commercial constraints |
-| `stakeholder` | Who else matters and what they care about |
-| `constraint` | Time, budget, policy, or technical limits |
-| `evidence` | What has actually been heard or measured |
-| `preference` | How the PM likes to work and be spoken to |
-
-Each note is `suggested` or `confirmed`. Suggested notes appear first under
-**What I know** with **Yes, that's right**, **That's not it**, and **Edit**;
-confirmed notes can be edited or forgotten. The PM can also add a note by hand.
-Nothing is silently promoted: the agent may propose, but the person decides.
-
-The agent writes notes through a `remember` tool during a normal reply. The
-sidecar applies it, emits a `memory` SSE event, and the panel updates without a
-refresh. Memory writes are best-effort — a database failure never turns a good
-answer into an error.
-
-Storage is a separate SQLite file from the ODI repository:
-`~/.agentic-odi/studio.db`, overridable with `AGENTIC_ODI_STUDIO_DB`
-(`:memory:` is supported and is what the tests use). The API is small:
-
-| Method | Path | Purpose |
-|---|---|---|
-| `GET` | `/api/memory/observations` | Everything the agent believes |
-| `POST` | `/api/memory/observations` | Add a note by hand |
-| `PATCH` | `/api/memory/observations/{id}` | Edit text, confidence, or status |
-| `DELETE` | `/api/memory/observations/{id}` | Forget one note |
-| `DELETE` | `/api/memory` | Forget all notes and conversations |
-
-**Forget everything** is a two-step confirmation and also clears the visible
-thread, because the server deletes the conversations behind it.
-
-### The thread comes back
-
-Conversations are stored beside the memory. On launch the SPA asks
-`GET /api/conversations/latest`, restores that thread's user and assistant
-turns, and continues with the same `conversation_id` on the next message. **New
-conversation** starts a fresh one without touching the memory; **Forget
-everything** removes both. The composer stays usable while the restore is in
-flight, and a restore failure simply leaves the room empty.
-
-## Rich responses
-
-The copilot does not only talk. When a surface carries the evidence better than a
-paragraph, the agent renders one **inline in the conversation**: a scored
-outcome, a ranked opportunity board, a before/after simulation of a bet, a
-customer quote with its lineage, the eight-stage job map, an opportunity thesis, or a decision record.
-Three properties keep this safe and cheap to extend:
-
-- **The catalog is closed and owned by the SPA.**
-  `apps/studio/src/ui/catalog.ts` declares nine primitives and seven cards, their
-  JSON Schema props, and the description the model reads. There is no HTML, no
-  eval, and no third-party component in the path. Prose is rendered by the same
-  `Markdown` component the transcript already used.
-- **The sidecar is catalog-agnostic.** The SPA sends the catalog with each turn;
-  the sidecar derives the `render_ui` tool schema from it, validates what comes
-  back, and streams a `ui` SSE event. Invalid props return to the model as a tool
-  result naming the exact violation, and the loop offers the tool again, so a
-  fumbled prop is corrected in the same reply. A client that sends no catalog
-  never sees the tool.
-- **Cards are views, never actors.** Every button is an `intent` string that the
-  agent receives as the user's next message — one authority, one audit trail.
-
-A surface is one node tree, streamed as one event:
-
-```json
-{
-  "type": "outcome-card",
-  "props": {
-    "id": "O-1",
-    "statement": "Minimize the time it takes to propagate secrets across environments",
-    "importance": 9,
-    "satisfaction": 3
-  }
-}
-```
-
-The opportunity thesis is the intent-first card: one opportunity with its
-importance, satisfaction, the gap in plain words, the thesis itself, and the
-smallest next move. It is the shape the agent reaches for when the PM is deciding
-what to chase, rather than when they are inspecting a single score.
-
-The conversation keeps the order the agent produced: a `delta` appends to the
-open prose part, a `ui` event opens a card, and the next `delta` opens a new
-paragraph after it. The opportunity score is computed from importance and
-satisfaction when the agent omits it, so the ODI formula has exactly one home
-(`src/lib/odi.ts`). Unknown component types degrade to a quiet fallback; a tree
-that fails validation is dropped whole, and the surrounding prose still reads.
-
-### Adding a surface
-
-1. Add an entry to `CATALOG` in `apps/studio/src/ui/catalog.ts` — props as a
-   JSON Schema subset, plus the description the model will read.
-2. Register the component in `apps/studio/src/ui/registry.ts`.
-3. Implement it in `apps/studio/src/ui/cards.tsx` (domain shape) or
-   `apps/studio/src/ui/primitives.tsx` (composition).
-4. Run `npm --prefix apps/studio test`. The `registry parity` test fails if the
-   catalog and the registry drift apart.
-
-No server change is needed, and no new dependency.
-
-## Hosted (experimental)
-
-The built SPA is also served from Cloudflare Workers at
-**[https://agentic-odi.alehar.workers.dev/](https://agentic-odi.alehar.workers.dev/)**.
-The UI loads without a backend; canvas data, chat, and mutations need the local
-sidecar and MCP server. Pull requests get preview URLs from Cloudflare Workers
-Builds. See [Deployment](deployment.md) for the Worker setup.
 
 ## 1. Web — production build (recommended for a quick look)
 

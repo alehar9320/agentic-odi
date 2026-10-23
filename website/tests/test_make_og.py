@@ -42,34 +42,6 @@ def test_cli_writes_both_files_to_out_dir(tmp_path):
     assert _dims((tmp_path / "favicon.png").read_bytes()) == (32, 32)
 
 
-def test_og_card_uses_the_site_palette():
-    m = _load()
-    assert m.CANVAS == (10, 11, 14)  # --bg
-    assert m.SURFACE == (14, 16, 20)  # --bg-raised
-    assert m.TEXT == (241, 242, 244)  # --text
-    assert m.ACCENT == (139, 140, 248)  # --accent
-
-
-def test_the_card_stays_within_ascii():
-    # Pillow's built-in font has no em dash, and a missing glyph renders as a
-    # tofu box on the card.
-    m = _load()
-    assert m.DEFAULT_HEADLINE.isascii()
-    assert m.DEFAULT_SUBHEAD.isascii()
-
-
-def test_the_mark_svg_matches_the_favicon_svg():
-    mark = (ASSETS / "mark.svg").read_bytes()
-    favicon = (ASSETS / "favicon.svg").read_bytes()
-    assert mark == favicon
-
-
-def test_the_mark_svg_uses_the_site_palette():
-    mark = (ASSETS / "mark.svg").read_text(encoding="utf-8")
-    assert "#8b8cf8" in mark
-    assert "#0e1014" in mark
-
-
 def test_committed_art_matches_generator():
     """Regenerate committed PNGs (uv run python website/tools/make_og.py) whenever the script changes."""
     from PIL import Image

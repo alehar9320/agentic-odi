@@ -20,6 +20,7 @@ from agentic_odi_core.models import (
     Outcome,
     Step,
     ValueMetric,
+    V2MOM,
 )
 
 _SCHEMA_MODELS: dict[str, type[BaseModel]] = {
@@ -31,6 +32,7 @@ _SCHEMA_MODELS: dict[str, type[BaseModel]] = {
     "BusinessValue": BusinessValue,
     "CustomerOutcome": CustomerOutcome,
     "Evidence": Evidence,
+    "V2MOM": V2MOM,
 }
 
 

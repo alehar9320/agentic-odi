@@ -19,11 +19,8 @@ members = [
 [dependency-groups]
 dev = [
     "bandit==1.9.4",
-    "jinja2==3.1.6",
-    "markdown-it-py==4.2.0",
     "mypy==2.4.0",
     "pyinstaller==6.22.3",
-    "pygments==2.21.0",
     "pytest==9.1.1",
     "pytest-asyncio==1.4.0",
     "pytest-cov==7.1.0",
@@ -50,16 +47,14 @@ select = ["E4", "E7", "E9", "F", "I", "UP", "B", "BLE"]
 
 [tool.mypy]
 python_version = "3.10"
-# Two test suites use a bare `conftest` module name; mypy cannot map both.
-exclude = ['^apps/studio-api/tests/conftest\.py$']
 ignore_missing_imports = true
 plugins = ["pydantic.mypy"]
 disable_error_code = ["prop-decorator"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "strict"
-pythonpath = [".", "brand/src"]
-testpaths = ["apps", "brand", "packages", "tests", "website"]
+pythonpath = ["."]
+testpaths = ["apps", "packages", "tests", "website"]
 
 [tool.coverage.run]
 source = [

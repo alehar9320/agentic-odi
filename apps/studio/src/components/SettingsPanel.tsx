@@ -1,9 +1,5 @@
-import { useState } from "react";
-
-import { useOnboarding } from "../onboarding/context";
 import { useStudio } from "../state/StudioContext";
 import type { StudioConfig } from "../types";
-import { FailurePanel } from "./FailurePanel";
 import { useUpdater } from "./updater/useUpdater";
 
 export function SettingsPanel() {
@@ -19,30 +15,12 @@ export function SettingsPanel() {
     llmHealth,
     mcpReachable,
     pushToast,
-    connectors,
-    connectorsError,
-    presets,
-    presetError,
-    refreshPresets,
-    refreshConnectors,
-    addConnector,
-    deleteConnector,
   } = useStudio();
-  const { enabled: tourEnabled, restart: restartTour } = useOnboarding();
-  const [selectedPreset, setSelectedPreset] = useState("");
   const updater = useUpdater();
 
   function update<K extends keyof StudioConfig>(key: K, value: StudioConfig[K]): void {
     saveSettings({ ...settings, [key]: value });
   }
-
-  const handleAddPreset = () => {
-    if (!selectedPreset) {
-      return;
-    }
-    void addConnector({ preset: selectedPreset });
-    setSelectedPreset("");
-  };
 
   return (
     <div className="settings">
@@ -54,6 +32,11 @@ export function SettingsPanel() {
               ? `${brief.product_name || "Your product"} — ${brief.job_statement}`
               : "Not set yet. The studio starts every reply from this."}
           </p>
+          {brief?.v2mom?.vision && (
+            <p className="settings__context-value" style={{ marginTop: "0.25rem", opacity: 0.85 }}>
+              <strong>Vision:</strong> {brief.v2mom.vision}
+            </p>
+          )}
         </div>
         <button type="button" className="button button--ghost" onClick={openSetup}>
           {brief ? "Edit context" : "Set up context"}
@@ -153,71 +136,6 @@ export function SettingsPanel() {
         </li>
       </ul>
 
-      <h3 className="settings__title">Connectors</h3>
-      {connectorsError ? (
-        <FailurePanel
-          error={connectorsError}
-          retryText="reload"
-          onRetry={() => void refreshConnectors()}
-        />
-      ) : connectors.length === 0 ? (
-        <p className="muted">No connectors registered. Pick a preset to add one.</p>
-      ) : (
-        <ul className="connection-list">
-          {connectors.map((connector) => (
-            <li key={connector.name}>
-              <span className="connection-list__value">
-                {connector.name} · {connector.kind}
-                {connector.enabled ? "" : " (disabled)"}
-              </span>
-              <button
-                type="button"
-                className="button button--ghost"
-                aria-label={`Remove ${connector.name}`}
-                onClick={() => void deleteConnector(connector.name)}
-              >
-                Remove
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-      <div className="field">
-        <label htmlFor="connector-preset">Add a preset</label>
-        {presetError ? (
-          <FailurePanel
-            error={presetError}
-            retryText="reload"
-            onRetry={() => void refreshPresets()}
-          />
-        ) : (
-          <select
-            id="connector-preset"
-            aria-label="Add preset"
-            value={selectedPreset}
-            onChange={(event) => setSelectedPreset(event.target.value)}
-          >
-            <option value="" disabled>
-              Select a preset
-            </option>
-            {presets.map((preset) => (
-              <option key={preset.id} value={preset.id}>
-                {preset.label}
-              </option>
-            ))}
-          </select>
-        )}
-      </div>
-      <button
-        type="button"
-        className="button button--ghost"
-        aria-label="Add preset"
-        disabled={!selectedPreset || Boolean(presetError)}
-        onClick={handleAddPreset}
-      >
-        Add
-      </button>
-
       <div className="settings__actions">
         <button type="button" className="button" onClick={clearChat}>
           Start a new conversation
@@ -226,16 +144,6 @@ export function SettingsPanel() {
           Sync canvas
         </button>
       </div>
-
-      {tourEnabled ? (
-        <div className="settings__tour">
-          <h3 className="settings__title">Getting started</h3>
-          <p className="muted">A four-step tour of what the studio can do, and where to begin.</p>
-          <button type="button" className="button button--ghost" onClick={restartTour}>
-            Replay the welcome tour
-          </button>
-        </div>
-      ) : null}
 
       <details className="disclosure">
         <summary>How the studio works</summary>

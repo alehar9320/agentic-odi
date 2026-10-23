@@ -4,16 +4,9 @@ As we validate the feasibility of this architecture, our next milestones include
 
 - [x] **External MCP client connector**: Pluggable connectors package with an
   HTTP MCP ingest client, CLI adapter, and in-memory tests.
-- [x] **Conversational rich surfaces**: the studio agent composes validated
-  cards inline from a closed, client-owned catalog instead of describing them
-  in prose.
 - [x] **Map ingested evidence onto ODI artifacts**: Turn connector records into
   jobs, outcomes, or evidence without mixing connector plumbing into the ODI
   store.
-- [x] **First-run wizard**: A skippable, resumable four-step tour with inline
-  connection repair, ending in the chosen surface or a handoff to the context
-  conversation — isolated in `apps/studio/src/onboarding/` behind the
-  `firstRunWizard` flag.
 - [x] **Additional connector kinds**: REST/webhooks and similar integrations
   implementing the same `Connector` protocol.
 - [x] **ODI Schema Definition**: Define standardized Pydantic models for *Jobs*,
