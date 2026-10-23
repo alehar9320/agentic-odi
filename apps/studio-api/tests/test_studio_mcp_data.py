@@ -51,6 +51,7 @@ def test_fetch_canvas_hydrates_jobs_steps_and_outcomes(monkeypatch) -> None:
         "get_jobs": json.dumps([{"id": "job-1"}]),
         "get_job_map": json.dumps([{"id": "step-1", "job_id": "job-1"}]),
         "get_outcomes": json.dumps([{"id": "outcome-1", "job_id": "job-1"}]),
+        "list_evidence": json.dumps([{"id": "evd-1", "job_id": "job-1"}]),
     }
     monkeypatch.setattr(mcp_data, "is_endpoint_reachable", lambda url, timeout: True)
     monkeypatch.setattr(mcp_data, "McpClient", _FakeClient)
@@ -61,6 +62,7 @@ def test_fetch_canvas_hydrates_jobs_steps_and_outcomes(monkeypatch) -> None:
         "jobs": [{"id": "job-1"}],
         "steps": [{"id": "step-1", "job_id": "job-1"}],
         "outcomes": [{"id": "outcome-1", "job_id": "job-1"}],
+        "evidence": [{"id": "evd-1", "job_id": "job-1"}],
         "source": "mcp",
         "warnings": [],
     }
@@ -68,6 +70,7 @@ def test_fetch_canvas_hydrates_jobs_steps_and_outcomes(monkeypatch) -> None:
         ("get_jobs", {}),
         ("get_job_map", {"job_id": "job-1"}),
         ("get_outcomes", {"job_id": "job-1"}),
+        ("list_evidence", {"job_id": "job-1"}),
     ]
 
 

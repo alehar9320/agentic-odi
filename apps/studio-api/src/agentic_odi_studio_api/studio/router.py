@@ -38,6 +38,7 @@ from agentic_odi_studio_api.studio.memory import ObservationNotFoundError, Studi
 from agentic_odi_studio_api.studio.probes import check_llm_health, defaults, is_endpoint_reachable
 from agentic_odi_studio_api.studio.schemas import (
     AddConnectorRequest,
+    AddEvidenceRequest,
     AddOutcomeRequest,
     AddStepRequest,
     ChatRequest,
@@ -52,6 +53,7 @@ from agentic_odi_studio_api.studio.schemas import (
     ObservationListResponse,
     ObservationResponse,
     ObservationUpdateRequest,
+    PromoteEvidenceRequest,
     UpdateJobRequest,
     UpdateOutcomeRequest,
     UpdateStepRequest,
@@ -436,3 +438,94 @@ async def post_chat(request: Request, body: ChatRequest) -> StreamingResponse:
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+@router.post("/evidence")
+async def post_evidence(body: AddEvidenceRequest, request: Request) -> dict:
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(body.mcp_url),
+            ToolName.ADD_EVIDENCE.value,
+            {
+                "source_name": body.source_name,
+                "source_kind": body.source_kind,
+                "name": body.name,
+                "content": body.content,
+                "url": body.url,
+                "item_type": body.item_type,
+                "job_id": body.job_id,
+                "step_id": body.step_id,
+                "outcome_id": body.outcome_id,
+            },
+        )
+        return {"ok": True, "result": result}
+    try:
+        evidence = _service(request).add_evidence(
+            source_name=body.source_name,
+            source_kind=body.source_kind,
+            name=body.name,
+            content=body.content,
+            url=body.url,
+            item_type=body.item_type,
+            job_id=body.job_id,
+            step_id=body.step_id,
+            outcome_id=body.outcome_id,
+        )
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return {"ok": True, "result": evidence.model_dump(mode="json")}
+
+
+@router.delete("/evidence/{evidence_id}")
+async def delete_evidence(
+    evidence_id: str, request: Request, mcp_url: str | None = Query(None)
+) -> dict:
+    if _uses_mcp(request):
+        await call_mcp_tool(
+            _require_mcp_url(mcp_url or ""),
+            ToolName.DELETE_EVIDENCE.value,
+            {"evidence_id": evidence_id},
+        )
+        return {"ok": True}
+    try:
+        _service(request).delete_evidence(evidence_id)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return {"ok": True}
+
+
+@router.post("/evidence/{evidence_id}/promote")
+async def promote_evidence(
+    evidence_id: str, body: PromoteEvidenceRequest, request: Request
+) -> dict:
+    if _uses_mcp(request):
+        args: dict[str, Any] = {"evidence_id": evidence_id, "target": body.target}
+        if body.job_id:
+            args["job_id"] = body.job_id
+        if body.statement:
+            args["statement"] = body.statement
+        if body.name:
+            args["name"] = body.name
+        if body.importance is not None:
+            args["importance"] = body.importance
+        if body.satisfaction is not None:
+            args["satisfaction"] = body.satisfaction
+        result = await call_mcp_tool(
+            _require_mcp_url(body.mcp_url),
+            ToolName.PROMOTE_EVIDENCE.value,
+            args,
+        )
+        return {"ok": True, "result": result}
+    try:
+        artifact = _service(request).promote_evidence(
+            evidence_id=evidence_id,
+            target=body.target,
+            job_id=body.job_id,
+            statement=body.statement,
+            name=body.name,
+            importance=body.importance,
+            satisfaction=body.satisfaction,
+        )
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return {"ok": True, "result": artifact.model_dump(mode="json")}

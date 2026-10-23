@@ -367,6 +367,7 @@ class LocalBackend(Backend):
                 name=args["name"],
                 content=args["content"],
                 item_type=args.get("item_type", "manual"),
+                url=args.get("url"),
                 raw=args.get("raw"),
                 job_id=args.get("job_id"),
                 step_id=args.get("step_id"),

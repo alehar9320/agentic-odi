@@ -1,29 +1,87 @@
+import { useState } from "react";
+import { useStudio } from "../../state/StudioContext";
+
 export function EvidenceStream() {
+  const { canvas, deleteEvidence, promoteEvidence } = useStudio();
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const items = canvas?.evidence ?? [];
+
   return (
     <section className="stack">
       <p className="notice">
-        Sample quotes, shown for orientation. No Gong, Slack, or telemetry connector is wired up in
-        this build.
+        Signals & Evidence captured from external connectors (Gong, Slack, Notion, Jira) or manual research. Knowledge remains stored in external tools while Agentic ODI orchestrates links to Jobs, Steps, and Outcomes.
       </p>
 
-      <figure className="evidence">
-        <figcaption>Gong call #104 · tech lead, fintech</figcaption>
-        <blockquote>
-          “We had a junior engineer push code that broke staging because the Stripe secret wasn’t
-          copied over. Three senior engineers spent two hours on it. There has to be a better way
-          than copy-pasting strings.”
-        </blockquote>
-        <span className="evidence__meta">Would link to JOB-402 / O-1 · severity high</span>
-      </figure>
-
-      <figure className="evidence">
-        <figcaption>Slack · #incident-deployments</figcaption>
-        <blockquote>
-          “Third time this week staging broke after a secret rotation. We need automated
-          synchronization.”
-        </blockquote>
-        <span className="evidence__meta">Would link to JOB-402 / O-2 · severity critical</span>
-      </figure>
+      {items.length === 0 ? (
+        <p className="empty-state">No evidence or research signals captured yet.</p>
+      ) : (
+        items.map((item) => {
+          const hasLinks = item.job_id || item.outcome_id || item.step_id;
+          return (
+            <figure className="evidence" key={item.id}>
+              <figcaption style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span>
+                  <strong>{item.name}</strong> · {item.source_name} ({item.source_kind})
+                </span>
+                {item.url && (
+                  <a
+                    href={item.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="quiet-action"
+                    style={{ textDecoration: "underline" }}
+                  >
+                    Open in {item.source_name} ↗
+                  </a>
+                )}
+              </figcaption>
+              <blockquote>“{item.content}”</blockquote>
+              <div
+                className="evidence__meta"
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginTop: "0.5rem",
+                }}
+              >
+                <span>
+                  {hasLinks ? (
+                    <>
+                      Linked to: {[item.job_id, item.step_id, item.outcome_id].filter(Boolean).join(" / ")}
+                    </>
+                  ) : (
+                    <em>Unlinked research signal</em>
+                  )}
+                </span>
+                <div style={{ display: "flex", gap: "0.5rem" }}>
+                  <button
+                    type="button"
+                    className="quiet-action"
+                    onClick={() => {
+                      void promoteEvidence(item.id, { target: "outcome" });
+                    }}
+                  >
+                    Promote to Outcome
+                  </button>
+                  <button
+                    type="button"
+                    className="quiet-action quiet-action--danger"
+                    disabled={deletingId === item.id}
+                    onClick={() => {
+                      setDeletingId(item.id);
+                      void deleteEvidence(item.id).finally(() => setDeletingId(null));
+                    }}
+                  >
+                    {deletingId === item.id ? "Removing…" : "Remove"}
+                  </button>
+                </div>
+              </div>
+            </figure>
+          );
+        })
+      )}
     </section>
   );
 }

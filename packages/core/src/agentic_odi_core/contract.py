@@ -107,6 +107,7 @@ TOOL_SPECS: dict[str, ToolSpec] = {
             "source_kind",
             "name",
             "content",
+            "url",
             "item_type",
             "raw",
             "job_id",

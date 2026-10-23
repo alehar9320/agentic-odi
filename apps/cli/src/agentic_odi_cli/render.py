@@ -232,6 +232,7 @@ def render_evidence(item: Any, *, as_json: bool) -> str:
             ("kind", item.get("source_kind", "")),
             ("item_type", item.get("item_type", "")),
             ("name", item.get("name", "")),
+            ("url", item.get("url") or ""),
             ("job_id", item.get("job_id") or ""),
             ("step_id", item.get("step_id") or ""),
             ("outcome_id", item.get("outcome_id") or ""),
@@ -247,13 +248,14 @@ def render_evidence_list(items: Any, *, as_json: bool) -> str:
     if as_json:
         return _json(items)
     return _table(
-        ("id", "source", "item_type", "name"),
+        ("id", "source", "item_type", "name", "url"),
         [
             (
                 str(item.get("id", "")),
                 _truncate(str(item.get("source_name", ""))),
                 _truncate(str(item.get("item_type", ""))),
                 _truncate(str(item.get("name", ""))),
+                _truncate(str(item.get("url") or "")),
             )
             for item in items
         ],

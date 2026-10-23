@@ -10,7 +10,11 @@ import { useStudio } from "../../state/StudioContext";
 import type { Outcome } from "../../types";
 
 export function OutcomeCard({ outcome }: { outcome: Outcome }) {
-  const { ask, deleteOutcome, updateOutcome } = useStudio();
+  const { ask, deleteOutcome, updateOutcome, canvas } = useStudio();
+
+  const linkedEvidence = (canvas?.evidence ?? []).filter(
+    (item) => item.outcome_id === outcome.id,
+  );
   const [showEvidence, setShowEvidence] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -42,9 +46,33 @@ export function OutcomeCard({ outcome }: { outcome: Outcome }) {
       </p>
 
       {showEvidence && (
-        <p className="card__evidence">
-          {outcome.evidence?.trim() || "No transcript is linked to this outcome yet."}
-        </p>
+        <div className="card__evidence">
+          {linkedEvidence.length > 0 ? (
+            linkedEvidence.map((evd) => (
+              <div key={evd.id} style={{ marginBottom: "0.5rem" }}>
+                <p style={{ margin: 0 }}>“{evd.content}”</p>
+                <small style={{ color: "var(--color-text-muted)" }}>
+                  Via {evd.source_name} ({evd.source_kind})
+                  {evd.url && (
+                    <>
+                      {" · "}
+                      <a
+                        href={evd.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{ color: "var(--color-accent)", textDecoration: "underline" }}
+                      >
+                        Source Link ↗
+                      </a>
+                    </>
+                  )}
+                </small>
+              </div>
+            ))
+          ) : (
+            <p>{outcome.evidence?.trim() || "No external evidence is linked to this outcome yet."}</p>
+          )}
+        </div>
       )}
 
       {editing && (

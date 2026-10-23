@@ -24,10 +24,25 @@ export interface Outcome {
   telemetry?: string;
 }
 
+export interface EvidenceItem {
+  id: string;
+  source_name: string;
+  source_kind: string;
+  item_type: string;
+  name: string;
+  content: string;
+  url?: string | null;
+  job_id?: string | null;
+  step_id?: string | null;
+  outcome_id?: string | null;
+  raw?: Record<string, unknown>;
+}
+
 export interface CanvasData {
   jobs: Job[];
   steps: Step[];
   outcomes: Outcome[];
+  evidence?: EvidenceItem[];
   source: "mcp" | "seed" | "local";
   /** Why the board is not what the server actually holds, when the sidecar knows. */
   warnings?: string[];

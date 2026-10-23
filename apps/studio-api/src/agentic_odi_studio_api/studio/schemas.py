@@ -178,3 +178,26 @@ class TurnModel(BaseModel):
 class LatestConversationResponse(BaseModel):
     conversation: ConversationModel | None = None
     turns: list[TurnModel] = Field(default_factory=list)
+
+
+class AddEvidenceRequest(BaseModel):
+    source_name: str
+    source_kind: str = "manual"
+    name: str
+    content: str
+    url: str | None = None
+    item_type: Literal["catalog", "resource", "tool_result", "manual", "note"] = "manual"
+    job_id: str | None = None
+    step_id: str | None = None
+    outcome_id: str | None = None
+    mcp_url: str = ""
+
+
+class PromoteEvidenceRequest(BaseModel):
+    target: Literal["job", "outcome"]
+    job_id: str | None = None
+    statement: str | None = None
+    name: str | None = None
+    importance: float | None = None
+    satisfaction: float | None = None
+    mcp_url: str = ""
