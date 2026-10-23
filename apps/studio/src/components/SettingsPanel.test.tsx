@@ -92,6 +92,17 @@ describe("SettingsPanel connectors", () => {
     expect(add).toHaveBeenCalledWith({ preset: "notion" });
   });
 
+  it("does not pretend unconnectable sources are connection rows", () => {
+    vi.mocked(useStudio).mockReturnValue(stubContext());
+
+    renderPanel();
+
+    expect(screen.queryByText(/gong transcripts/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/slack friction stream/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/product telemetry/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/no data source is connected yet/i)).toBeInTheDocument();
+  });
+
   it("shows an empty state when no connectors are registered", () => {
     vi.mocked(useStudio).mockReturnValue(stubContext({ connectors: [] }));
 
