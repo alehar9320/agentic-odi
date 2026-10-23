@@ -131,6 +131,7 @@ export function StudioBar({
           type="button"
           className="bar__health"
           onClick={() => openPanel("settings")}
+          aria-label={`Model status: ${status}. ${llmHealth.message}`}
           title={llmHealth.message}
         >
           <span
