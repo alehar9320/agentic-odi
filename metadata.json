@@ -3,7 +3,7 @@
   "checkpoint_id": "01M5N8K3CS4KPQWYQYP092FJCT",
   "strategy": "manual-commit",
   "branch": "slay/787ea800-extract-json",
-  "checkpoints_count": 5,
+  "checkpoints_count": 6,
   "files_touched": [
     "scripts/release_instructions.py",
     "tests/scripts/test_release_instructions.py"
@@ -35,6 +35,13 @@
       "transcript": "/3/full.jsonl",
       "compact_transcript": "/3/transcript.jsonl",
       "content_hash": "/3/content_hash.txt",
+      "prompt": ""
+    },
+    {
+      "metadata": "/4/metadata.json",
+      "transcript": "/4/full.jsonl",
+      "compact_transcript": "/4/transcript.jsonl",
+      "content_hash": "/4/content_hash.txt",
       "prompt": ""
     }
   ],
