@@ -149,7 +149,13 @@ Prefect's managed infrastructure for hosting MCP-compatible agents.</p>
 out to the maintainers to obtain the necessary credentials before connecting a
 client.</p>
 </blockquote>
-<h2 id="hosted-studio">Hosted Studio</h2>
+<h3 id="running-the-mcp-server-locally">Running the MCP server locally</h3>
+<p><code>python -m agentic_odi_mcp_server</code> listens on port 8000. Override it with
+<code>--port</code> or <code>AGENTIC_ODI_MCP_PORT</code> (the flag wins), so a second instance can run
+beside <code>scripts/dev.py</code> without a port clash:</p>
+<pre class="highlight"><code class="language-bash"><span class="nv">AGENTIC_ODI_MCP_PORT</span><span class="o">=</span><span class="m">8010</span><span class="w"> </span>python<span class="w"> </span>-m<span class="w"> </span>agentic_odi_mcp_server
+python<span class="w"> </span>-m<span class="w"> </span>agentic_odi_mcp_server<span class="w"> </span>--port<span class="w"> </span><span class="m">8020</span>
+</code></pre><h2 id="hosted-studio">Hosted Studio</h2>
 <p>The Living Studio SPA is deployed to Cloudflare Workers:</p>
 <table>
 <thead>
@@ -285,6 +291,9 @@ and impact simulation work without one.</p>
         </li>
         <li class="doc__toc-item doc__toc-item--2">
           <a href="#mcp-server-endpoint">MCP Server Endpoint</a>
+        </li>
+        <li class="doc__toc-item doc__toc-item--3">
+          <a href="#running-the-mcp-server-locally">Running the MCP server locally</a>
         </li>
         <li class="doc__toc-item doc__toc-item--2">
           <a href="#hosted-studio">Hosted Studio</a>
