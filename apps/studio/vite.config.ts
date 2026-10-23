@@ -19,5 +19,9 @@ export default defineConfig({
     globals: true,
     setupFiles: "./src/test/setup.ts",
     css: false,
+    // Vitest's default include is `**/*.{test,spec}.?(c|m)[jt]s?(x)`, which
+    // would also collect the Playwright specs in `e2e/`. Scope it to the unit
+    // tests so the two runners never overlap.
+    include: ["src/**/*.test.{ts,tsx}"],
   },
 });

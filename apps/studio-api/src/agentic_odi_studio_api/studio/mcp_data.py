@@ -26,6 +26,24 @@ log = logging.getLogger(__name__)
 MCP_CALL_TIMEOUT = 3.0
 
 
+def result_text(result: Any) -> str:
+    """Extract the text payload from a FastMCP tool result.
+
+    ``fastmcp.Client.call_tool`` returns a ``CallToolResult`` object, not a
+    string, so ``str(result)`` yields its ``repr`` rather than the tool's own
+    text. The text lives in the result's ``content`` blocks.
+    """
+    parts: list[str] = []
+    for item in getattr(result, "content", None) or []:
+        text = getattr(item, "text", None)
+        if isinstance(text, str):
+            parts.append(text)
+    if parts:
+        return "\n".join(parts)
+    # A plain string is a legitimate result shape for stubbed clients.
+    return result if isinstance(result, str) else str(result)
+
+
 async def fetch_canvas(mcp_url: str) -> dict[str, Any]:
     """Fetch live canvas data from FastMCP, falling back to the seed prototype."""
     jobs: list[dict[str, Any]] = []
@@ -44,7 +62,7 @@ async def fetch_canvas(mcp_url: str) -> dict[str, Any]:
                 mcp_client.call_tool(ToolName.GET_JOBS.value, {}), timeout=1.5
             )
             try:
-                parsed_jobs = json.loads(tool_result_text(raw_jobs))
+                parsed_jobs = json.loads(result_text(raw_jobs))
                 if isinstance(parsed_jobs, list):
                     jobs = parsed_jobs
             except Exception as exc:  # noqa: BLE001
@@ -61,7 +79,7 @@ async def fetch_canvas(mcp_url: str) -> dict[str, Any]:
                         mcp_client.call_tool(ToolName.GET_JOB_MAP.value, {"job_id": job_id}),
                         timeout=1.0,
                     )
-                    parsed_steps = json.loads(tool_result_text(raw_steps))
+                    parsed_steps = json.loads(result_text(raw_steps))
                     if isinstance(parsed_steps, list):
                         steps.extend(parsed_steps)
                 except Exception as exc:  # noqa: BLE001
@@ -74,7 +92,7 @@ async def fetch_canvas(mcp_url: str) -> dict[str, Any]:
                         mcp_client.call_tool(ToolName.GET_OUTCOMES.value, {"job_id": job_id}),
                         timeout=1.0,
                     )
-                    parsed_outcomes = json.loads(tool_result_text(raw_outcomes))
+                    parsed_outcomes = json.loads(result_text(raw_outcomes))
                     if isinstance(parsed_outcomes, list):
                         outcomes.extend(parsed_outcomes)
                 except Exception as exc:  # noqa: BLE001
@@ -110,7 +128,13 @@ def fetch_local_canvas(service: ODIService) -> dict[str, Any]:
 
 
 async def call_mcp_tool(mcp_url: str, tool: str, arguments: dict[str, Any]) -> str:
-    """Invoke an MCP tool, surfacing failures as typed HTTP errors."""
+    """Invoke an MCP tool, surfacing failures as HTTP 502.
+
+    The MCP server reports domain failures — a missing job, an out-of-range
+    score — as a successful tool call whose text starts with ``"Error: "``.
+    Relaying that as a 200 would tell the Studio a write succeeded when it did
+    not, so it is raised as a failure here instead.
+    """
     if not is_endpoint_reachable(mcp_url, timeout=0.3):
         raise StudioHTTPError(
             StudioError(
@@ -125,7 +149,11 @@ async def call_mcp_tool(mcp_url: str, tool: str, arguments: dict[str, Any]) -> s
             result = await asyncio.wait_for(
                 mcp_client.call_tool(tool, arguments), timeout=MCP_CALL_TIMEOUT
             )
-    except StudioHTTPError:
+            text = result_text(result)
+            if text.startswith("Error: "):
+                raise HTTPException(status_code=502, detail=text)
+            return text
+    except HTTPException:
         raise
     except ToolError as exc:
         # The tool ran and refused: that is the tool's failure, not the
