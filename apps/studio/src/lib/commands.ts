@@ -14,7 +14,6 @@ export type CommandId =
   | "jobs"
   | "start"
   | "status"
-  | "impact"
   | WorkspacePanelId;
 
 export interface StudioCommand {
@@ -25,15 +24,6 @@ export interface StudioCommand {
   description: string;
   keywords?: string[];
 }
-
-/**
- * The first thing the studio says when a simulation is asked for. Shared by
- * the `/impact` command and the first-run tour so both open the same
- * conversation.
- */
-export const IMPACT_PROMPT =
-  "Simulate the impact of a bet on my most underserved opportunity. " +
-  "Ask me what the bet is, then show me what changes before and after.";
 
 export const STUDIO_COMMANDS: StudioCommand[] = [
   {
@@ -88,8 +78,8 @@ export const STUDIO_COMMANDS: StudioCommand[] = [
   {
     id: "impact",
     name: "/impact",
-    label: "Simulate a bet",
-    description: "Ask the studio to simulate what a bet would change.",
+    label: "Impact simulation",
+    description: "Preview the friction collapse for a bet.",
     keywords: ["simulate", "bet"],
   },
   {
@@ -103,7 +93,7 @@ export const STUDIO_COMMANDS: StudioCommand[] = [
     id: "capture",
     name: "/capture",
     label: "Capture an outcome",
-    description: "Tell the studio what you heard. Falls back to the offline form.",
+    description: "Record an outcome by hand, with scores.",
     keywords: ["add", "outcome", "manual"],
   },
   {

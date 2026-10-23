@@ -40,6 +40,7 @@ interface Turn {
 const PANEL_COMMANDS = new Set<string>([
   "landscape",
   "jobmap",
+  "impact",
   "evidence",
   "capture",
   "settings",
@@ -125,7 +126,6 @@ export function SetupConversation() {
     closeSetup,
     openPanel,
     pushToast,
-    sendMessage,
     llmHealth,
   } = useStudio();
 
@@ -238,11 +238,6 @@ export function SetupConversation() {
         closeSetup();
         return;
       }
-      if (intent.kind === "talk") {
-        closeSetup();
-        void sendMessage(intent.text);
-        return;
-      }
       openPanel(intent.panel);
       return;
     }
@@ -353,13 +348,7 @@ export function SetupConversation() {
       if (jobId) {
         await updateJob(jobId, { name: jobName, description: description || undefined });
       } else {
-        // A job that could not be created must not cost the user their
-        // context: the setup continues without a job id.
-        try {
-          jobId = await createJob({ name: jobName, description: description || undefined });
-        } catch {
-          jobId = null;
-        }
+        jobId = await createJob({ name: jobName, description: description || undefined });
       }
     } else {
       jobId = null;
@@ -380,14 +369,6 @@ export function SetupConversation() {
   function handleCommand(command: StudioCommand) {
     if (PANEL_COMMANDS.has(command.id)) {
       openPanel(command.id as WorkspacePanelId);
-      return;
-    }
-    if (command.id === "impact") {
-      closeSetup();
-      void sendMessage(
-        "Simulate the impact of a bet on my most underserved opportunity. " +
-          "Ask me what the bet is, then show me what changes before and after.",
-      );
       return;
     }
     if (command.id === "help") {

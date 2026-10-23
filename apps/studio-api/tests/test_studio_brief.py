@@ -6,7 +6,7 @@ import asyncio
 import json
 
 from agentic_odi_studio_api.studio import chat
-from agentic_odi_studio_api.studio.schemas import V2MOM, ChatMessage, ChatRequest, StudioBrief
+from agentic_odi_studio_api.studio.schemas import ChatMessage, ChatRequest, StudioBrief, V2MOM
 
 BRIEF = StudioBrief(
     product_name="Ambient",
@@ -72,7 +72,6 @@ def test_offline_stream_is_tagged_so_the_ui_can_label_it(monkeypatch) -> None:
         if "event: status" in frame
     ]
     assert "offline" in phases
-
 
 def test_system_prompt_carries_v2mom() -> None:
     messages = chat._to_openai_messages(_request())

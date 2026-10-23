@@ -30,8 +30,7 @@ export function Composer({
   autoFocus = false,
   placeholder,
 }: ComposerProps) {
-  const { settings, llmHealth, brief, connectorSuggestions, presets, dismissConnectorSuggestion, refreshConnectors } =
-    useStudio();
+  const { settings, llmHealth, brief } = useStudio();
   const [highlight, setHighlight] = useState(0);
   // Remember which draft was dismissed, so typing again re-opens the palette
   // without an effect that writes state on every keystroke.
@@ -142,29 +141,6 @@ export function Composer({
         </div>
       )}
 
-      {connectorSuggestions.length > 0 && (
-        <div className="composer__suggestions" aria-label="Connector suggestions">
-          {connectorSuggestions.map((id) => {
-            const label = presets.find((preset) => preset.id === id)?.label ?? id;
-            return (
-              <button
-                key={id}
-                type="button"
-                className="composer__suggestion"
-                aria-label={`Added ${label}, dismiss`}
-                onClick={() => {
-                  dismissConnectorSuggestion(id);
-                  void refreshConnectors();
-                }}
-              >
-                <span>Added {label}</span>
-                <span aria-hidden>✕</span>
-              </button>
-            );
-          })}
-        </div>
-      )}
-
       <form
         className="composer__shell"
         onSubmit={(event) => {
@@ -186,8 +162,8 @@ export function Composer({
           placeholder={
             placeholder ??
             (offline
-              ? "Model offline — type / for commands, or capture what you know…"
-              : "What do you want to make happen?")
+              ? "Model offline — type / for commands, or work in the panels…"
+              : "Ask about a job, an outcome, or what to build next…")
           }
           aria-expanded={paletteOpen}
           aria-controls={paletteOpen ? "studio-command-palette" : undefined}

@@ -7,7 +7,7 @@ import {
 } from "../../lib/greeting";
 import { isUnderserved } from "../../lib/odi";
 import { useStudio } from "../../state/StudioContext";
-import { BoltIcon, CaptureIcon, CompassIcon, SparkIcon } from "../icons";
+import { BoltIcon, CaptureIcon, CompassIcon, RouteIcon, SparkIcon } from "../icons";
 
 function prefersReducedMotion(): boolean {
   return (
@@ -17,14 +17,9 @@ function prefersReducedMotion(): boolean {
   );
 }
 
-const OPPORTUNITY_PROMPT =
-  "I have an opportunity in mind. Ask me what it is, then help me sharpen it into something I can defend.";
-const FIND_PROMPT =
-  "I need to find the next opportunity worth chasing. Help me look across what I know about my customers and find the gap that matters most.";
-const PRESSURE_TEST_PROMPT =
-  "I have a bet I'm about to make. Pressure-test it with me: ask what it is, then tell me what would have to be true and what evidence I'm missing.";
-const CAPTURE_PROMPT =
-  "I heard something from a customer that I want to make sense of. Ask me what they said, then help me turn it into something we can act on.";
+const DEFINE_JOB_PROMPT =
+  "Help me define a job-to-be-done my customers are trying to get done.";
+const GUIDELINES_PROMPT = "Walk me through the ODI stage-by-stage guidelines.";
 
 interface HeroPill {
   id: string;
@@ -88,43 +83,44 @@ export function Hero({ onSubmit }: { onSubmit: (text: string) => void }) {
 
   const pills: HeroPill[] = [
     {
-      id: "sharpen",
-      label: "Sharpen an opportunity",
+      id: "define-job",
+      label: "Define a job",
       icon: <SparkIcon size={15} />,
-      run: () => onSubmit(OPPORTUNITY_PROMPT),
+      run: () => onSubmit(DEFINE_JOB_PROMPT),
       conversational: true,
+    },
+    {
+      id: "landscape",
+      label: "Opportunity landscape",
+      icon: <CompassIcon size={15} />,
+      run: () => openPanel("landscape"),
     },
     outcomes > 0
       ? {
-          id: "pressure-test",
-          label: "Pressure-test a bet",
+          id: "impact",
+          label: "Simulate a bet",
           icon: <BoltIcon size={15} />,
-          run: () => onSubmit(PRESSURE_TEST_PROMPT),
-          conversational: true,
+          run: () => openPanel("impact"),
         }
       : {
-          id: "find",
-          label: "Find the next opportunity",
-          icon: <CompassIcon size={15} />,
-          run: () => onSubmit(FIND_PROMPT),
+          id: "guidelines",
+          label: "ODI guidelines",
+          icon: <BoltIcon size={15} />,
+          run: () => onSubmit(GUIDELINES_PROMPT),
           conversational: true,
         },
     jobs > 0
       ? {
           id: "capture",
-          label: "Capture what you heard",
+          label: "Capture an outcome",
           icon: <CaptureIcon size={15} />,
-          run: () =>
-            llmHealth.healthy === false
-              ? openPanel("capture")
-              : onSubmit(CAPTURE_PROMPT),
-          conversational: true,
+          run: () => openPanel("capture"),
         }
       : {
-          id: "landscape",
-          label: "Opportunity landscape",
-          icon: <CompassIcon size={15} />,
-          run: () => openPanel("landscape"),
+          id: "jobmap",
+          label: "Job map",
+          icon: <RouteIcon size={15} />,
+          run: () => openPanel("jobmap"),
         },
   ];
 
@@ -138,8 +134,8 @@ export function Hero({ onSubmit }: { onSubmit: (text: string) => void }) {
       </h1>
       <p className="hero__sub">
         {brief?.target_user
-          ? `For ${brief.target_user}. Tell me where they get stuck, and we'll turn it into something you can defend.`
-          : "Name what you're trying to win. I'll help you test whether it's worth it — and what to do next."}
+          ? `For ${brief.target_user}. Tell me where they get stuck, and we will turn it into a measurable outcome.`
+          : "Think in outcomes, not tickets. Tell me what you're building and I'll keep it in mind — or just start anywhere."}
       </p>
       <div className="hero__pills" aria-label="Suggested next steps">
         {pills.map((pill) => (
