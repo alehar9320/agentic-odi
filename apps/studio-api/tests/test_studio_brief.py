@@ -6,7 +6,7 @@ import asyncio
 import json
 
 from agentic_odi_studio_api.studio import chat
-from agentic_odi_studio_api.studio.schemas import ChatMessage, ChatRequest, StudioBrief, V2MOM
+from agentic_odi_studio_api.studio.schemas import V2MOM, ChatMessage, ChatRequest, StudioBrief
 
 BRIEF = StudioBrief(
     product_name="Ambient",

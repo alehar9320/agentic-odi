@@ -12,6 +12,7 @@ from typing import Any
 from pydantic import BaseModel
 
 from agentic_odi_core.models import (
+    V2MOM,
     BusinessValue,
     CustomerOutcome,
     CustomerValue,
@@ -20,7 +21,6 @@ from agentic_odi_core.models import (
     Outcome,
     Step,
     ValueMetric,
-    V2MOM,
 )
 
 _SCHEMA_MODELS: dict[str, type[BaseModel]] = {
