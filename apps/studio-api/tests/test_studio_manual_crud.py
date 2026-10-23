@@ -100,3 +100,52 @@ def test_out_of_range_scores_are_rejected() -> None:
 
     response = client.patch(f"/api/outcomes/{outcome_id}", json={"importance": 42})
     assert response.status_code == 422
+
+
+def test_step_for_an_unknown_job_is_404_not_500() -> None:
+    response = _client().post(
+        "/api/steps",
+        json={"mcp_url": "", "job_id": "does-not-exist", "name": "Execute", "order": 1},
+    )
+
+    assert response.status_code == 404
+    assert "does-not-exist" in response.json()["detail"]
+
+
+def test_outcome_with_an_out_of_range_score_is_422_not_500() -> None:
+    client = _client()
+    job_id = client.post("/api/jobs", json={"name": "Ship a service"}).json()["result"]["id"]
+
+    response = client.post(
+        "/api/outcomes",
+        json={
+            "mcp_url": "",
+            "job_id": job_id,
+            "statement": "Minimize the time to ship",
+            "importance": 12,
+            "satisfaction": 3.5,
+        },
+    )
+
+    assert response.status_code == 422
+
+
+def test_outcome_for_an_unknown_job_is_404_not_500() -> None:
+    response = _client().post(
+        "/api/outcomes",
+        json={
+            "mcp_url": "",
+            "job_id": "does-not-exist",
+            "statement": "Minimize the time to ship",
+            "importance": 8.5,
+            "satisfaction": 3.5,
+        },
+    )
+
+    assert response.status_code == 404
+
+
+def test_job_without_a_name_is_422_not_500() -> None:
+    response = _client().post("/api/jobs", json={"name": ""})
+
+    assert response.status_code == 422

@@ -168,7 +168,10 @@ async def post_job(body: CreateJobRequest, request: Request) -> dict:
             {"name": body.name, "description": body.description},
         )
         return {"ok": True, "result": result}
-    job = _service(request).add_job(name=body.name, description=body.description)
+    try:
+        job = _service(request).add_job(name=body.name, description=body.description)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
     return {"ok": True, "result": job.model_dump(mode="json")}
 
 
@@ -212,11 +215,13 @@ async def post_step(body: AddStepRequest, request: Request) -> dict:
             {"job_id": body.job_id, "name": body.name, "order": body.order},
         )
     else:
-        result = (
-            _service(request)
-            .add_step(job_id=body.job_id, name=body.name, order=body.order)
-            .model_dump_json()
-        )
+        try:
+            step = _service(request).add_step(
+                job_id=body.job_id, name=body.name, order=body.order
+            )
+        except Exception as exc:  # noqa: BLE001
+            raise _as_http_error(exc) from exc
+        result = step.model_dump_json()
     return {"ok": True, "result": result}
 
 
@@ -265,16 +270,16 @@ async def post_outcome(body: AddOutcomeRequest, request: Request) -> dict:
             },
         )
     else:
-        result = (
-            _service(request)
-            .add_outcome(
+        try:
+            outcome = _service(request).add_outcome(
                 job_id=body.job_id,
                 statement=body.statement,
                 importance=body.importance,
                 satisfaction=body.satisfaction,
             )
-            .model_dump_json()
-        )
+        except Exception as exc:  # noqa: BLE001
+            raise _as_http_error(exc) from exc
+        result = outcome.model_dump_json()
     return {"ok": True, "result": result}
 
 
