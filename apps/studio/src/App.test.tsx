@@ -222,6 +222,44 @@ describe("studio shell", () => {
     expect(screen.getByText("Local guidance")).toBeInTheDocument();
   });
 
+  it("stops a running stream on Escape before closing the workspace", async () => {
+    const { streamChat } = await import("./api/studioApi");
+    vi.mocked(streamChat).mockImplementationOnce(
+      (_request, _onEvent, signal) =>
+        new Promise<void>((_resolve, reject) => {
+          signal?.addEventListener("abort", () => {
+            const error = new Error("aborted");
+            error.name = "AbortError";
+            reject(error);
+          });
+        }),
+    );
+    render(<App />);
+
+    const composer = await screen.findByRole("textbox", { name: /message the studio/i });
+    fireEvent.change(composer, { target: { value: "Where do I start?" } });
+    fireEvent.click(screen.getByRole("button", { name: /send message/i }));
+    await screen.findByRole("button", { name: /stop generating/i });
+
+    fireEvent.click(screen.getByRole("button", { name: /^landscape/i }));
+    expect(
+      await screen.findByRole("heading", { name: /opportunity landscape/i }),
+    ).toBeInTheDocument();
+
+    fireEvent.keyDown(window, { key: "Escape" });
+
+    await waitFor(() => {
+      expect(screen.queryByRole("button", { name: /stop generating/i })).toBeNull();
+    });
+    expect(screen.getByRole("heading", { name: /opportunity landscape/i })).toBeInTheDocument();
+
+    fireEvent.keyDown(window, { key: "Escape" });
+
+    await waitFor(() => {
+      expect(screen.queryByRole("heading", { name: /opportunity landscape/i })).toBeNull();
+    });
+  });
+
   it("starts a new conversation from the drawer", async () => {
     render(<App />);
 
