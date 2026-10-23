@@ -154,6 +154,7 @@ export function OpportunityLandscape() {
               className="studio-input"
               placeholder="Search opportunities / outcomes by statement or ID..."
               value={searchQuery}
+              disabled={isLoading}
               onChange={(e) => setSearchQuery(e.target.value)}
               style={{ width: "100%" }}
             />
@@ -162,6 +163,7 @@ export function OpportunityLandscape() {
             <input
               type="checkbox"
               checked={underservedOnly}
+              disabled={isLoading}
               onChange={(event) => setUnderservedOnly(event.target.checked)}
               style={{ accentColor: "var(--studio-indigo)" }}
             />
@@ -172,6 +174,7 @@ export function OpportunityLandscape() {
               type="button"
               className="studio-button"
               style={{ fontSize: "0.78rem", padding: "4px 10px" }}
+              disabled={isLoading}
               onClick={() => {
                 setSearchQuery("");
                 setUnderservedOnly(false);
