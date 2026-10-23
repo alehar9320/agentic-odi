@@ -184,7 +184,40 @@ export function OpportunityLandscape() {
             </button>
           ) : null}
         </div>
-      )}
+        <label
+          style={{
+            fontSize: "0.85rem",
+            color: "var(--studio-text)",
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            cursor: "pointer",
+            userSelect: "none",
+            minHeight: 44,
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={underservedOnly}
+            onChange={(event) => setUnderservedOnly(event.target.checked)}
+            style={{ width: 18, height: 18, accentColor: "var(--studio-indigo-strong)" }}
+          />
+          Show Underserved Only (&gt;10)
+        </label>
+        {searchQuery || underservedOnly ? (
+          <button
+            type="button"
+            className="studio-button"
+            style={{ fontSize: "0.78rem", padding: "4px 10px" }}
+            onClick={() => {
+              setSearchQuery("");
+              setUnderservedOnly(false);
+            }}
+          >
+            Clear Filters
+          </button>
+        ) : null}
+      </div>
 
       {isLoading ? (
         <GhostOpportunityCards />

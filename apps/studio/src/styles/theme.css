@@ -4613,3 +4613,74 @@ details[open] summary {
     display: none;
   }
 }
+
+/* Mobile: touch targets, safe areas, and a one-handed studio          */
+/* ================================================================== */
+:root {
+  --safe-area-top: env(safe-area-inset-top, 0px);
+  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+@media (max-width: 1023px) {
+  /* A notch must not eat the bar, and the home indicator must not eat
+     the composer. */
+  .bar {
+    padding-top: calc(8px + var(--safe-area-top));
+  }
+
+  .chat__dock {
+    padding-bottom: calc(10px + var(--safe-area-bottom));
+  }
+
+  /* 44px targets: a thumb, not a cursor. */
+  .button,
+  .quiet-action,
+  .chip,
+  .studio-button,
+  .ui-action {
+    min-height: 44px;
+  }
+
+  .quiet-action {
+    padding-inline: 12px;
+    font-size: 0.82rem;
+  }
+
+  .chip {
+    padding-inline: 14px;
+  }
+
+  .composer__send {
+    width: 44px;
+    height: 44px;
+  }
+
+  /* iOS zooms the whole page when a field is under 16px. */
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+
+  /* The rail scrolls instead of squeezing its chips. */
+  .rail {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .rail::-webkit-scrollbar {
+    display: none;
+  }
+
+  .rail__list {
+    width: max-content;
+    min-width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .metrics {
+    grid-template-columns: 1fr;
+  }
+}

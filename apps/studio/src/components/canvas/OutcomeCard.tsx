@@ -28,7 +28,10 @@ export function OutcomeCard({ outcome }: { outcome: Outcome }) {
   const pill = opportunityPill(opp);
 
   return (
-    <article className={`card${underserved ? " card--hot" : ""}`} aria-label={`Outcome ${outcomeId}`}>
+    <article
+      className={`card${underserved ? " card--hot" : ""}`}
+      aria-label={`Outcome ${outcomeId}: ${statement}`}
+    >
       <header className="card__head">
         <span className="card__id">{outcomeId}</span>
         <span className={`badge badge--${pill.variant}`}>{pill.label}</span>
