@@ -47,8 +47,8 @@ with a documentation hub at
 **[alehar9320.github.io/agentic-odi/docs/](https://alehar9320.github.io/agentic-odi/docs/)**.
 It is republished by the `Pages` workflow on every push to `main`. The site is
 generated from this repository — the MCP tool reference, the connector catalog,
-the CLI tree, and the ODI schema are read from the code that ships, so they
-cannot drift from it.
+and the ODI schema are read from the code that ships, so they cannot drift from
+it. The CLI reference is hand-written; a test fails when it misses a command.
 
 **Hosted Studio:** the experimental Living Studio UI runs at
 **[agentic-odi.alehar.workers.dev](https://agentic-odi.alehar.workers.dev/)**.
