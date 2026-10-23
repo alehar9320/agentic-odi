@@ -1,0 +1,5 @@
+Read-only research. Do not edit any files. Analyze website/, docs/, .github/workflows/, scripts/, packaging/, brand/, pyproject.toml, README.md in /home/alexa/repos/agentic-odi. Goal: find 12 concrete, high-value opportunities that each deliver a distinct user/developer-visible increment and could be implemented by a junior agent in 2-4 hours. Focus: docs accuracy/drift, first-run install experience, hosted Studio/deployment, website discoverability/SEO/accessibility/performance, release/version/update flow, CI signal speed/reliability, generated docs, contributor ergonomics, security headers, broken/stale links or commands. Run only read-only commands. Each candidate: title, user value, exact files, acceptance criteria, rough effort, overlaps with known issues/PRs. Prefer small, self-contained increments. Cite file_path:line_number.
+
+---
+
+Continue if you have next steps, or stop and ask for clarification if you are unsure how to proceed.
