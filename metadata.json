@@ -3,7 +3,7 @@
   "checkpoint_id": "01M5N5FQRJA5A7CD10TXJTKCJ0",
   "strategy": "manual-commit",
   "branch": "slay/86a8d260-composer-chip-copy",
-  "checkpoints_count": 1,
+  "checkpoints_count": 2,
   "files_touched": [
     "apps/studio/src/components/chat/Composer.test.tsx",
     "apps/studio/src/components/chat/Composer.tsx"
@@ -14,6 +14,13 @@
       "transcript": "/0/full.jsonl",
       "compact_transcript": "/0/transcript.jsonl",
       "content_hash": "/0/content_hash.txt",
+      "prompt": ""
+    },
+    {
+      "metadata": "/1/metadata.json",
+      "transcript": "/1/full.jsonl",
+      "compact_transcript": "/1/transcript.jsonl",
+      "content_hash": "/1/content_hash.txt",
       "prompt": ""
     }
   ],
