@@ -91,14 +91,18 @@ export function healthLlm(config: {
   return postJson<LlmHealth>("/api/health/llm", config);
 }
 
-export function addStep(payload: AddStepPayload): Promise<{ ok: boolean; result: string }> {
-  return postJson<{ ok: boolean; result: string }>("/api/steps", payload);
+// The local backend returns the created entity; the MCP backend returns its text
+// reply. Callers only rely on `ok`, so both shapes are declared.
+export function addStep(
+  payload: AddStepPayload,
+): Promise<{ ok: boolean; result: { id?: string } | string }> {
+  return postJson<{ ok: boolean; result: { id?: string } | string }>("/api/steps", payload);
 }
 
 export function addOutcome(
   payload: AddOutcomePayload,
-): Promise<{ ok: boolean; result: string }> {
-  return postJson<{ ok: boolean; result: string }>("/api/outcomes", payload);
+): Promise<{ ok: boolean; result: { id?: string } | string }> {
+  return postJson<{ ok: boolean; result: { id?: string } | string }>("/api/outcomes", payload);
 }
 
 export function createJob(

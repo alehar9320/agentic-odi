@@ -215,7 +215,7 @@ async def post_step(body: AddStepRequest, request: Request) -> dict:
         result = (
             _service(request)
             .add_step(job_id=body.job_id, name=body.name, order=body.order)
-            .model_dump_json()
+            .model_dump(mode="json")
         )
     return {"ok": True, "result": result}
 
@@ -273,7 +273,7 @@ async def post_outcome(body: AddOutcomeRequest, request: Request) -> dict:
                 importance=body.importance,
                 satisfaction=body.satisfaction,
             )
-            .model_dump_json()
+            .model_dump(mode="json")
         )
     return {"ok": True, "result": result}
 

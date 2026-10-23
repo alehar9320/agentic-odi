@@ -65,3 +65,53 @@ def test_post_outcome_returns_the_mcp_result(monkeypatch) -> None:
             },
         )
     ]
+
+
+def _local_client() -> TestClient:
+    return TestClient(create_app(InMemoryRepository(), backend="local"))
+
+
+def test_post_job_returns_a_dict_for_the_local_backend() -> None:
+    response = _local_client().post(
+        "/api/jobs", json={"mcp_url": "", "name": "Ship faster", "description": ""}
+    )
+
+    assert response.status_code == 200
+    result = response.json()["result"]
+    assert isinstance(result, dict)
+    assert result["name"] == "Ship faster"
+
+
+def test_post_step_returns_a_dict_for_the_local_backend() -> None:
+    client = _local_client()
+    job_id = client.post("/api/jobs", json={"mcp_url": "", "name": "Ship"}).json()["result"]["id"]
+
+    response = client.post(
+        "/api/steps", json={"mcp_url": "", "job_id": job_id, "name": "Execute", "order": 1}
+    )
+
+    assert response.status_code == 200
+    result = response.json()["result"]
+    assert isinstance(result, dict)
+    assert result["name"] == "Execute"
+
+
+def test_post_outcome_returns_a_dict_for_the_local_backend() -> None:
+    client = _local_client()
+    job_id = client.post("/api/jobs", json={"mcp_url": "", "name": "Ship"}).json()["result"]["id"]
+
+    response = client.post(
+        "/api/outcomes",
+        json={
+            "mcp_url": "",
+            "job_id": job_id,
+            "statement": "Minimize the time to ship",
+            "importance": 8.5,
+            "satisfaction": 3.5,
+        },
+    )
+
+    assert response.status_code == 200
+    result = response.json()["result"]
+    assert isinstance(result, dict)
+    assert result["statement"] == "Minimize the time to ship"
