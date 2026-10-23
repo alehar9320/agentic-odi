@@ -1,0 +1,51 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M5N7N1RT0RXX6WPX3PZE31BH",
+  "session_id": "ses_e973e3fd5ffeRN1E3KHHGyG5Kv",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-23T20:37:29.154130095Z",
+  "branch": "slay/54e49874-inmemory-reload",
+  "checkpoints_count": 1,
+  "save_step_count": 1,
+  "files_touched": [],
+  "agent": "OpenCode",
+  "model": "poolside/laguna-s-2.1:free",
+  "turn_id": "3f85dbbc19cc",
+  "checkpoint_transcript_start": 44,
+  "transcript_lines_at_start": 44,
+  "compact_transcript_start": 44,
+  "token_usage": {
+    "input_tokens": 152356,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 429088,
+    "output_tokens": 11548,
+    "api_call_count": 4
+  },
+  "session_metrics": {
+    "turn_count": 5
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 152,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        "docs/superpowers/plans/2026-10-21-conversational-generative-ui.md": 97,
+        "docs/superpowers/todos.md": 55
+      }
+    },
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 152,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        "docs/superpowers/plans/2026-10-21-conversational-generative-ui.md": 97,
+        "docs/superpowers/todos.md": 55
+      }
+    }
+  ]
+}

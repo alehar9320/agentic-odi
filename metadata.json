@@ -3,7 +3,7 @@
   "checkpoint_id": "01M5N7N1RT0RXX6WPX3PZE31BH",
   "strategy": "manual-commit",
   "branch": "slay/54e49874-inmemory-reload",
-  "checkpoints_count": 7,
+  "checkpoints_count": 8,
   "files_touched": [
     "packages/core/src/agentic_odi_core/repository.py",
     "packages/core/tests/test_repository.py",
@@ -51,13 +51,20 @@
       "compact_transcript": "/5/transcript.jsonl",
       "content_hash": "/5/content_hash.txt",
       "prompt": ""
+    },
+    {
+      "metadata": "/6/metadata.json",
+      "transcript": "/6/full.jsonl",
+      "compact_transcript": "/6/transcript.jsonl",
+      "content_hash": "/6/content_hash.txt",
+      "prompt": "/6/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 177405,
+    "input_tokens": 329761,
     "cache_creation_tokens": 0,
-    "cache_read_tokens": 997280,
-    "output_tokens": 4877,
-    "api_call_count": 20
+    "cache_read_tokens": 1426368,
+    "output_tokens": 16425,
+    "api_call_count": 24
   }
 }
