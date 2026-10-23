@@ -37,6 +37,24 @@ describe("JobMap Interactive Visualization", () => {
     expect(screen.getByText("8. Conclude")).toBeInTheDocument();
   });
 
+  it("adds a step from the inline form", async () => {
+    harness.state.addStep.mockResolvedValue(undefined);
+    render(<JobMap />);
+
+    fireEvent.click(screen.getByRole("button", { name: /add step/i }));
+    fireEvent.change(screen.getByLabelText(/new step name/i), {
+      target: { value: "Confirm the deployment target" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
+
+    await screen.findByRole("button", { name: /add step/i });
+    expect(harness.state.addStep).toHaveBeenCalledWith({
+      job_id: "JOB-1",
+      name: "Confirm the deployment target",
+      order: 3,
+    });
+  });
+
   it("filters job steps when clicking a phase card", () => {
     render(<JobMap />);
     const phase1 = screen.getByText("1. Define");

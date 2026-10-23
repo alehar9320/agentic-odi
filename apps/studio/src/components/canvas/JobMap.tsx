@@ -22,7 +22,8 @@ function phaseIndexFor(order: number, stepCount: number): number {
 }
 
 export function JobMap() {
-  const { canvasState, refreshCanvas, updateStep, deleteStep, updateJob, deleteJob } = useStudio();
+  const { canvasState, refreshCanvas, addStep, updateStep, deleteStep, updateJob, deleteJob } =
+    useStudio();
   const canvas = canvasState.data;
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [editingStepId, setEditingStepId] = useState<string | null>(null);
@@ -32,6 +33,8 @@ export function JobMap() {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [busy, setBusy] = useState(false);
   const [selectedPhaseIndex, setSelectedPhaseIndex] = useState<number | null>(null);
+  const [addStepOpen, setAddStepOpen] = useState(false);
+  const [newStepName, setNewStepName] = useState("");
 
   const jobs = canvas?.jobs ?? [];
   const activeJob = jobs.find((job) => job.id === selectedJobId) ?? jobs[0];
@@ -47,6 +50,24 @@ export function JobMap() {
     try {
       await updateStep(stepId, { name: editStepName.trim(), order: editStepOrder });
       setEditingStepId(null);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const nextStepOrder =
+    steps.reduce((max, step, index) => Math.max(max, step.order ?? index + 1), 0) + 1;
+
+  async function saveNewStep() {
+    const name = newStepName.trim();
+    if (!activeJobId || !name) {
+      return;
+    }
+    setBusy(true);
+    try {
+      await addStep({ job_id: activeJobId, name, order: nextStepOrder });
+      setNewStepName("");
+      setAddStepOpen(false);
     } finally {
       setBusy(false);
     }
@@ -211,6 +232,57 @@ export function JobMap() {
           );
         })}
       </div>
+
+      {activeJobId && (
+        <div className="jm-add">
+          {addStepOpen ? (
+            <form
+              className="form jm-add__form"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void saveNewStep();
+              }}
+              onKeyDown={(event) => {
+                if (event.key === "Escape") {
+                  event.preventDefault();
+                  setAddStepOpen(false);
+                }
+              }}
+            >
+              <div className="field">
+                <label htmlFor="jm-new-step">New step name</label>
+                <input
+                  id="jm-new-step"
+                  className="input"
+                  autoFocus
+                  value={newStepName}
+                  onChange={(event) => setNewStepName(event.target.value)}
+                />
+              </div>
+              <div className="step__edit">
+                <button
+                  type="submit"
+                  className="quiet-action"
+                  disabled={busy || !newStepName.trim()}
+                >
+                  Save
+                </button>
+                <button
+                  type="button"
+                  className="quiet-action"
+                  onClick={() => setAddStepOpen(false)}
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          ) : (
+            <button type="button" className="quiet-action" onClick={() => setAddStepOpen(true)}>
+              Add step
+            </button>
+          )}
+        </div>
+      )}
 
       {canvasState.kind === "loading" ? (
         <GhostJobSteps />
