@@ -66,9 +66,10 @@ One sentence is enough. I'll help you test whether it's worth chasing.
 Enter to send · / for commands
 ```
 
-- The hero opens on a **capability question**, not a greeting. It still rotates
-  through greeting, insight, and capability lines after the first few seconds,
-  and the rotation is the same one returning users see.
+- The hero opens on a **capability question**, not a greeting, and holds it
+  still for the whole first run — the headline must not change while someone is
+  deciding what to say. Once there is context or canvas data it becomes the
+  quiet rotation returning users already know.
 - Starters are sentences the PM would say out loud, not feature names.
 - The third starter adapts to state. With a job on the canvas it is **Capture
   what you heard**; with outcomes it is **Pressure-test a bet**. It never opens

@@ -74,9 +74,12 @@ export function Hero({ onSubmit }: { onSubmit: (text: string) => void }) {
 
   // The first frame is always the invitation; rotation starts from it.
   const current = candidates.find((candidate) => candidate.id === currentId) ?? candidates[0];
+  // A first run gets one still sentence. Changing the headline while someone is
+  // deciding what to say is the opposite of focus.
+  const firstRun = !brief && jobs === 0 && outcomes === 0;
 
   useEffect(() => {
-    if (prefersReducedMotion()) {
+    if (firstRun || prefersReducedMotion()) {
       return;
     }
     const timer = window.setInterval(() => {
@@ -87,7 +90,7 @@ export function Hero({ onSubmit }: { onSubmit: (text: string) => void }) {
       setCurrentId((id) => nextGreeting(candidates, id ?? current?.id)?.id ?? null);
     }, GREETING_ROTATION_MS);
     return () => window.clearInterval(timer);
-  }, [candidates, current?.id]);
+  }, [candidates, current?.id, firstRun]);
 
   const pills: HeroPill[] = [
     {
