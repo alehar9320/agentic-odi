@@ -1,0 +1,53 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M5N6G299PY4NQFFG7J3RMZ0M",
+  "session_id": "ses_e97237be6ffeYOE5iVM57jqF77",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-23T20:16:34.054432481Z",
+  "branch": "slay/c573d87e-capture-toasts",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "apps/studio/src/state/StudioContext.test.tsx"
+  ],
+  "agent": "OpenCode",
+  "model": "poolside/laguna-s-2.1:free",
+  "turn_id": "d876e9702456",
+  "checkpoint_transcript_start": 47,
+  "transcript_lines_at_start": 47,
+  "compact_transcript_start": 47,
+  "token_usage": {
+    "input_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 0,
+    "output_tokens": 0,
+    "api_call_count": 0
+  },
+  "session_metrics": {
+    "turn_count": 1
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-10-23T20:16:33.989648265Z",
+    "agent_lines": 0,
+    "agent_removed": 6,
+    "human_added": 393,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 393,
+    "total_lines_changed": 399,
+    "agent_percentage": 1.5037593984962405,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 152,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        "docs/superpowers/plans/2026-10-21-conversational-generative-ui.md": 97,
+        "docs/superpowers/todos.md": 55
+      }
+    }
+  ]
+}
