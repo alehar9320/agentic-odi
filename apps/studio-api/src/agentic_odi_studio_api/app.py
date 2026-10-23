@@ -6,14 +6,21 @@ import os
 from pathlib import Path
 
 from agentic_odi_core import ODIService
+from agentic_odi_core.remote import StudioError, StudioErrorCode
 from agentic_odi_core.repository import Repository
 from agentic_odi_core.sqlite_repository import SQLiteRepository
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from agentic_odi_studio_api.studio.connectors import ConnectorService
+from agentic_odi_studio_api.studio.errors import (
+    RequestIdMiddleware,
+    StudioHTTPError,
+    register_error_handlers,
+    request_id_for,
+)
 from agentic_odi_studio_api.studio.memory import StudioMemory
 from agentic_odi_studio_api.studio.router import router as studio_router
 
@@ -62,6 +69,8 @@ def create_app(
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    app.add_middleware(RequestIdMiddleware)
+    register_error_handlers(app)
 
     @app.get("/health")
     def health() -> dict:
@@ -79,13 +88,22 @@ def create_app(
             app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
 
         @app.get("/{full_path:path}", response_model=None)
-        def spa_fallback(full_path: str) -> FileResponse | JSONResponse:
+        def spa_fallback(request: Request, full_path: str) -> FileResponse | JSONResponse:
+            if full_path == "api" or full_path.startswith("api/"):
+                raise StudioHTTPError(
+                    StudioError(code=StudioErrorCode.NOT_FOUND, message="Not Found")
+                )
             candidate = (SPA_DIST / full_path).resolve()
             if full_path and candidate.is_file() and candidate.is_relative_to(SPA_DIST.resolve()):
                 return FileResponse(candidate)
             index = SPA_DIST / "index.html"
             if index.is_file():
                 return FileResponse(index)
-            return JSONResponse({"detail": "Not Found"}, status_code=404)
+            error = StudioError(
+                code=StudioErrorCode.NOT_FOUND,
+                message="Not Found",
+                request_id=request_id_for(request),
+            )
+            return JSONResponse({"error": error.model_dump(mode="json")}, status_code=404)
 
     return app

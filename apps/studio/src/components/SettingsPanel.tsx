@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useOnboarding } from "../onboarding/context";
 import { useStudio } from "../state/StudioContext";
 import type { StudioConfig } from "../types";
+import { FailurePanel } from "./FailurePanel";
 import { useUpdater } from "./updater/useUpdater";
 
 export function SettingsPanel() {
@@ -19,7 +20,11 @@ export function SettingsPanel() {
     mcpReachable,
     pushToast,
     connectors,
+    connectorsError,
     presets,
+    presetError,
+    refreshPresets,
+    refreshConnectors,
     addConnector,
     deleteConnector,
   } = useStudio();
@@ -149,7 +154,13 @@ export function SettingsPanel() {
       </ul>
 
       <h3 className="settings__title">Connectors</h3>
-      {connectors.length === 0 ? (
+      {connectorsError ? (
+        <FailurePanel
+          error={connectorsError}
+          retryText="reload"
+          onRetry={() => void refreshConnectors()}
+        />
+      ) : connectors.length === 0 ? (
         <p className="muted">No connectors registered. Pick a preset to add one.</p>
       ) : (
         <ul className="connection-list">
@@ -173,27 +184,35 @@ export function SettingsPanel() {
       )}
       <div className="field">
         <label htmlFor="connector-preset">Add a preset</label>
-        <select
-          id="connector-preset"
-          aria-label="Add preset"
-          value={selectedPreset}
-          onChange={(event) => setSelectedPreset(event.target.value)}
-        >
-          <option value="" disabled>
-            Select a preset
-          </option>
-          {presets.map((preset) => (
-            <option key={preset.id} value={preset.id}>
-              {preset.label}
+        {presetError ? (
+          <FailurePanel
+            error={presetError}
+            retryText="reload"
+            onRetry={() => void refreshPresets()}
+          />
+        ) : (
+          <select
+            id="connector-preset"
+            aria-label="Add preset"
+            value={selectedPreset}
+            onChange={(event) => setSelectedPreset(event.target.value)}
+          >
+            <option value="" disabled>
+              Select a preset
             </option>
-          ))}
-        </select>
+            {presets.map((preset) => (
+              <option key={preset.id} value={preset.id}>
+                {preset.label}
+              </option>
+            ))}
+          </select>
+        )}
       </div>
       <button
         type="button"
         className="button button--ghost"
         aria-label="Add preset"
-        disabled={!selectedPreset}
+        disabled={!selectedPreset || Boolean(presetError)}
         onClick={handleAddPreset}
       >
         Add

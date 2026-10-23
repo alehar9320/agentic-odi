@@ -100,3 +100,68 @@ describe("SettingsPanel connectors", () => {
     expect(screen.getByText(/no connectors registered/i)).toBeInTheDocument();
   });
 });
+
+describe("SettingsPanel connector catalog failures", () => {
+  it("shows the catalog failure with a retry instead of an empty select", () => {
+    const refresh = vi.fn().mockResolvedValue(undefined);
+    vi.mocked(useStudio).mockReturnValue(
+      stubContext({
+        presets: [],
+        presetError: {
+          code: "mcp_unreachable",
+          message: "The connector catalog is unreachable.",
+          suggestion: "Check that the sidecar is running, then try again.",
+          retryable: true,
+        },
+        refreshPresets: refresh,
+      }),
+    );
+
+    renderPanel();
+
+    expect(screen.getByRole("alert").textContent).toContain(
+      "The connector catalog is unreachable.",
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /retry/i }));
+    expect(refresh).toHaveBeenCalled();
+  });
+
+  it("disables adding a preset while the catalog is in error", () => {
+    vi.mocked(useStudio).mockReturnValue(
+      stubContext({
+        presets: [],
+        presetError: {
+          code: "mcp_unreachable",
+          message: "The connector catalog is unreachable.",
+          retryable: true,
+        },
+      }),
+    );
+
+    renderPanel();
+
+    expect(screen.getByRole("button", { name: /add preset/i })).toBeDisabled();
+  });
+});
+
+describe("SettingsPanel connector list failures", () => {
+  it("shows the failure instead of claiming there are no connectors", () => {
+    vi.mocked(useStudio).mockReturnValue(
+      stubContext({
+        connectors: [],
+        connectorsError: {
+          code: "mcp_unreachable",
+          message: "The connector list is unreachable.",
+          suggestion: "Check that the sidecar is running, then try again.",
+          retryable: true,
+        },
+      }),
+    );
+
+    renderPanel();
+
+    expect(screen.getByRole("alert").textContent).toContain("The connector list is unreachable.");
+    expect(screen.queryByText(/no connectors registered/i)).toBeNull();
+  });
+});

@@ -44,6 +44,12 @@ from agentic_odi_core.models import (
     ValueMetric,
     compute_opportunity_score,
 )
+from agentic_odi_core.remote import (
+    StudioError,
+    StudioErrorCode,
+    parse_tool_result,
+    tool_result_text,
+)
 from agentic_odi_core.repository import InMemoryRepository, Repository
 from agentic_odi_core.schema import odi_schema
 from agentic_odi_core.services import (
@@ -82,6 +88,8 @@ __all__ = [
     "Step",
     "StepNotFoundError",
     "StoreError",
+    "StudioError",
+    "StudioErrorCode",
     "ValueMetric",
     "ValueOutOfRangeError",
     "InMemoryRepository",
@@ -99,5 +107,7 @@ __all__ = [
     "job_not_found",
     "odi_schema",
     "outcome_not_found",
+    "parse_tool_result",
     "step_not_found",
+    "tool_result_text",
 ]

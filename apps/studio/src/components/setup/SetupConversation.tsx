@@ -346,7 +346,13 @@ export function SetupConversation() {
       if (jobId) {
         await updateJob(jobId, { name: jobName, description: description || undefined });
       } else {
-        jobId = await createJob({ name: jobName, description: description || undefined });
+        // A job that could not be created must not cost the user their
+        // context: the setup continues without a job id.
+        try {
+          jobId = await createJob({ name: jobName, description: description || undefined });
+        } catch {
+          jobId = null;
+        }
       }
     } else {
       jobId = null;

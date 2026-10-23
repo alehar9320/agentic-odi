@@ -21,6 +21,7 @@ import {
   healthLlm,
   healthMcp,
   streamChat,
+  asStudioError,
 } from "./studioApi";
 
 afterEach(() => {
@@ -89,14 +90,14 @@ describe("health probes", () => {
 
 describe("mcp passthrough writes", () => {
   it("adds a step", async () => {
-    mockJson({ ok: true, result: "created" });
+    mockJson({ id: "STEP-1", job_id: "JOB-402", name: "9. Ship", order: 9 });
     await expect(
       addStep({ mcp_url: "u", job_id: "JOB-402", name: "9. Ship", order: 9 }),
-    ).resolves.toMatchObject({ ok: true });
+    ).resolves.toMatchObject({ id: "STEP-1" });
   });
 
   it("adds an outcome", async () => {
-    mockJson({ ok: true, result: "created" });
+    mockJson({ id: "O-1", statement: "Minimize time", opportunity_score: 12 });
     await expect(
       addOutcome({
         mcp_url: "u",
@@ -105,7 +106,7 @@ describe("mcp passthrough writes", () => {
         importance: 8.5,
         satisfaction: 3.5,
       }),
-    ).resolves.toMatchObject({ ok: true });
+    ).resolves.toMatchObject({ id: "O-1" });
   });
 });
 
@@ -321,5 +322,76 @@ describe("conversations", () => {
         body: expect.stringContaining('"conversation_id":"c-1"'),
       }),
     );
+  });
+});
+
+describe("typed failures", () => {
+  function mockFailure(status: number, body: unknown): void {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(JSON.stringify(body), {
+            status,
+            headers: { "Content-Type": "application/json" },
+          }),
+      ),
+    );
+  }
+
+  it("rejects with a StudioApiError carrying the server's code and suggestion", async () => {
+    mockFailure(422, {
+      error: {
+        code: "out_of_range",
+        message: "Importance must be between 1.0 and 10.0",
+        detail: "importance: 42",
+        suggestion: "Use 1-10.",
+        retryable: false,
+        request_id: "req-1",
+      },
+    });
+
+    await expect(
+      addOutcome({
+        mcp_url: "u",
+        job_id: "JOB-402",
+        statement: "Minimize time",
+        importance: 42,
+        satisfaction: 1,
+      }),
+    ).rejects.toMatchObject({
+      name: "StudioApiError",
+      error: {
+        code: "out_of_range",
+        message: "Importance must be between 1.0 and 10.0",
+        suggestion: "Use 1-10.",
+        request_id: "req-1",
+      },
+    });
+  });
+
+  it("still rejects an old-style detail body with that message", async () => {
+    mockFailure(400, { detail: "nope" });
+
+    await expect(
+      addStep({ mcp_url: "u", job_id: "JOB-402", name: "9. Ship", order: 9 }),
+    ).rejects.toMatchObject({ message: "nope" });
+  });
+
+  it("turns an unknown failure into an internal error", async () => {
+    mockFailure(500, {});
+
+    await expect(
+      addStep({ mcp_url: "u", job_id: "JOB-402", name: "9. Ship", order: 9 }),
+    ).rejects.toMatchObject({
+      error: { code: "internal" },
+    });
+  });
+
+  it("exposes asStudioError for non-API failures", () => {
+    const problem = asStudioError(new Error("boom"));
+
+    expect(problem.code).toBe("internal");
+    expect(problem.message).toBe("boom");
   });
 });

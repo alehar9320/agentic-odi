@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 
 import { useStudio } from "../../state/StudioContext";
+import { FailurePanel } from "../FailurePanel";
 import { GhostJobSteps } from "../Skeletons";
 
 // Ulwick Universal Job Process Phases (8 phases)
@@ -21,7 +22,8 @@ function phaseIndexFor(order: number, stepCount: number): number {
 }
 
 export function JobMap() {
-  const { canvas, canvasLoading, updateStep, deleteStep, updateJob, deleteJob } = useStudio();
+  const { canvasState, refreshCanvas, updateStep, deleteStep, updateJob, deleteJob } = useStudio();
+  const canvas = canvasState.data;
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [editingStepId, setEditingStepId] = useState<string | null>(null);
   const [editStepName, setEditStepName] = useState("");
@@ -84,6 +86,20 @@ export function JobMap() {
           const order = step.order ?? idx + 1;
           return phaseIndexFor(order, steps.length) === selectedPhaseIndex;
         });
+
+  if (canvasState.kind === "error") {
+    // A failed canvas must not render as eight empty phases.
+    return (
+      <section className="fade-in">
+        <p className="section-title">Universal Job Map (8 Process Phases)</p>
+        <FailurePanel
+          error={canvasState.error}
+          onRetry={() => void refreshCanvas()}
+          retryText="reload"
+        />
+      </section>
+    );
+  }
 
   return (
     <section className="fade-in">
@@ -196,7 +212,7 @@ export function JobMap() {
         })}
       </div>
 
-      {canvasLoading && !canvas ? (
+      {canvasState.kind === "loading" ? (
         <GhostJobSteps />
       ) : steps.length ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>

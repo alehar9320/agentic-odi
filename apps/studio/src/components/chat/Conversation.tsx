@@ -1,9 +1,10 @@
 import { useState } from "react";
 
 import { useStudio } from "../../state/StudioContext";
-import type { ChatPart } from "../../types";
+import type { ChatPart, StudioError } from "../../types";
 import { UiActionContext } from "../../ui/actions";
 import { UiRenderer } from "../../ui/UiRenderer";
+import { FailurePanel } from "../FailurePanel";
 import { CheckIcon, CopyIcon, SparkIcon } from "../icons";
 import { Markdown } from "./Markdown";
 
@@ -62,6 +63,8 @@ function AssistantMessage({
   label,
   tools,
   offline,
+  error,
+  retryText,
 }: {
   content: string;
   parts: ChatPart[];
@@ -69,8 +72,10 @@ function AssistantMessage({
   label: string;
   tools: { name: string; status: string; preview?: string }[];
   offline?: boolean;
+  error?: StudioError;
+  retryText?: string;
 }) {
-  const { pushToast } = useStudio();
+  const { pushToast, sendMessage } = useStudio();
   const [copied, setCopied] = useState(false);
 
   async function copy() {
@@ -83,7 +88,7 @@ function AssistantMessage({
     }
   }
 
-  if (!content && !streaming && parts.length === 0) {
+  if (!content && !streaming && parts.length === 0 && !error) {
     return null;
   }
 
@@ -98,9 +103,16 @@ function AssistantMessage({
           <MessageParts parts={parts} />
         ) : content ? (
           <Markdown source={content} />
-        ) : (
+        ) : !error ? (
           <Typing label={label} />
-        )}
+        ) : null}
+        {error ? (
+          <FailurePanel
+            error={error}
+            retryText={retryText}
+            onRetry={(text) => void sendMessage(text)}
+          />
+        ) : null}
         {streaming && content && <span className="caret" aria-hidden="true" />}
 
         {tools.length > 0 && (
@@ -166,6 +178,8 @@ export function Conversation() {
               label={phaseLabel(thinkingPhase)}
               tools={isLast ? toolActivity : []}
               offline={isLast && offlineReply}
+              error={message.error}
+              retryText={message.retryText}
             />
           );
         })}

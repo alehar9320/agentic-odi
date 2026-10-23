@@ -12,29 +12,83 @@ import type {
   ConnectorPreset,
   Conversation,
   CreateJobPayload,
+  Job,
   LatestConversation,
   LlmHealth,
   McpHealth,
   Observation,
   ObservationKind,
   ObservationStatus,
+  Outcome,
+  Step,
   StudioConfig,
+  StudioError,
 } from "../types";
 import { createSseParser, type RawSseEvent } from "./sse";
 
-async function errorDetail(response: Response): Promise<string> {
-  try {
-    const body = (await response.json()) as { detail?: string };
-    return body.detail ?? `Request failed (${response.status})`;
-  } catch {
-    return `Request failed (${response.status})`;
+/** A failure the sidecar reported, kept whole so the UI can show it. */
+export class StudioApiError extends Error {
+  readonly error: StudioError;
+
+  constructor(error: StudioError) {
+    super(error.message);
+    this.name = "StudioApiError";
+    this.error = error;
   }
+}
+
+/** Turn anything thrown into the shared error shape. */
+export function asStudioError(error: unknown): StudioError {
+  if (error instanceof StudioApiError) {
+    return error.error;
+  }
+  if (error instanceof Error) {
+    return {
+      code: "internal",
+      message: error.message || "Something went wrong.",
+      retryable: false,
+    };
+  }
+  return {
+    code: "internal",
+    message: "Something went wrong.",
+    retryable: false,
+  };
+}
+
+async function studioError(response: Response): Promise<StudioApiError> {
+  let body: { error?: StudioError; detail?: string };
+  try {
+    body = (await response.json()) as { error?: StudioError; detail?: string };
+  } catch {
+    body = {};
+  }
+
+  if (body.error && typeof body.error === "object" && typeof body.error.code === "string") {
+    return new StudioApiError({
+      ...body.error,
+      retryable: body.error.retryable ?? false,
+      message: body.error.message || `Request failed (${response.status})`,
+    });
+  }
+  if (typeof body.detail === "string" && body.detail) {
+    return new StudioApiError({
+      code: "internal",
+      message: body.detail,
+      retryable: false,
+    });
+  }
+  return new StudioApiError({
+    code: "internal",
+    message: `Request failed (${response.status})`,
+    retryable: false,
+  });
 }
 
 async function getJson<T>(path: string): Promise<T> {
   const response = await fetch(apiUrl(path), { headers: { Accept: "application/json" } });
   if (!response.ok) {
-    throw new Error(await errorDetail(response));
+    throw await studioError(response);
   }
   return (await response.json()) as T;
 }
@@ -46,7 +100,7 @@ async function sendJson<T>(method: "POST" | "PATCH", path: string, body: unknown
     body: JSON.stringify(body),
   });
   if (!response.ok) {
-    throw new Error(await errorDetail(response));
+    throw await studioError(response);
   }
   return (await response.json()) as T;
 }
@@ -61,7 +115,7 @@ async function deleteJson<T>(path: string): Promise<T> {
     headers: { Accept: "application/json" },
   });
   if (!response.ok) {
-    throw new Error(await errorDetail(response));
+    throw await studioError(response);
   }
   return (await response.json()) as T;
 }
@@ -91,31 +145,27 @@ export function healthLlm(config: {
   return postJson<LlmHealth>("/api/health/llm", config);
 }
 
-export function addStep(payload: AddStepPayload): Promise<{ ok: boolean; result: string }> {
-  return postJson<{ ok: boolean; result: string }>("/api/steps", payload);
+export function addStep(payload: AddStepPayload): Promise<Step> {
+  return postJson<Step>("/api/steps", payload);
 }
 
-export function addOutcome(
-  payload: AddOutcomePayload,
-): Promise<{ ok: boolean; result: string }> {
-  return postJson<{ ok: boolean; result: string }>("/api/outcomes", payload);
+export function addOutcome(payload: AddOutcomePayload): Promise<Outcome> {
+  return postJson<Outcome>("/api/outcomes", payload);
 }
 
-export function createJob(
-  payload: CreateJobPayload,
-): Promise<{ ok: boolean; result: { id?: string } | string }> {
-  return postJson<{ ok: boolean; result: { id?: string } | string }>("/api/jobs", payload);
+export function createJob(payload: CreateJobPayload): Promise<Job> {
+  return postJson<Job>("/api/jobs", payload);
 }
 
 export function updateJob(
   jobId: string,
   payload: { name?: string; description?: string; mcp_url: string },
-): Promise<{ ok: boolean }> {
-  return sendJson<{ ok: boolean }>("PATCH", `/api/jobs/${encodeURIComponent(jobId)}`, payload);
+): Promise<Job> {
+  return sendJson<Job>("PATCH", `/api/jobs/${encodeURIComponent(jobId)}`, payload);
 }
 
-export function deleteJob(jobId: string, mcpUrl: string): Promise<{ ok: boolean }> {
-  return deleteJson<{ ok: boolean }>(
+export function deleteJob(jobId: string, mcpUrl: string): Promise<{ deleted: string }> {
+  return deleteJson<{ deleted: string }>(
     `/api/jobs/${encodeURIComponent(jobId)}?mcp_url=${encodeURIComponent(mcpUrl)}`,
   );
 }
@@ -123,12 +173,12 @@ export function deleteJob(jobId: string, mcpUrl: string): Promise<{ ok: boolean 
 export function updateStep(
   stepId: string,
   payload: { name?: string; order?: number; mcp_url: string },
-): Promise<{ ok: boolean }> {
-  return sendJson<{ ok: boolean }>("PATCH", `/api/steps/${encodeURIComponent(stepId)}`, payload);
+): Promise<Step> {
+  return sendJson<Step>("PATCH", `/api/steps/${encodeURIComponent(stepId)}`, payload);
 }
 
-export function deleteStep(stepId: string, mcpUrl: string): Promise<{ ok: boolean }> {
-  return deleteJson<{ ok: boolean }>(
+export function deleteStep(stepId: string, mcpUrl: string): Promise<{ deleted: string }> {
+  return deleteJson<{ deleted: string }>(
     `/api/steps/${encodeURIComponent(stepId)}?mcp_url=${encodeURIComponent(mcpUrl)}`,
   );
 }
@@ -136,16 +186,16 @@ export function deleteStep(stepId: string, mcpUrl: string): Promise<{ ok: boolea
 export function updateOutcome(
   outcomeId: string,
   payload: { statement?: string; importance?: number; satisfaction?: number; mcp_url: string },
-): Promise<{ ok: boolean }> {
-  return sendJson<{ ok: boolean }>(
+): Promise<Outcome> {
+  return sendJson<Outcome>(
     "PATCH",
     `/api/outcomes/${encodeURIComponent(outcomeId)}`,
     payload,
   );
 }
 
-export function deleteOutcome(outcomeId: string, mcpUrl: string): Promise<{ ok: boolean }> {
-  return deleteJson<{ ok: boolean }>(
+export function deleteOutcome(outcomeId: string, mcpUrl: string): Promise<{ deleted: string }> {
+  return deleteJson<{ deleted: string }>(
     `/api/outcomes/${encodeURIComponent(outcomeId)}?mcp_url=${encodeURIComponent(mcpUrl)}`,
   );
 }
@@ -167,7 +217,7 @@ export async function deleteConnector(name: string): Promise<ConnectorOperationR
     method: "DELETE",
     headers: { Accept: "application/json" },
   });
-  if (!response.ok) throw new Error(await errorDetail(response));
+  if (!response.ok) throw await studioError(response);
   return (await response.json()) as ConnectorOperationResponse;
 }
 
@@ -189,7 +239,7 @@ export async function streamChat(
   });
 
   if (!response.ok || !response.body) {
-    throw new Error(await errorDetail(response));
+    throw await studioError(response);
   }
 
   const reader = response.body.getReader();
