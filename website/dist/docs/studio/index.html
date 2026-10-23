@@ -153,12 +153,16 @@ SPA never contacts MCP or the LLM directly.</p>
 </thead>
 <tbody>
 <tr>
-<td><strong>First-run tour</strong></td>
-<td>A four-step, skippable welcome on the very first visit: what the studio is, which ambition brought you here, the live state of your sidecar/MCP/model (with inline repair when the model is down), and the first move. The four doors are <strong>I have one in mind</strong>, <strong>My boss handed me a priority</strong>, <strong>Help me find the next one</strong>, and <strong>Pressure-test a bet</strong>; each starts the matching conversation. Replay it from <strong>Settings → Replay the welcome tour</strong>.</td>
+<td><strong>First minute</strong></td>
+<td>The studio opens on one question — what do you want to win — with three starters and the composer already focused. Nothing covers the stage: no tour, no form, no required step. After the first exchange, at most one quiet line suggests the next thing (add context, or capture the evidence a score is missing). It sits above the composer, never over the thread, and can be dismissed forever.</td>
 </tr>
 <tr>
-<td><strong>First run</strong></td>
-<td>A short conversation in the chat, not a form: what you are building, who feels the problem, the job they are trying to get done, then where it hurts. One question at a time, with a reflection before the next ask, quick replies, and <strong>Explore on my own</strong> always visible. Skipping is allowed; answers and progress are kept as a draft. Re-open it any time with <code>/start</code>, the home stage's context pill, or Settings.</td>
+<td><strong>Product tour</strong></td>
+<td>An optional four-step tour: what the studio is, which ambition brought you here, the live state of your sidecar/MCP/model (with inline repair when the model is down), and the first move. The four doors are <strong>I have one in mind</strong>, <strong>My boss handed me a priority</strong>, <strong>Help me find the next one</strong>, and <strong>Pressure-test a bet</strong>; each starts the matching conversation. It never opens by itself: <strong>Show me around</strong> on the home stage opens it, and <strong>Settings → Replay the tour</strong> starts it over.</td>
+</tr>
+<tr>
+<td><strong>Context conversation</strong></td>
+<td>Opened when you ask for it — the <strong>Tell me what you're building</strong> starter, the context hint, <code>/start</code>, or Settings. A short conversation in the chat, not a form: what you are building, who feels the problem, the job they are trying to get done, then where it hurts. One question at a time, with a reflection before the next ask, quick replies, and <strong>Explore on my own</strong> always visible. Skipping is allowed; answers and progress are kept as a draft.</td>
 </tr>
 <tr>
 <td><strong>Hero</strong></td>
@@ -235,11 +239,12 @@ the model, so they work when it is offline.</p>
 </tbody>
 </table>
 <p>Unknown commands produce a transcript notice pointing at <code>/help</code>.</p>
-<h3 id="the-welcome-tour">The welcome tour</h3>
-<p>The tour is the front door, the context conversation is the first room. It is
-skippable at every step (<code>Skip the tour</code> or <code>Escape</code>), resumable (progress is
-stored after every transition in <code>localStorage[&quot;studio.onboarding&quot;]</code>), and
-replayable from Settings.</p>
+<h3 id="the-product-tour">The product tour</h3>
+<p>The stage is the front door; the tour is an answer to &quot;show me around&quot;, not a
+gate. It is skippable at every step (<code>Skip the tour</code> or <code>Escape</code>), resumable
+(progress is stored after every transition in <code>localStorage[&quot;studio.onboarding&quot;]</code>),
+and replayable from Settings. Nothing opens it automatically, and a fresh
+install writes no record until the person asks for it.</p>
 <p>Everything lives in <code>apps/studio/src/onboarding/</code>:</p>
 <table>
 <thead>
@@ -263,7 +268,7 @@ replayable from Settings.</p>
 </tr>
 <tr>
 <td><code>OnboardingProvider.tsx</code></td>
-<td>Auto-open, persistence, replay</td>
+<td>Explicit opening, persistence, replay</td>
 </tr>
 <tr>
 <td><code>FirstRunWizard.tsx</code>, <code>steps.tsx</code>, <code>onboarding.css</code></td>
@@ -314,12 +319,18 @@ the chat, canvas, and sidecar code are untouched.</p>
 <code>enabled</code>/<code>disabled</code>. With the flag off, no dialog renders, no onboarding state
 is written, and Settings hides the replay action.</p>
 <h3 id="guidance-not-gates">Guidance, not gates</h3>
-<p>The setup conversation is a nudge, never a prerequisite. If you skip it, the
-home stage keeps a dashed <strong>Tell me what you're building</strong> pill; it reopens the
-conversation exactly where you left off. <code>/start</code> and Settings do the same. The conversation also understands a
-natural reply: say &quot;skip&quot;, &quot;not now&quot;, or &quot;show me the landscape&quot; and it reacts
-instead of recording it as an answer. When a brief exists, it opens on a review
-and asks what changed rather than asking everything again.</p>
+<p>Nothing is a prerequisite. The home stage keeps a dashed <strong>Tell me what you're
+building</strong> pill, and the context conversation reopens exactly where you left off.
+<code>/start</code> and Settings do the same. The conversation also understands a natural
+reply: say &quot;skip&quot;, &quot;not now&quot;, or &quot;show me the landscape&quot; and it reacts instead
+of recording it as an answer. When a brief exists, it opens on a review and asks
+what changed rather than asking everything again.</p>
+<p>After the first exchange, <code>lib/guidance.ts</code> picks at most one hint worth showing:
+context the studio does not have, or the customer evidence a score is missing.
+Context outranks evidence because it makes every later answer better. Dismissals
+are permanent (<code>localStorage[&quot;studio.guidance&quot;]</code>), and with nothing useful to say
+the line does not render at all — a hint system that keeps finding things to say
+becomes the modal it replaced.</p>
 <h3 id="without-a-model">Without a model</h3>
 <p>When the LLM is unreachable the Studio keeps working:</p>
 <ul>
@@ -674,7 +685,7 @@ automatically.</p>
           <a href="#slash-commands">Slash commands</a>
         </li>
         <li class="doc__toc-item doc__toc-item--3">
-          <a href="#the-welcome-tour">The welcome tour</a>
+          <a href="#the-product-tour">The product tour</a>
         </li>
         <li class="doc__toc-item doc__toc-item--3">
           <a href="#guidance-not-gates">Guidance, not gates</a>
