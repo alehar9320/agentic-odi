@@ -150,3 +150,30 @@ def test_main_publishes_instructions(monkeypatch, capsys):
     assert "https://x/dl/odi_0.7.0_linux_x86_64.tar.gz" in out
     assert "install.sh | sh" in out
     assert "## 📦 Download & Run" in out
+
+
+def _fenced_block_after(section: str, heading: str) -> list[str]:
+    """Return the lines of the first ```bash block after ``heading``."""
+    rest = section.split(heading, 1)[1]
+    body = rest.split("```bash", 1)[1].split("```", 1)[0]
+    return [line for line in body.strip().splitlines() if line.strip()]
+
+
+def test_verify_block_is_one_copy_pasteable_curl_command():
+    import shlex
+
+    section = build_instructions_section("v0.7.0", "alehar9320/agentic-odi", [], "")
+
+    block = _fenced_block_after(section, "### Verify")
+    urls = [line for line in block if line.startswith("http")]
+    curl_lines = [line for line in block if line.startswith("curl")]
+
+    assert urls == []
+    assert len(curl_lines) == 1
+    # A URL on its own line would make the previous line a broken command.
+    assert shlex.split(curl_lines[0]) == [
+        "curl",
+        "-fsSL",
+        "-O",
+        "https://github.com/alehar9320/agentic-odi/releases/download/v0.7.0/checksums.txt",
+    ]
