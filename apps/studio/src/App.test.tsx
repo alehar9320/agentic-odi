@@ -222,6 +222,22 @@ describe("studio shell", () => {
     expect(screen.getByText("Local guidance")).toBeInTheDocument();
   });
 
+  it("closes the setup conversation when starting a new conversation", async () => {
+    window.localStorage.removeItem("studio.brief");
+    render(<App />);
+
+    expect(await screen.findByText("What are you building?", { selector: "strong" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /new conversation/i }));
+
+    await waitFor(() => {
+      expect(screen.queryByText("What are you building?", { selector: "strong" })).toBeNull();
+    });
+    expect(
+      screen.getByRole("heading", { name: /^Good (morning|afternoon|evening)/ }),
+    ).toBeInTheDocument();
+  });
+
   it("starts a new conversation from the drawer", async () => {
     render(<App />);
 

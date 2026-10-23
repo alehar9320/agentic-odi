@@ -31,6 +31,7 @@ function StudioShell() {
   function newConversation() {
     clearChat();
     closePanel();
+    closeSetup();
   }
 
   useEffect(() => {
