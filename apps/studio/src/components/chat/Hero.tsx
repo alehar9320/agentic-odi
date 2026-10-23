@@ -6,6 +6,7 @@ import {
   nextGreeting,
 } from "../../lib/greeting";
 import { isUnderserved } from "../../lib/odi";
+import { useOnboarding } from "../../onboarding/context";
 import { useStudio } from "../../state/StudioContext";
 import { BoltIcon, CaptureIcon, CompassIcon, SparkIcon } from "../icons";
 
@@ -37,6 +38,7 @@ interface HeroPill {
 export function Hero({ onSubmit }: { onSubmit: (text: string) => void }) {
   const { displayName, canvas, llmHealth, openPanel, streaming, brief, openSetup } =
     useStudio();
+  const { enabled: tourEnabled, openTour } = useOnboarding();
   const [now, setNow] = useState(() => new Date());
   const [currentId, setCurrentId] = useState<string | null>(null);
 
@@ -70,6 +72,7 @@ export function Hero({ onSubmit }: { onSubmit: (text: string) => void }) {
     ],
   );
 
+  // The first frame is always the invitation; rotation starts from it.
   const current = candidates.find((candidate) => candidate.id === currentId) ?? candidates[0];
 
   useEffect(() => {
@@ -121,10 +124,11 @@ export function Hero({ onSubmit }: { onSubmit: (text: string) => void }) {
           conversational: true,
         }
       : {
-          id: "landscape",
-          label: "Opportunity landscape",
-          icon: <CompassIcon size={15} />,
-          run: () => openPanel("landscape"),
+          id: "pressure-test-new",
+          label: "Pressure-test a bet",
+          icon: <BoltIcon size={15} />,
+          run: () => onSubmit(PRESSURE_TEST_PROMPT),
+          conversational: true,
         },
   ];
 
@@ -134,12 +138,12 @@ export function Hero({ onSubmit }: { onSubmit: (text: string) => void }) {
         {brief?.product_name ? `Living Studio · ${brief.product_name}` : "Living Studio"}
       </p>
       <h1 className="hero__line" key={current?.id ?? "greeting"}>
-        {current?.text ?? "Good morning"}
+        {current?.text ?? "What do you want to win?"}
       </h1>
       <p className="hero__sub">
         {brief?.target_user
-          ? `For ${brief.target_user}. Tell me where they get stuck, and we'll turn it into something you can defend.`
-          : "Name what you're trying to win. I'll help you test whether it's worth it — and what to do next."}
+          ? `For ${brief.target_user}. Tell me where they get stuck.`
+          : "One sentence is enough. I'll help you test whether it's worth chasing."}
       </p>
       <div className="hero__pills" aria-label="Suggested next steps">
         {pills.map((pill) => (
@@ -154,14 +158,26 @@ export function Hero({ onSubmit }: { onSubmit: (text: string) => void }) {
             {pill.label}
           </button>
         ))}
+      </div>
+      <div className="hero__aside">
         <button
           type="button"
-          className="suggestion suggestion--quiet"
+          className="hero__tour"
           onClick={openSetup}
           title="Tell me about your product, audience, and job"
         >
           {brief ? "Edit context" : "Tell me what you're building"}
         </button>
+        {tourEnabled ? (
+          <>
+            <span className="hero__aside-divider" aria-hidden="true">
+              ·
+            </span>
+            <button type="button" className="hero__tour" onClick={openTour}>
+              Show me around
+            </button>
+          </>
+        ) : null}
       </div>
     </div>
   );

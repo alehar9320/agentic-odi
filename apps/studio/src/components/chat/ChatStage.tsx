@@ -12,6 +12,7 @@ import type { WorkspacePanelId } from "../../types";
 import { SetupConversation } from "../setup/SetupConversation";
 import { Composer } from "./Composer";
 import { Conversation } from "./Conversation";
+import { GuidanceHint } from "./GuidanceHint";
 import { Hero } from "./Hero";
 import { OfflineNotice } from "./OfflineNotice";
 
@@ -204,6 +205,7 @@ export function ChatStage() {
         </div>
       </div>
       <div className="chat__dock">
+        <GuidanceHint />
         <Composer
           value={draft}
           onChange={setDraft}
