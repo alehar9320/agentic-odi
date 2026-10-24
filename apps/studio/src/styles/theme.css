@@ -343,6 +343,19 @@ a {
   animation: fade-in 0.12s ease;
 }
 
+.palette__group-title {
+  margin: 10px 10px 4px;
+  color: var(--faint);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.palette__group-title:first-child {
+  margin-top: 4px;
+}
+
 .palette__item {
   display: flex;
   align-items: flex-start;

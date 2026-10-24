@@ -129,7 +129,6 @@ export function Composer({
         onChoose={choose}
       />
       <ConnectorChips />
-
       <form
         className="composer__shell"
         onSubmit={(event) => {
