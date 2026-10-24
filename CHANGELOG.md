@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.13.0](https://github.com/alehar9320/agentic-odi/compare/v0.12.0...v0.13.0) (2026-10-24)
+
+
+### Features
+
+* **brand:** Odi the Otter — mascot, app icon, favicon, and CLI banner ([#100](https://github.com/alehar9320/agentic-odi/issues/100)) ([5286b6e](https://github.com/alehar9320/agentic-odi/commit/5286b6eb6956873cb843543f4bec682e05768c4c))
+* **core:** add a comprehensive error type hierarchy for ODI operations ([#128](https://github.com/alehar9320/agentic-odi/issues/128)) ([f615ff1](https://github.com/alehar9320/agentic-odi/commit/f615ff1b92b602fde02e4f028dfacf54360cae6c)), closes [#121](https://github.com/alehar9320/agentic-odi/issues/121)
+* **core:** make acting tools wait for consent ([#152](https://github.com/alehar9320/agentic-odi/issues/152)) ([9854da0](https://github.com/alehar9320/agentic-odi/commit/9854da06a3e3093f68ead729cb1a15f4e35fe7c3))
+* **core:** make the evidence-not-found error actionable ([#131](https://github.com/alehar9320/agentic-odi/issues/131)) ([a8165a1](https://github.com/alehar9320/agentic-odi/commit/a8165a1cf771ce0bdc31002b6e3f1806222e4cc7)), closes [#111](https://github.com/alehar9320/agentic-odi/issues/111)
+* **core:** paginate list reads across repositories, service, and MCP tools ([#176](https://github.com/alehar9320/agentic-odi/issues/176)) ([c99d80c](https://github.com/alehar9320/agentic-odi/commit/c99d80c8a8912112080bb23e4cbe4db92a112b74))
+* **studio:** show memory skeletons while loading ([#148](https://github.com/alehar9320/agentic-odi/issues/148)) ([8a1430d](https://github.com/alehar9320/agentic-odi/commit/8a1430d603d62b77b534d2fb0f9ae68fca515f98))
+* **v2mom:** implement living V2MOM artifact detection, persistence, MCP tools, and Studio UI ([#104](https://github.com/alehar9320/agentic-odi/issues/104)) ([a5e8f1e](https://github.com/alehar9320/agentic-odi/commit/a5e8f1e23f141ad096067bca913bc24cdb8aa9af))
+* **website:** rebuild the project site for the AI era ([#103](https://github.com/alehar9320/agentic-odi/issues/103)) ([a462af7](https://github.com/alehar9320/agentic-odi/commit/a462af7174ca67f2635c1217d1ea182fc8caed3a))
+
+
+### Bug Fixes
+
+* **cli:** parse MCP payloads that carry prose around them ([#179](https://github.com/alehar9320/agentic-odi/issues/179)) ([eb1125e](https://github.com/alehar9320/agentic-odi/commit/eb1125e8557500ebba4e4587b3589e53a6b4b5a1))
+* **cli:** resolve the connector registry through the shared path helper ([#178](https://github.com/alehar9320/agentic-odi/issues/178)) ([9c76939](https://github.com/alehar9320/agentic-odi/commit/9c76939a7477b8ec58f0a012053f4cbfd5590456))
+* **infra:** send security headers from the Living Studio Worker ([#181](https://github.com/alehar9320/agentic-odi/issues/181)) ([81e14c5](https://github.com/alehar9320/agentic-odi/commit/81e14c592742f543bfa29886397e44bb85ff9a94))
+* **mcp:** answer a missing job with the shared error string ([#154](https://github.com/alehar9320/agentic-odi/issues/154)) ([f810a58](https://github.com/alehar9320/agentic-odi/commit/f810a5857c2343017a82dd7fec8d230c429f8983))
+* **release:** make the checksum download one command ([#156](https://github.com/alehar9320/agentic-odi/issues/156)) ([f3b3a04](https://github.com/alehar9320/agentic-odi/commit/f3b3a0453f79d428ad2f2a7f3bc4376783275d88))
+* **studio:** let update errors stay inline ([#147](https://github.com/alehar9320/agentic-odi/issues/147)) ([b444a52](https://github.com/alehar9320/agentic-odi/commit/b444a524127acbeca10322cf43962412739ed45a))
+* **studio:** make failure as considered as success ([#129](https://github.com/alehar9320/agentic-odi/issues/129)) ([8cc0815](https://github.com/alehar9320/agentic-odi/commit/8cc08159eebc69a44bcd596354a480bb4be6845e))
+
 ## [0.12.0](https://github.com/alehar9320/agentic-odi/compare/v0.11.0...v0.12.0) (2026-10-21)
 
 
