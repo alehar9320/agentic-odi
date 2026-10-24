@@ -73,20 +73,20 @@ describe("Catch Up & Notification System", () => {
     fireEvent.click(bellBtn);
 
     expect(await screen.findByRole("heading", { name: /while you were away/i })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: /unread \(2\)/i })).toBeInTheDocument();
+    // Opening catch-up is seeing them, so the unread count clears.
+    expect(screen.getByRole("tab", { name: /unread \(0\)/i })).toBeInTheDocument();
   });
 
-  it("filters notifications by status and category", async () => {
+  it("filters notifications by category", async () => {
     render(<App />);
 
     fireEvent.click(await screen.findByRole("button", { name: /catch up notifications/i }));
     await screen.findByRole("heading", { name: /while you were away/i });
 
-    const unreadTab = screen.getByRole("tab", { name: /unread \(2\)/i });
-    fireEvent.click(unreadTab);
+    fireEvent.click(screen.getByRole("tab", { name: /outcome shifts \(1\)/i }));
 
     expect(screen.getByText(/Opportunity Score Shift Identified/i)).toBeInTheDocument();
-    expect(screen.getByText(/Friction Collapse Simulation Complete/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Friction Collapse Simulation Complete/i)).toBeNull();
     expect(screen.queryByText(/New Customer Telemetry Signal/i)).toBeNull();
   });
 
@@ -95,8 +95,10 @@ describe("Catch Up & Notification System", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: /catch up notifications/i }));
     await screen.findByRole("heading", { name: /while you were away/i });
+    // A new signal arrives after the feed was opened, so one is unread again.
+    fireEvent.click(screen.getByRole("button", { name: /\+ simulate update/i }));
 
-    const markAllBtn = screen.getByRole("button", { name: /mark all as read/i });
+    const markAllBtn = await screen.findByRole("button", { name: /mark all as read/i });
     fireEvent.click(markAllBtn);
 
     await waitFor(() => {
