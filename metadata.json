@@ -1,0 +1,29 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M5PHT6Z8YYKPYSRR94X0ASMW",
+  "strategy": "manual-commit",
+  "branch": "slay/2af8088e-connector-docs",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "website/dist/docs/connectors/index.html",
+    "website/templates/_connector_reference.html",
+    "website/tests/test_content_sync.py",
+    "website/tools/build_site.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/0/metadata.json",
+      "transcript": "/0/full.jsonl",
+      "compact_transcript": "/0/transcript.jsonl",
+      "content_hash": "/0/content_hash.txt",
+      "prompt": ""
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 0,
+    "output_tokens": 0,
+    "api_call_count": 0
+  }
+}
