@@ -1,7 +1,9 @@
-import { useMemo, useState, type KeyboardEvent } from "react";
+import { useMemo, useState, type FormEvent, type KeyboardEvent } from "react";
 
+import { asStudioError } from "../../api/studioApi";
 import { useStudio } from "../../state/StudioContext";
-import type { Evidence } from "../../types";
+import type { Evidence, StudioError } from "../../types";
+import { FailurePanel } from "../FailurePanel";
 
 const ORDER_KEY = "agentic-odi.evidence-order";
 
@@ -23,11 +25,19 @@ function writeStoredOrder(ids: string[]) {
 }
 
 export function EvidenceStream() {
-  const { canvasState } = useStudio();
+  const { canvasState, promoteEvidence } = useStudio();
   const evidence = useMemo(() => canvasState.data?.evidence ?? [], [canvasState.data]);
   const jobs = useMemo(() => canvasState.data?.jobs ?? [], [canvasState.data]);
   const [storedOrder, setStoredOrder] = useState<string[]>(readStoredOrder);
   const [draggingId, setDraggingId] = useState<string | null>(null);
+
+  const [promotingId, setPromotingId] = useState<string | null>(null);
+  const [jobId, setJobId] = useState("");
+  const [statement, setStatement] = useState("");
+  const [importance, setImportance] = useState(8.5);
+  const [satisfaction, setSatisfaction] = useState(3.5);
+  const [busy, setBusy] = useState(false);
+  const [failure, setFailure] = useState<StudioError | null>(null);
 
   const ordered = useMemo(() => {
     const byId = new Map(evidence.map((item) => [item.id, item]));
@@ -85,6 +95,38 @@ export function EvidenceStream() {
     }
   };
 
+  const startPromotion = (item: Evidence) => {
+    setPromotingId(item.id);
+    setJobId(item.job_id ?? jobs[0]?.id ?? "");
+    setStatement((item.content || item.name || "").trim());
+    setImportance(8.5);
+    setSatisfaction(3.5);
+    setFailure(null);
+  };
+
+  const submitPromotion = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!promotingId || !jobId || !statement.trim() || busy) {
+      return;
+    }
+    setBusy(true);
+    setFailure(null);
+    try {
+      await promoteEvidence(promotingId, {
+        job_id: jobId,
+        statement: statement.trim(),
+        importance,
+        satisfaction,
+      });
+      setPromotingId(null);
+      setStatement("");
+    } catch (error) {
+      setFailure(asStudioError(error));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   if (ordered.length === 0) {
     return (
       <section className="stack" aria-label="Customer evidence">
@@ -129,6 +171,104 @@ export function EvidenceStream() {
                 {item.source_name ? ` · ${item.source_name}` : ""}
                 {item.item_type ? ` · ${item.item_type}` : ""}
               </span>
+
+              {promotingId === item.id ? (
+                <form
+                  className="form"
+                  aria-label={`Promote ${label} to an outcome`}
+                  onSubmit={submitPromotion}
+                >
+                  <div className="field">
+                    <label htmlFor="promote-job">Job</label>
+                    <select
+                      id="promote-job"
+                      className="select"
+                      value={jobId}
+                      onChange={(event) => setJobId(event.target.value)}
+                    >
+                      {jobs.map((job) => (
+                        <option key={job.id} value={job.id}>
+                          {job.id}: {job.name ?? ""}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="field">
+                    <label htmlFor="promote-statement">Desired outcome</label>
+                    <input
+                      id="promote-statement"
+                      className="input"
+                      placeholder="Minimize the time it takes to…"
+                      value={statement}
+                      onChange={(event) => setStatement(event.target.value)}
+                    />
+                    <p className="field__hint">
+                      Direction + unit of measure + object of control + contextual clarifier.
+                    </p>
+                  </div>
+
+                  <div className="field">
+                    <label htmlFor="promote-importance">Importance · {importance.toFixed(1)}</label>
+                    <input
+                      id="promote-importance"
+                      type="range"
+                      min={1}
+                      max={10}
+                      step={0.1}
+                      value={importance}
+                      onChange={(event) => setImportance(Number(event.target.value))}
+                    />
+                  </div>
+
+                  <div className="field">
+                    <label htmlFor="promote-satisfaction">
+                      Current satisfaction · {satisfaction.toFixed(1)}
+                    </label>
+                    <input
+                      id="promote-satisfaction"
+                      type="range"
+                      min={1}
+                      max={10}
+                      step={0.1}
+                      value={satisfaction}
+                      onChange={(event) => setSatisfaction(Number(event.target.value))}
+                    />
+                  </div>
+
+                  {failure ? <FailurePanel error={failure} /> : null}
+
+                  <div>
+                    <button
+                      type="submit"
+                      className="button"
+                      disabled={busy || !statement.trim() || !jobId}
+                    >
+                      Save outcome
+                    </button>
+                    <button
+                      type="button"
+                      className="button button--ghost"
+                      onClick={() => {
+                        setPromotingId(null);
+                        setFailure(null);
+                      }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                <button
+                  type="button"
+                  className="button button--ghost"
+                  aria-label={`Turn ${label} into an outcome`}
+                  disabled={!jobs.length}
+                  onClick={() => startPromotion(item)}
+                >
+                  Turn into outcome
+                </button>
+              )}
             </li>
           );
         })}

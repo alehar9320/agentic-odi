@@ -32,6 +32,7 @@ import {
   fetchMemory,
   healthLlm,
   healthMcp,
+  promoteEvidence as apiPromoteEvidence,
   streamChat,
   updateJob as apiUpdateJob,
   updateObservation as apiUpdateObservation,
@@ -52,6 +53,7 @@ import type {
   ConnectorListItem,
   ConnectorPreset,
   Observation,
+  PromoteEvidencePayload,
   StudioBrief,
   StudioConfig,
   StudioError,
@@ -200,6 +202,10 @@ export interface StudioContextValue {
   offlineReply: boolean;
   addStep: (payload: Omit<AddStepPayload, "mcp_url">) => Promise<void>;
   addOutcome: (payload: Omit<AddOutcomePayload, "mcp_url">) => Promise<void>;
+  promoteEvidence: (
+    evidenceId: string,
+    payload: Omit<PromoteEvidencePayload, "mcp_url">,
+  ) => Promise<void>;
   createJob: (payload: { name: string; description?: string }) => Promise<string | null>;
   updateJob: (jobId: string, payload: { name?: string; description?: string }) => Promise<void>;
   deleteJob: (jobId: string) => Promise<void>;
@@ -620,6 +626,16 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       // it, so the error travels up instead of disappearing into a toast.
       await apiAddOutcome({ ...payload, mcp_url: settings.mcp_url });
       pushToast("success", "Outcome captured successfully!");
+      await refreshCanvas();
+    },
+    [settings.mcp_url, pushToast, refreshCanvas],
+  );
+
+  const promoteEvidence = useCallback(
+    async (evidenceId: string, payload: Omit<PromoteEvidencePayload, "mcp_url">) => {
+      // The form keeps the error beside the quote it came from.
+      await apiPromoteEvidence(evidenceId, { ...payload, mcp_url: settings.mcp_url });
+      pushToast("success", "Evidence turned into a scored outcome.");
       await refreshCanvas();
     },
     [settings.mcp_url, pushToast, refreshCanvas],
@@ -1169,6 +1185,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       offlineReply,
       addStep,
       addOutcome,
+      promoteEvidence,
       createJob,
       updateJob,
       deleteJob,
@@ -1240,6 +1257,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       offlineReply,
       addStep,
       addOutcome,
+      promoteEvidence,
       createJob,
       updateJob,
       deleteJob,
