@@ -235,7 +235,34 @@ export async function streamChat(
   const response = await fetch(apiUrl("/api/chat"), {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
-    body: JSON.stringify(request),
+    body: JSON.stringify({
+      ...request,
+      messages: request.messages.reduce<{
+        id: string;
+        role: "user" | "assistant";
+        content: string;
+        parent_id: string | null;
+      }[]>((history, message) => {
+        if (message.role === "notice") {
+          return history;
+        }
+        const parent_id = history.at(-1)?.id ?? null;
+        history.push({
+          id: message.id,
+          role: message.role,
+          content: message.content,
+          parent_id,
+        });
+        return history;
+      }, []),
+      attachments: request.attachments?.map((attachment) => ({
+        name: attachment.name,
+        content_type: attachment.contentType,
+        size: attachment.size,
+        ...(attachment.text ? { text: attachment.text } : {}),
+        ...(attachment.dataUrl ? { data_url: attachment.dataUrl } : {}),
+      })),
+    }),
     signal,
   });
 

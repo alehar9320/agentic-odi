@@ -117,6 +117,61 @@ describe("streamChat", () => {
     'event: delta\ndata: {"text":"lo"}\n\n' +
     'event: message\ndata: {"content":"Hello"}\n\n';
 
+  it("serializes visible messages and attachments to the sidecar request schema", async () => {
+    const requestBodies: Record<string, unknown>[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+        requestBodies.push(JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>);
+        return new Response("", {
+          status: 200,
+          headers: { "Content-Type": "text/event-stream" },
+        });
+      }),
+    );
+
+    await streamChat(
+      {
+        base_url: "http://llm/v1",
+        api_key: "key",
+        model: "model",
+        mcp_url: "http://mcp",
+        messages: [
+          { id: "t-1", parentId: null, role: "user", content: "First" },
+          { id: "n-1", parentId: "t-1", role: "notice", content: "Local note" },
+          { id: "t-2", parentId: "t-1", role: "assistant", content: "Answer" },
+          { id: "t-3", parentId: "t-2", role: "user", content: "Follow-up" },
+        ],
+        attachments: [
+          {
+            id: "file-1",
+            name: "notes.md",
+            contentType: "text/markdown",
+            size: 15,
+            text: "file contents",
+            dataUrl: "data:image/png;base64,AAAA",
+          },
+        ],
+      },
+      () => {},
+    );
+
+    expect(requestBodies[0]?.messages).toEqual([
+      { id: "t-1", role: "user", content: "First", parent_id: null },
+      { id: "t-2", role: "assistant", content: "Answer", parent_id: "t-1" },
+      { id: "t-3", role: "user", content: "Follow-up", parent_id: "t-2" },
+    ]);
+    expect(requestBodies[0]?.attachments).toEqual([
+      {
+        name: "notes.md",
+        content_type: "text/markdown",
+        size: 15,
+        text: "file contents",
+        data_url: "data:image/png;base64,AAAA",
+      },
+    ]);
+  });
+
   it("forwards parsed SSE events to the handler in order", async () => {
     vi.stubGlobal(
       "fetch",
