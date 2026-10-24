@@ -1,0 +1,36 @@
+# Role & Objective
+You are an expert systems engineer and GitHub Actions architect. Implement a lightweight, 100% native GitHub Action risk classification system for a repository. It must run entirely within GitHub Actions at $0 cost, with zero external SaaS dependencies, zero API keys, and zero spammy PR comment threads.
+
+# Core Requirements
+
+## 1. Trigger Events
+- Trigger on pull request events: `opened`, `synchronize`, `reopened`.
+
+## 2. Multi-Factor Risk Scoring Engine
+Calculate a risk score (0 to 100) and assign a clear, human-friendly tier based on three distinct factors evaluated via `git diff`:
+1. **File & Line Churn:** 
+   - Files changed count and total lines added/deleted.
+2. **Critical Path Overrides (Blast Radius):**
+   - Automatically assign high risk / danger tier if changes touch sensitive paths, such as:
+     - `auth/` or security logic
+     - `migrations/` or database schemas
+     - `billing/` or payment integrations
+     - `infra/` or `.github/workflows/`
+3. **Test Delta Analysis:**
+   - Detect if source code files were modified without corresponding test files (`*.test.*`, `*.spec.*`, or files in `tests/`) being touched in the same diff.
+
+## 3. Human-Friendly UX & Label Management
+- **Labels:** Automatically manage and update a single mutually exclusive PR label using direct, natural language:
+  - 🟢 `safe to merge` (Low risk / small diffs / docs / tested code)
+  - 🟡 `needs a look` (Medium risk / standard feature work / missing test updates)
+  - 🔴 `danger zone` (High risk / critical path changes / database migrations)
+- **Label Hygiene:** Automatically clean up and remove any stale risk labels when a PR is updated.
+- **No Spam:** Do NOT post chatty markdown comments in the PR conversation thread on every push. Keep execution silent, clean, and invisible.
+
+# Technical Constraints
+- Must run/ on `ubuntu-latest`.
+- Required permissions: `contents: read`, `pull-requests: write`, `checks: write`.
+- Implement using a clean, maintainable structure (preferably a standalone script via `actions/github-script@v7` or a minimal composite action).
+
+# Deliverable
+Provide the complete `.github/workflows/` configuration file and any accompanying helper scripts, fully typed, production-ready, and optimized for speed (< 2 seconds execution time).
