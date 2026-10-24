@@ -110,3 +110,19 @@ async def test_update_outcome_out_of_range_returns_error_string():
         res = await client.call_tool("update_outcome", {"outcome_id": outcome_id, "importance": 99})
         text = res.content[0].text  # type: ignore[index]
         assert "between 1.0 and 10.0" in text
+
+
+@pytest.mark.asyncio
+async def test_evaluate_outcome_reports_a_missing_job_as_an_error_string():
+    async with Client(mcp) as client:
+        res = await client.call_tool(
+            "evaluate_outcome",
+            {
+                "statement": "Minimize the time to onboard a customer when they sign up",
+                "job_id": "missing",
+            },
+        )
+
+    text = res.content[0].text  # type: ignore[index]
+    assert text == "Job not found: missing"
+    assert "{" not in text

@@ -313,3 +313,10 @@ def test_parse_remote_uses_the_shared_parser(monkeypatch):
         backend_module._parse_remote("get_jobs", "Error: Job with ID X not found.")
 
     assert seen == ["Error: Job with ID X not found."]
+
+
+def test_evaluate_outcome_job_error_surfaces_as_a_backend_error():
+    from agentic_odi_cli.backend import _parse_remote
+
+    with pytest.raises(BackendError, match="Job not found: missing"):
+        _parse_remote("evaluate_outcome", "Job not found: missing")
