@@ -23,6 +23,7 @@ import type {
   ObservationKind,
   ObservationStatus,
   Outcome,
+  PromoteEvidencePayload,
   Step,
   StudioConfig,
   StudioError,
@@ -278,6 +279,16 @@ export function addStep(payload: AddStepPayload): Promise<Step> {
 
 export function addOutcome(payload: AddOutcomePayload): Promise<Outcome> {
   return postJson<Outcome>("/api/outcomes", payload);
+}
+
+export function promoteEvidence(
+  evidenceId: string,
+  payload: PromoteEvidencePayload,
+): Promise<Outcome> {
+  return postJson<Outcome>(
+    `/api/evidence/${encodeURIComponent(evidenceId)}/promote`,
+    payload,
+  );
 }
 
 export function createJob(payload: CreateJobPayload): Promise<Job> {

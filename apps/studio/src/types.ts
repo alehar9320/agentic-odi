@@ -315,6 +315,14 @@ export interface AddOutcomePayload {
   satisfaction: number;
 }
 
+export interface PromoteEvidencePayload {
+  mcp_url: string;
+  job_id: string;
+  statement: string;
+  importance: number;
+  satisfaction: number;
+}
+
 export interface ConnectorPreset {
   id: string;
   label: string;

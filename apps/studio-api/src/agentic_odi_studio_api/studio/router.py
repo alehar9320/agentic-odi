@@ -13,6 +13,7 @@ from agentic_odi_connectors.registry import (
     DuplicateConnectorError,
 )
 from agentic_odi_core import (
+    EvidenceNotFoundError,
     JobNotFoundError,
     OdiError,
     ODIService,
@@ -74,6 +75,7 @@ from agentic_odi_studio_api.studio.schemas import (
     ObservationListResponse,
     ObservationResponse,
     ObservationUpdateRequest,
+    PromoteEvidenceRequest,
     TurnNode,
     UpdateConversationRequest,
     UpdateJobRequest,
@@ -107,7 +109,10 @@ def _require_mcp_url(mcp_url: str) -> str:
 
 def _as_http_error(exc: Exception) -> StudioHTTPError:
     """Translate domain errors into typed HTTP responses without leaking 500s."""
-    if isinstance(exc, (JobNotFoundError, StepNotFoundError, OutcomeNotFoundError)):
+    if isinstance(
+        exc,
+        (JobNotFoundError, StepNotFoundError, OutcomeNotFoundError, EvidenceNotFoundError),
+    ):
         return StudioHTTPError(StudioError(code=StudioErrorCode.NOT_FOUND, message=str(exc)))
     if isinstance(exc, ValueOutOfRangeError):
         return StudioHTTPError(StudioError(code=StudioErrorCode.OUT_OF_RANGE, message=str(exc)))
@@ -390,6 +395,39 @@ async def patch_outcome(outcome_id: str, body: UpdateOutcomeRequest, request: Re
         return _payload_from_text(result)
     try:
         outcome = _service(request).update_outcome(outcome_id, updates)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return outcome.model_dump(mode="json")
+
+
+@router.post("/evidence/{evidence_id}/promote")
+async def promote_evidence(
+    evidence_id: str, body: PromoteEvidenceRequest, request: Request
+) -> dict:
+    """Turn captured evidence into a scored outcome, without leaving the panel."""
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(body.mcp_url),
+            ToolName.PROMOTE_EVIDENCE.value,
+            {
+                "evidence_id": evidence_id,
+                "target": "outcome",
+                "job_id": body.job_id,
+                "statement": body.statement,
+                "importance": body.importance,
+                "satisfaction": body.satisfaction,
+            },
+        )
+        return _payload_from_text(result)
+    try:
+        outcome = _service(request).promote_evidence(
+            evidence_id,
+            "outcome",
+            job_id=body.job_id,
+            statement=body.statement,
+            importance=body.importance,
+            satisfaction=body.satisfaction,
+        )
     except Exception as exc:  # noqa: BLE001
         raise _as_http_error(exc) from exc
     return outcome.model_dump(mode="json")

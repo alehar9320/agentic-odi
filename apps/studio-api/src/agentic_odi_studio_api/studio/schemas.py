@@ -49,6 +49,16 @@ class AddOutcomeRequest(BaseModel):
     satisfaction: float
 
 
+class PromoteEvidenceRequest(BaseModel):
+    """Turn a captured quote into a scored outcome."""
+
+    mcp_url: str = ""
+    job_id: str
+    statement: str = Field(min_length=1)
+    importance: float
+    satisfaction: float
+
+
 class CreateJobRequest(BaseModel):
     """Create a Job by hand, with or without the model."""
 
