@@ -28,7 +28,7 @@ async def test_evaluate_outcome_reports_progress_before_returning() -> None:
             {"statement": "Minimize the time to ship when the build is green"},
         )
 
-    assert json.loads(result.content[0].text)["valid"] is True  # type: ignore[index]
+    assert json.loads(result.content[0].text)["valid"] is True
     assert events
     assert events[-1][0] == events[-1][1]
     assert events[-1][2] == "Evaluation complete"
@@ -48,7 +48,7 @@ async def test_add_evidence_reports_progress_before_returning() -> None:
             },
         )
 
-    assert "Evidence created successfully" in result.content[0].text  # type: ignore[index]
+    assert "Evidence created successfully" in result.content[0].text
     assert events
     assert events[-1][0] == events[-1][1]
     assert events[-1][2] == "Evidence stored"
