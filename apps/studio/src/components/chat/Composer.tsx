@@ -151,13 +151,13 @@ export function Composer({
                 key={id}
                 type="button"
                 className="composer__suggestion"
-                aria-label={`Added ${label}, dismiss`}
+                aria-label={`Dismiss suggestion: ${label}`}
                 onClick={() => {
                   dismissConnectorSuggestion(id);
                   void refreshConnectors();
                 }}
               >
-                <span>Added {label}</span>
+                <span>Suggested: {label}</span>
                 <span aria-hidden>✕</span>
               </button>
             );
