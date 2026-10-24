@@ -3,7 +3,7 @@
   "checkpoint_id": "01M5PQK01XE8E334XCA1C8WWB6",
   "strategy": "manual-commit",
   "branch": "slay/c2430966-connector-pagination",
-  "checkpoints_count": 2,
+  "checkpoints_count": 3,
   "files_touched": [
     "packages/connectors/src/agentic_odi_connectors/models.py",
     "packages/connectors/src/agentic_odi_connectors/rest/connector.py",
@@ -22,6 +22,13 @@
       "transcript": "/1/full.jsonl",
       "compact_transcript": "/1/transcript.jsonl",
       "content_hash": "/1/content_hash.txt",
+      "prompt": ""
+    },
+    {
+      "metadata": "/2/metadata.json",
+      "transcript": "/2/full.jsonl",
+      "compact_transcript": "/2/transcript.jsonl",
+      "content_hash": "/2/content_hash.txt",
       "prompt": ""
     }
   ],
