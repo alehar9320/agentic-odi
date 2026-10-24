@@ -3,7 +3,7 @@
   "checkpoint_id": "01M5PPV6QR263NAT2J0GFCCGRJ",
   "strategy": "manual-commit",
   "branch": "slay/f700e813-ci-release-origin",
-  "checkpoints_count": 2,
+  "checkpoints_count": 3,
   "files_touched": [
     ".github/actions/setup/action.yml",
     "scripts/ci_release.py",
@@ -22,6 +22,13 @@
       "transcript": "/1/full.jsonl",
       "compact_transcript": "/1/transcript.jsonl",
       "content_hash": "/1/content_hash.txt",
+      "prompt": ""
+    },
+    {
+      "metadata": "/2/metadata.json",
+      "transcript": "/2/full.jsonl",
+      "compact_transcript": "/2/transcript.jsonl",
+      "content_hash": "/2/content_hash.txt",
       "prompt": ""
     }
   ],
