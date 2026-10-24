@@ -213,6 +213,9 @@ class StudioMemory:
         self._connection.execute("PRAGMA foreign_keys = ON")
         if not self._memory:
             self._connection.execute("PRAGMA journal_mode = WAL")
+            # Another process may be mid-write; wait for it briefly rather
+            # than failing the turn with "database is locked".
+            self._connection.execute("PRAGMA busy_timeout = 5000")
         with self._connection:
             self._connection.executescript(_SCHEMA)
 
