@@ -289,7 +289,11 @@ agentic-odi<span class="w"> </span>desired-outcomes<span class="w"> </span>list<
 agentic-odi<span class="w"> </span>desired-outcomes<span class="w"> </span>get<span class="w"> </span>&lt;outcome-id&gt;
 agentic-odi<span class="w"> </span>desired-outcomes<span class="w"> </span>update<span class="w"> </span>&lt;outcome-id&gt;<span class="w"> </span>--satisfaction<span class="w"> </span><span class="m">6</span>
 agentic-odi<span class="w"> </span>desired-outcomes<span class="w"> </span>delete<span class="w"> </span>&lt;outcome-id&gt;<span class="w"> </span>--yes
-</code></pre><p>Add <code>--json</code> to any command for machine-readable output.</p>
+agentic-odi<span class="w"> </span>desired-outcomes<span class="w"> </span><span class="nb">export</span><span class="w"> </span>--job-id<span class="w"> </span>&lt;job-id&gt;<span class="w"> </span>--format<span class="w"> </span>csv<span class="w"> </span>&gt;<span class="w"> </span>outcomes.csv
+agentic-odi<span class="w"> </span>desired-outcomes<span class="w"> </span><span class="nb">export</span><span class="w"> </span>--job-id<span class="w"> </span>&lt;job-id&gt;<span class="w"> </span>--format<span class="w"> </span>json<span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span><span class="s1">'.[].opportunity_score'</span>
+</code></pre><p>Add <code>--json</code> to any command for machine-readable output. <code>export</code> writes to
+stdout only — CSV has one row per outcome with the same fields the table shows
+plus <code>job_id</code> and <code>step_id</code>, so it pipes straight into a spreadsheet or <code>jq</code>.</p>
 <h2 id="evidence">Evidence</h2>
 <p>Evidence is research captured from connectors (or entered by hand) and linked to
 a Job, Step, or desired Outcome. Records can later be promoted into ODI
