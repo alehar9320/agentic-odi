@@ -33,7 +33,7 @@ def _customer_value() -> CustomerValue:
         direction=Direction.MINIMIZE,
         unit_of_measure="minutes",
         object_of_control="time to onboard a customer",
-        statement="Minimize the time it takes to onboard a customer",
+        statement="Minimize the time it takes to onboard a customer when they sign up",
         importance=8.0,
         satisfaction=4.0,
     )
@@ -66,7 +66,10 @@ def test_job_map_is_sorted_by_order(service: ODIService) -> None:
 def test_add_outcome_computes_opportunity_score(service: ODIService) -> None:
     job = service.add_job("Onboard customers")
     outcome = service.add_outcome(
-        job.id, "Minimize onboarding time", importance=8.0, satisfaction=4.0
+        job.id,
+        "Minimize the time to onboard a customer when they sign up",
+        importance=8.0,
+        satisfaction=4.0,
     )
     assert outcome.opportunity_score == 12.0
     assert service.get_outcomes(job.id) == [outcome]
@@ -74,7 +77,9 @@ def test_add_outcome_computes_opportunity_score(service: ODIService) -> None:
 
 def test_add_outcome_without_scores_has_no_opportunity_score(service: ODIService) -> None:
     job = service.add_job("Onboard customers")
-    outcome = service.add_outcome(job.id, "Minimize onboarding time")
+    outcome = service.add_outcome(
+        job.id, "Minimize the time to onboard a customer when they sign up"
+    )
     assert outcome.opportunity_score is None
 
 
@@ -85,7 +90,10 @@ def test_add_outcome_rejects_out_of_range_scores(
     job = service.add_job("Onboard customers")
     with pytest.raises(ValueOutOfRangeError):
         service.add_outcome(
-            job.id, "Minimize onboarding time", importance=importance, satisfaction=satisfaction
+            job.id,
+            "Minimize the time to onboard a customer when they sign up",
+            importance=importance,
+            satisfaction=satisfaction,
         )
 
 
@@ -164,14 +172,23 @@ def test_add_step_requires_existing_job(service: ODIService) -> None:
 def test_add_outcome_requires_existing_job_and_step(service: ODIService) -> None:
     job = service.add_job("J")
     with pytest.raises(JobNotFoundError):
-        service.add_outcome("missing", "Min x")
+        service.add_outcome(
+            "missing", "Minimize the time to ship a release when the build is green"
+        )
     with pytest.raises(StepNotFoundError):
-        service.add_outcome(job.id, "Min x", step_id="missing")
+        service.add_outcome(
+            job.id, "Minimize the time to ship a release when the build is green", step_id="missing"
+        )
 
 
 def test_update_outcome_recomputes_opportunity_score(service: ODIService) -> None:
     job = service.add_job("J")
-    outcome = service.add_outcome(job.id, "Min x", importance=5.0, satisfaction=5.0)
+    outcome = service.add_outcome(
+        job.id,
+        "Minimize the time to ship a release when the build is green",
+        importance=5.0,
+        satisfaction=5.0,
+    )
     assert outcome.opportunity_score == 5.0
     updated = service.update_outcome(outcome.id, {"importance": 8.0})
     assert updated.opportunity_score == 11.0
@@ -181,7 +198,12 @@ def test_update_outcome_recomputes_opportunity_score(service: ODIService) -> Non
 
 def test_update_outcome_rejects_out_of_range_scores(service: ODIService) -> None:
     job = service.add_job("J")
-    outcome = service.add_outcome(job.id, "Min x", importance=5.0, satisfaction=5.0)
+    outcome = service.add_outcome(
+        job.id,
+        "Minimize the time to ship a release when the build is green",
+        importance=5.0,
+        satisfaction=5.0,
+    )
     with pytest.raises(ValueOutOfRangeError):
         service.update_outcome(outcome.id, {"importance": 99})
     stored = service.get_outcome(outcome.id)
@@ -213,7 +235,9 @@ def test_update_unknown_ids_raise(service: ODIService) -> None:
 def test_add_evidence_resolves_and_validates_links(service: ODIService) -> None:
     job = service.add_job("J")
     step = service.add_step(job.id, "S", order=1)
-    outcome = service.add_outcome(job.id, "Min x", step_id=step.id)
+    outcome = service.add_outcome(
+        job.id, "Minimize the time to ship a release when the build is green", step_id=step.id
+    )
 
     evidence = service.add_evidence(
         source_name="gong",
@@ -246,10 +270,15 @@ def test_evidence_delete_and_promote(service: ODIService) -> None:
     assert job.name == "quote"
 
     outcome = service.promote_evidence(
-        evidence.id, "outcome", job_id=job.id, importance=8, satisfaction=4
+        evidence.id,
+        "outcome",
+        job_id=job.id,
+        statement="Minimize the time to review a quote when feedback arrives",
+        importance=8,
+        satisfaction=4,
     )
     assert isinstance(outcome, Outcome)
-    assert outcome.statement == "quote"
+    assert outcome.statement == "Minimize the time to review a quote when feedback arrives"
     assert outcome.opportunity_score == 12.0
     with pytest.raises(ValueError):
         service.promote_evidence(evidence.id, "outcome")
