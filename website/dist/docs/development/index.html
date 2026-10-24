@@ -244,6 +244,12 @@ tolerates a 1% dip from <code>codecov.yml</code>.</li>
 <li><strong>Patch</strong> status is informational for now, so new code can land while the
 suite catches up.</li>
 </ul>
+<p>Codecov itself never fails the build (<code>fail_ci_if_error: false</code>), so the same
+floor is enforced locally: <code>[tool.coverage.report] fail_under</code> in
+<code>pyproject.toml</code> makes any run with <code>--cov</code> fail below <strong>89%</strong> — the 90% target
+minus codecov's 1% tolerance. The current measurement is ~89.2%, so the gate has
+little slack; raise <code>fail_under</code> as coverage improves rather than lowering it to
+unblock a change.</p>
 <p>To reproduce the report locally:</p>
 <pre class="highlight"><code class="language-bash">uv<span class="w"> </span>run<span class="w"> </span>pytest<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--cov<span class="o">=</span>agentic_odi_cli<span class="w"> </span><span class="se">\</span>
