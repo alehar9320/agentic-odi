@@ -205,6 +205,7 @@ async def delete_job(job_id: str, request: Request, mcp_url: str | None = Query(
 
 @router.post("/steps")
 async def post_step(body: AddStepRequest, request: Request) -> dict:
+    result: dict[str, Any] | str
     if _uses_mcp(request):
         result = await call_mcp_tool(
             body.mcp_url,
@@ -253,6 +254,7 @@ async def delete_step(step_id: str, request: Request, mcp_url: str | None = Quer
 
 @router.post("/outcomes")
 async def post_outcome(body: AddOutcomeRequest, request: Request) -> dict:
+    result: dict[str, Any] | str
     if _uses_mcp(request):
         result = await call_mcp_tool(
             body.mcp_url,

@@ -41,10 +41,8 @@ def test_step_can_be_edited_and_removed() -> None:
         "/api/steps",
         json={"mcp_url": "", "job_id": job["id"], "name": "Prepare", "order": 3},
     ).json()["result"]
-    # The local backend returns the serialized Step model.
-    import json
-
-    step_id = json.loads(step)["id"]
+    # The local backend returns the Step model as a dict.
+    step_id = step["id"]
 
     edited = client.patch(f"/api/steps/{step_id}", json={"name": "Prepare payload", "order": 2})
     assert edited.status_code == 200
@@ -67,9 +65,7 @@ def test_outcome_scores_recompute_on_edit_and_delete() -> None:
             "satisfaction": 4.0,
         },
     ).json()["result"]
-    import json
-
-    outcome_id = json.loads(outcome)["id"]
+    outcome_id = outcome["id"]
 
     edited = client.patch(
         f"/api/outcomes/{outcome_id}", json={"importance": 9.0, "satisfaction": 3.0}
@@ -94,9 +90,7 @@ def test_out_of_range_scores_are_rejected() -> None:
             "satisfaction": 4.0,
         },
     ).json()["result"]
-    import json
-
-    outcome_id = json.loads(outcome)["id"]
+    outcome_id = outcome["id"]
 
     response = client.patch(f"/api/outcomes/{outcome_id}", json={"importance": 42})
     assert response.status_code == 422
