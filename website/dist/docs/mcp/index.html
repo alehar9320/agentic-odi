@@ -880,18 +880,24 @@
 <section class="tool-doc" id="tool-add_evidence">
   <h2 class="tool-doc__name">
     <code>add_evidence</code>
-    <span class="pill">9 arguments</span>
+    <span class="pill">10 arguments</span>
   </h2>
   <p class="tool-doc__purpose">Attach a research record as evidence.</p>
   <div class="codeblock">
     <button class="copy-btn" type="button" data-copy>Copy</button>
-    <code>add_evidence(source_name: str, source_kind: str, name: str, content: str, item_type: EvidenceItemType = &#39;manual&#39;, raw: dict[str, Any] | None = None, job_id: str | None = None, step_id: str | None = None, outcome_id: str | None = None)</code>
+    <code>add_evidence(ctx: Context, source_name: str, source_kind: str, name: str, content: str, item_type: EvidenceItemType = &#39;manual&#39;, raw: dict[str, Any] | None = None, job_id: str | None = None, step_id: str | None = None, outcome_id: str | None = None)</code>
   </div>
   <table class="tool-doc__args">
     <thead>
       <tr><th>Argument</th><th>Type</th><th>Required</th><th>Default</th></tr>
     </thead>
     <tbody>
+      <tr>
+        <td><code>ctx</code></td>
+        <td><code>Context</code></td>
+        <td>yes</td>
+        <td><code>—</code></td>
+      </tr>
       <tr>
         <td><code>source_name</code></td>
         <td><code>str</code></td>
@@ -1108,18 +1114,24 @@
 <section class="tool-doc" id="tool-evaluate_outcome">
   <h2 class="tool-doc__name">
     <code>evaluate_outcome</code>
-    <span class="pill">2 arguments</span>
+    <span class="pill">3 arguments</span>
   </h2>
   <p class="tool-doc__purpose">Check a statement against the ODI format before saving it.</p>
   <div class="codeblock">
     <button class="copy-btn" type="button" data-copy>Copy</button>
-    <code>evaluate_outcome(statement: str, job_id: str | None = None)</code>
+    <code>evaluate_outcome(ctx: Context, statement: str, job_id: str | None = None)</code>
   </div>
   <table class="tool-doc__args">
     <thead>
       <tr><th>Argument</th><th>Type</th><th>Required</th><th>Default</th></tr>
     </thead>
     <tbody>
+      <tr>
+        <td><code>ctx</code></td>
+        <td><code>Context</code></td>
+        <td>yes</td>
+        <td><code>—</code></td>
+      </tr>
       <tr>
         <td><code>statement</code></td>
         <td><code>str</code></td>
