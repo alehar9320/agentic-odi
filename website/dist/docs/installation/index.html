@@ -126,8 +126,7 @@ creates a <code>current</code> symlink, and symlinks <code>odi</code>, <code>odi
 <code>export PATH=&quot;$HOME/.local/bin:$PATH&quot;</code>). On Windows, the PowerShell installer
 uses <code>~\AppData\Local\agentic-odi\</code> and copies <code>.exe</code> files to
 <code>~\AppData\Local\agentic-odi\bin\</code>.</p>
-<h2 id="update">Update</h2>
-<p>By default, <code>odi</code> auto-checks for updates once every 24 hours and applies the
+<h2 id="update">Update<a class="heading-anchor" href="#update" aria-label="Copy link to this section" title="Copy link">#</a></h2><p>By default, <code>odi</code> auto-checks for updates once every 24 hours and applies the
 update on the next run (auto-update is enabled by default). Control behavior
 with:</p>
 <ul>
@@ -137,8 +136,7 @@ with:</p>
 </ul>
 <p>When running from a non-frozen source install, auto-update is suppressed
 automatically.</p>
-<h2 id="install-layout">Install layout</h2>
-<pre class="highlight"><code class="language-text">~/.local/share/agentic-odi/
+<h2 id="install-layout">Install layout<a class="heading-anchor" href="#install-layout" aria-label="Copy link to this section" title="Copy link">#</a></h2><pre class="highlight"><code class="language-text">~/.local/share/agentic-odi/
   ├── versions/&lt;version&gt;/
   │   └── odi (and bundled files)
   └── current -&gt; versions/&lt;version&gt;
@@ -153,13 +151,11 @@ automatically.</p>
 </code></pre><p>Environment variables: <code>AGENTIC_ODI_INSTALL_DIR</code> (override install root),
 <code>XDG_DATA_HOME</code>, <code>XDG_BIN_HOME</code>. The default backend is <code>local</code>
 (<code>--backend local</code>); no MCP server is required.</p>
-<h2 id="unsigned-binaries">Unsigned binaries</h2>
-<p>macOS may quarantine downloaded binaries:
+<h2 id="unsigned-binaries">Unsigned binaries<a class="heading-anchor" href="#unsigned-binaries" aria-label="Copy link to this section" title="Copy link">#</a></h2><p>macOS may quarantine downloaded binaries:
 <code>xattr -d com.apple.quarantine ~/.local/bin/odi</code> (if needed). Windows SmartScreen
 may show a warning for unsigned binaries; choose &quot;More info → Run anyway&quot; if you
 trust the release.</p>
-<h2 id="release-automation">Release automation</h2>
-<p>Releases are cut and published by CI with no approval step:</p>
+<h2 id="release-automation">Release automation<a class="heading-anchor" href="#release-automation" aria-label="Copy link to this section" title="Copy link">#</a></h2><p>Releases are cut and published by CI with no approval step:</p>
 <ol>
 <li>Conventional commits land on <code>main</code>; <code>release-please</code> opens or updates the
 release PR.</li>
