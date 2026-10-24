@@ -375,3 +375,16 @@ def test_clear_removes_everything(tmp_path):
 
     assert repo.get_job("j1") is None
     assert SQLiteRepository(db_path=db).get_job("j1") is None
+
+
+def test_close_leaves_no_wal_or_shm_sidecars(tmp_path) -> None:
+    db_path = tmp_path / "odi.db"
+    repo = SQLiteRepository(str(db_path))
+    repo.add_job(Job(id="job-1", name="Onboard customers"))
+    assert (tmp_path / "odi.db-wal").exists()
+
+    repo.close()
+
+    assert db_path.exists()
+    assert list(tmp_path.glob("odi.db-wal")) == []
+    assert list(tmp_path.glob("odi.db-shm")) == []
