@@ -286,7 +286,7 @@ export function JobMap() {
                           fontStyle: "italic",
                         }}
                       >
-                        Phase {phaseIndexFor(order, steps.length) + 1}
+                        {UNIVERSAL_PHASES[phaseIndexFor(order, steps.length)].name}
                       </span>
                       {step.id && (
                         <span className="step__actions">

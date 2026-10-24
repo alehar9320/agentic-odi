@@ -33,13 +33,21 @@ describe("JobMap Interactive Visualization", () => {
   it("renders 8 universal process phases", () => {
     render(<JobMap />);
     expect(screen.getByText("Universal Job Map (8 Process Phases)")).toBeInTheDocument();
-    expect(screen.getByText("1. Define")).toBeInTheDocument();
+    expect(screen.getAllByText("1. Define")[0]).toBeInTheDocument();
     expect(screen.getByText("8. Conclude")).toBeInTheDocument();
+  });
+
+  it("names the Ulwick phase on each step row", () => {
+    render(<JobMap />);
+
+    const row = screen.getByText("Define payload parameters").closest(".step-row");
+    expect(row).toHaveTextContent("1. Define");
+    expect(row).not.toHaveTextContent("Phase 1");
   });
 
   it("filters job steps when clicking a phase card", () => {
     render(<JobMap />);
-    const phase1 = screen.getByText("1. Define");
+    const phase1 = screen.getAllByText("1. Define")[0];
     fireEvent.click(phase1);
 
     expect(screen.getByText("Define payload parameters")).toBeInTheDocument();
