@@ -213,6 +213,7 @@ ingest behavior.
 python -m agentic_odi_cli connectors catalog
 python -m agentic_odi_cli connectors add mcp --preset github
 python -m agentic_odi_cli connectors list
+python -m agentic_odi_cli connectors list --json   # name, kind, url, enabled per connector
 python -m agentic_odi_cli connectors health --name github
 python -m agentic_odi_cli connectors ingest --name github
 ```
