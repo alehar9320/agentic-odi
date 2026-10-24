@@ -49,6 +49,14 @@ class McpConnectorSettings(BaseModel):
     env_vars: list[str] = Field(default_factory=list)
 
 
+class PaginationSettings(BaseModel):
+    """Opt-in paging: where to find the next page, relative to the response."""
+
+    next_path: str = Field(
+        ..., description="Dotted path to the next page URL or cursor in the response."
+    )
+
+
 class RestConnectorSettings(BaseModel):
     url: str
     method: Literal["GET", "POST"] = "GET"
@@ -57,6 +65,7 @@ class RestConnectorSettings(BaseModel):
     records_key: str | None = None
     timeout: float = 10.0
     item_type: ItemType = "resource"
+    pagination: PaginationSettings | None = None
 
 
 class ConnectorConfig(BaseModel):
