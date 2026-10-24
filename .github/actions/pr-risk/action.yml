@@ -21,6 +21,7 @@ runs:
   using: composite
   steps:
     - name: Run PR risk scoring + label application
+      shell: bash
       env:
         GITHUB_TOKEN: ${{ inputs.GITHUB_TOKEN }}
         BASE_SHA: ${{ inputs.BASE_SHA }}
