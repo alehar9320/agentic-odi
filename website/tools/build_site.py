@@ -5,8 +5,7 @@ Studio theme, the MCP tool contract, the connector catalog, the CLI registry,
 the ODI schema, and the guides under ``docs/`` — into HTML, CSS, and JS.
 
 Nothing here runs at request time. The output is committed to
-``website/dist/`` so a reviewer can read the rendered page in a pull request,
-and CI fails when it drifts from a fresh build.
+   Generated on demand and by CI at build time; never committed.
 """
 
 from __future__ import annotations
@@ -362,8 +361,8 @@ def _tree(root: Path) -> dict[str, bytes]:
 def build(out_dir: Path, *, check: bool = False) -> int:
     """Render the site into ``out_dir``.
 
-    With ``check=True`` nothing is written: the committed output is compared
-    against a fresh render and the process exits non-zero when they differ.
+    With ``check=True`` nothing is written: ``out_dir`` is compared against a
+    fresh render and the process exits non-zero when they differ.
     """
     out_dir = Path(out_dir)
     env = environment()
@@ -389,7 +388,7 @@ def build(out_dir: Path, *, check: bool = False) -> int:
             name for name in set(committed) | set(files) if committed.get(name) != files.get(name)
         )
         if stale:
-            print("The committed site is out of date. Run: build_site.py", file=sys.stderr)
+            print("The built site is out of date. Run: build_site.py", file=sys.stderr)
             for name in stale:
                 print(f"  {name}", file=sys.stderr)
             raise SystemExit(1)
@@ -410,13 +409,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--check",
         action="store_true",
-        help="fail if the committed site differs from a fresh build; write nothing",
+        help="fail if out_dir differs from a fresh build; write nothing",
     )
     args = parser.parse_args(argv)
 
     if args.check:
         count = build(args.out, check=True)
-        print(f"The committed site is up to date ({count} files).")
+        print(f"The built site is up to date ({count} files).")
         return 0
 
     count = build(args.out)

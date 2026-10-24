@@ -8,6 +8,7 @@ by [`.github/workflows/pages.yml`](../.github/workflows/pages.yml).
 
 - A push to `main` runs the website tests, builds `_site` from `website/`, and
   deploys the artifact with `actions/deploy-pages`.
+- No site build output is committed; CI generates `_site` on every push.
 - `workflow_dispatch` republishes the site from the Actions tab without a code
   change.
 - Pages is configured with the "GitHub Actions" source, so there is no
@@ -65,13 +66,6 @@ through a free, account-less
 first for `/api/*`; `infra/cloudflare/worker.ts` forwards those calls to the
 `SIDECAR_URL` secret. The browser only talks to the Worker origin, so the
 sidecar's CORS list is not involved.
-
-Every response from the Worker — static assets and proxied API calls alike —
-carries a content security policy (`default-src 'self'`, `connect-src 'self'`,
-`frame-ancestors 'none'`) plus `X-Content-Type-Options: nosniff`,
-`X-Frame-Options: DENY`, a strict referrer policy, and a Permissions Policy that
-disables geolocation, camera, and microphone. `tests/test_worker_security_headers.py`
-pins those headers so a preview deployment can be smoke-tested against them.
 
 ```bash
 # 1. Build the SPA that the Worker uploads as static assets
