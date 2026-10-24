@@ -1,0 +1,28 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M5P8Y8VMYQCX161FZJ172BAX",
+  "strategy": "manual-commit",
+  "branch": "slay/e4060c02-adr",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "docs/architecture/README.md",
+    "docs/architecture/adr/0001-mcp-http-transport.md",
+    "docs/architecture/adr/README.md"
+  ],
+  "sessions": [
+    {
+      "metadata": "/0/metadata.json",
+      "transcript": "/0/full.jsonl",
+      "compact_transcript": "/0/transcript.jsonl",
+      "content_hash": "/0/content_hash.txt",
+      "prompt": ""
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 0,
+    "output_tokens": 0,
+    "api_call_count": 0
+  }
+}
