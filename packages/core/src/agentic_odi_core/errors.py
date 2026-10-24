@@ -55,6 +55,10 @@ class RateLimitError(OdiError):
         super().__init__(message)
 
 
+class ConsentRequired(OdiError):
+    """The agent tried to act on the workspace before the PM agreed to it."""
+
+
 class StoreError(OdiError):
     """The persistence layer could not complete the operation."""
 
@@ -68,6 +72,7 @@ _STATUS_BY_ERROR: tuple[tuple[type[OdiError], int], ...] = (
     (NotFoundError, 404),
     (ConflictError, 409),
     (RateLimitError, 429),
+    (ConsentRequired, 403),
     (StoreError, 500),
     (SerializationError, 502),
 )
