@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 from agentic_odi_cli import backend as backend_module
 from agentic_odi_cli.backend import (
+    AutoBackend,
     BackendConfig,
     BackendError,
     LocalBackend,
@@ -102,6 +103,46 @@ def test_local_compute_opportunity(tmp_path):
 def test_resolve_backend_selects_local_by_default(tmp_path):
     backend = resolve_backend(BackendConfig(backend="local", db_path=str(tmp_path / "odi.db")))
     assert isinstance(backend, LocalBackend)
+
+
+def test_get_backend_selects_auto(tmp_path):
+    backend = get_backend(backend="auto", db_path=str(tmp_path / "odi.db"))
+    assert isinstance(backend, AutoBackend)
+
+
+def test_auto_backend_stays_local_when_the_mcp_server_is_down(tmp_path, monkeypatch, capsys):
+    backend = AutoBackend(db_path=str(tmp_path / "odi.db"))
+
+    def unreachable(*_args):
+        raise BackendError("could not reach MCP server")
+
+    monkeypatch.setattr(backend._mcp, "call", unreachable)
+
+    job = backend.call("add_job", {"name": "Local job"})
+
+    assert job["name"] == "Local job"
+    assert "using the MCP server" not in capsys.readouterr().err
+
+
+def test_auto_backend_falls_back_to_mcp_and_notices_once(tmp_path, monkeypatch, capsys):
+    backend = AutoBackend(db_path=str(tmp_path / "odi.db"))
+
+    def stuck(*_args):
+        raise BackendError("local store is locked")
+
+    monkeypatch.setattr(backend._local, "call", stuck)
+    monkeypatch.setattr(
+        backend._mcp,
+        "call",
+        lambda _tool, _args: {"name": "Remote job"},
+    )
+
+    first = backend.call("add_job", {"name": "Remote job"})
+    second = backend.call("add_job", {"name": "Remote job"})
+
+    assert first["name"] == "Remote job"
+    assert second["name"] == "Remote job"
+    assert capsys.readouterr().err.count("Local store unavailable") == 1
 
 
 def test_get_backend_rejects_unknown_backend():
