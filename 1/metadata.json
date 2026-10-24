@@ -1,0 +1,75 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M5P5MY0M46V433A6AQRZ6GFY",
+  "session_id": "ses_e95ad064fffef0baLqHh5y2MwC",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-24T05:20:38.330574702Z",
+  "branch": "validate-protected-test",
+  "checkpoints_count": 1,
+  "save_step_count": 3,
+  "files_touched": [],
+  "agent": "OpenCode",
+  "model": "nvidia/nemotron-3.5-super-vl-120b-a12b",
+  "turn_id": "522c0599b2c3",
+  "checkpoint_transcript_start": 88,
+  "transcript_lines_at_start": 88,
+  "compact_transcript_start": 88,
+  "token_usage": {
+    "input_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 0,
+    "output_tokens": 0,
+    "api_call_count": 1
+  },
+  "session_metrics": {
+    "turn_count": 4
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 152,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        "docs/superpowers/plans/2026-10-21-conversational-generative-ui.md": 97,
+        "docs/superpowers/todos.md": 55
+      }
+    },
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 152,
+      "user_lines_removed": 0,
+      "agent_lines_added": 238,
+      "agent_lines_removed": 38,
+      "user_added_per_file": {
+        "docs/superpowers/plans/2026-10-21-conversational-generative-ui.md": 97,
+        "docs/superpowers/todos.md": 55
+      }
+    },
+    {
+      "checkpoint_number": 3,
+      "user_lines_added": 152,
+      "user_lines_removed": 0,
+      "agent_lines_added": 238,
+      "agent_lines_removed": 38,
+      "user_added_per_file": {
+        "docs/superpowers/plans/2026-10-21-conversational-generative-ui.md": 97,
+        "docs/superpowers/todos.md": 55
+      }
+    },
+    {
+      "checkpoint_number": 4,
+      "user_lines_added": 251,
+      "user_lines_removed": 0,
+      "agent_lines_added": 238,
+      "agent_lines_removed": 38,
+      "user_added_per_file": {
+        ".ci/protected-files.txt": 12,
+        "docs/superpowers/plans/2026-10-21-conversational-generative-ui.md": 97,
+        "docs/superpowers/todos.md": 55,
+        "tests/contract/test_protected_files.py": 87
+      }
+    }
+  ]
+}
