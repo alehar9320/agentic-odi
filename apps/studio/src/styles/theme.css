@@ -388,6 +388,17 @@ a {
   box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.09), 0 14px 34px rgba(0, 0, 0, 0.3);
 }
 
+/* Keyboard focus gets the same ring as the rest of the app. The textarea
+   suppresses the default outline, and a round 34px button mostly hides one,
+   so both are restated here with an offset that clears the shape. */
+.composer__input:focus-visible,
+.composer__send:focus-visible,
+.composer__suggestion:focus-visible,
+.palette__item:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
 .composer__input {
   flex: 1;
   min-width: 0;
