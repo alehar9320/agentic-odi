@@ -68,5 +68,9 @@ appended to the in-process ingest sink. They are **not** written into the ODI
 jobs/outcomes store — mapping ingested evidence onto ODI artifacts is still on
 the [roadmap](roadmap.md).
 
+Pass `--dry-run` to fetch and normalize without writing anything: it prints the
+record count, the first normalized record, and — when `--job-id`, `--step-id`,
+or `--outcome-id` is given — how many evidence drafts the ingest would create.
+
 Additional kinds (REST, webhooks, and so on) can register against the same
 `Connector` protocol later.
