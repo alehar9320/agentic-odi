@@ -184,6 +184,10 @@ export const CATALOG: readonly UiCatalogEntry[] = [
         description: "Omit it — the score is computed from importance and satisfaction.",
       },
       evidence: { type: "string", description: "The customer voice behind the rating." },
+      sample: {
+        type: "boolean",
+        description: "True when this is bundled sample data rather than the user's own.",
+      },
     },
     ["id", "statement", "importance", "satisfaction"],
   ),

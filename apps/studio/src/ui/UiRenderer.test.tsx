@@ -37,6 +37,24 @@ describe("UiRenderer", () => {
     expect(screen.getByText("Minimize propagation time")).toBeInTheDocument();
   });
 
+  it("marks a sample outcome card as bundled data", () => {
+    renderSpec({
+      type: "outcome-card",
+      props: {
+        id: "O-SAMPLE",
+        statement: "Minimize the time to propagate secrets",
+        importance: 9,
+        satisfaction: 3,
+        sample: true,
+      },
+    });
+
+    expect(screen.getByText("Sample")).toHaveAttribute(
+      "title",
+      "This is bundled sample data, not yours.",
+    );
+  });
+
   it("prefers an explicit opportunity score when the agent supplies one", () => {
     renderSpec({
       type: "outcome-card",
