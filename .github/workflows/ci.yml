@@ -19,6 +19,29 @@ defaults:
     shell: bash
 
 jobs:
+  # A PR with no description gives a reviewer nothing to check the diff
+  # against, so an empty body fails the build before any expensive job runs.
+  pr-body:
+    if: ${{ github.event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Require a non-empty pull request body
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          body="$(gh pr view "$PR_NUMBER" --repo "$REPO" --json body --jq '.body')"
+          if [ -z "$(printf '%s' "$body" | tr -d '[:space:]')" ]; then
+            echo "::error::The pull request body is empty. Summarize the change and how you verified it."
+            exit 1
+          fi
+          echo "OK: pull request body is present"
+
   lint:
     runs-on: ubuntu-latest
     timeout-minutes: 10
