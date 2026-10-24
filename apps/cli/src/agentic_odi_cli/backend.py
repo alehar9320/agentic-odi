@@ -634,6 +634,34 @@ def _extract_float(text: str) -> float:
 
 
 @dataclass
+class AutoBackend(Backend):
+    """Prefer the local store, and reach for the MCP server if it fails.
+
+    A locked or unreachable local store used to make every command fail even
+    when an MCP server was running. Auto keeps the local-first path but does
+    not let a local failure end the command.
+    """
+
+    def __init__(self, db_path: str | None = None, mcp_url: str | None = None) -> None:
+        self._local = LocalBackend(db_path=db_path)
+        self._mcp = MCPBackend(mcp_url=mcp_url)
+        self._announced = False
+
+    def call(self, tool_name: str, args: dict[str, Any]) -> Any:
+        try:
+            return self._local.call(tool_name, args)
+        except (BackendError, NotImplementedError) as local_error:
+            try:
+                result = self._mcp.call(tool_name, args)
+            except BackendError as mcp_error:
+                raise local_error from mcp_error
+            if not self._announced:
+                typer.echo("Local store unavailable; using the MCP server.", err=True)
+                self._announced = True
+            return result
+
+
+@dataclass
 class BackendConfig:
     backend: str | None = None
     db_path: str | None = None
@@ -648,6 +676,8 @@ def get_backend(
         return LocalBackend(db_path=db_path)
     if resolved in {"mcp", "remote"}:
         return MCPBackend(mcp_url=mcp_url)
+    if resolved == "auto":
+        return AutoBackend(db_path=db_path, mcp_url=mcp_url)
     raise BackendError(f"unknown backend: {resolved}")
 
 
