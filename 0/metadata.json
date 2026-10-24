@@ -1,0 +1,56 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M5PCVK00X2ZHQJV1ED67WJNX",
+  "session_id": "ses_e9718b02effeE6KEcUvihFPYaG",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-24T07:26:47.581867133Z",
+  "branch": "slay/da3ff8e5-sqlite-concurrency",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "apps/studio-api/src/agentic_odi_studio_api/studio/memory.py",
+    "apps/studio-api/tests/test_studio_memory.py",
+    "packages/core/src/agentic_odi_core/intent_store.py",
+    "packages/core/tests/test_sqlite_repository.py"
+  ],
+  "agent": "OpenCode",
+  "model": "poolside/laguna-s-2.1:free",
+  "turn_id": "b93f076dcb80",
+  "checkpoint_transcript_start": 62,
+  "transcript_lines_at_start": 62,
+  "compact_transcript_start": 62,
+  "token_usage": {
+    "input_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 0,
+    "output_tokens": 0,
+    "api_call_count": 0
+  },
+  "session_metrics": {
+    "turn_count": 1
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-10-24T07:26:47.532649734Z",
+    "agent_lines": 59,
+    "agent_removed": 0,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 59,
+    "total_lines_changed": 59,
+    "agent_percentage": 100,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 152,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        "docs/superpowers/plans/2026-10-21-conversational-generative-ui.md": 97,
+        "docs/superpowers/todos.md": 55
+      }
+    }
+  ]
+}
