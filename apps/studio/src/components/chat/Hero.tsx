@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useAuiState } from "@assistant-ui/react";
 
 import {
   GREETING_ROTATION_MS,
@@ -17,14 +18,11 @@ function prefersReducedMotion(): boolean {
   );
 }
 
-const OPPORTUNITY_PROMPT =
-  "I have an opportunity in mind. Ask me what it is, then help me sharpen it into something I can defend.";
-const FIND_PROMPT =
-  "I need to find the next opportunity worth chasing. Help me look across what I know about my customers and find the gap that matters most.";
-const PRESSURE_TEST_PROMPT =
-  "I have a bet I'm about to make. Pressure-test it with me: ask what it is, then tell me what would have to be true and what evidence I'm missing.";
-const CAPTURE_PROMPT =
-  "I heard something from a customer that I want to make sense of. Ask me what they said, then help me turn it into something we can act on.";
+const PILL_ICONS: ReactNode[] = [
+  <SparkIcon size={15} key="spark" />,
+  <BoltIcon size={15} key="bolt" />,
+  <CaptureIcon size={15} key="capture" />,
+];
 
 interface HeroPill {
   id: string;
@@ -34,9 +32,17 @@ interface HeroPill {
   conversational?: boolean;
 }
 
-export function Hero({ onSubmit }: { onSubmit: (text: string) => void }) {
-  const { displayName, canvas, llmHealth, openPanel, streaming, brief, openSetup } =
+/**
+ * The empty state.
+ *
+ * The starter prompts are the runtime's: `suggestions` on the external store is
+ * the one place they are decided, so what the hero offers and what the thread
+ * knows cannot drift apart.
+ */
+export function Hero() {
+  const { displayName, canvas, llmHealth, openPanel, streaming, brief, openSetup, sendMessage } =
     useStudio();
+  const suggestions = useAuiState((state) => state.thread.suggestions);
   const [now, setNow] = useState(() => new Date());
   const [currentId, setCurrentId] = useState<string | null>(null);
 
@@ -86,39 +92,21 @@ export function Hero({ onSubmit }: { onSubmit: (text: string) => void }) {
     return () => window.clearInterval(timer);
   }, [candidates, current?.id]);
 
-  const pills: HeroPill[] = [
-    {
-      id: "sharpen",
-      label: "Sharpen an opportunity",
-      icon: <SparkIcon size={15} />,
-      run: () => onSubmit(OPPORTUNITY_PROMPT),
-      conversational: true,
-    },
-    outcomes > 0
-      ? {
-          id: "pressure-test",
-          label: "Pressure-test a bet",
-          icon: <BoltIcon size={15} />,
-          run: () => onSubmit(PRESSURE_TEST_PROMPT),
-          conversational: true,
-        }
-      : {
-          id: "find",
-          label: "Find the next opportunity",
-          icon: <CompassIcon size={15} />,
-          run: () => onSubmit(FIND_PROMPT),
-          conversational: true,
-        },
-    jobs > 0
+  const pills: HeroPill[] = suggestions.map((suggestion, index) => ({
+    id: `suggestion-${index}`,
+    label: suggestion.title ?? suggestion.prompt,
+    icon: PILL_ICONS[index % PILL_ICONS.length],
+    run: () => void sendMessage(suggestion.prompt),
+    conversational: true,
+  }));
+
+  pills.push(
+    jobs > 0 && llmHealth.healthy === false
       ? {
           id: "capture",
           label: "Capture what you heard",
           icon: <CaptureIcon size={15} />,
-          run: () =>
-            llmHealth.healthy === false
-              ? openPanel("capture")
-              : onSubmit(CAPTURE_PROMPT),
-          conversational: true,
+          run: () => openPanel("capture"),
         }
       : {
           id: "landscape",
@@ -126,7 +114,7 @@ export function Hero({ onSubmit }: { onSubmit: (text: string) => void }) {
           icon: <CompassIcon size={15} />,
           run: () => openPanel("landscape"),
         },
-  ];
+  );
 
   return (
     <div className="hero">

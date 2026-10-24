@@ -50,6 +50,8 @@ let chatAborts = false;
 let chatFailure: Error | null = null;
 let connectorFetches = 0;
 let llmHealthFetches = 0;
+let approvalCalls: Record<string, unknown>[] = [];
+let headPatches: Record<string, unknown>[] = [];
 
 function route(input: RequestInfo | URL, init?: RequestInit): Response {
   const url = String(input);
@@ -111,6 +113,36 @@ function route(input: RequestInfo | URL, init?: RequestInit): Response {
       ],
     });
   }
+  if (url.startsWith("/api/approvals/")) {
+    approvalCalls.push(JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>);
+    return json({ ok: true, id: url.split("/").pop() });
+  }
+  if (init?.method === "PATCH" && url.startsWith("/api/conversations/")) {
+    headPatches.push(JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>);
+    return json({ conversation: CONVERSATION });
+  }
+  if (url === "/api/conversations/c-1/tree") {
+    return json({
+      conversation: CONVERSATION,
+      messages: [
+        {
+          id: "t-1",
+          parent_id: null,
+          role: "user",
+          content: "I own activation.",
+          created_at: "2026-10-22T10:00:00+00:00",
+        },
+        {
+          id: "t-2",
+          parent_id: "t-1",
+          role: "assistant",
+          content: "Tell me more.",
+          created_at: "2026-10-22T10:00:01+00:00",
+        },
+      ],
+      head_id: "t-2",
+    });
+  }
   if (url === "/api/conversations") {
     return json({
       conversation: {
@@ -141,6 +173,8 @@ describe("StudioContext memory and resume", () => {
     canvasFails = false;
     connectorFetches = 0;
     llmHealthFetches = 0;
+    approvalCalls = [];
+    headPatches = [];
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
   });
 
@@ -218,6 +252,8 @@ describe("StudioContext failures", () => {
     canvasFails = false;
     connectorFetches = 0;
     llmHealthFetches = 0;
+    approvalCalls = [];
+    headPatches = [];
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
   });
 
@@ -383,6 +419,8 @@ describe("StudioContext canvas state", () => {
     canvasFails = false;
     connectorFetches = 0;
     llmHealthFetches = 0;
+    approvalCalls = [];
+    headPatches = [];
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
   });
 
@@ -417,6 +455,8 @@ describe("StudioContext stopped turns", () => {
     canvasFails = false;
     connectorFetches = 0;
     llmHealthFetches = 0;
+    approvalCalls = [];
+    headPatches = [];
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
   });
 
@@ -436,5 +476,76 @@ describe("StudioContext stopped turns", () => {
     const messages = result.current.messages;
     expect(messages.some((message) => message.role === "user" && message.content === "list the jobs")).toBe(true);
     expect(messages.at(-1)?.error).toBeUndefined();
+  });
+});
+
+describe("StudioContext write approval and branches", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    chatBody = null;
+    chatStream = null;
+    chatFailure = null;
+    chatAborts = false;
+    canvasFails = false;
+    connectorFetches = 0;
+    llmHealthFetches = 0;
+    approvalCalls = [];
+    headPatches = [];
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("holds a write as a question until the person answers it", async () => {
+    chatStream =
+      'event: approval\ndata: {"id":"apv_1","tool_call_id":"call-1","name":"add_job","prompt":"Allow the assistant to add job?"}\n\n' +
+      'event: message\ndata: {"content":"Added."}\n\n';
+
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
+
+    await act(async () => {
+      await result.current.sendMessage("add a job for Retention");
+    });
+
+    const part = result.current.messages
+      .flatMap((message) => message.parts ?? [])
+      .find((candidate) => candidate.kind === "tool" && candidate.name === "add_job");
+    expect(part).toBeDefined();
+
+    await act(async () => {
+      await result.current.respondToApproval("apv_1", true, "yes please");
+    });
+
+    expect(approvalCalls).toEqual([{ approved: true, reason: "yes please" }]);
+  });
+
+  it("asks the server for approval before any write", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
+
+    await act(async () => {
+      await result.current.sendMessage("hello");
+    });
+
+    expect(chatBody).toMatchObject({ approvals: true });
+    expect(typeof chatBody?.assistant_id).toBe("string");
+  });
+
+  it("persists the branch a person switched to", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
+
+    await act(async () => {
+      result.current.switchBranch([
+        { id: "b-1", parentId: null, role: "user", content: "first" },
+        { id: "b-2", parentId: "b-1", role: "assistant", content: "answer" },
+      ]);
+    });
+
+    expect(result.current.messages.map((message) => message.id)).toEqual(["b-1", "b-2"]);
+    await waitFor(() => expect(headPatches).toEqual([{ head_id: "b-2" }]));
   });
 });

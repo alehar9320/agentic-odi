@@ -154,8 +154,20 @@ npm<span class="w"> </span>--prefix<span class="w"> </span>apps/studio<span clas
 <td>Card rendering, computed opportunity scores, action dispatch, per-node failure isolation, catalog/registry parity</td>
 </tr>
 <tr>
+<td><code>apps/studio/src/assistant/convert.test.ts</code></td>
+<td>Every part mapping in both directions, unknown parts dropped, <code>content</code> preserved for history</td>
+</tr>
+<tr>
 <td><code>apps/studio/src/components/chat/Conversation.test.tsx</code></td>
-<td>Prose and surfaces interleaved in the agent's order; card actions become messages</td>
+<td>Prose and surfaces interleaved in the agent's order through the real runtime; card actions become messages; branch affordance; failure retry</td>
+</tr>
+<tr>
+<td><code>apps/studio/src/components/chat/Composer.test.tsx</code></td>
+<td>Send, stop, and the slash palette in the runtime-bound composer</td>
+</tr>
+<tr>
+<td><code>apps/studio/src/state/StudioContext.test.tsx</code></td>
+<td>New, regenerate, and edit turns against a stubbed stream, branch switching, approval answers</td>
 </tr>
 <tr>
 <td><code>apps/studio-api/tests/test_studio_ui_spec.py</code></td>
@@ -164,6 +176,22 @@ npm<span class="w"> </span>--prefix<span class="w"> </span>apps/studio<span clas
 <tr>
 <td><code>apps/studio-api/tests/test_studio_chat_ui.py</code></td>
 <td><code>render_ui</code> interception, <code>ui</code> SSE events, and the correction fed back to the model</td>
+</tr>
+<tr>
+<td><code>apps/studio-api/tests/test_studio_chat_stream.py</code></td>
+<td>Reasoning and source events, attachment prompt assembly, terminal-event invariants</td>
+</tr>
+<tr>
+<td><code>apps/studio-api/tests/test_studio_chat_branches.py</code></td>
+<td>Turn ids and sibling branches: edit and regenerate produce a tree, not a rewrite</td>
+</tr>
+<tr>
+<td><code>apps/studio-api/tests/test_studio_conversations.py</code></td>
+<td>Branch tree endpoint, <code>head_id</code> patch, legacy linear fallback</td>
+</tr>
+<tr>
+<td><code>apps/studio-api/tests/test_studio_approvals.py</code></td>
+<td>Gate lifecycle: resolve, timeout, double resolve, unknown id</td>
 </tr>
 <tr>
 <td><code>apps/studio/src/features/flags.test.ts</code></td>

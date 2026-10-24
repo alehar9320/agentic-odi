@@ -25,6 +25,11 @@ from agentic_odi_core.remote import StudioError, StudioErrorCode
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 
+from agentic_odi_studio_api.studio.approvals import (
+    ApprovalDecision,
+    ApprovalNotFoundError,
+    ApprovalRegistry,
+)
 from agentic_odi_studio_api.studio.changelog import get_changelog
 from agentic_odi_studio_api.studio.chat import stream_chat
 from agentic_odi_studio_api.studio.connectors import ConnectorService
@@ -34,16 +39,23 @@ from agentic_odi_studio_api.studio.errors import (
     request_id_for,
 )
 from agentic_odi_studio_api.studio.mcp_data import call_mcp_tool, fetch_canvas, fetch_local_canvas
-from agentic_odi_studio_api.studio.memory import ObservationNotFoundError, StudioMemory
+from agentic_odi_studio_api.studio.memory import (
+    ConversationNotFoundError,
+    ObservationNotFoundError,
+    StudioMemory,
+)
 from agentic_odi_studio_api.studio.probes import check_llm_health, defaults, is_endpoint_reachable
 from agentic_odi_studio_api.studio.schemas import (
     AddConnectorRequest,
     AddOutcomeRequest,
     AddStepRequest,
+    ApprovalDecisionRequest,
+    ApprovalDecisionResponse,
     ChatRequest,
     ConnectorListItem,
     ConnectorOperationResponse,
     ConversationResponse,
+    ConversationTreeResponse,
     CreateJobRequest,
     LatestConversationResponse,
     LlmHealthRequest,
@@ -52,6 +64,8 @@ from agentic_odi_studio_api.studio.schemas import (
     ObservationListResponse,
     ObservationResponse,
     ObservationUpdateRequest,
+    TurnNode,
+    UpdateConversationRequest,
     UpdateJobRequest,
     UpdateOutcomeRequest,
     UpdateStepRequest,
@@ -116,6 +130,10 @@ def _connectors(request: Request) -> ConnectorService:
 
 def _memory(request: Request) -> StudioMemory:
     return request.app.state.memory
+
+
+def _approvals(request: Request) -> ApprovalRegistry:
+    return request.app.state.approvals
 
 
 @router.get("/config")
@@ -420,6 +438,76 @@ def create_conversation(request: Request) -> ConversationResponse:
     return ConversationResponse(conversation=_memory(request).create_conversation().to_dict())
 
 
+@router.get("/conversations/{conversation_id}/tree", response_model=ConversationTreeResponse)
+def conversation_tree(conversation_id: str, request: Request) -> ConversationTreeResponse:
+    """The whole branch tree, so a reload reopens the branch that was on screen."""
+    memory = _memory(request)
+    conversation = memory.get_conversation(conversation_id)
+    if conversation is None:
+        raise StudioHTTPError(
+            StudioError(
+                code=StudioErrorCode.NOT_FOUND,
+                message=f"Conversation {conversation_id} not found",
+            )
+        )
+    turns = memory.conversation_tree(conversation_id)
+    return ConversationTreeResponse(
+        conversation=conversation.to_dict(),
+        messages=[
+            TurnNode(
+                id=turn.message_id or f"turn-{turn.id}",
+                parent_id=turn.parent_id,
+                role=turn.role,
+                content=turn.content,
+                created_at=turn.created_at,
+            )
+            for turn in turns
+            if turn.role in {"user", "assistant"}
+        ],
+        head_id=conversation.head_id or (turns[-1].message_id if turns else None),
+    )
+
+
+@router.patch("/conversations/{conversation_id}", response_model=ConversationResponse)
+def patch_conversation(
+    conversation_id: str, body: UpdateConversationRequest, request: Request
+) -> ConversationResponse:
+    """Record the visible branch, or rename the thread."""
+    memory = _memory(request)
+    try:
+        if body.title is not None:
+            memory.update_title(conversation_id, body.title)
+        conversation = memory.set_head(conversation_id, body.head_id)
+    except ConversationNotFoundError as exc:
+        raise StudioHTTPError(
+            StudioError(
+                code=StudioErrorCode.NOT_FOUND,
+                message=f"Conversation {conversation_id} not found",
+            )
+        ) from exc
+    return ConversationResponse(conversation=conversation.to_dict())
+
+
+@router.post("/approvals/{approval_id}", response_model=ApprovalDecisionResponse)
+def resolve_approval(
+    approval_id: str, body: ApprovalDecisionRequest, request: Request
+) -> ApprovalDecisionResponse:
+    """Answer a paused write. The paused turn resumes on its own stream."""
+    try:
+        _approvals(request).resolve(
+            approval_id, ApprovalDecision(approved=body.approved, reason=body.reason)
+        )
+    except ApprovalNotFoundError as exc:
+        raise StudioHTTPError(
+            StudioError(
+                code=StudioErrorCode.NOT_FOUND,
+                message="That approval request is no longer waiting.",
+                suggestion="The turn may have ended or timed out. Send the request again.",
+            )
+        ) from exc
+    return ApprovalDecisionResponse(ok=True, id=approval_id)
+
+
 @router.post("/chat")
 async def post_chat(request: Request, body: ChatRequest) -> StreamingResponse:
     # The request id is the server's: the header the client sent (or one the
@@ -432,6 +520,7 @@ async def post_chat(request: Request, body: ChatRequest) -> StreamingResponse:
             service=request.app.state.connectors,
             memory=request.app.state.memory,
             request_id=request_id,
+            approvals=request.app.state.approvals,
         ),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
