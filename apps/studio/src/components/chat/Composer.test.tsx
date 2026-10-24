@@ -77,3 +77,37 @@ describe("Composer connector suggestions", () => {
     expect(screen.queryByRole("button", { name: /added gong/i })).not.toBeInTheDocument();
   });
 });
+
+describe("Composer keyboard focus", () => {
+  const baseProps = {
+    value: "hello",
+    onChange: () => {},
+    onSubmit: () => {},
+    onCommand: () => {},
+    streaming: false,
+    onStop: () => {},
+    inputRef: createRef<HTMLTextAreaElement>(),
+  };
+
+  it("keeps the send control in the tab order so it can take keyboard focus", () => {
+    vi.mocked(useStudio).mockReturnValue(stubContext({ connectorSuggestions: [] }));
+
+    render(<Composer {...baseProps} />);
+    const send = screen.getByRole("button", { name: "Send message" });
+    send.focus();
+
+    expect(send.tabIndex).toBe(0);
+    expect(document.activeElement).toBe(send);
+  });
+
+  it("keeps the stop control focusable while a reply streams", () => {
+    vi.mocked(useStudio).mockReturnValue(stubContext({ connectorSuggestions: [] }));
+
+    render(<Composer {...baseProps} streaming />);
+    const stop = screen.getByRole("button", { name: "Stop generating" });
+    stop.focus();
+
+    expect(stop.tabIndex).toBe(0);
+    expect(document.activeElement).toBe(stop);
+  });
+});
