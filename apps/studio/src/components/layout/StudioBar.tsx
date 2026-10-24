@@ -1,5 +1,5 @@
 import { useStudio } from "../../state/StudioContext";
-import { BellIcon, PlusIcon, SettingsIcon } from "../icons";
+import { BellIcon, MoonIcon, PlusIcon, SettingsIcon, SunIcon } from "../icons";
 import { OdiMascot } from "../OdiMascot";
 
 /**
@@ -16,7 +16,9 @@ export function StudioBar({
   onNew: () => void;
   onChangelog: () => void;
 }) {
-  const { llmHealth, unreadNotificationCount, openPanel } = useStudio();
+  const { llmHealth, unreadNotificationCount, openPanel, saveSettings, settings } = useStudio();
+  const theme = settings.theme === "light" ? "light" : "dark";
+  const nextTheme = theme === "dark" ? "light" : "dark";
 
   const status =
     llmHealth.healthy === null ? "Connecting" : llmHealth.healthy ? "Live" : "Local mode";
@@ -56,6 +58,16 @@ export function StudioBar({
           onClick={onNew}
         >
           <PlusIcon size={17} />
+        </button>
+
+        <button
+          type="button"
+          className="icon-button"
+          aria-label={`Switch to ${nextTheme} theme`}
+          title={`Switch to ${nextTheme} theme`}
+          onClick={() => saveSettings({ ...settings, theme: nextTheme })}
+        >
+          {theme === "dark" ? <SunIcon size={17} /> : <MoonIcon size={17} />}
         </button>
 
         <button

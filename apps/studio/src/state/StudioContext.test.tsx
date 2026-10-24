@@ -326,6 +326,53 @@ describe("StudioContext health polling", () => {
   });
 });
 
+describe("StudioContext theme", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    document.documentElement.className = "";
+    chatBody = null;
+    chatStream = null;
+    chatFailure = null;
+    chatAborts = false;
+    canvasFails = false;
+    connectorFetches = 0;
+    llmHealthFetches = 0;
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    document.documentElement.className = "";
+  });
+
+  it("applies the stored theme and persists a change", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
+
+    expect(document.documentElement.classList.contains("theme-dark")).toBe(true);
+
+    act(() => {
+      result.current.saveSettings({ ...result.current.settings, theme: "light" });
+    });
+
+    expect(document.documentElement.classList.contains("theme-light")).toBe(true);
+    expect(JSON.parse(localStorage.getItem("studio.settings") ?? "{}").theme).toBe("light");
+  });
+
+  it("keeps the chosen theme across a remount", async () => {
+    localStorage.setItem("studio.settings", JSON.stringify({ theme: "light" }));
+    const { unmount } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(document.documentElement.classList.contains("theme-light")).toBe(true));
+
+    unmount();
+    document.documentElement.className = "";
+
+    const second = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(second.result.current.settings.theme).toBe("light"));
+    expect(document.documentElement.classList.contains("theme-light")).toBe(true);
+  });
+});
+
 describe("StudioContext canvas state", () => {
   beforeEach(() => {
     localStorage.clear();

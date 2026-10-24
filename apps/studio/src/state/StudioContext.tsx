@@ -56,6 +56,7 @@ import type {
   StudioConfig,
   StudioError,
   StudioNotification,
+  StudioTheme,
   WorkspacePanelId,
 } from "../types";
 import { catalogManifest } from "../ui/catalog";
@@ -96,6 +97,7 @@ export const EMPTY_CONFIG: StudioConfig = {
   api_key: "local",
   model_name: "local-tools-model",
   mcp_url: "http://localhost:8000/mcp",
+  theme: "dark",
 };
 
 export type ToastKind = "success" | "error" | "info";
@@ -316,6 +318,7 @@ function loadNotifications(): StudioNotification[] {
 
 export function StudioProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<StudioConfig>(loadSettings);
+  const theme: StudioTheme = settings.theme === "light" ? "light" : "dark";
   const [displayName, setDisplayNameState] = useState<string>(loadDisplayName);
   const [brief, setBrief] = useState<StudioBrief | null>(loadBrief);
   const [setupOpen, setSetupOpen] = useState<boolean>(
@@ -500,6 +503,15 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     addNotification(chosen);
     pushToast("info", `Background Activity: ${chosen.title}`);
   }, [addNotification, pushToast]);
+
+  // The theme lives on <html> so every surface, portal, and native control
+  // follows one class instead of each component tracking its own copy.
+  useEffect(() => {
+    const root = document.documentElement;
+    root.classList.toggle("theme-light", theme === "light");
+    root.classList.toggle("theme-dark", theme === "dark");
+    root.style.colorScheme = theme;
+  }, [theme]);
 
   const saveSettings = useCallback((config: StudioConfig) => {
     setSettings(config);

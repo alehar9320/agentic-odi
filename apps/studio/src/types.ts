@@ -58,11 +58,14 @@ export interface StudioError {
   request_id?: string | null;
 }
 
+export type StudioTheme = "light" | "dark";
+
 export interface StudioConfig {
   base_url: string;
   api_key: string;
   model_name: string;
   mcp_url: string;
+  theme?: StudioTheme;
 }
 
 export interface LlmHealth {
