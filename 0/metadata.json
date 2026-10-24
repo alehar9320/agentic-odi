@@ -1,0 +1,41 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M5P8D01MT4645YJT7VVJAFMZ",
+  "session_id": "ses_e953e98d9ffeJ51GV13VT5K9fL",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-24T06:08:56.576874992Z",
+  "branch": "slay/1429fb91-job-summary",
+  "checkpoints_count": 1,
+  "save_step_count": 1,
+  "files_touched": [
+    "apps/cli/src/agentic_odi_cli/cli.py",
+    "docs/cli.md",
+    "website/dist/docs/cli/index.html"
+  ],
+  "agent": "OpenCode",
+  "model": "nvidia/nemotron-3.5-super-vl-120b-a12b",
+  "turn_id": "5f18fdeb5b55",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 355295,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 1981552,
+    "output_tokens": 7442,
+    "api_call_count": 41
+  },
+  "session_metrics": {
+    "turn_count": 4
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-10-24T06:08:56.521944725Z",
+    "agent_lines": 0,
+    "agent_removed": 0,
+    "human_added": 222,
+    "human_modified": 1,
+    "human_removed": 0,
+    "total_committed": 222,
+    "total_lines_changed": 223,
+    "agent_percentage": 0,
+    "metric_version": 2
+  }
+}
