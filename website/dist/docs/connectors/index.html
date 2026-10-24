@@ -156,7 +156,11 @@ python<span class="w"> </span>-m<span class="w"> </span>agentic_odi_cli<span cla
 </tr>
 </tbody>
 </table>
-<p>Register one with <code>--preset</code>; <code>--name</code> defaults to the preset id:</p>
+<p><code>docs/connectors-catalog.json</code> is the catalog as JSON, committed so a drift shows
+up in review. <code>packages/connectors/tests/test_catalog.py</code> fails when it stops
+matching the code; regenerate it after adding or editing a preset:</p>
+<pre class="highlight"><code class="language-bash">uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>-m<span class="w"> </span>agentic_odi_cli<span class="w"> </span>connectors<span class="w"> </span>catalog<span class="w"> </span>--json<span class="w"> </span>&gt;<span class="w"> </span>docs/connectors-catalog.json
+</code></pre><p>Register one with <code>--preset</code>; <code>--name</code> defaults to the preset id:</p>
 <pre class="highlight"><code class="language-bash"><span class="c1"># Token-based preset: export the variable it needs first</span>
 <span class="nb">export</span><span class="w"> </span><span class="nv">GITHUB_PERSONAL_ACCESS_TOKEN</span><span class="o">=</span>ghp_...
 python<span class="w"> </span>-m<span class="w"> </span>agentic_odi_cli<span class="w"> </span>connectors<span class="w"> </span>add<span class="w"> </span>mcp<span class="w"> </span>--preset<span class="w"> </span>github
