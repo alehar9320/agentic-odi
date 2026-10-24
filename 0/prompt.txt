@@ -1,17 +1,1 @@
 ACt as a world class principal software architect / devops expert / github pipeline expert / quality assurance expert. We almost had an agent delete the website/index.html file in a PR which likely would have caused the github pages deployment to fail. CI was green. To prevent this from passing in future, we need to act fail safe mechanisms in place that protects both this github pages deployment, in addition to the solutions we deliver.
-
----
-
-LGTME. Let's start simple and minimal as per your proposal. We can always iterate on this later.
-
----
-
-Did you commit and push this as new PR and verified PR CI green? You gave me no PR number.
-
----
-
-Your task is now to do that... fucking piece of shit
-
----
-
-You choose. GO! Confirm #PR number when done.
