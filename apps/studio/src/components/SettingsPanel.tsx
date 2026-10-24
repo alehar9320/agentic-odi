@@ -18,7 +18,6 @@ export function SettingsPanel() {
     refreshCanvas,
     llmHealth,
     mcpReachable,
-    pushToast,
     connectors,
     connectorsError,
     presets,
@@ -248,12 +247,7 @@ export function SettingsPanel() {
           type="button"
           className="button button--ghost"
           disabled={updater.checking}
-          onClick={() => {
-            void updater.check();
-            if (updater.error) {
-              pushToast("info", updater.error);
-            }
-          }}
+          onClick={() => void updater.check()}
         >
           {updater.checking ? "Checking for updates…" : "Check for updates"}
         </button>
