@@ -1,0 +1,54 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M5PBJ028W251NFY0ANZHVQ9A",
+  "session_id": "ses_e938222f0ffeT1N4D8lsoN4gyT",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-24T07:04:08.01965311Z",
+  "branch": "slay/b737e2cf-chat-error-surface",
+  "checkpoints_count": 3,
+  "files_touched": [
+    "apps/studio/src/components/chat/ChatStage.test.tsx"
+  ],
+  "agent": "OpenCode",
+  "model": "deepseek-v4.1-flash-free",
+  "turn_id": "ea70889b1ce5",
+  "checkpoint_transcript_start": 21,
+  "transcript_lines_at_start": 21,
+  "compact_transcript_start": 21,
+  "token_usage": {
+    "input_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 0,
+    "output_tokens": 0,
+    "api_call_count": 0
+  },
+  "session_metrics": {
+    "turn_count": 3
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-10-24T07:04:07.989430029Z",
+    "agent_lines": 0,
+    "agent_removed": 0,
+    "human_added": 85,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 85,
+    "total_lines_changed": 85,
+    "agent_percentage": 0,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 213,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        "docs/superpowers/plans/2026-10-21-conversational-generative-ui.md": 97,
+        "docs/superpowers/todos.md": 55,
+        "packages/core/tests/test_evaluation.py": 61
+      }
+    }
+  ]
+}
