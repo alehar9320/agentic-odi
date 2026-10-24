@@ -40,6 +40,9 @@
         <a href="https://alehar9320.github.io/agentic-odi/#how">How&nbsp;it&nbsp;works</a>
         <a href="https://alehar9320.github.io/agentic-odi/docs/">Docs</a>
       </nav>
+      <button class="site-search" type="button" data-search-open aria-label="Search the docs (Control K)">
+        Search <kbd>Ctrl K</kbd>
+      </button>
       <a class="btn btn--primary btn--sm" href="https://alehar9320.github.io/agentic-odi/#run">Run it in 60 seconds</a>
     </div>
   </header>
@@ -267,6 +270,20 @@ above to fix your local LLM setup.</p>
       </p>
     </div>
   </footer>
+
+  <div class="search" data-search data-site-url="https://alehar9320.github.io/agentic-odi/"
+       data-index-url="https://alehar9320.github.io/agentic-odi/assets/search-index.json" hidden>
+    <div class="search__scrim" data-search-close></div>
+    <div class="search__panel" role="dialog" aria-modal="true" aria-label="Search the docs">
+      <div class="search__field">
+        <input class="search__input" type="search" placeholder="Search the docs"
+               aria-label="Search the docs" autocomplete="off" data-search-input>
+        <button class="search__close" type="button" data-search-close aria-label="Close search">Esc</button>
+      </div>
+      <p class="search__hint" data-search-hint>Type to search every guide and reference page.</p>
+      <ul class="search__results" data-search-results></ul>
+    </div>
+  </div>
 
   <script defer src="../../assets/main.js"></script>
 </body>
