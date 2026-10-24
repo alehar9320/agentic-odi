@@ -1,41 +1,21 @@
-"""The CLI's local backend must stay aligned with the core contract."""
+"""The CLI's local backend must stay aligned with the core contract.
+
+The local handler surface mirrors the live MCP tool surface exactly: every
+contract tool has a local handler, and no local handler exists without a
+contract tool. This keeps the local (SQLite) and remote (MCP) backends in
+lockstep.
+"""
 
 from __future__ import annotations
 
 from agentic_odi_cli.backend import _LOCAL_HANDLERS
 from agentic_odi_core.contract import TOOL_NAMES
 
-LOCAL_TOOLS = {
-    "add_job",
-    "get_jobs",
-    "get_job",
-    "update_job",
-    "delete_job",
-    "add_step",
-    "get_job_map",
-    "get_step",
-    "update_step",
-    "delete_step",
-    "add_outcome",
-    "get_outcomes",
-    "get_outcome",
-    "update_outcome",
-    "delete_outcome",
-    "add_customer_outcome",
-    "get_customer_outcome",
-    "list_customer_outcomes",
-    "update_customer_outcome",
-    "delete_customer_outcome",
-    "add_evidence",
-    "get_evidence",
-    "list_evidence",
-    "delete_evidence",
-    "promote_evidence",
-    "get_odi_schema",
-    "compute_opportunity",
-}
+
+def test_local_handlers_match_mcp_tool_names() -> None:
+    """CLI local handlers are in one-to-one parity with MCP tool names."""
+    assert set(_LOCAL_HANDLERS) == set(TOOL_NAMES)
 
 
-def test_local_handler_keys_are_contract_tools() -> None:
-    assert set(_LOCAL_HANDLERS) == LOCAL_TOOLS
-    assert LOCAL_TOOLS <= set(TOOL_NAMES)
+def test_every_local_handler_is_a_contract_tool() -> None:
+    assert set(_LOCAL_HANDLERS) <= set(TOOL_NAMES)

@@ -154,8 +154,10 @@ ingested batch into evidence in one step.
 ## Schema and scoring
 
 ```bash
-agentic-odi schema            # canonical JSON schema for every ODI entity
-agentic-odi score 8 2         # ODI opportunity score → 14.00
+agentic-odi schema                   # canonical JSON schema for every ODI entity
+agentic-odi framework-guidelines     # ODI stage-by-stage tool guide
+agentic-odi capabilities             # what the assistant can help with
+agentic-odi score 8 2                # ODI opportunity score → 14.00
 ```
 
 ## Manage Customer Outcomes

@@ -313,8 +313,10 @@ agentic-odi<span class="w"> </span>evidence<span class="w"> </span>promote<span 
 </code></pre><p><code>connectors ingest --job-id &lt;job-id&gt;</code> maps every evidence-bearing record in the
 ingested batch into evidence in one step.</p>
 <h2 id="schema-and-scoring">Schema and scoring</h2>
-<pre class="highlight"><code class="language-bash">agentic-odi<span class="w"> </span>schema<span class="w">            </span><span class="c1"># canonical JSON schema for every ODI entity</span>
-agentic-odi<span class="w"> </span>score<span class="w"> </span><span class="m">8</span><span class="w"> </span><span class="m">2</span><span class="w">         </span><span class="c1"># ODI opportunity score → 14.00</span>
+<pre class="highlight"><code class="language-bash">agentic-odi<span class="w"> </span>schema<span class="w">                   </span><span class="c1"># canonical JSON schema for every ODI entity</span>
+agentic-odi<span class="w"> </span>framework-guidelines<span class="w">     </span><span class="c1"># ODI stage-by-stage tool guide</span>
+agentic-odi<span class="w"> </span>capabilities<span class="w">             </span><span class="c1"># what the assistant can help with</span>
+agentic-odi<span class="w"> </span>score<span class="w"> </span><span class="m">8</span><span class="w"> </span><span class="m">2</span><span class="w">                </span><span class="c1"># ODI opportunity score → 14.00</span>
 </code></pre><h2 id="manage-customer-outcomes">Manage Customer Outcomes</h2>
 <p>Customer Outcomes link customer value to business value. The <code>local</code> backend
 writes to the shared SQLite store with no server required; add <code>--backend mcp</code>

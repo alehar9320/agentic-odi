@@ -176,6 +176,8 @@ agentic-odi desired-outcomes list --job-id <id>
 agentic-odi customer-outcomes list
 agentic-odi evidence list --job-id <id>
 agentic-odi schema               # canonical JSON schema for every entity
+agentic-odi framework-guidelines # ODI stage-by-stage tool guide
+agentic-odi capabilities         # what the assistant can help with
 agentic-odi score 8 2            # ODI opportunity score → 14.00
 ```
 

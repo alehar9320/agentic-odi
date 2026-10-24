@@ -1,3 +1,4 @@
+import json
 import re
 
 from agentic_odi_cli import version
@@ -99,3 +100,45 @@ def test_unknown_backend_exits_nonzero():
 
     assert result.exit_code == 1
     assert "unknown backend: warp" in _strip_ansi(result.output)
+
+
+def test_score_command_computes_opportunity():
+    runner = CliRunner()
+    result = runner.invoke(app, ["score", "8", "2"])
+
+    assert result.exit_code == 0, result.output
+    assert "14.00" in _strip_ansi(result.output)
+
+
+def test_score_command_out_of_range_errors():
+    runner = CliRunner()
+    result = runner.invoke(app, ["score", "11", "2"])
+
+    assert result.exit_code != 0
+
+
+def test_schema_command_emits_json_entities():
+    runner = CliRunner()
+    result = runner.invoke(app, ["schema"])
+
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)
+    assert "Job" in data
+    assert "Step" in data
+    assert "Outcome" in data
+
+
+def test_framework_guidelines_command_prints_text():
+    runner = CliRunner()
+    result = runner.invoke(app, ["framework-guidelines"])
+
+    assert result.exit_code == 0, result.output
+    assert "Outcome-Driven Innovation" in _strip_ansi(result.output)
+
+
+def test_capabilities_command_prints_text():
+    runner = CliRunner()
+    result = runner.invoke(app, ["capabilities"])
+
+    assert result.exit_code == 0, result.output
+    assert "Manage Jobs-to-be-Done" in _strip_ansi(result.output)

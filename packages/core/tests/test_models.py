@@ -27,6 +27,21 @@ def test_compute_opportunity_score(importance: float, satisfaction: float, expec
     assert compute_opportunity_score(importance, satisfaction) == expected
 
 
+@pytest.mark.parametrize(
+    ("importance", "satisfaction", "expected"),
+    [
+        (1.0, 1.0, 1.0),
+        (1.0, 10.0, 1.0),
+        (10.0, 10.0, 10.0),
+        (10.0, 1.0, 19.0),
+    ],
+)
+def test_compute_opportunity_score_boundaries(
+    importance: float, satisfaction: float, expected: float
+) -> None:
+    assert compute_opportunity_score(importance, satisfaction) == expected
+
+
 def _customer_value(**overrides: object) -> CustomerValue:
     data: dict[str, object] = {
         "direction": Direction.MINIMIZE,

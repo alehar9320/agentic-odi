@@ -25,3 +25,13 @@ async def test_mcp_argument_names_match_the_contract() -> None:
         schema = tools[name].input_schema
         assert set(schema.get("properties", {})) == set(spec.arguments), name
         assert set(schema.get("required", [])) == set(spec.required), name
+
+
+@pytest.mark.asyncio
+async def test_mcp_guideline_and_capability_tools_return_text() -> None:
+    async with Client(mcp) as client:
+        guidelines = await client.call_tool("get_odi_framework_guidelines", {})
+        capabilities = await client.call_tool("get_capabilities", {})
+
+    assert guidelines.content[0].text.strip()
+    assert capabilities.content[0].text.strip()

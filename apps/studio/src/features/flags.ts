@@ -12,7 +12,7 @@
  * can never silently change behaviour.
  */
 
-export type FeatureFlagName = "firstRunWizard";
+export type FeatureFlagName = "firstRunWizard" | "catchUpFeed";
 
 export interface FeatureFlagDefinition {
   name: FeatureFlagName;
@@ -26,6 +26,12 @@ export const FEATURE_FLAGS: Record<FeatureFlagName, FeatureFlagDefinition> = {
     name: "firstRunWizard",
     description: "Four-step welcome tour for first-time Living Studio users.",
     envVar: "VITE_STUDIO_FIRST_RUN_WIZARD",
+    defaultEnabled: true,
+  },
+  catchUpFeed: {
+    name: "catchUpFeed",
+    description: "Bell rail that surfaces outcome shifts, simulations, and telemetry signals.",
+    envVar: "VITE_STUDIO_CATCH_UP_FEED",
     defaultEnabled: true,
   },
 };

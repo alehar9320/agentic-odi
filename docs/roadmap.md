@@ -29,3 +29,16 @@ As we validate the feasibility of this architecture, our next milestones include
 - [x] **Agentic Integration**: Hook the CLI chat up to an LLM (via the
   `openai` package) so the LLM can *discover* the ODI tools and intelligently
   request customer insights when ideating features.
+
+## Upcoming
+
+The validated milestones above are complete. Next candidates for the backlog:
+
+- **CLI parity surface**: expose every MCP tool (including
+  `get_odi_framework_guidelines` and `get_capabilities`) as first-class CLI
+  commands so the terminal mirrors the server.
+- **Error surfacing**: route every MCP/server error through a user-facing,
+  actionable message instead of raw exceptions.
+- **Coverage**: keep the test suite at or above the 90% Codecov target as new
+  tools and commands land.
+

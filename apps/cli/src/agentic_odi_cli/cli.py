@@ -158,6 +158,18 @@ def schema_cmd() -> None:
     typer.echo(json.dumps(run_tool("get_odi_schema", {}), indent=2))
 
 
+@app.command(name="framework-guidelines")
+def framework_guidelines_cmd() -> None:
+    """Print the ODI framework guidelines."""
+    typer.echo(run_tool("get_odi_framework_guidelines", {}))
+
+
+@app.command(name="capabilities")
+def capabilities_cmd() -> None:
+    """Print what the Agentic ODI assistant can help with."""
+    typer.echo(run_tool("get_capabilities", {}))
+
+
 @app.command(name="version")
 def version_cmd() -> None:
     """Show CLI version."""
