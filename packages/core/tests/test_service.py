@@ -63,6 +63,26 @@ def test_job_map_is_sorted_by_order(service: ODIService) -> None:
     assert [step.name for step in service.get_job_map(job.id)] == ["first", "second"]
 
 
+def test_add_step_accepts_every_job_map_stage(service: ODIService) -> None:
+    job = service.add_job("Onboard customers")
+
+    for order in range(1, 9):
+        step = service.add_step(job.id, f"stage {order}", order=order)
+        assert step.order == order
+
+    assert [step.order for step in service.get_job_map(job.id)] == list(range(1, 9))
+
+
+@pytest.mark.parametrize("order", [0, -1, 9, 42])
+def test_add_step_rejects_orders_outside_the_job_map(service: ODIService, order: int) -> None:
+    job = service.add_job("Onboard customers")
+
+    with pytest.raises(ValueOutOfRangeError, match="between 1 and 8"):
+        service.add_step(job.id, "off-map", order=order)
+
+    assert service.get_job_map(job.id) == []
+
+
 def test_add_outcome_computes_opportunity_score(service: ODIService) -> None:
     job = service.add_job("Onboard customers")
     outcome = service.add_outcome(

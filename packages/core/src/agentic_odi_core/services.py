@@ -139,6 +139,8 @@ class ODIService:
     def add_step(self, job_id: str, name: str, order: int) -> Step:
         if self.repo.get_job(job_id) is None:
             raise JobNotFoundError(job_id)
+        if not 1 <= order <= 8:
+            raise ValueOutOfRangeError("Step order must be between 1 and 8 (Ulwick's job map).")
         step = Step(id=str(uuid.uuid4()), job_id=job_id, name=name, order=order)
         return self.repo.add_step(step)
 
