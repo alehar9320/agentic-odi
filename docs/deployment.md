@@ -57,29 +57,45 @@ sidecar tunnel described below.
 ## Component Visual Review (Chromatic)
 
 Every `*.visual.test.tsx` file in `apps/studio` renders one component state in a
-real Chromium browser, and the `chromatic` job in
-[`.github/workflows/ci.yml`](../.github/workflows/ci.yml) publishes those
-snapshots to **[Chromatic](https://www.chromatic.com/)** on every push and pull
-request. Reviewers compare the pixels, approve or reject the change in
-Chromatic, and the approved build becomes the baseline for the next comparison.
+real Chromium browser. The `Chromatic` workflow
+([`.github/workflows/chromatic.yml`](../.github/workflows/chromatic.yml)) runs
+those tests on every branch push and publishes the snapshots to
+**[Chromatic](https://www.chromatic.com/)**. Reviewers compare the pixels,
+approve or reject the change in Chromatic, and the approved build becomes the
+baseline for the next comparison.
 
 ### Project setup
 
-The Chromatic project exists and is linked to `alehar9320/agentic-odi` (app id
-`6add05ad03e0b1f6aeda07ad`). Its first build was published from the CLI and
-contains the two `FailurePanel` snapshots:
+The project is linked to `alehar9320/agentic-odi` (app id
+`6add05ad03e0b1f6aeda07ad`), and the **`CHROMATIC_PROJECT_TOKEN`** repository
+secret holds its project token, so the workflow publishes with no manual step.
+The first build, published from the CLI, holds the two `FailurePanel`
+snapshots:
 [build 1](https://www.chromatic.com/build?appId=6add05ad03e0b1f6aeda07ad&number=1).
 
-One step remains so CI can publish on its own:
+To rotate the token, generate a new one in **Manage → Project token** and run
+`gh secret set CHROMATIC_PROJECT_TOKEN`. No code change is involved.
 
-1. Copy the project token from **Manage → Project token**.
-2. Add it to the repository as the **`CHROMATIC_PROJECT_TOKEN`** secret
-   (`gh secret set CHROMATIC_PROJECT_TOKEN`).
+### What CI does
 
-The next push then produces a build containing every
-`*.visual.test.tsx` component. Until the secret exists the job still runs the
-browser tests, skips the upload, and prints a notice, so forks and Dependabot
-PRs stay green.
+| Event | Result |
+|---|---|
+| Push to any branch | Captures the component states, publishes a build, reports its status against that commit |
+| Push to `main` | Same, and `chromatic.config.json` auto-accepts, so `main` becomes the baseline |
+| Push from Dependabot | Captures snapshots, skips the upload with a notice: Dependabot runs cannot read repository secrets |
+| Pull request from a fork | No build; the workflow runs in this repository and never sees a fork branch |
+| Missing token in any other run | The job fails rather than passing without publishing |
+
+The workflow triggers on `push` rather than `pull_request`, which is
+Chromatic's recommendation: GitHub builds pull_request runs from an ephemeral
+merge commit, so the diff would include everything merged into `main` since the
+branch point. Chromatic still reports its **UI Tests** status on the pull
+request that contains the commit.
+
+To stop a visual change from merging before someone looks at it, add **Visual
+tests (Chromatic)** and Chromatic's **UI Tests** to the required status checks
+for `main` (Settings → Rules → Rulesets). Unreviewed changes then keep the pull
+request red until they are approved in Chromatic.
 
 > [!NOTE]
 > `apps/studio/package.json` overrides the transitive `storybook` version that
@@ -100,15 +116,15 @@ choices keep this project far below that ceiling:
 | One Chromium instance, one viewport | same file | No browser or viewport matrix multiplying each test. |
 | Animations paused at their end frame | same file (`pauseAnimationAtEnd`) | Shimmer and fade-in components do not diff on capture timing. |
 
-Today that is **2 snapshots per build**, so the monthly allowance would cover
-~2,500 builds. A component added to visual review costs one snapshot per state
-per build, so keep new files focused on the states that matter rather than every
-prop permutation.
+Today that is **2 snapshots per build**, one build per branch push, so the
+monthly allowance would cover ~2,500 builds. A component added to visual review
+costs one snapshot per state per build, so keep new files focused on the states
+that matter rather than every prop permutation.
 
 `apps/studio/chromatic.config.json` auto-accepts changes on `main` (so the
 default branch updates its baseline without a manual review) and exits zero on
-visual changes elsewhere (so a PR is reviewed in Chromatic instead of blocking
-on a red check). Rendering errors still fail the job.
+visual changes elsewhere, so the job itself reports success while the review
+lands in Chromatic's **UI Tests** check. Rendering errors still fail the job.
 
 ### Commands
 

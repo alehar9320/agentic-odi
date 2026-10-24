@@ -38,8 +38,8 @@ cd apps/studio/src-tauri && cargo fmt --check && cargo clippy -- -D warnings && 
 
 `npm test` runs the jsdom suite and deliberately ignores `*.visual.test.tsx`.
 Those files render one component state in Chromium under
-`vitest.visual.config.ts`, and CI publishes them to Chromatic so a reviewer can
-compare pixels component by component. Each test costs one billed snapshot per
+`vitest.visual.config.ts`, and the `Chromatic` workflow publishes them on every
+branch push so a reviewer can compare pixels component by component. Each test costs one billed snapshot per
 build on the free 5,000/month allowance, which is why the two suites are split by
 filename instead of running every test in a browser. Browser mode needs Chromium
 locally: `npx playwright install chromium`. See
