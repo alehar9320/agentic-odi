@@ -30,6 +30,7 @@
   --glass: rgba(255, 255, 255, 0.045);
   --glass-blur: blur(20px) saturate(180%);
   --hairline: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  --shadow-deep: 0 40px 120px -20px rgba(0, 0, 0, 0.85);
   --r-sm: 8px;
   --r-md: 12px;
   --r-lg: 16px;
@@ -40,4 +41,25 @@
   --w-prose: 68ch;
   --gutter: clamp(20px, 5vw, 48px);
   --section-y: clamp(96px, 13vw, 200px);
+}
+
+:root[data-theme="light"] {
+  --bg: #f7f8fb;
+  --bg-raised: #ffffff;
+  --bg-sunken: #eef0f6;
+  --text: #12131a;
+  --muted: #555b68;
+  --faint: #6b7280;
+  --accent: #4f46e5;
+  --accent-strong: #4338ca;
+  --accent-ink: #ffffff;
+  --green: #15803d;
+  --amber: #b45309;
+  --line: rgba(18, 19, 26, 0.1);
+  --line-strong: rgba(18, 19, 26, 0.18);
+  --surface: rgba(18, 19, 26, 0.035);
+  --surface-hover: rgba(18, 19, 26, 0.07);
+  --glass: rgba(255, 255, 255, 0.72);
+  --hairline: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  --shadow-deep: 0 40px 120px -20px rgba(18, 19, 26, 0.18);
 }

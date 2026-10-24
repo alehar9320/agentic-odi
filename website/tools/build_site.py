@@ -65,6 +65,7 @@ def _tokens_css() -> str:
         "--glass": "rgba(255, 255, 255, 0.045)",
         "--glass-blur": "blur(20px) saturate(180%)",
         "--hairline": "inset 0 1px 0 rgba(255, 255, 255, 0.06)",
+        "--shadow-deep": "0 40px 120px -20px rgba(0, 0, 0, 0.85)",
         "--r-sm": "8px",
         "--r-md": "12px",
         "--r-lg": "16px",
@@ -81,6 +82,35 @@ def _tokens_css() -> str:
         body = "\n".join(f"  {name}: {value};" for name, value in pairs.items())
         return f":root {{\n{body}\n}}"
 
+    # The light theme is a token swap, nothing else: style.css never names a
+    # colour, so overriding the palette here is all a new theme needs. It is
+    # the Studio palette rotated onto a paper background, with accents darkened
+    # enough to keep their contrast against white.
+    light = {
+        "--bg": "#f7f8fb",
+        "--bg-raised": "#ffffff",
+        "--bg-sunken": "#eef0f6",
+        "--text": "#12131a",
+        "--muted": "#555b68",
+        "--faint": "#6b7280",
+        "--accent": "#4f46e5",
+        "--accent-strong": "#4338ca",
+        "--accent-ink": "#ffffff",
+        "--green": "#15803d",
+        "--amber": "#b45309",
+        "--line": "rgba(18, 19, 26, 0.1)",
+        "--line-strong": "rgba(18, 19, 26, 0.18)",
+        "--surface": "rgba(18, 19, 26, 0.035)",
+        "--surface-hover": "rgba(18, 19, 26, 0.07)",
+        "--glass": "rgba(255, 255, 255, 0.72)",
+        "--hairline": "inset 0 1px 0 rgba(255, 255, 255, 0.9)",
+        "--shadow-deep": "0 40px 120px -20px rgba(18, 19, 26, 0.18)",
+    }
+
+    def themed_block(selector: str, pairs: dict[str, str]) -> str:
+        body = "\n".join(f"  {name}: {value};" for name, value in pairs.items())
+        return f"{selector} {{\n{body}\n}}"
+
     return (
         "\n\n".join(
             [
@@ -88,6 +118,7 @@ def _tokens_css() -> str:
                 block(tokens),
                 block(easings),
                 block(site_only),
+                themed_block(':root[data-theme="light"]', light),
             ]
         )
         + "\n"
