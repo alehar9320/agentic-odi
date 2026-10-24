@@ -424,3 +424,21 @@ def test_reload_keeps_the_snapshot_on_disk(tmp_path) -> None:
     repo.reload()
 
     assert [job.id for job in repo.list_jobs()] == ["job-1"]
+
+
+
+def test_get_outcomes_ranks_by_opportunity_score(tmp_path) -> None:
+    from agentic_odi_core.models import Job, Outcome
+
+    repo = SQLiteRepository(str(tmp_path / "odi.db"))
+    repo.add_job(Job(id="job-1", name="Onboard customers"))
+    repo.add_outcome(Outcome(id="o-low", job_id="job-1", statement="low", opportunity_score=4.0))
+    repo.add_outcome(Outcome(id="o-high", job_id="job-1", statement="high", opportunity_score=15.0))
+    repo.add_outcome(Outcome(id="o-none", job_id="job-1", statement="unscored"))
+
+    assert [o.id for o in repo.get_outcomes("job-1")] == ["o-high", "o-low", "o-none"]
+    assert [o.id for o in repo.get_outcomes("job-1", sort="insertion")] == [
+        "o-low",
+        "o-high",
+        "o-none",
+    ]

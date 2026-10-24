@@ -132,12 +132,18 @@ def add_outcome(
 
 @mcp.tool
 def get_outcomes(
-    job_id: str, step_id: str | None = None, limit: int | None = None, offset: int = 0
+    job_id: str,
+    step_id: str | None = None,
+    limit: int | None = None,
+    offset: int = 0,
+    sort: str = "opportunity_score",
 ) -> str:
     job = service.get_job(job_id)
     if job is None:
         return f"Error: Job with ID {job_id} not found."
-    outcomes = service.get_outcomes(job_id=job_id, step_id=step_id, limit=limit, offset=offset)
+    outcomes = service.get_outcomes(
+        job_id=job_id, step_id=step_id, limit=limit, offset=offset, sort=sort
+    )
     return json.dumps([outcome.model_dump() for outcome in outcomes])
 
 
