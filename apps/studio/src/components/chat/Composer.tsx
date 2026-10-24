@@ -19,6 +19,35 @@ interface ComposerProps {
 
 const MAX_HEIGHT = 220;
 
+function CommandOption({
+  command,
+  active,
+  onHover,
+  onChoose,
+}: {
+  command: StudioCommand;
+  active: boolean;
+  onHover: () => void;
+  onChoose: (command: StudioCommand) => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="option"
+      aria-selected={active}
+      className={`palette__item${active ? " is-active" : ""}`}
+      onMouseEnter={onHover}
+      onClick={() => onChoose(command)}
+    >
+      <code className="palette__name">{command.name}</code>
+      <span className="palette__text">
+        <span className="palette__label">{command.label}</span>
+        <span className="palette__description">{command.description}</span>
+      </span>
+    </button>
+  );
+}
+
 export function Composer({
   value,
   onChange,
@@ -40,6 +69,17 @@ export function Composer({
   const offline = llmHealth.healthy === false;
   const matches = useMemo(() => (isCommandDraft(value) ? matchCommands(value) : []), [value]);
   const paletteOpen = isCommandDraft(value) && dismissedFor !== value;
+  // Keep the flat match index for keyboard navigation while showing the
+  // matches under their category headings.
+  const groups = useMemo(() => {
+    const grouped = new Map<string, { command: StudioCommand; index: number }[]>();
+    matches.forEach((command, index) => {
+      const bucket = grouped.get(command.category) ?? [];
+      bucket.push({ command, index });
+      grouped.set(command.category, bucket);
+    });
+    return [...grouped.entries()];
+  }, [matches]);
 
   // Grow with the draft, then scroll once it gets tall.
   useEffect(() => {
@@ -117,22 +157,24 @@ export function Composer({
       {paletteOpen && (
         <div className="palette" role="listbox" id="studio-command-palette" aria-label="Commands">
           {matches.length ? (
-            matches.map((command, index) => (
-              <button
-                key={command.id}
-                type="button"
-                role="option"
-                aria-selected={index === activeIndex}
-                className={`palette__item${index === activeIndex ? " is-active" : ""}`}
-                onMouseEnter={() => setHighlight(index)}
-                onClick={() => choose(command)}
+            groups.map(([category, entries]) => (
+              <div
+                key={category}
+                className="palette__group"
+                role="group"
+                aria-label={category}
               >
-                <code className="palette__name">{command.name}</code>
-                <span className="palette__text">
-                  <span className="palette__label">{command.label}</span>
-                  <span className="palette__description">{command.description}</span>
-                </span>
-              </button>
+                <p className="palette__group-title">{category}</p>
+                {entries.map(({ command: entry, index }) => (
+                  <CommandOption
+                    key={entry.id}
+                    command={entry}
+                    active={index === activeIndex}
+                    onHover={() => setHighlight(index)}
+                    onChoose={choose}
+                  />
+                ))}
+              </div>
             ))
           ) : (
             <p className="palette__empty">
