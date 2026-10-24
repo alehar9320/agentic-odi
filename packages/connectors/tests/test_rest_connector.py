@@ -63,6 +63,54 @@ async def test_ingest_normalizes_list_payload() -> None:
 
 
 @pytest.mark.asyncio
+async def test_ingest_follows_the_next_page_until_exhausted() -> None:
+    pages = {
+        "https://api.example/records": {
+            "records": [{"name": "one", "content": "first"}],
+            "next": "/records?page=2",
+        },
+        "https://api.example/records?page=2": {
+            "records": [{"name": "two", "content": "second"}],
+            "next": None,
+        },
+    }
+    calls: list[str] = []
+
+    def fetch(method, url, headers, body, timeout):
+        calls.append(url)
+        return 200, json.dumps(pages[url]).encode("utf-8")
+
+    connector = RestConnector(
+        name="jira",
+        settings=RestConnectorSettings(
+            url="https://api.example/records",
+            pagination={"next_path": "next"},
+        ),
+        fetcher=fetch,
+    )
+
+    batch = await connector.ingest()
+
+    assert [record.name for record in batch.records] == ["one", "two"]
+    assert calls == [
+        "https://api.example/records",
+        "https://api.example/records?page=2",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_ingest_stops_at_one_page_without_pagination_opt_in() -> None:
+    batch = await _connector(
+        {
+            "records": [{"name": "one", "content": "first"}],
+            "next": "/records?page=2",
+        }
+    ).ingest()
+
+    assert [record.name for record in batch.records] == ["one"]
+
+
+@pytest.mark.asyncio
 async def test_ingest_uses_records_key_and_serializes_objects() -> None:
     payload = {"result": {"issues": [{"id": "ABC-1", "summary": "Slow deploy"}]}}
     batch = await _connector(payload, records_key="result.issues").ingest()
