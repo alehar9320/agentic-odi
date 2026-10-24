@@ -31,16 +31,17 @@ def _protected_paths() -> list[Path]:
 def _base_ref() -> str:
     """The ref to diff against.
 
-    CI checkouts are shallow (fetch-depth 1), so ``origin/main`` may not be
-    present and ``HEAD~1`` may not exist. Fetch the default branch first so
-    we can diff the PR branch against its merge-base with main. Falls back
-    to the previous commit on a direct push to main.
+    CI checkouts are shallow (fetch-depth 1), so HEAD's ancestors are missing
+    and neither origin/main nor HEAD~1 may exist. Unshallow so we can diff the
+    PR branch against its merge-base with the default branch. Falls back to
+    the previous commit on a direct push to main.
     """
-    # Make sure we can compare against the default branch even on a shallow
-    # checkout (e.g. a pull request from a fork).
+    # Unshallow so we can walk ancestry even on a shallow checkout (e.g. a
+    # pull request from a fork). If that fails we fall through to HEAD~1,
+    # which will also fail red rather than silently passing.
     try:
         subprocess.check_output(
-            ["git", "fetch", "origin", "main"],
+            ["git", "fetch", "--unshallow", "origin"],
             stderr=subprocess.DEVNULL,
             cwd=ROOT,
         )
