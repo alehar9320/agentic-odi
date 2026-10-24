@@ -56,12 +56,17 @@ def drafts_from_batch(
 
 
 def _config_path(config: Path | None) -> Path:
+    """Resolve the registry file exactly as the connectors package does.
+
+    The explicit ``--config`` value wins; otherwise the shared resolver owns
+    the environment variable and the default location, so the CLI and every
+    other entry point read the same file.
+    """
     if config is not None:
         return config
-    env = os.getenv("AGENTIC_ODI_CONNECTORS_FILE")
-    if env:
-        return Path(env)
-    return Path.cwd() / ".agentic-odi" / "connectors.json"
+    from agentic_odi_connectors.paths import config_path
+
+    return config_path()
 
 
 def _registry(config: Path | None) -> ConnectorRegistry:
@@ -85,7 +90,7 @@ ConfigOption = typer.Option(
     None,
     "--config",
     help="Path to the connectors JSON registry.",
-    envvar="AGENTIC_ODI_CONNECTORS_FILE",
+    envvar="AGENTIC_ODI_CONNECTORS_CONFIG",
 )
 
 _CONNECTOR_TIMEOUT = 30.0
