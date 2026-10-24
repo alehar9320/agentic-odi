@@ -31,10 +31,21 @@ def _protected_paths() -> list[Path]:
 def _base_ref() -> str:
     """The ref to diff against.
 
-    On a pull request we diff against the merge-base with the default
-    branch so we see what the branch changed. On a direct push to main we
-    fall back to the previous commit.
+    CI checkouts are shallow (fetch-depth 1), so ``origin/main`` may not be
+    present and ``HEAD~1`` may not exist. Fetch the default branch first so
+    we can diff the PR branch against its merge-base with main. Falls back
+    to the previous commit on a direct push to main.
     """
+    # Make sure we can compare against the default branch even on a shallow
+    # checkout (e.g. a pull request from a fork).
+    try:
+        subprocess.check_output(
+            ["git", "fetch", "origin", "main"],
+            stderr=subprocess.DEVNULL,
+            cwd=ROOT,
+        )
+    except subprocess.CalledProcessError:
+        pass
     for candidate in ("origin/main", "main"):
         try:
             base = subprocess.check_output(
@@ -65,16 +76,12 @@ def _deleted_files(base: str) -> set[str]:
     return deleted
 
 
-def _git_revision_path(ref: str, path: Path) -> str:
-    return str(path.relative_to(ROOT))
-
-
 def test_no_protected_file_is_deleted() -> None:
     base = _base_ref()
     deleted = _deleted_files(base)
     violations = []
     for path in _protected_paths():
-        rel = _git_revision_path(base, path)
+        rel = str(path.relative_to(ROOT))
         if rel in deleted:
             violations.append(rel)
 
