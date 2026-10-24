@@ -1,0 +1,32 @@
+name: PR Risk Classifier
+description: Scores a PR diff (churn, critical-path, test delta) and applies a mutually exclusive risk label.
+inputs:
+  GITHUB_TOKEN:
+    description: GitHub token for PR label mutation.
+    required: true
+  BASE_SHA:
+    description: Base commit SHA to diff against.
+    required: true
+  HEAD_SHA:
+    description: Head commit SHA of the PR.
+    required: true
+  PR_NUMBER:
+    description: Pull request number.
+    required: true
+  REPO:
+    description: Repository (owner/repo).
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Run PR risk scoring + label application
+      env:
+        GITHUB_TOKEN: ${{ inputs.GITHUB_TOKEN }}
+        BASE_SHA: ${{ inputs.BASE_SHA }}
+        HEAD_SHA: ${{ inputs.HEAD_SHA }}
+        PR_NUMBER: ${{ inputs.PR_NUMBER }}
+        REPO: ${{ inputs.REPO }}
+      run: |
+        chmod +x "${{ github.action_path }}/score.sh"
+        "${{ github.action_path }}/score.sh"
