@@ -106,15 +106,10 @@ class LocalBackend(Backend):
         return self._service
 
     def call(self, tool_name: str, args: dict[str, Any]) -> Any:
-        from agentic_odi_core import OdiError
-
         handler = _LOCAL_HANDLERS.get(tool_name)
         if handler is None:
             raise NotImplementedError(f"Unknown tool: {tool_name}")
-        try:
-            return handler(self, args)
-        except OdiError as exc:
-            raise BackendError(str(exc)) from exc
+        return handler(self, args)
 
     def _add_job(self, args: dict[str, Any]) -> dict[str, Any]:
         job = self.service.add_job(name=args["name"], description=args.get("description"))
@@ -388,12 +383,7 @@ class LocalBackend(Backend):
         evidence_id = args["evidence_id"]
         evidence = self.service.get_evidence(evidence_id)
         if evidence is None:
-            raise BackendError(
-                evidence_not_found(
-                    evidence_id,
-                    "List the stored records with list_evidence() to find a valid id.",
-                )
-            )
+            raise BackendError(evidence_not_found(evidence_id))
         return evidence.model_dump()
 
     def _list_evidence(self, args: dict[str, Any]) -> list[dict[str, Any]]:
@@ -410,8 +400,8 @@ class LocalBackend(Backend):
         evidence_id = args["evidence_id"]
         try:
             self.service.delete_evidence(evidence_id)
-        except EvidenceNotFoundError as exc:
-            raise BackendError(evidence_not_found(evidence_id, exc.hint)) from None
+        except EvidenceNotFoundError:
+            raise BackendError(evidence_not_found(evidence_id)) from None
         return evidence_id
 
     def _promote_evidence(self, args: dict[str, Any]) -> dict[str, Any]:
@@ -438,8 +428,8 @@ class LocalBackend(Backend):
                 importance=args.get("importance"),
                 satisfaction=args.get("satisfaction"),
             )
-        except EvidenceNotFoundError as exc:
-            raise BackendError(evidence_not_found(evidence_id, exc.hint)) from None
+        except EvidenceNotFoundError:
+            raise BackendError(evidence_not_found(evidence_id)) from None
         except JobNotFoundError:
             raise BackendError(job_not_found(args.get("job_id") or "")) from None
         except StepNotFoundError:

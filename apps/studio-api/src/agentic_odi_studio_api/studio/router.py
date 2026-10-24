@@ -12,13 +12,11 @@ from agentic_odi_connectors.registry import (
 )
 from agentic_odi_core import (
     JobNotFoundError,
-    OdiError,
     ODIService,
     OutcomeNotFoundError,
     StepNotFoundError,
     ToolName,
     ValueOutOfRangeError,
-    error_status,
 )
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
@@ -73,8 +71,6 @@ def _as_http_error(exc: Exception) -> HTTPException:
         return HTTPException(status_code=404, detail=str(exc))
     if isinstance(exc, ValueOutOfRangeError):
         return HTTPException(status_code=422, detail=str(exc))
-    if isinstance(exc, OdiError):
-        return HTTPException(status_code=error_status(exc), detail=str(exc))
     return HTTPException(status_code=500, detail=str(exc))
 
 
