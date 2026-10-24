@@ -1,0 +1,135 @@
+/*
+ * Print.
+ *
+ * A thesis leaves the studio for a meeting: it gets printed, marked up, and
+ * handed across a table. On paper the chrome is noise, the dark theme is ink,
+ * and a card split across two sheets is unreadable. These rules turn the open
+ * conversation (and any docked lens) into an A4 document.
+ */
+
+@page {
+  size: A4;
+  margin: 14mm;
+}
+
+@media print {
+  html,
+  body,
+  #root,
+  .studio-app,
+  .stage,
+  .chat,
+  .chat__scroll {
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+  }
+
+  body,
+  .studio-app,
+  .stage {
+    background: #fff;
+    color: #111;
+  }
+
+  /* Chrome: the bar, the rail, the composer, and anything floating over the
+     page. The conversation and any docked lens are the document. */
+  .bar,
+  .rail,
+  .composer,
+  .chat__dock,
+  .scrim,
+  .toast-stack,
+  .message__actions,
+  .typing,
+  .caret {
+    display: none !important;
+  }
+
+  .stage__split {
+    display: block;
+  }
+
+  .chat__scroll {
+    padding: 0;
+  }
+
+  .chat__thread {
+    max-width: none;
+  }
+
+  .lens {
+    position: static;
+    width: auto;
+    max-height: none;
+    margin-top: 12mm;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    background: #fff;
+    box-shadow: none;
+  }
+
+  .lens__head,
+  .lens__body,
+  .lens__foot {
+    padding: 6mm;
+  }
+
+  /* Paper contrast: the theme's light-on-dark text becomes dark-on-white. */
+  .message__bubble,
+  .message__body,
+  .md,
+  .md-heading,
+  .md-list,
+  .tool-doc__purpose,
+  .card__statement,
+  .ui-heading {
+    color: #111;
+  }
+
+  .message__bubble {
+    border-color: #bbb;
+    background: #f4f4f5;
+  }
+
+  .message__avatar {
+    background: #e4e4e7;
+    color: #111;
+  }
+
+  .md-code,
+  .ui-code,
+  .md-pre {
+    border: 1px solid #ccc;
+    background: #f4f4f5;
+    color: #111;
+  }
+
+  a {
+    color: #111;
+    text-decoration: underline;
+  }
+
+  /* Cards stay whole. A split outcome or thesis is a page a reader has to
+     reconstruct, which defeats the point of printing it. */
+  .card,
+  .outcome-card,
+  .ui-card,
+  .ui-surface,
+  .evidence,
+  .step,
+  .metric,
+  .compare {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    border-color: #ccc;
+    background: #fff;
+    box-shadow: none;
+  }
+
+  .ui-surface,
+  .card,
+  .outcome-card {
+    margin-bottom: 6mm;
+  }
+}
