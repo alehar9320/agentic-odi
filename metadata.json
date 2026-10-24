@@ -3,7 +3,7 @@
   "checkpoint_id": "01M5PJ1AEV7REPX319RBV87E23",
   "strategy": "manual-commit",
   "branch": "slay/aa1f2ae9-copy-signature",
-  "checkpoints_count": 3,
+  "checkpoints_count": 4,
   "files_touched": [
     "website/tests/test_content_sync.py"
   ],
@@ -27,6 +27,13 @@
       "transcript": "/2/full.jsonl",
       "compact_transcript": "/2/transcript.jsonl",
       "content_hash": "/2/content_hash.txt",
+      "prompt": ""
+    },
+    {
+      "metadata": "/3/metadata.json",
+      "transcript": "/3/full.jsonl",
+      "compact_transcript": "/3/transcript.jsonl",
+      "content_hash": "/3/content_hash.txt",
       "prompt": ""
     }
   ],
