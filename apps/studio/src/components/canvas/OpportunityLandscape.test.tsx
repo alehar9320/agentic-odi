@@ -22,6 +22,8 @@ const harness = vi.hoisted(() => ({
     requestSimulate: vi.fn(),
     sendMessage: vi.fn(),
     pushToast: vi.fn(),
+    theses: [],
+    deleteThesis: vi.fn(),
   },
 }));
 

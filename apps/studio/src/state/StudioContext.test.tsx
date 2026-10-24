@@ -316,6 +316,30 @@ describe("StudioContext memory and resume", () => {
     );
   });
 
+  it("persists a saved opportunity thesis", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
+
+    act(() => {
+      result.current.saveThesis({
+        outcome_id: "O-1",
+        job_id: "JOB-1",
+        statement: "Minimize the time to ship when the build is green.",
+        importance: 9,
+        satisfaction: 3,
+        opportunity_score: 15,
+        rationale: "Shipping fast is the bet.",
+      });
+    });
+
+    expect(result.current.theses).toHaveLength(1);
+    const stored = JSON.parse(localStorage.getItem("studio.theses") ?? "[]");
+    expect(stored[0]).toMatchObject({
+      outcome_id: "O-1",
+      rationale: "Shipping fast is the bet.",
+    });
+  });
+
   it("sends the conversation id and applies memory events", async () => {
     const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
     await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
