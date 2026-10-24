@@ -29,6 +29,7 @@ class IntentStore:
     def __init__(self, db_path: str = "intent_store.db", check_same_thread: bool = True) -> None:
         self.conn = sqlite3.connect(db_path, check_same_thread=check_same_thread)
         self.conn.execute("PRAGMA journal_mode=WAL;")
+        self._closed = False
         self._init_db()
 
     def _init_db(self) -> None:
@@ -276,5 +277,19 @@ class IntentStore:
                 self.conn.execute("DELETE FROM events WHERE workspace_id = ?", (workspace_id,))
                 self.conn.execute("DELETE FROM sync_state WHERE workspace_id = ?", (workspace_id,))
 
+    def commit(self) -> None:
+        """Flush any open transaction to disk.
+
+        :meth:`append` already commits every event as it is written, so this is
+        normally a no-op. It exists so a shutdown path can assert durability
+        explicitly rather than assuming it.
+        """
+        self.conn.commit()
+
     def close(self) -> None:
+        """Close the connection. Safe to call more than once."""
+        if self._closed:
+            return
+        self._closed = True
+        self.conn.commit()
         self.conn.close()

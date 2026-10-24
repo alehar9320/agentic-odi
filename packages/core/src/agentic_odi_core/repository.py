@@ -75,6 +75,8 @@ class Repository(Protocol):
     ) -> list[Evidence]: ...
     def delete_evidence(self, evidence_id: str) -> bool: ...
     def clear(self) -> None: ...
+    def commit(self) -> None: ...
+    def close(self) -> None: ...
 
 
 class InMemoryRepository:
@@ -273,3 +275,9 @@ class InMemoryRepository:
         self.outcomes.clear()
         self.customer_outcomes.clear()
         self.evidence.clear()
+
+    def commit(self) -> None:
+        """No-op: an in-memory store has nothing to flush."""
+
+    def close(self) -> None:
+        """No-op: an in-memory store holds no resources."""
