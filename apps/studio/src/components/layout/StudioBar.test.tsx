@@ -1,4 +1,4 @@
-import { render } from "@testing-library/react";
+import { fireEvent, render } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("../../state/StudioContext", () => ({
@@ -11,6 +11,7 @@ import { StudioBar } from "./StudioBar";
 const stubContext = (overrides: Record<string, unknown> = {}) => ({
   llmHealth: { healthy: true, message: "ok" },
   unreadNotificationCount: 0,
+  markAllNotificationsAsRead: vi.fn(),
   openPanel: vi.fn(),
   ...overrides,
 });
@@ -33,5 +34,27 @@ describe("StudioBar", () => {
     );
     expect(container.querySelector(".brand__mark")?.getAttribute("aria-hidden")).toBe("true");
     expect(container.querySelector(".brand--home")?.getAttribute("aria-label")).toBe("Go to home");
+  });
+
+  it("shows the unread count and clears it when catch-up opens", () => {
+    const openPanel = vi.fn();
+    const markAllNotificationsAsRead = vi.fn();
+    vi.mocked(useStudio).mockReturnValue(
+      stubContext({
+        unreadNotificationCount: 3,
+        openPanel,
+        markAllNotificationsAsRead,
+      }) as never,
+    );
+    const { getByRole } = render(
+      <StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />
+    );
+
+    const bell = getByRole("button", { name: "Catch up notifications" });
+    expect(bell.textContent).toContain("3");
+    fireEvent.click(bell);
+
+    expect(markAllNotificationsAsRead).toHaveBeenCalled();
+    expect(openPanel).toHaveBeenCalledWith("catchup");
   });
 });

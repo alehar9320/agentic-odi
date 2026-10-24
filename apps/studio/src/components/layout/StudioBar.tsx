@@ -16,7 +16,7 @@ export function StudioBar({
   onNew: () => void;
   onChangelog: () => void;
 }) {
-  const { llmHealth, unreadNotificationCount, openPanel } = useStudio();
+  const { llmHealth, unreadNotificationCount, markAllNotificationsAsRead, openPanel } = useStudio();
 
   const status =
     llmHealth.healthy === null ? "Connecting" : llmHealth.healthy ? "Live" : "Local mode";
@@ -63,7 +63,10 @@ export function StudioBar({
           className="icon-button bar__bell"
           aria-label="Catch up notifications"
           title="Activity & Catch Up"
-          onClick={() => openPanel("catchup")}
+          onClick={() => {
+            markAllNotificationsAsRead();
+            openPanel("catchup");
+          }}
         >
           <BellIcon size={17} />
           {unreadNotificationCount > 0 && (
