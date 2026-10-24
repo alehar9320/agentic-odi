@@ -3,7 +3,7 @@
   "checkpoint_id": "01M5P7X14V4D755YQ156K6D3W4",
   "strategy": "manual-commit",
   "branch": "ci/protect-critical-files",
-  "checkpoints_count": 1,
+  "checkpoints_count": 4,
   "files_touched": [
     ".ci/protected-files.txt",
     "tests/contract/test_protected_files.py"
@@ -15,13 +15,20 @@
       "compact_transcript": "/0/transcript.jsonl",
       "content_hash": "/0/content_hash.txt",
       "prompt": "/0/prompt.txt"
+    },
+    {
+      "metadata": "/1/metadata.json",
+      "transcript": "/1/full.jsonl",
+      "compact_transcript": "/1/transcript.jsonl",
+      "content_hash": "/1/content_hash.txt",
+      "prompt": "/1/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 8745,
+    "input_tokens": 198583,
     "cache_creation_tokens": 0,
-    "cache_read_tokens": 164768,
-    "output_tokens": 482,
-    "api_call_count": 4
+    "cache_read_tokens": 747936,
+    "output_tokens": 5654,
+    "api_call_count": 9
   }
 }
