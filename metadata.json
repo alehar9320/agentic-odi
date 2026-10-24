@@ -3,7 +3,7 @@
   "checkpoint_id": "01M5PQ3BHMB1MXT6JBYPT8ECG8",
   "strategy": "manual-commit",
   "branch": "slay/3b0876d3-command-palette",
-  "checkpoints_count": 2,
+  "checkpoints_count": 3,
   "files_touched": [
     "apps/studio/src/components/chat/CommandPalette.test.tsx",
     "apps/studio/src/components/chat/Composer.tsx",
@@ -23,6 +23,13 @@
       "transcript": "/1/full.jsonl",
       "compact_transcript": "/1/transcript.jsonl",
       "content_hash": "/1/content_hash.txt",
+      "prompt": ""
+    },
+    {
+      "metadata": "/2/metadata.json",
+      "transcript": "/2/full.jsonl",
+      "compact_transcript": "/2/transcript.jsonl",
+      "content_hash": "/2/content_hash.txt",
       "prompt": ""
     }
   ],
