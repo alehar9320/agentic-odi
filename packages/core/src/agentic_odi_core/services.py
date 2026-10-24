@@ -6,6 +6,7 @@ import uuid
 from typing import Any
 
 from agentic_odi_core.errors import NotFoundError, ValidationError
+from agentic_odi_core.evaluation import evaluate_outcome_statement
 from agentic_odi_core.models import (
     BusinessValue,
     CustomerOutcome,
@@ -58,6 +59,19 @@ class EvidenceNotFoundError(NotFoundError, ValueError):
 
 class ValueOutOfRangeError(ValidationError):
     pass
+
+
+class InvalidOutcomeStatementError(ValidationError):
+    """A statement does not match the ODI desired-outcome format.
+
+    Carries the individual issues so the caller can show the fix next to the
+    field that needs it instead of a single opaque message.
+    """
+
+    def __init__(self, issues: list[str], suggestions: list[str]) -> None:
+        self.issues = issues
+        self.suggestions = suggestions
+        super().__init__("Outcome statement does not match the ODI format: " + " ".join(issues))
 
 
 def _first_line(text: str) -> str:
@@ -155,6 +169,7 @@ class ODIService:
         importance: float | None = None,
         satisfaction: float | None = None,
         step_id: str | None = None,
+        validate_statement: bool = True,
     ) -> Outcome:
         if self.repo.get_job(job_id) is None:
             raise JobNotFoundError(job_id)
@@ -164,6 +179,10 @@ class ODIService:
             raise ValueOutOfRangeError()
         if satisfaction is not None and not (1.0 <= satisfaction <= 10.0):
             raise ValueOutOfRangeError()
+        if validate_statement:
+            review = evaluate_outcome_statement(statement)
+            if not review["valid"]:
+                raise InvalidOutcomeStatementError(review["issues"], review["suggestions"])
         opportunity_score = None
         if importance is not None and satisfaction is not None:
             opportunity_score = compute_opportunity_score(importance, satisfaction)

@@ -111,7 +111,7 @@ async def test_add_outcome_without_both_scores_sets_no_opportunity_score():
             "add_outcome",
             {
                 "job_id": job_id,
-                "statement": "Outcome without full scores",
+                "statement": "Minimize the time to onboard when a customer signs up",
                 "importance": 7.0,
             },
         )
@@ -122,6 +122,22 @@ async def test_add_outcome_without_both_scores_sets_no_opportunity_score():
         outcome_data = json.loads(match.group(1)) if match else {}
 
         assert outcome_data.get("opportunity_score") is None
+
+
+@pytest.mark.asyncio
+async def test_add_outcome_rejects_a_vague_statement_with_the_fix():
+    async with Client(mcp) as client:
+        create_res = await client.call_tool("add_job", {"name": "Job", "description": "Desc"})
+        job_id = _extract_id(create_res.content[0].text)
+
+        res = await client.call_tool(
+            "add_outcome",
+            {"job_id": job_id, "statement": "Make it faster"},
+        )
+
+        text = res.content[0].text
+        assert text.startswith("Error: Outcome statement does not match the ODI format")
+        assert "Minimize" in text
 
 
 @pytest.mark.asyncio
