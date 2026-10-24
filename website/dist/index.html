@@ -885,13 +885,13 @@ agentic-odi --version</code>
     <div class="grid grid--3">
       <article class="tool" data-reveal>
         <span class="tool__name">get_job_map</span>
-        <p class="tool__purpose">Return a Job&#39;s ordered steps.</p>
-        <code class="tool__sig">get_job_map(job_id: str)</code>
+        <p class="tool__purpose">Return a Job&#39;s ordered steps, one page at a time.</p>
+        <code class="tool__sig">get_job_map(job_id: str, limit: int | None = None, offset: int = 0)</code>
       </article>
       <article class="tool" data-reveal>
         <span class="tool__name">get_outcomes</span>
-        <p class="tool__purpose">List the desired outcomes of a Job or step.</p>
-        <code class="tool__sig">get_outcomes(job_id: str, step_id: str | None = None)</code>
+        <p class="tool__purpose">List the desired outcomes of a Job or step, one page at a time.</p>
+        <code class="tool__sig">get_outcomes(job_id: str, step_id: str | None = None, limit: int | None = None, offset: int = 0)</code>
       </article>
       <article class="tool" data-reveal>
         <span class="tool__name">compute_opportunity</span>

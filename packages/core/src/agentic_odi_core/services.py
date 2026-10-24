@@ -17,7 +17,7 @@ from agentic_odi_core.models import (
     Step,
     compute_opportunity_score,
 )
-from agentic_odi_core.repository import Repository
+from agentic_odi_core.repository import Repository, page
 
 
 class JobNotFoundError(NotFoundError):
@@ -76,8 +76,8 @@ class ODIService:
         job = Job(name=name, description=description)
         return self.repo.add_job(job)
 
-    def get_jobs(self) -> list[Job]:
-        return self.repo.list_jobs()
+    def get_jobs(self, limit: int | None = None, offset: int = 0) -> list[Job]:
+        return self.repo.list_jobs(limit=limit, offset=offset)
 
     def get_job(self, job_id: str) -> Job | None:
         return self.repo.get_job(job_id)
@@ -142,9 +142,11 @@ class ODIService:
         step = Step(id=str(uuid.uuid4()), job_id=job_id, name=name, order=order)
         return self.repo.add_step(step)
 
-    def get_job_map(self, job_id: str) -> list[Step]:
-        steps = self.repo.get_steps_for_job(job_id)
-        return sorted(steps, key=lambda s: s.order)
+    def get_job_map(self, job_id: str, limit: int | None = None, offset: int = 0) -> list[Step]:
+        # Sort before slicing: a page of the map must be the first steps by
+        # order, not whichever steps happened to be stored first.
+        steps = sorted(self.repo.get_steps_for_job(job_id), key=lambda s: s.order)
+        return page(steps, limit, offset)
 
     def add_outcome(
         self,
@@ -176,8 +178,14 @@ class ODIService:
         )
         return self.repo.add_outcome(outcome)
 
-    def get_outcomes(self, job_id: str, step_id: str | None = None) -> list[Outcome]:
-        return self.repo.get_outcomes(job_id, step_id)
+    def get_outcomes(
+        self,
+        job_id: str,
+        step_id: str | None = None,
+        limit: int | None = None,
+        offset: int = 0,
+    ) -> list[Outcome]:
+        return self.repo.get_outcomes(job_id, step_id, limit=limit, offset=offset)
 
     def add_customer_outcome(
         self,
@@ -213,8 +221,13 @@ class ODIService:
             raise CustomerOutcomeNotFoundError(outcome_id)
         return co
 
-    def list_customer_outcomes(self, job_id: str | None = None) -> list[CustomerOutcome]:
-        return self.repo.list_customer_outcomes(job_id)
+    def list_customer_outcomes(
+        self,
+        job_id: str | None = None,
+        limit: int | None = None,
+        offset: int = 0,
+    ) -> list[CustomerOutcome]:
+        return self.repo.list_customer_outcomes(job_id, limit=limit, offset=offset)
 
     def update_customer_outcome(self, outcome_id: str, updates: dict[str, Any]) -> CustomerOutcome:
         res = self.repo.update_customer_outcome(outcome_id, updates)
@@ -282,8 +295,12 @@ class ODIService:
         job_id: str | None = None,
         step_id: str | None = None,
         outcome_id: str | None = None,
+        limit: int | None = None,
+        offset: int = 0,
     ) -> list[Evidence]:
-        return self.repo.list_evidence(job_id=job_id, step_id=step_id, outcome_id=outcome_id)
+        return self.repo.list_evidence(
+            job_id=job_id, step_id=step_id, outcome_id=outcome_id, limit=limit, offset=offset
+        )
 
     def delete_evidence(self, evidence_id: str) -> None:
         if not self.repo.delete_evidence(evidence_id):
