@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import csv
+import io
 import json
 
+from agentic_odi_cli import desired_outcomes
 from agentic_odi_cli.cli import app
 from typer.testing import CliRunner
 
@@ -103,3 +106,53 @@ def test_outcome_alias_still_points_at_customer_outcomes():
 
     assert alias.exit_code == 0
     assert alias.output.splitlines()[0] == primary.output.splitlines()[0]
+
+
+def test_export_csv_writes_a_header_and_one_row_per_outcome(tmp_path) -> None:
+    runner = CliRunner()
+    db = str(tmp_path / "odi.db")
+    job_id = _job_id(runner, db)
+    _add(runner, db, job_id)
+    _add(runner, db, job_id, "--statement", "Max adopted accounts")
+
+    result = runner.invoke(
+        app, ["--db", db, "desired-outcomes", "export", "--job-id", job_id, "--format", "csv"]
+    )
+
+    assert result.exit_code == 0, result.output
+    rows = list(csv.DictReader(io.StringIO(result.output)))
+    assert rows and len(rows) == 2
+    assert list(rows[0]) == list(desired_outcomes.EXPORT_FIELDS)
+    assert {row["statement"] for row in rows} == {"Min onboarding", "Max adopted accounts"}
+    assert all(row["job_id"] == job_id for row in rows)
+    assert all(row["opportunity_score"] == "12.0" for row in rows)
+
+
+def test_export_json_is_a_parseable_array(tmp_path) -> None:
+    runner = CliRunner()
+    db = str(tmp_path / "odi.db")
+    job_id = _job_id(runner, db)
+    _add(runner, db, job_id)
+
+    result = runner.invoke(
+        app, ["--db", db, "desired-outcomes", "export", "--job-id", job_id, "--format", "json"]
+    )
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert len(payload) == 1
+    assert payload[0]["statement"] == "Min onboarding"
+    assert payload[0]["opportunity_score"] == 12.0
+
+
+def test_export_rejects_an_unknown_format(tmp_path) -> None:
+    runner = CliRunner()
+    db = str(tmp_path / "odi.db")
+    job_id = _job_id(runner, db)
+
+    result = runner.invoke(
+        app, ["--db", db, "desired-outcomes", "export", "--job-id", job_id, "--format", "xml"]
+    )
+
+    assert result.exit_code == 1
+    assert "unknown format" in result.output
