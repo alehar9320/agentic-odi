@@ -573,13 +573,24 @@ def _parse_remote(tool_name: str, text: str) -> Any:
 
 
 def _extract_json(text: str) -> Any:
-    start = min((i for i in (text.find("{"), text.find("[")) if i != -1), default=-1)
-    if start == -1:
-        return text
-    try:
-        return json.loads(text[start:])
-    except json.JSONDecodeError:
-        return text
+    """Parse the first complete JSON value in ``text``, prose and all.
+
+    MCP replies often wrap a payload in a sentence, and that sentence can
+    itself contain braces (``created {JOB-1}: [...]``). Each brace is tried as
+    a start position with ``raw_decode``, so a stray one is skipped instead of
+    swallowing the real payload, and the outermost value wins when payloads
+    nest. Text with no parseable value is returned unchanged.
+    """
+    decoder = json.JSONDecoder()
+    for index, char in enumerate(text):
+        if char not in "{[":
+            continue
+        try:
+            payload, _end = decoder.raw_decode(text, index)
+        except json.JSONDecodeError:
+            continue
+        return payload
+    return text
 
 
 def _extract_float(text: str) -> float:
