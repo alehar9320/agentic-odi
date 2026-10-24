@@ -37,6 +37,17 @@ Integrate via the MCP protocol at:
 > out to the maintainers to obtain the necessary credentials before connecting a
 > client.
 
+### Running the MCP server locally
+
+`python -m agentic_odi_mcp_server` listens on port 8000. Override it with
+`--port` or `AGENTIC_ODI_MCP_PORT` (the flag wins), so a second instance can run
+beside `scripts/dev.py` without a port clash:
+
+```bash
+AGENTIC_ODI_MCP_PORT=8010 python -m agentic_odi_mcp_server
+python -m agentic_odi_mcp_server --port 8020
+```
+
 ## Hosted Studio
 
 The Living Studio SPA is deployed to Cloudflare Workers:
