@@ -14,7 +14,7 @@ Python project:
 ```bash
 uv run ruff check .
 uv run ruff format --check .
-uv run mypy apps packages
+uv run mypy apps brand packages
 uv run --directory website mypy .
 
 # Security scanning
