@@ -7,7 +7,13 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 from agentic_odi_cli.cli import app
-from agentic_odi_connectors.models import HealthStatus, IngestBatch, IngestRecord
+from agentic_odi_connectors.models import (
+    HealthStatus,
+    IngestBatch,
+    IngestRecord,
+    RestConnectorSettings,
+)
+from agentic_odi_connectors.rest.connector import RestConnector
 from typer.testing import CliRunner
 
 ANSI_ESCAPE = re.compile(r"\x1b\[[0-9;]*m")
@@ -315,6 +321,47 @@ def test_connectors_health_uses_built_connector(tmp_path: Path, monkeypatch) -> 
 
     assert result.exit_code == 0
     assert "reachable" in _strip(result.output)
+
+
+def test_connectors_health_no_cache_forces_a_fresh_check(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("AGENTIC_ODI_CONNECTORS_CACHE", str(tmp_path / "connector-health.json"))
+    config = tmp_path / "connectors.json"
+    runner.invoke(
+        app,
+        [
+            "connectors",
+            "add",
+            "rest",
+            "--name",
+            "jira",
+            "--url",
+            "https://api.example/records",
+            "--config",
+            str(config),
+        ],
+    )
+    calls: list[str] = []
+
+    def fetch(method, url, headers, body, timeout):
+        calls.append(url)
+        return 200, b"{}"
+
+    connector = RestConnector(
+        name="jira",
+        settings=RestConnectorSettings(url="https://api.example/records"),
+        fetcher=fetch,
+    )
+    monkeypatch.setattr("agentic_odi_cli.connectors.build_connector", lambda _config: connector)
+
+    first = runner.invoke(app, ["connectors", "health", "--name", "jira", "--config", str(config)])
+    cached = runner.invoke(app, ["connectors", "health", "--name", "jira", "--config", str(config)])
+    fresh = runner.invoke(
+        app,
+        ["connectors", "health", "--name", "jira", "--no-cache", "--config", str(config)],
+    )
+
+    assert first.exit_code == cached.exit_code == fresh.exit_code == 0
+    assert len(calls) == 2
 
 
 def test_connectors_ingest_appends_to_sink(tmp_path: Path, monkeypatch) -> None:
