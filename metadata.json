@@ -3,7 +3,7 @@
   "checkpoint_id": "01M5PRX2TNEGFQAV9QPHY8998Z",
   "strategy": "manual-commit",
   "branch": "slay/f4fc1fa2-tool-progress",
-  "checkpoints_count": 2,
+  "checkpoints_count": 3,
   "files_touched": [
     "apps/mcp-server/tests/test_tool_progress.py",
     "website/dist/docs/mcp/index.html",
@@ -22,6 +22,13 @@
       "transcript": "/1/full.jsonl",
       "compact_transcript": "/1/transcript.jsonl",
       "content_hash": "/1/content_hash.txt",
+      "prompt": ""
+    },
+    {
+      "metadata": "/2/metadata.json",
+      "transcript": "/2/full.jsonl",
+      "compact_transcript": "/2/transcript.jsonl",
+      "content_hash": "/2/content_hash.txt",
       "prompt": ""
     }
   ],
