@@ -423,6 +423,8 @@ def _persist_turn(
         return
     try:
         turns = memory.list_turns(conversation_id)
+        if message_id and any(turn.message_id == message_id for turn in turns):
+            return
         if turns and turns[-1].role == role and turns[-1].content == content:
             return
         memory.append_turn(conversation_id, role, content, message_id, parent_id)

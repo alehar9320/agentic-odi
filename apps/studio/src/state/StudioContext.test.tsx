@@ -185,6 +185,86 @@ describe("StudioContext memory and resume", () => {
     vi.unstubAllGlobals();
   });
 
+  it("sends the visible conversation path as model context", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.messages).toHaveLength(2));
+
+    await act(async () => {
+      await result.current.sendMessage("What should I do next?");
+    });
+
+    expect(chatBody?.messages).toEqual([
+      { id: "t-1", parent_id: null, role: "user", content: "I own activation." },
+      { id: "t-2", parent_id: "t-1", role: "assistant", content: "Tell me more." },
+      expect.objectContaining({ role: "user", content: "What should I do next?", parent_id: "t-2" }),
+    ]);
+  });
+
+  it("regenerates an answer from its existing user turn without duplicating it", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.messages).toHaveLength(2));
+
+    await act(async () => {
+      await result.current.regenerateFrom("t-1");
+    });
+
+    expect(chatBody?.messages).toEqual([
+      { id: "t-1", parent_id: null, role: "user", content: "I own activation." },
+    ]);
+    expect(result.current.messages.map((message) => message.content)).toEqual([
+      "I own activation.",
+      "Hi",
+    ]);
+    expect(result.current.messages.filter((message) => message.role === "user")).toHaveLength(1);
+    expect(result.current.messages.at(-1)).toMatchObject({ role: "assistant", parentId: "t-1" });
+  });
+
+  it("edits a user turn by replacing it at its original parent", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.messages).toHaveLength(2));
+
+    await act(async () => {
+      await result.current.editFrom("t-1", "I own onboarding.");
+    });
+
+    expect(chatBody?.messages).toEqual([
+      expect.objectContaining({ role: "user", content: "I own onboarding.", parent_id: null }),
+    ]);
+    expect(result.current.messages.map((message) => message.content)).toEqual([
+      "I own onboarding.",
+      "Hi",
+    ]);
+    expect(result.current.messages[0].parentId).toBeNull();
+  });
+
+  it("serializes attachments with the sidecar's snake-case fields", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
+
+    await act(async () => {
+      await result.current.sendMessage("Read this", [
+        {
+          id: "file-1",
+          name: "notes.md",
+          contentType: "text/markdown",
+          size: 12,
+          text: "Useful context",
+          dataUrl: "data:image/png;base64,AAAA",
+        },
+      ]);
+    });
+
+    expect(chatBody?.attachments).toEqual([
+      {
+        name: "notes.md",
+        content_type: "text/markdown",
+        size: 12,
+        text: "Useful context",
+        data_url: "data:image/png;base64,AAAA",
+      },
+    ]);
+  });
+
   it("resumes the latest conversation and loads what it learned", async () => {
     const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
 

@@ -819,13 +819,18 @@ export function StudioProvider({ children }: { children: ReactNode }) {
    * visible path and the wire.
    */
   const runTurn = useCallback(
-    async (base: ChatMessage[], text: string, attachments: ChatAttachment[] = []) => {
+    async (
+      base: ChatMessage[],
+      text: string,
+      attachments: ChatAttachment[] = [],
+      existingUserMessage?: ChatMessage,
+    ) => {
       const trimmed = text.trim();
       if ((!trimmed && attachments.length === 0) || streaming) {
         return;
       }
 
-      const userMessage: ChatMessage = {
+      const userMessage: ChatMessage = existingUserMessage ?? {
         id: crypto.randomUUID(),
         parentId: base.length ? base[base.length - 1].id : null,
         role: "user",
@@ -833,7 +838,10 @@ export function StudioProvider({ children }: { children: ReactNode }) {
         ...(attachments.length ? { attachments } : {}),
       };
       const assistantId = crypto.randomUUID();
-      const history: ChatMessage[] = [...base, userMessage];
+      const history: ChatMessage[] =
+        existingUserMessage && base.at(-1)?.id === existingUserMessage.id
+          ? base
+          : [...base, userMessage];
 
       setMessages([
         ...history,
@@ -1175,12 +1183,23 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       if (index < 0) {
         return;
       }
-      const base = messages.slice(0, index + 1);
-      const question = base[base.length - 1];
+      const target = messages[index];
+      const questionIndex =
+        target?.role === "user"
+          ? index
+          : target?.role === "assistant"
+            ? index - 1
+            : -1;
+      const question = messages[questionIndex];
       if (!question || question.role !== "user") {
         return;
       }
-      await runTurn(base, question.content, question.attachments ?? []);
+      await runTurn(
+        messages.slice(0, questionIndex + 1),
+        question.content,
+        question.attachments ?? [],
+        question,
+      );
     },
     [messages, runTurn],
   );
@@ -1190,10 +1209,17 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       const index = messageId
         ? messages.findIndex((message) => message.id === messageId)
         : messages.length - 1;
-      if (index < 0) {
+      const original = messages[index];
+      if (index < 0 || original?.role !== "user") {
         return;
       }
-      await runTurn(messages.slice(0, index + 1), text, attachments);
+      const edited: ChatMessage = {
+        ...original,
+        id: crypto.randomUUID(),
+        content: text.trim(),
+        ...(attachments.length ? { attachments } : { attachments: undefined }),
+      };
+      await runTurn(messages.slice(0, index), edited.content, attachments, edited);
     },
     [messages, runTurn],
   );
