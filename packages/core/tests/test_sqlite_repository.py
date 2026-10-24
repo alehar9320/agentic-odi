@@ -375,3 +375,12 @@ def test_clear_removes_everything(tmp_path):
 
     assert repo.get_job("j1") is None
     assert SQLiteRepository(db_path=db).get_job("j1") is None
+
+
+def test_reload_keeps_the_snapshot_on_disk(tmp_path) -> None:
+    repo = SQLiteRepository(str(tmp_path / "odi.db"))
+    repo.add_job(Job(id="job-1", name="Job", description=""))
+
+    repo.reload()
+
+    assert [job.id for job in repo.list_jobs()] == ["job-1"]

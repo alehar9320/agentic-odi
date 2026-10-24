@@ -75,6 +75,7 @@ class Repository(Protocol):
     ) -> list[Evidence]: ...
     def delete_evidence(self, evidence_id: str) -> bool: ...
     def clear(self) -> None: ...
+    def reload(self) -> None: ...
 
 
 class InMemoryRepository:
@@ -273,3 +274,7 @@ class InMemoryRepository:
         self.outcomes.clear()
         self.customer_outcomes.clear()
         self.evidence.clear()
+
+    def reload(self) -> None:
+        """Reset in-memory state; there is no external store to re-read."""
+        self.clear()
