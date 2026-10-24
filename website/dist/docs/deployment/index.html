@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Deployment</title>
+  <meta name="description" content="The project site, the hosted server, and the Worker.">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#0a0b0e">
+
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Agentic ODI">
+  <meta property="og:title" content="Deployment">
+  <meta property="og:description" content="The project site, the hosted server, and the Worker.">
+  <meta property="og:url" content="https://alehar9320.github.io/agentic-odi/docs/deployment/index.html">
+  <meta property="og:image" content="https://alehar9320.github.io/agentic-odi/assets/og.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Deployment">
+  <meta name="twitter:description" content="The project site, the hosted server, and the Worker.">
+  <meta name="twitter:image" content="https://alehar9320.github.io/agentic-odi/assets/og.png">
+
+  <link rel="canonical" href="https://alehar9320.github.io/agentic-odi/docs/deployment/index.html">
+  <link rel="stylesheet" href="../../assets/tokens.css">
+  <link rel="stylesheet" href="../../assets/style.css">
+  <link rel="icon" type="image/svg+xml" href="../../assets/favicon.svg">
+  <link rel="icon" type="image/png" href="../../assets/favicon.png" sizes="32x32">
+  <link rel="sitemap" type="application/xml" href="https://alehar9320.github.io/agentic-odi/sitemap.xml">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <header class="site-header">
+    <div class="site-header__inner">
+      <a class="brand" href="https://alehar9320.github.io/agentic-odi/">
+        <img src="../../assets/mark.svg" alt="" width="24" height="24" aria-hidden="true">
+        <span class="brand__name">Agentic&nbsp;ODI</span>
+      </a>
+      <nav class="site-nav" aria-label="Primary">
+        <a href="https://alehar9320.github.io/agentic-odi/#studio">The&nbsp;Studio</a>
+        <a href="https://alehar9320.github.io/agentic-odi/#how">How&nbsp;it&nbsp;works</a>
+        <a href="https://alehar9320.github.io/agentic-odi/docs/">Docs</a>
+      </nav>
+      <a class="btn btn--primary btn--sm" href="https://alehar9320.github.io/agentic-odi/#run">Run it in 60 seconds</a>
+    </div>
+  </header>
+
+  <main id="main">
+<div class="doc">
+  <aside class="doc__nav" aria-label="Documentation">
+    <a class="doc__back" href="https://alehar9320.github.io/agentic-odi/">← Agentic ODI</a>
+    <div class="doc__group">
+      <p class="doc__group-title">Get started</p>
+      <ul class="doc__list">
+        <li>
+          <a class="doc__link"
+             href="https://alehar9320.github.io/agentic-odi/docs/quick-start/">Quick start</a>
+        </li>
+        <li>
+          <a class="doc__link"
+             href="https://alehar9320.github.io/agentic-odi/docs/installation/">Installation</a>
+        </li>
+        <li>
+          <a class="doc__link"
+             href="https://alehar9320.github.io/agentic-odi/docs/studio/">The Living Studio</a>
+        </li>
+        <li>
+          <a class="doc__link"
+             href="https://alehar9320.github.io/agentic-odi/docs/local-llm/">Local LLM backend</a>
+        </li>
+      </ul>
+    </div>
+    <div class="doc__group">
+      <p class="doc__group-title">Build</p>
+      <ul class="doc__list">
+        <li>
+          <a class="doc__link"
+             href="https://alehar9320.github.io/agentic-odi/docs/cli/">CLI reference</a>
+        </li>
+        <li>
+          <a class="doc__link"
+             href="https://alehar9320.github.io/agentic-odi/docs/connectors/">Connectors</a>
+        </li>
+        <li>
+          <a class="doc__link"
+             href="https://alehar9320.github.io/agentic-odi/docs/mcp/">MCP tool reference</a>
+        </li>
+        <li>
+          <a class="doc__link"
+             href="https://alehar9320.github.io/agentic-odi/docs/architecture/">Architecture</a>
+        </li>
+      </ul>
+    </div>
+    <div class="doc__group">
+      <p class="doc__group-title">Operate</p>
+      <ul class="doc__list">
+        <li>
+          <a class="doc__link is-current"
+             href="https://alehar9320.github.io/agentic-odi/docs/deployment/">Deployment</a>
+        </li>
+        <li>
+          <a class="doc__link"
+             href="https://alehar9320.github.io/agentic-odi/docs/development/">Development</a>
+        </li>
+        <li>
+          <a class="doc__link"
+             href="https://alehar9320.github.io/agentic-odi/docs/roadmap/">Roadmap</a>
+        </li>
+      </ul>
+    </div>
+  </aside>
+
+  <article class="doc__body">
+    <header class="doc__head">
+      <p class="eyebrow">Operate</p>
+      <h1 class="doc__title">Deployment</h1>
+<p class="lead">The project site, the hosted server, and the Worker.</p>    </header>
+
+    <div class="prose">
+      <h2 id="project-site-github-pages">Project Site (GitHub Pages)</h2>
+<p>The static site in <code>website/</code> is published to
+<strong><a href="https://alehar9320.github.io/agentic-odi/">https://alehar9320.github.io/agentic-odi/</a></strong>
+by <a href="https://github.com/alehar9320/agentic-odi/blob/main/.github/workflows/pages.yml"><code>.github/workflows/pages.yml</code></a>.</p>
+<ul>
+<li>A push to <code>main</code> runs the website tests, builds <code>_site</code> from <code>website/</code>, and
+deploys the artifact with <code>actions/deploy-pages</code>.</li>
+<li><code>workflow_dispatch</code> republishes the site from the Actions tab without a code
+change.</li>
+<li>Pages is configured with the &quot;GitHub Actions&quot; source, so there is no
+<code>gh-pages</code> branch. Removing <code>pages.yml</code> stops all publishing and the site
+returns 404.</li>
+<li>The <code>github-pages</code> environment only allows deployments from <code>main</code>.</li>
+</ul>
+<h2 id="hosted-mcp-server">Hosted MCP Server</h2>
+<p>The server is deployed via <strong><a href="https://www.prefect.io/horizon">Horizon Prefect</a></strong>,
+Prefect's managed infrastructure for hosting MCP-compatible agents.</p>
+<h2 id="test-chat-ui">Test Chat (UI)</h2>
+<p>Interact with the deployed agent directly in your browser:</p>
+<blockquote>
+<p><strong><a href="https://horizon.prefect.io/alhase/servers/agentic-odi/chat">https://horizon.prefect.io/alhase/servers/agentic-odi/chat</a></strong></p>
+</blockquote>
+<h2 id="mcp-server-endpoint">MCP Server Endpoint</h2>
+<p>Integrate via the MCP protocol at:</p>
+<blockquote>
+<p><strong><a href="https://agentic-odi.fastmcp.app/mcp">https://agentic-odi.fastmcp.app/mcp</a></strong></p>
+</blockquote>
+<blockquote>
+<p>[!IMPORTANT]
+<strong>Authentication is required</strong> to access the MCP server endpoint. Please reach
+out to the maintainers to obtain the necessary credentials before connecting a
+client.</p>
+</blockquote>
+<h2 id="hosted-studio">Hosted Studio</h2>
+<p>The Living Studio SPA is deployed to Cloudflare Workers:</p>
+<table>
+<thead>
+<tr>
+<th>Environment</th>
+<th>URL</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Production (<code>main</code>)</td>
+<td><strong><a href="https://agentic-odi.alehar.workers.dev/">https://agentic-odi.alehar.workers.dev/</a></strong></td>
+</tr>
+<tr>
+<td>Pull request preview</td>
+<td>Posted automatically by Cloudflare Workers Builds as a PR comment</td>
+</tr>
+</tbody>
+</table>
+<p>Production deploys on every push to <code>main</code>. The Worker is <code>agentic-odi</code>; keep
+<code>name</code> in <code>wrangler.jsonc</code> aligned with the Worker connected in the dashboard.
+Preview builds run for non-production branches and are ephemeral: the Cloudflare
+PR comment is the source of truth, so do not copy a preview URL into docs. The
+hosted UI loads without a backend; canvas data, chat, and mutations need the
+sidecar tunnel described below.</p>
+<h2 id="living-studio-on-a-free-cloudflare-worker">Living Studio on a Free Cloudflare Worker</h2>
+<p>Workers Containers — the only way to run the Python sidecar entirely on
+Cloudflare — requires the Workers Paid plan. On the free plan, the Worker serves
+the built SPA as Workers Static Assets and proxies <code>/api/*</code> to the sidecar
+through a free, account-less
+<a href="https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/">Cloudflare Quick Tunnel</a>.</p>
+<p><code>wrangler.jsonc</code> publishes <code>apps/studio/dist</code> with SPA fallback and runs the Worker
+first for <code>/api/*</code>; <code>infra/cloudflare/worker.ts</code> forwards those calls to the
+<code>SIDECAR_URL</code> secret. The browser only talks to the Worker origin, so the
+sidecar's CORS list is not involved.</p>
+<pre class="highlight"><code class="language-bash"><span class="c1"># 1. Build the SPA that the Worker uploads as static assets</span>
+npm<span class="w"> </span>--prefix<span class="w"> </span>apps/studio<span class="w"> </span>ci
+npm<span class="w"> </span>--prefix<span class="w"> </span>apps/studio<span class="w"> </span>run<span class="w"> </span>build
+
+<span class="c1"># 2. Terminal A — MCP server (:8000) + sidecar (:8100)</span>
+python<span class="w"> </span>scripts/dev.py
+
+<span class="c1"># 3. Terminal B — free public URL for the sidecar (no account required)</span>
+cloudflared<span class="w"> </span>tunnel<span class="w"> </span>--url<span class="w"> </span>http://127.0.0.1:8100
+<span class="c1"># copy the https://&lt;random&gt;.trycloudflare.com URL it prints</span>
+
+<span class="c1"># 4. Store the URL on the Worker, then deploy</span>
+npx<span class="w"> </span>wrangler<span class="w"> </span>secret<span class="w"> </span>put<span class="w"> </span>SIDECAR_URL<span class="w">   </span><span class="c1"># paste the trycloudflare URL</span>
+npx<span class="w"> </span>wrangler<span class="w"> </span>deploy
+</code></pre><p>Workers Builds settings (Workers &amp; Pages → your Worker → Settings → Builds):</p>
+<table>
+<thead>
+<tr>
+<th>Setting</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Production branch</td>
+<td><code>main</code></td>
+</tr>
+<tr>
+<td>Root directory</td>
+<td><code>/</code></td>
+</tr>
+<tr>
+<td>Build command</td>
+<td><code>npm --prefix apps/studio ci &amp;&amp; npm --prefix apps/studio run build</code></td>
+</tr>
+<tr>
+<td>Deploy command</td>
+<td><code>npx wrangler deploy</code></td>
+</tr>
+<tr>
+<td>Preview command</td>
+<td><code>npx wrangler preview</code></td>
+</tr>
+</tbody>
+</table>
+<p>A Worker has no run command: the Worker script runs on Cloudflare. Set <code>name</code> in
+<code>wrangler.jsonc</code> to the Worker you created before the first deploy.</p>
+<h3 id="pull-request-previews">Pull request previews</h3>
+<p>Workers Builds posts the build status and Preview URL to the pull request
+automatically. To enable it:</p>
+<ol>
+<li>Open the Worker → <strong>Settings</strong> → <strong>Build</strong> → <strong>Branch control</strong>.</li>
+<li>Keep the production branch set to <code>main</code> and enable <strong>Preview Builds</strong>.</li>
+<li>If Cloudflare shows <strong>Set up Worker Previews</strong>, complete the one-time switch.
+This cannot be reversed.</li>
+<li>Confirm the Preview command is <code>npx wrangler preview</code>.</li>
+</ol>
+<p><code>wrangler.jsonc</code> must keep a <code>previews</code> block, even an empty one: the
+<code>wrangler preview</code> command fails the build with &quot;Your Wrangler configuration is
+missing a <code>previews</code> block&quot; without it. Assets and compatibility settings stay
+at the top level, so <code>&quot;previews&quot;: {}</code> is enough while Previews need no extra
+settings. If a future Preview needs vars or bindings, add them under <code>previews</code>
+with Preview-safe values.</p>
+<p>Previews do not inherit production settings. The SPA loads from a Preview, but
+<code>/api/*</code> returns <code>502 SIDECAR_URL is not configured</code> until a preview-specific
+<code>SIDECAR_URL</code> secret is configured:</p>
+<pre class="highlight"><code class="language-bash">npx<span class="w"> </span>wrangler<span class="w"> </span>preview<span class="w"> </span>secret<span class="w"> </span>put<span class="w"> </span>SIDECAR_URL<span class="w"> </span>--name<span class="w"> </span>&lt;branch&gt;
+</code></pre><p>When <code>--name</code> is omitted it defaults to the current git branch. Previews are
+ephemeral, and pull requests from forks may not receive one. If Cloudflare does
+not comment, paste the URL into the PR's <strong>Deployment</strong> section.</p>
+<p>The <code>cf</code> CLI can inspect build triggers and recent builds (<code>cf builds triggers list</code>, <code>cf builds list</code>) and create a Preview (<code>cf previews deploy</code>), but it does
+not post GitHub PR comments. The Workers Builds Git integration owns the PR link;
+<code>cf</code> is only an optional verification tool and requires <code>cf auth login</code>.</p>
+<blockquote>
+<p>[!NOTE]
+The sidecar runs on your machine, so the Worker only works while
+<code>python scripts/dev.py</code> and the Quick Tunnel are running. Quick Tunnel URLs
+change on every restart — update the secret with
+<code>npx wrangler secret put SIDECAR_URL</code>. Chat also needs a reachable
+OpenAI-compatible endpoint in the Studio's <strong>Settings</strong>; the canvas, job map,
+and impact simulation work without one.</p>
+</blockquote>
+
+<p class="prose__source">Source of truth: <code>docs/deployment.md</code> &mdash; <a href="https://github.com/alehar9320/agentic-odi/blob/main/docs/deployment.md">view on GitHub</a></p>
+    </div>
+
+    <nav class="doc__toc" aria-label="On this page">
+      <p class="doc__toc-title">On this page</p>
+      <ul>
+        <li class="doc__toc-item doc__toc-item--2">
+          <a href="#project-site-github-pages">Project Site (GitHub Pages)</a>
+        </li>
+        <li class="doc__toc-item doc__toc-item--2">
+          <a href="#hosted-mcp-server">Hosted MCP Server</a>
+        </li>
+        <li class="doc__toc-item doc__toc-item--2">
+          <a href="#test-chat-ui">Test Chat (UI)</a>
+        </li>
+        <li class="doc__toc-item doc__toc-item--2">
+          <a href="#mcp-server-endpoint">MCP Server Endpoint</a>
+        </li>
+        <li class="doc__toc-item doc__toc-item--2">
+          <a href="#hosted-studio">Hosted Studio</a>
+        </li>
+        <li class="doc__toc-item doc__toc-item--2">
+          <a href="#living-studio-on-a-free-cloudflare-worker">Living Studio on a Free Cloudflare Worker</a>
+        </li>
+        <li class="doc__toc-item doc__toc-item--3">
+          <a href="#pull-request-previews">Pull request previews</a>
+        </li>
+      </ul>
+    </nav>
+
+    <nav class="doc__pager" aria-label="Documentation">
+      <a class="doc__pager-link doc__pager-link--prev" href="https://alehar9320.github.io/agentic-odi/docs/architecture/">
+        <span class="doc__pager-label">Previous</span>
+        <span class="doc__pager-title">Architecture</span>
+      </a>
+      <a class="doc__pager-link doc__pager-link--next" href="https://alehar9320.github.io/agentic-odi/docs/development/">
+        <span class="doc__pager-label">Next</span>
+        <span class="doc__pager-title">Development</span>
+      </a>
+    </nav>
+  </article>
+</div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="shell">
+      <div class="site-footer__top">
+        <div class="site-footer__brand">
+          <img src="../../assets/mark.svg" alt="" width="24" height="24" aria-hidden="true">
+          <span class="brand__name">Agentic&nbsp;ODI</span>
+        </div>
+        <p class="site-footer__tagline">Built with outcomes, not guesses.</p>
+      </div>
+      <nav class="site-footer__nav" aria-label="Footer">
+        <a href="https://github.com/alehar9320/agentic-odi">GitHub</a>
+        <a href="https://github.com/alehar9320/agentic-odi/issues">Issues</a>
+        <a href="https://alehar9320.github.io/agentic-odi/docs/">Docs</a>
+        <a href="https://agentic-odi.alehar.workers.dev/">Hosted Studio</a>
+        <a href="https://horizon.prefect.io/alhase/servers/agentic-odi/chat">Test chat</a>
+      </nav>
+      <p class="site-footer__legal">
+        &copy; 2026 Agentic ODI maintainers &middot; All rights reserved
+      </p>
+      <p class="site-footer__note">
+        Experimental. We don't publish dates &mdash; this page changes when the code does.
+      </p>
+    </div>
+  </footer>
+
+  <script defer src="../../assets/main.js"></script>
+</body>
+</html>

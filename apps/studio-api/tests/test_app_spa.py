@@ -43,10 +43,11 @@ def test_spa_fallback_serves_existing_files(monkeypatch, tmp_path) -> None:
 def test_spa_fallback_returns_404_without_index(monkeypatch, tmp_path) -> None:
     monkeypatch.setattr(app_module, "SPA_DIST", tmp_path)
 
-    response = _client().get("/missing")
+    response = _client().get("/missing", headers={"X-Request-ID": "req-9"})
 
     assert response.status_code == 404
-    assert response.json() == {"detail": "Not Found"}
+    assert response.json()["error"]["code"] == "not_found"
+    assert response.json()["error"]["request_id"] == "req-9"
 
 
 def test_spa_fallback_can_be_disabled(monkeypatch, tmp_path) -> None:
@@ -57,7 +58,7 @@ def test_spa_fallback_can_be_disabled(monkeypatch, tmp_path) -> None:
     response = _client().get("/missing")
 
     assert response.status_code == 404
-    assert response.json() == {"detail": "Not Found"}
+    assert response.json()["error"]["code"] == "not_found"
 
 
 def test_spa_assets_are_mounted(monkeypatch, tmp_path) -> None:

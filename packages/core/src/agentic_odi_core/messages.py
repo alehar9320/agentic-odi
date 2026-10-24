@@ -68,5 +68,8 @@ def outcome_not_found(outcome_id: str | None) -> str:
     return f"Outcome not found: {outcome_id}"
 
 
-def evidence_not_found(evidence_id: str | None) -> str:
-    return f"Evidence not found: {evidence_id}"
+def evidence_not_found(evidence_id: str | None, hint: str | None = None) -> str:
+    message = f"Evidence not found: {evidence_id}"
+    if hint:
+        message = f"{message}. {hint}"
+    return message

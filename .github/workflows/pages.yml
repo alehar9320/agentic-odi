@@ -33,10 +33,11 @@ jobs:
       - name: Pytest (website)
         run: uv run --directory website pytest tests/
 
-      - name: Build site (rsync)
-        run: |
-          mkdir -p _site
-          rsync -av website/ _site/ --exclude='tests/' --exclude='tools/'
+      # The site is generated from the repository's own sources, so it is
+      # built here rather than copied. website/dist/ is the committed copy a
+      # reviewer reads; this step produces the artifact that goes live.
+      - name: Build site
+        run: uv run python website/tools/build_site.py --out _site
 
       - name: Configure Pages
         uses: actions/configure-pages@v6

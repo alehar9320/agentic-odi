@@ -1,6 +1,7 @@
 import { render, screen, fireEvent } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { CanvasState } from "../../types";
 import { OpportunityLandscape } from "./OpportunityLandscape";
 
 // Mock StudioContext
@@ -14,17 +15,25 @@ const mockCanvasData = {
   source: "seed" as const,
 };
 
-vi.mock("../../state/StudioContext", () => ({
-  useStudio: () => ({
-    canvas: mockCanvasData,
-    canvasLoading: false,
+const harness = vi.hoisted(() => ({
+  state: {
+    canvasState: { kind: "ready", data: null } as unknown as CanvasState,
+    refreshCanvas: vi.fn(),
     requestSimulate: vi.fn(),
     sendMessage: vi.fn(),
     pushToast: vi.fn(),
-  }),
+  },
+}));
+
+vi.mock("../../state/StudioContext", () => ({
+  useStudio: () => harness.state,
 }));
 
 describe("OpportunityLandscape Data Visualization", () => {
+  beforeEach(() => {
+    harness.state.canvasState = { kind: "ready", data: mockCanvasData } as unknown as CanvasState;
+  });
+
   it("renders opportunity landscape header and mode buttons", () => {
     render(<OpportunityLandscape />);
     expect(screen.getByText("Opportunity Landscape")).toBeInTheDocument();
@@ -59,5 +68,63 @@ describe("OpportunityLandscape Data Visualization", () => {
 
     fireEvent.click(checkbox);
     expect(checkbox).toBeChecked();
+  });
+});
+
+describe("OpportunityLandscape canvas states", () => {
+  it("shows the failure and a retry instead of the metrics when the canvas failed", () => {
+    harness.state.canvasState = {
+      kind: "error",
+      data: null,
+      error: {
+        code: "mcp_unreachable",
+        message: "The MCP server is unreachable.",
+        suggestion: "Check that the MCP server is running, then try again.",
+        retryable: true,
+      },
+    } as unknown as CanvasState;
+    harness.state.refreshCanvas = vi.fn();
+
+    render(<OpportunityLandscape />);
+
+    expect(screen.getByText("The MCP server is unreachable.")).toBeInTheDocument();
+    expect(screen.queryByText("Active Job Map Contexts")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: /retry/i }));
+    expect(harness.state.refreshCanvas).toHaveBeenCalled();
+  });
+
+  it("invites the user to capture something when the canvas is empty", () => {
+    harness.state.canvasState = {
+      kind: "empty",
+      data: { jobs: [], steps: [], outcomes: [], source: "local" },
+    } as unknown as CanvasState;
+
+    render(<OpportunityLandscape />);
+
+    expect(screen.getByText(/no opportunities yet/i)).toBeInTheDocument();
+    expect(screen.queryByText("Active Job Map Contexts")).toBeNull();
+  });
+
+  it("shows why the seed board is standing in when the canvas says so", () => {
+    harness.state.canvasState = {
+      kind: "ready",
+      data: { ...mockCanvasData, warnings: ["MCP endpoint unreachable"] },
+    } as unknown as CanvasState;
+
+    render(<OpportunityLandscape />);
+
+    expect(screen.getByText(/mcp endpoint unreachable/i)).toBeInTheDocument();
+  });
+
+  it("shows the skeleton while a warm canvas reloads", () => {
+    harness.state.canvasState = {
+      kind: "loading",
+      data: mockCanvasData,
+    } as unknown as CanvasState;
+
+    const { container } = render(<OpportunityLandscape />);
+
+    expect(container.textContent).not.toContain("Active Job Map Contexts");
   });
 });

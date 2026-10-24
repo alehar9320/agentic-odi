@@ -1389,6 +1389,44 @@ input[type="range"] {
   text-transform: uppercase;
 }
 
+/* A failure shown in place of the thing that failed. */
+.failure {
+  margin-top: 8px;
+  padding: 10px 12px;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  border-radius: 10px;
+  background: rgba(239, 68, 68, 0.08);
+}
+
+.failure__message {
+  margin: 0;
+  color: #fca5a5;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.failure__detail {
+  margin-top: 6px;
+  color: #d6d3d1;
+  font-size: 0.72rem;
+}
+
+.failure__detail pre {
+  margin: 4px 0 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.failure__suggestion {
+  margin: 6px 0 0;
+  color: #e7e5e4;
+  font-size: 0.78rem;
+}
+
+.failure__retry {
+  margin-top: 8px;
+}
+
 /* ------------------------------------------------------------------ */
 /* Setup conversation                                                 */
 /* ------------------------------------------------------------------ */
@@ -1595,9 +1633,80 @@ input[type="range"] {
   gap: 8px;
 }
 
+.catchup-metrics {
+  margin-top: 14px;
+}
+
+.metric__value--accent {
+  color: var(--accent);
+}
+
+.catchup-empty {
+  text-align: center;
+  padding: 32px 16px;
+}
+
+.catchup-empty__icon {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 1.8rem;
+}
+
+.catchup-empty__title {
+  margin: 0;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.catchup-empty__hint {
+  margin: 4px 0 0;
+  font-size: 0.78rem;
+  color: var(--faint);
+}
+
 .catchup-card {
   position: relative;
+  cursor: pointer;
   transition: all 0.2s ease-in-out;
+}
+
+.catchup-card__meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.catchup-card__controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.catchup-card__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.catchup-card__title {
+  margin: 8px 0 4px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.catchup-card__body {
+  margin: 0 0 12px;
+  color: var(--muted);
+}
+
+.catchup-card__action {
+  font-size: 0.76rem;
+  padding: 4px 10px;
+}
+
+.catchup-card__action-icon {
+  margin-right: 4px;
 }
 
 .catchup-card:hover {
@@ -1739,6 +1848,61 @@ input[type="range"] {
   border-radius: 10px;
   padding: 14px;
   backdrop-filter: blur(8px);
+}
+
+/* A lens that threw, contained to its own panel. */
+.panel-failure {
+  padding: 14px 16px;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  border-radius: 10px;
+  background: rgba(239, 68, 68, 0.08);
+}
+
+.panel-failure__message {
+  margin: 0;
+  color: #fca5a5;
+  font-size: 0.84rem;
+}
+
+.panel-failure__detail {
+  margin: 4px 0 0;
+  color: var(--studio-muted);
+  font-size: 0.75rem;
+  word-break: break-word;
+}
+
+/* Why the board is not what the server holds. */
+.canvas-warnings {
+  margin: 12px 0 0;
+  padding: 8px 12px 8px 28px;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-radius: 8px;
+  background: rgba(245, 158, 11, 0.08);
+  color: #f0b45a;
+  font-size: 0.78rem;
+}
+
+/* An empty canvas is an invitation, not a board of zeroes. */
+.studio-empty {
+  margin-top: 16px;
+  padding: 28px 20px;
+  text-align: center;
+  background: var(--studio-surface);
+  border: 1px solid var(--studio-border);
+  border-radius: 10px;
+}
+
+.studio-empty__title {
+  margin: 0;
+  color: var(--studio-text);
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.studio-empty__body {
+  margin: 6px 0 0;
+  color: var(--studio-muted);
+  font-size: 0.8rem;
 }
 
 /* Custom scrollbar for data density tables */
@@ -3088,7 +3252,8 @@ details[open] summary {
 }
 
 .catchup-title {
-  margin: 0;
+  margin: 2px 0 0;
+  font-size: 1.1rem;
   font-weight: 600;
   letter-spacing: -0.01em;
 }

@@ -29,6 +29,33 @@ export interface CanvasData {
   steps: Step[];
   outcomes: Outcome[];
   source: "mcp" | "seed" | "local";
+  /** Why the board is not what the server actually holds, when the sidecar knows. */
+  warnings?: string[];
+}
+
+/**
+ * What the canvas currently is. A union, not four booleans: "no work yet" and
+ * "the fetch failed" look identical if you only track emptiness, and a failed
+ * canvas must never render as an empty one.
+ */
+export type CanvasState =
+  | { kind: "loading"; data: CanvasData | null }
+  | { kind: "ready"; data: CanvasData }
+  | { kind: "empty"; data: CanvasData }
+  | { kind: "error"; error: StudioError; data: CanvasData | null };
+
+/**
+ * The one failure shape the sidecar reports. Every HTTP error arrives as
+ * `{"error": StudioError}`, so the UI can show what went wrong, what to do
+ * about it, and whether a retry is worth trying.
+ */
+export interface StudioError {
+  code: string;
+  message: string;
+  detail?: string | null;
+  suggestion?: string | null;
+  retryable: boolean;
+  request_id?: string | null;
 }
 
 export interface StudioConfig {
@@ -60,6 +87,13 @@ export interface ChatMessage {
    * the combined prose because that is what gets replayed as history.
    */
   parts?: ChatPart[];
+  /**
+   * Assistant turns only: the failure that ended this turn, so the transcript
+   * can show it in place instead of losing the question.
+   */
+  error?: StudioError;
+  /** The question this turn answered, kept so a failed turn can be retried. */
+  retryText?: string;
 }
 
 /**

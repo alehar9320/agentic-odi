@@ -8,17 +8,18 @@ vi.mock("../state/StudioContext", () => ({
   useStudio: vi.fn(),
 }));
 vi.mock("./updater/useUpdater", () => ({
-  useUpdater: () => ({
+  useUpdater: vi.fn(() => ({
     checking: false,
     available: false,
     version: null,
     progress: null,
     error: null,
     check: vi.fn(),
-  }),
+  })),
 }));
 
 import { useStudio } from "../state/StudioContext";
+import { useUpdater } from "./updater/useUpdater";
 import type { StudioContextValue } from "../state/StudioContext";
 
 const stubContext = (overrides: Record<string, unknown> = {}) =>
@@ -92,11 +93,94 @@ describe("SettingsPanel connectors", () => {
     expect(add).toHaveBeenCalledWith({ preset: "notion" });
   });
 
+  it("leaves update errors inline instead of toasting them", () => {
+    const pushToast = vi.fn();
+    vi.mocked(useStudio).mockReturnValue(stubContext({ pushToast }));
+    vi.mocked(useUpdater).mockReturnValueOnce({
+      checking: false,
+      available: false,
+      version: null,
+      progress: null,
+      error: "Update check failed.",
+      check: vi.fn(),
+    });
+
+    renderPanel();
+    fireEvent.click(screen.getByRole("button", { name: /check for updates/i }));
+
+    expect(pushToast).not.toHaveBeenCalled();
+  });
+
   it("shows an empty state when no connectors are registered", () => {
     vi.mocked(useStudio).mockReturnValue(stubContext({ connectors: [] }));
 
     renderPanel();
 
     expect(screen.getByText(/no connectors registered/i)).toBeInTheDocument();
+  });
+});
+
+describe("SettingsPanel connector catalog failures", () => {
+  it("shows the catalog failure with a retry instead of an empty select", () => {
+    const refresh = vi.fn().mockResolvedValue(undefined);
+    vi.mocked(useStudio).mockReturnValue(
+      stubContext({
+        presets: [],
+        presetError: {
+          code: "mcp_unreachable",
+          message: "The connector catalog is unreachable.",
+          suggestion: "Check that the sidecar is running, then try again.",
+          retryable: true,
+        },
+        refreshPresets: refresh,
+      }),
+    );
+
+    renderPanel();
+
+    expect(screen.getByRole("alert").textContent).toContain(
+      "The connector catalog is unreachable.",
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /retry/i }));
+    expect(refresh).toHaveBeenCalled();
+  });
+
+  it("disables adding a preset while the catalog is in error", () => {
+    vi.mocked(useStudio).mockReturnValue(
+      stubContext({
+        presets: [],
+        presetError: {
+          code: "mcp_unreachable",
+          message: "The connector catalog is unreachable.",
+          retryable: true,
+        },
+      }),
+    );
+
+    renderPanel();
+
+    expect(screen.getByRole("button", { name: /add preset/i })).toBeDisabled();
+  });
+});
+
+describe("SettingsPanel connector list failures", () => {
+  it("shows the failure instead of claiming there are no connectors", () => {
+    vi.mocked(useStudio).mockReturnValue(
+      stubContext({
+        connectors: [],
+        connectorsError: {
+          code: "mcp_unreachable",
+          message: "The connector list is unreachable.",
+          suggestion: "Check that the sidecar is running, then try again.",
+          retryable: true,
+        },
+      }),
+    );
+
+    renderPanel();
+
+    expect(screen.getByRole("alert").textContent).toContain("The connector list is unreachable.");
+    expect(screen.queryByText(/no connectors registered/i)).toBeNull();
   });
 });
