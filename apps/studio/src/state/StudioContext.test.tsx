@@ -161,6 +161,28 @@ describe("StudioContext memory and resume", () => {
     ]);
   });
 
+  it("toasts after creating a job and recording an outcome", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
+
+    await act(async () => {
+      await result.current.createJob({ name: "New job" });
+    });
+    expect(result.current.toasts.map((toast) => toast.message)).toContain("Job created: New job");
+
+    await act(async () => {
+      await result.current.addOutcome({
+        job_id: "JOB-1",
+        statement: "Minimize the time it takes to ship",
+        importance: 8,
+        satisfaction: 3,
+      });
+    });
+    expect(result.current.toasts.map((toast) => toast.message)).toContain(
+      "Outcome captured successfully!",
+    );
+  });
+
   it("sends the conversation id and applies memory events", async () => {
     const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
     await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
