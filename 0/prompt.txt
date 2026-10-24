@@ -1,0 +1,9 @@
+we seem to have incorrectly committed the website/dist folder, so we're expereicing a ton of merge conflicts as a result. Help us ensure that generated files aren't stored in source control, but rather generated for release material, in run-time, unless we meet some technical feasibility limitation. Do this work on a separate git worktree. Push as PR. When CI is green. You're done.
+
+---
+
+Why the fuck would I want website/index.html removed? Isn't that a key must-have for github pages?
+
+---
+
+If we don't need index.html and you can confirm that the github pages dist will sitll lead to successful github pages deployment, let's then instead remove it, and take the file off the no delete list
