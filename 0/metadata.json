@@ -1,0 +1,62 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M5P7X14V4D755YQ156K6D3W4",
+  "session_id": "ses_e953e98d9ffeJ51GV13VT5K9fL",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-24T06:00:00.046583948Z",
+  "branch": "ci/protect-critical-files",
+  "checkpoints_count": 1,
+  "save_step_count": 2,
+  "files_touched": [
+    ".ci/protected-files.txt",
+    "tests/contract/test_protected_files.py"
+  ],
+  "agent": "OpenCode",
+  "model": "nvidia/nemotron-3.5-super-vl-120b-a12b",
+  "turn_id": "5f18fdeb5b55",
+  "checkpoint_transcript_start": 22,
+  "transcript_lines_at_start": 22,
+  "compact_transcript_start": 22,
+  "token_usage": {
+    "input_tokens": 8745,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 164768,
+    "output_tokens": 482,
+    "api_call_count": 4
+  },
+  "session_metrics": {
+    "turn_count": 4
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-10-24T05:59:59.998509571Z",
+    "agent_lines": 97,
+    "agent_removed": 0,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 97,
+    "total_lines_changed": 97,
+    "agent_percentage": 100,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0
+    },
+    {
+      "checkpoint_number": 3,
+      "user_lines_added": 152,
+      "user_lines_removed": 0,
+      "agent_lines_added": 158,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        "docs/superpowers/plans/2026-10-21-conversational-generative-ui.md": 97,
+        "docs/superpowers/todos.md": 55
+      }
+    }
+  ]
+}
