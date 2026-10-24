@@ -63,3 +63,4 @@ apps/cli ──────────────▶ packages/connectors
 
 - [Data flow](data-flow.md)
 - [Testing](testing.md)
+- [Decisions (ADRs)](adr/README.md) — why the architecture looks the way it does
