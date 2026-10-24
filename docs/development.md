@@ -131,6 +131,13 @@ tracks `main`, which is the baseline every PR is compared against:
 - **Patch** status is informational for now, so new code can land while the
   suite catches up.
 
+Codecov itself never fails the build (`fail_ci_if_error: false`), so the same
+floor is enforced locally: `[tool.coverage.report] fail_under` in
+`pyproject.toml` makes any run with `--cov` fail below **89%** — the 90% target
+minus codecov's 1% tolerance. The current measurement is ~89.2%, so the gate has
+little slack; raise `fail_under` as coverage improves rather than lowering it to
+unblock a change.
+
 To reproduce the report locally:
 
 ```bash
