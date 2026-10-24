@@ -209,6 +209,11 @@ def _guide_body(
         link_map=link_map,
         page_path=f"docs/{slug}/index.html",
     )
+    if slug == "connectors":
+        # The guide explains how presets work; the catalog decides which ones
+        # exist. Append the generated reference so a new preset is documented
+        # by the build rather than by someone remembering to edit the guide.
+        body += env.get_template("_connector_reference.html").render(**context)
     return body, markdown_render.headings(body), title
 
 
