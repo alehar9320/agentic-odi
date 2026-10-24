@@ -2716,6 +2716,20 @@ input[type="range"] {
   color: #818cf8;
 }
 
+.changelog-release__new {
+  align-self: flex-start;
+  margin-top: 2px;
+  padding: 1px 6px;
+  border: 1px solid rgba(129, 140, 248, 0.45);
+  border-radius: 999px;
+  background: rgba(129, 140, 248, 0.16);
+  color: #a5b4fc;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .changelog-release__date {
   font-size: 0.78rem;
   color: var(--studio-muted);
