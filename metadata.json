@@ -3,7 +3,7 @@
   "checkpoint_id": "01M5P7DDFP9WNFZ1X06ANSDV8N",
   "strategy": "manual-commit",
   "branch": "slay/a919b8a6-step-order",
-  "checkpoints_count": 2,
+  "checkpoints_count": 3,
   "files_touched": [
     "apps/mcp-server/src/agentic_odi_mcp_server/mcp_server.py",
     "apps/mcp-server/tests/test_server_tools.py",
@@ -23,6 +23,13 @@
       "transcript": "/1/full.jsonl",
       "compact_transcript": "/1/transcript.jsonl",
       "content_hash": "/1/content_hash.txt",
+      "prompt": ""
+    },
+    {
+      "metadata": "/2/metadata.json",
+      "transcript": "/2/full.jsonl",
+      "compact_transcript": "/2/transcript.jsonl",
+      "content_hash": "/2/content_hash.txt",
       "prompt": ""
     }
   ],
