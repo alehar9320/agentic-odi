@@ -3,7 +3,7 @@
   "checkpoint_id": "01M5PBJ028W251NFY0ANZHVQ9A",
   "strategy": "manual-commit",
   "branch": "slay/b737e2cf-chat-error-surface",
-  "checkpoints_count": 4,
+  "checkpoints_count": 5,
   "files_touched": [
     "apps/studio/src/components/chat/ChatStage.test.tsx"
   ],
@@ -20,6 +20,13 @@
       "transcript": "/1/full.jsonl",
       "compact_transcript": "/1/transcript.jsonl",
       "content_hash": "/1/content_hash.txt",
+      "prompt": ""
+    },
+    {
+      "metadata": "/2/metadata.json",
+      "transcript": "/2/full.jsonl",
+      "compact_transcript": "/2/transcript.jsonl",
+      "content_hash": "/2/content_hash.txt",
       "prompt": ""
     }
   ],
