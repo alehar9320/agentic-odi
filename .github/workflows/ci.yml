@@ -284,6 +284,50 @@ jobs:
           npm run gen:api-types
           git diff --exit-code -- src/api/schema.d.ts
 
+  # Chromatic publishes one snapshot per `*.visual.test.tsx` test per build.
+  # The job always runs, because the browser rendering is itself a test; only
+  # the upload needs the project token, which forks and Dependabot cannot read.
+  chromatic:
+    name: Visual tests (Chromatic)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CHROMATIC_PROJECT_TOKEN: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
+    defaults:
+      run:
+        shell: bash
+        working-directory: apps/studio
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # Chromatic walks git history to find the baseline build to diff against.
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "lts/*"
+          cache: npm
+          cache-dependency-path: apps/studio/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium for Vitest Browser Mode
+        run: npx playwright install --with-deps chromium
+
+      - name: Capture component snapshots
+        run: npm run test:visual
+
+      - name: Publish to Chromatic
+        if: ${{ env.CHROMATIC_PROJECT_TOKEN != '' }}
+        run: npm run chromatic
+
+      - name: Explain the skipped upload
+        if: ${{ env.CHROMATIC_PROJECT_TOKEN == '' }}
+        run: |
+          echo "::notice::CHROMATIC_PROJECT_TOKEN is not set, so snapshots were captured but not published."
+          echo "Add the project token (Manage > Project token) as the CHROMATIC_PROJECT_TOKEN repository secret."
+
   tauri-check:
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -377,7 +421,7 @@ jobs:
   ci-green:
     name: CI green
     runs-on: ubuntu-latest
-    needs: [lint, typecheck, security, test, smoke, website, studio, tauri-check, tauri-build]
+    needs: [lint, typecheck, security, test, smoke, website, studio, chromatic, tauri-check, tauri-build]
     if: always()
     steps:
       - name: Verify all required jobs succeeded

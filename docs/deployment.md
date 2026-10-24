@@ -54,6 +54,82 @@ PR comment is the source of truth, so do not copy a preview URL into docs. The
 hosted UI loads without a backend; canvas data, chat, and mutations need the
 sidecar tunnel described below.
 
+## Component Visual Review (Chromatic)
+
+Every `*.visual.test.tsx` file in `apps/studio` renders one component state in a
+real Chromium browser, and the `chromatic` job in
+[`.github/workflows/ci.yml`](../.github/workflows/ci.yml) publishes those
+snapshots to **[Chromatic](https://www.chromatic.com/)** on every push and pull
+request. Reviewers compare the pixels, approve or reject the change in
+Chromatic, and the approved build becomes the baseline for the next comparison.
+
+### Project setup
+
+The Chromatic project exists and is linked to `alehar9320/agentic-odi` (app id
+`6add05ad03e0b1f6aeda07ad`). Its first build was published from the CLI and
+contains the two `FailurePanel` snapshots:
+[build 1](https://www.chromatic.com/build?appId=6add05ad03e0b1f6aeda07ad&number=1).
+
+One step remains so CI can publish on its own:
+
+1. Copy the project token from **Manage → Project token**.
+2. Add it to the repository as the **`CHROMATIC_PROJECT_TOKEN`** secret
+   (`gh secret set CHROMATIC_PROJECT_TOKEN`).
+
+The next push then produces a build containing every
+`*.visual.test.tsx` component. Until the secret exists the job still runs the
+browser tests, skips the upload, and prints a notice, so forks and Dependabot
+PRs stay green.
+
+> [!NOTE]
+> `apps/studio/package.json` overrides the transitive `storybook` version that
+> `@chromatic-com/vitest` pins, to a release without the dev-server advisory that
+> `npm audit` reports as critical. This project never runs a Storybook dev
+> server; the override only patches the archive build Chromatic does internally.
+> Revisit it when the plugin adopts a newer Storybook.
+
+### Staying inside the free plan
+
+Chromatic bills `tests × builds × browsers × viewports`, and the free plan
+includes **5,000 billed snapshots per month** with Chrome only. Three deliberate
+choices keep this project far below that ceiling:
+
+| Choice | Where | Why |
+|---|---|---|
+| Browser mode only picks up `*.visual.test.tsx` | `apps/studio/vitest.visual.config.ts` | The 29 jsdom unit tests never bill a snapshot; adding a component to visual review is one explicit new file. |
+| One Chromium instance, one viewport | same file | No browser or viewport matrix multiplying each test. |
+| Animations paused at their end frame | same file (`pauseAnimationAtEnd`) | Shimmer and fade-in components do not diff on capture timing. |
+
+Today that is **2 snapshots per build**, so the monthly allowance would cover
+~2,500 builds. A component added to visual review costs one snapshot per state
+per build, so keep new files focused on the states that matter rather than every
+prop permutation.
+
+`apps/studio/chromatic.config.json` auto-accepts changes on `main` (so the
+default branch updates its baseline without a manual review) and exits zero on
+visual changes elsewhere (so a PR is reviewed in Chromatic instead of blocking
+on a red check). Rendering errors still fail the job.
+
+### Commands
+
+```bash
+# Capture archives; needs Chromium locally (npx playwright install chromium)
+npm --prefix apps/studio run test:visual
+
+# Upload the archives captured above
+CHROMATIC_PROJECT_TOKEN=... npm --prefix apps/studio run chromatic
+```
+
+### Adding a component
+
+1. Create `apps/studio/src/components/<Name>.visual.test.tsx`.
+2. Render the state you want reviewed, importing `../styles/theme.css` so the
+   snapshot uses the real theme.
+3. Call `configure({ title: "<Name>" })` from `@chromatic-com/vitest` if the
+   derived name is not the component name.
+4. Add one test per state worth reviewing. Automatic snapshots are captured at
+   the end of each test; use `takeSnapshot("name")` for a mid-test state.
+
 ## Living Studio on a Free Cloudflare Worker
 
 Workers Containers — the only way to run the Python sidecar entirely on
