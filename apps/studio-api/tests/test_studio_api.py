@@ -370,6 +370,13 @@ def test_canvas_reads_local_repository() -> None:
     job = service.add_job(name="Local job", description="Stored locally")
     service.add_step(job_id=job.id, name="Local step", order=1)
     service.add_outcome(job_id=job.id, statement="Minimize time", importance=8.0, satisfaction=3.0)
+    service.add_evidence(
+        source_name="Gong",
+        source_kind="mcp",
+        name="Call with Ada",
+        content="Deploys break whenever a secret rotates.",
+        job_id=job.id,
+    )
 
     body = TestClient(create_app(repo)).get("/api/canvas").json()
 
@@ -377,6 +384,7 @@ def test_canvas_reads_local_repository() -> None:
     assert body["jobs"][0]["id"] == job.id
     assert body["steps"][0]["name"] == "Local step"
     assert body["outcomes"][0]["statement"] == "Minimize time"
+    assert body["evidence"][0]["name"] == "Call with Ada"
 
 
 def test_post_step_uses_local_service() -> None:
