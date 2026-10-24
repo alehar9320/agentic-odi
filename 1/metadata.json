@@ -1,0 +1,52 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M5P66PZ2PSN71HG8X6M4YKV5",
+  "session_id": "ses_e95ad064fffef0baLqHh5y2MwC",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-24T05:30:36.728486513Z",
+  "branch": "topic/cli-surface-parity",
+  "checkpoints_count": 1,
+  "save_step_count": 1,
+  "files_touched": [
+    "README.md",
+    "apps/cli/src/agentic_odi_cli/backend.py",
+    "apps/cli/src/agentic_odi_cli/cli.py",
+    "apps/cli/tests/test_cli.py",
+    "apps/studio/src/features/flags.ts",
+    "docs/cli.md",
+    "docs/roadmap.md",
+    "packages/core/tests/test_models.py",
+    "tests/contract/test_cli_contract.py",
+    "tests/contract/test_mcp_contract.py",
+    "website/dist/docs/cli/index.html",
+    "website/dist/docs/roadmap/index.html"
+  ],
+  "agent": "OpenCode",
+  "model": "nvidia/nemotron-3.5-super-vl-120b-a12b",
+  "turn_id": "522c0599b2c3",
+  "checkpoint_transcript_start": 90,
+  "transcript_lines_at_start": 90,
+  "compact_transcript_start": 90,
+  "token_usage": {
+    "input_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 0,
+    "output_tokens": 0,
+    "api_call_count": 0
+  },
+  "session_metrics": {
+    "turn_count": 4
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-10-24T05:30:36.660161819Z",
+    "agent_lines": 204,
+    "agent_removed": 47,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 204,
+    "total_lines_changed": 251,
+    "agent_percentage": 100,
+    "metric_version": 2
+  }
+}
