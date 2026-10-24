@@ -8,9 +8,10 @@ import {
 } from "../../lib/odi";
 import { useStudio } from "../../state/StudioContext";
 import type { Outcome } from "../../types";
+import { CopyIcon } from "../icons";
 
 export function OutcomeCard({ outcome }: { outcome: Outcome }) {
-  const { ask, deleteOutcome, updateOutcome } = useStudio();
+  const { ask, deleteOutcome, pushToast, updateOutcome } = useStudio();
   const [showEvidence, setShowEvidence] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -101,6 +102,24 @@ export function OutcomeCard({ outcome }: { outcome: Outcome }) {
       )}
 
       <div className="card__actions">
+        <button
+          type="button"
+          className="quiet-action"
+          aria-label="Copy outcome statement"
+          title="Copy the statement"
+          onClick={() => {
+            if (!navigator.clipboard) {
+              pushToast("error", "Could not copy the statement.");
+              return;
+            }
+            void navigator.clipboard
+              .writeText(statement)
+              .then(() => pushToast("success", "Copied"))
+              .catch(() => pushToast("error", "Could not copy the statement."));
+          }}
+        >
+          <CopyIcon size={14} /> Copy
+        </button>
         <button
           type="button"
           className="quiet-action"
