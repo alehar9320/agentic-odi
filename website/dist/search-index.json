@@ -1,0 +1,67 @@
+[
+  {
+    "title": "Repository Architecture",
+    "url": "docs/architecture/",
+    "excerpt": "The workspace, the data flow, and the testing strategy."
+  },
+  {
+    "title": "CLI Reference",
+    "url": "docs/cli/",
+    "excerpt": "Backends, chat, entities, and scoring."
+  },
+  {
+    "title": "External Connectors (MCP Ingest)",
+    "url": "docs/connectors/",
+    "excerpt": "The registry, the presets, and the protocol."
+  },
+  {
+    "title": "Deployment",
+    "url": "docs/deployment/",
+    "excerpt": "The project site, the hosted server, and the Worker."
+  },
+  {
+    "title": "Development",
+    "url": "docs/development/",
+    "excerpt": "Lint, types, frontend checks, and the coverage map."
+  },
+  {
+    "title": "Everything, in one place.",
+    "url": "docs/",
+    "excerpt": "Every guide, the CLI reference, the connector catalog, and the full MCP tool reference."
+  },
+  {
+    "title": "Installation",
+    "url": "docs/installation/",
+    "excerpt": "Binaries, the installer, and updates."
+  },
+  {
+    "title": "Local Tools-Capable LLM Backend",
+    "url": "docs/local-llm/",
+    "excerpt": "Running a local model with tool calling."
+  },
+  {
+    "title": "MCP tool reference",
+    "url": "docs/mcp/",
+    "excerpt": "Every tool the server exposes."
+  },
+  {
+    "title": "Quick start",
+    "url": "docs/quick-start/",
+    "excerpt": "From nothing to a running studio."
+  },
+  {
+    "title": "Roadmap & Next Steps",
+    "url": "docs/roadmap/",
+    "excerpt": "What has shipped, and what is queued."
+  },
+  {
+    "title": "Running The Living Studio",
+    "url": "docs/studio/",
+    "excerpt": "The chat-first interface, its first run, and the desktop app."
+  },
+  {
+    "title": "Your roadmap is a guess.",
+    "url": "",
+    "excerpt": "An MCP server that hands your agents verified customer outcomes, and the evidence behind them."
+  }
+]

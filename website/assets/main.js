@@ -136,6 +136,180 @@
   });
 
   /* ---------------------------------------------------------------- */
+  /* Docs search                                                       */
+  /* ---------------------------------------------------------------- */
+
+  var search = document.querySelector("[data-search]");
+
+  if (search) {
+    var searchInput = search.querySelector("[data-search-input]");
+    var searchResults = search.querySelector("[data-search-results]");
+    var searchHint = search.querySelector("[data-search-hint]");
+    var searchEntries = null;
+    var searchMatches = [];
+    var searchActive = -1;
+    var siteUrl = search.getAttribute("data-site-url") || "/";
+    var indexUrl = search.getAttribute("data-index-url");
+
+    function loadSearchIndex() {
+      if (searchEntries) return Promise.resolve(searchEntries);
+      return fetch(indexUrl)
+        .then(function (response) {
+          return response.json();
+        })
+        .then(function (entries) {
+          searchEntries = Array.isArray(entries) ? entries : [];
+          return searchEntries;
+        })
+        .catch(function () {
+          searchEntries = [];
+          return searchEntries;
+        });
+    }
+
+    function subsequence(needle, haystack) {
+      var index = 0;
+      for (var i = 0; i < haystack.length && index < needle.length; i += 1) {
+        if (haystack.charAt(i) === needle.charAt(index)) index += 1;
+      }
+      return index === needle.length;
+    }
+
+    function fuzzyScore(entry, query) {
+      if (!query) return 1;
+      var title = entry.title.toLowerCase();
+      var excerpt = (entry.excerpt || "").toLowerCase();
+      var tokens = query.split(/\s+/).filter(Boolean);
+      var score = 0;
+      for (var i = 0; i < tokens.length; i += 1) {
+        var token = tokens[i];
+        if (title.indexOf(token) === 0) score += 40;
+        else if (title.indexOf(token) !== -1) score += 25;
+        else if (excerpt.indexOf(token) !== -1) score += 10;
+        else if (subsequence(token, title + " " + excerpt)) score += 4;
+        else return 0;
+      }
+      return score;
+    }
+
+    function renderSearch(query) {
+      var cleaned = query.trim();
+      var ranked = searchEntries
+        .map(function (entry) {
+          return { entry: entry, score: fuzzyScore(entry, cleaned.toLowerCase()) };
+        })
+        .filter(function (item) {
+          return item.score > 0;
+        })
+        .sort(function (a, b) {
+          return b.score - a.score || a.entry.title.localeCompare(b.entry.title);
+        })
+        .slice(0, 8);
+
+      searchMatches = ranked.map(function (item) {
+        return item.entry;
+      });
+      searchActive = searchMatches.length ? 0 : -1;
+      searchResults.textContent = "";
+
+      if (!searchMatches.length) {
+        searchHint.textContent = cleaned
+          ? "No page matches \u201c" + cleaned + "\u201d."
+          : "Type to search every guide and reference page.";
+        return;
+      }
+
+      searchHint.textContent =
+        searchMatches.length + " page" + (searchMatches.length === 1 ? "" : "s") + ".";
+
+      searchMatches.forEach(function (entry, index) {
+        var item = document.createElement("li");
+        var link = document.createElement("a");
+        link.className = "search__result" + (index === searchActive ? " is-active" : "");
+        link.href = siteUrl + entry.url;
+
+        var title = document.createElement("span");
+        title.className = "search__result-title";
+        title.textContent = entry.title;
+
+        var excerpt = document.createElement("span");
+        excerpt.className = "search__result-excerpt";
+        excerpt.textContent = entry.excerpt || "";
+
+        link.appendChild(title);
+        link.appendChild(excerpt);
+        item.appendChild(link);
+        searchResults.appendChild(item);
+      });
+    }
+
+    function moveSearch(delta) {
+      if (!searchMatches.length) return;
+      searchActive = (searchActive + delta + searchMatches.length) % searchMatches.length;
+      var links = searchResults.querySelectorAll("a");
+      for (var i = 0; i < links.length; i += 1) {
+        links[i].classList.toggle("is-active", i === searchActive);
+      }
+      if (links[searchActive]) links[searchActive].scrollIntoView({ block: "nearest" });
+    }
+
+    function openSearch() {
+      search.hidden = false;
+      document.documentElement.classList.add("search-open");
+      searchInput.value = "";
+      searchInput.focus();
+      loadSearchIndex().then(function () {
+        renderSearch("");
+      });
+    }
+
+    function closeSearch() {
+      search.hidden = true;
+      document.documentElement.classList.remove("search-open");
+    }
+
+    document.querySelectorAll("[data-search-open]").forEach(function (button) {
+      button.addEventListener("click", openSearch);
+    });
+
+    document.querySelectorAll("[data-search-close]").forEach(function (button) {
+      button.addEventListener("click", closeSearch);
+    });
+
+    searchInput.addEventListener("input", function () {
+      loadSearchIndex().then(function () {
+        renderSearch(searchInput.value);
+      });
+    });
+
+    searchInput.addEventListener("keydown", function (event) {
+      if (event.key === "ArrowDown") {
+        event.preventDefault();
+        moveSearch(1);
+      } else if (event.key === "ArrowUp") {
+        event.preventDefault();
+        moveSearch(-1);
+      } else if (event.key === "Enter") {
+        var active = searchResults.querySelector("a.is-active");
+        if (active) {
+          event.preventDefault();
+          window.location.href = active.href;
+        }
+      }
+    });
+
+    document.addEventListener("keydown", function (event) {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        if (search.hidden) openSearch();
+        else closeSearch();
+      } else if (event.key === "Escape" && !search.hidden) {
+        closeSearch();
+      }
+    });
+  }
+
+  /* ---------------------------------------------------------------- */
   /* Scroll reveal                                                     */
   /* ---------------------------------------------------------------- */
 
