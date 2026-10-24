@@ -101,3 +101,15 @@ def test_every_guide_in_the_navigation_exists_on_disk():
                 assert (SITE.parents[0] / source).is_file(), f"{source} does not exist"
             page = read_page(f"docs/{guide['slug']}/index.html")
             assert "<h1" in page
+
+
+def test_the_docs_list_every_connector_preset_with_a_health_endpoint():
+    # The connectors guide is the page a reader lands on when they want a
+    # preset; the catalog is the code that decides which presets exist. The
+    # page must name every preset and the endpoint that checks its health, or
+    # a preset can ship without anyone being able to discover it.
+    presets = extract.read_connectors(CATALOG_PY)
+    html = read_page("docs/connectors/index.html")
+    for preset in presets:
+        assert f'id="preset-{preset["id"]}"' in html, f"{preset['id']} is missing from the docs"
+        assert f"POST /api/connectors/{preset['id']}/health" in html
