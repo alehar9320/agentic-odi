@@ -140,8 +140,7 @@ connected to the MCP server.</p>
 <p>The Studio runs three ways locally, plus a hosted deployment. All of them serve
 the same SPA, which talks only to the sidecar on <code>http://127.0.0.1:8100</code> — the
 SPA never contacts MCP or the LLM directly.</p>
-<h2 id="architecture">Architecture</h2>
-<pre class="highlight"><code class="language-text">┌────────────────────────────┐  /api (JSON)  ┌───────────────────────────────┐
+<h2 id="architecture">Architecture<a class="heading-anchor" href="#architecture" aria-label="Copy link to this section" title="Copy link">#</a></h2><pre class="highlight"><code class="language-text">┌────────────────────────────┐  /api (JSON)  ┌───────────────────────────────┐
 │  Living Studio SPA         │ ────────────▶ │  apps/studio-api (sidecar)    │
 │  React + TS + Vite         │  /api/chat    │  FastAPI on 127.0.0.1:8100    │
 │  (browser or Tauri webview)│ ◀──────────── │  - config / health / canvas   │
@@ -159,8 +158,7 @@ SPA never contacts MCP or the LLM directly.</p>
                                              ┌───────────────┴───────────────┐
                                              │  Your local LLM backend       │
                                              └───────────────────────────────┘
-</code></pre><h2 id="interface">Interface</h2>
-<p>The Studio opens as a conversation, not a dashboard.</p>
+</code></pre><h2 id="interface">Interface<a class="heading-anchor" href="#interface" aria-label="Copy link to this section" title="Copy link">#</a></h2><p>The Studio opens as a conversation, not a dashboard.</p>
 <table>
 <thead>
 <tr>
@@ -205,8 +203,7 @@ SPA never contacts MCP or the LLM directly.</p>
 </table>
 <p>Replies render Markdown (headings, lists, emphasis, inline and fenced code).
 Tool calls appear inline as small trace chips while the agent works.</p>
-<h3 id="slash-commands">Slash commands</h3>
-<p>Type <code>/</code> to open the palette. <code>Up</code>/<code>Down</code> move, <code>Enter</code> or <code>Tab</code> runs the
+<h3 id="slash-commands">Slash commands<a class="heading-anchor" href="#slash-commands" aria-label="Copy link to this section" title="Copy link">#</a></h3><p>Type <code>/</code> to open the palette. <code>Up</code>/<code>Down</code> move, <code>Enter</code> or <code>Tab</code> runs the
 selected command, <code>Esc</code> closes it. Commands are handled in the SPA and never call
 the model, so they work when it is offline.</p>
 <table>
@@ -252,8 +249,7 @@ the model, so they work when it is offline.</p>
 </tbody>
 </table>
 <p>Unknown commands produce a transcript notice pointing at <code>/help</code>.</p>
-<h3 id="the-welcome-tour">The welcome tour</h3>
-<p>The tour is the front door, the context conversation is the first room. It is
+<h3 id="the-welcome-tour">The welcome tour<a class="heading-anchor" href="#the-welcome-tour" aria-label="Copy link to this section" title="Copy link">#</a></h3><p>The tour is the front door, the context conversation is the first room. It is
 skippable at every step (<code>Skip the tour</code> or <code>Escape</code>), resumable (progress is
 stored after every transition in <code>localStorage[&quot;studio.onboarding&quot;]</code>), and
 replayable from Settings.</p>
@@ -294,8 +290,7 @@ replayable from Settings.</p>
 </table>
 <p><code>App.tsx</code> only wires the provider and the wizard around the existing shell;
 the chat, canvas, and sidecar code are untouched.</p>
-<h4 id="toggling-the-tour">Toggling the tour</h4>
-<p><code>firstRunWizard</code> defaults to on. Resolution order, highest first:</p>
+<h4 id="toggling-the-tour">Toggling the tour<a class="heading-anchor" href="#toggling-the-tour" aria-label="Copy link to this section" title="Copy link">#</a></h4><p><code>firstRunWizard</code> defaults to on. Resolution order, highest first:</p>
 <table>
 <thead>
 <tr>
@@ -330,15 +325,13 @@ the chat, canvas, and sidecar code are untouched.</p>
 <p>Accepted values are <code>1</code>/<code>0</code>, <code>true</code>/<code>false</code>, <code>on</code>/<code>off</code>, <code>yes</code>/<code>no</code>, and
 <code>enabled</code>/<code>disabled</code>. With the flag off, no dialog renders, no onboarding state
 is written, and Settings hides the replay action.</p>
-<h3 id="guidance-not-gates">Guidance, not gates</h3>
-<p>The setup conversation is a nudge, never a prerequisite. If you skip it, the
+<h3 id="guidance-not-gates">Guidance, not gates<a class="heading-anchor" href="#guidance-not-gates" aria-label="Copy link to this section" title="Copy link">#</a></h3><p>The setup conversation is a nudge, never a prerequisite. If you skip it, the
 home stage keeps a dashed <strong>Tell me what you're building</strong> pill; it reopens the
 conversation exactly where you left off. <code>/start</code> and Settings do the same. The conversation also understands a
 natural reply: say &quot;skip&quot;, &quot;not now&quot;, or &quot;show me the landscape&quot; and it reacts
 instead of recording it as an answer. When a brief exists, it opens on a review
 and asks what changed rather than asking everything again.</p>
-<h3 id="without-a-model">Without a model</h3>
-<p>When the LLM is unreachable the Studio keeps working:</p>
+<h3 id="without-a-model">Without a model<a class="heading-anchor" href="#without-a-model" aria-label="Copy link to this section" title="Copy link">#</a></h3><p>When the LLM is unreachable the Studio keeps working:</p>
 <ul>
 <li>A <strong>Working by hand</strong> strip explains the state and offers capture, job map,
 and context.</li>
@@ -351,8 +344,7 @@ local repository the model uses.</li>
 </ul>
 <p>The user's context is sent with every chat request, so the assistant starts from
 the product, audience, job, and problem rather than asking for them again.</p>
-<h3 id="the-thread-is-the-room">The thread is the room</h3>
-<p>Capture, scoring, simulation, and decisions are conversations. The storefront
+<h3 id="the-thread-is-the-room">The thread is the room<a class="heading-anchor" href="#the-thread-is-the-room" aria-label="Copy link to this section" title="Copy link">#</a></h3><p>Capture, scoring, simulation, and decisions are conversations. The storefront
 never asks the PM to leave the thread to do work: the agent asks for the
 customer's words or the bet in plain language, then renders the surface that
 carries it. A lens exists for reading and for people who prefer a click, not for
@@ -360,8 +352,7 @@ doing the work.</p>
 <p>That is also enforced in the agent's system prompt: it is told to keep every
 artifact in the conversation, never to send the PM to a panel, and to end each
 reply with the next move as an action on the surface.</p>
-<h3 id="what-it-remembers">What it remembers</h3>
-<p>The studio keeps a small, local, editable model of the person it is helping. It
+<h3 id="what-it-remembers">What it remembers<a class="heading-anchor" href="#what-it-remembers" aria-label="Copy link to this section" title="Copy link">#</a></h3><p>The studio keeps a small, local, editable model of the person it is helping. It
 is not a profile and not a transcript index; it is the handful of things that
 change the next answer.</p>
 <table>
@@ -451,15 +442,13 @@ answer into an error.</p>
 </table>
 <p><strong>Forget everything</strong> is a two-step confirmation and also clears the visible
 thread, because the server deletes the conversations behind it.</p>
-<h3 id="the-thread-comes-back">The thread comes back</h3>
-<p>Conversations are stored beside the memory. On launch the SPA asks
+<h3 id="the-thread-comes-back">The thread comes back<a class="heading-anchor" href="#the-thread-comes-back" aria-label="Copy link to this section" title="Copy link">#</a></h3><p>Conversations are stored beside the memory. On launch the SPA asks
 <code>GET /api/conversations/latest</code>, restores that thread's user and assistant
 turns, and continues with the same <code>conversation_id</code> on the next message. <strong>New
 conversation</strong> starts a fresh one without touching the memory; <strong>Forget
 everything</strong> removes both. The composer stays usable while the restore is in
 flight, and a restore failure simply leaves the room empty.</p>
-<h2 id="rich-responses">Rich responses</h2>
-<p>The copilot does not only talk. When a surface carries the evidence better than a
+<h2 id="rich-responses">Rich responses<a class="heading-anchor" href="#rich-responses" aria-label="Copy link to this section" title="Copy link">#</a></h2><p>The copilot does not only talk. When a surface carries the evidence better than a
 paragraph, the agent renders one <strong>inline in the conversation</strong>: a scored
 outcome, a ranked opportunity board, a before/after simulation of a bet, a
 customer quote with its lineage, the eight-stage job map, an opportunity thesis, or a decision record.
@@ -499,8 +488,7 @@ paragraph after it. The opportunity score is computed from importance and
 satisfaction when the agent omits it, so the ODI formula has exactly one home
 (<code>src/lib/odi.ts</code>). Unknown component types degrade to a quiet fallback; a tree
 that fails validation is dropped whole, and the surrounding prose still reads.</p>
-<h3 id="adding-a-surface">Adding a surface</h3>
-<ol>
+<h3 id="adding-a-surface">Adding a surface<a class="heading-anchor" href="#adding-a-surface" aria-label="Copy link to this section" title="Copy link">#</a></h3><ol>
 <li>Add an entry to <code>CATALOG</code> in <code>apps/studio/src/ui/catalog.ts</code> — props as a
 JSON Schema subset, plus the description the model will read.</li>
 <li>Register the component in <code>apps/studio/src/ui/registry.ts</code>.</li>
@@ -510,14 +498,12 @@ JSON Schema subset, plus the description the model will read.</li>
 catalog and the registry drift apart.</li>
 </ol>
 <p>No server change is needed, and no new dependency.</p>
-<h2 id="hosted-experimental">Hosted (experimental)</h2>
-<p>The built SPA is also served from Cloudflare Workers at
+<h2 id="hosted-experimental">Hosted (experimental)<a class="heading-anchor" href="#hosted-experimental" aria-label="Copy link to this section" title="Copy link">#</a></h2><p>The built SPA is also served from Cloudflare Workers at
 <strong><a href="https://agentic-odi.alehar.workers.dev/">https://agentic-odi.alehar.workers.dev/</a></strong>.
 The UI loads without a backend; canvas data, chat, and mutations need the local
 sidecar and MCP server. Pull requests get preview URLs from Cloudflare Workers
 Builds. See <a href="../deployment/">Deployment</a> for the Worker setup.</p>
-<h2 id="1-web-production-build-recommended-for-a-quick-look">1. Web — production build (recommended for a quick look)</h2>
-<pre class="highlight"><code class="language-bash">npm<span class="w"> </span>--prefix<span class="w"> </span>apps/studio<span class="w"> </span>run<span class="w"> </span>build<span class="w">   </span><span class="c1"># build the SPA into apps/studio/dist</span>
+<h2 id="1-web-production-build-recommended-for-a-quick-look">1. Web — production build (recommended for a quick look)<a class="heading-anchor" href="#1-web-production-build-recommended-for-a-quick-look" aria-label="Copy link to this section" title="Copy link">#</a></h2><pre class="highlight"><code class="language-bash">npm<span class="w"> </span>--prefix<span class="w"> </span>apps/studio<span class="w"> </span>run<span class="w"> </span>build<span class="w">   </span><span class="c1"># build the SPA into apps/studio/dist</span>
 python<span class="w"> </span>scripts/dev.py<span class="w">            </span><span class="c1"># starts MCP :8000 + sidecar :8100</span>
 </code></pre><table>
 <thead>
@@ -539,12 +525,10 @@ python<span class="w"> </span>scripts/dev.py<span class="w">            </span><
 </table>
 <p><code>python scripts/dev.py</code> starts both processes concurrently; press <strong>Ctrl+C</strong> to
 stop both.</p>
-<h2 id="2-web-dev-with-hot-reload">2. Web — dev with hot reload</h2>
-<p>Vite proxies <code>/api</code> to the sidecar:</p>
+<h2 id="2-web-dev-with-hot-reload">2. Web — dev with hot reload<a class="heading-anchor" href="#2-web-dev-with-hot-reload" aria-label="Copy link to this section" title="Copy link">#</a></h2><p>Vite proxies <code>/api</code> to the sidecar:</p>
 <pre class="highlight"><code class="language-bash">npm<span class="w"> </span>--prefix<span class="w"> </span>apps/studio<span class="w"> </span>run<span class="w"> </span>dev:full<span class="w">   </span><span class="c1"># MCP + sidecar + Vite together</span>
 <span class="c1"># open http://localhost:5173</span>
-</code></pre><h2 id="3-desktop-tauri-2">3. Desktop — Tauri 2</h2>
-<p>The app spawns the MCP server and sidecar itself:</p>
+</code></pre><h2 id="3-desktop-tauri-2">3. Desktop — Tauri 2<a class="heading-anchor" href="#3-desktop-tauri-2" aria-label="Copy link to this section" title="Copy link">#</a></h2><p>The app spawns the MCP server and sidecar itself:</p>
 <pre class="highlight"><code class="language-bash">npm<span class="w"> </span>--prefix<span class="w"> </span>apps/studio<span class="w"> </span>run<span class="w"> </span>tauri<span class="w"> </span>dev<span class="w">     </span><span class="c1"># dev window</span>
 npm<span class="w"> </span>--prefix<span class="w"> </span>apps/studio<span class="w"> </span>run<span class="w"> </span>tauri<span class="w"> </span>build<span class="w">   </span><span class="c1"># bundles: .deb / .AppImage (Linux), .app / .dmg (macOS), .msi / .exe (Windows)</span>
 </code></pre><blockquote>
@@ -558,8 +542,7 @@ Rust 1.90+. On Debian/Ubuntu:</p>
 <code>uv run python -m …</code> from the repository root; if the app cannot locate the
 repo root, set <code>AGENTIC_ODI_REPO_ROOT</code>.</p>
 </blockquote>
-<h2 id="desktop-signing-updater-secrets">Desktop signing &amp; updater secrets</h2>
-<p>Self-updating and code signing are <strong>env-driven</strong>: if a secret is absent, an
+<h2 id="desktop-signing-updater-secrets">Desktop signing &amp; updater secrets<a class="heading-anchor" href="#desktop-signing-updater-secrets" aria-label="Copy link to this section" title="Copy link">#</a></h2><p>Self-updating and code signing are <strong>env-driven</strong>: if a secret is absent, an
 unsigned artifact is produced instead of failing. CI reads these from GitHub
 Actions secrets.</p>
 <table>
@@ -599,8 +582,7 @@ Actions secrets.</p>
 <p>Releases are published by <code>.github/workflows/tauri-release.yml</code> when a <code>v*</code> tag
 is pushed. The desktop app checks for updates on startup and via
 <strong>Settings → Check for updates</strong>.</p>
-<h3 id="managing-the-updater-signing-key">Managing the updater signing key</h3>
-<p>The updater key pair authenticates release artifacts so an installed app can
+<h3 id="managing-the-updater-signing-key">Managing the updater signing key<a class="heading-anchor" href="#managing-the-updater-signing-key" aria-label="Copy link to this section" title="Copy link">#</a></h3><p>The updater key pair authenticates release artifacts so an installed app can
 verify that an auto-update genuinely came from you. The <strong>public</strong> key is
 embedded in <code>apps/studio/src-tauri/tauri.conf.json</code> (<code>plugins.updater.pubkey</code>) and is
 safe to commit. The <strong>private</strong> key must never be committed, logged, printed in
@@ -657,12 +639,10 @@ key ahead of the cut-over.</p>
 If the private key leaks, treat auto-updates as compromised: generate a new
 pair, rotate the Actions secret, and publish a freshly signed release.</p>
 </blockquote>
-<h2 id="connecting-an-llm">Connecting an LLM</h2>
-<p>The Studio needs an OpenAI-compatible LLM backend with tool-calling support to
+<h2 id="connecting-an-llm">Connecting an LLM<a class="heading-anchor" href="#connecting-an-llm" aria-label="Copy link to this section" title="Copy link">#</a></h2><p>The Studio needs an OpenAI-compatible LLM backend with tool-calling support to
 drive the agent. For a fully local setup, see
 <a href="../local-llm/">Local LLM Backend</a>.</p>
-<h2 id="agent-driven-testing">Agent-Driven Testing</h2>
-<p>Type <code>/dev</code> in the AI assistant to trigger the full automated workflow: it starts
+<h2 id="agent-driven-testing">Agent-Driven Testing<a class="heading-anchor" href="#agent-driven-testing" aria-label="Copy link to this section" title="Copy link">#</a></h2><p>Type <code>/dev</code> in the AI assistant to trigger the full automated workflow: it starts
 both processes, opens the browser, sends a test message, and reports the results.</p>
 <p>Type <code>/test</code> to have the agent run all tests and report the results
 automatically.</p>

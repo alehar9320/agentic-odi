@@ -137,8 +137,7 @@
 (or a path you pass with <code>--config</code> / <code>AGENTIC_ODI_CONNECTORS_CONFIG</code>). The first kind is
 <code>mcp</code>: Agentic ODI acts as an MCP <strong>client</strong> and pulls catalog, resources, and
 optional tool results from an external MCP <strong>server</strong>.</p>
-<h2 id="presets">Presets</h2>
-<p>The fastest way to connect is a preset. <code>connectors catalog</code> lists every
+<h2 id="presets">Presets<a class="heading-anchor" href="#presets" aria-label="Copy link to this section" title="Copy link">#</a></h2><p>The fastest way to connect is a preset. <code>connectors catalog</code> lists every
 built-in preset, grouped by the capability area it serves:</p>
 <pre class="highlight"><code class="language-bash">python<span class="w"> </span>-m<span class="w"> </span>agentic_odi_cli<span class="w"> </span>connectors<span class="w"> </span>catalog<span class="w">                          </span><span class="c1"># all presets</span>
 python<span class="w"> </span>-m<span class="w"> </span>agentic_odi_cli<span class="w"> </span>connectors<span class="w"> </span>catalog<span class="w"> </span>--area<span class="w"> </span>strategy-alignment
@@ -203,8 +202,7 @@ OAuth tokens are cached in memory for the life of one CLI process, so an OAuth
 preset may ask for consent again on the next <code>connectors health</code> or
 <code>connectors ingest</code>. Prefer a token-based preset where the server offers one.</p>
 </blockquote>
-<h2 id="ingest-behavior">Ingest behavior</h2>
-<p>Ingested records are normalized (<code>catalog</code>, <code>resource</code>, <code>tool_result</code>) and
+<h2 id="ingest-behavior">Ingest behavior<a class="heading-anchor" href="#ingest-behavior" aria-label="Copy link to this section" title="Copy link">#</a></h2><p>Ingested records are normalized (<code>catalog</code>, <code>resource</code>, <code>tool_result</code>) and
 appended to the in-process ingest sink. They are <strong>not</strong> written into the ODI
 jobs/outcomes store — mapping ingested evidence onto ODI artifacts is still on
 the <a href="../roadmap/">roadmap</a>.</p>
