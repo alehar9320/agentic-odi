@@ -56,7 +56,7 @@ def create_app(
     if repo is None:
         repo = SQLiteRepository()
     service = ODIService(repo)
-    app = FastAPI(title="Agentic ODI Studio API")
+    app = FastAPI(title="Agentic ODI Studio API", openapi_url="/api/openapi.json")
     app.state.service = service
     app.state.backend = backend or os.environ.get("AGENTIC_ODI_BACKEND") or DEFAULT_BACKEND
     app.state.connectors = connectors or ConnectorService()
