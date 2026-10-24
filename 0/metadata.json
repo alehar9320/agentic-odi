@@ -1,0 +1,54 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M5P9PP7BNS818HAJDDGG396S",
+  "session_id": "ses_e9718b02effeE6KEcUvihFPYaG",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-24T06:31:52.7347957Z",
+  "branch": "slay/b96f3017-release-version",
+  "checkpoints_count": 1,
+  "files_touched": [
+    ".github/workflows/release.yml",
+    "tests/scripts/test_release_version_gate.py"
+  ],
+  "agent": "OpenCode",
+  "model": "poolside/laguna-s-2.1:free",
+  "turn_id": "b93f076dcb80",
+  "checkpoint_transcript_start": 62,
+  "transcript_lines_at_start": 62,
+  "compact_transcript_start": 62,
+  "token_usage": {
+    "input_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 0,
+    "output_tokens": 0,
+    "api_call_count": 0
+  },
+  "session_metrics": {
+    "turn_count": 1
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-10-24T06:31:52.644941931Z",
+    "agent_lines": 0,
+    "agent_removed": 0,
+    "human_added": 55,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 55,
+    "total_lines_changed": 55,
+    "agent_percentage": 0,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 152,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        "docs/superpowers/plans/2026-10-21-conversational-generative-ui.md": 97,
+        "docs/superpowers/todos.md": 55
+      }
+    }
+  ]
+}
