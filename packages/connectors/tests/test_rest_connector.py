@@ -1,13 +1,23 @@
 from __future__ import annotations
 
 import json
+import time
 from typing import Any
 
 import pytest
 from agentic_odi_connectors.models import RestConnectorSettings
-from agentic_odi_connectors.rest.connector import RestConnector, WebhookConnector
+from agentic_odi_connectors.rest.connector import (
+    RestConnector,
+    WebhookConnector,
+    clear_health_cache,
+)
 
 Calls = list[tuple[str, str, dict[str, str], bytes | None, float]]
+
+
+@pytest.fixture(autouse=True)
+def _isolated_health_cache(monkeypatch, tmp_path):
+    monkeypatch.setenv("AGENTIC_ODI_CONNECTORS_CACHE", str(tmp_path / "connector-health.json"))
 
 
 def _fetcher(status: int, payload: Any, calls: Calls | None = None):
@@ -47,6 +57,56 @@ async def test_health_reports_http_failure() -> None:
 
     assert status.ok is False
     assert "503" in status.message
+
+
+@pytest.mark.asyncio
+async def test_health_reuses_a_result_checked_moments_ago() -> None:
+    calls: Calls = []
+    connector = RestConnector(
+        name="jira",
+        settings=RestConnectorSettings(url="https://api.example/records"),
+        fetcher=_fetcher(200, [], calls),
+    )
+
+    first = await connector.health()
+    second = await connector.health()
+
+    assert len(calls) == 1
+    assert "cached" not in first.details
+    assert second.details["cached"] is True
+
+
+@pytest.mark.asyncio
+async def test_health_refetches_once_the_cache_expires(monkeypatch) -> None:
+    calls: Calls = []
+    connector = RestConnector(
+        name="jira",
+        settings=RestConnectorSettings(url="https://api.example/records"),
+        fetcher=_fetcher(200, [], calls),
+    )
+    await connector.health()
+
+    now = time.time()
+    monkeypatch.setattr("agentic_odi_connectors.rest.connector.time.time", lambda: now + 31)
+    await connector.health()
+
+    assert len(calls) == 2
+
+
+@pytest.mark.asyncio
+async def test_clear_health_cache_forces_a_fresh_check() -> None:
+    calls: Calls = []
+    connector = RestConnector(
+        name="jira",
+        settings=RestConnectorSettings(url="https://api.example/records"),
+        fetcher=_fetcher(200, [], calls),
+    )
+    await connector.health()
+
+    clear_health_cache("jira")
+    await connector.health()
+
+    assert len(calls) == 2
 
 
 @pytest.mark.asyncio

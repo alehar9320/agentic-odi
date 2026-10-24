@@ -9,6 +9,7 @@ injectable so tests never touch the network.
 from __future__ import annotations
 
 import json
+import time
 import urllib.request
 from collections.abc import Callable
 from typing import Any
@@ -19,10 +20,65 @@ from agentic_odi_connectors.models import (
     IngestRecord,
     RestConnectorSettings,
 )
+from agentic_odi_connectors.paths import cache_path
 from agentic_odi_connectors.protocol import Connector
 
 FetchResult = tuple[int, bytes]
 Fetcher = Callable[[str, str, dict[str, str], bytes | None, float], FetchResult]
+
+# Health probes are harmless but not free: the studio polls connectors often,
+# and two probes within half a minute would report the same system.
+HEALTH_CACHE_TTL_SECONDS = 30.0
+
+
+def _load_health_cache() -> dict[str, Any]:
+    try:
+        payload = json.loads(cache_path().read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def _save_health_cache(cache: dict[str, Any]) -> None:
+    path = cache_path()
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(cache), encoding="utf-8")
+    except OSError:
+        # A cache that cannot be written is a missed optimization, not a
+        # failed health check.
+        return
+
+
+def clear_health_cache(name: str | None = None) -> None:
+    """Forget cached health results, for one connector or all of them."""
+    cache = _load_health_cache()
+    if name is None:
+        cache.clear()
+    else:
+        cache.pop(name, None)
+    _save_health_cache(cache)
+
+
+def _cached_health(name: str) -> HealthStatus | None:
+    entry = _load_health_cache().get(name)
+    if not isinstance(entry, dict):
+        return None
+    checked_at = entry.get("checked_at")
+    status = entry.get("status")
+    if not isinstance(checked_at, int | float) or not isinstance(status, dict):
+        return None
+    if time.time() - checked_at > HEALTH_CACHE_TTL_SECONDS:
+        return None
+    cached = HealthStatus(**status)
+    cached.details["cached"] = True
+    return cached
+
+
+def _store_health(name: str, status: HealthStatus) -> None:
+    cache = _load_health_cache()
+    cache[name] = {"checked_at": time.time(), "status": status.model_dump()}
+    _save_health_cache(cache)
 
 
 def _default_fetch(
@@ -126,16 +182,22 @@ class RestConnector(Connector):
         )
 
     async def health(self) -> HealthStatus:
+        cached = _cached_health(self.name)
+        if cached is not None:
+            return cached
         try:
             status, _ = self._request()
         except Exception as exc:  # noqa: BLE001
-            return HealthStatus(ok=False, message=str(exc))
-        ok = 200 <= status < 400
-        return HealthStatus(
-            ok=ok,
-            message="reachable" if ok else f"HTTP {status}",
-            details={"status": status, "url": self.settings.url},
-        )
+            result = HealthStatus(ok=False, message=str(exc))
+        else:
+            ok = 200 <= status < 400
+            result = HealthStatus(
+                ok=ok,
+                message="reachable" if ok else f"HTTP {status}",
+                details={"status": status, "url": self.settings.url},
+            )
+        _store_health(self.name, result)
+        return result
 
     async def ingest(self) -> IngestBatch:
         batch = IngestBatch(connector_name=self.name)
