@@ -65,6 +65,7 @@ export function OutcomeCard({ node }: NodeProps) {
   const evidence = str(node.props, "evidence");
   const score = scoreOf(node.props);
   const underserved = isUnderserved(score);
+  const sample = node.props.sample === true;
 
   return (
     <article
@@ -73,6 +74,14 @@ export function OutcomeCard({ node }: NodeProps) {
     >
       <header className="ui-card__head">
         <span className="ui-card__id">{id}</span>
+        {sample ? (
+          <span
+            className="badge badge--amber"
+            title="This is bundled sample data, not yours."
+          >
+            Sample
+          </span>
+        ) : null}
         <ScorePill tone={bandTone(score)}>{bandLabel(score)}</ScorePill>
       </header>
 
