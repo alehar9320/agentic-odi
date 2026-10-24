@@ -1,0 +1,25 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M5P892ADVPZYTEP3N6VDPM6W",
+  "session_id": "ses_e953e98d9ffeJ51GV13VT5K9fL",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-24T06:06:35.134347101Z",
+  "branch": "ci/protect-critical-files",
+  "checkpoints_count": 1,
+  "save_step_count": 1,
+  "files_touched": [],
+  "agent": "OpenCode",
+  "model": "nvidia/nemotron-3.5-super-vl-120b-a12b",
+  "turn_id": "5f18fdeb5b55",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 355295,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 1981552,
+    "output_tokens": 7442,
+    "api_call_count": 41
+  },
+  "session_metrics": {
+    "turn_count": 4
+  }
+}
