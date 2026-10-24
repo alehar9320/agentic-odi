@@ -55,6 +55,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/changelog": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Changelog Route */
+        get: operations["get_changelog_route_api_changelog_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health/mcp": {
         parameters: {
             query?: never;
@@ -300,6 +317,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/evidence": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Post Evidence */
+        post: operations["post_evidence_api_evidence_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/evidence/{evidence_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Evidence */
+        delete: operations["delete_evidence_api_evidence__evidence_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/evidence/{evidence_id}/promote": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Promote Evidence */
+        post: operations["promote_evidence_api_evidence__evidence_id__promote_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -312,6 +380,39 @@ export interface components {
             preset?: string | null;
             /** Url */
             url?: string | null;
+        };
+        /** AddEvidenceRequest */
+        AddEvidenceRequest: {
+            /** Source Name */
+            source_name: string;
+            /**
+             * Source Kind
+             * @default manual
+             */
+            source_kind: string;
+            /** Name */
+            name: string;
+            /** Content */
+            content: string;
+            /** Url */
+            url?: string | null;
+            /**
+             * Item Type
+             * @default manual
+             * @enum {string}
+             */
+            item_type: "catalog" | "resource" | "tool_result" | "manual" | "note";
+            /** Job Id */
+            job_id?: string | null;
+            /** Step Id */
+            step_id?: string | null;
+            /** Outcome Id */
+            outcome_id?: string | null;
+            /**
+             * Mcp Url
+             * @default
+             */
+            mcp_url: string;
         };
         /** AddOutcomeRequest */
         AddOutcomeRequest: {
@@ -436,6 +537,29 @@ export interface components {
         /** McpHealthRequest */
         McpHealthRequest: {
             /** Mcp Url */
+            mcp_url: string;
+        };
+        /** PromoteEvidenceRequest */
+        PromoteEvidenceRequest: {
+            /**
+             * Target
+             * @enum {string}
+             */
+            target: "job" | "outcome";
+            /** Job Id */
+            job_id?: string | null;
+            /** Statement */
+            statement?: string | null;
+            /** Name */
+            name?: string | null;
+            /** Importance */
+            importance?: number | null;
+            /** Satisfaction */
+            satisfaction?: number | null;
+            /**
+             * Mcp Url
+             * @default
+             */
             mcp_url: string;
         };
         /**
@@ -589,6 +713,28 @@ export interface operations {
         };
     };
     get_config_api_config_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    get_changelog_route_api_changelog_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -1191,6 +1337,113 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_evidence_api_evidence_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddEvidenceRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_evidence_api_evidence__evidence_id__delete: {
+        parameters: {
+            query?: {
+                mcp_url?: string | null;
+            };
+            header?: never;
+            path: {
+                evidence_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    promote_evidence_api_evidence__evidence_id__promote_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                evidence_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PromoteEvidenceRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
             /** @description Validation Error */

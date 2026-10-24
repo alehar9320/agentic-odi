@@ -328,6 +328,7 @@ def ingest_connector(
                         "item_type": draft.item_type,
                         "name": draft.name,
                         "content": draft.content,
+                        "url": draft.url,
                         "raw": draft.raw,
                         "job_id": draft.job_id,
                         "step_id": draft.step_id,

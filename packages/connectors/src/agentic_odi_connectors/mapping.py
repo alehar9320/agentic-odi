@@ -22,6 +22,7 @@ class EvidenceDraft(BaseModel):
     item_type: EvidenceItemType
     name: str
     content: str
+    url: str | None = None
     raw: dict[str, Any] = Field(default_factory=dict)
     job_id: str | None = None
     step_id: str | None = None
@@ -55,12 +56,21 @@ def _draft_from_record(
     step_id: str | None,
     outcome_id: str | None,
 ) -> EvidenceDraft:
+    url = None
+    if isinstance(record.raw, dict):
+        url = (
+            record.raw.get("url")
+            or record.raw.get("html_url")
+            or record.raw.get("link")
+            or record.raw.get("uri")
+        )
     return EvidenceDraft(
         source_name=record.source_name,
         source_kind=record.source_kind,
         item_type=record.item_type,
         name=record.name,
         content=record.content,
+        url=url if isinstance(url, str) else None,
         raw=record.raw,
         job_id=job_id,
         step_id=step_id,
