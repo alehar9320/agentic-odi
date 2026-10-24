@@ -10,6 +10,7 @@ import {
   retreatTour,
   selectGoal,
   shouldAutoOpen,
+  skipStepTour,
   skipTour,
   startTour,
   type OnboardingState,
@@ -45,6 +46,10 @@ export function OnboardingProvider({ children, enabled }: OnboardingProviderProp
     setState(advanceTour);
   }, []);
 
+  const skipStep = useCallback(() => {
+    setState(skipStepTour);
+  }, []);
+
   const back = useCallback(() => {
     setState(retreatTour);
   }, []);
@@ -74,12 +79,24 @@ export function OnboardingProvider({ children, enabled }: OnboardingProviderProp
       state,
       chooseGoal,
       advance,
+      skipStep,
       back,
       complete,
       skip,
       restart,
     }),
-    [featureEnabled, open, state, chooseGoal, advance, back, complete, skip, restart],
+    [
+      featureEnabled,
+      open,
+      state,
+      chooseGoal,
+      advance,
+      skipStep,
+      back,
+      complete,
+      skip,
+      restart,
+    ],
   );
 
   return <OnboardingContext.Provider value={value}>{children}</OnboardingContext.Provider>;
