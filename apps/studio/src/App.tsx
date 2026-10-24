@@ -19,7 +19,7 @@ import { StudioProvider, useStudio } from "./state/StudioContext";
  * composer never leaves the screen.
  */
 function StudioShell() {
-  const { closePanel, clearChat, closeSetup } = useStudio();
+  const { closePanel, clearChat, closeSetup, streaming, stopStreaming } = useStudio();
   const [showChangelog, setShowChangelog] = useState(false);
 
   function goHome() {
@@ -36,12 +36,16 @@ function StudioShell() {
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
+        if (streaming) {
+          stopStreaming();
+          return;
+        }
         closePanel();
       }
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [closePanel]);
+  }, [closePanel, streaming, stopStreaming]);
 
   return (
     <div className="studio-app">
