@@ -1,0 +1,40 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M5QQDVM34831FWQE3BV8GK88",
+  "session_id": "ses_e92648f6affebcbsGqV9O24j5c",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-24T19:50:43.534786353Z",
+  "branch": "feat/pr-risk-classification",
+  "checkpoints_count": 4,
+  "files_touched": [
+    ".github/actions/pr-risk/action.yml"
+  ],
+  "agent": "OpenCode",
+  "model": "nvidia/nemotron-3.5-super-vl-120b-a12b",
+  "turn_id": "8d48440b56c2",
+  "checkpoint_transcript_start": 46,
+  "transcript_lines_at_start": 46,
+  "compact_transcript_start": 46,
+  "token_usage": {
+    "input_tokens": 13613,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 303520,
+    "output_tokens": 662,
+    "api_call_count": 5
+  },
+  "session_metrics": {
+    "turn_count": 4
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-10-24T19:50:43.458485206Z",
+    "agent_lines": 1,
+    "agent_removed": 0,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 1,
+    "total_lines_changed": 1,
+    "agent_percentage": 100,
+    "metric_version": 2
+  }
+}
