@@ -1,0 +1,1 @@
+Next up, we will be looking to shift items from backlog lane to todo lane in slayzone. Do that for all but 10 items. Make the todo list be sorted from most important to least important based on positive impact on end-user experience.

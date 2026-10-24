@@ -1,0 +1,40 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M5PBT74Z2HQQQP5VBNB0BXGR",
+  "session_id": "ses_e973e3fd5ffeRN1E3KHHGyG5Kv",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-24T07:09:30.371774712Z",
+  "branch": "slay/4e2d25a5-composer-focus-ring",
+  "checkpoints_count": 2,
+  "files_touched": [],
+  "agent": "OpenCode",
+  "model": "poolside/laguna-s-2.1:free",
+  "turn_id": "413aeb6f2046",
+  "checkpoint_transcript_start": 78,
+  "transcript_lines_at_start": 78,
+  "compact_transcript_start": 78,
+  "token_usage": {
+    "input_tokens": 224101,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 2134304,
+    "output_tokens": 5680,
+    "api_call_count": 11
+  },
+  "session_metrics": {
+    "turn_count": 11
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 213,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        "docs/superpowers/plans/2026-10-21-conversational-generative-ui.md": 97,
+        "docs/superpowers/todos.md": 55,
+        "packages/core/tests/test_evaluation.py": 61
+      }
+    }
+  ]
+}

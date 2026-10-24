@@ -3,7 +3,7 @@
   "checkpoint_id": "01M5PBT74Z2HQQQP5VBNB0BXGR",
   "strategy": "manual-commit",
   "branch": "slay/4e2d25a5-composer-focus-ring",
-  "checkpoints_count": 7,
+  "checkpoints_count": 9,
   "files_touched": [
     "apps/studio/src/components/chat/Composer.test.tsx",
     "apps/studio/src/styles/theme.css"
@@ -43,13 +43,20 @@
       "compact_transcript": "/4/transcript.jsonl",
       "content_hash": "/4/content_hash.txt",
       "prompt": ""
+    },
+    {
+      "metadata": "/5/metadata.json",
+      "transcript": "/5/full.jsonl",
+      "compact_transcript": "/5/transcript.jsonl",
+      "content_hash": "/5/content_hash.txt",
+      "prompt": "/5/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 0,
+    "input_tokens": 224101,
     "cache_creation_tokens": 0,
-    "cache_read_tokens": 0,
-    "output_tokens": 0,
-    "api_call_count": 0
+    "cache_read_tokens": 2134304,
+    "output_tokens": 5680,
+    "api_call_count": 11
   }
 }
