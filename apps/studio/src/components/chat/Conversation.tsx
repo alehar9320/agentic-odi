@@ -98,7 +98,7 @@ function AssistantMessage({
         <SparkIcon size={15} />
       </span>
       <div className="message__body">
-        {offline && content ? <span className="message__tag">Local guidance</span> : null}
+        {offline ? <span className="message__tag">Local guidance</span> : null}
         {parts.length > 0 ? (
           <MessageParts parts={parts} />
         ) : content ? (
