@@ -101,3 +101,31 @@ def test_every_guide_in_the_navigation_exists_on_disk():
                 assert (SITE.parents[0] / source).is_file(), f"{source} does not exist"
             page = read_page(f"docs/{guide['slug']}/index.html")
             assert "<h1" in page
+
+
+def test_every_tool_signature_has_a_copy_control():
+    # The MCP reference is the page readers copy signatures from. Each tool's
+    # code block must carry its own control, not one shared button that copies
+    # whichever block happens to be first.
+    tools = extract.read_tools(MCP_SERVER_PY, CONTRACT_PY)
+    html = read_page("docs/mcp/index.html")
+    for tool in tools:
+        section = html.split(f'id="tool-{tool["name"]}"', 1)[1].split("</section>", 1)[0]
+        assert 'class="copy-btn"' in section, f"{tool['name']} has no copy control"
+        assert "data-copy" in section, f"{tool['name']} copy control is not wired"
+
+
+def test_the_schema_block_has_a_copy_control():
+    html = read_page("docs/mcp/index.html")
+    section = html.split('id="odi-schema"', 1)[1].split("</section>", 1)[0]
+    assert 'class="copy-btn"' in section
+    assert "data-copy" in section
+
+
+def test_the_copy_control_reports_that_it_copied():
+    # The acceptance is a visible Copied state, not just a button. The script
+    # is static, so this is the closest the site's test suite can get to the
+    # click without a browser.
+    script = (SITE / "assets" / "main.js").read_text(encoding="utf-8")
+    assert 'document.querySelectorAll("[data-copy]")' in script
+    assert 'button.textContent = "Copied"' in script
