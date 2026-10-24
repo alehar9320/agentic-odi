@@ -25,7 +25,7 @@ from agentic_odi_core import (
 from agentic_odi_core import (
     customer_outcome_not_found as _cust_not_found,
 )
-from fastmcp import FastMCP
+from fastmcp import Context, FastMCP
 from pydantic import ValidationError
 
 mcp = FastMCP("Agentic ODI")
@@ -369,7 +369,8 @@ def delete_outcome(outcome_id: str) -> str:
 
 
 @mcp.tool
-def add_evidence(
+async def add_evidence(
+    ctx: Context,
     source_name: str,
     source_kind: str,
     name: str,
@@ -380,6 +381,7 @@ def add_evidence(
     step_id: str | None = None,
     outcome_id: str | None = None,
 ) -> str:
+    await ctx.report_progress(0, 2, "Validating the evidence links")
     try:
         evidence = service.add_evidence(
             source_name=source_name,
@@ -400,6 +402,7 @@ def add_evidence(
         return _outcome_not_found(outcome_id)
     except (OdiError, ValueError) as exc:
         return f"Error: {exc}"
+    await ctx.report_progress(2, 2, "Evidence stored")
     return f"Evidence created successfully: {evidence.model_dump_json()}"
 
 
@@ -475,7 +478,8 @@ def promote_evidence(
 
 
 @mcp.tool
-def evaluate_outcome(statement: str, job_id: str | None = None) -> str:
+async def evaluate_outcome(ctx: Context, statement: str, job_id: str | None = None) -> str:
+    await ctx.report_progress(0, 2, "Evaluating the statement")
     result = evaluate_outcome_statement(statement)
     if job_id is not None:
         if service.get_job(job_id) is None:
@@ -489,6 +493,7 @@ def evaluate_outcome(statement: str, job_id: str | None = None) -> str:
             }
             for outcome in service.get_outcomes(job_id)
         ]
+    await ctx.report_progress(2, 2, "Evaluation complete")
     return json.dumps(result)
 
 

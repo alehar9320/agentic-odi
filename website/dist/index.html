@@ -918,12 +918,12 @@ agentic-odi --version</code>
       <article class="tool" data-reveal>
         <span class="tool__name">evaluate_outcome</span>
         <p class="tool__purpose">Check a statement against the ODI format before saving it.</p>
-        <code class="tool__sig">evaluate_outcome(statement: str, job_id: str | None = None)</code>
+        <code class="tool__sig">evaluate_outcome(ctx: Context, statement: str, job_id: str | None = None)</code>
       </article>
       <article class="tool" data-reveal>
         <span class="tool__name">add_evidence</span>
         <p class="tool__purpose">Attach a research record as evidence.</p>
-        <code class="tool__sig">add_evidence(source_name: str, source_kind: str, name: str, content: str, item_type: EvidenceItemType = &#39;manual&#39;, raw: dict[str, Any] | None = None, job_id: str | None = None, step_id: str | None = None, outcome_id: str | None = None)</code>
+        <code class="tool__sig">add_evidence(ctx: Context, source_name: str, source_kind: str, name: str, content: str, item_type: EvidenceItemType = &#39;manual&#39;, raw: dict[str, Any] | None = None, job_id: str | None = None, step_id: str | None = None, outcome_id: str | None = None)</code>
       </article>
       <article class="tool" data-reveal>
         <span class="tool__name">promote_evidence</span>
