@@ -3,7 +3,7 @@
   "checkpoint_id": "01M5PR8FRQCB8RRTABHDZWT3C0",
   "strategy": "manual-commit",
   "branch": "slay/db270c1f-sample-chip",
-  "checkpoints_count": 2,
+  "checkpoints_count": 3,
   "files_touched": [
     "apps/studio/src/components/canvas/OpportunityLandscape.tsx",
     "apps/studio/src/components/canvas/OutcomeCard.tsx",
@@ -25,6 +25,13 @@
       "transcript": "/1/full.jsonl",
       "compact_transcript": "/1/transcript.jsonl",
       "content_hash": "/1/content_hash.txt",
+      "prompt": ""
+    },
+    {
+      "metadata": "/2/metadata.json",
+      "transcript": "/2/full.jsonl",
+      "compact_transcript": "/2/transcript.jsonl",
+      "content_hash": "/2/content_hash.txt",
       "prompt": ""
     }
   ],
