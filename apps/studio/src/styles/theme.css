@@ -17,6 +17,28 @@
   --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
 }
 
+html.theme-dark {
+  color-scheme: dark;
+}
+
+/* Light keeps the same token names, so every surface follows the choice. */
+html.theme-light {
+  color-scheme: light;
+  --bg: #f5f6f8;
+  --bg-raised: #ffffff;
+  --text: #15171c;
+  --muted: #565d6b;
+  --faint: #7c838f;
+  --accent: #5b5bd6;
+  --accent-strong: #4f46e5;
+  --green: #15803d;
+  --amber: #b45309;
+  --line: rgba(15, 23, 42, 0.09);
+  --line-strong: rgba(15, 23, 42, 0.18);
+  --surface: rgba(15, 23, 42, 0.035);
+  --surface-hover: rgba(15, 23, 42, 0.07);
+}
+
 * {
   box-sizing: border-box;
 }
@@ -48,7 +70,7 @@ button {
 }
 
 a {
-  color: #a5b4fc;
+  color: var(--accent);
   text-decoration: underline;
   text-underline-offset: 2px;
 }
