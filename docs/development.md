@@ -14,7 +14,7 @@ Python project:
 ```bash
 uv run ruff check .
 uv run ruff format --check .
-uv run mypy apps brand packages
+uv run mypy apps packages
 uv run --directory website mypy .
 
 # Security scanning
@@ -52,18 +52,21 @@ The agent-composed surfaces and the first-run tour are covered at these levels:
 ## Website Checks (GitHub Pages)
 
 The `website/` static site is part of the main CI workflow. Its tests assert the
-committed OG art is reproducible, that `index.html` stays in sync with the
-README, and that the publish pipeline (`website/tests/test_pages_deploy.py`)
-still exists:
+committed OG art is reproducible and that the publish pipeline
+(`website/tests/test_pages_deploy.py`) still exists:
 
 ```bash
 uv run --directory website pytest tests/
 ```
 
-Publishing happens in `.github/workflows/pages.yml`: it runs those tests, builds
-`_site` from `website/`, and deploys the artifact with `actions/deploy-pages` on
-every push to `main`. There is no `gh-pages` branch, so that workflow is the only
-thing that keeps <https://alehar9320.github.io/agentic-odi/> online.
+The site is generated at CI time and never committed. CI runs `build_site.py` to
+produce `_site` and uploads it as the `website-site` artifact for review.
+
+Publishing happens in `.github/workflows/pages.yml`: it runs those tests,
+builds `_site` from `website/`, and deploys the artifact with
+`actions/deploy-pages` on every push to `main`. There is no `gh-pages` branch,
+so that workflow is the only thing that keeps
+<https://alehar9320.github.io/agentic-odi/> online.
 
 ## Formatting workflow
 

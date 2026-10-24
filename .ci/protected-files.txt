@@ -6,7 +6,6 @@
 .github/workflows/pages.yml
 .github/workflows/ci.yml
 .github/actions/setup/action.yml
-website/index.html
 website/tools/build_site.py
 website/tests/test_pages_deploy.py
 tests/contract/test_protected_files.py
