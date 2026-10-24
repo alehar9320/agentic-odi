@@ -3,7 +3,7 @@
   "checkpoint_id": "01M5PCVK00X2ZHQJV1ED67WJNX",
   "strategy": "manual-commit",
   "branch": "slay/da3ff8e5-sqlite-concurrency",
-  "checkpoints_count": 3,
+  "checkpoints_count": 4,
   "files_touched": [
     "apps/studio-api/src/agentic_odi_studio_api/studio/memory.py",
     "apps/studio-api/tests/test_studio_memory.py",
@@ -30,6 +30,13 @@
       "transcript": "/2/full.jsonl",
       "compact_transcript": "/2/transcript.jsonl",
       "content_hash": "/2/content_hash.txt",
+      "prompt": ""
+    },
+    {
+      "metadata": "/3/metadata.json",
+      "transcript": "/3/full.jsonl",
+      "compact_transcript": "/3/transcript.jsonl",
+      "content_hash": "/3/content_hash.txt",
       "prompt": ""
     }
   ],
