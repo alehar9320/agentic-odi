@@ -230,6 +230,7 @@ python -m agentic_odi_cli connectors add mcp --preset github
 python -m agentic_odi_cli connectors list
 python -m agentic_odi_cli connectors health --name github
 python -m agentic_odi_cli connectors ingest --name github
+python -m agentic_odi_cli connectors ingest --name github --dry-run   # preview only
 ```
 
 ## Updates
