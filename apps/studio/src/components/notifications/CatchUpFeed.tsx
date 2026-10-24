@@ -109,7 +109,7 @@ export function CatchUpFeed() {
         <div className="card__head">
           <div>
             <span className="hero__eyebrow">Intent & Outcome Feed</span>
-            <h2 className="catchup-title" style={{ marginTop: "2px", fontSize: "1.1rem" }}>
+            <h2 className="catchup-title">
               While you were away
             </h2>
           </div>
@@ -135,10 +135,10 @@ export function CatchUpFeed() {
           </div>
         </div>
 
-        <div className="metrics" style={{ marginTop: "14px" }}>
+        <div className="metrics catchup-metrics">
           <div className="metric">
             <span className="metric__label">Unread Signals</span>
-            <span className="metric__value" style={{ color: "var(--accent)" }}>
+            <span className="metric__value metric__value--accent">
               {unreadNotificationCount}
             </span>
           </div>
@@ -195,10 +195,10 @@ export function CatchUpFeed() {
 
       {/* Notifications List */}
       {filteredNotifications.length === 0 ? (
-        <div className="card empty-note" style={{ textAlign: "center", padding: "32px 16px" }}>
-          <span style={{ fontSize: "1.8rem", display: "block", marginBottom: "8px" }}>✨</span>
-          <p style={{ margin: 0, fontWeight: 500, color: "var(--text)" }}>You're all caught up!</p>
-          <p style={{ margin: "4px 0 0", color: "var(--faint)", fontSize: "0.78rem" }}>
+        <div className="card empty-note catchup-empty">
+          <span className="catchup-empty__icon">✨</span>
+          <p className="catchup-empty__title">You're all caught up!</p>
+          <p className="catchup-empty__hint">
             No updates found for this filter.
           </p>
         </div>
@@ -209,19 +209,12 @@ export function CatchUpFeed() {
               key={item.id}
               className={`card catchup-card${!item.read ? " is-unread" : ""}`}
               onClick={() => handleAction(item)}
-              style={{ cursor: "pointer" }}
             >
               <div className="card__head">
-                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <div className="catchup-card__meta">
                   {!item.read && <span className="status-dot" title="Unread signal" />}
                   <span className={`badge ${getCategoryBadgeClass(item.category)}`}>
-                    <span
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: "4px",
-                      }}
-                    >
+                    <span className="catchup-card__badge">
                       {getCategoryIcon(item.category)}
                       {item.category.toUpperCase()}
                     </span>
@@ -229,7 +222,7 @@ export function CatchUpFeed() {
                   <span className="card__id">{formatRelativeTime(item.timestamp)}</span>
                 </div>
 
-                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                <div className="catchup-card__controls">
                   {!item.read && (
                     <button
                       type="button"
@@ -258,17 +251,8 @@ export function CatchUpFeed() {
                 </div>
               </div>
 
-              <h3
-                style={{
-                  margin: "8px 0 4px",
-                  fontSize: "0.95rem",
-                  fontWeight: 600,
-                  color: "var(--text)",
-                }}
-              >
-                {item.title}
-              </h3>
-              <p className="card__statement" style={{ margin: "0 0 12px", color: "var(--muted)" }}>
+              <h3 className="catchup-card__title">{item.title}</h3>
+              <p className="card__statement catchup-card__body">
                 {item.message}
               </p>
 
@@ -276,8 +260,7 @@ export function CatchUpFeed() {
                 {item.actionText && (
                   <button
                     type="button"
-                    className="button button--ghost"
-                    style={{ fontSize: "0.76rem", padding: "4px 10px" }}
+                    className="button button--ghost catchup-card__action"
                     onClick={(e) => {
                       e.stopPropagation();
                       handleAction(item);
@@ -289,11 +272,10 @@ export function CatchUpFeed() {
                 {item.chatPrompt && (
                   <button
                     type="button"
-                    className="button"
-                    style={{ fontSize: "0.76rem", padding: "4px 10px" }}
+                    className="button catchup-card__action"
                     onClick={(e) => handleAskAssistant(item, e)}
                   >
-                    <SparkIcon size={14} style={{ marginRight: "4px" }} />
+                    <SparkIcon size={14} className="catchup-card__action-icon" />
                     Ask Assistant
                   </button>
                 )}

@@ -1633,9 +1633,80 @@ input[type="range"] {
   gap: 8px;
 }
 
+.catchup-metrics {
+  margin-top: 14px;
+}
+
+.metric__value--accent {
+  color: var(--accent);
+}
+
+.catchup-empty {
+  text-align: center;
+  padding: 32px 16px;
+}
+
+.catchup-empty__icon {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 1.8rem;
+}
+
+.catchup-empty__title {
+  margin: 0;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.catchup-empty__hint {
+  margin: 4px 0 0;
+  font-size: 0.78rem;
+  color: var(--faint);
+}
+
 .catchup-card {
   position: relative;
+  cursor: pointer;
   transition: all 0.2s ease-in-out;
+}
+
+.catchup-card__meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.catchup-card__controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.catchup-card__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.catchup-card__title {
+  margin: 8px 0 4px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.catchup-card__body {
+  margin: 0 0 12px;
+  color: var(--muted);
+}
+
+.catchup-card__action {
+  font-size: 0.76rem;
+  padding: 4px 10px;
+}
+
+.catchup-card__action-icon {
+  margin-right: 4px;
 }
 
 .catchup-card:hover {
@@ -3181,7 +3252,8 @@ details[open] summary {
 }
 
 .catchup-title {
-  margin: 0;
+  margin: 2px 0 0;
+  font-size: 1.1rem;
   font-weight: 600;
   letter-spacing: -0.01em;
 }
