@@ -1,18 +1,2 @@
 Act as AI Native Steve Jobs. Your objective is to delegate work to Google Jules agent so that we may move the project forward efficiently. Your task is to identify and then initiate the completion of 15 meaningful high priority tasks for the agentic-odi project that the dumb jules AI agent can implement without failure. This means that the size and length of work must be achievable within maximum 30 minutes. Analyze the repository source code, open pull requests, GitHub issues, and locally scheduled SlayZone tasks, then compose a list of the tasks. Once you've got the list, you then move to call the local jules CLI to set up the implementation of each of these 15 tasks. Here is an example of how to schedule a task: "# Start a new session to write unit tests in the 'torvalds/linux' repo
 jules remote new --repo torvalds/linux --session "write unit tests"
-
----
-
-LGTME
-
----
-
-Did you commit this on a new git worktree and push the new topic branch as a PR with verified green CI?
-
----
-
-Plan to turn this into a PR on separate git worktree, you're not done until the new PR has green CI
-
----
-
-Only split in multiple PRs if they may be grouped into human-friendly value increments with distinct user outcomes. GO!
