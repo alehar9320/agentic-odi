@@ -508,12 +508,12 @@
 <section class="tool-doc" id="tool-get_outcomes">
   <h2 class="tool-doc__name">
     <code>get_outcomes</code>
-    <span class="pill">4 arguments</span>
+    <span class="pill">5 arguments</span>
   </h2>
   <p class="tool-doc__purpose">List the desired outcomes of a Job or step, one page at a time.</p>
   <div class="codeblock">
     <button class="copy-btn" type="button" data-copy>Copy</button>
-    <code>get_outcomes(job_id: str, step_id: str | None = None, limit: int | None = None, offset: int = 0)</code>
+    <code>get_outcomes(job_id: str, step_id: str | None = None, limit: int | None = None, offset: int = 0, sort: str = &#39;opportunity_score&#39;)</code>
   </div>
   <table class="tool-doc__args">
     <thead>
@@ -543,6 +543,12 @@
         <td><code>int</code></td>
         <td>no</td>
         <td><code>0</code></td>
+      </tr>
+      <tr>
+        <td><code>sort</code></td>
+        <td><code>str</code></td>
+        <td>no</td>
+        <td><code>&#39;opportunity_score&#39;</code></td>
       </tr>
     </tbody>
   </table>

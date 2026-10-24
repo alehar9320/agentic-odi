@@ -89,6 +89,39 @@ def test_add_outcome_rejects_out_of_range_scores(
         )
 
 
+def test_get_outcomes_defaults_to_the_biggest_opportunities_first(service: ODIService) -> None:
+    job = service.add_job("Onboard customers")
+    service.add_outcome(job.id, "low", importance=4.0, satisfaction=4.0)  # 4
+    service.add_outcome(job.id, "high", importance=9.0, satisfaction=3.0)  # 15
+    service.add_outcome(job.id, "exactly served", importance=6.0, satisfaction=2.0)  # 10
+    service.add_outcome(job.id, "unscored")
+
+    assert [o.statement for o in service.get_outcomes(job.id)] == [
+        "high",
+        "exactly served",
+        "low",
+        "unscored",
+    ]
+
+
+def test_get_outcomes_can_keep_insertion_order(service: ODIService) -> None:
+    job = service.add_job("Onboard customers")
+    service.add_outcome(job.id, "low", importance=4.0, satisfaction=4.0)
+    service.add_outcome(job.id, "high", importance=9.0, satisfaction=3.0)
+
+    assert [o.statement for o in service.get_outcomes(job.id, sort="insertion")] == [
+        "low",
+        "high",
+    ]
+
+
+def test_get_outcomes_rejects_an_unknown_sort(service: ODIService) -> None:
+    job = service.add_job("Onboard customers")
+
+    with pytest.raises(ValueError, match="Unknown outcome sort"):
+        service.get_outcomes(job.id, sort="statement")
+
+
 def test_customer_outcome_crud(service: ODIService) -> None:
     job = service.add_job("Onboard customers")
     created = service.add_customer_outcome(job.id, _customer_value(), _business_value())

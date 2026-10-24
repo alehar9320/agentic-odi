@@ -184,8 +184,9 @@ class ODIService:
         step_id: str | None = None,
         limit: int | None = None,
         offset: int = 0,
+        sort: str = "opportunity_score",
     ) -> list[Outcome]:
-        return self.repo.get_outcomes(job_id, step_id, limit=limit, offset=offset)
+        return self.repo.get_outcomes(job_id, step_id, limit=limit, offset=offset, sort=sort)
 
     def add_customer_outcome(
         self,
