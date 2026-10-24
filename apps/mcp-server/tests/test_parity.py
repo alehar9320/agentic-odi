@@ -126,3 +126,57 @@ async def test_evaluate_outcome_reports_a_missing_job_as_an_error_string():
     text = res.content[0].text  # type: ignore[index]
     assert text == "Job not found: missing"
     assert "{" not in text
+
+
+@pytest.mark.asyncio
+async def test_evaluate_outcome_reports_a_well_formed_statement_as_valid():
+    async with Client(mcp) as client:
+        res = await client.call_tool(
+            "evaluate_outcome",
+            {
+                "statement": (
+                    "Minimize the time it takes to restore a failing deployment"
+                    " when an on-call engineer is paged"
+                )
+            },
+        )
+
+    payload = json.loads(res.content[0].text)  # type: ignore[index]
+    assert payload["valid"] is True
+    assert payload["issues"] == []
+    assert payload["statement"].startswith("Minimize")
+
+
+@pytest.mark.asyncio
+async def test_promote_evidence_reports_a_missing_evidence_id():
+    async with Client(mcp) as client:
+        res = await client.call_tool(
+            "promote_evidence", {"evidence_id": "EV-MISSING", "target": "job"}
+        )
+
+    text = res.content[0].text  # type: ignore[index]
+    assert text.startswith("Error:")
+    assert "EV-MISSING" in text
+    assert "list_evidence" in text
+
+
+@pytest.mark.asyncio
+async def test_promote_evidence_rejects_an_unknown_target():
+    async with Client(mcp) as client:
+        added = await client.call_tool(
+            "add_evidence",
+            {
+                "source_name": "Gong",
+                "source_kind": "manual",
+                "name": "Onboarding call",
+                "content": "Customers wait three days for a staging environment.",
+            },
+        )
+        evidence_id = json.loads(added.content[0].text.split(": ", 1)[1])["id"]  # type: ignore[index]
+
+        res = await client.call_tool(
+            "promote_evidence", {"evidence_id": evidence_id, "target": "slide"}
+        )
+
+    text = res.content[0].text  # type: ignore[index]
+    assert text == "Error: Unknown promotion target: slide"
