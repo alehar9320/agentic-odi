@@ -69,7 +69,7 @@ shared tooling at the root. Packages live in `packages/`, runnable services in
 | **`apps/mcp-server/`** | `agentic-odi-mcp-server` | FastMCP server exposing Jobs, Steps, Desired Outcomes, Customer Outcomes, Evidence, and context tools over HTTP. Persists to SQLite by default. |
 | **`apps/studio-api/`** | `agentic-odi-studio-api` | FastAPI **Living Studio sidecar**. Serves config, health, canvas data, local mutations, MCP passthrough, SSE chat, conversation history, and the PM memory store, plus the built SPA. |
 | **`apps/cli/`** | `agentic-odi-cli` | Typer CLI with interactive chat plus full entity CRUD, `schema`, `connectors`, and local-first (`--backend local`) or remote (`--backend mcp`) data access. |
-| **`apps/studio/`** | React + TypeScript + Vite | **The Living Studio** SPA and Tauri 2 desktop shell. The copilot renders **agent-composed surfaces inline** — scored outcomes, opportunity theses, bet simulations — from a closed catalog the SPA owns. A feature-flagged **four-step first-run tour** starts from the PM's ambition, and a local memory records what matters across sessions. |
+| **`apps/studio/`** | React + TypeScript + Vite | **The Living Studio** SPA and Tauri 2 desktop shell. The conversation runs on **assistant-ui** — streaming, reasoning, tool calls, approvals, sources, attachments, branches, and suggestions are the library's runtime; the ODI intelligence and the **agent-composed surfaces** (scored outcomes, opportunity theses, bet simulations) are ours, from a closed catalog the SPA owns. A feature-flagged **four-step first-run tour** starts from the PM's ambition, and a local memory records what matters across sessions. |
 | **`infra/cloudflare/`** | Worker | Worker script for the free-plan Workers Static Assets deployment and sidecar tunnel; its `wrangler.jsonc` lives at the repository root. |
 | **`scripts/`** | — | Dev launcher, binary build, installer tests. |
 | **`tests/contract/`** | — | Cross-package MCP contract tests. |
@@ -116,6 +116,15 @@ instead of replacing it. Capture and simulation are conversations too: tell the
 studio what a customer said, or what bet you are weighing, and it renders the
 card. Use the bell to **catch up on outcome shifts, simulations, and telemetry
 signals while you were away**.
+
+The thread behaves like a real assistant surface, not a chat box. Replies stream;
+reasoning arrives as a collapsed disclosure rather than prose; each tool call is a
+trace chip with the source the turn actually read; a write to your data pauses for
+a **Yes/No** before it runs; text and image attachments ride along with the turn;
+and any reply can be edited or regenerated as a **branch** you step through with
+`‹ 2 of 3 ›`. Starter suggestions change with the canvas. The runtime underneath
+is [assistant-ui](https://www.assistant-ui.com); the ODI surfaces, the catalog,
+and the sidecar contract stay ours.
 
 The studio also remembers the person, not just the canvas. As you talk it notes
 what matters — your role, the opportunity, business constraints, stakeholders,
@@ -203,7 +212,7 @@ layout, updates, and release automation.
 |---|---|
 | [CLI Reference](docs/cli.md) | Backends, interactive chat, Jobs/Steps/desired Outcomes/Customer Outcomes/evidence, `connectors`, scoring, environment variables |
 | [External Connectors](docs/connectors.md) | The MCP ingest connector, presets, and the `Connector` protocol |
-| [Running The Living Studio](docs/living-studio.md) | First-run tour and its flag, local memory and conversation resume, interface, rich inline responses and the UI catalog, run modes, desktop signing and updates, agent-driven testing (`/dev`, `/test`) |
+| [Running The Living Studio](docs/living-studio.md) | First-run tour and its flag, the assistant-ui conversation runtime, approvals, branches, attachments, local memory and conversation resume, interface, rich inline responses and the UI catalog, run modes, desktop signing and updates, agent-driven testing (`/dev`, `/test`) |
 | [Local LLM Backend](docs/local-llm.md) | Running a local OpenAI-compatible model with tool calling |
 | [Development](docs/development.md) | Lint, format, type checks, frontend checks, tests and the coverage map |
 | [Architecture](docs/architecture/README.md) | Workspace layout, dependency direction, data flow, and testing |

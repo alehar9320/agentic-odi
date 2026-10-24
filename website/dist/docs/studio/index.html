@@ -185,7 +185,7 @@ SPA never contacts MCP or the LLM directly.</p>
 </tr>
 <tr>
 <td><strong>Composer</strong></td>
-<td>Docked at the bottom of the transcript. <code>Enter</code> sends, <code>Shift</code>+<code>Enter</code> adds a line, <code>Cmd/Ctrl</code>+<code>K</code> focuses it, and <code>/</code> opens the command palette. The send button becomes a stop button while a reply streams.</td>
+<td>Docked at the bottom of the transcript. <code>Enter</code> sends, <code>Shift</code>+<code>Enter</code> adds a line, <code>Cmd/Ctrl</code>+<code>K</code> focuses it, <code>/</code> opens the command palette, and the paperclip attaches a text file or an image. The send button becomes a stop button while a reply streams.</td>
 </tr>
 <tr>
 <td><strong>Bar</strong></td>
@@ -202,7 +202,8 @@ SPA never contacts MCP or the LLM directly.</p>
 </tbody>
 </table>
 <p>Replies render Markdown (headings, lists, emphasis, inline and fenced code).
-Tool calls appear inline as small trace chips while the agent works.</p>
+Reasoning sits in a collapsed disclosure above the answer, and every tool call is
+a trace chip with the source the turn actually read.</p>
 <h3 id="slash-commands">Slash commands<a class="heading-anchor" href="#slash-commands" aria-label="Copy link to this section" title="Copy link">#</a></h3><p>Type <code>/</code> to open the palette. <code>Up</code>/<code>Down</code> move, <code>Enter</code> or <code>Tab</code> runs the
 selected command, <code>Esc</code> closes it. Commands are handled in the SPA and never call
 the model, so they work when it is offline.</p>
@@ -352,6 +353,110 @@ doing the work.</p>
 <p>That is also enforced in the agent's system prompt: it is told to keep every
 artifact in the conversation, never to send the PM to a panel, and to end each
 reply with the next move as an action on the surface.</p>
+<h3 id="the-conversation-runtime">The conversation runtime<a class="heading-anchor" href="#the-conversation-runtime" aria-label="Copy link to this section" title="Copy link">#</a></h3><p>The transcript is not a hand-rolled message list. It runs on <strong>assistant-ui</strong>,
+a React runtime for streaming assistants, bound to the Studio's own store with
+<code>useExternalStoreRuntime</code>, so the thread gains real conversation capabilities
+without giving up the message model the sidecar already understands.</p>
+<table>
+<thead>
+<tr>
+<th>Capability</th>
+<th>What it means here</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Streaming</strong></td>
+<td><code>delta</code> frames append to the open prose part; the send button becomes stop.</td>
+</tr>
+<tr>
+<td><strong>Reasoning</strong></td>
+<td><code>reasoning</code> frames render in a collapsed <em>Thought for a moment</em> disclosure. Never persisted, never counted as the answer.</td>
+</tr>
+<tr>
+<td><strong>Tools</strong></td>
+<td>Each MCP call is a trace chip with its status and a short preview of what came back.</td>
+</tr>
+<tr>
+<td><strong>Approval</strong></td>
+<td>A writing tool (<code>add_</code>, <code>create_</code>, <code>update_</code>, <code>delete_</code>, <code>ingest_</code>, <code>remove_</code>) pauses the turn until you answer <strong>Allow</strong> or <strong>Decline</strong>. A decline is a tool result, not an error: the model is told no and may propose something else.</td>
+</tr>
+<tr>
+<td><strong>Sources</strong></td>
+<td>Every tool call that returned data emits a <code>source</code>, titled with the tool and a preview. Provenance is what the turn actually read; a citation is never invented.</td>
+</tr>
+<tr>
+<td><strong>Attachments</strong></td>
+<td>Text-like files (<code>.md</code>, <code>.mdx</code>, <code>.json</code>, <code>.csv</code>, <code>.yaml</code>, <code>.log</code>, <code>text/*</code>) and images (PNG/JPEG/WebP/GIF, at most 5 MB). Text is extracted in the browser, capped at 20k characters, and sent with the turn. Nothing is stored server-side.</td>
+</tr>
+<tr>
+<td><strong>Branching</strong></td>
+<td><strong>Edit</strong> a user turn or <strong>Regenerate</strong> a reply and both versions are kept as siblings. <code>‹ 2 of 3 ›</code> steps between them, and the visible branch is saved as the conversation's <code>head_id</code>, so a reload reopens the branch you were reading.</td>
+</tr>
+<tr>
+<td><strong>Suggestions</strong></td>
+<td>The empty-stage pills are chosen from the canvas and handed to the runtime as suggestion prompts.</td>
+</tr>
+<tr>
+<td><strong>Generative UI</strong></td>
+<td>A validated <code>UiNode</code> travels as an assistant-ui <strong>data part</strong> (<code>data-odi-surface</code>) and renders through the same <code>UiRenderer</code>. The catalog stays ours and server-validated.</td>
+</tr>
+<tr>
+<td><strong>Voice</strong></td>
+<td>Deliberately not wired yet. The seam is <code>adapters.dictation</code> plus <code>ComposerPrimitive.Dictate</code>: no backend change and no message-model change. It waits because Tauri's WebKit webview support for the Web Speech API is uneven, and a microphone button that works in only one shell is worse than none.</td>
+</tr>
+</tbody>
+</table>
+<h4 id="where-the-bridge-lives">Where the bridge lives<a class="heading-anchor" href="#where-the-bridge-lives" aria-label="Copy link to this section" title="Copy link">#</a></h4><table>
+<thead>
+<tr>
+<th>File</th>
+<th>Role</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>apps/studio/src/assistant/convert.ts</code></td>
+<td>The only mapping between <code>ChatMessage</code>/<code>ChatPart</code> and assistant-ui parts, in both directions. Pure, and tested without a runtime.</td>
+</tr>
+<tr>
+<td><code>apps/studio/src/assistant/StudioRuntime.tsx</code></td>
+<td><code>useExternalStoreRuntime</code>: <code>onNew</code>, <code>onEdit</code>, <code>onReload</code>, <code>onCancel</code>, <code>setMessages</code>, <code>onRespondToToolApproval</code>, suggestions, attachments.</td>
+</tr>
+<tr>
+<td><code>apps/studio/src/assistant/attachments.ts</code></td>
+<td>The attachment adapter and the browser-side text/image extraction.</td>
+</tr>
+<tr>
+<td><code>apps/studio/src/assistant/parts.tsx</code></td>
+<td>One renderer per part: text, reasoning, tool (with its approval), source, file, generated surface.</td>
+</tr>
+<tr>
+<td><code>apps/studio/src/components/chat/Conversation.tsx</code></td>
+<td><code>MessagePrimitive.Parts</code>, the branch picker, the action bar, and the in-place edit composer.</td>
+</tr>
+<tr>
+<td><code>apps/studio/src/components/chat/ThreadComposer.tsx</code></td>
+<td><code>ComposerPrimitive</code> plus the slash palette and connector chips.</td>
+</tr>
+</tbody>
+</table>
+<p>The sidecar remains the source of truth for what happened. Its additions are
+opt-in and additive: <code>reasoning</code>, <code>source</code>, and <code>approval</code> stream events;
+<code>attachments</code> and <code>approvals</code> on <code>/api/chat</code>; <code>GET /api/conversations/{id}/tree</code>; and <code>PATCH /api/conversations/{id}</code>. A client that
+sends neither flag sees exactly the stream it saw before, which is what the CLI
+and older clients do.</p>
+<p>The approval gate is per-process and single-user by design. <code>ApprovalRegistry</code>
+waits on an <code>asyncio</code> future, <code>POST /api/approvals/{id}</code> answers it, and a
+timeout (300 s) or a cancelled turn resolves as a declined write, so a turn can
+never hang and a double click can never run a tool twice. That is the right size
+for a loopback sidecar with one person at the keyboard; it is not a durable job
+queue, and it is not pretending to be one.</p>
+<h4 id="extending-the-conversation">Extending the conversation<a class="heading-anchor" href="#extending-the-conversation" aria-label="Copy link to this section" title="Copy link">#</a></h4><p>A new kind of part is added in exactly two places — the mapping in <code>convert.ts</code>
+and the component in <code>parts.tsx</code> — and then registered in the <code>components</code> map
+in <code>Conversation.tsx</code>. Do not add a second message list, and never let an unknown
+part reach the screen as JSON: the converter drops what it does not understand on
+purpose, and <code>convert.test.ts</code> holds that line.</p>
 <h3 id="what-it-remembers">What it remembers<a class="heading-anchor" href="#what-it-remembers" aria-label="Copy link to this section" title="Copy link">#</a></h3><p>The studio keeps a small, local, editable model of the person it is helping. It
 is not a profile and not a transcript index; it is the handful of things that
 change the next answer.</p>
@@ -673,6 +778,9 @@ automatically.</p>
         </li>
         <li class="doc__toc-item doc__toc-item--3">
           <a href="#the-thread-is-the-room">The thread is the room</a>
+        </li>
+        <li class="doc__toc-item doc__toc-item--3">
+          <a href="#the-conversation-runtime">The conversation runtime</a>
         </li>
         <li class="doc__toc-item doc__toc-item--3">
           <a href="#what-it-remembers">What it remembers</a>

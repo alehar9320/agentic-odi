@@ -7,7 +7,7 @@
 | `packages/core` | `Job`, `Step`, `Outcome`, `CustomerOutcome`, `ODIService`, repository protocol | SQLite event log + snapshots |
 | `apps/mcp-server` | MCP tool adapters over `ODIService` | `build_repository()` selects SQLite in production and in-memory for `AGENTIC_ODI_DB=:memory:` |
 | `apps/studio-api` | Studio API, canvas projection, chat tool loop, conversation history, PM memory | Via the same repository when the local backend is active; conversations and memory in `~/.agentic-odi/studio.db` |
-| `apps/studio` | Presentation state, optimistic canvas updates | Browser cache only |
+| `apps/studio` | Presentation state, the visible conversation path, optimistic canvas updates; the conversation runtime is assistant-ui | Browser cache only |
 | `apps/cli` | Terminal rendering, local/remote backend selection | SQLite directly for `local`, no local writes for `mcp` |
 
 ## Write Paths
@@ -45,12 +45,53 @@ apps/studio SPA
   -> /api/chat
   -> stream_chat -> OpenAI-compatible LLM -> MCP tool calls
   -> StudioMemory (conversation turns + remembered observations)
+
+apps/studio SPA
+  -> POST /api/approvals/{id}
+  -> ApprovalRegistry -> resolves the paused turn's pending gate
 ```
 
 The studio memory is a separate SQLite file, not an ODI repository. It never
 feeds the canvas; it only supplies bounded context to the next chat turn.
 
 The SPA sends `mcp_url` with every data request for compatibility. In `local` mode the sidecar ignores it; in `mcp` mode it is required for canvas and mutations.
+
+## The Conversation
+
+One turn is one SSE stream, and the SPA renders it as typed parts rather than a
+string. Events, in the order they can appear:
+
+| Event | Payload | Meaning |
+|---|---|---|
+| `status` | `phase` | `health_check`, `mcp_tools`, `model`, or `offline` |
+| `conversation` | `id`, `title` | The thread this turn belongs to |
+| `reasoning` | `text` | Model thinking, rendered in a disclosure, never persisted as prose |
+| `delta` | `text` | Prose appended to the open text part |
+| `tool` | `name`, `status`, `preview` | `start`, `ok`, `error`, or `declined` |
+| `approval` | `id`, `tool_call_id`, `name`, `arguments`, `prompt` | A write is waiting for the person |
+| `source` | `id`, `title`, `filename`, `mediaType`, `preview` | What the turn actually read |
+| `ui` | `id`, `spec` | A validated generated surface |
+| `memory`, `connector`, `canvas_dirty` | — | Side effects the SPA applies without a refresh |
+| `message` / `error` | `content` / `StudioError` | Exactly one terminal event |
+
+Approval gates are process-local and single-user. `ApprovalRegistry` holds one
+`asyncio` future per pending write; `POST /api/approvals/{id}` resolves it and
+the same stream continues with the call or with a declined tool result. A
+timeout (300 s), a cancelled turn, or sidecar shutdown closes the gate, so a
+turn always terminates.
+
+The SPA owns the visible path; the sidecar owns the record. Turns persist with
+`message_id` and `parent_id`, and the conversation stores `head_id`:
+
+```text
+GET   /api/conversations/latest                -> thread + turns (resume)
+GET   /api/conversations/{id}/tree             -> branch tree + head
+PATCH /api/conversations/{id} {"head_id"}      -> record the visible branch
+```
+
+A conversation written before ids existed has none, so the tree endpoint
+synthesises a linear chain and old threads still open. `apps/studio` never
+invents a branch the sidecar cannot reproduce.
 
 ## Read Paths
 

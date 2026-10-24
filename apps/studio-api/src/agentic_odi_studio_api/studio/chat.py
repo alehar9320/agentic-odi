@@ -30,11 +30,20 @@ from agentic_odi_core.remote import (
 from fastmcp import Client as McpClient
 from openai import AsyncOpenAI
 
+from agentic_odi_studio_api.studio.approvals import (
+    ApprovalRegistry,
+    wait_for_decision,
+)
 from agentic_odi_studio_api.studio.connectors import ConnectorService
 from agentic_odi_studio_api.studio.memory import OBSERVATION_KINDS, StudioMemory
 from agentic_odi_studio_api.studio.observability import log_turn
 from agentic_odi_studio_api.studio.probes import check_llm_health, is_endpoint_reachable
-from agentic_odi_studio_api.studio.schemas import ChatRequest, StudioBrief
+from agentic_odi_studio_api.studio.schemas import (
+    AttachmentRef,
+    ChatMessage,
+    ChatRequest,
+    StudioBrief,
+)
 from agentic_odi_studio_api.studio.ui_spec import RENDER_UI_TOOL, UiCatalog
 
 log = logging.getLogger(__name__)
@@ -42,6 +51,31 @@ log = logging.getLogger(__name__)
 #: A rejected surface is corrected in the same reply, but a model that keeps
 #: missing must not be able to loop forever.
 MAX_TOOL_ROUNDS = 3
+
+#: Tool names that change stored data. Everything else is a read, a surface, or
+#: a memory note — none of which needs a confirmation the user would learn to
+#: click through.
+MUTATING_TOOL_PREFIXES: tuple[str, ...] = (
+    "add_",
+    "create_",
+    "update_",
+    "delete_",
+    "ingest_",
+    "remove_",
+)
+
+#: Attachments are context, not a corpus: five files, and a bounded slice of each.
+MAX_ATTACHMENTS = 5
+MAX_ATTACHMENT_TEXT = 20_000
+
+#: A single tool result is summarized for the source chip, never quoted whole.
+MAX_SOURCE_PREVIEW = 160
+
+
+def is_mutating_tool(name: str) -> bool:
+    """Whether a tool call changes stored data and should be confirmed."""
+    return name.startswith(MUTATING_TOOL_PREFIXES)
+
 
 SYSTEM_PROMPT = """You are an elite product strategist working inside The Living Studio, a room built for product managers.
 Your job is to help the PM choose and win the next opportunity that matters — to customers, the business, and their career.
@@ -152,13 +186,50 @@ def _error_frame(problem: StudioError, request_id: str) -> str:
     return _sse("error", {"error": body.model_dump(mode="json"), "request_id": request_id})
 
 
+def _attachment_block(attachments: list[AttachmentRef]) -> str:
+    """The readable part of the user's attachments, bounded and labelled."""
+    blocks: list[str] = []
+    for attachment in attachments[:MAX_ATTACHMENTS]:
+        text = (attachment.text or "").strip()
+        if not text:
+            continue
+        blocks.append(
+            f"[Attached file: {attachment.name}]\n{text[:MAX_ATTACHMENT_TEXT]}\n[/Attached file]"
+        )
+    return "\n\n".join(blocks)
+
+
+def _image_parts(attachments: list[AttachmentRef]) -> list[dict[str, Any]]:
+    parts: list[dict[str, Any]] = []
+    for attachment in attachments[:MAX_ATTACHMENTS]:
+        if attachment.data_url and attachment.content_type.startswith("image/"):
+            parts.append({"type": "image_url", "image_url": {"url": attachment.data_url}})
+    return parts
+
+
+def _user_content(message: ChatMessage, attachments: list[AttachmentRef]) -> Any:
+    """Text plus any readable attachments, shaped for an OpenAI-compatible model."""
+    block = _attachment_block(attachments)
+    text = f"{message.content}\n\n{block}".strip() if block else message.content
+    images = _image_parts(attachments)
+    if not images:
+        return text
+    return [{"type": "text", "text": text}, *images]
+
+
 def _to_openai_messages(request: ChatRequest, memory_context: str = "") -> list[dict[str, Any]]:
     system_prompt = SYSTEM_PROMPT + _brief_block(request.brief)
     if memory_context:
         system_prompt += "\n\n" + memory_context
     messages: list[dict[str, Any]] = [{"role": "system", "content": system_prompt}]
+    last_user = next((m for m in reversed(request.messages) if m.role == "user"), None)
     for message in request.messages:
-        messages.append({"role": message.role, "content": message.content})
+        if message is last_user and request.attachments:
+            messages.append(
+                {"role": "user", "content": _user_content(message, request.attachments)}
+            )
+        else:
+            messages.append({"role": message.role, "content": message.content})
     return messages
 
 
@@ -340,7 +411,12 @@ def _collect_tool_calls(delta: Any, tool_calls: dict[int, dict[str, str]]) -> No
 
 
 def _persist_turn(
-    memory: StudioMemory | None, conversation_id: str | None, role: str, content: str
+    memory: StudioMemory | None,
+    conversation_id: str | None,
+    role: str,
+    content: str,
+    message_id: str | None = None,
+    parent_id: str | None = None,
 ) -> None:
     """Record a turn, tolerating a duplicate retry and never breaking the reply."""
     if memory is None or conversation_id is None or not content.strip():
@@ -349,9 +425,60 @@ def _persist_turn(
         turns = memory.list_turns(conversation_id)
         if turns and turns[-1].role == role and turns[-1].content == content:
             return
-        memory.append_turn(conversation_id, role, content)
+        memory.append_turn(conversation_id, role, content, message_id, parent_id)
     except Exception:  # noqa: BLE001
         return
+
+
+def _reasoning_text(delta: Any) -> str:
+    """The model's thinking, when the backend exposes it (vLLM, Ollama, DeepSeek)."""
+    for attribute in ("reasoning_content", "reasoning"):
+        value = getattr(delta, attribute, None)
+        if isinstance(value, str) and value:
+            return value
+    return ""
+
+
+def _approval_prompt(name: str, arguments: dict[str, Any]) -> str:
+    human = name.replace("_", " ")
+    return f"Allow the assistant to {human}?"
+
+
+def _denial_result(name: str, decision: Any) -> str | None:
+    """The tool result for a write that must not run, or ``None`` when it may.
+
+    A declined or expired gate is never an error: the turn continues and the
+    model may propose something else.
+    """
+    if decision is None:
+        return (
+            f"The approval request for {name} expired before the user answered. "
+            "Nothing was changed. Ask the user whether to try again."
+        )
+    if decision.approved:
+        return None
+    reason = decision.reason.strip()
+    detail = f" The user said: {reason}" if reason else ""
+    return (
+        f"The user declined to run {name}, so nothing was changed.{detail} "
+        "Do not retry it without being asked."
+    )
+
+
+def _source_frame(counters: dict[str, int], name: str, result: str) -> dict[str, Any]:
+    """One provenance entry per tool the turn actually read."""
+    counters["sources"] += 1
+    preview = " ".join(result.split())[:MAX_SOURCE_PREVIEW]
+    return {
+        "event": "source",
+        "data": {
+            "id": f"src-{counters['sources']}",
+            "title": f"{name} — {preview}" if preview else name,
+            "filename": name,
+            "mediaType": "application/json",
+            "preview": preview,
+        },
+    }
 
 
 async def _turn_frames(
@@ -360,6 +487,7 @@ async def _turn_frames(
     memory: StudioMemory | None,
     request_id: str,
     counters: dict[str, int],
+    approvals: ApprovalRegistry | None = None,
 ) -> AsyncIterator[str]:
     """Yield the frames of one turn, raising ``_TurnFailure`` on a fatal error."""
 
@@ -368,7 +496,11 @@ async def _turn_frames(
 
     yield frame("status", {"phase": "health_check"})
 
-    last_user = next((m.content for m in reversed(request.messages) if m.role == "user"), "")
+    last_user_message = next((m for m in reversed(request.messages) if m.role == "user"), None)
+    last_user = last_user_message.content if last_user_message is not None else ""
+    user_message_id = last_user_message.id if last_user_message is not None else None
+    user_parent_id = last_user_message.parent_id if last_user_message is not None else None
+    assistant_message_id = request.assistant_id
 
     conversation_id: str | None = None
     if memory is not None:
@@ -378,7 +510,7 @@ async def _turn_frames(
         if conversation is None:
             conversation = memory.create_conversation()
         conversation_id = conversation.id
-        _persist_turn(memory, conversation_id, "user", last_user)
+        _persist_turn(memory, conversation_id, "user", last_user, user_message_id, user_parent_id)
         updated = memory.get_conversation(conversation_id) or conversation
         yield frame("conversation", {"id": updated.id, "title": updated.title})
 
@@ -389,7 +521,14 @@ async def _turn_frames(
         reply = offline_fallback(last_user, request.brief)
         yield frame("delta", {"text": reply})
         yield frame("message", {"content": reply})
-        _persist_turn(memory, conversation_id, "assistant", reply)
+        _persist_turn(
+            memory,
+            conversation_id,
+            "assistant",
+            reply,
+            assistant_message_id,
+            user_message_id,
+        )
         return
 
     catalog = UiCatalog.from_manifest(
@@ -464,6 +603,11 @@ async def _turn_frames(
             try:
                 async for chunk in stream:
                     delta = chunk.choices[0].delta
+                    reasoning = _reasoning_text(delta)
+                    if reasoning:
+                        # Thinking is shown as a disclosure, and is never part of
+                        # the answer or of the history that replays.
+                        yield frame("reasoning", {"text": reasoning})
                     if delta.content:
                         # Prose renders as it is generated. A card that follows it
                         # simply comes after the sentence that introduces it.
@@ -485,7 +629,14 @@ async def _turn_frames(
             if not tool_calls:
                 final = "".join(spoken)
                 yield frame("message", {"content": final})
-                _persist_turn(memory, conversation_id, "assistant", final)
+                _persist_turn(
+                    memory,
+                    conversation_id,
+                    "assistant",
+                    final,
+                    assistant_message_id,
+                    user_message_id,
+                )
                 return
 
             messages.append(
@@ -511,7 +662,25 @@ async def _turn_frames(
                 arguments = _parse_arguments(entry["arguments"])
                 counters["tool_calls"] += 1
 
-                if name == "add_connector":
+                declined: str | None = None
+                if request.approvals and approvals is not None and is_mutating_tool(name):
+                    approval, future = approvals.open(
+                        tool_call_id=entry["id"],
+                        name=name,
+                        arguments=arguments,
+                        prompt=_approval_prompt(name, arguments),
+                    )
+                    # The gate is announced before it is awaited: the client
+                    # cannot answer a question it was never sent.
+                    yield frame("approval", approval.to_dict())
+                    decision = await wait_for_decision(approvals, approval, future)
+                    declined = _denial_result(name, decision)
+
+                if declined is not None:
+                    counters["tool_errors"] += 1
+                    result_str = declined
+                    yield frame("tool", {"name": name, "status": "declined", "preview": declined})
+                elif name == "add_connector":
                     result_str, events = _apply_add_connector(arguments, connector_service)
                     for event in events:
                         yield frame(event["event"], event["data"])
@@ -585,6 +754,8 @@ async def _turn_frames(
                                     "tool",
                                     {"name": name, "status": "ok", "preview": result_str[:280]},
                                 )
+                                source = _source_frame(counters, name, result_str)
+                                yield frame(source["event"], source["data"])
 
                 messages.append(
                     {
@@ -607,7 +778,14 @@ async def _turn_frames(
         )
         content = f"{final}\n\n{note}".strip() if final else note
         yield frame("message", {"content": content})
-        _persist_turn(memory, conversation_id, "assistant", content)
+        _persist_turn(
+            memory,
+            conversation_id,
+            "assistant",
+            content,
+            assistant_message_id,
+            user_message_id,
+        )
 
 
 async def stream_chat(
@@ -615,8 +793,10 @@ async def stream_chat(
     service: ConnectorService | None = None,
     memory: StudioMemory | None = None,
     request_id: str | None = None,
+    approvals: ApprovalRegistry | None = None,
 ) -> AsyncIterator[str]:
-    """Yield SSE frames: status, conversation, delta, tool, ui, memory, connector, message, error.
+    """Yield SSE frames: status, conversation, reasoning, delta, tool, approval,
+    source, ui, memory, connector, message, error.
 
     Every turn ends with exactly one terminal event: one ``message`` or one
     ``error``. A failure is never dressed up as a success, and it never leaves
@@ -624,11 +804,17 @@ async def stream_chat(
     """
     rid = request_id or ""
     started = time.monotonic()
-    counters = {"rounds": 0, "tool_calls": 0, "tool_errors": 0, "rounds_exhausted": 0}
+    counters = {
+        "rounds": 0,
+        "tool_calls": 0,
+        "tool_errors": 0,
+        "rounds_exhausted": 0,
+        "sources": 0,
+    }
     outcome = "failed"
     error_code: str | None = None
     try:
-        async for chunk in _turn_frames(request, service, memory, rid, counters):
+        async for chunk in _turn_frames(request, service, memory, rid, counters, approvals):
             yield chunk
         outcome = "completed"
         if counters["tool_errors"]:

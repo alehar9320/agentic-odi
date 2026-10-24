@@ -34,6 +34,12 @@ apps/cli ──────────────▶ packages/connectors
 - `packages/connectors` depends on `core` only where it needs shared models.
 - Every runnable app may depend on `core`; none of them imports another app.
 - The React SPA only talks to `apps/studio-api` over `/api`; it never calls MCP or the LLM directly.
+- The SPA's conversation runtime is assistant-ui, bound to the Studio's own
+  store in `apps/studio/src/assistant/`. That directory
+  is the whole bridge: `convert.ts` maps the two message models in both
+  directions, `StudioRuntime.tsx` wires the runtime callbacks, and
+  `attachments.ts` extracts files in the browser. The library is presentation
+  only — it holds no product state and makes no network calls of its own.
 
 ## Persistence
 

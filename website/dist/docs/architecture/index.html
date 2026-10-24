@@ -157,6 +157,12 @@ apps/cli ──────────────▶ packages/connectors
 <li><code>packages/connectors</code> depends on <code>core</code> only where it needs shared models.</li>
 <li>Every runnable app may depend on <code>core</code>; none of them imports another app.</li>
 <li>The React SPA only talks to <code>apps/studio-api</code> over <code>/api</code>; it never calls MCP or the LLM directly.</li>
+<li>The SPA's conversation runtime is assistant-ui, bound to the Studio's own
+store in <code>apps/studio/src/assistant/</code>. That directory
+is the whole bridge: <code>convert.ts</code> maps the two message models in both
+directions, <code>StudioRuntime.tsx</code> wires the runtime callbacks, and
+<code>attachments.ts</code> extracts files in the browser. The library is presentation
+only — it holds no product state and makes no network calls of its own.</li>
 </ul>
 <h2 id="persistence">Persistence<a class="heading-anchor" href="#persistence" aria-label="Copy link to this section" title="Copy link">#</a></h2><ul>
 <li><code>SQLiteRepository</code> is the production default for the CLI, MCP server, and Studio API.</li>

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 
+import { StudioRuntimeProvider } from "./assistant/StudioRuntime";
 import { ChangelogModal } from "./components/ChangelogModal";
 import { ChatStage } from "./components/chat/ChatStage";
 import { ErrorBoundary } from "./components/ErrorBoundary";
@@ -69,10 +70,12 @@ export default function App() {
   return (
     <ErrorBoundary>
       <StudioProvider>
-        <OnboardingProvider>
-          <StudioShell />
-          <FirstRunWizard />
-        </OnboardingProvider>
+        <StudioRuntimeProvider>
+          <OnboardingProvider>
+            <StudioShell />
+            <FirstRunWizard />
+          </OnboardingProvider>
+        </StudioRuntimeProvider>
       </StudioProvider>
     </ErrorBoundary>
   );

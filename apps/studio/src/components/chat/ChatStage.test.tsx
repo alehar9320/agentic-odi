@@ -1,6 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { StudioRuntimeProvider } from "../../assistant/StudioRuntime";
 import type { ChatMessage } from "../../types";
 import { ChatStage } from "./ChatStage";
 
@@ -12,6 +13,10 @@ const harness = vi.hoisted(() => ({
     toolActivity: [] as unknown[],
     offlineReply: false,
     sendMessage: vi.fn<(text: string) => Promise<void>>(),
+    regenerateFrom: vi.fn<(messageId: string | null) => Promise<void>>(),
+    editFrom: vi.fn<(messageId: string | null, text: string) => Promise<void>>(),
+    switchBranch: vi.fn(),
+    respondToApproval: vi.fn<(approvalId: string, approved: boolean) => Promise<void>>(),
     stopStreaming: vi.fn(),
     openPanel: vi.fn(),
     closePanel: vi.fn(),
@@ -37,8 +42,10 @@ vi.mock("../../state/StudioContext", () => ({
 }));
 
 const FAILED_TURN: ChatMessage[] = [
-  { role: "user", content: "list the jobs" },
+  { id: "m-1", parentId: null, role: "user", content: "list the jobs" },
   {
+    id: "m-2",
+    parentId: "m-1",
     role: "assistant",
     content: "",
     parts: [],
@@ -63,7 +70,11 @@ describe("ChatStage stream failures", () => {
     const errorLog = vi.spyOn(console, "error").mockImplementation(() => {});
     harness.state.messages = FAILED_TURN;
 
-    const { container } = render(<ChatStage />);
+    const { container } = render(
+      <StudioRuntimeProvider>
+        <ChatStage />
+      </StudioRuntimeProvider>,
+    );
 
     expect(container.querySelector(".chat--empty")).toBeNull();
     expect(screen.getByRole("alert")).toHaveTextContent("The MCP server is unreachable.");
@@ -76,7 +87,11 @@ describe("ChatStage stream failures", () => {
     const errorLog = vi.spyOn(console, "error").mockImplementation(() => {});
     harness.state.messages = FAILED_TURN;
 
-    render(<ChatStage />);
+    render(
+      <StudioRuntimeProvider>
+        <ChatStage />
+      </StudioRuntimeProvider>,
+    );
 
     expect(screen.getByRole("button", { name: /retry/i })).toBeInTheDocument();
     expect(screen.getByRole("textbox")).toBeInTheDocument();
