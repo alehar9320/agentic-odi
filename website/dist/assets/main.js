@@ -136,6 +136,49 @@
   });
 
   /* ---------------------------------------------------------------- */
+  /* Theme toggle                                                      */
+  /*                                                                   */
+  /* theme.js already picked the theme before the first paint. This    */
+  /* only flips it, remembers the choice, and keeps the control's      */
+  /* label honest about what the next click will do.                   */
+  /* ---------------------------------------------------------------- */
+
+  var THEME_KEY = "agentic-odi.theme";
+  var themeRoot = document.documentElement;
+  var themeToggles = document.querySelectorAll(".theme-toggle");
+
+  function describeTheme() {
+    var light = themeRoot.getAttribute("data-theme") === "light";
+    themeToggles.forEach(function (toggle) {
+      toggle.setAttribute(
+        "aria-label",
+        light ? "Switch to the dark theme" : "Switch to the light theme"
+      );
+    });
+  }
+
+  function setTheme(theme) {
+    themeRoot.setAttribute("data-theme", theme);
+    try {
+      window.localStorage.setItem(THEME_KEY, theme);
+    } catch (error) {
+      /* private mode: the choice still applies to this page */
+    }
+    var meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) {
+      meta.setAttribute("content", theme === "light" ? "#f7f8fb" : "#0a0b0e");
+    }
+    describeTheme();
+  }
+
+  describeTheme();
+  themeToggles.forEach(function (toggle) {
+    toggle.addEventListener("click", function () {
+      setTheme(themeRoot.getAttribute("data-theme") === "light" ? "dark" : "light");
+    });
+  });
+
+  /* ---------------------------------------------------------------- */
   /* Scroll reveal                                                     */
   /* ---------------------------------------------------------------- */
 
