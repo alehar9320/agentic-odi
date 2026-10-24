@@ -10,10 +10,12 @@ import { useStudio } from "../../state/StudioContext";
 import type { Outcome } from "../../types";
 
 export function OutcomeCard({ outcome }: { outcome: Outcome }) {
-  const { ask, deleteOutcome, updateOutcome } = useStudio();
+  const { ask, deleteOutcome, pushToast, saveThesis, updateOutcome } = useStudio();
   const [showEvidence, setShowEvidence] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [thesisOpen, setThesisOpen] = useState(false);
+  const [rationale, setRationale] = useState("");
   const [importance, setImportance] = useState(outcome.importance ?? 5);
   const [satisfaction, setSatisfaction] = useState(outcome.satisfaction ?? 5);
   const [saving, setSaving] = useState(false);
@@ -134,6 +136,14 @@ export function OutcomeCard({ outcome }: { outcome: Outcome }) {
         <button
           type="button"
           className="quiet-action"
+          aria-expanded={thesisOpen}
+          onClick={() => setThesisOpen((prev) => !prev)}
+        >
+          Save as thesis
+        </button>
+        <button
+          type="button"
+          className="quiet-action"
           onClick={() => ask(`How should we solve outcome ${outcomeId}: "${statement}"?`)}
         >
           Ask
@@ -156,6 +166,50 @@ export function OutcomeCard({ outcome }: { outcome: Outcome }) {
           </button>
         )}
       </div>
+
+      {thesisOpen && (
+        <form
+          className="card__edit"
+          aria-label={`Save ${outcomeId} as an opportunity thesis`}
+          onSubmit={(event) => {
+            event.preventDefault();
+            saveThesis({
+              outcome_id: outcomeId,
+              job_id: outcome.job_id,
+              statement,
+              importance: outcome.importance ?? null,
+              satisfaction: outcome.satisfaction ?? null,
+              opportunity_score: opp ?? null,
+              rationale: rationale.trim(),
+            });
+            setThesisOpen(false);
+            setRationale("");
+            pushToast("success", "Opportunity thesis saved");
+          }}
+        >
+          <label className="card__slider" htmlFor={`rationale-${outcomeId}`}>
+            Why this bet, and what has to be true?
+            <textarea
+              id={`rationale-${outcomeId}`}
+              value={rationale}
+              onChange={(event) => setRationale(event.target.value)}
+              rows={3}
+            />
+          </label>
+          <div className="card__edit-actions">
+            <button type="submit" className="button button--ghost">
+              Save thesis
+            </button>
+            <button
+              type="button"
+              className="quiet-action"
+              onClick={() => setThesisOpen(false)}
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      )}
     </article>
   );
 }

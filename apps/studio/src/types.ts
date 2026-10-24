@@ -24,6 +24,18 @@ export interface Outcome {
   telemetry?: string;
 }
 
+export interface Thesis {
+  id: string;
+  outcome_id: string;
+  job_id?: string;
+  statement: string;
+  importance: number | null;
+  satisfaction: number | null;
+  opportunity_score: number | null;
+  rationale: string;
+  created_at: string;
+}
+
 export interface CanvasData {
   jobs: Job[];
   steps: Step[];
