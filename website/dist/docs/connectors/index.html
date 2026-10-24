@@ -191,6 +191,9 @@ preset may ask for consent again on the next <code>connectors health</code> or
 appended to the in-process ingest sink. They are <strong>not</strong> written into the ODI
 jobs/outcomes store — mapping ingested evidence onto ODI artifacts is still on
 the <a href="../roadmap/">roadmap</a>.</p>
+<p>Pass <code>--dry-run</code> to fetch and normalize without writing anything: it prints the
+record count, the first normalized record, and — when <code>--job-id</code>, <code>--step-id</code>,
+or <code>--outcome-id</code> is given — how many evidence drafts the ingest would create.</p>
 <p>Additional kinds (REST, webhooks, and so on) can register against the same
 <code>Connector</code> protocol later.</p>
 
