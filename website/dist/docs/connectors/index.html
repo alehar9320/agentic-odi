@@ -209,7 +209,170 @@ the <a href="../roadmap/">roadmap</a>.</p>
 <p>Additional kinds (REST, webhooks, and so on) can register against the same
 <code>Connector</code> protocol later.</p>
 
-<p class="prose__source">Source of truth: <code>docs/connectors.md</code> &mdash; <a href="https://github.com/alehar9320/agentic-odi/blob/main/docs/connectors.md">view on GitHub</a></p>
+<p class="prose__source">Source of truth: <code>docs/connectors.md</code> &mdash; <a href="https://github.com/alehar9320/agentic-odi/blob/main/docs/connectors.md">view on GitHub</a></p><section class="tool-doc" id="preset-reference">
+  <h2 class="tool-doc__name">Preset reference</h2>
+  <p class="tool-doc__purpose">
+    Every built-in preset, read from the catalog at build time. Register one
+    with <code>connectors add mcp --preset &lt;id&gt;</code>, then check it with
+    the health endpoint shown for that preset.
+  </p>
+  <table class="tool-doc__args">
+    <thead>
+      <tr>
+        <th>Provider</th>
+        <th>Kind</th>
+        <th>Auth</th>
+        <th>Health endpoint</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr id="preset-notion">
+        <td>
+          <code>notion</code>
+          <span class="preset-label">Notion</span>
+        </td>
+        <td><code>mcp</code></td>
+        <td>oauth</td>
+        <td><code>POST /api/connectors/notion/health</code></td>
+      </tr>
+      <tr id="preset-gong">
+        <td>
+          <code>gong</code>
+          <span class="preset-label">Gong</span>
+        </td>
+        <td><code>mcp</code></td>
+        <td>oauth</td>
+        <td><code>POST /api/connectors/gong/health</code></td>
+      </tr>
+      <tr id="preset-fireflies">
+        <td>
+          <code>fireflies</code>
+          <span class="preset-label">Fireflies.ai</span>
+        </td>
+        <td><code>mcp</code></td>
+        <td>oauth</td>
+        <td><code>POST /api/connectors/fireflies/health</code></td>
+      </tr>
+      <tr id="preset-intercom">
+        <td>
+          <code>intercom</code>
+          <span class="preset-label">Intercom</span>
+        </td>
+        <td><code>mcp</code></td>
+        <td>oauth</td>
+        <td><code>POST /api/connectors/intercom/health</code></td>
+      </tr>
+      <tr id="preset-confluence">
+        <td>
+          <code>confluence</code>
+          <span class="preset-label">Atlassian Confluence</span>
+        </td>
+        <td><code>mcp</code></td>
+        <td>oauth</td>
+        <td><code>POST /api/connectors/confluence/health</code></td>
+      </tr>
+      <tr id="preset-posthog">
+        <td>
+          <code>posthog</code>
+          <span class="preset-label">PostHog</span>
+        </td>
+        <td><code>mcp</code></td>
+        <td>oauth</td>
+        <td><code>POST /api/connectors/posthog/health</code></td>
+      </tr>
+      <tr id="preset-amplitude">
+        <td>
+          <code>amplitude</code>
+          <span class="preset-label">Amplitude</span>
+        </td>
+        <td><code>mcp</code></td>
+        <td>oauth</td>
+        <td><code>POST /api/connectors/amplitude/health</code></td>
+      </tr>
+      <tr id="preset-mixpanel">
+        <td>
+          <code>mixpanel</code>
+          <span class="preset-label">Mixpanel</span>
+        </td>
+        <td><code>mcp</code></td>
+        <td>oauth</td>
+        <td><code>POST /api/connectors/mixpanel/health</code></td>
+      </tr>
+      <tr id="preset-exa">
+        <td>
+          <code>exa</code>
+          <span class="preset-label">Exa</span>
+        </td>
+        <td><code>mcp</code></td>
+        <td>api key</td>
+        <td><code>POST /api/connectors/exa/health</code></td>
+      </tr>
+      <tr id="preset-tavily">
+        <td>
+          <code>tavily</code>
+          <span class="preset-label">Tavily</span>
+        </td>
+        <td><code>mcp</code></td>
+        <td>api key</td>
+        <td><code>POST /api/connectors/tavily/health</code></td>
+      </tr>
+      <tr id="preset-linear">
+        <td>
+          <code>linear</code>
+          <span class="preset-label">Linear</span>
+        </td>
+        <td><code>mcp</code></td>
+        <td>oauth</td>
+        <td><code>POST /api/connectors/linear/health</code></td>
+      </tr>
+      <tr id="preset-github">
+        <td>
+          <code>github</code>
+          <span class="preset-label">GitHub</span>
+        </td>
+        <td><code>mcp</code></td>
+        <td>api key</td>
+        <td><code>POST /api/connectors/github/health</code></td>
+      </tr>
+      <tr id="preset-jira">
+        <td>
+          <code>jira</code>
+          <span class="preset-label">Atlassian Jira</span>
+        </td>
+        <td><code>mcp</code></td>
+        <td>oauth</td>
+        <td><code>POST /api/connectors/jira/health</code></td>
+      </tr>
+      <tr id="preset-miro">
+        <td>
+          <code>miro</code>
+          <span class="preset-label">Miro</span>
+        </td>
+        <td><code>mcp</code></td>
+        <td>oauth</td>
+        <td><code>POST /api/connectors/miro/health</code></td>
+      </tr>
+      <tr id="preset-figma">
+        <td>
+          <code>figma</code>
+          <span class="preset-label">Figma</span>
+        </td>
+        <td><code>mcp</code></td>
+        <td>oauth</td>
+        <td><code>POST /api/connectors/figma/health</code></td>
+      </tr>
+      <tr id="preset-slack">
+        <td>
+          <code>slack</code>
+          <span class="preset-label">Slack</span>
+        </td>
+        <td><code>mcp</code></td>
+        <td>oauth</td>
+        <td><code>POST /api/connectors/slack/health</code></td>
+      </tr>
+    </tbody>
+  </table>
+</section>
     </div>
 
     <nav class="doc__toc" aria-label="On this page">
