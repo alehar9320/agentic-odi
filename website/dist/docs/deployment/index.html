@@ -185,6 +185,12 @@ through a free, account-less
 first for <code>/api/*</code>; <code>infra/cloudflare/worker.ts</code> forwards those calls to the
 <code>SIDECAR_URL</code> secret. The browser only talks to the Worker origin, so the
 sidecar's CORS list is not involved.</p>
+<p>Every response from the Worker — static assets and proxied API calls alike —
+carries a content security policy (<code>default-src 'self'</code>, <code>connect-src 'self'</code>,
+<code>frame-ancestors 'none'</code>) plus <code>X-Content-Type-Options: nosniff</code>,
+<code>X-Frame-Options: DENY</code>, a strict referrer policy, and a Permissions Policy that
+disables geolocation, camera, and microphone. <code>tests/test_worker_security_headers.py</code>
+pins those headers so a preview deployment can be smoke-tested against them.</p>
 <pre class="highlight"><code class="language-bash"><span class="c1"># 1. Build the SPA that the Worker uploads as static assets</span>
 npm<span class="w"> </span>--prefix<span class="w"> </span>apps/studio<span class="w"> </span>ci
 npm<span class="w"> </span>--prefix<span class="w"> </span>apps/studio<span class="w"> </span>run<span class="w"> </span>build

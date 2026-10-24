@@ -16,6 +16,47 @@ interface Env {
 
 const API_PREFIX = "/api/";
 
+/**
+ * Defense-in-depth headers on every Response, assets and API alike.
+ *
+ * The SPA loads only its own bundle, talks to the Worker origin at `/api/*`, and
+ * uses React inline styles, hence `'unsafe-inline'` for styles but nothing for
+ * scripts. `connect-src 'self'` keeps a compromised bundle from exfiltrating
+ * to another origin; `frame-ancestors` repeats the `X-Frame-Options` intent for
+ * browsers that only honor the CSP directive.
+ */
+const SECURITY_HEADERS: Record<string, string> = {
+  "Content-Security-Policy": [
+    "default-src 'self'",
+    "script-src 'self'",
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: blob:",
+    "font-src 'self' data:",
+    "connect-src 'self'",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "frame-ancestors 'none'",
+  ].join("; "),
+  "X-Content-Type-Options": "nosniff",
+  "X-Frame-Options": "DENY",
+  "Referrer-Policy": "strict-origin-when-cross-origin",
+  "Permissions-Policy": "geolocation=(), camera=(), microphone=()",
+};
+
+function secure(response: Response): Response {
+  const headers = new Headers(response.headers);
+  for (const [name, value] of Object.entries(SECURITY_HEADERS)) {
+    headers.set(name, value);
+  }
+  // Reuse the body stream so SSE (`/api/chat`) keeps streaming.
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
 function sidecarError(detail: string): Response {
   return Response.json({ detail }, { status: 502 });
 }
@@ -25,12 +66,12 @@ export default {
     const url = new URL(request.url);
 
     if (!url.pathname.startsWith(API_PREFIX)) {
-      return env.ASSETS.fetch(request);
+      return secure(await env.ASSETS.fetch(request));
     }
 
     const sidecar = env.SIDECAR_URL?.trim().replace(/\/+$/, "");
     if (!sidecar) {
-      return sidecarError("SIDECAR_URL is not configured");
+      return secure(sidecarError("SIDECAR_URL is not configured"));
     }
 
     // The Quick Tunnel routes by hostname, so the Worker's Host must not leak.
@@ -43,16 +84,18 @@ export default {
     try {
       // Returning the upstream Response directly preserves SSE streaming for
       // `/api/chat`.
-      return await fetch(
-        new Request(target, {
-          method: request.method,
-          headers,
-          body: request.body,
-          redirect: "manual",
-        }),
+      return secure(
+        await fetch(
+          new Request(target, {
+            method: request.method,
+            headers,
+            body: request.body,
+            redirect: "manual",
+          }),
+        ),
       );
     } catch (error) {
-      return sidecarError(`Sidecar unreachable: ${(error as Error).message}`);
+      return secure(sidecarError(`Sidecar unreachable: ${(error as Error).message}`));
     }
   },
 } satisfies ExportedHandler<Env>;
