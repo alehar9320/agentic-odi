@@ -190,13 +190,32 @@
 <section class="tool-doc" id="tool-get_jobs">
   <h2 class="tool-doc__name">
     <code>get_jobs</code>
-    <span class="pill">0 arguments</span>
+    <span class="pill">2 arguments</span>
   </h2>
-  <p class="tool-doc__purpose">List every Job.</p>
+  <p class="tool-doc__purpose">List Jobs, one page at a time.</p>
   <div class="codeblock">
     <button class="copy-btn" type="button" data-copy>Copy</button>
-    <code>get_jobs()</code>
+    <code>get_jobs(limit: int | None = None, offset: int = 0)</code>
   </div>
+  <table class="tool-doc__args">
+    <thead>
+      <tr><th>Argument</th><th>Type</th><th>Required</th><th>Default</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>limit</code></td>
+        <td><code>int | None</code></td>
+        <td>no</td>
+        <td><code>None</code></td>
+      </tr>
+      <tr>
+        <td><code>offset</code></td>
+        <td><code>int</code></td>
+        <td>no</td>
+        <td><code>0</code></td>
+      </tr>
+    </tbody>
+  </table>
 </section>
 <section class="tool-doc" id="tool-get_job">
   <h2 class="tool-doc__name">
@@ -321,12 +340,12 @@
 <section class="tool-doc" id="tool-get_job_map">
   <h2 class="tool-doc__name">
     <code>get_job_map</code>
-    <span class="pill">1 argument</span>
+    <span class="pill">3 arguments</span>
   </h2>
-  <p class="tool-doc__purpose">Return a Job&#39;s ordered steps.</p>
+  <p class="tool-doc__purpose">Return a Job&#39;s ordered steps, one page at a time.</p>
   <div class="codeblock">
     <button class="copy-btn" type="button" data-copy>Copy</button>
-    <code>get_job_map(job_id: str)</code>
+    <code>get_job_map(job_id: str, limit: int | None = None, offset: int = 0)</code>
   </div>
   <table class="tool-doc__args">
     <thead>
@@ -338,6 +357,18 @@
         <td><code>str</code></td>
         <td>yes</td>
         <td><code>—</code></td>
+      </tr>
+      <tr>
+        <td><code>limit</code></td>
+        <td><code>int | None</code></td>
+        <td>no</td>
+        <td><code>None</code></td>
+      </tr>
+      <tr>
+        <td><code>offset</code></td>
+        <td><code>int</code></td>
+        <td>no</td>
+        <td><code>0</code></td>
       </tr>
     </tbody>
   </table>
@@ -477,12 +508,12 @@
 <section class="tool-doc" id="tool-get_outcomes">
   <h2 class="tool-doc__name">
     <code>get_outcomes</code>
-    <span class="pill">2 arguments</span>
+    <span class="pill">4 arguments</span>
   </h2>
-  <p class="tool-doc__purpose">List the desired outcomes of a Job or step.</p>
+  <p class="tool-doc__purpose">List the desired outcomes of a Job or step, one page at a time.</p>
   <div class="codeblock">
     <button class="copy-btn" type="button" data-copy>Copy</button>
-    <code>get_outcomes(job_id: str, step_id: str | None = None)</code>
+    <code>get_outcomes(job_id: str, step_id: str | None = None, limit: int | None = None, offset: int = 0)</code>
   </div>
   <table class="tool-doc__args">
     <thead>
@@ -500,6 +531,18 @@
         <td><code>str | None</code></td>
         <td>no</td>
         <td><code>None</code></td>
+      </tr>
+      <tr>
+        <td><code>limit</code></td>
+        <td><code>int | None</code></td>
+        <td>no</td>
+        <td><code>None</code></td>
+      </tr>
+      <tr>
+        <td><code>offset</code></td>
+        <td><code>int</code></td>
+        <td>no</td>
+        <td><code>0</code></td>
       </tr>
     </tbody>
   </table>
@@ -669,12 +712,12 @@
 <section class="tool-doc" id="tool-list_customer_outcomes">
   <h2 class="tool-doc__name">
     <code>list_customer_outcomes</code>
-    <span class="pill">1 argument</span>
+    <span class="pill">3 arguments</span>
   </h2>
-  <p class="tool-doc__purpose">List customer outcomes, optionally for one Job.</p>
+  <p class="tool-doc__purpose">List customer outcomes, optionally for one Job, one page at a time.</p>
   <div class="codeblock">
     <button class="copy-btn" type="button" data-copy>Copy</button>
-    <code>list_customer_outcomes(job_id: str | None = None)</code>
+    <code>list_customer_outcomes(job_id: str | None = None, limit: int | None = None, offset: int = 0)</code>
   </div>
   <table class="tool-doc__args">
     <thead>
@@ -686,6 +729,18 @@
         <td><code>str | None</code></td>
         <td>no</td>
         <td><code>None</code></td>
+      </tr>
+      <tr>
+        <td><code>limit</code></td>
+        <td><code>int | None</code></td>
+        <td>no</td>
+        <td><code>None</code></td>
+      </tr>
+      <tr>
+        <td><code>offset</code></td>
+        <td><code>int</code></td>
+        <td>no</td>
+        <td><code>0</code></td>
       </tr>
     </tbody>
   </table>
@@ -921,12 +976,12 @@
 <section class="tool-doc" id="tool-list_evidence">
   <h2 class="tool-doc__name">
     <code>list_evidence</code>
-    <span class="pill">3 arguments</span>
+    <span class="pill">5 arguments</span>
   </h2>
-  <p class="tool-doc__purpose">List evidence, optionally for one Job.</p>
+  <p class="tool-doc__purpose">List evidence, optionally for one Job, one page at a time.</p>
   <div class="codeblock">
     <button class="copy-btn" type="button" data-copy>Copy</button>
-    <code>list_evidence(job_id: str | None = None, step_id: str | None = None, outcome_id: str | None = None)</code>
+    <code>list_evidence(job_id: str | None = None, step_id: str | None = None, outcome_id: str | None = None, limit: int | None = None, offset: int = 0)</code>
   </div>
   <table class="tool-doc__args">
     <thead>
@@ -950,6 +1005,18 @@
         <td><code>str | None</code></td>
         <td>no</td>
         <td><code>None</code></td>
+      </tr>
+      <tr>
+        <td><code>limit</code></td>
+        <td><code>int | None</code></td>
+        <td>no</td>
+        <td><code>None</code></td>
+      </tr>
+      <tr>
+        <td><code>offset</code></td>
+        <td><code>int</code></td>
+        <td>no</td>
+        <td><code>0</code></td>
       </tr>
     </tbody>
   </table>

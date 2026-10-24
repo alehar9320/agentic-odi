@@ -64,8 +64,13 @@ def add_job(name: str, description: str | None = None) -> str:
 
 
 @mcp.tool
-def get_jobs() -> str:
-    jobs = service.get_jobs()
+def get_jobs(limit: int | None = None, offset: int = 0) -> str:
+    """List jobs.
+
+    ``limit`` caps how many jobs are returned and ``offset`` skips that many
+    first, so a client can walk a long list without re-reading all of it.
+    """
+    jobs = service.get_jobs(limit=limit, offset=offset)
     return json.dumps([job.model_dump() for job in jobs])
 
 
@@ -87,11 +92,11 @@ def add_step(job_id: str, name: str, order: int) -> str:
 
 
 @mcp.tool
-def get_job_map(job_id: str) -> str:
+def get_job_map(job_id: str, limit: int | None = None, offset: int = 0) -> str:
     job = service.get_job(job_id)
     if job is None:
         return f"Error: Job with ID {job_id} not found."
-    steps = service.get_job_map(job_id)
+    steps = service.get_job_map(job_id, limit=limit, offset=offset)
     return json.dumps([step.model_dump() for step in steps])
 
 
@@ -121,11 +126,13 @@ def add_outcome(
 
 
 @mcp.tool
-def get_outcomes(job_id: str, step_id: str | None = None) -> str:
+def get_outcomes(
+    job_id: str, step_id: str | None = None, limit: int | None = None, offset: int = 0
+) -> str:
     job = service.get_job(job_id)
     if job is None:
         return f"Error: Job with ID {job_id} not found."
-    outcomes = service.get_outcomes(job_id=job_id, step_id=step_id)
+    outcomes = service.get_outcomes(job_id=job_id, step_id=step_id, limit=limit, offset=offset)
     return json.dumps([outcome.model_dump() for outcome in outcomes])
 
 
@@ -162,8 +169,11 @@ def get_customer_outcome(outcome_id: str) -> str:
 
 
 @mcp.tool
-def list_customer_outcomes(job_id: str | None = None) -> str:
-    outcomes = service.list_customer_outcomes(job_id=job_id)
+def list_customer_outcomes(
+    job_id: str | None = None, limit: int | None = None, offset: int = 0
+) -> str:
+    """List customer outcomes, optionally for one job and one page at a time."""
+    outcomes = service.list_customer_outcomes(job_id=job_id, limit=limit, offset=offset)
     return json.dumps([o.model_dump() for o in outcomes])
 
 
@@ -403,8 +413,13 @@ def list_evidence(
     job_id: str | None = None,
     step_id: str | None = None,
     outcome_id: str | None = None,
+    limit: int | None = None,
+    offset: int = 0,
 ) -> str:
-    items = service.list_evidence(job_id=job_id, step_id=step_id, outcome_id=outcome_id)
+    """List evidence for a job, step or outcome, one page at a time."""
+    items = service.list_evidence(
+        job_id=job_id, step_id=step_id, outcome_id=outcome_id, limit=limit, offset=offset
+    )
     return json.dumps([item.model_dump() for item in items])
 
 

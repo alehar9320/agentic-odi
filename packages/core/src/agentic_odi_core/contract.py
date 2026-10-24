@@ -54,12 +54,12 @@ class ToolSpec:
 
 TOOL_SPECS: dict[str, ToolSpec] = {
     ToolName.ADD_JOB.value: ToolSpec(("name", "description"), ("name",)),
-    ToolName.GET_JOBS.value: ToolSpec(),
+    ToolName.GET_JOBS.value: ToolSpec(("limit", "offset")),
     ToolName.GET_JOB.value: ToolSpec(("job_id",), ("job_id",)),
     ToolName.UPDATE_JOB.value: ToolSpec(("job_id", "name", "description"), ("job_id",)),
     ToolName.DELETE_JOB.value: ToolSpec(("job_id",), ("job_id",)),
     ToolName.ADD_STEP.value: ToolSpec(("job_id", "name", "order"), ("job_id", "name", "order")),
-    ToolName.GET_JOB_MAP.value: ToolSpec(("job_id",), ("job_id",)),
+    ToolName.GET_JOB_MAP.value: ToolSpec(("job_id", "limit", "offset"), ("job_id",)),
     ToolName.GET_STEP.value: ToolSpec(("step_id",), ("step_id",)),
     ToolName.UPDATE_STEP.value: ToolSpec(("step_id", "name", "order"), ("step_id",)),
     ToolName.DELETE_STEP.value: ToolSpec(("step_id",), ("step_id",)),
@@ -67,7 +67,7 @@ TOOL_SPECS: dict[str, ToolSpec] = {
         ("job_id", "statement", "importance", "satisfaction", "step_id"),
         ("job_id", "statement"),
     ),
-    ToolName.GET_OUTCOMES.value: ToolSpec(("job_id", "step_id"), ("job_id",)),
+    ToolName.GET_OUTCOMES.value: ToolSpec(("job_id", "step_id", "limit", "offset"), ("job_id",)),
     ToolName.GET_OUTCOME.value: ToolSpec(("outcome_id",), ("outcome_id",)),
     ToolName.UPDATE_OUTCOME.value: ToolSpec(
         ("outcome_id", "statement", "importance", "satisfaction", "step_id"),
@@ -79,7 +79,7 @@ TOOL_SPECS: dict[str, ToolSpec] = {
         ("job_id", "customer_value", "business_value"),
     ),
     ToolName.GET_CUSTOMER_OUTCOME.value: ToolSpec(("outcome_id",), ("outcome_id",)),
-    ToolName.LIST_CUSTOMER_OUTCOMES.value: ToolSpec(("job_id",)),
+    ToolName.LIST_CUSTOMER_OUTCOMES.value: ToolSpec(("job_id", "limit", "offset")),
     ToolName.UPDATE_CUSTOMER_OUTCOME.value: ToolSpec(
         (
             "outcome_id",
@@ -116,7 +116,7 @@ TOOL_SPECS: dict[str, ToolSpec] = {
         ("source_name", "source_kind", "name", "content"),
     ),
     ToolName.GET_EVIDENCE.value: ToolSpec(("evidence_id",), ("evidence_id",)),
-    ToolName.LIST_EVIDENCE.value: ToolSpec(("job_id", "step_id", "outcome_id")),
+    ToolName.LIST_EVIDENCE.value: ToolSpec(("job_id", "step_id", "outcome_id", "limit", "offset")),
     ToolName.DELETE_EVIDENCE.value: ToolSpec(("evidence_id",), ("evidence_id",)),
     ToolName.PROMOTE_EVIDENCE.value: ToolSpec(
         (

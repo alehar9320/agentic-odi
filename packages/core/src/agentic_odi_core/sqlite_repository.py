@@ -11,7 +11,7 @@ from pydantic import BaseModel, ValidationError
 from agentic_odi_core.events import DEFAULT_DEVICE, DEFAULT_WORKSPACE, Event
 from agentic_odi_core.intent_store import IntentStore
 from agentic_odi_core.models import CustomerOutcome, Evidence, Job, Outcome, Step
-from agentic_odi_core.repository import Repository
+from agentic_odi_core.repository import Repository, page
 
 
 class SQLiteRepository(Repository):
@@ -134,10 +134,10 @@ class SQLiteRepository(Repository):
             self._sync()
             return job
 
-    def list_jobs(self) -> list[Job]:
+    def list_jobs(self, limit: int | None = None, offset: int = 0) -> list[Job]:
         with self._lock:
             self._sync()
-            return list(self.jobs.values())
+            return page(list(self.jobs.values()), limit, offset)
 
     def get_job(self, job_id: str) -> Job | None:
         with self._lock:
@@ -192,10 +192,13 @@ class SQLiteRepository(Repository):
             self._sync()
             return self.steps.get(step_id)
 
-    def get_steps_for_job(self, job_id: str) -> list[Step]:
+    def get_steps_for_job(
+        self, job_id: str, limit: int | None = None, offset: int = 0
+    ) -> list[Step]:
         with self._lock:
             self._sync()
-            return [s for s in self.steps.values() if s.job_id == job_id]
+            steps = [s for s in self.steps.values() if s.job_id == job_id]
+            return page(steps, limit, offset)
 
     def update_step(self, step_id: str, updates: dict) -> Step | None:
         with self._lock:
@@ -245,13 +248,19 @@ class SQLiteRepository(Repository):
             self._sync()
             return self.outcomes.get(outcome_id)
 
-    def get_outcomes(self, job_id: str, step_id: str | None = None) -> list[Outcome]:
+    def get_outcomes(
+        self,
+        job_id: str,
+        step_id: str | None = None,
+        limit: int | None = None,
+        offset: int = 0,
+    ) -> list[Outcome]:
         with self._lock:
             self._sync()
             outs = [o for o in self.outcomes.values() if o.job_id == job_id]
             if step_id is not None:
                 outs = [o for o in outs if o.step_id == step_id]
-            return outs
+            return page(outs, limit, offset)
 
     def update_outcome(self, outcome_id: str, updates: dict) -> Outcome | None:
         with self._lock:
@@ -301,12 +310,19 @@ class SQLiteRepository(Repository):
             self._sync()
             return self.customer_outcomes.get(outcome_id)
 
-    def list_customer_outcomes(self, job_id: str | None = None) -> list[CustomerOutcome]:
+    def list_customer_outcomes(
+        self,
+        job_id: str | None = None,
+        limit: int | None = None,
+        offset: int = 0,
+    ) -> list[CustomerOutcome]:
         with self._lock:
             self._sync()
             if job_id is None:
-                return list(self.customer_outcomes.values())
-            return [co for co in self.customer_outcomes.values() if co.job_id == job_id]
+                items = list(self.customer_outcomes.values())
+            else:
+                items = [co for co in self.customer_outcomes.values() if co.job_id == job_id]
+            return page(items, limit, offset)
 
     def update_customer_outcome(
         self, outcome_id: str, updates: dict[str, Any]
@@ -352,6 +368,8 @@ class SQLiteRepository(Repository):
         job_id: str | None = None,
         step_id: str | None = None,
         outcome_id: str | None = None,
+        limit: int | None = None,
+        offset: int = 0,
     ) -> list[Evidence]:
         with self._lock:
             self._sync()
@@ -362,7 +380,7 @@ class SQLiteRepository(Repository):
                 items = [item for item in items if item.step_id == step_id]
             if outcome_id is not None:
                 items = [item for item in items if item.outcome_id == outcome_id]
-            return items
+            return page(items, limit, offset)
 
     def delete_evidence(self, evidence_id: str) -> bool:
         with self._lock:
