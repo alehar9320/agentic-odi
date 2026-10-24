@@ -127,7 +127,15 @@ agentic-odi desired-outcomes list --job-id <job-id>
 agentic-odi desired-outcomes get <outcome-id>
 agentic-odi desired-outcomes update <outcome-id> --satisfaction 6
 agentic-odi desired-outcomes delete <outcome-id> --yes
+
+# One-screen report: job header, phase coverage, biggest opportunities
+agentic-odi summary <job-id>
+agentic-odi summary <job-id> --top 3 --json
 ```
+
+`summary` shows how many of the eight job-map phases the Job covers, which are
+still missing, and the underserved outcomes (score above 10) in descending
+order. `--top` caps that list; `--json` returns the same data for a script.
 
 Add `--json` to any command for machine-readable output.
 
