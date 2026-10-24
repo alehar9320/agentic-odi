@@ -640,14 +640,6 @@ key ahead of the cut-over.</p>
 If the private key leaks, treat auto-updates as compromised: generate a new
 pair, rotate the Actions secret, and publish a freshly signed release.</p>
 </blockquote>
-<blockquote>
-<p>[!IMPORTANT]
-<strong>Migration note.</strong> The Streamlit UI has been removed. The Living Studio now
-lives in <code>apps/studio/</code> (browser SPA + Tauri desktop app) and is served by the
-<code>apps/studio-api</code> sidecar on port <strong>8100</strong> (previously Streamlit's <code>8501</code>).
-Start everything with <code>python scripts/dev.py</code>. All <code>AGENTIC_ODI_*</code> environment
-variable names, the demo dataset, and the ODI formulas are unchanged.</p>
-</blockquote>
 <h2 id="connecting-an-llm">Connecting an LLM</h2>
 <p>The Studio needs an OpenAI-compatible LLM backend with tool-calling support to
 drive the agent. For a fully local setup, see
