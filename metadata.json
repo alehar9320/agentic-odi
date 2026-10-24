@@ -3,7 +3,7 @@
   "checkpoint_id": "01M5PR387Z0WH6837885RPPMYJ",
   "strategy": "manual-commit",
   "branch": "slay/f4fc1fa2-tool-progress",
-  "checkpoints_count": 1,
+  "checkpoints_count": 2,
   "files_touched": [
     "apps/mcp-server/src/agentic_odi_mcp_server/mcp_server.py",
     "apps/mcp-server/tests/test_tool_progress.py"
@@ -14,6 +14,13 @@
       "transcript": "/0/full.jsonl",
       "compact_transcript": "/0/transcript.jsonl",
       "content_hash": "/0/content_hash.txt",
+      "prompt": ""
+    },
+    {
+      "metadata": "/1/metadata.json",
+      "transcript": "/1/full.jsonl",
+      "compact_transcript": "/1/transcript.jsonl",
+      "content_hash": "/1/content_hash.txt",
       "prompt": ""
     }
   ],
