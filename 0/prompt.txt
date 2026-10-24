@@ -1,1 +1,1 @@
-Your job is to implement prioritized github issues. Do so each on a new git worktree. You're done when a branch has been pushed with code changes that fulfill the described objective of the issue, PR is available, and linked to issue, and CI is verfied as green. The issue numberr is: https://github.com/alehar9320/agentic-odi/issues/124.
+Finish up then
