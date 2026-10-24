@@ -117,8 +117,7 @@
 
     <div class="prose">
       <p>Agentic ODI is a uv workspace with a single root <code>pyproject.toml</code> for shared tooling. Python distributions are imported by their stable <code>agentic_odi_*</code> package names; directory layout does not leak into imports.</p>
-<h2 id="layout">Layout</h2>
-<pre class="highlight"><code class="language-text">apps/
+<h2 id="layout">Layout<a class="heading-anchor" href="#layout" aria-label="Copy link to this section" title="Copy link">#</a></h2><pre class="highlight"><code class="language-text">apps/
   cli/            agentic_odi_cli         Typer CLI: local SQLite or remote MCP
   mcp-server/     agentic_odi_mcp_server  FastMCP server over HTTP
   studio-api/     agentic_odi_studio_api  FastAPI sidecar for the Studio SPA
@@ -131,8 +130,7 @@ scripts/          Dev launcher, binary build, installer checks
 tests/            Cross-package contract and launcher tests only
 docs/             Architecture, reference material, Superpowers artifacts
 packaging/        PyInstaller spec for the CLI binary
-</code></pre><h2 id="dependency-direction">Dependency Direction</h2>
-<pre class="highlight"><code class="language-text">apps/cli ──────────────┐
+</code></pre><h2 id="dependency-direction">Dependency Direction<a class="heading-anchor" href="#dependency-direction" aria-label="Copy link to this section" title="Copy link">#</a></h2><pre class="highlight"><code class="language-text">apps/cli ──────────────┐
 apps/mcp-server ───────┼──▶ packages/core
 apps/studio-api ───────┘         ▲
                                  │
@@ -143,8 +141,7 @@ apps/cli ──────────────▶ packages/connectors
 <li>Every runnable app may depend on <code>core</code>; none of them imports another app.</li>
 <li>The React SPA only talks to <code>apps/studio-api</code> over <code>/api</code>; it never calls MCP or the LLM directly.</li>
 </ul>
-<h2 id="persistence">Persistence</h2>
-<ul>
+<h2 id="persistence">Persistence<a class="heading-anchor" href="#persistence" aria-label="Copy link to this section" title="Copy link">#</a></h2><ul>
 <li><code>SQLiteRepository</code> is the production default for the CLI, MCP server, and Studio API.</li>
 <li>The default database is <code>~/.agentic-odi/odi.db</code>, overridable with <code>AGENTIC_ODI_DB</code>.</li>
 <li>Studio conversation history and PM memory use a separate SQLite database,
@@ -154,10 +151,8 @@ sidecar-local and never enter the ODI repository or the MCP contract.</li>
 <li>The CLI selects its backend with <code>--backend local|mcp</code> or <code>AGENTIC_ODI_BACKEND</code>.</li>
 <li>The Studio API selects <code>local</code> (direct service calls) or <code>mcp</code> (passthrough) with <code>AGENTIC_ODI_BACKEND</code> or <code>create_app(backend=...)</code>.</li>
 </ul>
-<h2 id="mcp-contract">MCP Contract</h2>
-<p><code>packages/core/src/agentic_odi_core/contract.py</code> owns <code>ToolName</code>, <code>ToolSpec</code>, <code>TOOL_SPECS</code>, and <code>TOOL_NAMES</code>. The live FastMCP registry is asserted against it by <code>tests/contract/test_mcp_contract.py</code>; the CLI's local handlers are checked by <code>tests/contract/test_cli_contract.py</code>.</p>
-<h2 id="entry-points">Entry Points</h2>
-<table>
+<h2 id="mcp-contract">MCP Contract<a class="heading-anchor" href="#mcp-contract" aria-label="Copy link to this section" title="Copy link">#</a></h2><p><code>packages/core/src/agentic_odi_core/contract.py</code> owns <code>ToolName</code>, <code>ToolSpec</code>, <code>TOOL_SPECS</code>, and <code>TOOL_NAMES</code>. The live FastMCP registry is asserted against it by <code>tests/contract/test_mcp_contract.py</code>; the CLI's local handlers are checked by <code>tests/contract/test_cli_contract.py</code>.</p>
+<h2 id="entry-points">Entry Points<a class="heading-anchor" href="#entry-points" aria-label="Copy link to this section" title="Copy link">#</a></h2><table>
 <thead>
 <tr>
 <th>Command</th>
@@ -183,8 +178,7 @@ sidecar-local and never enter the ODI repository or the MCP contract.</li>
 </tr>
 </tbody>
 </table>
-<h2 id="related">Related</h2>
-<ul>
+<h2 id="related">Related<a class="heading-anchor" href="#related" aria-label="Copy link to this section" title="Copy link">#</a></h2><ul>
 <li><a href="https://github.com/alehar9320/agentic-odi/blob/main/docs/architecture/data-flow.md">Data flow</a></li>
 <li><a href="https://github.com/alehar9320/agentic-odi/blob/main/docs/architecture/testing.md">Testing</a></li>
 </ul>

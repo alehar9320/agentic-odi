@@ -118,8 +118,7 @@
     <div class="prose">
       <p>Everything below mirrors what CI runs. Install the workspace first:</p>
 <pre class="highlight"><code class="language-bash">uv<span class="w"> </span>sync<span class="w"> </span>--all-packages
-</code></pre><h2 id="linting-formatting-type-checks">Linting, Formatting &amp; Type Checks</h2>
-<p>Shared tooling lives in the root <code>pyproject.toml</code>, so one command covers every
+</code></pre><h2 id="linting-formatting-type-checks">Linting, Formatting &amp; Type Checks<a class="heading-anchor" href="#linting-formatting-type-checks" aria-label="Copy link to this section" title="Copy link">#</a></h2><p>Shared tooling lives in the root <code>pyproject.toml</code>, so one command covers every
 Python project:</p>
 <pre class="highlight"><code class="language-bash">uv<span class="w"> </span>run<span class="w"> </span>ruff<span class="w"> </span>check<span class="w"> </span>.
 uv<span class="w"> </span>run<span class="w"> </span>ruff<span class="w"> </span>format<span class="w"> </span>--check<span class="w"> </span>.
@@ -128,15 +127,13 @@ uv<span class="w"> </span>run<span class="w"> </span>--directory<span class="w">
 
 <span class="c1"># Security scanning</span>
 uv<span class="w"> </span>run<span class="w"> </span>bandit<span class="w"> </span>-c<span class="w"> </span>pyproject.toml<span class="w"> </span>-r<span class="w"> </span>apps<span class="w"> </span>packages<span class="w"> </span>website/
-</code></pre><h2 id="frontend-desktop-checks-studio">Frontend &amp; Desktop Checks (studio)</h2>
-<p>The SPA and Tauri shell mirror their CI jobs locally:</p>
+</code></pre><h2 id="frontend-desktop-checks-studio">Frontend &amp; Desktop Checks (studio)<a class="heading-anchor" href="#frontend-desktop-checks-studio" aria-label="Copy link to this section" title="Copy link">#</a></h2><p>The SPA and Tauri shell mirror their CI jobs locally:</p>
 <pre class="highlight"><code class="language-bash">npm<span class="w"> </span>--prefix<span class="w"> </span>apps/studio<span class="w"> </span>run<span class="w"> </span>lint<span class="w">       </span><span class="c1"># ESLint</span>
 npm<span class="w"> </span>--prefix<span class="w"> </span>apps/studio<span class="w"> </span>run<span class="w"> </span>typecheck<span class="w">  </span><span class="c1"># tsc --noEmit</span>
 npm<span class="w"> </span>--prefix<span class="w"> </span>apps/studio<span class="w"> </span><span class="nb">test</span><span class="w"> </span>--<span class="w"> </span>--run<span class="w">  </span><span class="c1"># Vitest (run once)</span>
 npm<span class="w"> </span>--prefix<span class="w"> </span>apps/studio<span class="w"> </span>run<span class="w"> </span>build<span class="w">      </span><span class="c1"># production build → apps/studio/dist</span>
 <span class="nb">cd</span><span class="w"> </span>apps/studio/src-tauri<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>cargo<span class="w"> </span>fmt<span class="w"> </span>--check<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>cargo<span class="w"> </span>clippy<span class="w"> </span>--<span class="w"> </span>-D<span class="w"> </span>warnings<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>cargo<span class="w"> </span>check
-</code></pre><h3 id="conversational-ui-coverage">Conversational UI coverage</h3>
-<p>The agent-composed surfaces and the first-run tour are covered at these levels:</p>
+</code></pre><h3 id="conversational-ui-coverage">Conversational UI coverage<a class="heading-anchor" href="#conversational-ui-coverage" aria-label="Copy link to this section" title="Copy link">#</a></h3><p>The agent-composed surfaces and the first-run tour are covered at these levels:</p>
 <table>
 <thead>
 <tr>
@@ -183,8 +180,7 @@ npm<span class="w"> </span>--prefix<span class="w"> </span>apps/studio<span clas
 </tr>
 </tbody>
 </table>
-<h2 id="website-checks-github-pages">Website Checks (GitHub Pages)</h2>
-<p>The <code>website/</code> static site is part of the main CI workflow. Its tests assert the
+<h2 id="website-checks-github-pages">Website Checks (GitHub Pages)<a class="heading-anchor" href="#website-checks-github-pages" aria-label="Copy link to this section" title="Copy link">#</a></h2><p>The <code>website/</code> static site is part of the main CI workflow. Its tests assert the
 committed OG art is reproducible, that <code>index.html</code> stays in sync with the
 README, and that the publish pipeline (<code>website/tests/test_pages_deploy.py</code>)
 still exists:</p>
@@ -193,8 +189,7 @@ still exists:</p>
 <code>_site</code> from <code>website/</code>, and deploys the artifact with <code>actions/deploy-pages</code> on
 every push to <code>main</code>. There is no <code>gh-pages</code> branch, so that workflow is the only
 thing that keeps <a href="https://alehar9320.github.io/agentic-odi/">https://alehar9320.github.io/agentic-odi/</a> online.</p>
-<h2 id="formatting-workflow">Formatting workflow</h2>
-<ul>
+<h2 id="formatting-workflow">Formatting workflow<a class="heading-anchor" href="#formatting-workflow" aria-label="Copy link to this section" title="Copy link">#</a></h2><ul>
 <li>
 <p><strong>When editing Python files</strong>, either rely on the <strong>pre-commit hooks</strong> below
 (recommended) or run Ruff formatting directly before pushing:</p>
@@ -210,15 +205,13 @@ changes, and push again.</li>
 </ul>
 </li>
 </ul>
-<h2 id="pre-commit-hooks">Pre-commit hooks</h2>
-<p>To run the checks automatically before each commit:</p>
+<h2 id="pre-commit-hooks">Pre-commit hooks<a class="heading-anchor" href="#pre-commit-hooks" aria-label="Copy link to this section" title="Copy link">#</a></h2><p>To run the checks automatically before each commit:</p>
 <pre class="highlight"><code class="language-bash">uv<span class="w"> </span>tool<span class="w"> </span>install<span class="w"> </span>pre-commit
 pre-commit<span class="w"> </span>install
 </code></pre><p>After this, <code>ruff</code> and <code>ruff-format</code> run on staged files whenever you commit.
 You can also trigger them manually:</p>
 <pre class="highlight"><code class="language-bash">pre-commit<span class="w"> </span>run<span class="w"> </span>--all-files
-</code></pre><h2 id="testing">Testing</h2>
-<p>Tests use <strong>pytest</strong> with <strong>pytest-asyncio</strong> (strict mode) and run entirely
+</code></pre><h2 id="testing">Testing<a class="heading-anchor" href="#testing" aria-label="Copy link to this section" title="Copy link">#</a></h2><p>Tests use <strong>pytest</strong> with <strong>pytest-asyncio</strong> (strict mode) and run entirely
 in-memory — no running server required. Tests live next to the package they
 cover, and every test runs from the repository root:</p>
 <pre class="highlight"><code class="language-bash">uv<span class="w"> </span>run<span class="w"> </span>pytest<span class="w">                        </span><span class="c1"># everything</span>
@@ -230,8 +223,7 @@ uv<span class="w"> </span>run<span class="w"> </span>pytest<span class="w"> </sp
 <code>packages/core/src/agentic_odi_core/contract.py</code>, so add or change a tool in
 both places. The CLI local-backend contract test keeps <code>_LOCAL_HANDLERS</code> aligned
 with the same tool names.</p>
-<h2 id="test-coverage">Test Coverage</h2>
-<p>CI runs the suite on Python <strong>3.10, 3.11, and 3.12</strong> and uploads one combined
+<h2 id="test-coverage">Test Coverage<a class="heading-anchor" href="#test-coverage" aria-label="Copy link to this section" title="Copy link">#</a></h2><p>CI runs the suite on Python <strong>3.10, 3.11, and 3.12</strong> and uploads one combined
 <code>coverage.xml</code> from the 3.12 job to
 <a href="https://codecov.io/gh/alehar9320/agentic-odi">Codecov</a>.</p>
 <p>The Codecov upload authenticates with the <code>CODECOV_TOKEN</code> repository secret and
@@ -258,8 +250,7 @@ suite catches up.</li>
 Coverage is only collected for the Python packages. <code>apps/studio/</code> and test
 directories are excluded in <code>codecov.yml</code>.</p>
 </blockquote>
-<h3 id="conventions">Conventions</h3>
-<ul>
+<h3 id="conventions">Conventions<a class="heading-anchor" href="#conventions" aria-label="Copy link to this section" title="Copy link">#</a></h3><ul>
 <li>Test files live under each project's <code>tests/</code> directory and are named
 <code>test_*.py</code>.</li>
 <li>Root <code>tests/</code> is reserved for cross-package checks (<code>contract/</code> and
@@ -269,8 +260,7 @@ directories are excluded in <code>codecov.yml</code>.</p>
 <li>The MCP server's <code>reset_db</code> autouse fixture clears in-memory state before
 each test.</li>
 </ul>
-<h3 id="test-coverage-map">Test Coverage Map</h3>
-<table>
+<h3 id="test-coverage-map">Test Coverage Map<a class="heading-anchor" href="#test-coverage-map" aria-label="Copy link to this section" title="Copy link">#</a></h3><table>
 <thead>
 <tr>
 <th>Area</th>
@@ -321,8 +311,7 @@ each test.</li>
 Type <code>/test</code> in the AI assistant to have the agent run all tests and report the
 results automatically.</p>
 </blockquote>
-<h2 id="agent-session-tracking">Agent Session Tracking</h2>
-<p>Agent sessions are captured with the <a href="https://docs.entire.io/overview">Entire</a>
+<h2 id="agent-session-tracking">Agent Session Tracking<a class="heading-anchor" href="#agent-session-tracking" aria-label="Copy link to this section" title="Copy link">#</a></h2><p>Agent sessions are captured with the <a href="https://docs.entire.io/overview">Entire</a>
 CLI. The repository integration lives in <code>.entire/settings.json</code>,
 <code>.cursor/hooks.json</code>, and <code>.opencode/plugins/entire.ts</code>. Run <code>entire status</code> to
 confirm it is enabled and <code>entire checkpoint list</code> to inspect captured
