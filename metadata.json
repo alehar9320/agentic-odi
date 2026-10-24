@@ -3,7 +3,7 @@
   "checkpoint_id": "01M5P7RQEGAC4T3F54CPNEA903",
   "strategy": "manual-commit",
   "branch": "slay/bf6dd851-score-format",
-  "checkpoints_count": 4,
+  "checkpoints_count": 7,
   "files_touched": [
     "apps/cli/tests/test_backend_selection.py"
   ],
@@ -35,13 +35,20 @@
       "compact_transcript": "/3/transcript.jsonl",
       "content_hash": "/3/content_hash.txt",
       "prompt": ""
+    },
+    {
+      "metadata": "/4/metadata.json",
+      "transcript": "/4/full.jsonl",
+      "compact_transcript": "/4/transcript.jsonl",
+      "content_hash": "/4/content_hash.txt",
+      "prompt": "/4/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 0,
+    "input_tokens": 366093,
     "cache_creation_tokens": 0,
-    "cache_read_tokens": 0,
-    "output_tokens": 0,
-    "api_call_count": 0
+    "cache_read_tokens": 732256,
+    "output_tokens": 6190,
+    "api_call_count": 6
   }
 }

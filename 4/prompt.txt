@@ -1,0 +1,9 @@
+Your next objective is to groom the existing tasks. Each must provide a meaningful outcome so that when a human reviews the PR, it adds a distinct valuable value increment to the project. Today, many of them are chores, or documentation improvements, that mostly add noise to maintainer, and brings little joy to users. Note however that the instructions must yet be good enough for a simpler llm to implement it, so you still need to provide sufficient technical break-down of what needs to be done, however, starting off from outlinnig the higher-order objective
+
+---
+
+Only do items in backlog column/state. Each task must be distinct, but its instructions are great if they're atomic. If it helps to merge, do so.
+
+---
+
+It's your job to identify how to best group them so that they in clusters form a meaningful value increment on the roadmap, yet be implementable by a dumb llm later, so that there are specific instructions. Any item moved to a different stage in slayzone we should stop working on, since anotehr ai agent is then processing it
