@@ -3,7 +3,7 @@
   "checkpoint_id": "01M5P8Y8VMYQCX161FZJ172BAX",
   "strategy": "manual-commit",
   "branch": "slay/e4060c02-adr",
-  "checkpoints_count": 3,
+  "checkpoints_count": 4,
   "files_touched": [
     "docs/architecture/README.md",
     "docs/architecture/adr/0001-mcp-http-transport.md",
@@ -29,6 +29,13 @@
       "transcript": "/2/full.jsonl",
       "compact_transcript": "/2/transcript.jsonl",
       "content_hash": "/2/content_hash.txt",
+      "prompt": ""
+    },
+    {
+      "metadata": "/3/metadata.json",
+      "transcript": "/3/full.jsonl",
+      "compact_transcript": "/3/transcript.jsonl",
+      "content_hash": "/3/content_hash.txt",
       "prompt": ""
     }
   ],
