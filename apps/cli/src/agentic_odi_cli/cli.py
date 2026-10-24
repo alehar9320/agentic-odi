@@ -18,6 +18,7 @@ from agentic_odi_cli.customer_outcomes import customer_outcomes_app, score
 from agentic_odi_cli.desired_outcomes import desired_outcomes_app
 from agentic_odi_cli.evidence import evidence_app
 from agentic_odi_cli.jobs import jobs_app
+from agentic_odi_cli.render import render_job_summary
 from agentic_odi_cli.steps import steps_app
 from agentic_odi_cli.version import __version__  # noqa: F401  (re-exported for tests)
 
@@ -189,6 +190,27 @@ def guidelines_cmd() -> None:
 def capabilities_cmd() -> None:
     """Print what the assistant can do."""
     typer.echo(run_tool("get_capabilities", {}))
+
+
+@app.command(name="summary")
+def summary(
+    job_id: str = typer.Argument(..., help="Job ID"),
+    top: int = typer.Option(5, "--top", help="How many underserved outcomes to show."),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
+) -> None:
+    """Summarize a Job's map coverage and its biggest opportunities."""
+    job = run_tool("get_job", {"job_id": job_id})
+    steps = run_tool("get_job_map", {"job_id": job_id})
+    outcomes = run_tool("get_outcomes", {"job_id": job_id})
+    typer.echo(
+        render_job_summary(
+            job if isinstance(job, dict) else {},
+            steps if isinstance(steps, list) else [],
+            outcomes if isinstance(outcomes, list) else [],
+            top=top,
+            as_json=json_output,
+        )
+    )
 
 
 @app.command(name="version")

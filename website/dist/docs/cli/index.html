@@ -289,7 +289,14 @@ agentic-odi<span class="w"> </span>desired-outcomes<span class="w"> </span>list<
 agentic-odi<span class="w"> </span>desired-outcomes<span class="w"> </span>get<span class="w"> </span>&lt;outcome-id&gt;
 agentic-odi<span class="w"> </span>desired-outcomes<span class="w"> </span>update<span class="w"> </span>&lt;outcome-id&gt;<span class="w"> </span>--satisfaction<span class="w"> </span><span class="m">6</span>
 agentic-odi<span class="w"> </span>desired-outcomes<span class="w"> </span>delete<span class="w"> </span>&lt;outcome-id&gt;<span class="w"> </span>--yes
-</code></pre><p>Add <code>--json</code> to any command for machine-readable output.</p>
+
+<span class="c1"># One-screen report: job header, phase coverage, biggest opportunities</span>
+agentic-odi<span class="w"> </span>summary<span class="w"> </span>&lt;job-id&gt;
+agentic-odi<span class="w"> </span>summary<span class="w"> </span>&lt;job-id&gt;<span class="w"> </span>--top<span class="w"> </span><span class="m">3</span><span class="w"> </span>--json
+</code></pre><p><code>summary</code> shows how many of the eight job-map phases the Job covers, which are
+still missing, and the underserved outcomes (score above 10) in descending
+order. <code>--top</code> caps that list; <code>--json</code> returns the same data for a script.</p>
+<p>Add <code>--json</code> to any command for machine-readable output.</p>
 <h2 id="evidence">Evidence</h2>
 <p>Evidence is research captured from connectors (or entered by hand) and linked to
 a Job, Step, or desired Outcome. Records can later be promoted into ODI
