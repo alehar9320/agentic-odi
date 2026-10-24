@@ -1,0 +1,31 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M5PQDH0ZS571WG4PGESZASZD",
+  "strategy": "manual-commit",
+  "branch": "slay/5d05845d-skip-tour-step",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "apps/studio/src/onboarding/FirstRunWizard.test.tsx",
+    "apps/studio/src/onboarding/FirstRunWizard.tsx",
+    "apps/studio/src/onboarding/OnboardingProvider.tsx",
+    "apps/studio/src/onboarding/context.ts",
+    "apps/studio/src/onboarding/machine.ts",
+    "apps/studio/src/onboarding/onboarding.css"
+  ],
+  "sessions": [
+    {
+      "metadata": "/0/metadata.json",
+      "transcript": "/0/full.jsonl",
+      "compact_transcript": "/0/transcript.jsonl",
+      "content_hash": "/0/content_hash.txt",
+      "prompt": ""
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 0,
+    "output_tokens": 0,
+    "api_call_count": 0
+  }
+}
