@@ -375,3 +375,43 @@ def test_clear_removes_everything(tmp_path):
 
     assert repo.get_job("j1") is None
     assert SQLiteRepository(db_path=db).get_job("j1") is None
+
+
+def test_the_connection_is_configured_for_concurrent_writers(tmp_path):
+    from agentic_odi_core.intent_store import IntentStore
+
+    store = IntentStore(str(tmp_path / "events.db"))
+    try:
+        assert store.conn.execute("PRAGMA journal_mode").fetchone()[0].lower() == "wal"
+        assert store.conn.execute("PRAGMA busy_timeout").fetchone()[0] == 5000
+    finally:
+        store.close()
+
+
+def test_concurrent_writers_both_land_even_when_the_lock_is_contended(tmp_path):
+    import threading
+
+    db = str(tmp_path / "odi.db")
+    writers = [SQLiteRepository(db_path=db) for _ in range(6)]
+    failures: list[BaseException] = []
+    start = threading.Barrier(len(writers))
+
+    def write(repo: SQLiteRepository, index: int) -> None:
+        try:
+            start.wait()
+            for attempt in range(10):
+                repo.add_job(Job(id=f"j{index}-{attempt}", name=f"Job {index}.{attempt}"))
+        except BaseException as error:  # noqa: BLE001 - the assertion reports it
+            failures.append(error)
+
+    threads = [
+        threading.Thread(target=write, args=(repo, index)) for index, repo in enumerate(writers)
+    ]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=30)
+
+    assert failures == []
+    reopened = SQLiteRepository(db_path=db)
+    assert len(reopened.list_jobs()) == 60

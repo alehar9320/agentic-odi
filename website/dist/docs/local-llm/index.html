@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Local Tools-Capable LLM Backend</title>
   <meta name="description" content="Running a local model with tool calling.">
-  <meta name="color-scheme" content="dark">
+  <meta name="color-scheme" content="dark light">
   <meta name="theme-color" content="#0a0b0e">
 
   <meta property="og:type" content="website">
@@ -20,6 +20,7 @@
   <meta name="twitter:image" content="https://alehar9320.github.io/agentic-odi/assets/og.png">
 
   <link rel="canonical" href="https://alehar9320.github.io/agentic-odi/docs/local-llm/index.html">
+  <script src="../../assets/theme.js"></script>
   <link rel="stylesheet" href="../../assets/tokens.css">
   <link rel="stylesheet" href="../../assets/style.css">
   <link rel="icon" type="image/svg+xml" href="../../assets/favicon.svg">
@@ -40,7 +41,23 @@
         <a href="https://alehar9320.github.io/agentic-odi/#how">How&nbsp;it&nbsp;works</a>
         <a href="https://alehar9320.github.io/agentic-odi/docs/">Docs</a>
       </nav>
+      <div class="site-header__actions">
+      <button
+        class="theme-toggle"
+        type="button"
+        aria-label="Switch to the light theme"
+        title="Switch theme"
+      >
+        <svg class="theme-toggle__sun" viewBox="0 0 24 24" width="17" height="17" aria-hidden="true" focusable="false">
+          <circle cx="12" cy="12" r="4.2" fill="none" stroke="currentColor" stroke-width="1.8"></circle>
+          <path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
+        </svg>
+        <svg class="theme-toggle__moon" viewBox="0 0 24 24" width="17" height="17" aria-hidden="true" focusable="false">
+          <path d="M20 14.2A8.4 8.4 0 0 1 9.8 4a8.5 8.5 0 1 0 10.2 10.2Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"></path>
+        </svg>
+      </button>
       <a class="btn btn--primary btn--sm" href="https://alehar9320.github.io/agentic-odi/#run">Run it in 60 seconds</a>
+      </div>
     </div>
   </header>
 
@@ -126,16 +143,13 @@ local LLM backend that:</p>
 <p>A simple fully local option is
 <a href="https://github.com/abetlen/llama-cpp-python"><code>llama-cpp-python</code></a>, which can run
 a quantized model on your machine and expose an OpenAI-compatible server.</p>
-<h2 id="1-install-a-local-llm-server">1. Install a local LLM server</h2>
-<p>Install <code>llama-cpp-python</code> in your environment (see its README for
+<h2 id="1-install-a-local-llm-server">1. Install a local LLM server<a class="heading-anchor" href="#1-install-a-local-llm-server" aria-label="Copy link to this section" title="Copy link">#</a></h2><p>Install <code>llama-cpp-python</code> in your environment (see its README for
 platform-specific build notes):</p>
 <pre class="highlight"><code class="language-bash">pip<span class="w"> </span>install<span class="w"> </span>llama-cpp-python
-</code></pre><h2 id="2-download-a-small-tools-capable-model">2. Download a small tools-capable model</h2>
-<p>Download a small GGUF model that supports function/tool calling (for example, a
+</code></pre><h2 id="2-download-a-small-tools-capable-model">2. Download a small tools-capable model<a class="heading-anchor" href="#2-download-a-small-tools-capable-model" aria-label="Copy link to this section" title="Copy link">#</a></h2><p>Download a small GGUF model that supports function/tool calling (for example, a
 7B function-calling variant from Hugging Face) and note its path, e.g.
 <code>C:\models\local-tools-model.gguf</code>.</p>
-<h2 id="3-start-the-openai-compatible-server">3. Start the OpenAI-compatible server</h2>
-<p>Start the server and give the model a friendly alias that matches the default
+<h2 id="3-start-the-openai-compatible-server">3. Start the OpenAI-compatible server<a class="heading-anchor" href="#3-start-the-openai-compatible-server" aria-label="Copy link to this section" title="Copy link">#</a></h2><p>Start the server and give the model a friendly alias that matches the default
 used by the Living Studio sidecar and the CLI chat:</p>
 <pre class="highlight"><code class="language-bash">python<span class="w"> </span>-m<span class="w"> </span>llama_cpp.server<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--model<span class="w"> </span><span class="s2">"C:\models\local-tools-model.gguf"</span><span class="w"> </span><span class="se">\</span>
@@ -143,8 +157,7 @@ used by the Living Studio sidecar and the CLI chat:</p>
 <span class="w">  </span>--host<span class="w"> </span><span class="m">127</span>.0.0.1<span class="w"> </span>--port<span class="w"> </span><span class="m">8001</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--chat_format<span class="w"> </span>openai
 </code></pre><p>This exposes an OpenAI-style API at <code>http://127.0.0.1:8001/v1</code>.</p>
-<h2 id="4-configure-the-studio">4. Configure the Studio</h2>
-<p>The Living Studio sidecar and the CLI chat read the following environment
+<h2 id="4-configure-the-studio">4. Configure the Studio<a class="heading-anchor" href="#4-configure-the-studio" aria-label="Copy link to this section" title="Copy link">#</a></h2><p>The Living Studio sidecar and the CLI chat read the following environment
 variables (with sensible defaults):</p>
 <table>
 <thead>
@@ -174,8 +187,7 @@ variables (with sensible defaults):</p>
 </table>
 <p>You can either set these in your shell or adjust them in the Living Studio's
 <strong>Settings</strong> panel.</p>
-<h2 id="5-verify-tool-calling-against-the-mcp-server">5. Verify tool-calling against the MCP server</h2>
-<ul>
+<h2 id="5-verify-tool-calling-against-the-mcp-server">5. Verify tool-calling against the MCP server<a class="heading-anchor" href="#5-verify-tool-calling-against-the-mcp-server" aria-label="Copy link to this section" title="Copy link">#</a></h2><ul>
 <li>
 <p>(Optional) Before starting the UI, confirm the LLM backend is reachable:</p>
 <pre class="highlight"><code class="language-bash">curl<span class="w"> </span>http://127.0.0.1:8001/v1/models

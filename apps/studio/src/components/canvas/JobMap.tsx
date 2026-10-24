@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 
 import { useStudio } from "../../state/StudioContext";
 import { FailurePanel } from "../FailurePanel";
@@ -26,6 +26,7 @@ export function JobMap() {
   const canvas = canvasState.data;
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [editingStepId, setEditingStepId] = useState<string | null>(null);
+  const [focusedStepId, setFocusedStepId] = useState<string | null>(null);
   const [editStepName, setEditStepName] = useState("");
   const [editStepOrder, setEditStepOrder] = useState(1);
   const [jobName, setJobName] = useState("");
@@ -52,6 +53,22 @@ export function JobMap() {
     }
   }
 
+  /** Swap a step with its neighbour, so order changes without a mouse. */
+  async function moveStep(stepId: string, direction: -1 | 1) {
+    const index = steps.findIndex((step) => step.id === stepId);
+    const target = index + direction;
+    if (index < 0 || target < 0 || target >= steps.length) {
+      return;
+    }
+    setBusy(true);
+    try {
+      await updateStep(steps[index].id ?? "", { order: target + 1 });
+      await updateStep(steps[target].id ?? "", { order: index + 1 });
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function saveJob(event: React.FormEvent) {
     event.preventDefault();
     if (!activeJobId || !jobName.trim()) {
@@ -67,7 +84,7 @@ export function JobMap() {
   }
 
   // Map steps to 8 phases evenly or by order
-  const stepPhaseMapping = useMemo(() => {
+  const stepPhaseMapping = (() => {
     const buckets: Array<{ phase: (typeof UNIVERSAL_PHASES)[0]; steps: typeof steps }> =
       UNIVERSAL_PHASES.map((phase) => ({ phase, steps: [] }));
 
@@ -77,7 +94,7 @@ export function JobMap() {
     });
 
     return buckets;
-  }, [steps]);
+  })();
 
   const visibleSteps =
     selectedPhaseIndex === null
@@ -215,7 +232,11 @@ export function JobMap() {
       {canvasState.kind === "loading" ? (
         <GhostJobSteps />
       ) : steps.length ? (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <div
+          role="list"
+          aria-label="Job steps"
+          style={{ display: "flex", flexDirection: "column", gap: 8 }}
+        >
           {visibleSteps.map((step) => {
             const index = steps.indexOf(step);
             const order = step.order ?? index + 1;
@@ -224,6 +245,23 @@ export function JobMap() {
               <div
                 className="step-row fade-in"
                 key={step.id ?? index}
+                role="listitem"
+                tabIndex={0}
+                aria-label={`Step ${order}: ${step.name ?? ""}`}
+                onFocus={() => setFocusedStepId(step.id ?? null)}
+                onBlur={() => setFocusedStepId(null)}
+                onKeyDown={(event) => {
+                  if (!step.id || busy || editingStepId === step.id) {
+                    return;
+                  }
+                  if (event.key === "ArrowUp") {
+                    event.preventDefault();
+                    void moveStep(step.id, -1);
+                  } else if (event.key === "ArrowDown") {
+                    event.preventDefault();
+                    void moveStep(step.id, 1);
+                  }
+                }}
                 style={{
                   display: "flex",
                   alignItems: "center",
@@ -308,6 +346,26 @@ export function JobMap() {
                             onClick={() => void deleteStep(step.id ?? "")}
                           >
                             Remove
+                          </button>
+                          <button
+                            type="button"
+                            className="quiet-action"
+                            disabled={busy || !step.id}
+                            aria-label="Move step up"
+                            aria-grabbed={focusedStepId === step.id}
+                            onClick={() => void moveStep(step.id ?? "", -1)}
+                          >
+                            Move up
+                          </button>
+                          <button
+                            type="button"
+                            className="quiet-action"
+                            disabled={busy || !step.id}
+                            aria-label="Move step down"
+                            aria-grabbed={focusedStepId === step.id}
+                            onClick={() => void moveStep(step.id ?? "", 1)}
+                          >
+                            Move down
                           </button>
                         </span>
                       )}

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>CLI Reference</title>
   <meta name="description" content="Backends, chat, entities, and scoring.">
-  <meta name="color-scheme" content="dark">
+  <meta name="color-scheme" content="dark light">
   <meta name="theme-color" content="#0a0b0e">
 
   <meta property="og:type" content="website">
@@ -20,6 +20,7 @@
   <meta name="twitter:image" content="https://alehar9320.github.io/agentic-odi/assets/og.png">
 
   <link rel="canonical" href="https://alehar9320.github.io/agentic-odi/docs/cli/index.html">
+  <script src="../../assets/theme.js"></script>
   <link rel="stylesheet" href="../../assets/tokens.css">
   <link rel="stylesheet" href="../../assets/style.css">
   <link rel="icon" type="image/svg+xml" href="../../assets/favicon.svg">
@@ -40,7 +41,23 @@
         <a href="https://alehar9320.github.io/agentic-odi/#how">How&nbsp;it&nbsp;works</a>
         <a href="https://alehar9320.github.io/agentic-odi/docs/">Docs</a>
       </nav>
+      <div class="site-header__actions">
+      <button
+        class="theme-toggle"
+        type="button"
+        aria-label="Switch to the light theme"
+        title="Switch theme"
+      >
+        <svg class="theme-toggle__sun" viewBox="0 0 24 24" width="17" height="17" aria-hidden="true" focusable="false">
+          <circle cx="12" cy="12" r="4.2" fill="none" stroke="currentColor" stroke-width="1.8"></circle>
+          <path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
+        </svg>
+        <svg class="theme-toggle__moon" viewBox="0 0 24 24" width="17" height="17" aria-hidden="true" focusable="false">
+          <path d="M20 14.2A8.4 8.4 0 0 1 9.8 4a8.5 8.5 0 1 0 10.2 10.2Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"></path>
+        </svg>
+      </button>
       <a class="btn btn--primary btn--sm" href="https://alehar9320.github.io/agentic-odi/#run">Run it in 60 seconds</a>
+      </div>
     </div>
   </header>
 
@@ -123,13 +140,11 @@ commands are <strong>local-first</strong>: they read and write a SQLite store wi
 required, and switch to a remote MCP server with <code>--backend mcp</code>.</p>
 <p>Install the workspace first if you have not already:</p>
 <pre class="highlight"><code class="language-bash">uv<span class="w"> </span>sync<span class="w"> </span>--all-packages
-</code></pre><h2 id="launching">Launching</h2>
-<pre class="highlight"><code class="language-bash">python<span class="w"> </span>-m<span class="w"> </span>agentic_odi_cli<span class="w"> </span>--version<span class="w">   </span><span class="c1"># print the Agentic ODI version</span>
+</code></pre><h2 id="launching">Launching<a class="heading-anchor" href="#launching" aria-label="Copy link to this section" title="Copy link">#</a></h2><pre class="highlight"><code class="language-bash">python<span class="w"> </span>-m<span class="w"> </span>agentic_odi_cli<span class="w"> </span>--version<span class="w">   </span><span class="c1"># print the Agentic ODI version</span>
 python<span class="w"> </span>-m<span class="w"> </span>agentic_odi_cli<span class="w"> </span>--help<span class="w">      </span><span class="c1"># show available options and commands</span>
 python<span class="w"> </span>-m<span class="w"> </span>agentic_odi_cli<span class="w">             </span><span class="c1"># start interactive chat in a terminal (help when piped)</span>
 </code></pre><p>A console script is also installed, so <code>agentic-odi --version</code> works the same way.</p>
-<h2 id="global-options">Global options</h2>
-<table>
+<h2 id="global-options">Global options<a class="heading-anchor" href="#global-options" aria-label="Copy link to this section" title="Copy link">#</a></h2><table>
 <thead>
 <tr>
 <th>Option</th>
@@ -162,15 +177,13 @@ python<span class="w"> </span>-m<span class="w"> </span>agentic_odi_cli<span cla
 <p>Data commands print readable tables and blocks by default; add <code>--json</code> for
 machine-readable output. Diagnostics go to stderr and failures exit non-zero
 (<code>0</code> success, <code>1</code> error, <code>2</code> usage error).</p>
-<h2 id="interactive-chat">Interactive chat</h2>
-<p><code>agentic-odi chat</code> (or simply <code>agentic-odi</code> in a terminal) starts an
+<h2 id="interactive-chat">Interactive chat<a class="heading-anchor" href="#interactive-chat" aria-label="Copy link to this section" title="Copy link">#</a></h2><p><code>agentic-odi chat</code> (or simply <code>agentic-odi</code> in a terminal) starts an
 offline-first interactive REPL. The session always boots, even when no model or
 MCP server is reachable — a yellow warning is shown for any unavailable service,
 and free-text messages return a friendly nudge until you connect.</p>
 <pre class="highlight"><code class="language-bash">agentic-odi<span class="w"> </span>chat
 agentic-odi<span class="w"> </span>chat<span class="w"> </span>--model<span class="w"> </span>local-tools-model<span class="w"> </span>--mcp-url<span class="w"> </span>http://localhost:8000/mcp
-</code></pre><h3 id="connection-settings">Connection settings</h3>
-<p>The chat resolves settings in priority order:
+</code></pre><h3 id="connection-settings">Connection settings<a class="heading-anchor" href="#connection-settings" aria-label="Copy link to this section" title="Copy link">#</a></h3><p>The chat resolves settings in priority order:
 <strong>CLI flag → environment variable → persisted profile → built-in default.</strong></p>
 <table>
 <thead>
@@ -206,8 +219,7 @@ agentic-odi<span class="w"> </span>chat<span class="w"> </span>--model<span clas
 <p>The <strong>persisted profile</strong> is stored at
 <code>~/.config/agentic-odi/llm_profile.json</code>. You can create or update it from
 within the session using <code>/connect</code>.</p>
-<h3 id="slash-commands">Slash commands</h3>
-<table>
+<h3 id="slash-commands">Slash commands<a class="heading-anchor" href="#slash-commands" aria-label="Copy link to this section" title="Copy link">#</a></h3><table>
 <thead>
 <tr>
 <th>Command</th>
@@ -249,8 +261,7 @@ within the session using <code>/connect</code>.</p>
 </tr>
 </tbody>
 </table>
-<h3 id="connect-wizard">/connect wizard</h3>
-<p><code>/connect</code> walks you through configuring your LLM provider interactively:</p>
+<h3 id="connect-wizard">/connect wizard<a class="heading-anchor" href="#connect-wizard" aria-label="Copy link to this section" title="Copy link">#</a></h3><p><code>/connect</code> walks you through configuring your LLM provider interactively:</p>
 <ol>
 <li><strong>Provider</strong> — choose <code>openai</code>, <code>anthropic</code>, <code>local</code>, or <code>other</code></li>
 <li><strong>Base URL</strong> — preset filled for known providers; override freely</li>
@@ -265,8 +276,7 @@ within the session using <code>/connect</code>.</p>
 Chat is the only CLI mode that needs an LLM endpoint. The <code>customer-outcomes</code>
 and <code>connectors</code> commands keep working without one.</p>
 </blockquote>
-<h2 id="manage-jobs-steps-and-desired-outcomes">Manage Jobs, Steps, and desired Outcomes</h2>
-<p>Every ODI entity has the same create/read/update/delete surface in the CLI and
+<h2 id="manage-jobs-steps-and-desired-outcomes">Manage Jobs, Steps, and desired Outcomes<a class="heading-anchor" href="#manage-jobs-steps-and-desired-outcomes" aria-label="Copy link to this section" title="Copy link">#</a></h2><p>Every ODI entity has the same create/read/update/delete surface in the CLI and
 the MCP server. Jobs hold Steps (the Job Map) and desired Outcomes; deleting a
 Job cascades to both.</p>
 <pre class="highlight"><code class="language-bash"><span class="c1"># Jobs</span>
@@ -290,8 +300,7 @@ agentic-odi<span class="w"> </span>desired-outcomes<span class="w"> </span>get<s
 agentic-odi<span class="w"> </span>desired-outcomes<span class="w"> </span>update<span class="w"> </span>&lt;outcome-id&gt;<span class="w"> </span>--satisfaction<span class="w"> </span><span class="m">6</span>
 agentic-odi<span class="w"> </span>desired-outcomes<span class="w"> </span>delete<span class="w"> </span>&lt;outcome-id&gt;<span class="w"> </span>--yes
 </code></pre><p>Add <code>--json</code> to any command for machine-readable output.</p>
-<h2 id="evidence">Evidence</h2>
-<p>Evidence is research captured from connectors (or entered by hand) and linked to
+<h2 id="evidence">Evidence<a class="heading-anchor" href="#evidence" aria-label="Copy link to this section" title="Copy link">#</a></h2><p>Evidence is research captured from connectors (or entered by hand) and linked to
 a Job, Step, or desired Outcome. Records can later be promoted into ODI
 artifacts — the bridge from research to the model, without hand-copying.</p>
 <pre class="highlight"><code class="language-bash"><span class="c1"># Capture a record by hand</span>
@@ -312,8 +321,7 @@ agentic-odi<span class="w"> </span>evidence<span class="w"> </span>promote<span 
 agentic-odi<span class="w"> </span>evidence<span class="w"> </span>promote<span class="w"> </span>&lt;evidence-id&gt;<span class="w"> </span>--to<span class="w"> </span>outcome<span class="w"> </span>--job-id<span class="w"> </span>&lt;job-id&gt;
 </code></pre><p><code>connectors ingest --job-id &lt;job-id&gt;</code> maps every evidence-bearing record in the
 ingested batch into evidence in one step.</p>
-<h2 id="schema-scoring-and-guidance">Schema, scoring, and guidance</h2>
-<pre class="highlight"><code class="language-bash">agentic-odi<span class="w"> </span>schema<span class="w">            </span><span class="c1"># canonical JSON schema for every ODI entity</span>
+<h2 id="schema-scoring-and-guidance">Schema, scoring, and guidance<a class="heading-anchor" href="#schema-scoring-and-guidance" aria-label="Copy link to this section" title="Copy link">#</a></h2><pre class="highlight"><code class="language-bash">agentic-odi<span class="w"> </span>schema<span class="w">            </span><span class="c1"># canonical JSON schema for every ODI entity</span>
 agentic-odi<span class="w"> </span>score<span class="w"> </span><span class="m">8</span><span class="w"> </span><span class="m">2</span><span class="w">         </span><span class="c1"># ODI opportunity score → 14.00</span>
 agentic-odi<span class="w"> </span>evaluate<span class="w"> </span><span class="s2">"Minimize the time to ship when onboarding"</span><span class="w">  </span><span class="c1"># outcome-format check</span>
 agentic-odi<span class="w"> </span>evaluate<span class="w"> </span>--json<span class="w"> </span><span class="s2">"Minimize the time to ship when onboarding"</span>
@@ -321,8 +329,7 @@ agentic-odi<span class="w"> </span>guidelines<span class="w">        </span><spa
 agentic-odi<span class="w"> </span>capabilities<span class="w">      </span><span class="c1"># what the assistant can do</span>
 </code></pre><p><code>evaluate</code> returns the same verdict the <code>evaluate_outcome</code> MCP tool does, so the
 check works with or without a running server.</p>
-<h2 id="manage-customer-outcomes">Manage Customer Outcomes</h2>
-<p>Customer Outcomes link customer value to business value. The <code>local</code> backend
+<h2 id="manage-customer-outcomes">Manage Customer Outcomes<a class="heading-anchor" href="#manage-customer-outcomes" aria-label="Copy link to this section" title="Copy link">#</a></h2><p>Customer Outcomes link customer value to business value. The <code>local</code> backend
 writes to the shared SQLite store with no server required; add <code>--backend mcp</code>
 to route through a running MCP server (<code>python -m agentic_odi_mcp_server</code>). The group is also
 available under its historical name <code>outcomes</code>.</p>
@@ -359,8 +366,7 @@ agentic-odi<span class="w"> </span>outcomes<span class="w"> </span>score<span cl
 <code>importance + max(importance - satisfaction, 0)</code>.</p>
 <p>Set <code>AGENTIC_ODI_MCP_URL</code> (or <code>--mcp-url</code>) to point to a non-default server when
 using <code>--backend mcp</code> (default: <code>http://localhost:8000/mcp</code>).</p>
-<h2 id="connectors">Connectors</h2>
-<p>The <code>connectors</code> group manages external MCP integrations. See
+<h2 id="connectors">Connectors<a class="heading-anchor" href="#connectors" aria-label="Copy link to this section" title="Copy link">#</a></h2><p>The <code>connectors</code> group manages external MCP integrations. See
 <a href="../connectors/">External Connectors</a> for presets, the connector registry, and
 ingest behavior.</p>
 <pre class="highlight"><code class="language-bash">python<span class="w"> </span>-m<span class="w"> </span>agentic_odi_cli<span class="w"> </span>connectors<span class="w"> </span>catalog
@@ -368,8 +374,7 @@ python<span class="w"> </span>-m<span class="w"> </span>agentic_odi_cli<span cla
 python<span class="w"> </span>-m<span class="w"> </span>agentic_odi_cli<span class="w"> </span>connectors<span class="w"> </span>list
 python<span class="w"> </span>-m<span class="w"> </span>agentic_odi_cli<span class="w"> </span>connectors<span class="w"> </span>health<span class="w"> </span>--name<span class="w"> </span>github
 python<span class="w"> </span>-m<span class="w"> </span>agentic_odi_cli<span class="w"> </span>connectors<span class="w"> </span>ingest<span class="w"> </span>--name<span class="w"> </span>github
-</code></pre><h2 id="updates">Updates</h2>
-<p><code>odi update</code> checks for and installs a new binary release. Auto-update is on by
+</code></pre><h2 id="updates">Updates<a class="heading-anchor" href="#updates" aria-label="Copy link to this section" title="Copy link">#</a></h2><p><code>odi update</code> checks for and installs a new binary release. Auto-update is on by
 default; disable it with <code>--no-update</code> for one run or
 <code>AGENTIC_ODI_NO_UPDATE=1</code> globally. See <a href="../installation/">Installation</a>.</p>
 

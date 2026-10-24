@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Deployment</title>
   <meta name="description" content="The project site, the hosted server, and the Worker.">
-  <meta name="color-scheme" content="dark">
+  <meta name="color-scheme" content="dark light">
   <meta name="theme-color" content="#0a0b0e">
 
   <meta property="og:type" content="website">
@@ -20,6 +20,7 @@
   <meta name="twitter:image" content="https://alehar9320.github.io/agentic-odi/assets/og.png">
 
   <link rel="canonical" href="https://alehar9320.github.io/agentic-odi/docs/deployment/index.html">
+  <script src="../../assets/theme.js"></script>
   <link rel="stylesheet" href="../../assets/tokens.css">
   <link rel="stylesheet" href="../../assets/style.css">
   <link rel="icon" type="image/svg+xml" href="../../assets/favicon.svg">
@@ -40,7 +41,23 @@
         <a href="https://alehar9320.github.io/agentic-odi/#how">How&nbsp;it&nbsp;works</a>
         <a href="https://alehar9320.github.io/agentic-odi/docs/">Docs</a>
       </nav>
+      <div class="site-header__actions">
+      <button
+        class="theme-toggle"
+        type="button"
+        aria-label="Switch to the light theme"
+        title="Switch theme"
+      >
+        <svg class="theme-toggle__sun" viewBox="0 0 24 24" width="17" height="17" aria-hidden="true" focusable="false">
+          <circle cx="12" cy="12" r="4.2" fill="none" stroke="currentColor" stroke-width="1.8"></circle>
+          <path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
+        </svg>
+        <svg class="theme-toggle__moon" viewBox="0 0 24 24" width="17" height="17" aria-hidden="true" focusable="false">
+          <path d="M20 14.2A8.4 8.4 0 0 1 9.8 4a8.5 8.5 0 1 0 10.2 10.2Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"></path>
+        </svg>
+      </button>
       <a class="btn btn--primary btn--sm" href="https://alehar9320.github.io/agentic-odi/#run">Run it in 60 seconds</a>
+      </div>
     </div>
   </header>
 
@@ -116,8 +133,7 @@
 <p class="lead">The project site, the hosted server, and the Worker.</p>    </header>
 
     <div class="prose">
-      <h2 id="project-site-github-pages">Project Site (GitHub Pages)</h2>
-<p>The static site in <code>website/</code> is published to
+      <h2 id="project-site-github-pages">Project Site (GitHub Pages)<a class="heading-anchor" href="#project-site-github-pages" aria-label="Copy link to this section" title="Copy link">#</a></h2><p>The static site in <code>website/</code> is published to
 <strong><a href="https://alehar9320.github.io/agentic-odi/">https://alehar9320.github.io/agentic-odi/</a></strong>
 by <a href="https://github.com/alehar9320/agentic-odi/blob/main/.github/workflows/pages.yml"><code>.github/workflows/pages.yml</code></a>.</p>
 <ul>
@@ -130,16 +146,13 @@ change.</li>
 returns 404.</li>
 <li>The <code>github-pages</code> environment only allows deployments from <code>main</code>.</li>
 </ul>
-<h2 id="hosted-mcp-server">Hosted MCP Server</h2>
-<p>The server is deployed via <strong><a href="https://www.prefect.io/horizon">Horizon Prefect</a></strong>,
+<h2 id="hosted-mcp-server">Hosted MCP Server<a class="heading-anchor" href="#hosted-mcp-server" aria-label="Copy link to this section" title="Copy link">#</a></h2><p>The server is deployed via <strong><a href="https://www.prefect.io/horizon">Horizon Prefect</a></strong>,
 Prefect's managed infrastructure for hosting MCP-compatible agents.</p>
-<h2 id="test-chat-ui">Test Chat (UI)</h2>
-<p>Interact with the deployed agent directly in your browser:</p>
+<h2 id="test-chat-ui">Test Chat (UI)<a class="heading-anchor" href="#test-chat-ui" aria-label="Copy link to this section" title="Copy link">#</a></h2><p>Interact with the deployed agent directly in your browser:</p>
 <blockquote>
 <p><strong><a href="https://horizon.prefect.io/alhase/servers/agentic-odi/chat">https://horizon.prefect.io/alhase/servers/agentic-odi/chat</a></strong></p>
 </blockquote>
-<h2 id="mcp-server-endpoint">MCP Server Endpoint</h2>
-<p>Integrate via the MCP protocol at:</p>
+<h2 id="mcp-server-endpoint">MCP Server Endpoint<a class="heading-anchor" href="#mcp-server-endpoint" aria-label="Copy link to this section" title="Copy link">#</a></h2><p>Integrate via the MCP protocol at:</p>
 <blockquote>
 <p><strong><a href="https://agentic-odi.fastmcp.app/mcp">https://agentic-odi.fastmcp.app/mcp</a></strong></p>
 </blockquote>
@@ -149,8 +162,7 @@ Prefect's managed infrastructure for hosting MCP-compatible agents.</p>
 out to the maintainers to obtain the necessary credentials before connecting a
 client.</p>
 </blockquote>
-<h2 id="hosted-studio">Hosted Studio</h2>
-<p>The Living Studio SPA is deployed to Cloudflare Workers:</p>
+<h2 id="hosted-studio">Hosted Studio<a class="heading-anchor" href="#hosted-studio" aria-label="Copy link to this section" title="Copy link">#</a></h2><p>The Living Studio SPA is deployed to Cloudflare Workers:</p>
 <table>
 <thead>
 <tr>
@@ -175,8 +187,7 @@ Preview builds run for non-production branches and are ephemeral: the Cloudflare
 PR comment is the source of truth, so do not copy a preview URL into docs. The
 hosted UI loads without a backend; canvas data, chat, and mutations need the
 sidecar tunnel described below.</p>
-<h2 id="living-studio-on-a-free-cloudflare-worker">Living Studio on a Free Cloudflare Worker</h2>
-<p>Workers Containers — the only way to run the Python sidecar entirely on
+<h2 id="living-studio-on-a-free-cloudflare-worker">Living Studio on a Free Cloudflare Worker<a class="heading-anchor" href="#living-studio-on-a-free-cloudflare-worker" aria-label="Copy link to this section" title="Copy link">#</a></h2><p>Workers Containers — the only way to run the Python sidecar entirely on
 Cloudflare — requires the Workers Paid plan. On the free plan, the Worker serves
 the built SPA as Workers Static Assets and proxies <code>/api/*</code> to the sidecar
 through a free, account-less
@@ -238,8 +249,7 @@ npx<span class="w"> </span>wrangler<span class="w"> </span>deploy
 </table>
 <p>A Worker has no run command: the Worker script runs on Cloudflare. Set <code>name</code> in
 <code>wrangler.jsonc</code> to the Worker you created before the first deploy.</p>
-<h3 id="pull-request-previews">Pull request previews</h3>
-<p>Workers Builds posts the build status and Preview URL to the pull request
+<h3 id="pull-request-previews">Pull request previews<a class="heading-anchor" href="#pull-request-previews" aria-label="Copy link to this section" title="Copy link">#</a></h3><p>Workers Builds posts the build status and Preview URL to the pull request
 automatically. To enable it:</p>
 <ol>
 <li>Open the Worker → <strong>Settings</strong> → <strong>Build</strong> → <strong>Branch control</strong>.</li>

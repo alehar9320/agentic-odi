@@ -24,10 +24,24 @@ export interface Outcome {
   telemetry?: string;
 }
 
+export interface Evidence {
+  id: string;
+  source_name?: string;
+  source_kind?: string;
+  item_type?: string;
+  name?: string;
+  content?: string;
+  job_id?: string | null;
+  step_id?: string | null;
+  outcome_id?: string | null;
+}
+
 export interface CanvasData {
   jobs: Job[];
   steps: Step[];
   outcomes: Outcome[];
+  /** Captured research records, in capture order until the user reorders them. */
+  evidence?: Evidence[];
   source: "mcp" | "seed" | "local";
   /** Why the board is not what the server actually holds, when the sidecar knows. */
   warnings?: string[];

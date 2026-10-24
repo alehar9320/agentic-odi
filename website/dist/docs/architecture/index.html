@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Repository Architecture</title>
   <meta name="description" content="The workspace, the data flow, and the testing strategy.">
-  <meta name="color-scheme" content="dark">
+  <meta name="color-scheme" content="dark light">
   <meta name="theme-color" content="#0a0b0e">
 
   <meta property="og:type" content="website">
@@ -20,6 +20,7 @@
   <meta name="twitter:image" content="https://alehar9320.github.io/agentic-odi/assets/og.png">
 
   <link rel="canonical" href="https://alehar9320.github.io/agentic-odi/docs/architecture/index.html">
+  <script src="../../assets/theme.js"></script>
   <link rel="stylesheet" href="../../assets/tokens.css">
   <link rel="stylesheet" href="../../assets/style.css">
   <link rel="icon" type="image/svg+xml" href="../../assets/favicon.svg">
@@ -40,7 +41,23 @@
         <a href="https://alehar9320.github.io/agentic-odi/#how">How&nbsp;it&nbsp;works</a>
         <a href="https://alehar9320.github.io/agentic-odi/docs/">Docs</a>
       </nav>
+      <div class="site-header__actions">
+      <button
+        class="theme-toggle"
+        type="button"
+        aria-label="Switch to the light theme"
+        title="Switch theme"
+      >
+        <svg class="theme-toggle__sun" viewBox="0 0 24 24" width="17" height="17" aria-hidden="true" focusable="false">
+          <circle cx="12" cy="12" r="4.2" fill="none" stroke="currentColor" stroke-width="1.8"></circle>
+          <path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
+        </svg>
+        <svg class="theme-toggle__moon" viewBox="0 0 24 24" width="17" height="17" aria-hidden="true" focusable="false">
+          <path d="M20 14.2A8.4 8.4 0 0 1 9.8 4a8.5 8.5 0 1 0 10.2 10.2Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"></path>
+        </svg>
+      </button>
       <a class="btn btn--primary btn--sm" href="https://alehar9320.github.io/agentic-odi/#run">Run it in 60 seconds</a>
+      </div>
     </div>
   </header>
 
@@ -117,8 +134,7 @@
 
     <div class="prose">
       <p>Agentic ODI is a uv workspace with a single root <code>pyproject.toml</code> for shared tooling. Python distributions are imported by their stable <code>agentic_odi_*</code> package names; directory layout does not leak into imports.</p>
-<h2 id="layout">Layout</h2>
-<pre class="highlight"><code class="language-text">apps/
+<h2 id="layout">Layout<a class="heading-anchor" href="#layout" aria-label="Copy link to this section" title="Copy link">#</a></h2><pre class="highlight"><code class="language-text">apps/
   cli/            agentic_odi_cli         Typer CLI: local SQLite or remote MCP
   mcp-server/     agentic_odi_mcp_server  FastMCP server over HTTP
   studio-api/     agentic_odi_studio_api  FastAPI sidecar for the Studio SPA
@@ -131,8 +147,7 @@ scripts/          Dev launcher, binary build, installer checks
 tests/            Cross-package contract and launcher tests only
 docs/             Architecture, reference material, Superpowers artifacts
 packaging/        PyInstaller spec for the CLI binary
-</code></pre><h2 id="dependency-direction">Dependency Direction</h2>
-<pre class="highlight"><code class="language-text">apps/cli ──────────────┐
+</code></pre><h2 id="dependency-direction">Dependency Direction<a class="heading-anchor" href="#dependency-direction" aria-label="Copy link to this section" title="Copy link">#</a></h2><pre class="highlight"><code class="language-text">apps/cli ──────────────┐
 apps/mcp-server ───────┼──▶ packages/core
 apps/studio-api ───────┘         ▲
                                  │
@@ -149,8 +164,7 @@ directions, <code>StudioRuntime.tsx</code> wires the runtime callbacks, and
 <code>attachments.ts</code> extracts files in the browser. The library is presentation
 only — it holds no product state and makes no network calls of its own.</li>
 </ul>
-<h2 id="persistence">Persistence</h2>
-<ul>
+<h2 id="persistence">Persistence<a class="heading-anchor" href="#persistence" aria-label="Copy link to this section" title="Copy link">#</a></h2><ul>
 <li><code>SQLiteRepository</code> is the production default for the CLI, MCP server, and Studio API.</li>
 <li>The default database is <code>~/.agentic-odi/odi.db</code>, overridable with <code>AGENTIC_ODI_DB</code>.</li>
 <li>Studio conversation history and PM memory use a separate SQLite database,
@@ -160,10 +174,8 @@ sidecar-local and never enter the ODI repository or the MCP contract.</li>
 <li>The CLI selects its backend with <code>--backend local|mcp</code> or <code>AGENTIC_ODI_BACKEND</code>.</li>
 <li>The Studio API selects <code>local</code> (direct service calls) or <code>mcp</code> (passthrough) with <code>AGENTIC_ODI_BACKEND</code> or <code>create_app(backend=...)</code>.</li>
 </ul>
-<h2 id="mcp-contract">MCP Contract</h2>
-<p><code>packages/core/src/agentic_odi_core/contract.py</code> owns <code>ToolName</code>, <code>ToolSpec</code>, <code>TOOL_SPECS</code>, and <code>TOOL_NAMES</code>. The live FastMCP registry is asserted against it by <code>tests/contract/test_mcp_contract.py</code>; the CLI's local handlers are checked by <code>tests/contract/test_cli_contract.py</code>.</p>
-<h2 id="entry-points">Entry Points</h2>
-<table>
+<h2 id="mcp-contract">MCP Contract<a class="heading-anchor" href="#mcp-contract" aria-label="Copy link to this section" title="Copy link">#</a></h2><p><code>packages/core/src/agentic_odi_core/contract.py</code> owns <code>ToolName</code>, <code>ToolSpec</code>, <code>TOOL_SPECS</code>, and <code>TOOL_NAMES</code>. The live FastMCP registry is asserted against it by <code>tests/contract/test_mcp_contract.py</code>; the CLI's local handlers are checked by <code>tests/contract/test_cli_contract.py</code>.</p>
+<h2 id="entry-points">Entry Points<a class="heading-anchor" href="#entry-points" aria-label="Copy link to this section" title="Copy link">#</a></h2><table>
 <thead>
 <tr>
 <th>Command</th>
@@ -189,8 +201,7 @@ sidecar-local and never enter the ODI repository or the MCP contract.</li>
 </tr>
 </tbody>
 </table>
-<h2 id="related">Related</h2>
-<ul>
+<h2 id="related">Related<a class="heading-anchor" href="#related" aria-label="Copy link to this section" title="Copy link">#</a></h2><ul>
 <li><a href="https://github.com/alehar9320/agentic-odi/blob/main/docs/architecture/data-flow.md">Data flow</a></li>
 <li><a href="https://github.com/alehar9320/agentic-odi/blob/main/docs/architecture/testing.md">Testing</a></li>
 </ul>
