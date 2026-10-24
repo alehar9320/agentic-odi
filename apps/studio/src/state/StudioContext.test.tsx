@@ -84,6 +84,9 @@ function route(input: RequestInfo | URL, init?: RequestInit): Response {
     return json([]);
   }
   if (url === "/api/connectors") {
+    if (init?.method === "POST") {
+      return json({ ok: true, name: "gong" });
+    }
     connectorFetches += 1;
     return json([]);
   }
@@ -180,6 +183,22 @@ describe("StudioContext memory and resume", () => {
     });
     expect(result.current.toasts.map((toast) => toast.message)).toContain(
       "Outcome captured successfully!",
+    );
+  });
+
+  it("confirms a connector was added", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
+
+    await act(async () => {
+      await result.current.addConnector({
+        name: "gong",
+        url: "http://localhost:9000/mcp",
+      });
+    });
+
+    expect(result.current.toasts).toContainEqual(
+      expect.objectContaining({ kind: "success", message: "Added connector gong" }),
     );
   });
 
