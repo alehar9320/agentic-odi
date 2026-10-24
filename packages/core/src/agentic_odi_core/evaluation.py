@@ -2,7 +2,13 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
+
+OpportunitySegment = Literal["underserved", "appropriate", "overserved", "unscored"]
+
+# The ODI reading of an opportunity score: above 10 is underserved, exactly
+# 10 is appropriately served, below 10 is overserved.
+UNDERSERVED_SCORE = 10.0
 
 _CONTEXT_MARKERS = (
     " when ",
@@ -15,6 +21,17 @@ _CONTEXT_MARKERS = (
 )
 
 _VAGUE_TERMS = ("better", "improve", "optimize", "faster", "easier")
+
+
+def classify_opportunity(score: float | None) -> OpportunitySegment:
+    """Bucket an outcome's opportunity score for segmentation."""
+    if score is None:
+        return "unscored"
+    if score > UNDERSERVED_SCORE:
+        return "underserved"
+    if score == UNDERSERVED_SCORE:
+        return "appropriate"
+    return "overserved"
 
 
 def evaluate_outcome_statement(statement: str) -> dict[str, Any]:
