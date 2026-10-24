@@ -25,6 +25,8 @@ def test_the_gate_compares_the_tag_with_the_cli_version() -> None:
 
     assert 'tag_version="${GITHUB_REF_NAME#v}"' in job
     assert "uv run python -m agentic_odi_cli --version" in job
-    assert 'cli_version="${reported%% *}"' in job, "the build date must be stripped before comparing"
+    assert 'cli_version="${reported%% *}"' in job, (
+        "the build date must be stripped before comparing"
+    )
     assert '"$cli_version" != "$tag_version"' in job
     assert "exit 1" in job
