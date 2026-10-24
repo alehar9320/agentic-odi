@@ -216,9 +216,7 @@ async def post_step(body: AddStepRequest, request: Request) -> dict:
         )
     else:
         try:
-            step = _service(request).add_step(
-                job_id=body.job_id, name=body.name, order=body.order
-            )
+            step = _service(request).add_step(job_id=body.job_id, name=body.name, order=body.order)
         except Exception as exc:  # noqa: BLE001
             raise _as_http_error(exc) from exc
         result = step.model_dump_json()
