@@ -441,6 +441,15 @@ turns, and continues with the same <code>conversation_id</code> on the next mess
 conversation</strong> starts a fresh one without touching the memory; <strong>Forget
 everything</strong> removes both. The composer stays usable while the restore is in
 flight, and a restore failure simply leaves the room empty.</p>
+<h3 id="printing-and-export">Printing and export</h3>
+<p>The bar's overflow menu has <strong>Export → Markdown</strong>. The file labels every
+speaker, keeps the prose as Markdown, and writes each agent-composed surface as
+a fenced JSON block, so a thread can be pasted into a doc or a ticket without
+the reader needing the Studio.</p>
+<p>Printing (<code>Cmd</code>/<code>Ctrl</code>+<code>P</code>) lays the open conversation out for A4: the bar,
+rail, composer, and floating chrome are hidden, the palette switches to paper,
+and cards stay whole instead of splitting across sheets. An open lens prints
+below the thread instead of being clipped off-screen.</p>
 <h2 id="rich-responses">Rich responses</h2>
 <p>The copilot does not only talk. When a surface carries the evidence better than a
 paragraph, the agent renders one <strong>inline in the conversation</strong>: a scored
@@ -682,6 +691,9 @@ automatically.</p>
         </li>
         <li class="doc__toc-item doc__toc-item--3">
           <a href="#the-thread-comes-back">The thread comes back</a>
+        </li>
+        <li class="doc__toc-item doc__toc-item--3">
+          <a href="#printing-and-export">Printing and export</a>
         </li>
         <li class="doc__toc-item doc__toc-item--2">
           <a href="#rich-responses">Rich responses</a>
