@@ -52,6 +52,33 @@ The Studio opens as a conversation, not a dashboard.
 
 Replies render Markdown (headings, lists, emphasis, inline and fenced code).
 
+Every settled answer carries **Copy** and **Answer again** in the transcript,
+and every question carries **Edit**. Both re-asks replace the turn in place —
+Answer again keeps the question, Edit changes it — so a weak answer never leaves
+two copies of the question stacked in the thread. Editing uses assistant-ui's
+edit composer: the bubble becomes a field with Cancel and Send, and the rest of
+the thread waits until you decide.
+
+### The thread runs on assistant-ui
+
+The studio's conversation is not a bespoke list of bubbles. `Conversation`
+mounts assistant-ui's `AssistantRuntimeProvider` with an external-store runtime
+over the messages the sidecar already owns (`apps/studio/src/lib/thread.ts` maps
+a `ChatMessage` to a `ThreadMessageLike`), and renders the transcript through
+`ThreadPrimitive.Messages` with `MessagePrimitive`-scoped action bars. What that
+buys is the thread machinery a hand-built list has to keep reinventing: stable
+message identity, copy, edit and reload wired to the runtime's own
+capabilities, and the primitives the rest of the surface can grow into
+(branching, queued sends, dictation, attachment adapters).
+
+The store stays authoritative. The sidecar writes the transcript, memory
+restores it, and every turn carries fields a generic chat message has no room
+for — run steps, a failure, a stopped run, the agent's surfaces. Those travel in
+`metadata.custom` and as data parts, so the runtime never has to hold studio
+state and the studio never has to fork the runtime. A reload is one call:
+`sendMessage(question, files, { from: questionId })` drops that turn and every
+later one before asking again.
+
 ### Run activity
 
 Every tool call is one row in the turn's timeline, not one row per event. While

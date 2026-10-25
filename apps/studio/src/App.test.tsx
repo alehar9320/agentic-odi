@@ -290,6 +290,28 @@ describe("studio shell", () => {
     expect(secondRequest?.messages.at(-1)?.content).toBe("And now?");
   });
 
+  it("answers again in place instead of stacking a second question", async () => {
+    const baseline = vi.mocked(streamChat).mock.calls.length;
+    render(<App />);
+
+    const composer = await screen.findByRole("textbox", { name: /message the studio/i });
+    fireEvent.change(composer, { target: { value: "What is broken?" } });
+    fireEvent.click(screen.getByRole("button", { name: /send message/i }));
+
+    await waitFor(() => expect(vi.mocked(streamChat).mock.calls.length).toBe(baseline + 1));
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: /stop generating/i })).toBeNull(),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /answer again/i }));
+
+    await waitFor(() => expect(vi.mocked(streamChat).mock.calls.length).toBe(baseline + 2));
+    const request = vi.mocked(streamChat).mock.calls.at(-1)?.[0];
+    const asked = request?.messages.filter((message) => message.role === "user") ?? [];
+    expect(asked).toHaveLength(1);
+    expect(asked[0].content).toBe("What is broken?");
+  });
+
   it("shows each tool a turn used once, under one summary line", async () => {
     vi.mocked(streamChat).mockImplementationOnce(async (_request, onEvent) => {
       onEvent({ event: "status", data: { phase: "mcp_tools" } });

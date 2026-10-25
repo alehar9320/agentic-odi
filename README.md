@@ -69,7 +69,7 @@ shared tooling at the root. Packages live in `packages/`, runnable services in
 | **`apps/mcp-server/`** | `agentic-odi-mcp-server` | FastMCP server exposing Jobs, Steps, Desired Outcomes, Customer Outcomes, Evidence, and context tools over HTTP. Persists to SQLite by default. |
 | **`apps/studio-api/`** | `agentic-odi-studio-api` | FastAPI **Living Studio sidecar**. Serves config, health, canvas data, local mutations, MCP passthrough, SSE chat, conversation history, and the PM memory store, plus the built SPA. |
 | **`apps/cli/`** | `agentic-odi-cli` | Typer CLI with interactive chat plus full entity CRUD, `schema`, `connectors`, and local-first (`--backend local`) or remote (`--backend mcp`) data access. |
-| **`apps/studio/`** | React + TypeScript + Vite | **The Living Studio** SPA and Tauri 2 desktop shell. The copilot renders **agent-composed surfaces inline** — scored outcomes, opportunity theses, bet simulations — from a closed catalog the SPA owns. A feature-flagged **four-step first-run tour** starts from the PM's ambition, and a local memory records what matters across sessions. |
+| **`apps/studio/`** | React + TypeScript + Vite, assistant-ui | **The Living Studio** SPA and Tauri 2 desktop shell. The copilot renders **agent-composed surfaces inline** — scored outcomes, opportunity theses, bet simulations — from a closed catalog the SPA owns. A feature-flagged **four-step first-run tour** starts from the PM's ambition, and a local memory records what matters across sessions. |
 | **`infra/cloudflare/`** | Worker | Worker script for the free-plan Workers Static Assets deployment and sidecar tunnel; its `wrangler.jsonc` lives at the repository root. |
 | **`scripts/`** | — | Dev launcher, binary build, installer tests. |
 | **`tests/contract/`** | — | Cross-package MCP contract tests. |
@@ -138,6 +138,12 @@ catalog. Picking one changes the model used by the next message.
 A screenshot is a question too. Attach images or text files with the paperclip,
 by dropping them on the composer, or by pasting; the bytes travel with that turn
 (up to 6 files, 8 MB each) and later questions do not re-upload them.
+
+The thread itself runs on [assistant-ui](https://www.assistant-ui.com): its
+external-store runtime is fed the transcript the sidecar already owns, so every
+settled answer gets **Copy** and **Answer again**, and every question gets
+**Edit**. Both re-asks replace the turn in place instead of stacking a second
+copy of the question.
 
 ### Connectors (MCP ↔ Living Studio)
 

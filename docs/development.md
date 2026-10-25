@@ -41,7 +41,8 @@ The agent-composed surfaces and the first-run tour are covered at these levels:
 |---|---|
 | `apps/studio/src/ui/protocol.test.ts` | Spec parsing: prop types, enums, ranges, required props, depth/node/size ceilings, unknown types |
 | `apps/studio/src/ui/UiRenderer.test.tsx` | Card rendering, computed opportunity scores, action dispatch, per-node failure isolation, catalog/registry parity |
-| `apps/studio/src/components/chat/Conversation.test.tsx` | Prose and surfaces interleaved in the agent's order; card actions become messages |
+| `apps/studio/src/components/chat/Conversation.test.tsx` | Prose and surfaces interleaved in the agent's order; card actions become messages; copy/answer-again on a settled turn; sent files render from the runtime |
+| `apps/studio/src/lib/thread.test.ts` | `ChatMessage` → assistant-ui `ThreadMessageLike`: ids, statuses, data parts, custom metadata, append → text + bytes |
 | `apps/studio-api/tests/test_studio_ui_spec.py` | Catalog validation and `render_ui` tool-schema generation |
 | `apps/studio-api/tests/test_studio_chat_ui.py` | `render_ui` interception, `ui` SSE events, and the correction fed back to the model |
 | `apps/studio/src/lib/attachments.test.ts` | Readable media types, size/count refusals, base64 payloads, preview release |

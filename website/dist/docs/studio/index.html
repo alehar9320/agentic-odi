@@ -199,6 +199,29 @@ SPA never contacts MCP or the LLM directly.</p>
 </tbody>
 </table>
 <p>Replies render Markdown (headings, lists, emphasis, inline and fenced code).</p>
+<p>Every settled answer carries <strong>Copy</strong> and <strong>Answer again</strong> in the transcript,
+and every question carries <strong>Edit</strong>. Both re-asks replace the turn in place —
+Answer again keeps the question, Edit changes it — so a weak answer never leaves
+two copies of the question stacked in the thread. Editing uses assistant-ui's
+edit composer: the bubble becomes a field with Cancel and Send, and the rest of
+the thread waits until you decide.</p>
+<h3 id="the-thread-runs-on-assistant-ui">The thread runs on assistant-ui</h3>
+<p>The studio's conversation is not a bespoke list of bubbles. <code>Conversation</code>
+mounts assistant-ui's <code>AssistantRuntimeProvider</code> with an external-store runtime
+over the messages the sidecar already owns (<code>apps/studio/src/lib/thread.ts</code> maps
+a <code>ChatMessage</code> to a <code>ThreadMessageLike</code>), and renders the transcript through
+<code>ThreadPrimitive.Messages</code> with <code>MessagePrimitive</code>-scoped action bars. What that
+buys is the thread machinery a hand-built list has to keep reinventing: stable
+message identity, copy, edit and reload wired to the runtime's own
+capabilities, and the primitives the rest of the surface can grow into
+(branching, queued sends, dictation, attachment adapters).</p>
+<p>The store stays authoritative. The sidecar writes the transcript, memory
+restores it, and every turn carries fields a generic chat message has no room
+for — run steps, a failure, a stopped run, the agent's surfaces. Those travel in
+<code>metadata.custom</code> and as data parts, so the runtime never has to hold studio
+state and the studio never has to fork the runtime. A reload is one call:
+<code>sendMessage(question, files, { from: questionId })</code> drops that turn and every
+later one before asking again.</p>
 <h3 id="run-activity">Run activity</h3>
 <p>Every tool call is one row in the turn's timeline, not one row per event. While
 a turn streams, the studio names the work in flight — <em>Reading your jobs</em>,
@@ -697,6 +720,9 @@ automatically.</p>
         </li>
         <li class="doc__toc-item doc__toc-item--2">
           <a href="#interface">Interface</a>
+        </li>
+        <li class="doc__toc-item doc__toc-item--3">
+          <a href="#the-thread-runs-on-assistant-ui">The thread runs on assistant-ui</a>
         </li>
         <li class="doc__toc-item doc__toc-item--3">
           <a href="#run-activity">Run activity</a>

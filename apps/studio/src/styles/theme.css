@@ -740,6 +740,32 @@ a {
   word-break: break-word;
 }
 
+/* Editing a question happens in the bubble it was asked in. */
+.message__bubble--edit {
+  width: 82%;
+  white-space: normal;
+}
+
+.message__edit-input {
+  display: block;
+  width: 100%;
+  min-height: 1.6rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  line-height: 1.55;
+  resize: none;
+  outline: none;
+}
+
+.message__actions--pinned {
+  justify-content: flex-end;
+  margin-top: 8px;
+  opacity: 1;
+}
+
 .message--assistant {
   align-items: flex-start;
 }

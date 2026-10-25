@@ -43,6 +43,7 @@ import {
 } from "../api/studioApi";
 import type { RawSseEvent } from "../api/sse";
 import { applyToolEvent, type RunStep } from "../lib/run";
+import { newTurnId } from "../lib/thread";
 import type {
   AddConnectorPayload,
   ChatAttachmentPayload,
@@ -186,7 +187,12 @@ export interface StudioContextValue {
   streaming: boolean;
   /** The sidecar's stage for the live turn: health_check, mcp_tools, model. */
   thinkingPhase: string | null;
-  sendMessage: (text: string, attachments?: ChatAttachmentPayload[]) => Promise<void>;
+  sendMessage: (
+    text: string,
+    attachments?: ChatAttachmentPayload[],
+    /** Re-ask from this turn: it and everything after it are replaced. */
+    options?: { from?: string },
+  ) => Promise<void>;
   stopStreaming: () => void;
   clearChat: () => void;
   conversationId: string | null;
@@ -588,7 +594,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const pushNotice = useCallback((text: string) => {
-    setMessages((prev) => [...prev, { role: "notice", content: text }]);
+    setMessages((prev) => [...prev, { role: "notice", id: newTurnId(), content: text }]);
   }, []);
 
   const checkConnections = useCallback(
@@ -771,28 +777,50 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const sendMessage = useCallback(
-    async (text: string, attachments: ChatAttachmentPayload[] = []) => {
+    async (
+      text: string,
+      attachments: ChatAttachmentPayload[] = [],
+      options: { from?: string } = {},
+    ) => {
       const trimmed = text.trim();
       if ((!trimmed && !attachments.length) || streaming) {
         return;
       }
 
+      // A re-ask replaces the turn it starts from: the old question and the
+      // answer it got are the same turn, and keeping both would read as a
+      // conversation the reader never had.
+      const cut = options.from
+        ? messages.findIndex((message) => message.id === options.from)
+        : -1;
+      const replaced = cut >= 0 ? messages.slice(0, cut) : messages;
+
       // Files ride only on the newest turn. Re-sending megabytes of base64 with
       // every later question would make each turn slower than the last.
       const history: ChatMessage[] = [
-        ...messages.map((message) =>
+        ...replaced.map((message) =>
           message.attachments
-            ? { role: message.role, content: message.content, parts: message.parts }
+            ? {
+                id: message.id,
+                role: message.role,
+                content: message.content,
+                parts: message.parts,
+              }
             : message,
         ),
         {
           role: "user",
+          id: newTurnId(),
           content: trimmed,
           ...(attachments.length ? { attachments } : {}),
         },
       ];
       const assistantIndex = history.length;
-      setMessages([...history, { role: "assistant", content: "", parts: [] }]);
+      const assistantId = newTurnId();
+      setMessages([
+        ...history,
+        { role: "assistant", id: assistantId, content: "", parts: [] },
+      ]);
       setStreaming(true);
       setThinkingPhase("health_check");
       setOfflineReply(false);
@@ -832,6 +860,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
           const next = [...prev];
           next[assistantIndex] = {
             role: "assistant",
+            id: assistantId,
             content,
             parts: [...parts],
             ...(failure ? { error: failure, retryText: trimmed } : {}),
@@ -923,7 +952,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
               const reason = String(event.data.error ?? "The connector could not be added.");
               setMessages((prev) => [
                 ...prev,
-                { role: "notice", content: `Connector failed: ${reason}` },
+                { role: "notice", id: newTurnId(), content: `Connector failed: ${reason}` },
               ]);
             } else {
               setConnectorSuggestions((prev) => {
@@ -1141,9 +1170,10 @@ export function StudioProvider({ children }: { children: ReactNode }) {
             turns
               .filter((turn) => turn.role === "user" || turn.role === "assistant")
               .map((turn) => ({
+                id: `saved-${turn.id}`,
                 role: turn.role as "user" | "assistant",
                 content: turn.content,
-                parts: turn.content ? [{ kind: "text", text: turn.content }] : [],
+                parts: turn.content ? [{ kind: "text" as const, text: turn.content }] : [],
               })),
           );
         })

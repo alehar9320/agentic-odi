@@ -100,6 +100,8 @@ export interface ChatAttachmentPayload {
 }
 
 export interface ChatMessage {
+  /** Stable identity, so the thread runtime can address a turn to reload it. */
+  id?: string;
   role: "user" | "assistant" | "notice";
   content: string;
   /**
