@@ -1,4 +1,4 @@
-import { fireEvent, render } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("../../state/StudioContext", () => ({
@@ -10,8 +10,10 @@ import { StudioBar } from "./StudioBar";
 
 const stubContext = (overrides: Record<string, unknown> = {}) => ({
   llmHealth: { healthy: true, message: "ok" },
+  messages: [],
   unreadNotificationCount: 0,
   openPanel: vi.fn(),
+  pushToast: vi.fn(),
   saveSettings: vi.fn(),
   settings: { base_url: "", api_key: "", model_name: "", mcp_url: "", theme: "dark" },
   ...overrides,
@@ -47,5 +49,37 @@ describe("StudioBar", () => {
     fireEvent.click(getByRole("button", { name: "Switch to light theme" }));
 
     expect(saveSettings).toHaveBeenCalledWith(expect.objectContaining({ theme: "light" }));
+  });
+
+  it("exports the conversation as Markdown from the overflow menu", () => {
+    const createObjectURL = vi.fn(() => "blob:conversation");
+    const revokeObjectURL = vi.fn();
+    Object.defineProperty(URL, "createObjectURL", {
+      value: createObjectURL,
+      configurable: true,
+    });
+    Object.defineProperty(URL, "revokeObjectURL", {
+      value: revokeObjectURL,
+      configurable: true,
+    });
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+
+    vi.mocked(useStudio).mockReturnValue(
+      stubContext({
+        messages: [
+          { role: "user", content: "Show me the top outcomes." },
+          { role: "assistant", content: "Here they are." },
+        ],
+      }) as never,
+    );
+
+    render(<StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />);
+    fireEvent.click(screen.getByRole("button", { name: "More actions" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: /export.*markdown/i }));
+
+    expect(createObjectURL).toHaveBeenCalledOnce();
+    expect(click).toHaveBeenCalledOnce();
+    expect(revokeObjectURL).toHaveBeenCalledWith("blob:conversation");
+    click.mockRestore();
   });
 });

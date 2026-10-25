@@ -254,6 +254,18 @@ conversation** starts a fresh one without touching the memory; **Forget
 everything** removes both. The composer stays usable while the restore is in
 flight, and a restore failure simply leaves the room empty.
 
+### Printing and export
+
+The bar's overflow menu has **Export → Markdown**. The file labels every
+speaker, keeps the prose as Markdown, and writes each agent-composed surface as
+a fenced JSON block, so a thread can be pasted into a doc or a ticket without
+the reader needing the Studio.
+
+Printing (`Cmd`/`Ctrl`+`P`) lays the open conversation out for A4: the bar,
+rail, composer, and floating chrome are hidden, the palette switches to paper,
+and cards stay whole instead of splitting across sheets. An open lens prints
+below the thread instead of being clipped off-screen.
+
 ## Rich responses
 
 The copilot does not only talk. When a surface carries the evidence better than a
