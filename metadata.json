@@ -2,7 +2,7 @@
   "cli_version": "0.11.4",
   "checkpoint_id": "01M5SJZ9A1NRZQ6EHEAV2TN75Z",
   "strategy": "manual-commit",
-  "branch": "ui-not-looking-like-shit",
+  "branch": "web-preview-functional-backend-and-error-handling",
   "checkpoints_count": 3,
   "files_touched": null,
   "sessions": [
@@ -15,10 +15,10 @@
     }
   ],
   "token_usage": {
-    "input_tokens": 1084727,
+    "input_tokens": 175244,
     "cache_creation_tokens": 0,
-    "cache_read_tokens": 14812608,
-    "output_tokens": 24974,
-    "api_call_count": 101
+    "cache_read_tokens": 2672864,
+    "output_tokens": 5080,
+    "api_call_count": 17
   }
 }

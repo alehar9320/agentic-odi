@@ -1,8 +1,4 @@
-There are merge conflicts. You've failed to make the CI green.
-
----
-
-LGTME
+LGTME. Let's go. You're done when I have a PR wiht green CI that I can review and merge, with objective met.
 
 ---
 
