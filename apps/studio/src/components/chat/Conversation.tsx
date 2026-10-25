@@ -90,14 +90,21 @@ function AssistantMessage() {
         ) : null}
 
         <AuiIf condition={(state) => state.message.branchCount > 1}>
-          <BranchPickerPrimitive.Root className="branch-picker">
+          {/* The group carries the name. Putting an aria-label on the position
+              text instead would replace "2 of 2" for screen readers with the
+              label, hiding the one thing the control exists to state. */}
+          <BranchPickerPrimitive.Root
+            className="branch-picker"
+            role="group"
+            aria-label="Reply alternatives"
+          >
             <BranchPickerPrimitive.Previous
               className="branch-picker__step"
               aria-label="Previous alternative"
             >
               ‹
             </BranchPickerPrimitive.Previous>
-            <span className="branch-picker__label" aria-label="Reply alternative">
+            <span className="branch-picker__label">
               Alternative <BranchPickerPrimitive.Number /> of <BranchPickerPrimitive.Count />
             </span>
             <BranchPickerPrimitive.Next
@@ -110,7 +117,7 @@ function AssistantMessage() {
         </AuiIf>
 
         {!running ? (
-          <ActionBarPrimitive.Root className="message__actions" hideWhenRunning autohide="never">
+          <ActionBarPrimitive.Root className="message__actions" hideWhenRunning>
             <ActionBarPrimitive.Copy className="quiet-action" aria-label="Copy reply">
               <CopyIcon size={14} /> Copy
             </ActionBarPrimitive.Copy>

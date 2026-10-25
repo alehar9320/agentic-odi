@@ -8,7 +8,7 @@
  */
 
 import { ComposerPrimitive, useAui, useAuiState } from "@assistant-ui/react";
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 
 import { ATTACHMENT_ACCEPT, MAX_ATTACHMENT_CHARS, MAX_IMAGE_BYTES } from "../../assistant/attachments";
 import { isSlashCommand, matchCommands, type StudioCommand } from "../../lib/commands";
@@ -63,6 +63,9 @@ function ComposerBody({
 }) {
   const aui = useAui();
   const { llmHealth } = useStudio();
+  // A page can mount more than one composer, so the description needs an id
+  // that is unique per instance rather than a fixed string in the document.
+  const attachmentHelpId = useId();
   const text = useAuiState((state) => state.composer.text);
   const running = useAuiState((state) => state.thread.isRunning);
   const [highlight, setHighlight] = useState(0);
@@ -157,12 +160,12 @@ function ComposerBody({
           <ComposerPrimitive.AddAttachment
             className="composer__attach"
             aria-label="Attach a file"
-            aria-describedby="studio-attachment-help"
+            aria-describedby={attachmentHelpId}
             title={ATTACHMENT_HELP}
           >
             <PaperclipIcon size={16} />
           </ComposerPrimitive.AddAttachment>
-          <span id="studio-attachment-help" className="sr-only">
+          <span id={attachmentHelpId} className="sr-only">
             {ATTACHMENT_HELP}
           </span>
           {running ? (

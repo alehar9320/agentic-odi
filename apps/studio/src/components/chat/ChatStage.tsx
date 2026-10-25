@@ -7,6 +7,7 @@ import {
   isSlashCommand,
   type StudioCommand,
 } from "../../lib/commands";
+import { useMediaQuery } from "../../lib/useMediaQuery";
 import { useStudio } from "../../state/StudioContext";
 import type { WorkspacePanelId } from "../../types";
 import { SetupConversation } from "../setup/SetupConversation";
@@ -20,6 +21,9 @@ const VIEW_COMMANDS = new Set<string>(["landscape", "jobmap", "evidence", "setti
 function LatestMessageButton() {
   const isAtBottom = useThreadViewport((state) => state.isAtBottom);
   const scrollToBottom = useThreadViewport((state) => state.scrollToBottom);
+  // A reader who asked for less motion should land on the newest reply, not
+  // watch the transcript animate past everything in between.
+  const reducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
 
   if (isAtBottom) {
     return null;
@@ -29,7 +33,7 @@ function LatestMessageButton() {
     <button
       type="button"
       className="chat__latest"
-      onClick={() => scrollToBottom({ behavior: "smooth" })}
+      onClick={() => scrollToBottom({ behavior: reducedMotion ? "auto" : "smooth" })}
     >
       Latest message
     </button>

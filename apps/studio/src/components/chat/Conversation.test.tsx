@@ -193,7 +193,11 @@ describe("Conversation", () => {
       </StudioRuntimeProvider>,
     );
 
-    expect(container.querySelector(".branch-picker")?.textContent).toContain("Alternative 2 of 2");
+    // The group is named, and the position stays readable text rather than
+    // being replaced by an aria-label of its own.
+    expect(screen.getByRole("group", { name: "Reply alternatives" })).toHaveTextContent(
+      "Alternative 2 of 2",
+    );
     const previous = screen.getByRole("button", { name: "Previous alternative" });
     expect(screen.getByRole("button", { name: "Next alternative" })).toBeInTheDocument();
     expect(previous).not.toBeDisabled();
