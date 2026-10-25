@@ -1,0 +1,65 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M5SF1PA0YETDHKYVESK5ZCCS",
+  "session_id": "ses_e938222f0ffeT1N4D8lsoN4gyT",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-25T12:02:30.355871758Z",
+  "branch": "stop-having-to-approve-runs",
+  "checkpoints_count": 1,
+  "save_step_count": 1,
+  "files_touched": [
+    ".worktrees/untrack-generated-site/.ci/protected-files.txt",
+    ".worktrees/untrack-generated-site/.github/workflows/ci.yml",
+    ".worktrees/untrack-generated-site/.github/workflows/pages.yml",
+    ".worktrees/untrack-generated-site/.gitignore",
+    ".worktrees/untrack-generated-site/docs/deployment.md",
+    ".worktrees/untrack-generated-site/docs/development.md",
+    ".worktrees/untrack-generated-site/website/tests/site_support.py",
+    ".worktrees/untrack-generated-site/website/tests/test_design_system.py",
+    ".worktrees/untrack-generated-site/website/tests/test_generated.py",
+    ".worktrees/untrack-generated-site/website/tests/test_pages_deploy.py",
+    ".worktrees/untrack-generated-site/website/tools/build_site.py"
+  ],
+  "agent": "OpenCode",
+  "model": "nvidia/nemotron-3.5-super-vl-120b-a12b",
+  "turn_id": "ea70889b1ce5",
+  "checkpoint_transcript_start": 21,
+  "transcript_lines_at_start": 21,
+  "compact_transcript_start": 21,
+  "token_usage": {
+    "input_tokens": 401604,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 6079072,
+    "output_tokens": 10080,
+    "api_call_count": 40
+  },
+  "session_metrics": {
+    "turn_count": 4
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-10-25T12:02:30.294675485Z",
+    "agent_lines": 0,
+    "agent_removed": 0,
+    "human_added": 16,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 16,
+    "total_lines_changed": 24,
+    "agent_percentage": 0,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 213,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        "docs/superpowers/plans/2026-10-21-conversational-generative-ui.md": 97,
+        "docs/superpowers/todos.md": 55,
+        "packages/core/tests/test_evaluation.py": 61
+      }
+    }
+  ]
+}

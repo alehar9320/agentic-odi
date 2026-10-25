@@ -1,0 +1,36 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M5SF1PA0YETDHKYVESK5ZCCS",
+  "strategy": "manual-commit",
+  "branch": "stop-having-to-approve-runs",
+  "checkpoints_count": 1,
+  "files_touched": [
+    ".worktrees/untrack-generated-site/.ci/protected-files.txt",
+    ".worktrees/untrack-generated-site/.github/workflows/ci.yml",
+    ".worktrees/untrack-generated-site/.github/workflows/pages.yml",
+    ".worktrees/untrack-generated-site/.gitignore",
+    ".worktrees/untrack-generated-site/docs/deployment.md",
+    ".worktrees/untrack-generated-site/docs/development.md",
+    ".worktrees/untrack-generated-site/website/tests/site_support.py",
+    ".worktrees/untrack-generated-site/website/tests/test_design_system.py",
+    ".worktrees/untrack-generated-site/website/tests/test_generated.py",
+    ".worktrees/untrack-generated-site/website/tests/test_pages_deploy.py",
+    ".worktrees/untrack-generated-site/website/tools/build_site.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/0/metadata.json",
+      "transcript": "/0/full.jsonl",
+      "compact_transcript": "/0/transcript.jsonl",
+      "content_hash": "/0/content_hash.txt",
+      "prompt": "/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 401604,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 6079072,
+    "output_tokens": 10080,
+    "api_call_count": 40
+  }
+}
