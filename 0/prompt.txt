@@ -1,0 +1,17 @@
+The output failed to meet its objective. For example, we have merge conflicts. Idetify the gaps and plan how we push to same branch, wit hrevised code changes
+
+---
+
+Continue if you have next steps, or stop and ask for clarification if you are unsure how to proceed.
+
+---
+
+LGTME. GO!
+
+---
+
+Continue
+
+---
+
+Do the follow-up and commit beyond the rebase commit, and push as new follow-up pr
