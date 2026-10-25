@@ -27,6 +27,7 @@ export function SettingsPanel() {
     addConnector,
     deleteConnector,
     sidecarReachable,
+    capabilities,
   } = useStudio();
   const { enabled: tourEnabled, restart: restartTour } = useOnboarding();
   const [selectedPreset, setSelectedPreset] = useState("");
@@ -160,6 +161,24 @@ export function SettingsPanel() {
           <span>Product telemetry</span>
           <span className="connection-list__value">not connected</span>
         </li>
+      </ul>
+
+      <h3 className="settings__title">Capabilities</h3>
+      <ul className="connection-list">
+        {capabilities.map((capability) => (
+          <li key={capability.id}>
+            <span
+              className={`status-dot${
+                capability.status === "available" ? "" : " is-warn"
+              }`}
+            />
+            <span>{capability.label}</span>
+            <span className="connection-list__value">
+              {capability.status === "available" ? "available" : "unavailable"}
+              {capability.reason ? ` — ${capability.reason}` : ""}
+            </span>
+          </li>
+        ))}
       </ul>
 
       {sidecarReachable === false ? (

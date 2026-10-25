@@ -238,3 +238,29 @@ class ConversationTreeResponse(BaseModel):
 class UpdateConversationRequest(BaseModel):
     head_id: str | None = None
     title: str | None = Field(default=None, max_length=200)
+
+
+class LlmProxyMessage(BaseModel):
+    role: Literal["system", "user", "assistant", "tool"]
+    content: str = ""
+
+
+class LlmProxyRequest(BaseModel):
+    base_url: str
+    api_key: str = ""
+    model: str
+    messages: list[LlmProxyMessage] = Field(default_factory=list)
+    tools: list[dict[str, Any]] | None = None
+    stream: bool = True
+
+
+class CapabilityItem(BaseModel):
+    id: str
+    label: str
+    description: str
+    available: bool
+    reason: str | None = None
+
+
+class CapabilitiesResponse(BaseModel):
+    capabilities: list[CapabilityItem]

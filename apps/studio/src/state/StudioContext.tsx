@@ -44,6 +44,7 @@ import {
   type UpdateObservationPayload,
 } from "../api/studioApi";
 import type { RawSseEvent } from "../api/sse";
+import { capabilityRegistry, type Capability } from "../bff/capabilities/registry";
 import type {
   AddConnectorPayload,
   AddOutcomePayload,
@@ -284,8 +285,11 @@ export interface StudioContextValue {
   presetError: StudioError | null;
   /** The failure behind an unreachable connector list, if any. */
   connectorsError: StudioError | null;
+  /** Probed availability of local and sidecar capabilities. */
+  capabilities: Capability[];
   refreshConnectors: () => Promise<void>;
   refreshPresets: () => Promise<void>;
+  refreshCapabilities: () => Promise<void>;
   addConnector: (payload: AddConnectorPayload) => Promise<void>;
   deleteConnector: (name: string) => Promise<void>;
   connectorSuggestions: string[];
@@ -407,6 +411,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [presets, setPresets] = useState<ConnectorPreset[]>([]);
   const [presetError, setPresetError] = useState<StudioError | null>(null);
   const [connectorsError, setConnectorsError] = useState<StudioError | null>(null);
+  const [capabilities, setCapabilities] = useState<Capability[]>([]);
   const [connectorSuggestions, setConnectorSuggestions] = useState<string[]>([]);
   const [notifications, setNotifications] = useState<StudioNotification[]>(loadNotifications);
   const toastId = useRef(0);
@@ -498,6 +503,15 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       setPresets([]);
     }
   }, []);
+
+  const refreshCapabilities = useCallback(async () => {
+    try {
+      setCapabilities(await capabilityRegistry.statuses(settings));
+    } catch {
+      /* Capability probes are advisory; a probe failure leaves the list empty. */
+      setCapabilities([]);
+    }
+  }, [settings]);
 
   const addConnector = useCallback(
     async (payload: AddConnectorPayload) => {
@@ -654,9 +668,10 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       setSidecarReachable(sidecar);
       setMcpReachable(mcp);
       setLlmHealth(llm);
+      void refreshCapabilities();
       return { sidecarReachable: sidecar, mcpReachable: mcp, llmHealthy: llm.healthy };
     },
-    [settings],
+    [settings, refreshCapabilities],
   );
 
   const refreshCanvas = useCallback(async () => {
@@ -1377,6 +1392,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       if (cancelled) {
         return;
       }
+      void refreshCapabilities();
       void refreshCanvas();
       void refreshConnectors();
       void refreshPresets();
@@ -1507,10 +1523,12 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       dismissToast,
       connectors,
       connectorsError,
+      capabilities,
       presets,
       presetError,
       refreshConnectors,
       refreshPresets,
+      refreshCapabilities,
       addConnector,
       deleteConnector,
       connectorSuggestions,
@@ -1582,10 +1600,12 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       dismissToast,
       connectors,
       connectorsError,
+      capabilities,
       presets,
       presetError,
       refreshConnectors,
       refreshPresets,
+      refreshCapabilities,
       addConnector,
       deleteConnector,
       connectorSuggestions,

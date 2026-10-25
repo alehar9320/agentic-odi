@@ -48,6 +48,16 @@ export interface StoredTurn extends ConversationTurn {
   parent_id: string | null;
 }
 
+export interface WorkspaceSnapshot {
+  version: number;
+  jobs: StoredJob[];
+  steps: StoredStep[];
+  outcomes: StoredOutcome[];
+  observations: Observation[];
+  conversations: StoredConversation[];
+  turns: StoredTurn[];
+}
+
 /**
  * The persistence boundary for local-first studio data.
  *
@@ -86,6 +96,10 @@ export interface LocalStore {
     messages: StoredTurn[];
     head_id: string | null;
   }>;
+  /** Serialize every stored workspace record for export. */
+  snapshot(): Promise<WorkspaceSnapshot>;
+  /** Replace every stored workspace record with the imported snapshot. */
+  restore(snapshot: WorkspaceSnapshot): Promise<void>;
   clearAll(): Promise<void>;
   close(): void;
 }

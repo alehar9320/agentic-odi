@@ -98,4 +98,58 @@ describe("IndexedDbLocalStore", () => {
     expect(again.head_id).toBe("m-1");
     store.close();
   });
+
+  it("snapshots and restores the whole workspace across store instances", async () => {
+    const first = await makeStore();
+    await first.putJob({
+      id: "j-1",
+      name: "Job A",
+      description: "",
+      seq: 1,
+      created_at: "2026-01-01T00:00:00Z",
+      updated_at: "2026-01-01T00:00:00Z",
+    });
+    await first.putOutcome({
+      id: "o-1",
+      job_id: "j-1",
+      statement: "Outcome",
+      importance: 8,
+      satisfaction: 3,
+      opportunity_score: 13,
+      step_id: null,
+      seq: 2,
+      created_at: "2026-01-01T00:00:00Z",
+      updated_at: "2026-01-01T00:00:00Z",
+    });
+    await first.putConversation({
+      id: "c-1",
+      title: "Chat",
+      created_at: "2026-01-01T00:00:00Z",
+      updated_at: "2026-01-01T00:00:00Z",
+      head_id: null,
+    });
+    await first.appendTurn({
+      conversation_id: "c-1",
+      role: "user",
+      content: "hi",
+      created_at: "2026-01-01T00:00:00Z",
+      message_id: "m-1",
+      parent_id: null,
+    });
+    const snapshot = await first.snapshot();
+    first.close();
+
+    const second = await makeStore();
+    await second.restore(snapshot);
+    const jobs = await second.listJobs();
+    expect(jobs.map((j) => j.name)).toEqual(["Job A"]);
+    const outcomes = await second.listOutcomes();
+    expect(outcomes).toHaveLength(1);
+    expect(outcomes[0].opportunity_score).toBe(13);
+    const conversations = await second.listConversations();
+    expect(conversations).toHaveLength(1);
+    const tree = await second.conversationTree("c-1");
+    expect(tree.messages.map((m) => m.message_id)).toEqual(["m-1"]);
+    second.close();
+  });
 });
