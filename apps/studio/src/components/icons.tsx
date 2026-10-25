@@ -144,6 +144,16 @@ export function CheckIcon(props: IconProps) {
   );
 }
 
+export function AlertIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M12 8v5" />
+      <path d="M12 16.5h.01" />
+      <path d="M10.3 4.3 3.1 17a1.9 1.9 0 0 0 1.7 2.9h14.4A1.9 1.9 0 0 0 21 17L13.7 4.3a1.9 1.9 0 0 0-3.4 0Z" />
+    </Icon>
+  );
+}
+
 export function SparkIcon(props: IconProps) {
   return (
     <Icon {...props}>

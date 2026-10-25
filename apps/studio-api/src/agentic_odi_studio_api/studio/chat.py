@@ -512,9 +512,24 @@ async def _turn_frames(
                 counters["tool_calls"] += 1
 
                 if name == "add_connector":
+                    # Framed like every other tool so the client's run timeline can
+                    # show it starting and finishing instead of silently skipping it.
+                    yield frame("tool", {"name": name, "status": "start"})
                     result_str, events = _apply_add_connector(arguments, connector_service)
                     for event in events:
                         yield frame(event["event"], event["data"])
+                    failed = any(
+                        event["event"] == "connector" and event["data"].get("status") == "error"
+                        for event in events
+                    )
+                    yield frame(
+                        "tool",
+                        {
+                            "name": name,
+                            "status": "error" if failed else "ok",
+                            **({"preview": result_str} if failed else {}),
+                        },
+                    )
                 elif name == "remember":
                     yield frame("tool", {"name": name, "status": "start"})
                     result_str, memory_event = _apply_remember(arguments, memory)

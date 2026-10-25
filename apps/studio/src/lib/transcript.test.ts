@@ -32,6 +32,15 @@ describe("announcementText", () => {
     expect(announcementText({ role: "assistant", content: "" })).toBeNull();
   });
 
+  it("never claims a reply for a turn the reader stopped", () => {
+    expect(
+      announcementText({ role: "assistant", content: "Here is what I have so", stopped: true }),
+    ).toBe("Studio stopped early: Here is what I have so");
+    expect(announcementText({ role: "assistant", content: "", stopped: true })).toBe(
+      "Studio stopped before answering.",
+    );
+  });
+
   it("speaks for a turn that only posted a card", () => {
     expect(
       announcementText({

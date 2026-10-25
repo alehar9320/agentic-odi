@@ -9,7 +9,6 @@ const harness = vi.hoisted(() => ({
     messages: [] as unknown[],
     streaming: false,
     thinkingPhase: null as string | null,
-    toolActivity: [] as unknown[],
     offlineReply: false,
     setupOpen: false,
     canvas: null as unknown,

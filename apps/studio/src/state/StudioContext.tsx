@@ -41,6 +41,7 @@ import {
   type UpdateObservationPayload,
 } from "../api/studioApi";
 import type { RawSseEvent } from "../api/sse";
+import { applyToolEvent, type RunStep } from "../lib/run";
 import type {
   AddConnectorPayload,
   AddOutcomePayload,
@@ -104,12 +105,6 @@ export interface Toast {
   id: number;
   kind: ToastKind;
   message: string;
-}
-
-export interface ToolActivity {
-  name: string;
-  status: string;
-  preview?: string;
 }
 
 const SEED_NOTIFICATIONS: StudioNotification[] = [
@@ -180,8 +175,8 @@ export interface StudioContextValue {
   checkConnections: (override?: Partial<StudioConfig>) => Promise<ConnectionReport>;
   messages: ChatMessage[];
   streaming: boolean;
+  /** The sidecar's stage for the live turn: health_check, mcp_tools, model. */
   thinkingPhase: string | null;
-  toolActivity: ToolActivity[];
   sendMessage: (text: string) => Promise<void>;
   stopStreaming: () => void;
   clearChat: () => void;
@@ -339,7 +334,6 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [memoryLoading, setMemoryLoading] = useState(false);
   const [streaming, setStreaming] = useState(false);
   const [thinkingPhase, setThinkingPhase] = useState<string | null>(null);
-  const [toolActivity, setToolActivity] = useState<ToolActivity[]>([]);
   const [activePanel, setActivePanel] = useState<WorkspacePanelId | null>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [connectors, setConnectors] = useState<ConnectorListItem[]>([]);
@@ -745,13 +739,13 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       setStreaming(true);
       setThinkingPhase("health_check");
       setOfflineReply(false);
-      setToolActivity([]);
 
       const controller = new AbortController();
       abortRef.current = controller;
 
       let content = "";
       let parts: ChatPart[] = [];
+      let steps: RunStep[] = [];
       let failure: StudioError | null = null;
       let terminal = false;
       let stopped = false;
@@ -771,14 +765,21 @@ export function StudioProvider({ children }: { children: ReactNode }) {
             : [...parts, { kind: "text", text }];
       };
 
+      // The turn owns its own timeline, so a finished run stays inspectable and
+      // the next turn starts from nothing without a reset elsewhere.
       const publish = () => {
         setMessages((prev) => {
+          if (prev.length <= assistantIndex) {
+            return prev;
+          }
           const next = [...prev];
           next[assistantIndex] = {
             role: "assistant",
             content,
             parts: [...parts],
             ...(failure ? { error: failure, retryText: trimmed } : {}),
+            ...(stopped ? { stopped: true, retryText: trimmed } : {}),
+            ...(steps.length ? { tools: [...steps] } : {}),
           };
           return next;
         });
@@ -813,14 +814,16 @@ export function StudioProvider({ children }: { children: ReactNode }) {
             break;
           }
           case "tool":
-            setToolActivity((prev) => [
-              ...prev,
+            steps = applyToolEvent(
+              steps,
               {
                 name: String(event.data.name ?? ""),
                 status: String(event.data.status ?? ""),
                 preview: event.data.preview ? String(event.data.preview) : undefined,
               },
-            ]);
+              Date.now(),
+            );
+            publish();
             break;
           case "message": {
             terminal = true;
@@ -901,16 +904,22 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       } catch (error) {
         const aborted = (error as Error).name === "AbortError";
         if (aborted) {
-          // An abort is the user's own doing: drop the empty placeholder, keep
-          // the question, and report no failure — the assistant did not break.
+          // An abort is the user's own doing, so it is not a failure — but it is
+          // still a fact about the turn. Keep what arrived, stop any tool that
+          // was mid-flight, and leave the turn in place so the transcript says
+          // what happened instead of silently losing the question.
           stopped = true;
-          setMessages((prev) => {
-            const next = [...prev];
-            if (next.length && next[next.length - 1].role === "assistant" && !next[next.length - 1].content) {
-              next.pop();
-            }
-            return next;
-          });
+          steps = steps.map((step) =>
+            step.status === "running"
+              ? {
+                  ...step,
+                  status: "stopped",
+                  preview: step.preview ?? "Stopped before it returned.",
+                  endedAt: Date.now(),
+                }
+              : step,
+          );
+          publish();
         } else {
           terminal = true;
           failure = asStudioError(error);
@@ -1014,7 +1023,6 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       setMemory([]);
       setConversationId(null);
       setMessages([]);
-      setToolActivity([]);
     } catch {
       pushToast("error", "I couldn't clear what I've learned.");
     }
@@ -1024,7 +1032,6 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     abortRef.current?.abort();
     abortRef.current = null;
     setMessages([]);
-    setToolActivity([]);
     setStreaming(false);
     setThinkingPhase(null);
     setOfflineReply(false);
@@ -1153,7 +1160,6 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       messages,
       streaming,
       thinkingPhase,
-      toolActivity,
       sendMessage,
       stopStreaming,
       clearChat,
@@ -1224,7 +1230,6 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       messages,
       streaming,
       thinkingPhase,
-      toolActivity,
       sendMessage,
       stopStreaming,
       clearChat,

@@ -1,3 +1,4 @@
+import type { RunStep } from "./lib/run";
 import type { UiCatalogManifest, UiNode } from "./ui/protocol";
 
 export interface Job {
@@ -94,6 +95,13 @@ export interface ChatMessage {
   error?: StudioError;
   /** The question this turn answered, kept so a failed turn can be retried. */
   retryText?: string;
+  /**
+   * Assistant turns only: the tools the turn used, in the order they ran. Kept
+   * on the turn so a finished run can still be inspected later.
+   */
+  tools?: RunStep[];
+  /** True when the reader stopped the run before it answered. */
+  stopped?: boolean;
 }
 
 /**

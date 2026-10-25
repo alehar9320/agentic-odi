@@ -49,12 +49,35 @@ The Studio opens as a conversation, not a dashboard.
 | **Lens** | A view docks to the right of the thread on wide screens and becomes a full-height sheet on narrow ones. The transcript and the composer stay on screen and stay usable; `Esc`, **Close**, or the rail chip closes it. Every lens ends in one sentence that re-enters the conversation — *Ask which to chase*, *Walk me through the job*, *Weigh the evidence* — so leaving a view is never a return to a menu. Settings and catch-up use the same lens. |
 
 Replies render Markdown (headings, lists, emphasis, inline and fenced code).
-Tool calls appear inline as small trace chips while the agent works.
+
+### Run activity
+
+Every tool call is one row in the turn's timeline, not one row per event. While
+a turn streams, the studio names the work in flight — *Reading your jobs*,
+*Adding an outcome*, or the sidecar's own stage (*Waking the model*, *Opening
+your studio tools*, *Thinking*) — so a slow turn never looks like a stalled one.
+Each row carries its own outcome and duration, and a failed call keeps the
+tool's own words, so the transcript says which call broke instead of only that
+something did.
+
+When the turn settles the timeline collapses to a single line — `2 tools ·
+1.9s`, plus `1 failed` when it applies — which opens to the full list. The
+steps live on the turn itself (`ChatMessage.tools`), so the record survives the
+next question instead of being reset per run. The reducer that folds `tool`
+SSE events into steps is `apps/studio/src/lib/run.ts`, kept pure and testable.
+
+Stopping a run is a fact the transcript keeps. `Esc` (or the stop button) halts
+the stream, any tool still in flight is marked stopped, whatever prose arrived
+stays in place, and the turn says *Stopped by you* with **Ask again** — not a
+failure, because nothing broke, and not a silent disappearance, because the
+question is still on screen.
 
 Screen readers are not handed a streaming firehose. The transcript is not a
 live region; each settled reply is announced once, as prose with the Markdown
-markers removed, through a polite status region. Thinking phases announce as
-they change, failures arrive as an alert with their retry, and every turn is
+markers removed, through a polite status region. The run's current step
+announces as it changes, each step's outcome is read as part of its row, a
+stopped turn is spoken as stopped rather than as a reply, failures arrive as an
+alert with their retry, and every turn is
 labelled with who said it — "You said", "Studio said", "Studio notice" — so
 navigating turn by turn keeps its author.
 

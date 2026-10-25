@@ -602,42 +602,160 @@ a {
   color: var(--text);
 }
 
-.traces {
+/* Run activity: what the turn is doing, and what it did */
+.run {
+  margin-top: 10px;
+  font-size: 0.76rem;
+  line-height: 1.5;
+}
+
+.run--live {
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin: 12px 0 0;
+  flex-direction: column;
+  gap: 7px;
+  padding: 8px 11px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.run__now {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--muted);
+}
+
+.run__pulse {
+  width: 6px;
+  height: 6px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: run-pulse 1.4s ease-out infinite;
+}
+
+@keyframes run-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(139, 140, 248, 0.45);
+  }
+  70% {
+    box-shadow: 0 0 0 6px rgba(139, 140, 248, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(139, 140, 248, 0);
+  }
+}
+
+.run__steps {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.trace {
+.run__step {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 7px;
+  min-width: 0;
+  color: var(--faint);
+}
+
+.run__mark {
+  display: inline-flex;
+  align-self: center;
+  color: var(--faint);
+}
+
+.run__step--ok .run__mark {
+  color: var(--green);
+}
+
+.run__step--error .run__mark {
+  color: var(--amber);
+}
+
+.run__label {
+  color: var(--muted);
+}
+
+.run__step--error .run__label {
+  color: var(--text);
+}
+
+.run__time {
+  margin-left: auto;
+  color: var(--faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.run__preview {
+  flex-basis: 100%;
+  overflow: hidden;
+  padding-left: 19px;
+  color: var(--faint);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.run--settled {
+  margin-top: 10px;
+  color: var(--faint);
+}
+
+.run__summary {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  max-width: 100%;
-  padding: 3px 9px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.02);
+  padding: 2px 6px;
+  margin-left: -6px;
+  border-radius: 6px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.run__summary::-webkit-details-marker {
+  display: none;
+}
+
+.run__summary::before {
+  content: "›";
+  display: inline-block;
   color: var(--faint);
-  font-size: 0.71rem;
+  transition: transform 0.15s ease;
 }
 
-.trace__dot {
-  width: 5px;
-  height: 5px;
-  flex: none;
-  border-radius: 50%;
-  background: var(--accent);
+.run--settled[open] .run__summary::before {
+  transform: rotate(90deg);
 }
 
-.trace__preview {
-  max-width: 30ch;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.run__summary:hover {
   color: var(--muted);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.run__summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.run--settled .run__steps {
+  margin-top: 6px;
+}
+
+.stopped {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  color: var(--faint);
+  font-size: 0.76rem;
 }
 
 .typing {

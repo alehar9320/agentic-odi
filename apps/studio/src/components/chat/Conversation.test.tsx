@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ChatMessage } from "../../types";
 import { catalogManifest } from "../../ui/catalog";
@@ -11,7 +11,6 @@ const harness = vi.hoisted(() => ({
     messages: [] as unknown[],
     streaming: false,
     thinkingPhase: null as string | null,
-    toolActivity: [] as unknown[],
     offlineReply: false,
     sendMessage: vi.fn<(text: string) => Promise<void>>(),
   },
@@ -108,6 +107,95 @@ describe("Conversation", () => {
     fireEvent.click(document.querySelector("button.ui-action") as HTMLButtonElement);
 
     expect(harness.state.sendMessage).toHaveBeenCalledWith("Simulate O-1");
+  });
+});
+
+describe("Conversation run activity", () => {
+  beforeEach(() => {
+    harness.state.streaming = false;
+    harness.state.thinkingPhase = null;
+  });
+
+  it("names the tool in flight instead of leaving the turn blank", () => {
+    harness.state.streaming = true;
+    harness.state.thinkingPhase = "model";
+    const { container } = renderTurn([
+      {
+        role: "assistant",
+        content: "",
+        tools: [{ id: "get_jobs-0", name: "get_jobs", status: "running", startedAt: 0 }],
+      },
+    ]);
+
+    expect(container.textContent).toContain("Reading your jobs");
+    expect(container.textContent).toContain("in progress");
+  });
+
+  it("collapses a finished run to one line that still opens", () => {
+    const { container } = renderTurn([
+      {
+        role: "assistant",
+        content: "Two jobs, four outcomes.",
+        tools: [
+          { id: "get_jobs-0", name: "get_jobs", status: "ok", startedAt: 0, endedAt: 600 },
+          { id: "get_outcomes-1", name: "get_outcomes", status: "ok", startedAt: 600, endedAt: 1900 },
+        ],
+      },
+    ]);
+
+    const summary = container.querySelector("summary");
+    expect(summary?.textContent).toContain("2 tools");
+    expect(summary?.textContent).toContain("1.9s");
+    expect(container.textContent).toContain("Scoring outcomes");
+  });
+
+  it("keeps a failed step visible with what the tool said", () => {
+    const { container } = renderTurn([
+      {
+        role: "assistant",
+        content: "I could not read the board.",
+        tools: [
+          {
+            id: "get_jobs-0",
+            name: "get_jobs",
+            status: "error",
+            preview: "MCP server unreachable",
+            startedAt: 0,
+            endedAt: 300,
+          },
+        ],
+      },
+    ]);
+
+    expect(container.textContent).toContain("1 failed");
+    expect(container.textContent).toContain("MCP server unreachable");
+    expect(container.textContent).toContain("failed");
+  });
+});
+
+describe("Conversation stopped runs", () => {
+  it("says the reader stopped it, and offers to ask again", () => {
+    harness.state.sendMessage = vi.fn<(text: string) => Promise<void>>();
+    const { container } = renderTurn([
+      { role: "user", content: "list the jobs" },
+      { role: "assistant", content: "Here is what I have so", stopped: true, retryText: "list the jobs" },
+    ]);
+
+    expect(container.textContent).toContain("Stopped by you.");
+    expect(container.textContent).toContain("Here is what I have so");
+
+    fireEvent.click(screen.getByRole("button", { name: /ask again/i }));
+
+    expect(harness.state.sendMessage).toHaveBeenCalledWith("list the jobs");
+  });
+
+  it("still shows a stop that produced nothing at all", () => {
+    const { container } = renderTurn([
+      { role: "user", content: "list the jobs" },
+      { role: "assistant", content: "", parts: [], stopped: true, retryText: "list the jobs" },
+    ]);
+
+    expect(container.textContent).toContain("Stopped by you.");
   });
 });
 

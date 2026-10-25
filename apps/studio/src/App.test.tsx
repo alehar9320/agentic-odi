@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import App from "./App";
-import { healthLlm } from "./api/studioApi";
+import { healthLlm, streamChat } from "./api/studioApi";
 
 vi.mock("./api/studioApi", () => ({
   fetchConfig: vi.fn(async () => ({
@@ -227,6 +227,60 @@ describe("studio shell", () => {
       screen.getAllByRole("button", { name: /capture an outcome/i }).length,
     ).toBeGreaterThan(0);
     expect(screen.getByText("Local guidance")).toBeInTheDocument();
+  });
+
+  it("shows each tool a turn used once, under one summary line", async () => {
+    vi.mocked(streamChat).mockImplementationOnce(async (_request, onEvent) => {
+      onEvent({ event: "status", data: { phase: "mcp_tools" } });
+      onEvent({ event: "tool", data: { name: "get_jobs", status: "start" } });
+      onEvent({ event: "tool", data: { name: "get_jobs", status: "ok" } });
+      onEvent({ event: "tool", data: { name: "get_outcomes", status: "start" } });
+      onEvent({ event: "tool", data: { name: "get_outcomes", status: "ok" } });
+      onEvent({ event: "message", data: { content: "Two jobs, one bet." } });
+    });
+
+    const { container } = render(<App />);
+
+    const composer = await screen.findByRole("textbox", { name: /message the studio/i });
+    fireEvent.change(composer, { target: { value: "What do I have?" } });
+    fireEvent.click(screen.getByRole("button", { name: /send message/i }));
+
+    expect(await screen.findByText("Two jobs, one bet.")).toBeInTheDocument();
+
+    const summary = container.querySelector("summary.run__summary");
+    expect(summary?.textContent).toContain("2 tools");
+
+    const steps = Array.from(container.querySelectorAll(".run__step .run__label"));
+    expect(steps.map((step) => step.textContent)).toEqual([
+      expect.stringContaining("Reading your jobs"),
+      expect.stringContaining("Scoring outcomes"),
+    ]);
+  });
+
+  it("keeps a stopped run in the transcript and offers to ask again", async () => {
+    vi.mocked(streamChat).mockImplementationOnce(async (_request, onEvent, signal) => {
+      onEvent({ event: "delta", data: { text: "Here is what I have" } });
+      await new Promise<void>((_resolve, reject) => {
+        signal?.addEventListener("abort", () => {
+          const error = new Error("aborted");
+          error.name = "AbortError";
+          reject(error);
+        });
+      });
+    });
+
+    render(<App />);
+
+    const composer = await screen.findByRole("textbox", { name: /message the studio/i });
+    fireEvent.change(composer, { target: { value: "Read the whole board" } });
+    fireEvent.click(screen.getByRole("button", { name: /send message/i }));
+
+    expect(await screen.findByText("Here is what I have")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /stop generating/i }));
+
+    expect(await screen.findByText("Stopped by you.")).toBeInTheDocument();
+    expect(screen.getByText("Here is what I have")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /ask again/i })).toBeInTheDocument();
   });
 
   it("starts a new conversation from the drawer", async () => {

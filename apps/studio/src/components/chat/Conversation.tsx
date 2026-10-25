@@ -1,29 +1,14 @@
 import { useState } from "react";
 
+import { activityLabel } from "../../lib/run";
 import { useStudio } from "../../state/StudioContext";
-import type { ChatPart, StudioError } from "../../types";
+import type { ChatMessage, ChatPart, StudioError } from "../../types";
 import { UiActionContext } from "../../ui/actions";
 import { UiRenderer } from "../../ui/UiRenderer";
 import { FailurePanel } from "../FailurePanel";
 import { CheckIcon, CopyIcon, SparkIcon } from "../icons";
 import { Markdown } from "./Markdown";
-
-const PHASE_LABEL: Record<string, string> = {
-  health_check: "Waking the model",
-  mcp_tools: "Opening your studio tools",
-  model: "Thinking",
-};
-
-function phaseLabel(phase: string | null): string {
-  if (!phase) {
-    return "Thinking";
-  }
-  return PHASE_LABEL[phase] ?? "Thinking";
-}
-
-function toolLabel(name: string): string {
-  return name.replace(/_/g, " ");
-}
+import { RunActivity } from "./RunActivity";
 
 function Typing({ label }: { label: string }) {
   return (
@@ -60,8 +45,9 @@ function AssistantMessage({
   content,
   parts,
   streaming,
-  label,
+  phase,
   tools,
+  stopped,
   offline,
   error,
   retryText,
@@ -69,14 +55,18 @@ function AssistantMessage({
   content: string;
   parts: ChatPart[];
   streaming: boolean;
-  label: string;
-  tools: { name: string; status: string; preview?: string }[];
+  /** The sidecar's stage while this turn is live. */
+  phase: string | null;
+  tools: ChatMessage["tools"];
+  stopped?: boolean;
   offline?: boolean;
   error?: StudioError;
   retryText?: string;
 }) {
   const { pushToast, sendMessage } = useStudio();
   const [copied, setCopied] = useState(false);
+  const steps = tools ?? [];
+  const label = activityLabel(phase, []);
 
   async function copy() {
     try {
@@ -88,7 +78,8 @@ function AssistantMessage({
     }
   }
 
-  if (!content && !streaming && parts.length === 0 && !error) {
+  const empty = !content && parts.length === 0;
+  if (empty && !streaming && !error && !stopped && !steps.length) {
     return null;
   }
 
@@ -104,7 +95,7 @@ function AssistantMessage({
           <MessageParts parts={parts} />
         ) : content ? (
           <Markdown source={content} />
-        ) : !error ? (
+        ) : !error && !stopped && !steps.length ? (
           <Typing label={label} />
         ) : null}
         {error ? (
@@ -116,18 +107,23 @@ function AssistantMessage({
         ) : null}
         {streaming && content && <span className="caret" aria-hidden="true" />}
 
-        {tools.length > 0 && (
-          <ul className="traces" aria-label="Tools used">
-            {tools.map((tool, index) => (
-              <li className="trace" key={`${tool.name}-${index}`}>
-                <span className="trace__dot" aria-hidden="true" />
-                {toolLabel(tool.name)}
-                {tool.status && tool.status !== "ok" ? ` · ${tool.status}` : ""}
-                {tool.preview ? <span className="trace__preview">{tool.preview}</span> : null}
-              </li>
-            ))}
-          </ul>
-        )}
+        <RunActivity steps={steps} live={streaming} phase={phase} />
+
+        {stopped ? (
+          <div className="stopped">
+            <span className="stopped__text">Stopped by you.</span>
+            {retryText ? (
+              <button
+                type="button"
+                className="quiet-action"
+                onClick={() => void sendMessage(retryText)}
+                disabled={streaming}
+              >
+                Ask again
+              </button>
+            ) : null}
+          </div>
+        ) : null}
 
         {content && !streaming && (
           <div className="message__actions">
@@ -148,7 +144,7 @@ function AssistantMessage({
 }
 
 export function Conversation() {
-  const { messages, streaming, thinkingPhase, toolActivity, offlineReply, sendMessage } = useStudio();
+  const { messages, streaming, thinkingPhase, offlineReply, sendMessage } = useStudio();
   const lastIndex = messages.length - 1;
 
   return (
@@ -185,8 +181,9 @@ export function Conversation() {
               content={message.content}
               parts={message.parts ?? []}
               streaming={streaming && isLast}
-              label={phaseLabel(thinkingPhase)}
-              tools={isLast ? toolActivity : []}
+              phase={thinkingPhase ?? null}
+              tools={message.tools}
+              stopped={message.stopped}
               offline={isLast && offlineReply}
               error={message.error}
               retryText={message.retryText}

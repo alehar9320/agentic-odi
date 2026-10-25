@@ -50,6 +50,11 @@ export function announcementText(message: ChatMessage): string | null {
     return null;
   }
   const prose = spokenText(message.content);
+  if (message.stopped) {
+    // A stopped turn is not a reply: saying "Studio replied" would claim an
+    // answer that never arrived.
+    return prose ? `Studio stopped early: ${prose}` : "Studio stopped before answering.";
+  }
   if (!prose) {
     // A surface-only turn still finished; without a word for it the reader is
     // left with silence and no idea the card is there.
