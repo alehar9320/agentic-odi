@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pytest
+import typer
 from agentic_odi_cli import backend as backend_module
 from agentic_odi_cli.backend import (
     BackendConfig,
@@ -107,6 +108,56 @@ def test_resolve_backend_selects_local_by_default(tmp_path):
 def test_get_backend_rejects_unknown_backend():
     with pytest.raises(BackendError, match="unknown backend: warp"):
         get_backend(backend="warp")
+
+
+def test_backend_error_carries_suggestion():
+    err = BackendError("boom", "restart the sidecar")
+    assert err.suggestion == "restart the sidecar"
+    assert str(err) == "boom"
+
+
+def test_backend_error_suggestion_defaults_to_none():
+    assert BackendError("boom").suggestion is None
+    assert str(BackendError("boom")) == "boom"
+
+
+def test_parse_remote_threads_suggestion(monkeypatch):
+    from agentic_odi_core.remote import StudioError, StudioErrorCode
+
+    monkeypatch.setattr(
+        "agentic_odi_core.remote.parse_tool_result",
+        lambda text: StudioError(
+            code=StudioErrorCode.MCP_UNREACHABLE,
+            message="Could not reach the MCP server.",
+            suggestion="Start the MCP server with `python -m agentic_odi_mcp_server`.",
+            retryable=True,
+        ),
+    )
+
+    with pytest.raises(BackendError) as exc_info:
+        backend_module._parse_remote("get_jobs", "Error: anything")
+
+    assert (
+        exc_info.value.suggestion == "Start the MCP server with `python -m agentic_odi_mcp_server`."
+    )
+
+
+def test_run_tool_prints_suggestion_as_a_hint(monkeypatch, capsys):
+    class _FailingBackend:
+        def call(self, tool_name, args):
+            raise BackendError(
+                "sidecar is down", "Start the studio sidecar with `python scripts/dev.py`."
+            )
+
+    monkeypatch.setattr(backend_module, "require_backend", lambda: _FailingBackend())
+
+    with pytest.raises(typer.Exit) as exc_info:
+        backend_module.run_tool("get_jobs", {})
+    assert exc_info.value.exit_code == 1
+
+    captured = capsys.readouterr()
+    assert "Error: sidecar is down" in captured.err
+    assert "Hint: Start the studio sidecar" in captured.err
 
 
 def test_mcp_timeout_reads_env(monkeypatch):

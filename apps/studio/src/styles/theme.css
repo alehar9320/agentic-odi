@@ -1614,6 +1614,36 @@ input[type="range"] {
 }
 
 /* ------------------------------------------------------------------ */
+/* Sidecar notice                                                     */
+/* ------------------------------------------------------------------ */
+.sidecar-notice {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+  margin: 6px 22px 0;
+  padding: 10px 14px;
+  border: 1px solid rgba(239, 68, 68, 0.24);
+  border-radius: 12px;
+  background: rgba(239, 68, 68, 0.06);
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.sidecar-notice__text strong {
+  color: var(--text);
+}
+
+.sidecar-notice__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* ------------------------------------------------------------------ */
 /* Transcript notices and tags                                        */
 /* ------------------------------------------------------------------ */
 .message--notice {
