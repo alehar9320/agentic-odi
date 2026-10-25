@@ -7,10 +7,11 @@
  * decided what each part means.
  */
 
-import { useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { useAuiState, type ToolCallMessagePartProps } from "@assistant-ui/react";
 
-import { CheckIcon, SparkIcon } from "../components/icons";
+import { formatFileSize, preparedAttachmentById } from "./attachments";
+import { CheckIcon, ChevronDownIcon, SparkIcon } from "../components/icons";
 import { Markdown } from "../components/chat/Markdown";
 import type { UiNode } from "../ui/protocol";
 import { UiRenderer } from "../ui/UiRenderer";
@@ -25,25 +26,74 @@ export function TextPart() {
   return <Markdown source={text} />;
 }
 
-/** The model's thinking, kept out of the answer and out of the way. */
+/**
+ * The model's thinking, kept out of the answer and out of the way.
+ *
+ * It opens while it is being written so the reader can watch progress, and
+ * stays open afterwards rather than snapping shut mid-read. A reader who
+ * closes it keeps it closed: only the transition from running to done can
+ * change the state on its own.
+ */
 export function ReasoningPart() {
   const text = useAuiState((state) =>
     state.part.type === "reasoning" ? state.part.text : null,
   );
   const running = useAuiState((state) => state.part.status?.type === "running");
+  const [open, setOpen] = useState(running);
+  const [seconds, setSeconds] = useState<number | null>(null);
+  const startedAt = useRef<number | null>(null);
+  const panelId = useId();
+
+  useEffect(() => {
+    if (running) {
+      if (startedAt.current === null) {
+        startedAt.current = Date.now();
+      }
+      return;
+    }
+    const started = startedAt.current;
+    if (started === null) {
+      return;
+    }
+    startedAt.current = null;
+    // One tick after the run settles, so the duration lands as a settled value
+    // rather than writing state during the effect that observed the change.
+    const timer = window.setTimeout(() => {
+      setSeconds(Math.max(1, Math.round((Date.now() - started) / 1000)));
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [running]);
+
   if (!text) {
     return null;
   }
+
+  const label = running
+    ? "Thinking…"
+    : seconds === null
+      ? "Thought process"
+      : `Thought for ${seconds}s`;
+
   return (
-    <details className="reasoning" open={false}>
-      <summary className="reasoning__summary">
+    <div className={`reasoning${running ? " is-thinking" : ""}`}>
+      <button
+        type="button"
+        className="reasoning__summary"
+        aria-expanded={open}
+        aria-controls={panelId}
+        onClick={() => setOpen((value) => !value)}
+      >
         <SparkIcon size={13} />
-        {running ? "Thinking…" : "Thought for a moment"}
-      </summary>
-      <div className="reasoning__body">
+        <span>{label}</span>
+        <ChevronDownIcon
+          className={`reasoning__chevron${open ? " is-open" : ""}`}
+          size={12}
+        />
+      </button>
+      <div className="reasoning__body" id={panelId} hidden={!open}>
         <Markdown source={text} />
       </div>
-    </details>
+    </div>
   );
 }
 
@@ -81,15 +131,28 @@ export function SurfacePart() {
   return <UiRenderer node={node} />;
 }
 
-/** A file the user attached, shown by name. */
+/**
+ * A file the user attached, shown as what it was: an image preview, a name,
+ * and its size. The prepared copy has the bytes; a turn restored from history
+ * does not, so those fall back to the name alone rather than an empty frame.
+ */
 export function FilePart() {
   const file = useAuiState((state) => (state.part.type === "file" ? state.part : null));
   if (!file) {
     return null;
   }
+  const prepared = preparedAttachmentById(file.data);
+  const size = prepared ? formatFileSize(prepared.size) : "";
+
   return (
     <span className="attachment-chip">
-      <span className="attachment-chip__name">{file.filename ?? "Attachment"}</span>
+      {prepared?.dataUrl ? (
+        <img className="attachment-chip__thumb" src={prepared.dataUrl} alt="" />
+      ) : null}
+      <span className="attachment-chip__meta">
+        <span className="attachment-chip__name">{file.filename ?? "Attachment"}</span>
+        {size ? <span className="attachment-chip__size">{size}</span> : null}
+      </span>
     </span>
   );
 }
@@ -159,7 +222,7 @@ export function ToolPart({
 
   const tone = isError || payload?.status === "error" ? " is-error" : "";
   return (
-    <p className={`tool-trace${tone}`}>
+    <p className={`tool-trace${tone}${running ? " is-running" : ""}`}>
       <span className="tool-trace__dot" aria-hidden="true" />
       {toolLabel(toolName)}
       {running ? " · working" : payload?.status === "declined" ? " · declined" : ""}
@@ -168,18 +231,50 @@ export function ToolPart({
   );
 }
 
-/** The typing state before the first token arrives. */
+/**
+ * The activity state before the first token arrives.
+ *
+ * The phase is announced by the transcript's own status region, outside this
+ * message: the message is `aria-busy` while it streams, and a live region
+ * nested in a busy subtree would be held back until the reply finished.
+ */
 export function TypingPart({ label }: { label: string }) {
+  const seconds = useElapsedSeconds(true);
+
   return (
-    <p className="typing" role="status">
-      <span className="typing__dots" aria-hidden="true">
-        <i />
-        <i />
-        <i />
-      </span>
-      {label}…
-    </p>
+    <div className="thinking" aria-hidden="true">
+      <p className="thinking__status">
+        <span className="thinking__dots" aria-hidden="true">
+          <i />
+          <i />
+          <i />
+        </span>
+        <span className="thinking__label">{label}</span>
+      </p>
+      {seconds >= 3 ? (
+        <span className="thinking__timer" aria-hidden="true">
+          {seconds}s
+        </span>
+      ) : null}
+    </div>
   );
+}
+
+function useElapsedSeconds(active: boolean): number {
+  const [seconds, setSeconds] = useState(0);
+
+  useEffect(() => {
+    if (!active) {
+      return;
+    }
+    const startedAt = Date.now();
+    const timer = window.setInterval(() => {
+      setSeconds(Math.floor((Date.now() - startedAt) / 1000));
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [active]);
+
+  return seconds;
 }
 
 /** The sparkle avatar, shared by every assistant turn. */

@@ -17,6 +17,7 @@ import {
   useAuiState,
 } from "@assistant-ui/react";
 
+import { formatFileSize, preparedAttachmentById } from "../../assistant/attachments";
 import { SURFACE_PART } from "../../assistant/convert";
 import {
   AssistantAvatar,
@@ -32,7 +33,7 @@ import { useStudio } from "../../state/StudioContext";
 import type { StudioError } from "../../types";
 import { UiActionContext } from "../../ui/actions";
 import { FailurePanel } from "../FailurePanel";
-import { CopyIcon } from "../icons";
+import { CheckIcon, CopyIcon } from "../icons";
 import { Markdown } from "./Markdown";
 
 const PHASE_LABEL: Record<string, string> = {
@@ -51,6 +52,7 @@ function phaseLabel(phase: string | null): string {
 function AssistantMessage() {
   const { thinkingPhase, offlineReply, sendMessage } = useStudio();
   const running = useAuiState((state) => state.message.status?.type === "running");
+  const copied = useAuiState((state) => state.message.isCopied);
   const hasText = useAuiState((state) =>
     state.message.content.some((part) => part.type === "text" && part.text.trim().length > 0),
   );
@@ -62,7 +64,9 @@ function AssistantMessage() {
   );
 
   return (
-    <article className="message message--assistant">
+    // `aria-busy` keeps a screen reader from announcing every streamed token;
+    // it reads the reply once the turn settles.
+    <article className="message message--assistant" aria-busy={running}>
       <AssistantAvatar />
       <div className="message__body">
         {offlineReply ? <span className="message__tag">Local guidance</span> : null}
@@ -90,23 +94,45 @@ function AssistantMessage() {
         ) : null}
 
         <AuiIf condition={(state) => state.message.branchCount > 1}>
-          <BranchPickerPrimitive.Root className="branch-picker">
-            <BranchPickerPrimitive.Previous className="branch-picker__step" aria-label="Previous reply">
+          {/* The group carries the name. Putting an aria-label on the position
+              text instead would replace "2 of 2" for screen readers with the
+              label, hiding the one thing the control exists to state. */}
+          <BranchPickerPrimitive.Root
+            className="branch-picker"
+            role="group"
+            aria-label="Reply alternatives"
+          >
+            <BranchPickerPrimitive.Previous
+              className="branch-picker__step"
+              aria-label="Previous alternative"
+            >
               ‹
             </BranchPickerPrimitive.Previous>
             <span className="branch-picker__label">
-              <BranchPickerPrimitive.Number /> of <BranchPickerPrimitive.Count />
+              Alternative <BranchPickerPrimitive.Number /> of <BranchPickerPrimitive.Count />
             </span>
-            <BranchPickerPrimitive.Next className="branch-picker__step" aria-label="Next reply">
+            <BranchPickerPrimitive.Next
+              className="branch-picker__step"
+              aria-label="Next alternative"
+            >
               ›
             </BranchPickerPrimitive.Next>
           </BranchPickerPrimitive.Root>
         </AuiIf>
 
         {!running ? (
-          <ActionBarPrimitive.Root className="message__actions" hideWhenRunning>
-            <ActionBarPrimitive.Copy className="quiet-action" aria-label="Copy reply">
-              <CopyIcon size={14} /> Copy
+          <ActionBarPrimitive.Root
+            className="message__actions"
+            role="group"
+            aria-label="Reply actions"
+            hideWhenRunning
+          >
+            <ActionBarPrimitive.Copy
+              className="quiet-action"
+              aria-label={copied ? "Reply copied" : "Copy reply"}
+            >
+              {copied ? <CheckIcon size={14} /> : <CopyIcon size={14} />}
+              {copied ? "Copied" : "Copy"}
             </ActionBarPrimitive.Copy>
             <ActionBarPrimitive.Reload className="quiet-action" aria-label="Regenerate reply">
               Regenerate
@@ -119,24 +145,48 @@ function AssistantMessage() {
 }
 
 function UserMessage() {
+  const copied = useAuiState((state) => state.message.isCopied);
+
   return (
     <article className="message message--user">
       <div className="message__bubble">
         <MessagePrimitive.Parts components={{ Text: TextPart }} />
       </div>
       <MessagePrimitive.Attachments>
-        {({ attachment }) => (
-          <span className="attachment-chip">
-            <span className="attachment-chip__name">{attachment.name}</span>
-          </span>
-        )}
+        {({ attachment }) => {
+          // The turn owns the id; the prepared copy (if this session still has
+          // it) supplies the preview and size the composer showed.
+          const ready = attachment.content
+            ?.map((part) => (part.type === "file" ? preparedAttachmentById(part.data) : null))
+            .find((candidate) => candidate !== null);
+          const size = ready ? formatFileSize(ready.size) : "";
+
+          return (
+            <span className="attachment-chip">
+              {ready?.dataUrl ? (
+                <img className="attachment-chip__thumb" src={ready.dataUrl} alt="" />
+              ) : null}
+              <span className="attachment-chip__meta">
+                <span className="attachment-chip__name">{attachment.name}</span>
+                {size ? <span className="attachment-chip__size">{size}</span> : null}
+              </span>
+            </span>
+          );
+        }}
       </MessagePrimitive.Attachments>
-      <ActionBarPrimitive.Root className="message__actions message__actions--user">
+      <ActionBarPrimitive.Root
+        className="message__actions message__actions--user"
+        role="group"
+        aria-label="Message actions"
+      >
         <ActionBarPrimitive.Edit className="quiet-action" aria-label="Edit message">
           Edit
         </ActionBarPrimitive.Edit>
-        <ActionBarPrimitive.Copy className="quiet-action" aria-label="Copy message">
-          Copy
+        <ActionBarPrimitive.Copy
+          className="quiet-action"
+          aria-label={copied ? "Message copied" : "Copy message"}
+        >
+          {copied ? "Copied" : "Copy"}
         </ActionBarPrimitive.Copy>
       </ActionBarPrimitive.Root>
     </article>
@@ -171,12 +221,18 @@ function EditComposer() {
 }
 
 export function Conversation() {
-  const { sendMessage, streaming } = useStudio();
+  const { sendMessage, streaming, thinkingPhase } = useStudio();
 
   return (
     <UiActionContext.Provider
       value={{ onIntent: (intent) => void sendMessage(intent), busy: streaming }}
     >
+      {/* The phase lives outside the log: the streaming reply is `aria-busy`,
+          and a status message inside it would not be announced until the
+          answer finished — the one moment it is no longer useful. */}
+      <p className="sr-only" role="status" aria-live="polite">
+        {streaming ? phaseLabel(thinkingPhase) : ""}
+      </p>
       <div className="conversation" role="log" aria-live="polite" aria-label="Conversation">
         <ThreadPrimitive.Messages
           components={{

@@ -35,7 +35,7 @@ cd apps/studio/src-tauri && cargo fmt --check && cargo clippy -- -D warnings && 
 
 ### Conversational UI coverage
 
-The agent-composed surfaces and the first-run tour are covered at these levels:
+The agent-composed surfaces and the first-run tour are covered at these levels. `ChatStage.test.tsx` also covers the latest-message control while following a streamed turn and returning to the live end:
 
 | File | What it covers |
 |---|---|
@@ -43,8 +43,11 @@ The agent-composed surfaces and the first-run tour are covered at these levels:
 | `apps/studio/src/ui/UiRenderer.test.tsx` | Card rendering, computed opportunity scores, action dispatch, per-node failure isolation, catalog/registry parity |
 | `apps/studio/src/assistant/convert.test.ts` | Every part mapping in both directions, unknown parts dropped, `content` preserved for history |
 | `apps/studio/src/api/studioApi.test.ts` | Chat request serialization: visible-path messages and attachment fields match the sidecar schema |
-| `apps/studio/src/components/chat/Conversation.test.tsx` | Prose and surfaces interleaved in the agent's order through the real runtime; card actions become messages; branch affordance; failure retry |
-| `apps/studio/src/components/chat/Composer.test.tsx` | Send, stop, and the slash palette in the runtime-bound composer |
+| `apps/studio/src/components/chat/Conversation.test.tsx` | Prose and surfaces interleaved in the agent's order through the real runtime; card actions become messages; named alternative N of M and its switch; reasoning disclosure opens on request; the phase is announced and the reply is busy while streaming; failure retry |
+| `apps/studio/src/components/chat/Composer.test.tsx` | Send, stop, the slash palette, keyboard focus, dropped and pasted attachments, refusal of unreadable files, and accessible attachment format/size limits in the runtime-bound composer |
+| `apps/studio/src/components/chat/ModelPicker.test.tsx` | Listing and marking the configured model, selection writes through `saveSettings`, arrow/Enter/Escape operation, an unreachable backend explained with a Settings path, one probe per backend |
+| `apps/studio/src/assistant/attachments.test.ts` | Acceptance by extension and type, the 5 MB image ceiling, and human-readable sizes |
+| `apps/studio-api/tests/test_studio_models.py` | Model listing sorted and deduplicated, offline without connecting, failed probe returned as a message, `/api/models` response shape |
 | `apps/studio/src/state/StudioContext.test.tsx` | New, regenerate, and edit turns against a stubbed stream, branch switching, approval answers |
 | `apps/studio-api/tests/test_studio_ui_spec.py` | Catalog validation and `render_ui` tool-schema generation |
 | `apps/studio-api/tests/test_studio_chat_ui.py` | `render_ui` interception, `ui` SSE events, and the correction fed back to the model |
@@ -55,7 +58,7 @@ The agent-composed surfaces and the first-run tour are covered at these levels:
 | `apps/studio/src/features/flags.test.ts` | Flag precedence (query → storage → env → default), value parsing, local overrides |
 | `apps/studio/src/onboarding/machine.test.ts` | Tour transitions, no forward motion without a goal, versioned storage, malformed records |
 | `apps/studio/src/onboarding/FirstRunWizard.test.tsx` | Auto-open, full flow to a destination, skip/Escape, focus trap, resume, replay, inline model repair, flag off |
-| `apps/studio/src/App.test.tsx` | First-run ordering: tour over the context conversation, job handoff, chosen surface opens, flag off in shell tests |
+| `apps/studio/src/App.test.tsx` | First-run ordering: tour over the context conversation, job handoff, chosen surface opens, contextual starter-card labels and prompts, flag off in shell tests |
 
 ## Website Checks (GitHub Pages)
 
