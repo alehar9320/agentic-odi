@@ -38,8 +38,11 @@ const evidence: Evidence[] = [
   },
 ];
 
+const openPanel = vi.fn();
+
 function renderWith(items: Evidence[] = evidence) {
   vi.mocked(useStudio).mockReturnValue({
+    openPanel,
     canvasState: {
       kind: "ready",
       data: {
@@ -63,6 +66,7 @@ const labels = () =>
 beforeEach(() => {
   localStorage.clear();
   vi.mocked(useStudio).mockReset();
+  openPanel.mockReset();
 });
 
 describe("EvidenceStream", () => {
@@ -79,6 +83,15 @@ describe("EvidenceStream", () => {
 
     expect(screen.getByText(/No evidence captured yet/)).toBeInTheDocument();
     expect(screen.queryByRole("listitem")).toBeNull();
+    expect(screen.queryByText(/Gong call/i)).toBeNull();
+  });
+
+  it("opens Settings from the empty-state call to action", () => {
+    renderWith([]);
+
+    fireEvent.click(screen.getByRole("button", { name: /connect a source/i }));
+
+    expect(openPanel).toHaveBeenCalledWith("settings");
   });
 
   it("reorders with the keyboard and remembers the order", () => {
