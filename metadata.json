@@ -1,0 +1,26 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M5S3FFBJXB1AEKR9HEPABQ5P",
+  "strategy": "manual-commit",
+  "branch": "feat/label-merge-conflicts",
+  "checkpoints_count": 3,
+  "files_touched": [
+    ".github/workflows/label-merge-conflicts.yml"
+  ],
+  "sessions": [
+    {
+      "metadata": "/0/metadata.json",
+      "transcript": "/0/full.jsonl",
+      "compact_transcript": "/0/transcript.jsonl",
+      "content_hash": "/0/content_hash.txt",
+      "prompt": "/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 213607,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 364224,
+    "output_tokens": 3906,
+    "api_call_count": 16
+  }
+}
