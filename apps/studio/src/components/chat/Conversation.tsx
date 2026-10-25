@@ -1,12 +1,13 @@
 import { useState } from "react";
 
+import { isImage } from "../../lib/attachments";
 import { activityLabel } from "../../lib/run";
 import { useStudio } from "../../state/StudioContext";
-import type { ChatMessage, ChatPart, StudioError } from "../../types";
+import type { ChatAttachmentPayload, ChatMessage, ChatPart, StudioError } from "../../types";
 import { UiActionContext } from "../../ui/actions";
 import { UiRenderer } from "../../ui/UiRenderer";
 import { FailurePanel } from "../FailurePanel";
-import { CheckIcon, CopyIcon, SparkIcon } from "../icons";
+import { CheckIcon, CopyIcon, FileIcon, SparkIcon } from "../icons";
 import { Markdown } from "./Markdown";
 import { RunActivity } from "./RunActivity";
 
@@ -51,6 +52,7 @@ function AssistantMessage({
   offline,
   error,
   retryText,
+  retryAttachments,
 }: {
   content: string;
   parts: ChatPart[];
@@ -62,11 +64,14 @@ function AssistantMessage({
   offline?: boolean;
   error?: StudioError;
   retryText?: string;
+  retryAttachments?: ChatAttachmentPayload[];
 }) {
   const { pushToast, sendMessage } = useStudio();
   const [copied, setCopied] = useState(false);
   const steps = tools ?? [];
   const label = activityLabel(phase, []);
+  const retry = (text: string) =>
+    retryAttachments?.length ? void sendMessage(text, retryAttachments) : void sendMessage(text);
 
   async function copy() {
     try {
@@ -99,11 +104,7 @@ function AssistantMessage({
           <Typing label={label} />
         ) : null}
         {error ? (
-          <FailurePanel
-            error={error}
-            retryText={retryText}
-            onRetry={(text) => void sendMessage(text)}
-          />
+          <FailurePanel error={error} retryText={retryText} onRetry={retry} />
         ) : null}
         {streaming && content && <span className="caret" aria-hidden="true" />}
 
@@ -112,11 +113,11 @@ function AssistantMessage({
         {stopped ? (
           <div className="stopped">
             <span className="stopped__text">Stopped by you.</span>
-            {retryText ? (
+            {retryText || retryAttachments?.length ? (
               <button
                 type="button"
                 className="quiet-action"
-                onClick={() => void sendMessage(retryText)}
+                onClick={() => retry(retryText ?? "")}
                 disabled={streaming}
               >
                 Ask again
@@ -162,6 +163,24 @@ export function Conversation() {
               <article className="message message--user" key={index}>
                 <div className="message__bubble">
                   <span className="sr-only">You said: </span>
+                  {message.attachments?.length ? (
+                    <ul className="attach-sent" aria-label="Files you sent">
+                      {message.attachments.map((file, fileIndex) => (
+                        <li className="attach-sent__item" key={`${file.name}-${fileIndex}`}>
+                          {isImage(file) ? (
+                            <img
+                              className="attach-sent__thumb"
+                              src={`data:${file.media_type};base64,${file.data}`}
+                              alt=""
+                            />
+                          ) : (
+                            <FileIcon size={12} />
+                          )}
+                          <span>{file.name}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
                   {message.content}
                 </div>
               </article>
@@ -187,6 +206,7 @@ export function Conversation() {
               offline={isLast && offlineReply}
               error={message.error}
               retryText={message.retryText}
+              retryAttachments={message.retryAttachments}
             />
           );
         })}

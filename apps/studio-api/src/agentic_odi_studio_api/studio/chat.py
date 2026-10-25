@@ -14,6 +14,8 @@ and come back to the same thread and the same working context.
 from __future__ import annotations
 
 import asyncio
+import base64
+import binascii
 import json
 import logging
 import time
@@ -34,7 +36,7 @@ from agentic_odi_studio_api.studio.connectors import ConnectorService
 from agentic_odi_studio_api.studio.memory import OBSERVATION_KINDS, StudioMemory
 from agentic_odi_studio_api.studio.observability import log_turn
 from agentic_odi_studio_api.studio.probes import check_llm_health, is_endpoint_reachable
-from agentic_odi_studio_api.studio.schemas import ChatRequest, StudioBrief
+from agentic_odi_studio_api.studio.schemas import ChatAttachment, ChatMessage, ChatRequest, StudioBrief
 from agentic_odi_studio_api.studio.ui_spec import RENDER_UI_TOOL, UiCatalog
 
 log = logging.getLogger(__name__)
@@ -152,13 +154,108 @@ def _error_frame(problem: StudioError, request_id: str) -> str:
     return _sse("error", {"error": body.model_dump(mode="json"), "request_id": request_id})
 
 
+#: Base64 adds a third to the payload, and every round of a turn carries it, so
+#: one turn must not be able to become an unbounded upload.
+MAX_ATTACHMENT_BYTES = 8 * 1024 * 1024
+
+#: Text is inlined whole only up to this much. Past it the model is told the file
+#: was cut, instead of being handed a truncated quote as if it were complete.
+MAX_INLINE_CHARS = 120_000
+
+#: Text-bearing media types whose payload is safe to inline as prose.
+INLINE_MEDIA_TYPES = {
+    "application/json",
+    "application/xml",
+    "application/yaml",
+    "application/x-yaml",
+    "application/toml",
+    "application/csv",
+    "application/x-ndjson",
+    "application/sql",
+}
+
+
+def _media_type(attachment: ChatAttachment) -> str:
+    return (attachment.media_type or "").split(";")[0].strip().lower()
+
+
+def _attachment_bytes(attachment: ChatAttachment) -> bytes:
+    return base64.b64decode(attachment.data, validate=True)
+
+
+def _attachment_problem(attachment: ChatAttachment) -> str | None:
+    """Why this file cannot be read, or None when it can.
+
+    A file the model cannot open is refused instead of being mentioned as if it
+    had been read: a filename is not evidence.
+    """
+    media = _media_type(attachment)
+    readable = media.startswith("image/") or media.startswith("text/")
+    if not media:
+        return "has no media type"
+    if not readable and media not in INLINE_MEDIA_TYPES:
+        return f"is a {media} file, which the model cannot read"
+    try:
+        raw = _attachment_bytes(attachment)
+    except (binascii.Error, ValueError):
+        return "is not valid base64"
+    if not raw:
+        return "is empty"
+    if len(raw) > MAX_ATTACHMENT_BYTES:
+        return f"is larger than {MAX_ATTACHMENT_BYTES // (1024 * 1024)} MB"
+    if not media.startswith("image/"):
+        try:
+            raw.decode("utf-8")
+        except UnicodeDecodeError:
+            return "is not UTF-8 text"
+    return None
+
+
+def _attachment_part(attachment: ChatAttachment) -> dict[str, Any]:
+    """One OpenAI content part: an image, or a text file inlined verbatim."""
+    media = _media_type(attachment)
+    if media.startswith("image/"):
+        return {
+            "type": "image_url",
+            "image_url": {"url": f"data:{media};base64,{attachment.data}"},
+        }
+    text = _attachment_bytes(attachment).decode("utf-8")
+    if len(text) > MAX_INLINE_CHARS:
+        text = text[:MAX_INLINE_CHARS] + f"\n\n[truncated at {MAX_INLINE_CHARS} characters]"
+    label = attachment.name or "attached file"
+    return {"type": "text", "text": f"[{label}]\n{text}"}
+
+
+def _message_dict(message: ChatMessage) -> dict[str, Any]:
+    if message.role != "user" or not message.attachments:
+        return {"role": message.role, "content": message.content}
+    parts: list[dict[str, Any]] = []
+    if message.content:
+        parts.append({"type": "text", "text": message.content})
+    parts.extend(_attachment_part(attachment) for attachment in message.attachments)
+    return {"role": "user", "content": parts}
+
+
+def _stored_user_text(message: ChatMessage | None) -> str:
+    """The user's turn as the thread remembers it.
+
+    The files themselves are not stored, but their names are, so a resumed
+    conversation does not read as if the question came out of nowhere.
+    """
+    if message is None:
+        return ""
+    names = [attachment.name or "attached file" for attachment in message.attachments]
+    if not names:
+        return message.content
+    return f"{message.content}\n\n[{', '.join(names)}]".strip()
+
+
 def _to_openai_messages(request: ChatRequest, memory_context: str = "") -> list[dict[str, Any]]:
     system_prompt = SYSTEM_PROMPT + _brief_block(request.brief)
     if memory_context:
         system_prompt += "\n\n" + memory_context
     messages: list[dict[str, Any]] = [{"role": "system", "content": system_prompt}]
-    for message in request.messages:
-        messages.append({"role": message.role, "content": message.content})
+    messages.extend(_message_dict(message) for message in request.messages)
     return messages
 
 
@@ -368,7 +465,22 @@ async def _turn_frames(
 
     yield frame("status", {"phase": "health_check"})
 
-    last_user = next((m.content for m in reversed(request.messages) if m.role == "user"), "")
+    last_user_message = next(
+        (m for m in reversed(request.messages) if m.role == "user"), None
+    )
+    for message in request.messages:
+        for attachment in message.attachments:
+            problem = _attachment_problem(attachment)
+            if problem is not None:
+                raise _TurnFailure(
+                    StudioError(
+                        code=StudioErrorCode.VALIDATION,
+                        message=f"{attachment.name or 'The attached file'} {problem}.",
+                        suggestion="Attach an image or a text file, then try again.",
+                    )
+                )
+
+    last_user = last_user_message.content if last_user_message else ""
 
     conversation_id: str | None = None
     if memory is not None:
@@ -378,7 +490,7 @@ async def _turn_frames(
         if conversation is None:
             conversation = memory.create_conversation()
         conversation_id = conversation.id
-        _persist_turn(memory, conversation_id, "user", last_user)
+        _persist_turn(memory, conversation_id, "user", _stored_user_text(last_user_message))
         updated = memory.get_conversation(conversation_id) or conversation
         yield frame("conversation", {"id": updated.id, "title": updated.title})
 

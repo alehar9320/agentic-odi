@@ -231,6 +231,7 @@ describe("studio shell", () => {
   });
 
   it("sends the next message with the model picked in the composer", async () => {
+    const baseline = vi.mocked(streamChat).mock.calls.length;
     render(<App />);
 
     fireEvent.change(await screen.findByRole("combobox", { name: "Model" }), {
@@ -241,10 +242,52 @@ describe("studio shell", () => {
     fireEvent.change(composer, { target: { value: "Which model is answering?" } });
     fireEvent.click(screen.getByRole("button", { name: /send message/i }));
 
-    await waitFor(() => expect(streamChat).toHaveBeenCalled());
+    await waitFor(() => expect(vi.mocked(streamChat).mock.calls.length).toBe(baseline + 1));
 
     const request = vi.mocked(streamChat).mock.calls.at(-1)?.[0];
     expect(request?.model).toBe("qwen3-8b");
+  });
+
+  it("sends an attached file's bytes with that turn, and only that turn", async () => {
+    // Mocks outlive a test, so count the turns this one starts.
+    const baseline = vi.mocked(streamChat).mock.calls.length;
+    render(<App />);
+
+    const composer = await screen.findByRole("textbox", { name: /message the studio/i });
+    const file = new File([new Uint8Array([1, 2, 3])], "shot.png", { type: "image/png" });
+    fireEvent.change(document.getElementById("studio-composer-files") as HTMLInputElement, {
+      target: { files: [file] },
+    });
+    expect(await screen.findByText("shot.png")).toBeInTheDocument();
+
+    fireEvent.change(composer, { target: { value: "What is broken here?" } });
+    fireEvent.click(screen.getByRole("button", { name: /send message/i }));
+
+    await waitFor(() => expect(vi.mocked(streamChat).mock.calls.length).toBe(baseline + 1));
+    const firstRequest = vi.mocked(streamChat).mock.calls.at(-1)?.[0];
+    expect(firstRequest?.messages.at(-1)).toMatchObject({
+      role: "user",
+      content: "What is broken here?",
+      attachments: [{ name: "shot.png", media_type: "image/png", data: btoa("\x01\x02\x03") }],
+    });
+
+    // A later question must not re-upload the screenshot. The composer moves
+    // from the empty stage to the dock once a turn exists, and stays locked
+    // until the first turn settles, so wait for the stop control to go away.
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: /stop generating/i })).toBeNull(),
+    );
+    fireEvent.change(await screen.findByRole("textbox", { name: /message the studio/i }), {
+      target: { value: "And now?" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /send message/i }));
+
+    await waitFor(() => expect(vi.mocked(streamChat).mock.calls.length).toBe(baseline + 2));
+    const secondRequest = vi.mocked(streamChat).mock.calls.at(-1)?.[0];
+    expect(secondRequest?.messages.slice(0, -1).every((message) => !message.attachments)).toBe(
+      true,
+    );
+    expect(secondRequest?.messages.at(-1)?.content).toBe("And now?");
   });
 
   it("shows each tool a turn used once, under one summary line", async () => {

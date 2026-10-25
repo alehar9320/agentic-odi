@@ -7,9 +7,23 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 
 
+class ChatAttachment(BaseModel):
+    """One file the reader attached, as bytes the sidecar can decode.
+
+    ``data`` is base64. Images become image content; text is inlined verbatim.
+    The sidecar decides which, from ``media_type``, and refuses the rest rather
+    than letting a filename stand in for content the model never saw.
+    """
+
+    name: str = ""
+    media_type: str = ""
+    data: str = ""
+
+
 class ChatMessage(BaseModel):
     role: Literal["system", "user", "assistant", "tool"]
     content: str = ""
+    attachments: list[ChatAttachment] = Field(default_factory=list)
 
 
 class McpHealthRequest(BaseModel):

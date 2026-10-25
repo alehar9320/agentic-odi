@@ -517,6 +517,154 @@ a {
   color: var(--amber);
 }
 
+/* Attachments: what is about to be sent, and what was sent */
+.composer.is-dragging .composer__shell {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(139, 140, 248, 0.16);
+}
+
+.attach-tray {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 8px;
+  padding: 0;
+  list-style: none;
+}
+
+.attach {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  padding: 4px 6px 4px 4px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.attach__thumb {
+  width: 30px;
+  height: 30px;
+  flex: none;
+  border-radius: 7px;
+  object-fit: cover;
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.attach__thumb--file {
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+}
+
+.attach__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.25;
+}
+
+.attach__name {
+  overflow: hidden;
+  max-width: 24ch;
+  color: var(--text);
+  font-size: 0.75rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.attach__meta {
+  color: var(--faint);
+  font-size: 0.66rem;
+}
+
+.attach__remove {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  flex: none;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--faint);
+  font-size: 0.68rem;
+  cursor: pointer;
+}
+
+.attach__remove:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+}
+
+.attach__remove:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.composer__attach-error {
+  margin: 0 0 8px;
+  color: var(--amber);
+  font-size: 0.74rem;
+}
+
+.composer__attach {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex: none;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--faint);
+  cursor: pointer;
+}
+
+.composer__attach:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+}
+
+.composer__attach:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.composer__attach:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.attach-sent {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin: 0 0 6px;
+  padding: 0;
+  list-style: none;
+}
+
+.attach-sent__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  padding: 2px 8px 2px 3px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--muted);
+  font-size: 0.7rem;
+}
+
+.attach-sent__thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
 .composer__model {
   position: relative;
   display: inline-flex;

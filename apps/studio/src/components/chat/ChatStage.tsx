@@ -1,6 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 
 import {
+  attachmentProblem,
+  readAttachment,
+  releaseAttachment,
+  toPayload,
+  type StagedAttachment,
+} from "../../lib/attachments";
+import {
   HELP_TEXT,
   IMPACT_PROMPT,
   STUDIO_COMMANDS,
@@ -42,6 +49,8 @@ export function ChatStage() {
     llmHealth,
   } = useStudio();
   const [draft, setDraft] = useState("");
+  const [attachments, setAttachments] = useState<StagedAttachment[]>([]);
+  const [attachError, setAttachError] = useState<string | null>(null);
   const [atBottom, setAtBottom] = useState(true);
   const [announcement, setAnnouncement] = useState<Announcement | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -127,9 +136,49 @@ export function ChatStage() {
     }
   }
 
+  /**
+   * Stage the files the reader handed over: read only what the model can read,
+   * and say why anything else was refused instead of attaching a filename.
+   */
+  async function attachFiles(files: File[]) {
+    const accepted: StagedAttachment[] = [];
+    const problems: string[] = [];
+    let staged = attachments.length;
+
+    for (const file of files) {
+      const problem = attachmentProblem(file, staged);
+      if (problem) {
+        problems.push(problem);
+        continue;
+      }
+      try {
+        accepted.push(await readAttachment(file));
+        staged += 1;
+      } catch (error) {
+        problems.push((error as Error).message);
+      }
+    }
+
+    if (accepted.length) {
+      setAttachments((current) => [...current, ...accepted]);
+    }
+    setAttachError(problems[0] ?? null);
+  }
+
+  function removeAttachment(id: string) {
+    setAttachments((current) => {
+      const leaving = current.find((attachment) => attachment.id === id);
+      if (leaving) {
+        releaseAttachment(leaving);
+      }
+      return current.filter((attachment) => attachment.id !== id);
+    });
+    setAttachError(null);
+  }
+
   function submit(text?: string) {
     const value = (text ?? draft).trim();
-    if (!value || streaming) {
+    if ((!value && !attachments.length) || streaming) {
       return;
     }
     if (text === undefined) {
@@ -149,7 +198,11 @@ export function ChatStage() {
       return;
     }
 
-    void sendMessage(value);
+    const files = attachments.map(toPayload);
+    attachments.forEach(releaseAttachment);
+    setAttachments([]);
+    setAttachError(null);
+    void sendMessage(value, files);
   }
 
   // Keep the transcript pinned to the newest token unless the reader scrolled
@@ -213,6 +266,10 @@ export function ChatStage() {
               onStop={stopStreaming}
               inputRef={inputRef}
               autoFocus
+              attachments={attachments}
+              onAttachFiles={(files) => void attachFiles(files)}
+              onRemoveAttachment={removeAttachment}
+              attachmentError={attachError}
             />
           </div>
         </div>
@@ -278,6 +335,10 @@ export function ChatStage() {
           streaming={streaming}
           onStop={stopStreaming}
           inputRef={inputRef}
+          attachments={attachments}
+          onAttachFiles={(files) => void attachFiles(files)}
+          onRemoveAttachment={removeAttachment}
+          attachmentError={attachError}
         />
       </div>
     </section>

@@ -44,6 +44,8 @@ The agent-composed surfaces and the first-run tour are covered at these levels:
 | `apps/studio/src/components/chat/Conversation.test.tsx` | Prose and surfaces interleaved in the agent's order; card actions become messages |
 | `apps/studio-api/tests/test_studio_ui_spec.py` | Catalog validation and `render_ui` tool-schema generation |
 | `apps/studio-api/tests/test_studio_chat_ui.py` | `render_ui` interception, `ui` SSE events, and the correction fed back to the model |
+| `apps/studio/src/lib/attachments.test.ts` | Readable media types, size/count refusals, base64 payloads, preview release |
+| `apps/studio-api/tests/test_studio_chat_attachments.py` | Image and text parts on the wire, bad base64/oversized/undecodable files, attachments kept on the newest turn only |
 | `apps/studio/src/features/flags.test.ts` | Flag precedence (query → storage → env → default), value parsing, local overrides |
 | `apps/studio/src/onboarding/machine.test.ts` | Tour transitions, no forward motion without a goal, versioned storage, malformed records |
 | `apps/studio/src/onboarding/FirstRunWizard.test.tsx` | Auto-open, full flow to a destination, skip/Escape, focus trap, resume, replay, inline model repair, flag off |

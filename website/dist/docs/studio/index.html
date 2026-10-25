@@ -170,7 +170,19 @@ SPA never contacts MCP or the LLM directly.</p>
 </tr>
 <tr>
 <td><strong>Composer</strong></td>
-<td>Docked at the bottom of the transcript. <code>Enter</code> sends, <code>Shift</code>+<code>Enter</code> adds a line, <code>Cmd/Ctrl</code>+<code>K</code> focuses it, and <code>/</code> opens the command palette. The send button becomes a stop button while a reply streams.</td>
+<td>Docked at the bottom of the transcript. <code>Enter</code> sends, <code>Shift</code>+<code>Enter</code> adds a line, <code>Cmd/Ctrl</code>+<code>K</code> focuses it, <code>/</code> opens the command palette, and <code>Esc</code> stops a reply that is still streaming. The send button becomes a stop button while a reply streams. On touch screens the field stays at 16px so mobile browsers do not zoom into it.</td>
+</tr>
+<tr>
+<td><strong>Attachments</strong></td>
+<td>The paperclip, a drag onto the composer, or a paste stages images and text files (up to 6, 8 MB each) as chips with a thumbnail and a size; a file the model could not read is refused in words instead of attached by name. Files ride only on the turn that sends them — the next question does not re-upload them — and a turn that fails or is stopped keeps them for <strong>Ask again</strong>.</td>
+</tr>
+<tr>
+<td><strong>Model picker</strong></td>
+<td>The model name under the composer is a selector when the endpoint publishes a catalog (<code>POST /api/models</code>, asked at boot and again whenever the base URL or key changes); the configured name is always an option, and picking one changes the model used by the next message. A provider that will not list its models leaves the name as plain text, with the reason in its tooltip, and Settings keeps the free-text field plus the known models as suggestions.</td>
+</tr>
+<tr>
+<td><strong>Transcript</strong></td>
+<td>A focusable, labelled log: the arrow keys, <code>Page Up</code>/<code>Page Down</code>, and <code>Home</code>/<code>End</code> scroll history without a mouse. If you scroll back while the studio replies, <strong>Jump to latest</strong> returns you to the newest turn and puts focus in the transcript.</td>
 </tr>
 <tr>
 <td><strong>Bar</strong></td>
@@ -186,8 +198,32 @@ SPA never contacts MCP or the LLM directly.</p>
 </tr>
 </tbody>
 </table>
-<p>Replies render Markdown (headings, lists, emphasis, inline and fenced code).
-Tool calls appear inline as small trace chips while the agent works.</p>
+<p>Replies render Markdown (headings, lists, emphasis, inline and fenced code).</p>
+<h3 id="run-activity">Run activity</h3>
+<p>Every tool call is one row in the turn's timeline, not one row per event. While
+a turn streams, the studio names the work in flight — <em>Reading your jobs</em>,
+<em>Adding an outcome</em>, or the sidecar's own stage (<em>Waking the model</em>, <em>Opening
+your studio tools</em>, <em>Thinking</em>) — so a slow turn never looks like a stalled one.
+Each row carries its own outcome and duration, and a failed call keeps the
+tool's own words, so the transcript says which call broke instead of only that
+something did.</p>
+<p>When the turn settles the timeline collapses to a single line — <code>2 tools · 1.9s</code>, plus <code>1 failed</code> when it applies — which opens to the full list. The
+steps live on the turn itself (<code>ChatMessage.tools</code>), so the record survives the
+next question instead of being reset per run. The reducer that folds <code>tool</code>
+SSE events into steps is <code>apps/studio/src/lib/run.ts</code>, kept pure and testable.</p>
+<p>Stopping a run is a fact the transcript keeps. <code>Esc</code> (or the stop button) halts
+the stream, any tool still in flight is marked stopped, whatever prose arrived
+stays in place, and the turn says <em>Stopped by you</em> with <strong>Ask again</strong> — not a
+failure, because nothing broke, and not a silent disappearance, because the
+question is still on screen.</p>
+<p>Screen readers are not handed a streaming firehose. The transcript is not a
+live region; each settled reply is announced once, as prose with the Markdown
+markers removed, through a polite status region. The run's current step
+announces as it changes, each step's outcome is read as part of its row, a
+stopped turn is spoken as stopped rather than as a reply, failures arrive as an
+alert with their retry, and every turn is
+labelled with who said it — &quot;You said&quot;, &quot;Studio said&quot;, &quot;Studio notice&quot; — so
+navigating turn by turn keeps its author.</p>
 <h3 id="slash-commands">Slash commands</h3>
 <p>Type <code>/</code> to open the palette. <code>Up</code>/<code>Down</code> move, <code>Enter</code> or <code>Tab</code> runs the
 selected command, <code>Esc</code> closes it. Commands are handled in the SPA and never call
@@ -661,6 +697,9 @@ automatically.</p>
         </li>
         <li class="doc__toc-item doc__toc-item--2">
           <a href="#interface">Interface</a>
+        </li>
+        <li class="doc__toc-item doc__toc-item--3">
+          <a href="#run-activity">Run activity</a>
         </li>
         <li class="doc__toc-item doc__toc-item--3">
           <a href="#slash-commands">Slash commands</a>

@@ -131,6 +131,68 @@ describe("Composer model selection", () => {
   });
 });
 
+describe("Composer attachments", () => {
+  const baseProps = {
+    onChange: () => {},
+    onSubmit: () => {},
+    onCommand: () => {},
+    streaming: false,
+    onStop: () => {},
+    inputRef: createRef<HTMLTextAreaElement>(),
+  };
+
+  const staged = {
+    id: "shot-1",
+    name: "shot.png",
+    media_type: "image/png",
+    data: "aGk=",
+    size: 2048,
+    preview_url: "blob:shot",
+  };
+
+  beforeEach(() => {
+    vi.mocked(useStudio).mockReturnValue(stubContext({ connectorSuggestions: [] }));
+  });
+
+  it("stages a file with its name and size, and lets the reader take it back", () => {
+    const remove = vi.fn();
+    render(
+      <Composer {...baseProps} value="" attachments={[staged]} onRemoveAttachment={remove} />,
+    );
+
+    expect(screen.getByText("shot.png")).toBeInTheDocument();
+    expect(screen.getByText("2 KB")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove shot.png" }));
+
+    expect(remove).toHaveBeenCalledWith("shot-1");
+  });
+
+  it("sends a file with no sentence around it", () => {
+    const onSubmit = vi.fn();
+    render(
+      <Composer {...baseProps} value="" attachments={[staged]} onSubmit={onSubmit} onAttachFiles={() => {}} />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /send message/i }));
+
+    expect(onSubmit).toHaveBeenCalled();
+  });
+
+  it("says why a file was refused instead of attaching a name", () => {
+    render(
+      <Composer
+        {...baseProps}
+        value=""
+        onAttachFiles={() => {}}
+        attachmentError="deck.pdf is a application/pdf file. Attach an image or a text file."
+      />,
+    );
+
+    expect(screen.getByRole("status")).toHaveTextContent(/application\/pdf/);
+  });
+});
+
 describe("Composer accessibility", () => {
   const baseProps = {
     onChange: () => {},

@@ -166,6 +166,14 @@ npm<span class="w"> </span>--prefix<span class="w"> </span>apps/studio<span clas
 <td><code>render_ui</code> interception, <code>ui</code> SSE events, and the correction fed back to the model</td>
 </tr>
 <tr>
+<td><code>apps/studio/src/lib/attachments.test.ts</code></td>
+<td>Readable media types, size/count refusals, base64 payloads, preview release</td>
+</tr>
+<tr>
+<td><code>apps/studio-api/tests/test_studio_chat_attachments.py</code></td>
+<td>Image and text parts on the wire, bad base64/oversized/undecodable files, attachments kept on the newest turn only</td>
+</tr>
+<tr>
 <td><code>apps/studio/src/features/flags.test.ts</code></td>
 <td>Flag precedence (query → storage → env → default), value parsing, local overrides</td>
 </tr>

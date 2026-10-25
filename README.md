@@ -135,6 +135,10 @@ configured endpoint what it serves (`POST /api/models`) and the list is offered
 inline, with Settings keeping a free-text fallback for providers that publish no
 catalog. Picking one changes the model used by the next message.
 
+A screenshot is a question too. Attach images or text files with the paperclip,
+by dropping them on the composer, or by pasting; the bytes travel with that turn
+(up to 6 files, 8 MB each) and later questions do not re-upload them.
+
 ### Connectors (MCP ↔ Living Studio)
 
 Register MCP or REST connectors that the copilot can discover and invoke.

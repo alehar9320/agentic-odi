@@ -45,6 +45,7 @@ import type { RawSseEvent } from "../api/sse";
 import { applyToolEvent, type RunStep } from "../lib/run";
 import type {
   AddConnectorPayload,
+  ChatAttachmentPayload,
   AddOutcomePayload,
   AddStepPayload,
   CanvasData,
@@ -185,7 +186,7 @@ export interface StudioContextValue {
   streaming: boolean;
   /** The sidecar's stage for the live turn: health_check, mcp_tools, model. */
   thinkingPhase: string | null;
-  sendMessage: (text: string) => Promise<void>;
+  sendMessage: (text: string, attachments?: ChatAttachmentPayload[]) => Promise<void>;
   stopStreaming: () => void;
   clearChat: () => void;
   conversationId: string | null;
@@ -770,13 +771,26 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const sendMessage = useCallback(
-    async (text: string) => {
+    async (text: string, attachments: ChatAttachmentPayload[] = []) => {
       const trimmed = text.trim();
-      if (!trimmed || streaming) {
+      if ((!trimmed && !attachments.length) || streaming) {
         return;
       }
 
-      const history: ChatMessage[] = [...messages, { role: "user", content: trimmed }];
+      // Files ride only on the newest turn. Re-sending megabytes of base64 with
+      // every later question would make each turn slower than the last.
+      const history: ChatMessage[] = [
+        ...messages.map((message) =>
+          message.attachments
+            ? { role: message.role, content: message.content, parts: message.parts }
+            : message,
+        ),
+        {
+          role: "user",
+          content: trimmed,
+          ...(attachments.length ? { attachments } : {}),
+        },
+      ];
       const assistantIndex = history.length;
       setMessages([...history, { role: "assistant", content: "", parts: [] }]);
       setStreaming(true);
@@ -822,6 +836,11 @@ export function StudioProvider({ children }: { children: ReactNode }) {
             parts: [...parts],
             ...(failure ? { error: failure, retryText: trimmed } : {}),
             ...(stopped ? { stopped: true, retryText: trimmed } : {}),
+            ...(failure || stopped
+              ? attachments.length
+                ? { retryAttachments: attachments }
+                : {}
+              : {}),
             ...(steps.length ? { tools: [...steps] } : {}),
           };
           return next;

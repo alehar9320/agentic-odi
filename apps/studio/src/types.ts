@@ -89,6 +89,16 @@ export type ChatPart =
   | { kind: "text"; text: string }
   | { kind: "ui"; id: string; node: UiNode };
 
+/**
+ * A file that travelled with a turn: its bytes, base64-encoded, and the media
+ * type the sidecar needs to decide between image content and inlined text.
+ */
+export interface ChatAttachmentPayload {
+  name: string;
+  media_type: string;
+  data: string;
+}
+
 export interface ChatMessage {
   role: "user" | "assistant" | "notice";
   content: string;
@@ -105,6 +115,10 @@ export interface ChatMessage {
   error?: StudioError;
   /** The question this turn answered, kept so a failed turn can be retried. */
   retryText?: string;
+  /** Files this turn carried. Only the newest turn is sent with its bytes. */
+  attachments?: ChatAttachmentPayload[];
+  /** The files a failed or stopped turn should send again, if it had any. */
+  retryAttachments?: ChatAttachmentPayload[];
   /**
    * Assistant turns only: the tools the turn used, in the order they ran. Kept
    * on the turn so a finished run can still be inspected later.
