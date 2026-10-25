@@ -49,7 +49,7 @@ jobs:
           while IFS= read -r number; do
             [ -z "$number" ] && continue
             state="$(gh pr view "$number" --repo "$GITHUB_REPOSITORY" \
-              --json mergeableState -q '.mergeableState')"
+              --json mergeStateStatus -q '.mergeStateStatus')"
             case "$state" in
               dirty)
                 gh pr edit "$number" --repo "$GITHUB_REPOSITORY" \
