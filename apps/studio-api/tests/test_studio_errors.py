@@ -38,7 +38,11 @@ def test_validation_failure_returns_the_error_shape() -> None:
     assert body["error"]["suggestion"] == "Check the request body and try again."
 
 
-def test_studio_http_error_keeps_its_code_and_status() -> None:
+def test_studio_http_error_keeps_its_code_and_status(monkeypatch) -> None:
+    # A built SPA (`apps/studio/dist` from a local `npm run build`) registers a
+    # catch-all route when the app is created, which would shadow the route added
+    # below. The error shape is the subject here, not how the SPA is served.
+    monkeypatch.setenv("AGENTIC_ODI_DISABLE_SPA", "1")
     app = create_app(InMemoryRepository())
 
     @app.get("/api/boom")
@@ -63,7 +67,8 @@ def test_request_id_header_is_echoed() -> None:
     assert response.headers["X-Request-ID"] == "test-123"
 
 
-def test_unhandled_exception_returns_the_error_shape() -> None:
+def test_unhandled_exception_returns_the_error_shape(monkeypatch) -> None:
+    monkeypatch.setenv("AGENTIC_ODI_DISABLE_SPA", "1")
     app = create_app(InMemoryRepository())
 
     @app.get("/api/kaput")
