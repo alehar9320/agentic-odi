@@ -202,15 +202,51 @@ a {
   scrollbar-gutter: stable;
 }
 
+/* Keyboard readers can scroll history without a mouse (WCAG 2.1.1). */
+.chat__scroll:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+  border-radius: 14px;
+}
+
 .chat__thread {
   max-width: 720px;
   margin: 0 auto;
 }
 
 .chat__dock {
+  position: relative;
   flex: none;
-  padding: 6px 22px 16px;
+  padding: 6px 22px calc(16px + env(safe-area-inset-bottom, 0px));
   background: linear-gradient(to top, var(--bg) 60%, transparent);
+}
+
+/* Scroll anchor: floats above the composer only while the reader is behind. */
+.chat__jump {
+  position: absolute;
+  top: -34px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+}
+
+.chat__jump-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--bg-raised);
+  color: var(--muted);
+  font-size: 0.75rem;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.38);
+  cursor: pointer;
+}
+
+.chat__jump-button:hover {
+  border-color: rgba(139, 140, 248, 0.5);
+  color: var(--text);
 }
 
 .chat__dock > * {
@@ -404,6 +440,20 @@ a {
 
 .composer__input::placeholder {
   color: #6f7480;
+}
+
+/* iOS zooms into a field under 16px; the composer should never lurch. */
+@media (max-width: 640px) {
+  .composer__input {
+    font-size: 16px;
+  }
+}
+
+@media (pointer: coarse) {
+  .composer__send {
+    width: 40px;
+    height: 40px;
+  }
 }
 
 .composer__actions {

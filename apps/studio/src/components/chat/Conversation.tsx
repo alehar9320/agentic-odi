@@ -98,6 +98,7 @@ function AssistantMessage({
         <SparkIcon size={15} />
       </span>
       <div className="message__body">
+        <span className="sr-only">Studio said: </span>
         {offline && content ? <span className="message__tag">Local guidance</span> : null}
         {parts.length > 0 ? (
           <MessageParts parts={parts} />
@@ -152,19 +153,28 @@ export function Conversation() {
 
   return (
     <UiActionContext.Provider value={{ onIntent: (intent) => void sendMessage(intent), busy: streaming }}>
-      <div className="conversation" role="log" aria-live="polite" aria-label="Conversation">
+      {/*
+        The transcript itself is not a live region; the shell announces settled
+        turns through `TranscriptAnnouncer`. Speaker labels are hidden text so
+        navigating turn by turn has an author even when the avatar is decorative.
+      */}
+      <div className="conversation">
         {messages.map((message, index) => {
           const isLast = index === lastIndex;
           if (message.role === "user") {
             return (
               <article className="message message--user" key={index}>
-                <div className="message__bubble">{message.content}</div>
+                <div className="message__bubble">
+                  <span className="sr-only">You said: </span>
+                  {message.content}
+                </div>
               </article>
             );
           }
           if (message.role === "notice") {
             return (
               <article className="message message--notice" key={index}>
+                <span className="sr-only">Studio notice: </span>
                 <Markdown source={message.content} />
               </article>
             );

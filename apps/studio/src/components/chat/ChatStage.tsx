@@ -7,15 +7,21 @@ import {
   isSlashCommand,
   type StudioCommand,
 } from "../../lib/commands";
+import { announcementText } from "../../lib/transcript";
 import { useStudio } from "../../state/StudioContext";
-import type { WorkspacePanelId } from "../../types";
+import type { ChatMessage, WorkspacePanelId } from "../../types";
+import { ArrowDownIcon } from "../icons";
 import { SetupConversation } from "../setup/SetupConversation";
 import { Composer } from "./Composer";
 import { Conversation } from "./Conversation";
 import { Hero } from "./Hero";
 import { OfflineNotice } from "./OfflineNotice";
+import { TranscriptAnnouncer, type Announcement } from "./TranscriptAnnouncer";
 
 const VIEW_COMMANDS = new Set<string>(["landscape", "jobmap", "evidence", "settings"]);
+
+/** How close to the bottom still counts as reading the newest turn. */
+const PIN_THRESHOLD_PX = 96;
 
 export function ChatStage() {
   const {
@@ -36,10 +42,15 @@ export function ChatStage() {
     llmHealth,
   } = useStudio();
   const [draft, setDraft] = useState("");
+  const [atBottom, setAtBottom] = useState(true);
+  const [announcement, setAnnouncement] = useState<Announcement | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const pinned = useRef(true);
   const refocus = useRef(false);
+  // Seeded with the turn already on screen so remounting the stage (for
+  // example after setup) does not read the last reply again.
+  const announcedTurn = useRef<ChatMessage | null>(messages[messages.length - 1] ?? null);
+  const announcementToken = useRef(0);
 
   const empty = messages.length === 0;
 
@@ -124,7 +135,7 @@ export function ChatStage() {
     if (text === undefined) {
       setDraft("");
     }
-    pinned.current = true;
+    setAtBottom(true);
     refocus.current = true;
 
     if (isSlashCommand(value)) {
@@ -141,15 +152,37 @@ export function ChatStage() {
     void sendMessage(value);
   }
 
-  // Keep the transcript pinned to the newest token unless the reader scrolled up.
+  // Keep the transcript pinned to the newest token unless the reader scrolled
+  // up. Scrolling up is a reading decision, not an accident: it is honoured
+  // until they come back with the jump control or their own scroll.
   useEffect(() => {
-    if (!pinned.current) {
+    if (!atBottom) {
       return;
     }
     const element = scrollRef.current;
     if (element) {
       element.scrollTop = element.scrollHeight;
     }
+  }, [messages, streaming, atBottom]);
+
+  // Announce a turn once it settles. Token-by-token announcements are noise,
+  // and the message object only changes when the turn itself changes, so a
+  // repeated reply is still spoken.
+  useEffect(() => {
+    if (streaming) {
+      return;
+    }
+    const last = messages[messages.length - 1];
+    if (!last || last === announcedTurn.current) {
+      return;
+    }
+    const text = announcementText(last);
+    if (!text) {
+      return;
+    }
+    announcedTurn.current = last;
+    announcementToken.current += 1;
+    setAnnouncement({ token: announcementToken.current, text });
   }, [messages, streaming]);
 
   // The composer moves from the hero into the dock when the conversation starts.
@@ -187,16 +220,41 @@ export function ChatStage() {
     );
   }
 
+  function jumpToLatest() {
+    const element = scrollRef.current;
+    setAtBottom(true);
+    if (!element) {
+      return;
+    }
+    element.scrollTop = element.scrollHeight;
+    // The control unmounts as soon as we are back at the bottom; land focus on
+    // the transcript itself rather than dropping it on the document.
+    element.focus({ preventScroll: true });
+  }
+
   return (
     <section className="chat" aria-label="Studio conversation">
       <OfflineNotice />
+      <TranscriptAnnouncer announcement={announcement} />
+      {/*
+        A focusable log so keyboard readers can scroll history. `aria-live` is
+        deliberately off: the announcer speaks each settled turn once, where a
+        live log would read every streamed token and re-read re-rendered
+        Markdown.
+      */}
       <div
         ref={scrollRef}
         className="chat__scroll"
+        tabIndex={0}
+        role="log"
+        aria-label="Conversation transcript"
+        aria-live="off"
+        aria-busy={streaming}
         onScroll={(event) => {
           const element = event.currentTarget;
-          pinned.current =
-            element.scrollHeight - element.scrollTop - element.clientHeight < 96;
+          setAtBottom(
+            element.scrollHeight - element.scrollTop - element.clientHeight < PIN_THRESHOLD_PX,
+          );
         }}
       >
         <div className="chat__thread">
@@ -204,6 +262,14 @@ export function ChatStage() {
         </div>
       </div>
       <div className="chat__dock">
+        {!atBottom && messages.length > 0 ? (
+          <div className="chat__jump">
+            <button type="button" className="chat__jump-button" onClick={jumpToLatest}>
+              <ArrowDownIcon size={14} />
+              Jump to latest
+            </button>
+          </div>
+        ) : null}
         <Composer
           value={draft}
           onChange={setDraft}

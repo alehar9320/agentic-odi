@@ -18,6 +18,12 @@ interface ComposerProps {
 }
 
 const MAX_HEIGHT = 220;
+const HINT_ID = "studio-composer-hint";
+
+/** Stable element id for the highlighted slash-command option. */
+function optionId(command: StudioCommand): string {
+  return `studio-command-${command.id}`;
+}
 
 export function Composer({
   value,
@@ -83,6 +89,8 @@ export function Composer({
 
   function onTextareaKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (paletteOpen) {
+      // The palette owns Escape while it is open; closing it must not also
+      // cancel the reply the user is still reading.
       if (event.key === "ArrowDown" || event.key === "ArrowUp") {
         event.preventDefault();
         if (!matches.length) {
@@ -104,6 +112,15 @@ export function Composer({
       }
     }
 
+    if (event.key === "Escape" && streaming) {
+      // Keyboard-only readers should not have to tab to the stop button, and
+      // an Escape that stops a run is not also a request to close the lens.
+      event.preventDefault();
+      event.stopPropagation();
+      onStop();
+      return;
+    }
+
     if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
       event.preventDefault();
       if (canSend) {
@@ -120,6 +137,7 @@ export function Composer({
             matches.map((command, index) => (
               <button
                 key={command.id}
+                id={optionId(command)}
                 type="button"
                 role="option"
                 aria-selected={index === activeIndex}
@@ -192,6 +210,10 @@ export function Composer({
           aria-expanded={paletteOpen}
           aria-controls={paletteOpen ? "studio-command-palette" : undefined}
           aria-autocomplete="list"
+          aria-activedescendant={
+            paletteOpen && activeCommand ? optionId(activeCommand) : undefined
+          }
+          aria-describedby={HINT_ID}
           onChange={(event) => onChange(event.target.value)}
           onKeyDown={onTextareaKeyDown}
         />
@@ -217,9 +239,17 @@ export function Composer({
           )}
         </div>
       </form>
-      <p className="composer__hint">
+      <p className="composer__hint" id={HINT_ID}>
         <span>
-          <kbd>Enter</kbd> to send · <kbd>/</kbd> for commands
+          {streaming ? (
+            <>
+              <kbd>Esc</kbd> to stop
+            </>
+          ) : (
+            <>
+              <kbd>Enter</kbd> to send · <kbd>/</kbd> for commands
+            </>
+          )}
           {brief ? ` · ${brief.product_name || "your job"}` : ""}
         </span>
         <span className={`composer__status${offline ? " is-offline" : ""}`}>

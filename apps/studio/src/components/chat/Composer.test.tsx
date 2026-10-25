@@ -1,17 +1,13 @@
 import { createRef } from "react";
 
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { StudioContextValue } from "../../state/StudioContext";
 import { Composer } from "./Composer";
 
 vi.mock("../../state/StudioContext", () => ({
   useStudio: vi.fn(),
-}));
-vi.mock("../../lib/commands", () => ({
-  isCommandDraft: () => false,
-  matchCommands: () => [],
 }));
 
 import { useStudio } from "../../state/StudioContext";
@@ -75,5 +71,62 @@ describe("Composer connector suggestions", () => {
     render(<Composer {...baseProps} />);
 
     expect(screen.queryByRole("button", { name: /added gong/i })).not.toBeInTheDocument();
+  });
+});
+
+describe("Composer accessibility", () => {
+  const baseProps = {
+    onChange: () => {},
+    onSubmit: () => {},
+    onCommand: () => {},
+    streaming: false,
+    onStop: () => {},
+    inputRef: createRef<HTMLTextAreaElement>(),
+  };
+
+  beforeEach(() => {
+    vi.mocked(useStudio).mockReturnValue(stubContext({ connectorSuggestions: [] }));
+  });
+
+  it("describes the field with the shortcut hint", () => {
+    render(<Composer {...baseProps} value="" />);
+
+    const input = screen.getByLabelText("Message the studio");
+    const hint = document.getElementById(input.getAttribute("aria-describedby") ?? "");
+    expect(hint).not.toBeNull();
+    expect(hint?.textContent).toContain("to send");
+  });
+
+  it("points the field at the highlighted command while the palette is open", () => {
+    render(<Composer {...baseProps} value="/" />);
+
+    const input = screen.getByLabelText("Message the studio");
+    expect(input).toHaveAttribute("aria-activedescendant", "studio-command-help");
+    expect(document.getElementById("studio-command-help")).not.toBeNull();
+
+    fireEvent.keyDown(input, { key: "ArrowDown" });
+
+    expect(input).toHaveAttribute("aria-activedescendant", "studio-command-start");
+    expect(document.getElementById("studio-command-start")).not.toBeNull();
+  });
+
+  it("stops a streaming reply with Escape and shows the shortcut", () => {
+    const onStop = vi.fn();
+    render(<Composer {...baseProps} value="" streaming onStop={onStop} />);
+
+    expect(screen.getByText(/to stop/i)).toBeInTheDocument();
+
+    fireEvent.keyDown(screen.getByLabelText("Message the studio"), { key: "Escape" });
+
+    expect(onStop).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not stop anything when no reply is streaming", () => {
+    const onStop = vi.fn();
+    render(<Composer {...baseProps} value="" onStop={onStop} />);
+
+    fireEvent.keyDown(screen.getByLabelText("Message the studio"), { key: "Escape" });
+
+    expect(onStop).not.toHaveBeenCalled();
   });
 });
