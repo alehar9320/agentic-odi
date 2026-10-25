@@ -1,0 +1,40 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M5S3NDN48291C0E7F6X5XYSD",
+  "session_id": "ses_e902e5528ffeSvhIlyL61Fvz2f",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-25T08:43:45.800343747Z",
+  "branch": "feat/label-merge-conflicts",
+  "checkpoints_count": 3,
+  "files_touched": [
+    ".github/workflows/label-merge-conflicts.yml"
+  ],
+  "agent": "OpenCode",
+  "model": "nvidia/nemotron-3.5-super-vl-120b-a12b",
+  "turn_id": "6fca2757129d",
+  "checkpoint_transcript_start": 27,
+  "transcript_lines_at_start": 27,
+  "compact_transcript_start": 27,
+  "token_usage": {
+    "input_tokens": 8298,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 225472,
+    "output_tokens": 1102,
+    "api_call_count": 5
+  },
+  "session_metrics": {
+    "turn_count": 3
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-10-25T08:43:45.76453208Z",
+    "agent_lines": 9,
+    "agent_removed": 3,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 9,
+    "total_lines_changed": 12,
+    "agent_percentage": 100,
+    "metric_version": 2
+  }
+}
