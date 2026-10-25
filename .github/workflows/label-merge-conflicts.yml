@@ -53,15 +53,21 @@ jobs:
             case "$state" in
               dirty)
                 gh pr edit "$number" --repo "$GITHUB_REPOSITORY" \
-                  --add-label merge-conflict --remove-label merge-ready >/dev/null
+                  --add-label merge-conflict >/dev/null
+                gh pr edit "$number" --repo "$GITHUB_REPOSITORY" \
+                  --remove-label merge-ready >/dev/null || true
                 ;;
               clean)
                 gh pr edit "$number" --repo "$GITHUB_REPOSITORY" \
-                  --add-label merge-ready --remove-label merge-conflict >/dev/null
+                  --add-label merge-ready >/dev/null
+                gh pr edit "$number" --repo "$GITHUB_REPOSITORY" \
+                  --remove-label merge-conflict >/dev/null || true
                 ;;
               *)
                 gh pr edit "$number" --repo "$GITHUB_REPOSITORY" \
-                  --remove-label merge-conflict --remove-label merge-ready >/dev/null
+                  --remove-label merge-conflict >/dev/null || true
+                gh pr edit "$number" --repo "$GITHUB_REPOSITORY" \
+                  --remove-label merge-ready >/dev/null || true
                 ;;
             esac
             echo "PR #$number: $state"
