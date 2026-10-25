@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { ThreadPrimitive } from "@assistant-ui/react";
 
 import {
   HELP_TEXT,
@@ -10,23 +10,21 @@ import {
 import { useStudio } from "../../state/StudioContext";
 import type { WorkspacePanelId } from "../../types";
 import { SetupConversation } from "../setup/SetupConversation";
-import { Composer } from "./Composer";
 import { Conversation } from "./Conversation";
 import { Hero } from "./Hero";
 import { OfflineNotice } from "./OfflineNotice";
+import { ThreadComposer } from "./ThreadComposer";
 
 const VIEW_COMMANDS = new Set<string>(["landscape", "jobmap", "evidence", "settings"]);
 
 export function ChatStage() {
   const {
     messages,
-    streaming,
     sendMessage,
-    stopStreaming,
+    pushNotice,
     openPanel,
     closePanel,
     clearChat,
-    pushNotice,
     openSetup,
     setupOpen,
     canvas,
@@ -35,11 +33,6 @@ export function ChatStage() {
     mcpReachable,
     llmHealth,
   } = useStudio();
-  const [draft, setDraft] = useState("");
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLTextAreaElement>(null);
-  const pinned = useRef(true);
-  const refocus = useRef(false);
 
   const empty = messages.length === 0;
 
@@ -116,49 +109,19 @@ export function ChatStage() {
     }
   }
 
-  function submit(text?: string) {
-    const value = (text ?? draft).trim();
-    if (!value || streaming) {
-      return;
+  function submitCommand(text: string) {
+    if (!isSlashCommand(text)) {
+      return false;
     }
-    if (text === undefined) {
-      setDraft("");
+    const token = text.split(/\s+/)[0].toLowerCase();
+    const command = STUDIO_COMMANDS.find((entry) => entry.name === token);
+    if (command) {
+      runCommand(command);
+    } else {
+      pushNotice(`Unknown command: \`${token}\`. Type \`/help\` for the full list.`);
     }
-    pinned.current = true;
-    refocus.current = true;
-
-    if (isSlashCommand(value)) {
-      const token = value.split(/\s+/)[0].toLowerCase();
-      const command = STUDIO_COMMANDS.find((entry) => entry.name === token);
-      if (command) {
-        runCommand(command);
-      } else {
-        pushNotice(`Unknown command: \`${token}\`. Type \`/help\` for the full list.`);
-      }
-      return;
-    }
-
-    void sendMessage(value);
+    return true;
   }
-
-  // Keep the transcript pinned to the newest token unless the reader scrolled up.
-  useEffect(() => {
-    if (!pinned.current) {
-      return;
-    }
-    const element = scrollRef.current;
-    if (element) {
-      element.scrollTop = element.scrollHeight;
-    }
-  }, [messages, streaming]);
-
-  // The composer moves from the hero into the dock when the conversation starts.
-  useEffect(() => {
-    if (!empty && refocus.current) {
-      refocus.current = false;
-      inputRef.current?.focus();
-    }
-  }, [empty]);
 
   if (setupOpen) {
     return <SetupConversation />;
@@ -170,15 +133,10 @@ export function ChatStage() {
         <OfflineNotice />
         <div className="chat__welcome">
           <div className="chat__welcome-inner">
-            <Hero onSubmit={submit} />
-            <Composer
-              value={draft}
-              onChange={setDraft}
-              onSubmit={submit}
-              onCommand={runCommand}
-              streaming={streaming}
-              onStop={stopStreaming}
-              inputRef={inputRef}
+            <Hero />
+            <ThreadComposer
+              onCommand={(command) => runCommand(command)}
+              onSlashCommand={submitCommand}
               autoFocus
             />
           </div>
@@ -188,32 +146,19 @@ export function ChatStage() {
   }
 
   return (
-    <section className="chat" aria-label="Studio conversation">
+    <ThreadPrimitive.Root className="chat" aria-label="Studio conversation">
       <OfflineNotice />
-      <div
-        ref={scrollRef}
-        className="chat__scroll"
-        onScroll={(event) => {
-          const element = event.currentTarget;
-          pinned.current =
-            element.scrollHeight - element.scrollTop - element.clientHeight < 96;
-        }}
-      >
+      <ThreadPrimitive.Viewport className="chat__scroll" autoScroll>
         <div className="chat__thread">
           <Conversation />
         </div>
-      </div>
+      </ThreadPrimitive.Viewport>
       <div className="chat__dock">
-        <Composer
-          value={draft}
-          onChange={setDraft}
-          onSubmit={submit}
-          onCommand={runCommand}
-          streaming={streaming}
-          onStop={stopStreaming}
-          inputRef={inputRef}
+        <ThreadComposer
+          onCommand={(command) => runCommand(command)}
+          onSlashCommand={submitCommand}
         />
       </div>
-    </section>
+    </ThreadPrimitive.Root>
   );
 }

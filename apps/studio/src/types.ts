@@ -24,10 +24,24 @@ export interface Outcome {
   telemetry?: string;
 }
 
+export interface Evidence {
+  id: string;
+  source_name?: string;
+  source_kind?: string;
+  item_type?: string;
+  name?: string;
+  content?: string;
+  job_id?: string | null;
+  step_id?: string | null;
+  outcome_id?: string | null;
+}
+
 export interface CanvasData {
   jobs: Job[];
   steps: Step[];
   outcomes: Outcome[];
+  /** Captured research records, in capture order until the user reorders them. */
+  evidence?: Evidence[];
   source: "mcp" | "seed" | "local";
   /** Why the board is not what the server actually holds, when the sidecar knows. */
   warnings?: string[];
@@ -58,11 +72,14 @@ export interface StudioError {
   request_id?: string | null;
 }
 
+export type StudioTheme = "light" | "dark";
+
 export interface StudioConfig {
   base_url: string;
   api_key: string;
   model_name: string;
   mcp_url: string;
+  theme?: StudioTheme;
 }
 
 export interface LlmHealth {
@@ -74,11 +91,59 @@ export interface McpHealth {
   reachable: boolean;
 }
 
+/**
+ * Everything one turn can contain, in the order the agent produced it.
+ *
+ * Text and surfaces are the Studio's own vocabulary. Reasoning, tool calls,
+ * sources, approvals, and attachments are conversation primitives the runtime
+ * renders — the bridge in `assistant/convert.ts` maps each one to its
+ * assistant-ui message part.
+ */
+export type ToolStatus = "running" | "ok" | "error" | "declined";
+
+/** A write the agent is asking permission for. */
+export interface ToolApproval {
+  id: string;
+  prompt: string;
+}
+
+export interface ChatAttachment {
+  id: string;
+  name: string;
+  contentType: string;
+  size: number;
+  /** Extracted text, sent to the model when the file is text-like. */
+  text?: string;
+  /** A data URL, sent as a vision part when the file is an image. */
+  dataUrl?: string;
+}
+
 export type ChatPart =
   | { kind: "text"; text: string }
-  | { kind: "ui"; id: string; node: UiNode };
+  | { kind: "reasoning"; text: string }
+  | { kind: "ui"; id: string; node: UiNode }
+  | {
+      kind: "tool";
+      id: string;
+      name: string;
+      status: ToolStatus;
+      preview?: string;
+      /** Present while the runtime is waiting for the user's answer. */
+      approval?: ToolApproval;
+    }
+  | {
+      kind: "source";
+      id: string;
+      title: string;
+      filename?: string;
+      mediaType: string;
+    };
 
 export interface ChatMessage {
+  /** Stable id. Branching and persisted turns are keyed by it. */
+  id: string;
+  /** The message this one answers; `null` at the root of a branch. */
+  parentId: string | null;
   role: "user" | "assistant" | "notice";
   content: string;
   /**
@@ -87,6 +152,8 @@ export interface ChatMessage {
    * the combined prose because that is what gets replayed as history.
    */
   parts?: ChatPart[];
+  /** Files the user attached to this turn. */
+  attachments?: ChatAttachment[];
   /**
    * Assistant turns only: the failure that ended this turn, so the transcript
    * can show it in place instead of losing the question.
@@ -148,6 +215,27 @@ export interface ChatStreamRequest {
   ui_catalog?: UiCatalogManifest;
   /** Continue an existing thread instead of starting a new one. */
   conversation_id?: string | null;
+  /** Files attached to the last user turn. */
+  attachments?: ChatAttachment[];
+  /** Ask before the agent writes to stored data. */
+  approvals?: boolean;
+  /** The id this client is streaming the reply under. */
+  assistant_id?: string | null;
+}
+
+/** One turn in a persisted conversation, as the branch tree exposes it. */
+export interface TurnNode {
+  id: string;
+  parent_id: string | null;
+  role: string;
+  content: string;
+  created_at: string;
+}
+
+export interface ConversationTree {
+  conversation: Conversation;
+  messages: TurnNode[];
+  head_id: string | null;
 }
 
 export type ObservationKind =

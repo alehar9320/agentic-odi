@@ -171,3 +171,14 @@ def test_default_db_path_falls_back_to_home(monkeypatch) -> None:
     monkeypatch.delenv("AGENTIC_ODI_STUDIO_DB", raising=False)
     assert default_db_path().name == "studio.db"
     assert default_db_path().parent.name == ".agentic-odi"
+
+
+def test_a_file_backed_store_is_configured_for_concurrent_writers(tmp_path) -> None:
+    store = StudioMemory(str(tmp_path / "studio.db"))
+    try:
+        connection = store._connection
+        assert connection.execute("PRAGMA journal_mode").fetchone()[0].lower() == "wal"
+        assert connection.execute("PRAGMA busy_timeout").fetchone()[0] == 5000
+        assert connection.execute("PRAGMA foreign_keys").fetchone()[0] == 1
+    finally:
+        store.close()

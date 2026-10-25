@@ -1,4 +1,4 @@
-import { render } from "@testing-library/react";
+import { fireEvent, render } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("../../state/StudioContext", () => ({
@@ -12,6 +12,8 @@ const stubContext = (overrides: Record<string, unknown> = {}) => ({
   llmHealth: { healthy: true, message: "ok" },
   unreadNotificationCount: 0,
   openPanel: vi.fn(),
+  saveSettings: vi.fn(),
+  settings: { base_url: "", api_key: "", model_name: "", mcp_url: "", theme: "dark" },
   ...overrides,
 });
 
@@ -33,5 +35,17 @@ describe("StudioBar", () => {
     );
     expect(container.querySelector(".brand__mark")?.getAttribute("aria-hidden")).toBe("true");
     expect(container.querySelector(".brand--home")?.getAttribute("aria-label")).toBe("Go to home");
+  });
+
+  it("switches to the light theme from the bar", () => {
+    const saveSettings = vi.fn();
+    vi.mocked(useStudio).mockReturnValue(stubContext({ saveSettings }) as never);
+    const { getByRole } = render(
+      <StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />
+    );
+
+    fireEvent.click(getByRole("button", { name: "Switch to light theme" }));
+
+    expect(saveSettings).toHaveBeenCalledWith(expect.objectContaining({ theme: "light" }));
   });
 });

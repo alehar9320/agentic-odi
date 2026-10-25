@@ -11,6 +11,7 @@ import type {
   ConnectorOperationResponse,
   ConnectorPreset,
   Conversation,
+  ConversationTree,
   CreateJobPayload,
   Job,
   LatestConversation,
@@ -234,7 +235,34 @@ export async function streamChat(
   const response = await fetch(apiUrl("/api/chat"), {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
-    body: JSON.stringify(request),
+    body: JSON.stringify({
+      ...request,
+      messages: request.messages.reduce<{
+        id: string;
+        role: "user" | "assistant";
+        content: string;
+        parent_id: string | null;
+      }[]>((history, message) => {
+        if (message.role === "notice") {
+          return history;
+        }
+        const parent_id = history.at(-1)?.id ?? null;
+        history.push({
+          id: message.id,
+          role: message.role,
+          content: message.content,
+          parent_id,
+        });
+        return history;
+      }, []),
+      attachments: request.attachments?.map((attachment) => ({
+        name: attachment.name,
+        content_type: attachment.contentType,
+        size: attachment.size,
+        ...(attachment.text ? { text: attachment.text } : {}),
+        ...(attachment.dataUrl ? { data_url: attachment.dataUrl } : {}),
+      })),
+    }),
     signal,
   });
 
@@ -307,6 +335,38 @@ export function clearMemory(): Promise<{ ok: boolean }> {
 
 export function fetchLatestConversation(): Promise<LatestConversation> {
   return getJson<LatestConversation>("/api/conversations/latest");
+}
+
+/** The whole branch tree, so a reload reopens the branch that was visible. */
+export function fetchConversationTree(conversationId: string): Promise<ConversationTree> {
+  return getJson<ConversationTree>(
+    `/api/conversations/${encodeURIComponent(conversationId)}/tree`,
+  );
+}
+
+/** Record which branch is visible. */
+export async function setConversationHead(
+  conversationId: string,
+  headId: string | null,
+): Promise<Conversation> {
+  const body = await sendJson<{ conversation: Conversation }>(
+    "PATCH",
+    `/api/conversations/${encodeURIComponent(conversationId)}`,
+    { head_id: headId },
+  );
+  return body.conversation;
+}
+
+/** Answer one paused write. The turn resumes on the stream it came from. */
+export function resolveApproval(
+  approvalId: string,
+  approved: boolean,
+  reason = "",
+): Promise<{ ok: boolean; id: string }> {
+  return postJson<{ ok: boolean; id: string }>(
+    `/api/approvals/${encodeURIComponent(approvalId)}`,
+    { approved, reason },
+  );
 }
 
 export async function createConversation(): Promise<Conversation> {

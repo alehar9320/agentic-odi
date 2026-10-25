@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { JobMap } from "./JobMap";
@@ -13,11 +13,19 @@ const mockCanvasData = {
   source: "seed" as const,
 };
 
+const mocks = vi.hoisted(() => ({
+  updateStep: vi.fn(async () => undefined),
+  deleteStep: vi.fn(async () => undefined),
+  updateJob: vi.fn(async () => undefined),
+  deleteJob: vi.fn(async () => undefined),
+}));
+
 const harness = vi.hoisted(() => ({
   state: {
     canvasState: { kind: "ready", data: null } as unknown,
     refreshCanvas: vi.fn(),
     addStep: vi.fn(),
+    ...mocks,
   },
 }));
 
@@ -43,6 +51,50 @@ describe("JobMap Interactive Visualization", () => {
     fireEvent.click(phase1);
 
     expect(screen.getByText("Define payload parameters")).toBeInTheDocument();
+  });
+
+  it("moves a focused step up with the arrow keys", async () => {
+    mocks.updateStep.mockClear();
+    render(<JobMap />);
+
+    const rows = screen.getAllByRole("listitem");
+    expect(rows).toHaveLength(2);
+
+    rows[1].focus();
+    expect(rows[1]).toHaveFocus();
+    fireEvent.keyDown(rows[1], { key: "ArrowUp" });
+
+    await waitFor(() => expect(mocks.updateStep).toHaveBeenCalledTimes(2));
+    expect(mocks.updateStep).toHaveBeenNthCalledWith(1, "STEP-2", { order: 1 });
+    expect(mocks.updateStep).toHaveBeenNthCalledWith(2, "STEP-1", { order: 2 });
+  });
+
+  it("moves a focused step down with the arrow keys", async () => {
+    mocks.updateStep.mockClear();
+    render(<JobMap />);
+
+    const rows = screen.getAllByRole("listitem");
+    expect(rows).toHaveLength(2);
+
+    rows[0].focus();
+    expect(rows[0]).toHaveFocus();
+    fireEvent.keyDown(rows[0], { key: "ArrowDown" });
+
+    await waitFor(() => expect(mocks.updateStep).toHaveBeenCalledTimes(2));
+    expect(mocks.updateStep).toHaveBeenNthCalledWith(1, "STEP-1", { order: 2 });
+    expect(mocks.updateStep).toHaveBeenNthCalledWith(2, "STEP-2", { order: 1 });
+  });
+
+  it("ignores arrow keys that would move a step past the ends", () => {
+    mocks.updateStep.mockClear();
+    render(<JobMap />);
+
+    const [first, last] = screen.getAllByRole("listitem");
+
+    fireEvent.keyDown(first, { key: "ArrowUp" });
+    fireEvent.keyDown(last, { key: "ArrowDown" });
+
+    expect(mocks.updateStep).not.toHaveBeenCalled();
   });
 });
 

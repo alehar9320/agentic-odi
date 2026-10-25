@@ -42,13 +42,14 @@ The Studio opens as a conversation, not a dashboard.
 | **First run** | A short conversation in the chat, not a form: what you are building, who feels the problem, the job they are trying to get done, then where it hurts. One question at a time, with a reflection before the next ask, quick replies, and **Explore on my own** always visible. Skipping is allowed; answers and progress are kept as a draft. Re-open it any time with `/start`, the home stage's context pill, or Settings. |
 | **Hero** | One rotating headline above the composer: a greeting (time of day, plus your name if you set one in Settings), the product/job you set up, what is already on the canvas, or an intent-first prompt such as *What are you trying to win this quarter?* It cycles every few seconds and stays still under `prefers-reduced-motion`. |
 | **Suggestion pills** | Below the headline. **Sharpen an opportunity** always starts a conversation; the next pill becomes **Pressure-test a bet** once outcomes exist, or **Find the next opportunity** before that. **Capture what you heard** replaces the landscape pill once a job exists. They change as the canvas fills up. |
-| **Composer** | Docked at the bottom of the transcript. `Enter` sends, `Shift`+`Enter` adds a line, `Cmd/Ctrl`+`K` focuses it, and `/` opens the command palette. The send button becomes a stop button while a reply streams. |
+| **Composer** | Docked at the bottom of the transcript. `Enter` sends, `Shift`+`Enter` adds a line, `Cmd/Ctrl`+`K` focuses it, `/` opens the command palette, and the paperclip attaches a text file or an image. The send button becomes a stop button while a reply streams. |
 | **Bar** | The only persistent chrome: home, new conversation, catch-up, live model status, and settings. There is no navigation drawer to compete with the thread. |
 | **Rail** | Above the conversation, and only once the thread has produced something: `Landscape · N`, `Job map · N`, `Evidence · N`, `What I know · N`. Every item is derived from the canvas and the memory, so the strip is a record of the work rather than a fixed menu. |
 | **Lens** | A view docks to the right of the thread on wide screens and becomes a full-height sheet on narrow ones. The transcript and the composer stay on screen and stay usable; `Esc`, **Close**, or the rail chip closes it. Every lens ends in one sentence that re-enters the conversation — *Ask which to chase*, *Walk me through the job*, *Weigh the evidence* — so leaving a view is never a return to a menu. Settings and catch-up use the same lens. |
 
 Replies render Markdown (headings, lists, emphasis, inline and fenced code).
-Tool calls appear inline as small trace chips while the agent works.
+Reasoning sits in a collapsed disclosure above the answer, and every tool call is
+a trace chip with the source the turn actually read.
 
 ### Slash commands
 
@@ -141,6 +142,59 @@ doing the work.
 That is also enforced in the agent's system prompt: it is told to keep every
 artifact in the conversation, never to send the PM to a panel, and to end each
 reply with the next move as an action on the surface.
+
+### The conversation runtime
+
+The transcript is not a hand-rolled message list. It runs on **assistant-ui**,
+a React runtime for streaming assistants, bound to the Studio's own store with
+`useExternalStoreRuntime`, so the thread gains real conversation capabilities
+without giving up the message model the sidecar already understands.
+
+| Capability | What it means here |
+|---|---|
+| **Streaming** | `delta` frames append to the open prose part; the send button becomes stop. |
+| **Reasoning** | `reasoning` frames render in a collapsed *Thought for a moment* disclosure. Never persisted, never counted as the answer. |
+| **Tools** | Each MCP call is a trace chip with its status and a short preview of what came back. |
+| **Approval** | A writing tool (`add_`, `create_`, `update_`, `delete_`, `ingest_`, `remove_`) pauses the turn until you answer **Allow** or **Decline**. A decline is a tool result, not an error: the model is told no and may propose something else. |
+| **Sources** | Every tool call that returned data emits a `source`, titled with the tool and a preview. Provenance is what the turn actually read; a citation is never invented. |
+| **Attachments** | Text-like files (`.md`, `.mdx`, `.json`, `.csv`, `.yaml`, `.log`, `text/*`) and images (PNG/JPEG/WebP/GIF, at most 5 MB). Text is extracted in the browser, capped at 20k characters, and sent with the turn. Nothing is stored server-side. |
+| **Branching** | **Edit** a user turn or **Regenerate** a reply and both versions are kept as siblings. `‹ 2 of 3 ›` steps between them, and the visible branch is saved as the conversation's `head_id`, so a reload reopens the branch you were reading. |
+| **Suggestions** | The empty-stage pills are chosen from the canvas and handed to the runtime as suggestion prompts. |
+| **Generative UI** | A validated `UiNode` travels as an assistant-ui **data part** (`data-odi-surface`) and renders through the same `UiRenderer`. The catalog stays ours and server-validated. |
+| **Voice** | Deliberately not wired yet. The seam is `adapters.dictation` plus `ComposerPrimitive.Dictate`: no backend change and no message-model change. It waits because Tauri's WebKit webview support for the Web Speech API is uneven, and a microphone button that works in only one shell is worse than none. |
+
+#### Where the bridge lives
+
+| File | Role |
+|---|---|
+| `apps/studio/src/assistant/convert.ts` | The only mapping between `ChatMessage`/`ChatPart` and assistant-ui parts, in both directions. Pure, and tested without a runtime. |
+| `apps/studio/src/assistant/StudioRuntime.tsx` | `useExternalStoreRuntime`: `onNew`, `onEdit`, `onReload`, `onCancel`, `setMessages`, `onRespondToToolApproval`, suggestions, attachments. |
+| `apps/studio/src/assistant/attachments.ts` | The attachment adapter and the browser-side text/image extraction. |
+| `apps/studio/src/assistant/parts.tsx` | One renderer per part: text, reasoning, tool (with its approval), source, file, generated surface. |
+| `apps/studio/src/components/chat/Conversation.tsx` | `MessagePrimitive.Parts`, the branch picker, the action bar, and the in-place edit composer. |
+| `apps/studio/src/components/chat/ThreadComposer.tsx` | `ComposerPrimitive` plus the slash palette and connector chips. |
+
+The sidecar remains the source of truth for what happened. Its additions are
+opt-in and additive: `reasoning`, `source`, and `approval` stream events;
+`attachments` and `approvals` on `/api/chat`; `GET
+/api/conversations/{id}/tree`; and `PATCH /api/conversations/{id}`. A client that
+sends neither flag sees exactly the stream it saw before, which is what the CLI
+and older clients do.
+
+The approval gate is per-process and single-user by design. `ApprovalRegistry`
+waits on an `asyncio` future, `POST /api/approvals/{id}` answers it, and a
+timeout (300 s) or a cancelled turn resolves as a declined write, so a turn can
+never hang and a double click can never run a tool twice. That is the right size
+for a loopback sidecar with one person at the keyboard; it is not a durable job
+queue, and it is not pretending to be one.
+
+#### Extending the conversation
+
+A new kind of part is added in exactly two places — the mapping in `convert.ts`
+and the component in `parts.tsx` — and then registered in the `components` map
+in `Conversation.tsx`. Do not add a second message list, and never let an unknown
+part reach the screen as JSON: the converter drops what it does not understand on
+purpose, and `convert.test.ts` holds that line.
 
 ### What it remembers
 

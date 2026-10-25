@@ -50,6 +50,8 @@ let chatAborts = false;
 let chatFailure: Error | null = null;
 let connectorFetches = 0;
 let llmHealthFetches = 0;
+let approvalCalls: Record<string, unknown>[] = [];
+let headPatches: Record<string, unknown>[] = [];
 
 function route(input: RequestInfo | URL, init?: RequestInit): Response {
   const url = String(input);
@@ -84,6 +86,9 @@ function route(input: RequestInfo | URL, init?: RequestInit): Response {
     return json([]);
   }
   if (url === "/api/connectors") {
+    if (init?.method === "POST") {
+      return json({ ok: true, name: "gong" });
+    }
     connectorFetches += 1;
     return json([]);
   }
@@ -109,6 +114,36 @@ function route(input: RequestInfo | URL, init?: RequestInit): Response {
           created_at: "2026-10-22T10:00:01+00:00",
         },
       ],
+    });
+  }
+  if (url.startsWith("/api/approvals/")) {
+    approvalCalls.push(JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>);
+    return json({ ok: true, id: url.split("/").pop() });
+  }
+  if (init?.method === "PATCH" && url.startsWith("/api/conversations/")) {
+    headPatches.push(JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>);
+    return json({ conversation: CONVERSATION });
+  }
+  if (url === "/api/conversations/c-1/tree") {
+    return json({
+      conversation: CONVERSATION,
+      messages: [
+        {
+          id: "t-1",
+          parent_id: null,
+          role: "user",
+          content: "I own activation.",
+          created_at: "2026-10-22T10:00:00+00:00",
+        },
+        {
+          id: "t-2",
+          parent_id: "t-1",
+          role: "assistant",
+          content: "Tell me more.",
+          created_at: "2026-10-22T10:00:01+00:00",
+        },
+      ],
+      head_id: "t-2",
     });
   }
   if (url === "/api/conversations") {
@@ -141,11 +176,93 @@ describe("StudioContext memory and resume", () => {
     canvasFails = false;
     connectorFetches = 0;
     llmHealthFetches = 0;
+    approvalCalls = [];
+    headPatches = [];
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
   });
 
   afterEach(() => {
     vi.unstubAllGlobals();
+  });
+
+  it("sends the visible conversation path as model context", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.messages).toHaveLength(2));
+
+    await act(async () => {
+      await result.current.sendMessage("What should I do next?");
+    });
+
+    expect(chatBody?.messages).toEqual([
+      { id: "t-1", parent_id: null, role: "user", content: "I own activation." },
+      { id: "t-2", parent_id: "t-1", role: "assistant", content: "Tell me more." },
+      expect.objectContaining({ role: "user", content: "What should I do next?", parent_id: "t-2" }),
+    ]);
+  });
+
+  it("regenerates an answer from its existing user turn without duplicating it", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.messages).toHaveLength(2));
+
+    await act(async () => {
+      await result.current.regenerateFrom("t-1");
+    });
+
+    expect(chatBody?.messages).toEqual([
+      { id: "t-1", parent_id: null, role: "user", content: "I own activation." },
+    ]);
+    expect(result.current.messages.map((message) => message.content)).toEqual([
+      "I own activation.",
+      "Hi",
+    ]);
+    expect(result.current.messages.filter((message) => message.role === "user")).toHaveLength(1);
+    expect(result.current.messages.at(-1)).toMatchObject({ role: "assistant", parentId: "t-1" });
+  });
+
+  it("edits a user turn by replacing it at its original parent", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.messages).toHaveLength(2));
+
+    await act(async () => {
+      await result.current.editFrom("t-1", "I own onboarding.");
+    });
+
+    expect(chatBody?.messages).toEqual([
+      expect.objectContaining({ role: "user", content: "I own onboarding.", parent_id: null }),
+    ]);
+    expect(result.current.messages.map((message) => message.content)).toEqual([
+      "I own onboarding.",
+      "Hi",
+    ]);
+    expect(result.current.messages[0].parentId).toBeNull();
+  });
+
+  it("serializes attachments with the sidecar's snake-case fields", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
+
+    await act(async () => {
+      await result.current.sendMessage("Read this", [
+        {
+          id: "file-1",
+          name: "notes.md",
+          contentType: "text/markdown",
+          size: 12,
+          text: "Useful context",
+          dataUrl: "data:image/png;base64,AAAA",
+        },
+      ]);
+    });
+
+    expect(chatBody?.attachments).toEqual([
+      {
+        name: "notes.md",
+        content_type: "text/markdown",
+        size: 12,
+        text: "Useful context",
+        data_url: "data:image/png;base64,AAAA",
+      },
+    ]);
   });
 
   it("resumes the latest conversation and loads what it learned", async () => {
@@ -180,6 +297,22 @@ describe("StudioContext memory and resume", () => {
     });
     expect(result.current.toasts.map((toast) => toast.message)).toContain(
       "Outcome captured successfully!",
+    );
+  });
+
+  it("confirms a connector was added", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
+
+    await act(async () => {
+      await result.current.addConnector({
+        name: "gong",
+        url: "http://localhost:9000/mcp",
+      });
+    });
+
+    expect(result.current.toasts).toContainEqual(
+      expect.objectContaining({ kind: "success", message: "Added connector gong" }),
     );
   });
 
@@ -218,6 +351,8 @@ describe("StudioContext failures", () => {
     canvasFails = false;
     connectorFetches = 0;
     llmHealthFetches = 0;
+    approvalCalls = [];
+    headPatches = [];
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
   });
 
@@ -326,6 +461,53 @@ describe("StudioContext health polling", () => {
   });
 });
 
+describe("StudioContext theme", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    document.documentElement.className = "";
+    chatBody = null;
+    chatStream = null;
+    chatFailure = null;
+    chatAborts = false;
+    canvasFails = false;
+    connectorFetches = 0;
+    llmHealthFetches = 0;
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    document.documentElement.className = "";
+  });
+
+  it("applies the stored theme and persists a change", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
+
+    expect(document.documentElement.classList.contains("theme-dark")).toBe(true);
+
+    act(() => {
+      result.current.saveSettings({ ...result.current.settings, theme: "light" });
+    });
+
+    expect(document.documentElement.classList.contains("theme-light")).toBe(true);
+    expect(JSON.parse(localStorage.getItem("studio.settings") ?? "{}").theme).toBe("light");
+  });
+
+  it("keeps the chosen theme across a remount", async () => {
+    localStorage.setItem("studio.settings", JSON.stringify({ theme: "light" }));
+    const { unmount } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(document.documentElement.classList.contains("theme-light")).toBe(true));
+
+    unmount();
+    document.documentElement.className = "";
+
+    const second = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(second.result.current.settings.theme).toBe("light"));
+    expect(document.documentElement.classList.contains("theme-light")).toBe(true);
+  });
+});
+
 describe("StudioContext canvas state", () => {
   beforeEach(() => {
     localStorage.clear();
@@ -336,6 +518,8 @@ describe("StudioContext canvas state", () => {
     canvasFails = false;
     connectorFetches = 0;
     llmHealthFetches = 0;
+    approvalCalls = [];
+    headPatches = [];
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
   });
 
@@ -370,6 +554,8 @@ describe("StudioContext stopped turns", () => {
     canvasFails = false;
     connectorFetches = 0;
     llmHealthFetches = 0;
+    approvalCalls = [];
+    headPatches = [];
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
   });
 
@@ -389,5 +575,76 @@ describe("StudioContext stopped turns", () => {
     const messages = result.current.messages;
     expect(messages.some((message) => message.role === "user" && message.content === "list the jobs")).toBe(true);
     expect(messages.at(-1)?.error).toBeUndefined();
+  });
+});
+
+describe("StudioContext write approval and branches", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    chatBody = null;
+    chatStream = null;
+    chatFailure = null;
+    chatAborts = false;
+    canvasFails = false;
+    connectorFetches = 0;
+    llmHealthFetches = 0;
+    approvalCalls = [];
+    headPatches = [];
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("holds a write as a question until the person answers it", async () => {
+    chatStream =
+      'event: approval\ndata: {"id":"apv_1","tool_call_id":"call-1","name":"add_job","prompt":"Allow the assistant to add job?"}\n\n' +
+      'event: message\ndata: {"content":"Added."}\n\n';
+
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
+
+    await act(async () => {
+      await result.current.sendMessage("add a job for Retention");
+    });
+
+    const part = result.current.messages
+      .flatMap((message) => message.parts ?? [])
+      .find((candidate) => candidate.kind === "tool" && candidate.name === "add_job");
+    expect(part).toBeDefined();
+
+    await act(async () => {
+      await result.current.respondToApproval("apv_1", true, "yes please");
+    });
+
+    expect(approvalCalls).toEqual([{ approved: true, reason: "yes please" }]);
+  });
+
+  it("asks the server for approval before any write", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
+
+    await act(async () => {
+      await result.current.sendMessage("hello");
+    });
+
+    expect(chatBody).toMatchObject({ approvals: true });
+    expect(typeof chatBody?.assistant_id).toBe("string");
+  });
+
+  it("persists the branch a person switched to", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
+
+    await act(async () => {
+      result.current.switchBranch([
+        { id: "b-1", parentId: null, role: "user", content: "first" },
+        { id: "b-2", parentId: "b-1", role: "assistant", content: "answer" },
+      ]);
+    });
+
+    expect(result.current.messages.map((message) => message.id)).toEqual(["b-1", "b-2"]);
+    await waitFor(() => expect(headPatches).toEqual([{ head_id: "b-2" }]));
   });
 });

@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+import { StudioRuntimeProvider } from "../../assistant/StudioRuntime";
 import type { ChatMessage } from "../../types";
 import { catalogManifest } from "../../ui/catalog";
 import { parseUiSpec, type UiNode } from "../../ui/protocol";
@@ -13,6 +14,12 @@ const harness = vi.hoisted(() => ({
     thinkingPhase: null as string | null,
     toolActivity: [] as unknown[],
     offlineReply: false,
+    canvas: null,
+    regenerateFrom: vi.fn(),
+    editFrom: vi.fn(),
+    switchBranch: vi.fn(),
+    respondToApproval: vi.fn(),
+    stopStreaming: vi.fn(),
     sendMessage: vi.fn<(text: string) => Promise<void>>(),
   },
 }));
@@ -51,13 +58,19 @@ function outcomeCard(actions = false): UiNode {
 
 function renderTurn(messages: ChatMessage[]) {
   harness.state.messages = messages;
-  return render(<Conversation />);
+  return render(
+    <StudioRuntimeProvider>
+      <Conversation />
+    </StudioRuntimeProvider>,
+  );
 }
 
 describe("Conversation", () => {
   it("renders prose and surfaces in the agent's order", () => {
     const { container } = renderTurn([
       {
+        id: "m-1",
+        parentId: null,
         role: "assistant",
         content: "Here is the board. It is the top bet.",
         parts: [
@@ -80,7 +93,7 @@ describe("Conversation", () => {
 
   it("keeps history without parts readable", () => {
     const { container } = renderTurn([
-      { role: "assistant", content: "**Scored** three outcomes." },
+      { id: "m-1", parentId: null, role: "assistant", content: "**Scored** three outcomes." },
     ]);
 
     expect(container.textContent).toContain("Scored");
@@ -89,16 +102,67 @@ describe("Conversation", () => {
 
   it("renders a surface-only turn", () => {
     const { container } = renderTurn([
-      { role: "assistant", content: "", parts: [{ kind: "ui", id: "ui-1", node: outcomeCard() }] },
+      {
+        id: "m-1",
+        parentId: null,
+        role: "assistant",
+        content: "",
+        parts: [{ kind: "ui", id: "ui-1", node: outcomeCard() }],
+      },
     ]);
 
     expect(container.textContent).toContain("Minimize the time it takes to propagate secrets");
+  });
+
+  it("renders reasoning as a disclosure beside the answer", () => {
+    const { container } = renderTurn([
+      {
+        id: "m-1",
+        parentId: null,
+        role: "assistant",
+        content: "Two outcomes matter.",
+        parts: [
+          { kind: "reasoning", text: "Weighing the scored outcomes against the job map." },
+          { kind: "text", text: "Two outcomes matter." },
+        ],
+      },
+    ]);
+
+    const summary = container.querySelector("summary.reasoning__summary");
+    expect(summary?.textContent).toContain("Thought for a moment");
+    expect(container.textContent).toContain("Weighing the scored outcomes");
+  });
+
+  it("renders a source chip for what the turn read", () => {
+    const { container } = renderTurn([
+      {
+        id: "m-1",
+        parentId: null,
+        role: "assistant",
+        content: "One job.",
+        parts: [
+          { kind: "text", text: "One job." },
+          {
+            kind: "source",
+            id: "src-1",
+            title: "get_jobs — JOB-1 Retention",
+            filename: "get_jobs",
+            mediaType: "application/json",
+          },
+        ],
+      },
+    ]);
+
+    const chip = container.querySelector(".source-chip");
+    expect(chip?.textContent).toContain("get_jobs — JOB-1 Retention");
   });
 
   it("turns a card action into the user's next message", () => {
     harness.state.sendMessage = vi.fn<(text: string) => Promise<void>>();
     renderTurn([
       {
+        id: "m-1",
+        parentId: null,
         role: "assistant",
         content: "",
         parts: [{ kind: "ui", id: "ui-1", node: outcomeCard(true) }],
@@ -115,8 +179,10 @@ describe("Conversation failures", () => {
   it("shows the failure, the suggestion, and a retry that re-sends the question", () => {
     harness.state.sendMessage = vi.fn<(text: string) => Promise<void>>();
     const { container } = renderTurn([
-      { role: "user", content: "list the jobs" },
+      { id: "m-1", parentId: null, role: "user", content: "list the jobs" },
       {
+        id: "m-2",
+        parentId: "m-1",
         role: "assistant",
         content: "",
         parts: [],

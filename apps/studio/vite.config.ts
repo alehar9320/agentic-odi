@@ -18,6 +18,9 @@ export default defineConfig({
     environment: "jsdom",
     globals: true,
     setupFiles: "./src/test/setup.ts",
-    css: false,
+    // Most tests never look at CSS; the print contract test reads a
+    // stylesheet's source. Process CSS only when a test asks for it with a
+    // query (?raw/?inline), so the rest of the suite keeps the faster path.
+    css: { include: [/\.css(\?.*)?$/] },
   },
 });
