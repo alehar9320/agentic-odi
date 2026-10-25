@@ -140,6 +140,37 @@ describe("Conversation", () => {
     expect(panel.textContent).toContain("Weighing the scored outcomes");
   });
 
+  it("opens reasoning while it is written, then reports how long it took", async () => {
+    harness.state.streaming = true;
+    const turn: ChatMessage[] = [
+      {
+        id: "a-1",
+        parentId: null,
+        role: "assistant",
+        content: "",
+        parts: [{ kind: "reasoning", text: "Weighing the scored outcomes." }],
+      },
+    ];
+    harness.state.messages = turn;
+    const { rerender } = render(
+      <StudioRuntimeProvider>
+        <Conversation />
+      </StudioRuntimeProvider>,
+    );
+
+    const thinking = screen.getByRole("button", { name: /Thinking/ });
+    expect(thinking).toHaveAttribute("aria-expanded", "true");
+
+    harness.state.streaming = false;
+    rerender(
+      <StudioRuntimeProvider>
+        <Conversation />
+      </StudioRuntimeProvider>,
+    );
+
+    await screen.findByRole("button", { name: /Thought for \d+s/ });
+  });
+
   it("names the phase while a reply has no text yet", () => {
     harness.state.streaming = true;
     harness.state.thinkingPhase = "mcp_tools";
