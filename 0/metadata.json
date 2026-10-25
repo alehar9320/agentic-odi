@@ -1,0 +1,57 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M5S6NDZSESTNYTAW9QKPVJ1K",
+  "session_id": "ses_e9041dd93ffem4XLzPQbejAxg6",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-25T09:36:09.211122709Z",
+  "branch": "web-preview-functional-backend-and-error-handling",
+  "checkpoints_count": 4,
+  "save_step_count": 1,
+  "files_touched": [],
+  "agent": "OpenCode",
+  "model": "poolside/laguna-s-2.1:free",
+  "turn_id": "61161efad5e2",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 1193445,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 30400976,
+    "output_tokens": 56828,
+    "api_call_count": 247
+  },
+  "session_metrics": {
+    "turn_count": 4
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0
+    },
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 339,
+      "user_lines_removed": 36,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        "apps/studio-api/src/agentic_odi_studio_api/studio/errors.py": 2,
+        "apps/studio-api/src/agentic_odi_studio_api/studio/router.py": 58,
+        "apps/studio-api/tests/test_studio_connectors_router.py": 24,
+        "apps/studio-api/tests/test_studio_errors.py": 14,
+        "infra/cloudflare/worker.ts": 62,
+        "packages/core/src/agentic_odi_core/remote.py": 83,
+        "packages/core/tests/test_remote.py": 49,
+        "tests/test_worker_error_shape.py": 47
+      },
+      "user_removed_per_file": {
+        "apps/studio-api/src/agentic_odi_studio_api/studio/errors.py": 1,
+        "apps/studio-api/src/agentic_odi_studio_api/studio/router.py": 10,
+        "infra/cloudflare/worker.ts": 4,
+        "packages/core/src/agentic_odi_core/remote.py": 21
+      }
+    }
+  ]
+}
