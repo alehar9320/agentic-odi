@@ -1,4 +1,4 @@
-import { ThreadPrimitive } from "@assistant-ui/react";
+import { ThreadPrimitive, useThreadViewport } from "@assistant-ui/react";
 
 import {
   HELP_TEXT,
@@ -16,6 +16,25 @@ import { OfflineNotice } from "./OfflineNotice";
 import { ThreadComposer } from "./ThreadComposer";
 
 const VIEW_COMMANDS = new Set<string>(["landscape", "jobmap", "evidence", "settings"]);
+
+function LatestMessageButton() {
+  const isAtBottom = useThreadViewport((state) => state.isAtBottom);
+  const scrollToBottom = useThreadViewport((state) => state.scrollToBottom);
+
+  if (isAtBottom) {
+    return null;
+  }
+
+  return (
+    <button
+      type="button"
+      className="chat__latest"
+      onClick={() => scrollToBottom({ behavior: "smooth" })}
+    >
+      Latest message
+    </button>
+  );
+}
 
 export function ChatStage() {
   const {
@@ -148,11 +167,14 @@ export function ChatStage() {
   return (
     <ThreadPrimitive.Root className="chat" aria-label="Studio conversation">
       <OfflineNotice />
-      <ThreadPrimitive.Viewport className="chat__scroll" autoScroll>
-        <div className="chat__thread">
-          <Conversation />
-        </div>
-      </ThreadPrimitive.Viewport>
+      <div className="chat__transcript">
+        <ThreadPrimitive.Viewport className="chat__scroll" autoScroll>
+          <div className="chat__thread">
+            <Conversation />
+          </div>
+        </ThreadPrimitive.Viewport>
+        <LatestMessageButton />
+      </div>
       <div className="chat__dock">
         <ThreadComposer
           onCommand={(command) => runCommand(command)}

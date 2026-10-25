@@ -10,10 +10,18 @@
 import { ComposerPrimitive, useAui, useAuiState } from "@assistant-ui/react";
 import { useMemo, useState } from "react";
 
+import { ATTACHMENT_ACCEPT, MAX_ATTACHMENT_CHARS, MAX_IMAGE_BYTES } from "../../assistant/attachments";
 import { isSlashCommand, matchCommands, type StudioCommand } from "../../lib/commands";
 import { useStudio } from "../../state/StudioContext";
 import { ArrowUpIcon, PaperclipIcon, StopIcon } from "../icons";
 import { CommandPalette, ComposerHint, ConnectorChips, paletteOpenFor } from "./composerParts";
+
+const acceptedAttachmentTypes = ATTACHMENT_ACCEPT.split(",");
+const acceptedTextExtensions = acceptedAttachmentTypes.filter((type) => type.startsWith("."));
+const acceptedImageTypes = acceptedAttachmentTypes
+  .filter((type) => type.startsWith("image/"))
+  .map((type) => type.slice("image/".length).toUpperCase());
+const ATTACHMENT_HELP = `Supported text files (${acceptedTextExtensions.join(", ")} and text/*) and images (${acceptedImageTypes.join(", ")}). Images up to ${Math.floor(MAX_IMAGE_BYTES / (1024 * 1024))} MB; text files up to ${MAX_ATTACHMENT_CHARS.toLocaleString()} characters.`;
 
 function AttachmentRow() {
   const aui = useAui();
@@ -149,10 +157,14 @@ function ComposerBody({
           <ComposerPrimitive.AddAttachment
             className="composer__attach"
             aria-label="Attach a file"
-            title="Attach a text file or an image"
+            aria-describedby="studio-attachment-help"
+            title={ATTACHMENT_HELP}
           >
             <PaperclipIcon size={16} />
           </ComposerPrimitive.AddAttachment>
+          <span id="studio-attachment-help" className="sr-only">
+            {ATTACHMENT_HELP}
+          </span>
           {running ? (
             <ComposerPrimitive.Cancel
               className="composer__send composer__send--stop"

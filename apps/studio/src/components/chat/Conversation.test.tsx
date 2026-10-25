@@ -157,6 +157,50 @@ describe("Conversation", () => {
     expect(chip?.textContent).toContain("get_jobs — JOB-1 Retention");
   });
 
+  it("labels assistant actions and explains reply alternatives", () => {
+    const { container } = renderTurn([
+      { id: "u-1", parentId: null, role: "user", content: "Check this bet" },
+      { id: "a-1", parentId: "u-1", role: "assistant", content: "A useful reply." },
+    ]);
+
+    expect(screen.getByRole("button", { name: "Copy reply" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Regenerate reply" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Edit message" })).toBeInTheDocument();
+    expect(container.querySelector(".branch-picker")).toBeNull();
+  });
+
+  it("switches between contextual alternative replies through the thread runtime", () => {
+    const firstPath: ChatMessage[] = [
+      { id: "u-1", parentId: null, role: "user", content: "Check this bet" },
+      { id: "a-1", parentId: "u-1", role: "assistant", content: "First reply." },
+    ];
+    harness.state.messages = firstPath;
+    const { container, rerender } = render(
+      <StudioRuntimeProvider>
+        <Conversation />
+      </StudioRuntimeProvider>,
+    );
+
+    expect(container.querySelector(".branch-picker")).toBeNull();
+
+    harness.state.messages = [
+      firstPath[0],
+      { id: "a-2", parentId: "u-1", role: "assistant", content: "Alternative reply." },
+    ];
+    rerender(
+      <StudioRuntimeProvider>
+        <Conversation />
+      </StudioRuntimeProvider>,
+    );
+
+    expect(container.querySelector(".branch-picker")?.textContent).toContain("Alternative 2 of 2");
+    const previous = screen.getByRole("button", { name: "Previous alternative" });
+    expect(screen.getByRole("button", { name: "Next alternative" })).toBeInTheDocument();
+    expect(previous).not.toBeDisabled();
+    fireEvent.click(previous);
+    expect(harness.state.switchBranch).toHaveBeenCalledWith(firstPath);
+  });
+
   it("turns a card action into the user's next message", () => {
     harness.state.sendMessage = vi.fn<(text: string) => Promise<void>>();
     renderTurn([

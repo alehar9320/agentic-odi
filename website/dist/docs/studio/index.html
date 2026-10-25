@@ -180,8 +180,8 @@ SPA never contacts MCP or the LLM directly.</p>
 <td>One rotating headline above the composer: a greeting (time of day, plus your name if you set one in Settings), the product/job you set up, what is already on the canvas, or an intent-first prompt such as <em>What are you trying to win this quarter?</em> It cycles every few seconds and stays still under <code>prefers-reduced-motion</code>.</td>
 </tr>
 <tr>
-<td><strong>Suggestion pills</strong></td>
-<td>Below the headline. <strong>Sharpen an opportunity</strong> always starts a conversation; the next pill becomes <strong>Pressure-test a bet</strong> once outcomes exist, or <strong>Find the next opportunity</strong> before that. <strong>Capture what you heard</strong> replaces the landscape pill once a job exists. They change as the canvas fills up.</td>
+<td><strong>Starter cards</strong></td>
+<td>Below the headline, three canvas-aware conversation cards pair a clear next move with a short reason: <strong>Sharpen an opportunity</strong>, <strong>Pressure-test a bet</strong> or <strong>Find the next opportunity</strong>, and <strong>Capture what you heard</strong> or <strong>Name the job</strong>. Select one to start that prompt in the thread; the cards disappear once the conversation begins. <strong>Opportunity landscape</strong> remains a separate, quiet shortcut.</td>
 </tr>
 <tr>
 <td><strong>Composer</strong></td>
@@ -367,7 +367,7 @@ without giving up the message model the sidecar already understands.</p>
 <tbody>
 <tr>
 <td><strong>Streaming</strong></td>
-<td><code>delta</code> frames append to the open prose part; the send button becomes stop.</td>
+<td><code>delta</code> frames append to the open prose part; the send button becomes stop. When you scroll away during a reply, a keyboard-accessible <strong>Latest message</strong> control returns you to the live end without interrupting assistant-ui's follow behavior. Empty-thread starter cards pair each suggested move with its reason, then give way to the conversation after the first turn.</td>
 </tr>
 <tr>
 <td><strong>Reasoning</strong></td>
@@ -387,7 +387,7 @@ without giving up the message model the sidecar already understands.</p>
 </tr>
 <tr>
 <td><strong>Attachments</strong></td>
-<td>Text-like files (<code>.md</code>, <code>.mdx</code>, <code>.json</code>, <code>.csv</code>, <code>.yaml</code>, <code>.log</code>, <code>text/*</code>) and images (PNG/JPEG/WebP/GIF, at most 5 MB). Text is extracted in the browser, capped at 20k characters, and sent with the turn. Nothing is stored server-side.</td>
+<td>The composer describes accepted text-like files (<code>.md</code>, <code>.mdx</code>, <code>.json</code>, <code>.csv</code>, <code>.yaml</code>, <code>.yml</code>, <code>.log</code>, <code>text/*</code>) and images (PNG/JPEG/WebP/GIF, at most 5 MB). Text is extracted in the browser, capped at 20,000 characters, and sent with the turn. Nothing is stored server-side.</td>
 </tr>
 <tr>
 <td><strong>Branching</strong></td>
@@ -437,7 +437,7 @@ without giving up the message model the sidecar already understands.</p>
 </tr>
 <tr>
 <td><code>apps/studio/src/components/chat/ThreadComposer.tsx</code></td>
-<td><code>ComposerPrimitive</code> plus the slash palette and connector chips.</td>
+<td><code>ComposerPrimitive</code> plus the slash palette, connector chips, and attachment-format/size guidance.</td>
 </tr>
 </tbody>
 </table>

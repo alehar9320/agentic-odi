@@ -78,6 +78,37 @@ describe("Composer connector suggestions", () => {
   });
 });
 
+describe("ThreadComposer attachment guidance", () => {
+  it("describes supported files and the extraction limits on the attachment control", async () => {
+    const { StudioRuntimeProvider } = await import("../../assistant/StudioRuntime");
+    const { ThreadComposer } = await import("./ThreadComposer");
+    vi.mocked(useStudio).mockReturnValue(
+      stubContext({
+        connectorSuggestions: [],
+        messages: [],
+        streaming: false,
+        canvas: null,
+        sendMessage: vi.fn(async () => {}),
+        regenerateFrom: vi.fn(async () => {}),
+        editFrom: vi.fn(async () => {}),
+        switchBranch: vi.fn(),
+        respondToApproval: vi.fn(async () => {}),
+        stopStreaming: vi.fn(),
+      }),
+    );
+    render(
+      <StudioRuntimeProvider>
+        <ThreadComposer onCommand={() => {}} />
+      </StudioRuntimeProvider>,
+    );
+
+    const attachment = screen.getByRole("button", { name: "Attach a file" });
+    expect(attachment).toHaveAccessibleDescription(/\.md.*\.json.*PNG.*JPEG.*WEBP.*GIF/i);
+    expect(attachment).toHaveAccessibleDescription(/5 MB/);
+    expect(attachment).toHaveAccessibleDescription(/20,000 characters/);
+  });
+});
+
 describe("Composer keyboard focus", () => {
   const baseProps = {
     value: "hello",

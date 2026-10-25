@@ -91,20 +91,26 @@ function AssistantMessage() {
 
         <AuiIf condition={(state) => state.message.branchCount > 1}>
           <BranchPickerPrimitive.Root className="branch-picker">
-            <BranchPickerPrimitive.Previous className="branch-picker__step" aria-label="Previous reply">
+            <BranchPickerPrimitive.Previous
+              className="branch-picker__step"
+              aria-label="Previous alternative"
+            >
               ‹
             </BranchPickerPrimitive.Previous>
-            <span className="branch-picker__label">
-              <BranchPickerPrimitive.Number /> of <BranchPickerPrimitive.Count />
+            <span className="branch-picker__label" aria-label="Reply alternative">
+              Alternative <BranchPickerPrimitive.Number /> of <BranchPickerPrimitive.Count />
             </span>
-            <BranchPickerPrimitive.Next className="branch-picker__step" aria-label="Next reply">
+            <BranchPickerPrimitive.Next
+              className="branch-picker__step"
+              aria-label="Next alternative"
+            >
               ›
             </BranchPickerPrimitive.Next>
           </BranchPickerPrimitive.Root>
         </AuiIf>
 
         {!running ? (
-          <ActionBarPrimitive.Root className="message__actions" hideWhenRunning>
+          <ActionBarPrimitive.Root className="message__actions" hideWhenRunning autohide="never">
             <ActionBarPrimitive.Copy className="quiet-action" aria-label="Copy reply">
               <CopyIcon size={14} /> Copy
             </ActionBarPrimitive.Copy>
