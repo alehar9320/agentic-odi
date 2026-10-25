@@ -153,6 +153,15 @@ def test_llm_health_offline() -> None:
     assert body["message"] == "LLM server offline (Local Studio Mode enabled)"
 
 
+def test_models_endpoint_reports_an_offline_provider_without_failing() -> None:
+    response = _client().post("/api/models", json={"base_url": _closed_url("/v1"), "api_key": "k"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["models"] == []
+    assert body["message"] == "LLM server offline (Local Studio Mode enabled)"
+
+
 # ---------------------------------------------------------------------------
 # /api/canvas
 # ---------------------------------------------------------------------------

@@ -130,6 +130,11 @@ The Studio is better with an OpenAI-compatible LLM with tool-calling support
 with no model reachable it says so and every job, step, and outcome remains
 editable by hand.
 
+The model name in the composer is a picker, not a label: the sidecar asks the
+configured endpoint what it serves (`POST /api/models`) and the list is offered
+inline, with Settings keeping a free-text fallback for providers that publish no
+catalog. Picking one changes the model used by the next message.
+
 ### Connectors (MCP ↔ Living Studio)
 
 Register MCP or REST connectors that the copilot can discover and invoke.

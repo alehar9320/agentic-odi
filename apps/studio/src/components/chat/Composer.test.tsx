@@ -29,7 +29,12 @@ const preset = {
 const stubContext = (overrides: Record<string, unknown> = {}) =>
   ({
     settings: { base_url: "", api_key: "", model_name: "m", mcp_url: "", display_name: "" },
+    saveSettings: vi.fn(),
     llmHealth: { healthy: null, message: "" },
+    models: [] as string[],
+    modelsLoading: false,
+    modelsMessage: null as string | null,
+    refreshModels: vi.fn().mockResolvedValue(undefined),
     brief: null,
     connectorSuggestions: ["gong"],
     presets: [preset],
@@ -71,6 +76,58 @@ describe("Composer connector suggestions", () => {
     render(<Composer {...baseProps} />);
 
     expect(screen.queryByRole("button", { name: /added gong/i })).not.toBeInTheDocument();
+  });
+});
+
+describe("Composer model selection", () => {
+  const baseProps = {
+    value: "",
+    onChange: () => {},
+    onSubmit: () => {},
+    onCommand: () => {},
+    streaming: false,
+    onStop: () => {},
+    inputRef: createRef<HTMLTextAreaElement>(),
+  };
+
+  it("offers the models the endpoint publishes and saves the pick", () => {
+    const saveSettings = vi.fn();
+    vi.mocked(useStudio).mockReturnValue(
+      stubContext({
+        connectorSuggestions: [],
+        models: ["local-tools-model", "qwen3-8b"],
+        saveSettings,
+      }),
+    );
+
+    render(<Composer {...baseProps} />);
+
+    const select = screen.getByRole("combobox", { name: "Model" });
+    expect(select).toHaveValue("m");
+    // The configured name stays selectable even though the provider omits it.
+    expect(screen.getByRole("option", { name: "m" })).toBeInTheDocument();
+
+    fireEvent.change(select, { target: { value: "qwen3-8b" } });
+
+    expect(saveSettings).toHaveBeenCalledWith(expect.objectContaining({ model_name: "qwen3-8b" }));
+  });
+
+  it("falls back to the name in plain text when there is no catalog", () => {
+    vi.mocked(useStudio).mockReturnValue(
+      stubContext({
+        connectorSuggestions: [],
+        models: [],
+        modelsMessage: "connection_error: connection refused",
+      }),
+    );
+
+    render(<Composer {...baseProps} />);
+
+    expect(screen.queryByRole("combobox", { name: "Model" })).not.toBeInTheDocument();
+    expect(screen.getByText("m")).toHaveAttribute(
+      "title",
+      "connection_error: connection refused",
+    );
   });
 });
 

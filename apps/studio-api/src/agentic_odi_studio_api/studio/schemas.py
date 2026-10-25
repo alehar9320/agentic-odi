@@ -22,6 +22,11 @@ class LlmHealthRequest(BaseModel):
     model: str = ""
 
 
+class ModelsRequest(BaseModel):
+    base_url: str
+    api_key: str = ""
+
+
 class AddStepRequest(BaseModel):
     mcp_url: str
     job_id: str

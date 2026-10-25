@@ -30,6 +30,7 @@ import {
   fetchConnectors,
   fetchLatestConversation,
   fetchMemory,
+  fetchModels,
   healthLlm,
   healthMcp,
   streamChat,
@@ -169,6 +170,13 @@ export interface StudioContextValue {
   canvasError: StudioError | null;
   refreshCanvas: () => Promise<void>;
   llmHealth: { healthy: boolean | null; message: string };
+  /** Model ids the configured endpoint publishes. Empty means "type one". */
+  models: string[];
+  modelsLoading: boolean;
+  /** Why there is no catalog, when the provider would not list one. */
+  modelsMessage: string | null;
+  /** Re-ask the endpoint, optionally with unsaved connection settings. */
+  refreshModels: (config?: { base_url: string; api_key: string }) => Promise<void>;
   mcpReachable: boolean;
   sidecarReachable: boolean | null;
   /** Probe the sidecar, MCP server, and model. Optionally against unsaved config. */
@@ -326,6 +334,9 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     healthy: null,
     message: "Health not checked yet.",
   });
+  const [models, setModels] = useState<string[]>([]);
+  const [modelsLoading, setModelsLoading] = useState(false);
+  const [modelsMessage, setModelsMessage] = useState<string | null>(null);
   const [mcpReachable, setMcpReachable] = useState(false);
   const [sidecarReachable, setSidecarReachable] = useState<boolean | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -420,6 +431,28 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  /**
+   * Ask the configured endpoint what it serves. A provider that will not list
+   * models is not an error: the UI keeps the manual name and shows the reason.
+   */
+  const refreshModels = useCallback(
+    async (config?: { base_url: string; api_key: string }) => {
+      const target = config ?? { base_url: settings.base_url, api_key: settings.api_key };
+      setModelsLoading(true);
+      try {
+        const result = await fetchModels(target);
+        setModels(result.models);
+        setModelsMessage(result.message);
+      } catch (error) {
+        setModels([]);
+        setModelsMessage(asStudioError(error).message);
+      } finally {
+        setModelsLoading(false);
+      }
+    },
+    [settings.base_url, settings.api_key],
+  );
+
   const refreshPresets = useCallback(async () => {
     setPresetError(null);
     try {
@@ -495,14 +528,24 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     pushToast("info", `Background Activity: ${chosen.title}`);
   }, [addNotification, pushToast]);
 
-  const saveSettings = useCallback((config: StudioConfig) => {
-    setSettings(config);
-    try {
-      localStorage.setItem(SETTINGS_KEY, JSON.stringify(config));
-    } catch {
-      /* storage unavailable */
-    }
-  }, []);
+  const saveSettings = useCallback(
+    (config: StudioConfig) => {
+      const movedEndpoint =
+        config.base_url !== settings.base_url || config.api_key !== settings.api_key;
+      setSettings(config);
+      try {
+        localStorage.setItem(SETTINGS_KEY, JSON.stringify(config));
+      } catch {
+        /* storage unavailable */
+      }
+      // A new endpoint serves a different catalog; ask it before the reader
+      // opens the picker and sees the old one.
+      if (movedEndpoint) {
+        void refreshModels({ base_url: config.base_url, api_key: config.api_key });
+      }
+    },
+    [settings.base_url, settings.api_key, refreshModels],
+  );
 
   const setDisplayName = useCallback((name: string) => {
     setDisplayNameState(name);
@@ -1067,6 +1110,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       void refreshCanvas();
       void refreshConnectors();
       void refreshPresets();
+      void refreshModels();
       void refreshMemory();
       void fetchLatestConversation()
         .then(({ conversation, turns }) => {
@@ -1154,6 +1198,10 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       canvasError,
       refreshCanvas,
       llmHealth,
+      models,
+      modelsLoading,
+      modelsMessage,
+      refreshModels,
       mcpReachable,
       sidecarReachable,
       checkConnections,
@@ -1224,6 +1272,10 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       canvasError,
       refreshCanvas,
       llmHealth,
+      models,
+      modelsLoading,
+      modelsMessage,
+      refreshModels,
       mcpReachable,
       sidecarReachable,
       checkConnections,

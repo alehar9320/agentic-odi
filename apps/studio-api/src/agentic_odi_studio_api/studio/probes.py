@@ -78,6 +78,28 @@ def classify_llm_error(exc: Exception) -> tuple[str, str]:
     return "error", message
 
 
+async def list_models(base_url: str, api_key: str) -> tuple[list[str], str | None]:
+    """Ask an OpenAI-compatible endpoint which models it serves.
+
+    Plenty of local servers implement ``/v1/models`` and plenty do not. Not
+    answering is not a studio failure: it only means the reader types the model
+    name by hand, so the reason is returned alongside an empty list instead of
+    being raised.
+    """
+    if not is_endpoint_reachable(base_url, timeout=0.3):
+        return [], OFFLINE_MESSAGE
+
+    client = AsyncOpenAI(base_url=base_url, api_key=api_key, timeout=2.0)
+    try:
+        page = await asyncio.wait_for(client.models.list(), timeout=2.0)
+    except Exception as exc:  # noqa: BLE001
+        status, detail = classify_llm_error(exc)
+        return [], f"{status}: {detail}"
+
+    ids = sorted({str(model.id) for model in page.data if getattr(model, "id", None)})
+    return ids, None
+
+
 async def check_llm_health(base_url: str, api_key: str, model_name: str) -> tuple[bool, str]:
     """Non-blocking LLM health probe with an instant socket pre-check."""
     if not is_endpoint_reachable(base_url, timeout=0.3):

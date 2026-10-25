@@ -35,7 +35,12 @@ from agentic_odi_studio_api.studio.errors import (
 )
 from agentic_odi_studio_api.studio.mcp_data import call_mcp_tool, fetch_canvas, fetch_local_canvas
 from agentic_odi_studio_api.studio.memory import ObservationNotFoundError, StudioMemory
-from agentic_odi_studio_api.studio.probes import check_llm_health, defaults, is_endpoint_reachable
+from agentic_odi_studio_api.studio.probes import (
+    check_llm_health,
+    defaults,
+    is_endpoint_reachable,
+    list_models,
+)
 from agentic_odi_studio_api.studio.schemas import (
     AddConnectorRequest,
     AddOutcomeRequest,
@@ -48,6 +53,7 @@ from agentic_odi_studio_api.studio.schemas import (
     LatestConversationResponse,
     LlmHealthRequest,
     McpHealthRequest,
+    ModelsRequest,
     ObservationCreateRequest,
     ObservationListResponse,
     ObservationResponse,
@@ -137,6 +143,13 @@ def post_mcp_health(body: McpHealthRequest) -> dict:
 async def post_llm_health(body: LlmHealthRequest) -> dict:
     healthy, message = await check_llm_health(body.base_url, body.api_key, body.model)
     return {"healthy": healthy, "message": message}
+
+
+@router.post("/models")
+async def post_models(body: ModelsRequest) -> dict:
+    """What the configured endpoint serves, when it is willing to say."""
+    models, message = await list_models(body.base_url, body.api_key)
+    return {"models": models, "message": message}
 
 
 @router.get("/connectors/catalog")

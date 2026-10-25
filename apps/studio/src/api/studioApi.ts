@@ -16,6 +16,7 @@ import type {
   LatestConversation,
   LlmHealth,
   McpHealth,
+  ModelsResult,
   Observation,
   ObservationKind,
   ObservationStatus,
@@ -143,6 +144,14 @@ export function healthLlm(config: {
   model: string;
 }): Promise<LlmHealth> {
   return postJson<LlmHealth>("/api/health/llm", config);
+}
+
+/** The models the configured endpoint serves, when it will say. */
+export function fetchModels(config: {
+  base_url: string;
+  api_key: string;
+}): Promise<ModelsResult> {
+  return postJson<ModelsResult>("/api/models", config);
 }
 
 export function addStep(payload: AddStepPayload): Promise<Step> {

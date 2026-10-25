@@ -91,6 +91,55 @@ def test_check_llm_health_reports_connection_errors(monkeypatch) -> None:
     assert message == "connection_error: connection refused"
 
 
+def test_list_models_reports_offline_without_connecting(monkeypatch) -> None:
+    monkeypatch.setattr(probes, "is_endpoint_reachable", lambda url, timeout: False)
+
+    models, message = asyncio.run(probes.list_models("http://llm", "key"))
+
+    assert models == []
+    assert message == probes.OFFLINE_MESSAGE
+
+
+def test_list_models_returns_sorted_unique_ids(monkeypatch) -> None:
+    class _Model:
+        def __init__(self, model_id: str) -> None:
+            self.id = model_id
+
+    class _Models:
+        async def list(self) -> Any:
+            return type("Page", (), {"data": [_Model("b"), _Model("a"), _Model("b"), _Model("")]})()
+
+    class _FakeOpenAI:
+        def __init__(self, **kwargs: Any) -> None:
+            self.models = _Models()
+
+    monkeypatch.setattr(probes, "is_endpoint_reachable", lambda url, timeout: True)
+    monkeypatch.setattr(probes, "AsyncOpenAI", _FakeOpenAI)
+
+    models, message = asyncio.run(probes.list_models("http://llm", "key"))
+
+    assert models == ["a", "b"]
+    assert message is None
+
+
+def test_list_models_explains_why_a_provider_cannot_answer(monkeypatch) -> None:
+    class _Models:
+        async def list(self) -> Any:
+            raise RuntimeError("connection refused")
+
+    class _FakeOpenAI:
+        def __init__(self, **kwargs: Any) -> None:
+            self.models = _Models()
+
+    monkeypatch.setattr(probes, "is_endpoint_reachable", lambda url, timeout: True)
+    monkeypatch.setattr(probes, "AsyncOpenAI", _FakeOpenAI)
+
+    models, message = asyncio.run(probes.list_models("http://llm", "key"))
+
+    assert models == []
+    assert message == "connection_error: connection refused"
+
+
 def test_defaults_read_environment(monkeypatch) -> None:
     monkeypatch.setenv("AGENTIC_ODI_BASE_URL", "http://llm/v1")
     monkeypatch.setenv("AGENTIC_ODI_API_KEY", "secret")

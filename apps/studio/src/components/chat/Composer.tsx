@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState, type RefObject } from "react";
 import { isCommandDraft, matchCommands, type StudioCommand } from "../../lib/commands";
 import { useStudio } from "../../state/StudioContext";
 import { ArrowUpIcon, StopIcon } from "../icons";
+import { ModelPicker } from "./ModelPicker";
 
 interface ComposerProps {
   value: string;
@@ -36,7 +37,7 @@ export function Composer({
   autoFocus = false,
   placeholder,
 }: ComposerProps) {
-  const { settings, llmHealth, brief, connectorSuggestions, presets, dismissConnectorSuggestion, refreshConnectors } =
+  const { llmHealth, brief, connectorSuggestions, presets, dismissConnectorSuggestion, refreshConnectors } =
     useStudio();
   const [highlight, setHighlight] = useState(0);
   // Remember which draft was dismissed, so typing again re-opens the palette
@@ -252,9 +253,7 @@ export function Composer({
           )}
           {brief ? ` · ${brief.product_name || "your job"}` : ""}
         </span>
-        <span className={`composer__status${offline ? " is-offline" : ""}`}>
-          {offline ? "Local guidance" : settings.model_name}
-        </span>
+        <ModelPicker offline={offline} />
       </p>
     </div>
   );

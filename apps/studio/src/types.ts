@@ -75,6 +75,16 @@ export interface McpHealth {
   reachable: boolean;
 }
 
+/**
+ * What the configured endpoint says it serves. An empty list with a message is
+ * a normal answer — the provider simply does not publish a catalog — so the UI
+ * falls back to typing the model name rather than showing a failure.
+ */
+export interface ModelsResult {
+  models: string[];
+  message: string | null;
+}
+
 export type ChatPart =
   | { kind: "text"; text: string }
   | { kind: "ui"; id: string; node: UiNode };

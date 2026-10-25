@@ -517,6 +517,51 @@ a {
   color: var(--amber);
 }
 
+.composer__model {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  max-width: 45%;
+  min-width: 0;
+}
+
+.composer__model-select {
+  max-width: 100%;
+  padding: 0 15px 0 3px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--faint);
+  font-family: inherit;
+  font-size: 0.66rem;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.composer__model-select:hover {
+  color: var(--text);
+}
+
+.composer__model-select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.composer__model-select option {
+  background: var(--bg-raised);
+  color: var(--text);
+}
+
+.composer__model-caret {
+  position: absolute;
+  right: 2px;
+  color: var(--faint);
+  font-size: 0.62rem;
+  pointer-events: none;
+}
+
 /* Transcript */
 .conversation {
   display: flex;
@@ -1111,6 +1156,19 @@ a {
 .field__hint {
   margin: 0;
   color: var(--faint);
+  font-size: 0.7rem;
+  line-height: 1.45;
+}
+
+.settings__model-state {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.settings__model-state .muted {
   font-size: 0.7rem;
   line-height: 1.45;
 }

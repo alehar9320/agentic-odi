@@ -27,6 +27,7 @@ vi.mock("./api/studioApi", () => ({
     source: "local" as const,
   })),
   healthMcp: vi.fn(async () => ({ reachable: true })),
+  fetchModels: vi.fn(async () => ({ models: ["local-tools-model", "qwen3-8b"], message: null })),
   healthLlm: vi.fn(async () => ({ healthy: true, message: "LLM backend is reachable." })),
   addStep: vi.fn(async () => ({ ok: true, result: "created" })),
   addOutcome: vi.fn(async () => ({ ok: true, result: "created" })),
@@ -227,6 +228,23 @@ describe("studio shell", () => {
       screen.getAllByRole("button", { name: /capture an outcome/i }).length,
     ).toBeGreaterThan(0);
     expect(screen.getByText("Local guidance")).toBeInTheDocument();
+  });
+
+  it("sends the next message with the model picked in the composer", async () => {
+    render(<App />);
+
+    fireEvent.change(await screen.findByRole("combobox", { name: "Model" }), {
+      target: { value: "qwen3-8b" },
+    });
+
+    const composer = screen.getByRole("textbox", { name: /message the studio/i });
+    fireEvent.change(composer, { target: { value: "Which model is answering?" } });
+    fireEvent.click(screen.getByRole("button", { name: /send message/i }));
+
+    await waitFor(() => expect(streamChat).toHaveBeenCalled());
+
+    const request = vi.mocked(streamChat).mock.calls.at(-1)?.[0];
+    expect(request?.model).toBe("qwen3-8b");
   });
 
   it("shows each tool a turn used once, under one summary line", async () => {

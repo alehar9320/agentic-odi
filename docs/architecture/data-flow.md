@@ -45,6 +45,11 @@ apps/studio SPA
   -> /api/chat
   -> stream_chat -> OpenAI-compatible LLM -> MCP tool calls
   -> StudioMemory (conversation turns + remembered observations)
+
+apps/studio SPA
+  -> /api/models
+  -> list_models -> OpenAI-compatible /v1/models
+  -> {models, message}; an endpoint that will not list is not an error
 ```
 
 The studio memory is a separate SQLite file, not an ODI repository. It never
