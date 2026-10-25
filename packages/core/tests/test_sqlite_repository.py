@@ -426,7 +426,6 @@ def test_reload_keeps_the_snapshot_on_disk(tmp_path) -> None:
     assert [job.id for job in repo.list_jobs()] == ["job-1"]
 
 
-
 def test_get_outcomes_ranks_by_opportunity_score(tmp_path) -> None:
     from agentic_odi_core.models import Job, Outcome
 
