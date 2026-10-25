@@ -449,4 +449,43 @@ describe("typed failures", () => {
     expect(problem.code).toBe("internal");
     expect(problem.message).toBe("boom");
   });
+
+  it("classifies a network failure (sidecar down) as mcp_unreachable with a suggestion", () => {
+    const problem = asStudioError(new TypeError("fetch failed"));
+
+    expect(problem.code).toBe("mcp_unreachable");
+    expect(problem.retryable).toBe(true);
+    expect(problem.suggestion).toMatch(/sidecar/i);
+    expect(problem.message).toMatch(/reachable|not running|unreachable/i);
+  });
+
+  it("classifies an empty 502 response as mcp_unreachable", async () => {
+    mockFailure(502, {});
+
+    await expect(
+      addOutcome({
+        mcp_url: "u",
+        job_id: "JOB-402",
+        statement: "Minimize time",
+        importance: 5,
+        satisfaction: 3,
+      }),
+     ).rejects.toMatchObject({
+       error: { code: "mcp_unreachable", retryable: true, suggestion: expect.stringContaining("sidecar") },
+     });
+   });
+
+   it("classifies an empty 404 response as not_found", async () => {
+    mockFailure(404, {});
+
+    await expect(
+      addOutcome({
+        mcp_url: "u",
+        job_id: "JOB-402",
+        statement: "Minimize time",
+        importance: 5,
+        satisfaction: 3,
+      }),
+    ).rejects.toMatchObject({ error: { code: "not_found" } });
+  });
 });

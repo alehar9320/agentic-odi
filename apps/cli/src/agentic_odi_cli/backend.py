@@ -58,7 +58,19 @@ _BUSINESS_VALUE_FIELDS = {
 
 
 class BackendError(Exception):
-    """A user-facing failure: not found, invalid input, or unreachable server."""
+    """A user-facing failure: not found, invalid input, or unreachable server.
+
+    ``suggestion`` (when given) is rendered as a trailing hint so the user has a
+    next action instead of just a red line.
+    """
+
+    def __init__(self, message: str, suggestion: str | None = None) -> None:
+        super().__init__(message)
+        self.suggestion = suggestion
+
+    @property
+    def message(self) -> str:
+        return self.args[0] if self.args else ""
 
 
 def mcp_timeout() -> float:
@@ -557,9 +569,15 @@ def _call_mcp(tool: str, args: dict[str, Any], mcp_url: str, timeout: float) -> 
     try:
         return asyncio.run(_guarded())
     except asyncio.TimeoutError as exc:
-        raise BackendError(f"timed out after {timeout:.0f}s contacting {mcp_url}") from exc
+        raise BackendError(
+            f"timed out after {timeout:.0f}s contacting {mcp_url}",
+            "Check the MCP server and network, then retry or raise AGENTIC_ODI_MCP_TIMEOUT.",
+        ) from exc
     except Exception as exc:  # noqa: BLE001
-        raise BackendError(f"could not reach MCP server at {mcp_url}: {exc}") from exc
+        raise BackendError(
+            f"could not reach MCP server at {mcp_url}: {exc}",
+            "Start the MCP server (python -m agentic_odi_mcp_server) and check AGENTIC_ODI_MCP_URL.",
+        ) from exc
 
 
 _FLOAT_TOOLS = frozenset({"compute_opportunity"})
@@ -592,7 +610,7 @@ def _parse_remote(tool_name: str, text: str) -> Any:
     stripped = text.strip()
     problem = parse_tool_result(stripped)
     if problem is not None:
-        raise BackendError(problem.message)
+        raise BackendError(problem.message, problem.suggestion)
 
     if tool_name in _FLOAT_TOOLS:
         return _extract_float(stripped)
@@ -673,4 +691,6 @@ def run_tool(tool_name: str, args: dict[str, Any]) -> Any:
         if message.startswith("Error: "):
             message = message[len("Error: ") :]
         typer.secho(f"Error: {message}", fg="red", err=True)
+        if exc.suggestion:
+            typer.secho(f"Hint: {exc.suggestion}", fg="yellow", err=True)
         raise typer.Exit(code=1) from exc

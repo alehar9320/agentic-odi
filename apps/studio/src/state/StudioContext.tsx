@@ -139,6 +139,7 @@ const CANVAS_KEY = "studio.canvas";
 const DISPLAY_NAME_KEY = "studio.displayName";
 const BRIEF_KEY = "studio.brief";
 const SETUP_DISMISSED_KEY = "studio.setupDismissed";
+const SIDECAR_NOTICE_DISMISSED_KEY = "studio.sidecarNoticeDismissed";
 const NOTIFICATIONS_KEY = "studio.notifications";
 
 /** How often the studio re-probes the model and the MCP server. */
@@ -230,6 +231,11 @@ export interface StudioContextValue {
   llmHealth: { healthy: boolean | null; message: string };
   mcpReachable: boolean;
   sidecarReachable: boolean | null;
+  /** Whether the user has dismissed this session's sidecar-down notice. */
+  dismissedSidecarNotice: boolean;
+  /** Probe again now, e.g. after the user started the sidecar. */
+  recheckConnections: () => Promise<void>;
+  dismissSidecarNotice: () => void;
   /** Probe the sidecar, MCP server, and model. Optionally against unsaved config. */
   checkConnections: (override?: Partial<StudioConfig>) => Promise<ConnectionReport>;
   messages: ChatMessage[];
@@ -331,7 +337,15 @@ function loadCanvasCache(): CanvasData | null {
 
 function loadSetupDismissed(): boolean {
   try {
-    return localStorage.getItem(SETUP_DISMISSED_KEY) === "1";
+      return localStorage.getItem(SETUP_DISMISSED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function loadSidecarNoticeDismissed(): boolean {
+  try {
+    return localStorage.getItem(SIDECAR_NOTICE_DISMISSED_KEY) === "1";
   } catch {
     return false;
   }
@@ -398,6 +412,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   });
   const [mcpReachable, setMcpReachable] = useState(false);
   const [sidecarReachable, setSidecarReachable] = useState<boolean | null>(null);
+  const [dismissedSidecarNotice, setDismissedSidecarNotice] = useState<boolean>(loadSidecarNoticeDismissed);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [memory, setMemory] = useState<Observation[]>([]);
@@ -669,10 +684,28 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       setMcpReachable(mcp);
       setLlmHealth(llm);
       void refreshCapabilities();
+      if (sidecar) {
+        setDismissedSidecarNotice(false);
+      }
       return { sidecarReachable: sidecar, mcpReachable: mcp, llmHealthy: llm.healthy };
     },
     [settings, refreshCapabilities],
   );
+
+  // Re-probe after the user acted on the sidecar notice (e.g. started the
+  // sidecar). Resolves once the report is in so the UI can stop showing "busy".
+  const recheckConnections = useCallback(async () => {
+    await checkConnections();
+  }, [checkConnections]);
+
+  const dismissSidecarNotice = useCallback(() => {
+    setDismissedSidecarNotice(true);
+    try {
+      localStorage.setItem(SIDECAR_NOTICE_DISMISSED_KEY, "1");
+    } catch {
+      /* storage unavailable */
+    }
+  }, []);
 
   const refreshCanvas = useCallback(async () => {
     setCanvasState((prev) => ({ kind: "loading", data: prev.data }));
@@ -842,6 +875,14 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     ) => {
       const trimmed = text.trim();
       if ((!trimmed && attachments.length === 0) || streaming) {
+        return;
+      }
+
+      // The sidecar is confirmed down: don't start a doomed stream. The notice
+      // above the composer already explains what's wrong; just surface a quiet
+      // heads-up in-thread and stop.
+      if (sidecarReachable === false) {
+        pushNotice("The studio sidecar isn't running — live replies are paused. Start it from Settings.");
         return;
       }
 
@@ -1178,6 +1219,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       conversationId,
       refreshCanvas,
       refreshConnectors,
+      sidecarReachable,
+      pushNotice,
     ],
   );
 
@@ -1483,6 +1526,9 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       llmHealth,
       mcpReachable,
       sidecarReachable,
+      dismissedSidecarNotice,
+      dismissSidecarNotice,
+      recheckConnections,
       checkConnections,
       messages,
       streaming,
@@ -1560,6 +1606,9 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       llmHealth,
       mcpReachable,
       sidecarReachable,
+      dismissedSidecarNotice,
+      dismissSidecarNotice,
+      recheckConnections,
       checkConnections,
       messages,
       streaming,

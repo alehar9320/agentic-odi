@@ -23,7 +23,7 @@ from agentic_odi_core import (
     error_status,
 )
 from agentic_odi_core.remote import StudioError, StudioErrorCode
-from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi import APIRouter, Query, Request
 from fastapi.responses import StreamingResponse
 
 from agentic_odi_studio_api.studio.approvals import (
@@ -193,9 +193,22 @@ def add_connector(body: AddConnectorRequest, request: Request) -> ConnectorOpera
     try:
         config = _connectors(request).add(name=body.name, preset_id=body.preset, url=body.url)
     except DuplicateConnectorError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+        raise StudioHTTPError(
+            StudioError(
+                code=StudioErrorCode.CONFLICT,
+                message=str(exc),
+                suggestion="Pick a different name, or remove the existing connector first.",
+            )
+        ) from exc
     except (ValueError, UnknownPresetError) as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise StudioHTTPError(
+            StudioError(
+                code=StudioErrorCode.VALIDATION,
+                message=str(exc),
+                suggestion="Choose a preset, or supply a name and a URL.",
+            ),
+            status_code=400,
+        ) from exc
     return ConnectorOperationResponse(ok=True, name=config.name)
 
 
@@ -204,7 +217,13 @@ def delete_connector(name: str, request: Request) -> ConnectorOperationResponse:
     try:
         _connectors(request).delete(name)
     except ConnectorNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise StudioHTTPError(
+            StudioError(
+                code=StudioErrorCode.NOT_FOUND,
+                message=str(exc),
+                suggestion="Check the connector name in Settings.",
+            )
+        ) from exc
     return ConnectorOperationResponse(ok=True, name=name)
 
 
@@ -213,14 +232,27 @@ def health_connector(name: str, request: Request) -> HealthStatus:
     try:
         return _connectors(request).health(name)
     except ConnectorNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise StudioHTTPError(
+            StudioError(
+                code=StudioErrorCode.NOT_FOUND,
+                message=str(exc),
+                suggestion="Check the connector name in Settings.",
+            )
+        ) from exc
 
 
 @router.get("/canvas")
 async def get_canvas(request: Request, mcp_url: str | None = Query(None)) -> dict:
     if _uses_mcp(request):
         if not mcp_url:
-            raise HTTPException(status_code=400, detail="mcp_url is required for the mcp backend")
+            raise StudioHTTPError(
+                StudioError(
+                    code=StudioErrorCode.VALIDATION,
+                    message="mcp_url is required for the mcp backend",
+                    suggestion="Set the MCP server URL in Settings.",
+                ),
+                status_code=400,
+            )
         return await fetch_canvas(mcp_url)
     return fetch_local_canvas(_service(request))
 
@@ -400,7 +432,9 @@ def create_observation(body: ObservationCreateRequest, request: Request) -> Obse
             confidence=body.confidence,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
+        raise StudioHTTPError(
+            StudioError(code=StudioErrorCode.VALIDATION, message=str(exc))
+        ) from exc
     return ObservationResponse(observation=observation.to_dict())
 
 
@@ -417,9 +451,17 @@ def update_observation(
             confidence=body.confidence,
         )
     except ObservationNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise StudioHTTPError(
+            StudioError(
+                code=StudioErrorCode.NOT_FOUND,
+                message=str(exc),
+                suggestion="Check the identifier and try again.",
+            )
+        ) from exc
     except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
+        raise StudioHTTPError(
+            StudioError(code=StudioErrorCode.VALIDATION, message=str(exc))
+        ) from exc
     return ObservationResponse(observation=observation.to_dict())
 
 
@@ -428,7 +470,13 @@ def delete_observation(observation_id: str, request: Request) -> dict:
     try:
         _memory(request).delete_observation(observation_id)
     except ObservationNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise StudioHTTPError(
+            StudioError(
+                code=StudioErrorCode.NOT_FOUND,
+                message=str(exc),
+                suggestion="Check the identifier and try again.",
+            )
+        ) from exc
     return {"ok": True}
 
 
