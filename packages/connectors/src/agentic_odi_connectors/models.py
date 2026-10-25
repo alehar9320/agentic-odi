@@ -7,6 +7,21 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
+
+class ConfigurationError(ValueError):
+    """Raised when a connector configuration fails validation.
+
+    Attributes:
+        keys: The missing or invalid config keys, used to surface which
+            fields need correction at startup.
+    """
+
+    def __init__(self, keys: list[str]) -> None:
+        self.keys = keys
+        joined = ", ".join(keys)
+        super().__init__(f"Invalid connector config: {joined}")
+
+
 ItemType = Literal["resource", "tool_result", "catalog"]
 McpAuthMode = Literal["none", "oauth"]
 EvidenceItemType = Literal["catalog", "resource", "tool_result", "manual", "note"]
