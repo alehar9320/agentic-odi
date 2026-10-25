@@ -26,6 +26,7 @@ export function SettingsPanel() {
     refreshConnectors,
     addConnector,
     deleteConnector,
+    sidecarReachable,
   } = useStudio();
   const { enabled: tourEnabled, restart: restartTour } = useOnboarding();
   const [selectedPreset, setSelectedPreset] = useState("");
@@ -131,6 +132,15 @@ export function SettingsPanel() {
           </span>
         </li>
         <li>
+          <span
+            className={`status-dot${sidecarReachable === false ? " is-warn" : sidecarReachable === null ? " is-unknown" : ""}`}
+          />
+          <span>Sidecar</span>
+          <span className="connection-list__value">
+            {sidecarReachable === false ? "unavailable" : sidecarReachable === null ? "unknown" : "reachable"}
+          </span>
+        </li>
+        <li>
           <span className={`status-dot${mcpReachable ? "" : " is-unknown"}`} />
           <span>Local FastMCP server</span>
           <span className="connection-list__value">{mcpReachable ? "connected" : "offline"}</span>
@@ -152,61 +162,70 @@ export function SettingsPanel() {
         </li>
       </ul>
 
-      <h3 className="settings__title">Connectors</h3>
-      {connectorsError ? (
-        <FailurePanel
-          error={connectorsError}
-          retryText="reload"
-          onRetry={() => void refreshConnectors()}
-        />
-      ) : connectors.length === 0 ? (
-        <p className="muted">No connectors registered. Pick a preset to add one.</p>
+      {sidecarReachable === false ? (
+        <p className="muted">
+          Connectors require the local sidecar. Data and conversation still work
+          without it; connect a sidecar to add MCP or REST data sources.
+        </p>
       ) : (
-        <ul className="connection-list">
-          {connectors.map((connector) => (
-            <li key={connector.name}>
-              <span className="connection-list__value">
-                {connector.name} · {connector.kind}
-                {connector.enabled ? "" : " (disabled)"}
-              </span>
-              <button
-                type="button"
-                className="button button--ghost"
-                aria-label={`Remove ${connector.name}`}
-                onClick={() => void deleteConnector(connector.name)}
+        <>
+          <h3 className="settings__title">Connectors</h3>
+          {connectorsError ? (
+            <FailurePanel
+              error={connectorsError}
+              retryText="reload"
+              onRetry={() => void refreshConnectors()}
+            />
+          ) : connectors.length === 0 ? (
+            <p className="muted">No connectors registered. Pick a preset to add one.</p>
+          ) : (
+            <ul className="connection-list">
+              {connectors.map((connector) => (
+                <li key={connector.name}>
+                  <span className="connection-list__value">
+                    {connector.name} · {connector.kind}
+                    {connector.enabled ? "" : " (disabled)"}
+                  </span>
+                  <button
+                    type="button"
+                    className="button button--ghost"
+                    aria-label={`Remove ${connector.name}`}
+                    onClick={() => void deleteConnector(connector.name)}
+                  >
+                    Remove
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          <div className="field">
+            <label htmlFor="connector-preset">Add a preset</label>
+            {presetError ? (
+              <FailurePanel
+                error={presetError}
+                retryText="reload"
+                onRetry={() => void refreshPresets()}
+              />
+            ) : (
+              <select
+                id="connector-preset"
+                aria-label="Add preset"
+                value={selectedPreset}
+                onChange={(event) => setSelectedPreset(event.target.value)}
               >
-                Remove
-              </button>
-            </li>
-          ))}
-        </ul>
+                <option value="" disabled>
+                  Select a preset
+                </option>
+                {presets.map((preset) => (
+                  <option key={preset.id} value={preset.id}>
+                    {preset.label}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+          </>
       )}
-      <div className="field">
-        <label htmlFor="connector-preset">Add a preset</label>
-        {presetError ? (
-          <FailurePanel
-            error={presetError}
-            retryText="reload"
-            onRetry={() => void refreshPresets()}
-          />
-        ) : (
-          <select
-            id="connector-preset"
-            aria-label="Add preset"
-            value={selectedPreset}
-            onChange={(event) => setSelectedPreset(event.target.value)}
-          >
-            <option value="" disabled>
-              Select a preset
-            </option>
-            {presets.map((preset) => (
-              <option key={preset.id} value={preset.id}>
-                {preset.label}
-              </option>
-            ))}
-          </select>
-        )}
-      </div>
       <button
         type="button"
         className="button button--ghost"

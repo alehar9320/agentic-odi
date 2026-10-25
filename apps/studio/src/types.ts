@@ -267,6 +267,8 @@ export interface Conversation {
   title: string;
   created_at: string;
   updated_at: string;
+  /** The visible branch head turn, when the conversation has branches. */
+  head_id?: string | null;
 }
 
 export interface ConversationTurn {
@@ -275,6 +277,10 @@ export interface ConversationTurn {
   role: "user" | "assistant" | "system" | "tool";
   content: string;
   created_at: string;
+  /** Stable client message id, when the turn was authored with one. */
+  message_id?: string | null;
+  /** The id of the turn this one answers, when it is a branch or edit. */
+  parent_id?: string | null;
 }
 
 export interface LatestConversation {
