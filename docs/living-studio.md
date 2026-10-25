@@ -462,6 +462,51 @@ The Studio needs an OpenAI-compatible LLM backend with tool-calling support to
 drive the agent. For a fully local setup, see
 [Local LLM Backend](local-llm.md).
 
+## Reviewing the conversation by hand
+
+Timing, focus rings, drop targets, and menu placement are not things a test can
+judge. Start the stack against a local model and a database of its own — a second
+checkout sharing `~/.agentic-odi` can otherwise leave this one with a schema it
+cannot open:
+
+```bash
+AGENTIC_ODI_STUDIO_DB=~/.agentic-odi/studio-review.db \
+AGENTIC_ODI_BASE_URL=http://127.0.0.1:11434/v1 \
+AGENTIC_ODI_MODEL=qwen2.5-coder:14b \
+npm --prefix apps/studio run dev:full          # http://localhost:5173
+```
+
+Each row below names a state to reach and what is worth your own eyes.
+
+| State | How to reach it | What to judge |
+|---|---|---|
+| Activity line | A turn whose first token is slow: a cold model, or a long prompt | The label moves *Waking the model* → *Opening your studio tools* → *Thinking*, the dots animate, an elapsed count appears after 3 s, and the reply does not jump the layout when it arrives |
+| Streaming prose | Any turn | The caret trails the last word, the send button is a stop button, and scrolling away offers **Latest message** without fighting the follow |
+| Reasoning | A backend that streams `reasoning_content` or `reasoning` | The disclosure opens while it is written, settles to *Thought for Ns*, reopens on click, and never repeats the answer |
+| Tool trace and sources | A model that emits real `tool_calls` | The dot pulses while the tool runs, the chip previews what came back, and the source names the tool the turn actually read |
+| Approval | The same, asking it to write ("add a step to …") | The turn pauses for **Allow**/**Decline**, a decline reads as a tool result and not an error, and a double click runs the tool once |
+| Model picker | **Model** in the hint row; open it twice; narrow the window first | The list matches the backend, the configured id stays selectable, arrows/Home/End/Enter/Escape work, an offline backend explains itself and its Settings button is reachable from the keyboard, and it probes once per backend |
+| Attachments | Paperclip, drag a file onto the composer, paste a screenshot, then drop a `.exe` | Thumbnail, name, size, and remove on the chip; the unreadable file is refused with its reason; the sent turn shows the same; the paperclip has a visible focus ring |
+| Branches | Edit your own turn, then regenerate a reply | **Alternative N of M** with `‹`/`›`, and a reload reopens the branch you were reading |
+| Reduced motion, narrow window | Turn on OS reduce-motion; then drag the window narrow | Shimmer, dots, and cycling stop; the lens becomes a sheet, the composer stays usable, and menus stay on screen |
+
+Two things surprise people on a local model:
+
+- **Warm it first.** Loading a 14B model can take minutes, while the sidecar gives
+  a completion 15 s; the first turn after the model has been idle that long fails
+  as *The model could not be reached*. The error is retryable and the retry works
+  once the load finishes. Preload it right before a review with
+  `curl -X POST localhost:11434/api/generate -d '{"model":"qwen2.5-coder:14b"}'`,
+  or start Ollama with `OLLAMA_KEEP_ALIVE=2h` so an idle pause does not unload it
+  (Ollama's own default is five minutes, and every later request re-applies it).
+- **A model that prints JSON is not calling a tool.** Some coder models write
+  `{"name": "get_jobs", …}` as prose; nothing is traced, so no chip and no
+  source appears. Judge those rows on a model that returns `tool_calls`.
+
+Settings come from the browser before they come from the sidecar: if the composer
+still points at an old backend, set **Base URL** and **Model** in Settings once —
+the picker writes the same place.
+
 ## Agent-Driven Testing
 
 Type `/dev` in the AI assistant to trigger the full automated workflow: it starts
