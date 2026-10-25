@@ -46,6 +46,14 @@ agentic-odi chat
 agentic-odi chat --model local-tools-model --mcp-url http://localhost:8000/mcp
 ```
 
+Thinking does not need the Studio or its sidecar. While the first token is on
+its way, a dim `thinking…` sits on the prompt line and is erased when the reply
+starts, so a cold model reads as work rather than a hung session. When the
+model exposes its reasoning (`reasoning_content` or `reasoning`, as vLLM,
+Ollama, and DeepSeek do), it is printed dimmed on stderr as `thinking › …`:
+the answer on stdout stays clean, and the thinking is never replayed as
+conversation history.
+
 ### Connection settings
 
 The chat resolves settings in priority order:
