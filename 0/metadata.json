@@ -1,0 +1,105 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M5SXGG2M8AHJV32XCF48JGBS",
+  "session_id": "ses_e8d0f284affeZQYq2StICb3j6a",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-25T16:15:19.772488204Z",
+  "branch": "stop-having-to-approve-runs",
+  "checkpoints_count": 2,
+  "save_step_count": 2,
+  "files_touched": [
+    ".github/workflows/release.yml",
+    "apps/cli/src/agentic_odi_cli/_build_info.py",
+    "apps/studio/src-tauri/Cargo.toml",
+    "apps/studio/src-tauri/tauri.conf.json",
+    "docs/installation.md",
+    "release-please-config.json",
+    "scripts/build_binary.sh",
+    "scripts/release_instructions.py",
+    "tests/scripts/test_release_instructions.py",
+    "tests/scripts/test_version_sync.py",
+    "website/dist/docs/installation/index.html"
+  ],
+  "agent": "OpenCode",
+  "model": "poolside/laguna-s-2.1:free",
+  "turn_id": "61788ee75027",
+  "checkpoint_transcript_start": 24,
+  "transcript_lines_at_start": 24,
+  "compact_transcript_start": 24,
+  "token_usage": {
+    "input_tokens": 1000202,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 13953440,
+    "output_tokens": 32834,
+    "api_call_count": 102
+  },
+  "session_metrics": {
+    "turn_count": 3
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-10-25T16:15:19.648538155Z",
+    "agent_lines": 0,
+    "agent_removed": 0,
+    "human_added": 0,
+    "human_modified": 6,
+    "human_removed": 24,
+    "total_committed": 0,
+    "total_lines_changed": 30,
+    "agent_percentage": 0,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 371,
+      "user_lines_removed": 23,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        ".github/workflows/release.yml": 17,
+        "apps/cli/src/agentic_odi_cli/_build_info.py": 1,
+        "apps/studio/src-tauri/Cargo.toml": 1,
+        "apps/studio/src-tauri/tauri.conf.json": 8,
+        "docs/installation.md": 17,
+        "docs/superpowers/plans/2026-10-25-auto-release.md": 88,
+        "release-please-config.json": 12,
+        "scripts/build_binary.sh": 4,
+        "scripts/release_instructions.py": 80,
+        "tests/scripts/test_release_instructions.py": 78,
+        "tests/scripts/test_version_sync.py": 49,
+        "website/dist/docs/installation/index.html": 16
+      },
+      "user_removed_per_file": {
+        "apps/cli/src/agentic_odi_cli/_build_info.py": 1,
+        "apps/studio/src-tauri/Cargo.toml": 1,
+        "apps/studio/src-tauri/tauri.conf.json": 2,
+        "docs/installation.md": 5,
+        "release-please-config.json": 1,
+        "scripts/build_binary.sh": 2,
+        "scripts/release_instructions.py": 5,
+        "tests/scripts/test_release_instructions.py": 1,
+        "website/dist/docs/installation/index.html": 5
+      }
+    },
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 88,
+      "user_lines_removed": 0,
+      "agent_lines_added": 283,
+      "agent_lines_removed": 23,
+      "user_added_per_file": {
+        "docs/superpowers/plans/2026-10-25-auto-release.md": 88
+      }
+    },
+    {
+      "checkpoint_number": 3,
+      "user_lines_added": 88,
+      "user_lines_removed": 0,
+      "agent_lines_added": 283,
+      "agent_lines_removed": 23,
+      "user_added_per_file": {
+        "docs/superpowers/plans/2026-10-25-auto-release.md": 88
+      }
+    }
+  ]
+}
