@@ -137,3 +137,35 @@ async def test_get_odi_framework_guidelines_includes_expected_sections():
         assert "add_job" in text
         assert "add_outcome" in text
         assert "add_step" in text
+
+
+@pytest.mark.asyncio
+async def test_add_step_accepts_the_eight_job_map_stages():
+    async with Client(mcp) as client:
+        created = await client.call_tool("add_job", {"name": "Deploy a service"})
+        job_id = _extract_id(created.content[0].text)
+        assert job_id is not None
+
+        for order in range(1, 9):
+            result = await client.call_tool(
+                "add_step", {"job_id": job_id, "name": f"stage {order}", "order": order}
+            )
+            assert "Step created successfully" in result.content[0].text
+
+        listed = await client.call_tool("get_job_map", {"job_id": job_id})
+        assert [step["order"] for step in json.loads(listed.content[0].text)] == list(range(1, 9))
+
+
+@pytest.mark.asyncio
+async def test_add_step_rejects_an_order_outside_the_job_map():
+    async with Client(mcp) as client:
+        created = await client.call_tool("add_job", {"name": "Deploy a service"})
+        job_id = _extract_id(created.content[0].text)
+        assert job_id is not None
+
+        result = await client.call_tool(
+            "add_step", {"job_id": job_id, "name": "stage 9", "order": 9}
+        )
+
+        assert result.content[0].text.startswith("Error:")
+        assert "between 1 and 8" in result.content[0].text

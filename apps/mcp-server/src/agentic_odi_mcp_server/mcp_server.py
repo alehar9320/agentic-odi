@@ -91,6 +91,8 @@ def add_step(job_id: str, name: str, order: int) -> str:
         step = service.add_step(job_id=job_id, name=name, order=order)
     except JobNotFoundError:
         return job_not_found(job_id)
+    except ValueOutOfRangeError as exc:
+        return f"Error: {exc}"
     return f"Step created successfully: {step.model_dump_json()}"
 
 
