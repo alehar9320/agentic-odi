@@ -42,14 +42,19 @@ The Studio opens as a conversation, not a dashboard.
 | **First run** | A short conversation in the chat, not a form: what you are building, who feels the problem, the job they are trying to get done, then where it hurts. One question at a time, with a reflection before the next ask, quick replies, and **Explore on my own** always visible. Skipping is allowed; answers and progress are kept as a draft. Re-open it any time with `/start`, the home stage's context pill, or Settings. |
 | **Hero** | One rotating headline above the composer: a greeting (time of day, plus your name if you set one in Settings), the product/job you set up, what is already on the canvas, or an intent-first prompt such as *What are you trying to win this quarter?* It cycles every few seconds and stays still under `prefers-reduced-motion`. |
 | **Starter cards** | Below the headline, three canvas-aware conversation cards pair a clear next move with a short reason: **Sharpen an opportunity**, **Pressure-test a bet** or **Find the next opportunity**, and **Capture what you heard** or **Name the job**. Select one to start that prompt in the thread; the cards disappear once the conversation begins. **Opportunity landscape** remains a separate, quiet shortcut. |
-| **Composer** | Docked at the bottom of the transcript. `Enter` sends, `Shift`+`Enter` adds a line, `Cmd/Ctrl`+`K` focuses it, `/` opens the command palette, and the paperclip attaches a text file or an image. The send button becomes a stop button while a reply streams. |
+| **Composer** | Docked at the bottom of the transcript. `Enter` sends, `Shift`+`Enter` adds a line, `Cmd/Ctrl`+`K` focuses it, `/` opens the command palette, and the paperclip attaches a text file or an image. Files can also be dropped anywhere on the composer or pasted from the clipboard, and each one is shown with a size (and a thumbnail, for images) plus a remove control before it is sent; a file the studio cannot read is refused with the reason instead of becoming a chip that promises content the model will never see. The hint row's **Model** control lists the ids the configured backend reports and writes the choice through the same Settings store as the Base URL field. The send button becomes a stop button while a reply streams. |
 | **Bar** | The only persistent chrome: home, new conversation, catch-up, live model status, and settings. There is no navigation drawer to compete with the thread. |
 | **Rail** | Above the conversation, and only once the thread has produced something: `Landscape · N`, `Job map · N`, `Evidence · N`, `What I know · N`. Every item is derived from the canvas and the memory, so the strip is a record of the work rather than a fixed menu. |
 | **Lens** | A view docks to the right of the thread on wide screens and becomes a full-height sheet on narrow ones. The transcript and the composer stay on screen and stay usable; `Esc`, **Close**, or the rail chip closes it. Every lens ends in one sentence that re-enters the conversation — *Ask which to chase*, *Walk me through the job*, *Weigh the evidence* — so leaving a view is never a return to a menu. Settings and catch-up use the same lens. |
 
 Replies render Markdown (headings, lists, emphasis, inline and fenced code).
-Reasoning sits in a collapsed disclosure above the answer, and every tool call is
-a trace chip with the source the turn actually read.
+While a turn has produced no text yet, an activity line names the phase (*Waking
+the model*, *Opening your studio tools*, *Thinking*) with a shimmer and an
+elapsed hint; the phase is announced once to assistive technology, and the reply
+is marked busy until it settles so a screen reader reads the answer, not every
+token. Reasoning sits above the answer in a disclosure that opens while it is
+being written and collapses to *Thought for Ns* afterwards, and every tool call
+is a trace chip with the source the turn actually read.
 
 ### Slash commands
 
@@ -152,12 +157,13 @@ without giving up the message model the sidecar already understands.
 
 | Capability | What it means here |
 |---|---|
-| **Streaming** | `delta` frames append to the open prose part; the send button becomes stop. When you scroll away during a reply, a keyboard-accessible **Latest message** control returns you to the live end without interrupting assistant-ui's follow behavior. Empty-thread starter cards pair each suggested move with its reason, then give way to the conversation after the first turn. |
-| **Reasoning** | `reasoning` frames render in a collapsed *Thought for a moment* disclosure. Never persisted, never counted as the answer. |
+| **Streaming** | `delta` frames append to the open prose part; the send button becomes stop. Before the first token, the last message shows the current phase with a shimmering label and dots. When you scroll away during a reply, a keyboard-accessible **Latest message** control returns you to the live end without interrupting assistant-ui's follow behavior. Empty-thread starter cards pair each suggested move with its reason, then give way to the conversation after the first turn. |
+| **Reasoning** | `reasoning` frames render in a disclosure that starts open while the model is thinking, then reads *Thought for Ns* and can be reopened. Never persisted, never counted as the answer. |
 | **Tools** | Each MCP call is a trace chip with its status and a short preview of what came back. |
 | **Approval** | A writing tool (`add_`, `create_`, `update_`, `delete_`, `ingest_`, `remove_`) pauses the turn until you answer **Allow** or **Decline**. A decline is a tool result, not an error: the model is told no and may propose something else. |
 | **Sources** | Every tool call that returned data emits a `source`, titled with the tool and a preview. Provenance is what the turn actually read; a citation is never invented. |
-| **Attachments** | The composer describes accepted text-like files (`.md`, `.mdx`, `.json`, `.csv`, `.yaml`, `.yml`, `.log`, `text/*`) and images (PNG/JPEG/WebP/GIF, at most 5 MB). Text is extracted in the browser, capped at 20,000 characters, and sent with the turn. Nothing is stored server-side. |
+| **Attachments** | Attach from the paperclip, by dropping files on the composer, or by pasting a screenshot. The composer describes accepted text-like files (`.md`, `.mdx`, `.json`, `.csv`, `.yaml`, `.yml`, `.log`, `text/*`) and images (PNG/JPEG/WebP/GIF, at most 5 MB); a drop or paste of anything else is refused with the reason. Chips show a name, size, an image preview, and a remove control. Text is extracted in the browser, capped at 20,000 characters, and sent with the turn. Nothing is stored server-side. |
+| **Model** | The hint row's picker asks the sidecar (`POST /api/models`) which ids the configured backend serves, keeps the configured model selectable even when the backend omits it, and saves the choice through `saveSettings`, so Settings and the composer never disagree. An unreachable or empty backend is explained in the menu rather than shown as an empty list. |
 | **Branching** | **Edit** a user turn or **Regenerate** a reply and both versions are kept as siblings. **Alternative 2 of 3** with `‹`/`›` steps between them, and the visible branch is saved as the conversation's `head_id`, so a reload reopens the branch you were reading. |
 | **Suggestions** | The empty-stage pills are chosen from the canvas and handed to the runtime as suggestion prompts. |
 | **Generative UI** | A validated `UiNode` travels as an assistant-ui **data part** (`data-odi-surface`) and renders through the same `UiRenderer`. The catalog stays ours and server-validated. |
@@ -172,14 +178,16 @@ without giving up the message model the sidecar already understands.
 | `apps/studio/src/assistant/attachments.ts` | The attachment adapter and the browser-side text/image extraction. |
 | `apps/studio/src/assistant/parts.tsx` | One renderer per part: text, reasoning, tool (with its approval), source, file, generated surface. |
 | `apps/studio/src/components/chat/Conversation.tsx` | `MessagePrimitive.Parts`, the branch picker, the action bar, and the in-place edit composer. |
-| `apps/studio/src/components/chat/ThreadComposer.tsx` | `ComposerPrimitive` plus the slash palette, connector chips, and attachment-format/size guidance. |
+| `apps/studio/src/components/chat/ThreadComposer.tsx` | `ComposerPrimitive` plus the slash palette, connector chips, attachment drop/paste, and attachment-format/size guidance. |
+| `apps/studio/src/components/chat/ModelPicker.tsx` | The composer's model listbox: opens the sidecar's `/api/models`, keeps the configured id selectable, and saves through Settings. |
 
 The sidecar remains the source of truth for what happened. Its additions are
 opt-in and additive: `reasoning`, `source`, and `approval` stream events;
 `attachments` and `approvals` on `/api/chat`; `GET
-/api/conversations/{id}/tree`; and `PATCH /api/conversations/{id}`. A client that
-sends neither flag sees exactly the stream it saw before, which is what the CLI
-and older clients do.
+/api/conversations/{id}/tree`; `PATCH /api/conversations/{id}`; and `POST
+/api/models`, which lists the configured backend's ids without raising when it
+is offline. A client that sends none of these sees exactly the stream it saw
+before, which is what the CLI and older clients do.
 
 The approval gate is per-process and single-user by design. `ApprovalRegistry`
 waits on an `asyncio` future, `POST /api/approvals/{id}` answers it, and a

@@ -26,6 +26,14 @@ class LlmHealthRequest(BaseModel):
     model: str = ""
 
 
+class ModelListRequest(BaseModel):
+    """Which backend to ask for its model ids. The key travels in the body, not
+    the query string, so it never lands in a URL or an access log."""
+
+    base_url: str
+    api_key: str = ""
+
+
 class AddStepRequest(BaseModel):
     mcp_url: str
     job_id: str

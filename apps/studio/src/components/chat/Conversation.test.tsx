@@ -114,7 +114,7 @@ describe("Conversation", () => {
     expect(container.textContent).toContain("Minimize the time it takes to propagate secrets");
   });
 
-  it("renders reasoning as a disclosure beside the answer", () => {
+  it("keeps reasoning behind a disclosure that opens on request", () => {
     const { container } = renderTurn([
       {
         id: "m-1",
@@ -128,9 +128,46 @@ describe("Conversation", () => {
       },
     ]);
 
-    const summary = container.querySelector("summary.reasoning__summary");
-    expect(summary?.textContent).toContain("Thought for a moment");
-    expect(container.textContent).toContain("Weighing the scored outcomes");
+    const toggle = screen.getByRole("button", { name: /Thought process/ });
+    const panel = container.querySelector(".reasoning__body") as HTMLElement;
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(panel.hidden).toBe(true);
+
+    fireEvent.click(toggle);
+
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(panel.hidden).toBe(false);
+    expect(panel.textContent).toContain("Weighing the scored outcomes");
+  });
+
+  it("names the phase while a reply has no text yet", () => {
+    harness.state.streaming = true;
+    harness.state.thinkingPhase = "mcp_tools";
+    const { container } = renderTurn([
+      { id: "u-1", parentId: null, role: "user", content: "Check this bet" },
+      { id: "a-1", parentId: "u-1", role: "assistant", content: "", parts: [] },
+    ]);
+
+    expect(screen.getByRole("status")).toHaveTextContent("Opening your studio tools");
+    expect(container.querySelector(".message--assistant")).toHaveAttribute(
+      "aria-busy",
+      "true",
+    );
+
+    harness.state.streaming = false;
+    harness.state.thinkingPhase = null;
+  });
+
+  it("marks a settled reply as no longer busy", () => {
+    const { container } = renderTurn([
+      { id: "u-1", parentId: null, role: "user", content: "Check this bet" },
+      { id: "a-1", parentId: "u-1", role: "assistant", content: "A useful reply." },
+    ]);
+
+    expect(container.querySelector(".message--assistant")).toHaveAttribute(
+      "aria-busy",
+      "false",
+    );
   });
 
   it("renders a source chip for what the turn read", () => {

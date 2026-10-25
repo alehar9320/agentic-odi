@@ -109,6 +109,72 @@ describe("ThreadComposer attachment guidance", () => {
   });
 });
 
+async function renderThreadComposer(overrides: Record<string, unknown> = {}) {
+  const { StudioRuntimeProvider } = await import("../../assistant/StudioRuntime");
+  const { ThreadComposer } = await import("./ThreadComposer");
+  vi.mocked(useStudio).mockReturnValue(
+    stubContext({
+      connectorSuggestions: [],
+      messages: [],
+      streaming: false,
+      canvas: null,
+      pushToast: vi.fn(),
+      sendMessage: vi.fn(async () => {}),
+      regenerateFrom: vi.fn(async () => {}),
+      editFrom: vi.fn(async () => {}),
+      switchBranch: vi.fn(),
+      respondToApproval: vi.fn(async () => {}),
+      stopStreaming: vi.fn(),
+      ...overrides,
+    }),
+  );
+  return render(
+    <StudioRuntimeProvider>
+      <ThreadComposer onCommand={() => {}} />
+    </StudioRuntimeProvider>,
+  );
+}
+
+describe("ThreadComposer attachments", () => {
+  it("turns a dropped file into a removable attachment chip", async () => {
+    const { container } = await renderThreadComposer();
+    const root = container.querySelector(".composer") as HTMLElement;
+    const file = new File(["hello"], "notes.md", { type: "text/markdown" });
+
+    fireEvent.dragEnter(root, { dataTransfer: { types: ["Files"], files: [file] } });
+    expect(screen.getByText("Drop to attach")).toBeInTheDocument();
+
+    fireEvent.drop(root, { dataTransfer: { types: ["Files"], files: [file] } });
+
+    expect(await screen.findByText("notes.md")).toBeInTheDocument();
+    expect(screen.queryByText("Drop to attach")).toBeNull();
+    expect(screen.getByRole("button", { name: "Remove notes.md" })).toBeInTheDocument();
+  });
+
+  it("refuses a file the studio cannot read and says why", async () => {
+    const pushToast = vi.fn();
+    const { container } = await renderThreadComposer({ pushToast });
+    const root = container.querySelector(".composer") as HTMLElement;
+    const file = new File(["x"], "deck.pdf", { type: "application/pdf" });
+
+    fireEvent.drop(root, { dataTransfer: { types: ["Files"], files: [file] } });
+
+    expect(pushToast).toHaveBeenCalledWith("error", expect.stringContaining("deck.pdf"));
+    expect(screen.queryByText("deck.pdf")).toBeNull();
+  });
+
+  it("attaches a pasted screenshot from the clipboard", async () => {
+    await renderThreadComposer();
+    const file = new File(["png"], "screenshot.png", { type: "image/png" });
+
+    fireEvent.paste(screen.getByRole("textbox", { name: "Message the studio" }), {
+      clipboardData: { files: [file] },
+    });
+
+    expect(await screen.findByText("screenshot.png")).toBeInTheDocument();
+  });
+});
+
 describe("Composer keyboard focus", () => {
   const baseProps = {
     value: "hello",

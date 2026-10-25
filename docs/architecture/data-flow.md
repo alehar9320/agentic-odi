@@ -49,7 +49,17 @@ apps/studio SPA
 apps/studio SPA
   -> POST /api/approvals/{id}
   -> ApprovalRegistry -> resolves the paused turn's pending gate
+
+apps/studio SPA
+  -> POST /api/models
+  -> probes.list_models -> OpenAI-compatible LLM (model ids)
 ```
+
+`/api/models` is read-only discovery for the composer's picker. It answers the
+SPA rather than the browser because the model server may only be reachable from
+the sidecar's host and is not necessarily CORS-open. A refused connection is
+returned as `error` beside an empty list, not as a 5xx: an unreachable model
+server is a normal state the picker explains.
 
 The studio memory is a separate SQLite file, not an ODI repository. It never
 feeds the canvas; it only supplies bounded context to the next chat turn.

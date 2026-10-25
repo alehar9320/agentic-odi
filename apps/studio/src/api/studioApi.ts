@@ -17,6 +17,7 @@ import type {
   LatestConversation,
   LlmHealth,
   McpHealth,
+  ModelList,
   Observation,
   ObservationKind,
   ObservationStatus,
@@ -144,6 +145,19 @@ export function healthLlm(config: {
   model: string;
 }): Promise<LlmHealth> {
   return postJson<LlmHealth>("/api/health/llm", config);
+}
+
+/**
+ * The model ids the configured backend serves.
+ *
+ * The sidecar asks, not the browser: the model server may be reachable only
+ * from the host machine and is not necessarily CORS-open.
+ */
+export function fetchModels(config: {
+  base_url: string;
+  api_key: string;
+}): Promise<ModelList> {
+  return postJson<ModelList>("/api/models", config);
 }
 
 export function addStep(payload: AddStepPayload): Promise<Step> {

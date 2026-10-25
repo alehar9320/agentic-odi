@@ -7,16 +7,21 @@
  * connector chips, and the hint row are the same in both, so they live here.
  */
 
+import type { ReactNode } from "react";
+
 import { isCommandDraft, type StudioCommand } from "../../lib/commands";
 import { useStudio } from "../../state/StudioContext";
 
 export function CommandPalette({
+  id,
   open,
   matches,
   activeIndex,
   onHover,
   onChoose,
 }: {
+  /** Unique per composer: two composers can be mounted at once. */
+  id: string;
   open: boolean;
   matches: StudioCommand[];
   activeIndex: number;
@@ -28,7 +33,7 @@ export function CommandPalette({
   }
 
   return (
-    <div className="palette" role="listbox" id="studio-command-palette" aria-label="Commands">
+    <div className="palette" role="listbox" id={id} aria-label="Commands">
       {matches.length ? (
         matches.map((command, index) => (
           <button
@@ -92,20 +97,22 @@ export function ConnectorChips() {
   );
 }
 
-export function ComposerHint() {
+export function ComposerHint({ trailing }: { trailing?: ReactNode } = {}) {
   const { settings, llmHealth, brief } = useStudio();
   const offline = llmHealth.healthy === false;
 
   return (
-    <p className="composer__hint">
+    <div className="composer__hint">
       <span>
         <kbd>Enter</kbd> to send · <kbd>/</kbd> for commands
         {brief ? ` · ${brief.product_name || "your job"}` : ""}
       </span>
-      <span className={`composer__status${offline ? " is-offline" : ""}`}>
-        {offline ? "Local guidance" : settings.model_name}
+      <span className="composer__hint-end">
+        {offline ? <span className="composer__status is-offline">Local guidance</span> : null}
+        {trailing ??
+          (offline ? null : <span className="composer__status">{settings.model_name}</span>)}
       </span>
-    </p>
+    </div>
   );
 }
 

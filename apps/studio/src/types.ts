@@ -87,6 +87,12 @@ export interface LlmHealth {
   message: string;
 }
 
+/** What the configured backend reports it can serve, and why it reported none. */
+export interface ModelList {
+  models: string[];
+  error: string | null;
+}
+
 export interface McpHealth {
   reachable: boolean;
 }

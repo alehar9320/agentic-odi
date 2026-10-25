@@ -177,11 +177,23 @@ npm<span class="w"> </span>--prefix<span class="w"> </span>apps/studio<span clas
 </tr>
 <tr>
 <td><code>apps/studio/src/components/chat/Conversation.test.tsx</code></td>
-<td>Prose and surfaces interleaved in the agent's order through the real runtime; card actions become messages; named alternative N of M and its switch; failure retry</td>
+<td>Prose and surfaces interleaved in the agent's order through the real runtime; card actions become messages; named alternative N of M and its switch; reasoning disclosure opens on request; the phase is announced and the reply is busy while streaming; failure retry</td>
 </tr>
 <tr>
 <td><code>apps/studio/src/components/chat/Composer.test.tsx</code></td>
-<td>Send, stop, the slash palette, keyboard focus, and accessible attachment format/size limits in the runtime-bound composer</td>
+<td>Send, stop, the slash palette, keyboard focus, dropped and pasted attachments, refusal of unreadable files, and accessible attachment format/size limits in the runtime-bound composer</td>
+</tr>
+<tr>
+<td><code>apps/studio/src/components/chat/ModelPicker.test.tsx</code></td>
+<td>Listing and marking the configured model, selection writes through <code>saveSettings</code>, arrow/Enter/Escape operation, an unreachable backend explained with a Settings path, one probe per backend</td>
+</tr>
+<tr>
+<td><code>apps/studio/src/assistant/attachments.test.ts</code></td>
+<td>Acceptance by extension and type, the 5 MB image ceiling, and human-readable sizes</td>
+</tr>
+<tr>
+<td><code>apps/studio-api/tests/test_studio_models.py</code></td>
+<td>Model listing sorted and deduplicated, offline without connecting, failed probe returned as a message, <code>/api/models</code> response shape</td>
 </tr>
 <tr>
 <td><code>apps/studio/src/state/StudioContext.test.tsx</code></td>

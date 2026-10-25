@@ -117,14 +117,18 @@ studio what a customer said, or what bet you are weighing, and it renders the
 card. Use the bell to **catch up on outcome shifts, simulations, and telemetry
 signals while you were away**.
 
-The thread behaves like a real assistant surface, not a chat box. Replies stream;
-reasoning arrives as a collapsed disclosure rather than prose; each tool call is a
-trace chip with the source the turn actually read; a write to your data pauses for
-a **Yes/No** before it runs; text and image attachments ride along with the turn;
-and any reply can be edited or regenerated as a **branch** you step through with
-`‹ 2 of 3 ›`. Starter suggestions change with the canvas. The runtime underneath
-is [assistant-ui](https://www.assistant-ui.com); the ODI surfaces, the catalog,
-and the sidecar contract stay ours.
+The thread behaves like a real assistant surface, not a chat box. Replies stream
+behind an activity line that names the current phase until the first token
+arrives; reasoning opens while it is written rather than appearing as prose, then
+settles into *Thought for 3s*; each tool call is a trace chip with the source the
+turn actually read; a write to your data pauses for a **Yes/No** before it runs.
+Text and image attachments attach from the paperclip, a dropped file, or a pasted
+screenshot, with a preview and size before send, and the composer's model picker
+lists the ids the configured backend actually serves. Any reply can be edited or
+regenerated as a **branch** you step through with **Alternative 2 of 3**.
+Starter suggestions change with the canvas. The runtime underneath is
+[assistant-ui](https://www.assistant-ui.com); the ODI surfaces, the catalog, and
+the sidecar contract stay ours.
 
 The studio also remembers the person, not just the canvas. As you talk it notes
 what matters — your role, the opportunity, business constraints, stakeholders,
