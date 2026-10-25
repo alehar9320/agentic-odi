@@ -1,0 +1,48 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M5SGZ5WVGEN5FDP98AAJFXCS",
+  "session_id": "ses_e8d0f284affeZQYq2StICb3j6a",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-25T12:36:16.747810561Z",
+  "branch": "slay/1b1eeedb-tool-trace-aria-live",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "apps/studio/src/assistant/parts.tsx",
+    "apps/studio/src/components/chat/Conversation.test.tsx"
+  ],
+  "agent": "OpenCode",
+  "model": "poolside/laguna-s-2.1:free",
+  "turn_id": "8e06547c27f7",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 264485,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 1263392,
+    "output_tokens": 6210,
+    "api_call_count": 23
+  },
+  "session_metrics": {
+    "turn_count": 1
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-10-25T12:36:16.639665988Z",
+    "agent_lines": 496,
+    "agent_removed": 4,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 496,
+    "total_lines_changed": 500,
+    "agent_percentage": 100,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0
+    }
+  ]
+}
