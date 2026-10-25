@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
+import httpx
 from agentic_odi_connectors.catalog import UnknownPresetError
 from agentic_odi_connectors.models import HealthStatus
 from agentic_odi_connectors.registry import (
@@ -56,6 +57,8 @@ from agentic_odi_studio_api.studio.schemas import (
     AddStepRequest,
     ApprovalDecisionRequest,
     ApprovalDecisionResponse,
+    CapabilitiesResponse,
+    CapabilityItem,
     ChatRequest,
     ConnectorListItem,
     ConnectorOperationResponse,
@@ -64,6 +67,7 @@ from agentic_odi_studio_api.studio.schemas import (
     CreateJobRequest,
     LatestConversationResponse,
     LlmHealthRequest,
+    LlmProxyRequest,
     McpHealthRequest,
     ModelListRequest,
     ObservationCreateRequest,
@@ -535,6 +539,120 @@ async def post_chat(request: Request, body: ChatRequest) -> StreamingResponse:
             request_id=request_id,
             approvals=request.app.state.approvals,
         ),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+@router.get("/capabilities", response_model=CapabilitiesResponse)
+def get_capabilities(request: Request) -> CapabilitiesResponse:
+    """Manifest of what this sidecar can provide to a browser BFF."""
+    connectors_available = True
+    try:
+        _connectors(request).list()
+    except Exception:  # noqa: BLE001
+        connectors_available = False
+
+    return CapabilitiesResponse(
+        capabilities=[
+            CapabilityItem(
+                id="local-data",
+                label="Local canvas data",
+                description="Jobs, steps, and outcomes stored in the browser.",
+                available=True,
+            ),
+            CapabilityItem(
+                id="local-memory",
+                label="Local memory and conversations",
+                description="Observations and conversation history stored locally.",
+                available=True,
+            ),
+            CapabilityItem(
+                id="deterministic-assistant",
+                label="Deterministic assistant",
+                description="Answers about the canvas without a model.",
+                available=True,
+            ),
+            CapabilityItem(
+                id="browser-model",
+                label="Browser built-in model",
+                description="Uses the browser's built-in model when present.",
+                available=False,
+            ),
+            CapabilityItem(
+                id="endpoint-model",
+                label="Configured model endpoint",
+                description="Calls the model endpoint configured in Settings.",
+                available=False,
+            ),
+            CapabilityItem(
+                id="sidecar-llm",
+                label="Sidecar model proxy",
+                description="Streams model responses through this sidecar.",
+                available=True,
+            ),
+            CapabilityItem(
+                id="sidecar-connectors",
+                label="Sidecar connectors",
+                description="Third-party data sources through the sidecar.",
+                available=connectors_available,
+            ),
+            CapabilityItem(
+                id="sidecar-mcp",
+                label="Sidecar MCP",
+                description="Runs MCP servers through the sidecar.",
+                available=_uses_mcp(request),
+            ),
+            CapabilityItem(
+                id="sidecar-import",
+                label="Sidecar import",
+                description="Imports canvas data and memory from this sidecar.",
+                available=True,
+            ),
+        ]
+    )
+
+
+@router.post("/llm/chat")
+async def proxy_llm_chat(body: LlmProxyRequest) -> StreamingResponse:
+    """Proxy a streaming model call so provider keys stay server-side."""
+    url = f"{body.base_url.rstrip('/')}/chat/completions"
+
+    async def event_stream():
+        headers = {
+            "Content-Type": "application/json",
+            "Accept": "text/event-stream",
+        }
+        if body.api_key:
+            headers["Authorization"] = f"Bearer {body.api_key}"
+        payload: dict[str, Any] = {
+            "model": body.model,
+            "messages": [message.model_dump() for message in body.messages],
+            "stream": body.stream,
+        }
+        if body.tools:
+            payload["tools"] = body.tools
+
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            try:
+                async with client.stream("POST", url, headers=headers, json=payload) as response:
+                    if response.status_code >= 400:
+                        text = (await response.aread()).decode("utf-8", "replace")
+                        yield (
+                            "event: error\n"
+                            + f"data: {json.dumps({'error': {'code': 'provider_error', 'message': text or f'HTTP {response.status_code}'}})}\n\n"
+                        )
+                        return
+                    async for chunk in response.aiter_bytes():
+                        yield chunk.decode("utf-8", "replace")
+            except Exception as exc:  # noqa: BLE001
+                yield (
+                    "event: error\n"
+                    + f"data: {json.dumps({'error': {'code': 'provider_error', 'message': str(exc)}})}\n\n"
+                )
+
+    return StreamingResponse(
+        event_stream(),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )

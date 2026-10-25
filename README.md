@@ -143,6 +143,12 @@ The Studio is better with an OpenAI-compatible LLM with tool-calling support
 with no model reachable it says so and every job, step, and outcome remains
 editable by hand.
 
+The hosted Studio also works without any Python sidecar: the browser keeps
+canvas data, memory, conversation history, and a deterministic assistant in
+IndexedDB (with an in-memory fallback). Enhanced features such as connectors,
+MCP, and the sidecar model proxy stay hidden until a local sidecar is reachable;
+Settings shows sidecar availability and hides connector controls when it is not.
+
 ### Connectors (MCP ↔ Living Studio)
 
 Register MCP or REST connectors that the copilot can discover and invoke.
