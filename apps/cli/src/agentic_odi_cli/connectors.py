@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING
 
 import typer
 
+from agentic_odi_cli import flags
 from agentic_odi_cli.backend import run_tool
 from agentic_odi_cli.render import render_saved
 
@@ -29,6 +30,17 @@ connectors_app = typer.Typer(
     help="Connect Agentic ODI to external systems.",
     no_args_is_help=True,
 )
+
+
+@connectors_app.callback()
+def connectors_callback() -> None:
+    if not flags.is_enabled("experimental_connectors"):
+        typer.echo(
+            "Error: Feature 'experimental_connectors' is disabled. "
+            "Enable it with 'agentic-odi settings flags set experimental_connectors true'.",
+            err=True,
+        )
+        raise typer.Exit(code=1)
 
 
 def build_connector(config: ConnectorConfig) -> Connector:

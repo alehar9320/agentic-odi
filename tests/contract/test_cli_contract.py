@@ -36,6 +36,7 @@ LOCAL_TOOLS = {
     "evaluate_outcome",
     "get_odi_framework_guidelines",
     "get_capabilities",
+    "get_capabilities_manifest",
 }
 
 

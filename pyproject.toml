@@ -29,6 +29,7 @@ dev = [
     "pytest-cov==7.1.0",
     "ruff==0.17.1",
     "pillow==12.3.0",
+    "inline-snapshot==0.36.1",
 ]
 
 [tool.bandit]
