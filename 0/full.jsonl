@@ -21,11 +21,11 @@
     },
     "cost": 0,
     "tokens": {
-      "input": 101398,
-      "output": 4181,
+      "input": 184519,
+      "output": 5484,
       "reasoning": 2859,
       "cache": {
-        "read": 221728,
+        "read": 240480,
         "write": 0
       }
     },
@@ -38,7 +38,7 @@
     ],
     "time": {
       "created": 1793040342091,
-      "updated": 1793040514378
+      "updated": 1793040559316
     }
   },
   "messages": [
@@ -1674,19 +1674,22 @@
         },
         "cost": 0,
         "tokens": {
-          "input": 0,
-          "output": 0,
+          "total": 33608,
+          "input": 33464,
+          "output": 144,
           "reasoning": 0,
           "cache": {
-            "read": 0,
-            "write": 0
+            "write": 0,
+            "read": 0
           }
         },
         "modelID": "poolside/laguna-s-2.1:free",
         "providerID": "kilo",
         "time": {
-          "created": 1793040514374
+          "created": 1793040514374,
+          "completed": 1793040536835
         },
+        "finish": "tool-calls",
         "id": "msg_1798afd46001Tp2yzVMv9FPVJ3",
         "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7"
       },
@@ -1703,21 +1706,214 @@
           "tool": "bash",
           "callID": "chatcmpl-tool-7aaf309844a34a7bb074766aed1dbdc0",
           "state": {
-            "metadata": {
-              "output": ""
-            },
-            "status": "running",
+            "status": "completed",
             "input": {
               "command": "git commit -m \"feat: add ApprovalRegistry for mutating tool-call approval gates\n\nIn-process registry that opens, tracks, and resolves approval requests\nduring a streaming chat turn. Each gate uses an apv_ prefixed id, resolves\nexactly once, and is auto-discarded after timeout or decision. Includes\n7 tests covering open/describe, resolve, expiry, double-answer guard,\nunknown-id error, cancel-all, and decision serialization.\"",
               "workdir": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit"
             },
+            "output": "[ui-not-looking-like-shit 1555c36c] feat: add ApprovalRegistry for mutating tool-call approval gates\n 3 files changed, 275 insertions(+)\n create mode 100644 apps/studio-api/src/agentic_odi_studio_api/studio/approvals.py\n create mode 100644 apps/studio-api/tests/test_studio_approvals.py\n",
+            "metadata": {
+              "output": "[ui-not-looking-like-shit 1555c36c] feat: add ApprovalRegistry for mutating tool-call approval gates\n 3 files changed, 275 insertions(+)\n create mode 100644 apps/studio-api/src/agentic_odi_studio_api/studio/approvals.py\n create mode 100644 apps/studio-api/tests/test_studio_approvals.py\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "git commit -m \"feat: add ApprovalRegistry for mutating tool-call approval gates\n\nIn-process registry that opens, tracks, and resolves approval requests\nduring a streaming chat turn. Each gate uses an apv_ prefixed id, resolves\nexactly once, and is auto-discarded after timeout or decision. Includes\n7 tests covering open/describe, resolve, expiry, double-answer guard,\nunknown-id error, cancel-all, and decision serialization.\"",
             "time": {
-              "start": 1793040525493
+              "start": 1793040525493,
+              "end": 1793040536702
             }
           },
           "id": "prt_1798b1f9e001J2kJHfuwDYO4P2",
           "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
           "messageID": "msg_1798afd46001Tp2yzVMv9FPVJ3"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "6e7d94fa653fd41dd20263e33734a016030f7dfa",
+          "type": "step-finish",
+          "tokens": {
+            "total": 33608,
+            "input": 33464,
+            "output": 144,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 0
+            }
+          },
+          "cost": 0,
+          "id": "prt_1798b54b2001y6FX9goGMRa4ET",
+          "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+          "messageID": "msg_1798afd46001Tp2yzVMv9FPVJ3"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_179885c6c001rEi5wF0kJyeeFk",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit",
+          "root": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 34681,
+          "input": 16784,
+          "output": 969,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 16928
+          }
+        },
+        "modelID": "poolside/laguna-s-2.1:free",
+        "providerID": "kilo",
+        "time": {
+          "created": 1793040536846,
+          "completed": 1793040559287
+        },
+        "finish": "tool-calls",
+        "id": "msg_1798b550e001eKaN3TQHM0zqGL",
+        "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7"
+      },
+      "parts": [
+        {
+          "snapshot": "6e7d94fa653fd41dd20263e33734a016030f7dfa",
+          "type": "step-start",
+          "id": "prt_1798b5bfb001D4jGOu05kgiFcB",
+          "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+          "messageID": "msg_1798b550e001eKaN3TQHM0zqGL"
+        },
+        {
+          "type": "text",
+          "text": "Now write the report:",
+          "time": {
+            "start": 1793040538626,
+            "end": 1793040559118
+          },
+          "id": "prt_1798b5c02001HblPJ1N0qs6CcL",
+          "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+          "messageID": "msg_1798b550e001eKaN3TQHM0zqGL"
+        },
+        {
+          "type": "tool",
+          "tool": "write",
+          "callID": "chatcmpl-tool-01d212a2d392494582f3c802c2fd91e4",
+          "state": {
+            "status": "completed",
+            "input": {
+              "content": "# Task 1 Report: Backend Approval Registry\n\n## Status: Complete\n\n## Commits\n- `1555c36c` — feat: add ApprovalRegistry for mutating tool-call approval gates\n\n  3 files changed, 275 insertions(+)\n  - `apps/studio-api/src/agentic_odi_studio_api/studio/approvals.py` (new)\n  - `apps/studio-api/tests/test_studio_approvals.py` (new)\n  - `apps/studio-api/src/agentic_odi_studio_api/studio/__init__.py` (modified)\n\n## What was built\n\n**ApprovalRegistry** — an in-process, thread-safe registry for tool-call approval gates:\n- `ApprovalRequest` (dataclass): describes a pending gate with `apv_`-prefixed id, tool call metadata, prompt text, and ISO timestamp.\n- `ApprovalDecision` (dataclass): `approved` bool + optional `reason` string.\n- `ApprovalNotFoundError`: raised when resolving or answering an unknown/already-resolved gate.\n- `ApprovalRegistry`: `open()`, `resolve()`, `discard()`, `cancel_all()`, and `pending` property.\n- `wait_for_decision()`: async helper that awaits a future with timeout, auto-discards the gate, and returns `None` on expiry.\n\n**Design decisions resolved during implementation:**\n1. **ID format**: `apv_<12 hex char uuid>` as specified.\n2. **open() signature**: Uses keyword-only arguments (matching the reference) — `open(*, tool_call_id, name, arguments, prompt) -> tuple[ApprovalRequest, asyncio.Future]`.\n3. **resolve() behavior**: Returns `None` (not `ApprovalRequest`), removes from pending, sets future result, raises `ApprovalNotFoundError` if not found/done. This matches the reference implementation and test expectations, not the brief's sketch signature.\n4. **Models**: Used dataclasses (not Pydantic BaseModel) to match the reference implementation exactly. The tests rely on `to_dict()` and `__dict__` serialization, which are natural with dataclasses.\n5. **wait_for_decision**: Module-level async function (not an instance method) per the reference.\n6. **cancel**: `cancel_all()` (not instance `cancel(id)`) per the reference.\n\n## Test Summary\n**7/7 passing** — all ported from `feat/studio-assistant-ui-experience` branch with exact test names:\n1. `test_open_describes_the_call_for_the_ui` ✓\n2. `test_resolve_answers_the_waiting_turn` ✓\n3. `test_an_expired_gate_returns_none_and_is_forgotten` ✓\n4. `test_a_gate_answers_only_once` ✓\n5. `test_an_unknown_gate_cannot_be_resolved` ✓\n6. `test_cancel_all_drops_every_pending_gate` ✓\n7. `test_the_decision_serializes_for_the_stream` ✓\n\n## Verification\n- `uv run pytest apps/studio-api/tests/test_studio_approvals.py -v` → 7 passed in 0.17s\n- `uv run ruff check` → All checks passed\n- `uv run ruff format --check` → 3 files already formatted\n- `uv run mypy` → Success: no issues found\n\n## Exports\n`ApprovalRegistry` and other public symbols are exported from `studio/__init__.py` via `__all__`.\n\n## Concerns\n- The task brief's interface sketch (`resolve -> ApprovalRequest`, `get(id)`, instance `wait_for_decision(id)`, `cancel(id)`) differs from the reference implementation that the tests actually exercise. I followed the reference implementation since the tests were ported exactly — this is the correct contract. If the brief's interface is the intended final API, the tests would need to be adapted accordingly.\n- The brief mentioned Pydantic models, but the reference uses dataclasses. The test `test_the_decision_serializes_for_the_stream` uses `decision.__dict__` directly, which works cleanly with dataclasses. If converted to Pydantic, `model_dump()` would be more idiomatic and `__dict__` behavior may differ across pydantic versions.\n",
+              "filePath": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/.superpowers/sdd/2025-10-26-studio-assistant-ui-max-integration/task-1-report.md"
+            },
+            "output": "Wrote file successfully.",
+            "metadata": {
+              "diagnostics": {},
+              "filepath": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/.superpowers/sdd/2025-10-26-studio-assistant-ui-max-integration/task-1-report.md",
+              "exists": false,
+              "truncated": false
+            },
+            "title": ".superpowers/sdd/2025-10-26-studio-assistant-ui-max-integration/task-1-report.md",
+            "time": {
+              "start": 1793040559107,
+              "end": 1793040559128
+            }
+          },
+          "id": "prt_1798b5c97001Yi3PnsVWgyXB5C",
+          "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+          "messageID": "msg_1798b550e001eKaN3TQHM0zqGL"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "6e7d94fa653fd41dd20263e33734a016030f7dfa",
+          "type": "step-finish",
+          "tokens": {
+            "total": 34681,
+            "input": 16784,
+            "output": 969,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 16928
+            }
+          },
+          "cost": 0,
+          "id": "prt_1798bac58001vt4L2Gqjj56ezz",
+          "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+          "messageID": "msg_1798b550e001eKaN3TQHM0zqGL"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_179885c6c001rEi5wF0kJyeeFk",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit",
+          "root": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 34887,
+          "input": 32873,
+          "output": 190,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 1824
+          }
+        },
+        "modelID": "poolside/laguna-s-2.1:free",
+        "providerID": "kilo",
+        "time": {
+          "created": 1793040559314,
+          "completed": 1793040566320
+        },
+        "finish": "stop",
+        "id": "msg_1798bacd2001txTlXNCA34fspa",
+        "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7"
+      },
+      "parts": [
+        {
+          "snapshot": "6e7d94fa653fd41dd20263e33734a016030f7dfa",
+          "type": "step-start",
+          "id": "prt_1798bb575001U95rSy14lc5ISz",
+          "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+          "messageID": "msg_1798bacd2001txTlXNCA34fspa"
+        },
+        {
+          "type": "text",
+          "text": "## Summary\n\n**Status**: Complete  \n**Commit**: `1555c36c`  \n**Tests**: 7/7 passing (lint + mypy + format clean)\n\nCreated the `ApprovalRegistry` infrastructure — an in-process, thread-safe registry for tool-call approval gates. Each gate uses `apv_`-prefixed IDs, resolves exactly once, auto-discards after timeout, and the `cancel_all()` path ensures no futures leak on shutdown.\n\n**Two deviations from the task brief's interface sketch** (documented in the report): the reference implementation and its tests use dataclasses (not Pydantic `BaseModel`), and `resolve()` returns `None` rather than `ApprovalRequest`, with `cancel_all()`/`wait_for_decision()` as module-level functions rather than instance methods `cancel(id)`/`wait_for_decision(id)`. I followed the reference since the tests were ported exactly.",
+          "time": {
+            "start": 1793040561531,
+            "end": 1793040566083
+          },
+          "id": "prt_1798bb57b001tI3pf2L5whrhHn",
+          "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+          "messageID": "msg_1798bacd2001txTlXNCA34fspa"
+        },
+        {
+          "reason": "stop",
+          "snapshot": "6e7d94fa653fd41dd20263e33734a016030f7dfa",
+          "type": "step-finish",
+          "tokens": {
+            "total": 34887,
+            "input": 32873,
+            "output": 190,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 1824
+            }
+          },
+          "cost": 0,
+          "id": "prt_1798bc7b60016F5v2R6oUTyDz2",
+          "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+          "messageID": "msg_1798bacd2001txTlXNCA34fspa"
         }
       ]
     }
