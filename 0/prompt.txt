@@ -1,0 +1,27 @@
+You are implementing Task 7: Frontend assistant module — conversion layer (convert.ts + convert.test.ts).
+
+## Task Description
+Read your task brief first: /home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/.superpowers/sdd/2025-10-26-studio-assistant-ui-max-integration/task-7-brief.md
+
+## Context
+Types.ts (Task 6) is committed and byte-identical to reference. `ChatMessage`, `ChatPart`, `ChatAttachment`, `ToolStatus`, `ToolApproval` types exist now. You are creating `apps/studio/src/assistant/convert.ts` with bidirectional conversion between `ChatMessage` (Studio model) and assistant-ui `ThreadMessage`, plus `apps/studio/src/assistant/convert.test.ts` (TDD: write the failing test first).
+
+Reference files (read via `git show feat/studio-assistant-ui-experience:<path>`):
+- apps/studio/src/assistant/convert.ts
+- apps/studio/src/assistant/convert.test.ts
+
+## Your Job
+1. Create `apps/studio/src/assistant/convert.ts` — port from reference (toThreadMessage + toChatMessage; maps reasoning/source/tool/approval/parts and attachments).
+2. Create `apps/studio/src/assistant/convert.test.ts` — port from reference (every part mapping both directions, unknown parts dropped, content preserved for history).
+3. Run `npm --prefix apps/studio test -- --run -- assistant/convert.test.ts` (Vitest) — expect PASS.
+4. Run `npm --prefix apps/studio run typecheck` — report errors (expected in thread.ts etc until Task 9+ converts callers; assistant/ itself must be clean).
+5. Commit.
+
+## Constraints
+- Vitest test runner; `--run` flag.
+- `npm --prefix apps/studio run lint` on the new files (ESLint).
+- Do NOT use subagents.
+- Report to: /home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/.superpowers/sdd/2025-10-26-studio-assistant-ui-max-integration/task-7-report.md
+
+## Report Format
+Write full report to the report file. Then return: Status, Commits, Test Summary (e.g. "convert.test 6/6 passing"), Typecheck notes, Concerns.
