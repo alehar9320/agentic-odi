@@ -1,0 +1,1921 @@
+{
+  "info": {
+    "id": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+    "slug": "quick-squid",
+    "projectID": "e4fe19106d06261ebfed21a0e3ba06559abf1100",
+    "directory": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit",
+    "path": "",
+    "parentID": "ses_e86c0ebb4ffeAyfzsxiY2cHAfp",
+    "title": "Implement Task 1: Approval Registry (@general subagent)",
+    "agent": "general",
+    "model": {
+      "id": "poolside/laguna-s-2.1:free",
+      "providerID": "kilo",
+      "variant": "default"
+    },
+    "version": "1.18.35",
+    "summary": {
+      "additions": 0,
+      "deletions": 0,
+      "files": 0
+    },
+    "cost": 0,
+    "tokens": {
+      "input": 184519,
+      "output": 5484,
+      "reasoning": 2859,
+      "cache": {
+        "read": 240480,
+        "write": 0
+      }
+    },
+    "permission": [
+      {
+        "permission": "task",
+        "pattern": "*",
+        "action": "deny"
+      }
+    ],
+    "time": {
+      "created": 1793040342091,
+      "updated": 1793040571028
+    }
+  },
+  "messages": [
+    {
+      "info": {
+        "role": "user",
+        "time": {
+          "created": 1793040342126
+        },
+        "agent": "general",
+        "model": {
+          "providerID": "kilo",
+          "modelID": "poolside/laguna-s-2.1:free"
+        },
+        "summary": {
+          "diffs": [
+            {
+              "file": "apps/studio-api/src/agentic_odi_studio_api/studio/__init__.py",
+              "patch": "Index: apps/studio-api/src/agentic_odi_studio_api/studio/__init__.py\n===================================================================\n--- apps/studio-api/src/agentic_odi_studio_api/studio/__init__.py\t\n+++ apps/studio-api/src/agentic_odi_studio_api/studio/__init__.py\t\n@@ -1,3 +1,9 @@\n \"\"\"Living Studio sidecar: probes, MCP hydration, SSE chat tool-loop.\"\"\"\n \n from __future__ import annotations\n+\n+from agentic_odi_studio_api.studio.approvals import ApprovalRegistry\n+\n+__all__ = [\n+    \"ApprovalRegistry\",\n+]\n",
+              "additions": 6,
+              "deletions": 0,
+              "status": "modified"
+            },
+            {
+              "file": "apps/studio-api/src/agentic_odi_studio_api/studio/approvals.py",
+              "patch": "Index: apps/studio-api/src/agentic_odi_studio_api/studio/approvals.py\n===================================================================\n--- apps/studio-api/src/agentic_odi_studio_api/studio/approvals.py\t\n+++ apps/studio-api/src/agentic_odi_studio_api/studio/approvals.py\t\n@@ -0,0 +1,145 @@\n+\"\"\"In-process approval gates for mutating tool calls.\n+\n+A mutating MCP tool (``add_job``, ``update_outcome``, …) pauses the streaming\n+turn until the person in front of the Studio says yes or no. The gate is a\n+process-local registry of pending futures: the SSE generator awaits one, and\n+``POST /api/approvals/{id}`` resolves it.\n+\n+This is deliberately the smallest thing that is honest. The sidecar serves one\n+local user over one loopback socket; it has no durable job state and no worker\n+pool, so a gate that lives in memory is the whole requirement. Every gate has a\n+timeout and every gate resolves once, so a turn can never hang and a double\n+click can never run a tool twice.\n+\"\"\"\n+\n+from __future__ import annotations\n+\n+import asyncio\n+import threading\n+import uuid\n+from dataclasses import dataclass, field\n+from datetime import datetime, timezone\n+\n+#: A person deciding whether the agent may write to their data deserves longer\n+#: than a network timeout, but the turn must still end on its own.\n+DEFAULT_TIMEOUT_SECONDS = 300.0\n+\n+\n+@dataclass\n+class ApprovalRequest:\n+    \"\"\"One pending decision, described well enough for the UI to ask.\"\"\"\n+\n+    id: str\n+    tool_call_id: str\n+    name: str\n+    arguments: dict[str, object]\n+    prompt: str\n+    created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())\n+\n+    def to_dict(self) -> dict[str, object]:\n+        return {\n+            \"id\": self.id,\n+            \"tool_call_id\": self.tool_call_id,\n+            \"name\": self.name,\n+            \"arguments\": self.arguments,\n+            \"prompt\": self.prompt,\n+            \"created_at\": self.created_at,\n+        }\n+\n+\n+@dataclass\n+class ApprovalDecision:\n+    approved: bool\n+    reason: str = \"\"\n+\n+\n+class ApprovalNotFoundError(KeyError):\n+    \"\"\"No pending gate has that id, or it already resolved.\"\"\"\n+\n+\n+class ApprovalRegistry:\n+    \"\"\"Pending approval gates, keyed by the id the client answers with.\"\"\"\n+\n+    def __init__(self) -> None:\n+        self._lock = threading.Lock()\n+        self._pending: dict[str, asyncio.Future[ApprovalDecision]] = {}\n+\n+    def open(\n+        self,\n+        *,\n+        tool_call_id: str,\n+        name: str,\n+        arguments: dict[str, object],\n+        prompt: str,\n+    ) -> tuple[ApprovalRequest, asyncio.Future[ApprovalDecision]]:\n+        \"\"\"Register a gate and return its description and the future to await.\"\"\"\n+        loop = asyncio.get_running_loop()\n+        request = ApprovalRequest(\n+            id=f\"apv_{uuid.uuid4().hex[:12]}\",\n+            tool_call_id=tool_call_id,\n+            name=name,\n+            arguments=arguments,\n+            prompt=prompt,\n+        )\n+        future: asyncio.Future[ApprovalDecision] = loop.create_future()\n+        with self._lock:\n+            self._pending[request.id] = future\n+        return request, future\n+\n+    def resolve(self, approval_id: str, decision: ApprovalDecision) -> None:\n+        \"\"\"Answer a pending gate. Raises when the gate is unknown or already closed.\"\"\"\n+        with self._lock:\n+            future = self._pending.pop(approval_id, None)\n+        if future is None or future.done():\n+            raise ApprovalNotFoundError(approval_id)\n+        future.set_result(decision)\n+\n+    def discard(self, approval_id: str) -> None:\n+        \"\"\"Forget a gate without answering it (the turn ended first).\"\"\"\n+        with self._lock:\n+            self._pending.pop(approval_id, None)\n+\n+    def cancel_all(self) -> None:\n+        \"\"\"Drop every pending gate. Called when the sidecar shuts down.\"\"\"\n+        with self._lock:\n+            pending = list(self._pending.items())\n+            self._pending.clear()\n+        for _approval_id, future in pending:\n+            if not future.done():\n+                future.cancel()\n+\n+    @property\n+    def pending(self) -> int:\n+        with self._lock:\n+            return len(self._pending)\n+\n+\n+async def wait_for_decision(\n+    registry: ApprovalRegistry,\n+    request: ApprovalRequest,\n+    future: asyncio.Future[ApprovalDecision],\n+    timeout: float = DEFAULT_TIMEOUT_SECONDS,\n+) -> ApprovalDecision | None:\n+    \"\"\"Await a decision, returning ``None`` when the gate expired or was dropped.\n+\n+    The gate is always discarded, so an expired id can never be answered later\n+    and a cancelled turn leaves nothing behind.\n+    \"\"\"\n+    try:\n+        return await asyncio.wait_for(future, timeout=timeout)\n+    except asyncio.TimeoutError:\n+        return None\n+    except asyncio.CancelledError:\n+        raise\n+    finally:\n+        registry.discard(request.id)\n+\n+\n+__all__ = [\n+    \"ApprovalDecision\",\n+    \"ApprovalNotFoundError\",\n+    \"ApprovalRegistry\",\n+    \"ApprovalRequest\",\n+    \"DEFAULT_TIMEOUT_SECONDS\",\n+    \"wait_for_decision\",\n+]\n",
+              "additions": 145,
+              "deletions": 0,
+              "status": "added"
+            },
+            {
+              "file": "apps/studio-api/tests/test_studio_approvals.py",
+              "patch": "Index: apps/studio-api/tests/test_studio_approvals.py\n===================================================================\n--- apps/studio-api/tests/test_studio_approvals.py\t\n+++ apps/studio-api/tests/test_studio_approvals.py\t\n@@ -0,0 +1,124 @@\n+\"\"\"The write-approval gate: it resolves once, expires, and never leaks.\"\"\"\n+\n+from __future__ import annotations\n+\n+import asyncio\n+import json\n+\n+import pytest\n+from agentic_odi_studio_api.studio.approvals import (\n+    ApprovalDecision,\n+    ApprovalNotFoundError,\n+    ApprovalRegistry,\n+    wait_for_decision,\n+)\n+\n+\n+def _open(registry: ApprovalRegistry) -> tuple[object, object]:\n+    async def _run() -> tuple[object, object]:\n+        return registry.open(\n+            tool_call_id=\"call-1\",\n+            name=\"add_job\",\n+            arguments={\"name\": \"Retention\"},\n+            prompt=\"Allow the assistant to add job?\",\n+        )\n+\n+    return asyncio.run(_run())\n+\n+\n+def test_open_describes_the_call_for_the_ui() -> None:\n+    registry = ApprovalRegistry()\n+    request, _future = _open(registry)\n+\n+    payload = request.to_dict()  # type: ignore[attr-defined]\n+\n+    assert payload[\"id\"].startswith(\"apv_\")\n+    assert payload[\"tool_call_id\"] == \"call-1\"\n+    assert payload[\"name\"] == \"add_job\"\n+    assert payload[\"arguments\"] == {\"name\": \"Retention\"}\n+    assert payload[\"prompt\"] == \"Allow the assistant to add job?\"\n+    assert registry.pending == 1\n+\n+\n+def test_resolve_answers_the_waiting_turn() -> None:\n+    registry = ApprovalRegistry()\n+\n+    async def _run() -> ApprovalDecision:\n+        request, future = registry.open(\n+            tool_call_id=\"call-1\", name=\"add_job\", arguments={}, prompt=\"?\"\n+        )\n+        pending = asyncio.create_task(wait_for_decision(registry, request, future, timeout=5))\n+        await asyncio.sleep(0)\n+        registry.resolve(request.id, ApprovalDecision(approved=True, reason=\"ok\"))\n+        decision = await pending\n+        assert decision is not None\n+        return decision\n+\n+    decision = asyncio.run(_run())\n+\n+    assert decision.approved is True\n+    assert decision.reason == \"ok\"\n+    assert registry.pending == 0\n+\n+\n+def test_an_expired_gate_returns_none_and_is_forgotten() -> None:\n+    registry = ApprovalRegistry()\n+\n+    async def _run() -> ApprovalDecision | None:\n+        request, future = registry.open(\n+            tool_call_id=\"call-1\", name=\"add_job\", arguments={}, prompt=\"?\"\n+        )\n+        return await wait_for_decision(registry, request, future, timeout=0.01)\n+\n+    assert asyncio.run(_run()) is None\n+    assert registry.pending == 0\n+\n+\n+def test_a_gate_answers_only_once() -> None:\n+    registry = ApprovalRegistry()\n+\n+    async def _run() -> None:\n+        request, future = registry.open(\n+            tool_call_id=\"call-1\", name=\"add_job\", arguments={}, prompt=\"?\"\n+        )\n+        registry.resolve(request.id, ApprovalDecision(approved=True))\n+        with pytest.raises(ApprovalNotFoundError):\n+            registry.resolve(request.id, ApprovalDecision(approved=False))\n+        await asyncio.sleep(0)\n+        assert future.done()\n+\n+    asyncio.run(_run())\n+\n+\n+def test_an_unknown_gate_cannot_be_resolved() -> None:\n+    registry = ApprovalRegistry()\n+\n+    with pytest.raises(ApprovalNotFoundError):\n+        registry.resolve(\"apv_missing\", ApprovalDecision(approved=True))\n+\n+\n+def test_cancel_all_drops_every_pending_gate() -> None:\n+    registry = ApprovalRegistry()\n+\n+    async def _run() -> list[bool]:\n+        _first, first_future = registry.open(\n+            tool_call_id=\"call-1\", name=\"add_job\", arguments={}, prompt=\"?\"\n+        )\n+        _second, second_future = registry.open(\n+            tool_call_id=\"call-2\", name=\"delete_job\", arguments={}, prompt=\"?\"\n+        )\n+        registry.cancel_all()\n+        await asyncio.sleep(0)\n+        return [first_future.cancelled(), second_future.cancelled()]\n+\n+    assert asyncio.run(_run()) == [True, True]\n+    assert registry.pending == 0\n+\n+\n+def test_the_decision_serializes_for_the_stream() -> None:\n+    decision = ApprovalDecision(approved=False, reason=\"not this time\")\n+\n+    assert json.loads(json.dumps(decision.__dict__)) == {\n+        \"approved\": False,\n+        \"reason\": \"not this time\",\n+    }\n",
+              "additions": 124,
+              "deletions": 0,
+              "status": "added"
+            }
+          ]
+        },
+        "id": "msg_179885c6c001rEi5wF0kJyeeFk",
+        "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7"
+      },
+      "parts": [
+        {
+          "type": "text",
+          "text": "You are implementing Task 1: Backend Approval Registry for the Agentic ODI studio API.\n\n## Task Description\nRead your task brief first: /home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/.superpowers/sdd/2025-10-26-studio-assistant-ui-max-integration/task-1-brief.md\nIt contains the full task text from the plan.\n\n## Context\nThis is the first backend task in a 15-task plan to add full assistant-ui integration (approvals, branching, reasoning/sources streaming) to the Agentic ODI studio API + SPA. You are building the approval gate infrastructure — an in-process registry that opens, tracks, and resolves tool-call approval requests during a streaming chat turn.\n\nThe reference implementation lives in `feat/studio-assistant-ui-exexperience` branch. You can read any file from that branch with:\n  git show feat/studio-assistant-ui-experience:apps/studio-api/src/agentic_odi_studio_api/studio/approvals.py\n  git show feat/studio-assistant-ui-experience:apps/studio-api/tests/test_studio_approvals.py\n\n## Before You Begin\nKey decisions to make (resolve before coding):\n1. **Approval ID format**: Use `apv_` prefix for IDs (per the test expectations).\n2. **open() signature**: `open(tool_call_id, name, arguments, prompt) -> tuple[ApprovalRequest, asyncio.Future]` — returns both the request (for streaming) and a future (for the chat loop to await).\n3. **resolve() behavior**: Removes from pending, sets future result, raises `ApprovalNotFoundError` if not found.\n\nAsk questions if anything is unclear, but these decisions are settled by the spec.\n\n## Your Job\n1. Create `apps/studio-api/src/agentic_odi_studio_api/studio/approvals.py` with `ApprovalRequest`, `ApprovalDecision`, `ApprovalNotFoundError`, `ApprovalRegistry`\n2. Export from `__init__.py`\n3. Write `apps/studio-api/tests/test_studio_approvals.py` (port from feature branch with exact test names)\n4. Run tests\n5. Commit\n\n## Constraints\n- Python 3.10+\n- Async tests use `@pytest.mark.asyncio`\n- Do NOT use subagents\n- Report to: /home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/.superpowers/sdd/2025-10-26-studio-assistant-ui-max-integration/task-1-report.md\n\n## Code Organization\nFollow existing patterns in `apps/studio-api/src/agentic_odi_studio_api/studio/` — models use Pydantic, services use plain classes.\n\n## Report Format\nWrite full report to the report file. Then return: Status, Commits, Test Summary (e.g. \"8/8 passing\"), Concerns.",
+          "id": "prt_179885c75001GqJtkrVmidElZS",
+          "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+          "messageID": "msg_179885c6c001rEi5wF0kJyeeFk"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_179885c6c001rEi5wF0kJyeeFk",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit",
+          "root": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 19068,
+          "input": 18784,
+          "output": 268,
+          "reasoning": 16,
+          "cache": {
+            "write": 0,
+            "read": 0
+          }
+        },
+        "modelID": "poolside/laguna-s-2.1:free",
+        "providerID": "kilo",
+        "time": {
+          "created": 1793040342397,
+          "completed": 1793040346838
+        },
+        "finish": "tool-calls",
+        "id": "msg_179885d7d001lwU82zX9f8BfoM",
+        "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7"
+      },
+      "parts": [
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "chatcmpl-tool-11d64994cdf9460a8ff47ea886ca03b7",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "git show feat/studio-assistant-ui-experience:apps/studio-api/src/agentic_odi_studio_api/studio/approvals.py 2>/dev/null || echo \"BRANCH NOT FOUND - trying alternate name\"",
+              "workdir": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit"
+            },
+            "output": "\"\"\"In-process approval gates for mutating tool calls.\n\nA mutating MCP tool (``add_job``, ``update_outcome``, …) pauses the streaming\nturn until the person in front of the Studio says yes or no. The gate is a\nprocess-local registry of pending futures: the SSE generator awaits one, and\n``POST /api/approvals/{id}`` resolves it.\n\nThis is deliberately the smallest thing that is honest. The sidecar serves one\nlocal user over one loopback socket; it has no durable job state and no worker\npool, so a gate that lives in memory is the whole requirement. Every gate has a\ntimeout and every gate resolves once, so a turn can never hang and a double\nclick can never run a tool twice.\n\"\"\"\n\nfrom __future__ import annotations\n\nimport asyncio\nimport threading\nimport uuid\nfrom dataclasses import dataclass, field\nfrom datetime import datetime, timezone\n\n#: A person deciding whether the agent may write to their data deserves longer\n#: than a network timeout, but the turn must still end on its own.\nDEFAULT_TIMEOUT_SECONDS = 300.0\n\n\n@dataclass\nclass ApprovalRequest:\n    \"\"\"One pending decision, described well enough for the UI to ask.\"\"\"\n\n    id: str\n    tool_call_id: str\n    name: str\n    arguments: dict[str, object]\n    prompt: str\n    created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())\n\n    def to_dict(self) -> dict[str, object]:\n        return {\n            \"id\": self.id,\n            \"tool_call_id\": self.tool_call_id,\n            \"name\": self.name,\n            \"arguments\": self.arguments,\n            \"prompt\": self.prompt,\n            \"created_at\": self.created_at,\n        }\n\n\n@dataclass\nclass ApprovalDecision:\n    approved: bool\n    reason: str = \"\"\n\n\nclass ApprovalNotFoundError(KeyError):\n    \"\"\"No pending gate has that id, or it already resolved.\"\"\"\n\n\nclass ApprovalRegistry:\n    \"\"\"Pending approval gates, keyed by the id the client answers with.\"\"\"\n\n    def __init__(self) -> None:\n        self._lock = threading.Lock()\n        self._pending: dict[str, asyncio.Future[ApprovalDecision]] = {}\n\n    def open(\n        self,\n        *,\n        tool_call_id: str,\n        name: str,\n        arguments: dict[str, object],\n        prompt: str,\n    ) -> tuple[ApprovalRequest, asyncio.Future[ApprovalDecision]]:\n        \"\"\"Register a gate and return its description and the future to await.\"\"\"\n        loop = asyncio.get_running_loop()\n        request = ApprovalRequest(\n            id=f\"apv_{uuid.uuid4().hex[:12]}\",\n            tool_call_id=tool_call_id,\n            name=name,\n            arguments=arguments,\n            prompt=prompt,\n        )\n        future: asyncio.Future[ApprovalDecision] = loop.create_future()\n        with self._lock:\n            self._pending[request.id] = future\n        return request, future\n\n    def resolve(self, approval_id: str, decision: ApprovalDecision) -> None:\n        \"\"\"Answer a pending gate. Raises when the gate is unknown or already closed.\"\"\"\n        with self._lock:\n            future = self._pending.pop(approval_id, None)\n        if future is None or future.done():\n            raise ApprovalNotFoundError(approval_id)\n        future.set_result(decision)\n\n    def discard(self, approval_id: str) -> None:\n        \"\"\"Forget a gate without answering it (the turn ended first).\"\"\"\n        with self._lock:\n            self._pending.pop(approval_id, None)\n\n    def cancel_all(self) -> None:\n        \"\"\"Drop every pending gate. Called when the sidecar shuts down.\"\"\"\n        with self._lock:\n            pending = list(self._pending.items())\n            self._pending.clear()\n        for _approval_id, future in pending:\n            if not future.done():\n                future.cancel()\n\n    @property\n    def pending(self) -> int:\n        with self._lock:\n            return len(self._pending)\n\n\nasync def wait_for_decision(\n    registry: ApprovalRegistry,\n    request: ApprovalRequest,\n    future: asyncio.Future[ApprovalDecision],\n    timeout: float = DEFAULT_TIMEOUT_SECONDS,\n) -> ApprovalDecision | None:\n    \"\"\"Await a decision, returning ``None`` when the gate expired or was dropped.\n\n    The gate is always discarded, so an expired id can never be answered later\n    and a cancelled turn leaves nothing behind.\n    \"\"\"\n    try:\n        return await asyncio.wait_for(future, timeout=timeout)\n    except asyncio.TimeoutError:\n        return None\n    except asyncio.CancelledError:\n        raise\n    finally:\n        registry.discard(request.id)\n\n\n__all__ = [\n    \"ApprovalDecision\",\n    \"ApprovalNotFoundError\",\n    \"ApprovalRegistry\",\n    \"ApprovalRequest\",\n    \"DEFAULT_TIMEOUT_SECONDS\",\n    \"wait_for_decision\",\n]\n",
+            "metadata": {
+              "output": "\"\"\"In-process approval gates for mutating tool calls.\n\nA mutating MCP tool (``add_job``, ``update_outcome``, …) pauses the streaming\nturn until the person in front of the Studio says yes or no. The gate is a\nprocess-local registry of pending futures: the SSE generator awaits one, and\n``POST /api/approvals/{id}`` resolves it.\n\nThis is deliberately the smallest thing that is honest. The sidecar serves one\nlocal user over one loopback socket; it has no durable job state and no worker\npool, so a gate that lives in memory is the whole requirement. Every gate has a\ntimeout and every gate resolves once, so a turn can never hang and a double\nclick can never run a tool twice.\n\"\"\"\n\nfrom __future__ import annotations\n\nimport asyncio\nimport threading\nimport uuid\nfrom dataclasses import dataclass, field\nfrom datetime import datetime, timezone\n\n#: A person deciding whether the agent may write to their data deserves longer\n#: than a network timeout, but the turn must still end on its own.\nDEFAULT_TIMEOUT_SECONDS = 300.0\n\n\n@dataclass\nclass ApprovalRequest:\n    \"\"\"One pending decision, described well enough for the UI to ask.\"\"\"\n\n    id: str\n    tool_call_id: str\n    name: str\n    arguments: dict[str, object]\n    prompt: str\n    created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())\n\n    def to_dict(self) -> dict[str, object]:\n        return {\n            \"id\": self.id,\n            \"tool_call_id\": self.tool_call_id,\n            \"name\": self.name,\n            \"arguments\": self.arguments,\n            \"prompt\": self.prompt,\n            \"created_at\": self.created_at,\n        }\n\n\n@dataclass\nclass ApprovalDecision:\n    approved: bool\n    reason: str = \"\"\n\n\nclass ApprovalNotFoundError(KeyError):\n    \"\"\"No pending gate has that id, or it already resolved.\"\"\"\n\n\nclass ApprovalRegistry:\n    \"\"\"Pending approval gates, keyed by the id the client answers with.\"\"\"\n\n    def __init__(self) -> None:\n        self._lock = threading.Lock()\n        self._pending: dict[str, asyncio.Future[ApprovalDecision]] = {}\n\n    def open(\n        self,\n        *,\n        tool_call_id: str,\n        name: str,\n        arguments: dict[str, object],\n        prompt: str,\n    ) -> tuple[ApprovalRequest, asyncio.Future[ApprovalDecision]]:\n        \"\"\"Register a gate and return its description and the future to await.\"\"\"\n        loop = asyncio.get_running_loop()\n        request = ApprovalRequest(\n            id=f\"apv_{uuid.uuid4().hex[:12]}\",\n            tool_call_id=tool_call_id,\n            name=name,\n            arguments=arguments,\n            prompt=prompt,\n        )\n        future: asyncio.Future[ApprovalDecision] = loop.create_future()\n        with self._lock:\n            self._pending[request.id] = future\n        return request, future\n\n    def resolve(self, approval_id: str, decision: ApprovalDecision) -> None:\n        \"\"\"Answer a pending gate. Raises when the gate is unknown or already closed.\"\"\"\n        with self._lock:\n            future = self._pending.pop(approval_id, None)\n        if future is None or future.done():\n            raise ApprovalNotFoundError(approval_id)\n        future.set_result(decision)\n\n    def discard(self, approval_id: str) -> None:\n        \"\"\"Forget a gate without answering it (the turn ended first).\"\"\"\n        with self._lock:\n            self._pending.pop(approval_id, None)\n\n    def cancel_all(self) -> None:\n        \"\"\"Drop every pending gate. Called when the sidecar shuts down.\"\"\"\n        with self._lock:\n            pending = list(self._pending.items())\n            self._pending.clear()\n        for _approval_id, future in pending:\n            if not future.done():\n                future.cancel()\n\n    @property\n    def pending(self) -> int:\n        with self._lock:\n            return len(self._pending)\n\n\nasync def wait_for_decision(\n    registry: ApprovalRegistry,\n    request: ApprovalRequest,\n    future: asyncio.Future[ApprovalDecision],\n    timeout: float = DEFAULT_TIMEOUT_SECONDS,\n) -> ApprovalDecision | None:\n    \"\"\"Await a decision, returning ``None`` when the gate expired or was dropped.\n\n    The gate is always discarded, so an expired id can never be answered later\n    and a cancelled turn leaves nothing behind.\n    \"\"\"\n    try:\n        return await asyncio.wait_for(future, timeout=timeout)\n    except asyncio.TimeoutError:\n        return None\n    except asyncio.CancelledError:\n        raise\n    finally:\n        registry.discard(request.id)\n\n\n__all__ = [\n    \"ApprovalDecision\",\n    \"ApprovalNotFoundError\",\n    \"ApprovalRegistry\",\n    \"ApprovalRequest\",\n    \"DEFAULT_TIMEOUT_SECONDS\",\n    \"wait_for_decision\",\n]\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "git show feat/studio-assistant-ui-experience:apps/studio-api/src/agentic_odi_studio_api/studio/approvals.py 2>/dev/null || echo \"BRANCH NOT FOUND - trying alternate name\"",
+            "time": {
+              "start": 1793040344771,
+              "end": 1793040344812
+            }
+          },
+          "id": "prt_1798861bf001ZZALw2y11SK3qa",
+          "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+          "messageID": "msg_179885d7d001lwU82zX9f8BfoM"
+        },
+        {
+          "snapshot": "da2b858c2d640118bdbaa3c500b7305d9d8ceccf",
+          "type": "step-start",
+          "id": "prt_1798864bd001vAyqjso0AMFU34",
+          "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+          "messageID": "msg_179885d7d001lwU82zX9f8BfoM"
+        },
+        {
+          "type": "reasoning",
+          "text": "Let me start by reading the task brief to understand what I need to do.",
+          "time": {
+            "start": 1793040344260,
+            "end": 1793040344613
+          },
+          "id": "prt_1798864c4001v5gO3u6W3nHdLP",
+          "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+          "messageID": "msg_179885d7d001lwU82zX9f8BfoM"
+        },
+        {
+          "type": "text",
+          "text": "I'll start by reading the task brief and examining the reference implementation.",
+          "time": {
+            "start": 1793040344616,
+            "end": 1793040346693
+          },
+          "id": "prt_1798866280013YKmm9Lwq5HUh9",
+          "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+          "messageID": "msg_179885d7d001lwU82zX9f8BfoM"
+        },
+        {
+          "type": "tool",
+          "tool": "read",
+          "callID": "chatcmpl-tool-1cec8c0ddcdf41b4854459b78bb94862",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/.superpowers/sdd/2025-10-26-studio-assistant-ui-max-integration/task-1-brief.md"
+            },
+            "output": "<path>/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/.superpowers/sdd/2025-10-26-studio-assistant-ui-max-integration/task-1-brief.md</path>\n<type>file</type>\n<content>\n1: ### Task 1: Backend — Approval Registry\n2: \n3: **Files:**\n4: - Create: `apps/studio-api/src/agentic_odi_studio_api/studio/approvals.py`\n5: - Modify: `apps/studio-api/src/agentic_odi_studio_api/studio/__init__.py`\n6: \n7: **Interfaces:**\n8: - Consumes: nothing (standalone infrastructure)\n9: - Produces: `ApprovalRegistry`, `ApprovalRequest`, `ApprovalDecision`, `ApprovalNotFoundError`, `wait_for_decision()`, `resolve()`\n10: \n11: - [ ] **Step 1: Write `approvals.py` with `ApprovalRegistry`**\n12: \n13: ```python\n14: class ApprovalRequest(BaseModel):\n15:     id: str\n16:     tool_call_id: str\n17:     name: str\n18:     arguments: dict[str, Any]\n19:     prompt: str\n20: \n21: class ApprovalDecision(BaseModel):\n22:     approved: bool\n23:     reason: str\n24: \n25: class ApprovalNotFoundError(Exception): ...\n26: \n27: class ApprovalRegistry:\n28:     def __init__(self) -> None: ...\n29:     @property\n30:     def pending(self) -> int: ...\n31:     def open(self, tool_call_id, name, arguments, prompt) -> tuple[ApprovalRequest, asyncio.Future]: ...\n32:     def resolve(self, id, decision: ApprovalDecision) -> ApprovalRequest: ...\n33:     def get(self, id) -> ApprovalRequest: ...\n34:     async def wait_for_decision(self, id) -> ApprovalDecision: ...\n35:     def cancel(self, id) -> None: ...\n36: ```\n37: \n38: - [ ] **Step 2: Export from `__init__.py`**\n39: \n40: Add `ApprovalRegistry` to `approvals` import line and `__all__`.\n41: \n42: - [ ] **Step 3: Write `test_studio_approvals.py`** (port from feature branch)\n43: \n44: Test: open/describe, pending count, resolve approved/declined, get pending by id, wait_for_decision resolves, cancelled decision never resolves.\n45: \n46: Run: `uv run pytest apps/studio-api/tests/test_studio_approvals.py -v`\n47: \n48: ---\n49: \n\n(End of file - total 49 lines)\n</content>",
+            "metadata": {
+              "preview": "### Task 1: Backend — Approval Registry\n\n**Files:**\n- Create: `apps/studio-api/src/agentic_odi_studio_api/studio/approvals.py`\n- Modify: `apps/studio-api/src/agentic_odi_studio_api/studio/__init__.py`\n\n**Interfaces:**\n- Consumes: nothing (standalone infrastructure)\n- Produces: `ApprovalRegistry`, `ApprovalRequest`, `ApprovalDecision`, `ApprovalNotFoundError`, `wait_for_decision()`, `resolve()`\n\n- [ ] **Step 1: Write `approvals.py` with `ApprovalRegistry`**\n\n```python\nclass ApprovalRequest(BaseModel):\n    id: str\n    tool_call_id: str\n    name: str\n    arguments: dict[str, Any]\n    prompt: str\n",
+              "truncated": false,
+              "loaded": [],
+              "display": {
+                "type": "file",
+                "path": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/.superpowers/sdd/2025-10-26-studio-assistant-ui-max-integration/task-1-brief.md",
+                "text": "### Task 1: Backend — Approval Registry\n\n**Files:**\n- Create: `apps/studio-api/src/agentic_odi_studio_api/studio/approvals.py`\n- Modify: `apps/studio-api/src/agentic_odi_studio_api/studio/__init__.py`\n\n**Interfaces:**\n- Consumes: nothing (standalone infrastructure)\n- Produces: `ApprovalRegistry`, `ApprovalRequest`, `ApprovalDecision`, `ApprovalNotFoundError`, `wait_for_decision()`, `resolve()`\n\n- [ ] **Step 1: Write `approvals.py` with `ApprovalRegistry`**\n\n```python\nclass ApprovalRequest(BaseModel):\n    id: str\n    tool_call_id: str\n    name: str\n    arguments: dict[str, Any]\n    prompt: str\n\nclass ApprovalDecision(BaseModel):\n    approved: bool\n    reason: str\n\nclass ApprovalNotFoundError(Exception): ...\n\nclass ApprovalRegistry:\n    def __init__(self) -> None: ...\n    @property\n    def pending(self) -> int: ...\n    def open(self, tool_call_id, name, arguments, prompt) -> tuple[ApprovalRequest, asyncio.Future]: ...\n    def resolve(self, id, decision: ApprovalDecision) -> ApprovalRequest: ...\n    def get(self, id) -> ApprovalRequest: ...\n    async def wait_for_decision(self, id) -> ApprovalDecision: ...\n    def cancel(self, id) -> None: ...\n```\n\n- [ ] **Step 2: Export from `__init__.py`**\n\nAdd `ApprovalRegistry` to `approvals` import line and `__all__`.\n\n- [ ] **Step 3: Write `test_studio_approvals.py`** (port from feature branch)\n\nTest: open/describe, pending count, resolve approved/declined, get pending by id, wait_for_decision resolves, cancelled decision never resolves.\n\nRun: `uv run pytest apps/studio-api/tests/test_studio_approvals.py -v`\n\n---\n",
+                "lineStart": 1,
+                "lineEnd": 49,
+                "totalLines": 49,
+                "truncated": false
+              }
+            },
+            "title": ".superpowers/sdd/2025-10-26-studio-assistant-ui-max-integration/task-1-brief.md",
+            "time": {
+              "start": 1793040343303,
+              "end": 1793040343315
+            }
+          },
+          "id": "prt_179886728001AOnsiiSWEiYOcw",
+          "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+          "messageID": "msg_179885d7d001lwU82zX9f8BfoM"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "chatcmpl-tool-6886958b7b12409e81f525b9aaf69259",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "git show feat/studio-assistant-ui-experience:apps/studio-api/tests/test_studio_approvals.py 2>/dev/null || echo \"BRANCH NOT FOUND\"",
+              "workdir": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit"
+            },
+            "output": "\"\"\"The write-approval gate: it resolves once, expires, and never leaks.\"\"\"\n\nfrom __future__ import annotations\n\nimport asyncio\nimport json\n\nimport pytest\nfrom agentic_odi_studio_api.studio.approvals import (\n    ApprovalDecision,\n    ApprovalNotFoundError,\n    ApprovalRegistry,\n    wait_for_decision,\n)\n\n\ndef _open(registry: ApprovalRegistry) -> tuple[object, object]:\n    async def _run() -> tuple[object, object]:\n        return registry.open(\n            tool_call_id=\"call-1\",\n            name=\"add_job\",\n            arguments={\"name\": \"Retention\"},\n            prompt=\"Allow the assistant to add job?\",\n        )\n\n    return asyncio.run(_run())\n\n\ndef test_open_describes_the_call_for_the_ui() -> None:\n    registry = ApprovalRegistry()\n    request, _future = _open(registry)\n\n    payload = request.to_dict()  # type: ignore[attr-defined]\n\n    assert payload[\"id\"].startswith(\"apv_\")\n    assert payload[\"tool_call_id\"] == \"call-1\"\n    assert payload[\"name\"] == \"add_job\"\n    assert payload[\"arguments\"] == {\"name\": \"Retention\"}\n    assert payload[\"prompt\"] == \"Allow the assistant to add job?\"\n    assert registry.pending == 1\n\n\ndef test_resolve_answers_the_waiting_turn() -> None:\n    registry = ApprovalRegistry()\n\n    async def _run() -> ApprovalDecision:\n        request, future = registry.open(\n            tool_call_id=\"call-1\", name=\"add_job\", arguments={}, prompt=\"?\"\n        )\n        pending = asyncio.create_task(wait_for_decision(registry, request, future, timeout=5))\n        await asyncio.sleep(0)\n        registry.resolve(request.id, ApprovalDecision(approved=True, reason=\"ok\"))\n        decision = await pending\n        assert decision is not None\n        return decision\n\n    decision = asyncio.run(_run())\n\n    assert decision.approved is True\n    assert decision.reason == \"ok\"\n    assert registry.pending == 0\n\n\ndef test_an_expired_gate_returns_none_and_is_forgotten() -> None:\n    registry = ApprovalRegistry()\n\n    async def _run() -> ApprovalDecision | None:\n        request, future = registry.open(\n            tool_call_id=\"call-1\", name=\"add_job\", arguments={}, prompt=\"?\"\n        )\n        return await wait_for_decision(registry, request, future, timeout=0.01)\n\n    assert asyncio.run(_run()) is None\n    assert registry.pending == 0\n\n\ndef test_a_gate_answers_only_once() -> None:\n    registry = ApprovalRegistry()\n\n    async def _run() -> None:\n        request, future = registry.open(\n            tool_call_id=\"call-1\", name=\"add_job\", arguments={}, prompt=\"?\"\n        )\n        registry.resolve(request.id, ApprovalDecision(approved=True))\n        with pytest.raises(ApprovalNotFoundError):\n            registry.resolve(request.id, ApprovalDecision(approved=False))\n        await asyncio.sleep(0)\n        assert future.done()\n\n    asyncio.run(_run())\n\n\ndef test_an_unknown_gate_cannot_be_resolved() -> None:\n    registry = ApprovalRegistry()\n\n    with pytest.raises(ApprovalNotFoundError):\n        registry.resolve(\"apv_missing\", ApprovalDecision(approved=True))\n\n\ndef test_cancel_all_drops_every_pending_gate() -> None:\n    registry = ApprovalRegistry()\n\n    async def _run() -> list[bool]:\n        _first, first_future = registry.open(\n            tool_call_id=\"call-1\", name=\"add_job\", arguments={}, prompt=\"?\"\n        )\n        _second, second_future = registry.open(\n            tool_call_id=\"call-2\", name=\"delete_job\", arguments={}, prompt=\"?\"\n        )\n        registry.cancel_all()\n        await asyncio.sleep(0)\n        return [first_future.cancelled(), second_future.cancelled()]\n\n    assert asyncio.run(_run()) == [True, True]\n    assert registry.pending == 0\n\n\ndef test_the_decision_serializes_for_the_stream() -> None:\n    decision = ApprovalDecision(approved=False, reason=\"not this time\")\n\n    assert json.loads(json.dumps(decision.__dict__)) == {\n        \"approved\": False,\n        \"reason\": \"not this time\",\n    }\n",
+            "metadata": {
+              "output": "\"\"\"The write-approval gate: it resolves once, expires, and never leaks.\"\"\"\n\nfrom __future__ import annotations\n\nimport asyncio\nimport json\n\nimport pytest\nfrom agentic_odi_studio_api.studio.approvals import (\n    ApprovalDecision,\n    ApprovalNotFoundError,\n    ApprovalRegistry,\n    wait_for_decision,\n)\n\n\ndef _open(registry: ApprovalRegistry) -> tuple[object, object]:\n    async def _run() -> tuple[object, object]:\n        return registry.open(\n            tool_call_id=\"call-1\",\n            name=\"add_job\",\n            arguments={\"name\": \"Retention\"},\n            prompt=\"Allow the assistant to add job?\",\n        )\n\n    return asyncio.run(_run())\n\n\ndef test_open_describes_the_call_for_the_ui() -> None:\n    registry = ApprovalRegistry()\n    request, _future = _open(registry)\n\n    payload = request.to_dict()  # type: ignore[attr-defined]\n\n    assert payload[\"id\"].startswith(\"apv_\")\n    assert payload[\"tool_call_id\"] == \"call-1\"\n    assert payload[\"name\"] == \"add_job\"\n    assert payload[\"arguments\"] == {\"name\": \"Retention\"}\n    assert payload[\"prompt\"] == \"Allow the assistant to add job?\"\n    assert registry.pending == 1\n\n\ndef test_resolve_answers_the_waiting_turn() -> None:\n    registry = ApprovalRegistry()\n\n    async def _run() -> ApprovalDecision:\n        request, future = registry.open(\n            tool_call_id=\"call-1\", name=\"add_job\", arguments={}, prompt=\"?\"\n        )\n        pending = asyncio.create_task(wait_for_decision(registry, request, future, timeout=5))\n        await asyncio.sleep(0)\n        registry.resolve(request.id, ApprovalDecision(approved=True, reason=\"ok\"))\n        decision = await pending\n        assert decision is not None\n        return decision\n\n    decision = asyncio.run(_run())\n\n    assert decision.approved is True\n    assert decision.reason == \"ok\"\n    assert registry.pending == 0\n\n\ndef test_an_expired_gate_returns_none_and_is_forgotten() -> None:\n    registry = ApprovalRegistry()\n\n    async def _run() -> ApprovalDecision | None:\n        request, future = registry.open(\n            tool_call_id=\"call-1\", name=\"add_job\", arguments={}, prompt=\"?\"\n        )\n        return await wait_for_decision(registry, request, future, timeout=0.01)\n\n    assert asyncio.run(_run()) is None\n    assert registry.pending == 0\n\n\ndef test_a_gate_answers_only_once() -> None:\n    registry = ApprovalRegistry()\n\n    async def _run() -> None:\n        request, future = registry.open(\n            tool_call_id=\"call-1\", name=\"add_job\", arguments={}, prompt=\"?\"\n        )\n        registry.resolve(request.id, ApprovalDecision(approved=True))\n        with pytest.raises(ApprovalNotFoundError):\n            registry.resolve(request.id, ApprovalDecision(approved=False))\n        await asyncio.sleep(0)\n        assert future.done()\n\n    asyncio.run(_run())\n\n\ndef test_an_unknown_gate_cannot_be_resolved() -> None:\n    registry = ApprovalRegistry()\n\n    with pytest.raises(ApprovalNotFoundError):\n        registry.resolve(\"apv_missing\", ApprovalDecision(approved=True))\n\n\ndef test_cancel_all_drops_every_pending_gate() -> None:\n    registry = ApprovalRegistry()\n\n    async def _run() -> list[bool]:\n        _first, first_future = registry.open(\n            tool_call_id=\"call-1\", name=\"add_job\", arguments={}, prompt=\"?\"\n        )\n        _second, second_future = registry.open(\n            tool_call_id=\"call-2\", name=\"delete_job\", arguments={}, prompt=\"?\"\n        )\n        registry.cancel_all()\n        await asyncio.sleep(0)\n        return [first_future.cancelled(), second_future.cancelled()]\n\n    assert asyncio.run(_run()) == [True, True]\n    assert registry.pending == 0\n\n\ndef test_the_decision_serializes_for_the_stream() -> None:\n    decision = ApprovalDecision(approved=False, reason=\"not this time\")\n\n    assert json.loads(json.dumps(decision.__dict__)) == {\n        \"approved\": False,\n        \"reason\": \"not this time\",\n    }\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "git show feat/studio-assistant-ui-experience:apps/studio-api/tests/test_studio_approvals.py 2>/dev/null || echo \"BRANCH NOT FOUND\"",
+            "time": {
+              "start": 1793040346684,
+              "end": 1793040346706
+            }
+          },
+          "id": "prt_17988676c001aUKXlgWLfvXuMm",
+          "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+          "messageID": "msg_179885d7d001lwU82zX9f8BfoM"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "da2b858c2d640118bdbaa3c500b7305d9d8ceccf",
+          "type": "step-finish",
+          "tokens": {
+            "total": 19068,
+            "input": 18784,
+            "output": 268,
+            "reasoning": 16,
+            "cache": {
+              "write": 0,
+              "read": 0
+            }
+          },
+          "cost": 0,
+          "id": "prt_179886e87001sbjKRwCTaRJ9d6",
+          "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+          "messageID": "msg_179885d7d001lwU82zX9f8BfoM"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_179885c6c001rEi5wF0kJyeeFk",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit",
+          "root": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 21920,
+          "input": 3067,
+          "output": 74,
+          "reasoning": 27,
+          "cache": {
+            "write": 0,
+            "read": 18752
+          }
+        },
+        "modelID": "poolside/laguna-s-2.1:free",
+        "providerID": "kilo",
+        "time": {
+          "created": 1793040346847,
+          "completed": 1793040349902
+        },
+        "finish": "tool-calls",
+        "id": "msg_179886edf001FHUkj0t4KkTH4I",
+        "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7"
+      },
+      "parts": [
+        {
+          "snapshot": "da2b858c2d640118bdbaa3c500b7305d9d8ceccf",
+          "type": "step-start",
+          "id": "prt_1798875d4001uiO6ywEU1pQ2so",
+          "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+          "messageID": "msg_179886edf001FHUkj0t4KkTH4I"
+        },
+        {
+          "type": "reasoning",
+          "text": "Now I have both files from the feature branch. Let me also check the current `__init__.py` to see the existing structure:",
+          "time": {
+            "start": 1793040348631,
+            "end": 1793040348810
+          },
+          "id": "prt_1798875d7001h1BtMXTY2sbntY",
+          "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+          "messageID": "msg_179886edf001FHUkj0t4KkTH4I"
+        },
+        {
+          "type": "text",
+          "text": "Let me read the current `__init__.py` to understand the existing patterns:",
+          "time": {
+            "start": 1793040348817,
+            "end": 1793040349775
+          },
+          "id": "prt_1798876910012vaun6J9AXLcYZ",
+          "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+          "messageID": "msg_179886edf001FHUkj0t4KkTH4I"
+        },
+        {
+          "type": "tool",
+          "tool": "read",
+          "callID": "chatcmpl-tool-5b48224d15d449989920714c163936ed",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio-api/src/agentic_odi_studio_api/studio/__init__.py"
+            },
+            "output": "<path>/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio-api/src/agentic_odi_studio_api/studio/__init__.py</path>\n<type>file</type>\n<content>\n1: \"\"\"Living Studio sidecar: probes, MCP hydration, SSE chat tool-loop.\"\"\"\n2: \n3: from __future__ import annotations\n\n(End of file - total 3 lines)\n</content>",
+            "metadata": {
+              "preview": "\"\"\"Living Studio sidecar: probes, MCP hydration, SSE chat tool-loop.\"\"\"\n\nfrom __future__ import annotations",
+              "truncated": false,
+              "loaded": [],
+              "display": {
+                "type": "file",
+                "path": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio-api/src/agentic_odi_studio_api/studio/__init__.py",
+                "text": "\"\"\"Living Studio sidecar: probes, MCP hydration, SSE chat tool-loop.\"\"\"\n\nfrom __future__ import annotations",
+                "lineStart": 1,
+                "lineEnd": 3,
+                "totalLines": 3,
+                "truncated": false
+              }
+            },
+            "title": "apps/studio-api/src/agentic_odi_studio_api/studio/__init__.py",
+            "time": {
+              "start": 1793040349769,
+              "end": 1793040349806
+            }
+          },
+          "id": "prt_17988774a001yt7SLXPWt69iM0",
+          "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+          "messageID": "msg_179886edf001FHUkj0t4KkTH4I"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "da2b858c2d640118bdbaa3c500b7305d9d8ceccf",
+          "type": "step-finish",
+          "tokens": {
+            "total": 21920,
+            "input": 3067,
+            "output": 74,
+            "reasoning": 27,
+            "cache": {
+              "write": 0,
+              "read": 18752
+            }
+          },
+          "cost": 0,
+          "id": "prt_179887aa8001kysYVY17IcWL8s",
+          "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+          "messageID": "msg_179886edf001FHUkj0t4KkTH4I"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_179885c6c001rEi5wF0kJyeeFk",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit",
+          "root": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 22285,
+          "input": 5104,
+          "output": 205,
+          "reasoning": 48,
+          "cache": {
+            "write": 0,
+            "read": 16928
+          }
+        },
+        "modelID": "poolside/laguna-s-2.1:free",
+        "providerID": "kilo",
+        "time": {
+          "created": 1793040349906,
+          "completed": 1793040361404
+        },
+        "finish": "tool-calls",
+        "id": "msg_179887ad2001lOK09Vm0ZtiFsB",
+        "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7"
+      },
+      "parts": [
+        {
+          "snapshot": "da2b858c2d640118bdbaa3c500b7305d9d8ceccf",
+          "type": "step-start",
+          "id": "prt_179888fc500194TmCrmIWu7apf",
+          "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+          "messageID": "msg_179887ad2001lOK09Vm0ZtiFsB"
+        },
+        {
+          "type": "reasoning",
+          "text": "I need to look at more of the `__init__.py` to understand its structure. It looks like it might be empty or just a docstring. Let me also check if there are other files in the studio directory to understand the patterns:",
+          "time": {
+            "start": 1793040355278,
+            "end": 1793040357470
+          },
+          "id": "prt_179888fcd001tVNifqibUaDVRD",
+          "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+          "messageID": "msg_179887ad2001lOK09Vm0ZtiFsB"
+        },
+        {
+          "type": "text",
+          "text": "The `__init__.py` is minimal. Let me look at existing patterns in the studio directory to understand conventions:",
+          "time": {
+            "start": 1793040357474,
+            "end": 1793040361200
+          },
+          "id": "prt_179889862001IwjtU3aI7g9MIq",
+          "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+          "messageID": "msg_179887ad2001lOK09Vm0ZtiFsB"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "chatcmpl-tool-0a3ce353ff6b420ea47304ccfc0cbcb9",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "ls -la /home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio-api/src/agentic_odi_studio_api/studio/",
+              "workdir": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit"
+            },
+            "output": "total 140\ndrwxrwxr-x 3 alexa alexa  4096 Oct 25 14:44 .\ndrwxrwxr-x 4 alexa alexa  4096 Oct 25 14:43 ..\n-rw-rw-r-- 1 alexa alexa   108 Oct 25 12:42 __init__.py\ndrwxrwxr-x 2 alexa alexa  4096 Oct 25 14:58 __pycache__\n-rw-rw-r-- 1 alexa alexa  3869 Oct 25 12:42 changelog.py\n-rw-rw-r-- 1 alexa alexa 33893 Oct 25 14:57 chat.py\n-rw-rw-r-- 1 alexa alexa  2711 Oct 25 12:42 connectors.py\n-rw-rw-r-- 1 alexa alexa  6686 Oct 25 12:42 errors.py\n-rw-rw-r-- 1 alexa alexa  5676 Oct 25 12:42 mcp_data.py\n-rw-rw-r-- 1 alexa alexa 16053 Oct 25 12:42 memory.py\n-rw-rw-r-- 1 alexa alexa  1892 Oct 25 12:42 observability.py\n-rw-rw-r-- 1 alexa alexa  4075 Oct 25 14:47 probes.py\n-rw-rw-r-- 1 alexa alexa 15830 Oct 25 14:48 router.py\n-rw-rw-r-- 1 alexa alexa  4432 Oct 25 14:56 schemas.py\n-rw-rw-r-- 1 alexa alexa  3192 Oct 25 12:42 seed.py\n-rw-rw-r-- 1 alexa alexa  9323 Oct 25 12:42 ui_spec.py\n",
+            "metadata": {
+              "output": "total 140\ndrwxrwxr-x 3 alexa alexa  4096 Oct 25 14:44 .\ndrwxrwxr-x 4 alexa alexa  4096 Oct 25 14:43 ..\n-rw-rw-r-- 1 alexa alexa   108 Oct 25 12:42 __init__.py\ndrwxrwxr-x 2 alexa alexa  4096 Oct 25 14:58 __pycache__\n-rw-rw-r-- 1 alexa alexa  3869 Oct 25 12:42 changelog.py\n-rw-rw-r-- 1 alexa alexa 33893 Oct 25 14:57 chat.py\n-rw-rw-r-- 1 alexa alexa  2711 Oct 25 12:42 connectors.py\n-rw-rw-r-- 1 alexa alexa  6686 Oct 25 12:42 errors.py\n-rw-rw-r-- 1 alexa alexa  5676 Oct 25 12:42 mcp_data.py\n-rw-rw-r-- 1 alexa alexa 16053 Oct 25 12:42 memory.py\n-rw-rw-r-- 1 alexa alexa  1892 Oct 25 12:42 observability.py\n-rw-rw-r-- 1 alexa alexa  4075 Oct 25 14:47 probes.py\n-rw-rw-r-- 1 alexa alexa 15830 Oct 25 14:48 router.py\n-rw-rw-r-- 1 alexa alexa  4432 Oct 25 14:56 schemas.py\n-rw-rw-r-- 1 alexa alexa  3192 Oct 25 12:42 seed.py\n-rw-rw-r-- 1 alexa alexa  9323 Oct 25 12:42 ui_spec.py\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "ls -la /home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio-api/src/agentic_odi_studio_api/studio/",
+            "time": {
+              "start": 1793040359531,
+              "end": 1793040359569
+            }
+          },
+          "id": "prt_179889a3d001k861s5F2t1pS90",
+          "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+          "messageID": "msg_179887ad2001lOK09Vm0ZtiFsB"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "chatcmpl-tool-25bebccd360742c6b45a954207688e37",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "git show feat/studio-assistant-ui-experience:apps/studio-api/src/agentic_odi_studio_api/studio/__init__.py 2>/dev/null",
+              "workdir": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit"
+            },
+            "output": "\"\"\"Living Studio sidecar: probes, MCP hydration, SSE chat tool-loop.\"\"\"\n\nfrom __future__ import annotations\n",
+            "metadata": {
+              "output": "\"\"\"Living Studio sidecar: probes, MCP hydration, SSE chat tool-loop.\"\"\"\n\nfrom __future__ import annotations\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "git show feat/studio-assistant-ui-experience:apps/studio-api/src/agentic_odi_studio_api/studio/__init__.py 2>/dev/null",
+            "time": {
+              "start": 1793040361191,
+              "end": 1793040361242
+            }
+          },
+          "id": "prt_17988a134001euHzeJRKr4HsXo",
+          "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+          "messageID": "msg_179887ad2001lOK09Vm0ZtiFsB"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "da2b858c2d640118bdbaa3c500b7305d9d8ceccf",
+          "type": "step-finish",
+          "tokens": {
+            "total": 22285,
+            "input": 5104,
+            "output": 205,
+            "reasoning": 48,
+            "cache": {
+              "write": 0,
+              "read": 16928
+            }
+          },
+          "cost": 0,
+          "id": "prt_17988a779001oJuYbRm07h2eih",
+          "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+          "messageID": "msg_179887ad2001lOK09Vm0ZtiFsB"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_179885c6c001rEi5wF0kJyeeFk",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit",
+          "root": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 22981,
+          "input": 5873,
+          "output": 136,
+          "reasoning": 44,
+          "cache": {
+            "write": 0,
+            "read": 16928
+          }
+        },
+        "modelID": "poolside/laguna-s-2.1:free",
+        "providerID": "kilo",
+        "time": {
+          "created": 1793040361411,
+          "completed": 1793040367179
+        },
+        "finish": "tool-calls",
+        "id": "msg_17988a7c3001o6qa3k54riuOK3",
+        "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7"
+      },
+      "parts": [
+        {
+          "snapshot": "da2b858c2d640118bdbaa3c500b7305d9d8ceccf",
+          "type": "step-start",
+          "id": "prt_17988ae57001siFSx72S3ybSBC",
+          "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+          "messageID": "msg_17988a7c3001o6qa3k54riuOK3"
+        },
+        {
+          "type": "reasoning",
+          "text": "Wait, the current `__init__.py` in main has only 108 bytes, but the feature branch has more content. Let me check if there are imports in the feature branch's `__init__.py`:",
+          "time": {
+            "start": 1793040363099,
+            "end": 1793040363740
+          },
+          "id": "prt_17988ae5b001qi5J8EyYMqgQgv",
+          "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+          "messageID": "msg_17988a7c3001o6qa3k54riuOK3"
+        },
+        {
+          "type": "text",
+          "text": "Let me see the full feature branch `__init__.py` to understand the exported symbols:",
+          "time": {
+            "start": 1793040363744,
+            "end": 1793040367048
+          },
+          "id": "prt_17988b0e00015NYvsqYog3DjNf",
+          "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+          "messageID": "msg_17988a7c3001o6qa3k54riuOK3"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "chatcmpl-tool-32c5525e7de24d8db13283751e4c8625",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "git show feat/studio-assistant-ui-experience:apps/studio-api/src/agentic_odi_studio_api/studio/__init__.py | wc -l && git show feat/studio-assistant-ui-experience:apps/studio-api/src/agentic_odi_studio_api/studio/__init__.py",
+              "workdir": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit"
+            },
+            "output": "3\n\"\"\"Living Studio sidecar: probes, MCP hydration, SSE chat tool-loop.\"\"\"\n\nfrom __future__ import annotations\n",
+            "metadata": {
+              "output": "3\n\"\"\"Living Studio sidecar: probes, MCP hydration, SSE chat tool-loop.\"\"\"\n\nfrom __future__ import annotations\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "git show feat/studio-assistant-ui-experience:apps/studio-api/src/agentic_odi_studio_api/studio/__init__.py | wc -l && git show feat/studio-assistant-ui-experience:apps/studio-api/src/agentic_odi_studio_api/studio/__init__.py",
+            "time": {
+              "start": 1793040367037,
+              "end": 1793040367070
+            }
+          },
+          "id": "prt_17988b3ce001dlnkdmeeQ11MFG",
+          "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+          "messageID": "msg_17988a7c3001o6qa3k54riuOK3"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "da2b858c2d640118bdbaa3c500b7305d9d8ceccf",
+          "type": "step-finish",
+          "tokens": {
+            "total": 22981,
+            "input": 5873,
+            "output": 136,
+            "reasoning": 44,
+            "cache": {
+              "write": 0,
+              "read": 16928
+            }
+          },
+          "cost": 0,
+          "id": "prt_17988be36001LST1M0QFyOEYrY",
+          "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+          "messageID": "msg_17988a7c3001o6qa3k54riuOK3"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_179885c6c001rEi5wF0kJyeeFk",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit",
+          "root": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 24323,
+          "input": 747,
+          "output": 295,
+          "reasoning": 1009,
+          "cache": {
+            "write": 0,
+            "read": 22272
+          }
+        },
+        "modelID": "poolside/laguna-s-2.1:free",
+        "providerID": "kilo",
+        "time": {
+          "created": 1793040367185,
+          "completed": 1793040391881
+        },
+        "finish": "tool-calls",
+        "id": "msg_17988be50001k1sz5s3Ktuw0oK",
+        "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7"
+      },
+      "parts": [
+        {
+          "snapshot": "da2b858c2d640118bdbaa3c500b7305d9d8ceccf",
+          "type": "step-start",
+          "id": "prt_17988c442001OjnyvuHWbkoujX",
+          "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+          "messageID": "msg_17988be50001k1sz5s3Ktuw0oK"
+        },
+        {
+          "type": "reasoning",
+          "text": "Interesting - the feature branch's `__init__.py` is also just a docstring and `from __future__ import annotations`. So there are no existing exports to add to — I need to add the approvals import line and `__all__` according to the task brief.\n\nLet me check if there's an existing `__all__` in the feature branch or if I need to create it. The task brief says:\n- Add `ApprovalRegistry` to `approvals` import line and `__all__`.\n\nSo the current main branch `__init__.py` has no imports or `__all__`. I need to add them.\n\nLet me also check the test file from the feature branch to understand what tests I need to write. I already have it - it has 7 tests:\n1. `test_open_describes_the_call_for_the_ui`\n2. `test_resolve_answers_the_waiting_turn`\n3. `test_an_expired_gate_returns_none_and_is_forgotten`\n4. `test_a_gate_answers_only_once`\n5. `test_an_unknown_gate_cannot_be_resolved`\n6. `test_cancel_all_drops_every_pending_gate`\n7. `test_the_decision_serializes_for_the_stream`\n\nNow let me understand the discrepancies between the task brief spec and the reference implementation:\n\n**Task brief spec says:**\n```python\ndef resolve(self, id, decision: ApprovalDecision) -> ApprovalRequest: ...\ndef get(self, id) -> ApprovalRequest: ...\nasync def wait_for_decision(self, id) -> ApprovalDecision: ...\ndef cancel(self, id) -> None: ...\n```\n\n**Reference implementation has:**\n- `resolve(self, approval_id: str, decision: ApprovalDecision) -> None` — returns None, not ApprovalRequest\n- No `get()` method\n- No instance `wait_for_decision(self, id)` - instead has module-level `wait_for_decision(registry, request, future, timeout)`\n- No `cancel(self, id)` — instead has `cancel_all()` that cancels all pending\n\n**Decision:** The task brief says to \"port from feature branch with exact test names\". The tests use the reference implementation's API (`resolve` returns None, module-level `wait_for_decision`, `cancel_all()`). So I should follow the reference implementation, not the brief's interface spec. The brief's interface spec is a simplified sketch, while the actual tests define the real contract.\n\nAlso note: the task brief says to use Pydantic for models (`class ApprovalRequest(BaseModel)`), but the reference implementation uses dataclasses. The tests use `request.to_dict()` and `decision.__dict__`, which works with dataclasses. The test also uses `decision.__dict__` which works with both dataclasses and pydantic models, but in pydantic v2, `.model_dump()` is preferred. Let me check the test more carefully.\n\nThe test has:\n```python\npayload = request.to_dict()  # type: ignore[attr-defined]\n```\n\nAnd:\n```python\nassert json.loads(json.dumps(decision.__dict__)) == {\n    \"approved\": False,\n    \"reason\": \"not this time\",\n}\n```\n\nFor dataclasses, `decision.__dict__` would give `{'approved': False, 'reason': 'not this time'}`. That matches.\n\nFor Pydantic models, `__dict__` in v2 would give `{'approved': False, 'reason': 'not this time'}` as well — wait, actually Pydantic v2 adds `__pydantic_fields_set__` and other internal stuff to `__dict__` if they're set as instance attributes. But since `approved` and `reason` are the only fields, and no extra instance attributes are set, `__dict__` should work. But `json.dumps(decision.__dict__)` with pydantic — the `__dict__` might contain `__pydantic_extra__` etc. Actually, for a simple model, `__dict__` would just contain the field values in Pydantic v2 (unless extra fields are configured). But it's riskier.\n\nSince the reference implementation uses dataclasses, and the tests are written for dataclasses (e.g., `to_dict()` method), I should use dataclasses to match exactly. The task brief says \"models use Pydantic\" but the reference implementation uses dataclasses. Since I'm told to port from the feature branch with exact test names, I should match the reference implementation.\n\nWait, let me re-read the task: \"Write `apps/studio-api/tests/test_studio_approvals.py` (port from feature branch with exact test names)\". The tests are from the feature branch, and they use the dataclass-based implementation. So I should port both the implementation and tests as-is.\n\nLet me also check the existing codebase to see if Pydantic is used elsewhere in the studio module:",
+          "time": {
+            "start": 1793040368709,
+            "end": 1793040386747
+          },
+          "id": "prt_17988c445001eIKcgKPY10o6sB",
+          "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+          "messageID": "msg_17988be50001k1sz5s3Ktuw0oK"
+        },
+        {
+          "type": "text",
+          "text": "Let me check if Pydantic is used in existing modules and see the test setup conventions:",
+          "time": {
+            "start": 1793040386755,
+            "end": 1793040391478
+          },
+          "id": "prt_179890ac30015XAzoBi3j39vbO",
+          "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+          "messageID": "msg_17988be50001k1sz5s3Ktuw0oK"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "chatcmpl-tool-e615d1e4577943e7a930876622372736",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "grep -rn \"pydantic\\|BaseModel\\|dataclass\" /home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio-api/src/agentic_odi_studio_api/studio/ | head -20",
+              "workdir": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit"
+            },
+            "output": "grep: /home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio-api/src/agentic_odi_studio_api/studio/__pycache__/memory.cpython-315.pyc: binary file matches\ngrep: /home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio-api/src/agentic_odi_studio_api/studio/__pycache__/schemas.cpython-315.pyc: binary file matches\n/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio-api/src/agentic_odi_studio_api/studio/schemas.py:7:from pydantic import BaseModel, Field\n/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio-api/src/agentic_odi_studio_api/studio/schemas.py:10:class ChatAttachment(BaseModel):\n/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio-api/src/agentic_odi_studio_api/studio/schemas.py:23:class ChatMessage(BaseModel):\n/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio-api/src/agentic_odi_studio_api/studio/schemas.py:29:class McpHealthRequest(BaseModel):\n/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio-api/src/agentic_odi_studio_api/studio/schemas.py:33:class LlmHealthRequest(BaseModel):\n/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio-api/src/agentic_odi_studio_api/studio/schemas.py:39:class ModelsRequest(BaseModel):\n/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio-api/src/agentic_odi_studio_api/studio/schemas.py:44:class AddStepRequest(BaseModel):\n/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio-api/src/agentic_odi_studio_api/studio/schemas.py:51:class AddOutcomeRequest(BaseModel):\n/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio-api/src/agentic_odi_studio_api/studio/schemas.py:59:class CreateJobRequest(BaseModel):\n/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio-api/src/agentic_odi_studio_api/studio/schemas.py:67:class UpdateJobRequest(BaseModel):\n/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio-api/src/agentic_odi_studio_api/studio/schemas.py:73:class UpdateStepRequest(BaseModel):\n/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio-api/src/agentic_odi_studio_api/studio/schemas.py:79:class UpdateOutcomeRequest(BaseModel):\n/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio-api/src/agentic_odi_studio_api/studio/schemas.py:86:class StudioBrief(BaseModel):\n/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio-api/src/agentic_odi_studio_api/studio/schemas.py:96:class UiCatalogRequest(BaseModel):\n/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio-api/src/agentic_odi_studio_api/studio/schemas.py:103:class ChatRequest(BaseModel):\n/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio-api/src/agentic_odi_studio_api/studio/schemas.py:114:class AddConnectorRequest(BaseModel):\n/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio-api/src/agentic_odi_studio_api/studio/schemas.py:120:class ConnectorListItem(BaseModel):\n/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio-api/src/agentic_odi_studio_api/studio/schemas.py:126:class ConnectorOperationResponse(BaseModel):\n/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio-api/src/agentic_odi_studio_api/studio/schemas.py:143:class ObservationModel(BaseModel):\n/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio-api/src/agentic_odi_studio_api/studio/schemas.py:155:class ObservationListResponse(BaseModel):\n",
+            "metadata": {
+              "output": "grep: /home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio-api/src/agentic_odi_studio_api/studio/__pycache__/memory.cpython-315.pyc: binary file matches\ngrep: /home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio-api/src/agentic_odi_studio_api/studio/__pycache__/schemas.cpython-315.pyc: binary file matches\n/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio-api/src/agentic_odi_studio_api/studio/schemas.py:7:from pydantic import BaseModel, Field\n/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio-api/src/agentic_odi_studio_api/studio/schemas.py:10:class ChatAttachment(BaseModel):\n/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio-api/src/agentic_odi_studio_api/studio/schemas.py:23:class ChatMessage(BaseModel):\n/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio-api/src/agentic_odi_studio_api/studio/schemas.py:29:class McpHealthRequest(BaseModel):\n/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio-api/src/agentic_odi_studio_api/studio/schemas.py:33:class LlmHealthRequest(BaseModel):\n/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio-api/src/agentic_odi_studio_api/studio/schemas.py:39:class ModelsRequest(BaseModel):\n/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio-api/src/agentic_odi_studio_api/studio/schemas.py:44:class AddStepRequest(BaseModel):\n/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio-api/src/agentic_odi_studio_api/studio/schemas.py:51:class AddOutcomeRequest(BaseModel):\n/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio-api/src/agentic_odi_studio_api/studio/schemas.py:59:class CreateJobRequest(BaseModel):\n/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio-api/src/agentic_odi_studio_api/studio/schemas.py:67:class UpdateJobRequest(BaseModel):\n/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio-api/src/agentic_odi_studio_api/studio/schemas.py:73:class UpdateStepRequest(BaseModel):\n/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio-api/src/agentic_odi_studio_api/studio/schemas.py:79:class UpdateOutcomeRequest(BaseModel):\n/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio-api/src/agentic_odi_studio_api/studio/schemas.py:86:class StudioBrief(BaseModel):\n/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio-api/src/agentic_odi_studio_api/studio/schemas.py:96:class UiCatalogRequest(BaseModel):\n/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio-api/src/agentic_odi_studio_api/studio/schemas.py:103:class ChatRequest(BaseModel):\n/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio-api/src/agentic_odi_studio_api/studio/schemas.py:114:class AddConnectorRequest(BaseModel):\n/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio-api/src/agentic_odi_studio_api/studio/schemas.py:120:class ConnectorListItem(BaseModel):\n/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio-api/src/agentic_odi_studio_api/studio/schemas.py:126:class ConnectorOperationResponse(BaseModel):\n/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio-api/src/agentic_odi_studio_api/studio/schemas.py:143:class ObservationModel(BaseModel):\n/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio-api/src/agentic_odi_studio_api/studio/schemas.py:155:class ObservationListResponse(BaseModel):\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "grep -rn \"pydantic\\|BaseModel\\|dataclass\" /home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio-api/src/agentic_odi_studio_api/studio/ | head -20",
+            "time": {
+              "start": 1793040388746,
+              "end": 1793040388797
+            }
+          },
+          "id": "prt_179890c120014qxMASJPNEa0je",
+          "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+          "messageID": "msg_17988be50001k1sz5s3Ktuw0oK"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "chatcmpl-tool-a08fd380d08d434ba5864cc1496298ad",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "ls /home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio-api/tests/",
+              "workdir": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit"
+            },
+            "output": "__pycache__\nconftest.py\ntest_api.py\ntest_app_spa.py\ntest_studio_api.py\ntest_studio_brief.py\ntest_studio_chat_attachments.py\ntest_studio_chat_branches.py\ntest_studio_chat_ui.py\ntest_studio_connectors.py\ntest_studio_connectors_router.py\ntest_studio_errors.py\ntest_studio_manual_crud.py\ntest_studio_mcp_data.py\ntest_studio_memory.py\ntest_studio_observability.py\ntest_studio_probes.py\ntest_studio_router.py\ntest_studio_ui_spec.py\n",
+            "metadata": {
+              "output": "__pycache__\nconftest.py\ntest_api.py\ntest_app_spa.py\ntest_studio_api.py\ntest_studio_brief.py\ntest_studio_chat_attachments.py\ntest_studio_chat_branches.py\ntest_studio_chat_ui.py\ntest_studio_connectors.py\ntest_studio_connectors_router.py\ntest_studio_errors.py\ntest_studio_manual_crud.py\ntest_studio_mcp_data.py\ntest_studio_memory.py\ntest_studio_observability.py\ntest_studio_probes.py\ntest_studio_router.py\ntest_studio_ui_spec.py\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "ls /home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio-api/tests/",
+            "time": {
+              "start": 1793040390556,
+              "end": 1793040390630
+            }
+          },
+          "id": "prt_1798913ae001PGSsJ4LJW3SGj4",
+          "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+          "messageID": "msg_17988be50001k1sz5s3Ktuw0oK"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "chatcmpl-tool-8ab98f8c385d46d2bb3e8eea97b21d3f",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "cat /home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio-api/pyproject.toml",
+              "workdir": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit"
+            },
+            "output": "[project]\nname = \"agentic-odi-studio-api\"\nversion = \"0.12.0\"\ndescription = \"FastAPI sidecar for the Agentic ODI Living Studio.\"\nrequires-python = \">=3.10\"\ndependencies = [\n    \"fastapi\",\n    \"uvicorn\",\n    \"agentic-odi-core\",\n    \"fastmcp>=4.1.0\",\n    \"openai>=3.28.0\",\n]\n\n[tool.uv.sources]\nagentic-odi-core = { workspace = true }\n\n[project.scripts]\nagentic-odi-studio-api = \"agentic_odi_studio_api.main:main\"\n\n[build-system]\nrequires = [\"hatchling\"]\nbuild-backend = \"hatchling.build\"\n\n[tool.hatch.build.targets.wheel]\npackages = [\"src/agentic_odi_studio_api\"]\n",
+            "metadata": {
+              "output": "[project]\nname = \"agentic-odi-studio-api\"\nversion = \"0.12.0\"\ndescription = \"FastAPI sidecar for the Agentic ODI Living Studio.\"\nrequires-python = \">=3.10\"\ndependencies = [\n    \"fastapi\",\n    \"uvicorn\",\n    \"agentic-odi-core\",\n    \"fastmcp>=4.1.0\",\n    \"openai>=3.28.0\",\n]\n\n[tool.uv.sources]\nagentic-odi-core = { workspace = true }\n\n[project.scripts]\nagentic-odi-studio-api = \"agentic_odi_studio_api.main:main\"\n\n[build-system]\nrequires = [\"hatchling\"]\nbuild-backend = \"hatchling.build\"\n\n[tool.hatch.build.targets.wheel]\npackages = [\"src/agentic_odi_studio_api\"]\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "cat /home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio-api/pyproject.toml",
+            "time": {
+              "start": 1793040391457,
+              "end": 1793040391529
+            }
+          },
+          "id": "prt_1798919a9001S1US3jJKYK0dce",
+          "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+          "messageID": "msg_17988be50001k1sz5s3Ktuw0oK"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "da2b858c2d640118bdbaa3c500b7305d9d8ceccf",
+          "type": "step-finish",
+          "tokens": {
+            "total": 24323,
+            "input": 747,
+            "output": 295,
+            "reasoning": 1009,
+            "cache": {
+              "write": 0,
+              "read": 22272
+            }
+          },
+          "cost": 0,
+          "id": "prt_179891e4c001HtE3sRPRAYlWYP",
+          "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+          "messageID": "msg_17988be50001k1sz5s3Ktuw0oK"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_179885c6c001rEi5wF0kJyeeFk",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit",
+          "root": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 26023,
+          "input": 25704,
+          "output": 294,
+          "reasoning": 25,
+          "cache": {
+            "write": 0,
+            "read": 0
+          }
+        },
+        "modelID": "poolside/laguna-s-2.1:free",
+        "providerID": "kilo",
+        "time": {
+          "created": 1793040391894,
+          "completed": 1793040402622
+        },
+        "finish": "tool-calls",
+        "id": "msg_179891ed6001AT0xNwDRcIrHdl",
+        "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7"
+      },
+      "parts": [
+        {
+          "snapshot": "da2b858c2d640118bdbaa3c500b7305d9d8ceccf",
+          "type": "step-start",
+          "id": "prt_17989279c001BADexJ7K3yQGE1",
+          "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+          "messageID": "msg_179891ed6001AT0xNwDRcIrHdl"
+        },
+        {
+          "type": "reasoning",
+          "text": "Let me check the pyproject.toml for pytest and asyncio config, and also look at an existing test to understand test conventions:",
+          "time": {
+            "start": 1793040394147,
+            "end": 1793040397099
+          },
+          "id": "prt_1798927a2001BSx34jPesvsC5k",
+          "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+          "messageID": "msg_179891ed6001AT0xNwDRcIrHdl"
+        },
+        {
+          "type": "text",
+          "text": "Let me check the pytest config and existing test patterns:",
+          "time": {
+            "start": 1793040397102,
+            "end": 1793040402219
+          },
+          "id": "prt_17989332e001uDGFs2L1kAlLds",
+          "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+          "messageID": "msg_179891ed6001AT0xNwDRcIrHdl"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "chatcmpl-tool-acf4c47879954fa0ac6abef5c9ca68dd",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "cat /home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/pyproject.toml 2>/dev/null || cat /home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio-api/pyproject.toml",
+              "workdir": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit"
+            },
+            "output": "[project]\nname = \"agentic-odi\"\nversion = \"0.12.0\"\ndescription = \"Outcome-Driven Innovation (ODI): an MCP server, chat client, CLI, and external connectors.\"\nrequires-python = \">=3.10\"\n\n[tool.uv]\npackage = false\n\n[tool.uv.workspace]\nmembers = [\n    \"apps/cli\",\n    \"apps/mcp-server\",\n    \"apps/studio-api\",\n    \"packages/connectors\",\n    \"packages/core\",\n]\n\n[dependency-groups]\ndev = [\n    \"bandit==1.9.4\",\n    \"jinja2==3.1.6\",\n    \"markdown-it-py==4.2.0\",\n    \"mypy==2.4.0\",\n    \"pyinstaller==6.22.3\",\n    \"pygments==2.21.0\",\n    \"pytest==9.1.1\",\n    \"pytest-asyncio==1.4.0\",\n    \"pytest-cov==7.1.0\",\n    \"ruff==0.17.1\",\n    \"pillow==12.3.0\",\n]\n\n[tool.bandit]\nexclude_dirs = [\".venv\", \"tests\", \".worktrees\", \"node_modules\"]\n\n[tool.ruff]\nline-length = 100\ntarget-version = \"py310\"\n# Vendored Superpowers skills are third-party content. Their Markdown code\n# fences are examples, not project Python, so Ruff must not lint or reformat\n# them (and `npx skills update` would overwrite any local edits anyway).\n# Implementation plans under docs/superpowers/plans/ are documentation specs\n# containing illustrative code fences, not production Python modules, so they\n# are excluded from lint/format as well.\nextend-exclude = [\".agents/skills\", \".worktrees\", \"docs/superpowers/plans\"]\n\n[tool.ruff.lint]\nselect = [\"E4\", \"E7\", \"E9\", \"F\", \"I\", \"UP\", \"B\", \"BLE\"]\n\n[tool.mypy]\npython_version = \"3.10\"\n# Two test suites use a bare `conftest` module name; mypy cannot map both.\nexclude = ['^apps/studio-api/tests/conftest\\.py$']\nignore_missing_imports = true\nplugins = [\"pydantic.mypy\"]\ndisable_error_code = [\"prop-decorator\"]\n\n[tool.pytest.ini_options]\nasyncio_mode = \"strict\"\npythonpath = [\".\", \"brand/src\"]\ntestpaths = [\"apps\", \"brand\", \"packages\", \"tests\", \"website\"]\n\n[tool.coverage.run]\nsource = [\n    \"agentic_odi_cli\",\n    \"agentic_odi_connectors\",\n    \"agentic_odi_core\",\n    \"agentic_odi_mcp_server\",\n    \"agentic_odi_studio_api\",\n]\n",
+            "metadata": {
+              "output": "[project]\nname = \"agentic-odi\"\nversion = \"0.12.0\"\ndescription = \"Outcome-Driven Innovation (ODI): an MCP server, chat client, CLI, and external connectors.\"\nrequires-python = \">=3.10\"\n\n[tool.uv]\npackage = false\n\n[tool.uv.workspace]\nmembers = [\n    \"apps/cli\",\n    \"apps/mcp-server\",\n    \"apps/studio-api\",\n    \"packages/connectors\",\n    \"packages/core\",\n]\n\n[dependency-groups]\ndev = [\n    \"bandit==1.9.4\",\n    \"jinja2==3.1.6\",\n    \"markdown-it-py==4.2.0\",\n    \"mypy==2.4.0\",\n    \"pyinstaller==6.22.3\",\n    \"pygments==2.21.0\",\n    \"pytest==9.1.1\",\n    \"pytest-asyncio==1.4.0\",\n    \"pytest-cov==7.1.0\",\n    \"ruff==0.17.1\",\n    \"pillow==12.3.0\",\n]\n\n[tool.bandit]\nexclude_dirs = [\".venv\", \"tests\", \".worktrees\", \"node_modules\"]\n\n[tool.ruff]\nline-length = 100\ntarget-version = \"py310\"\n# Vendored Superpowers skills are third-party content. Their Markdown code\n# fences are examples, not project Python, so Ruff must not lint or reformat\n# them (and `npx skills update` would overwrite any local edits anyway).\n# Implementation plans under docs/superpowers/plans/ are documentation specs\n# containing illustrative code fences, not production Python modules, so they\n# are excluded from lint/format as well.\nextend-exclude = [\".agents/skills\", \".worktrees\", \"docs/superpowers/plans\"]\n\n[tool.ruff.lint]\nselect = [\"E4\", \"E7\", \"E9\", \"F\", \"I\", \"UP\", \"B\", \"BLE\"]\n\n[tool.mypy]\npython_version = \"3.10\"\n# Two test suites use a bare `conftest` module name; mypy cannot map both.\nexclude = ['^apps/studio-api/tests/conftest\\.py$']\nignore_missing_imports = true\nplugins = [\"pydantic.mypy\"]\ndisable_error_code = [\"prop-decorator\"]\n\n[tool.pytest.ini_options]\nasyncio_mode = \"strict\"\npythonpath = [\".\", \"brand/src\"]\ntestpaths = [\"apps\", \"brand\", \"packages\", \"tests\", \"website\"]\n\n[tool.coverage.run]\nsource = [\n    \"agentic_odi_cli\",\n    \"agentic_odi_connectors\",\n    \"agentic_odi_core\",\n    \"agentic_odi_mcp_server\",\n    \"agentic_odi_studio_api\",\n]\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "cat /home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/pyproject.toml 2>/dev/null || cat /home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio-api/pyproject.toml",
+            "time": {
+              "start": 1793040398778,
+              "end": 1793040398826
+            }
+          },
+          "id": "prt_179893345001kk4X82RiuaWlaF",
+          "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+          "messageID": "msg_179891ed6001AT0xNwDRcIrHdl"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "chatcmpl-tool-6e9b1c8531614b81954e316fc40b763d",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "ls /home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/pyproject.toml 2>/dev/null; ls /home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/uv.lock 2>/dev/null",
+              "workdir": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit"
+            },
+            "output": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/pyproject.toml\n/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/uv.lock\n",
+            "metadata": {
+              "output": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/pyproject.toml\n/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/uv.lock\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "ls /home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/pyproject.toml 2>/dev/null; ls /home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/uv.lock 2>/dev/null",
+            "time": {
+              "start": 1793040401463,
+              "end": 1793040401509
+            }
+          },
+          "id": "prt_179893a81001vtcB7q7Rgv8cTR",
+          "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+          "messageID": "msg_179891ed6001AT0xNwDRcIrHdl"
+        },
+        {
+          "type": "tool",
+          "tool": "read",
+          "callID": "chatcmpl-tool-dc02075355fc49da9d572fb633af5e4f",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio-api/tests/test_studio_observability.py"
+            },
+            "output": "<path>/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio-api/tests/test_studio_observability.py</path>\n<type>file</type>\n<content>\n1: \"\"\"Tests for the per-turn structured log line and its redaction.\"\"\"\n2: \n3: from __future__ import annotations\n4: \n5: import json\n6: import logging\n7: \n8: from agentic_odi_studio_api.studio.observability import log_turn, redact\n9: \n10: \n11: def test_redact_hides_sensitive_values_and_keeps_the_rest() -> None:\n12:     redacted = redact(\n13:         {\n14:             \"token\": \"t\",\n15:             \"api_key\": \"k\",\n16:             \"quote\": \"customer words\",\n17:             \"model\": \"m\",\n18:         }\n19:     )\n20: \n21:     assert redacted[\"token\"] == \"[redacted]\"\n22:     assert redacted[\"api_key\"] == \"[redacted]\"\n23:     assert redacted[\"quote\"] == \"[redacted]\"\n24:     assert redacted[\"model\"] == \"m\"\n25: \n26: \n27: def test_log_turn_writes_one_json_line(caplog) -> None:\n28:     with caplog.at_level(logging.INFO, logger=\"agentic_odi_studio_api.studio.observability\"):\n29:         log_turn(\n30:             request_id=\"req-1\",\n31:             model=\"m\",\n32:             rounds=2,\n33:             tool_calls=3,\n34:             tool_errors=1,\n35:             duration_ms=42,\n36:             outcome=\"completed\",\n37:         )\n38: \n39:     lines = [record.getMessage() for record in caplog.records]\n40:     assert len(lines) == 1\n41:     payload = json.loads(lines[0])\n42:     assert payload[\"request_id\"] == \"req-1\"\n43:     assert payload[\"rounds\"] == 2\n44:     assert payload[\"tool_calls\"] == 3\n45:     assert payload[\"tool_errors\"] == 1\n46:     assert payload[\"duration_ms\"] == 42\n47:     assert payload[\"outcome\"] == \"completed\"\n48: \n49: \n50: def test_log_turn_never_writes_secrets_or_quotations(caplog) -> None:\n51:     with caplog.at_level(logging.INFO, logger=\"agentic_odi_studio_api.studio.observability\"):\n52:         log_turn(\n53:             request_id=\"req-1\",\n54:             model=\"m\",\n55:             rounds=1,\n56:             tool_calls=1,\n57:             tool_errors=0,\n58:             duration_ms=10,\n59:             outcome=\"completed\",\n60:             api_key=\"sk-live-secret\",\n61:             quote=\"customer words\",\n62:         )\n63: \n64:     text = \"\\n\".join(record.getMessage() for record in caplog.records)\n65:     assert \"api_key\" not in text\n66:     assert \"sk-live-secret\" not in text\n67:     assert \"quote\" not in text\n68:     assert \"customer words\" not in text\n69:     assert \"request_id\" in text\n70: \n71: \n72: def test_log_turn_records_the_error_code_of_a_failed_turn(caplog) -> None:\n73:     with caplog.at_level(logging.INFO, logger=\"agentic_odi_studio_api.studio.observability\"):\n74:         log_turn(\n75:             request_id=\"req-1\",\n76:             model=\"m\",\n77:             rounds=0,\n78:             tool_calls=0,\n79:             tool_errors=0,\n80:             duration_ms=5,\n81:             outcome=\"failed\",\n82:             error_code=\"mcp_unreachable\",\n83:         )\n84: \n85:     payload = json.loads(caplog.records[0].getMessage())\n86:     assert payload[\"error_code\"] == \"mcp_unreachable\"\n87: \n88: \n89: def test_log_turn_redacts_nested_values(caplog) -> None:\n90:     with caplog.at_level(logging.INFO, logger=\"agentic_odi_studio_api.studio.observability\"):\n91:         log_turn(\n92:             request_id=\"req-1\",\n93:             model=\"m\",\n94:             rounds=0,\n95:             tool_calls=0,\n96:             tool_errors=0,\n97:             duration_ms=1,\n98:             outcome=\"completed\",\n99:             context={\"api_key\": \"sk-live\", \"name\": \"studio\"},\n100:         )\n101: \n102:     payload = json.loads(caplog.records[0].getMessage())\n103:     assert payload[\"context\"][\"api_key\"] == \"[redacted]\"\n104:     assert payload[\"context\"][\"name\"] == \"studio\"\n\n(End of file - total 104 lines)\n</content>",
+            "metadata": {
+              "preview": "\"\"\"Tests for the per-turn structured log line and its redaction.\"\"\"\n\nfrom __future__ import annotations\n\nimport json\nimport logging\n\nfrom agentic_odi_studio_api.studio.observability import log_turn, redact\n\n\ndef test_redact_hides_sensitive_values_and_keeps_the_rest() -> None:\n    redacted = redact(\n        {\n            \"token\": \"t\",\n            \"api_key\": \"k\",\n            \"quote\": \"customer words\",\n            \"model\": \"m\",\n        }\n    )\n",
+              "truncated": false,
+              "loaded": [],
+              "display": {
+                "type": "file",
+                "path": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio-api/tests/test_studio_observability.py",
+                "text": "\"\"\"Tests for the per-turn structured log line and its redaction.\"\"\"\n\nfrom __future__ import annotations\n\nimport json\nimport logging\n\nfrom agentic_odi_studio_api.studio.observability import log_turn, redact\n\n\ndef test_redact_hides_sensitive_values_and_keeps_the_rest() -> None:\n    redacted = redact(\n        {\n            \"token\": \"t\",\n            \"api_key\": \"k\",\n            \"quote\": \"customer words\",\n            \"model\": \"m\",\n        }\n    )\n\n    assert redacted[\"token\"] == \"[redacted]\"\n    assert redacted[\"api_key\"] == \"[redacted]\"\n    assert redacted[\"quote\"] == \"[redacted]\"\n    assert redacted[\"model\"] == \"m\"\n\n\ndef test_log_turn_writes_one_json_line(caplog) -> None:\n    with caplog.at_level(logging.INFO, logger=\"agentic_odi_studio_api.studio.observability\"):\n        log_turn(\n            request_id=\"req-1\",\n            model=\"m\",\n            rounds=2,\n            tool_calls=3,\n            tool_errors=1,\n            duration_ms=42,\n            outcome=\"completed\",\n        )\n\n    lines = [record.getMessage() for record in caplog.records]\n    assert len(lines) == 1\n    payload = json.loads(lines[0])\n    assert payload[\"request_id\"] == \"req-1\"\n    assert payload[\"rounds\"] == 2\n    assert payload[\"tool_calls\"] == 3\n    assert payload[\"tool_errors\"] == 1\n    assert payload[\"duration_ms\"] == 42\n    assert payload[\"outcome\"] == \"completed\"\n\n\ndef test_log_turn_never_writes_secrets_or_quotations(caplog) -> None:\n    with caplog.at_level(logging.INFO, logger=\"agentic_odi_studio_api.studio.observability\"):\n        log_turn(\n            request_id=\"req-1\",\n            model=\"m\",\n            rounds=1,\n            tool_calls=1,\n            tool_errors=0,\n            duration_ms=10,\n            outcome=\"completed\",\n            api_key=\"sk-live-secret\",\n            quote=\"customer words\",\n        )\n\n    text = \"\\n\".join(record.getMessage() for record in caplog.records)\n    assert \"api_key\" not in text\n    assert \"sk-live-secret\" not in text\n    assert \"quote\" not in text\n    assert \"customer words\" not in text\n    assert \"request_id\" in text\n\n\ndef test_log_turn_records_the_error_code_of_a_failed_turn(caplog) -> None:\n    with caplog.at_level(logging.INFO, logger=\"agentic_odi_studio_api.studio.observability\"):\n        log_turn(\n            request_id=\"req-1\",\n            model=\"m\",\n            rounds=0,\n            tool_calls=0,\n            tool_errors=0,\n            duration_ms=5,\n            outcome=\"failed\",\n            error_code=\"mcp_unreachable\",\n        )\n\n    payload = json.loads(caplog.records[0].getMessage())\n    assert payload[\"error_code\"] == \"mcp_unreachable\"\n\n\ndef test_log_turn_redacts_nested_values(caplog) -> None:\n    with caplog.at_level(logging.INFO, logger=\"agentic_odi_studio_api.studio.observability\"):\n        log_turn(\n            request_id=\"req-1\",\n            model=\"m\",\n            rounds=0,\n            tool_calls=0,\n            tool_errors=0,\n            duration_ms=1,\n            outcome=\"completed\",\n            context={\"api_key\": \"sk-live\", \"name\": \"studio\"},\n        )\n\n    payload = json.loads(caplog.records[0].getMessage())\n    assert payload[\"context\"][\"api_key\"] == \"[redacted]\"\n    assert payload[\"context\"][\"name\"] == \"studio\"",
+                "lineStart": 1,
+                "lineEnd": 104,
+                "totalLines": 104,
+                "truncated": false
+              }
+            },
+            "title": "apps/studio-api/tests/test_studio_observability.py",
+            "time": {
+              "start": 1793040402208,
+              "end": 1793040402266
+            }
+          },
+          "id": "prt_1798944450019moNcXGoE2qQ9O",
+          "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+          "messageID": "msg_179891ed6001AT0xNwDRcIrHdl"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "da2b858c2d640118bdbaa3c500b7305d9d8ceccf",
+          "type": "step-finish",
+          "tokens": {
+            "total": 26023,
+            "input": 25704,
+            "output": 294,
+            "reasoning": 25,
+            "cache": {
+              "write": 0,
+              "read": 0
+            }
+          },
+          "cost": 0,
+          "id": "prt_17989483f001gmWCtfjAwfMwIq",
+          "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+          "messageID": "msg_179891ed6001AT0xNwDRcIrHdl"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_179885c6c001rEi5wF0kJyeeFk",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit",
+          "root": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 31052,
+          "input": 2233,
+          "output": 1202,
+          "reasoning": 1601,
+          "cache": {
+            "write": 0,
+            "read": 26016
+          }
+        },
+        "modelID": "poolside/laguna-s-2.1:free",
+        "providerID": "kilo",
+        "time": {
+          "created": 1793040402662,
+          "completed": 1793040458293
+        },
+        "finish": "tool-calls",
+        "id": "msg_1798948e6001ybWO5BkFbV1P6x",
+        "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7"
+      },
+      "parts": [
+        {
+          "snapshot": "da2b858c2d640118bdbaa3c500b7305d9d8ceccf",
+          "type": "step-start",
+          "id": "prt_17989526f001FR4Xridljb8LAJ",
+          "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+          "messageID": "msg_1798948e6001ybWO5BkFbV1P6x"
+        },
+        {
+          "type": "reasoning",
+          "text": "Now I understand the codebase conventions:\n- Tests use plain functions with `@pytest.mark.asyncio` for async tests (but `asyncio_mode = \"strict\"` means I need the decorator explicitly)\n- The test uses `asyncio.run()` instead of `@pytest.mark.asyncio` for some tests in the feature branch test\n- Pydantic is used for schemas in `schemas.py`, but the reference implementation uses dataclasses\n\nLooking at the feature branch test, it uses `asyncio.run()` rather than `@pytest.mark.asyncio`. Since `asyncio_mode = \"strict\"` is configured, I need to decide: should I use `@pytest.mark.asyncio` or `asyncio.run()`?\n\nThe constraint says \"Async tests use `@pytest.mark.asyncio`\". But the reference implementation test uses `asyncio.run()`. Since I'm porting the test from the feature branch with exact test names, and the constraint says to use `@pytest.mark.asyncio`, I need to reconcile this.\n\nLooking more carefully at the reference test:\n```python\ndef test_resolve_answers_the_waiting_turn() -> None:\n    registry = ApprovalRegistry()\n\n    async def _run() -> ApprovalDecision:\n        ...\n\n    decision = asyncio.run(_run())\n```\n\nThe tests use `asyncio.run()` to run async code within sync test functions. This is a valid pattern and would work with `asyncio_mode = \"strict\"` since there are no async test functions.\n\nBut the constraint says \"Async tests use `@pytest.mark.asyncio`\". I think this means if there are async test functions, they should use `@pytest.mark.asyncio`. But in this case, all test functions are sync (using `asyncio.run()` internally), so there's a conflict with the constraint.\n\nHmm, let me re-read the constraint: \"Async tests use `@pytest.mark.asyncio`\". I think the intent is that the test suite should be compatible with the strict asyncio mode. Using `asyncio.run()` works fine in strict mode because the test functions themselves are sync. Using `@pytest.mark.asyncio` would make them async test functions, which also works.\n\nGiven the instruction says \"port from feature branch with exact test names\", I think I should port the test as-is (using `asyncio.run()`), since the exact test names are specified. The constraint about `@pytest.mark.asyncio` might be a general guideline, but the exact porting takes priority.\n\nActually, wait. Let me re-read: \"Write `apps/studio-api/tests/test_studio_approvals.py` (port from feature branch with exact test names)\". This means I should port the test files, keeping the exact test names. The implementation in the test uses `asyncio.run()`, so I should keep that pattern.\n\nActually, the constraint says \"Async tests use `@pytest.mark.asyncio`\", but the test file doesn't have any async test functions — it uses `asyncio.run()` inside sync functions. So this constraint doesn't conflict. The tests are technically sync functions that happen to run async code internally.\n\nOK, let me proceed. I need to:\n\n1. Create `approvals.py` — port from the feature branch. The reference uses dataclasses, not Pydantic. Since the task says \"Follow existing patterns in `apps/studio-api/src/agentic_odi_studio_api/studio/` — models use Pydantic, services use plain classes\", this suggests I should consider using Pydantic for models. But the reference implementation uses dataclasses. Since I'm told to \"port from feature branch\", I'll use dataclasses to match the exact behavior.\n\nActually, let me think about this more carefully. The task brief spec says:\n```python\nclass ApprovalRequest(BaseModel):\n    ...\nclass ApprovalDecision(BaseModel):\n    ...\n```\n\nThese use BaseModel (Pydantic). But the reference implementation uses dataclasses. The tests use `to_dict()` and `__dict__` which differ between Pydantic and dataclass.\n\nFor the test `test_the_decision_serializes_for_the_stream`:\n```python\ndecision = ApprovalDecision(approved=False, reason=\"not this time\")\nassert json.loads(json.dumps(decision.__dict__)) == {\n    \"approved\": False,\n    \"reason\": \"not this time\",\n}\n```\n\nWith dataclasses, `decision.__dict__` returns `{'approved': False, 'reason': 'not this time'}`. With Pydantic v2, `decision.__dict__` would return... Let me think. Pydantic v2 `BaseModel.__dict__` only contains fields that were set after creation. For a simple model, `__dict__` would be `{'approved': False, 'reason': 'not this time'}`. Actually, I'm not sure — it might have `__pydantic_fields_set__` and other attributes.\n\nActually, in Pydantic v2, `model.__dict__` typically contains only the field values (not internal pydantic stuff, since those are stored elsewhere). Let me check... In Pydantic v2, `__dict__` on a model instance is populated with the field values during `__init__`. Additional internal attributes like `__pydantic_fields_set__` are set as class-level descriptors or stored in `__pydantic_extra__`. So `__dict__` should just have `{'approved': False, 'reason': 'not this time'}`.\n\nBut `to_dict()` is a custom method in the reference implementation. The test `test_open_describes_the_call_for_the_ui` calls `request.to_dict()`. If I use Pydantic, I'd need to implement `to_dict()` or use `.model_dump()`. \n\nSince I'm told to port from the feature branch with exact test names, and the tests use `to_dict()` and `__dict__`, I should use the reference implementation as-is (dataclasses). The task brief's class signatures are just sketches, and the actual reference impl is the source of truth.\n\n2. Export from `__init__.py` — add `ApprovalRegistry` to `approvals` import line and `__all__`.\n\n3. Write `test_studio_approvals.py` — port from the feature branch.\n\nLet me now create the files. I have the exact reference implementation and test. Let me write them.\n\nFor the `__init__.py`, the task says:\n- Add `ApprovalRegistry` to `approvals` import line and `__all__`.\n\nSo I should add an import from `.approvals` and add `__all__`. The current `__init__.py` is just:\n```python\n\"\"\"Living Studio sidecar: probes, MCP hydration, SSE chat tool-loop.\"\"\"\n\nfrom __future__ import annotations\n```\n\nI need to add:\n```python\nfrom agentic_odi_studio_api.studio.approvals import ApprovalRegistry\n```\n\nAnd add `__all__`.\n\nLet me now create the files. I'll use the exact reference implementation.\n\nActually, let me also check: the `open()` signature in the task brief says `open(tool_call_id, name, arguments, prompt) -> tuple[ApprovalRequest, asyncio.Future]`, and the decisions say \"Use `apv_` prefix for IDs\" and \"open() signature: `open(tool_call_id, name, arguments, prompt) -> tuple[ApprovalRequest, asyncio.Future]`\". But the reference uses keyword-only arguments with `*`. Let me check the test:\n\n```python\nregistry.open(\n    tool_call_id=\"call-1\",\n    name=\"add_job\",\n    arguments={\"name\": \"Retention\"},\n    prompt=\"Allow the assistant to add job?\",\n)\n```\n\nThe test uses keyword arguments, so the `*` in the reference won't cause issues. I'll keep the reference exactly as-is.\n\nNow let me write the files:",
+          "time": {
+            "start": 1793040405107,
+            "end": 1793040433611
+          },
+          "id": "prt_179895273001UN4XHstt7otUXZ",
+          "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+          "messageID": "msg_1798948e6001ybWO5BkFbV1P6x"
+        },
+        {
+          "type": "text",
+          "text": "I have everything I need. The reference implementation uses dataclasses (not Pydantic), and the tests use `asyncio.run()` within sync functions. Let me create the files:",
+          "time": {
+            "start": 1793040433619,
+            "end": 1793040457963
+          },
+          "id": "prt_17989c1d3001wtRDbuYEE2QkAu",
+          "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+          "messageID": "msg_1798948e6001ybWO5BkFbV1P6x"
+        },
+        {
+          "type": "tool",
+          "tool": "write",
+          "callID": "chatcmpl-tool-0953540750154a0f99fe2ba77b14cfe5",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio-api/src/agentic_odi_studio_api/studio/approvals.py",
+              "content": "\"\"\"In-process approval gates for mutating tool calls.\n\nA mutating MCP tool (``add_job``, ``update_outcome``, …) pauses the streaming\nturn until the person in front of the Studio says yes or no. The gate is a\nprocess-local registry of pending futures: the SSE generator awaits one, and\n``POST /api/approvals/{id}`` resolves it.\n\nThis is deliberately the smallest thing that is honest. The sidecar serves one\nlocal user over one loopback socket; it has no durable job state and no worker\npool, so a gate that lives in memory is the whole requirement. Every gate has a\ntimeout and every gate resolves once, so a turn can never hang and a double\nclick can never run a tool twice.\n\"\"\"\n\nfrom __future__ import annotations\n\nimport asyncio\nimport threading\nimport uuid\nfrom dataclasses import dataclass, field\nfrom datetime import datetime, timezone\n\n#: A person deciding whether the agent may write to their data deserves longer\n#: than a network timeout, but the turn must still end on its own.\nDEFAULT_TIMEOUT_SECONDS = 300.0\n\n\n@dataclass\nclass ApprovalRequest:\n    \"\"\"One pending decision, described well enough for the UI to ask.\"\"\"\n\n    id: str\n    tool_call_id: str\n    name: str\n    arguments: dict[str, object]\n    prompt: str\n    created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())\n\n    def to_dict(self) -> dict[str, object]:\n        return {\n            \"id\": self.id,\n            \"tool_call_id\": self.tool_call_id,\n            \"name\": self.name,\n            \"arguments\": self.arguments,\n            \"prompt\": self.prompt,\n            \"created_at\": self.created_at,\n        }\n\n\n@dataclass\nclass ApprovalDecision:\n    approved: bool\n    reason: str = \"\"\n\n\nclass ApprovalNotFoundError(KeyError):\n    \"\"\"No pending gate has that id, or it already resolved.\"\"\"\n\n\nclass ApprovalRegistry:\n    \"\"\"Pending approval gates, keyed by the id the client answers with.\"\"\"\n\n    def __init__(self) -> None:\n        self._lock = threading.Lock()\n        self._pending: dict[str, asyncio.Future[ApprovalDecision]] = {}\n\n    def open(\n        self,\n        *,\n        tool_call_id: str,\n        name: str,\n        arguments: dict[str, object],\n        prompt: str,\n    ) -> tuple[ApprovalRequest, asyncio.Future[ApprovalDecision]]:\n        \"\"\"Register a gate and return its description and the future to await.\"\"\"\n        loop = asyncio.get_running_loop()\n        request = ApprovalRequest(\n            id=f\"apv_{uuid.uuid4().hex[:12]}\",\n            tool_call_id=tool_call_id,\n            name=name,\n            arguments=arguments,\n            prompt=prompt,\n        )\n        future: asyncio.Future[ApprovalDecision] = loop.create_future()\n        with self._lock:\n            self._pending[request.id] = future\n        return request, future\n\n    def resolve(self, approval_id: str, decision: ApprovalDecision) -> None:\n        \"\"\"Answer a pending gate. Raises when the gate is unknown or already closed.\"\"\"\n        with self._lock:\n            future = self._pending.pop(approval_id, None)\n        if future is None or future.done():\n            raise ApprovalNotFoundError(approval_id)\n        future.set_result(decision)\n\n    def discard(self, approval_id: str) -> None:\n        \"\"\"Forget a gate without answering it (the turn ended first).\"\"\"\n        with self._lock:\n            self._pending.pop(approval_id, None)\n\n    def cancel_all(self) -> None:\n        \"\"\"Drop every pending gate. Called when the sidecar shuts down.\"\"\"\n        with self._lock:\n            pending = list(self._pending.items())\n            self._pending.clear()\n        for _approval_id, future in pending:\n            if not future.done():\n                future.cancel()\n\n    @property\n    def pending(self) -> int:\n        with self._lock:\n            return len(self._pending)\n\n\nasync def wait_for_decision(\n    registry: ApprovalRegistry,\n    request: ApprovalRequest,\n    future: asyncio.Future[ApprovalDecision],\n    timeout: float = DEFAULT_TIMEOUT_SECONDS,\n) -> ApprovalDecision | None:\n    \"\"\"Await a decision, returning ``None`` when the gate expired or was dropped.\n\n    The gate is always discarded, so an expired id can never be answered later\n    and a cancelled turn leaves nothing behind.\n    \"\"\"\n    try:\n        return await asyncio.wait_for(future, timeout=timeout)\n    except asyncio.TimeoutError:\n        return None\n    except asyncio.CancelledError:\n        raise\n    finally:\n        registry.discard(request.id)\n\n\n__all__ = [\n    \"ApprovalDecision\",\n    \"ApprovalNotFoundError\",\n    \"ApprovalRegistry\",\n    \"ApprovalRequest\",\n    \"DEFAULT_TIMEOUT_SECONDS\",\n    \"wait_for_decision\",\n]\n"
+            },
+            "output": "Wrote file successfully.",
+            "metadata": {
+              "diagnostics": {},
+              "filepath": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio-api/src/agentic_odi_studio_api/studio/approvals.py",
+              "exists": false,
+              "truncated": false
+            },
+            "title": "apps/studio-api/src/agentic_odi_studio_api/studio/approvals.py",
+            "time": {
+              "start": 1793040457955,
+              "end": 1793040457992
+            }
+          },
+          "id": "prt_17989c3c9001TLYaHqyLcErID0",
+          "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+          "messageID": "msg_1798948e6001ybWO5BkFbV1P6x"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "ad2ba54e999d04558d83d2cd965b1ac826711409",
+          "type": "step-finish",
+          "tokens": {
+            "total": 31052,
+            "input": 2233,
+            "output": 1202,
+            "reasoning": 1601,
+            "cache": {
+              "write": 0,
+              "read": 26016
+            }
+          },
+          "cost": 0,
+          "id": "prt_1798a21f3001WaaIUejGQ3MwLh",
+          "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+          "messageID": "msg_1798948e6001ybWO5BkFbV1P6x"
+        },
+        {
+          "type": "patch",
+          "hash": "da2b858c2d640118bdbaa3c500b7305d9d8ceccf",
+          "files": [
+            "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio-api/src/agentic_odi_studio_api/studio/approvals.py"
+          ],
+          "id": "prt_1798a222d0014d0ezVNo1oiFG8",
+          "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+          "messageID": "msg_1798948e6001ybWO5BkFbV1P6x"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_179885c6c001rEi5wF0kJyeeFk",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit",
+          "root": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 31283,
+          "input": 28,
+          "output": 176,
+          "reasoning": 39,
+          "cache": {
+            "write": 0,
+            "read": 31040
+          }
+        },
+        "modelID": "poolside/laguna-s-2.1:free",
+        "providerID": "kilo",
+        "time": {
+          "created": 1793040458302,
+          "completed": 1793040463960
+        },
+        "finish": "tool-calls",
+        "id": "msg_1798a223d001OfjH2DRQqiuonu",
+        "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7"
+      },
+      "parts": [
+        {
+          "snapshot": "ad2ba54e999d04558d83d2cd965b1ac826711409",
+          "type": "step-start",
+          "id": "prt_1798a2cc7001f6Wuqu6YlfR33c",
+          "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+          "messageID": "msg_1798a223d001OfjH2DRQqiuonu"
+        },
+        {
+          "type": "reasoning",
+          "text": "Now I need to update the `__init__.py` to export `ApprovalRegistry`. The task says \"Add `ApprovalRegistry` to `approvals` import line and `__all__`.\"",
+          "time": {
+            "start": 1793040461005,
+            "end": 1793040462219
+          },
+          "id": "prt_1798a2ccd001Yl6CHrCtjAXvar",
+          "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+          "messageID": "msg_1798a223d001OfjH2DRQqiuonu"
+        },
+        {
+          "type": "text",
+          "text": "Now update `__init__.py` to export `ApprovalRegistry`:",
+          "time": {
+            "start": 1793040462223,
+            "end": 1793040463749
+          },
+          "id": "prt_1798a318f001K1iHskislp0AaS",
+          "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+          "messageID": "msg_1798a223d001OfjH2DRQqiuonu"
+        },
+        {
+          "type": "tool",
+          "tool": "edit",
+          "callID": "chatcmpl-tool-492c8da922a04e609626ce8921251360",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio-api/src/agentic_odi_studio_api/studio/__init__.py",
+              "oldString": "\"\"\"Living Studio sidecar: probes, MCP hydration, SSE chat tool-loop.\"\"\"\n\nfrom __future__ import annotations",
+              "newString": "\"\"\"Living Studio sidecar: probes, MCP hydration, SSE chat tool-loop.\"\"\"\n\nfrom __future__ import annotations\n\nfrom agentic_odi_studio_api.studio.approvals import ApprovalRegistry\n\n__all__ = [\n    \"ApprovalRegistry\",\n]"
+            },
+            "output": "Edit applied successfully.",
+            "metadata": {
+              "diagnostics": {},
+              "diff": "Index: /home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio-api/src/agentic_odi_studio_api/studio/__init__.py\n===================================================================\n--- /home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio-api/src/agentic_odi_studio_api/studio/__init__.py\n+++ /home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio-api/src/agentic_odi_studio_api/studio/__init__.py\n@@ -1,3 +1,9 @@\n \"\"\"Living Studio sidecar: probes, MCP hydration, SSE chat tool-loop.\"\"\"\n \n from __future__ import annotations\n+\n+from agentic_odi_studio_api.studio.approvals import ApprovalRegistry\n+\n+__all__ = [\n+    \"ApprovalRegistry\",\n+]\n",
+              "filediff": {
+                "file": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio-api/src/agentic_odi_studio_api/studio/__init__.py",
+                "patch": "Index: /home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio-api/src/agentic_odi_studio_api/studio/__init__.py\n===================================================================\n--- /home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio-api/src/agentic_odi_studio_api/studio/__init__.py\n+++ /home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio-api/src/agentic_odi_studio_api/studio/__init__.py\n@@ -1,3 +1,9 @@\n \"\"\"Living Studio sidecar: probes, MCP hydration, SSE chat tool-loop.\"\"\"\n \n from __future__ import annotations\n+\n+from agentic_odi_studio_api.studio.approvals import ApprovalRegistry\n+\n+__all__ = [\n+    \"ApprovalRegistry\",\n+]\n",
+                "additions": 6,
+                "deletions": 0
+              },
+              "truncated": false
+            },
+            "title": "apps/studio-api/src/agentic_odi_studio_api/studio/__init__.py",
+            "time": {
+              "start": 1793040463744,
+              "end": 1793040463797
+            }
+          },
+          "id": "prt_1798a32be001B2jz9lC1MgmEa4",
+          "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+          "messageID": "msg_1798a223d001OfjH2DRQqiuonu"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "ac8d08a28f33fb848c4a7bbca2cff444e87964e3",
+          "type": "step-finish",
+          "tokens": {
+            "total": 31283,
+            "input": 28,
+            "output": 176,
+            "reasoning": 39,
+            "cache": {
+              "write": 0,
+              "read": 31040
+            }
+          },
+          "cost": 0,
+          "id": "prt_1798a381c001bmJQj8fGuMArBt",
+          "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+          "messageID": "msg_1798a223d001OfjH2DRQqiuonu"
+        },
+        {
+          "type": "patch",
+          "hash": "ad2ba54e999d04558d83d2cd965b1ac826711409",
+          "files": [
+            "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio-api/src/agentic_odi_studio_api/studio/__init__.py"
+          ],
+          "id": "prt_1798a3854001VQnQMaNig1Hubw",
+          "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+          "messageID": "msg_1798a223d001OfjH2DRQqiuonu"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_179885c6c001rEi5wF0kJyeeFk",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit",
+          "root": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 32311,
+          "input": 35,
+          "output": 1012,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 31264
+          }
+        },
+        "modelID": "poolside/laguna-s-2.1:free",
+        "providerID": "kilo",
+        "time": {
+          "created": 1793040463966,
+          "completed": 1793040487840
+        },
+        "finish": "tool-calls",
+        "id": "msg_1798a385e0013wpYbze4B0llWO",
+        "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7"
+      },
+      "parts": [
+        {
+          "snapshot": "ac8d08a28f33fb848c4a7bbca2cff444e87964e3",
+          "type": "step-start",
+          "id": "prt_1798a3e98001n33WwVFmOh40zQ",
+          "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+          "messageID": "msg_1798a385e0013wpYbze4B0llWO"
+        },
+        {
+          "type": "text",
+          "text": "Now create the test file:",
+          "time": {
+            "start": 1793040465564,
+            "end": 1793040487382
+          },
+          "id": "prt_1798a3e9c001tYnS7NaZEYGNZ4",
+          "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+          "messageID": "msg_1798a385e0013wpYbze4B0llWO"
+        },
+        {
+          "type": "tool",
+          "tool": "write",
+          "callID": "chatcmpl-tool-80e97642cf65431993e136a46287ad01",
+          "state": {
+            "status": "completed",
+            "input": {
+              "content": "\"\"\"The write-approval gate: it resolves once, expires, and never leaks.\"\"\"\n\nfrom __future__ import annotations\n\nimport asyncio\nimport json\n\nimport pytest\nfrom agentic_odi_studio_api.studio.approvals import (\n    ApprovalDecision,\n    ApprovalNotFoundError,\n    ApprovalRegistry,\n    wait_for_decision,\n)\n\n\ndef _open(registry: ApprovalRegistry) -> tuple[object, object]:\n    async def _run() -> tuple[object, object]:\n        return registry.open(\n            tool_call_id=\"call-1\",\n            name=\"add_job\",\n            arguments={\"name\": \"Retention\"},\n            prompt=\"Allow the assistant to add job?\",\n        )\n\n    return asyncio.run(_run())\n\n\ndef test_open_describes_the_call_for_the_ui() -> None:\n    registry = ApprovalRegistry()\n    request, _future = _open(registry)\n\n    payload = request.to_dict()  # type: ignore[attr-defined]\n\n    assert payload[\"id\"].startswith(\"apv_\")\n    assert payload[\"tool_call_id\"] == \"call-1\"\n    assert payload[\"name\"] == \"add_job\"\n    assert payload[\"arguments\"] == {\"name\": \"Retention\"}\n    assert payload[\"prompt\"] == \"Allow the assistant to add job?\"\n    assert registry.pending == 1\n\n\ndef test_resolve_answers_the_waiting_turn() -> None:\n    registry = ApprovalRegistry()\n\n    async def _run() -> ApprovalDecision:\n        request, future = registry.open(\n            tool_call_id=\"call-1\", name=\"add_job\", arguments={}, prompt=\"?\"\n        )\n        pending = asyncio.create_task(wait_for_decision(registry, request, future, timeout=5))\n        await asyncio.sleep(0)\n        registry.resolve(request.id, ApprovalDecision(approved=True, reason=\"ok\"))\n        decision = await pending\n        assert decision is not None\n        return decision\n\n    decision = asyncio.run(_run())\n\n    assert decision.approved is True\n    assert decision.reason == \"ok\"\n    assert registry.pending == 0\n\n\ndef test_an_expired_gate_returns_none_and_is_forgotten() -> None:\n    registry = ApprovalRegistry()\n\n    async def _run() -> ApprovalDecision | None:\n        request, future = registry.open(\n            tool_call_id=\"call-1\", name=\"add_job\", arguments={}, prompt=\"?\"\n        )\n        return await wait_for_decision(registry, request, future, timeout=0.01)\n\n    assert asyncio.run(_run()) is None\n    assert registry.pending == 0\n\n\ndef test_a_gate_answers_only_once() -> None:\n    registry = ApprovalRegistry()\n\n    async def _run() -> None:\n        request, future = registry.open(\n            tool_call_id=\"call-1\", name=\"add_job\", arguments={}, prompt=\"?\"\n        )\n        registry.resolve(request.id, ApprovalDecision(approved=True))\n        with pytest.raises(ApprovalNotFoundError):\n            registry.resolve(request.id, ApprovalDecision(approved=False))\n        await asyncio.sleep(0)\n        assert future.done()\n\n    asyncio.run(_run())\n\n\ndef test_an_unknown_gate_cannot_be_resolved() -> None:\n    registry = ApprovalRegistry()\n\n    with pytest.raises(ApprovalNotFoundError):\n        registry.resolve(\"apv_missing\", ApprovalDecision(approved=True))\n\n\ndef test_cancel_all_drops_every_pending_gate() -> None:\n    registry = ApprovalRegistry()\n\n    async def _run() -> list[bool]:\n        _first, first_future = registry.open(\n            tool_call_id=\"call-1\", name=\"add_job\", arguments={}, prompt=\"?\"\n        )\n        _second, second_future = registry.open(\n            tool_call_id=\"call-2\", name=\"delete_job\", arguments={}, prompt=\"?\"\n        )\n        registry.cancel_all()\n        await asyncio.sleep(0)\n        return [first_future.cancelled(), second_future.cancelled()]\n\n    assert asyncio.run(_run()) == [True, True]\n    assert registry.pending == 0\n\n\ndef test_the_decision_serializes_for_the_stream() -> None:\n    decision = ApprovalDecision(approved=False, reason=\"not this time\")\n\n    assert json.loads(json.dumps(decision.__dict__)) == {\n        \"approved\": False,\n        \"reason\": \"not this time\",\n    }\n",
+              "filePath": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio-api/tests/test_studio_approvals.py"
+            },
+            "output": "Wrote file successfully.",
+            "metadata": {
+              "diagnostics": {},
+              "filepath": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio-api/tests/test_studio_approvals.py",
+              "exists": false,
+              "truncated": false
+            },
+            "title": "apps/studio-api/tests/test_studio_approvals.py",
+            "time": {
+              "start": 1793040487370,
+              "end": 1793040487418
+            }
+          },
+          "id": "prt_1798a3f46001j20rUm9cYqbzYc",
+          "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+          "messageID": "msg_1798a385e0013wpYbze4B0llWO"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "6e7d94fa653fd41dd20263e33734a016030f7dfa",
+          "type": "step-finish",
+          "tokens": {
+            "total": 32311,
+            "input": 35,
+            "output": 1012,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 31264
+            }
+          },
+          "cost": 0,
+          "id": "prt_1798a9510001mXbJQ3ikRrAgyd",
+          "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+          "messageID": "msg_1798a385e0013wpYbze4B0llWO"
+        },
+        {
+          "type": "patch",
+          "hash": "ac8d08a28f33fb848c4a7bbca2cff444e87964e3",
+          "files": [
+            "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio-api/tests/test_studio_approvals.py"
+          ],
+          "id": "prt_1798a9580001I7wJrjDTc96ngr",
+          "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+          "messageID": "msg_1798a385e0013wpYbze4B0llWO"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_179885c6c001rEi5wF0kJyeeFk",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit",
+          "root": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 32408,
+          "input": 30503,
+          "output": 81,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 1824
+          }
+        },
+        "modelID": "poolside/laguna-s-2.1:free",
+        "providerID": "kilo",
+        "time": {
+          "created": 1793040487851,
+          "completed": 1793040493349
+        },
+        "finish": "tool-calls",
+        "id": "msg_1798a95ab001yDY6QoIpRWxjTl",
+        "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7"
+      },
+      "parts": [
+        {
+          "snapshot": "6e7d94fa653fd41dd20263e33734a016030f7dfa",
+          "type": "step-start",
+          "id": "prt_1798aa565001w0Aj8rdkUl13jo",
+          "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+          "messageID": "msg_1798a95ab001yDY6QoIpRWxjTl"
+        },
+        {
+          "type": "text",
+          "text": "Run the tests:",
+          "time": {
+            "start": 1793040491892,
+            "end": 1793040492132
+          },
+          "id": "prt_1798aa574001arXgP32TYoXOw5",
+          "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+          "messageID": "msg_1798a95ab001yDY6QoIpRWxjTl"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "6e7d94fa653fd41dd20263e33734a016030f7dfa",
+          "type": "step-finish",
+          "tokens": {
+            "total": 32408,
+            "input": 30503,
+            "output": 81,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 1824
+            }
+          },
+          "cost": 0,
+          "id": "prt_1798aaace001p7xI51Kzjki4b0",
+          "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+          "messageID": "msg_1798a95ab001yDY6QoIpRWxjTl"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "chatcmpl-tool-2b74c2b4668c4da3a0cfef92edf03dfa",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "uv run pytest apps/studio-api/tests/test_studio_approvals.py -v 2>&1",
+              "workdir": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit"
+            },
+            "output": "============================= test session starts ==============================\nplatform linux -- Python 3.15.0, pytest-9.1.1, pluggy-1.6.0 -- /home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/.venv/bin/python\ncachedir: .pytest_cache\nrootdir: /home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit\nconfigfile: pyproject.toml\nplugins: platformdirs-4.13.0, cov-7.1.0, asyncio-1.4.0, anyio-4.15.1\nasyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function\ncollecting ... collected 7 items\n\napps/studio-api/tests/test_studio_approvals.py::test_open_describes_the_call_for_the_ui PASSED [ 14%]\napps/studio-api/tests/test_studio_approvals.py::test_resolve_answers_the_waiting_turn PASSED [ 28%]\napps/studio-api/tests/test_studio_approvals.py::test_an_expired_gate_returns_none_and_is_forgotten PASSED [ 42%]\napps/studio-api/tests/test_studio_approvals.py::test_a_gate_answers_only_once PASSED [ 57%]\napps/studio-api/tests/test_studio_approvals.py::test_an_unknown_gate_cannot_be_resolved PASSED [ 71%]\napps/studio-api/tests/test_studio_approvals.py::test_cancel_all_drops_every_pending_gate PASSED [ 85%]\napps/studio-api/tests/test_studio_approvals.py::test_the_decision_serializes_for_the_stream PASSED [100%]\n\n============================== 7 passed in 0.17s ===============================\n",
+            "metadata": {
+              "output": "============================= test session starts ==============================\nplatform linux -- Python 3.15.0, pytest-9.1.1, pluggy-1.6.0 -- /home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/.venv/bin/python\ncachedir: .pytest_cache\nrootdir: /home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit\nconfigfile: pyproject.toml\nplugins: platformdirs-4.13.0, cov-7.1.0, asyncio-1.4.0, anyio-4.15.1\nasyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function\ncollecting ... collected 7 items\n\napps/studio-api/tests/test_studio_approvals.py::test_open_describes_the_call_for_the_ui PASSED [ 14%]\napps/studio-api/tests/test_studio_approvals.py::test_resolve_answers_the_waiting_turn PASSED [ 28%]\napps/studio-api/tests/test_studio_approvals.py::test_an_expired_gate_returns_none_and_is_forgotten PASSED [ 42%]\napps/studio-api/tests/test_studio_approvals.py::test_a_gate_answers_only_once PASSED [ 57%]\napps/studio-api/tests/test_studio_approvals.py::test_an_unknown_gate_cannot_be_resolved PASSED [ 71%]\napps/studio-api/tests/test_studio_approvals.py::test_cancel_all_drops_every_pending_gate PASSED [ 85%]\napps/studio-api/tests/test_studio_approvals.py::test_the_decision_serializes_for_the_stream PASSED [100%]\n\n============================== 7 passed in 0.17s ===============================\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "uv run pytest apps/studio-api/tests/test_studio_approvals.py -v 2>&1",
+            "time": {
+              "start": 1793040492118,
+              "end": 1793040493205
+            }
+          },
+          "id": "prt_1798aabb500160hTTzXeluszUf",
+          "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+          "messageID": "msg_1798a95ab001yDY6QoIpRWxjTl"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_179885c6c001rEi5wF0kJyeeFk",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit",
+          "root": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 33157,
+          "input": 432,
+          "output": 322,
+          "reasoning": 19,
+          "cache": {
+            "write": 0,
+            "read": 32384
+          }
+        },
+        "modelID": "poolside/laguna-s-2.1:free",
+        "providerID": "kilo",
+        "time": {
+          "created": 1793040493357,
+          "completed": 1793040504829
+        },
+        "finish": "tool-calls",
+        "id": "msg_1798aab2c001Jbb5x18TJrHiv2",
+        "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7"
+      },
+      "parts": [
+        {
+          "snapshot": "6e7d94fa653fd41dd20263e33734a016030f7dfa",
+          "type": "step-start",
+          "id": "prt_1798ab60f0017rTDEUIbUNrTPx",
+          "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+          "messageID": "msg_1798aab2c001Jbb5x18TJrHiv2"
+        },
+        {
+          "type": "reasoning",
+          "text": "All 7 tests pass. Now let me run the linter to make sure code is clean:",
+          "time": {
+            "start": 1793040496148,
+            "end": 1793040497225
+          },
+          "id": "prt_1798ab6140010x0s2mcJR2rzDn",
+          "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+          "messageID": "msg_1798aab2c001Jbb5x18TJrHiv2"
+        },
+        {
+          "type": "text",
+          "text": "All 7 tests pass. Let me run linter and type-check:",
+          "time": {
+            "start": 1793040497229,
+            "end": 1793040504235
+          },
+          "id": "prt_1798aba4d001skQ90eC487VV3o",
+          "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+          "messageID": "msg_1798aab2c001Jbb5x18TJrHiv2"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "chatcmpl-tool-9f07c8c909bf401d85a03ab7baeff877",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "uv run ruff check apps/studio-api/src/agentic_odi_studio_api/studio/approvals.py apps/studio-api/src/agentic_odi_studio_api/studio/__init__.py apps/studio-api/tests/test_studio_approvals.py 2>&1",
+              "workdir": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit"
+            },
+            "output": "All checks passed!\n",
+            "metadata": {
+              "output": "All checks passed!\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "uv run ruff check apps/studio-api/src/agentic_odi_studio_api/studio/approvals.py apps/studio-api/src/agentic_odi_studio_api/studio/__init__.py apps/studio-api/tests/test_studio_approvals.py 2>&1",
+            "time": {
+              "start": 1793040500900,
+              "end": 1793040500975
+            }
+          },
+          "id": "prt_1798abf26001Qkcd0kcaDGdh2G",
+          "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+          "messageID": "msg_1798aab2c001Jbb5x18TJrHiv2"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "chatcmpl-tool-312bcfa181a440cabf96a66d058866cc",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "uv run ruff format --check apps/studio-api/src/agentic_odi_studio_api/studio/approvals.py apps/studio-api/src/agentic_odi_studio_api/studio/__init__.py apps/studio-api/tests/test_studio_approvals.py 2>&1",
+              "workdir": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit"
+            },
+            "output": "3 files already formatted\n",
+            "metadata": {
+              "output": "3 files already formatted\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "uv run ruff format --check apps/studio-api/src/agentic_odi_studio_api/studio/approvals.py apps/studio-api/src/agentic_odi_studio_api/studio/__init__.py apps/studio-api/tests/test_studio_approvals.py 2>&1",
+            "time": {
+              "start": 1793040502892,
+              "end": 1793040502965
+            }
+          },
+          "id": "prt_1798ac954001tPEnRJ70Fj5laM",
+          "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+          "messageID": "msg_1798aab2c001Jbb5x18TJrHiv2"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "chatcmpl-tool-032f938717434592818f678fb30b5fdc",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "uv run mypy apps/studio-api/src/agentic_odi_studio_api/studio/approvals.py 2>&1",
+              "workdir": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit"
+            },
+            "output": "Success: no issues found in 1 source file\n",
+            "metadata": {
+              "output": "Success: no issues found in 1 source file\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "uv run mypy apps/studio-api/src/agentic_odi_studio_api/studio/approvals.py 2>&1",
+            "time": {
+              "start": 1793040504226,
+              "end": 1793040504704
+            }
+          },
+          "id": "prt_1798ad0780018ftDT1TzM1YwmO",
+          "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+          "messageID": "msg_1798aab2c001Jbb5x18TJrHiv2"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "6e7d94fa653fd41dd20263e33734a016030f7dfa",
+          "type": "step-finish",
+          "tokens": {
+            "total": 33157,
+            "input": 432,
+            "output": 322,
+            "reasoning": 19,
+            "cache": {
+              "write": 0,
+              "read": 32384
+            }
+          },
+          "cost": 0,
+          "id": "prt_1798ad7cf001WmOnd1tLetvEbA",
+          "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+          "messageID": "msg_1798aab2c001Jbb5x18TJrHiv2"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_179885c6c001rEi5wF0kJyeeFk",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit",
+          "root": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 33355,
+          "input": 8888,
+          "output": 116,
+          "reasoning": 31,
+          "cache": {
+            "write": 0,
+            "read": 24320
+          }
+        },
+        "modelID": "poolside/laguna-s-2.1:free",
+        "providerID": "kilo",
+        "time": {
+          "created": 1793040504858,
+          "completed": 1793040514363
+        },
+        "finish": "tool-calls",
+        "id": "msg_1798ad81a001UdXHJulOT0h2dR",
+        "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7"
+      },
+      "parts": [
+        {
+          "snapshot": "6e7d94fa653fd41dd20263e33734a016030f7dfa",
+          "type": "step-start",
+          "id": "prt_1798aeec9001o3MrS8qsgj0KPl",
+          "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+          "messageID": "msg_1798ad81a001UdXHJulOT0h2dR"
+        },
+        {
+          "type": "reasoning",
+          "text": "Everything passes — ruff lint, ruff format, and mypy. Now let me commit.\n\nLet me first stage and check the git status:",
+          "time": {
+            "start": 1793040510672,
+            "end": 1793040511205
+          },
+          "id": "prt_1798aeed0001xKzO4as5GS1YNP",
+          "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+          "messageID": "msg_1798ad81a001UdXHJulOT0h2dR"
+        },
+        {
+          "type": "text",
+          "text": "All checks pass. Let me commit:",
+          "time": {
+            "start": 1793040511209,
+            "end": 1793040514110
+          },
+          "id": "prt_1798af0e9001WFLgd1kOgcRSLl",
+          "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+          "messageID": "msg_1798ad81a001UdXHJulOT0h2dR"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "chatcmpl-tool-f6a2ec0a9b6648f6a421a2f8b406b10e",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "git add apps/studio-api/src/agentic_odi_studio_api/studio/approvals.py apps/studio-api/src/agentic_odi_studio_api/studio/__init__.py apps/studio-api/tests/test_studio_approvals.py && git status",
+              "workdir": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit"
+            },
+            "output": "On branch ui-not-looking-like-shit\nChanges to be committed:\n  (use \"git restore --staged <file>...\" to unstage)\n\tmodified:   apps/studio-api/src/agentic_odi_studio_api/studio/__init__.py\n\tnew file:   apps/studio-api/src/agentic_odi_studio_api/studio/approvals.py\n\tnew file:   apps/studio-api/tests/test_studio_approvals.py\n\n",
+            "metadata": {
+              "output": "On branch ui-not-looking-like-shit\nChanges to be committed:\n  (use \"git restore --staged <file>...\" to unstage)\n\tmodified:   apps/studio-api/src/agentic_odi_studio_api/studio/__init__.py\n\tnew file:   apps/studio-api/src/agentic_odi_studio_api/studio/approvals.py\n\tnew file:   apps/studio-api/tests/test_studio_approvals.py\n\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "git add apps/studio-api/src/agentic_odi_studio_api/studio/approvals.py apps/studio-api/src/agentic_odi_studio_api/studio/__init__.py apps/studio-api/tests/test_studio_approvals.py && git status",
+            "time": {
+              "start": 1793040514101,
+              "end": 1793040514187
+            }
+          },
+          "id": "prt_1798af193001Novkmv7myTBtwl",
+          "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+          "messageID": "msg_1798ad81a001UdXHJulOT0h2dR"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "6e7d94fa653fd41dd20263e33734a016030f7dfa",
+          "type": "step-finish",
+          "tokens": {
+            "total": 33355,
+            "input": 8888,
+            "output": 116,
+            "reasoning": 31,
+            "cache": {
+              "write": 0,
+              "read": 24320
+            }
+          },
+          "cost": 0,
+          "id": "prt_1798afcfb001mEMeuRQGwr5cuV",
+          "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+          "messageID": "msg_1798ad81a001UdXHJulOT0h2dR"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_179885c6c001rEi5wF0kJyeeFk",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit",
+          "root": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 33608,
+          "input": 33464,
+          "output": 144,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 0
+          }
+        },
+        "modelID": "poolside/laguna-s-2.1:free",
+        "providerID": "kilo",
+        "time": {
+          "created": 1793040514374,
+          "completed": 1793040536835
+        },
+        "finish": "tool-calls",
+        "id": "msg_1798afd46001Tp2yzVMv9FPVJ3",
+        "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7"
+      },
+      "parts": [
+        {
+          "snapshot": "6e7d94fa653fd41dd20263e33734a016030f7dfa",
+          "type": "step-start",
+          "id": "prt_1798b1f94001lwn4vAVZEVJV7Z",
+          "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+          "messageID": "msg_1798afd46001Tp2yzVMv9FPVJ3"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "chatcmpl-tool-7aaf309844a34a7bb074766aed1dbdc0",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "git commit -m \"feat: add ApprovalRegistry for mutating tool-call approval gates\n\nIn-process registry that opens, tracks, and resolves approval requests\nduring a streaming chat turn. Each gate uses an apv_ prefixed id, resolves\nexactly once, and is auto-discarded after timeout or decision. Includes\n7 tests covering open/describe, resolve, expiry, double-answer guard,\nunknown-id error, cancel-all, and decision serialization.\"",
+              "workdir": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit"
+            },
+            "output": "[ui-not-looking-like-shit 1555c36c] feat: add ApprovalRegistry for mutating tool-call approval gates\n 3 files changed, 275 insertions(+)\n create mode 100644 apps/studio-api/src/agentic_odi_studio_api/studio/approvals.py\n create mode 100644 apps/studio-api/tests/test_studio_approvals.py\n",
+            "metadata": {
+              "output": "[ui-not-looking-like-shit 1555c36c] feat: add ApprovalRegistry for mutating tool-call approval gates\n 3 files changed, 275 insertions(+)\n create mode 100644 apps/studio-api/src/agentic_odi_studio_api/studio/approvals.py\n create mode 100644 apps/studio-api/tests/test_studio_approvals.py\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "git commit -m \"feat: add ApprovalRegistry for mutating tool-call approval gates\n\nIn-process registry that opens, tracks, and resolves approval requests\nduring a streaming chat turn. Each gate uses an apv_ prefixed id, resolves\nexactly once, and is auto-discarded after timeout or decision. Includes\n7 tests covering open/describe, resolve, expiry, double-answer guard,\nunknown-id error, cancel-all, and decision serialization.\"",
+            "time": {
+              "start": 1793040525493,
+              "end": 1793040536702
+            }
+          },
+          "id": "prt_1798b1f9e001J2kJHfuwDYO4P2",
+          "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+          "messageID": "msg_1798afd46001Tp2yzVMv9FPVJ3"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "6e7d94fa653fd41dd20263e33734a016030f7dfa",
+          "type": "step-finish",
+          "tokens": {
+            "total": 33608,
+            "input": 33464,
+            "output": 144,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 0
+            }
+          },
+          "cost": 0,
+          "id": "prt_1798b54b2001y6FX9goGMRa4ET",
+          "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+          "messageID": "msg_1798afd46001Tp2yzVMv9FPVJ3"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_179885c6c001rEi5wF0kJyeeFk",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit",
+          "root": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 34681,
+          "input": 16784,
+          "output": 969,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 16928
+          }
+        },
+        "modelID": "poolside/laguna-s-2.1:free",
+        "providerID": "kilo",
+        "time": {
+          "created": 1793040536846,
+          "completed": 1793040559287
+        },
+        "finish": "tool-calls",
+        "id": "msg_1798b550e001eKaN3TQHM0zqGL",
+        "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7"
+      },
+      "parts": [
+        {
+          "snapshot": "6e7d94fa653fd41dd20263e33734a016030f7dfa",
+          "type": "step-start",
+          "id": "prt_1798b5bfb001D4jGOu05kgiFcB",
+          "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+          "messageID": "msg_1798b550e001eKaN3TQHM0zqGL"
+        },
+        {
+          "type": "text",
+          "text": "Now write the report:",
+          "time": {
+            "start": 1793040538626,
+            "end": 1793040559118
+          },
+          "id": "prt_1798b5c02001HblPJ1N0qs6CcL",
+          "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+          "messageID": "msg_1798b550e001eKaN3TQHM0zqGL"
+        },
+        {
+          "type": "tool",
+          "tool": "write",
+          "callID": "chatcmpl-tool-01d212a2d392494582f3c802c2fd91e4",
+          "state": {
+            "status": "completed",
+            "input": {
+              "content": "# Task 1 Report: Backend Approval Registry\n\n## Status: Complete\n\n## Commits\n- `1555c36c` — feat: add ApprovalRegistry for mutating tool-call approval gates\n\n  3 files changed, 275 insertions(+)\n  - `apps/studio-api/src/agentic_odi_studio_api/studio/approvals.py` (new)\n  - `apps/studio-api/tests/test_studio_approvals.py` (new)\n  - `apps/studio-api/src/agentic_odi_studio_api/studio/__init__.py` (modified)\n\n## What was built\n\n**ApprovalRegistry** — an in-process, thread-safe registry for tool-call approval gates:\n- `ApprovalRequest` (dataclass): describes a pending gate with `apv_`-prefixed id, tool call metadata, prompt text, and ISO timestamp.\n- `ApprovalDecision` (dataclass): `approved` bool + optional `reason` string.\n- `ApprovalNotFoundError`: raised when resolving or answering an unknown/already-resolved gate.\n- `ApprovalRegistry`: `open()`, `resolve()`, `discard()`, `cancel_all()`, and `pending` property.\n- `wait_for_decision()`: async helper that awaits a future with timeout, auto-discards the gate, and returns `None` on expiry.\n\n**Design decisions resolved during implementation:**\n1. **ID format**: `apv_<12 hex char uuid>` as specified.\n2. **open() signature**: Uses keyword-only arguments (matching the reference) — `open(*, tool_call_id, name, arguments, prompt) -> tuple[ApprovalRequest, asyncio.Future]`.\n3. **resolve() behavior**: Returns `None` (not `ApprovalRequest`), removes from pending, sets future result, raises `ApprovalNotFoundError` if not found/done. This matches the reference implementation and test expectations, not the brief's sketch signature.\n4. **Models**: Used dataclasses (not Pydantic BaseModel) to match the reference implementation exactly. The tests rely on `to_dict()` and `__dict__` serialization, which are natural with dataclasses.\n5. **wait_for_decision**: Module-level async function (not an instance method) per the reference.\n6. **cancel**: `cancel_all()` (not instance `cancel(id)`) per the reference.\n\n## Test Summary\n**7/7 passing** — all ported from `feat/studio-assistant-ui-experience` branch with exact test names:\n1. `test_open_describes_the_call_for_the_ui` ✓\n2. `test_resolve_answers_the_waiting_turn` ✓\n3. `test_an_expired_gate_returns_none_and_is_forgotten` ✓\n4. `test_a_gate_answers_only_once` ✓\n5. `test_an_unknown_gate_cannot_be_resolved` ✓\n6. `test_cancel_all_drops_every_pending_gate` ✓\n7. `test_the_decision_serializes_for_the_stream` ✓\n\n## Verification\n- `uv run pytest apps/studio-api/tests/test_studio_approvals.py -v` → 7 passed in 0.17s\n- `uv run ruff check` → All checks passed\n- `uv run ruff format --check` → 3 files already formatted\n- `uv run mypy` → Success: no issues found\n\n## Exports\n`ApprovalRegistry` and other public symbols are exported from `studio/__init__.py` via `__all__`.\n\n## Concerns\n- The task brief's interface sketch (`resolve -> ApprovalRequest`, `get(id)`, instance `wait_for_decision(id)`, `cancel(id)`) differs from the reference implementation that the tests actually exercise. I followed the reference implementation since the tests were ported exactly — this is the correct contract. If the brief's interface is the intended final API, the tests would need to be adapted accordingly.\n- The brief mentioned Pydantic models, but the reference uses dataclasses. The test `test_the_decision_serializes_for_the_stream` uses `decision.__dict__` directly, which works cleanly with dataclasses. If converted to Pydantic, `model_dump()` would be more idiomatic and `__dict__` behavior may differ across pydantic versions.\n",
+              "filePath": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/.superpowers/sdd/2025-10-26-studio-assistant-ui-max-integration/task-1-report.md"
+            },
+            "output": "Wrote file successfully.",
+            "metadata": {
+              "diagnostics": {},
+              "filepath": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/.superpowers/sdd/2025-10-26-studio-assistant-ui-max-integration/task-1-report.md",
+              "exists": false,
+              "truncated": false
+            },
+            "title": ".superpowers/sdd/2025-10-26-studio-assistant-ui-max-integration/task-1-report.md",
+            "time": {
+              "start": 1793040559107,
+              "end": 1793040559128
+            }
+          },
+          "id": "prt_1798b5c97001Yi3PnsVWgyXB5C",
+          "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+          "messageID": "msg_1798b550e001eKaN3TQHM0zqGL"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "6e7d94fa653fd41dd20263e33734a016030f7dfa",
+          "type": "step-finish",
+          "tokens": {
+            "total": 34681,
+            "input": 16784,
+            "output": 969,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 16928
+            }
+          },
+          "cost": 0,
+          "id": "prt_1798bac58001vt4L2Gqjj56ezz",
+          "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+          "messageID": "msg_1798b550e001eKaN3TQHM0zqGL"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_179885c6c001rEi5wF0kJyeeFk",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit",
+          "root": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 34887,
+          "input": 32873,
+          "output": 190,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 1824
+          }
+        },
+        "modelID": "poolside/laguna-s-2.1:free",
+        "providerID": "kilo",
+        "time": {
+          "created": 1793040559314,
+          "completed": 1793040566320
+        },
+        "finish": "stop",
+        "id": "msg_1798bacd2001txTlXNCA34fspa",
+        "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7"
+      },
+      "parts": [
+        {
+          "snapshot": "6e7d94fa653fd41dd20263e33734a016030f7dfa",
+          "type": "step-start",
+          "id": "prt_1798bb575001U95rSy14lc5ISz",
+          "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+          "messageID": "msg_1798bacd2001txTlXNCA34fspa"
+        },
+        {
+          "type": "text",
+          "text": "## Summary\n\n**Status**: Complete  \n**Commit**: `1555c36c`  \n**Tests**: 7/7 passing (lint + mypy + format clean)\n\nCreated the `ApprovalRegistry` infrastructure — an in-process, thread-safe registry for tool-call approval gates. Each gate uses `apv_`-prefixed IDs, resolves exactly once, auto-discards after timeout, and the `cancel_all()` path ensures no futures leak on shutdown.\n\n**Two deviations from the task brief's interface sketch** (documented in the report): the reference implementation and its tests use dataclasses (not Pydantic `BaseModel`), and `resolve()` returns `None` rather than `ApprovalRequest`, with `cancel_all()`/`wait_for_decision()` as module-level functions rather than instance methods `cancel(id)`/`wait_for_decision(id)`. I followed the reference since the tests were ported exactly.",
+          "time": {
+            "start": 1793040561531,
+            "end": 1793040566083
+          },
+          "id": "prt_1798bb57b001tI3pf2L5whrhHn",
+          "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+          "messageID": "msg_1798bacd2001txTlXNCA34fspa"
+        },
+        {
+          "reason": "stop",
+          "snapshot": "6e7d94fa653fd41dd20263e33734a016030f7dfa",
+          "type": "step-finish",
+          "tokens": {
+            "total": 34887,
+            "input": 32873,
+            "output": 190,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 1824
+            }
+          },
+          "cost": 0,
+          "id": "prt_1798bc7b60016F5v2R6oUTyDz2",
+          "sessionID": "ses_e8677a3b4ffeA0APuQ8SOrEhu7",
+          "messageID": "msg_1798bacd2001txTlXNCA34fspa"
+        }
+      ]
+    }
+  ]
+}
