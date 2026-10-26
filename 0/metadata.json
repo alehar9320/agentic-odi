@@ -1,0 +1,49 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M5WZTAR3FHXRTQPMQ9MWP6JP",
+  "session_id": "ses_e8606aa81ffewMYZfcGXTAQtsT",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-26T20:53:28.006235808Z",
+  "branch": "ui-not-looking-like-shit",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "apps/studio/src/assistant/StudioRuntime.tsx",
+    "apps/studio/src/assistant/parts.tsx",
+    "apps/studio/src/components/icons.tsx"
+  ],
+  "agent": "OpenCode",
+  "model": "",
+  "turn_id": "aa2a2c917731",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 131261,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 1686704,
+    "output_tokens": 7485,
+    "api_call_count": 27
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-10-26T20:53:27.968458696Z",
+    "agent_lines": 0,
+    "agent_removed": 0,
+    "human_added": 420,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 420,
+    "total_lines_changed": 420,
+    "agent_percentage": 0,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 72,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        "task-10-report.md": 72
+      }
+    }
+  ]
+}
