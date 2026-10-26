@@ -1,6 +1,6 @@
 import { apiUrl } from "../bridge/desktopBridge";
 import { nowIso } from "./id";
-import type { CanvasData, Observation } from "../types";
+import type { CanvasData, ChangelogData, Observation } from "../types";
 import type { LocalStore } from "./store/types";
 import type { WorkspaceSnapshot } from "./store/types";
 import { openLocalStore } from "./store/openStore";
@@ -32,6 +32,26 @@ export class StudioBff {
 
   async fetchCanvas(): Promise<CanvasData> {
     return this.data.fetchCanvas();
+  }
+
+  async fetchChangelog(): Promise<ChangelogData> {
+    return {
+      releases: [
+        {
+          version: "0.12.0",
+          date: "2026-10-21",
+          categories: [
+            {
+              name: "Features",
+              items: [
+                "Keep the conversation on stage while a view is open",
+                "Local front-end fallback support when sidecar is offline",
+              ],
+            },
+          ],
+        },
+      ],
+    };
   }
 
   /** Serialize the whole local workspace (canvas, memory, conversations) to JSON. */

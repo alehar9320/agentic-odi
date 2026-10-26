@@ -2831,18 +2831,39 @@ input[type="range"] {
 /* Discrete Changelog Modal (Steve Jobs Quality)                     */
 /* ------------------------------------------------------------------ */
 .pill-changelog {
-  background: rgba(129, 140, 248, 0.18);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 9999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.01em;
+  background: linear-gradient(135deg, rgba(129, 140, 248, 0.16) 0%, rgba(99, 102, 241, 0.1) 100%);
   color: #a5b4fc;
-  border: 1px solid rgba(129, 140, 248, 0.4);
+  border: 1px solid rgba(129, 140, 248, 0.35);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+.studio-pill.pill-changelog::before {
+  display: none;
 }
 
 .pill-changelog:hover {
-  background: rgba(129, 140, 248, 0.3);
-  border-color: #818cf8;
+  background: linear-gradient(135deg, rgba(129, 140, 248, 0.28) 0%, rgba(99, 102, 241, 0.2) 100%);
+  border-color: rgba(129, 140, 248, 0.6);
   color: #ffffff;
-  box-shadow: 0 0 12px rgba(129, 140, 248, 0.25);
+  box-shadow: 0 0 12px rgba(129, 140, 248, 0.3), 0 2px 4px rgba(0, 0, 0, 0.15);
+  transform: translateY(-1px);
+}
+
+.pill-changelog:active {
+  transform: translateY(0) scale(0.97);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
 }
 
 .changelog-overlay {

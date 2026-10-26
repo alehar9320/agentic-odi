@@ -180,7 +180,10 @@ export async function fetchConfig(): Promise<StudioConfig> {
 }
 
 export function fetchChangelog(): Promise<ChangelogData> {
-  return getJson<ChangelogData>("/api/changelog");
+  return withLocal(
+    () => getJson<ChangelogData>("/api/changelog"),
+    (bff) => bff.fetchChangelog(),
+  );
 }
 
 export async function fetchCanvas(mcpUrl: string): Promise<CanvasData> {
