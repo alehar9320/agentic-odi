@@ -1,0 +1,66 @@
+"""The labeler workflows, pinned so the silent failures cannot come back.
+
+Every assertion here corresponds to a way the previous labelers failed while
+reporting success: inputs that never reached the action, labels that were never
+created, and failures hidden behind ``|| true``.
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
+RISK = ROOT / ".github" / "workflows" / "pr-risk.yml"
+
+
+def test_inputs_are_passed_with_with_not_env():
+    """A uses: step's env does not populate the action's inputs."""
+    text = RISK.read_text(encoding="utf-8")
+    assert "uses: ./.github/actions/pr-risk" in text
+    # Everything from the composite-action step onward is its wiring.
+    wiring = text.split("uses: ./.github/actions/pr-risk", 1)[1]
+    assert "with:" in wiring
+    expected = {
+        "BASE_SHA": "${{ github.event.pull_request.base.sha }}",
+        "HEAD_SHA": "${{ github.event.pull_request.head.sha }}",
+        "PR_NUMBER": "${{ github.event.pull_request.number }}",
+        "REPO": "${{ github.repository }}",
+        "GITHUB_TOKEN": "${{ secrets.GITHUB_TOKEN }}",
+    }
+    for key, value in expected.items():
+        assert f"{key}: {value}" in wiring, key
+
+
+def test_the_labels_job_creates_labels_with_an_explicit_repo():
+    """gh label create needs --repo outside a checkout."""
+    text = RISK.read_text(encoding="utf-8")
+    assert "gh label create" in text
+    assert "--repo" in text
+
+
+def test_permissions_include_issues_write():
+    """GitHub's label API lives under issues, so issues: write is required."""
+    text = RISK.read_text(encoding="utf-8")
+    assert "issues: write" in text
+    assert "pull-requests: write" in text
+
+
+def test_no_failure_is_swallowed_on_the_label_path():
+    """Removal may be tolerant; adding a label must not be."""
+    text = RISK.read_text(encoding="utf-8")
+    assert "pr_labels.py" in text
+    for line in text.splitlines():
+        if "--add-label" in line:
+            assert "|| true" not in line, f"swallowed add-label failure: {line.strip()}"
+
+
+def test_the_workflow_uses_the_managed_label_list_from_the_script():
+    """One source of truth: the workflow asks the script, it does not re-list."""
+    text = RISK.read_text(encoding="utf-8")
+    assert "pr_labels.py --managed" in text
+
+
+def test_the_workflow_never_checks_out_pr_code():
+    """A write-permission workflow must not run PR code."""
+    text = RISK.read_text(encoding="utf-8")
+    assert "pull_request_target" not in text

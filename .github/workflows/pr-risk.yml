@@ -11,27 +11,146 @@ concurrency:
 
 permissions:
   contents: read
-  pull-requests: write
-  checks: write
 
 defaults:
   run:
     shell: bash
 
 jobs:
+  # Provenance, size, domain, supply chain, and agent telemetry. Deterministic:
+  # no LLM calls, no external services, and no pull request code executed.
+  labels:
+    name: Label pull request
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write # gh label create lives under the issues API
+    steps:
+      - name: Checkout base branch
+        uses: actions/checkout@v7
+
+      # A fork pull request gets a read-only token, so labeling it cannot
+      # succeed. Say so instead of failing red on a PR we may not touch.
+      - name: Note fork pull requests
+        if: ${{ github.event.pull_request.head.repo.fork }}
+        run: echo "::notice::Skipping labels for a fork pull request (read-only token)."
+
+      - name: Ensure labels exist
+        if: ${{ ! github.event.pull_request.head.repo.fork }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          # --repo removes the need for a git checkout, which is what broke the
+          # previous attempt ("fatal: not a git repository"). --force keeps this
+          # idempotent across re-runs.
+          while IFS= read -r label; do
+            [ -z "$label" ] && continue
+            case "$label" in
+              "🤖 agent") color=8250df; description="Authored by a coding agent" ;;
+              "👤 human") color=0e8a16; description="Authored by a human" ;;
+              "size/XS") color=c2e0c6; description="Under 50 lines changed" ;;
+              "size/S") color=bfd4f2; description="50-249 lines changed" ;;
+              "size/M") color=fbca04; description="250-799 lines changed" ;;
+              "size/L") color=d93f0b; description="800-1999 lines changed" ;;
+              "size/XL") color=b60205; description="2000 or more lines changed" ;;
+              dependencies) color=0366d6; description="Pull requests that update a dependency file" ;;
+              "breaking change") color=b60205; description="Agent declared breaking changes" ;;
+              "needs deep dive") color=fbca04; description="Agent reported low confidence" ;;
+              "telemetry invalid") color=ededed; description="AGENT_METADATA block could not be parsed" ;;
+              area/mcp) color=006b75; description="MCP server (apps/mcp-server)" ;;
+              area/connectors) color=006b75; description="External connectors (packages/connectors)" ;;
+              area/website) color=c2e0c6; description="Published website (website)" ;;
+              area/brand) color=d4c5f9; description="Brand assets and mascot (brand)" ;;
+              area/infra) color=0052cc; description="Infrastructure (infra, wrangler)" ;;
+              area/ci) color=7057ff; description="CI, workflows, and release automation" ;;
+              area/cli) color=006b75; description="Command-line interface (apps/cli)" ;;
+              area/core) color=0075ca; description="Domain and services (packages/core)" ;;
+              area/docs) color=c2e0c6; description="Documentation and specifications" ;;
+              area/release) color=0052cc; description="Release and distribution pipeline" ;;
+              area/studio) color=1d76db; description="Living Studio (apps/studio, apps/studio-api)" ;;
+              *) color=ededed; description="Managed by the PR labeler" ;;
+            esac
+            gh label create "$label" --color "$color" --description "$description" \
+              --repo "$REPO" --force
+          done < <(python3 scripts/pr_labels.py --managed)
+
+      - name: Apply labels
+        if: ${{ ! github.event.pull_request.head.repo.fork }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          author_json="$(gh pr view "$PR_NUMBER" --repo "$REPO" --json author,body,headRefName)"
+          commits_json="$(gh api "repos/$REPO/pulls/$PR_NUMBER/commits?per_page=100" --paginate \
+            --jq '[.[] | "\(.commit.author.name) <\(.commit.author.email)>"]')"
+          files_json="$(gh api "repos/$REPO/pulls/$PR_NUMBER/files?per_page=100" --paginate \
+            --jq '[.[] | {filename, additions, deletions}] | .[:300]')"
+
+          facts="$(python3 - "$author_json" "$commits_json" "$files_json" <<'PY'
+          import json
+          import sys
+
+          meta = json.loads(sys.argv[1])
+          print(json.dumps({
+              "author": meta.get("author") or {},
+              "branch": meta.get("headRefName") or "",
+              "body": meta.get("body") or "",
+              "commits": json.loads(sys.argv[2]),
+              "files": json.loads(sys.argv[3]),
+          }))
+          PY
+          )"
+
+          computed="$(printf '%s' "$facts" | python3 scripts/pr_labels.py)"
+
+          # Remove labels this run no longer wants, then add what it does.
+          # Removing an absent label is a harmless no-op, so it is tolerated.
+          # Adding must not be swallowed, or the next silent failure looks
+          # exactly like the one this workflow was written to fix.
+          while IFS= read -r label; do
+            [ -z "$label" ] && continue
+            if ! printf '%s\n' "$computed" | grep -Fxq "$label"; then
+              gh pr edit "$PR_NUMBER" --repo "$REPO" --remove-label "$label" || true
+            fi
+          done < <(python3 scripts/pr_labels.py --managed)
+
+          while IFS= read -r label; do
+            [ -z "$label" ] && continue
+            gh pr edit "$PR_NUMBER" --repo "$REPO" --add-label "$label"
+          done <<< "$computed"
+
+          {
+            echo "### Labels applied"
+            echo
+            echo '```'
+            printf '%s\n' "$computed"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
   pr-risk:
     name: Classify PR risk
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: write
+      checks: write
     steps:
       - name: Checkout PR branch (full history for diffs)
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
+      # Inputs must go through `with:`. Step-level `env:` does not populate a
+      # composite action's `inputs`, which is why this job previously diffed
+      # empty SHAs and scored every pull request 0/100.
       - name: Score PR diff and apply risk label
         uses: ./.github/actions/pr-risk
-        env:
+        with:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
