@@ -63,6 +63,14 @@ describe("OpportunityLandscape Data Visualization", () => {
     expect(screen.getByText("Minimize risk of configuration drift")).toBeInTheDocument();
   });
 
+  it("disables search and filters while the canvas loads", () => {
+    harness.state.canvasState = { kind: "loading", data: null } as unknown as CanvasState;
+    render(<OpportunityLandscape />);
+
+    expect(screen.getByPlaceholderText(/Search opportunities/i)).toBeDisabled();
+    expect(screen.getByLabelText(/Show Underserved Only/i)).toBeDisabled();
+  });
+
   it("toggles underserved filter checkbox", () => {
     render(<OpportunityLandscape />);
     const checkbox = screen.getByLabelText(/Show Underserved Only/i);
