@@ -1,0 +1,39 @@
+You are implementing Task 1: Backend Approval Registry for the Agentic ODI studio API.
+
+## Task Description
+Read your task brief first: /home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/.superpowers/sdd/2025-10-26-studio-assistant-ui-max-integration/task-1-brief.md
+It contains the full task text from the plan.
+
+## Context
+This is the first backend task in a 15-task plan to add full assistant-ui integration (approvals, branching, reasoning/sources streaming) to the Agentic ODI studio API + SPA. You are building the approval gate infrastructure — an in-process registry that opens, tracks, and resolves tool-call approval requests during a streaming chat turn.
+
+The reference implementation lives in `feat/studio-assistant-ui-exexperience` branch. You can read any file from that branch with:
+  git show feat/studio-assistant-ui-experience:apps/studio-api/src/agentic_odi_studio_api/studio/approvals.py
+  git show feat/studio-assistant-ui-experience:apps/studio-api/tests/test_studio_approvals.py
+
+## Before You Begin
+Key decisions to make (resolve before coding):
+1. **Approval ID format**: Use `apv_` prefix for IDs (per the test expectations).
+2. **open() signature**: `open(tool_call_id, name, arguments, prompt) -> tuple[ApprovalRequest, asyncio.Future]` — returns both the request (for streaming) and a future (for the chat loop to await).
+3. **resolve() behavior**: Removes from pending, sets future result, raises `ApprovalNotFoundError` if not found.
+
+Ask questions if anything is unclear, but these decisions are settled by the spec.
+
+## Your Job
+1. Create `apps/studio-api/src/agentic_odi_studio_api/studio/approvals.py` with `ApprovalRequest`, `ApprovalDecision`, `ApprovalNotFoundError`, `ApprovalRegistry`
+2. Export from `__init__.py`
+3. Write `apps/studio-api/tests/test_studio_approvals.py` (port from feature branch with exact test names)
+4. Run tests
+5. Commit
+
+## Constraints
+- Python 3.10+
+- Async tests use `@pytest.mark.asyncio`
+- Do NOT use subagents
+- Report to: /home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/.superpowers/sdd/2025-10-26-studio-assistant-ui-max-integration/task-1-report.md
+
+## Code Organization
+Follow existing patterns in `apps/studio-api/src/agentic_odi_studio_api/studio/` — models use Pydantic, services use plain classes.
+
+## Report Format
+Write full report to the report file. Then return: Status, Commits, Test Summary (e.g. "8/8 passing"), Concerns.
