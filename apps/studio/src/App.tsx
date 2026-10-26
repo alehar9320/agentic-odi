@@ -1,83 +1,73 @@
-import { useEffect, useState } from "react";
-
-import { StudioRuntimeProvider } from "./assistant/StudioRuntime";
-import { ChangelogModal } from "./components/ChangelogModal";
-import { ChatStage } from "./components/chat/ChatStage";
+import { CanvasTabs } from "./components/canvas/CanvasTabs";
+import { ChatCopilot } from "./components/chat/ChatCopilot";
 import { ErrorBoundary } from "./components/ErrorBoundary";
-import { StudioBar } from "./components/layout/StudioBar";
-import { SidecarNotice } from "./components/notices/SidecarNotice";
+import { SettingsPanel } from "./components/SettingsPanel";
+import { StudioHeader } from "./components/StudioHeader";
 import { Toasts } from "./components/Toasts";
-import { WorkbenchRail } from "./components/workspace/WorkbenchRail";
-import { WorkspacePanel } from "./components/workspace/WorkspacePanel";
-import { FirstRunWizard, OnboardingProvider } from "./onboarding";
-import { StudioProvider, useStudio } from "./state/StudioContext";
+import { useStudio } from "./state/StudioContext";
+import { StudioProvider } from "./state/StudioContext";
 
-/**
- * One room, one intelligence.
- *
- * The conversation owns the stage at every moment. The rail above it is the
- * only navigation, and it is derived from what the thread has produced. A
- * workspace view docks beside the thread instead of replacing it, so the
- * composer never leaves the screen.
- */
-function StudioShell() {
-  const { closePanel, clearChat, closeSetup } = useStudio();
-  const [showChangelog, setShowChangelog] = useState(false);
-
-  function goHome() {
-    clearChat();
-    closePanel();
-    closeSetup();
-  }
-
-  function newConversation() {
-    clearChat();
-    closePanel();
-  }
-
-  useEffect(() => {
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        closePanel();
-      }
-    }
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [closePanel]);
-
+function StudioShellMinimal() {
   return (
     <div className="studio-app">
-      <SidecarNotice />
-      <main className="stage">
-        <StudioBar
-          onHome={goHome}
-          onNew={newConversation}
-          onChangelog={() => setShowChangelog(true)}
-        />
-        <div className="stage__split">
-          <div className="stage__thread">
-            <WorkbenchRail />
-            <ChatStage />
-          </div>
-          <WorkspacePanel />
-        </div>
-      </main>
-      <ChangelogModal isOpen={showChangelog} onClose={() => setShowChangelog(false)} />
+      <StudioHeader />
+      <div className="studio-layout">
+        <ChatCopilot />
+      </div>
       <Toasts />
     </div>
   );
+}
+
+function StudioShellModerate() {
+  return (
+    <div className="studio-app">
+      <StudioHeader />
+      <div className="studio-layout">
+        <CanvasTabs />
+        <ChatCopilot />
+      </div>
+      <Toasts />
+    </div>
+  );
+}
+
+function StudioShellFull() {
+  return (
+    <div className="studio-app">
+      <SettingsPanel />
+      <StudioHeader />
+      <div className="studio-layout">
+        <CanvasTabs />
+        <ChatCopilot />
+      </div>
+      <Toasts />
+    </div>
+  );
+}
+
+export function StudioShell({ engagementLevel }: { engagementLevel: number }) {
+  switch (engagementLevel) {
+    case 0:
+      return <StudioShellMinimal />;
+    case 1:
+      return <StudioShellModerate />;
+    case 2:
+    default:
+      return <StudioShellFull />;
+  }
+}
+
+function StudioShellFromContext() {
+  const { engagementLevel } = useStudio();
+  return <StudioShell engagementLevel={engagementLevel} />;
 }
 
 export default function App() {
   return (
     <ErrorBoundary>
       <StudioProvider>
-        <StudioRuntimeProvider>
-          <OnboardingProvider>
-            <StudioShell />
-            <FirstRunWizard />
-          </OnboardingProvider>
-        </StudioRuntimeProvider>
+        <StudioShellFromContext />
       </StudioProvider>
     </ErrorBoundary>
   );

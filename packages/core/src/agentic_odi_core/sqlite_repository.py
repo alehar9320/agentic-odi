@@ -8,27 +8,17 @@ from typing import Any
 
 from pydantic import BaseModel, ValidationError
 
-from agentic_odi_core.events import DEFAULT_DEVICE, DEFAULT_WORKSPACE, Event
 from agentic_odi_core.intent_store import IntentStore
 from agentic_odi_core.models import CustomerOutcome, Evidence, Job, Outcome, Step
-from agentic_odi_core.repository import Repository, page, rank_outcomes
+from agentic_odi_core.repository import Repository
 
 
 class SQLiteRepository(Repository):
-    def __init__(
-        self,
-        db_path: str | None = None,
-        workspace_id: str | None = None,
-        device_id: str | None = None,
-    ) -> None:
+    def __init__(self, db_path: str | None = None) -> None:
         if db_path is None:
             db_path = os.environ.get("AGENTIC_ODI_DB", os.path.expanduser("~/.agentic-odi/odi.db"))
         os.makedirs(os.path.dirname(db_path) or ".", exist_ok=True)
         self._lock = threading.RLock()
-        self._workspace_id = workspace_id or os.environ.get(
-            "AGENTIC_ODI_WORKSPACE", DEFAULT_WORKSPACE
-        )
-        self._device_id = device_id or os.environ.get("AGENTIC_ODI_DEVICE_ID", DEFAULT_DEVICE)
         self.store = IntentStore(db_path, check_same_thread=False)
         self._last_event_id = 0
         self._load_snapshot()
@@ -40,15 +30,15 @@ class SQLiteRepository(Repository):
         self.customer_outcomes: dict[str, CustomerOutcome] = {}
         self.evidence: dict[str, Evidence] = {}
         self._last_event_id = 0
-        for ev in self.store.get_stream(workspace_id=self._workspace_id, replay_order=True):
+        for ev in self.store.get_stream():
             self._apply_event(ev)
 
     def _sync(self) -> None:
-        for ev in self.store.get_stream(workspace_id=self._workspace_id):
+        for ev in self.store.get_stream():
             if ev["id"] > self._last_event_id:
                 self._apply_event(ev)
 
-    def _apply_event(self, ev: Event) -> None:
+    def _apply_event(self, ev: dict) -> None:
         et = ev["type"]
         p = ev["payload"]
         if et == "JOB_CREATED":
@@ -125,19 +115,14 @@ class SQLiteRepository(Repository):
 
     def add_job(self, job: Job) -> Job:
         with self._lock:
-            self.store.append(
-                "JOB_CREATED",
-                job.model_dump(),
-                workspace_id=self._workspace_id,
-                device_id=self._device_id,
-            )
+            self.store.append("JOB_CREATED", job.model_dump())
             self._sync()
             return job
 
-    def list_jobs(self, limit: int | None = None, offset: int = 0) -> list[Job]:
+    def list_jobs(self) -> list[Job]:
         with self._lock:
             self._sync()
-            return page(list(self.jobs.values()), limit, offset)
+            return list(self.jobs.values())
 
     def get_job(self, job_id: str) -> Job | None:
         with self._lock:
@@ -153,12 +138,7 @@ class SQLiteRepository(Repository):
             current = job.model_dump(exclude_unset=True)
             current.update(updates)
             new_job = job.model_validate(current)
-            self.store.append(
-                "JOB_UPDATED",
-                {"id": job_id, "updates": updates},
-                workspace_id=self._workspace_id,
-                device_id=self._device_id,
-            )
+            self.store.append("JOB_UPDATED", {"id": job_id, "updates": updates})
             self._sync()
             return new_job
 
@@ -167,23 +147,13 @@ class SQLiteRepository(Repository):
             self._sync()
             if job_id not in self.jobs:
                 return False
-            self.store.append(
-                "JOB_DELETED",
-                {"id": job_id},
-                workspace_id=self._workspace_id,
-                device_id=self._device_id,
-            )
+            self.store.append("JOB_DELETED", {"id": job_id})
             self._sync()
             return True
 
     def add_step(self, step: Step) -> Step:
         with self._lock:
-            self.store.append(
-                "STEP_CREATED",
-                step.model_dump(),
-                workspace_id=self._workspace_id,
-                device_id=self._device_id,
-            )
+            self.store.append("STEP_CREATED", step.model_dump())
             self._sync()
             return step
 
@@ -192,13 +162,10 @@ class SQLiteRepository(Repository):
             self._sync()
             return self.steps.get(step_id)
 
-    def get_steps_for_job(
-        self, job_id: str, limit: int | None = None, offset: int = 0
-    ) -> list[Step]:
+    def get_steps_for_job(self, job_id: str) -> list[Step]:
         with self._lock:
             self._sync()
-            steps = [s for s in self.steps.values() if s.job_id == job_id]
-            return page(steps, limit, offset)
+            return [s for s in self.steps.values() if s.job_id == job_id]
 
     def update_step(self, step_id: str, updates: dict) -> Step | None:
         with self._lock:
@@ -209,12 +176,7 @@ class SQLiteRepository(Repository):
             current = step.model_dump(exclude_unset=True)
             current.update(updates)
             new_step = step.model_validate(current)
-            self.store.append(
-                "STEP_UPDATED",
-                {"id": step_id, "updates": updates},
-                workspace_id=self._workspace_id,
-                device_id=self._device_id,
-            )
+            self.store.append("STEP_UPDATED", {"id": step_id, "updates": updates})
             self._sync()
             return new_step
 
@@ -223,23 +185,13 @@ class SQLiteRepository(Repository):
             self._sync()
             if step_id not in self.steps:
                 return False
-            self.store.append(
-                "STEP_DELETED",
-                {"id": step_id},
-                workspace_id=self._workspace_id,
-                device_id=self._device_id,
-            )
+            self.store.append("STEP_DELETED", {"id": step_id})
             self._sync()
             return True
 
     def add_outcome(self, outcome: Outcome) -> Outcome:
         with self._lock:
-            self.store.append(
-                "OUTCOME_CREATED",
-                outcome.model_dump(),
-                workspace_id=self._workspace_id,
-                device_id=self._device_id,
-            )
+            self.store.append("OUTCOME_CREATED", outcome.model_dump())
             self._sync()
             return outcome
 
@@ -248,19 +200,13 @@ class SQLiteRepository(Repository):
             self._sync()
             return self.outcomes.get(outcome_id)
 
-    def get_outcomes(
-        self,
-        job_id: str,
-        step_id: str | None = None,
-        limit: int | None = None,
-        offset: int = 0,
-    ) -> list[Outcome]:
+    def get_outcomes(self, job_id: str, step_id: str | None = None) -> list[Outcome]:
         with self._lock:
             self._sync()
             outs = [o for o in self.outcomes.values() if o.job_id == job_id]
             if step_id is not None:
                 outs = [o for o in outs if o.step_id == step_id]
-            return page(rank_outcomes(outs), limit, offset)
+            return outs
 
     def update_outcome(self, outcome_id: str, updates: dict) -> Outcome | None:
         with self._lock:
@@ -271,12 +217,7 @@ class SQLiteRepository(Repository):
             current = outcome.model_dump(exclude_unset=True)
             current.update(updates)
             new_outcome = outcome.model_validate(current)
-            self.store.append(
-                "OUTCOME_UPDATED",
-                {"id": outcome_id, "updates": updates},
-                workspace_id=self._workspace_id,
-                device_id=self._device_id,
-            )
+            self.store.append("OUTCOME_UPDATED", {"id": outcome_id, "updates": updates})
             self._sync()
             return new_outcome
 
@@ -285,23 +226,13 @@ class SQLiteRepository(Repository):
             self._sync()
             if outcome_id not in self.outcomes:
                 return False
-            self.store.append(
-                "OUTCOME_DELETED",
-                {"id": outcome_id},
-                workspace_id=self._workspace_id,
-                device_id=self._device_id,
-            )
+            self.store.append("OUTCOME_DELETED", {"id": outcome_id})
             self._sync()
             return True
 
     def add_customer_outcome(self, co: CustomerOutcome) -> CustomerOutcome:
         with self._lock:
-            self.store.append(
-                "CUSTOMER_OUTCOME_CREATED",
-                co.model_dump(),
-                workspace_id=self._workspace_id,
-                device_id=self._device_id,
-            )
+            self.store.append("CUSTOMER_OUTCOME_CREATED", co.model_dump())
             self._sync()
             return co
 
@@ -310,19 +241,12 @@ class SQLiteRepository(Repository):
             self._sync()
             return self.customer_outcomes.get(outcome_id)
 
-    def list_customer_outcomes(
-        self,
-        job_id: str | None = None,
-        limit: int | None = None,
-        offset: int = 0,
-    ) -> list[CustomerOutcome]:
+    def list_customer_outcomes(self, job_id: str | None = None) -> list[CustomerOutcome]:
         with self._lock:
             self._sync()
             if job_id is None:
-                items = list(self.customer_outcomes.values())
-            else:
-                items = [co for co in self.customer_outcomes.values() if co.job_id == job_id]
-            return page(items, limit, offset)
+                return list(self.customer_outcomes.values())
+            return [co for co in self.customer_outcomes.values() if co.job_id == job_id]
 
     def update_customer_outcome(
         self, outcome_id: str, updates: dict[str, Any]
@@ -338,23 +262,13 @@ class SQLiteRepository(Repository):
                 new_co = co.model_validate(current)
             except ValidationError:
                 return None
-            self.store.append(
-                "CUSTOMER_OUTCOME_UPDATED",
-                {"id": outcome_id, "updates": updates},
-                workspace_id=self._workspace_id,
-                device_id=self._device_id,
-            )
+            self.store.append("CUSTOMER_OUTCOME_UPDATED", {"id": outcome_id, "updates": updates})
             self._sync()
             return new_co
 
     def add_evidence(self, evidence: Evidence) -> Evidence:
         with self._lock:
-            self.store.append(
-                "EVIDENCE_CREATED",
-                evidence.model_dump(),
-                workspace_id=self._workspace_id,
-                device_id=self._device_id,
-            )
+            self.store.append("EVIDENCE_CREATED", evidence.model_dump())
             self._sync()
             return evidence
 
@@ -368,8 +282,6 @@ class SQLiteRepository(Repository):
         job_id: str | None = None,
         step_id: str | None = None,
         outcome_id: str | None = None,
-        limit: int | None = None,
-        offset: int = 0,
     ) -> list[Evidence]:
         with self._lock:
             self._sync()
@@ -380,19 +292,14 @@ class SQLiteRepository(Repository):
                 items = [item for item in items if item.step_id == step_id]
             if outcome_id is not None:
                 items = [item for item in items if item.outcome_id == outcome_id]
-            return page(items, limit, offset)
+            return items
 
     def delete_evidence(self, evidence_id: str) -> bool:
         with self._lock:
             self._sync()
             if evidence_id not in self.evidence:
                 return False
-            self.store.append(
-                "EVIDENCE_DELETED",
-                {"id": evidence_id},
-                workspace_id=self._workspace_id,
-                device_id=self._device_id,
-            )
+            self.store.append("EVIDENCE_DELETED", {"id": evidence_id})
             self._sync()
             return True
 
@@ -400,12 +307,7 @@ class SQLiteRepository(Repository):
         with self._lock:
             self._sync()
             if outcome_id in self.customer_outcomes:
-                self.store.append(
-                    "CUSTOMER_OUTCOME_DELETED",
-                    {"id": outcome_id},
-                    workspace_id=self._workspace_id,
-                    device_id=self._device_id,
-                )
+                self.store.append("CUSTOMER_OUTCOME_DELETED", {"id": outcome_id})
                 self._sync()
                 return True
             return False
@@ -414,7 +316,3 @@ class SQLiteRepository(Repository):
         with self._lock:
             self.store.clear()
             self._load_snapshot()
-
-    def reload(self) -> None:
-        """Re‑load the local snapshot from the event store."""
-        self._load_snapshot()

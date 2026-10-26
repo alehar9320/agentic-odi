@@ -16,7 +16,7 @@ def test_every_entity_type_survives_reopen(tmp_path):
         "add_outcome",
         {
             "job_id": job_id,
-            "statement": "Minimize the time to ship a release when the build is green",
+            "statement": "Min x",
             "importance": 8.0,
             "satisfaction": 4.0,
             "step_id": step_id,
@@ -30,7 +30,7 @@ def test_every_entity_type_survives_reopen(tmp_path):
                 "direction": "minimize",
                 "unit_of_measure": "time",
                 "object_of_control": "x",
-                "statement": "Minimize the time to ship a release when the build is green",
+                "statement": "Min x",
                 "importance": 8.0,
                 "satisfaction": 4.0,
                 "value_metrics": [

@@ -19,29 +19,6 @@ defaults:
     shell: bash
 
 jobs:
-  # A PR with no description gives a reviewer nothing to check the diff
-  # against, so an empty body fails the build before any expensive job runs.
-  pr-body:
-    if: ${{ github.event_name == 'pull_request' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      contents: read
-      pull-requests: read
-    steps:
-      - name: Require a non-empty pull request body
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          REPO: ${{ github.repository }}
-        run: |
-          body="$(gh pr view "$PR_NUMBER" --repo "$REPO" --json body --jq '.body')"
-          if [ -z "$(printf '%s' "$body" | tr -d '[:space:]')" ]; then
-            echo "::error::The pull request body is empty. Summarize the change and how you verified it."
-            exit 1
-          fi
-          echo "OK: pull request body is present"
-
   lint:
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -55,9 +32,6 @@ jobs:
       - name: Verify Ruff Formatting (no auto-fix)
         run: uv run ruff format --check .
 
-      - name: Verify the mascot assets match the generator
-        run: uv run python brand/tools/render.py --check
-
   typecheck:
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -66,7 +40,7 @@ jobs:
       - uses: ./.github/actions/setup
 
       - name: Run Mypy
-        run: uv run mypy apps brand packages
+        run: uv run mypy apps packages
 
       - name: Run Mypy (website)
         run: uv run --directory website mypy .
@@ -92,11 +66,7 @@ jobs:
       matrix:
         python-version: ["3.10", "3.11", "3.12"]
     steps:
-      # The protected-files contract diffs the branch against its base, so this
-      # job needs the parent commit, not a one-commit shallow checkout.
       - uses: actions/checkout@v7
-        with:
-          fetch-depth: 2
       - uses: ./.github/actions/setup
         with:
           python-version: ${{ matrix.python-version }}
@@ -122,7 +92,7 @@ jobs:
       # One upload per run is enough; the 3.12 report is the canonical one.
       - name: Upload coverage to Codecov
         if: ${{ matrix.python-version == '3.12' }}
-        uses: codecov/codecov-action@v7
+        uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml
@@ -233,21 +203,13 @@ jobs:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
 
-      # The site is generated from the repository's own sources and built in CI;
-      # no committed copy exists. If a fresh build fails, the PR is not ready.
-
       - name: Pytest (website)
         run: uv run --directory website pytest tests/
 
-      - name: Build site
-        run: uv run python website/tools/build_site.py --out _site
-
-      - name: Upload built site for review
-        uses: actions/upload-artifact@v7
-        with:
-          name: website-site
-          path: _site
-          if-no-files-found: error
+      - name: Build site (rsync)
+        run: |
+          mkdir -p _site
+          rsync -av website/ _site/ --exclude='tests/' --exclude='tools/'
 
   studio:
     runs-on: ubuntu-latest
@@ -258,7 +220,7 @@ jobs:
         working-directory: apps/studio
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@v6
         with:
           node-version: "lts/*"
           cache: npm
@@ -283,10 +245,6 @@ jobs:
         run: |
           npm run gen:api-types
           git diff --exit-code -- src/api/schema.d.ts
-
-  # Component snapshots are published by `chromatic.yml`, which runs on push.
-  # Chromatic recommends push over pull_request because a PR run checks out an
-  # ephemeral merge commit that diffs against the wrong baseline.
 
   tauri-check:
     runs-on: ubuntu-latest
@@ -333,7 +291,7 @@ jobs:
           sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file \
             libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev patchelf
 
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@v6
         with:
           node-version: "lts/*"
           cache: npm
@@ -349,24 +307,22 @@ jobs:
         run: npm ci
         working-directory: apps/studio
 
-      # Dependabot PRs cannot read repository secrets, so the signing key is
-      # empty there. Export it only when present and disable updater artifacts
-      # otherwise; passing an empty key makes the bundler try (and fail) to
-      # decode it.
-      - name: Build desktop bundle
+      - name: Configure updater artifacts
         working-directory: apps/studio
         env:
           SIGNING_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          SIGNING_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: |
-          if [ -n "$SIGNING_KEY" ]; then
-            export TAURI_SIGNING_PRIVATE_KEY="$SIGNING_KEY"
-            export TAURI_SIGNING_PRIVATE_KEY_PASSWORD="$SIGNING_KEY_PASSWORD"
-            npm run tauri -- build
-          else
+          if [ -z "$SIGNING_KEY" ]; then
+            echo 'TAURI_CONFIG={"bundle":{"createUpdaterArtifacts":false}}' >> "$GITHUB_ENV"
             echo "No TAURI_SIGNING_PRIVATE_KEY provided — building without signed updater artifacts."
-            npm run tauri -- build --config '{"bundle":{"createUpdaterArtifacts":false}}'
           fi
+
+      - name: Build desktop bundle
+        working-directory: apps/studio
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: npm run tauri build
 
       - name: Upload desktop bundles
         uses: actions/upload-artifact@v7

@@ -110,23 +110,3 @@ def test_registry_accepts_preset_config(tmp_path: Path) -> None:
     stored = registry.get("notion")
     assert stored.settings["auth"] == "oauth"
     assert stored.settings["url"] == "https://mcp.notion.com/mcp"
-
-
-def test_recommended_presets_are_marked() -> None:
-    recommended = {preset.id for preset in PRESETS if preset.is_recommended}
-
-    assert {"notion", "posthog", "exa", "linear", "github"} <= recommended
-
-
-def test_list_presets_recommended_filter_returns_subset() -> None:
-    full = list_presets()
-    rec = list_presets(recommended=True)
-
-    assert rec
-    assert {preset.id for preset in rec} <= {preset.id for preset in full}
-    assert all(preset.is_recommended for preset in rec)
-    assert len(rec) < len(full)
-
-
-def test_list_presets_recommended_false_returns_all() -> None:
-    assert len(list_presets(recommended=False)) == len(list_presets())

@@ -1,58 +1,5 @@
 # Changelog
 
-## [0.12.0](https://github.com/alehar9320/agentic-odi/compare/v0.11.0...v0.12.0) (2026-10-21)
-
-
-### Features
-
-* **studio:** keep the conversation on stage while a view is open ([#71](https://github.com/alehar9320/agentic-odi/issues/71)) ([ab6db19](https://github.com/alehar9320/agentic-odi/commit/ab6db196d0f8e533a69c580b3fc89e480b6ab971))
-
-## [0.11.0](https://github.com/alehar9320/agentic-odi/compare/v0.10.0...v0.11.0) (2026-10-21)
-
-
-### Features
-
-* add feature flags accessible via CLI and Studio settings ([#72](https://github.com/alehar9320/agentic-odi/issues/72)) ([52b2273](https://github.com/alehar9320/agentic-odi/commit/52b2273c477fa2c7f36882e24f3d52b23d048ccb))
-* **studio:** add discrete changelog drawer with Steve Jobs quality experience ([#60](https://github.com/alehar9320/agentic-odi/issues/60)) ([01dc737](https://github.com/alehar9320/agentic-odi/commit/01dc737dbf3ce6a8742e26ffe45e66254cc987cf))
-* **studio:** add feature-flagged first-run wizard ([#69](https://github.com/alehar9320/agentic-odi/issues/69)) ([3d07761](https://github.com/alehar9320/agentic-odi/commit/3d077618db0cb9cc3498af5d99b38cadf8ab2608))
-* **studio:** add intent and outcome notification catch-up experience ([#58](https://github.com/alehar9320/agentic-odi/issues/58)) ([b89e8f4](https://github.com/alehar9320/agentic-odi/commit/b89e8f419610954d6a9caeddf6b746076723c220))
-* **studio:** introduce 20 micro interactions and animations ([#61](https://github.com/alehar9320/agentic-odi/issues/61)) ([1fc5411](https://github.com/alehar9320/agentic-odi/commit/1fc5411db724b465040cd79db56c3a5713543959))
-
-
-### Bug Fixes
-
-* **deploy:** add required previews block for Worker previews ([#74](https://github.com/alehar9320/agentic-odi/issues/74)) ([00e3943](https://github.com/alehar9320/agentic-odi/commit/00e39436001bd0555405c637e05d71748447bdb7))
-* **pages:** deploy the website from main again ([#73](https://github.com/alehar9320/agentic-odi/issues/73)) ([f806382](https://github.com/alehar9320/agentic-odi/commit/f8063826cf827cb37fb108e564abd62439f1b7a8))
-
-## [0.10.0](https://github.com/alehar9320/agentic-odi/compare/v0.9.0...v0.10.0) (2026-10-21)
-
-
-### Features
-
-* MCP ↔ Living Studio connectors (presets, REST API, SSE suggestions) ([#56](https://github.com/alehar9320/agentic-odi/issues/56)) ([9b4c5aa](https://github.com/alehar9320/agentic-odi/commit/9b4c5aa1d56a44d225f1676a91abede120722fad))
-* **studio:** render agent-composed surfaces inline in chat ([#55](https://github.com/alehar9320/agentic-odi/issues/55)) ([97f7e95](https://github.com/alehar9320/agentic-odi/commit/97f7e95f7da831e6b78ef297895beef1330ddf12))
-
-## [0.9.0](https://github.com/alehar9320/agentic-odi/compare/v0.8.0...v0.9.0) (2026-10-21)
-
-
-### Features
-
-* **release:** publish end-user download & run instructions on every release ([#35](https://github.com/alehar9320/agentic-odi/issues/35)) ([bf8c147](https://github.com/alehar9320/agentic-odi/commit/bf8c14717f7c028c2269ee2d0b78c4b8ec4fb79a))
-* **storage:** local-first event store with Cloudflare D1 sync foundation ([#42](https://github.com/alehar9320/agentic-odi/issues/42)) ([b6487ac](https://github.com/alehar9320/agentic-odi/commit/b6487ac40a6c6184e4067c44f2bd47709f959a71))
-* **studio:** add world-class interactive data visualizations for opportunity landscape and job map ([#44](https://github.com/alehar9320/agentic-odi/issues/44)) ([50c38d6](https://github.com/alehar9320/agentic-odi/commit/50c38d6dbe8a1b24f35c927c6bfb6b45e639d388))
-* **studio:** chat-first interface with drawer and workspace panel ([#34](https://github.com/alehar9320/agentic-odi/issues/34)) ([ee1f154](https://github.com/alehar9320/agentic-odi/commit/ee1f154c815314c6a272cad6f3fb7cd0a324dea0))
-* **studio:** conversational first-run, commands, and offline manual work ([#43](https://github.com/alehar9320/agentic-odi/issues/43)) ([a3b8a33](https://github.com/alehar9320/agentic-odi/commit/a3b8a336c20cb2744cbc544da682f712dcd92efd))
-
-
-### Bug Fixes
-
-* **ci:** let tauri-build run without signing secrets ([#45](https://github.com/alehar9320/agentic-odi/issues/45)) ([2dc14e4](https://github.com/alehar9320/agentic-odi/commit/2dc14e4ae2065b465f920e8a1aa4e5b7a1d6b425))
-* **cli:** implement onboarding card and narrow profile except ([#49](https://github.com/alehar9320/agentic-odi/issues/49)) ([7346f6a](https://github.com/alehar9320/agentic-odi/commit/7346f6a76ab20246b0760f9b3bad2fd1a7362766))
-* **cli:** make the unreachable-server test hermetic ([#53](https://github.com/alehar9320/agentic-odi/issues/53)) ([8c04a1e](https://github.com/alehar9320/agentic-odi/commit/8c04a1ed099cb893239ef380c7a21f5dddfb4a8b))
-* **cli:** remove unused EvidenceNotFoundError import ([#51](https://github.com/alehar9320/agentic-odi/issues/51)) ([abbe628](https://github.com/alehar9320/agentic-odi/commit/abbe62877f06e2c46695dcba17f3f87a4933b4c7))
-* harden error handling and not-found checks ([#50](https://github.com/alehar9320/agentic-odi/issues/50)) ([7afe4a3](https://github.com/alehar9320/agentic-odi/commit/7afe4a344ab014ce0b5eaae5a6812ddf733391ff))
-* **website:** fix CSS variable, duplicate sections, SVG, description, apostrophes ([#47](https://github.com/alehar9320/agentic-odi/issues/47)) ([b8e141b](https://github.com/alehar9320/agentic-odi/commit/b8e141b9ec310a73322f75eb271f4b702c836f18))
-
 ## [0.8.0](https://github.com/alehar9320/agentic-odi/compare/v0.7.0...v0.8.0) (2026-10-20)
 
 
