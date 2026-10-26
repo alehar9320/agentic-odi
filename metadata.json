@@ -1,0 +1,43 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M5WKVTSYHKCZ7JS8NPRMYTK9",
+  "strategy": "manual-commit",
+  "branch": "stop-having-to-approve-runs",
+  "checkpoints_count": 1,
+  "files_touched": [
+    ".worktrees/pr-101/apps/studio/e2e/helpers.ts",
+    ".worktrees/pr-101/apps/studio/e2e/mcp-backend.spec.ts",
+    ".worktrees/pr-101/apps/studio/vite.config.ts",
+    ".worktrees/pr-101/website/tests/test_site.py",
+    ".worktrees/pr-125/apps/cli/src/agentic_odi_cli/backend.py",
+    ".worktrees/pr-125/apps/studio-api/src/agentic_odi_studio_api/app.py",
+    ".worktrees/pr-125/packages/core/src/agentic_odi_core/__init__.py",
+    ".worktrees/pr-125/packages/core/src/agentic_odi_core/contract.py",
+    ".worktrees/pr-125/packages/core/tests/test_capability_manifest.py",
+    ".worktrees/pr-125/uv.lock",
+    ".worktrees/pr-234/apps/cli/src/agentic_odi_cli/cli.py",
+    ".worktrees/pr-70/apps/studio-api/src/agentic_odi_studio_api/studio/mcp_data.py",
+    ".worktrees/pr-70/apps/studio/src/components/canvas/OutcomeCard.tsx",
+    ".worktrees/pr-76/README.md",
+    ".worktrees/pr-76/apps/studio/src/components/SettingsPanel.test.tsx",
+    ".worktrees/pr-76/apps/studio/src/components/SettingsPanel.tsx",
+    ".worktrees/pr-76/apps/studio/src/components/layout/StudioBar.test.tsx",
+    ".worktrees/pr-76/apps/studio/src/components/layout/StudioBar.tsx"
+  ],
+  "sessions": [
+    {
+      "metadata": "/0/metadata.json",
+      "transcript": "/0/full.jsonl",
+      "compact_transcript": "/0/transcript.jsonl",
+      "content_hash": "/0/content_hash.txt",
+      "prompt": "/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 704217,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 41499856,
+    "output_tokens": 36782,
+    "api_call_count": 168
+  }
+}

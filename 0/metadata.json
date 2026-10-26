@@ -1,0 +1,67 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M5WKVTSYHKCZ7JS8NPRMYTK9",
+  "session_id": "ses_e9211a1f6ffe8DKvjEmuo0Goc0",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-26T17:24:25.219657097Z",
+  "branch": "stop-having-to-approve-runs",
+  "checkpoints_count": 1,
+  "save_step_count": 1,
+  "files_touched": [
+    ".worktrees/pr-101/apps/studio/e2e/helpers.ts",
+    ".worktrees/pr-101/apps/studio/e2e/mcp-backend.spec.ts",
+    ".worktrees/pr-101/apps/studio/vite.config.ts",
+    ".worktrees/pr-101/website/tests/test_site.py",
+    ".worktrees/pr-125/apps/cli/src/agentic_odi_cli/backend.py",
+    ".worktrees/pr-125/apps/studio-api/src/agentic_odi_studio_api/app.py",
+    ".worktrees/pr-125/packages/core/src/agentic_odi_core/__init__.py",
+    ".worktrees/pr-125/packages/core/src/agentic_odi_core/contract.py",
+    ".worktrees/pr-125/packages/core/tests/test_capability_manifest.py",
+    ".worktrees/pr-125/uv.lock",
+    ".worktrees/pr-234/apps/cli/src/agentic_odi_cli/cli.py",
+    ".worktrees/pr-70/apps/studio-api/src/agentic_odi_studio_api/studio/mcp_data.py",
+    ".worktrees/pr-70/apps/studio/src/components/canvas/OutcomeCard.tsx",
+    ".worktrees/pr-76/README.md",
+    ".worktrees/pr-76/apps/studio/src/components/SettingsPanel.test.tsx",
+    ".worktrees/pr-76/apps/studio/src/components/SettingsPanel.tsx",
+    ".worktrees/pr-76/apps/studio/src/components/layout/StudioBar.test.tsx",
+    ".worktrees/pr-76/apps/studio/src/components/layout/StudioBar.tsx"
+  ],
+  "agent": "OpenCode",
+  "model": "nvidia/nemotron-3.5-super-vl-120b-a12b",
+  "turn_id": "10cd633d166e",
+  "checkpoint_transcript_start": 51,
+  "transcript_lines_at_start": 51,
+  "compact_transcript_start": 51,
+  "token_usage": {
+    "input_tokens": 704217,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 41499856,
+    "output_tokens": 36782,
+    "api_call_count": 168
+  },
+  "session_metrics": {
+    "turn_count": 2
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-10-26T17:24:25.088128152Z",
+    "agent_lines": 0,
+    "agent_removed": 0,
+    "human_added": 282,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 282,
+    "total_lines_changed": 305,
+    "agent_percentage": 0,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0
+    }
+  ]
+}
