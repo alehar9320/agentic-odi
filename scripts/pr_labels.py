@@ -7,6 +7,21 @@ network, so its behaviour can be pinned by tests.
 
 from __future__ import annotations
 
+import argparse
+import json
+import re
+import sys
+
+from pr_provenance import classify
+
+# Agents declare their own metadata in an HTML comment. The body may be
+# multi-line, so the pattern spans lines and captures everything up to the
+# closing marker.
+AGENT_METADATA_PATTERN = re.compile(
+    r"<!--\s*AGENT_METADATA\s*(.*?)\s*-->",
+    re.DOTALL,
+)
+
 # Size ladder. A reviewer reads this as "how much do I have to read".
 SIZE_THRESHOLDS: tuple[tuple[int, str], ...] = (
     (50, "size/XS"),
@@ -121,3 +136,94 @@ def is_dependency_change(filenames: list[str]) -> bool:
         filename.replace("\\", "/").rsplit("/", 1)[-1] in DEPENDENCY_FILES
         for filename in filenames or []
     )
+
+
+def telemetry_labels(body: str | None) -> set[str]:
+    """Read the agent's own metadata block out of a pull request body.
+
+    Agents embed a JSON object in an HTML comment. An unreadable block is worth
+    saying out loud rather than ignoring, so it gets its own label; a body with
+    no block at all is perfectly normal and gets nothing.
+    """
+    match = AGENT_METADATA_PATTERN.search(body or "")
+    if match is None:
+        return set()
+
+    try:
+        payload = json.loads(match.group(1))
+    except json.JSONDecodeError:
+        return {"telemetry invalid"}
+
+    if not isinstance(payload, dict):
+        return {"telemetry invalid"}
+
+    labels: set[str] = set()
+    # ``is True`` rather than a truthiness test: a string "false" or the integer
+    # 1 is not the boolean the contract asks for, and guessing would put a
+    # breaking-change label on a PR that never claimed one.
+    if payload.get("has_breaking_changes") is True:
+        labels.add("breaking change")
+    if payload.get("agent_confidence") == "low":
+        labels.add("needs deep dive")
+    return labels
+
+
+def compute_labels(facts: dict) -> set[str]:
+    """Return every label the managed axes imply for one pull request.
+
+    ``facts`` may be missing any key; a missing key is an absent signal, never
+    an error, because a half-populated payload should still label the PR.
+    """
+    author = facts.get("author") or {}
+    files = facts.get("files") or []
+    filenames = [entry.get("filename", "") for entry in files if isinstance(entry, dict)]
+
+    labels = {
+        classify(
+            author.get("login", ""),
+            author.get("type", ""),
+            facts.get("branch", ""),
+            facts.get("commits") or [],
+        )
+    }
+    labels.add(
+        size_label(
+            sum(entry.get("additions", 0) for entry in files if isinstance(entry, dict)),
+            sum(entry.get("deletions", 0) for entry in files if isinstance(entry, dict)),
+        )
+    )
+    labels |= domain_labels(filenames)
+    if is_dependency_change(filenames):
+        labels.add(DEPENDENCY_LABEL)
+    labels |= telemetry_labels(facts.get("body"))
+    return labels
+
+
+def main(argv: list[str] | None = None) -> int:
+    """Print labels for the workflow: computed from stdin, or ``--managed``."""
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--managed",
+        action="store_true",
+        help="print every label this system may add or remove, then exit",
+    )
+    args = parser.parse_args(argv)
+
+    if args.managed:
+        for label in sorted(MANAGED_LABELS):
+            print(label)
+        return 0
+
+    try:
+        facts = json.load(sys.stdin)
+    except json.JSONDecodeError as error:
+        print(f"could not read pull request facts: {error}", file=sys.stderr)
+        return 1
+
+    for label in sorted(compute_labels(facts)):
+        print(label)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

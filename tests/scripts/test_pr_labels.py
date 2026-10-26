@@ -1,11 +1,17 @@
 from __future__ import annotations
 
+import subprocess
+import sys
+from pathlib import Path
+
 import pytest
 from pr_labels import (
     MANAGED_LABELS,
+    compute_labels,
     domain_labels,
     is_dependency_change,
     size_label,
+    telemetry_labels,
 )
 
 
@@ -110,3 +116,117 @@ def test_managed_labels_cover_every_axis_this_system_owns():
         "area/ci",
         "area/docs",
     } == MANAGED_LABELS
+
+
+BREAKING = '<!-- AGENT_METADATA {"has_breaking_changes": true} -->'
+LOW_CONF = '<!-- AGENT_METADATA {"agent_confidence": "low"} -->'
+MULTILINE = '<!-- AGENT_METADATA\n{"has_breaking_changes": true, "agent_confidence": "low"}\n-->'
+
+
+def test_a_breaking_change_is_flagged():
+    assert telemetry_labels(BREAKING) == {"breaking change"}
+
+
+def test_low_confidence_asks_for_a_deep_dive():
+    assert telemetry_labels(LOW_CONF) == {"needs deep dive"}
+
+
+def test_a_multiline_block_parses():
+    assert telemetry_labels(MULTILINE) == {"breaking change", "needs deep dive"}
+
+
+def test_a_false_breaking_change_is_not_flagged():
+    assert telemetry_labels('<!-- AGENT_METADATA {"has_breaking_changes": false} -->') == set()
+
+
+def test_absent_metadata_is_not_an_error():
+    assert telemetry_labels(None) == set()
+    assert telemetry_labels("") == set()
+    assert telemetry_labels("Just a normal PR body.") == set()
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        "<!-- AGENT_METADATA {not json} -->",
+        "<!-- AGENT_METADATA { -->",
+        "<!-- AGENT_METADATA true -->",
+        '<!-- AGENT_METADATA "a string" -->',
+    ],
+)
+def test_malformed_metadata_is_flagged_and_never_raises(body):
+    assert telemetry_labels(body) == {"telemetry invalid"}
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        '{"agent_confidence": "yes"}',
+        '{"has_breaking_changes": 1}',
+        '{"has_breaking_changes": null}',
+        '{"agent_confidence": null}',
+        '{"unrelated": true}',
+    ],
+)
+def test_wrongly_typed_values_are_ignored(payload):
+    assert telemetry_labels(f"<!-- AGENT_METADATA {payload} -->") == set()
+
+
+def test_compute_labels_combines_every_axis():
+    facts = {
+        "author": {"login": "alehar9320", "type": "User"},
+        "branch": "slay/abc-promote-evidence",
+        "commits": [],
+        "body": BREAKING,
+        "files": [{"filename": "package-lock.json", "additions": 20, "deletions": 5}],
+    }
+    assert compute_labels(facts) == {"🤖 agent", "size/XS", "dependencies", "breaking change"}
+
+
+def test_compute_labels_survives_an_empty_pr():
+    facts = {"author": {"login": "x", "type": "User"}, "branch": "fix/y", "files": []}
+    assert compute_labels(facts) == {"👤 human", "size/XS"}
+
+
+def test_compute_labels_tolerates_missing_keys():
+    assert compute_labels({}) == {"👤 human", "size/XS"}
+
+
+def test_the_cli_runs_as_a_script():
+    """The workflow invokes this file directly, so __main__ must call main().
+
+    Without this the workflow would apply zero labels and still exit 0 — the
+    same silent failure this work exists to remove.
+    """
+    script = Path(__file__).resolve().parents[2] / "scripts" / "pr_labels.py"
+    managed = subprocess.run(
+        [sys.executable, str(script), "--managed"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert managed.returncode == 0, managed.stderr
+    assert set(managed.stdout.splitlines()) == MANAGED_LABELS
+
+    computed = subprocess.run(
+        [sys.executable, str(script)],
+        input='{"author": {"login": "x", "type": "User"}, "branch": "fix/y", "files": []}',
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert computed.returncode == 0, computed.stderr
+    assert set(computed.stdout.splitlines()) == {"👤 human", "size/XS"}
+
+
+def test_the_cli_fails_loudly_on_unreadable_input():
+    script = Path(__file__).resolve().parents[2] / "scripts" / "pr_labels.py"
+    result = subprocess.run(
+        [sys.executable, str(script)],
+        input="not json",
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 1
+    assert "could not read" in result.stderr
