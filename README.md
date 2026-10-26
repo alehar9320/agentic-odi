@@ -234,8 +234,8 @@ layout, updates, and release automation.
 
 Every guide above is also published on the
 [project site](https://alehar9320.github.io/agentic-odi/docs/), rendered from
-these files. The site adds a quick start, a generated MCP tool reference, and
-the connector catalog.
+these files. The site adds a quick start, a generated MCP tool reference, the
+connector catalog, and client-side search over every page (`Ctrl`/`Cmd`+`K`).
 
 ## Contributing
 
