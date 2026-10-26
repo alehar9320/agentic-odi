@@ -1,0 +1,656 @@
+{
+  "info": {
+    "id": "ses_e8632f532ffelXOEarF0SZxzLM",
+    "slug": "stellar-orchid",
+    "projectID": "e4fe19106d06261ebfed21a0e3ba06559abf1100",
+    "directory": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit",
+    "path": "",
+    "parentID": "ses_e86c0ebb4ffeAyfzsxiY2cHAfp",
+    "title": "Implement Task 6 frontend types (@general subagent)",
+    "agent": "general",
+    "model": {
+      "id": "nvidia/nemotron-3.5-super-vl-120b-a12b",
+      "providerID": "nvidia",
+      "variant": "default"
+    },
+    "version": "1.18.35",
+    "summary": {
+      "additions": 0,
+      "deletions": 0,
+      "files": 0
+    },
+    "cost": 0,
+    "tokens": {
+      "input": 57104,
+      "output": 2717,
+      "reasoning": 61,
+      "cache": {
+        "read": 39024,
+        "write": 0
+      }
+    },
+    "permission": [
+      {
+        "permission": "task",
+        "pattern": "*",
+        "action": "deny"
+      }
+    ],
+    "time": {
+      "created": 1793044843213,
+      "updated": 1793044888008
+    }
+  },
+  "messages": [
+    {
+      "info": {
+        "role": "user",
+        "time": {
+          "created": 1793044843245
+        },
+        "agent": "general",
+        "model": {
+          "providerID": "nvidia",
+          "modelID": "nvidia/nemotron-3.5-super-vl-120b-a12b"
+        },
+        "summary": {
+          "diffs": [
+            {
+              "file": "apps/studio/src/types.ts",
+              "patch": "Index: apps/studio/src/types.ts\n===================================================================\n--- apps/studio/src/types.ts\t\n+++ apps/studio/src/types.ts\t\n@@ -1,302 +1,362 @@\n-import type { RunStep } from \"./lib/run\";\n import type { UiCatalogManifest, UiNode } from \"./ui/protocol\";\n \n export interface Job {\n   id: string;\n   name?: string;\n   description?: string;\n }\n \n export interface Step {\n   id?: string;\n   job_id?: string;\n   name?: string;\n   order?: number;\n }\n \n export interface Outcome {\n   id?: string;\n   job_id?: string;\n   statement?: string;\n   importance?: number | null;\n   satisfaction?: number | null;\n   opportunity_score?: number | null;\n   evidence?: string;\n   telemetry?: string;\n }\n \n+export interface Evidence {\n+  id: string;\n+  source_name?: string;\n+  source_kind?: string;\n+  item_type?: string;\n+  name?: string;\n+  content?: string;\n+  job_id?: string | null;\n+  step_id?: string | null;\n+  outcome_id?: string | null;\n+}\n+\n export interface CanvasData {\n   jobs: Job[];\n   steps: Step[];\n   outcomes: Outcome[];\n+  /** Captured research records, in capture order until the user reorders them. */\n+  evidence?: Evidence[];\n   source: \"mcp\" | \"seed\" | \"local\";\n   /** Why the board is not what the server actually holds, when the sidecar knows. */\n   warnings?: string[];\n }\n \n /**\n  * What the canvas currently is. A union, not four booleans: \"no work yet\" and\n  * \"the fetch failed\" look identical if you only track emptiness, and a failed\n  * canvas must never render as an empty one.\n  */\n export type CanvasState =\n   | { kind: \"loading\"; data: CanvasData | null }\n   | { kind: \"ready\"; data: CanvasData }\n   | { kind: \"empty\"; data: CanvasData }\n   | { kind: \"error\"; error: StudioError; data: CanvasData | null };\n \n /**\n  * The one failure shape the sidecar reports. Every HTTP error arrives as\n  * `{\"error\": StudioError}`, so the UI can show what went wrong, what to do\n  * about it, and whether a retry is worth trying.\n  */\n export interface StudioError {\n   code: string;\n   message: string;\n   detail?: string | null;\n   suggestion?: string | null;\n   retryable: boolean;\n   request_id?: string | null;\n }\n \n+export type StudioTheme = \"light\" | \"dark\";\n+\n export interface StudioConfig {\n   base_url: string;\n   api_key: string;\n   model_name: string;\n   mcp_url: string;\n+  theme?: StudioTheme;\n }\n \n export interface LlmHealth {\n   healthy: boolean;\n   message: string;\n }\n \n+/** What the configured backend reports it can serve, and why it reported none. */\n+export interface ModelList {\n+  models: string[];\n+  error: string | null;\n+}\n+\n export interface McpHealth {\n   reachable: boolean;\n }\n \n /**\n- * What the configured endpoint says it serves. An empty list with a message is\n- * a normal answer — the provider simply does not publish a catalog — so the UI\n- * falls back to typing the model name rather than showing a failure.\n+ * Everything one turn can contain, in the order the agent produced it.\n+ *\n+ * Text and surfaces are the Studio's own vocabulary. Reasoning, tool calls,\n+ * sources, approvals, and attachments are conversation primitives the runtime\n+ * renders — the bridge in `assistant/convert.ts` maps each one to its\n+ * assistant-ui message part.\n  */\n-export interface ModelsResult {\n-  models: string[];\n-  message: string | null;\n+export type ToolStatus = \"running\" | \"ok\" | \"error\" | \"declined\";\n+\n+/** A write the agent is asking permission for. */\n+export interface ToolApproval {\n+  id: string;\n+  prompt: string;\n }\n \n-export type ChatPart =\n-  | { kind: \"text\"; text: string }\n-  | { kind: \"ui\"; id: string; node: UiNode };\n-\n-/**\n- * A file that travelled with a turn: its bytes, base64-encoded, and the media\n- * type the sidecar needs to decide between image content and inlined text.\n- */\n-export interface ChatAttachmentPayload {\n+export interface ChatAttachment {\n+  id: string;\n   name: string;\n-  media_type: string;\n-  data: string;\n+  contentType: string;\n+  size: number;\n+  /** Extracted text, sent to the model when the file is text-like. */\n+  text?: string;\n+  /** A data URL, sent as a vision part when the file is an image. */\n+  dataUrl?: string;\n }\n \n+export type ChatPart =\n+  | { kind: \"text\"; text: string }\n+  | { kind: \"reasoning\"; text: string }\n+  | { kind: \"ui\"; id: string; node: UiNode }\n+  | {\n+      kind: \"tool\";\n+      id: string;\n+      name: string;\n+      status: ToolStatus;\n+      preview?: string;\n+      /** Present while the runtime is waiting for the user's answer. */\n+      approval?: ToolApproval;\n+    }\n+  | {\n+      kind: \"source\";\n+      id: string;\n+      title: string;\n+      filename?: string;\n+      mediaType: string;\n+    };\n+\n export interface ChatMessage {\n-  /** Stable identity, so the thread runtime can address a turn to reload it. */\n-  id?: string;\n+  /** Stable id. Branching and persisted turns are keyed by it. */\n+  id: string;\n+  /** The message this one answers; `null` at the root of a branch. */\n+  parentId: string | null;\n   role: \"user\" | \"assistant\" | \"notice\";\n   content: string;\n   /**\n    * Assistant turns only: prose and surfaces in the order the agent produced\n    * them, so a card sits between the paragraphs that frame it. `content` stays\n    * the combined prose because that is what gets replayed as history.\n    */\n   parts?: ChatPart[];\n+  /** Files the user attached to this turn. */\n+  attachments?: ChatAttachment[];\n   /**\n    * Assistant turns only: the failure that ended this turn, so the transcript\n    * can show it in place instead of losing the question.\n    */\n   error?: StudioError;\n   /** The question this turn answered, kept so a failed turn can be retried. */\n   retryText?: string;\n-  /** Files this turn carried. Only the newest turn is sent with its bytes. */\n-  attachments?: ChatAttachmentPayload[];\n-  /** The files a failed or stopped turn should send again, if it had any. */\n-  retryAttachments?: ChatAttachmentPayload[];\n-  /**\n-   * Assistant turns only: the tools the turn used, in the order they ran. Kept\n-   * on the turn so a finished run can still be inspected later.\n-   */\n-  tools?: RunStep[];\n-  /** True when the reader stopped the run before it answered. */\n-  stopped?: boolean;\n }\n \n /**\n  * The user's context, captured on first run. Kept in local storage and sent to\n  * the sidecar so every reply starts from the user's actual product and job.\n  */\n export interface StudioBrief {\n   product_name: string;\n   product_url?: string;\n   target_user: string;\n   job_statement: string;\n   core_problem: string;\n   job_id?: string;\n }\n \n /**\n  * Lenses reachable from the rail and the bar. Chat is always the primary\n  * stage; a lens makes room for itself and never replaces the thread.\n  */\n export type WorkspacePanelId =\n   | \"landscape\"\n   | \"jobmap\"\n   | \"evidence\"\n   | \"capture\"\n   | \"memory\"\n   | \"catchup\"\n   | \"settings\";\n \n export type NotificationCategory = \"outcome\" | \"simulation\" | \"evidence\" | \"job\" | \"insight\";\n \n export interface StudioNotification {\n   id: string;\n   title: string;\n   message: string;\n   category: NotificationCategory;\n   timestamp: string;\n   read: boolean;\n   targetPanel?: WorkspacePanelId;\n   targetId?: string;\n   actionText?: string;\n   chatPrompt?: string;\n }\n \n export interface ChatStreamRequest {\n   base_url: string;\n   api_key: string;\n   model: string;\n   mcp_url: string;\n   messages: ChatMessage[];\n   brief?: StudioBrief | null;\n   /** What this client can render. Omitted by clients that only read prose. */\n   ui_catalog?: UiCatalogManifest;\n   /** Continue an existing thread instead of starting a new one. */\n   conversation_id?: string | null;\n+  /** Files attached to the last user turn. */\n+  attachments?: ChatAttachment[];\n+  /** Ask before the agent writes to stored data. */\n+  approvals?: boolean;\n+  /** The id this client is streaming the reply under. */\n+  assistant_id?: string | null;\n }\n \n+/** One turn in a persisted conversation, as the branch tree exposes it. */\n+export interface TurnNode {\n+  id: string;\n+  parent_id: string | null;\n+  role: string;\n+  content: string;\n+  created_at: string;\n+}\n+\n+export interface ConversationTree {\n+  conversation: Conversation;\n+  messages: TurnNode[];\n+  head_id: string | null;\n+}\n+\n export type ObservationKind =\n   | \"career\"\n   | \"opportunity\"\n   | \"business\"\n   | \"stakeholder\"\n   | \"constraint\"\n   | \"evidence\"\n   | \"preference\";\n \n export type ObservationStatus = \"suggested\" | \"confirmed\" | \"dismissed\";\n \n /** One thing the agent believes about the PM, shown for correction. */\n export interface Observation {\n   id: string;\n   kind: ObservationKind;\n   text: string;\n   data: Record<string, unknown>;\n   status: ObservationStatus;\n   confidence: number;\n   source_turn: number | null;\n   created_at: string;\n   updated_at: string;\n }\n \n export interface Conversation {\n   id: string;\n   title: string;\n   created_at: string;\n   updated_at: string;\n }\n \n export interface ConversationTurn {\n   id: number;\n   conversation_id: string;\n   role: \"user\" | \"assistant\" | \"system\" | \"tool\";\n   content: string;\n   created_at: string;\n }\n \n export interface LatestConversation {\n   conversation: Conversation | null;\n   turns: ConversationTurn[];\n }\n \n export interface CreateJobPayload {\n   name: string;\n   description?: string;\n   mcp_url: string;\n }\n \n export interface AddStepPayload {\n   mcp_url: string;\n   job_id: string;\n   name: string;\n   order: number;\n }\n \n export interface AddOutcomePayload {\n   mcp_url: string;\n   job_id: string;\n   statement: string;\n   importance: number;\n   satisfaction: number;\n }\n \n export interface ConnectorPreset {\n   id: string;\n   label: string;\n   area: string;\n   summary: string;\n   url: string;\n   auth: \"none\" | \"oauth\";\n   env_vars: string[];\n   headers: Record<string, string>;\n   docs: string;\n   tools: string[];\n   is_recommended: boolean;\n }\n \n export interface ConnectorListItem {\n   name: string;\n   kind: string;\n   enabled: boolean;\n }\n \n export interface ConnectorHealth {\n   ok: boolean;\n   message: string;\n   details: Record<string, unknown>;\n }\n \n export interface ConnectorOperationResponse {\n   ok: boolean;\n   name: string;\n }\n \n export interface AddConnectorPayload {\n   name?: string;\n   preset?: string;\n   url?: string;\n }\n \n export interface ChangelogCategory {\n   name: string;\n   items: string[];\n }\n \n export interface ChangelogRelease {\n   version: string;\n   date: string;\n   categories: ChangelogCategory[];\n }\n \n export interface ChangelogData {\n   releases: ChangelogRelease[];\n }\n",
+              "additions": 91,
+              "deletions": 31,
+              "status": "modified"
+            }
+          ]
+        },
+        "id": "msg_179cd0aeb001VjODZfKHV1AV4J",
+        "sessionID": "ses_e8632f532ffelXOEarF0SZxzLM"
+      },
+      "parts": [
+        {
+          "type": "text",
+          "text": "You are implementing Task 6: Frontend Type Definitions for the Agentic ODI studio SPA.\n\n## Task Description\nRead your task brief first: /home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/.superpowers/sdd/2025-10-26-studio-assistant-ui-max-integration/task-6-brief.md\n\n## Context\nThis is the first frontend task. The backend (Tasks 1-5) is committed and green (209 studio-api tests pass). You are now aligning `apps/studio/src/types.ts` with the new assistant-ui message model so `ChatMessage`, `ChatPart`, `ChatAttachment`, `ChatStreamRequest`, etc. match what the streaming backend sends.\n\nThe reference `types.ts` lives at `feat/studio-assistant-ui-experience:apps/studio/src/types.ts`. Key changes vs current:\n- Remove `import type { RunStep } from \"./lib/run\"` (that lib is being deleted later) and remove `tools?: RunStep[]` from ChatMessage.\n- Add `Evidence` interface (CanvasData.evidence).\n- Add `StudioTheme`, optional `theme` on StudioConfig.\n- `ModelList` replaces `ModelsResult` (`models` + `error` instead of `message`).\n- `ChatPart` union adds `reasoning`, `tool` (with id/status/preview/approval), `source`.\n- `ToolStatus = \"running\"|\"ok\"|\"error\"|\"declined\"`; `ToolApproval { id, prompt }`.\n- `ChatAttachment { id, name, contentType, size, text?, dataUrl? }`.\n- `ChatMessage { id, parentId, parts?, attachments?: ChatAttachment[], ... }` — remove `retryAttachments`, `stopped`, `tools`, `retryText`.\n- `ChatStreamRequest` adds `attachments`, `approvals`, `assistant_id`.\n- `TurnNode`, `ConversationTree` for branching.\n- Keep everything else identical.\n\n## Your Job\n1. Rewrite `apps/studio/src/types.ts` to match the reference (read it via `git show feat/studio-assistant-ui-experience:apps/studio/src/types.ts`).\n2. Run `npm --prefix apps/studio run typecheck` — expect errors until later tasks convert callers; that's acceptable for now but report what breaks.\n3. Commit `types.ts`.\n\n## Constraints\n- TypeScript strict mode.\n- Do NOT use subagents.\n- Report to: /home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/.superpowers/sdd/2025-10-26-studio-assistant-ui-max-integration/task-6-report.md\n\n## Report Format\nWrite full report to the report file. Then return: Status (DONE/DONE_WITH_CONCERNS), Commits, Test/Typecheck Summary, Concerns.",
+          "id": "prt_179cd0af6001xaCwwEsvmAALch",
+          "sessionID": "ses_e8632f532ffelXOEarF0SZxzLM",
+          "messageID": "msg_179cd0aeb001VjODZfKHV1AV4J"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_179cd0aeb001VjODZfKHV1AV4J",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit",
+          "root": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 19884,
+          "input": 19711,
+          "output": 158,
+          "reasoning": 15,
+          "cache": {
+            "write": 0,
+            "read": 0
+          }
+        },
+        "modelID": "nvidia/nemotron-3.5-super-vl-120b-a12b",
+        "providerID": "nvidia",
+        "time": {
+          "created": 1793044843698,
+          "completed": 1793044847272
+        },
+        "finish": "tool-calls",
+        "id": "msg_179cd0cb2001gant7wRbNfDHsD",
+        "sessionID": "ses_e8632f532ffelXOEarF0SZxzLM"
+      },
+      "parts": [
+        {
+          "snapshot": "919620150bdb832b4944ddeae693864f5b628eae",
+          "type": "step-start",
+          "id": "prt_179cd1509001VJPcKQN7o35QJV",
+          "sessionID": "ses_e8632f532ffelXOEarF0SZxzLM",
+          "messageID": "msg_179cd0cb2001gant7wRbNfDHsD"
+        },
+        {
+          "type": "reasoning",
+          "text": "Let me start by reading the task brief and the reference types.ts file.",
+          "time": {
+            "start": 1793044845838,
+            "end": 1793044846523
+          },
+          "id": "prt_179cd150e001UjLluaHLduBmKq",
+          "sessionID": "ses_e8632f532ffelXOEarF0SZxzLM",
+          "messageID": "msg_179cd0cb2001gant7wRbNfDHsD"
+        },
+        {
+          "type": "tool",
+          "tool": "read",
+          "callID": "call-3e868669-bfef-4d7a-b0f7-cf77d69c15e1",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/.superpowers/sdd/2025-10-26-studio-assistant-ui-max-integration/task-6-brief.md"
+            },
+            "output": "<path>/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/.superpowers/sdd/2025-10-26-studio-assistant-ui-max-integration/task-6-brief.md</path>\n<type>file</type>\n<content>\n1: ### Task 6: Frontend — Type Definitions\n2: \n3: **Files:**\n4: - Modify: `apps/studio/src/types.ts`\n5: \n6: **Interfaces:**\n7: - Consumes: nothing\n8: - Produces: `ChatAttachment` (client-side), `ChatPart` (rich), `ChatMessage` (with `parentId`), `ToolStatus`, `ToolApproval`, `TurnNode`, `ConversationTree`, `AttachmentRef`\n9: \n10: - [ ] **Step 1: Run typecheck as failing baseline**\n11: \n12: `npm --prefix apps/studio run typecheck`\n13: \n14: - [ ] **Step 2: Update `ChatAttachment` to `{ id, content_type, size?, text?, data_url?, name? }`**\n15: \n16: - [ ] **Step 3: Update `ChatPart` to discriminated union** with `reasoning`, `source`, `tool` (with `approval`), `error` kinds\n17: \n18: - [ ] **Step 4: Update `ChatMessage` to add `id`, `parent_id`**\n19: \n20: - [ ] **Step 5: Add `ConversationTreeElement`, `TurnNode`**\n21: \n22: - [ ] **Step 6: Add `ToolStatus`, `ToolApproval`**\n23: \n24: - [ ] **Step 7: Run typecheck**\n25: \n26: `npm --prefix apps/studio run typecheck`\n27: \n28: ---\n29: \n\n(End of file - total 29 lines)\n</content>",
+            "metadata": {
+              "preview": "### Task 6: Frontend — Type Definitions\n\n**Files:**\n- Modify: `apps/studio/src/types.ts`\n\n**Interfaces:**\n- Consumes: nothing\n- Produces: `ChatAttachment` (client-side), `ChatPart` (rich), `ChatMessage` (with `parentId`), `ToolStatus`, `ToolApproval`, `TurnNode`, `ConversationTree`, `AttachmentRef`\n\n- [ ] **Step 1: Run typecheck as failing baseline**\n\n`npm --prefix apps/studio run typecheck`\n\n- [ ] **Step 2: Update `ChatAttachment` to `{ id, content_type, size?, text?, data_url?, name? }`**\n\n- [ ] **Step 3: Update `ChatPart` to discriminated union** with `reasoning`, `source`, `tool` (with `approval`), `error` kinds\n\n- [ ] **Step 4: Update `ChatMessage` to add `id`, `parent_id`**\n\n- [ ] **Step 5: Add `ConversationTreeElement`, `TurnNode`**",
+              "truncated": false,
+              "loaded": [],
+              "display": {
+                "type": "file",
+                "path": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/.superpowers/sdd/2025-10-26-studio-assistant-ui-max-integration/task-6-brief.md",
+                "text": "### Task 6: Frontend — Type Definitions\n\n**Files:**\n- Modify: `apps/studio/src/types.ts`\n\n**Interfaces:**\n- Consumes: nothing\n- Produces: `ChatAttachment` (client-side), `ChatPart` (rich), `ChatMessage` (with `parentId`), `ToolStatus`, `ToolApproval`, `TurnNode`, `ConversationTree`, `AttachmentRef`\n\n- [ ] **Step 1: Run typecheck as failing baseline**\n\n`npm --prefix apps/studio run typecheck`\n\n- [ ] **Step 2: Update `ChatAttachment` to `{ id, content_type, size?, text?, data_url?, name? }`**\n\n- [ ] **Step 3: Update `ChatPart` to discriminated union** with `reasoning`, `source`, `tool` (with `approval`), `error` kinds\n\n- [ ] **Step 4: Update `ChatMessage` to add `id`, `parent_id`**\n\n- [ ] **Step 5: Add `ConversationTreeElement`, `TurnNode`**\n\n- [ ] **Step 6: Add `ToolStatus`, `ToolApproval`**\n\n- [ ] **Step 7: Run typecheck**\n\n`npm --prefix apps/studio run typecheck`\n\n---\n",
+                "lineStart": 1,
+                "lineEnd": 29,
+                "totalLines": 29,
+                "truncated": false
+              }
+            },
+            "title": ".superpowers/sdd/2025-10-26-studio-assistant-ui-max-integration/task-6-brief.md",
+            "time": {
+              "start": 1793044846541,
+              "end": 1793044846558
+            }
+          },
+          "id": "prt_179cd17c1001lquUa4BWztKck4",
+          "sessionID": "ses_e8632f532ffelXOEarF0SZxzLM",
+          "messageID": "msg_179cd0cb2001gant7wRbNfDHsD"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "call-25e3a1e7-36ee-47a1-b073-6f3703394daa",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "git show feat/studio-assistant-ui-experience:apps/studio/src/types.ts",
+              "workdir": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit"
+            },
+            "output": "import type { UiCatalogManifest, UiNode } from \"./ui/protocol\";\n\nexport interface Job {\n  id: string;\n  name?: string;\n  description?: string;\n}\n\nexport interface Step {\n  id?: string;\n  job_id?: string;\n  name?: string;\n  order?: number;\n}\n\nexport interface Outcome {\n  id?: string;\n  job_id?: string;\n  statement?: string;\n  importance?: number | null;\n  satisfaction?: number | null;\n  opportunity_score?: number | null;\n  evidence?: string;\n  telemetry?: string;\n}\n\nexport interface Evidence {\n  id: string;\n  source_name?: string;\n  source_kind?: string;\n  item_type?: string;\n  name?: string;\n  content?: string;\n  job_id?: string | null;\n  step_id?: string | null;\n  outcome_id?: string | null;\n}\n\nexport interface CanvasData {\n  jobs: Job[];\n  steps: Step[];\n  outcomes: Outcome[];\n  /** Captured research records, in capture order until the user reorders them. */\n  evidence?: Evidence[];\n  source: \"mcp\" | \"seed\" | \"local\";\n  /** Why the board is not what the server actually holds, when the sidecar knows. */\n  warnings?: string[];\n}\n\n/**\n * What the canvas currently is. A union, not four booleans: \"no work yet\" and\n * \"the fetch failed\" look identical if you only track emptiness, and a failed\n * canvas must never render as an empty one.\n */\nexport type CanvasState =\n  | { kind: \"loading\"; data: CanvasData | null }\n  | { kind: \"ready\"; data: CanvasData }\n  | { kind: \"empty\"; data: CanvasData }\n  | { kind: \"error\"; error: StudioError; data: CanvasData | null };\n\n/**\n * The one failure shape the sidecar reports. Every HTTP error arrives as\n * `{\"error\": StudioError}`, so the UI can show what went wrong, what to do\n * about it, and whether a retry is worth trying.\n */\nexport interface StudioError {\n  code: string;\n  message: string;\n  detail?: string | null;\n  suggestion?: string | null;\n  retryable: boolean;\n  request_id?: string | null;\n}\n\nexport type StudioTheme = \"light\" | \"dark\";\n\nexport interface StudioConfig {\n  base_url: string;\n  api_key: string;\n  model_name: string;\n  mcp_url: string;\n  theme?: StudioTheme;\n}\n\nexport interface LlmHealth {\n  healthy: boolean;\n  message: string;\n}\n\n/** What the configured backend reports it can serve, and why it reported none. */\nexport interface ModelList {\n  models: string[];\n  error: string | null;\n}\n\nexport interface McpHealth {\n  reachable: boolean;\n}\n\n/**\n * Everything one turn can contain, in the order the agent produced it.\n *\n * Text and surfaces are the Studio's own vocabulary. Reasoning, tool calls,\n * sources, approvals, and attachments are conversation primitives the runtime\n * renders — the bridge in `assistant/convert.ts` maps each one to its\n * assistant-ui message part.\n */\nexport type ToolStatus = \"running\" | \"ok\" | \"error\" | \"declined\";\n\n/** A write the agent is asking permission for. */\nexport interface ToolApproval {\n  id: string;\n  prompt: string;\n}\n\nexport interface ChatAttachment {\n  id: string;\n  name: string;\n  contentType: string;\n  size: number;\n  /** Extracted text, sent to the model when the file is text-like. */\n  text?: string;\n  /** A data URL, sent as a vision part when the file is an image. */\n  dataUrl?: string;\n}\n\nexport type ChatPart =\n  | { kind: \"text\"; text: string }\n  | { kind: \"reasoning\"; text: string }\n  | { kind: \"ui\"; id: string; node: UiNode }\n  | {\n      kind: \"tool\";\n      id: string;\n      name: string;\n      status: ToolStatus;\n      preview?: string;\n      /** Present while the runtime is waiting for the user's answer. */\n      approval?: ToolApproval;\n    }\n  | {\n      kind: \"source\";\n      id: string;\n      title: string;\n      filename?: string;\n      mediaType: string;\n    };\n\nexport interface ChatMessage {\n  /** Stable id. Branching and persisted turns are keyed by it. */\n  id: string;\n  /** The message this one answers; `null` at the root of a branch. */\n  parentId: string | null;\n  role: \"user\" | \"assistant\" | \"notice\";\n  content: string;\n  /**\n   * Assistant turns only: prose and surfaces in the order the agent produced\n   * them, so a card sits between the paragraphs that frame it. `content` stays\n   * the combined prose because that is what gets replayed as history.\n   */\n  parts?: ChatPart[];\n  /** Files the user attached to this turn. */\n  attachments?: ChatAttachment[];\n  /**\n   * Assistant turns only: the failure that ended this turn, so the transcript\n   * can show it in place instead of losing the question.\n   */\n  error?: StudioError;\n  /** The question this turn answered, kept so a failed turn can be retried. */\n  retryText?: string;\n}\n\n/**\n * The user's context, captured on first run. Kept in local storage and sent to\n * the sidecar so every reply starts from the user's actual product and job.\n */\nexport interface StudioBrief {\n  product_name: string;\n  product_url?: string;\n  target_user: string;\n  job_statement: string;\n  core_problem: string;\n  job_id?: string;\n}\n\n/**\n * Lenses reachable from the rail and the bar. Chat is always the primary\n * stage; a lens makes room for itself and never replaces the thread.\n */\nexport type WorkspacePanelId =\n  | \"landscape\"\n  | \"jobmap\"\n  | \"evidence\"\n  | \"capture\"\n  | \"memory\"\n  | \"catchup\"\n  | \"settings\";\n\nexport type NotificationCategory = \"outcome\" | \"simulation\" | \"evidence\" | \"job\" | \"insight\";\n\nexport interface StudioNotification {\n  id: string;\n  title: string;\n  message: string;\n  category: NotificationCategory;\n  timestamp: string;\n  read: boolean;\n  targetPanel?: WorkspacePanelId;\n  targetId?: string;\n  actionText?: string;\n  chatPrompt?: string;\n}\n\nexport interface ChatStreamRequest {\n  base_url: string;\n  api_key: string;\n  model: string;\n  mcp_url: string;\n  messages: ChatMessage[];\n  brief?: StudioBrief | null;\n  /** What this client can render. Omitted by clients that only read prose. */\n  ui_catalog?: UiCatalogManifest;\n  /** Continue an existing thread instead of starting a new one. */\n  conversation_id?: string | null;\n  /** Files attached to the last user turn. */\n  attachments?: ChatAttachment[];\n  /** Ask before the agent writes to stored data. */\n  approvals?: boolean;\n  /** The id this client is streaming the reply under. */\n  assistant_id?: string | null;\n}\n\n/** One turn in a persisted conversation, as the branch tree exposes it. */\nexport interface TurnNode {\n  id: string;\n  parent_id: string | null;\n  role: string;\n  content: string;\n  created_at: string;\n}\n\nexport interface ConversationTree {\n  conversation: Conversation;\n  messages: TurnNode[];\n  head_id: string | null;\n}\n\nexport type ObservationKind =\n  | \"career\"\n  | \"opportunity\"\n  | \"business\"\n  | \"stakeholder\"\n  | \"constraint\"\n  | \"evidence\"\n  | \"preference\";\n\nexport type ObservationStatus = \"suggested\" | \"confirmed\" | \"dismissed\";\n\n/** One thing the agent believes about the PM, shown for correction. */\nexport interface Observation {\n  id: string;\n  kind: ObservationKind;\n  text: string;\n  data: Record<string, unknown>;\n  status: ObservationStatus;\n  confidence: number;\n  source_turn: number | null;\n  created_at: string;\n  updated_at: string;\n}\n\nexport interface Conversation {\n  id: string;\n  title: string;\n  created_at: string;\n  updated_at: string;\n}\n\nexport interface ConversationTurn {\n  id: number;\n  conversation_id: string;\n  role: \"user\" | \"assistant\" | \"system\" | \"tool\";\n  content: string;\n  created_at: string;\n}\n\nexport interface LatestConversation {\n  conversation: Conversation | null;\n  turns: ConversationTurn[];\n}\n\nexport interface CreateJobPayload {\n  name: string;\n  description?: string;\n  mcp_url: string;\n}\n\nexport interface AddStepPayload {\n  mcp_url: string;\n  job_id: string;\n  name: string;\n  order: number;\n}\n\nexport interface AddOutcomePayload {\n  mcp_url: string;\n  job_id: string;\n  statement: string;\n  importance: number;\n  satisfaction: number;\n}\n\nexport interface ConnectorPreset {\n  id: string;\n  label: string;\n  area: string;\n  summary: string;\n  url: string;\n  auth: \"none\" | \"oauth\";\n  env_vars: string[];\n  headers: Record<string, string>;\n  docs: string;\n  tools: string[];\n  is_recommended: boolean;\n}\n\nexport interface ConnectorListItem {\n  name: string;\n  kind: string;\n  enabled: boolean;\n}\n\nexport interface ConnectorHealth {\n  ok: boolean;\n  message: string;\n  details: Record<string, unknown>;\n}\n\nexport interface ConnectorOperationResponse {\n  ok: boolean;\n  name: string;\n}\n\nexport interface AddConnectorPayload {\n  name?: string;\n  preset?: string;\n  url?: string;\n}\n\nexport interface ChangelogCategory {\n  name: string;\n  items: string[];\n}\n\nexport interface ChangelogRelease {\n  version: string;\n  date: string;\n  categories: ChangelogCategory[];\n}\n\nexport interface ChangelogData {\n  releases: ChangelogRelease[];\n}\n",
+            "metadata": {
+              "output": "import type { UiCatalogManifest, UiNode } from \"./ui/protocol\";\n\nexport interface Job {\n  id: string;\n  name?: string;\n  description?: string;\n}\n\nexport interface Step {\n  id?: string;\n  job_id?: string;\n  name?: string;\n  order?: number;\n}\n\nexport interface Outcome {\n  id?: string;\n  job_id?: string;\n  statement?: string;\n  importance?: number | null;\n  satisfaction?: number | null;\n  opportunity_score?: number | null;\n  evidence?: string;\n  telemetry?: string;\n}\n\nexport interface Evidence {\n  id: string;\n  source_name?: string;\n  source_kind?: string;\n  item_type?: string;\n  name?: string;\n  content?: string;\n  job_id?: string | null;\n  step_id?: string | null;\n  outcome_id?: string | null;\n}\n\nexport interface CanvasData {\n  jobs: Job[];\n  steps: Step[];\n  outcomes: Outcome[];\n  /** Captured research records, in capture order until the user reorders them. */\n  evidence?: Evidence[];\n  source: \"mcp\" | \"seed\" | \"local\";\n  /** Why the board is not what the server actually holds, when the sidecar knows. */\n  warnings?: string[];\n}\n\n/**\n * What the canvas currently is. A union, not four booleans: \"no work yet\" and\n * \"the fetch failed\" look identical if you only track emptiness, and a failed\n * canvas must never render as an empty one.\n */\nexport type CanvasState =\n  | { kind: \"loading\"; data: CanvasData | null }\n  | { kind: \"ready\"; data: CanvasData }\n  | { kind: \"empty\"; data: CanvasData }\n  | { kind: \"error\"; error: StudioError; data: CanvasData | null };\n\n/**\n * The one failure shape the sidecar reports. Every HTTP error arrives as\n * `{\"error\": StudioError}`, so the UI can show what went wrong, what to do\n * about it, and whether a retry is worth trying.\n */\nexport interface StudioError {\n  code: string;\n  message: string;\n  detail?: string | null;\n  suggestion?: string | null;\n  retryable: boolean;\n  request_id?: string | null;\n}\n\nexport type StudioTheme = \"light\" | \"dark\";\n\nexport interface StudioConfig {\n  base_url: string;\n  api_key: string;\n  model_name: string;\n  mcp_url: string;\n  theme?: StudioTheme;\n}\n\nexport interface LlmHealth {\n  healthy: boolean;\n  message: string;\n}\n\n/** What the configured backend reports it can serve, and why it reported none. */\nexport interface ModelList {\n  models: string[];\n  error: string | null;\n}\n\nexport interface McpHealth {\n  reachable: boolean;\n}\n\n/**\n * Everything one turn can contain, in the order the agent produced it.\n *\n * Text and surfaces are the Studio's own vocabulary. Reasoning, tool calls,\n * sources, approvals, and attachments are conversation primitives the runtime\n * renders — the bridge in `assistant/convert.ts` maps each one to its\n * assistant-ui message part.\n */\nexport type ToolStatus = \"running\" | \"ok\" | \"error\" | \"declined\";\n\n/** A write the agent is asking permission for. */\nexport interface ToolApproval {\n  id: string;\n  prompt: string;\n}\n\nexport interface ChatAttachment {\n  id: string;\n  name: string;\n  contentType: string;\n  size: number;\n  /** Extracted text, sent to the model when the file is text-like. */\n  text?: string;\n  /** A data URL, sent as a vision part when the file is an image. */\n  dataUrl?: string;\n}\n\nexport type ChatPart =\n  | { kind: \"text\"; text: string }\n  | { kind: \"reasoning\"; text: string }\n  | { kind: \"ui\"; id: string; node: UiNode }\n  | {\n      kind: \"tool\";\n      id: string;\n      name: string;\n      status: ToolStatus;\n      preview?: string;\n      /** Present while the runtime is waiting for the user's answer. */\n      approval?: ToolApproval;\n    }\n  | {\n      kind: \"source\";\n      id: string;\n      title: string;\n      filename?: string;\n      mediaType: string;\n    };\n\nexport interface ChatMessage {\n  /** Stable id. Branching and persisted turns are keyed by it. */\n  id: string;\n  /** The message this one answers; `null` at the root of a branch. */\n  parentId: string | null;\n  role: \"user\" | \"assistant\" | \"notice\";\n  content: string;\n  /**\n   * Assistant turns only: prose and surfaces in the order the agent produced\n   * them, so a card sits between the paragraphs that frame it. `content` stays\n   * the combined prose because that is what gets replayed as history.\n   */\n  parts?: ChatPart[];\n  /** Files the user attached to this turn. */\n  attachments?: ChatAttachment[];\n  /**\n   * Assistant turns only: the failure that ended this turn, so the transcript\n   * can show it in place instead of losing the question.\n   */\n  error?: StudioError;\n  /** The question this turn answered, kept so a failed turn can be retried. */\n  retryText?: string;\n}\n\n/**\n * The user's context, captured on first run. Kept in local storage and sent to\n * the sidecar so every reply starts from the user's actual product and job.\n */\nexport interface StudioBrief {\n  product_name: string;\n  product_url?: string;\n  target_user: string;\n  job_statement: string;\n  core_problem: string;\n  job_id?: string;\n}\n\n/**\n * Lenses reachable from the rail and the bar. Chat is always the primary\n * stage; a lens makes room for itself and never replaces the thread.\n */\nexport type WorkspacePanelId =\n  | \"landscape\"\n  | \"jobmap\"\n  | \"evidence\"\n  | \"capture\"\n  | \"memory\"\n  | \"catchup\"\n  | \"settings\";\n\nexport type NotificationCategory = \"outcome\" | \"simulation\" | \"evidence\" | \"job\" | \"insight\";\n\nexport interface StudioNotification {\n  id: string;\n  title: string;\n  message: string;\n  category: NotificationCategory;\n  timestamp: string;\n  read: boolean;\n  targetPanel?: WorkspacePanelId;\n  targetId?: string;\n  actionText?: string;\n  chatPrompt?: string;\n}\n\nexport interface ChatStreamRequest {\n  base_url: string;\n  api_key: string;\n  model: string;\n  mcp_url: string;\n  messages: ChatMessage[];\n  brief?: StudioBrief | null;\n  /** What this client can render. Omitted by clients that only read prose. */\n  ui_catalog?: UiCatalogManifest;\n  /** Continue an existing thread instead of starting a new one. */\n  conversation_id?: string | null;\n  /** Files attached to the last user turn. */\n  attachments?: ChatAttachment[];\n  /** Ask before the agent writes to stored data. */\n  approvals?: boolean;\n  /** The id this client is streaming the reply under. */\n  assistant_id?: string | null;\n}\n\n/** One turn in a persisted conversation, as the branch tree exposes it. */\nexport interface TurnNode {\n  id: string;\n  parent_id: string | null;\n  role: string;\n  content: string;\n  created_at: string;\n}\n\nexport interface ConversationTree {\n  conversation: Conversation;\n  messages: TurnNode[];\n  head_id: string | null;\n}\n\nexport type ObservationKind =\n  | \"career\"\n  | \"opportunity\"\n  | \"business\"\n  | \"stakeholder\"\n  | \"constraint\"\n  | \"evidence\"\n  | \"preference\";\n\nexport type ObservationStatus = \"suggested\" | \"confirmed\" | \"dismissed\";\n\n/** One thing the agent believes about the PM, shown for correction. */\nexport interface Observation {\n  id: string;\n  kind: ObservationKind;\n  text: string;\n  data: Record<string, unknown>;\n  status: ObservationStatus;\n  confidence: number;\n  source_turn: number | null;\n  created_at: string;\n  updated_at: string;\n}\n\nexport interface Conversation {\n  id: string;\n  title: string;\n  created_at: string;\n  updated_at: string;\n}\n\nexport interface ConversationTurn {\n  id: number;\n  conversation_id: string;\n  role: \"user\" | \"assistant\" | \"system\" | \"tool\";\n  content: string;\n  created_at: string;\n}\n\nexport interface LatestConversation {\n  conversation: Conversation | null;\n  turns: ConversationTurn[];\n}\n\nexport interface CreateJobPayload {\n  name: string;\n  description?: string;\n  mcp_url: string;\n}\n\nexport interface AddStepPayload {\n  mcp_url: string;\n  job_id: string;\n  name: string;\n  order: number;\n}\n\nexport interface AddOutcomePayload {\n  mcp_url: string;\n  job_id: string;\n  statement: string;\n  importance: number;\n  satisfaction: number;\n}\n\nexport interface ConnectorPreset {\n  id: string;\n  label: string;\n  area: string;\n  summary: string;\n  url: string;\n  auth: \"none\" | \"oauth\";\n  env_vars: string[];\n  headers: Record<string, string>;\n  docs: string;\n  tools: string[];\n  is_recommended: boolean;\n}\n\nexport interface ConnectorListItem {\n  name: string;\n  kind: string;\n  enabled: boolean;\n}\n\nexport interface ConnectorHealth {\n  ok: boolean;\n  message: string;\n  details: Record<string, unknown>;\n}\n\nexport interface ConnectorOperationResponse {\n  ok: boolean;\n  name: string;\n}\n\nexport interface AddConnectorPayload {\n  name?: string;\n  preset?: string;\n  url?: string;\n}\n\nexport interface ChangelogCategory {\n  name: string;\n  items: string[];\n}\n\nexport interface ChangelogRelease {\n  version: string;\n  date: string;\n  categories: ChangelogCategory[];\n}\n\nexport interface ChangelogData {\n  releases: ChangelogRelease[];\n}\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "git show feat/studio-assistant-ui-experience:apps/studio/src/types.ts",
+            "time": {
+              "start": 1793044847012,
+              "end": 1793044847046
+            }
+          },
+          "id": "prt_179cd1996001eI02frI5o1Welf",
+          "sessionID": "ses_e8632f532ffelXOEarF0SZxzLM",
+          "messageID": "msg_179cd0cb2001gant7wRbNfDHsD"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "919620150bdb832b4944ddeae693864f5b628eae",
+          "type": "step-finish",
+          "tokens": {
+            "total": 19884,
+            "input": 19711,
+            "output": 158,
+            "reasoning": 15,
+            "cache": {
+              "write": 0,
+              "read": 0
+            }
+          },
+          "cost": 0,
+          "id": "prt_179cd1a3f00115TSpTTD9D8DQg",
+          "sessionID": "ses_e8632f532ffelXOEarF0SZxzLM",
+          "messageID": "msg_179cd0cb2001gant7wRbNfDHsD"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_179cd0aeb001VjODZfKHV1AV4J",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit",
+          "root": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 22683,
+          "input": 5200,
+          "output": 124,
+          "reasoning": 15,
+          "cache": {
+            "write": 0,
+            "read": 17344
+          }
+        },
+        "modelID": "nvidia/nemotron-3.5-super-vl-120b-a12b",
+        "providerID": "nvidia",
+        "time": {
+          "created": 1793044847285,
+          "completed": 1793044852045
+        },
+        "finish": "tool-calls",
+        "id": "msg_179cd1ab5001opodfjvRSXyf4n",
+        "sessionID": "ses_e8632f532ffelXOEarF0SZxzLM"
+      },
+      "parts": [
+        {
+          "snapshot": "919620150bdb832b4944ddeae693864f5b628eae",
+          "type": "step-start",
+          "id": "prt_179cd27ec001SpMA6h8B6O1Yei",
+          "sessionID": "ses_e8632f532ffelXOEarF0SZxzLM",
+          "messageID": "msg_179cd1ab5001opodfjvRSXyf4n"
+        },
+        {
+          "type": "reasoning",
+          "text": "Now let me read the current types.ts file to understand what's there.",
+          "time": {
+            "start": 1793044850674,
+            "end": 1793044851167
+          },
+          "id": "prt_179cd27f20012WQCjw9TalDvUc",
+          "sessionID": "ses_e8632f532ffelXOEarF0SZxzLM",
+          "messageID": "msg_179cd1ab5001opodfjvRSXyf4n"
+        },
+        {
+          "type": "tool",
+          "tool": "read",
+          "callID": "call-db7a4f10-9483-4eb5-97cd-89a2cdc5137a",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio/src/types.ts"
+            },
+            "output": "<path>/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio/src/types.ts</path>\n<type>file</type>\n<content>\n1: import type { RunStep } from \"./lib/run\";\n2: import type { UiCatalogManifest, UiNode } from \"./ui/protocol\";\n3: \n4: export interface Job {\n5:   id: string;\n6:   name?: string;\n7:   description?: string;\n8: }\n9: \n10: export interface Step {\n11:   id?: string;\n12:   job_id?: string;\n13:   name?: string;\n14:   order?: number;\n15: }\n16: \n17: export interface Outcome {\n18:   id?: string;\n19:   job_id?: string;\n20:   statement?: string;\n21:   importance?: number | null;\n22:   satisfaction?: number | null;\n23:   opportunity_score?: number | null;\n24:   evidence?: string;\n25:   telemetry?: string;\n26: }\n27: \n28: export interface CanvasData {\n29:   jobs: Job[];\n30:   steps: Step[];\n31:   outcomes: Outcome[];\n32:   source: \"mcp\" | \"seed\" | \"local\";\n33:   /** Why the board is not what the server actually holds, when the sidecar knows. */\n34:   warnings?: string[];\n35: }\n36: \n37: /**\n38:  * What the canvas currently is. A union, not four booleans: \"no work yet\" and\n39:  * \"the fetch failed\" look identical if you only track emptiness, and a failed\n40:  * canvas must never render as an empty one.\n41:  */\n42: export type CanvasState =\n43:   | { kind: \"loading\"; data: CanvasData | null }\n44:   | { kind: \"ready\"; data: CanvasData }\n45:   | { kind: \"empty\"; data: CanvasData }\n46:   | { kind: \"error\"; error: StudioError; data: CanvasData | null };\n47: \n48: /**\n49:  * The one failure shape the sidecar reports. Every HTTP error arrives as\n50:  * `{\"error\": StudioError}`, so the UI can show what went wrong, what to do\n51:  * about it, and whether a retry is worth trying.\n52:  */\n53: export interface StudioError {\n54:   code: string;\n55:   message: string;\n56:   detail?: string | null;\n57:   suggestion?: string | null;\n58:   retryable: boolean;\n59:   request_id?: string | null;\n60: }\n61: \n62: export interface StudioConfig {\n63:   base_url: string;\n64:   api_key: string;\n65:   model_name: string;\n66:   mcp_url: string;\n67: }\n68: \n69: export interface LlmHealth {\n70:   healthy: boolean;\n71:   message: string;\n72: }\n73: \n74: export interface McpHealth {\n75:   reachable: boolean;\n76: }\n77: \n78: /**\n79:  * What the configured endpoint says it serves. An empty list with a message is\n80:  * a normal answer — the provider simply does not publish a catalog — so the UI\n81:  * falls back to typing the model name rather than showing a failure.\n82:  */\n83: export interface ModelsResult {\n84:   models: string[];\n85:   message: string | null;\n86: }\n87: \n88: export type ChatPart =\n89:   | { kind: \"text\"; text: string }\n90:   | { kind: \"ui\"; id: string; node: UiNode };\n91: \n92: /**\n93:  * A file that travelled with a turn: its bytes, base64-encoded, and the media\n94:  * type the sidecar needs to decide between image content and inlined text.\n95:  */\n96: export interface ChatAttachmentPayload {\n97:   name: string;\n98:   media_type: string;\n99:   data: string;\n100: }\n101: \n102: export interface ChatMessage {\n103:   /** Stable identity, so the thread runtime can address a turn to reload it. */\n104:   id?: string;\n105:   role: \"user\" | \"assistant\" | \"notice\";\n106:   content: string;\n107:   /**\n108:    * Assistant turns only: prose and surfaces in the order the agent produced\n109:    * them, so a card sits between the paragraphs that frame it. `content` stays\n110:    * the combined prose because that is what gets replayed as history.\n111:    */\n112:   parts?: ChatPart[];\n113:   /**\n114:    * Assistant turns only: the failure that ended this turn, so the transcript\n115:    * can show it in place instead of losing the question.\n116:    */\n117:   error?: StudioError;\n118:   /** The question this turn answered, kept so a failed turn can be retried. */\n119:   retryText?: string;\n120:   /** Files this turn carried. Only the newest turn is sent with its bytes. */\n121:   attachments?: ChatAttachmentPayload[];\n122:   /** The files a failed or stopped turn should send again, if it had any. */\n123:   retryAttachments?: ChatAttachmentPayload[];\n124:   /**\n125:    * Assistant turns only: the tools the turn used, in the order they ran. Kept\n126:    * on the turn so a finished run can still be inspected later.\n127:    */\n128:   tools?: RunStep[];\n129:   /** True when the reader stopped the run before it answered. */\n130:   stopped?: boolean;\n131: }\n132: \n133: /**\n134:  * The user's context, captured on first run. Kept in local storage and sent to\n135:  * the sidecar so every reply starts from the user's actual product and job.\n136:  */\n137: export interface StudioBrief {\n138:   product_name: string;\n139:   product_url?: string;\n140:   target_user: string;\n141:   job_statement: string;\n142:   core_problem: string;\n143:   job_id?: string;\n144: }\n145: \n146: /**\n147:  * Lenses reachable from the rail and the bar. Chat is always the primary\n148:  * stage; a lens makes room for itself and never replaces the thread.\n149:  */\n150: export type WorkspacePanelId =\n151:   | \"landscape\"\n152:   | \"jobmap\"\n153:   | \"evidence\"\n154:   | \"capture\"\n155:   | \"memory\"\n156:   | \"catchup\"\n157:   | \"settings\";\n158: \n159: export type NotificationCategory = \"outcome\" | \"simulation\" | \"evidence\" | \"job\" | \"insight\";\n160: \n161: export interface StudioNotification {\n162:   id: string;\n163:   title: string;\n164:   message: string;\n165:   category: NotificationCategory;\n166:   timestamp: string;\n167:   read: boolean;\n168:   targetPanel?: WorkspacePanelId;\n169:   targetId?: string;\n170:   actionText?: string;\n171:   chatPrompt?: string;\n172: }\n173: \n174: export interface ChatStreamRequest {\n175:   base_url: string;\n176:   api_key: string;\n177:   model: string;\n178:   mcp_url: string;\n179:   messages: ChatMessage[];\n180:   brief?: StudioBrief | null;\n181:   /** What this client can render. Omitted by clients that only read prose. */\n182:   ui_catalog?: UiCatalogManifest;\n183:   /** Continue an existing thread instead of starting a new one. */\n184:   conversation_id?: string | null;\n185: }\n186: \n187: export type ObservationKind =\n188:   | \"career\"\n189:   | \"opportunity\"\n190:   | \"business\"\n191:   | \"stakeholder\"\n192:   | \"constraint\"\n193:   | \"evidence\"\n194:   | \"preference\";\n195: \n196: export type ObservationStatus = \"suggested\" | \"confirmed\" | \"dismissed\";\n197: \n198: /** One thing the agent believes about the PM, shown for correction. */\n199: export interface Observation {\n200:   id: string;\n201:   kind: ObservationKind;\n202:   text: string;\n203:   data: Record<string, unknown>;\n204:   status: ObservationStatus;\n205:   confidence: number;\n206:   source_turn: number | null;\n207:   created_at: string;\n208:   updated_at: string;\n209: }\n210: \n211: export interface Conversation {\n212:   id: string;\n213:   title: string;\n214:   created_at: string;\n215:   updated_at: string;\n216: }\n217: \n218: export interface ConversationTurn {\n219:   id: number;\n220:   conversation_id: string;\n221:   role: \"user\" | \"assistant\" | \"system\" | \"tool\";\n222:   content: string;\n223:   created_at: string;\n224: }\n225: \n226: export interface LatestConversation {\n227:   conversation: Conversation | null;\n228:   turns: ConversationTurn[];\n229: }\n230: \n231: export interface CreateJobPayload {\n232:   name: string;\n233:   description?: string;\n234:   mcp_url: string;\n235: }\n236: \n237: export interface AddStepPayload {\n238:   mcp_url: string;\n239:   job_id: string;\n240:   name: string;\n241:   order: number;\n242: }\n243: \n244: export interface AddOutcomePayload {\n245:   mcp_url: string;\n246:   job_id: string;\n247:   statement: string;\n248:   importance: number;\n249:   satisfaction: number;\n250: }\n251: \n252: export interface ConnectorPreset {\n253:   id: string;\n254:   label: string;\n255:   area: string;\n256:   summary: string;\n257:   url: string;\n258:   auth: \"none\" | \"oauth\";\n259:   env_vars: string[];\n260:   headers: Record<string, string>;\n261:   docs: string;\n262:   tools: string[];\n263:   is_recommended: boolean;\n264: }\n265: \n266: export interface ConnectorListItem {\n267:   name: string;\n268:   kind: string;\n269:   enabled: boolean;\n270: }\n271: \n272: export interface ConnectorHealth {\n273:   ok: boolean;\n274:   message: string;\n275:   details: Record<string, unknown>;\n276: }\n277: \n278: export interface ConnectorOperationResponse {\n279:   ok: boolean;\n280:   name: string;\n281: }\n282: \n283: export interface AddConnectorPayload {\n284:   name?: string;\n285:   preset?: string;\n286:   url?: string;\n287: }\n288: \n289: export interface ChangelogCategory {\n290:   name: string;\n291:   items: string[];\n292: }\n293: \n294: export interface ChangelogRelease {\n295:   version: string;\n296:   date: string;\n297:   categories: ChangelogCategory[];\n298: }\n299: \n300: export interface ChangelogData {\n301:   releases: ChangelogRelease[];\n302: }\n\n(End of file - total 302 lines)\n</content>",
+            "metadata": {
+              "preview": "import type { RunStep } from \"./lib/run\";\nimport type { UiCatalogManifest, UiNode } from \"./ui/protocol\";\n\nexport interface Job {\n  id: string;\n  name?: string;\n  description?: string;\n}\n\nexport interface Step {\n  id?: string;\n  job_id?: string;\n  name?: string;\n  order?: number;\n}\n\nexport interface Outcome {\n  id?: string;\n  job_id?: string;\n  statement?: string;",
+              "truncated": false,
+              "loaded": [],
+              "display": {
+                "type": "file",
+                "path": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio/src/types.ts",
+                "text": "import type { RunStep } from \"./lib/run\";\nimport type { UiCatalogManifest, UiNode } from \"./ui/protocol\";\n\nexport interface Job {\n  id: string;\n  name?: string;\n  description?: string;\n}\n\nexport interface Step {\n  id?: string;\n  job_id?: string;\n  name?: string;\n  order?: number;\n}\n\nexport interface Outcome {\n  id?: string;\n  job_id?: string;\n  statement?: string;\n  importance?: number | null;\n  satisfaction?: number | null;\n  opportunity_score?: number | null;\n  evidence?: string;\n  telemetry?: string;\n}\n\nexport interface CanvasData {\n  jobs: Job[];\n  steps: Step[];\n  outcomes: Outcome[];\n  source: \"mcp\" | \"seed\" | \"local\";\n  /** Why the board is not what the server actually holds, when the sidecar knows. */\n  warnings?: string[];\n}\n\n/**\n * What the canvas currently is. A union, not four booleans: \"no work yet\" and\n * \"the fetch failed\" look identical if you only track emptiness, and a failed\n * canvas must never render as an empty one.\n */\nexport type CanvasState =\n  | { kind: \"loading\"; data: CanvasData | null }\n  | { kind: \"ready\"; data: CanvasData }\n  | { kind: \"empty\"; data: CanvasData }\n  | { kind: \"error\"; error: StudioError; data: CanvasData | null };\n\n/**\n * The one failure shape the sidecar reports. Every HTTP error arrives as\n * `{\"error\": StudioError}`, so the UI can show what went wrong, what to do\n * about it, and whether a retry is worth trying.\n */\nexport interface StudioError {\n  code: string;\n  message: string;\n  detail?: string | null;\n  suggestion?: string | null;\n  retryable: boolean;\n  request_id?: string | null;\n}\n\nexport interface StudioConfig {\n  base_url: string;\n  api_key: string;\n  model_name: string;\n  mcp_url: string;\n}\n\nexport interface LlmHealth {\n  healthy: boolean;\n  message: string;\n}\n\nexport interface McpHealth {\n  reachable: boolean;\n}\n\n/**\n * What the configured endpoint says it serves. An empty list with a message is\n * a normal answer — the provider simply does not publish a catalog — so the UI\n * falls back to typing the model name rather than showing a failure.\n */\nexport interface ModelsResult {\n  models: string[];\n  message: string | null;\n}\n\nexport type ChatPart =\n  | { kind: \"text\"; text: string }\n  | { kind: \"ui\"; id: string; node: UiNode };\n\n/**\n * A file that travelled with a turn: its bytes, base64-encoded, and the media\n * type the sidecar needs to decide between image content and inlined text.\n */\nexport interface ChatAttachmentPayload {\n  name: string;\n  media_type: string;\n  data: string;\n}\n\nexport interface ChatMessage {\n  /** Stable identity, so the thread runtime can address a turn to reload it. */\n  id?: string;\n  role: \"user\" | \"assistant\" | \"notice\";\n  content: string;\n  /**\n   * Assistant turns only: prose and surfaces in the order the agent produced\n   * them, so a card sits between the paragraphs that frame it. `content` stays\n   * the combined prose because that is what gets replayed as history.\n   */\n  parts?: ChatPart[];\n  /**\n   * Assistant turns only: the failure that ended this turn, so the transcript\n   * can show it in place instead of losing the question.\n   */\n  error?: StudioError;\n  /** The question this turn answered, kept so a failed turn can be retried. */\n  retryText?: string;\n  /** Files this turn carried. Only the newest turn is sent with its bytes. */\n  attachments?: ChatAttachmentPayload[];\n  /** The files a failed or stopped turn should send again, if it had any. */\n  retryAttachments?: ChatAttachmentPayload[];\n  /**\n   * Assistant turns only: the tools the turn used, in the order they ran. Kept\n   * on the turn so a finished run can still be inspected later.\n   */\n  tools?: RunStep[];\n  /** True when the reader stopped the run before it answered. */\n  stopped?: boolean;\n}\n\n/**\n * The user's context, captured on first run. Kept in local storage and sent to\n * the sidecar so every reply starts from the user's actual product and job.\n */\nexport interface StudioBrief {\n  product_name: string;\n  product_url?: string;\n  target_user: string;\n  job_statement: string;\n  core_problem: string;\n  job_id?: string;\n}\n\n/**\n * Lenses reachable from the rail and the bar. Chat is always the primary\n * stage; a lens makes room for itself and never replaces the thread.\n */\nexport type WorkspacePanelId =\n  | \"landscape\"\n  | \"jobmap\"\n  | \"evidence\"\n  | \"capture\"\n  | \"memory\"\n  | \"catchup\"\n  | \"settings\";\n\nexport type NotificationCategory = \"outcome\" | \"simulation\" | \"evidence\" | \"job\" | \"insight\";\n\nexport interface StudioNotification {\n  id: string;\n  title: string;\n  message: string;\n  category: NotificationCategory;\n  timestamp: string;\n  read: boolean;\n  targetPanel?: WorkspacePanelId;\n  targetId?: string;\n  actionText?: string;\n  chatPrompt?: string;\n}\n\nexport interface ChatStreamRequest {\n  base_url: string;\n  api_key: string;\n  model: string;\n  mcp_url: string;\n  messages: ChatMessage[];\n  brief?: StudioBrief | null;\n  /** What this client can render. Omitted by clients that only read prose. */\n  ui_catalog?: UiCatalogManifest;\n  /** Continue an existing thread instead of starting a new one. */\n  conversation_id?: string | null;\n}\n\nexport type ObservationKind =\n  | \"career\"\n  | \"opportunity\"\n  | \"business\"\n  | \"stakeholder\"\n  | \"constraint\"\n  | \"evidence\"\n  | \"preference\";\n\nexport type ObservationStatus = \"suggested\" | \"confirmed\" | \"dismissed\";\n\n/** One thing the agent believes about the PM, shown for correction. */\nexport interface Observation {\n  id: string;\n  kind: ObservationKind;\n  text: string;\n  data: Record<string, unknown>;\n  status: ObservationStatus;\n  confidence: number;\n  source_turn: number | null;\n  created_at: string;\n  updated_at: string;\n}\n\nexport interface Conversation {\n  id: string;\n  title: string;\n  created_at: string;\n  updated_at: string;\n}\n\nexport interface ConversationTurn {\n  id: number;\n  conversation_id: string;\n  role: \"user\" | \"assistant\" | \"system\" | \"tool\";\n  content: string;\n  created_at: string;\n}\n\nexport interface LatestConversation {\n  conversation: Conversation | null;\n  turns: ConversationTurn[];\n}\n\nexport interface CreateJobPayload {\n  name: string;\n  description?: string;\n  mcp_url: string;\n}\n\nexport interface AddStepPayload {\n  mcp_url: string;\n  job_id: string;\n  name: string;\n  order: number;\n}\n\nexport interface AddOutcomePayload {\n  mcp_url: string;\n  job_id: string;\n  statement: string;\n  importance: number;\n  satisfaction: number;\n}\n\nexport interface ConnectorPreset {\n  id: string;\n  label: string;\n  area: string;\n  summary: string;\n  url: string;\n  auth: \"none\" | \"oauth\";\n  env_vars: string[];\n  headers: Record<string, string>;\n  docs: string;\n  tools: string[];\n  is_recommended: boolean;\n}\n\nexport interface ConnectorListItem {\n  name: string;\n  kind: string;\n  enabled: boolean;\n}\n\nexport interface ConnectorHealth {\n  ok: boolean;\n  message: string;\n  details: Record<string, unknown>;\n}\n\nexport interface ConnectorOperationResponse {\n  ok: boolean;\n  name: string;\n}\n\nexport interface AddConnectorPayload {\n  name?: string;\n  preset?: string;\n  url?: string;\n}\n\nexport interface ChangelogCategory {\n  name: string;\n  items: string[];\n}\n\nexport interface ChangelogRelease {\n  version: string;\n  date: string;\n  categories: ChangelogCategory[];\n}\n\nexport interface ChangelogData {\n  releases: ChangelogRelease[];\n}",
+                "lineStart": 1,
+                "lineEnd": 302,
+                "totalLines": 302,
+                "truncated": false
+              }
+            },
+            "title": "apps/studio/src/types.ts",
+            "time": {
+              "start": 1793044851185,
+              "end": 1793044851208
+            }
+          },
+          "id": "prt_179cd29e2001LCDWZQxl3zyU20",
+          "sessionID": "ses_e8632f532ffelXOEarF0SZxzLM",
+          "messageID": "msg_179cd1ab5001opodfjvRSXyf4n"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "call-8e10c2ae-a839-49f4-8019-2ec8581d665f",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "git branch --show-current && git status --short",
+              "workdir": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit"
+            },
+            "output": "ui-not-looking-like-shit\n",
+            "metadata": {
+              "output": "ui-not-looking-like-shit\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "git branch --show-current && git status --short",
+            "time": {
+              "start": 1793044851726,
+              "end": 1793044851794
+            }
+          },
+          "id": "prt_179cd2bfb001Ys8QWIOMY8RSvX",
+          "sessionID": "ses_e8632f532ffelXOEarF0SZxzLM",
+          "messageID": "msg_179cd1ab5001opodfjvRSXyf4n"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "919620150bdb832b4944ddeae693864f5b628eae",
+          "type": "step-finish",
+          "tokens": {
+            "total": 22683,
+            "input": 5200,
+            "output": 124,
+            "reasoning": 15,
+            "cache": {
+              "write": 0,
+              "read": 17344
+            }
+          },
+          "cost": 0,
+          "id": "prt_179cd2cec001BPpw0YlMr1zR5J",
+          "sessionID": "ses_e8632f532ffelXOEarF0SZxzLM",
+          "messageID": "msg_179cd1ab5001opodfjvRSXyf4n"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_179cd0aeb001VjODZfKHV1AV4J",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit",
+          "root": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 28059,
+          "input": 4113,
+          "output": 2248,
+          "reasoning": 18,
+          "cache": {
+            "write": 0,
+            "read": 21680
+          }
+        },
+        "modelID": "nvidia/nemotron-3.5-super-vl-120b-a12b",
+        "providerID": "nvidia",
+        "time": {
+          "created": 1793044852062,
+          "completed": 1793044874269
+        },
+        "finish": "tool-calls",
+        "id": "msg_179cd2d5d001AYqAqO8XHV2XRg",
+        "sessionID": "ses_e8632f532ffelXOEarF0SZxzLM"
+      },
+      "parts": [
+        {
+          "snapshot": "919620150bdb832b4944ddeae693864f5b628eae",
+          "type": "step-start",
+          "id": "prt_179cd343a001egjsDQOFMwkTLx",
+          "sessionID": "ses_e8632f532ffelXOEarF0SZxzLM",
+          "messageID": "msg_179cd2d5d001AYqAqO8XHV2XRg"
+        },
+        {
+          "type": "reasoning",
+          "text": "Now I'll write the new types.ts matching the reference exactly. Let me write it.",
+          "time": {
+            "start": 1793044853824,
+            "end": 1793044873864
+          },
+          "id": "prt_179cd3440001B4t7PCL5kwFDr2",
+          "sessionID": "ses_e8632f532ffelXOEarF0SZxzLM",
+          "messageID": "msg_179cd2d5d001AYqAqO8XHV2XRg"
+        },
+        {
+          "type": "tool",
+          "tool": "write",
+          "callID": "call-7f2ed389-3346-4507-8919-5d95d7e93909",
+          "state": {
+            "status": "completed",
+            "input": {
+              "content": "import type { UiCatalogManifest, UiNode } from \"./ui/protocol\";\n\nexport interface Job {\n  id: string;\n  name?: string;\n  description?: string;\n}\n\nexport interface Step {\n  id?: string;\n  job_id?: string;\n  name?: string;\n  order?: number;\n}\n\nexport interface Outcome {\n  id?: string;\n  job_id?: string;\n  statement?: string;\n  importance?: number | null;\n  satisfaction?: number | null;\n  opportunity_score?: number | null;\n  evidence?: string;\n  telemetry?: string;\n}\n\nexport interface Evidence {\n  id: string;\n  source_name?: string;\n  source_kind?: string;\n  item_type?: string;\n  name?: string;\n  content?: string;\n  job_id?: string | null;\n  step_id?: string | null;\n  outcome_id?: string | null;\n}\n\nexport interface CanvasData {\n  jobs: Job[];\n  steps: Step[];\n  outcomes: Outcome[];\n  /** Captured research records, in capture order until the user reorders them. */\n  evidence?: Evidence[];\n  source: \"mcp\" | \"seed\" | \"local\";\n  /** Why the board is not what the server actually holds, when the sidecar knows. */\n  warnings?: string[];\n}\n\n/**\n * What the canvas currently is. A union, not four booleans: \"no work yet\" and\n * \"the fetch failed\" look identical if you only track emptiness, and a failed\n * canvas must never render as an empty one.\n */\nexport type CanvasState =\n  | { kind: \"loading\"; data: CanvasData | null }\n  | { kind: \"ready\"; data: CanvasData }\n  | { kind: \"empty\"; data: CanvasData }\n  | { kind: \"error\"; error: StudioError; data: CanvasData | null };\n\n/**\n * The one failure shape the sidecar reports. Every HTTP error arrives as\n * `{\"error\": StudioError}`, so the UI can show what went wrong, what to do\n * about it, and whether a retry is worth trying.\n */\nexport interface StudioError {\n  code: string;\n  message: string;\n  detail?: string | null;\n  suggestion?: string | null;\n  retryable: boolean;\n  request_id?: string | null;\n}\n\nexport type StudioTheme = \"light\" | \"dark\";\n\nexport interface StudioConfig {\n  base_url: string;\n  api_key: string;\n  model_name: string;\n  mcp_url: string;\n  theme?: StudioTheme;\n}\n\nexport interface LlmHealth {\n  healthy: boolean;\n  message: string;\n}\n\n/** What the configured backend reports it can serve, and why it reported none. */\nexport interface ModelList {\n  models: string[];\n  error: string | null;\n}\n\nexport interface McpHealth {\n  reachable: boolean;\n}\n\n/**\n * Everything one turn can contain, in the order the agent produced it.\n *\n * Text and surfaces are the Studio's own vocabulary. Reasoning, tool calls,\n * sources, approvals, and attachments are conversation primitives the runtime\n * renders — the bridge in `assistant/convert.ts` maps each one to its\n * assistant-ui message part.\n */\nexport type ToolStatus = \"running\" | \"ok\" | \"error\" | \"declined\";\n\n/** A write the agent is asking permission for. */\nexport interface ToolApproval {\n  id: string;\n  prompt: string;\n}\n\nexport interface ChatAttachment {\n  id: string;\n  name: string;\n  contentType: string;\n  size: number;\n  /** Extracted text, sent to the model when the file is text-like. */\n  text?: string;\n  /** A data URL, sent as a vision part when the file is an image. */\n  dataUrl?: string;\n}\n\nexport type ChatPart =\n  | { kind: \"text\"; text: string }\n  | { kind: \"reasoning\"; text: string }\n  | { kind: \"ui\"; id: string; node: UiNode }\n  | {\n      kind: \"tool\";\n      id: string;\n      name: string;\n      status: ToolStatus;\n      preview?: string;\n      /** Present while the runtime is waiting for the user's answer. */\n      approval?: ToolApproval;\n    }\n  | {\n      kind: \"source\";\n      id: string;\n      title: string;\n      filename?: string;\n      mediaType: string;\n    };\n\nexport interface ChatMessage {\n  /** Stable id. Branching and persisted turns are keyed by it. */\n  id: string;\n  /** The message this one answers; `null` at the root of a branch. */\n  parentId: string | null;\n  role: \"user\" | \"assistant\" | \"notice\";\n  content: string;\n  /**\n   * Assistant turns only: prose and surfaces in the order the agent produced\n   * them, so a card sits between the paragraphs that frame it. `content` stays\n   * the combined prose because that is what gets replayed as history.\n   */\n  parts?: ChatPart[];\n  /** Files the user attached to this turn. */\n  attachments?: ChatAttachment[];\n  /**\n   * Assistant turns only: the failure that ended this turn, so the transcript\n   * can show it in place instead of losing the question.\n   */\n  error?: StudioError;\n  /** The question this turn answered, kept so a failed turn can be retried. */\n  retryText?: string;\n}\n\n/**\n * The user's context, captured on first run. Kept in local storage and sent to\n * the sidecar so every reply starts from the user's actual product and job.\n */\nexport interface StudioBrief {\n  product_name: string;\n  product_url?: string;\n  target_user: string;\n  job_statement: string;\n  core_problem: string;\n  job_id?: string;\n}\n\n/**\n * Lenses reachable from the rail and the bar. Chat is always the primary\n * stage; a lens makes room for itself and never replaces the thread.\n */\nexport type WorkspacePanelId =\n  | \"landscape\"\n  | \"jobmap\"\n  | \"evidence\"\n  | \"capture\"\n  | \"memory\"\n  | \"catchup\"\n  | \"settings\";\n\nexport type NotificationCategory = \"outcome\" | \"simulation\" | \"evidence\" | \"job\" | \"insight\";\n\nexport interface StudioNotification {\n  id: string;\n  title: string;\n  message: string;\n  category: NotificationCategory;\n  timestamp: string;\n  read: boolean;\n  targetPanel?: WorkspacePanelId;\n  targetId?: string;\n  actionText?: string;\n  chatPrompt?: string;\n}\n\nexport interface ChatStreamRequest {\n  base_url: string;\n  api_key: string;\n  model: string;\n  mcp_url: string;\n  messages: ChatMessage[];\n  brief?: StudioBrief | null;\n  /** What this client can render. Omitted by clients that only read prose. */\n  ui_catalog?: UiCatalogManifest;\n  /** Continue an existing thread instead of starting a new one. */\n  conversation_id?: string | null;\n  /** Files attached to the last user turn. */\n  attachments?: ChatAttachment[];\n  /** Ask before the agent writes to stored data. */\n  approvals?: boolean;\n  /** The id this client is streaming the reply under. */\n  assistant_id?: string | null;\n}\n\n/** One turn in a persisted conversation, as the branch tree exposes it. */\nexport interface TurnNode {\n  id: string;\n  parent_id: string | null;\n  role: string;\n  content: string;\n  created_at: string;\n}\n\nexport interface ConversationTree {\n  conversation: Conversation;\n  messages: TurnNode[];\n  head_id: string | null;\n}\n\nexport type ObservationKind =\n  | \"career\"\n  | \"opportunity\"\n  | \"business\"\n  | \"stakeholder\"\n  | \"constraint\"\n  | \"evidence\"\n  | \"preference\";\n\nexport type ObservationStatus = \"suggested\" | \"confirmed\" | \"dismissed\";\n\n/** One thing the agent believes about the PM, shown for correction. */\nexport interface Observation {\n  id: string;\n  kind: ObservationKind;\n  text: string;\n  data: Record<string, unknown>;\n  status: ObservationStatus;\n  confidence: number;\n  source_turn: number | null;\n  created_at: string;\n  updated_at: string;\n}\n\nexport interface Conversation {\n  id: string;\n  title: string;\n  created_at: string;\n  updated_at: string;\n}\n\nexport interface ConversationTurn {\n  id: number;\n  conversation_id: string;\n  role: \"user\" | \"assistant\" | \"system\" | \"tool\";\n  content: string;\n  created_at: string;\n}\n\nexport interface LatestConversation {\n  conversation: Conversation | null;\n  turns: ConversationTurn[];\n}\n\nexport interface CreateJobPayload {\n  name: string;\n  description?: string;\n  mcp_url: string;\n}\n\nexport interface AddStepPayload {\n  mcp_url: string;\n  job_id: string;\n  name: string;\n  order: number;\n}\n\nexport interface AddOutcomePayload {\n  mcp_url: string;\n  job_id: string;\n  statement: string;\n  importance: number;\n  satisfaction: number;\n}\n\nexport interface ConnectorPreset {\n  id: string;\n  label: string;\n  area: string;\n  summary: string;\n  url: string;\n  auth: \"none\" | \"oauth\";\n  env_vars: string[];\n  headers: Record<string, string>;\n  docs: string;\n  tools: string[];\n  is_recommended: boolean;\n}\n\nexport interface ConnectorListItem {\n  name: string;\n  kind: string;\n  enabled: boolean;\n}\n\nexport interface ConnectorHealth {\n  ok: boolean;\n  message: string;\n  details: Record<string, unknown>;\n}\n\nexport interface ConnectorOperationResponse {\n  ok: boolean;\n  name: string;\n}\n\nexport interface AddConnectorPayload {\n  name?: string;\n  preset?: string;\n  url?: string;\n}\n\nexport interface ChangelogCategory {\n  name: string;\n  items: string[];\n}\n\nexport interface ChangelogRelease {\n  version: string;\n  date: string;\n  categories: ChangelogCategory[];\n}\n\nexport interface ChangelogData {\n  releases: ChangelogRelease[];\n}\n",
+              "filePath": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio/src/types.ts"
+            },
+            "output": "Wrote file successfully.",
+            "metadata": {
+              "diagnostics": {},
+              "filepath": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio/src/types.ts",
+              "exists": true,
+              "truncated": false
+            },
+            "title": "apps/studio/src/types.ts",
+            "time": {
+              "start": 1793044873873,
+              "end": 1793044873888
+            }
+          },
+          "id": "prt_179cd828b001gNWUohVWPU044D",
+          "sessionID": "ses_e8632f532ffelXOEarF0SZxzLM",
+          "messageID": "msg_179cd2d5d001AYqAqO8XHV2XRg"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "a7245e95a7aa490198fcd2e7a1d2ed2d3f87353b",
+          "type": "step-finish",
+          "tokens": {
+            "total": 28059,
+            "input": 4113,
+            "output": 2248,
+            "reasoning": 18,
+            "cache": {
+              "write": 0,
+              "read": 21680
+            }
+          },
+          "cost": 0,
+          "id": "prt_179cd83d5001STDCmg58u6Jt5l",
+          "sessionID": "ses_e8632f532ffelXOEarF0SZxzLM",
+          "messageID": "msg_179cd2d5d001AYqAqO8XHV2XRg"
+        },
+        {
+          "type": "patch",
+          "hash": "919620150bdb832b4944ddeae693864f5b628eae",
+          "files": [
+            "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio/src/types.ts"
+          ],
+          "id": "prt_179cd8416001v0QlYxKPNTzVAj",
+          "sessionID": "ses_e8632f532ffelXOEarF0SZxzLM",
+          "messageID": "msg_179cd2d5d001AYqAqO8XHV2XRg"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_179cd0aeb001VjODZfKHV1AV4J",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit",
+          "root": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 28280,
+          "input": 28080,
+          "output": 187,
+          "reasoning": 13,
+          "cache": {
+            "write": 0,
+            "read": 0
+          }
+        },
+        "modelID": "nvidia/nemotron-3.5-super-vl-120b-a12b",
+        "providerID": "nvidia",
+        "time": {
+          "created": 1793044874276,
+          "completed": 1793044887995
+        },
+        "finish": "tool-calls",
+        "id": "msg_179cd8424001ETF3ZrXfSP7Xkz",
+        "sessionID": "ses_e8632f532ffelXOEarF0SZxzLM"
+      },
+      "parts": [
+        {
+          "snapshot": "a7245e95a7aa490198fcd2e7a1d2ed2d3f87353b",
+          "type": "step-start",
+          "id": "prt_179cd8e12001KSlvNBzEsVeV3J",
+          "sessionID": "ses_e8632f532ffelXOEarF0SZxzLM",
+          "messageID": "msg_179cd8424001ETF3ZrXfSP7Xkz"
+        },
+        {
+          "type": "reasoning",
+          "text": "Now verify it matches the reference exactly, then run typecheck.",
+          "time": {
+            "start": 1793044876823,
+            "end": 1793044878941
+          },
+          "id": "prt_179cd8e17001ZkJnhFtlkE0VTw",
+          "sessionID": "ses_e8632f532ffelXOEarF0SZxzLM",
+          "messageID": "msg_179cd8424001ETF3ZrXfSP7Xkz"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "call-74eda0b9-6dfd-4ed0-a2d6-492c4134513c",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "diff <(git show feat/studio-assistant-ui-experience:apps/studio/src/types.ts) apps/studio/src/types.ts && echo \"IDENTICAL TO REFERENCE\"",
+              "workdir": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit"
+            },
+            "output": "IDENTICAL TO REFERENCE\n",
+            "metadata": {
+              "output": "IDENTICAL TO REFERENCE\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "diff <(git show feat/studio-assistant-ui-experience:apps/studio/src/types.ts) apps/studio/src/types.ts && echo \"IDENTICAL TO REFERENCE\"",
+            "time": {
+              "start": 1793044878954,
+              "end": 1793044878975
+            }
+          },
+          "id": "prt_179cd9660001wRpqn2dkeVtFgg",
+          "sessionID": "ses_e8632f532ffelXOEarF0SZxzLM",
+          "messageID": "msg_179cd8424001ETF3ZrXfSP7Xkz"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "call-7e626ffd-fead-45c4-864d-13a6d288df6c",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "npm --prefix apps/studio run typecheck 2>&1 | tail -60",
+              "workdir": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit",
+              "timeout": 180000
+            },
+            "output": "src/lib/thread.test.ts(57,27): error TS2739: Type '{ role: \"assistant\"; content: string; }' is missing the following properties from type 'ChatMessage': id, parentId\nsrc/lib/thread.test.ts(64,7): error TS2739: Type '{ role: \"user\"; content: string; }' is missing the following properties from type 'ChatMessage': id, parentId\nsrc/lib/thread.test.ts(65,7): error TS2739: Type '{ role: \"assistant\"; content: string; }' is missing the following properties from type 'ChatMessage': id, parentId\nsrc/lib/thread.test.ts(66,7): error TS2739: Type '{ role: \"user\"; content: string; }' is missing the following properties from type 'ChatMessage': id, parentId\nsrc/lib/thread.test.ts(67,7): error TS2739: Type '{ role: \"assistant\"; content: string; }' is missing the following properties from type 'ChatMessage': id, parentId\nsrc/lib/thread.test.ts(77,67): error TS2353: Object literal may only specify known properties, and 'stopped' does not exist in type 'ChatMessage'.\nsrc/lib/thread.test.ts(80,9): error TS2739: Type '{ role: \"assistant\"; content: string; error: { code: string; message: string; retryable: true; }; }' is missing the following properties from type 'ChatMessage': id, parentId\nsrc/lib/thread.test.ts(100,7): error TS2741: Property 'parentId' is missing in type '{ id: string; role: \"user\"; content: string; }' but required in type 'ChatMessage'.\nsrc/lib/thread.test.ts(105,9): error TS2353: Object literal may only specify known properties, and 'tools' does not exist in type 'ChatMessage'.\nsrc/lib/thread.test.ts(122,7): error TS2739: Type '{ role: \"assistant\"; content: string; }' is missing the following properties from type 'ChatMessage': id, parentId\nsrc/lib/thread.test.ts(123,7): error TS2739: Type '{ role: \"assistant\"; content: string; }' is missing the following properties from type 'ChatMessage': id, parentId\nsrc/lib/thread.test.ts(140,33): error TS2353: Object literal may only specify known properties, and 'media_type' does not exist in type 'ChatAttachment'.\nsrc/lib/thread.test.ts(141,33): error TS2353: Object literal may only specify known properties, and 'media_type' does not exist in type 'ChatAttachment'.\nsrc/lib/thread.test.ts(170,7): error TS2739: Type '{ role: \"user\"; content: string; }' is missing the following properties from type 'ChatMessage': id, parentId\nsrc/lib/thread.test.ts(171,7): error TS2739: Type '{ role: \"assistant\"; content: string; }' is missing the following properties from type 'ChatMessage': id, parentId\nsrc/lib/thread.test.ts(172,7): error TS2739: Type '{ role: \"notice\"; content: string; }' is missing the following properties from type 'ChatMessage': id, parentId\nsrc/lib/thread.test.ts(187,9): error TS2739: Type '{ role: \"assistant\"; content: string; parts: ({ kind: \"text\"; text: string; } | { kind: \"ui\"; id: string; node: never; })[]; }' is missing the following properties from type 'ChatMessage': id, parentId\nsrc/lib/thread.ts(22,15): error TS2724: '\"../types\"' has no exported member named 'ChatAttachmentPayload'. Did you mean 'ChatAttachment'?\nsrc/lib/thread.ts(88,40): error TS2339: Property 'text' does not exist on type '{ kind: \"text\"; text: string; } | { kind: \"reasoning\"; text: string; } | { kind: \"tool\"; id: string; name: string; status: ToolStatus; preview?: string | undefined; approval?: ToolApproval | undefined; } | { ...; }'.\n  Property 'text' does not exist on type '{ kind: \"tool\"; id: string; name: string; status: ToolStatus; preview?: string | undefined; approval?: ToolApproval | undefined; }'.\nsrc/lib/thread.ts(106,15): error TS2339: Property 'stopped' does not exist on type 'ChatMessage'.\nsrc/lib/thread.ts(133,17): error TS2339: Property 'tools' does not exist on type 'ChatMessage'.\nsrc/lib/thread.ts(133,50): error TS2339: Property 'tools' does not exist on type 'ChatMessage'.\nsrc/lib/thread.ts(134,17): error TS2339: Property 'stopped' does not exist on type 'ChatMessage'.\nsrc/lib/thread.ts(137,17): error TS2551: Property 'retryAttachments' does not exist on type 'ChatMessage'. Did you mean 'attachments'?\nsrc/lib/thread.ts(138,37): error TS2551: Property 'retryAttachments' does not exist on type 'ChatMessage'. Did you mean 'attachments'?\nsrc/lib/transcript.test.ts(19,29): error TS2345: Argument of type '{ role: \"assistant\"; content: string; }' is not assignable to parameter of type 'ChatMessage'.\n  Type '{ role: \"assistant\"; content: string; }' is missing the following properties from type 'ChatMessage': id, parentId\nsrc/lib/transcript.test.ts(25,29): error TS2345: Argument of type '{ role: \"notice\"; content: string; }' is not assignable to parameter of type 'ChatMessage'.\n  Type '{ role: \"notice\"; content: string; }' is missing the following properties from type 'ChatMessage': id, parentId\nsrc/lib/transcript.test.ts(31,29): error TS2345: Argument of type '{ role: \"user\"; content: string; }' is not assignable to parameter of type 'ChatMessage'.\n  Type '{ role: \"user\"; content: string; }' is missing the following properties from type 'ChatMessage': id, parentId\nsrc/lib/transcript.test.ts(32,29): error TS2345: Argument of type '{ role: \"assistant\"; content: string; }' is not assignable to parameter of type 'ChatMessage'.\n  Type '{ role: \"assistant\"; content: string; }' is missing the following properties from type 'ChatMessage': id, parentId\nsrc/lib/transcript.test.ts(37,80): error TS2353: Object literal may only specify known properties, and 'stopped' does not exist in type 'ChatMessage'.\nsrc/lib/transcript.test.ts(39,63): error TS2353: Object literal may only specify known properties, and 'stopped' does not exist in type 'ChatMessage'.\nsrc/lib/transcript.test.ts(46,24): error TS2345: Argument of type '{ role: \"assistant\"; content: string; parts: { kind: \"ui\"; id: string; node: never; }[]; }' is not assignable to parameter of type 'ChatMessage'.\n  Type '{ role: \"assistant\"; content: string; parts: { kind: \"ui\"; id: string; node: never; }[]; }' is missing the following properties from type 'ChatMessage': id, parentId\nsrc/lib/transcript.ts(53,15): error TS2339: Property 'stopped' does not exist on type 'ChatMessage'.\nsrc/state/StudioContext.tsx(49,3): error TS2724: '\"../types\"' has no exported member named 'ChatAttachmentPayload'. Did you mean 'ChatAttachment'?\nsrc/state/StudioContext.tsx(597,17): error TS2345: Argument of type '(prev: ChatMessage[]) => (ChatMessage | { role: \"notice\"; id: string; content: string; })[]' is not assignable to parameter of type 'SetStateAction<ChatMessage[]>'.\n  Type '(prev: ChatMessage[]) => (ChatMessage | { role: \"notice\"; id: string; content: string; })[]' is not assignable to type '(prevState: ChatMessage[]) => ChatMessage[]'.\n    Type '(ChatMessage | { role: \"notice\"; id: string; content: string; })[]' is not assignable to type 'ChatMessage[]'.\n      Type 'ChatMessage | { role: \"notice\"; id: string; content: string; }' is not assignable to type 'ChatMessage'.\n        Property 'parentId' is missing in type '{ role: \"notice\"; id: string; content: string; }' but required in type 'ChatMessage'.\nsrc/state/StudioContext.tsx(801,9): error TS2322: Type 'ChatMessage | { id: string; role: \"user\" | \"assistant\" | \"notice\"; content: string; parts: ChatPart[] | undefined; }' is not assignable to type 'ChatMessage'.\n  Property 'parentId' is missing in type '{ id: string; role: \"user\" | \"assistant\" | \"notice\"; content: string; parts: ChatPart[] | undefined; }' but required in type 'ChatMessage'.\nsrc/state/StudioContext.tsx(811,9): error TS2741: Property 'parentId' is missing in type '{ attachments?: ChatAttachmentPayload[] | undefined; role: \"user\"; id: string; content: string; }' but required in type 'ChatMessage'.\nsrc/state/StudioContext.tsx(821,9): error TS2322: Type 'ChatMessage | { role: \"assistant\"; id: string; content: string; parts: never[]; }' is not assignable to type 'ChatMessage'.\n  Property 'parentId' is missing in type '{ role: \"assistant\"; id: string; content: string; parts: never[]; }' but required in type 'ChatMessage'.\nsrc/state/StudioContext.tsx(822,9): error TS2741: Property 'parentId' is missing in type '{ role: \"assistant\"; id: string; content: string; parts: never[]; }' but required in type 'ChatMessage'.\nsrc/state/StudioContext.tsx(861,11): error TS2741: Property 'parentId' is missing in type '{ tools?: RunStep[] | undefined; retryAttachments?: ChatAttachmentPayload[] | undefined; stopped?: boolean | undefined; retryText?: string | undefined; error?: StudioError | undefined; role: \"assistant\"; id: string; content: string; parts: ChatPart[]; }' but required in type 'ChatMessage'.\nsrc/state/StudioContext.tsx(953,27): error TS2345: Argument of type '(prev: ChatMessage[]) => (ChatMessage | { role: \"notice\"; id: string; content: string; })[]' is not assignable to parameter of type 'SetStateAction<ChatMessage[]>'.\n  Type '(prev: ChatMessage[]) => (ChatMessage | { role: \"notice\"; id: string; content: string; })[]' is not assignable to type '(prevState: ChatMessage[]) => ChatMessage[]'.\n    Type '(ChatMessage | { role: \"notice\"; id: string; content: string; })[]' is not assignable to type 'ChatMessage[]'.\n      Type 'ChatMessage | { role: \"notice\"; id: string; content: string; }' is not assignable to type 'ChatMessage'.\n        Property 'parentId' is missing in type '{ role: \"notice\"; id: string; content: string; }' but required in type 'ChatMessage'.\nsrc/state/StudioContext.tsx(1170,13): error TS2345: Argument of type '{ id: string; role: \"user\" | \"assistant\"; content: string; parts: { kind: \"text\"; text: string; }[]; }[]' is not assignable to parameter of type 'SetStateAction<ChatMessage[]>'.\n  Type '{ id: string; role: \"user\" | \"assistant\"; content: string; parts: { kind: \"text\"; text: string; }[]; }[]' is not assignable to type 'ChatMessage[]'.\n    Property 'parentId' is missing in type '{ id: string; role: \"user\" | \"assistant\"; content: string; parts: { kind: \"text\"; text: string; }[]; }' but required in type 'ChatMessage'.\n",
+            "metadata": {
+              "output": "src/lib/thread.test.ts(57,27): error TS2739: Type '{ role: \"assistant\"; content: string; }' is missing the following properties from type 'ChatMessage': id, parentId\nsrc/lib/thread.test.ts(64,7): error TS2739: Type '{ role: \"user\"; content: string; }' is missing the following properties from type 'ChatMessage': id, parentId\nsrc/lib/thread.test.ts(65,7): error TS2739: Type '{ role: \"assistant\"; content: string; }' is missing the following properties from type 'ChatMessage': id, parentId\nsrc/lib/thread.test.ts(66,7): error TS2739: Type '{ role: \"user\"; content: string; }' is missing the following properties from type 'ChatMessage': id, parentId\nsrc/lib/thread.test.ts(67,7): error TS2739: Type '{ role: \"assistant\"; content: string; }' is missing the following properties from type 'ChatMessage': id, parentId\nsrc/lib/thread.test.ts(77,67): error TS2353: Object literal may only specify known properties, and 'stopped' does not exist in type 'ChatMessage'.\nsrc/lib/thread.test.ts(80,9): error TS2739: Type '{ role: \"assistant\"; content: string; error: { code: string; message: string; retryable: true; }; }' is missing the following properties from type 'ChatMessage': id, parentId\nsrc/lib/thread.test.ts(100,7): error TS2741: Property 'parentId' is missing in type '{ id: string; role: \"user\"; content: string; }' but required in type 'ChatMessage'.\nsrc/lib/thread.test.ts(105,9): error TS2353: Object literal may only specify known properties, and 'tools' does not exist in type 'ChatMessage'.\nsrc/lib/thread.test.ts(122,7): error TS2739: Type '{ role: \"assistant\"; content: string; }' is missing the following properties from type 'ChatMessage': id, parentId\nsrc/lib/thread.test.ts(123,7): error TS2739: Type '{ role: \"assistant\"; content: string; }' is missing the following properties from type 'ChatMessage': id, parentId\nsrc/lib/thread.test.ts(140,33): error TS2353: Object literal may only specify known properties, and 'media_type' does not exist in type 'ChatAttachment'.\nsrc/lib/thread.test.ts(141,33): error TS2353: Object literal may only specify known properties, and 'media_type' does not exist in type 'ChatAttachment'.\nsrc/lib/thread.test.ts(170,7): error TS2739: Type '{ role: \"user\"; content: string; }' is missing the following properties from type 'ChatMessage': id, parentId\nsrc/lib/thread.test.ts(171,7): error TS2739: Type '{ role: \"assistant\"; content: string; }' is missing the following properties from type 'ChatMessage': id, parentId\nsrc/lib/thread.test.ts(172,7): error TS2739: Type '{ role: \"notice\"; content: string; }' is missing the following properties from type 'ChatMessage': id, parentId\nsrc/lib/thread.test.ts(187,9): error TS2739: Type '{ role: \"assistant\"; content: string; parts: ({ kind: \"text\"; text: string; } | { kind: \"ui\"; id: string; node: never; })[]; }' is missing the following properties from type 'ChatMessage': id, parentId\nsrc/lib/thread.ts(22,15): error TS2724: '\"../types\"' has no exported member named 'ChatAttachmentPayload'. Did you mean 'ChatAttachment'?\nsrc/lib/thread.ts(88,40): error TS2339: Property 'text' does not exist on type '{ kind: \"text\"; text: string; } | { kind: \"reasoning\"; text: string; } | { kind: \"tool\"; id: string; name: string; status: ToolStatus; preview?: string | undefined; approval?: ToolApproval | undefined; } | { ...; }'.\n  Property 'text' does not exist on type '{ kind: \"tool\"; id: string; name: string; status: ToolStatus; preview?: string | undefined; approval?: ToolApproval | undefined; }'.\nsrc/lib/thread.ts(106,15): error TS2339: Property 'stopped' does not exist on type 'ChatMessage'.\nsrc/lib/thread.ts(133,17): error TS2339: Property 'tools' does not exist on type 'ChatMessage'.\nsrc/lib/thread.ts(133,50): error TS2339: Property 'tools' does not exist on type 'ChatMessage'.\nsrc/lib/thread.ts(134,17): error TS2339: Property 'stopped' does not exist on type 'ChatMessage'.\nsrc/lib/thread.ts(137,17): error TS2551: Property 'retryAttachments' does not exist on type 'ChatMessage'. Did you mean 'attachments'?\nsrc/lib/thread.ts(138,37): error TS2551: Property 'retryAttachments' does not exist on type 'ChatMessage'. Did you mean 'attachments'?\nsrc/lib/transcript.test.ts(19,29): error TS2345: Argument of type '{ role: \"assistant\"; content: string; }' is not assignable to parameter of type 'ChatMessage'.\n  Type '{ role: \"assistant\"; content: string; }' is missing the following properties from type 'ChatMessage': id, parentId\nsrc/lib/transcript.test.ts(25,29): error TS2345: Argument of type '{ role: \"notice\"; content: string; }' is not assignable to parameter of type 'ChatMessage'.\n  Type '{ role: \"notice\"; content: string; }' is missing the following properties from type 'ChatMessage': id, parentId\nsrc/lib/transcript.test.ts(31,29): error TS2345: Argument of type '{ role: \"user\"; content: string; }' is not assignable to parameter of type 'ChatMessage'.\n  Type '{ role: \"user\"; content: string; }' is missing the following properties from type 'ChatMessage': id, parentId\nsrc/lib/transcript.test.ts(32,29): error TS2345: Argument of type '{ role: \"assistant\"; content: string; }' is not assignable to parameter of type 'ChatMessage'.\n  Type '{ role: \"assistant\"; content: string; }' is missing the following properties from type 'ChatMessage': id, parentId\nsrc/lib/transcript.test.ts(37,80): error TS2353: Object literal may only specify known properties, and 'stopped' does not exist in type 'ChatMessage'.\nsrc/lib/transcript.test.ts(39,63): error TS2353: Object literal may only specify known properties, and 'stopped' does not exist in type 'ChatMessage'.\nsrc/lib/transcript.test.ts(46,24): error TS2345: Argument of type '{ role: \"assistant\"; content: string; parts: { kind: \"ui\"; id: string; node: never; }[]; }' is not assignable to parameter of type 'ChatMessage'.\n  Type '{ role: \"assistant\"; content: string; parts: { kind: \"ui\"; id: string; node: never; }[]; }' is missing the following properties from type 'ChatMessage': id, parentId\nsrc/lib/transcript.ts(53,15): error TS2339: Property 'stopped' does not exist on type 'ChatMessage'.\nsrc/state/StudioContext.tsx(49,3): error TS2724: '\"../types\"' has no exported member named 'ChatAttachmentPayload'. Did you mean 'ChatAttachment'?\nsrc/state/StudioContext.tsx(597,17): error TS2345: Argument of type '(prev: ChatMessage[]) => (ChatMessage | { role: \"notice\"; id: string; content: string; })[]' is not assignable to parameter of type 'SetStateAction<ChatMessage[]>'.\n  Type '(prev: ChatMessage[]) => (ChatMessage | { role: \"notice\"; id: string; content: string; })[]' is not assignable to type '(prevState: ChatMessage[]) => ChatMessage[]'.\n    Type '(ChatMessage | { role: \"notice\"; id: string; content: string; })[]' is not assignable to type 'ChatMessage[]'.\n      Type 'ChatMessage | { role: \"notice\"; id: string; content: string; }' is not assignable to type 'ChatMessage'.\n        Property 'parentId' is missing in type '{ role: \"notice\"; id: string; content: string; }' but required in type 'ChatMessage'.\nsrc/state/StudioContext.tsx(801,9): error TS2322: Type 'ChatMessage | { id: string; role: \"user\" | \"assistant\" | \"notice\"; content: string; parts: ChatPart[] | undefined; }' is not assignable to type 'ChatMessage'.\n  Property 'parentId' is missing in type '{ id: string; role: \"user\" | \"assistant\" | \"notice\"; content: string; parts: ChatPart[] | undefined; }' but required in type 'ChatMessage'.\nsrc/state/StudioContext.tsx(811,9): error TS2741: Property 'parentId' is missing in type '{ attachments?: ChatAttachmentPayload[] | undefined; role: \"user\"; id: string; content: string; }' but required in type 'ChatMessage'.\nsrc/state/StudioContext.tsx(821,9): error TS2322: Type 'ChatMessage | { role: \"assistant\"; id: string; content: string; parts: never[]; }' is not assignable to type 'ChatMessage'.\n  Property 'parentId' is missing in type '{ role: \"assistant\"; id: string; content: string; parts: never[]; }' but required in type 'ChatMessage'.\nsrc/state/StudioContext.tsx(822,9): error TS2741: Property 'parentId' is missing in type '{ role: \"assistant\"; id: string; content: string; parts: never[]; }' but required in type 'ChatMessage'.\nsrc/state/StudioContext.tsx(861,11): error TS2741: Property 'parentId' is missing in type '{ tools?: RunStep[] | undefined; retryAttachments?: ChatAttachmentPayload[] | undefined; stopped?: boolean | undefined; retryText?: string | undefined; error?: StudioError | undefined; role: \"assistant\"; id: string; content: string; parts: ChatPart[]; }' but required in type 'ChatMessage'.\nsrc/state/StudioContext.tsx(953,27): error TS2345: Argument of type '(prev: ChatMessage[]) => (ChatMessage | { role: \"notice\"; id: string; content: string; })[]' is not assignable to parameter of type 'SetStateAction<ChatMessage[]>'.\n  Type '(prev: ChatMessage[]) => (ChatMessage | { role: \"notice\"; id: string; content: string; })[]' is not assignable to type '(prevState: ChatMessage[]) => ChatMessage[]'.\n    Type '(ChatMessage | { role: \"notice\"; id: string; content: string; })[]' is not assignable to type 'ChatMessage[]'.\n      Type 'ChatMessage | { role: \"notice\"; id: string; content: string; }' is not assignable to type 'ChatMessage'.\n        Property 'parentId' is missing in type '{ role: \"notice\"; id: string; content: string; }' but required in type 'ChatMessage'.\nsrc/state/StudioContext.tsx(1170,13): error TS2345: Argument of type '{ id: string; role: \"user\" | \"assistant\"; content: string; parts: { kind: \"text\"; text: string; }[]; }[]' is not assignable to parameter of type 'SetStateAction<ChatMessage[]>'.\n  Type '{ id: string; role: \"user\" | \"assistant\"; content: string; parts: { kind: \"text\"; text: string; }[]; }[]' is not assignable to type 'ChatMessage[]'.\n    Property 'parentId' is missing in type '{ id: string; role: \"user\" | \"assistant\"; content: string; parts: { kind: \"text\"; text: string; }[]; }' but required in type 'ChatMessage'.\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "npm --prefix apps/studio run typecheck 2>&1 | tail -60",
+            "time": {
+              "start": 1793044879642,
+              "end": 1793044887884
+            }
+          },
+          "id": "prt_179cd9910001n3AF0ADjFBUEyK",
+          "sessionID": "ses_e8632f532ffelXOEarF0SZxzLM",
+          "messageID": "msg_179cd8424001ETF3ZrXfSP7Xkz"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "a7245e95a7aa490198fcd2e7a1d2ed2d3f87353b",
+          "type": "step-finish",
+          "tokens": {
+            "total": 28280,
+            "input": 28080,
+            "output": 187,
+            "reasoning": 13,
+            "cache": {
+              "write": 0,
+              "read": 0
+            }
+          },
+          "cost": 0,
+          "id": "prt_179cdb984001CoBvUXRbKYlNyq",
+          "sessionID": "ses_e8632f532ffelXOEarF0SZxzLM",
+          "messageID": "msg_179cd8424001ETF3ZrXfSP7Xkz"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_179cd0aeb001VjODZfKHV1AV4J",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit",
+          "root": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit"
+        },
+        "cost": 0,
+        "tokens": {
+          "input": 0,
+          "output": 0,
+          "reasoning": 0,
+          "cache": {
+            "read": 0,
+            "write": 0
+          }
+        },
+        "modelID": "nvidia/nemotron-3.5-super-vl-120b-a12b",
+        "providerID": "nvidia",
+        "time": {
+          "created": 1793044888005
+        },
+        "id": "msg_179cdb9c5001amb03ZJvuZRwGJ",
+        "sessionID": "ses_e8632f532ffelXOEarF0SZxzLM"
+      },
+      "parts": [
+        {
+          "snapshot": "a7245e95a7aa490198fcd2e7a1d2ed2d3f87353b",
+          "type": "step-start",
+          "id": "prt_179ce4d9a001Z0mt8Te2X14O7T",
+          "sessionID": "ses_e8632f532ffelXOEarF0SZxzLM",
+          "messageID": "msg_179cdb9c5001amb03ZJvuZRwGJ"
+        },
+        {
+          "type": "reasoning",
+          "text": "Types match reference exactly. Typecheck errors are all expected callers-of-types errors (id/parentId now required, removed props). These are acceptable per task. Let me count errors and write the report, then commit types.ts.\n\nLet me get a count of errors.",
+          "time": {
+            "start": 1793044925863,
+            "end": 1793044926930
+          },
+          "id": "prt_179ce4da7001RpYrSXuzPARmfR",
+          "sessionID": "ses_e8632f532ffelXOEarF0SZxzLM",
+          "messageID": "msg_179cdb9c5001amb03ZJvuZRwGJ"
+        },
+        {
+          "type": "text",
+          "text": "Types match the reference exactly. Typecheck errors are all expected caller-migration errors (required `id`/`parentId`, removed `stopped`/`tools`/`retryAttachments`/`ChatAttachmentPayload`). Now committing.\n",
+          "time": {
+            "start": 1793044926936,
+            "end": 1793044928154
+          },
+          "id": "prt_179ce51d8001MnoPlIKkKEBri4",
+          "sessionID": "ses_e8632f532ffelXOEarF0SZxzLM",
+          "messageID": "msg_179cdb9c5001amb03ZJvuZRwGJ"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "call-70a0ff28-4ff3-41a9-9d81-a37835164655",
+          "state": {
+            "metadata": {
+              "output": ""
+            },
+            "status": "running",
+            "input": {
+              "command": "git add apps/studio/src/types.ts && git commit -m \"studio: align types.ts with assistant-ui message model\" && git log --oneline -3",
+              "workdir": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit"
+            },
+            "time": {
+              "start": 1793044928131
+            }
+          },
+          "id": "prt_179ce566f001GPuPYTPw3k8Ibx",
+          "sessionID": "ses_e8632f532ffelXOEarF0SZxzLM",
+          "messageID": "msg_179cdb9c5001amb03ZJvuZRwGJ"
+        }
+      ]
+    }
+  ]
+}
