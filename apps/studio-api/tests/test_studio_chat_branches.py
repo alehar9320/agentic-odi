@@ -252,6 +252,12 @@ def test_stream_chat_handles_add_connector_locally(monkeypatch, tmp_path) -> Non
     assert registered["name"] == "gong"
     assert service.list()[0].name == "gong"
     assert _Mcp.calls == []
+    # The run timeline shows the tool starting and finishing, like every other one.
+    tool_frames = [json.loads(raw) for raw in events["tool"]]
+    assert [(frame["name"], frame["status"]) for frame in tool_frames] == [
+        ("add_connector", "start"),
+        ("add_connector", "ok"),
+    ]
 
 
 def test_stream_chat_add_connector_unknown_preset_emits_error(monkeypatch, tmp_path) -> None:
@@ -270,6 +276,11 @@ def test_stream_chat_add_connector_unknown_preset_emits_error(monkeypatch, tmp_p
 
     assert json.loads(events["connector"][0])["status"] == "error"
     assert service.list() == []
+    tool_frames = [json.loads(raw) for raw in events["tool"]]
+    assert [(frame["name"], frame["status"]) for frame in tool_frames] == [
+        ("add_connector", "start"),
+        ("add_connector", "error"),
+    ]
 
 
 def test_unreachable_mcp_server_emits_one_error_event(monkeypatch) -> None:
