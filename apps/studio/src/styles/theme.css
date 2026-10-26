@@ -317,6 +317,15 @@ a {
   cursor: not-allowed;
 }
 
+/* Suggestion pills in composer */
+.composer__pills {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 2px;
+}
+
 /* Composer */
 .composer {
   position: relative;

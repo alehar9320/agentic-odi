@@ -7,8 +7,73 @@
  * connector chips, and the hint row are the same in both, so they live here.
  */
 
+import { type ReactNode } from "react";
+import { useAuiState } from "@assistant-ui/react";
 import { isCommandDraft, type StudioCommand } from "../../lib/commands";
 import { useStudio } from "../../state/StudioContext";
+import { BoltIcon, CaptureIcon, CompassIcon, SparkIcon } from "../icons";
+
+const PILL_ICONS: ReactNode[] = [
+  <SparkIcon size={15} key="spark" />,
+  <BoltIcon size={15} key="bolt" />,
+  <CaptureIcon size={15} key="capture" />,
+];
+
+interface QuickPill {
+  id: string;
+  label: string;
+  icon: ReactNode;
+  run: () => void;
+  conversational?: boolean;
+}
+
+export function SuggestionPills() {
+  const { canvas, llmHealth, openPanel, streaming, sendMessage } = useStudio();
+  const suggestions = useAuiState((state) => state.thread.suggestions);
+
+  const jobs = canvas?.jobs.length ?? 0;
+
+  const pills: QuickPill[] = suggestions.map((suggestion, index) => ({
+    id: `suggestion-${index}`,
+    label: suggestion.title ?? suggestion.prompt,
+    icon: PILL_ICONS[index % PILL_ICONS.length],
+    run: () => void sendMessage(suggestion.prompt),
+    conversational: true,
+  }));
+
+  pills.push(
+    jobs > 0 && llmHealth.healthy === false
+      ? {
+          id: "capture",
+          label: "Capture what you heard",
+          icon: <CaptureIcon size={15} />,
+          run: () => openPanel("capture"),
+        }
+      : {
+          id: "landscape",
+          label: "Opportunity landscape",
+          icon: <CompassIcon size={15} />,
+          run: () => openPanel("landscape"),
+        },
+  );
+
+  return (
+    <div className="composer__pills" aria-label="Suggested next steps">
+      {pills.map((pill) => (
+        <button
+          key={pill.id}
+          type="button"
+          className="suggestion"
+          disabled={Boolean(pill.conversational && streaming)}
+          onClick={pill.run}
+        >
+          {pill.icon}
+          {pill.label}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 export function CommandPalette({
   open,

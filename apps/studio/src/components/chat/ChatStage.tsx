@@ -157,6 +157,7 @@ export function ChatStage() {
         <ThreadComposer
           onCommand={(command) => runCommand(command)}
           onSlashCommand={submitCommand}
+          autoFocus
         />
       </div>
     </ThreadPrimitive.Root>

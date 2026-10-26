@@ -8,12 +8,12 @@
  */
 
 import { ComposerPrimitive, useAui, useAuiState } from "@assistant-ui/react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { isSlashCommand, matchCommands, type StudioCommand } from "../../lib/commands";
 import { useStudio } from "../../state/StudioContext";
 import { ArrowUpIcon, PaperclipIcon, StopIcon } from "../icons";
-import { CommandPalette, ComposerHint, ConnectorChips, paletteOpenFor } from "./composerParts";
+import { CommandPalette, ComposerHint, ConnectorChips, SuggestionPills, paletteOpenFor } from "./composerParts";
 
 function AttachmentRow() {
   const aui = useAui();
@@ -61,6 +61,13 @@ function ComposerBody({
   // Remember which draft was dismissed, so typing again re-opens the palette
   // without an effect that writes state on every keystroke.
   const [dismissedFor, setDismissedFor] = useState<string | null>(null);
+  const inputRef = useRef<HTMLTextAreaElement | null>(null);
+
+  useEffect(() => {
+    if (autoFocus) {
+      inputRef.current?.focus();
+    }
+  }, [autoFocus]);
 
   const offline = llmHealth.healthy === false;
   const matches = useMemo(() => (paletteOpenFor(text) ? matchCommands(text) : []), [text]);
@@ -116,6 +123,7 @@ function ComposerBody({
 
   return (
     <>
+      <SuggestionPills />
       <CommandPalette
         open={open}
         matches={matches}
@@ -130,6 +138,7 @@ function ComposerBody({
           Message the studio
         </label>
         <ComposerPrimitive.Input
+          ref={inputRef}
           id="studio-composer"
           className="composer__input"
           rows={1}

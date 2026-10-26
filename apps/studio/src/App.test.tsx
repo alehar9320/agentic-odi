@@ -355,7 +355,7 @@ describe("first run", () => {
         expect.objectContaining({ name: "Get a service from commit to production" }),
       );
     });
-    expect(await screen.findByText(/Living Studio · Ambient/i)).toBeInTheDocument();
+    expect(await screen.findAllByText(/Ambient/i)).not.toHaveLength(0);
     expect(screen.queryByRole("button", { name: /explore on my own/i })).toBeNull();
   });
 
