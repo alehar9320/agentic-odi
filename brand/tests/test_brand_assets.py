@@ -53,6 +53,9 @@ def test_palette_matches_the_spec():
         "cream": "#F6EAD8",
         "accent": "#8B8CF8",
         "tile": "#131722",
+        "suit": "#1F2536",
+        "shirt": "#FFFFFF",
+        "tie": "#6366F1",
     }
 
 
@@ -113,6 +116,8 @@ def test_contrast_ratio_matches_wcag_reference_values():
     assert odi_mascot.contrast_ratio("#B4794C", "#1B1410") > 4.0
     assert odi_mascot.contrast_ratio("#B4794C", "#0A0B0E") > 4.0
     assert odi_mascot.contrast_ratio("#8B8CF8", "#0A0B0E") > 4.0
+    assert odi_mascot.contrast_ratio("#FFFFFF", "#1F2536") > 4.5
+    assert odi_mascot.contrast_ratio("#6366F1", "#FFFFFF") > 3.0
 
 
 @pytest.mark.parametrize("name", ASSET_NAMES)
@@ -178,3 +183,11 @@ def test_ansi_banner_covers_the_same_silhouette_as_the_plain_one():
     plain_cells = sum(1 for line in plain.splitlines() for glyph in line if glyph != " ")
     assert ansi.count("▀") == plain_cells
     assert "\x1b[0m" in ansi
+
+
+def test_bust_contains_pm_attire_and_glasses():
+    bust = odi_mascot.bust_raster()
+    colors = {bust.get(x, y) for y in range(bust.grid) for x in range(bust.grid)}
+    assert "suit" in colors
+    assert "shirt" in colors
+    assert "tie" in colors
