@@ -1678,11 +1678,25 @@ input[type="range"] {
 
 /* A failure shown in place of the thing that failed. */
 .failure {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
   margin-top: 8px;
   padding: 10px 12px;
   border: 1px solid rgba(239, 68, 68, 0.35);
+  border-left-color: rgba(239, 68, 68, 0.7);
   border-radius: 10px;
   background: rgba(239, 68, 68, 0.08);
+}
+
+.failure__icon {
+  display: inline-flex;
+  padding-top: 2px;
+  color: #f87171;
+}
+
+.failure__body {
+  min-width: 0;
 }
 
 .failure__message {
@@ -1698,10 +1712,44 @@ input[type="range"] {
   font-size: 0.72rem;
 }
 
+.failure__detail summary {
+  list-style: none;
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.failure__detail summary::-webkit-details-marker {
+  display: none;
+}
+
+.failure__detail summary::before {
+  content: "+ ";
+  color: var(--faint);
+}
+
+.failure__detail[open] summary::before {
+  content: "− ";
+}
+
+.failure__detail[open] summary {
+  margin-bottom: 4px;
+}
+
 .failure__detail pre {
   margin: 4px 0 0;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+.failure__request {
+  margin: 6px 0 0;
+  color: var(--faint);
+  font-size: 0.7rem;
+}
+
+.failure__request code {
+  font-family: var(--mono);
+  color: var(--muted);
 }
 
 .failure__suggestion {
