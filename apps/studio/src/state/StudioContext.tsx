@@ -28,11 +28,14 @@ import {
   fetchConfig,
   fetchConnectorCatalog,
   fetchConnectors,
+  fetchConversationTree as apiFetchConversationTree,
   fetchLatestConversation,
   fetchMemory,
   fetchModels,
   healthLlm,
   healthMcp,
+  resolveApproval as apiResolveApproval,
+  setConversationHead as apiSetConversationHead,
   streamChat,
   updateJob as apiUpdateJob,
   updateObservation as apiUpdateObservation,
@@ -46,6 +49,7 @@ import { applyToolEvent, type RunStep } from "../lib/run";
 import { newTurnId } from "../lib/thread";
 import type {
   AddConnectorPayload,
+  ChatAttachment,
   ChatAttachmentPayload,
   AddOutcomePayload,
   AddStepPayload,
@@ -55,11 +59,13 @@ import type {
   ChatPart,
   ConnectorListItem,
   ConnectorPreset,
+  ConversationTree,
   Observation,
   StudioBrief,
   StudioConfig,
   StudioError,
   StudioNotification,
+  TurnNode,
   WorkspacePanelId,
 } from "../types";
 import { catalogManifest } from "../ui/catalog";
@@ -193,6 +199,18 @@ export interface StudioContextValue {
     /** Re-ask from this turn: it and everything after it are replaced. */
     options?: { from?: string },
   ) => Promise<void>;
+  /** Re-answer the turn ending at `messageId`, as a sibling branch. */
+  regenerateFrom: (messageId: string) => Promise<void>;
+  /** Replace the user turn at `messageId`, as a sibling branch. */
+  editFrom: (messageId: string, text: string) => Promise<void>;
+  /** Take `branch` as the visible path and record it as the conversation head. */
+  switchBranch: (messages: ChatMessage[]) => void;
+  /** Answer a paused write. The turn resumes on the stream it came from. */
+  respondToApproval: (approvalId: string, approved: boolean, reason?: string) => Promise<void>;
+  /** Replay a persisted conversation's visible branch as the local transcript. */
+  fetchConversationTree: (conversationId: string) => Promise<ConversationTree>;
+  /** Record which branch of a conversation is visible. */
+  setConversationHead: (conversationId: string, headId: string | null) => Promise<void>;
   stopStreaming: () => void;
   clearChat: () => void;
   conversationId: string | null;
@@ -593,9 +611,12 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const pushNotice = useCallback((text: string) => {
-    setMessages((prev) => [...prev, { role: "notice", id: newTurnId(), content: text }]);
-  }, []);
+const pushNotice = useCallback((text: string) => {
+  setMessages((prev) => [
+    ...prev,
+    { role: "notice", id: newTurnId(), parentId: null, content: text },
+  ]);
+}, []);
 
   const checkConnections = useCallback(
     async (override: Partial<StudioConfig> = {}): Promise<ConnectionReport> => {
@@ -776,50 +797,29 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     abortRef.current?.abort();
   }, []);
 
-  const sendMessage = useCallback(
+  /**
+   * Stream one assistant turn. `base` is the history sent to the model; when
+   * `userTurn` is given it is appended to that history, otherwise the last
+   * message of `base` is the turn being re-answered. The new assistant turn is
+   * parented to `assistantParentId`, which is how branches stay linked.
+   */
+  const runTurn = useCallback(
     async (
-      text: string,
-      attachments: ChatAttachmentPayload[] = [],
-      options: { from?: string } = {},
+      base: ChatMessage[],
+      userTurn: ChatMessage | null,
+      assistantParentId: string,
     ) => {
-      const trimmed = text.trim();
-      if ((!trimmed && !attachments.length) || streaming) {
+      if (streaming) {
         return;
       }
 
-      // A re-ask replaces the turn it starts from: the old question and the
-      // answer it got are the same turn, and keeping both would read as a
-      // conversation the reader never had.
-      const cut = options.from
-        ? messages.findIndex((message) => message.id === options.from)
-        : -1;
-      const replaced = cut >= 0 ? messages.slice(0, cut) : messages;
+      const history: ChatMessage[] = userTurn ? [...base, userTurn] : base;
 
-      // Files ride only on the newest turn. Re-sending megabytes of base64 with
-      // every later question would make each turn slower than the last.
-      const history: ChatMessage[] = [
-        ...replaced.map((message) =>
-          message.attachments
-            ? {
-                id: message.id,
-                role: message.role,
-                content: message.content,
-                parts: message.parts,
-              }
-            : message,
-        ),
-        {
-          role: "user",
-          id: newTurnId(),
-          content: trimmed,
-          ...(attachments.length ? { attachments } : {}),
-        },
-      ];
-      const assistantIndex = history.length;
       const assistantId = newTurnId();
+      const assistantIndex = history.length;
       setMessages([
         ...history,
-        { role: "assistant", id: assistantId, content: "", parts: [] },
+        { role: "assistant", id: assistantId, parentId: assistantParentId, content: "", parts: [] },
       ]);
       setStreaming(true);
       setThinkingPhase("health_check");
@@ -858,18 +858,15 @@ export function StudioProvider({ children }: { children: ReactNode }) {
             return prev;
           }
           const next = [...prev];
+          const retryText = userTurn?.content ?? base[base.length - 1]?.content ?? "";
           next[assistantIndex] = {
             role: "assistant",
             id: assistantId,
+            parentId: assistantParentId,
             content,
             parts: [...parts],
-            ...(failure ? { error: failure, retryText: trimmed } : {}),
-            ...(stopped ? { stopped: true, retryText: trimmed } : {}),
-            ...(failure || stopped
-              ? attachments.length
-                ? { retryAttachments: attachments }
-                : {}
-              : {}),
+            ...(failure ? { error: failure, retryText } : {}),
+            ...(stopped ? { stopped: true, retryText } : {}),
             ...(steps.length ? { tools: [...steps] } : {}),
           };
           return next;
@@ -952,7 +949,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
               const reason = String(event.data.error ?? "The connector could not be added.");
               setMessages((prev) => [
                 ...prev,
-                { role: "notice", id: newTurnId(), content: `Connector failed: ${reason}` },
+                { role: "notice", id: newTurnId(), parentId: null, content: `Connector failed: ${reason}` },
               ]);
             } else {
               setConnectorSuggestions((prev) => {
@@ -1033,15 +1030,152 @@ export function StudioProvider({ children }: { children: ReactNode }) {
         abortRef.current = null;
       }
     },
-    [
-      messages,
-      streaming,
-      settings,
-      brief,
-      conversationId,
-      refreshCanvas,
-      refreshConnectors,
-    ],
+    [streaming, settings, brief, conversationId, refreshCanvas, refreshConnectors],
+  );
+
+  const sendMessage = useCallback(
+    async (
+      text: string,
+      attachments: ChatAttachmentPayload[] = [],
+      options: { from?: string } = {},
+    ) => {
+      const trimmed = text.trim();
+      if ((!trimmed && !attachments.length) || streaming) {
+        return;
+      }
+
+      // A re-ask replaces the turn it starts from: the old question and the
+      // answer it got are the same turn, and keeping both would read as a
+      // conversation the reader never had.
+      const cut = options.from
+        ? messages.findIndex((message) => message.id === options.from)
+        : -1;
+      const replaced = cut >= 0 ? messages.slice(0, cut) : messages;
+
+      // Files ride only on the newest turn. Re-sending megabytes of base64 with
+      // every later question would make each turn slower than the last.
+      const history: ChatMessage[] = replaced.map((message) =>
+        message.attachments
+          ? {
+              id: message.id,
+              parentId: message.parentId,
+              role: message.role,
+              content: message.content,
+              parts: message.parts,
+            }
+          : message,
+      );
+      const userMessage: ChatMessage = {
+        id: newTurnId(),
+        parentId: history.length ? history[history.length - 1].id : null,
+        role: "user",
+        content: trimmed,
+        ...(attachments.length ? { attachments: attachments as unknown as ChatAttachment[] } : {}),
+      };
+      await runTurn(history, userMessage, userMessage.id);
+    },
+    [messages, streaming, runTurn],
+  );
+
+  /**
+   * Re-answer the turn ending at `messageId`: everything up to and including
+   * that message stays, and a new assistant branch grows from it.
+   */
+  const regenerateFrom = useCallback(
+    async (messageId: string) => {
+      const cut = messages.findIndex((message) => message.id === messageId);
+      if (cut < 0 || streaming) {
+        return;
+      }
+      const base = messages.slice(0, cut + 1);
+      await runTurn(base, null, base[base.length - 1].id);
+    },
+    [messages, streaming, runTurn],
+  );
+
+  /**
+   * Replace the user turn at `messageId` with edited words, at its original
+   * parent, and grow a new assistant branch from it.
+   */
+  const editFrom = useCallback(
+    async (messageId: string, text: string) => {
+      const cut = messages.findIndex((message) => message.id === messageId);
+      if (cut < 0 || streaming) {
+        return;
+      }
+      const original = messages[cut];
+      const base = messages.slice(0, cut);
+      const trimmed = text.trim();
+      const edited: ChatMessage = {
+        id: original.id,
+        parentId: original.parentId ?? null,
+        role: "user",
+        content: trimmed,
+        ...(original.attachments ? { attachments: original.attachments } : {}),
+      };
+      await runTurn(base, edited, edited.id);
+    },
+    [messages, streaming, runTurn],
+  );
+
+  /**
+   * Take `branch` as the visible path and record it as the conversation head,
+   * so a reload reopens the branch that was visible.
+   */
+  const switchBranch = useCallback(
+    (branch: ChatMessage[]) => {
+      setMessages(branch);
+      const head = branch.length ? branch[branch.length - 1].id : null;
+      if (conversationId) {
+        void apiSetConversationHead(conversationId, head).catch(() => undefined);
+      }
+    },
+    [conversationId],
+  );
+
+  /**
+   * Answer a paused write. The turn resumes on the stream it came from.
+   */
+  const respondToApproval = useCallback(
+    async (approvalId: string, approved: boolean, reason = "") => {
+      try {
+        await apiResolveApproval(approvalId, approved, reason);
+      } catch {
+        pushToast("error", "That approval request is no longer waiting.");
+      }
+    },
+    [pushToast],
+  );
+
+  /**
+   * Replay a persisted conversation's visible branch as the local transcript.
+   */
+  const fetchConversationTree = useCallback(
+    async (conversationId: string): Promise<ConversationTree> => {
+      const tree = await apiFetchConversationTree(conversationId);
+      setConversationId(tree.conversation.id);
+      setMessages(
+        tree.messages
+          .filter((node: TurnNode) => node.role === "user" || node.role === "assistant")
+          .map((node: TurnNode) => ({
+            id: node.id,
+            parentId: node.parent_id,
+            role: node.role as "user" | "assistant",
+            content: node.content ?? "",
+            parts: node.content ? [{ kind: "text", text: node.content }] : [],
+          })),
+      );
+      return tree;
+    },
+    [],
+  );
+
+  /** Record which branch of a conversation is visible. */
+  const setConversationHead = useCallback(
+    async (conversationId: string, headId: string | null) => {
+      await apiSetConversationHead(conversationId, headId);
+    },
+    [],
   );
 
   /** The single conversational exit from any lens. */
@@ -1171,6 +1305,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
               .filter((turn) => turn.role === "user" || turn.role === "assistant")
               .map((turn) => ({
                 id: `saved-${turn.id}`,
+                parentId: null,
                 role: turn.role as "user" | "assistant",
                 content: turn.content,
                 parts: turn.content ? [{ kind: "text" as const, text: turn.content }] : [],
@@ -1258,6 +1393,12 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       streaming,
       thinkingPhase,
       sendMessage,
+      regenerateFrom,
+      editFrom,
+      switchBranch,
+      respondToApproval,
+      fetchConversationTree,
+      setConversationHead,
       stopStreaming,
       clearChat,
       conversationId,
@@ -1332,6 +1473,12 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       streaming,
       thinkingPhase,
       sendMessage,
+      regenerateFrom,
+      editFrom,
+      switchBranch,
+      respondToApproval,
+      fetchConversationTree,
+      setConversationHead,
       stopStreaming,
       clearChat,
       conversationId,

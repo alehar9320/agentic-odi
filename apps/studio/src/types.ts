@@ -113,6 +113,13 @@ export interface ToolApproval {
   prompt: string;
 }
 
+/** What goes on the wire with a turn: the sidecar's snake-case shape. */
+export interface ChatAttachmentPayload {
+  name: string;
+  media_type: string;
+  data: string;
+}
+
 export interface ChatAttachment {
   id: string;
   name: string;
