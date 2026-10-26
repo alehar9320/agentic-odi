@@ -1,8 +1,11 @@
 {
-  "name": "agentic-odi-monorepo",
+  "name": "agentic-odi",
   "private": true,
   "workspaces": [
     "apps/*",
     "packages/*"
-  ]
+  ],
+  "scripts": {
+    "build": "npm --prefix apps/studio run build"
+  }
 }
