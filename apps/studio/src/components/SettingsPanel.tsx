@@ -31,6 +31,7 @@ export function SettingsPanel() {
   } = useStudio();
   const { enabled: tourEnabled, restart: restartTour } = useOnboarding();
   const [selectedPreset, setSelectedPreset] = useState("");
+  const [showApiKey, setShowApiKey] = useState(false);
   const updater = useUpdater();
 
   function update<K extends keyof StudioConfig>(key: K, value: StudioConfig[K]): void {
@@ -88,14 +89,24 @@ export function SettingsPanel() {
       </div>
       <div className="field">
         <label htmlFor="api-key">API key</label>
-        <input
-          id="api-key"
-          className="input"
-          type="password"
-          autoComplete="off"
-          value={settings.api_key}
-          onChange={(event) => update("api_key", event.target.value)}
-        />
+        <div className="field__row">
+          <input
+            id="api-key"
+            className="input"
+            type={showApiKey ? "text" : "password"}
+            autoComplete="off"
+            value={settings.api_key}
+            onChange={(event) => update("api_key", event.target.value)}
+          />
+          <button
+            type="button"
+            className="quiet-action"
+            aria-label={showApiKey ? "Hide API key" : "Show API key"}
+            onClick={() => setShowApiKey((visible) => !visible)}
+          >
+            {showApiKey ? "Hide" : "Show"}
+          </button>
+        </div>
       </div>
       <div className="field">
         <label htmlFor="model-name">Model</label>
