@@ -31,6 +31,7 @@ from agentic_odi_core.messages import (
     step_not_found,
 )
 from agentic_odi_core.models import (
+    V2MOM,
     BusinessImpactCategory,
     BusinessValue,
     CustomerOutcome,
@@ -99,6 +100,7 @@ __all__ = [
     "TOOL_SPECS",
     "ToolName",
     "ToolSpec",
+    "V2MOM",
     "Repository",
     "build_repository",
     "compute_opportunity_score",

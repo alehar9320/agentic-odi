@@ -884,6 +884,7 @@ export interface components {
              * @default
              */
             core_problem: string;
+            v2mom?: components["schemas"]["V2MOM"] | null;
         };
         /** TurnModel */
         TurnModel: {
@@ -977,6 +978,28 @@ export interface components {
              * @default
              */
             mcp_url: string;
+        };
+        /**
+         * V2MOM
+         * @description The domain's V2MOM artifact: Vision, Values, Methods, Obstacles, Measures.
+         *
+         *     Only ``vision`` is captured today, by the context conversation; the other
+         *     four fields have no input path yet and arrive empty.
+         */
+        V2MOM: {
+            /**
+             * Vision
+             * @default
+             */
+            vision: string;
+            /** Values */
+            values?: string[];
+            /** Methods */
+            methods?: string[];
+            /** Obstacles */
+            obstacles?: string[];
+            /** Measures */
+            measures?: string[];
         };
         /** ValidationError */
         ValidationError: {

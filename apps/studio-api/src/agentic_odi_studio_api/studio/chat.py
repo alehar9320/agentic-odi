@@ -104,6 +104,17 @@ def _brief_lines(brief: StudioBrief | None) -> list[str]:
         ("Job to be done", brief.job_statement),
         ("Core problem", brief.core_problem),
     ]
+    if brief.v2mom:
+        if brief.v2mom.vision:
+            facts.append(("Vision (V2MOM)", brief.v2mom.vision))
+        if brief.v2mom.values:
+            facts.append(("Values (V2MOM)", ", ".join(brief.v2mom.values)))
+        if brief.v2mom.methods:
+            facts.append(("Methods (V2MOM)", ", ".join(brief.v2mom.methods)))
+        if brief.v2mom.obstacles:
+            facts.append(("Obstacles (V2MOM)", ", ".join(brief.v2mom.obstacles)))
+        if brief.v2mom.measures:
+            facts.append(("Measures (V2MOM)", ", ".join(brief.v2mom.measures)))
     return [f"- {label}: {value}" for label, value in facts if value.strip()]
 
 
