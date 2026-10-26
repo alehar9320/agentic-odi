@@ -1,15 +1,30 @@
 name: Tauri Release
 
+# The desktop bundles ride on the same release as the CLI archives, so this
+# workflow needs the same trigger treatment as `release.yml`: the `push: tags`
+# trigger alone never fired because release-please creates the tag with the
+# repository GITHUB_TOKEN, and GitHub suppresses workflow runs for events that
+# token produces. `workflow_run` fires from the release-please run, and
+# `workflow_dispatch` is the manual self-heal path. The `resolve` job gates both
+# so a run that finds the release already carrying every bundle does nothing.
 on:
   push:
     tags:
       - "v*"
+  workflow_run:
+    workflows: ["release-please"]
+    types: [completed]
   workflow_dispatch:
     inputs:
       tag:
-        description: "Existing release tag to attach desktop bundles to (e.g. v0.3.0)"
-        required: true
+        description: "Existing release tag to attach desktop bundles to (default: the latest release)"
+        required: false
         type: string
+      force:
+        description: "Rebuild even when the release already has every bundle"
+        required: false
+        type: boolean
+        default: false
 
 concurrency:
   group: tauri-release-${{ inputs.tag || github.ref_name }}
@@ -19,7 +34,46 @@ permissions:
   contents: write
 
 jobs:
+  resolve:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      tag: ${{ steps.gate.outputs.tag }}
+      version: ${{ steps.gate.outputs.version }}
+      should_build: ${{ steps.gate.outputs.should_build }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Resolve the tag and check for missing bundles
+        id: gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          DISPATCH_TAG: ${{ inputs.tag }}
+          RUN_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          FORCE: ${{ inputs.force }}
+        run: |
+          set -euo pipefail
+          tag=""
+          case "$EVENT" in
+            push)              tag="${GITHUB_REF_NAME}" ;;
+            workflow_dispatch) tag="$DISPATCH_TAG" ;;
+            workflow_run)      tag="$RUN_BRANCH" ;;
+          esac
+          case "$tag" in
+            v[0-9]*) ;;
+            *)
+              echo "No explicit v* tag for a '$EVENT' run (got '$tag'); using the latest release."
+              tag="$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name)"
+              ;;
+          esac
+          args=(--stream studio --tag "$tag" --repo "$GITHUB_REPOSITORY")
+          if [ "$FORCE" = "true" ]; then args+=(--force); fi
+          python3 scripts/release_assets.py "${args[@]}" >> "$GITHUB_OUTPUT"
+          cat "$GITHUB_OUTPUT"
+
   preflight:
+    needs: resolve
+    if: needs.resolve.outputs.should_build == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -33,7 +87,8 @@ jobs:
           fi
 
   build:
-    needs: [preflight]
+    needs: [resolve, preflight]
+    if: needs.resolve.outputs.should_build == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -49,7 +104,10 @@ jobs:
     runs-on: ${{ matrix.platform }}
     timeout-minutes: 90
     steps:
+      # Build the tagged tree so the bundles match the release they attach to.
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.resolve.outputs.tag }}
 
       - name: Install Linux webview dependencies
         if: matrix.platform == 'ubuntu-22.04'
@@ -114,8 +172,8 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         with:
           projectPath: apps/studio
-          tagName: ${{ inputs.tag || github.ref_name }}
-          releaseName: ${{ inputs.tag || github.ref_name }}
+          tagName: ${{ needs.resolve.outputs.tag }}
+          releaseName: ${{ needs.resolve.outputs.tag }}
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}

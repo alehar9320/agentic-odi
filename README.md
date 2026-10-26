@@ -206,15 +206,28 @@ Add `--backend mcp` to route data commands through a running MCP server
 
 ### Install the binary
 
-Prebuilt binaries are available for Linux, macOS, and Windows:
+Prebuilt binaries are available for Linux (x86_64, ARM64), macOS (Intel, Apple
+Silicon), and Windows. Every release page carries a **📦 Download & Run** section
+with the per-platform archives, their SHA-256 checksums, and a one-line install.
+The fastest path is:
 
 ```bash
 curl -fsSL https://github.com/alehar9320/agentic-odi/releases/latest/download/install.sh | sh
 ```
 
-The installer symlinks `odi`, `odipm`, `odi-cli`, and `agentic-odi` into
-`~/.local/bin/`. See [Installation](docs/installation.md) for the install
-layout, updates, and release automation.
+On Windows (PowerShell):
+
+```powershell
+iex (Invoke-WebRequest -Uri https://github.com/alehar9320/agentic-odi/releases/latest/download/install.ps1 -UseBasicParsing)
+```
+
+The installer verifies the download against `checksums.txt`, unpacks the binary
+under `~/.local/share/agentic-odi/versions/<version>/`, and symlinks `odi`,
+`odipm`, `odi-cli`, and `agentic-odi` into `~/.local/bin/`. See
+[Installation](docs/installation.md) for the install layout, updates, and
+release automation, or open the
+[latest release](https://github.com/alehar9320/agentic-odi/releases/latest) to
+download an archive by hand.
 
 ## Documentation
 
