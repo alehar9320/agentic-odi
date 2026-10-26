@@ -21,11 +21,11 @@
     },
     "cost": 0,
     "tokens": {
-      "input": 240100,
-      "output": 19652,
-      "reasoning": 34292,
+      "input": 245029,
+      "output": 21107,
+      "reasoning": 34538,
       "cache": {
-        "read": 4747920,
+        "read": 5151168,
         "write": 0
       }
     },
@@ -38,7 +38,7 @@
     ],
     "time": {
       "created": 1793046579958,
-      "updated": 1793047458116
+      "updated": 1793047509866
     }
   },
   "messages": [
@@ -75,6 +75,13 @@
               "additions": 7,
               "deletions": 0,
               "status": "modified"
+            },
+            {
+              "file": "task-10-report.md",
+              "patch": "Index: task-10-report.md\n===================================================================\n--- task-10-report.md\t\n+++ task-10-report.md\t\n@@ -0,0 +1,72 @@\n+# Task 10 Report: Frontend StudioContext — branching & approvals\n+\n+## Status\n+\n+Complete. All six methods added to `StudioContext.tsx`, tests rewritten,\n+lint clean, `StudioContext.tsx` typechecks clean, committed.\n+\n+## Commits\n+\n+- `b69da015 feat(studio): add branching and approvals to StudioContext`\n+  - `apps/studio/src/state/StudioContext.tsx`\n+  - `apps/studio/src/state/StudioContext.test.tsx`\n+  - `apps/studio/src/types.ts`\n+  Branch: `ui-not-looking-like-shit`\n+\n+## Changes\n+\n+`StudioContext.tsx`\n+- `regenerateFrom(messageId)` — keeps the visible path up to and including\n+  `messageId`, streams a new assistant branch parented to it (no duplicated\n+  user turn).\n+- `editFrom(messageId, text)` — replaces the user turn at `messageId` at its\n+  original parent, streams a new assistant branch from it.\n+- `switchBranch(messages: ChatMessage[])` — replaces the visible transcript\n+  and PATCHes the conversation head to the branch's last message\n+  (`setConversationHead`).\n+- `respondToApproval(approvalId, approved, reason)` — POSTs via\n+  `resolveApproval` to `/api/approvals/{id}`.\n+- `fetchConversationTree(conversationId)` — GETs the tree via\n+  `fetchConversationTree`, replays the visible path as the transcript.\n+- `setConversationHead(conversationId, headId)` — PATCHes the head.\n+- The sendMessage streaming pipeline was extracted into a shared `runTurn`\n+  helper so new messages, regenerations, and edits share one code path.\n+- Assistant turns now carry `parentId`, so branches are linked in the store.\n+\n+`types.ts`\n+- Exported the missing `ChatAttachmentPayload` wire type (referenced by\n+  `attachments.ts`, `thread.ts`, `Conversation.tsx`; previously an\n+  unresolved import).\n+\n+`StudioContext.test.tsx`\n+- Rewrote from the feature-branch reference, adapted to main behavior:\n+  branch switching + head patch, approval answers (`/api/approvals/`),\n+  stopped turns, conversation-tree load, plus the pre-existing memory,\n+  failure, health-polling, and canvas suites.\n+\n+## Verification\n+\n+- `npm --prefix apps/studio test -- --run -- StudioContext.test.tsx`\n+  → 20/20 tests pass (8 new branch/approval tests). Full studio suite:\n+  361/361 across 36 files.\n+- `npx eslint src/state/StudioContext.tsx src/state/StudioContext.test.tsx src/types.ts`\n+  → clean.\n+- `npm --prefix apps/studio run typecheck`\n+  → `StudioContext.tsx` has zero errors. 83 errors remain elsewhere in the\n+  app, down from 104 on the base commit; these are pre-existing\n+  pre-Task-9 errors as expected.\n+\n+## Concerns\n+\n+- `switchBranch` accepts `ChatMessage[]` (matching the reference\n+  implementation and its test) rather than `messageIds[]` as loosely\n+  sketched in the brief; full message objects are required to rebuild the\n+  visible transcript anyway.\n+- `sendMessage` attaches payloads to `ChatMessage.attachments` via an\n+  `as unknown as` cast because `ChatAttachmentPayload` (wire shape) and\n+  `ChatAttachment` (transcript shape) diverge — pre-existing type slack in\n+  the codebase, not a runtime issue.\n+- The studio app still has pre-existing type errors outside\n+  `StudioContext.tsx`; they predate this task and were not touched beyond\n+  the incidental fixes this change made (missing `parentId` on\n+  store-inserted notices/hydrated turns, the exported `ChatAttachmentPayload`).\n\\ No newline at end of file\n",
+              "additions": 72,
+              "deletions": 0,
+              "status": "added"
             }
           ]
         },
@@ -6013,19 +6020,22 @@
         },
         "cost": 0,
         "tokens": {
-          "input": 0,
-          "output": 0,
-          "reasoning": 0,
+          "total": 135709,
+          "input": 1048,
+          "output": 211,
+          "reasoning": 34,
           "cache": {
-            "read": 0,
-            "write": 0
+            "write": 0,
+            "read": 134416
           }
         },
         "modelID": "nvidia/nemotron-3.5-super-vl-120b-a12b",
         "providerID": "nvidia",
         "time": {
-          "created": 1793047458108
+          "created": 1793047458108,
+          "completed": 1793047498134
         },
+        "finish": "tool-calls",
         "id": "msg_179f4f13c0018jA3HoHhYwj1sa",
         "sessionID": "ses_e8618750affegHugTfFdEFTJja"
       },
@@ -6053,21 +6063,246 @@
           "tool": "bash",
           "callID": "call-f649a0de-174d-4940-9434-2cc2571c75f5",
           "state": {
-            "metadata": {
-              "output": ""
-            },
-            "status": "running",
+            "status": "completed",
             "input": {
               "command": "git add apps/studio/src/state/StudioContext.tsx apps/studio/src/state/StudioContext.test.tsx apps/studio/src/types.ts && git commit -m \"feat(studio): add branching and approvals to StudioContext\n\nAdd regenerateFrom, editFrom, switchBranch, respondToApproval,\nfetchConversationTree, and setConversationHead to StudioContext,\nwired to the studioApi conversation-tree, head, and approval\nendpoints. Stream sharing is extracted into runTurn so a new\nmessage, a regeneration, and an edit reuse one turn pipeline.\n\nAlso export the missing ChatAttachmentPayload type from types.ts and\nparentId hydrated/notice turns so ChatMessage is fully satisfied.\" && git log --oneline -1",
               "workdir": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit"
             },
+            "output": "[ui-not-looking-like-shit b69da015] feat(studio): add branching and approvals to StudioContext\n 3 files changed, 433 insertions(+), 55 deletions(-)\nb69da015 feat(studio): add branching and approvals to StudioContext\n",
+            "metadata": {
+              "output": "[ui-not-looking-like-shit b69da015] feat(studio): add branching and approvals to StudioContext\n 3 files changed, 433 insertions(+), 55 deletions(-)\nb69da015 feat(studio): add branching and approvals to StudioContext\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "git add apps/studio/src/state/StudioContext.tsx apps/studio/src/state/StudioContext.test.tsx apps/studio/src/types.ts && git commit -m \"feat(studio): add branching and approvals to StudioContext\n\nAdd regenerateFrom, editFrom, switchBranch, respondToApproval,\nfetchConversationTree, and setConversationHead to StudioContext,\nwired to the studioApi conversation-tree, head, and approval\nendpoints. Stream sharing is extracted into runTurn so a new\nmessage, a regeneration, and an edit reuse one turn pipeline.\n\nAlso export the missing ChatAttachmentPayload type from types.ts and\nparentId hydrated/notice turns so ChatMessage is fully satisfied.\" && git log --oneline -1",
             "time": {
-              "start": 1793047466762
+              "start": 1793047466762,
+              "end": 1793047498035
             }
           },
           "id": "prt_179f512fb001eHOQu33iypwerd",
           "sessionID": "ses_e8618750affegHugTfFdEFTJja",
           "messageID": "msg_179f4f13c0018jA3HoHhYwj1sa"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "1d482ce26510c7e422b161188f2b0ac1edffde60",
+          "type": "step-finish",
+          "tokens": {
+            "total": 135709,
+            "input": 1048,
+            "output": 211,
+            "reasoning": 34,
+            "cache": {
+              "write": 0,
+              "read": 134416
+            }
+          },
+          "cost": 0,
+          "id": "prt_179f58d5e001QhaBf4IFl7J2QS",
+          "sessionID": "ses_e8618750affegHugTfFdEFTJja",
+          "messageID": "msg_179f4f13c0018jA3HoHhYwj1sa"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_179e78b02001ZrzTo6baBWPbhK",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit",
+          "root": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 136900,
+          "input": 1376,
+          "output": 905,
+          "reasoning": 203,
+          "cache": {
+            "write": 0,
+            "read": 134416
+          }
+        },
+        "modelID": "nvidia/nemotron-3.5-super-vl-120b-a12b",
+        "providerID": "nvidia",
+        "time": {
+          "created": 1793047498149,
+          "completed": 1793047509836
+        },
+        "finish": "tool-calls",
+        "id": "msg_179f58da5001YYtTFu4gSBLR14",
+        "sessionID": "ses_e8618750affegHugTfFdEFTJja"
+      },
+      "parts": [
+        {
+          "snapshot": "1d482ce26510c7e422b161188f2b0ac1edffde60",
+          "type": "step-start",
+          "id": "prt_179f593aa0013d2D0zpl5yAPsr",
+          "sessionID": "ses_e8618750affegHugTfFdEFTJja",
+          "messageID": "msg_179f58da5001YYtTFu4gSBLR14"
+        },
+        {
+          "type": "reasoning",
+          "text": "Committed: b69da015. Now write task-10-report.md at repo root.\n\nReport format: Status, Commits, Test Summary, Concerns.\n\n- Status: Complete — all 6 methods added, tests rewritten and passing, lint clean, StudioContext.tsx typecheck-clean, committed.\n- Commits: b69da015 on branch ui-not-looking-like-shit (3 files).\n- Test Summary: vitest --run StudioContext.test.tsx: 20 tests pass (8 new branch/approval + 12 pre-existing), full studio suite 361/361 across 36 files.\n- Concerns: pre-existing type errors elsewhere in the studio app (83 remaining, down from 104 baseline) expected pre-Task-9; sendMessage attachments stored with a cast due to ChatAttachmentPayload vs ChatAttachment mismatch; switchBranch takes ChatMessage[] per the reference implementation rather than messageIds[].",
+          "time": {
+            "start": 1793047499701,
+            "end": 1793047501207
+          },
+          "id": "prt_179f593b5001i19bd6aiy1H6by",
+          "sessionID": "ses_e8618750affegHugTfFdEFTJja",
+          "messageID": "msg_179f58da5001YYtTFu4gSBLR14"
+        },
+        {
+          "type": "text",
+          "text": "Committed as `b69da015`. Writing the report:\n",
+          "time": {
+            "start": 1793047501216,
+            "end": 1793047509510
+          },
+          "id": "prt_179f599a0001k6zX5We9FdCrrl",
+          "sessionID": "ses_e8618750affegHugTfFdEFTJja",
+          "messageID": "msg_179f58da5001YYtTFu4gSBLR14"
+        },
+        {
+          "type": "tool",
+          "tool": "write",
+          "callID": "call-abb56eec-fc18-4af4-bbe3-636bedf6425c",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/task-10-report.md",
+              "content": "# Task 10 Report: Frontend StudioContext — branching & approvals\n\n## Status\n\nComplete. All six methods added to `StudioContext.tsx`, tests rewritten,\nlint clean, `StudioContext.tsx` typechecks clean, committed.\n\n## Commits\n\n- `b69da015 feat(studio): add branching and approvals to StudioContext`\n  - `apps/studio/src/state/StudioContext.tsx`\n  - `apps/studio/src/state/StudioContext.test.tsx`\n  - `apps/studio/src/types.ts`\n  Branch: `ui-not-looking-like-shit`\n\n## Changes\n\n`StudioContext.tsx`\n- `regenerateFrom(messageId)` — keeps the visible path up to and including\n  `messageId`, streams a new assistant branch parented to it (no duplicated\n  user turn).\n- `editFrom(messageId, text)` — replaces the user turn at `messageId` at its\n  original parent, streams a new assistant branch from it.\n- `switchBranch(messages: ChatMessage[])` — replaces the visible transcript\n  and PATCHes the conversation head to the branch's last message\n  (`setConversationHead`).\n- `respondToApproval(approvalId, approved, reason)` — POSTs via\n  `resolveApproval` to `/api/approvals/{id}`.\n- `fetchConversationTree(conversationId)` — GETs the tree via\n  `fetchConversationTree`, replays the visible path as the transcript.\n- `setConversationHead(conversationId, headId)` — PATCHes the head.\n- The sendMessage streaming pipeline was extracted into a shared `runTurn`\n  helper so new messages, regenerations, and edits share one code path.\n- Assistant turns now carry `parentId`, so branches are linked in the store.\n\n`types.ts`\n- Exported the missing `ChatAttachmentPayload` wire type (referenced by\n  `attachments.ts`, `thread.ts`, `Conversation.tsx`; previously an\n  unresolved import).\n\n`StudioContext.test.tsx`\n- Rewrote from the feature-branch reference, adapted to main behavior:\n  branch switching + head patch, approval answers (`/api/approvals/`),\n  stopped turns, conversation-tree load, plus the pre-existing memory,\n  failure, health-polling, and canvas suites.\n\n## Verification\n\n- `npm --prefix apps/studio test -- --run -- StudioContext.test.tsx`\n  → 20/20 tests pass (8 new branch/approval tests). Full studio suite:\n  361/361 across 36 files.\n- `npx eslint src/state/StudioContext.tsx src/state/StudioContext.test.tsx src/types.ts`\n  → clean.\n- `npm --prefix apps/studio run typecheck`\n  → `StudioContext.tsx` has zero errors. 83 errors remain elsewhere in the\n  app, down from 104 on the base commit; these are pre-existing\n  pre-Task-9 errors as expected.\n\n## Concerns\n\n- `switchBranch` accepts `ChatMessage[]` (matching the reference\n  implementation and its test) rather than `messageIds[]` as loosely\n  sketched in the brief; full message objects are required to rebuild the\n  visible transcript anyway.\n- `sendMessage` attaches payloads to `ChatMessage.attachments` via an\n  `as unknown as` cast because `ChatAttachmentPayload` (wire shape) and\n  `ChatAttachment` (transcript shape) diverge — pre-existing type slack in\n  the codebase, not a runtime issue.\n- The studio app still has pre-existing type errors outside\n  `StudioContext.tsx`; they predate this task and were not touched beyond\n  the incidental fixes this change made (missing `parentId` on\n  store-inserted notices/hydrated turns, the exported `ChatAttachmentPayload`)."
+            },
+            "output": "Wrote file successfully.",
+            "metadata": {
+              "diagnostics": {},
+              "filepath": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/task-10-report.md",
+              "exists": false,
+              "truncated": false
+            },
+            "title": "task-10-report.md",
+            "time": {
+              "start": 1793047509486,
+              "end": 1793047509527
+            }
+          },
+          "id": "prt_179f5b9cf001FN7SwnpDIDhMeQ",
+          "sessionID": "ses_e8618750affegHugTfFdEFTJja",
+          "messageID": "msg_179f58da5001YYtTFu4gSBLR14"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "529faabeea56a5f7b383cbbb06051f9713eca1b2",
+          "type": "step-finish",
+          "tokens": {
+            "total": 136900,
+            "input": 1376,
+            "output": 905,
+            "reasoning": 203,
+            "cache": {
+              "write": 0,
+              "read": 134416
+            }
+          },
+          "cost": 0,
+          "id": "prt_179f5badb0012J7Q3WXyEeEAN5",
+          "sessionID": "ses_e8618750affegHugTfFdEFTJja",
+          "messageID": "msg_179f58da5001YYtTFu4gSBLR14"
+        },
+        {
+          "type": "patch",
+          "hash": "1d482ce26510c7e422b161188f2b0ac1edffde60",
+          "files": [
+            "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/task-10-report.md"
+          ],
+          "id": "prt_179f5bb300011FCadU3nfgwUya",
+          "sessionID": "ses_e8618750affegHugTfFdEFTJja",
+          "messageID": "msg_179f58da5001YYtTFu4gSBLR14"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_179e78b02001ZrzTo6baBWPbhK",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit",
+          "root": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 137269,
+          "input": 2505,
+          "output": 339,
+          "reasoning": 9,
+          "cache": {
+            "write": 0,
+            "read": 134416
+          }
+        },
+        "modelID": "nvidia/nemotron-3.5-super-vl-120b-a12b",
+        "providerID": "nvidia",
+        "time": {
+          "created": 1793047509860,
+          "completed": 1793047516583
+        },
+        "finish": "stop",
+        "id": "msg_179f5bb64001YTkd8OS6QDnlLX",
+        "sessionID": "ses_e8618750affegHugTfFdEFTJja"
+      },
+      "parts": [
+        {
+          "snapshot": "529faabeea56a5f7b383cbbb06051f9713eca1b2",
+          "type": "step-start",
+          "id": "prt_179f5c3d5001LWMmvPRa5Lsi5D",
+          "sessionID": "ses_e8618750affegHugTfFdEFTJja",
+          "messageID": "msg_179f5bb64001YTkd8OS6QDnlLX"
+        },
+        {
+          "type": "reasoning",
+          "text": "Done. Summarize concisely.",
+          "time": {
+            "start": 1793047512066,
+            "end": 1793047512892
+          },
+          "id": "prt_179f5c402001SUQ9znfebRBVNj",
+          "sessionID": "ses_e8618750affegHugTfFdEFTJja",
+          "messageID": "msg_179f5bb64001YTkd8OS6QDnlLX"
+        },
+        {
+          "type": "text",
+          "text": "Done. Task 10 complete, committed as `b69da015` on `ui-not-looking-like-shit`.\n\n**What was added to `apps/studio/src/state/StudioContext.tsx`:**\n- `regenerateFrom(messageId)` — keeps path through `messageId`, streams a new assistant branch parented to it\n- `editFrom(messageId, text)` — replaces the user turn at its original parent, streams a new branch\n- `switchBranch(messages: ChatMessage[])` — replaces the visible transcript, PATCHes conversation head\n- `respondToApproval(id, approved, reason)` — wires to `resolveApproval` (`PATCH /api/approvals/{id}`)\n- `fetchConversationTree(conversationId)` — replays the tree's visible path as the transcript\n- `setConversationHead(conversationId, headId)` — records the visible head\n- Streaming pipeline extracted into a shared `runTurn` used by `sendMessage`, `regenerateFrom`, `editFrom`\n\n**Supporting:** exported missing `ChatAttachmentPayload` from `types.ts`; `parentId` on store-inserted notices/hydrated turns so `ChatMessage` is fully satisfied.\n\n**Verification:** Vitest 20/20 on `StudioContext.test.tsx` (full suite 361/361, 36 files), ESLint clean on all three changed files, `StudioContext.tsx` typechecks clean (83 pre-existing errors remain elsewhere, down from 104 at base). Report at `task-10-report.md`.",
+          "time": {
+            "start": 1793047512900,
+            "end": 1793047516397
+          },
+          "id": "prt_179f5c744001RFQ1AVAT3AcbO3",
+          "sessionID": "ses_e8618750affegHugTfFdEFTJja",
+          "messageID": "msg_179f5bb64001YTkd8OS6QDnlLX"
+        },
+        {
+          "reason": "stop",
+          "snapshot": "529faabeea56a5f7b383cbbb06051f9713eca1b2",
+          "type": "step-finish",
+          "tokens": {
+            "total": 137269,
+            "input": 2505,
+            "output": 339,
+            "reasoning": 9,
+            "cache": {
+              "write": 0,
+              "read": 134416
+            }
+          },
+          "cost": 0,
+          "id": "prt_179f5d534001NLUN59YXuM5Ccu",
+          "sessionID": "ses_e8618750affegHugTfFdEFTJja",
+          "messageID": "msg_179f5bb64001YTkd8OS6QDnlLX"
         }
       ]
     }
