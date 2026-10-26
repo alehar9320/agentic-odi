@@ -1,0 +1,5 @@
+Your objective was to ensure that we get assistant-ui installed and used to the max, so that the client studio makes use of its capabilities. However, we had a crash, so we'll need to pick up from where we left off on this topic branch we're on
+
+---
+
+Continue if you have next steps, or stop and ask for clarification if you are unsure how to proceed.
