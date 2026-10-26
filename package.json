@@ -1,0 +1,8 @@
+{
+  "name": "agentic-odi-monorepo",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ]
+}
