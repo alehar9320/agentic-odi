@@ -168,6 +168,57 @@ def telemetry_labels(body: str | None) -> set[str]:
     return labels
 
 
+def _pages(payload: object) -> list:
+    """Flatten ``gh api --paginate --slurp`` output into one list of records.
+
+    ``--paginate`` wraps each page in its own array, so a 150-commit PR arrives
+    as ``[[...100...], [...50...]]``. Treating that as one flat list would read
+    only the first page and quietly under-count the diff. A single page may also
+    arrive flat, so both shapes are accepted.
+    """
+    if not isinstance(payload, list):
+        return []
+    if payload and all(isinstance(page, list) for page in payload):
+        return [record for page in payload for record in page]
+    return payload
+
+
+def build_facts(
+    meta: dict | None,
+    commits_payload: object,
+    files_payload: object,
+) -> dict:
+    """Assemble the fact sheet ``compute_labels`` reads, from GitHub payloads."""
+    meta = meta or {}
+    author = meta.get("author")
+    commits = []
+    for entry in _pages(commits_payload):
+        if not isinstance(entry, dict):
+            continue
+        commit_author = (entry.get("commit") or {}).get("author") or {}
+        commits.append(f"{commit_author.get('name') or ''} <{commit_author.get('email') or ''}>")
+
+    files = []
+    for entry in _pages(files_payload):
+        if not isinstance(entry, dict):
+            continue
+        files.append(
+            {
+                "filename": entry.get("filename") or "",
+                "additions": entry.get("additions") or 0,
+                "deletions": entry.get("deletions") or 0,
+            }
+        )
+
+    return {
+        "author": author if isinstance(author, dict) else {},
+        "branch": meta.get("headRefName") or "",
+        "body": meta.get("body") or "",
+        "commits": commits,
+        "files": files,
+    }
+
+
 def compute_labels(facts: dict) -> set[str]:
     """Return every label the managed axes imply for one pull request.
 
@@ -207,6 +258,14 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="print every label this system may add or remove, then exit",
     )
+    parser.add_argument(
+        "--facts",
+        metavar="PATH",
+        help=(
+            "read a JSON object with meta, commits, and files keys (as returned "
+            "by `gh api --paginate --slurp`), build the fact sheet, and print labels"
+        ),
+    )
     args = parser.parse_args(argv)
 
     if args.managed:
@@ -215,8 +274,17 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     try:
-        facts = json.load(sys.stdin)
-    except json.JSONDecodeError as error:
+        if args.facts:
+            with open(args.facts, encoding="utf-8") as handle:
+                payload = json.load(handle)
+            facts = build_facts(
+                payload.get("meta"),
+                payload.get("commits"),
+                payload.get("files"),
+            )
+        else:
+            facts = json.load(sys.stdin)
+    except (json.JSONDecodeError, OSError, AttributeError) as error:
         print(f"could not read pull request facts: {error}", file=sys.stderr)
         return 1
 

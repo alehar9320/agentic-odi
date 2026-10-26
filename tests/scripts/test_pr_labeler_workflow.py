@@ -64,3 +64,18 @@ def test_the_workflow_never_checks_out_pr_code():
     """A write-permission workflow must not run PR code."""
     text = RISK.read_text(encoding="utf-8")
     assert "pull_request_target" not in text
+
+
+def test_paginated_api_calls_use_slurp():
+    """Without --slurp, gh emits one array per page and only page 1 is read."""
+    text = RISK.read_text(encoding="utf-8")
+    for line in text.splitlines():
+        if "--paginate" in line:
+            assert "--slurp" in line, f"paginate without slurp: {line.strip()}"
+
+
+def test_label_computation_uses_the_tested_python_entrypoint():
+    """No inline JSON assembly in YAML: it cannot be tested or paginated."""
+    text = RISK.read_text(encoding="utf-8")
+    assert "pr_labels.py --facts" in text
+    assert "python3 -c" not in text

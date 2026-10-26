@@ -84,28 +84,22 @@ jobs:
           REPO: ${{ github.repository }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          author_json="$(gh pr view "$PR_NUMBER" --repo "$REPO" --json author,body,headRefName)"
-          commits_json="$(gh api "repos/$REPO/pulls/$PR_NUMBER/commits?per_page=100" --paginate \
-            --jq '[.[] | "\(.commit.author.name) <\(.commit.author.email)>"]')"
-          files_json="$(gh api "repos/$REPO/pulls/$PR_NUMBER/files?per_page=100" --paginate \
-            --jq '[.[] | {filename, additions, deletions}] | .[:300]')"
+          # --slurp keeps one array per page, so nothing is dropped on a PR
+          # with more than 100 commits or files; pr_labels.build_facts flattens
+          # the pages. The assembly lives in tested Python, not inline here.
+          gh pr view "$PR_NUMBER" --repo "$REPO" \
+            --json author,body,headRefName > "$RUNNER_TEMP/meta.json"
+          gh api "repos/$REPO/pulls/$PR_NUMBER/commits?per_page=100" --paginate --slurp \
+            > "$RUNNER_TEMP/commits.json"
+          gh api "repos/$REPO/pulls/$PR_NUMBER/files?per_page=100" --paginate --slurp \
+            > "$RUNNER_TEMP/files.json"
+          jq -n --slurpfile meta "$RUNNER_TEMP/meta.json" \
+                --slurpfile commits "$RUNNER_TEMP/commits.json" \
+                --slurpfile files "$RUNNER_TEMP/files.json" \
+            '{meta: $meta[0], commits: $commits[0], files: $files[0]}' \
+            > "$RUNNER_TEMP/facts.json"
 
-          facts="$(python3 - "$author_json" "$commits_json" "$files_json" <<'PY'
-          import json
-          import sys
-
-          meta = json.loads(sys.argv[1])
-          print(json.dumps({
-              "author": meta.get("author") or {},
-              "branch": meta.get("headRefName") or "",
-              "body": meta.get("body") or "",
-              "commits": json.loads(sys.argv[2]),
-              "files": json.loads(sys.argv[3]),
-          }))
-          PY
-          )"
-
-          computed="$(printf '%s' "$facts" | python3 scripts/pr_labels.py)"
+          computed="$(python3 scripts/pr_labels.py --facts "$RUNNER_TEMP/facts.json")"
 
           # Remove labels this run no longer wants, then add what it does.
           # Removing an absent label is a harmless no-op, so it is tolerated.

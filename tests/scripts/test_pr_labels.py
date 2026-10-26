@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 from pr_labels import (
     MANAGED_LABELS,
+    build_facts,
     compute_labels,
     domain_labels,
     is_dependency_change,
@@ -230,3 +231,61 @@ def test_the_cli_fails_loudly_on_unreadable_input():
     )
     assert result.returncode == 1
     assert "could not read" in result.stderr
+
+
+def test_build_facts_flattens_paginated_pages():
+    """gh --paginate --slurp returns an array of pages, not one flat array.
+
+    Reading only the first page would silently under-count size on a large PR.
+    """
+    meta = {"author": {"login": "a", "type": "User"}, "body": "x", "headRefName": "slay/y"}
+    commits = [
+        [{"commit": {"author": {"name": "A", "email": "a@x"}}}],
+        [{"commit": {"author": {"name": "B", "email": "b@x"}}}],
+    ]
+    files = [
+        [{"filename": "a.py", "additions": 1, "deletions": 2}],
+        [{"filename": "b.py", "additions": 3, "deletions": 4}],
+    ]
+    facts = build_facts(meta, commits, files)
+    assert facts["branch"] == "slay/y"
+    assert facts["commits"] == ["A <a@x>", "B <b@x>"]
+    assert [f["filename"] for f in facts["files"]] == ["a.py", "b.py"]
+    assert "size/XS" in compute_labels(facts)
+
+
+def test_build_facts_accepts_unpaginated_single_page_shape():
+    """A single page may arrive either flat or wrapped."""
+    meta = {"author": {"login": "a", "type": "User"}}
+    flat_commits = [{"commit": {"author": {"name": "A", "email": "a@x"}}}]
+    flat_files = [{"filename": "a.py", "additions": 10, "deletions": 0}]
+    facts = build_facts(meta, flat_commits, flat_files)
+    assert facts["commits"] == ["A <a@x>"]
+    assert facts["files"] == [{"filename": "a.py", "additions": 10, "deletions": 0}]
+
+
+def test_build_facts_keeps_every_file_past_one_page():
+    meta = {"author": {"login": "a", "type": "User"}}
+    page = [{"filename": f"f{i}.py", "additions": 1, "deletions": 0} for i in range(100)]
+    facts = build_facts(meta, [], [page, page])
+    assert len(facts["files"]) == 200
+
+
+def test_build_facts_tolerates_missing_and_odd_entries():
+    assert build_facts({}, [], []) == {
+        "author": {},
+        "branch": "",
+        "body": "",
+        "commits": [],
+        "files": [],
+    }
+    facts = build_facts(
+        {"author": None, "headRefName": None, "body": None},
+        [{"commit": {"author": {}}}],
+        [{"filename": "a.py"}],
+    )
+    assert facts["author"] == {}
+    assert facts["branch"] == ""
+    assert facts["body"] == ""
+    assert facts["commits"] == [" <>"]
+    assert facts["files"] == [{"filename": "a.py", "additions": 0, "deletions": 0}]
