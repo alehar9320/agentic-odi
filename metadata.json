@@ -3,7 +3,7 @@
   "checkpoint_id": "01M5WVQ2Z06FAJAZ65QK7XFYNY",
   "strategy": "manual-commit",
   "branch": "ui-not-looking-like-shit",
-  "checkpoints_count": 3,
+  "checkpoints_count": 5,
   "files_touched": [
     "apps/studio-api/src/agentic_odi_studio_api/studio/chat.py",
     "apps/studio-api/src/agentic_odi_studio_api/studio/memory.py",
@@ -27,13 +27,20 @@
       "compact_transcript": "/1/transcript.jsonl",
       "content_hash": "/1/content_hash.txt",
       "prompt": ""
+    },
+    {
+      "metadata": "/2/metadata.json",
+      "transcript": "/2/full.jsonl",
+      "compact_transcript": "/2/transcript.jsonl",
+      "content_hash": "/2/content_hash.txt",
+      "prompt": "/2/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 593461,
+    "input_tokens": 715249,
     "cache_creation_tokens": 0,
-    "cache_read_tokens": 9409280,
-    "output_tokens": 26466,
-    "api_call_count": 90
+    "cache_read_tokens": 12400416,
+    "output_tokens": 34258,
+    "api_call_count": 125
   }
 }
