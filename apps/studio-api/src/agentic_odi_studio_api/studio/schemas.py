@@ -7,23 +7,13 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 
 
-class ChatAttachment(BaseModel):
-    """One file the reader attached, as bytes the sidecar can decode.
-
-    ``data`` is base64. Images become image content; text is inlined verbatim.
-    The sidecar decides which, from ``media_type``, and refuses the rest rather
-    than letting a filename stand in for content the model never saw.
-    """
-
-    name: str = ""
-    media_type: str = ""
-    data: str = ""
-
-
 class ChatMessage(BaseModel):
     role: Literal["system", "user", "assistant", "tool"]
     content: str = ""
-    attachments: list[ChatAttachment] = Field(default_factory=list)
+    #: Stable id for this turn, so a branch survives a reload. Clients that do
+    #: not send one are persisted in a linear chain instead.
+    id: str | None = None
+    parent_id: str | None = None
 
 
 class McpHealthRequest(BaseModel):
@@ -36,7 +26,10 @@ class LlmHealthRequest(BaseModel):
     model: str = ""
 
 
-class ModelsRequest(BaseModel):
+class ModelListRequest(BaseModel):
+    """Which backend to ask for its model ids. The key travels in the body, not
+    the query string, so it never lands in a URL or an access log."""
+
     base_url: str
     api_key: str = ""
 
@@ -100,6 +93,21 @@ class UiCatalogRequest(BaseModel):
     components: list[dict[str, Any]] = Field(default_factory=list)
 
 
+class AttachmentRef(BaseModel):
+    """One file the user attached to a turn.
+
+    Nothing is stored server-side: an attachment is part of the message. Text is
+    extracted by the client because only the client has the file; images arrive
+    as data URLs for backends that accept them.
+    """
+
+    name: str = Field(min_length=1, max_length=255)
+    content_type: str = "application/octet-stream"
+    size: int = Field(default=0, ge=0)
+    text: str | None = Field(default=None, max_length=80_000)
+    data_url: str | None = Field(default=None, max_length=8_000_000)
+
+
 class ChatRequest(BaseModel):
     base_url: str
     api_key: str = ""
@@ -109,6 +117,23 @@ class ChatRequest(BaseModel):
     brief: StudioBrief | None = None
     ui_catalog: UiCatalogRequest | None = None
     conversation_id: str | None = None
+    attachments: list[AttachmentRef] = Field(default_factory=list)
+    #: Ask before a tool writes. Off by default so the CLI and older clients keep
+    #: their current, unprompted behaviour.
+    approvals: bool = False
+    #: The id the client is streaming this reply under, so the persisted branch
+    #: tree matches the one on screen.
+    assistant_id: str | None = None
+
+
+class ApprovalDecisionRequest(BaseModel):
+    approved: bool
+    reason: str = Field(default="", max_length=500)
+
+
+class ApprovalDecisionResponse(BaseModel):
+    ok: bool
+    id: str
 
 
 class AddConnectorRequest(BaseModel):
@@ -180,6 +205,7 @@ class ConversationModel(BaseModel):
     title: str
     created_at: str
     updated_at: str
+    head_id: str | None = None
 
 
 class ConversationResponse(BaseModel):
@@ -192,8 +218,31 @@ class TurnModel(BaseModel):
     role: str
     content: str
     created_at: str
+    message_id: str | None = None
+    parent_id: str | None = None
 
 
 class LatestConversationResponse(BaseModel):
     conversation: ConversationModel | None = None
     turns: list[TurnModel] = Field(default_factory=list)
+
+
+class TurnNode(BaseModel):
+    """One turn in the branch tree, as the thread runtime needs it."""
+
+    id: str
+    parent_id: str | None = None
+    role: str
+    content: str
+    created_at: str
+
+
+class ConversationTreeResponse(BaseModel):
+    conversation: ConversationModel
+    messages: list[TurnNode] = Field(default_factory=list)
+    head_id: str | None = None
+
+
+class UpdateConversationRequest(BaseModel):
+    head_id: str | None = None
+    title: str | None = Field(default=None, max_length=200)

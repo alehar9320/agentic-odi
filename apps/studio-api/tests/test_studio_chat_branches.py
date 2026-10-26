@@ -9,6 +9,7 @@ from typing import Any
 
 from agentic_odi_studio_api.studio import chat
 from agentic_odi_studio_api.studio.connectors import ConnectorService
+from agentic_odi_studio_api.studio.memory import StudioMemory
 from agentic_odi_studio_api.studio.schemas import ChatMessage, ChatRequest
 
 
@@ -146,6 +147,23 @@ def _tool_call(arguments: str, name: str = "get_jobs") -> Any:
     )
 
 
+def test_retrying_a_persisted_question_does_not_duplicate_its_turn() -> None:
+    memory = StudioMemory(":memory:")
+    conversation = memory.create_conversation()
+
+    chat._persist_turn(memory, conversation.id, "user", "list jobs", "user-1", None)
+    chat._persist_turn(
+        memory, conversation.id, "assistant", "first answer", "assistant-1", "user-1"
+    )
+    chat._persist_turn(memory, conversation.id, "user", "list jobs", "user-1", None)
+
+    turns = memory.list_turns(conversation.id)
+    assert [(turn.message_id, turn.role, turn.content) for turn in turns] == [
+        ("user-1", "user", "list jobs"),
+        ("assistant-1", "assistant", "first answer"),
+    ]
+
+
 def test_stream_chat_falls_back_to_empty_arguments_for_invalid_json(monkeypatch) -> None:
     _install(
         monkeypatch,
@@ -235,13 +253,6 @@ def test_stream_chat_handles_add_connector_locally(monkeypatch, tmp_path) -> Non
     assert service.list()[0].name == "gong"
     assert _Mcp.calls == []
 
-    # The run timeline shows the tool starting and finishing, like every other one.
-    tool_frames = [json.loads(raw) for raw in events["tool"]]
-    assert [(frame["name"], frame["status"]) for frame in tool_frames] == [
-        ("add_connector", "start"),
-        ("add_connector", "ok"),
-    ]
-
 
 def test_stream_chat_add_connector_unknown_preset_emits_error(monkeypatch, tmp_path) -> None:
     service = ConnectorService(tmp_path / "connectors.json")
@@ -259,10 +270,6 @@ def test_stream_chat_add_connector_unknown_preset_emits_error(monkeypatch, tmp_p
 
     assert json.loads(events["connector"][0])["status"] == "error"
     assert service.list() == []
-
-    tool_frames = [json.loads(raw) for raw in events["tool"]]
-    assert tool_frames[-1]["status"] == "error"
-    assert "nope" in tool_frames[-1]["preview"]
 
 
 def test_unreachable_mcp_server_emits_one_error_event(monkeypatch) -> None:

@@ -14,8 +14,6 @@ and come back to the same thread and the same working context.
 from __future__ import annotations
 
 import asyncio
-import base64
-import binascii
 import json
 import logging
 import time
@@ -32,11 +30,20 @@ from agentic_odi_core.remote import (
 from fastmcp import Client as McpClient
 from openai import AsyncOpenAI
 
+from agentic_odi_studio_api.studio.approvals import (
+    ApprovalRegistry,
+    wait_for_decision,
+)
 from agentic_odi_studio_api.studio.connectors import ConnectorService
 from agentic_odi_studio_api.studio.memory import OBSERVATION_KINDS, StudioMemory
 from agentic_odi_studio_api.studio.observability import log_turn
 from agentic_odi_studio_api.studio.probes import check_llm_health, is_endpoint_reachable
-from agentic_odi_studio_api.studio.schemas import ChatAttachment, ChatMessage, ChatRequest, StudioBrief
+from agentic_odi_studio_api.studio.schemas import (
+    AttachmentRef,
+    ChatMessage,
+    ChatRequest,
+    StudioBrief,
+)
 from agentic_odi_studio_api.studio.ui_spec import RENDER_UI_TOOL, UiCatalog
 
 log = logging.getLogger(__name__)
@@ -44,6 +51,31 @@ log = logging.getLogger(__name__)
 #: A rejected surface is corrected in the same reply, but a model that keeps
 #: missing must not be able to loop forever.
 MAX_TOOL_ROUNDS = 3
+
+#: Tool names that change stored data. Everything else is a read, a surface, or
+#: a memory note — none of which needs a confirmation the user would learn to
+#: click through.
+MUTATING_TOOL_PREFIXES: tuple[str, ...] = (
+    "add_",
+    "create_",
+    "update_",
+    "delete_",
+    "ingest_",
+    "remove_",
+)
+
+#: Attachments are context, not a corpus: five files, and a bounded slice of each.
+MAX_ATTACHMENTS = 5
+MAX_ATTACHMENT_TEXT = 20_000
+
+#: A single tool result is summarized for the source chip, never quoted whole.
+MAX_SOURCE_PREVIEW = 160
+
+
+def is_mutating_tool(name: str) -> bool:
+    """Whether a tool call changes stored data and should be confirmed."""
+    return name.startswith(MUTATING_TOOL_PREFIXES)
+
 
 SYSTEM_PROMPT = """You are an elite product strategist working inside The Living Studio, a room built for product managers.
 Your job is to help the PM choose and win the next opportunity that matters — to customers, the business, and their career.
@@ -154,100 +186,35 @@ def _error_frame(problem: StudioError, request_id: str) -> str:
     return _sse("error", {"error": body.model_dump(mode="json"), "request_id": request_id})
 
 
-#: Base64 adds a third to the payload, and every round of a turn carries it, so
-#: one turn must not be able to become an unbounded upload.
-MAX_ATTACHMENT_BYTES = 8 * 1024 * 1024
-
-#: Text is inlined whole only up to this much. Past it the model is told the file
-#: was cut, instead of being handed a truncated quote as if it were complete.
-MAX_INLINE_CHARS = 120_000
-
-#: Text-bearing media types whose payload is safe to inline as prose.
-INLINE_MEDIA_TYPES = {
-    "application/json",
-    "application/xml",
-    "application/yaml",
-    "application/x-yaml",
-    "application/toml",
-    "application/csv",
-    "application/x-ndjson",
-    "application/sql",
-}
+def _attachment_block(attachments: list[AttachmentRef]) -> str:
+    """The readable part of the user's attachments, bounded and labelled."""
+    blocks: list[str] = []
+    for attachment in attachments[:MAX_ATTACHMENTS]:
+        text = (attachment.text or "").strip()
+        if not text:
+            continue
+        blocks.append(
+            f"[Attached file: {attachment.name}]\n{text[:MAX_ATTACHMENT_TEXT]}\n[/Attached file]"
+        )
+    return "\n\n".join(blocks)
 
 
-def _media_type(attachment: ChatAttachment) -> str:
-    return (attachment.media_type or "").split(";")[0].strip().lower()
-
-
-def _attachment_bytes(attachment: ChatAttachment) -> bytes:
-    return base64.b64decode(attachment.data, validate=True)
-
-
-def _attachment_problem(attachment: ChatAttachment) -> str | None:
-    """Why this file cannot be read, or None when it can.
-
-    A file the model cannot open is refused instead of being mentioned as if it
-    had been read: a filename is not evidence.
-    """
-    media = _media_type(attachment)
-    readable = media.startswith("image/") or media.startswith("text/")
-    if not media:
-        return "has no media type"
-    if not readable and media not in INLINE_MEDIA_TYPES:
-        return f"is a {media} file, which the model cannot read"
-    try:
-        raw = _attachment_bytes(attachment)
-    except (binascii.Error, ValueError):
-        return "is not valid base64"
-    if not raw:
-        return "is empty"
-    if len(raw) > MAX_ATTACHMENT_BYTES:
-        return f"is larger than {MAX_ATTACHMENT_BYTES // (1024 * 1024)} MB"
-    if not media.startswith("image/"):
-        try:
-            raw.decode("utf-8")
-        except UnicodeDecodeError:
-            return "is not UTF-8 text"
-    return None
-
-
-def _attachment_part(attachment: ChatAttachment) -> dict[str, Any]:
-    """One OpenAI content part: an image, or a text file inlined verbatim."""
-    media = _media_type(attachment)
-    if media.startswith("image/"):
-        return {
-            "type": "image_url",
-            "image_url": {"url": f"data:{media};base64,{attachment.data}"},
-        }
-    text = _attachment_bytes(attachment).decode("utf-8")
-    if len(text) > MAX_INLINE_CHARS:
-        text = text[:MAX_INLINE_CHARS] + f"\n\n[truncated at {MAX_INLINE_CHARS} characters]"
-    label = attachment.name or "attached file"
-    return {"type": "text", "text": f"[{label}]\n{text}"}
-
-
-def _message_dict(message: ChatMessage) -> dict[str, Any]:
-    if message.role != "user" or not message.attachments:
-        return {"role": message.role, "content": message.content}
+def _image_parts(attachments: list[AttachmentRef]) -> list[dict[str, Any]]:
     parts: list[dict[str, Any]] = []
-    if message.content:
-        parts.append({"type": "text", "text": message.content})
-    parts.extend(_attachment_part(attachment) for attachment in message.attachments)
-    return {"role": "user", "content": parts}
+    for attachment in attachments[:MAX_ATTACHMENTS]:
+        if attachment.data_url and attachment.content_type.startswith("image/"):
+            parts.append({"type": "image_url", "image_url": {"url": attachment.data_url}})
+    return parts
 
 
-def _stored_user_text(message: ChatMessage | None) -> str:
-    """The user's turn as the thread remembers it.
-
-    The files themselves are not stored, but their names are, so a resumed
-    conversation does not read as if the question came out of nowhere.
-    """
-    if message is None:
-        return ""
-    names = [attachment.name or "attached file" for attachment in message.attachments]
-    if not names:
-        return message.content
-    return f"{message.content}\n\n[{', '.join(names)}]".strip()
+def _user_content(message: ChatMessage, attachments: list[AttachmentRef]) -> Any:
+    """Text plus any readable attachments, shaped for an OpenAI-compatible model."""
+    block = _attachment_block(attachments)
+    text = f"{message.content}\n\n{block}".strip() if block else message.content
+    images = _image_parts(attachments)
+    if not images:
+        return text
+    return [{"type": "text", "text": text}, *images]
 
 
 def _to_openai_messages(request: ChatRequest, memory_context: str = "") -> list[dict[str, Any]]:
@@ -255,7 +222,14 @@ def _to_openai_messages(request: ChatRequest, memory_context: str = "") -> list[
     if memory_context:
         system_prompt += "\n\n" + memory_context
     messages: list[dict[str, Any]] = [{"role": "system", "content": system_prompt}]
-    messages.extend(_message_dict(message) for message in request.messages)
+    last_user = next((m for m in reversed(request.messages) if m.role == "user"), None)
+    for message in request.messages:
+        if message is last_user and request.attachments:
+            messages.append(
+                {"role": "user", "content": _user_content(message, request.attachments)}
+            )
+        else:
+            messages.append({"role": message.role, "content": message.content})
     return messages
 
 
@@ -437,18 +411,76 @@ def _collect_tool_calls(delta: Any, tool_calls: dict[int, dict[str, str]]) -> No
 
 
 def _persist_turn(
-    memory: StudioMemory | None, conversation_id: str | None, role: str, content: str
+    memory: StudioMemory | None,
+    conversation_id: str | None,
+    role: str,
+    content: str,
+    message_id: str | None = None,
+    parent_id: str | None = None,
 ) -> None:
     """Record a turn, tolerating a duplicate retry and never breaking the reply."""
     if memory is None or conversation_id is None or not content.strip():
         return
     try:
         turns = memory.list_turns(conversation_id)
+        if message_id and any(turn.message_id == message_id for turn in turns):
+            return
         if turns and turns[-1].role == role and turns[-1].content == content:
             return
-        memory.append_turn(conversation_id, role, content)
+        memory.append_turn(conversation_id, role, content, message_id, parent_id)
     except Exception:  # noqa: BLE001
         return
+
+
+def _reasoning_text(delta: Any) -> str:
+    """The model's thinking, when the backend exposes it (vLLM, Ollama, DeepSeek)."""
+    for attribute in ("reasoning_content", "reasoning"):
+        value = getattr(delta, attribute, None)
+        if isinstance(value, str) and value:
+            return value
+    return ""
+
+
+def _approval_prompt(name: str, arguments: dict[str, Any]) -> str:
+    human = name.replace("_", " ")
+    return f"Allow the assistant to {human}?"
+
+
+def _denial_result(name: str, decision: Any) -> str | None:
+    """The tool result for a write that must not run, or ``None`` when it may.
+
+    A declined or expired gate is never an error: the turn continues and the
+    model may propose something else.
+    """
+    if decision is None:
+        return (
+            f"The approval request for {name} expired before the user answered. "
+            "Nothing was changed. Ask the user whether to try again."
+        )
+    if decision.approved:
+        return None
+    reason = decision.reason.strip()
+    detail = f" The user said: {reason}" if reason else ""
+    return (
+        f"The user declined to run {name}, so nothing was changed.{detail} "
+        "Do not retry it without being asked."
+    )
+
+
+def _source_frame(counters: dict[str, int], name: str, result: str) -> dict[str, Any]:
+    """One provenance entry per tool the turn actually read."""
+    counters["sources"] += 1
+    preview = " ".join(result.split())[:MAX_SOURCE_PREVIEW]
+    return {
+        "event": "source",
+        "data": {
+            "id": f"src-{counters['sources']}",
+            "title": f"{name} — {preview}" if preview else name,
+            "filename": name,
+            "mediaType": "application/json",
+            "preview": preview,
+        },
+    }
 
 
 async def _turn_frames(
@@ -457,6 +489,7 @@ async def _turn_frames(
     memory: StudioMemory | None,
     request_id: str,
     counters: dict[str, int],
+    approvals: ApprovalRegistry | None = None,
 ) -> AsyncIterator[str]:
     """Yield the frames of one turn, raising ``_TurnFailure`` on a fatal error."""
 
@@ -465,22 +498,11 @@ async def _turn_frames(
 
     yield frame("status", {"phase": "health_check"})
 
-    last_user_message = next(
-        (m for m in reversed(request.messages) if m.role == "user"), None
-    )
-    for message in request.messages:
-        for attachment in message.attachments:
-            problem = _attachment_problem(attachment)
-            if problem is not None:
-                raise _TurnFailure(
-                    StudioError(
-                        code=StudioErrorCode.VALIDATION,
-                        message=f"{attachment.name or 'The attached file'} {problem}.",
-                        suggestion="Attach an image or a text file, then try again.",
-                    )
-                )
-
-    last_user = last_user_message.content if last_user_message else ""
+    last_user_message = next((m for m in reversed(request.messages) if m.role == "user"), None)
+    last_user = last_user_message.content if last_user_message is not None else ""
+    user_message_id = last_user_message.id if last_user_message is not None else None
+    user_parent_id = last_user_message.parent_id if last_user_message is not None else None
+    assistant_message_id = request.assistant_id
 
     conversation_id: str | None = None
     if memory is not None:
@@ -490,7 +512,7 @@ async def _turn_frames(
         if conversation is None:
             conversation = memory.create_conversation()
         conversation_id = conversation.id
-        _persist_turn(memory, conversation_id, "user", _stored_user_text(last_user_message))
+        _persist_turn(memory, conversation_id, "user", last_user, user_message_id, user_parent_id)
         updated = memory.get_conversation(conversation_id) or conversation
         yield frame("conversation", {"id": updated.id, "title": updated.title})
 
@@ -501,7 +523,14 @@ async def _turn_frames(
         reply = offline_fallback(last_user, request.brief)
         yield frame("delta", {"text": reply})
         yield frame("message", {"content": reply})
-        _persist_turn(memory, conversation_id, "assistant", reply)
+        _persist_turn(
+            memory,
+            conversation_id,
+            "assistant",
+            reply,
+            assistant_message_id,
+            user_message_id,
+        )
         return
 
     catalog = UiCatalog.from_manifest(
@@ -576,6 +605,11 @@ async def _turn_frames(
             try:
                 async for chunk in stream:
                     delta = chunk.choices[0].delta
+                    reasoning = _reasoning_text(delta)
+                    if reasoning:
+                        # Thinking is shown as a disclosure, and is never part of
+                        # the answer or of the history that replays.
+                        yield frame("reasoning", {"text": reasoning})
                     if delta.content:
                         # Prose renders as it is generated. A card that follows it
                         # simply comes after the sentence that introduces it.
@@ -597,7 +631,14 @@ async def _turn_frames(
             if not tool_calls:
                 final = "".join(spoken)
                 yield frame("message", {"content": final})
-                _persist_turn(memory, conversation_id, "assistant", final)
+                _persist_turn(
+                    memory,
+                    conversation_id,
+                    "assistant",
+                    final,
+                    assistant_message_id,
+                    user_message_id,
+                )
                 return
 
             messages.append(
@@ -623,25 +664,28 @@ async def _turn_frames(
                 arguments = _parse_arguments(entry["arguments"])
                 counters["tool_calls"] += 1
 
-                if name == "add_connector":
-                    # Framed like every other tool so the client's run timeline can
-                    # show it starting and finishing instead of silently skipping it.
-                    yield frame("tool", {"name": name, "status": "start"})
+                declined: str | None = None
+                if request.approvals and approvals is not None and is_mutating_tool(name):
+                    approval, future = approvals.open(
+                        tool_call_id=entry["id"],
+                        name=name,
+                        arguments=arguments,
+                        prompt=_approval_prompt(name, arguments),
+                    )
+                    # The gate is announced before it is awaited: the client
+                    # cannot answer a question it was never sent.
+                    yield frame("approval", approval.to_dict())
+                    decision = await wait_for_decision(approvals, approval, future)
+                    declined = _denial_result(name, decision)
+
+                if declined is not None:
+                    counters["tool_errors"] += 1
+                    result_str = declined
+                    yield frame("tool", {"name": name, "status": "declined", "preview": declined})
+                elif name == "add_connector":
                     result_str, events = _apply_add_connector(arguments, connector_service)
                     for event in events:
                         yield frame(event["event"], event["data"])
-                    failed = any(
-                        event["event"] == "connector" and event["data"].get("status") == "error"
-                        for event in events
-                    )
-                    yield frame(
-                        "tool",
-                        {
-                            "name": name,
-                            "status": "error" if failed else "ok",
-                            **({"preview": result_str} if failed else {}),
-                        },
-                    )
                 elif name == "remember":
                     yield frame("tool", {"name": name, "status": "start"})
                     result_str, memory_event = _apply_remember(arguments, memory)
@@ -712,6 +756,8 @@ async def _turn_frames(
                                     "tool",
                                     {"name": name, "status": "ok", "preview": result_str[:280]},
                                 )
+                                source = _source_frame(counters, name, result_str)
+                                yield frame(source["event"], source["data"])
 
                 messages.append(
                     {
@@ -734,7 +780,14 @@ async def _turn_frames(
         )
         content = f"{final}\n\n{note}".strip() if final else note
         yield frame("message", {"content": content})
-        _persist_turn(memory, conversation_id, "assistant", content)
+        _persist_turn(
+            memory,
+            conversation_id,
+            "assistant",
+            content,
+            assistant_message_id,
+            user_message_id,
+        )
 
 
 async def stream_chat(
@@ -742,8 +795,10 @@ async def stream_chat(
     service: ConnectorService | None = None,
     memory: StudioMemory | None = None,
     request_id: str | None = None,
+    approvals: ApprovalRegistry | None = None,
 ) -> AsyncIterator[str]:
-    """Yield SSE frames: status, conversation, delta, tool, ui, memory, connector, message, error.
+    """Yield SSE frames: status, conversation, reasoning, delta, tool, approval,
+    source, ui, memory, connector, message, error.
 
     Every turn ends with exactly one terminal event: one ``message`` or one
     ``error``. A failure is never dressed up as a success, and it never leaves
@@ -751,11 +806,17 @@ async def stream_chat(
     """
     rid = request_id or ""
     started = time.monotonic()
-    counters = {"rounds": 0, "tool_calls": 0, "tool_errors": 0, "rounds_exhausted": 0}
+    counters = {
+        "rounds": 0,
+        "tool_calls": 0,
+        "tool_errors": 0,
+        "rounds_exhausted": 0,
+        "sources": 0,
+    }
     outcome = "failed"
     error_code: str | None = None
     try:
-        async for chunk in _turn_frames(request, service, memory, rid, counters):
+        async for chunk in _turn_frames(request, service, memory, rid, counters, approvals):
             yield chunk
         outcome = "completed"
         if counters["tool_errors"]:

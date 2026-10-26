@@ -79,14 +79,14 @@ def classify_llm_error(exc: Exception) -> tuple[str, str]:
 
 
 async def list_models(base_url: str, api_key: str) -> tuple[list[str], str | None]:
-    """Ask an OpenAI-compatible endpoint which models it serves.
+    """Model ids the configured backend reports, and why that list is empty.
 
-    Plenty of local servers implement ``/v1/models`` and plenty do not. Not
-    answering is not a studio failure: it only means the reader types the model
-    name by hand, so the reason is returned alongside an empty list instead of
-    being raised.
+    The browser cannot ask the backend itself — the model server is not
+    necessarily CORS-open, and its address may only be reachable from here —
+    so the sidecar asks on the user's behalf and never raises: a failed probe
+    is a message the picker can show, not a 500.
     """
-    if not is_endpoint_reachable(base_url, timeout=0.3):
+    if not is_endpoint_reachable(base_url, timeout=0.4):
         return [], OFFLINE_MESSAGE
 
     client = AsyncOpenAI(base_url=base_url, api_key=api_key, timeout=2.0)
@@ -96,8 +96,12 @@ async def list_models(base_url: str, api_key: str) -> tuple[list[str], str | Non
         status, detail = classify_llm_error(exc)
         return [], f"{status}: {detail}"
 
-    ids = sorted({str(model.id) for model in page.data if getattr(model, "id", None)})
-    return ids, None
+    # The async SDK returns an `AsyncPage`, whose items live on `.data`; the page
+    # itself is not synchronously iterable, so read the payload explicitly. A
+    # compatible server with an unusual shape yields no ids rather than a 500.
+    items = getattr(page, "data", None) or []
+    ids = {str(getattr(model, "id", "") or "") for model in items}
+    return sorted(model_id for model_id in ids if model_id), None
 
 
 async def check_llm_health(base_url: str, api_key: str, model_name: str) -> tuple[bool, str]:
