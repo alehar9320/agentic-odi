@@ -1,0 +1,47 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M5WKVQK3WG441F63NJ6XV28T",
+  "session_id": "ses_e905b3f81ffeZKGiM2n7Fki7Vg",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-26T17:24:23.413095408Z",
+  "branch": "stop-having-to-approve-runs",
+  "checkpoints_count": 1,
+  "save_step_count": 1,
+  "files_touched": [
+    "README.md",
+    "apps/studio/package.json",
+    "apps/studio/src/api/studioApi.ts",
+    "apps/studio/src/bff/chat/orchestrator.ts",
+    "apps/studio/src/bff/data/localDataService.ts",
+    "apps/studio/src/bff/errors.ts",
+    "apps/studio/src/bff/id.ts",
+    "apps/studio/src/bff/memory/localMemoryService.ts",
+    "apps/studio/src/bff/store/openStore.ts"
+  ],
+  "agent": "OpenCode",
+  "model": "nvidia/nemotron-3.5-super-vl-120b-a12b",
+  "turn_id": "305b28c251a4",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 2731376,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 75041504,
+    "output_tokens": 145012,
+    "api_call_count": 398
+  },
+  "session_metrics": {
+    "turn_count": 10
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-10-26T17:24:23.202760886Z",
+    "agent_lines": 0,
+    "agent_removed": 0,
+    "human_added": 0,
+    "human_modified": 1206,
+    "human_removed": 573,
+    "total_committed": 0,
+    "total_lines_changed": 17269,
+    "agent_percentage": 0,
+    "metric_version": 2
+  }
+}
