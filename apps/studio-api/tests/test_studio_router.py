@@ -49,7 +49,7 @@ def test_post_outcome_returns_the_normalized_result(monkeypatch) -> None:
         json={
             "mcp_url": "http://mcp",
             "job_id": "job-1",
-            "statement": "Minimize the time to ship",
+            "statement": "Minimize the time to ship a release when the build is green",
             "importance": 8.5,
             "satisfaction": 3.5,
         },
@@ -63,7 +63,7 @@ def test_post_outcome_returns_the_normalized_result(monkeypatch) -> None:
             "add_outcome",
             {
                 "job_id": "job-1",
-                "statement": "Minimize the time to ship",
+                "statement": "Minimize the time to ship a release when the build is green",
                 "importance": 8.5,
                 "satisfaction": 3.5,
             },
@@ -87,7 +87,7 @@ def test_post_outcome_without_an_mcp_url_is_a_validation_error() -> None:
         json={
             "mcp_url": "",
             "job_id": "job-1",
-            "statement": "Minimize the time to ship",
+            "statement": "Minimize the time to ship a release when the build is green",
             "importance": 8.5,
             "satisfaction": 3.5,
         },
@@ -106,7 +106,7 @@ def test_local_post_outcome_returns_the_outcome_object() -> None:
         json={
             "mcp_url": "",
             "job_id": job["id"],
-            "statement": "Minimize the time to ship",
+            "statement": "Minimize the time to ship a release when the build is green",
             "importance": 8.0,
             "satisfaction": 4.0,
         },
@@ -115,7 +115,7 @@ def test_local_post_outcome_returns_the_outcome_object() -> None:
     assert response.status_code == 200
     body = response.json()
     assert body["id"]
-    assert body["statement"] == "Minimize the time to ship"
+    assert body["statement"] == "Minimize the time to ship a release when the build is green"
     assert body["opportunity_score"] == 12.0
 
 
@@ -218,7 +218,7 @@ def test_local_create_routes_map_domain_errors() -> None:
         json={
             "mcp_url": "",
             "job_id": job["id"],
-            "statement": "Minimize the time to ship",
+            "statement": "Minimize the time to ship a release when the build is green",
             "importance": 42,
             "satisfaction": 3,
         },
@@ -238,7 +238,7 @@ def test_local_create_routes_map_domain_errors() -> None:
         json={
             "mcp_url": "",
             "job_id": "JOB-NOPE",
-            "statement": "Minimize the time to ship",
+            "statement": "Minimize the time to ship a release when the build is green",
             "importance": 8,
             "satisfaction": 3,
         },

@@ -285,9 +285,17 @@ def test_local_backend_job_step_outcome_crud(tmp_path):
 
     outcome_id = backend.call(
         "add_outcome",
-        {"job_id": job_id, "statement": "Min x", "importance": 8.0, "satisfaction": 4.0},
+        {
+            "job_id": job_id,
+            "statement": "Minimize the time to ship a release when the build is green",
+            "importance": 8.0,
+            "satisfaction": 4.0,
+        },
     )["id"]
-    assert backend.call("get_outcomes", {"job_id": job_id})[0]["statement"] == "Min x"
+    assert (
+        backend.call("get_outcomes", {"job_id": job_id})[0]["statement"]
+        == "Minimize the time to ship a release when the build is green"
+    )
     updated = backend.call("update_outcome", {"outcome_id": outcome_id, "importance": 9.0})
     assert updated["importance"] == 9.0
     assert backend.call("get_outcome", {"outcome_id": outcome_id})["opportunity_score"] == 14.0
@@ -316,7 +324,14 @@ def test_local_backend_rejects_out_of_range_scores(tmp_path):
     job_id = backend.call("add_job", {"name": "J"})["id"]
 
     with pytest.raises(BackendError, match="between 1.0 and 10.0"):
-        backend.call("add_outcome", {"job_id": job_id, "statement": "S", "importance": 99.0})
+        backend.call(
+            "add_outcome",
+            {
+                "job_id": job_id,
+                "statement": "Minimize the time to ship a release when the build is green",
+                "importance": 99.0,
+            },
+        )
 
 
 def test_local_backend_update_customer_outcome_folds_value_metrics(tmp_path):
