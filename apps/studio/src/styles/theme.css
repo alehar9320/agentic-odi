@@ -2946,6 +2946,26 @@ input[type="range"] {
   margin-bottom: 4px;
 }
 
+.changelog-modal__unread {
+  display: inline-block;
+  margin: 6px 0 0;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--accent-strong);
+  color: #ffffff;
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+.changelog-release__new {
+  margin-top: 4px;
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #818cf8;
+}
+
 .changelog-modal__title {
   margin: 0;
   font-size: 1.35rem;
@@ -3056,6 +3076,12 @@ input[type="range"] {
   font-size: 0.78rem;
   font-style: italic;
   color: var(--studio-muted);
+}
+
+.changelog-modal__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .changelog-modal__loading,
