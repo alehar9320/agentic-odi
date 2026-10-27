@@ -619,3 +619,45 @@ def test_connectors_ingest_dry_run_counts_evidence_drafts(tmp_path: Path, monkey
     preview = json.loads(_strip(result.output))
     assert preview["records"] == 1
     assert preview["evidence_drafts"] == 1
+
+
+
+def test_connectors_list_json_prints_expected_fields(tmp_path: Path) -> None:
+    config = tmp_path / "connectors.json"
+    runner.invoke(
+        app,
+        [
+            "connectors",
+            "add",
+            "mcp",
+            "--name",
+            "gong",
+            "--url",
+            "http://localhost:9000/mcp",
+            "--config",
+            str(config),
+        ],
+    )
+
+    result = runner.invoke(app, ["connectors", "list", "--config", str(config), "--json"])
+
+    assert result.exit_code == 0
+    payload = json.loads(_strip(result.output))
+    assert isinstance(payload, list)
+    assert payload == [
+        {
+            "name": "gong",
+            "kind": "mcp",
+            "url": "http://localhost:9000/mcp",
+            "enabled": True,
+        }
+    ]
+
+
+def test_connectors_list_json_is_an_empty_array(tmp_path: Path) -> None:
+    config = tmp_path / "connectors.json"
+
+    result = runner.invoke(app, ["connectors", "list", "--config", str(config), "--json"])
+
+    assert result.exit_code == 0
+    assert json.loads(_strip(result.output)) == []

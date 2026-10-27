@@ -26,7 +26,7 @@ A console script is also installed, so `agentic-odi --version` works the same wa
 
 | Option | Environment variable | Default | Meaning |
 |---|---|---|---|
-| `--backend local\|mcp` | `AGENTIC_ODI_BACKEND` | `local` | Run in-process against SQLite, or call a remote MCP server. |
+| `--backend auto\|local\|mcp` | `AGENTIC_ODI_BACKEND` | `local` | Run in-process against SQLite, call a remote MCP server, or (`auto`) try local first and fall back to MCP. |
 | `--db PATH` | `AGENTIC_ODI_DB` | `~/.agentic-odi/odi.db` | Store path for the `local` backend. |
 | `--mcp-url URL` | `AGENTIC_ODI_MCP_URL` | `http://localhost:8000/mcp` | Server URL for the `mcp` backend. |
 
@@ -228,6 +228,7 @@ ingest behavior.
 python -m agentic_odi_cli connectors catalog
 python -m agentic_odi_cli connectors add mcp --preset github
 python -m agentic_odi_cli connectors list
+python -m agentic_odi_cli connectors list --json   # name, kind, url, enabled per connector
 python -m agentic_odi_cli connectors health --name github
 python -m agentic_odi_cli connectors ingest --name github
 python -m agentic_odi_cli connectors ingest --name github --dry-run   # preview only
