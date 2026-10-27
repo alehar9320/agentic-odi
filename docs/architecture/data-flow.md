@@ -167,4 +167,18 @@ MCP tool result (text)
   model, the round and tool counts, the error count, the duration, and the
   outcome. Sensitive keys are dropped rather than redacted, so no token, key,
   or customer quote can reach the log.
+- **Two layers of error shaping.** The sidecar (and the Worker that proxies it)
+  return the server-shaped `StudioError` over HTTP, so the SPA reads it whole.
+  When the sidecar never answers at all — a network failure in the browser — the
+  SPA classifies the failure client-side (`TypeError` → `mcp_unreachable`) and
+  surfaces the same `SidecarNotice` strip plus a non-retryable in-thread notice,
+  instead of a generic "something went wrong".
+- **CLI hints.** `BackendError(message, suggestion)` is rendered as `Error: …` on
+  stderr with a trailing `Hint: …` line, so a `BackendError("could not reach MCP
+  server …")` tells the user exactly what to start.
+- **Hosted proxied path.** The free Cloudflare Worker forwards `/api/*` to
+  `SIDECAR_URL`; a missing/unreachable sidecar is reported to the browser as
+  `{"error": mcp_unreachable}` with a suggestion to start the sidecar and with
+  `X-Request-ID` echoed for support. It is logged on the Worker but never leaks
+  internals.
 

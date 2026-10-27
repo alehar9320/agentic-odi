@@ -1,16 +1,19 @@
 /**
  * Free-plan Living Studio Worker.
  *
- * Workers Static Assets serve the built SPA from `apps/studio/dist`. Requests under
- * `/api/*` are forwarded to the Python sidecar (`apps/studio-api`), which runs on
- * the developer's machine and is published by a free Cloudflare Quick Tunnel.
- * (Running the sidecar inside Cloudflare requires Workers Containers, which is
- * a paid-plan feature.)
+ * Workers Static Assets serve the built SPA from `apps/studio/dist`. Requests
+ * under `/api/*` are forwarded to the Python sidecar (`apps/studio-api`), which
+ * runs on the developer's machine and is published by a free Cloudflare Quick
+ * Tunnel. (Running the sidecar inside Cloudflare requires Workers Containers,
+ * which is a paid-plan feature.)
  *
  * When `SIDECAR_URL` is absent, the Worker answers `/api/capabilities` with a
  * local-only manifest so the browser BFF can run fully offline. Every other
- * `/api/*` request returns a 502. The browser BFF then serves canvas data,
- * memory, conversations, and the deterministic assistant from IndexedDB.
+ * `/api/*` request returns a 502 carrying the shared `{"error": StudioError}`
+ * shape, so a dead tunnel reads as a recoverable, actionable failure instead of
+ * a blank page or a legacy `{"detail": ...}` blob. The browser BFF then serves
+ * canvas data, memory, conversations, and the deterministic assistant from
+ * IndexedDB.
  */
 
 interface Env {
@@ -112,6 +115,7 @@ function securityHeaders(env: Env): Record<string, string> {
     "Content-Security-Policy": [
       "default-src 'self'",
       "script-src 'self'",
+      "style-src 'self' 'unsafe-inline'",
       `connect-src 'self' ${buildConnectSrc(env)}`.replace(/\s+/g, " ").trim(),
       "img-src 'self' data: blob:",
       "font-src 'self' data:",
@@ -140,8 +144,34 @@ function secure(response: Response, env: Env): Response {
   });
 }
 
-function sidecarError(detail: string, env: Env): Response {
-  return secure(Response.json({ detail }, { status: 502 }), env);
+/** The one error body every Worker-generated failure carries. */
+interface StudioError {
+  code: string;
+  message: string;
+  suggestion?: string;
+  retryable?: boolean;
+  request_id?: string | null;
+}
+
+/**
+ * Build a Worker-originated failure as the shared `{"error": StudioError}` the
+ * sidecar returns, so a dead tunnel reads as a recoverable, actionable failure
+ * instead of a blank page or a legacy `{"detail": ...}` blob. The returned
+ * Response is wrapped with `secure(...)` by its callers.
+ */
+function sidecarError(error: StudioError, requestId: string | null): Response {
+  return Response.json(
+    {
+      error: {
+        code: error.code,
+        message: error.message,
+        suggestion: error.suggestion ?? null,
+        retryable: error.retryable ?? false,
+        request_id: requestId,
+      },
+    },
+    { status: 502 },
+  );
 }
 
 function localCapabilitiesResponse(env: Env): Response {
@@ -151,6 +181,7 @@ function localCapabilitiesResponse(env: Env): Response {
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
+    const requestId = request.headers.get("X-Request-ID");
 
     if (!url.pathname.startsWith(API_PREFIX)) {
       return secure(await env.ASSETS.fetch(request), env);
@@ -165,7 +196,22 @@ export default {
       if (url.pathname === "/api/capabilities" || url.pathname === "/api/capabilities/") {
         return localCapabilitiesResponse(env);
       }
-      return sidecarError("SIDECAR_URL is not configured", env);
+      console.error(
+        "sidecar proxy: SIDECAR_URL is not configured (request_id=%s)",
+        requestId ?? "-",
+      );
+      return secure(
+        sidecarError(
+          {
+            code: "mcp_unreachable",
+            message: "The studio sidecar isn't configured.",
+            suggestion: "Set SIDECAR_URL and redeploy.",
+            retryable: false,
+          },
+          requestId,
+        ),
+        env,
+      );
     }
 
     // The Quick Tunnel routes by hostname, so the Worker's Host must not leak.
@@ -190,8 +236,23 @@ export default {
         env,
       );
     } catch (error) {
-      return sidecarError(
-        `Sidecar unreachable: ${(error as Error).message}`,
+      const cause = error instanceof Error ? error.message : String(error);
+      console.error(
+        "sidecar proxy: sidecar unreachable at %s (request_id=%s): %s",
+        sidecar,
+        requestId ?? "-",
+        cause,
+      );
+      return secure(
+        sidecarError(
+          {
+            code: "mcp_unreachable",
+            message: "The studio sidecar isn't reachable.",
+            suggestion: "Start the sidecar locally (python scripts/dev.py), then try again.",
+            retryable: true,
+          },
+          requestId,
+        ),
         env,
       );
     }

@@ -26,12 +26,24 @@ uv run bandit -c pyproject.toml -r apps packages website/
 The SPA and Tauri shell mirror their CI jobs locally:
 
 ```bash
-npm --prefix apps/studio run lint       # ESLint
-npm --prefix apps/studio run typecheck  # tsc --noEmit
-npm --prefix apps/studio test -- --run  # Vitest (run once)
-npm --prefix apps/studio run build      # production build → apps/studio/dist
+npm --prefix apps/studio run lint        # ESLint
+npm --prefix apps/studio run typecheck   # tsc --noEmit
+npm --prefix apps/studio test -- --run   # Vitest on jsdom (run once)
+npm --prefix apps/studio run test:visual # Vitest Browser Mode → Chromatic archives
+npm --prefix apps/studio run build       # production build → apps/studio/dist
 cd apps/studio/src-tauri && cargo fmt --check && cargo clippy -- -D warnings && cargo check
 ```
+
+### Visual tests
+
+`npm test` runs the jsdom suite and deliberately ignores `*.visual.test.tsx`.
+Those files render one component state in Chromium under
+`vitest.visual.config.ts`, and the `Chromatic` workflow publishes them on every
+branch push so a reviewer can compare pixels component by component. Each test costs one billed snapshot per
+build on the free 5,000/month allowance, which is why the two suites are split by
+filename instead of running every test in a browser. Browser mode needs Chromium
+locally: `npx playwright install chromium`. See
+[Deployment](deployment.md) for the project setup and budget rules.
 
 ### Conversational UI coverage
 
@@ -185,6 +197,7 @@ uv run pytest \
 | `tests/contract/` | Live MCP tool surface and CLI local-handler parity |
 | `tests/scripts/` | `scripts/dev.py` startup, port checks, signals, and shutdown |
 | `apps/studio/src/**/*.test.ts` | SPA units: ODI math, transport bridge, SSE parser, sidecar client |
+| `apps/studio/src/**/*.visual.test.tsx` | Component states captured for Chromatic visual review |
 | `website/tests/` | Static site integrity, OG art reproducibility, and README sync |
 
 > [!TIP]

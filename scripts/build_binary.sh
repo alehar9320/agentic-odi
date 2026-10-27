@@ -5,7 +5,9 @@
 #
 # Environment:
 #   VERSION            required, e.g. 0.1.0
-#   RELEASE_DATE_UTC   optional, e.g. 2026-10-15T21:13:00Z (default: "")
+#   RELEASE_DATE_UTC   optional, e.g. 2026-10-15T21:13:00Z (default: empty;
+#                      the human-friendly date is also written to the release
+#                      title/notes by the release workflow)
 #   COMMIT             optional (default: dev)
 #   TARGET             optional, e.g. linux_x86_64 (default: dev)
 #
@@ -39,7 +41,7 @@ uv sync --all-packages --locked
 
 echo "==> Writing apps/cli/src/agentic_odi_cli/_build_info.py"
 cat > apps/cli/src/agentic_odi_cli/_build_info.py <<EOF
-VERSION = "${VERSION}"
+VERSION = "${VERSION}"  # x-release-please-version
 RELEASE_DATE_UTC = "${RELEASE_DATE_UTC}"
 COMMIT = "${COMMIT}"
 TARGET = "${TARGET}"
