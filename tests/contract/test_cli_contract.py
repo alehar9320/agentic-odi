@@ -42,3 +42,24 @@ LOCAL_TOOLS = {
 def test_local_handler_keys_are_contract_tools() -> None:
     assert set(_LOCAL_HANDLERS) == LOCAL_TOOLS
     assert LOCAL_TOOLS <= set(TOOL_NAMES)
+
+
+# Tools the offline backend may not serve: they describe the ODI framework or
+# evaluate a statement rather than touching the store. Anything else must work
+# with `--backend local`, because the CLI advertises full offline parity.
+REMOTE_ONLY_TOOLS = frozenset(
+    {"evaluate_outcome", "get_odi_framework_guidelines", "get_capabilities"}
+)
+
+
+def test_every_tool_has_a_local_handler_or_an_allowlist_entry() -> None:
+    missing = set(TOOL_NAMES) - set(_LOCAL_HANDLERS)
+
+    assert missing <= REMOTE_ONLY_TOOLS, (
+        "New MCP tools need a LocalBackend handler or a REMOTE_ONLY_TOOLS entry; "
+        f"missing: {sorted(missing - REMOTE_ONLY_TOOLS)}"
+    )
+
+
+def test_the_allowlist_only_names_real_tools() -> None:
+    assert REMOTE_ONLY_TOOLS <= set(TOOL_NAMES)

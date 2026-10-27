@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from agentic_odi_core.messages import CAPABILITIES
 from agentic_odi_core.repository import InMemoryRepository
 from agentic_odi_studio_api import app as app_module
 from agentic_odi_studio_api import main as main_module
@@ -12,11 +13,14 @@ def _client() -> TestClient:
     return TestClient(app_module.create_app(InMemoryRepository()))
 
 
-def test_capabilities_endpoint_reports_local() -> None:
+def test_capabilities_endpoint_returns_the_capability_list() -> None:
     response = _client().get("/capabilities")
 
     assert response.status_code == 200
-    assert response.json() == {"capabilities": "local"}
+    assert response.json() == {"capabilities": CAPABILITIES}
+    # The body must say what the assistant can do, not which backend is loaded.
+    assert "Job Maps" in response.json()["capabilities"]
+    assert response.json()["capabilities"] != "local"
 
 
 def test_spa_fallback_serves_index_for_unknown_routes(monkeypatch, tmp_path) -> None:

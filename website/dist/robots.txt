@@ -1,4 +1,0 @@
-User-agent: *
-Allow: /
-
-Sitemap: https://alehar9320.github.io/agentic-odi/sitemap.xml

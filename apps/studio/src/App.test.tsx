@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import App from "./App";
@@ -106,8 +106,35 @@ describe("studio shell", () => {
     ).toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: /message the studio/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /sharpen an opportunity/i })).toBeInTheDocument();
+    expect(screen.getByText("Turn a hunch into something defensible")).toBeInTheDocument();
+    expect(screen.getByText("Look across what you already know")).toBeInTheDocument();
     // The classic UI is secondary: no workspace surface until you ask for one.
     expect(screen.queryByRole("heading", { name: /opportunity landscape/i })).toBeNull();
+  });
+
+  it("sends the runtime prompt when a contextual starter card is selected", async () => {
+    render(<App />);
+
+    const start = await screen.findByRole("button", { name: /sharpen an opportunity/i });
+    await act(async () => {
+      fireEvent.click(start);
+    });
+
+    const { streamChat } = await import("./api/studioApi");
+    await waitFor(() => {
+      expect(streamChat).toHaveBeenCalledWith(
+        expect.objectContaining({
+          messages: [
+            expect.objectContaining({
+              content:
+                "I have an opportunity in mind. Ask me what it is, then help me sharpen it into something I can defend.",
+            }),
+          ],
+        }),
+        expect.any(Function),
+        expect.any(AbortSignal),
+      );
+    });
   });
 
   it("opens a workspace view beside the conversation and keeps the composer", async () => {
@@ -173,6 +200,7 @@ describe("studio shell", () => {
     expect(await screen.findByText("Where do I start?")).toBeInTheDocument();
     expect(await screen.findByText("job")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /copy reply/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /sharpen an opportunity/i })).not.toBeInTheDocument();
   });
 
   it("returns home from the wordmark", async () => {

@@ -8,12 +8,57 @@
  */
 
 import { ComposerPrimitive, useAui, useAuiState } from "@assistant-ui/react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 
+import {
+  ATTACHMENT_ACCEPT,
+  MAX_ATTACHMENT_CHARS,
+  MAX_IMAGE_BYTES,
+  attachmentRejection,
+  formatFileSize,
+  isImageLike,
+} from "../../assistant/attachments";
 import { isSlashCommand, matchCommands, type StudioCommand } from "../../lib/commands";
 import { useStudio } from "../../state/StudioContext";
 import { ArrowUpIcon, PaperclipIcon, StopIcon } from "../icons";
-import { CommandPalette, ComposerHint, ConnectorChips, SuggestionPills, paletteOpenFor } from "./composerParts";
+import {
+  CommandPalette,
+  ComposerHint,
+  ConnectorChips,
+  SuggestionPills,
+  paletteOpenFor,
+} from "./composerParts";
+import { ModelPicker } from "./ModelPicker";
+
+const acceptedAttachmentTypes = ATTACHMENT_ACCEPT.split(",");
+const acceptedTextExtensions = acceptedAttachmentTypes.filter((type) => type.startsWith("."));
+const acceptedImageTypes = acceptedAttachmentTypes
+  .filter((type) => type.startsWith("image/"))
+  .map((type) => type.slice("image/".length).toUpperCase());
+const ATTACHMENT_HELP = `Supported text files (${acceptedTextExtensions.join(", ")} and text/*) and images (${acceptedImageTypes.join(", ")}). Images up to ${Math.floor(MAX_IMAGE_BYTES / (1024 * 1024))} MB; text files up to ${MAX_ATTACHMENT_CHARS.toLocaleString()} characters.`;
+
+/** The local preview for an image before it is ever sent. */
+function AttachmentThumb({ file }: { file?: File }) {
+  const url = useMemo(() => {
+    if (!file || !isImageLike(file.type) || typeof URL.createObjectURL !== "function") {
+      return null;
+    }
+    return URL.createObjectURL(file);
+  }, [file]);
+
+  useEffect(() => {
+    return () => {
+      if (url) {
+        URL.revokeObjectURL(url);
+      }
+    };
+  }, [url]);
+
+  if (!url) {
+    return null;
+  }
+  return <img className="attachment-chip__thumb" src={url} alt="" />;
+}
 
 function AttachmentRow() {
   const aui = useAui();
@@ -24,20 +69,27 @@ function AttachmentRow() {
   }
 
   return (
-    <div className="composer__attachments" aria-label="Attachments">
-      {attachments.map((attachment, index) => (
-        <span className="attachment-chip" key={attachment.id}>
-          <span className="attachment-chip__name">{attachment.name}</span>
-          <button
-            type="button"
-            className="attachment-chip__remove"
-            aria-label={`Remove ${attachment.name}`}
-            onClick={() => void aui.composer.attachment({ index }).remove()}
-          >
-            ✕
-          </button>
-        </span>
-      ))}
+    <div className="composer__attachments" role="list" aria-label="Attachments">
+      {attachments.map((attachment, index) => {
+        const size = formatFileSize(attachment.file?.size ?? 0);
+        return (
+          <span className="attachment-chip" role="listitem" key={attachment.id}>
+            <AttachmentThumb file={attachment.file} />
+            <span className="attachment-chip__meta">
+              <span className="attachment-chip__name">{attachment.name}</span>
+              {size ? <span className="attachment-chip__size">{size}</span> : null}
+            </span>
+            <button
+              type="button"
+              className="attachment-chip__remove"
+              aria-label={`Remove ${attachment.name}`}
+              onClick={() => void aui.composer.attachment({ index }).remove()}
+            >
+              ✕
+            </button>
+          </span>
+        );
+      })}
     </div>
   );
 }
@@ -45,16 +97,23 @@ function AttachmentRow() {
 function ComposerBody({
   onCommand,
   onSlashCommand,
+  onFiles,
   placeholder,
   autoFocus = false,
 }: {
   onCommand: (command: StudioCommand) => void;
   onSlashCommand?: (text: string) => boolean;
+  onFiles: (files: File[]) => void;
   placeholder?: string;
   autoFocus?: boolean;
 }) {
   const aui = useAui();
   const { llmHealth } = useStudio();
+  // A page can mount more than one composer, so every id and description needs
+  // to be unique per instance rather than a fixed string in the document.
+  const attachmentHelpId = useId();
+  const inputId = useId();
+  const paletteId = useId();
   const text = useAuiState((state) => state.composer.text);
   const running = useAuiState((state) => state.thread.isRunning);
   const [highlight, setHighlight] = useState(0);
@@ -125,6 +184,7 @@ function ComposerBody({
     <>
       <SuggestionPills />
       <CommandPalette
+        id={paletteId}
         open={open}
         matches={matches}
         activeIndex={activeIndex}
@@ -134,12 +194,12 @@ function ComposerBody({
       <ConnectorChips />
       <AttachmentRow />
       <div className="composer__shell">
-        <label className="sr-only" htmlFor="studio-composer">
+        <label className="sr-only" htmlFor={inputId}>
           Message the studio
         </label>
         <ComposerPrimitive.Input
           ref={inputRef}
-          id="studio-composer"
+          id={inputId}
           className="composer__input"
           rows={1}
           autoFocus={autoFocus}
@@ -151,17 +211,31 @@ function ComposerBody({
           }
           aria-autocomplete="list"
           aria-expanded={open}
-          aria-controls={open ? "studio-command-palette" : undefined}
+          aria-controls={open ? paletteId : undefined}
           onKeyDown={onKeyDown}
+          onPaste={(event) => {
+            // A screenshot on the clipboard is a file, not text: attach it
+            // rather than letting the browser paste a placeholder name.
+            const files = Array.from(event.clipboardData?.files ?? []);
+            if (files.length === 0) {
+              return;
+            }
+            event.preventDefault();
+            onFiles(files);
+          }}
         />
         <div className="composer__actions">
           <ComposerPrimitive.AddAttachment
             className="composer__attach"
             aria-label="Attach a file"
-            title="Attach a text file or an image"
+            aria-describedby={attachmentHelpId}
+            title={ATTACHMENT_HELP}
           >
             <PaperclipIcon size={16} />
           </ComposerPrimitive.AddAttachment>
+          <span id={attachmentHelpId} className="sr-only">
+            {ATTACHMENT_HELP}
+          </span>
           {running ? (
             <ComposerPrimitive.Cancel
               className="composer__send composer__send--stop"
@@ -176,9 +250,13 @@ function ComposerBody({
           )}
         </div>
       </div>
-      <ComposerHint />
+      <ComposerHint trailing={<ModelPicker />} />
     </>
   );
+}
+
+function hasFiles(event: React.DragEvent<HTMLElement>): boolean {
+  return Array.from(event.dataTransfer?.types ?? []).includes("Files");
 }
 
 export function ThreadComposer(props: {
@@ -187,9 +265,62 @@ export function ThreadComposer(props: {
   placeholder?: string;
   autoFocus?: boolean;
 }) {
+  const aui = useAui();
+  const { pushToast } = useStudio();
+  const [dragging, setDragging] = useState(false);
+  // dragenter/dragleave fire for every child; count depth so moving over the
+  // textarea does not flicker the drop state off and on.
+  const dragDepth = useRef(0);
+
+  function attachFiles(files: File[]) {
+    for (const file of files) {
+      const rejection = attachmentRejection(file);
+      if (rejection) {
+        pushToast("error", rejection);
+        continue;
+      }
+      void aui.composer.addAttachment(file);
+    }
+  }
+
   return (
-    <ComposerPrimitive.Root className="composer">
-      <ComposerBody {...props} />
+    <ComposerPrimitive.Root
+      className={`composer${dragging ? " is-dragging" : ""}`}
+      onDragEnter={(event) => {
+        if (!hasFiles(event)) {
+          return;
+        }
+        event.preventDefault();
+        dragDepth.current += 1;
+        setDragging(true);
+      }}
+      onDragOver={(event) => {
+        if (!hasFiles(event)) {
+          return;
+        }
+        // Without this the browser opens the dropped file instead.
+        event.preventDefault();
+      }}
+      onDragLeave={() => {
+        // Leave events often carry no types, so this only ever removes depth we
+        // added on a file drag.
+        dragDepth.current = Math.max(dragDepth.current - 1, 0);
+        if (dragDepth.current === 0) {
+          setDragging(false);
+        }
+      }}
+      onDrop={(event) => {
+        if (!hasFiles(event)) {
+          return;
+        }
+        event.preventDefault();
+        dragDepth.current = 0;
+        setDragging(false);
+        attachFiles(Array.from(event.dataTransfer.files));
+      }}
+    >
+      {dragging ? <p className="composer__drop-hint">Drop to attach</p> : null}
+      <ComposerBody {...props} onFiles={attachFiles} />
     </ComposerPrimitive.Root>
   );
 }

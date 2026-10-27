@@ -233,17 +233,21 @@ jobs:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
 
-      # The site is generated and committed so a reviewer can read the
-      # rendered HTML in a pull request. If the committed copy no longer
-      # matches a fresh build, the site has drifted and the PR is not ready.
-      - name: Check the committed site matches a fresh build
-        run: uv run python website/tools/build_site.py --check
+      # The site is generated from the repository's own sources and built in CI;
+      # no committed copy exists. If a fresh build fails, the PR is not ready.
 
       - name: Pytest (website)
         run: uv run --directory website pytest tests/
 
       - name: Build site
         run: uv run python website/tools/build_site.py --out _site
+
+      - name: Upload built site for review
+        uses: actions/upload-artifact@v7
+        with:
+          name: website-site
+          path: _site
+          if-no-files-found: error
 
   studio:
     runs-on: ubuntu-latest
@@ -279,6 +283,10 @@ jobs:
         run: |
           npm run gen:api-types
           git diff --exit-code -- src/api/schema.d.ts
+
+  # Component snapshots are published by `chromatic.yml`, which runs on push.
+  # Chromatic recommends push over pull_request because a PR run checks out an
+  # ephemeral merge commit that diffs against the wrong baseline.
 
   tauri-check:
     runs-on: ubuntu-latest

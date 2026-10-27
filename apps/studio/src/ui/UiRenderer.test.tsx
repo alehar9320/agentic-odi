@@ -1,5 +1,11 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+
+const toast = vi.hoisted(() => ({ pushToast: vi.fn() }));
+
+vi.mock("../state/StudioContext", () => ({
+  useStudio: () => ({ pushToast: toast.pushToast }),
+}));
 
 import { UiActionContext } from "./actions";
 import { CATALOG, catalogManifest } from "./catalog";
@@ -108,6 +114,21 @@ describe("UiRenderer", () => {
   it("names an unsupported surface instead of rendering blank space", () => {
     renderSpec({ type: "hover-car", props: {} });
     expect(screen.getByRole("status")).toHaveTextContent("hover-car");
+  });
+
+  it("copies the raw spec of an unsupported surface", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText },
+      configurable: true,
+    });
+    renderSpec({ type: "hover-car", props: {} });
+
+    fireEvent.click(screen.getByRole("button", { name: /copy raw spec/i }));
+
+    await waitFor(() => {
+      expect(writeText).toHaveBeenCalledWith(expect.stringContaining('"type": "hover-car"'));
+    });
   });
 
   it("dispatches an action as an intent for the agent", () => {

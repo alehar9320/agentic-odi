@@ -144,6 +144,24 @@ export function CheckIcon(props: IconProps) {
   );
 }
 
+export function ChevronDownIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="m6 9 6 6 6-6" />
+    </Icon>
+  );
+}
+
+export function ImageIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <rect x="3" y="4" width="18" height="16" rx="2.5" />
+      <circle cx="9" cy="10" r="1.6" />
+      <path d="m4 18 5-5 3.5 3.5L16 13l4 4" />
+    </Icon>
+  );
+}
+
 export function SparkIcon(props: IconProps) {
   return (
     <Icon {...props}>
@@ -175,6 +193,16 @@ export function MenuIcon(props: IconProps) {
   return (
     <Icon {...props}>
       <path d="M4 7h16M4 12h16M4 17h10" />
+    </Icon>
+  );
+}
+
+export function AlertIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M12 3.5 2.9 19.2a1 1 0 0 0 .87 1.5h16.46a1 1 0 0 0 .87-1.5z" />
+      <path d="M12 9.2v4.4" />
+      <path d="M12 17.2h.01" />
     </Icon>
   );
 }

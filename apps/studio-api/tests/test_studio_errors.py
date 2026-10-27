@@ -39,6 +39,9 @@ def test_validation_failure_returns_the_error_shape() -> None:
 
 
 def test_studio_http_error_keeps_its_code_and_status(monkeypatch) -> None:
+    # A built SPA (`apps/studio/dist` from a local `npm run build`) registers a
+    # catch-all route when the app is created, which would shadow the route added
+    # below. The error shape is the subject here, not how the SPA is served.
     monkeypatch.setenv("AGENTIC_ODI_DISABLE_SPA", "1")
     app = create_app(InMemoryRepository())
 
@@ -80,6 +83,21 @@ def test_unhandled_exception_returns_the_error_shape(monkeypatch) -> None:
     assert body["error"]["request_id"]
     assert response.headers["X-Request-ID"] == body["error"]["request_id"]
     assert "secret internal detail" not in response.text
+
+
+def test_unhandled_exception_surfaces_the_request_id_in_the_message(monkeypatch) -> None:
+    monkeypatch.setenv("AGENTIC_ODI_DISABLE_SPA", "1")
+    app = create_app(InMemoryRepository())
+
+    @app.get("/api/kaput")
+    def kaput():
+        raise RuntimeError("secret internal detail")
+
+    response = _client(app).get("/api/kaput", headers={"X-Request-ID": "req-9"})
+
+    body = response.json()
+    assert "req-9" in body["error"]["message"]
+    assert body["error"]["message"].startswith("Something went wrong")
 
 
 def test_unknown_api_route_is_not_swallowed_by_the_spa(monkeypatch, tmp_path) -> None:
