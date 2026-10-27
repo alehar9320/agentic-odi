@@ -1,0 +1,31 @@
+Explore the repository at /home/alexa/repos/agentic-odi/repos/agentic-odi/clear-backlog. I need to understand the current codebase structure to plan implementations for 10 GitHub issues (#77-#86).
+
+Please read and report back the FULL contents (or as much as possible) of these key files:
+
+1. packages/core/src/agentic_odi_core/models.py - especially Outcome, Step, Job entities
+2. packages/core/src/agentic_odi_core/evaluation.py - the current outcome evaluator
+3. packages/core/src/agentic_odi_core/services.py - the ODIService class
+4. packages/core/src/agentic_odi_core/repository.py - the Repository protocol
+5. packages/core/src/agentic_odi_core/sqlite_repository.py - the SQLite implementation
+6. packages/core/src/agentic_odi_core/messages.py - ODI_FRAMEWORK_GUIDELINES, CAPABILITIES
+7. packages/core/src/agentic_odi_core/contract.py - ToolName, ToolSpec, TOOL_SPECS
+8. apps/mcp-server/src/agentic_odi_mcp_server/mcp_server.py - the MCP server tools
+9. apps/cli/src/agentic_odi_cli/cli.py - the Typer CLI app
+10. apps/cli/src/agentic_odi_cli/backend.py - local handlers
+11. apps/cli/src/agentic_odi_cli/settings.py - settings_app
+12. apps/cli/src/agentic_odi_cli/profile.py - profile.app
+13. apps/cli/src/agentic_odi_cli/onboard.py - inference stub
+14. apps/cli/src/agentic_odi_cli/flags.py - feature flags
+15. apps/studio-api/src/agentic_odi_studio_api/studio/router.py - API routes
+16. apps/studio-api/src/agentic_odi_studio_api/studio/chat.py - system prompt, agent loop
+17. apps/studio/src/types.ts - CanvasData, StudioNotification
+18. apps/studio/src/state/StudioContext.tsx - state management
+19. apps/studio/src/components/notifications/CatchUpFeed.tsx - notifications feed
+20. apps/studio/src/components/SettingsPanel.tsx - settings panel
+21. apps/studio/src/ui/cards.tsx - card components including impact-simulation
+22. apps/studio/src/ui/catalog.ts - card catalog
+23. apps/studio/src/ui/actions.ts - UiAction model
+24. apps/studio-api/src/agentic_odi_studio_api/studio/ui_spec.py - server-side validator
+25. docs/cli.md - CLI documentation
+
+For each file, report: the file path, the key classes/functions/interfaces and their line numbers, and any notable patterns. Be thorough - I need this to write an implementation plan. Report in a structured way grouped by package.
