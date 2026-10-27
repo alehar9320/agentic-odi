@@ -3,7 +3,7 @@
   "checkpoint_id": "01M5YXQ3XCH0Y0TTD880F7T9Y7",
   "strategy": "manual-commit",
   "branch": "ui-not-looking-like-shit",
-  "checkpoints_count": 8,
+  "checkpoints_count": 9,
   "files_touched": [
     "apps/studio-api/src/agentic_odi_studio_api/studio/schemas.py"
   ],
@@ -62,6 +62,13 @@
       "transcript": "/7/full.jsonl",
       "compact_transcript": "/7/transcript.jsonl",
       "content_hash": "/7/content_hash.txt",
+      "prompt": ""
+    },
+    {
+      "metadata": "/8/metadata.json",
+      "transcript": "/8/full.jsonl",
+      "compact_transcript": "/8/transcript.jsonl",
+      "content_hash": "/8/content_hash.txt",
       "prompt": ""
     }
   ],
