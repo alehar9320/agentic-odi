@@ -4366,3 +4366,163 @@ details[open] summary {
   opacity: 1;
   animation: thinkingPulse 1.4s ease-in-out infinite;
 }
+
+/* ------------------------------------------------------------------ */
+/* Banners: one system for everything the studio has to say            */
+/* ------------------------------------------------------------------ */
+.banner-dock {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.banner-dock > * {
+  pointer-events: auto;
+}
+
+/* A top banner is a page strip: it holds the layout still rather than
+   floating over the thread, so reading position never shifts under it. */
+.banner-dock--top {
+  position: sticky;
+  top: 0;
+  z-index: 900;
+  padding: 8px 22px 0;
+}
+
+.banner-dock--corner {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 1000;
+  width: min(380px, calc(100vw - 36px));
+}
+
+.banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px 16px;
+  padding: 10px 14px;
+  border: 1px solid var(--line-strong);
+  border-left-width: 3px;
+  border-radius: 12px;
+  background: var(--bg-raised);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.28);
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.banner__text {
+  min-width: 0;
+}
+
+.banner__title {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.banner__body {
+  margin-top: 2px;
+}
+
+.banner__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.banner__action,
+.banner__dismiss {
+  padding: 5px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.banner__action:hover,
+.banner__dismiss:hover {
+  background: var(--surface-hover);
+}
+
+.banner__action--primary {
+  border-color: transparent;
+  background: var(--accent-strong);
+  color: #fff;
+}
+
+.banner__dismiss {
+  color: var(--muted);
+}
+
+/* Severity is one class and one accent, so a new banner cannot invent a look. */
+.banner--info {
+  border-left-color: var(--accent);
+}
+
+.banner--success {
+  border-left-color: var(--green);
+}
+
+.banner--warning {
+  border-left-color: var(--amber);
+}
+
+.banner--critical {
+  border-left-color: #ef4444;
+}
+
+.banner-overflow {
+  padding: 6px 14px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--faint);
+  font-size: 0.72rem;
+}
+
+/* Radix needs a viewport to position toasts into; ours are the docks above. */
+.banner-viewport {
+  position: fixed;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  outline: none;
+}
+
+.banner-viewport--top {
+  top: 0;
+  left: 0;
+  right: 0;
+}
+
+.banner-viewport--corner {
+  right: 18px;
+  bottom: 18px;
+  width: min(380px, calc(100vw - 36px));
+}
+
+@keyframes bannerIn {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.banner {
+  animation: bannerIn 0.28s var(--ease-apple-spring, ease-out);
+}

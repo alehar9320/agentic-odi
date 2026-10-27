@@ -81,3 +81,8 @@ export function useBanner(): BannerApi {
   }
   return api;
 }
+
+/** For presentational components that accept an explicit api as a prop. */
+export function useBannerOptional(): BannerApi | null {
+  return useContext(BannerContext);
+}
