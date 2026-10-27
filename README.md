@@ -14,6 +14,7 @@
 [![FastMCP](https://img.shields.io/badge/FastMCP-powered-orange)](https://github.com/jlowin/fastmcp)
 [![pytest](https://img.shields.io/badge/tests-pytest-blue)](https://pytest.org)
 [![MCP](https://img.shields.io/badge/Model%20Context%20Protocol-enabled-8A2BE2)](https://modelcontextprotocol.io)
+[![GitHub Pages](https://img.shields.io/badge/GitHub%20Pages-site-blue?logo=github)](https://alehar9320.github.io/agentic-odi/)
 
 > **[![Experimental](https://img.shields.io/badge/Experimental-1e293b?style=for-the-badge)](https://github.com/alehar9320/agentic-odi)**
 
@@ -69,7 +70,7 @@ shared tooling at the root. Packages live in `packages/`, runnable services in
 | **`apps/mcp-server/`** | `agentic-odi-mcp-server` | FastMCP server exposing Jobs, Steps, Desired Outcomes, Customer Outcomes, Evidence, and context tools over HTTP. Persists to SQLite by default. |
 | **`apps/studio-api/`** | `agentic-odi-studio-api` | FastAPI **Living Studio sidecar**. Serves config, health, canvas data, local mutations, MCP passthrough, SSE chat, conversation history, and the PM memory store, plus the built SPA. |
 | **`apps/cli/`** | `agentic-odi-cli` | Typer CLI with interactive chat — streamed replies and the model's thinking, no sidecar needed — plus full entity CRUD, `schema`, `connectors`, and local-first (`--backend local`) or remote (`--backend mcp`) data access. |
-| **`apps/studio/`** | React + TypeScript + Vite | **The Living Studio** SPA and Tauri 2 desktop shell. The conversation runs on **assistant-ui** — streaming, reasoning, tool calls, approvals, sources, attachments, branches, and suggestions are the library's runtime; the ODI intelligence and the **agent-composed surfaces** (scored outcomes, opportunity theses, bet simulations) are ours, from a closed catalog the SPA owns. A feature-flagged **four-step first-run tour** starts from the PM's ambition, and a local memory records what matters across sessions. |
+| **`apps/studio/`** | React + TypeScript + Vite | **The Living Studio** SPA and Tauri 2 desktop shell. The conversation runs on **assistant-ui** — streaming, reasoning, tool calls, approvals, sources, attachments, branches, and suggestions are the library's runtime; the ODI intelligence and the **agent-composed surfaces** (scored outcomes, opportunity theses, bet simulations) are ours, from a closed catalog the SPA owns. A feature-flagged **four-step first-run tour** starts from the PM's ambition, and a local memory records what matters across sessions. `*.visual.test.tsx` files capture component states in Chromium for Chromatic visual review. |
 | **`infra/cloudflare/`** | Worker | Worker script for the free-plan Workers Static Assets deployment and sidecar tunnel; its `wrangler.jsonc` lives at the repository root. |
 | **`scripts/`** | — | Dev launcher, binary build, installer tests. |
 | **`tests/contract/`** | — | Cross-package MCP contract tests. |
@@ -241,8 +242,8 @@ layout, updates, and release automation.
 
 Every guide above is also published on the
 [project site](https://alehar9320.github.io/agentic-odi/docs/), rendered from
-these files. The site adds a quick start, a generated MCP tool reference, and
-the connector catalog.
+these files. The site adds a quick start, a generated MCP tool reference, the
+connector catalog, and client-side search over every page (`Ctrl`/`Cmd`+`K`).
 
 ## Contributing
 

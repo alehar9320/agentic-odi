@@ -216,6 +216,16 @@ export function MenuIcon(props: IconProps) {
   );
 }
 
+export function AlertIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M12 3.5 2.9 19.2a1 1 0 0 0 .87 1.5h16.46a1 1 0 0 0 .87-1.5z" />
+      <path d="M12 9.2v4.4" />
+      <path d="M12 17.2h.01" />
+    </Icon>
+  );
+}
+
 export function BellIcon(props: IconProps) {
   return (
     <Icon {...props}>

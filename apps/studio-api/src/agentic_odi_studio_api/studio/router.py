@@ -109,6 +109,14 @@ def _require_mcp_url(mcp_url: str) -> str:
     return mcp_url
 
 
+def _json_or_raw(value: str) -> Any:
+    """MCP answers in text; a JSON payload is returned as the object it encodes."""
+    try:
+        return json.loads(value)
+    except (TypeError, ValueError):
+        return value
+
+
 def _as_http_error(exc: Exception) -> StudioHTTPError:
     """Translate domain errors into typed HTTP responses without leaking 500s."""
     if isinstance(exc, (JobNotFoundError, StepNotFoundError, OutcomeNotFoundError)):
@@ -306,6 +314,101 @@ async def get_canvas(request: Request, mcp_url: str | None = Query(None)) -> dic
             )
         return await fetch_canvas(mcp_url)
     return fetch_local_canvas(_service(request))
+
+
+@router.get("/jobs")
+async def get_jobs(request: Request, mcp_url: str | None = Query(None)) -> dict:
+    if _uses_mcp(request):
+        result = await call_mcp_tool(_require_mcp_url(mcp_url or ""), ToolName.GET_JOBS.value, {})
+        return {"ok": True, "result": _json_or_raw(result)}
+    return {
+        "ok": True,
+        "result": [job.model_dump(mode="json") for job in _service(request).get_jobs()],
+    }
+
+
+@router.get("/jobs/{job_id}")
+async def get_job(job_id: str, request: Request, mcp_url: str | None = Query(None)) -> dict:
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(mcp_url or ""), ToolName.GET_JOB.value, {"job_id": job_id}
+        )
+        return {"ok": True, "result": _json_or_raw(result)}
+    job = _service(request).get_job(job_id)
+    if job is None:
+        raise _as_http_error(JobNotFoundError(job_id))
+    return {"ok": True, "result": job.model_dump(mode="json")}
+
+
+@router.get("/steps")
+async def get_steps(
+    request: Request,
+    job_id: str | None = Query(None),
+    mcp_url: str | None = Query(None),
+) -> dict:
+    service = _service(request)
+    if _uses_mcp(request):
+        target = _require_mcp_url(mcp_url or "")
+        if job_id:
+            result = await call_mcp_tool(target, ToolName.GET_JOB_MAP.value, {"job_id": job_id})
+            return {"ok": True, "result": _json_or_raw(result)}
+        jobs = _json_or_raw(await call_mcp_tool(target, ToolName.GET_JOBS.value, {}))
+        steps: list[Any] = []
+        for job in jobs if isinstance(jobs, list) else []:
+            job_steps = _json_or_raw(
+                await call_mcp_tool(target, ToolName.GET_JOB_MAP.value, {"job_id": job["id"]})
+            )
+            if isinstance(job_steps, list):
+                steps.extend(job_steps)
+        return {"ok": True, "result": steps}
+    if job_id:
+        return {
+            "ok": True,
+            "result": [step.model_dump(mode="json") for step in service.get_job_map(job_id)],
+        }
+    return {
+        "ok": True,
+        "result": [
+            step.model_dump(mode="json")
+            for job in service.get_jobs()
+            for step in service.get_job_map(job.id)
+        ],
+    }
+
+
+@router.get("/outcomes")
+async def get_outcomes(
+    request: Request,
+    job_id: str | None = Query(None),
+    step_id: str | None = Query(None),
+    mcp_url: str | None = Query(None),
+) -> dict:
+    if _uses_mcp(request):
+        target = _require_mcp_url(mcp_url or "")
+        if not job_id:
+            raise StudioHTTPError(
+                StudioError(
+                    code=StudioErrorCode.VALIDATION,
+                    message="job_id is required for the mcp backend",
+                    suggestion="Pass job_id, or use the local backend to list every outcome.",
+                ),
+                status_code=400,
+            )
+        arguments: dict[str, Any] = {"job_id": job_id}
+        if step_id:
+            arguments["step_id"] = step_id
+        result = await call_mcp_tool(target, ToolName.GET_OUTCOMES.value, arguments)
+        return {"ok": True, "result": _json_or_raw(result)}
+    service = _service(request)
+    if job_id:
+        outcomes = service.get_outcomes(job_id, step_id)
+    else:
+        outcomes = [
+            outcome
+            for job in service.get_jobs()
+            for outcome in service.get_outcomes(job.id, step_id)
+        ]
+    return {"ok": True, "result": [item.model_dump(mode="json") for item in outcomes]}
 
 
 @router.post("/jobs")
