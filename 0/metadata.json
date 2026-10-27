@@ -1,0 +1,65 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M5Y3WE7V1KBPBVKQVPMPE0D8",
+  "session_id": "ses_e83d1adfdffe3EiYX0hP3s4hKt",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-27T07:23:37.700586938Z",
+  "branch": "ui-not-looking-like-shit",
+  "checkpoints_count": 1,
+  "save_step_count": 1,
+  "files_touched": [
+    "apps/studio/src/components/chat/ChatStage.test.tsx",
+    "apps/studio/src/components/chat/ChatStage.tsx",
+    "apps/studio/src/components/chat/Composer.test.tsx",
+    "apps/studio/src/components/chat/Composer.tsx",
+    "apps/studio/src/components/chat/Conversation.test.tsx",
+    "apps/studio/src/components/chat/Conversation.tsx",
+    "apps/studio/src/components/chat/ModelPicker.tsx",
+    "apps/studio/src/components/chat/RunActivity.tsx",
+    "apps/studio/src/components/chat/ThreadComposer.tsx",
+    "apps/studio/src/components/chat/TranscriptAnnouncer.tsx",
+    "apps/studio/src/components/chat/composerParts.tsx"
+  ],
+  "agent": "OpenCode",
+  "model": "nvidia/nemotron-3.5-super-vl-120b-a12b",
+  "turn_id": "b4c7767a30b0",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 216479,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 4864992,
+    "output_tokens": 8746,
+    "api_call_count": 50
+  },
+  "session_metrics": {
+    "turn_count": 1
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-10-27T07:23:37.653633736Z",
+    "agent_lines": 1132,
+    "agent_removed": 1244,
+    "human_added": 0,
+    "human_modified": 4,
+    "human_removed": 1,
+    "total_committed": 1136,
+    "total_lines_changed": 2383,
+    "agent_percentage": 99.70625262274444,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0
+    },
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 1221,
+      "agent_lines_removed": 1244
+    }
+  ]
+}
