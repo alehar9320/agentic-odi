@@ -45,8 +45,6 @@ import {
   type UpdateObservationPayload,
 } from "../api/studioApi";
 import type { RawSseEvent } from "../api/sse";
-import { applyToolEvent, type RunStep } from "../lib/run";
-import { newTurnId } from "../lib/thread";
 import type {
   AddConnectorPayload,
   ChatAttachment,
@@ -64,6 +62,7 @@ import type {
   StudioConfig,
   StudioError,
   StudioNotification,
+  ToolStatus,
   TurnNode,
   WorkspacePanelId,
 } from "../types";
@@ -613,7 +612,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 const pushNotice = useCallback((text: string) => {
   setMessages((prev) => [
     ...prev,
-    { role: "notice", id: newTurnId(), parentId: null, content: text },
+    { role: "notice", id: crypto.randomUUID(), parentId: null, content: text },
   ]);
 }, []);
 
@@ -814,7 +813,7 @@ const pushNotice = useCallback((text: string) => {
 
       const history: ChatMessage[] = userTurn ? [...base, userTurn] : base;
 
-      const assistantId = newTurnId();
+      const assistantId = crypto.randomUUID();
       const assistantIndex = history.length;
       setMessages([
         ...history,
@@ -829,7 +828,6 @@ const pushNotice = useCallback((text: string) => {
 
       let content = "";
       let parts: ChatPart[] = [];
-      let steps: RunStep[] = [];
       let failure: StudioError | null = null;
       let terminal = false;
       let stopped = false;
@@ -866,7 +864,6 @@ const pushNotice = useCallback((text: string) => {
             parts: [...parts],
             ...(failure ? { error: failure, retryText } : {}),
             ...(stopped ? { stopped: true, retryText } : {}),
-            ...(steps.length ? { tools: [...steps] } : {}),
           };
           return next;
         });
@@ -900,18 +897,34 @@ const pushNotice = useCallback((text: string) => {
             }
             break;
           }
-          case "tool":
-            steps = applyToolEvent(
-              steps,
-              {
-                name: String(event.data.name ?? ""),
-                status: String(event.data.status ?? ""),
-                preview: event.data.preview ? String(event.data.preview) : undefined,
-              },
-              Date.now(),
-            );
+          case "tool": {
+            const name = String(event.data.name ?? "");
+            const status = String(event.data.status ?? "");
+            const mapped: ToolStatus =
+              status === "ok" || status === "error" || status === "declined" ? status : "running";
+            const open = parts
+              .slice()
+              .reverse()
+              .find(
+                (part): part is Extract<ChatPart, { kind: "tool" }> =>
+                  part.kind === "tool" && part.name === name && part.status === "running",
+              );
+            if (mapped === "running") {
+              if (open) {
+                break;
+              }
+              parts = [...parts, { kind: "tool", id: `tool-${Date.now()}`, name, status: mapped }];
+            } else if (open) {
+              parts = [
+                ...parts.filter((part) => part !== open),
+                { ...open, status: mapped, approval: undefined },
+              ];
+            } else {
+              parts = [...parts, { kind: "tool", id: `tool-${Date.now()}`, name, status: mapped }];
+            }
             publish();
             break;
+          }
           case "message": {
             terminal = true;
             content = String(event.data.content ?? content);
@@ -948,7 +961,7 @@ const pushNotice = useCallback((text: string) => {
               const reason = String(event.data.error ?? "The connector could not be added.");
               setMessages((prev) => [
                 ...prev,
-                { role: "notice", id: newTurnId(), parentId: null, content: `Connector failed: ${reason}` },
+                { role: "notice", id: crypto.randomUUID(), parentId: null, content: `Connector failed: ${reason}` },
               ]);
             } else {
               setConnectorSuggestions((prev) => {
@@ -996,15 +1009,10 @@ const pushNotice = useCallback((text: string) => {
           // was mid-flight, and leave the turn in place so the transcript says
           // what happened instead of silently losing the question.
           stopped = true;
-          steps = steps.map((step) =>
-            step.status === "running"
-              ? {
-                  ...step,
-                  status: "stopped",
-                  preview: step.preview ?? "Stopped before it returned.",
-                  endedAt: Date.now(),
-                }
-              : step,
+          parts = parts.map((part) =>
+            part.kind === "tool" && part.status === "running"
+              ? { ...part, status: "error" as ToolStatus }
+              : part,
           );
           publish();
         } else {
@@ -1065,7 +1073,7 @@ const pushNotice = useCallback((text: string) => {
           : message,
       );
       const userMessage: ChatMessage = {
-        id: newTurnId(),
+        id: crypto.randomUUID(),
         parentId: history.length ? history[history.length - 1].id : null,
         role: "user",
         content: trimmed,
