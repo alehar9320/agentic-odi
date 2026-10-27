@@ -424,7 +424,6 @@ function loadNotifications(): StudioNotification[] {
 
 export function StudioProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<StudioConfig>(loadSettings);
-  const theme: StudioTheme = settings.theme === "light" ? "light" : "dark";
   const [displayName, setDisplayNameState] = useState<string>(loadDisplayName);
   const [brief, setBrief] = useState<StudioBrief | null>(loadBrief);
   const [setupOpen, setSetupOpen] = useState<boolean>(
@@ -1011,47 +1010,7 @@ const pushNotice = useCallback((text: string) => {
               part.kind === "tool" && part.name === name && part.status === "running",
           );
 
-      const applyToolEvent = (
-        name: string,
-        status: ToolStatus,
-        preview?: string,
-        id?: string,
-      ) => {
-        const open = openTool(name);
-        if (status === "running") {
-          if (open) {
-            return;
-          }
-          toolSeq += 1;
-          parts = [
-            ...parts,
-            { kind: "tool", id: id ?? `tool-${toolSeq}`, name, status },
-          ];
-          return;
-        }
-        if (open) {
-          const next = {
-            ...open,
-            status,
-            ...(preview ? { preview } : {}),
-            // A result means the gate was answered; the question is spent.
-            approval: undefined,
-          };
-          parts = [...parts.filter((part) => part !== open), next];
-          return;
-        }
-        toolSeq += 1;
-        parts = [
-          ...parts,
-          {
-            kind: "tool",
-            id: id ?? `tool-${toolSeq}`,
-            name,
-            status,
-            ...(preview ? { preview } : {}),
-          },
-        ];
-      };
+
 
       // The turn owns its own timeline, so a finished run stays inspectable and
       // the next turn starts from nothing without a reset elsewhere.
