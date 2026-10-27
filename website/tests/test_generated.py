@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import subprocess
 
 import build_site
@@ -67,3 +68,28 @@ def test_the_cli_reference_mentions_every_registered_command():
     assert commands
     missing = [command["name"] for command in commands if command["name"] not in reference]
     assert missing == []
+
+
+def test_build_emits_a_search_index(tmp_path):
+    # The docs are static, so the only way to search them without a network
+    # call is an index the build writes next to the pages.
+    build_site.build(tmp_path)
+    entries = json.loads((tmp_path / "search-index.json").read_text(encoding="utf-8"))
+    assert entries
+    for entry in entries:
+        assert entry["title"]
+        assert isinstance(entry["url"], str)
+        assert not entry["url"].startswith("http")
+        assert "excerpt" in entry
+
+
+def test_the_search_index_covers_every_page(tmp_path):
+    build_site.build(tmp_path)
+    entries = json.loads((tmp_path / "search-index.json").read_text(encoding="utf-8"))
+    pages = {
+        str(path.relative_to(tmp_path))
+        for path in tmp_path.rglob("*.html")
+        if path.name != "404.html"
+    }
+    expected = {"" if page == "index.html" else page[: -len("index.html")] for page in pages}
+    assert {entry["url"] for entry in entries} == expected

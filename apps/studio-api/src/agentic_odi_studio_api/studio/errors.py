@@ -131,7 +131,8 @@ def unhandled_error_handler(request: Request, exc: Exception) -> JSONResponse:
     logger.exception("unhandled studio-api error (request_id=%s)", request_id, exc_info=exc)
     error = StudioError(
         code=StudioErrorCode.INTERNAL,
-        message="Something went wrong. The team has been notified.",
+        message=f"Something went wrong (request {request_id}). The team has been notified.",
+        suggestion="Try again — your work is still safe.",
     )
     return _error_response(request, error, 500)
 
