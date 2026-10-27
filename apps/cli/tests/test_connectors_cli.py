@@ -621,7 +621,6 @@ def test_connectors_ingest_dry_run_counts_evidence_drafts(tmp_path: Path, monkey
     assert preview["evidence_drafts"] == 1
 
 
-
 def test_connectors_list_json_prints_expected_fields(tmp_path: Path) -> None:
     config = tmp_path / "connectors.json"
     runner.invoke(
