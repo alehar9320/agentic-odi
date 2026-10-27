@@ -667,7 +667,6 @@ async def _turn_frames(
                 arguments = _parse_arguments(entry["arguments"])
                 counters["tool_calls"] += 1
 
-<<<<<<< HEAD
                 declined: str | None = None
                 if request.approvals and approvals is not None and is_mutating_tool(name):
                     approval, future = approvals.open(
@@ -687,30 +686,7 @@ async def _turn_frames(
                     result_str = declined
                     yield frame("tool", {"name": name, "status": "declined", "preview": declined})
                 elif name == "add_connector":
-                    yield frame("tool", {"name": name, "status": "start"})
-||||||| fcf59923
-                if name == "add_connector":
-=======
-                declined: str | None = None
-                if request.approvals and approvals is not None and is_mutating_tool(name):
-                    approval, future = approvals.open(
-                        tool_call_id=entry["id"],
-                        name=name,
-                        arguments=arguments,
-                        prompt=_approval_prompt(name, arguments),
-                    )
-                    # The gate is announced before it is awaited: the client
-                    # cannot answer a question it was never sent.
-                    yield frame("approval", approval.to_dict())
-                    decision = await wait_for_decision(approvals, approval, future)
-                    declined = _denial_result(name, decision)
 
-                if declined is not None:
-                    counters["tool_errors"] += 1
-                    result_str = declined
-                    yield frame("tool", {"name": name, "status": "declined", "preview": declined})
-                elif name == "add_connector":
->>>>>>> origin/main
                     result_str, events = _apply_add_connector(arguments, connector_service)
                     for event in events:
                         yield frame(event["event"], event["data"])
