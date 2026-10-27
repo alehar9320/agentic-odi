@@ -272,3 +272,30 @@ class CapabilityItem(BaseModel):
 
 class CapabilitiesResponse(BaseModel):
     capabilities: list[CapabilityItem]
+
+
+class AddEvidenceRequest(BaseModel):
+    """A research record delegated from an external tool, or captured by hand."""
+
+    source_name: str
+    source_kind: str = "manual"
+    name: str
+    content: str
+    url: str | None = None
+    item_type: Literal["catalog", "resource", "tool_result", "manual", "note"] = "manual"
+    job_id: str | None = None
+    step_id: str | None = None
+    outcome_id: str | None = None
+    mcp_url: str = ""
+
+
+class PromoteEvidenceRequest(BaseModel):
+    """Turn a captured record into a Job or a Desired Outcome."""
+
+    target: Literal["job", "outcome"]
+    job_id: str | None = None
+    statement: str | None = None
+    name: str | None = None
+    importance: float | None = None
+    satisfaction: float | None = None
+    mcp_url: str = ""

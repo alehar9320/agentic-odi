@@ -104,12 +104,17 @@ class Evidence(BaseModel):
 
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     source_name: str = Field(..., description="Connector or person that produced the record")
-    source_kind: str = Field(..., description="Connector kind, e.g. mcp, rest, webhook, manual")
+    source_kind: str = Field(
+        ..., description="Connector kind, e.g. mcp, rest, webhook, manual — or demo for a fixture"
+    )
     item_type: EvidenceItemType = Field(
         "manual", description="Normalized record kind produced by the connector"
     )
     name: str = Field(..., description="Short human-readable label for the record")
     content: str = Field(..., description="Normalized text content of the record")
+    url: str | None = Field(
+        None, description="External URL/link to the signal/evidence in the source system"
+    )
     raw: dict[str, Any] = Field(default_factory=dict, description="Original record payload")
     job_id: str | None = Field(None, description="Job this evidence supports")
     step_id: str | None = Field(None, description="Job-map Step this evidence supports")
