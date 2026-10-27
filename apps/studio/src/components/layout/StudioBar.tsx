@@ -23,6 +23,7 @@ export function StudioBar({
     llmHealth,
     messages,
     unreadNotificationCount,
+    markAllNotificationsAsRead,
     openPanel,
     pushToast,
     saveSettings,
@@ -117,7 +118,10 @@ export function StudioBar({
           className="icon-button bar__bell"
           aria-label="Catch up notifications"
           title="Activity & Catch Up"
-          onClick={() => openPanel("catchup")}
+          onClick={() => {
+            markAllNotificationsAsRead();
+            openPanel("catchup");
+          }}
         >
           <BellIcon size={17} />
           {unreadNotificationCount > 0 && (
@@ -131,6 +135,7 @@ export function StudioBar({
           type="button"
           className="bar__health"
           onClick={() => openPanel("settings")}
+          aria-label={`Model status: ${status}. ${llmHealth.message}`}
           title={llmHealth.message}
         >
           <span

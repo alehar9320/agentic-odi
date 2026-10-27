@@ -113,6 +113,32 @@ describe("SettingsPanel connectors", () => {
     expect(pushToast).not.toHaveBeenCalled();
   });
 
+  it("does not pretend unconnectable sources are connection rows", () => {
+    vi.mocked(useStudio).mockReturnValue(stubContext());
+
+    renderPanel();
+
+    expect(screen.queryByText(/gong transcripts/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/slack friction stream/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/product telemetry/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/no data source is connected yet/i)).toBeInTheDocument();
+  });
+
+  it("toggles API key visibility", () => {
+    vi.mocked(useStudio).mockReturnValue(stubContext());
+
+    renderPanel();
+
+    const input = screen.getByLabelText("API key") as HTMLInputElement;
+    expect(input.type).toBe("password");
+
+    fireEvent.click(screen.getByRole("button", { name: /show api key/i }));
+    expect(input.type).toBe("text");
+
+    fireEvent.click(screen.getByRole("button", { name: /hide api key/i }));
+    expect(input.type).toBe("password");
+  });
+
   it("shows an empty state when no connectors are registered", () => {
     vi.mocked(useStudio).mockReturnValue(stubContext({ connectors: [] }));
 
