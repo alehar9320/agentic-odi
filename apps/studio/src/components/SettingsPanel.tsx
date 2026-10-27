@@ -4,7 +4,7 @@ import { useOnboarding } from "../onboarding/context";
 import { useStudio } from "../state/StudioContext";
 import type { StudioConfig } from "../types";
 import { FailurePanel } from "./FailurePanel";
-import { useUpdater } from "./updater/useUpdater";
+import { UpdateSettings } from "../updater";
 
 export function SettingsPanel() {
   const {
@@ -33,7 +33,6 @@ export function SettingsPanel() {
   const { enabled: tourEnabled, restart: restartTour } = useOnboarding();
   const [selectedPreset, setSelectedPreset] = useState("");
   const [showApiKey, setShowApiKey] = useState(false);
-  const updater = useUpdater();
 
   function update<K extends keyof StudioConfig>(key: K, value: StudioConfig[K]): void {
     saveSettings({ ...settings, [key]: value });
@@ -282,6 +281,8 @@ export function SettingsPanel() {
         </div>
       ) : null}
 
+      <UpdateSettings />
+
       <details className="disclosure">
         <summary>How the studio works</summary>
         <p>
@@ -289,21 +290,6 @@ export function SettingsPanel() {
           Point at an outcome, then talk about it: every bet traces back to evidence, and impact is
           simulated before code gets written.
         </p>
-        <button
-          type="button"
-          className="button button--ghost"
-          disabled={updater.checking}
-          onClick={() => void updater.check()}
-        >
-          {updater.checking ? "Checking for updates…" : "Check for updates"}
-        </button>
-        {updater.available && updater.version && (
-          <span className="muted">v{updater.version}</span>
-        )}
-        {updater.progress !== null && (
-          <span className="muted">{Math.round((updater.progress ?? 0) * 100)}%</span>
-        )}
-        {updater.error && <span className="muted">{updater.error}</span>}
       </details>
     </div>
   );

@@ -13,6 +13,7 @@ import { WorkbenchRail } from "./components/workspace/WorkbenchRail";
 import { WorkspacePanel } from "./components/workspace/WorkspacePanel";
 import { FirstRunWizard, OnboardingProvider } from "./onboarding";
 import { StudioProvider, useStudio } from "./state/StudioContext";
+import { UpdateBanner, UpdateProvider } from "./updater";
 
 /**
  * One room, one intelligence.
@@ -58,6 +59,7 @@ function StudioShell() {
           onNew={newConversation}
           onChangelog={() => setShowChangelog(true)}
         />
+        <UpdateBanner />
         {customizeOpen ? (
           <CustomizePage />
         ) : (
@@ -80,14 +82,16 @@ function StudioShell() {
 export default function App() {
   return (
     <ErrorBoundary>
-      <StudioProvider>
-        <StudioRuntimeProvider>
-          <OnboardingProvider>
-            <StudioShell />
-            <FirstRunWizard />
-          </OnboardingProvider>
-        </StudioRuntimeProvider>
-      </StudioProvider>
+      <UpdateProvider>
+        <StudioProvider>
+          <StudioRuntimeProvider>
+            <OnboardingProvider>
+              <StudioShell />
+              <FirstRunWizard />
+            </OnboardingProvider>
+          </StudioRuntimeProvider>
+        </StudioProvider>
+      </UpdateProvider>
     </ErrorBoundary>
   );
 }
