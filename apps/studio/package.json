@@ -17,13 +17,8 @@
     "tauri": "tauri"
   },
   "dependencies": {
-<<<<<<< HEAD
-    "@assistant-ui/react": "^0.15.31",
-||||||| fcf59923
-=======
     "@assistant-ui/react": "^0.15.31",
     "@assistant-ui/react-markdown": "^0.14.24",
->>>>>>> origin/main
     "@tauri-apps/api": "^2.12.4",
     "@tauri-apps/plugin-updater": "^2.14.0",
     "@tauri-apps/plugin-process": "^2.4.0",
