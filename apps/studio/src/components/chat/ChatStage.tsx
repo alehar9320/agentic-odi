@@ -156,7 +156,7 @@ export function ChatStage() {
         <OfflineNotice />
         <div className="chat__welcome">
           <div className="chat__welcome-inner">
-            <Hero onSubmit={(text) => void sendMessage(text)} />
+            <Hero />
             <ThreadComposer
               onCommand={(command) => runCommand(command)}
               onSlashCommand={submitCommand}

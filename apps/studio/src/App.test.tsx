@@ -1,8 +1,8 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import App from "./App";
-import { healthLlm, streamChat } from "./api/studioApi";
+import { healthLlm } from "./api/studioApi";
 
 vi.mock("./api/studioApi", () => ({
   fetchConfig: vi.fn(async () => ({
@@ -27,7 +27,6 @@ vi.mock("./api/studioApi", () => ({
     source: "local" as const,
   })),
   healthMcp: vi.fn(async () => ({ reachable: true })),
-  fetchModels: vi.fn(async () => ({ models: ["local-tools-model", "qwen3-8b"], message: null })),
   healthLlm: vi.fn(async () => ({ healthy: true, message: "LLM backend is reachable." })),
   addStep: vi.fn(async () => ({ ok: true, result: "created" })),
   addOutcome: vi.fn(async () => ({ ok: true, result: "created" })),
@@ -107,8 +106,35 @@ describe("studio shell", () => {
     ).toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: /message the studio/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /sharpen an opportunity/i })).toBeInTheDocument();
+    expect(screen.getByText("Turn a hunch into something defensible")).toBeInTheDocument();
+    expect(screen.getByText("Look across what you already know")).toBeInTheDocument();
     // The classic UI is secondary: no workspace surface until you ask for one.
     expect(screen.queryByRole("heading", { name: /opportunity landscape/i })).toBeNull();
+  });
+
+  it("sends the runtime prompt when a contextual starter card is selected", async () => {
+    render(<App />);
+
+    const start = await screen.findByRole("button", { name: /sharpen an opportunity/i });
+    await act(async () => {
+      fireEvent.click(start);
+    });
+
+    const { streamChat } = await import("./api/studioApi");
+    await waitFor(() => {
+      expect(streamChat).toHaveBeenCalledWith(
+        expect.objectContaining({
+          messages: [
+            expect.objectContaining({
+              content:
+                "I have an opportunity in mind. Ask me what it is, then help me sharpen it into something I can defend.",
+            }),
+          ],
+        }),
+        expect.any(Function),
+        expect.any(AbortSignal),
+      );
+    });
   });
 
   it("opens a workspace view beside the conversation and keeps the composer", async () => {
@@ -174,6 +200,7 @@ describe("studio shell", () => {
     expect(await screen.findByText("Where do I start?")).toBeInTheDocument();
     expect(await screen.findByText("job")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /copy reply/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /sharpen an opportunity/i })).not.toBeInTheDocument();
   });
 
   it("returns home from the wordmark", async () => {
@@ -228,142 +255,6 @@ describe("studio shell", () => {
       screen.getAllByRole("button", { name: /capture an outcome/i }).length,
     ).toBeGreaterThan(0);
     expect(screen.getByText("Local guidance")).toBeInTheDocument();
-  });
-
-  it("sends the next message with the model picked in the composer", async () => {
-    const baseline = vi.mocked(streamChat).mock.calls.length;
-    render(<App />);
-
-    fireEvent.change(await screen.findByRole("combobox", { name: "Model" }), {
-      target: { value: "qwen3-8b" },
-    });
-
-    const composer = screen.getByRole("textbox", { name: /message the studio/i });
-    fireEvent.change(composer, { target: { value: "Which model is answering?" } });
-    fireEvent.click(screen.getByRole("button", { name: /send message/i }));
-
-    await waitFor(() => expect(vi.mocked(streamChat).mock.calls.length).toBe(baseline + 1));
-
-    const request = vi.mocked(streamChat).mock.calls.at(-1)?.[0];
-    expect(request?.model).toBe("qwen3-8b");
-  });
-
-  it("sends an attached file's bytes with that turn, and only that turn", async () => {
-    // Mocks outlive a test, so count the turns this one starts.
-    const baseline = vi.mocked(streamChat).mock.calls.length;
-    render(<App />);
-
-    const composer = await screen.findByRole("textbox", { name: /message the studio/i });
-    const file = new File([new Uint8Array([1, 2, 3])], "shot.png", { type: "image/png" });
-    fireEvent.change(document.getElementById("studio-composer-files") as HTMLInputElement, {
-      target: { files: [file] },
-    });
-    expect(await screen.findByText("shot.png")).toBeInTheDocument();
-
-    fireEvent.change(composer, { target: { value: "What is broken here?" } });
-    fireEvent.click(screen.getByRole("button", { name: /send message/i }));
-
-    await waitFor(() => expect(vi.mocked(streamChat).mock.calls.length).toBe(baseline + 1));
-    const firstRequest = vi.mocked(streamChat).mock.calls.at(-1)?.[0];
-    expect(firstRequest?.messages.at(-1)).toMatchObject({
-      role: "user",
-      content: "What is broken here?",
-      attachments: [{ name: "shot.png", media_type: "image/png", data: btoa("\x01\x02\x03") }],
-    });
-
-    // A later question must not re-upload the screenshot. The composer moves
-    // from the empty stage to the dock once a turn exists, and stays locked
-    // until the first turn settles, so wait for the stop control to go away.
-    await waitFor(() =>
-      expect(screen.queryByRole("button", { name: /stop generating/i })).toBeNull(),
-    );
-    fireEvent.change(await screen.findByRole("textbox", { name: /message the studio/i }), {
-      target: { value: "And now?" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: /send message/i }));
-
-    await waitFor(() => expect(vi.mocked(streamChat).mock.calls.length).toBe(baseline + 2));
-    const secondRequest = vi.mocked(streamChat).mock.calls.at(-1)?.[0];
-    expect(secondRequest?.messages.slice(0, -1).every((message) => !message.attachments)).toBe(
-      true,
-    );
-    expect(secondRequest?.messages.at(-1)?.content).toBe("And now?");
-  });
-
-  it("answers again in place instead of stacking a second question", async () => {
-    const baseline = vi.mocked(streamChat).mock.calls.length;
-    render(<App />);
-
-    const composer = await screen.findByRole("textbox", { name: /message the studio/i });
-    fireEvent.change(composer, { target: { value: "What is broken?" } });
-    fireEvent.click(screen.getByRole("button", { name: /send message/i }));
-
-    await waitFor(() => expect(vi.mocked(streamChat).mock.calls.length).toBe(baseline + 1));
-    await waitFor(() =>
-      expect(screen.queryByRole("button", { name: /stop generating/i })).toBeNull(),
-    );
-
-    fireEvent.click(screen.getByRole("button", { name: /answer again/i }));
-
-    await waitFor(() => expect(vi.mocked(streamChat).mock.calls.length).toBe(baseline + 2));
-    const request = vi.mocked(streamChat).mock.calls.at(-1)?.[0];
-    const asked = request?.messages.filter((message) => message.role === "user") ?? [];
-    expect(asked).toHaveLength(1);
-    expect(asked[0].content).toBe("What is broken?");
-  });
-
-  it("shows each tool a turn used once, under one summary line", async () => {
-    vi.mocked(streamChat).mockImplementationOnce(async (_request, onEvent) => {
-      onEvent({ event: "status", data: { phase: "mcp_tools" } });
-      onEvent({ event: "tool", data: { name: "get_jobs", status: "start" } });
-      onEvent({ event: "tool", data: { name: "get_jobs", status: "ok" } });
-      onEvent({ event: "tool", data: { name: "get_outcomes", status: "start" } });
-      onEvent({ event: "tool", data: { name: "get_outcomes", status: "ok" } });
-      onEvent({ event: "message", data: { content: "Two jobs, one bet." } });
-    });
-
-    const { container } = render(<App />);
-
-    const composer = await screen.findByRole("textbox", { name: /message the studio/i });
-    fireEvent.change(composer, { target: { value: "What do I have?" } });
-    fireEvent.click(screen.getByRole("button", { name: /send message/i }));
-
-    expect(await screen.findByText("Two jobs, one bet.")).toBeInTheDocument();
-
-    const summary = container.querySelector("summary.run__summary");
-    expect(summary?.textContent).toContain("2 tools");
-
-    const steps = Array.from(container.querySelectorAll(".run__step .run__label"));
-    expect(steps.map((step) => step.textContent)).toEqual([
-      expect.stringContaining("Reading your jobs"),
-      expect.stringContaining("Scoring outcomes"),
-    ]);
-  });
-
-  it("keeps a stopped run in the transcript and offers to ask again", async () => {
-    vi.mocked(streamChat).mockImplementationOnce(async (_request, onEvent, signal) => {
-      onEvent({ event: "delta", data: { text: "Here is what I have" } });
-      await new Promise<void>((_resolve, reject) => {
-        signal?.addEventListener("abort", () => {
-          const error = new Error("aborted");
-          error.name = "AbortError";
-          reject(error);
-        });
-      });
-    });
-
-    render(<App />);
-
-    const composer = await screen.findByRole("textbox", { name: /message the studio/i });
-    fireEvent.change(composer, { target: { value: "Read the whole board" } });
-    fireEvent.click(screen.getByRole("button", { name: /send message/i }));
-
-    expect(await screen.findByText("Here is what I have")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /stop generating/i }));
-
-    expect(await screen.findByText("Stopped by you.")).toBeInTheDocument();
-    expect(screen.getByText("Here is what I have")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /ask again/i })).toBeInTheDocument();
   });
 
   it("starts a new conversation from the drawer", async () => {

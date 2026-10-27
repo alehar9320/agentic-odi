@@ -8,6 +8,7 @@ import { Toasts } from "./components/Toasts";
 import { WorkbenchRail } from "./components/workspace/WorkbenchRail";
 import { WorkspacePanel } from "./components/workspace/WorkspacePanel";
 import { FirstRunWizard, OnboardingProvider } from "./onboarding";
+import { StudioRuntimeProvider } from "./assistant/StudioRuntime";
 import { StudioProvider, useStudio } from "./state/StudioContext";
 
 /**
@@ -69,10 +70,12 @@ export default function App() {
   return (
     <ErrorBoundary>
       <StudioProvider>
-        <OnboardingProvider>
-          <StudioShell />
-          <FirstRunWizard />
-        </OnboardingProvider>
+        <StudioRuntimeProvider>
+          <OnboardingProvider>
+            <StudioShell />
+            <FirstRunWizard />
+          </OnboardingProvider>
+        </StudioRuntimeProvider>
       </StudioProvider>
     </ErrorBoundary>
   );

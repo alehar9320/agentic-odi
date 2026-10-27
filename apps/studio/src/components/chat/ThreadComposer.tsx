@@ -235,7 +235,7 @@ function ComposerBody({
           )}
         </div>
       </div>
-      <ComposerHint trailing={<ModelPicker offline={llmHealth.healthy === false} />} />
+      <ComposerHint trailing={<ModelPicker />} />
     </>
   );
 }
