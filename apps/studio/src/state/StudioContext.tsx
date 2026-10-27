@@ -50,7 +50,6 @@ import { newTurnId } from "../lib/thread";
 import type {
   AddConnectorPayload,
   ChatAttachment,
-  ChatAttachmentPayload,
   AddOutcomePayload,
   AddStepPayload,
   CanvasData,
@@ -195,14 +194,14 @@ export interface StudioContextValue {
   thinkingPhase: string | null;
   sendMessage: (
     text: string,
-    attachments?: ChatAttachmentPayload[],
+    attachments?: ChatAttachment[],
     /** Re-ask from this turn: it and everything after it are replaced. */
     options?: { from?: string },
   ) => Promise<void>;
   /** Re-answer the turn ending at `messageId`, as a sibling branch. */
-  regenerateFrom: (messageId: string) => Promise<void>;
+  regenerateFrom: (messageId: string | null) => Promise<void>;
   /** Replace the user turn at `messageId`, as a sibling branch. */
-  editFrom: (messageId: string, text: string) => Promise<void>;
+  editFrom: (messageId: string | null, text: string, attachments?: ChatAttachment[]) => Promise<void>;
   /** Take `branch` as the visible path and record it as the conversation head. */
   switchBranch: (messages: ChatMessage[]) => void;
   /** Answer a paused write. The turn resumes on the stream it came from. */
@@ -1036,7 +1035,7 @@ const pushNotice = useCallback((text: string) => {
   const sendMessage = useCallback(
     async (
       text: string,
-      attachments: ChatAttachmentPayload[] = [],
+      attachments: ChatAttachment[] = [],
       options: { from?: string } = {},
     ) => {
       const trimmed = text.trim();
@@ -1082,12 +1081,25 @@ const pushNotice = useCallback((text: string) => {
    * that message stays, and a new assistant branch grows from it.
    */
   const regenerateFrom = useCallback(
-    async (messageId: string) => {
-      const cut = messages.findIndex((message) => message.id === messageId);
-      if (cut < 0 || streaming) {
+    async (messageId: string | null) => {
+      const index = messageId
+        ? messages.findIndex((message) => message.id === messageId)
+        : messages.length - 1;
+      if (index < 0) {
         return;
       }
-      const base = messages.slice(0, cut + 1);
+      const target = messages[index];
+      const questionIndex =
+        target?.role === "user"
+          ? index
+          : target?.role === "assistant"
+            ? index - 1
+            : -1;
+      const question = messages[questionIndex];
+      if (!question || question.role !== "user") {
+        return;
+      }
+      const base = messages.slice(0, questionIndex + 1);
       await runTurn(base, null, base[base.length - 1].id);
     },
     [messages, streaming, runTurn],
@@ -1098,8 +1110,8 @@ const pushNotice = useCallback((text: string) => {
    * parent, and grow a new assistant branch from it.
    */
   const editFrom = useCallback(
-    async (messageId: string, text: string) => {
-      const cut = messages.findIndex((message) => message.id === messageId);
+    async (messageId: string | null, text: string, attachments: ChatAttachment[] = []) => {
+      const cut = messageId === null ? messages.length - 1 : messages.findIndex((message) => message.id === messageId);
       if (cut < 0 || streaming) {
         return;
       }
@@ -1111,7 +1123,7 @@ const pushNotice = useCallback((text: string) => {
         parentId: original.parentId ?? null,
         role: "user",
         content: trimmed,
-        ...(original.attachments ? { attachments: original.attachments } : {}),
+        ...(attachments.length ? { attachments } : { attachments: original.attachments }),
       };
       await runTurn(base, edited, edited.id);
     },

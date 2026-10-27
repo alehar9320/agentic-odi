@@ -11,12 +11,13 @@ import type {
   ConnectorOperationResponse,
   ConnectorPreset,
   Conversation,
+  ConversationTree,
   CreateJobPayload,
   Job,
   LatestConversation,
   LlmHealth,
   McpHealth,
-  ModelsResult,
+  ModelList,
   Observation,
   ObservationKind,
   ObservationStatus,
@@ -150,8 +151,8 @@ export function healthLlm(config: {
 export function fetchModels(config: {
   base_url: string;
   api_key: string;
-}): Promise<ModelsResult> {
-  return postJson<ModelsResult>("/api/models", config);
+}): Promise<ModelList> {
+  return postJson<ModelList>("/api/models", config);
 }
 
 export function addStep(payload: AddStepPayload): Promise<Step> {
