@@ -134,7 +134,14 @@ jobs:
       pull-requests: write
       checks: write
     steps:
+      # A fork PR gets a read-only token, so the label write would fail and the
+      # job would go red on a pull request we are not permitted to label.
+      - name: Note fork pull requests
+        if: ${{ github.event.pull_request.head.repo.fork }}
+        run: echo "::notice::Skipping risk labels for a fork pull request (read-only token)."
+
       - name: Checkout PR branch (full history for diffs)
+        if: ${{ ! github.event.pull_request.head.repo.fork }}
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
@@ -143,6 +150,7 @@ jobs:
       # composite action's `inputs`, which is why this job previously diffed
       # empty SHAs and scored every pull request 0/100.
       - name: Score PR diff and apply risk label
+        if: ${{ ! github.event.pull_request.head.repo.fork }}
         uses: ./.github/actions/pr-risk
         with:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

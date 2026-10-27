@@ -79,3 +79,15 @@ def test_label_computation_uses_the_tested_python_entrypoint():
     text = RISK.read_text(encoding="utf-8")
     assert "pr_labels.py --facts" in text
     assert "python3 -c" not in text
+
+
+def test_both_jobs_skip_fork_pull_requests():
+    """pull_request gives forks a read-only token, so labeling cannot succeed.
+
+    The risk job must not go red on an external contribution just because it
+    cannot write a label; the labels job already guards this.
+    """
+    text = RISK.read_text(encoding="utf-8")
+    labels_job, risk_job = text.split("\n  pr-risk:\n", 1)
+    for name, job in (("labels", labels_job), ("pr-risk", risk_job)):
+        assert "head.repo.fork" in job, f"{name} job does not guard fork PRs"

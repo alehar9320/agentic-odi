@@ -121,8 +121,9 @@ def domain_labels(filenames: list[str]) -> set[str]:
             labels.add("area/docs")
         if path in DOMAIN_FILES:
             labels.add(DOMAIN_FILES[path])
-        # Longest directory match wins, so a future apps/studio-api rule cannot
-        # be shadowed by the shorter apps/studio rule.
+        # Longest directory match wins, so apps/studio-api is matched by its own
+        # entry rather than falling through to apps/studio. Both map to
+        # area/studio today, but the ordering keeps that from being load-bearing.
         for directory in sorted(DOMAIN_DIRECTORIES, key=len, reverse=True):
             if path == directory or path.startswith(f"{directory}/"):
                 labels.add(DOMAIN_DIRECTORIES[directory])
