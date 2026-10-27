@@ -178,41 +178,18 @@ and asks what changed rather than asking everything again.
 
 ### Without a model
 
-When the LLM is unreachable the Studio keeps working:
-
-- A **Working by hand** strip explains the state and offers capture, job map,
-  and context.
-- Messages still return deterministic ODI guidance from the sidecar, labelled
-  **Local guidance**.
-- Jobs can be created, renamed, and deleted; steps added, edited, and removed;
-  outcomes recorded, re-scored, and removed. All of it goes through the same
-  local repository the model uses.
-- Settings → Base URL and Model reconnect the assistant whenever you are ready.
-
-The user's context is sent with every chat request, so the assistant starts from
-the product, audience, job, and problem rather than asking for them again.
+When the LLM is unreachable the Studio keeps working: a **Working by hand** strip explains the state and offers capture, job map, and context; messages still return deterministic ODI guidance labelled **Local guidance**; jobs, steps, and outcomes can be created, edited, and removed through the same local repository. Settings → Base URL and Model reconnect the assistant whenever you are ready. The user's context is sent with every chat request, so the assistant starts from the product, audience, job, and problem rather than asking for them again.
 
 ### When the studio is not running
 
-The Living Studio is a local service, and it is the kind of thing that is easy to
-forget to start. When the sidecar is not reachable, the SPA does not pretend
-otherwise.
+The Living Studio is a local service. When the sidecar is not reachable, the SPA does not pretend otherwise:
 
-- A **subtle strip** across the top of the window says the sidecar isn't running,
-  that the assistant is paused and live data is frozen, and offers **Recheck**
-  and **Start the sidecar** (opens Settings). It is dismissible for the session
-  and clears itself once the sidecar is reached again.
-- Sending a message does not fire off a doomed request: it drops a quiet in-thread
-  notice pointing to Settings, and the composer never spins.
-- The canvas keeps showing the last thing it drew instead of going blank; a failed
-  canvas is a failure panel with Retry, not an empty board.
+- A strip across the top of the window says the sidecar isn't running and the assistant is paused, with **Recheck** and **Start the sidecar**.
+- Sending a message drops a quiet in-thread notice pointing to Settings; the composer never spins.
+- The canvas keeps showing the last thing it drew instead of going blank.
 
-On the CLI, the same condition is `BackendError("could not reach MCP server …")`,
-rendered as `Error: …` followed by `Hint: Start the MCP server (python -m
-agentic_odi_mcp_server)…`. When the Studio is reached through the free
-Cloudflare Worker proxy, a missing `SIDECAR_URL` is reported to the browser as
-`{"error": {"code": "mcp_unreachable", "suggestion": "Start the studio sidecar
-…"}}` with `X-Request-ID` echoed for support.
+On the CLI, the same condition is `BackendError("could not reach MCP server …")`. Through the free Cloudflare Worker proxy, a missing `SIDECAR_URL` is reported as `{"error": {"code": "mcp_unreachable", …}}` with `X-Request-ID` echoed for support.
+
 
 ### The thread is the room
 
@@ -228,24 +205,20 @@ reply with the next move as an action on the surface.
 
 ### The conversation runtime
 
-The transcript is not a hand-rolled message list. It runs on **assistant-ui**,
-a React runtime for streaming assistants, bound to the Studio's own store with
-`useExternalStoreRuntime`, so the thread gains real conversation capabilities
-without giving up the message model the sidecar already understands.
+The transcript runs on **assistant-ui**, bound to the Studio's store with `useExternalStoreRuntime`, so the thread gains real conversation capabilities without giving up the sidecar's message model.
 
 | Capability | What it means here |
 |---|---|
-| **Streaming** | `delta` frames append to the open prose part; the send button becomes stop. Before the first token, the last message shows the current phase with a shimmering label and dots. When you scroll away during a reply, a keyboard-accessible **Latest message** control returns you to the live end without interrupting assistant-ui's follow behavior. Empty-thread starter cards pair each suggested move with its reason, then give way to the conversation after the first turn. |
+| **Streaming** | `delta` frames append to the open prose part; the send button becomes stop. Before the first token, the last message shows the current phase. A keyboard-accessible **Latest message** control returns you to the live end. |
 | **Reasoning** | `reasoning` frames render in a disclosure that starts open while the model is thinking, then reads *Thought for Ns* and can be reopened. Never persisted, never counted as the answer. |
 | **Tools** | Each MCP call is a trace chip with its status and a short preview of what came back. |
-| **Approval** | A writing tool (`add_`, `create_`, `update_`, `delete_`, `ingest_`, `remove_`) pauses the turn until you answer **Allow** or **Decline**. A decline is a tool result, not an error: the model is told no and may propose something else. |
-| **Sources** | Every tool call that returned data emits a `source`, titled with the tool and a preview. Provenance is what the turn actually read; a citation is never invented. |
+| **Approval** | A writing tool pauses the turn until you answer **Allow** or **Decline**. A decline is a tool result, not an error: the model is told no and may propose something else. |
+| **Sources** | Every tool call that returned data emits a `source`, titled with the tool and a preview of what came back. |
 | **Attachments** | Attach from the paperclip, by dropping files on the composer, or by pasting a screenshot. The composer describes accepted text-like files (`.md`, `.mdx`, `.json`, `.csv`, `.yaml`, `.yml`, `.log`, `text/*`) and images (PNG/JPEG/WebP/GIF, at most 5 MB); a drop or paste of anything else is refused with the reason. Chips show a name, size, an image preview, and a remove control. Text is extracted in the browser, capped at 20,000 characters, and sent with the turn. Nothing is stored server-side. |
-| **Model** | The hint row's picker asks the sidecar (`POST /api/models`) which ids the configured backend serves, keeps the configured model selectable even when the backend omits it, and saves the choice through `saveSettings`, so Settings and the composer never disagree. An unreachable or empty backend is explained in the menu rather than shown as an empty list. |
+| **Model** | The hint row's picker asks the sidecar (`POST /api/models`) which ids the configured backend serves, keeps the configured model selectable even when the backend omits it, and saves the choice through `saveSettings`, so Settings and the composer never disagree. |
 | **Branching** | **Edit** a user turn or **Regenerate** a reply and both versions are kept as siblings. **Alternative 2 of 3** with `‹`/`›` steps between them, and the visible branch is saved as the conversation's `head_id`, so a reload reopens the branch you were reading. |
 | **Suggestions** | The empty-stage pills are chosen from the canvas and handed to the runtime as suggestion prompts. |
-| **Generative UI** | A validated `UiNode` travels as an assistant-ui **data part** (`data-odi-surface`) and renders through the same `UiRenderer`. The catalog stays ours and server-validated. |
-| **Voice** | Deliberately not wired yet. The seam is `adapters.dictation` plus `ComposerPrimitive.Dictate`: no backend change and no message-model change. It waits because Tauri's WebKit webview support for the Web Speech API is uneven, and a microphone button that works in only one shell is worse than none. |
+| **Generative UI** | A validated `UiNode` travels as an assistant-ui **data part** (`data-odi-surface`) and renders through `UiRenderer`. The catalog stays ours and server-validated. |
 
 #### Where the bridge lives
 
@@ -267,26 +240,15 @@ opt-in and additive: `reasoning`, `source`, and `approval` stream events;
 is offline. A client that sends none of these sees exactly the stream it saw
 before, which is what the CLI and older clients do.
 
-The approval gate is per-process and single-user by design. `ApprovalRegistry`
-waits on an `asyncio` future, `POST /api/approvals/{id}` answers it, and a
-timeout (300 s) or a cancelled turn resolves as a declined write, so a turn can
-never hang and a double click can never run a tool twice. That is the right size
-for a loopback sidecar with one person at the keyboard; it is not a durable job
-queue, and it is not pretending to be one.
+The approval gate is per-process and single-user: `ApprovalRegistry` waits on an `asyncio` future, `POST /api/approvals/{id}` answers it, and a timeout or cancelled turn resolves as a declined write, so a turn can never hang and a double click can never run a tool twice.
 
 #### Extending the conversation
 
-A new kind of part is added in exactly two places — the mapping in `convert.ts`
-and the component in `parts.tsx` — and then registered in the `components` map
-in `Conversation.tsx`. Do not add a second message list, and never let an unknown
-part reach the screen as JSON: the converter drops what it does not understand on
-purpose, and `convert.test.ts` holds that line.
+A new part is added in two places — `convert.ts` and `parts.tsx` — then registered in `Conversation.tsx`. The converter drops unknown parts on purpose.
 
 ### What it remembers
 
-The studio keeps a small, local, editable model of the person it is helping. It
-is not a profile and not a transcript index; it is the handful of things that
-change the next answer.
+The studio keeps a small, local model of the person it is helping.
 
 | Kind | What it captures |
 |---|---|
