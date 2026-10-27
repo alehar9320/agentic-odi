@@ -1,0 +1,72 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M5YW5YSV01X9Y8G61DSSJ3D1",
+  "session_id": "ses_e83b57382ffexWtK33yDHUX0jZ",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-27T14:28:54.334189368Z",
+  "branch": "ui-not-looking-like-shit",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "website/dist/404.html",
+    "website/dist/assets/demo.js",
+    "website/dist/assets/favicon.png",
+    "website/dist/assets/favicon.svg",
+    "website/dist/assets/main.js",
+    "website/dist/assets/mark.svg",
+    "website/dist/assets/og.png",
+    "website/dist/assets/style.css",
+    "website/dist/assets/theme.js",
+    "website/dist/assets/tokens.css",
+    "website/dist/docs/architecture/index.html",
+    "website/dist/docs/cli/index.html",
+    "website/dist/docs/connectors/index.html",
+    "website/dist/docs/deployment/index.html",
+    "website/dist/docs/development/index.html",
+    "website/dist/docs/index.html",
+    "website/dist/docs/installation/index.html",
+    "website/dist/docs/local-llm/index.html",
+    "website/dist/docs/mcp/index.html",
+    "website/dist/docs/quick-start/index.html",
+    "website/dist/docs/roadmap/index.html",
+    "website/dist/docs/studio/index.html",
+    "website/dist/index.html",
+    "website/dist/robots.txt",
+    "website/dist/search-index.json",
+    "website/dist/sitemap.xml"
+  ],
+  "agent": "OpenCode",
+  "model": "nvidia/nemotron-3.5-super-vl-120b-a12b",
+  "turn_id": "cbebf041899d",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 47196,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 411920,
+    "output_tokens": 2858,
+    "api_call_count": 13
+  },
+  "session_metrics": {
+    "turn_count": 1
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-10-27T14:28:54.32297692Z",
+    "agent_lines": 11158,
+    "agent_removed": 0,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 11158,
+    "total_lines_changed": 11158,
+    "agent_percentage": 100,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0
+    }
+  ]
+}
