@@ -137,7 +137,7 @@ catalog. Picking one changes the model used by the next message.
 
 A screenshot is a question too. Attach images or text files with the paperclip,
 by dropping them on the composer, or by pasting; the bytes travel with that turn
-(up to 6 files, 8 MB each) and later questions do not re-upload them.
+(up to 5 files; images up to 5 MB, other files up to 8 MB) and later questions do not re-upload them.
 
 The thread itself runs on [assistant-ui](https://www.assistant-ui.com): its
 external-store runtime is fed the transcript the sidecar already owns, so every

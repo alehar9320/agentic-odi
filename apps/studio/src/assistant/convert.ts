@@ -32,7 +32,7 @@ function toPart(part: ChatPart): LikePart | null {
       return { type: "reasoning", text: part.text };
 
     case "ui":
-      return { type: `data-${SURFACE_PART}` as const, id: part.id, data: part.node };
+      return { type: "data", name: SURFACE_PART, id: part.id, data: part.node };
 
     case "source":
       return {

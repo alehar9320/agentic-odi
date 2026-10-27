@@ -124,7 +124,7 @@ MCP tool result (text)
   error`. An empty canvas is an invitation; a failed canvas is a failure panel
   with Retry. The two never look the same.
 - **The thread runtime never owns studio state.** `Conversation` maps the store
-  into assistant-ui once per render (`lib/thread.ts`) and hands it to an
+  into assistant-ui once per render (`assistant/convert.ts`) and hands it to an
   external-store runtime; run steps, failures, stopped turns, and surfaces ride
   in `metadata.custom` and data parts. A regenerate is a store operation
   (`sendMessage(text, files, {from})`), not a runtime fork, so the transcript
