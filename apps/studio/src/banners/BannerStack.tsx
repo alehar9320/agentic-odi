@@ -2,13 +2,14 @@ import * as Toast from "@radix-ui/react-toast";
 
 import { BannerRow } from "./Banner";
 import { useBannerOptional } from "./BannerProvider";
-import type { Banner } from "./types";
+import type { Banner, BannerActionId } from "./types";
 
 export interface BannerStackProps {
   /** Explicit data for tests and stories; otherwise the provider's view is used. */
   banners?: Banner[];
   overflow?: number;
   onDismiss?: (id: string) => void;
+  onAction?: (action: BannerActionId) => void;
   onIntent?: (intent: string) => void;
 }
 
@@ -25,6 +26,7 @@ export function BannerStack(props: BannerStackProps) {
   const banners = props.banners ?? context?.view.visible ?? [];
   const overflow = props.overflow ?? context?.view.overflow ?? 0;
   const onDismiss = props.onDismiss ?? context?.dismiss ?? (() => {});
+  const onAction = props.onAction ?? (() => {});
   const onIntent = props.onIntent ?? (() => {});
 
   const top = banners.filter((banner) => banner.dock === "top");
@@ -34,7 +36,13 @@ export function BannerStack(props: BannerStackProps) {
     <Toast.Provider swipeDirection="right">
       <Toast.Viewport className="banner-dock banner-dock--top" label="Studio notices">
         {top.map((banner) => (
-          <BannerRow key={banner.id} banner={banner} onDismiss={onDismiss} onIntent={onIntent} />
+          <BannerRow
+            key={banner.id}
+            banner={banner}
+            onDismiss={onDismiss}
+            onAction={onAction}
+            onIntent={onIntent}
+          />
         ))}
         {overflow > 0 && (
           <li className="banner-overflow" role="status">
@@ -45,7 +53,13 @@ export function BannerStack(props: BannerStackProps) {
 
       <Toast.Viewport className="banner-dock banner-dock--corner" label="Studio notifications">
         {corner.map((banner) => (
-          <BannerRow key={banner.id} banner={banner} onDismiss={onDismiss} onIntent={onIntent} />
+          <BannerRow
+            key={banner.id}
+            banner={banner}
+            onDismiss={onDismiss}
+            onAction={onAction}
+            onIntent={onIntent}
+          />
         ))}
       </Toast.Viewport>
     </Toast.Provider>

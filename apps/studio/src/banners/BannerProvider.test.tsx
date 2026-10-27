@@ -24,12 +24,19 @@ describe("BannerProvider", () => {
     expect(result.current.view.visible[0].kind).toBe("sidecar-down");
   });
 
-  it("keeps one banner when the same kind is raised twice", () => {
+  it("updates one banner when the same persistent kind is raised twice", () => {
     const { result } = renderHook(useHarness, { wrapper });
-    act(() => result.current.raise({ kind: "info", body: "First." }));
-    act(() => result.current.raise({ kind: "info", body: "Second." }));
+    act(() => result.current.raise({ kind: "sidecar-down", body: "First." }));
+    act(() => result.current.raise({ kind: "sidecar-down", body: "Second." }));
     expect(result.current.view.visible).toHaveLength(1);
     expect(result.current.view.visible[0].body).toBe("Second.");
+  });
+
+  it("keeps two transient banners of the same kind when their messages differ", () => {
+    const { result } = renderHook(useHarness, { wrapper });
+    act(() => result.current.raise({ kind: "success", body: "Added A." }));
+    act(() => result.current.raise({ kind: "success", body: "Added B." }));
+    expect(result.current.view.visible).toHaveLength(2);
   });
 
   it("resolves a banner when its condition clears", () => {

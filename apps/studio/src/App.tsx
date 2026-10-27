@@ -1,12 +1,14 @@
 import { useEffect, useState } from "react";
 
 import { StudioRuntimeProvider } from "./assistant/StudioRuntime";
+import { BannerBridge, useBannerActionDispatcher } from "./banners/BannerBridge";
+import { BannerProvider, useBanner } from "./banners/BannerProvider";
+import { BannerStack } from "./banners/BannerStack";
+import { BannerToasts } from "./banners/BannerToasts";
 import { ChangelogModal } from "./components/ChangelogModal";
 import { ChatStage } from "./components/chat/ChatStage";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { StudioBar } from "./components/layout/StudioBar";
-import { SidecarNotice } from "./components/notices/SidecarNotice";
-import { Toasts } from "./components/Toasts";
 import { WorkbenchRail } from "./components/workspace/WorkbenchRail";
 import { WorkspacePanel } from "./components/workspace/WorkspacePanel";
 import { FirstRunWizard, OnboardingProvider } from "./onboarding";
@@ -22,6 +24,8 @@ import { StudioProvider, useStudio } from "./state/StudioContext";
  */
 function StudioShell() {
   const { closePanel, clearChat, closeSetup } = useStudio();
+  const { view } = useBanner();
+  const { onIntent, onAction, onDismiss } = useBannerActionDispatcher();
   const [showChangelog, setShowChangelog] = useState(false);
 
   function goHome() {
@@ -47,7 +51,15 @@ function StudioShell() {
 
   return (
     <div className="studio-app">
-      <SidecarNotice />
+      <BannerBridge />
+      <BannerToasts />
+      <BannerStack
+        banners={view.visible}
+        overflow={view.overflow}
+        onDismiss={onDismiss}
+        onAction={onAction}
+        onIntent={onIntent}
+      />
       <main className="stage">
         <StudioBar
           onHome={goHome}
@@ -63,7 +75,6 @@ function StudioShell() {
         </div>
       </main>
       <ChangelogModal isOpen={showChangelog} onClose={() => setShowChangelog(false)} />
-      <Toasts />
     </div>
   );
 }
@@ -72,12 +83,14 @@ export default function App() {
   return (
     <ErrorBoundary>
       <StudioProvider>
-        <StudioRuntimeProvider>
-          <OnboardingProvider>
-            <StudioShell />
-            <FirstRunWizard />
-          </OnboardingProvider>
-        </StudioRuntimeProvider>
+        <BannerProvider>
+          <StudioRuntimeProvider>
+            <OnboardingProvider>
+              <StudioShell />
+              <FirstRunWizard />
+            </OnboardingProvider>
+          </StudioRuntimeProvider>
+        </BannerProvider>
       </StudioProvider>
     </ErrorBoundary>
   );

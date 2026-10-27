@@ -20,10 +20,32 @@ export interface BannerState {
 
 export const EMPTY_BANNER_STATE: BannerState = { banners: [] };
 
+let transientCounter = 0;
+
+function transientId(kind: BannerKind, now: number): string {
+  transientCounter += 1;
+  return `${kind}-${now}-${transientCounter}`;
+}
+
+/**
+ * Raise a banner.
+ *
+ * Identity decides dedupe. A banner with a stable identity — a persistent
+ * condition, or any banner given a `key` — updates in place, so a retry loop
+ * cannot paint ten copies of the same warning. A transient banner with no key is
+ * an event ("Added connector X"), so two of them are two facts and both stay.
+ */
 export function raiseBanner(state: BannerState, spec: BannerSpec, now = Date.now()): BannerState {
   const resolved = resolveSpec(spec);
-  const banner: Banner = { ...resolved, id: spec.kind, raisedAt: now };
-  const existing = state.banners.findIndex((entry) => entry.kind === spec.kind);
+  const identity = spec.key ?? (resolved.life === "persistent" ? spec.kind : null);
+  const banner: Banner = {
+    ...resolved,
+    id: identity ?? transientId(spec.kind, now),
+    raisedAt: now,
+  };
+
+  const existing =
+    identity === null ? -1 : state.banners.findIndex((entry) => entry.id === identity);
   if (existing === -1) {
     return { banners: [...state.banners, banner] };
   }
@@ -41,18 +63,23 @@ export function dismissBanner(state: BannerState, id: string): BannerState {
 }
 
 /**
- * The visible set, most severe first. Critical banners win the cap, so a burst
- * of success banners can never push a warning off-screen.
+ * The visible set, most severe first, capped per dock.
+ *
+ * Capping per dock matters: the top strip is a page region and the corner stack
+ * is a floating one, so a burst of toasts must never hide the strip that says
+ * the sidecar is down.
  */
 export function selectBanners(
   state: BannerState,
   maxVisible = DEFAULT_MAX_VISIBLE,
 ): { visible: Banner[]; overflow: number } {
-  const ordered = state.banners
-    .slice()
-    .sort(
-      (a, b) => severityWeight(b.severity) - severityWeight(a.severity) || b.raisedAt - a.raisedAt,
-    );
-  const visible = ordered.slice(0, maxVisible);
-  return { visible, overflow: Math.max(0, ordered.length - visible.length) };
+  const bySeverity = (a: Banner, b: Banner) =>
+    severityWeight(b.severity) - severityWeight(a.severity) || b.raisedAt - a.raisedAt;
+
+  const top = state.banners.filter((banner) => banner.dock === "top").sort(bySeverity);
+  const corner = state.banners.filter((banner) => banner.dock === "corner").sort(bySeverity);
+
+  const visible = [...top.slice(0, maxVisible), ...corner.slice(0, maxVisible)];
+  const overflow = Math.max(0, top.length - maxVisible) + Math.max(0, corner.length - maxVisible);
+  return { visible, overflow };
 }

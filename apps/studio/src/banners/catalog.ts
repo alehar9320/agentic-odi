@@ -20,12 +20,8 @@ export const BANNER_CATALOG: Record<BannerKind, BannerDefaults> = {
     body: "The assistant is paused and live data is frozen until it comes back.",
     dismissible: true,
     actions: [
-      { label: "Recheck", intent: "Recheck the connection to the studio sidecar.", tone: "ghost" },
-      {
-        label: "Start the sidecar",
-        intent: "Open setup so I can start the studio sidecar.",
-        tone: "ghost",
-      },
+      { label: "Recheck", action: "recheck-sidecar", tone: "ghost" },
+      { label: "Start the sidecar", action: "open-setup", tone: "ghost" },
     ],
   },
   "model-offline": {
@@ -36,13 +32,9 @@ export const BANNER_CATALOG: Record<BannerKind, BannerDefaults> = {
     body: "No model is reachable, so the assistant is paused. Every change still writes to your ODI repository.",
     dismissible: false,
     actions: [
-      {
-        label: "Capture an outcome",
-        intent: "Open capture so I can add an outcome by hand.",
-        tone: "ghost",
-      },
-      { label: "Map the job", intent: "Open the job map.", tone: "ghost" },
-      { label: "Set your context", intent: "Open setup so I can set my context.", tone: "ghost" },
+      { label: "Capture an outcome", action: "open-capture", tone: "ghost" },
+      { label: "Map the job", action: "open-jobmap", tone: "ghost" },
+      { label: "Set your context", action: "open-setup", tone: "ghost" },
     ],
   },
   "update-available": {
@@ -52,10 +44,7 @@ export const BANNER_CATALOG: Record<BannerKind, BannerDefaults> = {
     title: "An update is ready to download.",
     body: "A newer version of the desktop build is available.",
     dismissible: true,
-    actions: [
-      { label: "Install", intent: "Install the available update.", tone: "primary" },
-      { label: "Later", intent: "Remind me about the update later.", tone: "ghost" },
-    ],
+    actions: [{ label: "Install", action: "install-update", tone: "primary" }],
   },
   "update-ready": {
     severity: "success",
@@ -64,7 +53,7 @@ export const BANNER_CATALOG: Record<BannerKind, BannerDefaults> = {
     title: "Update installed.",
     body: "Restart to finish the update.",
     dismissible: true,
-    actions: [{ label: "Restart", intent: "Restart the studio.", tone: "primary" }],
+    actions: [{ label: "Restart", action: "restart", tone: "primary" }],
   },
   "write-rejected": {
     severity: "critical",

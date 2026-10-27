@@ -1,6 +1,6 @@
 import * as Toast from "@radix-ui/react-toast";
 
-import type { Banner } from "./types";
+import type { Banner, BannerActionId } from "./types";
 
 /** Critical and warning interrupt; info and success wait their turn. */
 function isUrgent(banner: Banner): boolean {
@@ -19,10 +19,12 @@ function isUrgent(banner: Banner): boolean {
 export function BannerRow({
   banner,
   onDismiss,
+  onAction,
   onIntent,
 }: {
   banner: Banner;
   onDismiss: (id: string) => void;
+  onAction: (action: BannerActionId) => void;
   onIntent: (intent: string) => void;
 }) {
   const urgent = isUrgent(banner);
@@ -54,9 +56,15 @@ export function BannerRow({
           {banner.actions.map((action) => (
             <Toast.Action
               key={action.label}
-              altText={action.intent}
+              altText={action.label}
               className={`banner__action banner__action--${action.tone}`}
-              onClick={() => onIntent(action.intent)}
+              onClick={() => {
+                if (action.action) {
+                  onAction(action.action);
+                } else if (action.intent) {
+                  onIntent(action.intent);
+                }
+              }}
             >
               {action.label}
             </Toast.Action>

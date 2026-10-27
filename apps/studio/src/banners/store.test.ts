@@ -16,19 +16,34 @@ describe("raiseBanner", () => {
     expect(state.banners[0].id).toBe("sidecar-down");
   });
 
-  it("updates in place when the same kind is raised twice", () => {
-    let state = raiseBanner(EMPTY_BANNER_STATE, { kind: "info", body: "First." }, 100);
-    state = raiseBanner(state, { kind: "info", body: "Second." }, 200);
+  it("updates in place when the same persistent kind is raised twice", () => {
+    let state = raiseBanner(EMPTY_BANNER_STATE, { kind: "sidecar-down", body: "First." }, 100);
+    state = raiseBanner(state, { kind: "sidecar-down", body: "Second." }, 200);
     expect(state.banners).toHaveLength(1);
     expect(state.banners[0].body).toBe("Second.");
   });
 
   it("reappears when a dismissed kind is raised again", () => {
-    let state = raiseBanner(EMPTY_BANNER_STATE, { kind: "info" }, 100);
-    state = dismissBanner(state, "info");
+    let state = raiseBanner(EMPTY_BANNER_STATE, { kind: "sidecar-down" }, 100);
+    state = dismissBanner(state, "sidecar-down");
     expect(state.banners).toHaveLength(0);
-    state = raiseBanner(state, { kind: "info" }, 300);
+    state = raiseBanner(state, { kind: "sidecar-down" }, 300);
     expect(state.banners).toHaveLength(1);
+  });
+});
+
+describe("transient banners stack", () => {
+  it("keeps both when two different messages of the same kind are raised", () => {
+    let state = raiseBanner(EMPTY_BANNER_STATE, { kind: "success", body: "Added A." }, 100);
+    state = raiseBanner(state, { kind: "success", body: "Added B." }, 200);
+    expect(state.banners).toHaveLength(2);
+    expect(state.banners.map((banner) => banner.body)).toEqual(["Added A.", "Added B."]);
+  });
+
+  it("gives each transient banner a distinct id", () => {
+    let state = raiseBanner(EMPTY_BANNER_STATE, { kind: "success", body: "A." }, 100);
+    state = raiseBanner(state, { kind: "success", body: "B." }, 200);
+    expect(new Set(state.banners.map((banner) => banner.id)).size).toBe(2);
   });
 });
 
@@ -48,14 +63,37 @@ describe("selectBanners", () => {
     expect(visible[0].severity).toBe("critical");
   });
 
-  it("caps the visible set and counts the rest as overflow", () => {
+  it("caps a dock's visible set and counts the rest as overflow", () => {
     let state = EMPTY_BANNER_STATE;
-    for (const kind of ["sidecar-down", "model-offline", "update-available", "info", "success"] as const) {
+    for (const kind of [
+      "sidecar-down",
+      "model-offline",
+      "update-available",
+      "update-ready",
+      "write-rejected",
+    ] as const) {
       state = raiseBanner(state, { kind });
     }
     const { visible, overflow } = selectBanners(state, 3);
     expect(visible).toHaveLength(3);
     expect(overflow).toBe(2);
+  });
+
+  it("caps each dock on its own, so top strips never hide corner notices", () => {
+    let state = EMPTY_BANNER_STATE;
+    for (const kind of [
+      "sidecar-down",
+      "model-offline",
+      "update-available",
+      "update-ready",
+      "write-rejected",
+    ] as const) {
+      state = raiseBanner(state, { kind });
+    }
+    state = raiseBanner(state, { kind: "success", body: "Saved." });
+    const { visible } = selectBanners(state, 3);
+    expect(visible.some((banner) => banner.dock === "corner")).toBe(true);
+    expect(visible.filter((banner) => banner.dock === "top")).toHaveLength(3);
   });
 
   it("keeps the critical banners visible when a success banner would displace them", () => {

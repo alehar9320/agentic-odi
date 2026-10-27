@@ -27,16 +27,39 @@ export type BannerKind =
   | "success"
   | "error";
 
+/** A studio action a banner button can invoke directly. */
+export type BannerActionId =
+  | "recheck-sidecar"
+  | "open-setup"
+  | "open-capture"
+  | "open-jobmap"
+  | "install-update"
+  | "restart";
+
 export interface BannerAction {
   label: string;
-  /** The message sent when the action is taken, written as the user would say it. */
-  intent: string;
+  /**
+   * A studio action invoked directly. Preferred for things that are not
+   * messages — rechecking a connection, opening a panel.
+   */
+  action?: BannerActionId;
+  /**
+   * A message to send as the user. Used when the right response is to ask the
+   * agent for something, written as the user would say it.
+   */
+  intent?: string;
   tone: "primary" | "ghost";
 }
 
 /** What a caller passes. Everything but `kind` may be omitted. */
 export interface BannerSpec {
   kind: BannerKind;
+  /**
+   * A stable identity for this banner. Two raises with the same key are the
+   * same banner and update in place. Persistent banners default their key to
+   * their kind; a transient banner with no key is an event and stacks.
+   */
+  key?: string;
   title?: string;
   body?: string;
   severity?: BannerSeverity;
