@@ -1,4 +1,4 @@
-import { configDefaults, defineConfig } from "vitest/config";
+import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
 
 export default defineConfig({
@@ -18,12 +18,6 @@ export default defineConfig({
     environment: "jsdom",
     globals: true,
     setupFiles: "./src/test/setup.ts",
-    // Most tests never look at CSS; the print contract test reads a
-    // stylesheet's source. Process CSS only when a test asks for it with a
-    // query (?raw/?inline), so the rest of the suite keeps the faster path.
-    css: { include: [/\.css(\?.*)?$/] },
-    // Visual tests need Chromium, so they run from vitest.visual.config.ts and
-    // never from this jsdom suite (see docs/development.md).
-    exclude: [...configDefaults.exclude, "**/*.visual.test.tsx"],
+    css: false,
   },
 });

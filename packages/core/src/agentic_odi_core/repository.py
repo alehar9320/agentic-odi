@@ -2,36 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Protocol, TypeVar
+from typing import Protocol
 
 from agentic_odi_core.models import CustomerOutcome, Evidence, Job, Outcome, Step
-
-_Item = TypeVar("_Item")
-
-
-def rank_outcomes(outcomes: list[Outcome]) -> list[Outcome]:
-    """Rank outcomes by opportunity score, highest first, unscored last."""
-    return sorted(
-        outcomes,
-        key=lambda outcome: (
-            outcome.opportunity_score is None,
-            -(outcome.opportunity_score or 0.0),
-        ),
-    )
-
-
-def page(items: list[_Item], limit: int | None = None, offset: int = 0) -> list[_Item]:
-    """Slice a list for pagination; no arguments returns everything.
-
-    ``limit``/``offset`` are validated here so both repositories reject a
-    nonsensical page the same way instead of silently slicing from the end.
-    """
-    if offset < 0:
-        raise ValueError("offset must be >= 0")
-    if limit is not None and limit < 0:
-        raise ValueError("limit must be >= 0")
-    sliced = items[offset:] if offset else items
-    return sliced if limit is None else sliced[:limit]
 
 
 class Repository(Protocol):
@@ -42,36 +15,23 @@ class Repository(Protocol):
     evidence: dict[str, Evidence]
 
     def add_job(self, job: Job) -> Job: ...
-    def list_jobs(self, limit: int | None = None, offset: int = 0) -> list[Job]: ...
+    def list_jobs(self) -> list[Job]: ...
     def get_job(self, job_id: str) -> Job | None: ...
     def update_job(self, job_id: str, updates: dict) -> Job | None: ...
     def delete_job(self, job_id: str) -> bool: ...
     def add_step(self, step: Step) -> Step: ...
     def get_step(self, step_id: str) -> Step | None: ...
-    def get_steps_for_job(
-        self, job_id: str, limit: int | None = None, offset: int = 0
-    ) -> list[Step]: ...
+    def get_steps_for_job(self, job_id: str) -> list[Step]: ...
     def update_step(self, step_id: str, updates: dict) -> Step | None: ...
     def delete_step(self, step_id: str) -> bool: ...
     def add_outcome(self, outcome: Outcome) -> Outcome: ...
     def get_outcome(self, outcome_id: str) -> Outcome | None: ...
-    def get_outcomes(
-        self,
-        job_id: str,
-        step_id: str | None = None,
-        limit: int | None = None,
-        offset: int = 0,
-    ) -> list[Outcome]: ...
+    def get_outcomes(self, job_id: str, step_id: str | None = None) -> list[Outcome]: ...
     def update_outcome(self, outcome_id: str, updates: dict) -> Outcome | None: ...
     def delete_outcome(self, outcome_id: str) -> bool: ...
     def add_customer_outcome(self, co: CustomerOutcome) -> CustomerOutcome: ...
     def get_customer_outcome(self, outcome_id: str) -> CustomerOutcome | None: ...
-    def list_customer_outcomes(
-        self,
-        job_id: str | None = None,
-        limit: int | None = None,
-        offset: int = 0,
-    ) -> list[CustomerOutcome]: ...
+    def list_customer_outcomes(self, job_id: str | None = None) -> list[CustomerOutcome]: ...
     def update_customer_outcome(self, outcome_id: str, updates: dict) -> CustomerOutcome | None: ...
     def delete_customer_outcome(self, outcome_id: str) -> bool: ...
     def add_evidence(self, evidence: Evidence) -> Evidence: ...
@@ -81,12 +41,9 @@ class Repository(Protocol):
         job_id: str | None = None,
         step_id: str | None = None,
         outcome_id: str | None = None,
-        limit: int | None = None,
-        offset: int = 0,
     ) -> list[Evidence]: ...
     def delete_evidence(self, evidence_id: str) -> bool: ...
     def clear(self) -> None: ...
-    def reload(self) -> None: ...
 
 
 class InMemoryRepository:
@@ -101,8 +58,8 @@ class InMemoryRepository:
         self.jobs[job.id] = job
         return job
 
-    def list_jobs(self, limit: int | None = None, offset: int = 0) -> list[Job]:
-        return page(list(self.jobs.values()), limit, offset)
+    def list_jobs(self) -> list[Job]:
+        return list(self.jobs.values())
 
     def get_job(self, job_id: str) -> Job | None:
         return self.jobs.get(job_id)
@@ -144,11 +101,8 @@ class InMemoryRepository:
     def get_step(self, step_id: str) -> Step | None:
         return self.steps.get(step_id)
 
-    def get_steps_for_job(
-        self, job_id: str, limit: int | None = None, offset: int = 0
-    ) -> list[Step]:
-        steps = [s for s in self.steps.values() if s.job_id == job_id]
-        return page(steps, limit, offset)
+    def get_steps_for_job(self, job_id: str) -> list[Step]:
+        return [s for s in self.steps.values() if s.job_id == job_id]
 
     def update_step(self, step_id: str, updates: dict) -> Step | None:
         step = self.steps.get(step_id)
@@ -184,17 +138,11 @@ class InMemoryRepository:
     def get_outcome(self, outcome_id: str) -> Outcome | None:
         return self.outcomes.get(outcome_id)
 
-    def get_outcomes(
-        self,
-        job_id: str,
-        step_id: str | None = None,
-        limit: int | None = None,
-        offset: int = 0,
-    ) -> list[Outcome]:
+    def get_outcomes(self, job_id: str, step_id: str | None = None) -> list[Outcome]:
         outs = [o for o in self.outcomes.values() if o.job_id == job_id]
         if step_id is not None:
             outs = [o for o in outs if o.step_id == step_id]
-        return page(rank_outcomes(outs), limit, offset)
+        return outs
 
     def update_outcome(self, outcome_id: str, updates: dict) -> Outcome | None:
         outcome = self.outcomes.get(outcome_id)
@@ -221,17 +169,10 @@ class InMemoryRepository:
     def get_customer_outcome(self, outcome_id: str) -> CustomerOutcome | None:
         return self.customer_outcomes.get(outcome_id)
 
-    def list_customer_outcomes(
-        self,
-        job_id: str | None = None,
-        limit: int | None = None,
-        offset: int = 0,
-    ) -> list[CustomerOutcome]:
+    def list_customer_outcomes(self, job_id: str | None = None) -> list[CustomerOutcome]:
         if job_id is None:
-            items = list(self.customer_outcomes.values())
-        else:
-            items = [co for co in self.customer_outcomes.values() if co.job_id == job_id]
-        return page(items, limit, offset)
+            return list(self.customer_outcomes.values())
+        return [co for co in self.customer_outcomes.values() if co.job_id == job_id]
 
     def update_customer_outcome(self, outcome_id: str, updates: dict) -> CustomerOutcome | None:
         co = self.customer_outcomes.get(outcome_id)
@@ -261,8 +202,6 @@ class InMemoryRepository:
         job_id: str | None = None,
         step_id: str | None = None,
         outcome_id: str | None = None,
-        limit: int | None = None,
-        offset: int = 0,
     ) -> list[Evidence]:
         items = list(self.evidence.values())
         if job_id is not None:
@@ -271,7 +210,7 @@ class InMemoryRepository:
             items = [item for item in items if item.step_id == step_id]
         if outcome_id is not None:
             items = [item for item in items if item.outcome_id == outcome_id]
-        return page(items, limit, offset)
+        return items
 
     def delete_evidence(self, evidence_id: str) -> bool:
         if evidence_id in self.evidence:
@@ -285,7 +224,3 @@ class InMemoryRepository:
         self.outcomes.clear()
         self.customer_outcomes.clear()
         self.evidence.clear()
-
-    def reload(self) -> None:
-        """Reset in-memory state; there is no external store to re-read."""
-        self.clear()

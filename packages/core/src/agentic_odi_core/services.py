@@ -6,7 +6,6 @@ import uuid
 from typing import Any
 
 from agentic_odi_core.errors import NotFoundError, ValidationError
-from agentic_odi_core.evaluation import evaluate_outcome_statement
 from agentic_odi_core.models import (
     BusinessValue,
     CustomerOutcome,
@@ -18,7 +17,7 @@ from agentic_odi_core.models import (
     Step,
     compute_opportunity_score,
 )
-from agentic_odi_core.repository import Repository, page
+from agentic_odi_core.repository import Repository
 
 
 class JobNotFoundError(NotFoundError):
@@ -61,19 +60,6 @@ class ValueOutOfRangeError(ValidationError):
     pass
 
 
-class InvalidOutcomeStatementError(ValidationError):
-    """A statement does not match the ODI desired-outcome format.
-
-    Carries the individual issues so the caller can show the fix next to the
-    field that needs it instead of a single opaque message.
-    """
-
-    def __init__(self, issues: list[str], suggestions: list[str]) -> None:
-        self.issues = issues
-        self.suggestions = suggestions
-        super().__init__("Outcome statement does not match the ODI format: " + " ".join(issues))
-
-
 def _first_line(text: str) -> str:
     for line in text.splitlines():
         stripped = line.strip()
@@ -90,8 +76,8 @@ class ODIService:
         job = Job(name=name, description=description)
         return self.repo.add_job(job)
 
-    def get_jobs(self, limit: int | None = None, offset: int = 0) -> list[Job]:
-        return self.repo.list_jobs(limit=limit, offset=offset)
+    def get_jobs(self) -> list[Job]:
+        return self.repo.list_jobs()
 
     def get_job(self, job_id: str) -> Job | None:
         return self.repo.get_job(job_id)
@@ -153,16 +139,12 @@ class ODIService:
     def add_step(self, job_id: str, name: str, order: int) -> Step:
         if self.repo.get_job(job_id) is None:
             raise JobNotFoundError(job_id)
-        if not 1 <= order <= 8:
-            raise ValueOutOfRangeError("Step order must be between 1 and 8 (Ulwick's job map).")
         step = Step(id=str(uuid.uuid4()), job_id=job_id, name=name, order=order)
         return self.repo.add_step(step)
 
-    def get_job_map(self, job_id: str, limit: int | None = None, offset: int = 0) -> list[Step]:
-        # Sort before slicing: a page of the map must be the first steps by
-        # order, not whichever steps happened to be stored first.
-        steps = sorted(self.repo.get_steps_for_job(job_id), key=lambda s: s.order)
-        return page(steps, limit, offset)
+    def get_job_map(self, job_id: str) -> list[Step]:
+        steps = self.repo.get_steps_for_job(job_id)
+        return sorted(steps, key=lambda s: s.order)
 
     def add_outcome(
         self,
@@ -171,7 +153,6 @@ class ODIService:
         importance: float | None = None,
         satisfaction: float | None = None,
         step_id: str | None = None,
-        validate_statement: bool = True,
     ) -> Outcome:
         if self.repo.get_job(job_id) is None:
             raise JobNotFoundError(job_id)
@@ -181,10 +162,6 @@ class ODIService:
             raise ValueOutOfRangeError()
         if satisfaction is not None and not (1.0 <= satisfaction <= 10.0):
             raise ValueOutOfRangeError()
-        if validate_statement:
-            review = evaluate_outcome_statement(statement)
-            if not review["valid"]:
-                raise InvalidOutcomeStatementError(review["issues"], review["suggestions"])
         opportunity_score = None
         if importance is not None and satisfaction is not None:
             opportunity_score = compute_opportunity_score(importance, satisfaction)
@@ -199,14 +176,8 @@ class ODIService:
         )
         return self.repo.add_outcome(outcome)
 
-    def get_outcomes(
-        self,
-        job_id: str,
-        step_id: str | None = None,
-        limit: int | None = None,
-        offset: int = 0,
-    ) -> list[Outcome]:
-        return self.repo.get_outcomes(job_id, step_id, limit=limit, offset=offset)
+    def get_outcomes(self, job_id: str, step_id: str | None = None) -> list[Outcome]:
+        return self.repo.get_outcomes(job_id, step_id)
 
     def add_customer_outcome(
         self,
@@ -242,13 +213,8 @@ class ODIService:
             raise CustomerOutcomeNotFoundError(outcome_id)
         return co
 
-    def list_customer_outcomes(
-        self,
-        job_id: str | None = None,
-        limit: int | None = None,
-        offset: int = 0,
-    ) -> list[CustomerOutcome]:
-        return self.repo.list_customer_outcomes(job_id, limit=limit, offset=offset)
+    def list_customer_outcomes(self, job_id: str | None = None) -> list[CustomerOutcome]:
+        return self.repo.list_customer_outcomes(job_id)
 
     def update_customer_outcome(self, outcome_id: str, updates: dict[str, Any]) -> CustomerOutcome:
         res = self.repo.update_customer_outcome(outcome_id, updates)
@@ -316,12 +282,8 @@ class ODIService:
         job_id: str | None = None,
         step_id: str | None = None,
         outcome_id: str | None = None,
-        limit: int | None = None,
-        offset: int = 0,
     ) -> list[Evidence]:
-        return self.repo.list_evidence(
-            job_id=job_id, step_id=step_id, outcome_id=outcome_id, limit=limit, offset=offset
-        )
+        return self.repo.list_evidence(job_id=job_id, step_id=step_id, outcome_id=outcome_id)
 
     def delete_evidence(self, evidence_id: str) -> None:
         if not self.repo.delete_evidence(evidence_id):

@@ -26,7 +26,7 @@ A console script is also installed, so `agentic-odi --version` works the same wa
 
 | Option | Environment variable | Default | Meaning |
 |---|---|---|---|
-| `--backend auto\|local\|mcp` | `AGENTIC_ODI_BACKEND` | `local` | Run in-process against SQLite, call a remote MCP server, or (`auto`) try local first and fall back to MCP. |
+| `--backend local\|mcp` | `AGENTIC_ODI_BACKEND` | `local` | Run in-process against SQLite, or call a remote MCP server. |
 | `--db PATH` | `AGENTIC_ODI_DB` | `~/.agentic-odi/odi.db` | Store path for the `local` backend. |
 | `--mcp-url URL` | `AGENTIC_ODI_MCP_URL` | `http://localhost:8000/mcp` | Server URL for the `mcp` backend. |
 
@@ -45,14 +45,6 @@ and free-text messages return a friendly nudge until you connect.
 agentic-odi chat
 agentic-odi chat --model local-tools-model --mcp-url http://localhost:8000/mcp
 ```
-
-Thinking does not need the Studio or its sidecar. While the first token is on
-its way, a dim `thinking…` sits on the prompt line and is erased when the reply
-starts, so a cold model reads as work rather than a hung session. When the
-model exposes its reasoning (`reasoning_content` or `reasoning`, as vLLM,
-Ollama, and DeepSeek do), it is printed dimmed on stderr as `thinking › …`:
-the answer on stdout stays clean, and the thinking is never replayed as
-conversation history.
 
 ### Connection settings
 
@@ -194,19 +186,12 @@ agentic-odi evidence promote <evidence-id> --to outcome --job-id <job-id>
 `connectors ingest --job-id <job-id>` maps every evidence-bearing record in the
 ingested batch into evidence in one step.
 
-## Schema, scoring, and guidance
+## Schema and scoring
 
 ```bash
 agentic-odi schema            # canonical JSON schema for every ODI entity
 agentic-odi score 8 2         # ODI opportunity score → 14.00
-agentic-odi evaluate "Minimize the time to ship when onboarding"  # outcome-format check
-agentic-odi evaluate --json "Minimize the time to ship when onboarding"
-agentic-odi guidelines        # the ODI stage-by-stage guide
-agentic-odi capabilities      # what the assistant can do
 ```
-
-`evaluate` returns the same verdict the `evaluate_outcome` MCP tool does, so the
-check works with or without a running server.
 
 ## Manage Customer Outcomes
 

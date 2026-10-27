@@ -64,7 +64,6 @@ from agentic_odi_core.schema import odi_schema
 from agentic_odi_core.services import (
     CustomerOutcomeNotFoundError,
     EvidenceNotFoundError,
-    InvalidOutcomeStatementError,
     JobNotFoundError,
     ODIService,
     OutcomeNotFoundError,
@@ -103,7 +102,6 @@ __all__ = [
     "ValueMetric",
     "ValueOutOfRangeError",
     "InMemoryRepository",
-    "InvalidOutcomeStatementError",
     "TOOL_NAMES",
     "TOOL_SPECS",
     "ToolEffect",

@@ -1,13 +1,11 @@
-"""The build must be deterministic, and generated output must never be tracked."""
+"""The build must be deterministic, and the committed output must be current."""
 
 from __future__ import annotations
-
-import subprocess
 
 import build_site
 import extract
 import pytest
-from site_support import ROOT
+from site_support import DIST, ROOT
 
 
 def _tree(root):
@@ -44,18 +42,11 @@ def test_check_passes_when_output_is_current(tmp_path):
     build_site.build(tmp_path, check=True)
 
 
-def test_generated_output_is_not_tracked():
-    # ``website/dist/`` is generated; it must never reappear in source control.
-    result = subprocess.run(
-        ["git", "ls-files", "--", "website/dist"],
-        cwd=ROOT,
-        text=True,
-        capture_output=True,
-    )
-    assert result.returncode == 0, result.stderr
-    assert result.stdout.strip() == "", (
-        "website/dist is generated; build it instead of committing it"
-    )
+def test_the_committed_site_matches_a_fresh_build():
+    # The committed output is committed so a reviewer can read the rendered
+    # HTML in a pull request. That only works if it is never stale.
+    assert DIST.is_dir(), "the site has not been built; run build_site.py"
+    build_site.build(DIST, check=True)
 
 
 def test_the_cli_reference_mentions_every_registered_command():

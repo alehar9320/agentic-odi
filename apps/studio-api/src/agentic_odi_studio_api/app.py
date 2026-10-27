@@ -3,12 +3,9 @@
 from __future__ import annotations
 
 import os
-from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
 from pathlib import Path
 
 from agentic_odi_core import ODIService
-from agentic_odi_core.messages import CAPABILITIES
 from agentic_odi_core.remote import StudioError, StudioErrorCode
 from agentic_odi_core.repository import Repository
 from agentic_odi_core.sqlite_repository import SQLiteRepository
@@ -16,8 +13,8 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.routing import Match
 
-from agentic_odi_studio_api.studio.approvals import ApprovalRegistry
 from agentic_odi_studio_api.studio.connectors import ConnectorService
 from agentic_odi_studio_api.studio.errors import (
     RequestIdMiddleware,
@@ -60,26 +57,11 @@ def create_app(
     if repo is None:
         repo = SQLiteRepository()
     service = ODIService(repo)
-    # Pending write approvals live for the life of the process: a local sidecar
-    # serves one person and has no durable run state to resume into.
-    approvals = ApprovalRegistry()
-
-    @asynccontextmanager
-    async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
-        yield
-        # Nothing may outlive the process waiting on a decision.
-        approvals.cancel_all()
-
-    app = FastAPI(
-        title="Agentic ODI Studio API",
-        openapi_url="/api/openapi.json",
-        lifespan=lifespan,
-    )
+    app = FastAPI(title="Agentic ODI Studio API")
     app.state.service = service
     app.state.backend = backend or os.environ.get("AGENTIC_ODI_BACKEND") or DEFAULT_BACKEND
     app.state.connectors = connectors or ConnectorService()
     app.state.memory = memory or StudioMemory()
-    app.state.approvals = approvals
 
     app.add_middleware(
         CORSMiddleware,
@@ -97,7 +79,7 @@ def create_app(
 
     @app.get("/capabilities")
     def capabilities() -> dict:
-        return {"capabilities": CAPABILITIES}
+        return {"capabilities": app.state.backend}
 
     app.include_router(studio_router)
 
@@ -107,7 +89,14 @@ def create_app(
             app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
 
         @app.get("/{full_path:path}", response_model=None)
-        def spa_fallback(request: Request, full_path: str) -> FileResponse | JSONResponse:
+        async def spa_fallback(request: Request, full_path: str) -> FileResponse | JSONResponse:
+            for route in request.app.routes:
+                if getattr(route, "endpoint", None) == spa_fallback:
+                    continue
+                match, _ = route.matches(request.scope)
+                if match == Match.FULL:
+                    return await route.handle(request.scope, request._receive, request._send)
+
             if full_path == "api" or full_path.startswith("api/"):
                 raise StudioHTTPError(
                     StudioError(code=StudioErrorCode.NOT_FOUND, message="Not Found")

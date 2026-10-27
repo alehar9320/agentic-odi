@@ -45,7 +45,7 @@ async def test_odi_workflow():
             "add_outcome",
             {
                 "job_id": job_id,
-                "statement": "Minimize the time it takes to find a specific song when searching the catalog",
+                "statement": "Minimize the time it takes to find a specific song",
                 "importance": 8.5,
                 "satisfaction": 4.0,
                 "step_id": step1_id,
@@ -75,10 +75,7 @@ async def test_odi_workflow():
         outcomes_match = re.search(r"(\[.*\])", outcomes_text, re.DOTALL)
         outcomes_data = json.loads(outcomes_match.group(1)) if outcomes_match else []
         assert len(outcomes_data) == 1
-        assert (
-            outcomes_data[0]["statement"]
-            == "Minimize the time it takes to find a specific song when searching the catalog"
-        )
+        assert outcomes_data[0]["statement"] == "Minimize the time it takes to find a specific song"
 
 
 @pytest.mark.asyncio

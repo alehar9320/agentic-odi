@@ -9,7 +9,6 @@ from agentic_odi_core import (
     CustomerOutcomeNotFoundError,
     EvidenceItemType,
     EvidenceNotFoundError,
-    InvalidOutcomeStatementError,
     JobNotFoundError,
     OdiError,
     ODIService,
@@ -27,7 +26,7 @@ from agentic_odi_core import (
 from agentic_odi_core import (
     customer_outcome_not_found as _cust_not_found,
 )
-from fastmcp import Context, FastMCP
+from fastmcp import FastMCP
 from pydantic import ValidationError
 
 mcp = FastMCP("Agentic ODI")
@@ -69,13 +68,8 @@ def add_job(name: str, description: str | None = None) -> str:
 
 
 @mcp.tool
-def get_jobs(limit: int | None = None, offset: int = 0) -> str:
-    """List jobs.
-
-    ``limit`` caps how many jobs are returned and ``offset`` skips that many
-    first, so a client can walk a long list without re-reading all of it.
-    """
-    jobs = service.get_jobs(limit=limit, offset=offset)
+def get_jobs() -> str:
+    jobs = service.get_jobs()
     return json.dumps([job.model_dump() for job in jobs])
 
 
@@ -93,17 +87,15 @@ def add_step(job_id: str, name: str, order: int) -> str:
         step = service.add_step(job_id=job_id, name=name, order=order)
     except JobNotFoundError:
         return job_not_found(job_id)
-    except ValueOutOfRangeError as exc:
-        return f"Error: {exc}"
     return f"Step created successfully: {step.model_dump_json()}"
 
 
 @mcp.tool
-def get_job_map(job_id: str, limit: int | None = None, offset: int = 0) -> str:
+def get_job_map(job_id: str) -> str:
     job = service.get_job(job_id)
     if job is None:
         return f"Error: Job with ID {job_id} not found."
-    steps = service.get_job_map(job_id, limit=limit, offset=offset)
+    steps = service.get_job_map(job_id)
     return json.dumps([step.model_dump() for step in steps])
 
 
@@ -129,19 +121,15 @@ def add_outcome(
         return _step_not_found(step_id)
     except ValueOutOfRangeError:
         return "Error: importance and satisfaction must be between 1.0 and 10.0"
-    except InvalidOutcomeStatementError as exc:
-        return f"Error: {exc}"
     return f"Outcome created successfully: {outcome.model_dump_json()}"
 
 
 @mcp.tool
-def get_outcomes(
-    job_id: str, step_id: str | None = None, limit: int | None = None, offset: int = 0
-) -> str:
+def get_outcomes(job_id: str, step_id: str | None = None) -> str:
     job = service.get_job(job_id)
     if job is None:
         return f"Error: Job with ID {job_id} not found."
-    outcomes = service.get_outcomes(job_id=job_id, step_id=step_id, limit=limit, offset=offset)
+    outcomes = service.get_outcomes(job_id=job_id, step_id=step_id)
     return json.dumps([outcome.model_dump() for outcome in outcomes])
 
 
@@ -178,11 +166,8 @@ def get_customer_outcome(outcome_id: str) -> str:
 
 
 @mcp.tool
-def list_customer_outcomes(
-    job_id: str | None = None, limit: int | None = None, offset: int = 0
-) -> str:
-    """List customer outcomes, optionally for one job and one page at a time."""
-    outcomes = service.list_customer_outcomes(job_id=job_id, limit=limit, offset=offset)
+def list_customer_outcomes(job_id: str | None = None) -> str:
+    outcomes = service.list_customer_outcomes(job_id=job_id)
     return json.dumps([o.model_dump() for o in outcomes])
 
 
@@ -380,8 +365,7 @@ def delete_outcome(outcome_id: str) -> str:
 
 
 @mcp.tool
-async def add_evidence(
-    ctx: Context,
+def add_evidence(
     source_name: str,
     source_kind: str,
     name: str,
@@ -392,7 +376,6 @@ async def add_evidence(
     step_id: str | None = None,
     outcome_id: str | None = None,
 ) -> str:
-    await ctx.report_progress(0, 2, "Validating the evidence links")
     try:
         evidence = service.add_evidence(
             source_name=source_name,
@@ -413,7 +396,6 @@ async def add_evidence(
         return _outcome_not_found(outcome_id)
     except (OdiError, ValueError) as exc:
         return f"Error: {exc}"
-    await ctx.report_progress(2, 2, "Evidence stored")
     return f"Evidence created successfully: {evidence.model_dump_json()}"
 
 
@@ -433,13 +415,8 @@ def list_evidence(
     job_id: str | None = None,
     step_id: str | None = None,
     outcome_id: str | None = None,
-    limit: int | None = None,
-    offset: int = 0,
 ) -> str:
-    """List evidence for a job, step or outcome, one page at a time."""
-    items = service.list_evidence(
-        job_id=job_id, step_id=step_id, outcome_id=outcome_id, limit=limit, offset=offset
-    )
+    items = service.list_evidence(job_id=job_id, step_id=step_id, outcome_id=outcome_id)
     return json.dumps([item.model_dump() for item in items])
 
 
@@ -489,12 +466,11 @@ def promote_evidence(
 
 
 @mcp.tool
-async def evaluate_outcome(ctx: Context, statement: str, job_id: str | None = None) -> str:
-    await ctx.report_progress(0, 2, "Evaluating the statement")
+def evaluate_outcome(statement: str, job_id: str | None = None) -> str:
     result = evaluate_outcome_statement(statement)
     if job_id is not None:
         if service.get_job(job_id) is None:
-            return job_not_found(job_id)
+            return json.dumps({**result, "job_id": job_id, "error": job_not_found(job_id)})
         result["job_id"] = job_id
         result["existing_outcomes"] = [
             {
@@ -504,7 +480,6 @@ async def evaluate_outcome(ctx: Context, statement: str, job_id: str | None = No
             }
             for outcome in service.get_outcomes(job_id)
         ]
-    await ctx.report_progress(2, 2, "Evaluation complete")
     return json.dumps(result)
 
 

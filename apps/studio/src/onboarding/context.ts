@@ -13,8 +13,6 @@ export interface OnboardingController {
   state: OnboardingState;
   chooseGoal: (goal: GoalId) => void;
   advance: () => void;
-  /** Advance past one step without leaving the tour. */
-  skipStep: () => void;
   back: () => void;
   complete: () => void;
   skip: () => void;

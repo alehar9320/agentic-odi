@@ -10,10 +10,6 @@ As we validate the feasibility of this architecture, our next milestones include
 - [x] **Map ingested evidence onto ODI artifacts**: Turn connector records into
   jobs, outcomes, or evidence without mixing connector plumbing into the ODI
   store.
-- [x] **Conversation runtime**: Streaming, reasoning, tool calls, write
-  approvals, sources, attachments, branches, and suggestions now run on
-  assistant-ui, with the Studio's own store and the sidecar's SSE contract
-  unchanged. Voice is deferred behind a documented seam.
 - [x] **First-run wizard**: A skippable, resumable four-step tour with inline
   connection repair, ending in the chosen surface or a handoff to the context
   conversation — isolated in `apps/studio/src/onboarding/` behind the

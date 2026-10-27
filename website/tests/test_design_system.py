@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 
 import extract
-from site_support import SITE, STUDIO_THEME, _built_root
+from site_support import SITE, STUDIO_THEME
 
 STYLE = SITE / "assets" / "style.css"
 
@@ -91,4 +91,4 @@ def test_content_is_visible_without_javascript():
 
 
 def _tokens_css() -> str:
-    return _built_root("assets/tokens.css").read_text(encoding="utf-8")
+    return (SITE / "dist" / "assets" / "tokens.css").read_text(encoding="utf-8")
