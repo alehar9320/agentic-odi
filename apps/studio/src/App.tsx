@@ -13,6 +13,7 @@ import { WorkbenchRail } from "./components/workspace/WorkbenchRail";
 import { WorkspacePanel } from "./components/workspace/WorkspacePanel";
 import { FirstRunWizard, OnboardingProvider } from "./onboarding";
 import { StudioProvider, useStudio } from "./state/StudioContext";
+import { UpdateBanner, UpdateProvider } from "./updater";
 
 /**
  * One room, one intelligence.
@@ -66,6 +67,7 @@ function StudioShell() {
           onNew={newConversation}
           onChangelog={() => setShowChangelog(true)}
         />
+        <UpdateBanner />
         <div className="stage__split">
           <div className="stage__thread">
             <WorkbenchRail />
@@ -82,16 +84,18 @@ function StudioShell() {
 export default function App() {
   return (
     <ErrorBoundary>
-      <StudioProvider>
-        <BannerProvider>
-          <StudioRuntimeProvider>
-            <OnboardingProvider>
-              <StudioShell />
-              <FirstRunWizard />
-            </OnboardingProvider>
-          </StudioRuntimeProvider>
-        </BannerProvider>
-      </StudioProvider>
+      <UpdateProvider>
+        <StudioProvider>
+          <BannerProvider>
+            <StudioRuntimeProvider>
+              <OnboardingProvider>
+                <StudioShell />
+                <FirstRunWizard />
+              </OnboardingProvider>
+            </StudioRuntimeProvider>
+          </BannerProvider>
+        </StudioProvider>
+      </UpdateProvider>
     </ErrorBoundary>
   );
 }

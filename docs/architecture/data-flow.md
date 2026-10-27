@@ -133,6 +133,7 @@ The Studio canvas falls back to the demo seed only in `mcp` mode when MCP is unr
 - The SPA runs in a browser or Tauri webview and only trusts the sidecar origin.
 - The sidecar may reach MCP and the LLM; CORS is restricted to known Studio origins.
 - MCP is an HTTP service with no authentication in local development. Do not expose it directly to the internet; the Cloudflare setup tunnels the sidecar, not MCP.
+- The Tauri desktop shell contacts the GitHub releases endpoint for `latest.json`, verifies the artifact signatures against the key pinned in `tauri.conf.json`, and only stages an update after verification. The updater cannot be reached from the browser build.
 
 ## The Failure Path
 
