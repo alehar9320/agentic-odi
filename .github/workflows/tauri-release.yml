@@ -4,13 +4,16 @@ name: Tauri Release
 # workflow needs the same trigger treatment as `release.yml`: the `push: tags`
 # trigger alone never fired because release-please creates the tag with the
 # repository GITHUB_TOKEN, and GitHub suppresses workflow runs for events that
-# token produces. `workflow_run` fires from the release-please run, and
-# `workflow_dispatch` is the manual self-heal path. The `resolve` job gates both
+# token produces. The workflow listens on the published release and on the
+# release-please run itself; `workflow_dispatch` is the manual self-heal path,
+# and `push` stays for tags created by hand. The `resolve` job gates every path
 # so a run that finds the release already carrying every bundle does nothing.
 on:
   push:
     tags:
       - "v*"
+  release:
+    types: [published]
   workflow_run:
     workflows: ["release-please"]
     types: [completed]
@@ -56,6 +59,7 @@ jobs:
           tag=""
           case "$EVENT" in
             push)              tag="${GITHUB_REF_NAME}" ;;
+            release)           tag="${GITHUB_REF_NAME}" ;;
             workflow_dispatch) tag="$DISPATCH_TAG" ;;
             workflow_run)      tag="$RUN_BRANCH" ;;
           esac
@@ -177,3 +181,44 @@ jobs:
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
+
+  # A release without a usable latest.json cannot update anybody. Fail the
+  # release loudly instead of leaving a quiet download that installs nothing.
+  verify:
+    needs: [build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Verify the signed updater manifest covers every platform
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          version="${TAG#v}"
+          dir="$(mktemp -d)"
+          for attempt in 1 2 3 4 5 6; do
+            if gh release download "$TAG" --pattern latest.json --dir "$dir" --clobber; then
+              break
+            fi
+            echo "latest.json not available yet (attempt $attempt); retrying…"
+            sleep 10
+          done
+          manifest="$dir/latest.json"
+          if [ ! -f "$manifest" ]; then
+            echo "::error::latest.json was not published for $TAG, so installed apps cannot update."
+            exit 1
+          fi
+          manifest_version="$(jq -r '.version // empty' "$manifest")"
+          if [ "$manifest_version" != "$version" ]; then
+            echo "::error::latest.json advertises $manifest_version but the tag is $version."
+            echo "The desktop app version is out of sync with the release; see the release-please extra-files config."
+            exit 1
+          fi
+          for key in linux-x86_64 windows-x86_64 darwin-aarch64 darwin-x86_64; do
+            if ! jq -e --arg k "$key" '.platforms[$k].url and .platforms[$k].signature' "$manifest" > /dev/null; then
+              echo "::error::latest.json is missing a signed $key artifact."
+              exit 1
+            fi
+          done
+          echo "OK: $TAG publishes a signed updater manifest for every platform"

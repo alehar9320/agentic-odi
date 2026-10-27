@@ -2,18 +2,22 @@ name: release
 
 # Attaching assets has to survive the way release-please cuts a tag.
 #
-# release-please creates the tag with the repository GITHUB_TOKEN, and GitHub
-# does not start workflow runs for events that token produces. A `push: tags`
-# trigger alone therefore never fired (this workflow had zero runs, and every
-# release shipped with no archives, no checksums.txt, and no install scripts).
-# The `workflow_run` trigger fires from the release-please run itself, which is
-# not subject to that block, and `workflow_dispatch` is the manual self-heal
-# path. Both are gated by the `resolve` job, so a run that finds the release
-# complete does nothing instead of rebuilding every platform.
+# release-please creates the tag and publishes the GitHub Release with the
+# repository GITHUB_TOKEN, and GitHub does not start workflow runs for events
+# that token produces. A `push: tags` trigger alone therefore never fired (this
+# workflow had zero runs, and every release shipped with no archives, no
+# checksums.txt, and no install scripts). The workflow listens on the published
+# release and on the release-please run itself, neither of which is subject to
+# that block, and `workflow_dispatch` is the manual self-heal path. `push: tags`
+# stays for tags created by hand. The `resolve` job gates every path, so a run
+# that finds the release complete does nothing instead of rebuilding every
+# platform.
 on:
   push:
     tags:
       - "v*"
+  release:
+    types: [published]
   workflow_run:
     workflows: ["release-please"]
     types: [completed]
@@ -56,6 +60,7 @@ jobs:
           tag=""
           case "$EVENT" in
             push)              tag="${GITHUB_REF_NAME}" ;;
+            release)           tag="${GITHUB_REF_NAME}" ;;
             workflow_dispatch) tag="$DISPATCH_TAG" ;;
             workflow_run)      tag="$RUN_BRANCH" ;;
           esac

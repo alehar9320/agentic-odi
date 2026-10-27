@@ -66,14 +66,19 @@ Releases are cut and published by CI with no approval step:
 2. The `release-please` workflow arms auto-merge on that PR. `main` requires the
    `CI green` check (ruleset `main-requires-ci-green`), so the PR merges itself
    as soon as CI passes — nobody clicks merge.
-3. The merge cuts tag `vX.Y.Z` and the GitHub Release. The `release` and
-   `Tauri Release` workflows attach the CLI archives, `checksums.txt`, the
-   install scripts, and the desktop bundles to it. The `release-instructions`
-   job then sets a human-friendly release title (`vX.Y.Z — YYYY-MM-DD`) and
-   appends an end-user "## 📦 Download & Run" section to the release page:
-   numbered download / verify / install / quick-start steps, a per-platform
-   SHA-256 table, and a "Living Studio (desktop)" subsection with install
-   commands for each Tauri bundle. All edits are idempotent on re-runs.
+3. The merge cuts tag `vX.Y.Z` and publishes the GitHub Release. The `release`
+   and `Tauri Release` workflows attach the CLI archives, `checksums.txt`, the
+   install scripts, the desktop bundles, and the signed `latest.json` updater
+   manifest. They run on the published release, on the `release-please` run
+   itself, and on a hand-cut `v*` tag; the `resolve` gate makes whichever fires
+   first do the work and the rest no-ops. The `release-instructions` job then
+   sets a human-friendly release title (`vX.Y.Z — YYYY-MM-DD`, the date pulled
+   from the tagged commit — the same `RELEASE_DATE_UTC` the CLI prints via
+   `odi --version`) and appends an end-user "## 📦 Download & Run" section to
+   the release page: numbered download / verify / install / quick-start steps,
+   a per-platform SHA-256 table, and a "Living Studio (desktop)" subsection
+   with install commands for each Tauri bundle (`.deb`, `.AppImage`, `.dmg`,
+   `.msi`). All edits are idempotent on re-runs.
 4. `e2e-install` runs after `release` succeeds and installs the published binary
    on Linux, macOS, and Windows.
 
