@@ -1,0 +1,38 @@
+Explore the repository at /home/alexa/repos/agentic-odi/repos/agentic-odi/clear-backlog. I need to understand the testing, CI, and project structure to plan implementations for 10 GitHub issues (#77-#86).
+
+Please read and report:
+
+1. The directory structure of packages/, apps/, tests/ at the top level (list all subdirectories)
+2. packages/core/pyproject.toml - dependencies and config
+3. pyproject.toml at root - testpaths, ruff config, mypy config
+4. .github/workflows/ci.yml - the full CI workflow
+5. .github/pull_request_template.md - the PR template
+6. .github/workflows/ directory listing - all workflow files
+7. tests/contract/test_mcp_contract.py - the MCP contract test
+8. tests/contract/test_cli_contract.py - the CLI contract test
+9. apps/cli/tests/test_onboard.py - the onboarding test
+10. apps/cli/tests/test_cli.py - CLI tests
+11. apps/cli/src/agentic_odi_cli/render.py - CLI renderers
+12. apps/cli/src/agentic_odi_cli/desired_outcomes.py - CLI outcomes command
+13. apps/cli/src/agentic_odi_cli/connectors.py - CLI connectors command
+14. packages/core/src/agentic_odi_core/__init__.py - what's exported
+15. apps/mcp-server/pyproject.toml - dependencies
+16. apps/studio-api/pyproject.toml - dependencies
+17. apps/cli/pyproject.toml - dependencies
+18. packages/connectors/src/agentic_odi_connectors/mapping.py - current mapping
+19. packages/connectors/src/agentic_odi_connectors/models.py - connector models
+20. packages/connectors/src/agentic_odi_connectors/mcp/connector.py - MCP connector
+21. apps/studio/src/components/canvas/JobMap.tsx - job map component
+22. apps/studio/src/components/canvas/OpportunityLandscape.tsx - opportunity landscape
+23. apps/studio/src/components/canvas/DirectCapture.tsx - direct capture form
+24. apps/studio/src/components/layout/StudioBar.tsx - studio bar with bell
+25. apps/studio/src/components/workspace/WorkbenchRail.tsx - workbench rail
+26. apps/studio/src/lib/commands.ts - slash commands
+27. apps/studio-api/src/agentic_odi_studio_api/studio/schemas.py - API schemas
+28. apps/studio-api/src/agentic_odi_studio_api/studio/mcp_data.py - canvas projection
+29. apps/studio-api/src/agentic_odi_studio_api/studio/seed.py - seed data
+30. .agents/workflows/test.md - testing workflow
+31. docs/architecture/README.md - architecture docs
+32. docs/development.md - development docs
+
+Report the full or near-full contents of each file with file paths and line numbers. Be very thorough.
