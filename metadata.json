@@ -3,7 +3,7 @@
   "checkpoint_id": "01M5YW5YSV01X9Y8G61DSSJ3D1",
   "strategy": "manual-commit",
   "branch": "ui-not-looking-like-shit",
-  "checkpoints_count": 16,
+  "checkpoints_count": 17,
   "files_touched": [
     "website/dist/404.html",
     "website/dist/assets/demo.js",
@@ -144,13 +144,20 @@
       "compact_transcript": "/15/transcript.jsonl",
       "content_hash": "/15/content_hash.txt",
       "prompt": "/15/prompt.txt"
+    },
+    {
+      "metadata": "/16/metadata.json",
+      "transcript": "/16/full.jsonl",
+      "compact_transcript": "/16/transcript.jsonl",
+      "content_hash": "/16/content_hash.txt",
+      "prompt": "/16/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 846849,
+    "input_tokens": 927878,
     "cache_creation_tokens": 0,
-    "cache_read_tokens": 8033376,
-    "output_tokens": 30263,
-    "api_call_count": 125
+    "cache_read_tokens": 8264288,
+    "output_tokens": 34356,
+    "api_call_count": 134
   }
 }

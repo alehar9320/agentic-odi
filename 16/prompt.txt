@@ -1,0 +1,37 @@
+You are reviewing one task's implementation.
+
+## What Was Requested
+Read the task brief: /home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/.superpowers/sdd/2025-10-26-studio-assistant-ui-max-integration/task-1-brief.md
+
+Global constraints from the spec/design that bind this task:
+- Python 3.10+; async tests decorated with @pytest.mark.asyncio
+- Never touch real ~/.agentic-odi/studio.db
+- uv run ruff check / uv run ruff format --check / uv run mypy must pass
+
+## What the Implementer Claims They Built
+Read the implementer's report: /home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/.superpowers/sdd/2025-10-26-studio-assistant-ui-max-integration/task-1-report.md
+
+## Diff Under Review
+Base: 0d5aebb1
+Head: 1555c36c
+Diff file: /home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/.superpowers/sdd/2025-10-26-studio-assistant-ui-max-integration/review-0d5aebb1..1555c36c.diff
+
+Read the diff file once — it contains the commit list, a stat summary, and the full diff with context.
+
+## Part 1: Spec Compliance
+Compare the diff against the brief. The brief sketches an interface with `resolve()->ApprovalRequest`, Pydantic `BaseModel`, instance `wait_for_decision(id)`, instance `cancel(id)`. The implementer instead used dataclasses, `resolve()->None`, module-level `wait_for_decision()`, and `cancel_all()`. Check whether this matches the reference test expectations in the diff.
+
+## Part 2: Code Quality
+Clean separation? Error handling? DRY? Edge cases? Tests verify real behavior?
+
+## Output Format
+### Spec Compliance
+- ✅ / ❌ / ⚠️ with file:line references
+### Strengths
+### Issues
+#### Critical (Must Fix)
+#### Important (Should Fix)
+#### Minor (Nice to Have)
+### Assessment
+**Task quality:** Approved / Needs fixes
+**Reasoning:** [1-2 sentence technical assessment]
