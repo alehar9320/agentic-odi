@@ -335,7 +335,14 @@ async def get_outcomes(
     if _uses_mcp(request):
         target = _require_mcp_url(mcp_url or "")
         if not job_id:
-            raise HTTPException(status_code=400, detail="job_id is required for the mcp backend")
+            raise StudioHTTPError(
+                StudioError(
+                    code=StudioErrorCode.VALIDATION,
+                    message="job_id is required for the mcp backend",
+                    suggestion="Pass job_id, or use the local backend to list every outcome.",
+                ),
+                status_code=400,
+            )
         arguments: dict[str, Any] = {"job_id": job_id}
         if step_id:
             arguments["step_id"] = step_id

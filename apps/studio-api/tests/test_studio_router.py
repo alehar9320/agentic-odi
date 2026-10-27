@@ -304,23 +304,23 @@ def test_get_steps_without_a_job_lists_every_step() -> None:
 def test_get_outcomes_lists_what_was_captured() -> None:
     client = _client("local")
     job_id = client.post("/api/jobs", json={"mcp_url": "", "name": "Ship"}).json()["id"]
-    client.post(
+    statement = "Minimize the time it takes to ship a release when the team is small"
+    created = client.post(
         "/api/outcomes",
         json={
             "mcp_url": "",
             "job_id": job_id,
-            "statement": "Minimize the time to ship",
+            "statement": statement,
             "importance": 8.5,
             "satisfaction": 3.5,
         },
     )
+    assert created.status_code == 200, created.text
 
     response = client.get("/api/outcomes", params={"job_id": job_id})
 
     assert response.status_code == 200
-    assert [item["statement"] for item in response.json()["result"]] == [
-        "Minimize the time to ship"
-    ]
+    assert [item["statement"] for item in response.json()["result"]] == [statement]
 
 
 def test_get_jobs_returns_the_parsed_mcp_payload(monkeypatch) -> None:
