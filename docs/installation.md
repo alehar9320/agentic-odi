@@ -66,9 +66,12 @@ Releases are cut and published by CI with no approval step:
 2. The `release-please` workflow arms auto-merge on that PR. `main` requires the
    `CI green` check (ruleset `main-requires-ci-green`), so the PR merges itself
    as soon as CI passes — nobody clicks merge.
-3. The merge cuts tag `vX.Y.Z` and the GitHub Release; the tag starts the
-   `release` and `Tauri Release` workflows, which attach the CLI archives,
-   `checksums.txt`, the install scripts, and the desktop bundles to it. The
+3. The merge cuts tag `vX.Y.Z` and publishes the GitHub Release; the published
+   release starts the `release` and `Tauri Release` workflows, which attach the
+   CLI archives, `checksums.txt`, the install scripts, the desktop bundles, and
+   the signed `latest.json` updater manifest. (`Tauri Release` also accepts a
+   `v*` tag push for hand-cut tags, but release-please publishes through the
+   API, so the release event is the path that actually runs.) The
    `release-instructions` job then sets a human-friendly release title
    (`vX.Y.Z — YYYY-MM-DD`, the date pulled from the tagged commit — the same
    `RELEASE_DATE_UTC` the CLI prints via `odi --version`) and appends an
