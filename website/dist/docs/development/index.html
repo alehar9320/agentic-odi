@@ -136,7 +136,7 @@ npm<span class="w"> </span>--prefix<span class="w"> </span>apps/studio<span clas
 npm<span class="w"> </span>--prefix<span class="w"> </span>apps/studio<span class="w"> </span>run<span class="w"> </span>build<span class="w">      </span><span class="c1"># production build → apps/studio/dist</span>
 <span class="nb">cd</span><span class="w"> </span>apps/studio/src-tauri<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>cargo<span class="w"> </span>fmt<span class="w"> </span>--check<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>cargo<span class="w"> </span>clippy<span class="w"> </span>--<span class="w"> </span>-D<span class="w"> </span>warnings<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>cargo<span class="w"> </span>check
 </code></pre><h3 id="conversational-ui-coverage">Conversational UI coverage</h3>
-<p>The agent-composed surfaces and the first-run tour are covered at these levels:</p>
+<p>The agent-composed surfaces and the first-run tour are covered at these levels. <code>ChatStage.test.tsx</code> also covers the latest-message control while following a streamed turn and returning to the live end:</p>
 <table>
 <thead>
 <tr>
@@ -154,44 +154,36 @@ npm<span class="w"> </span>--prefix<span class="w"> </span>apps/studio<span clas
 <td>Card rendering, computed opportunity scores, action dispatch, per-node failure isolation, catalog/registry parity</td>
 </tr>
 <tr>
+<td><code>apps/studio/src/assistant/convert.test.ts</code></td>
+<td>Every part mapping in both directions, unknown parts dropped, <code>content</code> preserved for history</td>
+</tr>
+<tr>
+<td><code>apps/studio/src/api/studioApi.test.ts</code></td>
+<td>Chat request serialization: visible-path messages and attachment fields match the sidecar schema</td>
+</tr>
+<tr>
 <td><code>apps/studio/src/components/chat/Conversation.test.tsx</code></td>
-<td>Prose and surfaces interleaved in the agent's order; card actions become messages; copy/answer-again on a settled turn; sent files render from the runtime</td>
+<td>Prose and surfaces interleaved in the agent's order through the real runtime; card actions become messages; named alternative N of M and its switch; reasoning disclosure opens on request; the phase is announced and the reply is busy while streaming; failure retry</td>
 </tr>
 <tr>
-<td><code>apps/studio/src/lib/thread.test.ts</code></td>
-<td><code>ChatMessage</code> → assistant-ui <code>ThreadMessageLike</code>: ids, statuses, data parts, custom metadata, append → text + bytes</td>
+<td><code>apps/studio/src/components/chat/Composer.test.tsx</code></td>
+<td>Send, stop, the slash palette, keyboard focus, dropped and pasted attachments, refusal of unreadable files, and accessible attachment format/size limits in the runtime-bound composer</td>
 </tr>
 <tr>
-<td><code>apps/studio-api/tests/test_studio_ui_spec.py</code></td>
-<td>Catalog validation and <code>render_ui</code> tool-schema generation</td>
+<td><code>apps/studio/src/components/chat/ModelPicker.test.tsx</code></td>
+<td>Listing and marking the configured model, selection writes through <code>saveSettings</code>, arrow/Enter/Escape operation, an unreachable backend explained with a Settings path, one probe per backend</td>
 </tr>
 <tr>
-<td><code>apps/studio-api/tests/test_studio_chat_ui.py</code></td>
-<td><code>render_ui</code> interception, <code>ui</code> SSE events, and the correction fed back to the model</td>
+<td><code>apps/studio/src/assistant/attachments.test.ts</code></td>
+<td>Acceptance by extension and type, the 5 MB image ceiling, and human-readable sizes</td>
 </tr>
 <tr>
-<td><code>apps/studio/src/lib/attachments.test.ts</code></td>
-<td>Readable media types, size/count refusals, base64 payloads, preview release</td>
+<td><code>apps/studio-api/tests/test_studio_models.py</code></td>
+<td>Model listing sorted and deduplicated, offline without connecting, failed probe returned as a message, <code>/api/models</code> response shape</td>
 </tr>
 <tr>
-<td><code>apps/studio-api/tests/test_studio_chat_attachments.py</code></td>
-<td>Image and text parts on the wire, bad base64/oversized/undecodable files, attachments kept on the newest turn only</td>
-</tr>
-<tr>
-<td><code>apps/studio/src/features/flags.test.ts</code></td>
-<td>Flag precedence (query → storage → env → default), value parsing, local overrides</td>
-</tr>
-<tr>
-<td><code>apps/studio/src/onboarding/machine.test.ts</code></td>
-<td>Tour transitions, no forward motion without a goal, versioned storage, malformed records</td>
-</tr>
-<tr>
-<td><code>apps/studio/src/onboarding/FirstRunWizard.test.tsx</code></td>
-<td>Auto-open, full flow to a destination, skip/Escape, focus trap, resume, replay, inline model repair, flag off</td>
-</tr>
-<tr>
-<td><code>apps/studio/src/App.test.tsx</code></td>
-<td>First-run ordering: tour over the context conversation, job handoff, chosen surface opens, flag off in shell tests</td>
+<td><code>apps/studio/src/state/StudioContext.test.tsx</code></td>
+<td>New, regenerate, and edit turns against a stubbed stream, branch switching, approval answers</td>
 </tr>
 </tbody>
 </table>

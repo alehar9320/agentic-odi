@@ -208,7 +208,7 @@ the thread waits until you decide.</p>
 <h3 id="the-thread-runs-on-assistant-ui">The thread runs on assistant-ui</h3>
 <p>The studio's conversation is not a bespoke list of bubbles. <code>Conversation</code>
 mounts assistant-ui's <code>AssistantRuntimeProvider</code> with an external-store runtime
-over the messages the sidecar already owns (<code>apps/studio/src/lib/thread.ts</code> maps
+over the messages the sidecar already owns (<code>apps/studio/src/assistant/convert.ts</code> maps
 a <code>ChatMessage</code> to a <code>ThreadMessageLike</code>), and renders the transcript through
 <code>ThreadPrimitive.Messages</code> with <code>MessagePrimitive</code>-scoped action bars. What that
 buys is the thread machinery a hand-built list has to keep reinventing: stable
@@ -233,7 +233,9 @@ something did.</p>
 <p>When the turn settles the timeline collapses to a single line — <code>2 tools · 1.9s</code>, plus <code>1 failed</code> when it applies — which opens to the full list. The
 steps live on the turn itself (<code>ChatMessage.tools</code>), so the record survives the
 next question instead of being reset per run. The reducer that folds <code>tool</code>
-SSE events into steps is <code>apps/studio/src/lib/run.ts</code>, kept pure and testable.</p>
+SSE events into turn steps lives in the runtime's <code>runTurn</code>
+(<code>apps/studio/src/assistant/StudioRuntime.tsx</code>), kept pure and testable, with
+each part rendered by <code>apps/studio/src/assistant/parts.tsx</code>.</p>
 <p>Stopping a run is a fact the transcript keeps. <code>Esc</code> (or the stop button) halts
 the stream, any tool still in flight is marked stopped, whatever prose arrived
 stays in place, and the turn says <em>Stopped by you</em> with <strong>Ask again</strong> — not a

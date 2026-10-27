@@ -123,6 +123,7 @@ by <a href="https://github.com/alehar9320/agentic-odi/blob/main/.github/workflow
 <ul>
 <li>A push to <code>main</code> runs the website tests, builds <code>_site</code> from <code>website/</code>, and
 deploys the artifact with <code>actions/deploy-pages</code>.</li>
+<li>No site build output is committed; CI generates <code>_site</code> on every push.</li>
 <li><code>workflow_dispatch</code> republishes the site from the Actions tab without a code
 change.</li>
 <li>Pages is configured with the &quot;GitHub Actions&quot; source, so there is no

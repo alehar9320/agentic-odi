@@ -169,7 +169,14 @@ MCP server is reachable — a yellow warning is shown for any unavailable servic
 and free-text messages return a friendly nudge until you connect.</p>
 <pre class="highlight"><code class="language-bash">agentic-odi<span class="w"> </span>chat
 agentic-odi<span class="w"> </span>chat<span class="w"> </span>--model<span class="w"> </span>local-tools-model<span class="w"> </span>--mcp-url<span class="w"> </span>http://localhost:8000/mcp
-</code></pre><h3 id="connection-settings">Connection settings</h3>
+</code></pre><p>Thinking does not need the Studio or its sidecar. While the first token is on
+its way, a dim <code>thinking…</code> sits on the prompt line and is erased when the reply
+starts, so a cold model reads as work rather than a hung session. When the
+model exposes its reasoning (<code>reasoning_content</code> or <code>reasoning</code>, as vLLM,
+Ollama, and DeepSeek do), it is printed dimmed on stderr as <code>thinking › …</code>:
+the answer on stdout stays clean, and the thinking is never replayed as
+conversation history.</p>
+<h3 id="connection-settings">Connection settings</h3>
 <p>The chat resolves settings in priority order:
 <strong>CLI flag → environment variable → persisted profile → built-in default.</strong></p>
 <table>
