@@ -686,6 +686,7 @@ async def _turn_frames(
                     result_str = declined
                     yield frame("tool", {"name": name, "status": "declined", "preview": declined})
                 elif name == "add_connector":
+                    yield frame("tool", {"name": name, "status": "start"})
                     result_str, events = _apply_add_connector(arguments, connector_service)
                     for event in events:
                         yield frame(event["event"], event["data"])
