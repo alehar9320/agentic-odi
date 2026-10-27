@@ -38,9 +38,10 @@ The Studio opens as a conversation, not a dashboard.
 
 | Surface | What it does |
 |---|---|
-| **First-run tour** | A four-step, skippable welcome on the very first visit: what the studio is, which ambition brought you here, the live state of your sidecar/MCP/model (with inline repair when the model is down), and the first move. The four doors are **I have one in mind**, **My boss handed me a priority**, **Help me find the next one**, and **Pressure-test a bet**; each starts the matching conversation. Replay it from **Settings → Replay the welcome tour**. |
-| **First run** | A short conversation in the chat, not a form: what you are building, who feels the problem, the job they are trying to get done, then where it hurts. One question at a time, with a reflection before the next ask, quick replies, and **Explore on my own** always visible. Skipping is allowed; answers and progress are kept as a draft. Re-open it any time with `/start`, the home stage's context pill, or Settings. |
-| **Hero** | One rotating headline above the composer: a greeting (time of day, plus your name if you set one in Settings), the product/job you set up, what is already on the canvas, or an intent-first prompt such as *What are you trying to win this quarter?* It cycles every few seconds and stays still under `prefers-reduced-motion`. |
+| **First minute** | The studio opens on one question — what do you want to win — with three starters and the composer already focused. Nothing covers the stage: no tour, no form, no required step. After the first exchange, at most one quiet line suggests the next thing (add context, or capture the evidence a score is missing). It sits above the composer, never over the thread, and can be dismissed forever. |
+| **Product tour** | An optional four-step tour: what the studio is, which ambition brought you here, the live state of your sidecar/MCP/model (with inline repair when the model is down), and the first move. The four doors are **I have one in mind**, **My boss handed me a priority**, **Help me find the next one**, and **Pressure-test a bet**; each starts the matching conversation. It never opens by itself: **Show me around** on the home stage opens it, and **Settings → Replay the tour** starts it over. |
+| **Context conversation** | Opened when you ask for it — the **Tell me what you're building** starter, the context hint, `/start`, or Settings. A short conversation in the chat, not a form: what you are building, who feels the problem, the job they are trying to get done, then where it hurts. One question at a time, with a reflection before the next ask, quick replies, and **Explore on my own** always visible. Skipping is allowed; answers and progress are kept as a draft. |
+| **Hero** | One headline above the composer. A first run holds a single invitation — *What do you want to win?* — and never changes while you think. With context or canvas data it becomes a quiet rotation: a greeting (time of day, plus your name if you set one in Settings), the product/job you set up, or what is already on the canvas. It stays still under `prefers-reduced-motion`. |
 | **Starter cards** | Below the headline, three canvas-aware conversation cards pair a clear next move with a short reason: **Sharpen an opportunity**, **Pressure-test a bet** or **Find the next opportunity**, and **Capture what you heard** or **Name the job**. Select one to start that prompt in the thread; the cards disappear once the conversation begins. **Opportunity landscape** remains a separate, quiet shortcut. |
 | **Composer** | Docked at the bottom of the transcript. `Enter` sends, `Shift`+`Enter` adds a line, `Cmd/Ctrl`+`K` focuses it, `/` opens the command palette, and the paperclip attaches a text file or an image. Files can also be dropped anywhere on the composer or pasted from the clipboard, and each one is shown with a size (and a thumbnail, for images) plus a remove control before it is sent; a file the studio cannot read is refused with the reason instead of becoming a chip that promises content the model will never see. The hint row's **Model** control lists the ids the configured backend reports and writes the choice through the same Settings store as the Base URL field. The send button becomes a stop button while a reply streams. |
 | **Bar** | The only persistent chrome: home, new conversation, catch-up, live model status, and settings. There is no navigation drawer to compete with the thread. |
@@ -75,12 +76,13 @@ the model, so they work when it is offline.
 
 Unknown commands produce a transcript notice pointing at `/help`.
 
-### The welcome tour
+### The product tour
 
-The tour is the front door, the context conversation is the first room. It is
-skippable at every step (`Skip the tour` or `Escape`), resumable (progress is
-stored after every transition in `localStorage["studio.onboarding"]`), and
-replayable from Settings.
+The stage is the front door; the tour is an answer to "show me around", not a
+gate. It is skippable at every step (`Skip the tour` or `Escape`), resumable
+(progress is stored after every transition in `localStorage["studio.onboarding"]`),
+and replayable from Settings. Nothing opens it automatically, and a fresh
+install writes no record until the person asks for it.
 
 Everything lives in `apps/studio/src/onboarding/`:
 
@@ -89,7 +91,7 @@ Everything lives in `apps/studio/src/onboarding/`:
 | `content.ts` | Steps and goal copy as typed data — the only place the words live |
 | `machine.ts` | Pure state transitions, no React or storage |
 | `storage.ts` | Versioned, defensive `localStorage` persistence |
-| `OnboardingProvider.tsx` | Auto-open, persistence, replay |
+| `OnboardingProvider.tsx` | Explicit opening, persistence, replay |
 | `FirstRunWizard.tsx`, `steps.tsx`, `onboarding.css` | The dialog |
 | `../features/flags.ts` | The `firstRunWizard` toggle |
 
@@ -113,12 +115,19 @@ is written, and Settings hides the replay action.
 
 ### Guidance, not gates
 
-The setup conversation is a nudge, never a prerequisite. If you skip it, the
-home stage keeps a dashed **Tell me what you're building** pill; it reopens the
-conversation exactly where you left off. `/start` and Settings do the same. The conversation also understands a
-natural reply: say "skip", "not now", or "show me the landscape" and it reacts
-instead of recording it as an answer. When a brief exists, it opens on a review
-and asks what changed rather than asking everything again.
+Nothing is a prerequisite. The home stage keeps a dashed **Tell me what you're
+building** pill, and the context conversation reopens exactly where you left off.
+`/start` and Settings do the same. The conversation also understands a natural
+reply: say "skip", "not now", or "show me the landscape" and it reacts instead
+of recording it as an answer. When a brief exists, it opens on a review and asks
+what changed rather than asking everything again.
+
+After the first exchange, `lib/guidance.ts` picks at most one hint worth showing:
+context the studio does not have, or the customer evidence a score is missing.
+Context outranks evidence because it makes every later answer better. Dismissals
+are permanent (`localStorage["studio.guidance"]`), and with nothing useful to say
+the line does not render at all — a hint system that keeps finding things to say
+becomes the modal it replaced.
 
 ### Without a model
 
