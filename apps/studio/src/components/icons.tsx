@@ -160,7 +160,6 @@ export function CheckIcon(props: IconProps) {
   );
 }
 
-<<<<<<< HEAD
 export function PaperclipIcon(props: IconProps) {
   return (
     <Icon {...props}>
@@ -187,28 +186,6 @@ export function AlertIcon(props: IconProps) {
     </Icon>
   );
 }
-
-||||||| fcf59923
-=======
-export function ChevronDownIcon(props: IconProps) {
-  return (
-    <Icon {...props}>
-      <path d="m6 9 6 6 6-6" />
-    </Icon>
-  );
-}
-
-export function ImageIcon(props: IconProps) {
-  return (
-    <Icon {...props}>
-      <rect x="3" y="4" width="18" height="16" rx="2.5" />
-      <circle cx="9" cy="10" r="1.6" />
-      <path d="m4 18 5-5 3.5 3.5L16 13l4 4" />
-    </Icon>
-  );
-}
-
->>>>>>> origin/main
 export function SparkIcon(props: IconProps) {
   return (
     <Icon {...props}>

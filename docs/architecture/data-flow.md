@@ -46,7 +46,6 @@ apps/studio SPA
   -> stream_chat -> OpenAI-compatible LLM -> MCP tool calls
   -> attachments (base64 bytes on the newest user turn) -> image or text part
   -> StudioMemory (conversation turns + remembered observations)
-<<<<<<< HEAD
 
 apps/studio SPA (conversation)
   -> ChatMessage[] (the store the sidecar fills)
@@ -57,17 +56,6 @@ apps/studio SPA
   -> /api/models
   -> list_models -> OpenAI-compatible /v1/models
   -> {models, message}; an endpoint that will not list is not an error
-||||||| fcf59923
-=======
-
-apps/studio SPA
-  -> POST /api/approvals/{id}
-  -> ApprovalRegistry -> resolves the paused turn's pending gate
-
-apps/studio SPA
-  -> POST /api/models
-  -> probes.list_models -> OpenAI-compatible LLM (model ids)
->>>>>>> origin/main
 ```
 
 `/api/models` is read-only discovery for the composer's picker. It answers the

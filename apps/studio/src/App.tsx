@@ -74,23 +74,6 @@ function StudioShell() {
 export default function App() {
   return (
     <ErrorBoundary>
-<<<<<<< HEAD
-      <StudioProvider>
-        <StudioRuntimeProvider>
-          <OnboardingProvider>
-            <StudioShell />
-            <FirstRunWizard />
-          </OnboardingProvider>
-        </StudioRuntimeProvider>
-      </StudioProvider>
-||||||| fcf59923
-      <StudioProvider>
-        <OnboardingProvider>
-          <StudioShell />
-          <FirstRunWizard />
-        </OnboardingProvider>
-      </StudioProvider>
-=======
       <UpdateProvider>
         <StudioProvider>
           <StudioRuntimeProvider>
@@ -101,7 +84,6 @@ export default function App() {
           </StudioRuntimeProvider>
         </StudioProvider>
       </UpdateProvider>
->>>>>>> origin/main
     </ErrorBoundary>
   );
 }

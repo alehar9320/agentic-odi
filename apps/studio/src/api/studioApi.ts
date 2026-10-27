@@ -259,17 +259,6 @@ export function healthLlm(config: {
   return postJson<LlmHealth>("/api/health/llm", config);
 }
 
-<<<<<<< HEAD
-/** The models the configured endpoint serves, when it will say. */
-export function fetchModels(config: {
-  base_url: string;
-  api_key: string;
-}): Promise<ModelList> {
-  return postJson<ModelList>("/api/models", config);
-}
-
-||||||| fcf59923
-=======
 /**
  * The model ids the configured backend serves.
  *
@@ -283,7 +272,6 @@ export function fetchModels(config: {
   return postJson<ModelList>("/api/models", config);
 }
 
->>>>>>> origin/main
 export function addStep(payload: AddStepPayload): Promise<Step> {
   return postJson<Step>("/api/steps", payload);
 }

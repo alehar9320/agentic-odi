@@ -28,12 +28,7 @@ import {
   fetchConfig,
   fetchConnectorCatalog,
   fetchConnectors,
-<<<<<<< HEAD
   fetchConversationTree as apiFetchConversationTree,
-||||||| fcf59923
-=======
-  fetchConversationTree,
->>>>>>> origin/main
   fetchLatestConversation,
   fetchMemory,
   fetchModels,
@@ -69,16 +64,8 @@ import type {
   StudioConfig,
   StudioError,
   StudioNotification,
-<<<<<<< HEAD
   ToolStatus,
   TurnNode,
-||||||| fcf59923
-=======
-  StudioTheme,
-  Thesis,
-  ToolStatus,
-  TurnNode,
->>>>>>> origin/main
   WorkspacePanelId,
 } from "../types";
 import { catalogManifest } from "../ui/catalog";
@@ -259,7 +246,6 @@ export interface StudioContextValue {
   streaming: boolean;
   /** The sidecar's stage for the live turn: health_check, mcp_tools, model. */
   thinkingPhase: string | null;
-<<<<<<< HEAD
   sendMessage: (
     text: string,
     attachments?: ChatAttachment[],
@@ -278,20 +264,6 @@ export interface StudioContextValue {
   fetchConversationTree: (conversationId: string) => Promise<ConversationTree>;
   /** Record which branch of a conversation is visible. */
   setConversationHead: (conversationId: string, headId: string | null) => Promise<void>;
-||||||| fcf59923
-  toolActivity: ToolActivity[];
-  sendMessage: (text: string) => Promise<void>;
-=======
-  sendMessage: (text: string, attachments?: ChatAttachment[]) => Promise<void>;
-  /** Re-answer the turn that follows `messageId`, as a sibling branch. */
-  regenerateFrom: (messageId: string | null) => Promise<void>;
-  /** Replace the user turn before `messageId`, as a sibling branch. */
-  editFrom: (messageId: string | null, text: string, attachments?: ChatAttachment[]) => Promise<void>;
-  /** Take the branch the runtime switched to as the visible conversation. */
-  switchBranch: (messages: ChatMessage[]) => void;
-  /** Answer a paused write. The turn resumes on its own stream. */
-  respondToApproval: (approvalId: string, approved: boolean, reason?: string) => Promise<void>;
->>>>>>> origin/main
   stopStreaming: () => void;
   clearChat: () => void;
   conversationId: string | null;
@@ -703,7 +675,6 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     pushToast("info", `Background Activity: ${chosen.title}`);
   }, [addNotification, pushToast]);
 
-<<<<<<< HEAD
   const saveSettings = useCallback(
     (config: StudioConfig) => {
       const movedEndpoint =
@@ -722,34 +693,6 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     },
     [settings.base_url, settings.api_key, refreshModels],
   );
-||||||| fcf59923
-  const saveSettings = useCallback((config: StudioConfig) => {
-    setSettings(config);
-    try {
-      localStorage.setItem(SETTINGS_KEY, JSON.stringify(config));
-    } catch {
-      /* storage unavailable */
-    }
-  }, []);
-=======
-  // The theme lives on <html> so every surface, portal, and native control
-  // follows one class instead of each component tracking its own copy.
-  useEffect(() => {
-    const root = document.documentElement;
-    root.classList.toggle("theme-light", theme === "light");
-    root.classList.toggle("theme-dark", theme === "dark");
-    root.style.colorScheme = theme;
-  }, [theme]);
-
-  const saveSettings = useCallback((config: StudioConfig) => {
-    setSettings(config);
-    try {
-      localStorage.setItem(SETTINGS_KEY, JSON.stringify(config));
-    } catch {
-      /* storage unavailable */
-    }
-  }, []);
->>>>>>> origin/main
 
   const setDisplayName = useCallback((name: string) => {
     setDisplayNameState(name);
@@ -790,30 +733,12 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-<<<<<<< HEAD
 const pushNotice = useCallback((text: string) => {
   setMessages((prev) => [
     ...prev,
     { role: "notice", id: crypto.randomUUID(), parentId: null, content: text },
   ]);
 }, []);
-||||||| fcf59923
-  const pushNotice = useCallback((text: string) => {
-    setMessages((prev) => [...prev, { role: "notice", content: text }]);
-  }, []);
-=======
-  const pushNotice = useCallback((text: string) => {
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: crypto.randomUUID(),
-        parentId: prev.length ? prev[prev.length - 1].id : null,
-        role: "notice",
-        content: text,
-      },
-    ]);
-  }, []);
->>>>>>> origin/main
 
   const checkConnections = useCallback(
     async (override: Partial<StudioConfig> = {}): Promise<ConnectionReport> => {
@@ -1013,7 +938,6 @@ const pushNotice = useCallback((text: string) => {
     abortRef.current?.abort();
   }, []);
 
-<<<<<<< HEAD
   /**
    * Stream one assistant turn. `base` is the history sent to the model; when
    * `userTurn` is given it is appended to that history, otherwise the last
@@ -1027,34 +951,9 @@ const pushNotice = useCallback((text: string) => {
       assistantParentId: string,
     ) => {
       if (streaming) {
-||||||| fcf59923
-  const sendMessage = useCallback(
-    async (text: string) => {
-      const trimmed = text.trim();
-      if (!trimmed || streaming) {
-=======
-  /**
-   * One turn, from the user's words to the agent's last part.
-   *
-   * `base` is the visible path the turn answers, so the same machinery serves a
-   * new message, a regeneration, and an edit without three copies of the stream
-   * handling. The assistant-ui runtime owns the branch tree; this owns the
-   * visible path and the wire.
-   */
-  const runTurn = useCallback(
-    async (
-      base: ChatMessage[],
-      text: string,
-      attachments: ChatAttachment[] = [],
-      existingUserMessage?: ChatMessage,
-    ) => {
-      const trimmed = text.trim();
-      if ((!trimmed && attachments.length === 0) || streaming) {
->>>>>>> origin/main
         return;
       }
 
-<<<<<<< HEAD
       const history: ChatMessage[] = userTurn ? [...base, userTurn] : base;
 
       const assistantId = crypto.randomUUID();
@@ -1063,37 +962,6 @@ const pushNotice = useCallback((text: string) => {
         ...history,
         { role: "assistant", id: assistantId, parentId: assistantParentId, content: "", parts: [] },
       ]);
-||||||| fcf59923
-      const history: ChatMessage[] = [...messages, { role: "user", content: trimmed }];
-      const assistantIndex = history.length;
-      setMessages([...history, { role: "assistant", content: "", parts: [] }]);
-=======
-      // The sidecar is confirmed down: don't start a doomed stream. The notice
-      // above the composer already explains what's wrong; just surface a quiet
-      // heads-up in-thread and stop.
-      if (sidecarReachable === false) {
-        pushNotice("The studio sidecar isn't running — live replies are paused. Start it from Settings.");
-        return;
-      }
-
-      const userMessage: ChatMessage = existingUserMessage ?? {
-        id: crypto.randomUUID(),
-        parentId: base.length ? base[base.length - 1].id : null,
-        role: "user",
-        content: trimmed,
-        ...(attachments.length ? { attachments } : {}),
-      };
-      const assistantId = crypto.randomUUID();
-      const history: ChatMessage[] =
-        existingUserMessage && base.at(-1)?.id === existingUserMessage.id
-          ? base
-          : [...base, userMessage];
-
-      setMessages([
-        ...history,
-        { id: assistantId, parentId: userMessage.id, role: "assistant", content: "", parts: [] },
-      ]);
->>>>>>> origin/main
       setStreaming(true);
       setThinkingPhase("health_check");
       setOfflineReply(false);
@@ -1188,7 +1056,6 @@ const pushNotice = useCallback((text: string) => {
       // The turn owns its own timeline, so a finished run stays inspectable and
       // the next turn starts from nothing without a reset elsewhere.
       const publish = () => {
-<<<<<<< HEAD
         setMessages((prev) => {
           if (prev.length <= assistantIndex) {
             return prev;
@@ -1206,31 +1073,6 @@ const pushNotice = useCallback((text: string) => {
           };
           return next;
         });
-||||||| fcf59923
-        setMessages((prev) => {
-          const next = [...prev];
-          next[assistantIndex] = {
-            role: "assistant",
-            content,
-            parts: [...parts],
-            ...(failure ? { error: failure, retryText: trimmed } : {}),
-          };
-          return next;
-        });
-=======
-        setMessages((prev) =>
-          prev.map((message) =>
-            message.id === assistantId
-              ? {
-                  ...message,
-                  content,
-                  parts: [...parts],
-                  ...(failure ? { error: failure, retryText: trimmed } : {}),
-                }
-              : message,
-          ),
-        );
->>>>>>> origin/main
       };
 
       const handleEvent = (event: RawSseEvent) => {
@@ -1301,7 +1143,6 @@ const pushNotice = useCallback((text: string) => {
             }
             break;
           }
-<<<<<<< HEAD
           case "tool": {
             const name = String(event.data.name ?? "");
             const status = String(event.data.status ?? "");
@@ -1328,33 +1169,6 @@ const pushNotice = useCallback((text: string) => {
               parts = [...parts, { kind: "tool", id: `tool-${Date.now()}`, name, status: mapped }];
             }
             publish();
-||||||| fcf59923
-          case "tool":
-            setToolActivity((prev) => [
-              ...prev,
-              {
-                name: String(event.data.name ?? ""),
-                status: String(event.data.status ?? ""),
-                preview: event.data.preview ? String(event.data.preview) : undefined,
-              },
-            ]);
-=======
-          case "tool": {
-            const name = String(event.data.name ?? "");
-            const status = String(event.data.status ?? "");
-            const mapped: ToolStatus =
-              status === "ok" || status === "error" || status === "declined" ? status : "running";
-            applyToolEvent(
-              name,
-              mapped,
-              event.data.preview ? String(event.data.preview) : undefined,
-            );
-            setToolActivity((prev) => [
-              ...prev,
-              { name, status, ...(event.data.preview ? { preview: String(event.data.preview) } : {}) },
-            ]);
-            publish();
->>>>>>> origin/main
             break;
           }
           case "message": {
@@ -1395,18 +1209,7 @@ const pushNotice = useCallback((text: string) => {
               const reason = String(event.data.error ?? "The connector could not be added.");
               setMessages((prev) => [
                 ...prev,
-<<<<<<< HEAD
                 { role: "notice", id: crypto.randomUUID(), parentId: null, content: `Connector failed: ${reason}` },
-||||||| fcf59923
-                { role: "notice", content: `Connector failed: ${reason}` },
-=======
-                {
-                  id: crypto.randomUUID(),
-                  parentId: assistantId,
-                  role: "notice",
-                  content: `Connector failed: ${reason}`,
-                },
->>>>>>> origin/main
               ]);
             } else {
               setConnectorSuggestions((prev) => {
@@ -1457,26 +1260,12 @@ const pushNotice = useCallback((text: string) => {
           // was mid-flight, and leave the turn in place so the transcript says
           // what happened instead of silently losing the question.
           stopped = true;
-<<<<<<< HEAD
           parts = parts.map((part) =>
             part.kind === "tool" && part.status === "running"
               ? { ...part, status: "error" as ToolStatus }
               : part,
           );
           publish();
-||||||| fcf59923
-          setMessages((prev) => {
-            const next = [...prev];
-            if (next.length && next[next.length - 1].role === "assistant" && !next[next.length - 1].content) {
-              next.pop();
-            }
-            return next;
-          });
-=======
-          setMessages((prev) =>
-            prev.filter((message) => message.id !== assistantId || message.content !== ""),
-          );
->>>>>>> origin/main
         } else {
           terminal = true;
           failure = asStudioError(error);
@@ -1499,7 +1288,6 @@ const pushNotice = useCallback((text: string) => {
         abortRef.current = null;
       }
     },
-<<<<<<< HEAD
     [streaming, settings, brief, conversationId, refreshCanvas, refreshConnectors],
   );
 
@@ -1659,28 +1447,6 @@ const pushNotice = useCallback((text: string) => {
       await apiSetConversationHead(conversationId, headId);
     },
     [],
-||||||| fcf59923
-    [
-      messages,
-      streaming,
-      settings,
-      brief,
-      conversationId,
-      refreshCanvas,
-      refreshConnectors,
-    ],
-=======
-    [
-      streaming,
-      settings,
-      brief,
-      conversationId,
-      refreshCanvas,
-      refreshConnectors,
-      sidecarReachable,
-      pushNotice,
-    ],
->>>>>>> origin/main
   );
 
   const sendMessage = useCallback(
@@ -1904,7 +1670,6 @@ const pushNotice = useCallback((text: string) => {
             return;
           }
           setConversationId(conversation.id);
-<<<<<<< HEAD
           setMessages(
             turns
               .filter((turn) => turn.role === "user" || turn.role === "assistant")
@@ -1916,25 +1681,6 @@ const pushNotice = useCallback((text: string) => {
                 parts: turn.content ? [{ kind: "text" as const, text: turn.content }] : [],
               })),
           );
-||||||| fcf59923
-          setMessages(
-            turns
-              .filter((turn) => turn.role === "user" || turn.role === "assistant")
-              .map((turn) => ({
-                role: turn.role as "user" | "assistant",
-                content: turn.content,
-                parts: turn.content ? [{ kind: "text", text: turn.content }] : [],
-              })),
-          );
-=======
-          // The tree, not the flat turn list: a conversation with branches
-          // must open on the branch that was visible when it was left.
-          const tree = await fetchConversationTree(conversation.id);
-          if (cancelled) {
-            return;
-          }
-          setMessages(turnsToMessages(tree.messages, tree.head_id));
->>>>>>> origin/main
         })
         .catch(() => undefined);
       void healthMcp(settings.mcp_url)
@@ -2020,20 +1766,12 @@ const pushNotice = useCallback((text: string) => {
       streaming,
       thinkingPhase,
       sendMessage,
-<<<<<<< HEAD
       regenerateFrom,
       editFrom,
       switchBranch,
       respondToApproval,
       fetchConversationTree,
       setConversationHead,
-||||||| fcf59923
-=======
-      regenerateFrom,
-      editFrom,
-      switchBranch,
-      respondToApproval,
->>>>>>> origin/main
       stopStreaming,
       clearChat,
       conversationId,
@@ -2116,20 +1854,12 @@ const pushNotice = useCallback((text: string) => {
       streaming,
       thinkingPhase,
       sendMessage,
-<<<<<<< HEAD
       regenerateFrom,
       editFrom,
       switchBranch,
       respondToApproval,
       fetchConversationTree,
       setConversationHead,
-||||||| fcf59923
-=======
-      regenerateFrom,
-      editFrom,
-      switchBranch,
-      respondToApproval,
->>>>>>> origin/main
       stopStreaming,
       clearChat,
       conversationId,

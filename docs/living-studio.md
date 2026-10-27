@@ -41,25 +41,16 @@ The Studio opens as a conversation, not a dashboard.
 | **First-run tour** | A four-step, skippable welcome on the very first visit: what the studio is, which ambition brought you here, the live state of your sidecar/MCP/model (with inline repair when the model is down), and the first move. The four doors are **I have one in mind**, **My boss handed me a priority**, **Help me find the next one**, and **Pressure-test a bet**; each starts the matching conversation. Replay it from **Settings → Replay the welcome tour**. |
 | **First run** | A short conversation in the chat, not a form: what you are building, who feels the problem, the job they are trying to get done, then where it hurts. One question at a time, with a reflection before the next ask, quick replies, and **Explore on my own** always visible. Skipping is allowed; answers and progress are kept as a draft. Re-open it any time with `/start`, the home stage's context pill, or Settings. |
 | **Hero** | One rotating headline above the composer: a greeting (time of day, plus your name if you set one in Settings), the product/job you set up, what is already on the canvas, or an intent-first prompt such as *What are you trying to win this quarter?* It cycles every few seconds and stays still under `prefers-reduced-motion`. |
-<<<<<<< HEAD
 | **Suggestion pills** | Below the headline. **Sharpen an opportunity** always starts a conversation; the next pill becomes **Pressure-test a bet** once outcomes exist, or **Find the next opportunity** before that. **Capture what you heard** replaces the landscape pill once a job exists. They change as the canvas fills up. |
 | **Composer** | Docked at the bottom of the transcript. `Enter` sends, `Shift`+`Enter` adds a line, `Cmd/Ctrl`+`K` focuses it, `/` opens the command palette, and `Esc` stops a reply that is still streaming. The send button becomes a stop button while a reply streams. On touch screens the field stays at 16px so mobile browsers do not zoom into it. |
 | **Attachments** | The paperclip, a drag onto the composer, or a paste stages images and text files (up to 6, 8 MB each) as chips with a thumbnail and a size; a file the model could not read is refused in words instead of attached by name. Files ride only on the turn that sends them — the next question does not re-upload them — and a turn that fails or is stopped keeps them for **Ask again**. |
 | **Model picker** | The model name under the composer is a selector when the endpoint publishes a catalog (`POST /api/models`, asked at boot and again whenever the base URL or key changes); the configured name is always an option, and picking one changes the model used by the next message. A provider that will not list its models leaves the name as plain text, with the reason in its tooltip, and Settings keeps the free-text field plus the known models as suggestions. |
 | **Transcript** | A focusable, labelled log: the arrow keys, `Page Up`/`Page Down`, and `Home`/`End` scroll history without a mouse. If you scroll back while the studio replies, **Jump to latest** returns you to the newest turn and puts focus in the transcript. |
-||||||| fcf59923
-| **Suggestion pills** | Below the headline. **Sharpen an opportunity** always starts a conversation; the next pill becomes **Pressure-test a bet** once outcomes exist, or **Find the next opportunity** before that. **Capture what you heard** replaces the landscape pill once a job exists. They change as the canvas fills up. |
-| **Composer** | Docked at the bottom of the transcript. `Enter` sends, `Shift`+`Enter` adds a line, `Cmd/Ctrl`+`K` focuses it, and `/` opens the command palette. The send button becomes a stop button while a reply streams. |
-=======
-| **Starter cards** | Below the headline, three canvas-aware conversation cards pair a clear next move with a short reason: **Sharpen an opportunity**, **Pressure-test a bet** or **Find the next opportunity**, and **Capture what you heard** or **Name the job**. Select one to start that prompt in the thread; the cards disappear once the conversation begins. **Opportunity landscape** remains a separate, quiet shortcut. |
-| **Composer** | Docked at the bottom of the transcript. `Enter` sends, `Shift`+`Enter` adds a line, `Cmd/Ctrl`+`K` focuses it, `/` opens the command palette, and the paperclip attaches a text file or an image. Files can also be dropped anywhere on the composer or pasted from the clipboard, and each one is shown with a size (and a thumbnail, for images) plus a remove control before it is sent; a file the studio cannot read is refused with the reason instead of becoming a chip that promises content the model will never see. The hint row's **Model** control lists the ids the configured backend reports and writes the choice through the same Settings store as the Base URL field. The send button becomes a stop button while a reply streams. |
->>>>>>> origin/main
 | **Bar** | The only persistent chrome: home, new conversation, catch-up, live model status, and settings. There is no navigation drawer to compete with the thread. |
 | **Rail** | Above the conversation, and only once the thread has produced something: `Landscape · N`, `Job map · N`, `Evidence · N`, `What I know · N`. Every item is derived from the canvas and the memory, so the strip is a record of the work rather than a fixed menu. |
 | **Lens** | A view docks to the right of the thread on wide screens and becomes a full-height sheet on narrow ones. The transcript and the composer stay on screen and stay usable; `Esc`, **Close**, or the rail chip closes it. Every lens ends in one sentence that re-enters the conversation — *Ask which to chase*, *Walk me through the job*, *Weigh the evidence* — so leaving a view is never a return to a menu. Settings and catch-up use the same lens. |
 
 Replies render Markdown (headings, lists, emphasis, inline and fenced code).
-<<<<<<< HEAD
 
 Every settled answer carries **Copy** and **Answer again** in the transcript,
 and every question carries **Edit**. Both re-asks replace the turn in place —
@@ -120,17 +111,6 @@ stopped turn is spoken as stopped rather than as a reply, failures arrive as an
 alert with their retry, and every turn is
 labelled with who said it — "You said", "Studio said", "Studio notice" — so
 navigating turn by turn keeps its author.
-||||||| fcf59923
-Tool calls appear inline as small trace chips while the agent works.
-=======
-While a turn has produced no text yet, an activity line names the phase (*Waking
-the model*, *Opening your studio tools*, *Thinking*) with a shimmer and an
-elapsed hint; the phase is announced once to assistive technology, and the reply
-is marked busy until it settles so a screen reader reads the answer, not every
-token. Reasoning sits above the answer in a disclosure that opens while it is
-being written and collapses to *Thought for Ns* afterwards, and every tool call
-is a trace chip with the source the turn actually read.
->>>>>>> origin/main
 
 ### Slash commands
 

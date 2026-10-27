@@ -69,16 +69,8 @@ shared tooling at the root. Packages live in `packages/`, runnable services in
 | **`packages/connectors/`** | `agentic-odi-connectors` | Pluggable MCP and REST connectors with presets and an ingest sink. |
 | **`apps/mcp-server/`** | `agentic-odi-mcp-server` | FastMCP server exposing Jobs, Steps, Desired Outcomes, Customer Outcomes, Evidence, and context tools over HTTP. Persists to SQLite by default. |
 | **`apps/studio-api/`** | `agentic-odi-studio-api` | FastAPI **Living Studio sidecar**. Serves config, health, canvas data, local mutations, MCP passthrough, SSE chat, conversation history, and the PM memory store, plus the built SPA. |
-<<<<<<< HEAD
-| **`apps/cli/`** | `agentic-odi-cli` | Typer CLI with interactive chat — streamed replies and the model's thinking, no sidecar needed — plus full entity CRUD, `schema`, `connectors`, and local-first (`--backend local`) or remote (`--backend mcp`) data access. |
-| **`apps/studio/`** | React + TypeScript + Vite, assistant-ui | **The Living Studio** SPA and Tauri 2 desktop shell. The conversation runs on **assistant-ui** — streaming, reasoning, tool calls, approvals, sources, attachments, branches, and suggestions are the library's runtime; the ODI intelligence and the **agent-composed surfaces** (scored outcomes, opportunity theses, bet simulations) are ours, from a closed catalog the SPA owns. A feature-flagged **four-step first-run tour** starts from the PM's ambition, and a local memory records what matters across sessions. |
-||||||| fcf59923
-| **`apps/cli/`** | `agentic-odi-cli` | Typer CLI with interactive chat plus full entity CRUD, `schema`, `connectors`, and local-first (`--backend local`) or remote (`--backend mcp`) data access. |
-| **`apps/studio/`** | React + TypeScript + Vite | **The Living Studio** SPA and Tauri 2 desktop shell. The copilot renders **agent-composed surfaces inline** — scored outcomes, opportunity theses, bet simulations — from a closed catalog the SPA owns. A feature-flagged **four-step first-run tour** starts from the PM's ambition, and a local memory records what matters across sessions. |
-=======
 | **`apps/cli/`** | `agentic-odi-cli` | Typer CLI with interactive chat — streamed replies and the model's thinking, no sidecar needed — plus full entity CRUD, `schema`, `connectors`, and local-first (`--backend local`) or remote (`--backend mcp`) data access. |
 | **`apps/studio/`** | React + TypeScript + Vite | **The Living Studio** SPA and Tauri 2 desktop shell. The conversation runs on **assistant-ui** — streaming, reasoning, tool calls, approvals, sources, attachments, branches, and suggestions are the library's runtime; the ODI intelligence and the **agent-composed surfaces** (scored outcomes, opportunity theses, bet simulations) are ours, from a closed catalog the SPA owns. A feature-flagged **four-step first-run tour** starts from the PM's ambition, and a local memory records what matters across sessions. `*.visual.test.tsx` files capture component states in Chromium for Chromatic visual review. Installed desktop builds **update themselves** in the background and apply on restart. |
->>>>>>> origin/main
 | **`infra/cloudflare/`** | Worker | Worker script for the free-plan Workers Static Assets deployment and sidecar tunnel; its `wrangler.jsonc` lives at the repository root. |
 | **`scripts/`** | — | Dev launcher, binary build, installer tests. |
 | **`tests/contract/`** | — | Cross-package MCP contract tests. |
@@ -152,7 +144,6 @@ The Studio is better with an OpenAI-compatible LLM with tool-calling support
 with no model reachable it says so and every job, step, and outcome remains
 editable by hand.
 
-<<<<<<< HEAD
 The model name in the composer is a picker, not a label: the sidecar asks the
 configured endpoint what it serves (`POST /api/models`) and the list is offered
 inline, with Settings keeping a free-text fallback for providers that publish no
@@ -168,15 +159,6 @@ settled answer gets **Copy** and **Answer again**, and every question gets
 **Edit**. Both re-asks replace the turn in place instead of stacking a second
 copy of the question.
 
-||||||| fcf59923
-=======
-The hosted Studio also works without any Python sidecar: the browser keeps
-canvas data, memory, conversation history, and a deterministic assistant in
-IndexedDB (with an in-memory fallback). Enhanced features such as connectors,
-MCP, and the sidecar model proxy stay hidden until a local sidecar is reachable;
-Settings shows sidecar availability and hides connector controls when it is not.
-
->>>>>>> origin/main
 ### Connectors (MCP ↔ Living Studio)
 
 Register MCP or REST connectors that the copilot can discover and invoke.
