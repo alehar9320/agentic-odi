@@ -132,6 +132,12 @@ npm --prefix apps/studio run build
 cd apps/studio/src-tauri && cargo fmt --check && cargo clippy -- -D warnings && cargo check
 ```
 
+The self-updater lives in `apps/studio/src/updater/` and is covered by vitest:
+`machine.test.ts` (state transitions), `service.test.ts` (scheduling,
+download, and install), `transport.test.ts` (Tauri boundary), and the
+`UpdateBanner`/`UpdateSettings` component tests. `StudioBar.test.tsx` and
+`SettingsPanel.test.tsx` cover the UI integration points.
+
 ## End-to-end
 
 The browser-level suite lives in `apps/studio/e2e/` and runs with
