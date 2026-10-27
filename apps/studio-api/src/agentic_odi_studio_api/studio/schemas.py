@@ -225,30 +225,7 @@ class TurnModel(BaseModel):
 class LatestConversationResponse(BaseModel):
     conversation: ConversationModel | None = None
     turns: list[TurnModel] = Field(default_factory=list)
-<<<<<<< HEAD
 
-
-class TurnNode(BaseModel):
-    """One turn in the branch tree, as the thread runtime needs it."""
-
-    id: str
-    parent_id: str | None = None
-    role: str
-    content: str
-    created_at: str
-
-
-class ConversationTreeResponse(BaseModel):
-    conversation: ConversationModel
-    messages: list[TurnNode] = Field(default_factory=list)
-    head_id: str | None = None
-
-
-class UpdateConversationRequest(BaseModel):
-    head_id: str | None = None
-    title: str | None = Field(default=None, max_length=200)
-||||||| fcf59923
-=======
 
 
 class TurnNode(BaseModel):
@@ -296,4 +273,4 @@ class CapabilityItem(BaseModel):
 
 class CapabilitiesResponse(BaseModel):
     capabilities: list[CapabilityItem]
->>>>>>> origin/main
+
