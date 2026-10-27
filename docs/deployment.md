@@ -8,6 +8,7 @@ by [`.github/workflows/pages.yml`](../.github/workflows/pages.yml).
 
 - A push to `main` runs the website tests, builds `_site` from `website/`, and
   deploys the artifact with `actions/deploy-pages`.
+- No site build output is committed; CI generates `_site` on every push.
 - `workflow_dispatch` republishes the site from the Actions tab without a code
   change.
 - Pages is configured with the "GitHub Actions" source, so there is no
