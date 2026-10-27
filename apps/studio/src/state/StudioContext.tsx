@@ -466,7 +466,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       try {
         const result = await fetchModels(target);
         setModels(result.models);
-        setModelsMessage(result.message);
+        setModelsMessage(result.error);
       } catch (error) {
         setModels([]);
         setModelsMessage(asStudioError(error).message);
@@ -1102,7 +1102,7 @@ const pushNotice = useCallback((text: string) => {
       const base = messages.slice(0, questionIndex + 1);
       await runTurn(base, null, base[base.length - 1].id);
     },
-    [messages, streaming, runTurn],
+    [messages, runTurn],
   );
 
   /**

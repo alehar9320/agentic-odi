@@ -8,7 +8,6 @@ import { useStudio } from "../../state/StudioContext";
  */
 export function ModelPicker({ offline }: { offline: boolean }) {
   const { settings, saveSettings, models, modelsLoading, modelsMessage } = useStudio();
-
   if (offline) {
     return <span className="composer__status is-offline">Local guidance</span>;
   }

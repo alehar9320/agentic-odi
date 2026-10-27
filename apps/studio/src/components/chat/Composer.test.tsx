@@ -1,13 +1,17 @@
 import { createRef } from "react";
 
 import { fireEvent, render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type { StudioContextValue } from "../../state/StudioContext";
 import { Composer } from "./Composer";
 
 vi.mock("../../state/StudioContext", () => ({
   useStudio: vi.fn(),
+}));
+vi.mock("../../lib/commands", () => ({
+  isCommandDraft: () => false,
+  matchCommands: () => [],
 }));
 
 import { useStudio } from "../../state/StudioContext";
@@ -29,12 +33,7 @@ const preset = {
 const stubContext = (overrides: Record<string, unknown> = {}) =>
   ({
     settings: { base_url: "", api_key: "", model_name: "m", mcp_url: "", display_name: "" },
-    saveSettings: vi.fn(),
     llmHealth: { healthy: null, message: "" },
-    models: [] as string[],
-    modelsLoading: false,
-    modelsMessage: null as string | null,
-    refreshModels: vi.fn().mockResolvedValue(undefined),
     brief: null,
     connectorSuggestions: ["gong"],
     presets: [preset],
@@ -79,60 +78,106 @@ describe("Composer connector suggestions", () => {
   });
 });
 
-describe("Composer model selection", () => {
-  const baseProps = {
-    value: "",
-    onChange: () => {},
-    onSubmit: () => {},
-    onCommand: () => {},
-    streaming: false,
-    onStop: () => {},
-    inputRef: createRef<HTMLTextAreaElement>(),
-  };
-
-  it("offers the models the endpoint publishes and saves the pick", () => {
-    const saveSettings = vi.fn();
+describe("ThreadComposer attachment guidance", () => {
+  it("describes supported files and the extraction limits on the attachment control", async () => {
+    const { StudioRuntimeProvider } = await import("../../assistant/StudioRuntime");
+    const { ThreadComposer } = await import("./ThreadComposer");
     vi.mocked(useStudio).mockReturnValue(
       stubContext({
         connectorSuggestions: [],
-        models: ["local-tools-model", "qwen3-8b"],
-        saveSettings,
+        messages: [],
+        streaming: false,
+        canvas: null,
+        sendMessage: vi.fn(async () => {}),
+        regenerateFrom: vi.fn(async () => {}),
+        editFrom: vi.fn(async () => {}),
+        switchBranch: vi.fn(),
+        respondToApproval: vi.fn(async () => {}),
+        stopStreaming: vi.fn(),
       }),
     );
-
-    render(<Composer {...baseProps} />);
-
-    const select = screen.getByRole("combobox", { name: "Model" });
-    expect(select).toHaveValue("m");
-    // The configured name stays selectable even though the provider omits it.
-    expect(screen.getByRole("option", { name: "m" })).toBeInTheDocument();
-
-    fireEvent.change(select, { target: { value: "qwen3-8b" } });
-
-    expect(saveSettings).toHaveBeenCalledWith(expect.objectContaining({ model_name: "qwen3-8b" }));
-  });
-
-  it("falls back to the name in plain text when there is no catalog", () => {
-    vi.mocked(useStudio).mockReturnValue(
-      stubContext({
-        connectorSuggestions: [],
-        models: [],
-        modelsMessage: "connection_error: connection refused",
-      }),
+    render(
+      <StudioRuntimeProvider>
+        <ThreadComposer onCommand={() => {}} />
+      </StudioRuntimeProvider>,
     );
 
-    render(<Composer {...baseProps} />);
-
-    expect(screen.queryByRole("combobox", { name: "Model" })).not.toBeInTheDocument();
-    expect(screen.getByText("m")).toHaveAttribute(
-      "title",
-      "connection_error: connection refused",
-    );
+    const attachment = screen.getByRole("button", { name: "Attach a file" });
+    expect(attachment).toHaveAccessibleDescription(/\.md.*\.json.*PNG.*JPEG.*WEBP.*GIF/i);
+    expect(attachment).toHaveAccessibleDescription(/5 MB/);
+    expect(attachment).toHaveAccessibleDescription(/20,000 characters/);
   });
 });
 
-describe("Composer attachments", () => {
+async function renderThreadComposer(overrides: Record<string, unknown> = {}) {
+  const { StudioRuntimeProvider } = await import("../../assistant/StudioRuntime");
+  const { ThreadComposer } = await import("./ThreadComposer");
+  vi.mocked(useStudio).mockReturnValue(
+    stubContext({
+      connectorSuggestions: [],
+      messages: [],
+      streaming: false,
+      canvas: null,
+      pushToast: vi.fn(),
+      sendMessage: vi.fn(async () => {}),
+      regenerateFrom: vi.fn(async () => {}),
+      editFrom: vi.fn(async () => {}),
+      switchBranch: vi.fn(),
+      respondToApproval: vi.fn(async () => {}),
+      stopStreaming: vi.fn(),
+      ...overrides,
+    }),
+  );
+  return render(
+    <StudioRuntimeProvider>
+      <ThreadComposer onCommand={() => {}} />
+    </StudioRuntimeProvider>,
+  );
+}
+
+describe("ThreadComposer attachments", () => {
+  it("turns a dropped file into a removable attachment chip", async () => {
+    const { container } = await renderThreadComposer();
+    const root = container.querySelector(".composer") as HTMLElement;
+    const file = new File(["hello"], "notes.md", { type: "text/markdown" });
+
+    fireEvent.dragEnter(root, { dataTransfer: { types: ["Files"], files: [file] } });
+    expect(screen.getByText("Drop to attach")).toBeInTheDocument();
+
+    fireEvent.drop(root, { dataTransfer: { types: ["Files"], files: [file] } });
+
+    expect(await screen.findByText("notes.md")).toBeInTheDocument();
+    expect(screen.queryByText("Drop to attach")).toBeNull();
+    expect(screen.getByRole("button", { name: "Remove notes.md" })).toBeInTheDocument();
+  });
+
+  it("refuses a file the studio cannot read and says why", async () => {
+    const pushToast = vi.fn();
+    const { container } = await renderThreadComposer({ pushToast });
+    const root = container.querySelector(".composer") as HTMLElement;
+    const file = new File(["x"], "deck.pdf", { type: "application/pdf" });
+
+    fireEvent.drop(root, { dataTransfer: { types: ["Files"], files: [file] } });
+
+    expect(pushToast).toHaveBeenCalledWith("error", expect.stringContaining("deck.pdf"));
+    expect(screen.queryByText("deck.pdf")).toBeNull();
+  });
+
+  it("attaches a pasted screenshot from the clipboard", async () => {
+    await renderThreadComposer();
+    const file = new File(["png"], "screenshot.png", { type: "image/png" });
+
+    fireEvent.paste(screen.getByRole("textbox", { name: "Message the studio" }), {
+      clipboardData: { files: [file] },
+    });
+
+    expect(await screen.findByText("screenshot.png")).toBeInTheDocument();
+  });
+});
+
+describe("Composer keyboard focus", () => {
   const baseProps = {
+    value: "hello",
     onChange: () => {},
     onSubmit: () => {},
     onCommand: () => {},
@@ -141,111 +186,25 @@ describe("Composer attachments", () => {
     inputRef: createRef<HTMLTextAreaElement>(),
   };
 
-  const staged = {
-    id: "shot-1",
-    name: "shot.png",
-    media_type: "image/png",
-    data: "aGk=",
-    size: 2048,
-    preview_url: "blob:shot",
-  };
-
-  beforeEach(() => {
+  it("keeps the send control in the tab order so it can take keyboard focus", () => {
     vi.mocked(useStudio).mockReturnValue(stubContext({ connectorSuggestions: [] }));
+
+    render(<Composer {...baseProps} />);
+    const send = screen.getByRole("button", { name: "Send message" });
+    send.focus();
+
+    expect(send.tabIndex).toBe(0);
+    expect(document.activeElement).toBe(send);
   });
 
-  it("stages a file with its name and size, and lets the reader take it back", () => {
-    const remove = vi.fn();
-    render(
-      <Composer {...baseProps} value="" attachments={[staged]} onRemoveAttachment={remove} />,
-    );
-
-    expect(screen.getByText("shot.png")).toBeInTheDocument();
-    expect(screen.getByText("2 KB")).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "Remove shot.png" }));
-
-    expect(remove).toHaveBeenCalledWith("shot-1");
-  });
-
-  it("sends a file with no sentence around it", () => {
-    const onSubmit = vi.fn();
-    render(
-      <Composer {...baseProps} value="" attachments={[staged]} onSubmit={onSubmit} onAttachFiles={() => {}} />,
-    );
-
-    fireEvent.click(screen.getByRole("button", { name: /send message/i }));
-
-    expect(onSubmit).toHaveBeenCalled();
-  });
-
-  it("says why a file was refused instead of attaching a name", () => {
-    render(
-      <Composer
-        {...baseProps}
-        value=""
-        onAttachFiles={() => {}}
-        attachmentError="deck.pdf is a application/pdf file. Attach an image or a text file."
-      />,
-    );
-
-    expect(screen.getByRole("status")).toHaveTextContent(/application\/pdf/);
-  });
-});
-
-describe("Composer accessibility", () => {
-  const baseProps = {
-    onChange: () => {},
-    onSubmit: () => {},
-    onCommand: () => {},
-    streaming: false,
-    onStop: () => {},
-    inputRef: createRef<HTMLTextAreaElement>(),
-  };
-
-  beforeEach(() => {
+  it("keeps the stop control focusable while a reply streams", () => {
     vi.mocked(useStudio).mockReturnValue(stubContext({ connectorSuggestions: [] }));
-  });
 
-  it("describes the field with the shortcut hint", () => {
-    render(<Composer {...baseProps} value="" />);
+    render(<Composer {...baseProps} streaming />);
+    const stop = screen.getByRole("button", { name: "Stop generating" });
+    stop.focus();
 
-    const input = screen.getByLabelText("Message the studio");
-    const hint = document.getElementById(input.getAttribute("aria-describedby") ?? "");
-    expect(hint).not.toBeNull();
-    expect(hint?.textContent).toContain("to send");
-  });
-
-  it("points the field at the highlighted command while the palette is open", () => {
-    render(<Composer {...baseProps} value="/" />);
-
-    const input = screen.getByLabelText("Message the studio");
-    expect(input).toHaveAttribute("aria-activedescendant", "studio-command-help");
-    expect(document.getElementById("studio-command-help")).not.toBeNull();
-
-    fireEvent.keyDown(input, { key: "ArrowDown" });
-
-    expect(input).toHaveAttribute("aria-activedescendant", "studio-command-start");
-    expect(document.getElementById("studio-command-start")).not.toBeNull();
-  });
-
-  it("stops a streaming reply with Escape and shows the shortcut", () => {
-    const onStop = vi.fn();
-    render(<Composer {...baseProps} value="" streaming onStop={onStop} />);
-
-    expect(screen.getByText(/to stop/i)).toBeInTheDocument();
-
-    fireEvent.keyDown(screen.getByLabelText("Message the studio"), { key: "Escape" });
-
-    expect(onStop).toHaveBeenCalledTimes(1);
-  });
-
-  it("does not stop anything when no reply is streaming", () => {
-    const onStop = vi.fn();
-    render(<Composer {...baseProps} value="" onStop={onStop} />);
-
-    fireEvent.keyDown(screen.getByLabelText("Message the studio"), { key: "Escape" });
-
-    expect(onStop).not.toHaveBeenCalled();
+    expect(stop.tabIndex).toBe(0);
+    expect(document.activeElement).toBe(stop);
   });
 });

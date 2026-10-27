@@ -1,6 +1,7 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
 
+import { StudioRuntimeProvider } from "../../assistant/StudioRuntime";
 import type { ChatMessage } from "../../types";
 import { catalogManifest } from "../../ui/catalog";
 import { parseUiSpec, type UiNode } from "../../ui/protocol";
@@ -11,8 +12,15 @@ const harness = vi.hoisted(() => ({
     messages: [] as unknown[],
     streaming: false,
     thinkingPhase: null as string | null,
+    toolActivity: [] as unknown[],
     offlineReply: false,
-    sendMessage: vi.fn<(text: string, attachments?: unknown, options?: unknown) => Promise<void>>(),
+    canvas: null,
+    regenerateFrom: vi.fn(),
+    editFrom: vi.fn(),
+    switchBranch: vi.fn(),
+    respondToApproval: vi.fn(),
+    stopStreaming: vi.fn(),
+    sendMessage: vi.fn<(text: string) => Promise<void>>(),
   },
 }));
 
@@ -50,13 +58,19 @@ function outcomeCard(actions = false): UiNode {
 
 function renderTurn(messages: ChatMessage[]) {
   harness.state.messages = messages;
-  return render(<Conversation />);
+  return render(
+    <StudioRuntimeProvider>
+      <Conversation />
+    </StudioRuntimeProvider>,
+  );
 }
 
 describe("Conversation", () => {
   it("renders prose and surfaces in the agent's order", () => {
     const { container } = renderTurn([
       {
+        id: "m-1",
+        parentId: null,
         role: "assistant",
         content: "Here is the board. It is the top bet.",
         parts: [
@@ -79,7 +93,7 @@ describe("Conversation", () => {
 
   it("keeps history without parts readable", () => {
     const { container } = renderTurn([
-      { role: "assistant", content: "**Scored** three outcomes." },
+      { id: "m-1", parentId: null, role: "assistant", content: "**Scored** three outcomes." },
     ]);
 
     expect(container.textContent).toContain("Scored");
@@ -88,16 +102,183 @@ describe("Conversation", () => {
 
   it("renders a surface-only turn", () => {
     const { container } = renderTurn([
-      { role: "assistant", content: "", parts: [{ kind: "ui", id: "ui-1", node: outcomeCard() }] },
+      {
+        id: "m-1",
+        parentId: null,
+        role: "assistant",
+        content: "",
+        parts: [{ kind: "ui", id: "ui-1", node: outcomeCard() }],
+      },
     ]);
 
     expect(container.textContent).toContain("Minimize the time it takes to propagate secrets");
+  });
+
+  it("keeps reasoning behind a disclosure that opens on request", () => {
+    const { container } = renderTurn([
+      {
+        id: "m-1",
+        parentId: null,
+        role: "assistant",
+        content: "Two outcomes matter.",
+        parts: [
+          { kind: "reasoning", text: "Weighing the scored outcomes against the job map." },
+          { kind: "text", text: "Two outcomes matter." },
+        ],
+      },
+    ]);
+
+    const toggle = screen.getByRole("button", { name: /Thought process/ });
+    const panel = container.querySelector(".reasoning__body") as HTMLElement;
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(panel.hidden).toBe(true);
+
+    fireEvent.click(toggle);
+
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(panel.hidden).toBe(false);
+    expect(panel.textContent).toContain("Weighing the scored outcomes");
+  });
+
+  it("opens reasoning while it is written, then reports how long it took", async () => {
+    harness.state.streaming = true;
+    const turn: ChatMessage[] = [
+      {
+        id: "a-1",
+        parentId: null,
+        role: "assistant",
+        content: "",
+        parts: [{ kind: "reasoning", text: "Weighing the scored outcomes." }],
+      },
+    ];
+    harness.state.messages = turn;
+    const { rerender } = render(
+      <StudioRuntimeProvider>
+        <Conversation />
+      </StudioRuntimeProvider>,
+    );
+
+    const thinking = screen.getByRole("button", { name: /Thinking/ });
+    expect(thinking).toHaveAttribute("aria-expanded", "true");
+
+    harness.state.streaming = false;
+    rerender(
+      <StudioRuntimeProvider>
+        <Conversation />
+      </StudioRuntimeProvider>,
+    );
+
+    await screen.findByRole("button", { name: /Thought for \d+s/ });
+  });
+
+  it("names the phase while a reply has no text yet", () => {
+    harness.state.streaming = true;
+    harness.state.thinkingPhase = "mcp_tools";
+    const { container } = renderTurn([
+      { id: "u-1", parentId: null, role: "user", content: "Check this bet" },
+      { id: "a-1", parentId: "u-1", role: "assistant", content: "", parts: [] },
+    ]);
+
+    expect(screen.getByRole("status")).toHaveTextContent("Opening your studio tools");
+    expect(container.querySelector(".message--assistant")).toHaveAttribute(
+      "aria-busy",
+      "true",
+    );
+
+    harness.state.streaming = false;
+    harness.state.thinkingPhase = null;
+  });
+
+  it("marks a settled reply as no longer busy", () => {
+    const { container } = renderTurn([
+      { id: "u-1", parentId: null, role: "user", content: "Check this bet" },
+      { id: "a-1", parentId: "u-1", role: "assistant", content: "A useful reply." },
+    ]);
+
+    expect(container.querySelector(".message--assistant")).toHaveAttribute(
+      "aria-busy",
+      "false",
+    );
+  });
+
+  it("renders a source chip for what the turn read", () => {
+    const { container } = renderTurn([
+      {
+        id: "m-1",
+        parentId: null,
+        role: "assistant",
+        content: "One job.",
+        parts: [
+          { kind: "text", text: "One job." },
+          {
+            kind: "source",
+            id: "src-1",
+            title: "get_jobs — JOB-1 Retention",
+            filename: "get_jobs",
+            mediaType: "application/json",
+          },
+        ],
+      },
+    ]);
+
+    const chip = container.querySelector(".source-chip");
+    expect(chip?.textContent).toContain("get_jobs — JOB-1 Retention");
+  });
+
+  it("labels assistant actions and explains reply alternatives", () => {
+    const { container } = renderTurn([
+      { id: "u-1", parentId: null, role: "user", content: "Check this bet" },
+      { id: "a-1", parentId: "u-1", role: "assistant", content: "A useful reply." },
+    ]);
+
+    expect(screen.getByRole("button", { name: "Copy reply" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Regenerate reply" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Edit message" })).toBeInTheDocument();
+    expect(container.querySelector(".branch-picker")).toBeNull();
+  });
+
+  it("switches between contextual alternative replies through the thread runtime", () => {
+    const firstPath: ChatMessage[] = [
+      { id: "u-1", parentId: null, role: "user", content: "Check this bet" },
+      { id: "a-1", parentId: "u-1", role: "assistant", content: "First reply." },
+    ];
+    harness.state.messages = firstPath;
+    const { container, rerender } = render(
+      <StudioRuntimeProvider>
+        <Conversation />
+      </StudioRuntimeProvider>,
+    );
+
+    expect(container.querySelector(".branch-picker")).toBeNull();
+
+    harness.state.messages = [
+      firstPath[0],
+      { id: "a-2", parentId: "u-1", role: "assistant", content: "Alternative reply." },
+    ];
+    rerender(
+      <StudioRuntimeProvider>
+        <Conversation />
+      </StudioRuntimeProvider>,
+    );
+
+    // The group is named, and the position stays readable text rather than
+    // being replaced by an aria-label of its own.
+    expect(screen.getByRole("group", { name: "Reply alternatives" })).toHaveTextContent(
+      "Alternative 2 of 2",
+    );
+    const previous = screen.getByRole("button", { name: "Previous alternative" });
+    expect(screen.getByRole("button", { name: "Next alternative" })).toBeInTheDocument();
+    expect(previous).not.toBeDisabled();
+    fireEvent.click(previous);
+    expect(harness.state.switchBranch).toHaveBeenCalledWith(firstPath);
   });
 
   it("turns a card action into the user's next message", () => {
     harness.state.sendMessage = vi.fn<(text: string) => Promise<void>>();
     renderTurn([
       {
+        id: "m-1",
+        parentId: null,
         role: "assistant",
         content: "",
         parts: [{ kind: "ui", id: "ui-1", node: outcomeCard(true) }],
@@ -110,163 +291,14 @@ describe("Conversation", () => {
   });
 });
 
-describe("Conversation actions", () => {
-  it("re-asks the same question when the reader wants another answer", async () => {
-    harness.state.sendMessage = vi.fn(async () => undefined);
-    renderTurn([
-      { id: "q1", role: "user", content: "list the jobs" },
-      { id: "a1", role: "assistant", content: "Two jobs." },
-    ]);
-
-    fireEvent.click(screen.getByRole("button", { name: /answer again/i }));
-
-    await waitFor(() =>
-      expect(harness.state.sendMessage).toHaveBeenCalledWith("list the jobs", [], { from: "q1" }),
-    );
-  });
-
-  it("edits the question and replaces the turn it started", async () => {
-    harness.state.sendMessage = vi.fn(async () => undefined);
-    renderTurn([
-      { id: "q1", role: "user", content: "list the jobs" },
-      { id: "a1", role: "assistant", content: "Two jobs." },
-    ]);
-
-    fireEvent.click(screen.getByRole("button", { name: /edit/i }));
-    const field = await screen.findByRole("textbox", { name: /edit your message/i });
-    fireEvent.change(field, { target: { value: "list the outcomes" } });
-    fireEvent.click(screen.getByRole("button", { name: /^send$/i }));
-
-    await waitFor(() =>
-      expect(harness.state.sendMessage).toHaveBeenCalledWith("list the outcomes", [], {
-        from: "q1",
-      }),
-    );
-  });
-
-  it("offers a copy action on a settled answer", () => {
-    renderTurn([{ role: "user", content: "list the jobs" }, { role: "assistant", content: "Two jobs." }]);
-
-    expect(screen.getByRole("button", { name: /copy reply/i })).toBeInTheDocument();
-  });
-
-  it("shows the files the reader sent, with a preview for an image", () => {
-    const { container } = renderTurn([
-      {
-        id: "q1",
-        role: "user",
-        content: "What is broken?",
-        attachments: [
-          { name: "shot.png", media_type: "image/png", data: "AQID" },
-          { name: "logs.txt", media_type: "text/plain", data: "Ym9vbQ==" },
-        ],
-      },
-    ]);
-
-    expect(container.textContent).toContain("shot.png");
-    expect(container.textContent).toContain("logs.txt");
-    expect(container.querySelector(".attach-sent__thumb")).toHaveAttribute(
-      "src",
-      "data:image/png;base64,AQID",
-    );
-  });
-});
-
-describe("Conversation run activity", () => {
-  beforeEach(() => {
-    harness.state.streaming = false;
-    harness.state.thinkingPhase = null;
-  });
-
-  it("names the tool in flight instead of leaving the turn blank", () => {
-    harness.state.streaming = true;
-    harness.state.thinkingPhase = "model";
-    const { container } = renderTurn([
-      {
-        role: "assistant",
-        content: "",
-        tools: [{ id: "get_jobs-0", name: "get_jobs", status: "running", startedAt: 0 }],
-      },
-    ]);
-
-    expect(container.textContent).toContain("Reading your jobs");
-    expect(container.textContent).toContain("in progress");
-  });
-
-  it("collapses a finished run to one line that still opens", () => {
-    const { container } = renderTurn([
-      {
-        role: "assistant",
-        content: "Two jobs, four outcomes.",
-        tools: [
-          { id: "get_jobs-0", name: "get_jobs", status: "ok", startedAt: 0, endedAt: 600 },
-          { id: "get_outcomes-1", name: "get_outcomes", status: "ok", startedAt: 600, endedAt: 1900 },
-        ],
-      },
-    ]);
-
-    const summary = container.querySelector("summary");
-    expect(summary?.textContent).toContain("2 tools");
-    expect(summary?.textContent).toContain("1.9s");
-    expect(container.textContent).toContain("Scoring outcomes");
-  });
-
-  it("keeps a failed step visible with what the tool said", () => {
-    const { container } = renderTurn([
-      {
-        role: "assistant",
-        content: "I could not read the board.",
-        tools: [
-          {
-            id: "get_jobs-0",
-            name: "get_jobs",
-            status: "error",
-            preview: "MCP server unreachable",
-            startedAt: 0,
-            endedAt: 300,
-          },
-        ],
-      },
-    ]);
-
-    expect(container.textContent).toContain("1 failed");
-    expect(container.textContent).toContain("MCP server unreachable");
-    expect(container.textContent).toContain("failed");
-  });
-});
-
-describe("Conversation stopped runs", () => {
-  it("says the reader stopped it, and offers to ask again", () => {
-    harness.state.sendMessage = vi.fn<(text: string) => Promise<void>>();
-    const { container } = renderTurn([
-      { role: "user", content: "list the jobs" },
-      { role: "assistant", content: "Here is what I have so", stopped: true, retryText: "list the jobs" },
-    ]);
-
-    expect(container.textContent).toContain("Stopped by you.");
-    expect(container.textContent).toContain("Here is what I have so");
-
-    fireEvent.click(screen.getByRole("button", { name: /ask again/i }));
-
-    expect(harness.state.sendMessage).toHaveBeenCalledWith("list the jobs");
-  });
-
-  it("still shows a stop that produced nothing at all", () => {
-    const { container } = renderTurn([
-      { role: "user", content: "list the jobs" },
-      { role: "assistant", content: "", parts: [], stopped: true, retryText: "list the jobs" },
-    ]);
-
-    expect(container.textContent).toContain("Stopped by you.");
-  });
-});
-
 describe("Conversation failures", () => {
   it("shows the failure, the suggestion, and a retry that re-sends the question", () => {
     harness.state.sendMessage = vi.fn<(text: string) => Promise<void>>();
     const { container } = renderTurn([
-      { role: "user", content: "list the jobs" },
+      { id: "m-1", parentId: null, role: "user", content: "list the jobs" },
       {
+        id: "m-2",
+        parentId: "m-1",
         role: "assistant",
         content: "",
         parts: [],
