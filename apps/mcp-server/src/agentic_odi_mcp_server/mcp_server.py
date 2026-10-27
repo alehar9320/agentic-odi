@@ -4,7 +4,6 @@ import json
 from typing import Any
 
 from agentic_odi_core import (
-    CAPABILITIES,
     ODI_ASSISTANT_PROMPT,
     ODI_FRAMEWORK_GUIDELINES,
     CustomerOutcomeNotFoundError,
@@ -18,6 +17,8 @@ from agentic_odi_core import (
     StepNotFoundError,
     ValueOutOfRangeError,
     build_repository,
+    capability_manifest,
+    capability_summary,
     compute_opportunity_score,
     evaluate_outcome_statement,
     job_not_found,
@@ -273,7 +274,12 @@ def get_odi_framework_guidelines() -> str:
 
 @mcp.tool
 def get_capabilities() -> str:
-    return CAPABILITIES
+    return capability_summary()
+
+
+@mcp.tool
+def get_capabilities_manifest() -> str:
+    return json.dumps(capability_manifest())
 
 
 @mcp.tool

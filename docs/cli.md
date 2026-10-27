@@ -100,6 +100,40 @@ The wizard can be cancelled at any step with Ctrl-C.
 > Chat is the only CLI mode that needs an LLM endpoint. The `customer-outcomes`
 > and `connectors` commands keep working without one.
 
+## Capabilities
+
+Explore all tools and capabilities generated from the core contract:
+
+```bash
+agentic-odi capabilities         # print human-readable summary
+agentic-odi capabilities --json  # print capability manifest in JSON
+agentic-odi capabilities tools   # list all tool names
+```
+
+## Validate desired outcome statements
+
+```bash
+agentic-odi desired-outcomes evaluate "Minimize the time to setup"
+```
+
+## Settings and Feature Flags
+
+```bash
+agentic-odi settings flags list
+agentic-odi settings flags get developer_mode
+agentic-odi settings flags set developer_mode on
+agentic-odi settings flags reset developer_mode
+```
+
+## Profile and Setup
+
+```bash
+agentic-odi profile show
+agentic-odi profile set --product-name "My Product"
+agentic-odi profile path
+agentic-odi setup
+```
+
 ## Manage Jobs, Steps, and desired Outcomes
 
 Every ODI entity has the same create/read/update/delete surface in the CLI and
@@ -127,6 +161,7 @@ agentic-odi desired-outcomes list --job-id <job-id>
 agentic-odi desired-outcomes get <outcome-id>
 agentic-odi desired-outcomes update <outcome-id> --satisfaction 6
 agentic-odi desired-outcomes delete <outcome-id> --yes
+agentic-odi desired-outcomes evaluate "Minimize the time to resolve setup errors"
 ```
 
 Add `--json` to any command for machine-readable output.

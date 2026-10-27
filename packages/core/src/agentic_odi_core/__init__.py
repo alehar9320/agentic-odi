@@ -8,7 +8,15 @@ Pydantic's identically named class. Import it from
 ``agentic_odi_core.errors`` instead.
 """
 
-from agentic_odi_core.contract import TOOL_NAMES, TOOL_SPECS, ToolName, ToolSpec
+from agentic_odi_core.contract import (
+    TOOL_NAMES,
+    TOOL_SPECS,
+    ToolEffect,
+    ToolName,
+    ToolSpec,
+    capability_manifest,
+    capability_summary,
+)
 from agentic_odi_core.errors import (
     ConflictError,
     NotFoundError,
@@ -26,6 +34,7 @@ from agentic_odi_core.messages import (
     ODI_FRAMEWORK_GUIDELINES,
     customer_outcome_not_found,
     evidence_not_found,
+    get_odi_framework_guidelines,
     job_not_found,
     outcome_not_found,
     step_not_found,
@@ -97,11 +106,15 @@ __all__ = [
     "InvalidOutcomeStatementError",
     "TOOL_NAMES",
     "TOOL_SPECS",
+    "ToolEffect",
     "ToolName",
     "ToolSpec",
+    "capability_manifest",
+    "capability_summary",
     "Repository",
     "build_repository",
     "compute_opportunity_score",
+    "get_odi_framework_guidelines",
     "customer_outcome_not_found",
     "error_status",
     "evaluate_outcome_statement",
