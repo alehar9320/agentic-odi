@@ -65,7 +65,7 @@ TOOL_SPECS: dict[str, ToolSpec] = {
     ToolName.DELETE_STEP.value: ToolSpec(("step_id",), ("step_id",)),
     ToolName.ADD_OUTCOME.value: ToolSpec(
         ("job_id", "statement", "importance", "satisfaction", "step_id"),
-        ("job_id", "statement"),
+        ("job_id", "statement", "importance", "satisfaction"),
     ),
     ToolName.GET_OUTCOMES.value: ToolSpec(("job_id", "step_id", "limit", "offset"), ("job_id",)),
     ToolName.GET_OUTCOME.value: ToolSpec(("outcome_id",), ("outcome_id",)),

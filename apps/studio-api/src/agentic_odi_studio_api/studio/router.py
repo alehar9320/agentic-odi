@@ -16,6 +16,7 @@ from agentic_odi_core import (
     OdiError,
     ODIService,
     OutcomeNotFoundError,
+    OutcomeStatementError,
     StepNotFoundError,
     ToolName,
     ValueOutOfRangeError,
@@ -83,6 +84,11 @@ def _require_mcp_url(mcp_url: str) -> str:
 
 def _as_http_error(exc: Exception) -> StudioHTTPError:
     """Translate domain errors into typed HTTP responses without leaking 500s."""
+    if isinstance(exc, OutcomeStatementError):
+        return StudioHTTPError(
+            StudioError(code=StudioErrorCode.VALIDATION, message=str(exc)),
+            status_code=422,
+        )
     if isinstance(exc, (JobNotFoundError, StepNotFoundError, OutcomeNotFoundError)):
         return StudioHTTPError(StudioError(code=StudioErrorCode.NOT_FOUND, message=str(exc)))
     if isinstance(exc, ValueOutOfRangeError):

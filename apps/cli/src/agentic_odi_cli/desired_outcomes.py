@@ -23,17 +23,18 @@ JSON_OPTION = typer.Option(False, "--json", help="Emit machine-readable JSON.")
 def add(
     job_id: str = typer.Option(..., help="Job ID the outcome belongs to"),
     statement: str = typer.Option(..., help="Desired outcome statement"),
-    importance: float | None = typer.Option(default=None, min=1.0, max=10.0),
-    satisfaction: float | None = typer.Option(default=None, min=1.0, max=10.0),
+    importance: float = typer.Option(..., min=1.0, max=10.0, help="Importance score (1-10)"),
+    satisfaction: float = typer.Option(..., min=1.0, max=10.0, help="Satisfaction score (1-10)"),
     step_id: str | None = typer.Option(default=None, help="Optional Step ID"),
     json_output: bool = JSON_OPTION,
 ) -> None:
     """Add a desired Outcome to a Job."""
-    args: dict[str, Any] = {"job_id": job_id, "statement": statement}
-    if importance is not None:
-        args["importance"] = importance
-    if satisfaction is not None:
-        args["satisfaction"] = satisfaction
+    args: dict[str, Any] = {
+        "job_id": job_id,
+        "statement": statement,
+        "importance": importance,
+        "satisfaction": satisfaction,
+    }
     if step_id is not None:
         args["step_id"] = step_id
     typer.echo(

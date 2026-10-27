@@ -106,7 +106,7 @@ def test_local_post_outcome_returns_the_outcome_object() -> None:
         json={
             "mcp_url": "",
             "job_id": job["id"],
-            "statement": "Minimize the time to ship",
+            "statement": "Minimize the time it takes to ship when releasing",
             "importance": 8.0,
             "satisfaction": 4.0,
         },
@@ -115,7 +115,7 @@ def test_local_post_outcome_returns_the_outcome_object() -> None:
     assert response.status_code == 200
     body = response.json()
     assert body["id"]
-    assert body["statement"] == "Minimize the time to ship"
+    assert body["statement"] == "Minimize the time it takes to ship when releasing"
     assert body["opportunity_score"] == 12.0
 
 
@@ -170,6 +170,17 @@ def test_local_job_create_returns_the_job_object() -> None:
 def test_local_step_create_returns_the_step_object() -> None:
     client = _client("local")
     job = client.post("/api/jobs", json={"name": "Ship a service"}).json()
+    # An outcome must exist before steps can be added.
+    client.post(
+        "/api/outcomes",
+        json={
+            "mcp_url": "",
+            "job_id": job["id"],
+            "statement": "Minimize the time it takes to deploy when releasing",
+            "importance": 8.0,
+            "satisfaction": 4.0,
+        },
+    )
 
     response = client.post(
         "/api/steps",
@@ -224,7 +235,7 @@ def test_local_create_routes_map_domain_errors() -> None:
         },
     )
     assert out_of_range.status_code == 422
-    assert out_of_range.json()["error"]["code"] == "out_of_range"
+    assert out_of_range.json()["error"]["code"] == "validation"
 
     missing_job = client.post(
         "/api/steps",

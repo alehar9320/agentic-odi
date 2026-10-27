@@ -99,20 +99,21 @@ async def test_get_outcomes_job_not_found_returns_error():
 
 
 @pytest.mark.asyncio
-async def test_add_outcome_without_both_scores_sets_no_opportunity_score():
+async def test_add_outcome_requires_both_scores():
     async with Client(mcp) as client:
         # First create a job
         create_res = await client.call_tool("add_job", {"name": "Job", "description": "Desc"})
         job_id = _extract_id(create_res.content[0].text)
         assert job_id is not None
 
-        # Add an outcome with only importance provided
+        # Add an outcome with both scores
         outcome_res = await client.call_tool(
             "add_outcome",
             {
                 "job_id": job_id,
-                "statement": "Outcome without full scores",
+                "statement": "Minimize the time it takes to deploy when releasing",
                 "importance": 7.0,
+                "satisfaction": 3.0,
             },
         )
         outcome_text = outcome_res.content[0].text
@@ -121,7 +122,8 @@ async def test_add_outcome_without_both_scores_sets_no_opportunity_score():
         match = re.search(r"({.*})", outcome_text, re.DOTALL)
         outcome_data = json.loads(match.group(1)) if match else {}
 
-        assert outcome_data.get("opportunity_score") is None
+        # 7.0 + max(7.0 - 3.0, 0) = 11.0
+        assert outcome_data.get("opportunity_score") == 11.0
 
 
 @pytest.mark.asyncio
@@ -132,7 +134,7 @@ async def test_get_odi_framework_guidelines_includes_expected_sections():
 
         assert "Stage 1: Define Intent" in text
         assert "Stage 2: Capture Desired Outcomes" in text
-        assert "Stage 4: Build the Job Map" in text
+        assert "Stage 3: Build the Job Map" in text
         # Mention of key tools
         assert "add_job" in text
         assert "add_outcome" in text

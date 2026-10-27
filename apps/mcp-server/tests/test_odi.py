@@ -26,33 +26,22 @@ async def test_odi_workflow():
         job_id = extract_id(job_text)
         assert job_id in jobs_db
 
-        # 2. Add Steps to the Job Map
-        step1_res = await client.call_tool(
-            "add_step", {"job_id": job_id, "name": "Select music", "order": 1}
-        )
-        step2_res = await client.call_tool(
-            "add_step", {"job_id": job_id, "name": "Play music", "order": 2}
-        )
-
-        step1_text = step1_res.content[0].text
-        assert "Step created successfully" in step1_text
-        assert "Step created successfully" in step2_res.content[0].text
-
-        step1_id = extract_id(step1_text)
-
-        # 3. Add an Outcome
+        # 2. Add an Outcome first (steps require an outcome to exist)
         outcome_res = await client.call_tool(
             "add_outcome",
             {
                 "job_id": job_id,
-                "statement": "Minimize the time it takes to find a specific song",
+                "statement": "Minimize the time it takes to find a specific song when searching",
                 "importance": 8.5,
                 "satisfaction": 4.0,
-                "step_id": step1_id,
             },
         )
         outcome_text = outcome_res.content[0].text
         assert "Outcome created successfully" in outcome_text
+
+        # 3. Add Steps to the Job Map
+        await client.call_tool("add_step", {"job_id": job_id, "name": "Select music", "order": 1})
+        await client.call_tool("add_step", {"job_id": job_id, "name": "Play music", "order": 2})
 
         outcome_match = re.search(r"({.*})", outcome_text, re.DOTALL)
         outcome_data = json.loads(outcome_match.group(1)) if outcome_match else {}
@@ -75,7 +64,10 @@ async def test_odi_workflow():
         outcomes_match = re.search(r"(\[.*\])", outcomes_text, re.DOTALL)
         outcomes_data = json.loads(outcomes_match.group(1)) if outcomes_match else []
         assert len(outcomes_data) == 1
-        assert outcomes_data[0]["statement"] == "Minimize the time it takes to find a specific song"
+        assert (
+            outcomes_data[0]["statement"]
+            == "Minimize the time it takes to find a specific song when searching"
+        )
 
 
 @pytest.mark.asyncio

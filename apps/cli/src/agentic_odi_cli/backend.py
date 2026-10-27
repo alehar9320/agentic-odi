@@ -214,8 +214,8 @@ class LocalBackend(Backend):
             outcome = self.service.add_outcome(
                 job_id=args["job_id"],
                 statement=args["statement"],
-                importance=args.get("importance"),
-                satisfaction=args.get("satisfaction"),
+                importance=float(args["importance"]),
+                satisfaction=float(args["satisfaction"]),
                 step_id=step_id,
             )
         except JobNotFoundError:
@@ -459,9 +459,12 @@ class LocalBackend(Backend):
 
     def _evaluate_outcome(self, args: dict[str, Any]) -> str:
         from agentic_odi_core import job_not_found
-        from agentic_odi_core.evaluation import evaluate_outcome_statement
+        from agentic_odi_core.evaluation import (
+            evaluate_outcome_statement,
+            statement_to_dict,
+        )
 
-        result = evaluate_outcome_statement(args["statement"])
+        result = statement_to_dict(evaluate_outcome_statement(args["statement"]))
         job_id = args.get("job_id")
         if job_id is not None:
             if self.service.get_job(job_id) is None:

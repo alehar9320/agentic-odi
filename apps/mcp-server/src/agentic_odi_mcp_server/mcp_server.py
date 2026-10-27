@@ -14,6 +14,7 @@ from agentic_odi_core import (
     OdiError,
     ODIService,
     OutcomeNotFoundError,
+    OutcomeStatementError,
     StepNotFoundError,
     ValueOutOfRangeError,
     build_repository,
@@ -21,6 +22,7 @@ from agentic_odi_core import (
     evaluate_outcome_statement,
     job_not_found,
     odi_schema,
+    statement_to_dict,
 )
 from agentic_odi_core import (
     customer_outcome_not_found as _cust_not_found,
@@ -107,8 +109,8 @@ def get_job_map(job_id: str, limit: int | None = None, offset: int = 0) -> str:
 def add_outcome(
     job_id: str,
     statement: str,
-    importance: float | None = None,
-    satisfaction: float | None = None,
+    importance: float,
+    satisfaction: float,
     step_id: str | None = None,
 ) -> str:
     try:
@@ -123,6 +125,8 @@ def add_outcome(
         return f"Error: Job with ID {job_id} not found."
     except StepNotFoundError:
         return _step_not_found(step_id)
+    except OutcomeStatementError as exc:
+        return f"Error: {exc}"
     except ValueOutOfRangeError:
         return "Error: importance and satisfaction must be between 1.0 and 10.0"
     return f"Outcome created successfully: {outcome.model_dump_json()}"
@@ -354,6 +358,8 @@ def update_outcome(
         updated = service.update_outcome(outcome_id, updates)
     except OutcomeNotFoundError:
         return _outcome_not_found(outcome_id)
+    except OutcomeStatementError as exc:
+        return f"Error: {exc}"
     except ValueOutOfRangeError:
         return "Error: importance and satisfaction must be between 1.0 and 10.0"
     return f"Outcome updated successfully: {updated.model_dump_json()}"
@@ -476,7 +482,8 @@ def promote_evidence(
 
 @mcp.tool
 def evaluate_outcome(statement: str, job_id: str | None = None) -> str:
-    result = evaluate_outcome_statement(statement)
+    verdict = evaluate_outcome_statement(statement)
+    result = statement_to_dict(verdict)
     if job_id is not None:
         if service.get_job(job_id) is None:
             return job_not_found(job_id)

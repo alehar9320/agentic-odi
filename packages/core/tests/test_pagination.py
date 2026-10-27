@@ -59,7 +59,16 @@ def _seed(repo) -> tuple[Job, list[Step]]:
         for i in range(5)
     ]
     for i, step in enumerate(steps):
-        repo.add_outcome(Outcome(id=f"OUT-{i}", job_id=job.id, step_id=step.id, statement=f"o{i}"))
+        repo.add_outcome(
+            Outcome(
+                id=f"OUT-{i}",
+                job_id=job.id,
+                step_id=step.id,
+                statement=f"o{i}",
+                importance=5.0,
+                satisfaction=5.0,
+            )
+        )
         repo.add_customer_outcome(
             CustomerOutcome(
                 id=f"CO-{i}",
@@ -134,6 +143,12 @@ def test_service_pages_job_map_in_step_order() -> None:
     repo = InMemoryRepository()
     service = ODIService(repo)
     job = service.add_job(name="Deploy")
+    service.add_outcome(
+        job.id,
+        "Minimize the time it takes to deploy when releasing",
+        importance=8.0,
+        satisfaction=4.0,
+    )
 
     # Insert out of order: pagination must still return ascending order.
     for order in (3, 0, 4, 1, 2):
@@ -149,6 +164,12 @@ def test_service_passes_pagination_through() -> None:
     repo = InMemoryRepository()
     service = ODIService(repo)
     job = service.add_job(name="Deploy")
+    service.add_outcome(
+        job.id,
+        "Minimize the time it takes to deploy when releasing",
+        importance=8.0,
+        satisfaction=4.0,
+    )
     for i in range(3):
         step = service.add_step(job_id=job.id, name=f"step {i}", order=i)
         service.add_customer_outcome(

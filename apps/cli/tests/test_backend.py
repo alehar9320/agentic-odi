@@ -186,6 +186,16 @@ def test_local_backend_job_step_outcome_crud(tmp_path):
     assert backend.call("get_job", {"job_id": job_id})["name"] == "J"
     assert backend.call("update_job", {"job_id": job_id, "name": "J2"})["name"] == "J2"
 
+    # An outcome must exist before steps can be added.
+    backend.call(
+        "add_outcome",
+        {
+            "job_id": job_id,
+            "statement": "Minimize the time it takes to deploy when releasing",
+            "importance": 8.0,
+            "satisfaction": 4.0,
+        },
+    )
     step_id = backend.call("add_step", {"job_id": job_id, "name": "S", "order": 1})["id"]
     assert [step["name"] for step in backend.call("get_job_map", {"job_id": job_id})] == ["S"]
     assert backend.call("update_step", {"step_id": step_id, "name": "S2"})["name"] == "S2"
@@ -193,9 +203,17 @@ def test_local_backend_job_step_outcome_crud(tmp_path):
 
     outcome_id = backend.call(
         "add_outcome",
-        {"job_id": job_id, "statement": "Min x", "importance": 8.0, "satisfaction": 4.0},
+        {
+            "job_id": job_id,
+            "statement": "Minimize the time it takes to ship when releasing",
+            "importance": 8.0,
+            "satisfaction": 4.0,
+        },
     )["id"]
-    assert backend.call("get_outcomes", {"job_id": job_id})[0]["statement"] == "Min x"
+    assert (
+        backend.call("get_outcomes", {"job_id": job_id})[0]["statement"]
+        == "Minimize the time it takes to deploy when releasing"
+    )
     updated = backend.call("update_outcome", {"outcome_id": outcome_id, "importance": 9.0})
     assert updated["importance"] == 9.0
     assert backend.call("get_outcome", {"outcome_id": outcome_id})["opportunity_score"] == 14.0
@@ -224,7 +242,15 @@ def test_local_backend_rejects_out_of_range_scores(tmp_path):
     job_id = backend.call("add_job", {"name": "J"})["id"]
 
     with pytest.raises(BackendError, match="between 1.0 and 10.0"):
-        backend.call("add_outcome", {"job_id": job_id, "statement": "S", "importance": 99.0})
+        backend.call(
+            "add_outcome",
+            {
+                "job_id": job_id,
+                "statement": "Minimize the time it takes to deploy when releasing",
+                "importance": 99.0,
+                "satisfaction": 5.0,
+            },
+        )
 
 
 def test_local_backend_update_customer_outcome_folds_value_metrics(tmp_path):

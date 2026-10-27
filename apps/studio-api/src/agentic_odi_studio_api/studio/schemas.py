@@ -33,8 +33,8 @@ class AddOutcomeRequest(BaseModel):
     mcp_url: str
     job_id: str
     statement: str
-    importance: float
-    satisfaction: float
+    importance: float = Field(ge=1.0, le=10.0)
+    satisfaction: float = Field(ge=1.0, le=10.0)
 
 
 class CreateJobRequest(BaseModel):
