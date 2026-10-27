@@ -1,21 +1,5 @@
-Your objective was to ensure that we get assistant-ui installed and used to the max, so that the client studio makes use of its capabilities. However, we had a crash, so we'll need to pick up from where we left off on this topic branch we're on
+Your objective is to push the changes to a new PR and verify that it is CI green. Before you do, review the quality of the delivery relative to objective. Any flaws, you address them, before you push the PR.
 
 ---
 
 Continue if you have next steps, or stop and ask for clarification if you are unsure how to proceed.
-
----
-
-LGTME. Sub agents.
-
----
-
-Continue
-
----
-
-Continue
-
----
-
-GO!
