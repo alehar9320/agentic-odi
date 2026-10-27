@@ -65,8 +65,12 @@ _AGENT_PATTERN = re.compile(
 )
 
 
-def _mentions_an_agent(text: str) -> bool:
-    return _AGENT_PATTERN.search(text or "") is not None
+def _mentions_an_agent(text: object) -> bool:
+    # Entries arrive from a JSON payload, so a malformed one must be ignored
+    # rather than crash the run.
+    if not isinstance(text, str):
+        return False
+    return _AGENT_PATTERN.search(text) is not None
 
 
 def classify(

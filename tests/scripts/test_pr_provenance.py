@@ -82,3 +82,13 @@ def test_agent_commit_identities_are_detected(identity):
 def test_human_commit_identities_are_not_agents(identity):
     """Word-boundary matching: 'amp' in 'example' must not look like an agent."""
     assert classify("alehar9320", "User", "fix/thing", [identity]) == HUMAN
+
+
+def test_classify_survives_malformed_commit_entries():
+    """A wrong-shaped commits field must not crash the labeler.
+
+    Raw API commit objects can reach the CLI instead of "Name <email>" strings.
+    Raising here would fail the workflow, which the spec forbids.
+    """
+    assert classify("alehar9320", "User", "fix/x", [{"author": {"name": "x"}}]) == HUMAN
+    assert classify("alehar9320", "User", "fix/x", [None, 42, "human <h@x>"]) == HUMAN
