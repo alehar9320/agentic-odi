@@ -126,6 +126,7 @@ export function OutcomeCard({ outcome }: { outcome: Outcome }) {
           type="button"
           className="quiet-action"
           aria-expanded={showEvidence}
+          title="Inspect customer interview transcripts and evidence line"
           onClick={() => setShowEvidence((prev) => !prev)}
         >
           {showEvidence ? "Hide evidence" : "Evidence"}
@@ -133,6 +134,7 @@ export function OutcomeCard({ outcome }: { outcome: Outcome }) {
         <button
           type="button"
           className="quiet-action"
+          title="Ask the studio what a bet on this outcome would change"
           onClick={() =>
             ask(
               `Simulate the impact of a bet on ${outcomeId}: "${statement}". ` +
@@ -163,6 +165,7 @@ export function OutcomeCard({ outcome }: { outcome: Outcome }) {
         <button
           type="button"
           className="quiet-action"
+          title="Consult the studio on strategic solutions for this outcome"
           onClick={() => ask(`How should we solve outcome ${outcomeId}: "${statement}"?`)}
         >
           Ask
