@@ -1,0 +1,51 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M5Y4KE7FF7D9MW7HZA3JP64H",
+  "session_id": "ses_e83bb79dcffe87IoT8iN05u8XN",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-27T07:36:14.136398373Z",
+  "branch": "ui-not-looking-like-shit",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "apps/studio/src/App.test.tsx",
+    "apps/studio/src/App.tsx",
+    "apps/studio/src/components/chat/ChatStage.tsx",
+    "apps/studio/src/components/chat/Hero.tsx",
+    "apps/studio/src/components/chat/ModelPicker.test.tsx",
+    "apps/studio/src/components/chat/ModelPicker.tsx",
+    "apps/studio/src/components/chat/ThreadComposer.tsx",
+    "apps/studio/src/test/setup.ts"
+  ],
+  "agent": "OpenCode",
+  "model": "",
+  "turn_id": "c28da36d2be4",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 163428,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 1834128,
+    "output_tokens": 19069,
+    "api_call_count": 30
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-10-27T07:36:14.104821624Z",
+    "agent_lines": 0,
+    "agent_removed": 0,
+    "human_added": 268,
+    "human_modified": 224,
+    "human_removed": 0,
+    "total_committed": 268,
+    "total_lines_changed": 492,
+    "agent_percentage": 0,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0
+    }
+  ]
+}

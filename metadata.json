@@ -1,0 +1,33 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M5Y4KE7FF7D9MW7HZA3JP64H",
+  "strategy": "manual-commit",
+  "branch": "ui-not-looking-like-shit",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "apps/studio/src/App.test.tsx",
+    "apps/studio/src/App.tsx",
+    "apps/studio/src/components/chat/ChatStage.tsx",
+    "apps/studio/src/components/chat/Hero.tsx",
+    "apps/studio/src/components/chat/ModelPicker.test.tsx",
+    "apps/studio/src/components/chat/ModelPicker.tsx",
+    "apps/studio/src/components/chat/ThreadComposer.tsx",
+    "apps/studio/src/test/setup.ts"
+  ],
+  "sessions": [
+    {
+      "metadata": "/0/metadata.json",
+      "transcript": "/0/full.jsonl",
+      "compact_transcript": "/0/transcript.jsonl",
+      "content_hash": "/0/content_hash.txt",
+      "prompt": "/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 163428,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 1834128,
+    "output_tokens": 19069,
+    "api_call_count": 30
+  }
+}
