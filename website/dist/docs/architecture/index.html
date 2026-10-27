@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Repository Architecture</title>
+  <meta name="description" content="The workspace, the data flow, and the testing strategy.">
+  <meta name="color-scheme" content="dark light">
+  <meta name="theme-color" content="#0a0b0e">
+
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Agentic ODI">
+  <meta property="og:title" content="Repository Architecture">
+  <meta property="og:description" content="The workspace, the data flow, and the testing strategy.">
+  <meta property="og:url" content="https://alehar9320.github.io/agentic-odi/docs/architecture/index.html">
+  <meta property="og:image" content="https://alehar9320.github.io/agentic-odi/assets/og.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Repository Architecture">
+  <meta name="twitter:description" content="The workspace, the data flow, and the testing strategy.">
+  <meta name="twitter:image" content="https://alehar9320.github.io/agentic-odi/assets/og.png">
+
+  <link rel="canonical" href="https://alehar9320.github.io/agentic-odi/docs/architecture/index.html">
+  <script src="../../assets/theme.js"></script>
+  <link rel="stylesheet" href="../../assets/tokens.css">
+  <link rel="stylesheet" href="../../assets/style.css">
+  <link rel="icon" type="image/svg+xml" href="../../assets/favicon.svg">
+  <link rel="icon" type="image/png" href="../../assets/favicon.png" sizes="32x32">
+  <link rel="sitemap" type="application/xml" href="https://alehar9320.github.io/agentic-odi/sitemap.xml">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <header class="site-header">
+    <div class="site-header__inner">
+      <a class="brand" href="https://alehar9320.github.io/agentic-odi/">
+        <img src="../../assets/mark.svg" alt="" width="24" height="24" aria-hidden="true">
+        <span class="brand__name">Agentic&nbsp;ODI</span>
+      </a>
+      <nav class="site-nav" aria-label="Primary">
+        <a href="https://alehar9320.github.io/agentic-odi/#studio">The&nbsp;Studio</a>
+        <a href="https://alehar9320.github.io/agentic-odi/#how">How&nbsp;it&nbsp;works</a>
+        <a href="https://alehar9320.github.io/agentic-odi/docs/">Docs</a>
+      </nav>
+      <div class="site-header__actions">
+      <button
+        class="theme-toggle"
+        type="button"
+        aria-label="Switch to the light theme"
+        title="Switch theme"
+      >
+        <svg class="theme-toggle__sun" viewBox="0 0 24 24" width="17" height="17" aria-hidden="true" focusable="false">
+          <circle cx="12" cy="12" r="4.2" fill="none" stroke="currentColor" stroke-width="1.8"></circle>
+          <path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
+        </svg>
+        <svg class="theme-toggle__moon" viewBox="0 0 24 24" width="17" height="17" aria-hidden="true" focusable="false">
+          <path d="M20 14.2A8.4 8.4 0 0 1 9.8 4a8.5 8.5 0 1 0 10.2 10.2Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"></path>
+        </svg>
+      </button>
+      <button class="site-search" type="button" data-search-open aria-label="Search the docs (Control K)">
+        Search <kbd>Ctrl K</kbd>
+      </button>
+      <a class="btn btn--primary btn--sm" href="https://alehar9320.github.io/agentic-odi/#run">Run it in 60 seconds</a>
+      </div>
+    </div>
+  </header>
+
+  <main id="main">
+<div class="doc">
+  <aside class="doc__nav" aria-label="Documentation">
+    <a class="doc__back" href="https://alehar9320.github.io/agentic-odi/">← Agentic ODI</a>
+    <div class="doc__group">
+      <p class="doc__group-title">Get started</p>
+      <ul class="doc__list">
+        <li>
+          <a class="doc__link"
+             href="https://alehar9320.github.io/agentic-odi/docs/quick-start/">Quick start</a>
+        </li>
+        <li>
+          <a class="doc__link"
+             href="https://alehar9320.github.io/agentic-odi/docs/installation/">Installation</a>
+        </li>
+        <li>
+          <a class="doc__link"
+             href="https://alehar9320.github.io/agentic-odi/docs/studio/">The Living Studio</a>
+        </li>
+        <li>
+          <a class="doc__link"
+             href="https://alehar9320.github.io/agentic-odi/docs/local-llm/">Local LLM backend</a>
+        </li>
+      </ul>
+    </div>
+    <div class="doc__group">
+      <p class="doc__group-title">Build</p>
+      <ul class="doc__list">
+        <li>
+          <a class="doc__link"
+             href="https://alehar9320.github.io/agentic-odi/docs/cli/">CLI reference</a>
+        </li>
+        <li>
+          <a class="doc__link"
+             href="https://alehar9320.github.io/agentic-odi/docs/connectors/">Connectors</a>
+        </li>
+        <li>
+          <a class="doc__link"
+             href="https://alehar9320.github.io/agentic-odi/docs/mcp/">MCP tool reference</a>
+        </li>
+        <li>
+          <a class="doc__link is-current"
+             href="https://alehar9320.github.io/agentic-odi/docs/architecture/">Architecture</a>
+        </li>
+      </ul>
+    </div>
+    <div class="doc__group">
+      <p class="doc__group-title">Operate</p>
+      <ul class="doc__list">
+        <li>
+          <a class="doc__link"
+             href="https://alehar9320.github.io/agentic-odi/docs/deployment/">Deployment</a>
+        </li>
+        <li>
+          <a class="doc__link"
+             href="https://alehar9320.github.io/agentic-odi/docs/development/">Development</a>
+        </li>
+        <li>
+          <a class="doc__link"
+             href="https://alehar9320.github.io/agentic-odi/docs/roadmap/">Roadmap</a>
+        </li>
+      </ul>
+    </div>
+  </aside>
+
+  <article class="doc__body">
+    <header class="doc__head">
+      <p class="eyebrow">Build</p>
+      <h1 class="doc__title">Repository Architecture</h1>
+<p class="lead">The workspace, the data flow, and the testing strategy.</p>    </header>
+
+    <div class="prose">
+      <p>Agentic ODI is a uv workspace with a single root <code>pyproject.toml</code> for shared tooling. Python distributions are imported by their stable <code>agentic_odi_*</code> package names; directory layout does not leak into imports.</p>
+<h2 id="layout">Layout<a class="heading-anchor" href="#layout" aria-label="Copy link to this section" title="Copy link">#</a></h2><pre class="highlight"><code class="language-text">apps/
+  cli/            agentic_odi_cli         Typer CLI: local SQLite or remote MCP
+  mcp-server/     agentic_odi_mcp_server  FastMCP server over HTTP
+  studio-api/     agentic_odi_studio_api  FastAPI sidecar for the Studio SPA
+  studio/         React + TypeScript + Vite SPA and Tauri 2 shell
+packages/
+  core/           agentic_odi_core        Domain, services, repositories, contract
+  connectors/     agentic_odi_connectors  MCP client connectors and catalog
+infra/cloudflare/ Worker script; wrangler.jsonc lives at the repo root
+scripts/          Dev launcher, binary build, installer checks
+tests/            Cross-package contract and launcher tests only
+docs/             Architecture, reference material, Superpowers artifacts
+packaging/        PyInstaller spec for the CLI binary
+</code></pre><h2 id="dependency-direction">Dependency Direction<a class="heading-anchor" href="#dependency-direction" aria-label="Copy link to this section" title="Copy link">#</a></h2><pre class="highlight"><code class="language-text">apps/cli ──────────────┐
+apps/mcp-server ───────┼──▶ packages/core
+apps/studio-api ───────┘         ▲
+                                 │
+apps/cli ──────────────▶ packages/connectors
+</code></pre><ul>
+<li><code>packages/core</code> depends on no other workspace package.</li>
+<li><code>packages/connectors</code> depends on <code>core</code> only where it needs shared models.</li>
+<li>Every runnable app may depend on <code>core</code>; none of them imports another app.</li>
+<li>The React SPA only talks to <code>apps/studio-api</code> over <code>/api</code>; it never calls MCP or the LLM directly.</li>
+<li>The SPA's conversation runtime is assistant-ui, bound to the Studio's own
+store in <code>apps/studio/src/assistant/</code>. That directory
+is the whole bridge: <code>convert.ts</code> maps the two message models in both
+directions, <code>StudioRuntime.tsx</code> wires the runtime callbacks, and
+<code>attachments.ts</code> extracts files in the browser. The library is presentation
+only — it holds no product state and makes no network calls of its own.</li>
+</ul>
+<h2 id="persistence">Persistence<a class="heading-anchor" href="#persistence" aria-label="Copy link to this section" title="Copy link">#</a></h2><ul>
+<li><code>SQLiteRepository</code> is the production default for the CLI, MCP server, and Studio API.</li>
+<li>The default database is <code>~/.agentic-odi/odi.db</code>, overridable with <code>AGENTIC_ODI_DB</code>.</li>
+<li>Studio conversation history and PM memory use a separate SQLite database,
+<code>~/.agentic-odi/studio.db</code>, overridable with <code>AGENTIC_ODI_STUDIO_DB</code>. They are
+sidecar-local and never enter the ODI repository or the MCP contract.</li>
+<li><code>build_repository()</code> chooses SQLite by default and <code>InMemoryRepository</code> when <code>AGENTIC_ODI_DB=:memory:</code>, which is what tests use.</li>
+<li>The CLI selects its backend with <code>--backend local|mcp</code> or <code>AGENTIC_ODI_BACKEND</code>.</li>
+<li>The Studio API selects <code>local</code> (direct service calls) or <code>mcp</code> (passthrough) with <code>AGENTIC_ODI_BACKEND</code> or <code>create_app(backend=...)</code>.</li>
+</ul>
+<h2 id="mcp-contract">MCP Contract<a class="heading-anchor" href="#mcp-contract" aria-label="Copy link to this section" title="Copy link">#</a></h2><p><code>packages/core/src/agentic_odi_core/contract.py</code> owns <code>ToolName</code>, <code>ToolSpec</code>, <code>TOOL_SPECS</code>, and <code>TOOL_NAMES</code>. The live FastMCP registry is asserted against it by <code>tests/contract/test_mcp_contract.py</code>; the CLI's local handlers are checked by <code>tests/contract/test_cli_contract.py</code>.</p>
+<h2 id="entry-points">Entry Points<a class="heading-anchor" href="#entry-points" aria-label="Copy link to this section" title="Copy link">#</a></h2><table>
+<thead>
+<tr>
+<th>Command</th>
+<th>Module</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>agentic-odi</code></td>
+<td><code>agentic_odi_cli.cli:app</code></td>
+</tr>
+<tr>
+<td><code>agentic-odi-server</code> / <code>agentic-odi-mcp-server</code></td>
+<td><code>agentic_odi_mcp_server.mcp_server:main</code></td>
+</tr>
+<tr>
+<td><code>agentic-odi-studio-api</code></td>
+<td><code>agentic_odi_studio_api.main:main</code></td>
+</tr>
+<tr>
+<td><code>uv run python scripts/dev.py</code></td>
+<td>Dev launcher (MCP + Studio API)</td>
+</tr>
+</tbody>
+</table>
+<h2 id="related">Related<a class="heading-anchor" href="#related" aria-label="Copy link to this section" title="Copy link">#</a></h2><ul>
+<li><a href="https://github.com/alehar9320/agentic-odi/blob/main/docs/architecture/data-flow.md">Data flow</a></li>
+<li><a href="https://github.com/alehar9320/agentic-odi/blob/main/docs/architecture/testing.md">Testing</a></li>
+</ul>
+
+<p class="prose__source">Source of truth: <code>docs/architecture/README.md</code> &mdash; <a href="https://github.com/alehar9320/agentic-odi/blob/main/docs/architecture/README.md">view on GitHub</a></p>
+    </div>
+
+    <nav class="doc__toc" aria-label="On this page">
+      <p class="doc__toc-title">On this page</p>
+      <ul>
+        <li class="doc__toc-item doc__toc-item--2">
+          <a href="#layout">Layout</a>
+        </li>
+        <li class="doc__toc-item doc__toc-item--2">
+          <a href="#dependency-direction">Dependency Direction</a>
+        </li>
+        <li class="doc__toc-item doc__toc-item--2">
+          <a href="#persistence">Persistence</a>
+        </li>
+        <li class="doc__toc-item doc__toc-item--2">
+          <a href="#mcp-contract">MCP Contract</a>
+        </li>
+        <li class="doc__toc-item doc__toc-item--2">
+          <a href="#entry-points">Entry Points</a>
+        </li>
+        <li class="doc__toc-item doc__toc-item--2">
+          <a href="#related">Related</a>
+        </li>
+      </ul>
+    </nav>
+
+    <nav class="doc__pager" aria-label="Documentation">
+      <a class="doc__pager-link doc__pager-link--prev" href="https://alehar9320.github.io/agentic-odi/docs/mcp/">
+        <span class="doc__pager-label">Previous</span>
+        <span class="doc__pager-title">MCP tool reference</span>
+      </a>
+      <a class="doc__pager-link doc__pager-link--next" href="https://alehar9320.github.io/agentic-odi/docs/deployment/">
+        <span class="doc__pager-label">Next</span>
+        <span class="doc__pager-title">Deployment</span>
+      </a>
+    </nav>
+  </article>
+</div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="shell">
+      <div class="site-footer__top">
+        <div class="site-footer__brand">
+          <img src="../../assets/mark.svg" alt="" width="24" height="24" aria-hidden="true">
+          <span class="brand__name">Agentic&nbsp;ODI</span>
+        </div>
+        <p class="site-footer__tagline">Built with outcomes, not guesses.</p>
+      </div>
+      <nav class="site-footer__nav" aria-label="Footer">
+        <a href="https://github.com/alehar9320/agentic-odi">GitHub</a>
+        <a href="https://github.com/alehar9320/agentic-odi/issues">Issues</a>
+        <a href="https://alehar9320.github.io/agentic-odi/docs/">Docs</a>
+        <a href="https://agentic-odi.alehar.workers.dev/">Hosted Studio</a>
+        <a href="https://horizon.prefect.io/alhase/servers/agentic-odi/chat">Test chat</a>
+      </nav>
+      <p class="site-footer__legal">
+        &copy; 2026 Agentic ODI maintainers &middot; All rights reserved
+      </p>
+      <p class="site-footer__note">
+        Experimental. We don't publish dates &mdash; this page changes when the code does.
+      </p>
+    </div>
+  </footer>
+
+  <div class="search" data-search data-site-url="https://alehar9320.github.io/agentic-odi/"
+       data-index-url="https://alehar9320.github.io/agentic-odi/assets/search-index.json" hidden>
+    <div class="search__scrim" data-search-close></div>
+    <div class="search__panel" role="dialog" aria-modal="true" aria-label="Search the docs">
+      <div class="search__field">
+        <input class="search__input" type="search" placeholder="Search the docs"
+               aria-label="Search the docs" autocomplete="off" data-search-input>
+        <button class="search__close" type="button" data-search-close aria-label="Close search">Esc</button>
+      </div>
+      <p class="search__hint" data-search-hint>Type to search every guide and reference page.</p>
+      <ul class="search__results" data-search-results></ul>
+    </div>
+  </div>
+
+  <script defer src="../../assets/main.js"></script>
+</body>
+</html>

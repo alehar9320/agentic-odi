@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Deployment</title>
+  <meta name="description" content="The project site, the hosted server, and the Worker.">
+  <meta name="color-scheme" content="dark light">
+  <meta name="theme-color" content="#0a0b0e">
+
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Agentic ODI">
+  <meta property="og:title" content="Deployment">
+  <meta property="og:description" content="The project site, the hosted server, and the Worker.">
+  <meta property="og:url" content="https://alehar9320.github.io/agentic-odi/docs/deployment/index.html">
+  <meta property="og:image" content="https://alehar9320.github.io/agentic-odi/assets/og.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Deployment">
+  <meta name="twitter:description" content="The project site, the hosted server, and the Worker.">
+  <meta name="twitter:image" content="https://alehar9320.github.io/agentic-odi/assets/og.png">
+
+  <link rel="canonical" href="https://alehar9320.github.io/agentic-odi/docs/deployment/index.html">
+  <script src="../../assets/theme.js"></script>
+  <link rel="stylesheet" href="../../assets/tokens.css">
+  <link rel="stylesheet" href="../../assets/style.css">
+  <link rel="icon" type="image/svg+xml" href="../../assets/favicon.svg">
+  <link rel="icon" type="image/png" href="../../assets/favicon.png" sizes="32x32">
+  <link rel="sitemap" type="application/xml" href="https://alehar9320.github.io/agentic-odi/sitemap.xml">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <header class="site-header">
+    <div class="site-header__inner">
+      <a class="brand" href="https://alehar9320.github.io/agentic-odi/">
+        <img src="../../assets/mark.svg" alt="" width="24" height="24" aria-hidden="true">
+        <span class="brand__name">Agentic&nbsp;ODI</span>
+      </a>
+      <nav class="site-nav" aria-label="Primary">
+        <a href="https://alehar9320.github.io/agentic-odi/#studio">The&nbsp;Studio</a>
+        <a href="https://alehar9320.github.io/agentic-odi/#how">How&nbsp;it&nbsp;works</a>
+        <a href="https://alehar9320.github.io/agentic-odi/docs/">Docs</a>
+      </nav>
+      <div class="site-header__actions">
+      <button
+        class="theme-toggle"
+        type="button"
+        aria-label="Switch to the light theme"
+        title="Switch theme"
+      >
+        <svg class="theme-toggle__sun" viewBox="0 0 24 24" width="17" height="17" aria-hidden="true" focusable="false">
+          <circle cx="12" cy="12" r="4.2" fill="none" stroke="currentColor" stroke-width="1.8"></circle>
+          <path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
+        </svg>
+        <svg class="theme-toggle__moon" viewBox="0 0 24 24" width="17" height="17" aria-hidden="true" focusable="false">
+          <path d="M20 14.2A8.4 8.4 0 0 1 9.8 4a8.5 8.5 0 1 0 10.2 10.2Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"></path>
+        </svg>
+      </button>
+      <button class="site-search" type="button" data-search-open aria-label="Search the docs (Control K)">
+        Search <kbd>Ctrl K</kbd>
+      </button>
+      <a class="btn btn--primary btn--sm" href="https://alehar9320.github.io/agentic-odi/#run">Run it in 60 seconds</a>
+      </div>
+    </div>
+  </header>
+
+  <main id="main">
+<div class="doc">
+  <aside class="doc__nav" aria-label="Documentation">
+    <a class="doc__back" href="https://alehar9320.github.io/agentic-odi/">← Agentic ODI</a>
+    <div class="doc__group">
+      <p class="doc__group-title">Get started</p>
+      <ul class="doc__list">
+        <li>
+          <a class="doc__link"
+             href="https://alehar9320.github.io/agentic-odi/docs/quick-start/">Quick start</a>
+        </li>
+        <li>
+          <a class="doc__link"
+             href="https://alehar9320.github.io/agentic-odi/docs/installation/">Installation</a>
+        </li>
+        <li>
+          <a class="doc__link"
+             href="https://alehar9320.github.io/agentic-odi/docs/studio/">The Living Studio</a>
+        </li>
+        <li>
+          <a class="doc__link"
+             href="https://alehar9320.github.io/agentic-odi/docs/local-llm/">Local LLM backend</a>
+        </li>
+      </ul>
+    </div>
+    <div class="doc__group">
+      <p class="doc__group-title">Build</p>
+      <ul class="doc__list">
+        <li>
+          <a class="doc__link"
+             href="https://alehar9320.github.io/agentic-odi/docs/cli/">CLI reference</a>
+        </li>
+        <li>
+          <a class="doc__link"
+             href="https://alehar9320.github.io/agentic-odi/docs/connectors/">Connectors</a>
+        </li>
+        <li>
+          <a class="doc__link"
+             href="https://alehar9320.github.io/agentic-odi/docs/mcp/">MCP tool reference</a>
+        </li>
+        <li>
+          <a class="doc__link"
+             href="https://alehar9320.github.io/agentic-odi/docs/architecture/">Architecture</a>
+        </li>
+      </ul>
+    </div>
+    <div class="doc__group">
+      <p class="doc__group-title">Operate</p>
+      <ul class="doc__list">
+        <li>
+          <a class="doc__link is-current"
+             href="https://alehar9320.github.io/agentic-odi/docs/deployment/">Deployment</a>
+        </li>
+        <li>
+          <a class="doc__link"
+             href="https://alehar9320.github.io/agentic-odi/docs/development/">Development</a>
+        </li>
+        <li>
+          <a class="doc__link"
+             href="https://alehar9320.github.io/agentic-odi/docs/roadmap/">Roadmap</a>
+        </li>
+      </ul>
+    </div>
+  </aside>
+
+  <article class="doc__body">
+    <header class="doc__head">
+      <p class="eyebrow">Operate</p>
+      <h1 class="doc__title">Deployment</h1>
+<p class="lead">The project site, the hosted server, and the Worker.</p>    </header>
+
+    <div class="prose">
+      <h2 id="project-site-github-pages">Project Site (GitHub Pages)<a class="heading-anchor" href="#project-site-github-pages" aria-label="Copy link to this section" title="Copy link">#</a></h2><p>The static site in <code>website/</code> is published to
+<strong><a href="https://alehar9320.github.io/agentic-odi/">https://alehar9320.github.io/agentic-odi/</a></strong>
+by <a href="https://github.com/alehar9320/agentic-odi/blob/main/.github/workflows/pages.yml"><code>.github/workflows/pages.yml</code></a>.</p>
+<ul>
+<li>A push to <code>main</code> runs the website tests, builds <code>_site</code> from <code>website/</code>, and
+deploys the artifact with <code>actions/deploy-pages</code>.</li>
+<li>No site build output is committed; CI generates <code>_site</code> on every push.</li>
+<li><code>workflow_dispatch</code> republishes the site from the Actions tab without a code
+change.</li>
+<li>Pages is configured with the &quot;GitHub Actions&quot; source, so there is no
+<code>gh-pages</code> branch. Removing <code>pages.yml</code> stops all publishing and the site
+returns 404.</li>
+<li>The <code>github-pages</code> environment only allows deployments from <code>main</code>.</li>
+</ul>
+<h2 id="hosted-mcp-server">Hosted MCP Server<a class="heading-anchor" href="#hosted-mcp-server" aria-label="Copy link to this section" title="Copy link">#</a></h2><p>The server is deployed via <strong><a href="https://www.prefect.io/horizon">Horizon Prefect</a></strong>,
+Prefect's managed infrastructure for hosting MCP-compatible agents.</p>
+<h2 id="test-chat-ui">Test Chat (UI)<a class="heading-anchor" href="#test-chat-ui" aria-label="Copy link to this section" title="Copy link">#</a></h2><p>Interact with the deployed agent directly in your browser:</p>
+<blockquote>
+<p><strong><a href="https://horizon.prefect.io/alhase/servers/agentic-odi/chat">https://horizon.prefect.io/alhase/servers/agentic-odi/chat</a></strong></p>
+</blockquote>
+<h2 id="mcp-server-endpoint">MCP Server Endpoint<a class="heading-anchor" href="#mcp-server-endpoint" aria-label="Copy link to this section" title="Copy link">#</a></h2><p>Integrate via the MCP protocol at:</p>
+<blockquote>
+<p><strong><a href="https://agentic-odi.fastmcp.app/mcp">https://agentic-odi.fastmcp.app/mcp</a></strong></p>
+</blockquote>
+<blockquote>
+<p>[!IMPORTANT]
+<strong>Authentication is required</strong> to access the MCP server endpoint. Please reach
+out to the maintainers to obtain the necessary credentials before connecting a
+client.</p>
+</blockquote>
+<h2 id="hosted-studio">Hosted Studio<a class="heading-anchor" href="#hosted-studio" aria-label="Copy link to this section" title="Copy link">#</a></h2><p>The Living Studio SPA is deployed to Cloudflare Workers:</p>
+<table>
+<thead>
+<tr>
+<th>Environment</th>
+<th>URL</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Production (<code>main</code>)</td>
+<td><strong><a href="https://agentic-odi.alehar.workers.dev/">https://agentic-odi.alehar.workers.dev/</a></strong></td>
+</tr>
+<tr>
+<td>Pull request preview</td>
+<td>Posted automatically by Cloudflare Workers Builds as a PR comment</td>
+</tr>
+</tbody>
+</table>
+<p>Production deploys on every push to <code>main</code>. The Worker is <code>agentic-odi</code>; keep
+<code>name</code> in <code>wrangler.jsonc</code> aligned with the Worker connected in the dashboard.
+Preview builds run for non-production branches and are ephemeral: the Cloudflare
+PR comment is the source of truth, so do not copy a preview URL into docs. The
+hosted UI loads without a backend; canvas data, chat, and mutations need the
+sidecar tunnel described below.</p>
+<h2 id="component-visual-review-chromatic">Component Visual Review (Chromatic)<a class="heading-anchor" href="#component-visual-review-chromatic" aria-label="Copy link to this section" title="Copy link">#</a></h2><p>Every <code>*.visual.test.tsx</code> file in <code>apps/studio</code> renders one component state in a
+real Chromium browser. The <code>Chromatic</code> workflow
+(<a href="https://github.com/alehar9320/agentic-odi/blob/main/.github/workflows/chromatic.yml"><code>.github/workflows/chromatic.yml</code></a>) runs
+those tests on every branch push and publishes the snapshots to
+<strong><a href="https://www.chromatic.com/">Chromatic</a></strong>. Reviewers compare the pixels,
+approve or reject the change in Chromatic, and the approved build becomes the
+baseline for the next comparison.</p>
+<h3 id="project-setup">Project setup<a class="heading-anchor" href="#project-setup" aria-label="Copy link to this section" title="Copy link">#</a></h3><p>The project is linked to <code>alehar9320/agentic-odi</code> (app id
+<code>6add05ad03e0b1f6aeda07ad</code>), and the <strong><code>CHROMATIC_PROJECT_TOKEN</code></strong> repository
+secret holds its project token, so the workflow publishes with no manual step.
+The first build, published from the CLI, holds the two <code>FailurePanel</code>
+snapshots:
+<a href="https://www.chromatic.com/build?appId=6add05ad03e0b1f6aeda07ad&amp;number=1">build 1</a>.</p>
+<p>To rotate the token, generate a new one in <strong>Manage → Project token</strong> and run
+<code>gh secret set CHROMATIC_PROJECT_TOKEN</code>. No code change is involved.</p>
+<h3 id="what-ci-does">What CI does<a class="heading-anchor" href="#what-ci-does" aria-label="Copy link to this section" title="Copy link">#</a></h3><table>
+<thead>
+<tr>
+<th>Event</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Push to any branch</td>
+<td>Captures the component states, publishes a build, reports its status against that commit</td>
+</tr>
+<tr>
+<td>Push to <code>main</code></td>
+<td>Same, and <code>chromatic.config.json</code> auto-accepts, so <code>main</code> becomes the baseline</td>
+</tr>
+<tr>
+<td>Push from Dependabot</td>
+<td>Captures snapshots, skips the upload with a notice: Dependabot runs cannot read repository secrets</td>
+</tr>
+<tr>
+<td>Pull request from a fork</td>
+<td>No build; the workflow runs in this repository and never sees a fork branch</td>
+</tr>
+<tr>
+<td>Missing token in any other run</td>
+<td>The job fails rather than passing without publishing</td>
+</tr>
+</tbody>
+</table>
+<p>The workflow triggers on <code>push</code> rather than <code>pull_request</code>, which is
+Chromatic's recommendation: GitHub builds pull_request runs from an ephemeral
+merge commit, so the diff would include everything merged into <code>main</code> since the
+branch point. Chromatic still reports its <strong>UI Tests</strong> status on the pull
+request that contains the commit.</p>
+<p>To stop a visual change from merging before someone looks at it, add <strong>Visual
+tests (Chromatic)</strong> and Chromatic's <strong>UI Tests</strong> to the required status checks
+for <code>main</code> (Settings → Rules → Rulesets). Unreviewed changes then keep the pull
+request red until they are approved in Chromatic.</p>
+<blockquote>
+<p>[!NOTE]
+<code>apps/studio/package.json</code> overrides the transitive <code>storybook</code> version that
+<code>@chromatic-com/vitest</code> pins, to a release without the dev-server advisory that
+<code>npm audit</code> reports as critical. This project never runs a Storybook dev
+server; the override only patches the archive build Chromatic does internally.
+Revisit it when the plugin adopts a newer Storybook.</p>
+</blockquote>
+<h3 id="staying-inside-the-free-plan">Staying inside the free plan<a class="heading-anchor" href="#staying-inside-the-free-plan" aria-label="Copy link to this section" title="Copy link">#</a></h3><p>Chromatic bills <code>tests × builds × browsers × viewports</code>, and the free plan
+includes <strong>5,000 billed snapshots per month</strong> with Chrome only. Three deliberate
+choices keep this project far below that ceiling:</p>
+<table>
+<thead>
+<tr>
+<th>Choice</th>
+<th>Where</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Browser mode only picks up <code>*.visual.test.tsx</code></td>
+<td><code>apps/studio/vitest.visual.config.ts</code></td>
+<td>The 29 jsdom unit tests never bill a snapshot; adding a component to visual review is one explicit new file.</td>
+</tr>
+<tr>
+<td>One Chromium instance, one viewport</td>
+<td>same file</td>
+<td>No browser or viewport matrix multiplying each test.</td>
+</tr>
+<tr>
+<td>Animations paused at their end frame</td>
+<td>same file (<code>pauseAnimationAtEnd</code>)</td>
+<td>Shimmer and fade-in components do not diff on capture timing.</td>
+</tr>
+</tbody>
+</table>
+<p>Today that is <strong>2 snapshots per build</strong>, one build per branch push, so the
+monthly allowance would cover ~2,500 builds. A component added to visual review
+costs one snapshot per state per build, so keep new files focused on the states
+that matter rather than every prop permutation.</p>
+<p><code>apps/studio/chromatic.config.json</code> auto-accepts changes on <code>main</code> (so the
+default branch updates its baseline without a manual review) and exits zero on
+visual changes elsewhere, so the job itself reports success while the review
+lands in Chromatic's <strong>UI Tests</strong> check. Rendering errors still fail the job.</p>
+<h3 id="commands">Commands<a class="heading-anchor" href="#commands" aria-label="Copy link to this section" title="Copy link">#</a></h3><pre class="highlight"><code class="language-bash"><span class="c1"># Capture archives; needs Chromium locally (npx playwright install chromium)</span>
+npm<span class="w"> </span>--prefix<span class="w"> </span>apps/studio<span class="w"> </span>run<span class="w"> </span>test:visual
+
+<span class="c1"># Upload the archives captured above</span>
+<span class="nv">CHROMATIC_PROJECT_TOKEN</span><span class="o">=</span>...<span class="w"> </span>npm<span class="w"> </span>--prefix<span class="w"> </span>apps/studio<span class="w"> </span>run<span class="w"> </span>chromatic
+</code></pre><h3 id="adding-a-component">Adding a component<a class="heading-anchor" href="#adding-a-component" aria-label="Copy link to this section" title="Copy link">#</a></h3><ol>
+<li>Create <code>apps/studio/src/components/&lt;Name&gt;.visual.test.tsx</code>.</li>
+<li>Render the state you want reviewed, importing <code>../styles/theme.css</code> so the
+snapshot uses the real theme.</li>
+<li>Call <code>configure({ title: &quot;&lt;Name&gt;&quot; })</code> from <code>@chromatic-com/vitest</code> if the
+derived name is not the component name.</li>
+<li>Add one test per state worth reviewing. Automatic snapshots are captured at
+the end of each test; use <code>takeSnapshot(&quot;name&quot;)</code> for a mid-test state.</li>
+</ol>
+<h2 id="living-studio-on-a-free-cloudflare-worker">Living Studio on a Free Cloudflare Worker<a class="heading-anchor" href="#living-studio-on-a-free-cloudflare-worker" aria-label="Copy link to this section" title="Copy link">#</a></h2><p>Workers Containers — the only way to run the Python sidecar entirely on
+Cloudflare — requires the Workers Paid plan. On the free plan, the Worker serves
+the built SPA as Workers Static Assets and proxies <code>/api/*</code> to the sidecar
+through a free, account-less
+<a href="https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/">Cloudflare Quick Tunnel</a>.</p>
+<p><code>wrangler.jsonc</code> publishes <code>apps/studio/dist</code> with SPA fallback and runs the Worker
+first for <code>/api/*</code>; <code>infra/cloudflare/worker.ts</code> forwards those calls to the
+<code>SIDECAR_URL</code> secret. The browser only talks to the Worker origin, so the
+sidecar's CORS list is not involved.</p>
+<pre class="highlight"><code class="language-bash"><span class="c1"># 1. Build the SPA that the Worker uploads as static assets</span>
+npm<span class="w"> </span>--prefix<span class="w"> </span>apps/studio<span class="w"> </span>ci
+npm<span class="w"> </span>--prefix<span class="w"> </span>apps/studio<span class="w"> </span>run<span class="w"> </span>build
+
+<span class="c1"># 2. Terminal A — MCP server (:8000) + sidecar (:8100)</span>
+python<span class="w"> </span>scripts/dev.py
+
+<span class="c1"># 3. Terminal B — free public URL for the sidecar (no account required)</span>
+cloudflared<span class="w"> </span>tunnel<span class="w"> </span>--url<span class="w"> </span>http://127.0.0.1:8100
+<span class="c1"># copy the https://&lt;random&gt;.trycloudflare.com URL it prints</span>
+
+<span class="c1"># 4. Store the URL on the Worker, then deploy</span>
+npx<span class="w"> </span>wrangler<span class="w"> </span>secret<span class="w"> </span>put<span class="w"> </span>SIDECAR_URL<span class="w">   </span><span class="c1"># paste the trycloudflare URL</span>
+npx<span class="w"> </span>wrangler<span class="w"> </span>deploy
+</code></pre><p>Workers Builds settings (Workers &amp; Pages → your Worker → Settings → Builds):</p>
+<table>
+<thead>
+<tr>
+<th>Setting</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Production branch</td>
+<td><code>main</code></td>
+</tr>
+<tr>
+<td>Root directory</td>
+<td><code>/</code></td>
+</tr>
+<tr>
+<td>Build command</td>
+<td><code>npm --prefix apps/studio ci &amp;&amp; npm --prefix apps/studio run build</code></td>
+</tr>
+<tr>
+<td>Deploy command</td>
+<td><code>npx wrangler deploy</code></td>
+</tr>
+<tr>
+<td>Preview command</td>
+<td><code>npx wrangler preview</code></td>
+</tr>
+</tbody>
+</table>
+<p>A Worker has no run command: the Worker script runs on Cloudflare. Set <code>name</code> in
+<code>wrangler.jsonc</code> to the Worker you created before the first deploy.</p>
+<h3 id="pull-request-previews">Pull request previews<a class="heading-anchor" href="#pull-request-previews" aria-label="Copy link to this section" title="Copy link">#</a></h3><p>Workers Builds posts the build status and Preview URL to the pull request
+automatically. To enable it:</p>
+<ol>
+<li>Open the Worker → <strong>Settings</strong> → <strong>Build</strong> → <strong>Branch control</strong>.</li>
+<li>Keep the production branch set to <code>main</code> and enable <strong>Preview Builds</strong>.</li>
+<li>If Cloudflare shows <strong>Set up Worker Previews</strong>, complete the one-time switch.
+This cannot be reversed.</li>
+<li>Confirm the Preview command is <code>npx wrangler preview</code>.</li>
+</ol>
+<p><code>wrangler.jsonc</code> must keep a <code>previews</code> block, even an empty one: the
+<code>wrangler preview</code> command fails the build with &quot;Your Wrangler configuration is
+missing a <code>previews</code> block&quot; without it. Assets and compatibility settings stay
+at the top level, so <code>&quot;previews&quot;: {}</code> is enough while Previews need no extra
+settings. If a future Preview needs vars or bindings, add them under <code>previews</code>
+with Preview-safe values.</p>
+<p>Previews do not inherit production settings. The SPA loads from a Preview, but
+<code>/api/*</code> returns <code>502 SIDECAR_URL is not configured</code> until a preview-specific
+<code>SIDECAR_URL</code> secret is configured:</p>
+<pre class="highlight"><code class="language-bash">npx<span class="w"> </span>wrangler<span class="w"> </span>preview<span class="w"> </span>secret<span class="w"> </span>put<span class="w"> </span>SIDECAR_URL<span class="w"> </span>--name<span class="w"> </span>&lt;branch&gt;
+</code></pre><p>When <code>--name</code> is omitted it defaults to the current git branch. Previews are
+ephemeral, and pull requests from forks may not receive one. If Cloudflare does
+not comment, paste the URL into the PR's <strong>Deployment</strong> section.</p>
+<p>The <code>cf</code> CLI can inspect build triggers and recent builds (<code>cf builds triggers list</code>, <code>cf builds list</code>) and create a Preview (<code>cf previews deploy</code>), but it does
+not post GitHub PR comments. The Workers Builds Git integration owns the PR link;
+<code>cf</code> is only an optional verification tool and requires <code>cf auth login</code>.</p>
+<blockquote>
+<p>[!NOTE]
+The sidecar runs on your machine, so the Worker only works while
+<code>python scripts/dev.py</code> and the Quick Tunnel are running. Quick Tunnel URLs
+change on every restart — update the secret with
+<code>npx wrangler secret put SIDECAR_URL</code>. Chat also needs a reachable
+OpenAI-compatible endpoint in the Studio's <strong>Settings</strong>; the canvas, job map,
+and impact simulation work without one.</p>
+</blockquote>
+
+<p class="prose__source">Source of truth: <code>docs/deployment.md</code> &mdash; <a href="https://github.com/alehar9320/agentic-odi/blob/main/docs/deployment.md">view on GitHub</a></p>
+    </div>
+
+    <nav class="doc__toc" aria-label="On this page">
+      <p class="doc__toc-title">On this page</p>
+      <ul>
+        <li class="doc__toc-item doc__toc-item--2">
+          <a href="#project-site-github-pages">Project Site (GitHub Pages)</a>
+        </li>
+        <li class="doc__toc-item doc__toc-item--2">
+          <a href="#hosted-mcp-server">Hosted MCP Server</a>
+        </li>
+        <li class="doc__toc-item doc__toc-item--2">
+          <a href="#test-chat-ui">Test Chat (UI)</a>
+        </li>
+        <li class="doc__toc-item doc__toc-item--2">
+          <a href="#mcp-server-endpoint">MCP Server Endpoint</a>
+        </li>
+        <li class="doc__toc-item doc__toc-item--2">
+          <a href="#hosted-studio">Hosted Studio</a>
+        </li>
+        <li class="doc__toc-item doc__toc-item--2">
+          <a href="#component-visual-review-chromatic">Component Visual Review (Chromatic)</a>
+        </li>
+        <li class="doc__toc-item doc__toc-item--3">
+          <a href="#project-setup">Project setup</a>
+        </li>
+        <li class="doc__toc-item doc__toc-item--3">
+          <a href="#what-ci-does">What CI does</a>
+        </li>
+        <li class="doc__toc-item doc__toc-item--3">
+          <a href="#staying-inside-the-free-plan">Staying inside the free plan</a>
+        </li>
+        <li class="doc__toc-item doc__toc-item--3">
+          <a href="#commands">Commands</a>
+        </li>
+        <li class="doc__toc-item doc__toc-item--3">
+          <a href="#adding-a-component">Adding a component</a>
+        </li>
+        <li class="doc__toc-item doc__toc-item--2">
+          <a href="#living-studio-on-a-free-cloudflare-worker">Living Studio on a Free Cloudflare Worker</a>
+        </li>
+        <li class="doc__toc-item doc__toc-item--3">
+          <a href="#pull-request-previews">Pull request previews</a>
+        </li>
+      </ul>
+    </nav>
+
+    <nav class="doc__pager" aria-label="Documentation">
+      <a class="doc__pager-link doc__pager-link--prev" href="https://alehar9320.github.io/agentic-odi/docs/architecture/">
+        <span class="doc__pager-label">Previous</span>
+        <span class="doc__pager-title">Architecture</span>
+      </a>
+      <a class="doc__pager-link doc__pager-link--next" href="https://alehar9320.github.io/agentic-odi/docs/development/">
+        <span class="doc__pager-label">Next</span>
+        <span class="doc__pager-title">Development</span>
+      </a>
+    </nav>
+  </article>
+</div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="shell">
+      <div class="site-footer__top">
+        <div class="site-footer__brand">
+          <img src="../../assets/mark.svg" alt="" width="24" height="24" aria-hidden="true">
+          <span class="brand__name">Agentic&nbsp;ODI</span>
+        </div>
+        <p class="site-footer__tagline">Built with outcomes, not guesses.</p>
+      </div>
+      <nav class="site-footer__nav" aria-label="Footer">
+        <a href="https://github.com/alehar9320/agentic-odi">GitHub</a>
+        <a href="https://github.com/alehar9320/agentic-odi/issues">Issues</a>
+        <a href="https://alehar9320.github.io/agentic-odi/docs/">Docs</a>
+        <a href="https://agentic-odi.alehar.workers.dev/">Hosted Studio</a>
+        <a href="https://horizon.prefect.io/alhase/servers/agentic-odi/chat">Test chat</a>
+      </nav>
+      <p class="site-footer__legal">
+        &copy; 2026 Agentic ODI maintainers &middot; All rights reserved
+      </p>
+      <p class="site-footer__note">
+        Experimental. We don't publish dates &mdash; this page changes when the code does.
+      </p>
+    </div>
+  </footer>
+
+  <div class="search" data-search data-site-url="https://alehar9320.github.io/agentic-odi/"
+       data-index-url="https://alehar9320.github.io/agentic-odi/assets/search-index.json" hidden>
+    <div class="search__scrim" data-search-close></div>
+    <div class="search__panel" role="dialog" aria-modal="true" aria-label="Search the docs">
+      <div class="search__field">
+        <input class="search__input" type="search" placeholder="Search the docs"
+               aria-label="Search the docs" autocomplete="off" data-search-input>
+        <button class="search__close" type="button" data-search-close aria-label="Close search">Esc</button>
+      </div>
+      <p class="search__hint" data-search-hint>Type to search every guide and reference page.</p>
+      <ul class="search__results" data-search-results></ul>
+    </div>
+  </div>
+
+  <script defer src="../../assets/main.js"></script>
+</body>
+</html>

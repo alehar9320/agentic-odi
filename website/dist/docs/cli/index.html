@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CLI Reference</title>
+  <meta name="description" content="Backends, chat, entities, and scoring.">
+  <meta name="color-scheme" content="dark light">
+  <meta name="theme-color" content="#0a0b0e">
+
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Agentic ODI">
+  <meta property="og:title" content="CLI Reference">
+  <meta property="og:description" content="Backends, chat, entities, and scoring.">
+  <meta property="og:url" content="https://alehar9320.github.io/agentic-odi/docs/cli/index.html">
+  <meta property="og:image" content="https://alehar9320.github.io/agentic-odi/assets/og.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="CLI Reference">
+  <meta name="twitter:description" content="Backends, chat, entities, and scoring.">
+  <meta name="twitter:image" content="https://alehar9320.github.io/agentic-odi/assets/og.png">
+
+  <link rel="canonical" href="https://alehar9320.github.io/agentic-odi/docs/cli/index.html">
+  <script src="../../assets/theme.js"></script>
+  <link rel="stylesheet" href="../../assets/tokens.css">
+  <link rel="stylesheet" href="../../assets/style.css">
+  <link rel="icon" type="image/svg+xml" href="../../assets/favicon.svg">
+  <link rel="icon" type="image/png" href="../../assets/favicon.png" sizes="32x32">
+  <link rel="sitemap" type="application/xml" href="https://alehar9320.github.io/agentic-odi/sitemap.xml">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <header class="site-header">
+    <div class="site-header__inner">
+      <a class="brand" href="https://alehar9320.github.io/agentic-odi/">
+        <img src="../../assets/mark.svg" alt="" width="24" height="24" aria-hidden="true">
+        <span class="brand__name">Agentic&nbsp;ODI</span>
+      </a>
+      <nav class="site-nav" aria-label="Primary">
+        <a href="https://alehar9320.github.io/agentic-odi/#studio">The&nbsp;Studio</a>
+        <a href="https://alehar9320.github.io/agentic-odi/#how">How&nbsp;it&nbsp;works</a>
+        <a href="https://alehar9320.github.io/agentic-odi/docs/">Docs</a>
+      </nav>
+      <div class="site-header__actions">
+      <button
+        class="theme-toggle"
+        type="button"
+        aria-label="Switch to the light theme"
+        title="Switch theme"
+      >
+        <svg class="theme-toggle__sun" viewBox="0 0 24 24" width="17" height="17" aria-hidden="true" focusable="false">
+          <circle cx="12" cy="12" r="4.2" fill="none" stroke="currentColor" stroke-width="1.8"></circle>
+          <path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
+        </svg>
+        <svg class="theme-toggle__moon" viewBox="0 0 24 24" width="17" height="17" aria-hidden="true" focusable="false">
+          <path d="M20 14.2A8.4 8.4 0 0 1 9.8 4a8.5 8.5 0 1 0 10.2 10.2Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"></path>
+        </svg>
+      </button>
+      <button class="site-search" type="button" data-search-open aria-label="Search the docs (Control K)">
+        Search <kbd>Ctrl K</kbd>
+      </button>
+      <a class="btn btn--primary btn--sm" href="https://alehar9320.github.io/agentic-odi/#run">Run it in 60 seconds</a>
+      </div>
+    </div>
+  </header>
+
+  <main id="main">
+<div class="doc">
+  <aside class="doc__nav" aria-label="Documentation">
+    <a class="doc__back" href="https://alehar9320.github.io/agentic-odi/">← Agentic ODI</a>
+    <div class="doc__group">
+      <p class="doc__group-title">Get started</p>
+      <ul class="doc__list">
+        <li>
+          <a class="doc__link"
+             href="https://alehar9320.github.io/agentic-odi/docs/quick-start/">Quick start</a>
+        </li>
+        <li>
+          <a class="doc__link"
+             href="https://alehar9320.github.io/agentic-odi/docs/installation/">Installation</a>
+        </li>
+        <li>
+          <a class="doc__link"
+             href="https://alehar9320.github.io/agentic-odi/docs/studio/">The Living Studio</a>
+        </li>
+        <li>
+          <a class="doc__link"
+             href="https://alehar9320.github.io/agentic-odi/docs/local-llm/">Local LLM backend</a>
+        </li>
+      </ul>
+    </div>
+    <div class="doc__group">
+      <p class="doc__group-title">Build</p>
+      <ul class="doc__list">
+        <li>
+          <a class="doc__link is-current"
+             href="https://alehar9320.github.io/agentic-odi/docs/cli/">CLI reference</a>
+        </li>
+        <li>
+          <a class="doc__link"
+             href="https://alehar9320.github.io/agentic-odi/docs/connectors/">Connectors</a>
+        </li>
+        <li>
+          <a class="doc__link"
+             href="https://alehar9320.github.io/agentic-odi/docs/mcp/">MCP tool reference</a>
+        </li>
+        <li>
+          <a class="doc__link"
+             href="https://alehar9320.github.io/agentic-odi/docs/architecture/">Architecture</a>
+        </li>
+      </ul>
+    </div>
+    <div class="doc__group">
+      <p class="doc__group-title">Operate</p>
+      <ul class="doc__list">
+        <li>
+          <a class="doc__link"
+             href="https://alehar9320.github.io/agentic-odi/docs/deployment/">Deployment</a>
+        </li>
+        <li>
+          <a class="doc__link"
+             href="https://alehar9320.github.io/agentic-odi/docs/development/">Development</a>
+        </li>
+        <li>
+          <a class="doc__link"
+             href="https://alehar9320.github.io/agentic-odi/docs/roadmap/">Roadmap</a>
+        </li>
+      </ul>
+    </div>
+  </aside>
+
+  <article class="doc__body">
+    <header class="doc__head">
+      <p class="eyebrow">Build</p>
+      <h1 class="doc__title">CLI Reference</h1>
+<p class="lead">Backends, chat, entities, and scoring.</p>    </header>
+
+    <div class="prose">
+      <p>The <code>agentic-odi</code> CLI is a <a href="https://github.com/fastapi/typer"><code>Typer</code></a>-based
+command-line interface for working with Agentic ODI without a chat UI. It
+provides an interactive chat mode plus version, update, and data commands. Data
+commands are <strong>local-first</strong>: they read and write a SQLite store with no server
+required, and switch to a remote MCP server with <code>--backend mcp</code>.</p>
+<p>Install the workspace first if you have not already:</p>
+<pre class="highlight"><code class="language-bash">uv<span class="w"> </span>sync<span class="w"> </span>--all-packages
+</code></pre><h2 id="launching">Launching<a class="heading-anchor" href="#launching" aria-label="Copy link to this section" title="Copy link">#</a></h2><pre class="highlight"><code class="language-bash">python<span class="w"> </span>-m<span class="w"> </span>agentic_odi_cli<span class="w"> </span>--version<span class="w">   </span><span class="c1"># print the Agentic ODI version</span>
+python<span class="w"> </span>-m<span class="w"> </span>agentic_odi_cli<span class="w"> </span>--help<span class="w">      </span><span class="c1"># show available options and commands</span>
+python<span class="w"> </span>-m<span class="w"> </span>agentic_odi_cli<span class="w">             </span><span class="c1"># start interactive chat in a terminal (help when piped)</span>
+</code></pre><p>A console script is also installed, so <code>agentic-odi --version</code> works the same way.</p>
+<h2 id="global-options">Global options<a class="heading-anchor" href="#global-options" aria-label="Copy link to this section" title="Copy link">#</a></h2><table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Environment variable</th>
+<th>Default</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--backend auto|local|mcp</code></td>
+<td><code>AGENTIC_ODI_BACKEND</code></td>
+<td><code>local</code></td>
+<td>Run in-process against SQLite, call a remote MCP server, or (<code>auto</code>) try local first and fall back to MCP.</td>
+</tr>
+<tr>
+<td><code>--db PATH</code></td>
+<td><code>AGENTIC_ODI_DB</code></td>
+<td><code>~/.agentic-odi/odi.db</code></td>
+<td>Store path for the <code>local</code> backend.</td>
+</tr>
+<tr>
+<td><code>--mcp-url URL</code></td>
+<td><code>AGENTIC_ODI_MCP_URL</code></td>
+<td><code>http://localhost:8000/mcp</code></td>
+<td>Server URL for the <code>mcp</code> backend.</td>
+</tr>
+</tbody>
+</table>
+<p>Data commands print readable tables and blocks by default; add <code>--json</code> for
+machine-readable output. Diagnostics go to stderr and failures exit non-zero
+(<code>0</code> success, <code>1</code> error, <code>2</code> usage error).</p>
+<h2 id="interactive-chat">Interactive chat<a class="heading-anchor" href="#interactive-chat" aria-label="Copy link to this section" title="Copy link">#</a></h2><p><code>agentic-odi chat</code> (or simply <code>agentic-odi</code> in a terminal) starts an
+offline-first interactive REPL. The session always boots, even when no model or
+MCP server is reachable — a yellow warning is shown for any unavailable service,
+and free-text messages return a friendly nudge until you connect.</p>
+<pre class="highlight"><code class="language-bash">agentic-odi<span class="w"> </span>chat
+agentic-odi<span class="w"> </span>chat<span class="w"> </span>--model<span class="w"> </span>local-tools-model<span class="w"> </span>--mcp-url<span class="w"> </span>http://localhost:8000/mcp
+</code></pre><p>Thinking does not need the Studio or its sidecar. While the first token is on
+its way, a dim <code>thinking…</code> sits on the prompt line and is erased when the reply
+starts, so a cold model reads as work rather than a hung session. When the
+model exposes its reasoning (<code>reasoning_content</code> or <code>reasoning</code>, as vLLM,
+Ollama, and DeepSeek do), it is printed dimmed on stderr as <code>thinking › …</code>:
+the answer on stdout stays clean, and the thinking is never replayed as
+conversation history.</p>
+<h3 id="connection-settings">Connection settings<a class="heading-anchor" href="#connection-settings" aria-label="Copy link to this section" title="Copy link">#</a></h3><p>The chat resolves settings in priority order:
+<strong>CLI flag → environment variable → persisted profile → built-in default.</strong></p>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Default</th>
+<th>CLI flag</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>AGENTIC_ODI_BASE_URL</code></td>
+<td><code>http://localhost:8001/v1</code></td>
+<td><code>--base-url</code></td>
+</tr>
+<tr>
+<td><code>AGENTIC_ODI_MODEL</code></td>
+<td><code>local-tools-model</code></td>
+<td><code>--model</code></td>
+</tr>
+<tr>
+<td><code>AGENTIC_ODI_API_KEY</code></td>
+<td><code>local</code></td>
+<td><code>--api-key</code></td>
+</tr>
+<tr>
+<td><code>AGENTIC_ODI_MCP_URL</code></td>
+<td><code>http://localhost:8000/mcp</code></td>
+<td><code>--mcp-url</code></td>
+</tr>
+</tbody>
+</table>
+<p>The <strong>persisted profile</strong> is stored at
+<code>~/.config/agentic-odi/llm_profile.json</code>. You can create or update it from
+within the session using <code>/connect</code>.</p>
+<h3 id="slash-commands">Slash commands<a class="heading-anchor" href="#slash-commands" aria-label="Copy link to this section" title="Copy link">#</a></h3><table>
+<thead>
+<tr>
+<th>Command</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/help</code></td>
+<td>Show all available commands</td>
+</tr>
+<tr>
+<td><code>/status</code></td>
+<td>Show current model, base URL, and MCP server with connection status</td>
+</tr>
+<tr>
+<td><code>/connect</code></td>
+<td>Launch the wizard: provider → URL → API key → model → MCP URL → save</td>
+</tr>
+<tr>
+<td><code>/model &lt;name&gt;</code></td>
+<td>Hot-swap to a different model mid-session</td>
+</tr>
+<tr>
+<td><code>/mcp &lt;url&gt;</code></td>
+<td>Reconnect to a different MCP server mid-session</td>
+</tr>
+<tr>
+<td><code>/tools</code></td>
+<td>List the MCP tools the assistant can call</td>
+</tr>
+<tr>
+<td><code>/clear</code></td>
+<td>Reset conversation history (keeps connection)</td>
+</tr>
+<tr>
+<td><code>/exit</code></td>
+<td>Quit the session (also <code>/quit</code>)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="connect-wizard">/connect wizard<a class="heading-anchor" href="#connect-wizard" aria-label="Copy link to this section" title="Copy link">#</a></h3><p><code>/connect</code> walks you through configuring your LLM provider interactively:</p>
+<ol>
+<li><strong>Provider</strong> — choose <code>openai</code>, <code>anthropic</code>, <code>local</code>, or <code>other</code></li>
+<li><strong>Base URL</strong> — preset filled for known providers; override freely</li>
+<li><strong>API key</strong> — input is hidden via <code>getpass</code></li>
+<li><strong>Model</strong> — sensible default per provider</li>
+<li><strong>MCP URL</strong> — defaults to the current value</li>
+<li><strong>Save to profile?</strong> — writes <code>~/.config/agentic-odi/llm_profile.json</code> so settings persist across sessions</li>
+</ol>
+<p>The wizard can be cancelled at any step with Ctrl-C.</p>
+<blockquote>
+<p>[!NOTE]
+Chat is the only CLI mode that needs an LLM endpoint. The <code>customer-outcomes</code>
+and <code>connectors</code> commands keep working without one.</p>
+</blockquote>
+<h2 id="manage-jobs-steps-and-desired-outcomes">Manage Jobs, Steps, and desired Outcomes<a class="heading-anchor" href="#manage-jobs-steps-and-desired-outcomes" aria-label="Copy link to this section" title="Copy link">#</a></h2><p>Every ODI entity has the same create/read/update/delete surface in the CLI and
+the MCP server. Jobs hold Steps (the Job Map) and desired Outcomes; deleting a
+Job cascades to both.</p>
+<pre class="highlight"><code class="language-bash"><span class="c1"># Jobs</span>
+agentic-odi<span class="w"> </span><span class="nb">jobs</span><span class="w"> </span>add<span class="w"> </span>--name<span class="w"> </span><span class="s2">"Onboard a customer"</span><span class="w"> </span>--description<span class="w"> </span><span class="s2">"First 30 days"</span>
+agentic-odi<span class="w"> </span><span class="nb">jobs</span><span class="w"> </span>list
+agentic-odi<span class="w"> </span><span class="nb">jobs</span><span class="w"> </span>get<span class="w"> </span>&lt;job-id&gt;
+agentic-odi<span class="w"> </span><span class="nb">jobs</span><span class="w"> </span>update<span class="w"> </span>&lt;job-id&gt;<span class="w"> </span>--name<span class="w"> </span><span class="s2">"Onboard a new customer"</span>
+agentic-odi<span class="w"> </span><span class="nb">jobs</span><span class="w"> </span>delete<span class="w"> </span>&lt;job-id&gt;<span class="w"> </span>--yes
+
+<span class="c1"># Steps (Job Map)</span>
+agentic-odi<span class="w"> </span>steps<span class="w"> </span>add<span class="w"> </span>--job-id<span class="w"> </span>&lt;job-id&gt;<span class="w"> </span>--name<span class="w"> </span><span class="s2">"Prepare environment"</span><span class="w"> </span>--order<span class="w"> </span><span class="m">1</span>
+agentic-odi<span class="w"> </span>steps<span class="w"> </span>list<span class="w"> </span>--job-id<span class="w"> </span>&lt;job-id&gt;
+agentic-odi<span class="w"> </span>steps<span class="w"> </span>get<span class="w"> </span>&lt;step-id&gt;
+agentic-odi<span class="w"> </span>steps<span class="w"> </span>update<span class="w"> </span>&lt;step-id&gt;<span class="w"> </span>--order<span class="w"> </span><span class="m">2</span>
+agentic-odi<span class="w"> </span>steps<span class="w"> </span>delete<span class="w"> </span>&lt;step-id&gt;<span class="w"> </span>--yes
+
+<span class="c1"># Desired Outcomes</span>
+agentic-odi<span class="w"> </span>desired-outcomes<span class="w"> </span>add<span class="w"> </span>--job-id<span class="w"> </span>&lt;job-id&gt;<span class="w">   </span>--statement<span class="w"> </span><span class="s2">"Minimize the time it takes to get a working environment"</span><span class="w">   </span>--importance<span class="w"> </span><span class="m">8</span><span class="w"> </span>--satisfaction<span class="w"> </span><span class="m">4</span>
+agentic-odi<span class="w"> </span>desired-outcomes<span class="w"> </span>list<span class="w"> </span>--job-id<span class="w"> </span>&lt;job-id&gt;
+agentic-odi<span class="w"> </span>desired-outcomes<span class="w"> </span>get<span class="w"> </span>&lt;outcome-id&gt;
+agentic-odi<span class="w"> </span>desired-outcomes<span class="w"> </span>update<span class="w"> </span>&lt;outcome-id&gt;<span class="w"> </span>--satisfaction<span class="w"> </span><span class="m">6</span>
+agentic-odi<span class="w"> </span>desired-outcomes<span class="w"> </span>delete<span class="w"> </span>&lt;outcome-id&gt;<span class="w"> </span>--yes
+</code></pre><p>Add <code>--json</code> to any command for machine-readable output.</p>
+<h2 id="evidence">Evidence<a class="heading-anchor" href="#evidence" aria-label="Copy link to this section" title="Copy link">#</a></h2><p>Evidence is research captured from connectors (or entered by hand) and linked to
+a Job, Step, or desired Outcome. Records can later be promoted into ODI
+artifacts — the bridge from research to the model, without hand-copying.</p>
+<pre class="highlight"><code class="language-bash"><span class="c1"># Capture a record by hand</span>
+agentic-odi<span class="w"> </span>evidence<span class="w"> </span>add<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--source-name<span class="w"> </span><span class="s2">"interview"</span><span class="w"> </span>--source-kind<span class="w"> </span>manual<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--name<span class="w"> </span><span class="s2">"Support lead"</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--content<span class="w"> </span><span class="s2">"Setup takes two days for every new engineer"</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--job-id<span class="w"> </span>&lt;job-id&gt;
+
+<span class="c1"># Read and delete</span>
+agentic-odi<span class="w"> </span>evidence<span class="w"> </span>list<span class="w"> </span>--job-id<span class="w"> </span>&lt;job-id&gt;
+agentic-odi<span class="w"> </span>evidence<span class="w"> </span>list<span class="w"> </span>--job-id<span class="w"> </span>&lt;job-id&gt;<span class="w"> </span>--json
+agentic-odi<span class="w"> </span>evidence<span class="w"> </span>get<span class="w"> </span>&lt;evidence-id&gt;
+agentic-odi<span class="w"> </span>evidence<span class="w"> </span>delete<span class="w"> </span>&lt;evidence-id&gt;<span class="w"> </span>--yes
+
+<span class="c1"># Promote into the ODI model</span>
+agentic-odi<span class="w"> </span>evidence<span class="w"> </span>promote<span class="w"> </span>&lt;evidence-id&gt;<span class="w"> </span>--to<span class="w"> </span>job
+agentic-odi<span class="w"> </span>evidence<span class="w"> </span>promote<span class="w"> </span>&lt;evidence-id&gt;<span class="w"> </span>--to<span class="w"> </span>outcome<span class="w"> </span>--job-id<span class="w"> </span>&lt;job-id&gt;
+</code></pre><p><code>connectors ingest --job-id &lt;job-id&gt;</code> maps every evidence-bearing record in the
+ingested batch into evidence in one step.</p>
+<h2 id="schema-scoring-and-guidance">Schema, scoring, and guidance<a class="heading-anchor" href="#schema-scoring-and-guidance" aria-label="Copy link to this section" title="Copy link">#</a></h2><pre class="highlight"><code class="language-bash">agentic-odi<span class="w"> </span>schema<span class="w">            </span><span class="c1"># canonical JSON schema for every ODI entity</span>
+agentic-odi<span class="w"> </span>score<span class="w"> </span><span class="m">8</span><span class="w"> </span><span class="m">2</span><span class="w">         </span><span class="c1"># ODI opportunity score → 14.00</span>
+agentic-odi<span class="w"> </span>evaluate<span class="w"> </span><span class="s2">"Minimize the time to ship when onboarding"</span><span class="w">  </span><span class="c1"># outcome-format check</span>
+agentic-odi<span class="w"> </span>evaluate<span class="w"> </span>--json<span class="w"> </span><span class="s2">"Minimize the time to ship when onboarding"</span>
+agentic-odi<span class="w"> </span>guidelines<span class="w">        </span><span class="c1"># the ODI stage-by-stage guide</span>
+agentic-odi<span class="w"> </span>capabilities<span class="w">      </span><span class="c1"># what the assistant can do</span>
+</code></pre><p><code>evaluate</code> returns the same verdict the <code>evaluate_outcome</code> MCP tool does, so the
+check works with or without a running server.</p>
+<h2 id="manage-customer-outcomes">Manage Customer Outcomes<a class="heading-anchor" href="#manage-customer-outcomes" aria-label="Copy link to this section" title="Copy link">#</a></h2><p>Customer Outcomes link customer value to business value. The <code>local</code> backend
+writes to the shared SQLite store with no server required; add <code>--backend mcp</code>
+to route through a running MCP server (<code>python -m agentic_odi_mcp_server</code>). The group is also
+available under its historical name <code>outcomes</code>.</p>
+<pre class="highlight"><code class="language-bash"><span class="c1"># Add a Customer Outcome</span>
+agentic-odi<span class="w"> </span>customer-outcomes<span class="w"> </span>add<span class="w"> </span>--job-id<span class="w"> </span>&lt;job-id&gt;<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--direction<span class="w"> </span>minimize<span class="w"> </span>--unit<span class="w"> </span><span class="s2">"time"</span><span class="w"> </span>--object<span class="w"> </span><span class="s2">"to resolve setup errors"</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--statement<span class="w"> </span><span class="s2">"Minimize the time to resolve environment setup errors when onboarding"</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--importance<span class="w"> </span><span class="m">8</span>.8<span class="w"> </span>--satisfaction<span class="w"> </span><span class="m">3</span>.2<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--category<span class="w"> </span>cost_reduction<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--business-statement<span class="w"> </span><span class="s2">"Saves engineering hours and reduces early churn"</span>
+
+<span class="c1"># Attach value metrics: repeatable JSON objects</span>
+agentic-odi<span class="w"> </span>customer-outcomes<span class="w"> </span>add<span class="w"> </span>--job-id<span class="w"> </span>&lt;job-id&gt;<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--direction<span class="w"> </span>minimize<span class="w"> </span>--unit<span class="w"> </span><span class="s2">"time"</span><span class="w"> </span>--object<span class="w"> </span><span class="s2">"to resolve setup errors"</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--statement<span class="w"> </span><span class="s2">"Minimize the time to resolve environment setup errors when onboarding"</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--importance<span class="w"> </span><span class="m">8</span>.8<span class="w"> </span>--satisfaction<span class="w"> </span><span class="m">3</span>.2<span class="w"> </span>--category<span class="w"> </span>cost_reduction<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--business-statement<span class="w"> </span><span class="s2">"Saves engineering hours"</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--value-metric<span class="w"> </span><span class="s1">'{"name":"first response","direction":"minimize","unit_of_measure":"minutes","importance":7,"satisfaction":3}'</span>
+
+<span class="c1"># List outcomes (optionally filtered, or as JSON)</span>
+agentic-odi<span class="w"> </span>customer-outcomes<span class="w"> </span>list
+agentic-odi<span class="w"> </span>customer-outcomes<span class="w"> </span>list<span class="w"> </span>--job-id<span class="w"> </span>&lt;job-id&gt;
+agentic-odi<span class="w"> </span>customer-outcomes<span class="w"> </span>list<span class="w"> </span>--json
+
+<span class="c1"># Get, update, delete</span>
+agentic-odi<span class="w"> </span>customer-outcomes<span class="w"> </span>get<span class="w"> </span>&lt;outcome-id&gt;
+agentic-odi<span class="w"> </span>customer-outcomes<span class="w"> </span>update<span class="w"> </span>&lt;outcome-id&gt;<span class="w"> </span>--importance<span class="w"> </span><span class="m">9</span>.0
+agentic-odi<span class="w"> </span>customer-outcomes<span class="w"> </span>delete<span class="w"> </span>&lt;outcome-id&gt;<span class="w"> </span>--yes
+
+<span class="c1"># Compute an ODI Opportunity Score (top-level, also under the group)</span>
+agentic-odi<span class="w"> </span>score<span class="w"> </span><span class="m">8</span><span class="w"> </span><span class="m">2</span>
+agentic-odi<span class="w"> </span>outcomes<span class="w"> </span>score<span class="w"> </span><span class="m">8</span><span class="w"> </span><span class="m">2</span>
+</code></pre><p><code>score</code> applies the ODI opportunity formula,
+<code>importance + max(importance - satisfaction, 0)</code>.</p>
+<p>Set <code>AGENTIC_ODI_MCP_URL</code> (or <code>--mcp-url</code>) to point to a non-default server when
+using <code>--backend mcp</code> (default: <code>http://localhost:8000/mcp</code>).</p>
+<h2 id="connectors">Connectors<a class="heading-anchor" href="#connectors" aria-label="Copy link to this section" title="Copy link">#</a></h2><p>The <code>connectors</code> group manages external MCP integrations. See
+<a href="../connectors/">External Connectors</a> for presets, the connector registry, and
+ingest behavior.</p>
+<pre class="highlight"><code class="language-bash">python<span class="w"> </span>-m<span class="w"> </span>agentic_odi_cli<span class="w"> </span>connectors<span class="w"> </span>catalog
+python<span class="w"> </span>-m<span class="w"> </span>agentic_odi_cli<span class="w"> </span>connectors<span class="w"> </span>add<span class="w"> </span>mcp<span class="w"> </span>--preset<span class="w"> </span>github
+python<span class="w"> </span>-m<span class="w"> </span>agentic_odi_cli<span class="w"> </span>connectors<span class="w"> </span>list
+python<span class="w"> </span>-m<span class="w"> </span>agentic_odi_cli<span class="w"> </span>connectors<span class="w"> </span>list<span class="w"> </span>--json<span class="w">   </span><span class="c1"># name, kind, url, enabled per connector</span>
+python<span class="w"> </span>-m<span class="w"> </span>agentic_odi_cli<span class="w"> </span>connectors<span class="w"> </span>health<span class="w"> </span>--name<span class="w"> </span>github
+python<span class="w"> </span>-m<span class="w"> </span>agentic_odi_cli<span class="w"> </span>connectors<span class="w"> </span>ingest<span class="w"> </span>--name<span class="w"> </span>github
+</code></pre><h2 id="updates">Updates<a class="heading-anchor" href="#updates" aria-label="Copy link to this section" title="Copy link">#</a></h2><p><code>odi update</code> checks for and installs a new binary release. Auto-update is on by
+default; disable it with <code>--no-update</code> for one run or
+<code>AGENTIC_ODI_NO_UPDATE=1</code> globally. See <a href="../installation/">Installation</a>.</p>
+
+<p class="prose__source">Source of truth: <code>docs/cli.md</code> &mdash; <a href="https://github.com/alehar9320/agentic-odi/blob/main/docs/cli.md">view on GitHub</a></p>
+    </div>
+
+    <nav class="doc__toc" aria-label="On this page">
+      <p class="doc__toc-title">On this page</p>
+      <ul>
+        <li class="doc__toc-item doc__toc-item--2">
+          <a href="#launching">Launching</a>
+        </li>
+        <li class="doc__toc-item doc__toc-item--2">
+          <a href="#global-options">Global options</a>
+        </li>
+        <li class="doc__toc-item doc__toc-item--2">
+          <a href="#interactive-chat">Interactive chat</a>
+        </li>
+        <li class="doc__toc-item doc__toc-item--3">
+          <a href="#connection-settings">Connection settings</a>
+        </li>
+        <li class="doc__toc-item doc__toc-item--3">
+          <a href="#slash-commands">Slash commands</a>
+        </li>
+        <li class="doc__toc-item doc__toc-item--3">
+          <a href="#connect-wizard">/connect wizard</a>
+        </li>
+        <li class="doc__toc-item doc__toc-item--2">
+          <a href="#manage-jobs-steps-and-desired-outcomes">Manage Jobs, Steps, and desired Outcomes</a>
+        </li>
+        <li class="doc__toc-item doc__toc-item--2">
+          <a href="#evidence">Evidence</a>
+        </li>
+        <li class="doc__toc-item doc__toc-item--2">
+          <a href="#schema-scoring-and-guidance">Schema, scoring, and guidance</a>
+        </li>
+        <li class="doc__toc-item doc__toc-item--2">
+          <a href="#manage-customer-outcomes">Manage Customer Outcomes</a>
+        </li>
+        <li class="doc__toc-item doc__toc-item--2">
+          <a href="#connectors">Connectors</a>
+        </li>
+        <li class="doc__toc-item doc__toc-item--2">
+          <a href="#updates">Updates</a>
+        </li>
+      </ul>
+    </nav>
+
+    <nav class="doc__pager" aria-label="Documentation">
+      <a class="doc__pager-link doc__pager-link--prev" href="https://alehar9320.github.io/agentic-odi/docs/local-llm/">
+        <span class="doc__pager-label">Previous</span>
+        <span class="doc__pager-title">Local LLM backend</span>
+      </a>
+      <a class="doc__pager-link doc__pager-link--next" href="https://alehar9320.github.io/agentic-odi/docs/connectors/">
+        <span class="doc__pager-label">Next</span>
+        <span class="doc__pager-title">Connectors</span>
+      </a>
+    </nav>
+  </article>
+</div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="shell">
+      <div class="site-footer__top">
+        <div class="site-footer__brand">
+          <img src="../../assets/mark.svg" alt="" width="24" height="24" aria-hidden="true">
+          <span class="brand__name">Agentic&nbsp;ODI</span>
+        </div>
+        <p class="site-footer__tagline">Built with outcomes, not guesses.</p>
+      </div>
+      <nav class="site-footer__nav" aria-label="Footer">
+        <a href="https://github.com/alehar9320/agentic-odi">GitHub</a>
+        <a href="https://github.com/alehar9320/agentic-odi/issues">Issues</a>
+        <a href="https://alehar9320.github.io/agentic-odi/docs/">Docs</a>
+        <a href="https://agentic-odi.alehar.workers.dev/">Hosted Studio</a>
+        <a href="https://horizon.prefect.io/alhase/servers/agentic-odi/chat">Test chat</a>
+      </nav>
+      <p class="site-footer__legal">
+        &copy; 2026 Agentic ODI maintainers &middot; All rights reserved
+      </p>
+      <p class="site-footer__note">
+        Experimental. We don't publish dates &mdash; this page changes when the code does.
+      </p>
+    </div>
+  </footer>
+
+  <div class="search" data-search data-site-url="https://alehar9320.github.io/agentic-odi/"
+       data-index-url="https://alehar9320.github.io/agentic-odi/assets/search-index.json" hidden>
+    <div class="search__scrim" data-search-close></div>
+    <div class="search__panel" role="dialog" aria-modal="true" aria-label="Search the docs">
+      <div class="search__field">
+        <input class="search__input" type="search" placeholder="Search the docs"
+               aria-label="Search the docs" autocomplete="off" data-search-input>
+        <button class="search__close" type="button" data-search-close aria-label="Close search">Esc</button>
+      </div>
+      <p class="search__hint" data-search-hint>Type to search every guide and reference page.</p>
+      <ul class="search__results" data-search-results></ul>
+    </div>
+  </div>
+
+  <script defer src="../../assets/main.js"></script>
+</body>
+</html>
