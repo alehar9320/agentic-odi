@@ -227,7 +227,6 @@ class LatestConversationResponse(BaseModel):
     turns: list[TurnModel] = Field(default_factory=list)
 
 
-
 class TurnNode(BaseModel):
     """One turn in the branch tree, as the thread runtime needs it."""
 
@@ -273,4 +272,3 @@ class CapabilityItem(BaseModel):
 
 class CapabilitiesResponse(BaseModel):
     capabilities: list[CapabilityItem]
-

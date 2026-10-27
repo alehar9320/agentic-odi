@@ -684,7 +684,6 @@ async def resolve_approval(
     return ApprovalDecisionResponse(ok=True, id=approval_id)
 
 
-
 @router.post("/chat")
 async def post_chat(request: Request, body: ChatRequest) -> StreamingResponse:
     # The request id is the server's: the header the client sent (or one the
