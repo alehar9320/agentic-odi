@@ -68,4 +68,5 @@ apps/cli ──────────────▶ packages/connectors
 ## Related
 
 - [Data flow](data-flow.md)
+- [Studio banners](banners.md)
 - [Testing](testing.md)

@@ -181,6 +181,22 @@ the fetch failed, and a broken lens is contained to that lens. Quote the
 `request_id` when you report a failure: it is echoed on the response header and
 on every streamed frame, and it is the id in the sidecar's per-turn log line.
 
+### Banners
+
+Everything the Studio says about the state of the studio goes through one banner
+system: the sidecar strip, the offline strip, and the toast stack are now kinds
+in a single catalog, not three components. A banner is an entry in
+`apps/studio/src/banners/catalog.ts` plus a `raise()` call — never a new
+component and never a new CSS class, so any number of banners stays consistent.
+
+Two docks, one model. A `top` banner is a sticky page strip for a condition that
+holds the layout still; a `corner` banner is a fixed stack for an event. Severity
+drives urgency and ARIA (`critical`/`warning` interrupt, `info`/`success` wait),
+a persistent banner never auto-expires, and anything past the visible cap
+collapses into a "+N more notices" affordance. The live region, timers, and
+dismissal come from `@radix-ui/react-toast`. See
+[Studio banners](docs/architecture/banners.md).
+
 ### CLI at a glance
 
 The CLI is local-first, so data commands work without a running server:

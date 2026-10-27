@@ -1,6 +1,6 @@
 # Banner System Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Replace five hand-rolled "tell the user something" surfaces with one typed, modular banner system that renders any number of banners consistently.
 
@@ -52,11 +52,11 @@
   - `function severityWeight(severity: BannerSeverity): number`
   - `function resolveSpec(spec: BannerSpec): Omit<Banner, "id" | "raisedAt">`
 
-- [ ] **Step 1: Write the failing test** in `catalog.test.ts` — assert every `BannerKind` has a complete entry, that `sidecar-down` is `critical`/`persistent`/`top` and dismissible, that `model-offline` is `warning`/`persistent` and not dismissible, and that `severityWeight` orders critical above warning above info above success.
-- [ ] **Step 2: Run `npm test -- banners/catalog` and watch it fail** (module missing).
-- [ ] **Step 3: Implement `types.ts` and `catalog.ts`.**
-- [ ] **Step 4: Run `npm test -- banners/catalog`** — PASS.
-- [ ] **Step 5: Commit.**
+- [x] **Step 1: Write the failing test** in `catalog.test.ts` — assert every `BannerKind` has a complete entry, that `sidecar-down` is `critical`/`persistent`/`top` and dismissible, that `model-offline` is `warning`/`persistent` and not dismissible, and that `severityWeight` orders critical above warning above info above success.
+- [x] **Step 2: Run `npm test -- banners/catalog` and watch it fail** (module missing).
+- [x] **Step 3: Implement `types.ts` and `catalog.ts`.**
+- [x] **Step 4: Run `npm test -- banners/catalog`** — PASS.
+- [x] **Step 5: Commit.**
 
 ### Task 2: The store (pure)
 
@@ -74,11 +74,11 @@
   - `function dismissBanner(state, id): BannerState`
   - `function selectBanners(state, maxVisible?): { visible: Banner[]; overflow: number }`
 
-- [ ] **Step 1: Write failing tests** — dedupe by kind; resolve removes; dismiss removes; `selectBanners` orders `critical` before `success`; cap at 3 with overflow counted; a later raise of a dismissed kind reappears.
-- [ ] **Step 2: Run `npm test -- banners/store` and watch it fail.**
-- [ ] **Step 3: Implement `store.ts` as pure functions.**
-- [ ] **Step 4: Run `npm test -- banners/store`** — PASS.
-- [ ] **Step 5: Commit.**
+- [x] **Step 1: Write failing tests** — dedupe by kind; resolve removes; dismiss removes; `selectBanners` orders `critical` before `success`; cap at 3 with overflow counted; a later raise of a dismissed kind reappears.
+- [x] **Step 2: Run `npm test -- banners/store` and watch it fail.**
+- [x] **Step 3: Implement `store.ts` as pure functions.**
+- [x] **Step 4: Run `npm test -- banners/store`** — PASS.
+- [x] **Step 5: Commit.**
 
 ### Task 3: The provider and hook
 
@@ -93,11 +93,11 @@
   - `function BannerProvider({ children, maxVisible? })`
   - `function useBanner(): BannerApi`
 
-- [ ] **Step 1: Write failing tests** — `renderHook` wrapped in `BannerProvider`; raise then read `view.visible`; raise same kind twice yields one; resolve clears it.
-- [ ] **Step 2: Run `npm test -- banners/BannerProvider` and watch it fail.**
-- [ ] **Step 3: Implement the provider with `useReducer` over the store.**
-- [ ] **Step 4: Run the test** — PASS.
-- [ ] **Step 5: Commit.**
+- [x] **Step 1: Write failing tests** — `renderHook` wrapped in `BannerProvider`; raise then read `view.visible`; raise same kind twice yields one; resolve clears it.
+- [x] **Step 2: Run `npm test -- banners/BannerProvider` and watch it fail.**
+- [x] **Step 3: Implement the provider with `useReducer` over the store.**
+- [x] **Step 4: Run the test** — PASS.
+- [x] **Step 5: Commit.**
 
 ### Task 4: `Banner` and `BannerStack` renderer
 
@@ -111,34 +111,53 @@
 - Consumes: `Banner` type (Task 1), `BannerApi` (Task 3).
 - Produces: `function Banner({ banner, onDismiss })`, `function BannerStack({ dock })`.
 
-- [ ] **Step 1: Write failing tests** — renders one banner's title and body; `critical` gets `role="alert"`, `info` gets `role="status"`; an action button calls its `intent`; overflow renders a "+N" affordance.
-- [ ] **Step 2: Run `npm test -- banners/BannerStack` and watch it fail.**
-- [ ] **Step 3: Implement `Banner.tsx` on Radix `Toast.Root` and `BannerStack.tsx` on `Toast.Provider`/`Toast.Viewport`; add the `.banner*` token block to `theme.css`.**
-- [ ] **Step 4: Run the test** — PASS.
-- [ ] **Step 5: Commit.**
+- [x] **Step 1: Write failing tests** — renders one banner's title and body; `critical` gets `role="alert"`, `info` gets `role="status"`; an action button calls its `intent`; overflow renders a "+N" affordance.
+- [x] **Step 2: Run `npm test -- banners/BannerStack` and watch it fail.**
+- [x] **Step 3: Implement `Banner.tsx` on Radix `Toast.Root` and `BannerStack.tsx` on `Toast.Provider`/`Toast.Viewport`; add the `.banner*` token block to `theme.css`.**
+- [x] **Step 4: Run the test** — PASS.
+- [x] **Step 5: Commit.**
 
 ### Task 5: Migrate the existing notices and toasts
 
 **Files:**
 - Modify: `apps/studio/src/App.tsx` — mount `BannerProvider` and `BannerStack`; delete `Toasts`/`SidecarNotice` mounts
-- Modify: `apps/studio/src/components/notices/SidecarNotice.tsx` — raise/resolve `sidecar-down`
-- Modify: `apps/studio/src/components/chat/OfflineNotice.tsx` — raise `model-offline`
+- Add: `apps/studio/src/banners/BannerBridge.tsx` — raise/resolve `sidecar-down` and `model-offline` from studio state, route actions and dismissal
+- Add: `apps/studio/src/banners/BannerToasts.tsx` — turn each `pushToast` into a keyed banner
+- Delete: `apps/studio/src/components/notices/SidecarNotice.tsx` and `apps/studio/src/components/chat/OfflineNotice.tsx` (now kinds, not components)
 - Delete: `apps/studio/src/components/Toasts.tsx` and its test
-- Modify: `apps/studio/src/state/StudioContext.tsx` — `pushToast` delegates to the banner API
+- Note: `pushToast` keeps its signature, so `StudioContext.tsx` did not change.
 
-- [ ] **Step 1: Write/adjust failing tests** proving the sidecar strip appears and disappears via the banner system, and that `pushToast` produces a corner banner.
-- [ ] **Step 2: Run the affected tests and watch them fail.**
-- [ ] **Step 3: Rewire the components and the context.**
-- [ ] **Step 4: Run the full suite `npm test`** — PASS.
-- [ ] **Step 5: Commit.**
+- [x] **Step 1: Write/adjust failing tests** proving the sidecar strip appears and disappears via the banner system, and that `pushToast` produces a corner banner.
+- [x] **Step 2: Run the affected tests and watch them fail.**
+- [x] **Step 3: Rewire the components and the context.**
+- [x] **Step 4: Run the full suite `npm test`** — PASS.
+- [x] **Step 5: Commit.**
 
 ### Task 6: Docs and verification
 
 **Files:**
 - Modify: `README.md`, `docs/architecture/notifications.md`
-- Add: `apps/studio/src/banners/Banner.visual.test.tsx`
+- Add: `apps/studio/src/banners/BannerStack.visual.test.tsx`
 
-- [ ] **Step 1: Add the visual snapshot test** covering each severity.
-- [ ] **Step 2: Run `npm run typecheck` and `npm test`** — both clean.
-- [ ] **Step 3: Update `README.md` and the architecture note.**
-- [ ] **Step 4: Commit.**
+- [x] **Step 1: Add the visual snapshot test** covering each severity.
+- [x] **Step 2: Run `npm run typecheck` and `npm test`** — both clean.
+- [x] **Step 3: Update `README.md` and the architecture note.**
+- [x] **Step 4: Commit.**
+
+---
+
+## Outcome
+
+All six tasks landed on `feat/banner-system`. The banner system is the only path
+a notice takes to the screen.
+
+- Unit suite: 52 files, 441 tests, green (banner tests stress-run 6×, full suite 4×).
+- Visual suite: 2 files, 6 snapshots, green (`BannerStack.visual.test.tsx` covers
+  each severity, both docks, and the overflow affordance).
+- `tsc -b`, `vite build`, and `eslint` are clean (the only warnings are the
+  project's existing `react-refresh/only-export-components` idiom, shared with
+  `StudioRuntime.tsx` and `composerParts.tsx`).
+- Superseded: `Toasts.tsx`, `notices/SidecarNotice.tsx`,
+  `chat/OfflineNotice.tsx`, and their CSS blocks.
+- Docs: `docs/architecture/banners.md` (new), `notifications.md` (distinguishes
+  the feed from banners), `architecture/README.md`, and the root `README.md`.
