@@ -94,9 +94,13 @@ class MarketplaceProvider(Protocol):
 
 
 def _default_fetcher(url: str, timeout: float) -> FetchResult:
+    # Listing URLs arrive from a remote registry, so a hostile or intercepted
+    # response could point at file:// and turn a fetch into a local file read.
+    if urllib.parse.urlparse(url).scheme not in {"http", "https"}:
+        raise MarketplaceUnavailable(f"Refusing to fetch a non-HTTP listing URL: {url}")
     request = urllib.request.Request(url, headers={"Accept": "application/json"})
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:  # noqa: S310
+        with urllib.request.urlopen(request, timeout=timeout) as response:  # nosec B310
             return response.status, response.read()
     except urllib.error.HTTPError as exc:  # pragma: no cover - network path
         return exc.code, exc.read()

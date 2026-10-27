@@ -15,6 +15,7 @@ from agentic_odi_connectors.marketplace import (
     MarketplaceService,
     MarketplaceUnavailable,
     OfficialRegistryProvider,
+    _default_fetcher,
     connector_config_from_listing,
     env_vars_in_listing,
     listing_from_preset,
@@ -268,3 +269,10 @@ def test_env_vars_in_listing_collects_declared_and_interpolated() -> None:
     exa = next(preset for preset in PRESETS if preset.id == "exa")
 
     assert env_vars_in_listing(listing_from_preset(exa)) == ["EXA_API_KEY"]
+
+
+def test_fetcher_refuses_a_non_http_listing_url() -> None:
+    # Listing URLs come from a remote registry, so a hostile response could
+    # point at file:// and turn a fetch into a local file read.
+    with pytest.raises(MarketplaceUnavailable):
+        _default_fetcher("file:///etc/passwd", timeout=1.0)
