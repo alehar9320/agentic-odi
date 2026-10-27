@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { conversationToMarkdown, downloadMarkdown, exportFilename } from "../../lib/export";
 import { useStudio } from "../../state/StudioContext";
-import { BellIcon, MenuIcon, MoonIcon, PlusIcon, SettingsIcon, SunIcon } from "../icons";
+import { BellIcon, MenuIcon, MoonIcon, PlugIcon, PlusIcon, SettingsIcon, SunIcon } from "../icons";
 import { OdiMascot } from "../OdiMascot";
 
 /**
@@ -24,6 +24,7 @@ export function StudioBar({
     messages,
     unreadNotificationCount,
     openPanel,
+    openCustomize,
     pushToast,
     saveSettings,
     settings,
@@ -83,6 +84,17 @@ export function StudioBar({
       </div>
 
       <div className="bar__right">
+        <button
+          type="button"
+          className="studio-pill pill-customize"
+          onClick={() => openCustomize()}
+          aria-label="Customize connectors"
+          title="Customize connectors"
+        >
+          <PlugIcon size={15} />
+          Customize
+        </button>
+
         <button
           type="button"
           className="studio-pill pill-changelog"

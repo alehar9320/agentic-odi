@@ -3,6 +3,8 @@ import { useEffect, useState } from "react";
 import { StudioRuntimeProvider } from "./assistant/StudioRuntime";
 import { ChangelogModal } from "./components/ChangelogModal";
 import { ChatStage } from "./components/chat/ChatStage";
+import { ConnectorSuggestionModal } from "./components/customize/ConnectorSuggestionModal";
+import { CustomizePage } from "./components/customize/CustomizePage";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { StudioBar } from "./components/layout/StudioBar";
 import { SidecarNotice } from "./components/notices/SidecarNotice";
@@ -21,18 +23,20 @@ import { StudioProvider, useStudio } from "./state/StudioContext";
  * composer never leaves the screen.
  */
 function StudioShell() {
-  const { closePanel, clearChat, closeSetup } = useStudio();
+  const { closePanel, clearChat, closeSetup, customizeOpen, closeCustomize } = useStudio();
   const [showChangelog, setShowChangelog] = useState(false);
 
   function goHome() {
     clearChat();
     closePanel();
     closeSetup();
+    closeCustomize();
   }
 
   function newConversation() {
     clearChat();
     closePanel();
+    closeCustomize();
   }
 
   useEffect(() => {
@@ -54,15 +58,20 @@ function StudioShell() {
           onNew={newConversation}
           onChangelog={() => setShowChangelog(true)}
         />
-        <div className="stage__split">
-          <div className="stage__thread">
-            <WorkbenchRail />
-            <ChatStage />
+        {customizeOpen ? (
+          <CustomizePage />
+        ) : (
+          <div className="stage__split">
+            <div className="stage__thread">
+              <WorkbenchRail />
+              <ChatStage />
+            </div>
+            <WorkspacePanel />
           </div>
-          <WorkspacePanel />
-        </div>
+        )}
       </main>
       <ChangelogModal isOpen={showChangelog} onClose={() => setShowChangelog(false)} />
+      <ConnectorSuggestionModal />
       <Toasts />
     </div>
   );

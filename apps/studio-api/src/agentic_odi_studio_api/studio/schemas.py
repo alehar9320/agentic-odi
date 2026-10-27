@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from pydantic import BaseModel, Field
+
+if TYPE_CHECKING:
+    from agentic_odi_connectors.marketplace import MarketplaceListing
 
 
 class ChatMessage(BaseModel):
@@ -140,12 +143,51 @@ class AddConnectorRequest(BaseModel):
     name: str | None = None
     preset: str | None = None
     url: str | None = None
+    # A marketplace listing id (`official:…` / `preset:…`) instead of a preset.
+    marketplace_id: str | None = None
 
 
 class ConnectorListItem(BaseModel):
     name: str
     kind: str
     enabled: bool = True
+
+
+class MarketplaceListingOut(BaseModel):
+    id: str
+    name: str
+    title: str | None = None
+    summary: str = ""
+    version: str = ""
+    url: str | None = None
+    source: str = "official"
+    area: str | None = None
+    repository: str | None = None
+    docs: str | None = None
+    env_vars: list[str] = Field(default_factory=list)
+    headers: dict[str, str] = Field(default_factory=dict)
+    auth: str = "none"
+    installable: bool = False
+    verified: bool = False
+    pull_count: int = 0
+    is_recommended: bool = False
+    unavailable_reason: str | None = None
+    # The registry name an install produces, so the shelf can match a listing
+    # against the installed list without re-deriving the slug itself.
+    connector_name: str = ""
+
+    @classmethod
+    def from_listing(cls, listing: MarketplaceListing) -> MarketplaceListingOut:
+        return cls(**listing.model_dump(), connector_name=listing.connector_name)
+
+
+class MarketplaceSearchResponse(BaseModel):
+    listings: list[MarketplaceListingOut] = Field(default_factory=list)
+    areas: dict[str, str] = Field(default_factory=dict)
+    cached: bool = False
+    # Connection types the page can offer, with the ones not yet supported
+    # listed so the UI can show them as "coming soon".
+    types: list[dict[str, object]] = Field(default_factory=list)
 
 
 class ConnectorOperationResponse(BaseModel):

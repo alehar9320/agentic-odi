@@ -165,6 +165,47 @@
         }
       }
     },
+    "/api/models": {
+      "post": {
+        "summary": "Post Models",
+        "description": "The model ids this backend serves, for the composer's model picker.",
+        "operationId": "post_models_api_models_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModelListRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Post Models Api Models Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/connectors/catalog": {
       "get": {
         "summary": "Get Connectors Catalog",
@@ -181,6 +222,120 @@
                   },
                   "type": "array",
                   "title": "Response Get Connectors Catalog Api Connectors Catalog Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/marketplace/servers": {
+      "get": {
+        "summary": "Search Marketplace",
+        "operationId": "search_marketplace_api_marketplace_servers_get",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Substring to match against name, title, or summary.",
+              "default": "",
+              "title": "Q"
+            },
+            "description": "Substring to match against name, title, or summary."
+          },
+          {
+            "name": "area",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Capability area filter.",
+              "title": "Area"
+            },
+            "description": "Capability area filter."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MarketplaceSearchResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/marketplace/featured": {
+      "get": {
+        "summary": "Featured Marketplace",
+        "operationId": "featured_marketplace_api_marketplace_featured_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 6,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MarketplaceSearchResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -1240,6 +1395,43 @@
           }
         }
       }
+    },
+    "/{full_path}": {
+      "get": {
+        "summary": "Spa Fallback",
+        "operationId": "spa_fallback__full_path__get",
+        "parameters": [
+          {
+            "name": "full_path",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Full Path"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1278,6 +1470,17 @@
               }
             ],
             "title": "Url"
+          },
+          "marketplace_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Marketplace Id"
           }
         },
         "type": "object",
@@ -1931,6 +2134,182 @@
         ],
         "title": "LlmProxyRequest"
       },
+      "MarketplaceListingOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary",
+            "default": ""
+          },
+          "version": {
+            "type": "string",
+            "title": "Version",
+            "default": ""
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "default": "official"
+          },
+          "area": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Area"
+          },
+          "repository": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Repository"
+          },
+          "docs": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Docs"
+          },
+          "env_vars": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Env Vars"
+          },
+          "headers": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Headers"
+          },
+          "auth": {
+            "type": "string",
+            "title": "Auth",
+            "default": "none"
+          },
+          "installable": {
+            "type": "boolean",
+            "title": "Installable",
+            "default": false
+          },
+          "verified": {
+            "type": "boolean",
+            "title": "Verified",
+            "default": false
+          },
+          "pull_count": {
+            "type": "integer",
+            "title": "Pull Count",
+            "default": 0
+          },
+          "is_recommended": {
+            "type": "boolean",
+            "title": "Is Recommended",
+            "default": false
+          },
+          "unavailable_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unavailable Reason"
+          },
+          "connector_name": {
+            "type": "string",
+            "title": "Connector Name",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "MarketplaceListingOut"
+      },
+      "MarketplaceSearchResponse": {
+        "properties": {
+          "listings": {
+            "items": {
+              "$ref": "#/components/schemas/MarketplaceListingOut"
+            },
+            "type": "array",
+            "title": "Listings"
+          },
+          "areas": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Areas"
+          },
+          "cached": {
+            "type": "boolean",
+            "title": "Cached",
+            "default": false
+          },
+          "types": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Types"
+          }
+        },
+        "type": "object",
+        "title": "MarketplaceSearchResponse"
+      },
       "McpHealthRequest": {
         "properties": {
           "mcp_url": {
@@ -1943,6 +2322,25 @@
           "mcp_url"
         ],
         "title": "McpHealthRequest"
+      },
+      "ModelListRequest": {
+        "properties": {
+          "base_url": {
+            "type": "string",
+            "title": "Base Url"
+          },
+          "api_key": {
+            "type": "string",
+            "title": "Api Key",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "base_url"
+        ],
+        "title": "ModelListRequest",
+        "description": "Which backend to ask for its model ids. The key travels in the body, not\nthe query string, so it never lands in a URL or an access log."
       },
       "ObservationCreateRequest": {
         "properties": {

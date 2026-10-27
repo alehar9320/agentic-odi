@@ -157,16 +157,24 @@ Register MCP or REST connectors that the copilot can discover and invoke.
   with `AGENTIC_ODI_CONNECTORS_CONFIG`; by default it is
   `~/.config/agentic-odi/connectors.json`. See
   [External Connectors](docs/connectors.md).
-- **In the Living Studio**: open the **Settings** drawer → **Connectors** to list,
-  remove, or add one of the recommended presets (Notion, PostHog, Exa, Linear,
-  GitHub).
+- **In the Living Studio**: **Customize** is the one place to see what the studio
+  can already read and to add more. The shelf lists what is installed (from the
+  same `connectors.json` the CLI reads), then curated picks, then the
+  marketplace. A studio with nothing installed opens a suggestion when a
+  connector would help. **Settings** → **Connectors** links here.
+- **Marketplace**: the shelf is populated from the trusted vendor registry, so a
+  listing can be added by id without hand-writing a URL. A listing that needs a
+  token names the environment variable to set — no credential is stored in the
+  app. MCP servers install today; A2A agents appear as "coming soon".
 - **Conversationally**: tell the copilot "use Notion" / "add the GitHub connector".
   It emits an `add_connector` local tool (handled in-process) that writes the
   preset to the registry, plus a `connector` SSE event the Studio surfaces as a
   suggestion chip. Dismissing or accepting the chip also refreshes the list.
-- **API**: `GET/POST/DELETE /api/connectors`, `GET /api/connectors/catalog`, and
+- **API**: `GET/POST/DELETE /api/connectors`, `GET /api/connectors/catalog`,
+  `GET /api/marketplace/servers`, `GET /api/marketplace/featured`, and
   `GET /api/connectors/{name}/health` (the catalog honors
-  `?area=<capability>` and `?recommended=true`).
+  `?area=<capability>` and `?recommended=true`; `POST /api/connectors` accepts a
+  `marketplace_id`).
 - **CLI**: `agentic-odi connectors catalog | add <preset> | list | health <name> | ingest <name>`.
 
 ### When something fails

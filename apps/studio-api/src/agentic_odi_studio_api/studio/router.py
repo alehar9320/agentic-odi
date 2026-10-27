@@ -7,6 +7,7 @@ from typing import Any
 
 import httpx
 from agentic_odi_connectors.catalog import UnknownPresetError
+from agentic_odi_connectors.marketplace import DEFAULT_LIMIT, MAX_LIMIT
 from agentic_odi_connectors.models import HealthStatus
 from agentic_odi_connectors.registry import (
     ConnectorNotFoundError,
@@ -39,6 +40,7 @@ from agentic_odi_studio_api.studio.errors import (
     code_for_status,
     request_id_for,
 )
+from agentic_odi_studio_api.studio.marketplace import StudioMarketplace
 from agentic_odi_studio_api.studio.mcp_data import call_mcp_tool, fetch_canvas, fetch_local_canvas
 from agentic_odi_studio_api.studio.memory import (
     ConversationNotFoundError,
@@ -68,6 +70,8 @@ from agentic_odi_studio_api.studio.schemas import (
     LatestConversationResponse,
     LlmHealthRequest,
     LlmProxyRequest,
+    MarketplaceListingOut,
+    MarketplaceSearchResponse,
     McpHealthRequest,
     ModelListRequest,
     ObservationCreateRequest,
@@ -179,6 +183,48 @@ def get_connectors_catalog(request: Request) -> list[dict[str, Any]]:
     return _connectors(request).catalog()
 
 
+#: Connection types the Customize page offers. A2A is listed but not
+#: implemented: the UI shows it disabled so the roadmap is visible.
+CONNECTION_TYPES: list[dict[str, object]] = [
+    {"id": "mcp", "label": "MCP servers", "available": True},
+    {"id": "a2a", "label": "A2A agents", "available": False, "note": "Coming soon"},
+]
+
+
+def _marketplace(request: Request) -> StudioMarketplace:
+    return request.app.state.marketplace
+
+
+@router.get("/marketplace/servers", response_model=MarketplaceSearchResponse)
+def search_marketplace(
+    request: Request,
+    q: str = Query("", description="Substring to match against name, title, or summary."),
+    area: str | None = Query(None, description="Capability area filter."),
+    limit: int = Query(DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
+) -> MarketplaceSearchResponse:
+    listings, cached = _marketplace(request).search(q, area, limit)
+    return MarketplaceSearchResponse(
+        listings=[MarketplaceListingOut.from_listing(item) for item in listings],
+        areas=_marketplace(request).catalog_areas(),
+        cached=cached,
+        types=CONNECTION_TYPES,
+    )
+
+
+@router.get("/marketplace/featured", response_model=MarketplaceSearchResponse)
+def featured_marketplace(
+    request: Request,
+    limit: int = Query(6, ge=1, le=MAX_LIMIT),
+) -> MarketplaceSearchResponse:
+    listings = _marketplace(request).featured(limit)
+    return MarketplaceSearchResponse(
+        listings=[MarketplaceListingOut.from_listing(item) for item in listings],
+        areas=_marketplace(request).catalog_areas(),
+        cached=False,
+        types=CONNECTION_TYPES,
+    )
+
+
 @router.get("/connectors")
 def list_connectors(request: Request) -> list[ConnectorListItem]:
     service = _connectors(request)
@@ -191,7 +237,12 @@ def list_connectors(request: Request) -> list[ConnectorListItem]:
 @router.post("/connectors")
 def add_connector(body: AddConnectorRequest, request: Request) -> ConnectorOperationResponse:
     try:
-        config = _connectors(request).add(name=body.name, preset_id=body.preset, url=body.url)
+        config = _connectors(request).add(
+            name=body.name,
+            preset_id=body.preset,
+            url=body.url,
+            marketplace_id=body.marketplace_id,
+        )
     except DuplicateConnectorError as exc:
         raise StudioHTTPError(
             StudioError(
