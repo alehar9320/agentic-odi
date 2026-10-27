@@ -119,9 +119,26 @@ def _run(coro, name: str):
 @connectors_app.command("list")
 def list_connectors(
     config: Path | None = ConfigOption,
+    as_json: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
     """List configured external connectors."""
     items = _registry(config).list_all()
+    if as_json:
+        typer.echo(
+            json.dumps(
+                [
+                    {
+                        "name": item.name,
+                        "kind": item.kind,
+                        "url": item.settings.get("url"),
+                        "enabled": item.enabled,
+                    }
+                    for item in items
+                ],
+                indent=2,
+            )
+        )
+        return
     if not items:
         typer.echo("No connectors configured.")
         return
@@ -274,6 +291,7 @@ def add_connector(
 @connectors_app.command("health")
 def health_connector(
     name: str = typer.Option(..., "--name", help="Connector name."),
+    no_cache: bool = typer.Option(False, "--no-cache", help="Ignore a cached health result."),
     config: Path | None = ConfigOption,
 ) -> None:
     """Check whether a connector can reach its external system."""
@@ -285,6 +303,10 @@ def health_connector(
     except (ConnectorNotFoundError, UnknownConnectorKindError) as exc:
         typer.echo(f"Error: {exc}", err=True)
         raise typer.Exit(code=1) from exc
+    if no_cache:
+        from agentic_odi_connectors.rest.connector import clear_health_cache
+
+        clear_health_cache(name)
     status = _run(connector.health(), name)
     typer.echo(status.model_dump_json())
     if not status.ok:

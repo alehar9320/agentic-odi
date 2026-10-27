@@ -225,6 +225,7 @@ class TurnModel(BaseModel):
 class LatestConversationResponse(BaseModel):
     conversation: ConversationModel | None = None
     turns: list[TurnModel] = Field(default_factory=list)
+<<<<<<< HEAD
 
 
 class TurnNode(BaseModel):
@@ -246,3 +247,53 @@ class ConversationTreeResponse(BaseModel):
 class UpdateConversationRequest(BaseModel):
     head_id: str | None = None
     title: str | None = Field(default=None, max_length=200)
+||||||| fcf59923
+=======
+
+
+class TurnNode(BaseModel):
+    """One turn in the branch tree, as the thread runtime needs it."""
+
+    id: str
+    parent_id: str | None = None
+    role: str
+    content: str
+    created_at: str
+
+
+class ConversationTreeResponse(BaseModel):
+    conversation: ConversationModel
+    messages: list[TurnNode] = Field(default_factory=list)
+    head_id: str | None = None
+
+
+class UpdateConversationRequest(BaseModel):
+    head_id: str | None = None
+    title: str | None = Field(default=None, max_length=200)
+
+
+class LlmProxyMessage(BaseModel):
+    role: Literal["system", "user", "assistant", "tool"]
+    content: str = ""
+
+
+class LlmProxyRequest(BaseModel):
+    base_url: str
+    api_key: str = ""
+    model: str
+    messages: list[LlmProxyMessage] = Field(default_factory=list)
+    tools: list[dict[str, Any]] | None = None
+    stream: bool = True
+
+
+class CapabilityItem(BaseModel):
+    id: str
+    label: str
+    description: str
+    available: bool
+    reason: str | None = None
+
+
+class CapabilitiesResponse(BaseModel):
+    capabilities: list[CapabilityItem]
+>>>>>>> origin/main

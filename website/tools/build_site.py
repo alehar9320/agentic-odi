@@ -5,13 +5,13 @@ Studio theme, the MCP tool contract, the connector catalog, the CLI registry,
 the ODI schema, and the guides under ``docs/`` — into HTML, CSS, and JS.
 
 Nothing here runs at request time. The output is committed to
-``website/dist/`` so a reviewer can read the rendered page in a pull request,
-and CI fails when it drifts from a fresh build.
+   Generated on demand and by CI at build time; never committed.
 """
 
 from __future__ import annotations
 
 import argparse
+import html as html_module
 import json
 import re
 import shutil
@@ -65,6 +65,7 @@ def _tokens_css() -> str:
         "--glass": "rgba(255, 255, 255, 0.045)",
         "--glass-blur": "blur(20px) saturate(180%)",
         "--hairline": "inset 0 1px 0 rgba(255, 255, 255, 0.06)",
+        "--shadow-deep": "0 40px 120px -20px rgba(0, 0, 0, 0.85)",
         "--r-sm": "8px",
         "--r-md": "12px",
         "--r-lg": "16px",
@@ -81,6 +82,35 @@ def _tokens_css() -> str:
         body = "\n".join(f"  {name}: {value};" for name, value in pairs.items())
         return f":root {{\n{body}\n}}"
 
+    # The light theme is a token swap, nothing else: style.css never names a
+    # colour, so overriding the palette here is all a new theme needs. It is
+    # the Studio palette rotated onto a paper background, with accents darkened
+    # enough to keep their contrast against white.
+    light = {
+        "--bg": "#f7f8fb",
+        "--bg-raised": "#ffffff",
+        "--bg-sunken": "#eef0f6",
+        "--text": "#12131a",
+        "--muted": "#555b68",
+        "--faint": "#6b7280",
+        "--accent": "#4f46e5",
+        "--accent-strong": "#4338ca",
+        "--accent-ink": "#ffffff",
+        "--green": "#15803d",
+        "--amber": "#b45309",
+        "--line": "rgba(18, 19, 26, 0.1)",
+        "--line-strong": "rgba(18, 19, 26, 0.18)",
+        "--surface": "rgba(18, 19, 26, 0.035)",
+        "--surface-hover": "rgba(18, 19, 26, 0.07)",
+        "--glass": "rgba(255, 255, 255, 0.72)",
+        "--hairline": "inset 0 1px 0 rgba(255, 255, 255, 0.9)",
+        "--shadow-deep": "0 40px 120px -20px rgba(18, 19, 26, 0.18)",
+    }
+
+    def themed_block(selector: str, pairs: dict[str, str]) -> str:
+        body = "\n".join(f"  {name}: {value};" for name, value in pairs.items())
+        return f"{selector} {{\n{body}\n}}"
+
     return (
         "\n\n".join(
             [
@@ -88,6 +118,7 @@ def _tokens_css() -> str:
                 block(tokens),
                 block(easings),
                 block(site_only),
+                themed_block(':root[data-theme="light"]', light),
             ]
         )
         + "\n"
@@ -209,6 +240,11 @@ def _guide_body(
         link_map=link_map,
         page_path=f"docs/{slug}/index.html",
     )
+    if slug == "connectors":
+        # The guide explains how presets work; the catalog decides which ones
+        # exist. Append the generated reference so a new preset is documented
+        # by the build rather than by someone remembering to edit the guide.
+        body += env.get_template("_connector_reference.html").render(**context)
     return body, markdown_render.headings(body), title
 
 
@@ -334,6 +370,40 @@ def _render_pages(env: Environment) -> dict[str, str]:
     return rendered
 
 
+def _page_url(name: str) -> str:
+    """A page's path relative to the site root, without a leading slash."""
+    if name == "index.html":
+        return ""
+    return name[: -len("index.html")]
+
+
+def _search_entry(name: str, page: str) -> dict[str, str]:
+    """One search-index entry: a page's title, path, and description."""
+    heading = re.search(r"<h1[^>]*>(.*?)</h1>", page, re.DOTALL)
+    title = _plain_text(heading.group(1)) if heading else SITE_NAME
+    description = re.search(r'<meta\s+name="description"\s+content="([^"]*)"', page)
+    excerpt = html_module.unescape(description.group(1)) if description else ""
+    return {"title": title, "url": _page_url(name), "excerpt": excerpt}
+
+
+def _plain_text(fragment: str) -> str:
+    """A fragment's visible text, with tags and entities resolved."""
+    text = html_module.unescape(re.sub(r"<[^>]+>", "", fragment))
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def _search_index(rendered: dict[str, str]) -> str:
+    """The client-side search index, built from the pages themselves.
+
+    Paths are relative to the site root so the same index works under the
+    project site's subpath and under a pull-request preview.
+    """
+    entries = [
+        _search_entry(name, page) for name, page in sorted(rendered.items()) if name != "404.html"
+    ]
+    return json.dumps(entries, indent=2, ensure_ascii=False) + "\n"
+
+
 def _sitemap(urls: list[str]) -> str:
     entries = "\n".join(f"  <url><loc>{PAGES_URL.rstrip('/')}{url}</loc></url>" for url in urls)
     return (
@@ -362,8 +432,8 @@ def _tree(root: Path) -> dict[str, bytes]:
 def build(out_dir: Path, *, check: bool = False) -> int:
     """Render the site into ``out_dir``.
 
-    With ``check=True`` nothing is written: the committed output is compared
-    against a fresh render and the process exits non-zero when they differ.
+    With ``check=True`` nothing is written: ``out_dir`` is compared against a
+    fresh render and the process exits non-zero when they differ.
     """
     out_dir = Path(out_dir)
     env = environment()
@@ -377,6 +447,7 @@ def build(out_dir: Path, *, check: bool = False) -> int:
         urls.append("/" + name[: -len("index.html")])
     files["sitemap.xml"] = _sitemap(urls).encode("utf-8")
     files["robots.txt"] = _robots().encode("utf-8")
+    files["search-index.json"] = _search_index(rendered).encode("utf-8")
     files["assets/tokens.css"] = _tokens_css().encode("utf-8")
 
     for asset in sorted(ASSETS.rglob("*")):
@@ -389,7 +460,7 @@ def build(out_dir: Path, *, check: bool = False) -> int:
             name for name in set(committed) | set(files) if committed.get(name) != files.get(name)
         )
         if stale:
-            print("The committed site is out of date. Run: build_site.py", file=sys.stderr)
+            print("The built site is out of date. Run: build_site.py", file=sys.stderr)
             for name in stale:
                 print(f"  {name}", file=sys.stderr)
             raise SystemExit(1)
@@ -410,13 +481,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--check",
         action="store_true",
-        help="fail if the committed site differs from a fresh build; write nothing",
+        help="fail if out_dir differs from a fresh build; write nothing",
     )
     args = parser.parse_args(argv)
 
     if args.check:
         count = build(args.out, check=True)
-        print(f"The committed site is up to date ({count} files).")
+        print(f"The built site is up to date ({count} files).")
         return 0
 
     count = build(args.out)

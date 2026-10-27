@@ -124,6 +124,7 @@ export function Composer({
 
   return (
     <div className="composer">
+<<<<<<< HEAD
       <CommandPalette
         id={paletteId}
         open={paletteOpen}
@@ -134,6 +135,69 @@ export function Composer({
       />
       <ConnectorChips />
 
+||||||| fcf59923
+      {paletteOpen && (
+        <div className="palette" role="listbox" id="studio-command-palette" aria-label="Commands">
+          {matches.length ? (
+            matches.map((command, index) => (
+              <button
+                key={command.id}
+                type="button"
+                role="option"
+                aria-selected={index === activeIndex}
+                className={`palette__item${index === activeIndex ? " is-active" : ""}`}
+                onMouseEnter={() => setHighlight(index)}
+                onClick={() => choose(command)}
+              >
+                <code className="palette__name">{command.name}</code>
+                <span className="palette__text">
+                  <span className="palette__label">{command.label}</span>
+                  <span className="palette__description">{command.description}</span>
+                </span>
+              </button>
+            ))
+          ) : (
+            <p className="palette__empty">
+              No command matches. Type <code>/help</code> for the full list.
+            </p>
+          )}
+        </div>
+      )}
+
+      {connectorSuggestions.length > 0 && (
+        <div className="composer__suggestions" aria-label="Connector suggestions">
+          {connectorSuggestions.map((id) => {
+            const label = presets.find((preset) => preset.id === id)?.label ?? id;
+            return (
+              <button
+                key={id}
+                type="button"
+                className="composer__suggestion"
+                aria-label={`Added ${label}, dismiss`}
+                onClick={() => {
+                  dismissConnectorSuggestion(id);
+                  void refreshConnectors();
+                }}
+              >
+                <span>Added {label}</span>
+                <span aria-hidden>✕</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+=======
+      <CommandPalette
+        id={paletteId}
+        open={paletteOpen}
+        matches={matches}
+        activeIndex={activeIndex}
+        onHover={setHighlight}
+        onChoose={choose}
+      />
+      <ConnectorChips />
+>>>>>>> origin/main
       <form
         className="composer__shell"
         onSubmit={(event) => {

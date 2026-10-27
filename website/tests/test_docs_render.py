@@ -37,6 +37,30 @@ def test_headings_get_anchors():
     assert 'id="second-section"' in html
 
 
+def test_each_heading_links_to_itself():
+    html = markdown_render.render("## First section\n\n### Deeper detail\n")
+
+    assert html.count('class="heading-anchor"') == 2
+    assert 'href="#first-section"' in html
+    assert 'href="#deeper-detail"' in html
+    assert 'aria-label="Copy link to this section"' in html
+
+
+def test_duplicate_headings_link_to_their_own_anchor():
+    html = markdown_render.render("## Setup\n\n## Setup\n")
+
+    assert 'href="#setup"' in html
+    assert 'href="#setup-1"' in html
+
+
+def test_the_section_link_is_not_part_of_the_heading_text():
+    html = markdown_render.render("## Install the CLI\n")
+
+    assert markdown_render.headings(html) == [
+        {"level": "2", "anchor": "install-the-cli", "text": "Install the CLI"}
+    ]
+
+
 def test_duplicate_headings_get_unique_anchors():
     html = markdown_render.render("## Setup\n\n## Setup\n")
     assert 'id="setup"' in html

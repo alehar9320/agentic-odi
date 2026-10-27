@@ -24,6 +24,7 @@ export interface Outcome {
   telemetry?: string;
 }
 
+<<<<<<< HEAD
 export interface Evidence {
   id: string;
   source_name?: string;
@@ -36,6 +37,33 @@ export interface Evidence {
   outcome_id?: string | null;
 }
 
+||||||| fcf59923
+=======
+export interface Evidence {
+  id: string;
+  source_name?: string;
+  source_kind?: string;
+  item_type?: string;
+  name?: string;
+  content?: string;
+  job_id?: string | null;
+  step_id?: string | null;
+  outcome_id?: string | null;
+}
+
+export interface Thesis {
+  id: string;
+  outcome_id: string;
+  job_id?: string;
+  statement: string;
+  importance: number | null;
+  satisfaction: number | null;
+  opportunity_score: number | null;
+  rationale: string;
+  created_at: string;
+}
+
+>>>>>>> origin/main
 export interface CanvasData {
   jobs: Job[];
   steps: Step[];
@@ -97,6 +125,7 @@ export interface McpHealth {
   reachable: boolean;
 }
 
+<<<<<<< HEAD
 /**
  * Everything one turn can contain, in the order the agent produced it.
  *
@@ -131,6 +160,36 @@ export interface ChatAttachment {
   dataUrl?: string;
 }
 
+||||||| fcf59923
+=======
+/**
+ * Everything one turn can contain, in the order the agent produced it.
+ *
+ * Text and surfaces are the Studio's own vocabulary. Reasoning, tool calls,
+ * sources, approvals, and attachments are conversation primitives the runtime
+ * renders — the bridge in `assistant/convert.ts` maps each one to its
+ * assistant-ui message part.
+ */
+export type ToolStatus = "running" | "ok" | "error" | "declined";
+
+/** A write the agent is asking permission for. */
+export interface ToolApproval {
+  id: string;
+  prompt: string;
+}
+
+export interface ChatAttachment {
+  id: string;
+  name: string;
+  contentType: string;
+  size: number;
+  /** Extracted text, sent to the model when the file is text-like. */
+  text?: string;
+  /** A data URL, sent as a vision part when the file is an image. */
+  dataUrl?: string;
+}
+
+>>>>>>> origin/main
 export type ChatPart =
   | { kind: "text"; text: string }
   | { kind: "reasoning"; text: string }
@@ -280,6 +339,8 @@ export interface Conversation {
   title: string;
   created_at: string;
   updated_at: string;
+  /** The visible branch head turn, when the conversation has branches. */
+  head_id?: string | null;
 }
 
 export interface ConversationTurn {
@@ -288,6 +349,10 @@ export interface ConversationTurn {
   role: "user" | "assistant" | "system" | "tool";
   content: string;
   created_at: string;
+  /** Stable client message id, when the turn was authored with one. */
+  message_id?: string | null;
+  /** The id of the turn this one answers, when it is a branch or edit. */
+  parent_id?: string | null;
 }
 
 export interface LatestConversation {

@@ -1,5 +1,9 @@
+import { useEffect, useRef, useState } from "react";
+
+import { conversationToMarkdown, downloadMarkdown, exportFilename } from "../../lib/export";
 import { useStudio } from "../../state/StudioContext";
-import { BellIcon, PlusIcon, SettingsIcon } from "../icons";
+import { useUpdateSnapshot } from "../../updater";
+import { BellIcon, MenuIcon, MoonIcon, PlusIcon, SettingsIcon, SunIcon } from "../icons";
 import { OdiMascot } from "../OdiMascot";
 
 /**
@@ -16,10 +20,59 @@ export function StudioBar({
   onNew: () => void;
   onChangelog: () => void;
 }) {
-  const { llmHealth, unreadNotificationCount, openPanel } = useStudio();
+  const {
+    llmHealth,
+    messages,
+    unreadNotificationCount,
+    markAllNotificationsAsRead,
+    openPanel,
+    pushToast,
+    saveSettings,
+    settings,
+  }    = useStudio();
+  const update = useUpdateSnapshot();
+  const theme = settings.theme === "light" ? "light" : "dark";
+  const nextTheme = theme === "dark" ? "light" : "dark";
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!menuOpen) {
+      return;
+    }
+    function onPointerDown(event: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setMenuOpen(false);
+      }
+    }
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setMenuOpen(false);
+      }
+    }
+    window.addEventListener("mousedown", onPointerDown);
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("mousedown", onPointerDown);
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [menuOpen]);
+
+  function exportConversation() {
+    const exportedAt = new Date();
+    downloadMarkdown(conversationToMarkdown(messages, exportedAt), exportFilename(exportedAt));
+    setMenuOpen(false);
+    pushToast("success", "Conversation exported as Markdown.");
+  }
 
   const status =
     llmHealth.healthy === null ? "Connecting" : llmHealth.healthy ? "Live" : "Local mode";
+  const updateReady = update.phase === "ready";
+  const versionLabel = updateReady
+    ? "Update ready"
+    : update.currentVersion
+      ? `v${update.currentVersion}`
+      : null;
 
   return (
     <header className="bar">
@@ -60,10 +113,23 @@ export function StudioBar({
 
         <button
           type="button"
+          className="icon-button"
+          aria-label={`Switch to ${nextTheme} theme`}
+          title={`Switch to ${nextTheme} theme`}
+          onClick={() => saveSettings({ ...settings, theme: nextTheme })}
+        >
+          {theme === "dark" ? <SunIcon size={17} /> : <MoonIcon size={17} />}
+        </button>
+
+        <button
+          type="button"
           className="icon-button bar__bell"
           aria-label="Catch up notifications"
           title="Activity & Catch Up"
-          onClick={() => openPanel("catchup")}
+          onClick={() => {
+            markAllNotificationsAsRead();
+            openPanel("catchup");
+          }}
         >
           <BellIcon size={17} />
           {unreadNotificationCount > 0 && (
@@ -77,6 +143,7 @@ export function StudioBar({
           type="button"
           className="bar__health"
           onClick={() => openPanel("settings")}
+          aria-label={`Model status: ${status}. ${llmHealth.message}`}
           title={llmHealth.message}
         >
           <span
@@ -87,6 +154,21 @@ export function StudioBar({
           {status}
         </button>
 
+        {versionLabel && (
+          <button
+            type="button"
+            className={`bar__version${updateReady ? " is-accent" : ""}`}
+            onClick={() => openPanel("settings")}
+            title={
+              update.currentVersion
+                ? `Living Studio ${update.currentVersion} — open software update settings`
+                : "Open software update settings"
+            }
+          >
+            {versionLabel}
+          </button>
+        )}
+
         <button
           type="button"
           className="icon-button"
@@ -96,6 +178,33 @@ export function StudioBar({
         >
           <SettingsIcon size={17} />
         </button>
+
+        <div className="bar__menu" ref={menuRef}>
+          <button
+            type="button"
+            className="icon-button"
+            aria-label="More actions"
+            title="More actions"
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
+            onClick={() => setMenuOpen((open) => !open)}
+          >
+            <MenuIcon size={17} />
+          </button>
+          {menuOpen && (
+            <div className="bar__menu-list" role="menu" aria-label="More actions">
+              <button
+                type="button"
+                role="menuitem"
+                className="bar__menu-item"
+                onClick={exportConversation}
+                disabled={messages.length === 0}
+              >
+                Export → Markdown
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </header>
   );
