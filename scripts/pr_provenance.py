@@ -8,6 +8,8 @@ signal lives one level down, in the commit identity and the branch name.
 
 from __future__ import annotations
 
+import re
+
 AGENT_LABEL = "🤖 agent"
 HUMAN_LABEL = "👤 human"
 
@@ -33,9 +35,38 @@ AGENT_BRANCH_PREFIXES: frozenset[str] = frozenset(
 )
 
 
+# Tool names that identify an agent in a login or a commit identity. Matched on
+# word boundaries, so "amp" does not fire inside "example" and "otto" does not
+# fire inside "ottomatic".
+AGENT_TOKENS: frozenset[str] = frozenset(
+    {
+        "agent",
+        "aider",
+        "amp",
+        "claude",
+        "codex",
+        "copilot",
+        "cursor",
+        "devin",
+        "factory",
+        "goose",
+        "jules",
+        "openhands",
+        "opencode",
+        "otto",
+        "slay",
+        "sweep",
+    }
+)
+
+_AGENT_PATTERN = re.compile(
+    r"\[bot\]|\b(?:" + "|".join(sorted(AGENT_TOKENS)) + r")\b",
+    re.IGNORECASE,
+)
+
+
 def _mentions_an_agent(text: str) -> bool:
-    lowered = text.lower()
-    return "[bot]" in lowered or "agent" in lowered
+    return _AGENT_PATTERN.search(text or "") is not None
 
 
 def classify(

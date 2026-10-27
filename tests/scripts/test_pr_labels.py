@@ -14,6 +14,7 @@ from pr_labels import (
     size_label,
     telemetry_labels,
 )
+from pr_provenance import classify
 
 
 @pytest.mark.parametrize(
@@ -289,3 +290,18 @@ def test_build_facts_tolerates_missing_and_odd_entries():
     assert facts["body"] == ""
     assert facts["commits"] == [" <>"]
     assert facts["files"] == [{"filename": "a.py", "additions": 0, "deletions": 0}]
+
+
+def test_build_facts_maps_is_bot_to_the_bot_type():
+    """gh pr view --json author returns is_bot, not the REST API's type field.
+
+    Reading only `type` left provenance blind to the PR author entirely.
+    """
+    facts = build_facts({"author": {"login": "some-app", "is_bot": True}}, [], [])
+    assert facts["author"]["type"] == "Bot"
+    assert classify(facts["author"]["login"], facts["author"]["type"], "", []) == "🤖 agent"
+
+
+def test_build_facts_preserves_a_real_type_field():
+    facts = build_facts({"author": {"login": "x", "type": "Bot", "is_bot": False}}, [], [])
+    assert facts["author"]["type"] == "Bot"

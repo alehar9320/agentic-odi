@@ -91,3 +91,15 @@ def test_both_jobs_skip_fork_pull_requests():
     labels_job, risk_job = text.split("\n  pr-risk:\n", 1)
     for name, job in (("labels", labels_job), ("pr-risk", risk_job)):
         assert "head.repo.fork" in job, f"{name} job does not guard fork PRs"
+
+
+def test_the_risk_job_creates_its_own_tier_labels():
+    """The tier labels did not exist, so --add-label 'danger zone' failed.
+
+    Nothing created them: the labels job manages a different set by design.
+    """
+    text = RISK.read_text(encoding="utf-8")
+    risk_job = text.split("\n  pr-risk:\n", 1)[1]
+    for tier in ("safe to merge", "needs a look", "danger zone"):
+        assert f'gh label create "{tier}"' in risk_job, tier
+        assert "--repo" in risk_job

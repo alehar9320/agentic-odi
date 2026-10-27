@@ -191,7 +191,12 @@ def build_facts(
 ) -> dict:
     """Assemble the fact sheet ``compute_labels`` reads, from GitHub payloads."""
     meta = meta or {}
-    author = meta.get("author")
+    author = dict(meta.get("author") or {}) if isinstance(meta.get("author"), dict) else {}
+    # `gh pr view --json author` reports `is_bot`, while the REST API reports
+    # `type`. Without this translation the classifier sees neither and calls
+    # every PR human.
+    if "type" not in author and author.get("is_bot") is not None:
+        author["type"] = "Bot" if author["is_bot"] else "User"
     commits = []
     for entry in _pages(commits_payload):
         if not isinstance(entry, dict):
@@ -212,7 +217,7 @@ def build_facts(
         )
 
     return {
-        "author": author if isinstance(author, dict) else {},
+        "author": author,
         "branch": meta.get("headRefName") or "",
         "body": meta.get("body") or "",
         "commits": commits,

@@ -146,6 +146,22 @@ jobs:
         with:
           fetch-depth: 0
 
+      # Nothing created these labels, so --add-label failed with
+      # "'danger zone' not found" and the job went red. The labels job manages a
+      # different set on purpose, so this job owns its own tiers.
+      - name: Ensure risk tier labels exist
+        if: ${{ ! github.event.pull_request.head.repo.fork }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          gh label create "safe to merge" --color 0e8a16 \
+            --description "Low risk (score <= 20)" --repo "$REPO" --force
+          gh label create "needs a look" --color fbca04 \
+            --description "Medium risk (score 21-50)" --repo "$REPO" --force
+          gh label create "danger zone" --color b60205 \
+            --description "High risk (score >= 51)" --repo "$REPO" --force
+
       # Inputs must go through `with:`. Step-level `env:` does not populate a
       # composite action's `inputs`, which is why this job previously diffed
       # empty SHAs and scored every pull request 0/100.

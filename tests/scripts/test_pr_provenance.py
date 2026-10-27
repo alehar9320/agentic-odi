@@ -53,3 +53,32 @@ def test_a_human_branch_never_overrides_a_bot_commit():
 def test_the_numeric_suffix_alone_is_not_enough():
     """A 20-digit suffix on an unknown prefix is not a provenance signal."""
     assert classify("contributor", "User", "patch-1-18122562874758321467", []) == HUMAN
+
+
+@pytest.mark.parametrize(
+    "identity",
+    [
+        "openhands <openhands@all-hands.dev>",
+        "google-labs-jules[bot] <1+x@users.noreply.github.com>",
+        "opencode-agent <opencode-agent@users.noreply.github.com>",
+        "Claude <noreply@anthropic.com>",
+        "dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>",
+    ],
+)
+def test_agent_commit_identities_are_detected(identity):
+    """The tool name is the signal; these are the identities this repo sees."""
+    assert classify("alehar9320", "User", "fix/thing", [identity]) == AGENT
+
+
+@pytest.mark.parametrize(
+    "identity",
+    [
+        "Alexander <alehar9320@users.noreply.github.com>",
+        "Sam <sam@example.com>",
+        "Contributor <c@example.com>",
+        "Maria <maria@company.io>",
+    ],
+)
+def test_human_commit_identities_are_not_agents(identity):
+    """Word-boundary matching: 'amp' in 'example' must not look like an agent."""
+    assert classify("alehar9320", "User", "fix/thing", [identity]) == HUMAN
