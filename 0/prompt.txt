@@ -1,1 +1,1 @@
-Your objective is to provide implementations for the 10 oldest github issues. You are done when they have a linked PR each, their CI is green, and definition of done is fulfilled.
+LGTME. Go!
