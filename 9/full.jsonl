@@ -1,0 +1,766 @@
+{
+  "info": {
+    "id": "ses_e86219555ffeHvif1RU6MffLcT",
+    "slug": "swift-canyon",
+    "projectID": "e4fe19106d06261ebfed21a0e3ba06559abf1100",
+    "directory": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit",
+    "path": "",
+    "parentID": "ses_e86c0ebb4ffeAyfzsxiY2cHAfp",
+    "title": "Review Task 8 attachments adapter (@general subagent)",
+    "agent": "general",
+    "model": {
+      "id": "nvidia/nemotron-3.5-super-vl-120b-a12b",
+      "providerID": "nvidia",
+      "variant": "default"
+    },
+    "version": "1.18.35",
+    "summary": {
+      "additions": 0,
+      "deletions": 0,
+      "files": 0
+    },
+    "cost": 0,
+    "tokens": {
+      "input": 17178,
+      "output": 1767,
+      "reasoning": 614,
+      "cache": {
+        "read": 86720,
+        "write": 0
+      }
+    },
+    "permission": [
+      {
+        "permission": "task",
+        "pattern": "*",
+        "action": "deny"
+      }
+    ],
+    "time": {
+      "created": 1793045981866,
+      "updated": 1793046012212
+    }
+  },
+  "messages": [
+    {
+      "info": {
+        "role": "user",
+        "time": {
+          "created": 1793045981881
+        },
+        "agent": "general",
+        "model": {
+          "providerID": "nvidia",
+          "modelID": "nvidia/nemotron-3.5-super-vl-120b-a12b"
+        },
+        "summary": {
+          "diffs": []
+        },
+        "id": "msg_179de6ab8001cHhZ99HwlB3BXh",
+        "sessionID": "ses_e86219555ffeHvif1RU6MffLcT"
+      },
+      "parts": [
+        {
+          "type": "text",
+          "text": "You are reviewing Task 8: frontend assistant module attachment adapter (attachments.ts + attachments.test.ts).\n\n## What Was Requested\nTask brief: /home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/.superpowers/sdd/2025-10-26-studio-assistant-ui-max-integration/task-8-brief.md\nReference: `git show feat/studio-assistant-ui-experience:apps/studio/src/assistant/attachments.ts` and `.attachments.test.ts`\n\n## Diff Under Review\nBase: 10a3c157\nHead: ed64e282\nDiff file: /home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/.superpowers/sdd/2025-10-26-studio-assistant-ui-max-integration/review-10a3c157..ed64e282.diff\n\n## Verify\n1. attachments.ts + attachments.test.ts exist under apps/studio/src/assistant/.\n2. Vitest passing for attachments.test.ts (implementer reports 353 suite tests).\n3. ESLint clean.\n4. Only assistant/ files added; byte-identical to reference.\n\n## Output Format\n### Spec Compliance / Strengths / Issues / Assessment\n### Spec Compliance\n- ✅ / ❌ / ⚠️\n### Strengths\n### Issues\n#### Critical / Important / Minor\n### Assessment\n**Task quality:** Approved / Needs fixes\n**Reasoning:**",
+          "id": "prt_179de6ac40019W8F8UsUN5WwHZ",
+          "sessionID": "ses_e86219555ffeHvif1RU6MffLcT",
+          "messageID": "msg_179de6ab8001cHhZ99HwlB3BXh"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_179de6ab8001cHhZ99HwlB3BXh",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit",
+          "root": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 19941,
+          "input": 2084,
+          "output": 418,
+          "reasoning": 95,
+          "cache": {
+            "write": 0,
+            "read": 17344
+          }
+        },
+        "modelID": "nvidia/nemotron-3.5-super-vl-120b-a12b",
+        "providerID": "nvidia",
+        "time": {
+          "created": 1793045982138,
+          "completed": 1793045988959
+        },
+        "finish": "tool-calls",
+        "id": "msg_179de6bba0017uuT5E2fMgkZTM",
+        "sessionID": "ses_e86219555ffeHvif1RU6MffLcT"
+      },
+      "parts": [
+        {
+          "snapshot": "9c3c1a972d38d51fdd9e6d2cabd40b618288eba8",
+          "type": "step-start",
+          "id": "prt_179de717f001Wl8um87hrp00Aq",
+          "sessionID": "ses_e86219555ffeHvif1RU6MffLcT",
+          "messageID": "msg_179de6bba0017uuT5E2fMgkZTM"
+        },
+        {
+          "type": "reasoning",
+          "text": "The user wants me to review Task 8. Let me start by understanding what's being asked. I need to:\n\n1. Read the task brief\n2. Look at the diff file\n3. Verify the attachments.ts and attachments.test.ts exist\n4. Run vitest for attachments.test.ts\n5. Run ESLint\n6. Verify only assistant/ files added and byte-identical to reference\n\nLet me start by reading the relevant files in parallel.",
+          "time": {
+            "start": 1793045983625,
+            "end": 1793045984738
+          },
+          "id": "prt_179de7189001RPleORPGa3DQHF",
+          "sessionID": "ses_e86219555ffeHvif1RU6MffLcT",
+          "messageID": "msg_179de6bba0017uuT5E2fMgkZTM"
+        },
+        {
+          "type": "text",
+          "text": "I'll review Task 8. Let me start by reading the task brief, diff file, and checking the repository state.\n",
+          "time": {
+            "start": 1793045984750,
+            "end": 1793045988740
+          },
+          "id": "prt_179de75ee001g0WteJ6B4ct4h6",
+          "sessionID": "ses_e86219555ffeHvif1RU6MffLcT",
+          "messageID": "msg_179de6bba0017uuT5E2fMgkZTM"
+        },
+        {
+          "type": "tool",
+          "tool": "read",
+          "callID": "call-a6563973-0544-41b2-aa7e-23c5b29bdf21",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/.superpowers/sdd/2025-10-26-studio-assistant-ui-max-integration/task-8-brief.md"
+            },
+            "output": "<path>/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/.superpowers/sdd/2025-10-26-studio-assistant-ui-max-integration/task-8-brief.md</path>\n<type>file</type>\n<content>\n1: ### Task 8: Frontend — Assistant Module: Attachment Adapter\n2: \n3: **Files:**\n4: - Create: `apps/studio/src/assistant/attachments.ts`\n5: - Create: `apps/studio/src/assistant/attachments.test.ts`\n6: \n7: **Interfaces:**\n8: - Consumes: `ChatAttachment` (client-side), `AttachmentRef`\n9: - Produces: `createAttachmentAdapter`, `preparedAttachments`, `AttachmentAdapter`\n10: \n11: - [ ] **Step 1: Write `attachments.test.ts`** (port from feature branch)\n12: \n13: Test: acceptance by extension/type, 5 MB image ceiling, human-readable sizes.\n14: \n15: - [ ] **Step 2: Implement `createAttachmentAdapter`**\n16: \n17: Reads files in browser, extracts text via `TextDecoder`, creates `data_url` for images.\n18: \n19: - [ ] **Step 3: Implement `preparedAttachments`** helper\n20: \n21: - [ ] **Step 4: Run tests**\n22: \n23: ---\n24: \n\n(End of file - total 24 lines)\n</content>",
+            "metadata": {
+              "preview": "### Task 8: Frontend — Assistant Module: Attachment Adapter\n\n**Files:**\n- Create: `apps/studio/src/assistant/attachments.ts`\n- Create: `apps/studio/src/assistant/attachments.test.ts`\n\n**Interfaces:**\n- Consumes: `ChatAttachment` (client-side), `AttachmentRef`\n- Produces: `createAttachmentAdapter`, `preparedAttachments`, `AttachmentAdapter`\n\n- [ ] **Step 1: Write `attachments.test.ts`** (port from feature branch)\n\nTest: acceptance by extension/type, 5 MB image ceiling, human-readable sizes.\n\n- [ ] **Step 2: Implement `createAttachmentAdapter`**\n\nReads files in browser, extracts text via `TextDecoder`, creates `data_url` for images.\n\n- [ ] **Step 3: Implement `preparedAttachments`** helper\n",
+              "truncated": false,
+              "loaded": [],
+              "display": {
+                "type": "file",
+                "path": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/.superpowers/sdd/2025-10-26-studio-assistant-ui-max-integration/task-8-brief.md",
+                "text": "### Task 8: Frontend — Assistant Module: Attachment Adapter\n\n**Files:**\n- Create: `apps/studio/src/assistant/attachments.ts`\n- Create: `apps/studio/src/assistant/attachments.test.ts`\n\n**Interfaces:**\n- Consumes: `ChatAttachment` (client-side), `AttachmentRef`\n- Produces: `createAttachmentAdapter`, `preparedAttachments`, `AttachmentAdapter`\n\n- [ ] **Step 1: Write `attachments.test.ts`** (port from feature branch)\n\nTest: acceptance by extension/type, 5 MB image ceiling, human-readable sizes.\n\n- [ ] **Step 2: Implement `createAttachmentAdapter`**\n\nReads files in browser, extracts text via `TextDecoder`, creates `data_url` for images.\n\n- [ ] **Step 3: Implement `preparedAttachments`** helper\n\n- [ ] **Step 4: Run tests**\n\n---\n",
+                "lineStart": 1,
+                "lineEnd": 24,
+                "totalLines": 24,
+                "truncated": false
+              }
+            },
+            "title": ".superpowers/sdd/2025-10-26-studio-assistant-ui-max-integration/task-8-brief.md",
+            "time": {
+              "start": 1793045985462,
+              "end": 1793045985476
+            }
+          },
+          "id": "prt_179de78a0001uKvjHqXhCo0mK4",
+          "sessionID": "ses_e86219555ffeHvif1RU6MffLcT",
+          "messageID": "msg_179de6bba0017uuT5E2fMgkZTM"
+        },
+        {
+          "type": "tool",
+          "tool": "read",
+          "callID": "call-9376e652-1241-4340-9ec3-6a7e52d0bc29",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/.superpowers/sdd/2025-10-26-studio-assistant-ui-max-integration/review-10a3c157..ed64e282.diff"
+            },
+            "output": "<path>/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/.superpowers/sdd/2025-10-26-studio-assistant-ui-max-integration/review-10a3c157..ed64e282.diff</path>\n<type>file</type>\n<content>\n1: # Review package: 10a3c157..HEAD\n2: \n3: ## Commits\n4: ed64e282 feat(studio): add assistant attachment adapter\n5: \n6: ## Files changed\n7:  apps/studio/src/assistant/attachments.test.ts |  55 ++++++++\n8:  apps/studio/src/assistant/attachments.ts      | 196 ++++++++++++++++++++++++++\n9:  2 files changed, 251 insertions(+)\n10: \n11: ## Diff\n12: diff --git a/apps/studio/src/assistant/attachments.test.ts b/apps/studio/src/assistant/attachments.test.ts\n13: new file mode 100644\n14: index 00000000..de031ca7\n15: --- /dev/null\n16: +++ b/apps/studio/src/assistant/attachments.test.ts\n17: @@ -0,0 +1,55 @@\n18: +import { describe, expect, it } from \"vitest\";\n19: +\n20: +import {\n21: +  MAX_IMAGE_BYTES,\n22: +  attachmentRejection,\n23: +  formatFileSize,\n24: +  isTextLike,\n25: +} from \"./attachments\";\n26: +\n27: +function fileOf(name: string, type: string, size = 10): File {\n28: +  const file = new File([\"x\"], name, { type });\n29: +  Object.defineProperty(file, \"size\", { value: size });\n30: +  return file;\n31: +}\n32: +\n33: +describe(\"attachmentRejection\", () => {\n34: +  it(\"accepts a text file by extension even when the browser reports no type\", () => {\n35: +    expect(attachmentRejection(fileOf(\"notes.md\", \"\"))).toBeNull();\n36: +    expect(isTextLike(\"notes.md\", \"\")).toBe(true);\n37: +  });\n38: +\n39: +  it(\"accepts a small image\", () => {\n40: +    expect(attachmentRejection(fileOf(\"shot.png\", \"image/png\", 1024))).toBeNull();\n41: +  });\n42: +\n43: +  it(\"explains that an oversized image will not be sent\", () => {\n44: +    const rejection = attachmentRejection(\n45: +      fileOf(\"huge.png\", \"image/png\", MAX_IMAGE_BYTES + 1),\n46: +    );\n47: +    expect(rejection).toContain(\"huge.png\");\n48: +    expect(rejection).toContain(\"5 MB\");\n49: +  });\n50: +\n51: +  it(\"rejects a file the studio cannot read\", () => {\n52: +    expect(attachmentRejection(fileOf(\"deck.pdf\", \"application/pdf\"))).toContain(\"deck.pdf\");\n53: +  });\n54: +\n55: +  it(\"rejects an image format the model cannot be sent\", () => {\n56: +    const rejection = attachmentRejection(fileOf(\"chart.svg\", \"image/svg+xml\"));\n57: +    expect(rejection).toContain(\"chart.svg\");\n58: +    expect(rejection).toContain(\"PNG\");\n59: +  });\n60: +});\n61: +\n62: +describe(\"formatFileSize\", () => {\n63: +  it(\"reads at a human scale\", () => {\n64: +    expect(formatFileSize(512)).toBe(\"512 B\");\n65: +    expect(formatFileSize(2048)).toBe(\"2 KB\");\n66: +    expect(formatFileSize(3 * 1024 * 1024)).toBe(\"3.0 MB\");\n67: +  });\n68: +\n69: +  it(\"says nothing when there is no size to report\", () => {\n70: +    expect(formatFileSize(0)).toBe(\"\");\n71: +  });\n72: +});\n73: diff --git a/apps/studio/src/assistant/attachments.ts b/apps/studio/src/assistant/attachments.ts\n74: new file mode 100644\n75: index 00000000..7a10aefd\n76: --- /dev/null\n77: +++ b/apps/studio/src/assistant/attachments.ts\n78: @@ -0,0 +1,196 @@\n79: +/**\n80: + * Turning a dropped file into something the model can actually read.\n81: + *\n82: + * The client owns this because only the client has the bytes: the sidecar\n83: + * receives extracted text (or a data URL for an image), never a file handle.\n84: + * Extraction is bounded so one large attachment cannot crowd out the\n85: + * conversation, and it is silent about failure — a file we cannot read is shown\n86: + * as a name, not dressed up as content.\n87: + */\n88: +\n89: +import type { AttachmentAdapter, CompleteAttachment, PendingAttachment } from \"@assistant-ui/react\";\n90: +\n91: +import type { ChatAttachment } from \"../types\";\n92: +\n93: +/** How much of a text file the model sees. */\n94: +export const MAX_ATTACHMENT_CHARS = 20_000;\n95: +\n96: +/** A single image, bounded so a data URL cannot bloat the request. */\n97: +export const MAX_IMAGE_BYTES = 5 * 1024 * 1024;\n98: +\n99: +export const ATTACHMENT_ACCEPT = [\n100: +  \"text/*\",\n101: +  \".md\",\n102: +  \".mdx\",\n103: +  \".json\",\n104: +  \".csv\",\n105: +  \".yaml\",\n106: +  \".yml\",\n107: +  \".log\",\n108: +  \"image/png\",\n109: +  \"image/jpeg\",\n110: +  \"image/webp\",\n111: +  \"image/gif\",\n112: +].join(\",\");\n113: +\n114: +const TEXT_LIKE = /^(text\\/|application\\/(json|yaml|x-yaml)$)/;\n115: +const SUPPORTED_IMAGE_TYPES = new Set(\n116: +  ATTACHMENT_ACCEPT.split(\",\").filter((type) => type.startsWith(\"image/\")),\n117: +);\n118: +\n119: +export function isTextLike(name: string, contentType: string): boolean {\n120: +  if (TEXT_LIKE.test(contentType)) {\n121: +    return true;\n122: +  }\n123: +  return /\\.(md|mdx|json|csv|ya?ml|txt|log)$/i.test(name);\n124: +}\n125: +\n126: +export function isImageLike(contentType: string): boolean {\n127: +  return contentType.startsWith(\"image/\");\n128: +}\n129: +\n130: +/**\n131: + * Why a dropped or pasted file cannot become an attachment, or null if it can.\n132: + *\n133: + * The file input already honours `accept`; a drop bypasses it, so the same\n134: + * rule is applied here rather than letting an unreadable file become a chip\n135: + * that promises content the model will never see.\n136: + */\n137: +export function attachmentRejection(file: File): string | null {\n138: +  if (isImageLike(file.type)) {\n139: +    if (!SUPPORTED_IMAGE_TYPES.has(file.type)) {\n140: +      return `${file.name} is not an image the studio can read (PNG, JPEG, WebP, GIF).`;\n141: +    }\n142: +    if (file.size > MAX_IMAGE_BYTES) {\n143: +      return `${file.name} is larger than ${Math.floor(MAX_IMAGE_BYTES / (1024 * 1024))} MB.`;\n144: +    }\n145: +    return null;\n146: +  }\n147: +  if (isTextLike(file.name, file.type)) {\n148: +    return null;\n149: +  }\n150: +  return `${file.name} is not a text or image file the studio can read.`;\n151: +}\n152: +\n153: +/** A short size for an attachment chip; empty when there is nothing to say. */\n154: +export function formatFileSize(bytes: number): string {\n155: +  if (!bytes || bytes < 0) {\n156: +    return \"\";\n157: +  }\n158: +  if (bytes < 1024) {\n159: +    return `${bytes} B`;\n160: +  }\n161: +  if (bytes < 1024 * 1024) {\n162: +    return `${Math.round(bytes / 1024)} KB`;\n163: +  }\n164: +  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;\n165: +}\n166: +\n167: +function readAsDataUrl(file: File): Promise<string> {\n168: +  return new Promise((resolve, reject) => {\n169: +    const reader = new FileReader();\n170: +    reader.onload = () => resolve(String(reader.result ?? \"\"));\n171: +    reader.onerror = () => reject(reader.error ?? new Error(\"Could not read the file.\"));\n172: +    reader.readAsDataURL(file);\n173: +  });\n174: +}\n175: +\n176: +/**\n177: + * Prepare one file for a turn. Never throws: an unreadable file becomes a\n178: + * name-only attachment so the user can still see what they attached.\n179: + */\n180: +export async function prepareAttachment(file: File): Promise<ChatAttachment> {\n181: +  const base: ChatAttachment = {\n182: +    id: crypto.randomUUID(),\n183: +    name: file.name,\n184: +    contentType: file.type || \"application/octet-stream\",\n185: +    size: file.size,\n186: +  };\n187: +\n188: +  try {\n189: +    if (isImageLike(base.contentType) && file.size <= MAX_IMAGE_BYTES) {\n190: +      return { ...base, dataUrl: await readAsDataUrl(file) };\n191: +    }\n192: +    if (isTextLike(file.name, base.contentType)) {\n193: +      const text = await file.text();\n194: +      return { ...base, text: text.slice(0, MAX_ATTACHMENT_CHARS) };\n195: +    }\n196: +  } catch {\n197: +    /* a file we cannot read is still an attachment the user chose */\n198: +  }\n199: +\n200: +  return base;\n201: +}\n202: +\n203: +/**\n204: + * The adapter the runtime uses for `ComposerPrimitive.Attachments`.\n205: + *\n206: + * Prepared attachments are kept by id so `onNew` can hand the turn the same\n207: + * extraction the composer showed.\n208: + */\n209: +export function createAttachmentAdapter(): AttachmentAdapter {\n210: +  return {\n211: +    accept: ATTACHMENT_ACCEPT,\n212: +\n213: +    async add({ file }): Promise<PendingAttachment> {\n214: +      return {\n215: +        id: crypto.randomUUID(),\n216: +        type: isImageLike(file.type) ? \"image\" : file.type ? \"document\" : \"file\",\n217: +        name: file.name,\n218: +        contentType: file.type || \"application/octet-stream\",\n219: +        file,\n220: +        status: { type: \"requires-action\", reason: \"composer-send\" },\n221: +      };\n222: +    },\n223: +\n224: +    async remove(): Promise<void> {\n225: +      // Nothing to release: the file never left the browser.\n226: +    },\n227: +\n228: +    async send(attachment): Promise<CompleteAttachment> {\n229: +      const file = attachment.file;\n230: +      const ready = file\n231: +        ? await prepareAttachment(file)\n232: +        : {\n233: +            id: attachment.id,\n234: +            name: attachment.name,\n235: +            contentType: attachment.contentType ?? \"application/octet-stream\",\n236: +            size: 0,\n237: +          };\n238: +      ATTACHMENTS.set(attachment.id, ready);\n239: +      return {\n240: +        ...attachment,\n241: +        status: { type: \"complete\" },\n242: +        content: [\n243: +          {\n244: +            type: \"file\",\n245: +            data: attachment.id,\n246: +            mimeType: ready.contentType,\n247: +            filename: ready.name,\n248: +          },\n249: +        ],\n250: +      };\n251: +    },\n252: +  };\n253: +}\n254: +\n255: +/** Process-wide, because the runtime adapter outlives a render. */\n256: +const ATTACHMENTS = new Map<string, ChatAttachment>();\n257: +\n258: +/** The extraction for one attachment, for showing what was actually sent. */\n259: +export function preparedAttachmentById(id: string): ChatAttachment | undefined {\n260: +  return ATTACHMENTS.get(id);\n261: +}\n262: +\n263: +/** The extraction for the attachments the runtime handed back on a send. */\n264: +export function preparedAttachments(\n265: +  attachments: readonly { id: string }[] | undefined,\n266: +): ChatAttachment[] {\n267: +  if (!attachments?.length) {\n268: +    return [];\n269: +  }\n270: +  return attachments.flatMap((attachment) => {\n271: +    const ready = ATTACHMENTS.get(attachment.id);\n272: +    return ready ? [ready] : [];\n273: +  });\n274: +}\n\n(End of file - total 274 lines)\n</content>",
+            "metadata": {
+              "preview": "# Review package: 10a3c157..HEAD\n\n## Commits\ned64e282 feat(studio): add assistant attachment adapter\n\n## Files changed\n apps/studio/src/assistant/attachments.test.ts |  55 ++++++++\n apps/studio/src/assistant/attachments.ts      | 196 ++++++++++++++++++++++++++\n 2 files changed, 251 insertions(+)\n\n## Diff\ndiff --git a/apps/studio/src/assistant/attachments.test.ts b/apps/studio/src/assistant/attachments.test.ts\nnew file mode 100644\nindex 00000000..de031ca7\n--- /dev/null\n+++ b/apps/studio/src/assistant/attachments.test.ts\n@@ -0,0 +1,55 @@\n+import { describe, expect, it } from \"vitest\";\n+\n+import {",
+              "truncated": false,
+              "loaded": [],
+              "display": {
+                "type": "file",
+                "path": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/.superpowers/sdd/2025-10-26-studio-assistant-ui-max-integration/review-10a3c157..ed64e282.diff",
+                "text": "# Review package: 10a3c157..HEAD\n\n## Commits\ned64e282 feat(studio): add assistant attachment adapter\n\n## Files changed\n apps/studio/src/assistant/attachments.test.ts |  55 ++++++++\n apps/studio/src/assistant/attachments.ts      | 196 ++++++++++++++++++++++++++\n 2 files changed, 251 insertions(+)\n\n## Diff\ndiff --git a/apps/studio/src/assistant/attachments.test.ts b/apps/studio/src/assistant/attachments.test.ts\nnew file mode 100644\nindex 00000000..de031ca7\n--- /dev/null\n+++ b/apps/studio/src/assistant/attachments.test.ts\n@@ -0,0 +1,55 @@\n+import { describe, expect, it } from \"vitest\";\n+\n+import {\n+  MAX_IMAGE_BYTES,\n+  attachmentRejection,\n+  formatFileSize,\n+  isTextLike,\n+} from \"./attachments\";\n+\n+function fileOf(name: string, type: string, size = 10): File {\n+  const file = new File([\"x\"], name, { type });\n+  Object.defineProperty(file, \"size\", { value: size });\n+  return file;\n+}\n+\n+describe(\"attachmentRejection\", () => {\n+  it(\"accepts a text file by extension even when the browser reports no type\", () => {\n+    expect(attachmentRejection(fileOf(\"notes.md\", \"\"))).toBeNull();\n+    expect(isTextLike(\"notes.md\", \"\")).toBe(true);\n+  });\n+\n+  it(\"accepts a small image\", () => {\n+    expect(attachmentRejection(fileOf(\"shot.png\", \"image/png\", 1024))).toBeNull();\n+  });\n+\n+  it(\"explains that an oversized image will not be sent\", () => {\n+    const rejection = attachmentRejection(\n+      fileOf(\"huge.png\", \"image/png\", MAX_IMAGE_BYTES + 1),\n+    );\n+    expect(rejection).toContain(\"huge.png\");\n+    expect(rejection).toContain(\"5 MB\");\n+  });\n+\n+  it(\"rejects a file the studio cannot read\", () => {\n+    expect(attachmentRejection(fileOf(\"deck.pdf\", \"application/pdf\"))).toContain(\"deck.pdf\");\n+  });\n+\n+  it(\"rejects an image format the model cannot be sent\", () => {\n+    const rejection = attachmentRejection(fileOf(\"chart.svg\", \"image/svg+xml\"));\n+    expect(rejection).toContain(\"chart.svg\");\n+    expect(rejection).toContain(\"PNG\");\n+  });\n+});\n+\n+describe(\"formatFileSize\", () => {\n+  it(\"reads at a human scale\", () => {\n+    expect(formatFileSize(512)).toBe(\"512 B\");\n+    expect(formatFileSize(2048)).toBe(\"2 KB\");\n+    expect(formatFileSize(3 * 1024 * 1024)).toBe(\"3.0 MB\");\n+  });\n+\n+  it(\"says nothing when there is no size to report\", () => {\n+    expect(formatFileSize(0)).toBe(\"\");\n+  });\n+});\ndiff --git a/apps/studio/src/assistant/attachments.ts b/apps/studio/src/assistant/attachments.ts\nnew file mode 100644\nindex 00000000..7a10aefd\n--- /dev/null\n+++ b/apps/studio/src/assistant/attachments.ts\n@@ -0,0 +1,196 @@\n+/**\n+ * Turning a dropped file into something the model can actually read.\n+ *\n+ * The client owns this because only the client has the bytes: the sidecar\n+ * receives extracted text (or a data URL for an image), never a file handle.\n+ * Extraction is bounded so one large attachment cannot crowd out the\n+ * conversation, and it is silent about failure — a file we cannot read is shown\n+ * as a name, not dressed up as content.\n+ */\n+\n+import type { AttachmentAdapter, CompleteAttachment, PendingAttachment } from \"@assistant-ui/react\";\n+\n+import type { ChatAttachment } from \"../types\";\n+\n+/** How much of a text file the model sees. */\n+export const MAX_ATTACHMENT_CHARS = 20_000;\n+\n+/** A single image, bounded so a data URL cannot bloat the request. */\n+export const MAX_IMAGE_BYTES = 5 * 1024 * 1024;\n+\n+export const ATTACHMENT_ACCEPT = [\n+  \"text/*\",\n+  \".md\",\n+  \".mdx\",\n+  \".json\",\n+  \".csv\",\n+  \".yaml\",\n+  \".yml\",\n+  \".log\",\n+  \"image/png\",\n+  \"image/jpeg\",\n+  \"image/webp\",\n+  \"image/gif\",\n+].join(\",\");\n+\n+const TEXT_LIKE = /^(text\\/|application\\/(json|yaml|x-yaml)$)/;\n+const SUPPORTED_IMAGE_TYPES = new Set(\n+  ATTACHMENT_ACCEPT.split(\",\").filter((type) => type.startsWith(\"image/\")),\n+);\n+\n+export function isTextLike(name: string, contentType: string): boolean {\n+  if (TEXT_LIKE.test(contentType)) {\n+    return true;\n+  }\n+  return /\\.(md|mdx|json|csv|ya?ml|txt|log)$/i.test(name);\n+}\n+\n+export function isImageLike(contentType: string): boolean {\n+  return contentType.startsWith(\"image/\");\n+}\n+\n+/**\n+ * Why a dropped or pasted file cannot become an attachment, or null if it can.\n+ *\n+ * The file input already honours `accept`; a drop bypasses it, so the same\n+ * rule is applied here rather than letting an unreadable file become a chip\n+ * that promises content the model will never see.\n+ */\n+export function attachmentRejection(file: File): string | null {\n+  if (isImageLike(file.type)) {\n+    if (!SUPPORTED_IMAGE_TYPES.has(file.type)) {\n+      return `${file.name} is not an image the studio can read (PNG, JPEG, WebP, GIF).`;\n+    }\n+    if (file.size > MAX_IMAGE_BYTES) {\n+      return `${file.name} is larger than ${Math.floor(MAX_IMAGE_BYTES / (1024 * 1024))} MB.`;\n+    }\n+    return null;\n+  }\n+  if (isTextLike(file.name, file.type)) {\n+    return null;\n+  }\n+  return `${file.name} is not a text or image file the studio can read.`;\n+}\n+\n+/** A short size for an attachment chip; empty when there is nothing to say. */\n+export function formatFileSize(bytes: number): string {\n+  if (!bytes || bytes < 0) {\n+    return \"\";\n+  }\n+  if (bytes < 1024) {\n+    return `${bytes} B`;\n+  }\n+  if (bytes < 1024 * 1024) {\n+    return `${Math.round(bytes / 1024)} KB`;\n+  }\n+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;\n+}\n+\n+function readAsDataUrl(file: File): Promise<string> {\n+  return new Promise((resolve, reject) => {\n+    const reader = new FileReader();\n+    reader.onload = () => resolve(String(reader.result ?? \"\"));\n+    reader.onerror = () => reject(reader.error ?? new Error(\"Could not read the file.\"));\n+    reader.readAsDataURL(file);\n+  });\n+}\n+\n+/**\n+ * Prepare one file for a turn. Never throws: an unreadable file becomes a\n+ * name-only attachment so the user can still see what they attached.\n+ */\n+export async function prepareAttachment(file: File): Promise<ChatAttachment> {\n+  const base: ChatAttachment = {\n+    id: crypto.randomUUID(),\n+    name: file.name,\n+    contentType: file.type || \"application/octet-stream\",\n+    size: file.size,\n+  };\n+\n+  try {\n+    if (isImageLike(base.contentType) && file.size <= MAX_IMAGE_BYTES) {\n+      return { ...base, dataUrl: await readAsDataUrl(file) };\n+    }\n+    if (isTextLike(file.name, base.contentType)) {\n+      const text = await file.text();\n+      return { ...base, text: text.slice(0, MAX_ATTACHMENT_CHARS) };\n+    }\n+  } catch {\n+    /* a file we cannot read is still an attachment the user chose */\n+  }\n+\n+  return base;\n+}\n+\n+/**\n+ * The adapter the runtime uses for `ComposerPrimitive.Attachments`.\n+ *\n+ * Prepared attachments are kept by id so `onNew` can hand the turn the same\n+ * extraction the composer showed.\n+ */\n+export function createAttachmentAdapter(): AttachmentAdapter {\n+  return {\n+    accept: ATTACHMENT_ACCEPT,\n+\n+    async add({ file }): Promise<PendingAttachment> {\n+      return {\n+        id: crypto.randomUUID(),\n+        type: isImageLike(file.type) ? \"image\" : file.type ? \"document\" : \"file\",\n+        name: file.name,\n+        contentType: file.type || \"application/octet-stream\",\n+        file,\n+        status: { type: \"requires-action\", reason: \"composer-send\" },\n+      };\n+    },\n+\n+    async remove(): Promise<void> {\n+      // Nothing to release: the file never left the browser.\n+    },\n+\n+    async send(attachment): Promise<CompleteAttachment> {\n+      const file = attachment.file;\n+      const ready = file\n+        ? await prepareAttachment(file)\n+        : {\n+            id: attachment.id,\n+            name: attachment.name,\n+            contentType: attachment.contentType ?? \"application/octet-stream\",\n+            size: 0,\n+          };\n+      ATTACHMENTS.set(attachment.id, ready);\n+      return {\n+        ...attachment,\n+        status: { type: \"complete\" },\n+        content: [\n+          {\n+            type: \"file\",\n+            data: attachment.id,\n+            mimeType: ready.contentType,\n+            filename: ready.name,\n+          },\n+        ],\n+      };\n+    },\n+  };\n+}\n+\n+/** Process-wide, because the runtime adapter outlives a render. */\n+const ATTACHMENTS = new Map<string, ChatAttachment>();\n+\n+/** The extraction for one attachment, for showing what was actually sent. */\n+export function preparedAttachmentById(id: string): ChatAttachment | undefined {\n+  return ATTACHMENTS.get(id);\n+}\n+\n+/** The extraction for the attachments the runtime handed back on a send. */\n+export function preparedAttachments(\n+  attachments: readonly { id: string }[] | undefined,\n+): ChatAttachment[] {\n+  if (!attachments?.length) {\n+    return [];\n+  }\n+  return attachments.flatMap((attachment) => {\n+    const ready = ATTACHMENTS.get(attachment.id);\n+    return ready ? [ready] : [];\n+  });\n+}",
+                "lineStart": 1,
+                "lineEnd": 274,
+                "totalLines": 274,
+                "truncated": false
+              }
+            },
+            "title": ".superpowers/sdd/2025-10-26-studio-assistant-ui-max-integration/review-10a3c157..ed64e282.diff",
+            "time": {
+              "start": 1793045986011,
+              "end": 1793045986029
+            }
+          },
+          "id": "prt_179de7acd001eQQGNPaYKEXogK",
+          "sessionID": "ses_e86219555ffeHvif1RU6MffLcT",
+          "messageID": "msg_179de6bba0017uuT5E2fMgkZTM"
+        },
+        {
+          "type": "tool",
+          "tool": "read",
+          "callID": "call-8b39e504-1e8a-44c3-bf75-eef2bfcb54e5",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio/src/assistant/attachments.ts"
+            },
+            "output": "<path>/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio/src/assistant/attachments.ts</path>\n<type>file</type>\n<content>\n1: /**\n2:  * Turning a dropped file into something the model can actually read.\n3:  *\n4:  * The client owns this because only the client has the bytes: the sidecar\n5:  * receives extracted text (or a data URL for an image), never a file handle.\n6:  * Extraction is bounded so one large attachment cannot crowd out the\n7:  * conversation, and it is silent about failure — a file we cannot read is shown\n8:  * as a name, not dressed up as content.\n9:  */\n10: \n11: import type { AttachmentAdapter, CompleteAttachment, PendingAttachment } from \"@assistant-ui/react\";\n12: \n13: import type { ChatAttachment } from \"../types\";\n14: \n15: /** How much of a text file the model sees. */\n16: export const MAX_ATTACHMENT_CHARS = 20_000;\n17: \n18: /** A single image, bounded so a data URL cannot bloat the request. */\n19: export const MAX_IMAGE_BYTES = 5 * 1024 * 1024;\n20: \n21: export const ATTACHMENT_ACCEPT = [\n22:   \"text/*\",\n23:   \".md\",\n24:   \".mdx\",\n25:   \".json\",\n26:   \".csv\",\n27:   \".yaml\",\n28:   \".yml\",\n29:   \".log\",\n30:   \"image/png\",\n31:   \"image/jpeg\",\n32:   \"image/webp\",\n33:   \"image/gif\",\n34: ].join(\",\");\n35: \n36: const TEXT_LIKE = /^(text\\/|application\\/(json|yaml|x-yaml)$)/;\n37: const SUPPORTED_IMAGE_TYPES = new Set(\n38:   ATTACHMENT_ACCEPT.split(\",\").filter((type) => type.startsWith(\"image/\")),\n39: );\n40: \n41: export function isTextLike(name: string, contentType: string): boolean {\n42:   if (TEXT_LIKE.test(contentType)) {\n43:     return true;\n44:   }\n45:   return /\\.(md|mdx|json|csv|ya?ml|txt|log)$/i.test(name);\n46: }\n47: \n48: export function isImageLike(contentType: string): boolean {\n49:   return contentType.startsWith(\"image/\");\n50: }\n51: \n52: /**\n53:  * Why a dropped or pasted file cannot become an attachment, or null if it can.\n54:  *\n55:  * The file input already honours `accept`; a drop bypasses it, so the same\n56:  * rule is applied here rather than letting an unreadable file become a chip\n57:  * that promises content the model will never see.\n58:  */\n59: export function attachmentRejection(file: File): string | null {\n60:   if (isImageLike(file.type)) {\n61:     if (!SUPPORTED_IMAGE_TYPES.has(file.type)) {\n62:       return `${file.name} is not an image the studio can read (PNG, JPEG, WebP, GIF).`;\n63:     }\n64:     if (file.size > MAX_IMAGE_BYTES) {\n65:       return `${file.name} is larger than ${Math.floor(MAX_IMAGE_BYTES / (1024 * 1024))} MB.`;\n66:     }\n67:     return null;\n68:   }\n69:   if (isTextLike(file.name, file.type)) {\n70:     return null;\n71:   }\n72:   return `${file.name} is not a text or image file the studio can read.`;\n73: }\n74: \n75: /** A short size for an attachment chip; empty when there is nothing to say. */\n76: export function formatFileSize(bytes: number): string {\n77:   if (!bytes || bytes < 0) {\n78:     return \"\";\n79:   }\n80:   if (bytes < 1024) {\n81:     return `${bytes} B`;\n82:   }\n83:   if (bytes < 1024 * 1024) {\n84:     return `${Math.round(bytes / 1024)} KB`;\n85:   }\n86:   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;\n87: }\n88: \n89: function readAsDataUrl(file: File): Promise<string> {\n90:   return new Promise((resolve, reject) => {\n91:     const reader = new FileReader();\n92:     reader.onload = () => resolve(String(reader.result ?? \"\"));\n93:     reader.onerror = () => reject(reader.error ?? new Error(\"Could not read the file.\"));\n94:     reader.readAsDataURL(file);\n95:   });\n96: }\n97: \n98: /**\n99:  * Prepare one file for a turn. Never throws: an unreadable file becomes a\n100:  * name-only attachment so the user can still see what they attached.\n101:  */\n102: export async function prepareAttachment(file: File): Promise<ChatAttachment> {\n103:   const base: ChatAttachment = {\n104:     id: crypto.randomUUID(),\n105:     name: file.name,\n106:     contentType: file.type || \"application/octet-stream\",\n107:     size: file.size,\n108:   };\n109: \n110:   try {\n111:     if (isImageLike(base.contentType) && file.size <= MAX_IMAGE_BYTES) {\n112:       return { ...base, dataUrl: await readAsDataUrl(file) };\n113:     }\n114:     if (isTextLike(file.name, base.contentType)) {\n115:       const text = await file.text();\n116:       return { ...base, text: text.slice(0, MAX_ATTACHMENT_CHARS) };\n117:     }\n118:   } catch {\n119:     /* a file we cannot read is still an attachment the user chose */\n120:   }\n121: \n122:   return base;\n123: }\n124: \n125: /**\n126:  * The adapter the runtime uses for `ComposerPrimitive.Attachments`.\n127:  *\n128:  * Prepared attachments are kept by id so `onNew` can hand the turn the same\n129:  * extraction the composer showed.\n130:  */\n131: export function createAttachmentAdapter(): AttachmentAdapter {\n132:   return {\n133:     accept: ATTACHMENT_ACCEPT,\n134: \n135:     async add({ file }): Promise<PendingAttachment> {\n136:       return {\n137:         id: crypto.randomUUID(),\n138:         type: isImageLike(file.type) ? \"image\" : file.type ? \"document\" : \"file\",\n139:         name: file.name,\n140:         contentType: file.type || \"application/octet-stream\",\n141:         file,\n142:         status: { type: \"requires-action\", reason: \"composer-send\" },\n143:       };\n144:     },\n145: \n146:     async remove(): Promise<void> {\n147:       // Nothing to release: the file never left the browser.\n148:     },\n149: \n150:     async send(attachment): Promise<CompleteAttachment> {\n151:       const file = attachment.file;\n152:       const ready = file\n153:         ? await prepareAttachment(file)\n154:         : {\n155:             id: attachment.id,\n156:             name: attachment.name,\n157:             contentType: attachment.contentType ?? \"application/octet-stream\",\n158:             size: 0,\n159:           };\n160:       ATTACHMENTS.set(attachment.id, ready);\n161:       return {\n162:         ...attachment,\n163:         status: { type: \"complete\" },\n164:         content: [\n165:           {\n166:             type: \"file\",\n167:             data: attachment.id,\n168:             mimeType: ready.contentType,\n169:             filename: ready.name,\n170:           },\n171:         ],\n172:       };\n173:     },\n174:   };\n175: }\n176: \n177: /** Process-wide, because the runtime adapter outlives a render. */\n178: const ATTACHMENTS = new Map<string, ChatAttachment>();\n179: \n180: /** The extraction for one attachment, for showing what was actually sent. */\n181: export function preparedAttachmentById(id: string): ChatAttachment | undefined {\n182:   return ATTACHMENTS.get(id);\n183: }\n184: \n185: /** The extraction for the attachments the runtime handed back on a send. */\n186: export function preparedAttachments(\n187:   attachments: readonly { id: string }[] | undefined,\n188: ): ChatAttachment[] {\n189:   if (!attachments?.length) {\n190:     return [];\n191:   }\n192:   return attachments.flatMap((attachment) => {\n193:     const ready = ATTACHMENTS.get(attachment.id);\n194:     return ready ? [ready] : [];\n195:   });\n196: }\n\n(End of file - total 196 lines)\n</content>",
+            "metadata": {
+              "preview": "/**\n * Turning a dropped file into something the model can actually read.\n *\n * The client owns this because only the client has the bytes: the sidecar\n * receives extracted text (or a data URL for an image), never a file handle.\n * Extraction is bounded so one large attachment cannot crowd out the\n * conversation, and it is silent about failure — a file we cannot read is shown\n * as a name, not dressed up as content.\n */\n\nimport type { AttachmentAdapter, CompleteAttachment, PendingAttachment } from \"@assistant-ui/react\";\n\nimport type { ChatAttachment } from \"../types\";\n\n/** How much of a text file the model sees. */\nexport const MAX_ATTACHMENT_CHARS = 20_000;\n\n/** A single image, bounded so a data URL cannot bloat the request. */\nexport const MAX_IMAGE_BYTES = 5 * 1024 * 1024;\n",
+              "truncated": false,
+              "loaded": [],
+              "display": {
+                "type": "file",
+                "path": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio/src/assistant/attachments.ts",
+                "text": "/**\n * Turning a dropped file into something the model can actually read.\n *\n * The client owns this because only the client has the bytes: the sidecar\n * receives extracted text (or a data URL for an image), never a file handle.\n * Extraction is bounded so one large attachment cannot crowd out the\n * conversation, and it is silent about failure — a file we cannot read is shown\n * as a name, not dressed up as content.\n */\n\nimport type { AttachmentAdapter, CompleteAttachment, PendingAttachment } from \"@assistant-ui/react\";\n\nimport type { ChatAttachment } from \"../types\";\n\n/** How much of a text file the model sees. */\nexport const MAX_ATTACHMENT_CHARS = 20_000;\n\n/** A single image, bounded so a data URL cannot bloat the request. */\nexport const MAX_IMAGE_BYTES = 5 * 1024 * 1024;\n\nexport const ATTACHMENT_ACCEPT = [\n  \"text/*\",\n  \".md\",\n  \".mdx\",\n  \".json\",\n  \".csv\",\n  \".yaml\",\n  \".yml\",\n  \".log\",\n  \"image/png\",\n  \"image/jpeg\",\n  \"image/webp\",\n  \"image/gif\",\n].join(\",\");\n\nconst TEXT_LIKE = /^(text\\/|application\\/(json|yaml|x-yaml)$)/;\nconst SUPPORTED_IMAGE_TYPES = new Set(\n  ATTACHMENT_ACCEPT.split(\",\").filter((type) => type.startsWith(\"image/\")),\n);\n\nexport function isTextLike(name: string, contentType: string): boolean {\n  if (TEXT_LIKE.test(contentType)) {\n    return true;\n  }\n  return /\\.(md|mdx|json|csv|ya?ml|txt|log)$/i.test(name);\n}\n\nexport function isImageLike(contentType: string): boolean {\n  return contentType.startsWith(\"image/\");\n}\n\n/**\n * Why a dropped or pasted file cannot become an attachment, or null if it can.\n *\n * The file input already honours `accept`; a drop bypasses it, so the same\n * rule is applied here rather than letting an unreadable file become a chip\n * that promises content the model will never see.\n */\nexport function attachmentRejection(file: File): string | null {\n  if (isImageLike(file.type)) {\n    if (!SUPPORTED_IMAGE_TYPES.has(file.type)) {\n      return `${file.name} is not an image the studio can read (PNG, JPEG, WebP, GIF).`;\n    }\n    if (file.size > MAX_IMAGE_BYTES) {\n      return `${file.name} is larger than ${Math.floor(MAX_IMAGE_BYTES / (1024 * 1024))} MB.`;\n    }\n    return null;\n  }\n  if (isTextLike(file.name, file.type)) {\n    return null;\n  }\n  return `${file.name} is not a text or image file the studio can read.`;\n}\n\n/** A short size for an attachment chip; empty when there is nothing to say. */\nexport function formatFileSize(bytes: number): string {\n  if (!bytes || bytes < 0) {\n    return \"\";\n  }\n  if (bytes < 1024) {\n    return `${bytes} B`;\n  }\n  if (bytes < 1024 * 1024) {\n    return `${Math.round(bytes / 1024)} KB`;\n  }\n  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;\n}\n\nfunction readAsDataUrl(file: File): Promise<string> {\n  return new Promise((resolve, reject) => {\n    const reader = new FileReader();\n    reader.onload = () => resolve(String(reader.result ?? \"\"));\n    reader.onerror = () => reject(reader.error ?? new Error(\"Could not read the file.\"));\n    reader.readAsDataURL(file);\n  });\n}\n\n/**\n * Prepare one file for a turn. Never throws: an unreadable file becomes a\n * name-only attachment so the user can still see what they attached.\n */\nexport async function prepareAttachment(file: File): Promise<ChatAttachment> {\n  const base: ChatAttachment = {\n    id: crypto.randomUUID(),\n    name: file.name,\n    contentType: file.type || \"application/octet-stream\",\n    size: file.size,\n  };\n\n  try {\n    if (isImageLike(base.contentType) && file.size <= MAX_IMAGE_BYTES) {\n      return { ...base, dataUrl: await readAsDataUrl(file) };\n    }\n    if (isTextLike(file.name, base.contentType)) {\n      const text = await file.text();\n      return { ...base, text: text.slice(0, MAX_ATTACHMENT_CHARS) };\n    }\n  } catch {\n    /* a file we cannot read is still an attachment the user chose */\n  }\n\n  return base;\n}\n\n/**\n * The adapter the runtime uses for `ComposerPrimitive.Attachments`.\n *\n * Prepared attachments are kept by id so `onNew` can hand the turn the same\n * extraction the composer showed.\n */\nexport function createAttachmentAdapter(): AttachmentAdapter {\n  return {\n    accept: ATTACHMENT_ACCEPT,\n\n    async add({ file }): Promise<PendingAttachment> {\n      return {\n        id: crypto.randomUUID(),\n        type: isImageLike(file.type) ? \"image\" : file.type ? \"document\" : \"file\",\n        name: file.name,\n        contentType: file.type || \"application/octet-stream\",\n        file,\n        status: { type: \"requires-action\", reason: \"composer-send\" },\n      };\n    },\n\n    async remove(): Promise<void> {\n      // Nothing to release: the file never left the browser.\n    },\n\n    async send(attachment): Promise<CompleteAttachment> {\n      const file = attachment.file;\n      const ready = file\n        ? await prepareAttachment(file)\n        : {\n            id: attachment.id,\n            name: attachment.name,\n            contentType: attachment.contentType ?? \"application/octet-stream\",\n            size: 0,\n          };\n      ATTACHMENTS.set(attachment.id, ready);\n      return {\n        ...attachment,\n        status: { type: \"complete\" },\n        content: [\n          {\n            type: \"file\",\n            data: attachment.id,\n            mimeType: ready.contentType,\n            filename: ready.name,\n          },\n        ],\n      };\n    },\n  };\n}\n\n/** Process-wide, because the runtime adapter outlives a render. */\nconst ATTACHMENTS = new Map<string, ChatAttachment>();\n\n/** The extraction for one attachment, for showing what was actually sent. */\nexport function preparedAttachmentById(id: string): ChatAttachment | undefined {\n  return ATTACHMENTS.get(id);\n}\n\n/** The extraction for the attachments the runtime handed back on a send. */\nexport function preparedAttachments(\n  attachments: readonly { id: string }[] | undefined,\n): ChatAttachment[] {\n  if (!attachments?.length) {\n    return [];\n  }\n  return attachments.flatMap((attachment) => {\n    const ready = ATTACHMENTS.get(attachment.id);\n    return ready ? [ready] : [];\n  });\n}",
+                "lineStart": 1,
+                "lineEnd": 196,
+                "totalLines": 196,
+                "truncated": false
+              }
+            },
+            "title": "apps/studio/src/assistant/attachments.ts",
+            "time": {
+              "start": 1793045986376,
+              "end": 1793045986391
+            }
+          },
+          "id": "prt_179de7c3e001431iGr5EbLIuja",
+          "sessionID": "ses_e86219555ffeHvif1RU6MffLcT",
+          "messageID": "msg_179de6bba0017uuT5E2fMgkZTM"
+        },
+        {
+          "type": "tool",
+          "tool": "read",
+          "callID": "call-30db3b42-5695-47c1-9bed-1f82fa0bb8a0",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio/src/assistant/attachments.test.ts"
+            },
+            "output": "<path>/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio/src/assistant/attachments.test.ts</path>\n<type>file</type>\n<content>\n1: import { describe, expect, it } from \"vitest\";\n2: \n3: import {\n4:   MAX_IMAGE_BYTES,\n5:   attachmentRejection,\n6:   formatFileSize,\n7:   isTextLike,\n8: } from \"./attachments\";\n9: \n10: function fileOf(name: string, type: string, size = 10): File {\n11:   const file = new File([\"x\"], name, { type });\n12:   Object.defineProperty(file, \"size\", { value: size });\n13:   return file;\n14: }\n15: \n16: describe(\"attachmentRejection\", () => {\n17:   it(\"accepts a text file by extension even when the browser reports no type\", () => {\n18:     expect(attachmentRejection(fileOf(\"notes.md\", \"\"))).toBeNull();\n19:     expect(isTextLike(\"notes.md\", \"\")).toBe(true);\n20:   });\n21: \n22:   it(\"accepts a small image\", () => {\n23:     expect(attachmentRejection(fileOf(\"shot.png\", \"image/png\", 1024))).toBeNull();\n24:   });\n25: \n26:   it(\"explains that an oversized image will not be sent\", () => {\n27:     const rejection = attachmentRejection(\n28:       fileOf(\"huge.png\", \"image/png\", MAX_IMAGE_BYTES + 1),\n29:     );\n30:     expect(rejection).toContain(\"huge.png\");\n31:     expect(rejection).toContain(\"5 MB\");\n32:   });\n33: \n34:   it(\"rejects a file the studio cannot read\", () => {\n35:     expect(attachmentRejection(fileOf(\"deck.pdf\", \"application/pdf\"))).toContain(\"deck.pdf\");\n36:   });\n37: \n38:   it(\"rejects an image format the model cannot be sent\", () => {\n39:     const rejection = attachmentRejection(fileOf(\"chart.svg\", \"image/svg+xml\"));\n40:     expect(rejection).toContain(\"chart.svg\");\n41:     expect(rejection).toContain(\"PNG\");\n42:   });\n43: });\n44: \n45: describe(\"formatFileSize\", () => {\n46:   it(\"reads at a human scale\", () => {\n47:     expect(formatFileSize(512)).toBe(\"512 B\");\n48:     expect(formatFileSize(2048)).toBe(\"2 KB\");\n49:     expect(formatFileSize(3 * 1024 * 1024)).toBe(\"3.0 MB\");\n50:   });\n51: \n52:   it(\"says nothing when there is no size to report\", () => {\n53:     expect(formatFileSize(0)).toBe(\"\");\n54:   });\n55: });\n\n(End of file - total 55 lines)\n</content>",
+            "metadata": {
+              "preview": "import { describe, expect, it } from \"vitest\";\n\nimport {\n  MAX_IMAGE_BYTES,\n  attachmentRejection,\n  formatFileSize,\n  isTextLike,\n} from \"./attachments\";\n\nfunction fileOf(name: string, type: string, size = 10): File {\n  const file = new File([\"x\"], name, { type });\n  Object.defineProperty(file, \"size\", { value: size });\n  return file;\n}\n\ndescribe(\"attachmentRejection\", () => {\n  it(\"accepts a text file by extension even when the browser reports no type\", () => {\n    expect(attachmentRejection(fileOf(\"notes.md\", \"\"))).toBeNull();\n    expect(isTextLike(\"notes.md\", \"\")).toBe(true);\n  });",
+              "truncated": false,
+              "loaded": [],
+              "display": {
+                "type": "file",
+                "path": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio/src/assistant/attachments.test.ts",
+                "text": "import { describe, expect, it } from \"vitest\";\n\nimport {\n  MAX_IMAGE_BYTES,\n  attachmentRejection,\n  formatFileSize,\n  isTextLike,\n} from \"./attachments\";\n\nfunction fileOf(name: string, type: string, size = 10): File {\n  const file = new File([\"x\"], name, { type });\n  Object.defineProperty(file, \"size\", { value: size });\n  return file;\n}\n\ndescribe(\"attachmentRejection\", () => {\n  it(\"accepts a text file by extension even when the browser reports no type\", () => {\n    expect(attachmentRejection(fileOf(\"notes.md\", \"\"))).toBeNull();\n    expect(isTextLike(\"notes.md\", \"\")).toBe(true);\n  });\n\n  it(\"accepts a small image\", () => {\n    expect(attachmentRejection(fileOf(\"shot.png\", \"image/png\", 1024))).toBeNull();\n  });\n\n  it(\"explains that an oversized image will not be sent\", () => {\n    const rejection = attachmentRejection(\n      fileOf(\"huge.png\", \"image/png\", MAX_IMAGE_BYTES + 1),\n    );\n    expect(rejection).toContain(\"huge.png\");\n    expect(rejection).toContain(\"5 MB\");\n  });\n\n  it(\"rejects a file the studio cannot read\", () => {\n    expect(attachmentRejection(fileOf(\"deck.pdf\", \"application/pdf\"))).toContain(\"deck.pdf\");\n  });\n\n  it(\"rejects an image format the model cannot be sent\", () => {\n    const rejection = attachmentRejection(fileOf(\"chart.svg\", \"image/svg+xml\"));\n    expect(rejection).toContain(\"chart.svg\");\n    expect(rejection).toContain(\"PNG\");\n  });\n});\n\ndescribe(\"formatFileSize\", () => {\n  it(\"reads at a human scale\", () => {\n    expect(formatFileSize(512)).toBe(\"512 B\");\n    expect(formatFileSize(2048)).toBe(\"2 KB\");\n    expect(formatFileSize(3 * 1024 * 1024)).toBe(\"3.0 MB\");\n  });\n\n  it(\"says nothing when there is no size to report\", () => {\n    expect(formatFileSize(0)).toBe(\"\");\n  });\n});",
+                "lineStart": 1,
+                "lineEnd": 55,
+                "totalLines": 55,
+                "truncated": false
+              }
+            },
+            "title": "apps/studio/src/assistant/attachments.test.ts",
+            "time": {
+              "start": 1793045987614,
+              "end": 1793045987638
+            }
+          },
+          "id": "prt_179de8105001K8ETSsO4g4825z",
+          "sessionID": "ses_e86219555ffeHvif1RU6MffLcT",
+          "messageID": "msg_179de6bba0017uuT5E2fMgkZTM"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "call-843819c7-fc33-4847-800c-b823c4ade298",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "git -C /home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit status --short && echo \"---LOG---\" && git -C /home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit log --oneline -5"
+            },
+            "output": "---LOG---\ned64e282 feat(studio): add assistant attachment adapter\n10a3c157 feat(studio): add assistant convert layer between ChatMessage and ThreadMessage\neba230fd studio: align types.ts with assistant-ui message model\n1116ea8b fix(studio-api): resolve approvals on event loop; gate promote_evidence; frame add_connector tool; keep head on rename\n943efab3 feat(studio-api): port approval gates, branching, reasoning and sources\n",
+            "metadata": {
+              "output": "---LOG---\ned64e282 feat(studio): add assistant attachment adapter\n10a3c157 feat(studio): add assistant convert layer between ChatMessage and ThreadMessage\neba230fd studio: align types.ts with assistant-ui message model\n1116ea8b fix(studio-api): resolve approvals on event loop; gate promote_evidence; frame add_connector tool; keep head on rename\n943efab3 feat(studio-api): port approval gates, branching, reasoning and sources\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "git -C /home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit status --short && echo \"---LOG---\" && git -C /home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit log --oneline -5",
+            "time": {
+              "start": 1793045988727,
+              "end": 1793045988768
+            }
+          },
+          "id": "prt_179de8564001kdEwKm3VrHpyxu",
+          "sessionID": "ses_e86219555ffeHvif1RU6MffLcT",
+          "messageID": "msg_179de6bba0017uuT5E2fMgkZTM"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "9c3c1a972d38d51fdd9e6d2cabd40b618288eba8",
+          "type": "step-finish",
+          "tokens": {
+            "total": 19941,
+            "input": 2084,
+            "output": 418,
+            "reasoning": 95,
+            "cache": {
+              "write": 0,
+              "read": 17344
+            }
+          },
+          "cost": 0,
+          "id": "prt_179de85e5001ZTI7IUy34bHM4x",
+          "sessionID": "ses_e86219555ffeHvif1RU6MffLcT",
+          "messageID": "msg_179de6bba0017uuT5E2fMgkZTM"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_179de6ab8001cHhZ99HwlB3BXh",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit",
+          "root": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 27782,
+          "input": 9858,
+          "output": 381,
+          "reasoning": 199,
+          "cache": {
+            "write": 0,
+            "read": 17344
+          }
+        },
+        "modelID": "nvidia/nemotron-3.5-super-vl-120b-a12b",
+        "providerID": "nvidia",
+        "time": {
+          "created": 1793045988966,
+          "completed": 1793045995998
+        },
+        "finish": "tool-calls",
+        "id": "msg_179de8666001frOmV0nNYw1qxv",
+        "sessionID": "ses_e86219555ffeHvif1RU6MffLcT"
+      },
+      "parts": [
+        {
+          "snapshot": "9c3c1a972d38d51fdd9e6d2cabd40b618288eba8",
+          "type": "step-start",
+          "id": "prt_179de8c51001V5i2vqjYu7yRXx",
+          "sessionID": "ses_e86219555ffeHvif1RU6MffLcT",
+          "messageID": "msg_179de8666001frOmV0nNYw1qxv"
+        },
+        {
+          "type": "reasoning",
+          "text": "Now let me verify the requirements:\n\n1. attachments.ts + attachments.test.ts exist under apps/studio/src/assistant/. ✓ (both exist)\n2. Vitest passing for attachments.test.ts - need to run\n3. ESLint clean - need to run\n4. Only assistant/ files added; byte-identical to reference - need to verify against git show reference\n\nLet me check:\n- The git status shows only ed64e282 commit on top of 10a3c157, which added exactly these two files. Good.\n- Need to verify byte-identical to reference (git show feat/studio-assistant-ui-experience:apps/studio/src/assistant/attachments.ts)\n- Need to run vitest and eslint\n\nLet me run these verifications in parallel. First, let me verify the reference matches byte-for-byte, and run tests/lint.\n\nLet me check the reference branch exists and compare.",
+          "time": {
+            "start": 1793045990485,
+            "end": 1793045993142
+          },
+          "id": "prt_179de8c55001fq9tAPGE8dvTsr",
+          "sessionID": "ses_e86219555ffeHvif1RU6MffLcT",
+          "messageID": "msg_179de8666001frOmV0nNYw1qxv"
+        },
+        {
+          "type": "text",
+          "text": "Files exist and match the diff. Now let me verify byte-identity against the reference branch, run vitest, and ESLint.\n",
+          "time": {
+            "start": 1793045993147,
+            "end": 1793045995832
+          },
+          "id": "prt_179de96ba001Z96fs8wjqVINcq",
+          "sessionID": "ses_e86219555ffeHvif1RU6MffLcT",
+          "messageID": "msg_179de8666001frOmV0nNYw1qxv"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "call-ede4dbb6-7b7e-49e0-8501-dd63371ecbe9",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "git -C /home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit show feat/studio-assistant-ui-experience:apps/studio/src/assistant/attachments.ts > /tmp/opencode/ref-attachments.ts 2>&1; echo \"EXIT: $?\""
+            },
+            "output": "EXIT: 0\n",
+            "metadata": {
+              "output": "EXIT: 0\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "git -C /home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit show feat/studio-assistant-ui-experience:apps/studio/src/assistant/attachments.ts > /tmp/opencode/ref-attachments.ts 2>&1; echo \"EXIT: $?\"",
+            "time": {
+              "start": 1793045993939,
+              "end": 1793045993970
+            }
+          },
+          "id": "prt_179de99c7001AC3HvA7BFybWg2",
+          "sessionID": "ses_e86219555ffeHvif1RU6MffLcT",
+          "messageID": "msg_179de8666001frOmV0nNYw1qxv"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "call-98dde549-1ee4-4cc0-9efd-409af82400ff",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "git -C /home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit show feat/studio-assistant-ui-experience:apps/studio/src/assistant/attachments.test.ts > /tmp/opencode/ref-attachments.test.ts 2>&1; echo \"EXIT: $?\""
+            },
+            "output": "EXIT: 0\n",
+            "metadata": {
+              "output": "EXIT: 0\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "git -C /home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit show feat/studio-assistant-ui-experience:apps/studio/src/assistant/attachments.test.ts > /tmp/opencode/ref-attachments.test.ts 2>&1; echo \"EXIT: $?\"",
+            "time": {
+              "start": 1793045994505,
+              "end": 1793045994527
+            }
+          },
+          "id": "prt_179de9bff001TfxcWnhVToGcOt",
+          "sessionID": "ses_e86219555ffeHvif1RU6MffLcT",
+          "messageID": "msg_179de8666001frOmV0nNYw1qxv"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "call-975a7be4-fb60-477f-a90d-6c5593c0f842",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "git -C /home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit diff --stat 10a3c157 ed64e282"
+            },
+            "output": " apps/studio/src/assistant/attachments.test.ts |  55 ++++++++\n apps/studio/src/assistant/attachments.ts      | 196 ++++++++++++++++++++++++++\n 2 files changed, 251 insertions(+)\n",
+            "metadata": {
+              "output": " apps/studio/src/assistant/attachments.test.ts |  55 ++++++++\n apps/studio/src/assistant/attachments.ts      | 196 ++++++++++++++++++++++++++\n 2 files changed, 251 insertions(+)\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "git -C /home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit diff --stat 10a3c157 ed64e282",
+            "time": {
+              "start": 1793045994946,
+              "end": 1793045994967
+            }
+          },
+          "id": "prt_179de9dbb0010Sqh8aCjC9pAjj",
+          "sessionID": "ses_e86219555ffeHvif1RU6MffLcT",
+          "messageID": "msg_179de8666001frOmV0nNYw1qxv"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "call-d838221e-d2b9-4923-94e0-ed83fac7b4ce",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "ls /home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio/package.json && cat /home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio/package.json | grep -A 30 '\"scripts\"'"
+            },
+            "output": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio/package.json\n  \"scripts\": {\n    \"dev\": \"vite\",\n    \"build\": \"tsc -b && vite build\",\n    \"preview\": \"vite preview\",\n    \"test\": \"vitest\",\n    \"lint\": \"eslint .\",\n    \"typecheck\": \"tsc -b --noEmit\",\n    \"gen:api-types\": \"openapi-typescript openapi.json -o src/api/schema.d.ts\",\n    \"dev:full\": \"concurrently -k -n mcp,sidecar,vite \\\"uv run python -m agentic_odi_mcp_server\\\" \\\"uv run python -m agentic_odi_studio_api.main\\\" \\\"vite\\\"\",\n    \"tauri\": \"tauri\"\n  },\n  \"dependencies\": {\n    \"@assistant-ui/react\": \"^0.15.31\",\n    \"@tauri-apps/api\": \"^2.12.4\",\n    \"@tauri-apps/plugin-updater\": \"^2.14.0\",\n    \"react\": \"^19.3.1\",\n    \"react-dom\": \"^19.3.1\"\n  },\n  \"devDependencies\": {\n    \"@eslint/js\": \"^10.0.1\",\n    \"@tauri-apps/cli\": \"^2.12.3\",\n    \"@testing-library/jest-dom\": \"^7.0.1\",\n    \"@testing-library/react\": \"^16.3.3\",\n    \"@types/react\": \"^19.3.0\",\n    \"@types/react-dom\": \"^19.3.0\",\n    \"@vitejs/plugin-react\": \"^6.1.2\",\n    \"concurrently\": \"^9.2.1\",\n    \"eslint\": \"^10.12.0\",\n    \"eslint-plugin-react-hooks\": \"^7.1.1\",\n    \"eslint-plugin-react-refresh\": \"^0.5.7\",\n    \"globals\": \"^17.13.0\",\n",
+            "metadata": {
+              "output": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio/package.json\n  \"scripts\": {\n    \"dev\": \"vite\",\n    \"build\": \"tsc -b && vite build\",\n    \"preview\": \"vite preview\",\n    \"test\": \"vitest\",\n    \"lint\": \"eslint .\",\n    \"typecheck\": \"tsc -b --noEmit\",\n    \"gen:api-types\": \"openapi-typescript openapi.json -o src/api/schema.d.ts\",\n    \"dev:full\": \"concurrently -k -n mcp,sidecar,vite \\\"uv run python -m agentic_odi_mcp_server\\\" \\\"uv run python -m agentic_odi_studio_api.main\\\" \\\"vite\\\"\",\n    \"tauri\": \"tauri\"\n  },\n  \"dependencies\": {\n    \"@assistant-ui/react\": \"^0.15.31\",\n    \"@tauri-apps/api\": \"^2.12.4\",\n    \"@tauri-apps/plugin-updater\": \"^2.14.0\",\n    \"react\": \"^19.3.1\",\n    \"react-dom\": \"^19.3.1\"\n  },\n  \"devDependencies\": {\n    \"@eslint/js\": \"^10.0.1\",\n    \"@tauri-apps/cli\": \"^2.12.3\",\n    \"@testing-library/jest-dom\": \"^7.0.1\",\n    \"@testing-library/react\": \"^16.3.3\",\n    \"@types/react\": \"^19.3.0\",\n    \"@types/react-dom\": \"^19.3.0\",\n    \"@vitejs/plugin-react\": \"^6.1.2\",\n    \"concurrently\": \"^9.2.1\",\n    \"eslint\": \"^10.12.0\",\n    \"eslint-plugin-react-hooks\": \"^7.1.1\",\n    \"eslint-plugin-react-refresh\": \"^0.5.7\",\n    \"globals\": \"^17.13.0\",\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "ls /home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio/package.json && cat /home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio/package.json | grep -A 30 '\"scripts\"'",
+            "time": {
+              "start": 1793045995784,
+              "end": 1793045995814
+            }
+          },
+          "id": "prt_179dea1000018VrCH0dHyD7gn0",
+          "sessionID": "ses_e86219555ffeHvif1RU6MffLcT",
+          "messageID": "msg_179de8666001frOmV0nNYw1qxv"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "9c3c1a972d38d51fdd9e6d2cabd40b618288eba8",
+          "type": "step-finish",
+          "tokens": {
+            "total": 27782,
+            "input": 9858,
+            "output": 381,
+            "reasoning": 199,
+            "cache": {
+              "write": 0,
+              "read": 17344
+            }
+          },
+          "cost": 0,
+          "id": "prt_179dea197001MtEiwuvmlxlPnZ",
+          "sessionID": "ses_e86219555ffeHvif1RU6MffLcT",
+          "messageID": "msg_179de8666001frOmV0nNYw1qxv"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_179de6ab8001cHhZ99HwlB3BXh",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit",
+          "root": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 28776,
+          "input": 2310,
+          "output": 416,
+          "reasoning": 34,
+          "cache": {
+            "write": 0,
+            "read": 26016
+          }
+        },
+        "modelID": "nvidia/nemotron-3.5-super-vl-120b-a12b",
+        "providerID": "nvidia",
+        "time": {
+          "created": 1793045996005,
+          "completed": 1793046000256
+        },
+        "finish": "tool-calls",
+        "id": "msg_179dea1e5001UXZI2CbHM1SvpN",
+        "sessionID": "ses_e86219555ffeHvif1RU6MffLcT"
+      },
+      "parts": [
+        {
+          "snapshot": "9c3c1a972d38d51fdd9e6d2cabd40b618288eba8",
+          "type": "step-start",
+          "id": "prt_179dea78f001U2V5D34GkAspFL",
+          "sessionID": "ses_e86219555ffeHvif1RU6MffLcT",
+          "messageID": "msg_179dea1e5001UXZI2CbHM1SvpN"
+        },
+        {
+          "type": "reasoning",
+          "text": "Now let me compare byte-identity between the working tree files and the reference files, and run vitest + eslint.\n\nLet me run the comparisons and tests in parallel.",
+          "time": {
+            "start": 1793045997459,
+            "end": 1793045997750
+          },
+          "id": "prt_179dea793001KN7WZX5Uew1Q95",
+          "sessionID": "ses_e86219555ffeHvif1RU6MffLcT",
+          "messageID": "msg_179dea1e5001UXZI2CbHM1SvpN"
+        },
+        {
+          "type": "text",
+          "text": "Now let me compare byte-identity with the reference and run vitest + ESLint.\n",
+          "time": {
+            "start": 1793045997756,
+            "end": 1793046000737
+          },
+          "id": "prt_179dea8bc001fQRQvI0DNhk8nq",
+          "sessionID": "ses_e86219555ffeHvif1RU6MffLcT",
+          "messageID": "msg_179dea1e5001UXZI2CbHM1SvpN"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "call-664d14c1-a4d5-4ea0-bb15-2d4b08b41dfb",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "diff /tmp/opencode/ref-attachments.ts /home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio/src/assistant/attachments.ts && echo \"attachments.ts: IDENTICAL\" || echo \"attachments.ts: DIFFERS\""
+            },
+            "output": "attachments.ts: IDENTICAL\n",
+            "metadata": {
+              "output": "attachments.ts: IDENTICAL\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "diff /tmp/opencode/ref-attachments.ts /home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio/src/assistant/attachments.ts && echo \"attachments.ts: IDENTICAL\" || echo \"attachments.ts: DIFFERS\"",
+            "time": {
+              "start": 1793045998389,
+              "end": 1793045998410
+            }
+          },
+          "id": "prt_179deab2a001xyIP27SeFfdbar",
+          "sessionID": "ses_e86219555ffeHvif1RU6MffLcT",
+          "messageID": "msg_179dea1e5001UXZI2CbHM1SvpN"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "call-da70ee68-b428-4f18-90cf-84616f021e55",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "diff /tmp/opencode/ref-attachments.test.ts /home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio/src/assistant/attachments.test.ts && echo \"attachments.test.ts: IDENTICAL\" || echo \"attachments.test.ts: DIFFERS\""
+            },
+            "output": "attachments.test.ts: IDENTICAL\n",
+            "metadata": {
+              "output": "attachments.test.ts: IDENTICAL\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "diff /tmp/opencode/ref-attachments.test.ts /home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio/src/assistant/attachments.test.ts && echo \"attachments.test.ts: IDENTICAL\" || echo \"attachments.test.ts: DIFFERS\"",
+            "time": {
+              "start": 1793045998942,
+              "end": 1793045998960
+            }
+          },
+          "id": "prt_179dead5400163CXghRdBYNUwW",
+          "sessionID": "ses_e86219555ffeHvif1RU6MffLcT",
+          "messageID": "msg_179dea1e5001UXZI2CbHM1SvpN"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "call-611e3a7d-8770-489c-beb6-ff4f4e9c21d4",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "npx vitest run src/assistant/attachments.test.ts 2>&1 | tail -40",
+              "workdir": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio",
+              "timeout": 180000
+            },
+            "output": "\n RUN  v4.1.11 /home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio\n\n\n Test Files  1 passed (1)\n      Tests  7 passed (7)\n   Start at  21:20:00\n   Duration  1.44s (transform 83ms, setup 167ms, import 64ms, tests 7ms, environment 1.02s)\n\n",
+            "metadata": {
+              "output": "\n RUN  v4.1.11 /home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio\n\n\n Test Files  1 passed (1)\n      Tests  7 passed (7)\n   Start at  21:20:00\n   Duration  1.44s (transform 83ms, setup 167ms, import 64ms, tests 7ms, environment 1.02s)\n\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "npx vitest run src/assistant/attachments.test.ts 2>&1 | tail -40",
+            "time": {
+              "start": 1793045999513,
+              "end": 1793045999428
+            }
+          },
+          "id": "prt_179deaf90001SLZSLSNQiEAD4S",
+          "sessionID": "ses_e86219555ffeHvif1RU6MffLcT",
+          "messageID": "msg_179dea1e5001UXZI2CbHM1SvpN"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "9c3c1a972d38d51fdd9e6d2cabd40b618288eba8",
+          "type": "step-finish",
+          "tokens": {
+            "total": 28776,
+            "input": 2310,
+            "output": 416,
+            "reasoning": 34,
+            "cache": {
+              "write": 0,
+              "read": 26016
+            }
+          },
+          "cost": 0,
+          "id": "prt_179deb236001CZTjdbXfl5Csn3",
+          "sessionID": "ses_e86219555ffeHvif1RU6MffLcT",
+          "messageID": "msg_179dea1e5001UXZI2CbHM1SvpN"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "call-900391ce-3784-4f6d-a751-a2d2be852ef1",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "npx eslint src/assistant/attachments.ts src/assistant/attachments.test.ts 2>&1 | tail -40; echo \"ESLINT_EXIT: $?\"",
+              "workdir": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/apps/studio",
+              "timeout": 180000
+            },
+            "output": "ESLINT_EXIT: 0\n",
+            "metadata": {
+              "output": "ESLINT_EXIT: 0\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "npx eslint src/assistant/attachments.ts src/assistant/attachments.test.ts 2>&1 | tail -40; echo \"ESLINT_EXIT: $?\"",
+            "time": {
+              "start": 1793046000719,
+              "end": 1793046000134
+            }
+          },
+          "id": "prt_179deb43b001Frvr6uAW4f4doE",
+          "sessionID": "ses_e86219555ffeHvif1RU6MffLcT",
+          "messageID": "msg_179dea1e5001UXZI2CbHM1SvpN"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_179de6ab8001cHhZ99HwlB3BXh",
+        "role": "assistant",
+        "mode": "general",
+        "agent": "general",
+        "path": {
+          "cwd": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit",
+          "root": "/home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 29780,
+          "input": 2926,
+          "output": 552,
+          "reasoning": 286,
+          "cache": {
+            "write": 0,
+            "read": 26016
+          }
+        },
+        "modelID": "nvidia/nemotron-3.5-super-vl-120b-a12b",
+        "providerID": "nvidia",
+        "time": {
+          "created": 1793046000287,
+          "completed": 1793046010160
+        },
+        "finish": "stop",
+        "id": "msg_179deb29f001EUX8qNc7THh0br",
+        "sessionID": "ses_e86219555ffeHvif1RU6MffLcT"
+      },
+      "parts": [
+        {
+          "snapshot": "9c3c1a972d38d51fdd9e6d2cabd40b618288eba8",
+          "type": "step-start",
+          "id": "prt_179deb87c001vmlqOBEdFDaf9R",
+          "sessionID": "ses_e86219555ffeHvif1RU6MffLcT",
+          "messageID": "msg_179deb29f001EUX8qNc7THh0br"
+        },
+        {
+          "type": "reasoning",
+          "text": "All verifications pass:\n\n1. ✅ attachments.ts + attachments.test.ts exist under apps/studio/src/assistant/.\n2. ✅ Vitest passing: 7 tests passed (the implementer reported \"353 suite tests\" — likely meaning across the whole studio test suite, or perhaps they miscounted; regardless attachments.test.ts has 7 tests, all passing)\n3. ✅ ESLint clean (exit 0, no output)\n4. ✅ Only assistant/ files added; byte-identical to reference (both IDENTICAL)\n\nThe diff stat confirms only 2 files changed, both under assistant/.\n\nThe brief mentioned \"353 suite tests\" — that's likely the whole studio suite count, not just this file. attachments.test.ts has 7 tests. All passing.\n\nLet me also do a typecheck to be thorough since the task mentions verifying. Actually, the brief's verify list is specific: existence, vitest passing, ESLint clean, only assistant/ files added, byte-identical to reference. All done. Let me optionally run typecheck since attachments.ts imports types. But the brief doesn't require it. Let me run typecheck quickly to be safe since it's good practice. Actually, let me keep it focused on what was requested. All 4 verification points pass.\n\nLet me write the review output in the requested format.",
+          "time": {
+            "start": 1793046001791,
+            "end": 1793046005261
+          },
+          "id": "prt_179deb87f00165teHqpl2oiNJU",
+          "sessionID": "ses_e86219555ffeHvif1RU6MffLcT",
+          "messageID": "msg_179deb29f001EUX8qNc7THh0br"
+        },
+        {
+          "type": "text",
+          "text": "All four verification points pass:\n\n1. ✅ Both files exist under `apps/studio/src/assistant/`.\n2. ✅ Vitest: 7/7 tests passing for `attachments.test.ts` (1 test file, 1.44s).\n3. ✅ ESLint: clean (exit 0, no output).\n4. ✅ Diff stat shows only the two `assistant/` files added; both are byte-identical to the `feat/studio-assistant-ui-experience` reference.\n\n### Spec Compliance / Strengths / Issues / Assessment\n\n### Spec Compliance\n- ✅ `attachments.ts` + `attachments.test.ts` exist under `apps/studio/src/assistant/`.\n- ✅ Vitest passing for `attachments.test.ts` — 7 tests passed (the \"353 suite tests\" figure refers to the full studio suite; this file's 7 tests all green).\n- ✅ ESLint clean.\n- ✅ Only `assistant/` files added (diff stat: 2 files, 251 insertions); byte-identical to `feat/studio-assistant-ui-experience` reference for both `attachments.ts` and `attachments.test.ts`.\n\n### Strengths\n- Exact port from the reference branch — no drift, no partial reimplementation.\n- Test coverage matches the brief: extension/type acceptance, 5 MB image ceiling, human-readable sizes (`formatFileSize`).\n- Implementation honors the brief's contract: `createAttachmentAdapter`, `preparedAttachments`, `AttachmentAdapter`, consumes `ChatAttachment`/`AttachmentRef`; bounded text extraction (`MAX_ATTACHMENT_CHARS`), image `data_url` gated by `MAX_IMAGE_BYTES`, never-throws `prepareAttachment`.\n\n### Issues\n#### Critical\n- None.\n\n#### Important\n- None.\n\n#### Minor\n- The brief's \"353 suite tests\" likely refers to the whole `apps/studio` vitest suite, not `attachments.test.ts` alone (which has 7 tests). No action needed — this is a reporting wording issue, not a code issue.\n\n### Assessment\n**Task quality:** Approved\n**Reasoning:** All four verify criteria pass: both files exist under `apps/studio/src/assistant/`, vitest is green (7/7), ESLint is clean, and only the two `assistant/` files were added — byte-identical to the `feat/studio-assistant-ui-experience` reference (`git show` confirms identity for both `attachments.ts` and `attachments.test.ts`). No changes needed.",
+          "time": {
+            "start": 1793046005265,
+            "end": 1793046010034
+          },
+          "id": "prt_179dec611001YqHHaIn2g2pY1x",
+          "sessionID": "ses_e86219555ffeHvif1RU6MffLcT",
+          "messageID": "msg_179deb29f001EUX8qNc7THh0br"
+        },
+        {
+          "reason": "stop",
+          "snapshot": "9c3c1a972d38d51fdd9e6d2cabd40b618288eba8",
+          "type": "step-finish",
+          "tokens": {
+            "total": 29780,
+            "input": 2926,
+            "output": 552,
+            "reasoning": 286,
+            "cache": {
+              "write": 0,
+              "read": 26016
+            }
+          },
+          "cost": 0,
+          "id": "prt_179ded8eb001t0XkwS03S2Nb3m",
+          "sessionID": "ses_e86219555ffeHvif1RU6MffLcT",
+          "messageID": "msg_179deb29f001EUX8qNc7THh0br"
+        }
+      ]
+    }
+  ]
+}
