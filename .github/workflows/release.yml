@@ -120,23 +120,6 @@ jobs:
         uses: ./.github/actions/setup
         with:
           python-version: "3.11"
-
-      # Tag to the semver tag (vX.Y.Z) so release-please/parsers/installers stay
-      # happy; surface the human-friendly release date in the title (the CLI's
-      # `--version` already prints "X.Y.Z (YYYY-MM-DD)" from build_info).
-      - name: Set the release title to include the date
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          tag="${{ github.ref_name }}"
-          version="${tag#v}"
-          date_utc="$(git log -1 --format=%cI)"
-          human_date="${date_utc:0:10}"
-          gh release edit "$tag" --repo "${{ github.repository }}" \
-            --title "v${version} — ${human_date}"
-          echo "Release title set to: v${version} — ${human_date}"
-
       - name: Publish download & run instructions on the release
         env:
           GH_TOKEN: ${{ github.token }}

@@ -1,9 +1,8 @@
 """Interactive conversational mode for the Agentic ODI CLI.
 
 The chat is a small terminal REPL around an OpenAI-compatible model and the
-Agentic ODI MCP server. It streams assistant text, shows the model's thinking
-when the backend exposes it, executes MCP tool calls, and keeps the
-conversation history in memory for the duration of the session.
+Agentic ODI MCP server. It streams assistant text, executes MCP tool calls,
+and keeps the conversation history in memory for the duration of the session.
 """
 
 from __future__ import annotations
@@ -11,7 +10,6 @@ from __future__ import annotations
 import asyncio
 import json
 import os
-import sys
 import traceback
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -21,8 +19,6 @@ import typer
 from agentic_odi_core import ODI_ASSISTANT_PROMPT
 from fastmcp import Client
 from openai import AsyncOpenAI
-
-from agentic_odi_cli.mascot import render_banner, should_show_banner, wants_color
 
 DEFAULT_BASE_URL = "http://localhost:8001/v1"
 DEFAULT_API_KEY = "local"
@@ -311,9 +307,7 @@ class ChatSession:
         self.connection_state.llm_ok = True
 
     async def _stream_completion(
-        self,
-        on_delta: Callable[[str], None] | None,
-        on_reasoning: Callable[[str], None] | None = None,
+        self, on_delta: Callable[[str], None] | None
     ) -> tuple[str, dict[int, dict[str, str]]]:
         stream: Any = await self.openai_client.chat.completions.create(
             model=self.config.model,
@@ -333,11 +327,6 @@ class ChatSession:
             delta = choices[0].delta
             if delta is None:
                 continue
-            reasoning = _reasoning_text(delta)
-            if reasoning and on_reasoning is not None:
-                # Thinking is shown while it is written, never merged into the
-                # answer: it must not be replayed as something the model said.
-                on_reasoning(reasoning)
             content = getattr(delta, "content", None)
             if content:
                 content_parts.append(content)
@@ -375,12 +364,7 @@ class ChatSession:
             return f"Error calling {name}: {exc}"
         return _tool_result_text(result)
 
-    async def ask(
-        self,
-        text: str,
-        on_delta: Callable[[str], None] | None = None,
-        on_reasoning: Callable[[str], None] | None = None,
-    ) -> str:
+    async def ask(self, text: str, on_delta: Callable[[str], None] | None = None) -> str:
         """Send a message, execute any tool calls, and return the final text."""
         if not self.connection_state.llm_ok:
             return "No model connected. Type /connect to set one up."
@@ -389,7 +373,7 @@ class ChatSession:
         self.messages.append({"role": "user", "content": text})
         try:
             while True:
-                content, tool_calls = await self._stream_completion(on_delta, on_reasoning)
+                content, tool_calls = await self._stream_completion(on_delta)
                 if not tool_calls:
                     self.messages.append({"role": "assistant", "content": content})
                     return content
@@ -413,43 +397,6 @@ class ChatSession:
             raise
 
 
-def _reasoning_text(delta: Any) -> str:
-    """The model's thinking, when the backend exposes it (vLLM, Ollama, DeepSeek)."""
-    for attribute in ("reasoning_content", "reasoning"):
-        value = getattr(delta, attribute, None)
-        if isinstance(value, str) and value:
-            return value
-    return ""
-
-
-THINKING_HINT = "thinking…"
-CLEAR_LINE = "\r\x1b[2K"
-
-
-def _show_thinking_hint(stream: Any) -> bool:
-    """A dim ``thinking…`` on the prompt line, where it can be rewritten.
-
-    Only a terminal that can render the glyph and rewrite a line gets the
-    hint: a pipe, a build log, or a stream without cursor control must stay
-    clean and free of escape sequences.
-    """
-    if not getattr(stream, "isatty", lambda: False)():
-        return False
-    encoding = (getattr(stream, "encoding", "") or "").lower()
-    if "utf" not in encoding:
-        return False
-    dim, reset = ("\x1b[2m", "\x1b[0m") if "NO_COLOR" not in os.environ else ("", "")
-    stream.write(f"{CLEAR_LINE}  {dim}{THINKING_HINT}{reset}")
-    stream.flush()
-    return True
-
-
-def _clear_thinking_hint(stream: Any) -> None:
-    """Erase the hint and leave the cursor at the start of its line."""
-    stream.write(CLEAR_LINE)
-    stream.flush()
-
-
 def _print_tool(name: str, arguments: dict[str, Any]) -> None:
     rendered = json.dumps(arguments, ensure_ascii=False)
     if len(rendered) > 100:
@@ -458,8 +405,6 @@ def _print_tool(name: str, arguments: dict[str, Any]) -> None:
 
 
 async def _run_chat(config: ChatConfig) -> int:
-    if should_show_banner(sys.stdout):
-        typer.echo(render_banner(color=wants_color()))
     typer.echo("Agentic ODI · interactive")
 
     llm: Any | None = None
@@ -569,54 +514,20 @@ async def _run_chat(config: ChatConfig) -> int:
 
             typer.secho("odi › ", fg="green", bold=True, nl=False)
             printed = False
-            # A cold model can take a while to say anything at all; the hint
-            # keeps that silence from reading as a hung session.
-            hint_shown = _show_thinking_hint(sys.stdout)
-            reasoning_open = False
-
-            def reveal() -> None:
-                """Clear the hint and put the prompt back where the answer lands."""
-                nonlocal hint_shown
-                if hint_shown:
-                    _clear_thinking_hint(sys.stdout)
-                    typer.secho("odi › ", fg="green", bold=True, nl=False)
-                    hint_shown = False
-
-            def close_reasoning() -> None:
-                nonlocal reasoning_open
-                if reasoning_open:
-                    typer.secho("", err=True)
-                    reasoning_open = False
-
-            def on_reasoning(piece: str) -> None:
-                # Thinking is not the answer: it goes to stderr, dimmed, so a
-                # redirected transcript holds only what the model replied.
-                nonlocal reasoning_open
-                reveal()
-                if not reasoning_open:
-                    typer.secho("thinking › ", fg="bright_black", err=True, nl=False)
-                    reasoning_open = True
-                typer.secho(piece, fg="bright_black", err=True, nl=False)
 
             def on_delta(piece: str) -> None:
                 nonlocal printed
-                reveal()
-                close_reasoning()
                 printed = True
                 typer.echo(piece, nl=False)
 
             try:
-                reply = await session.ask(line, on_delta=on_delta, on_reasoning=on_reasoning)
+                reply = await session.ask(line, on_delta=on_delta)
             except Exception as exc:  # noqa: BLE001
-                reveal()
-                close_reasoning()
                 typer.echo()
                 typer.echo(f"Error: {exc}", err=True)
                 if os.environ.get("AGENTIC_ODI_DEBUG"):
                     typer.echo(traceback.format_exc(), err=True)
                 continue
-            reveal()
-            close_reasoning()
             typer.echo()
             if not printed:
                 typer.echo(reply if reply else "(no response)")

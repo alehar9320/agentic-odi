@@ -1,21 +1,10 @@
 {
   // Free-plan deployment: the Worker uploads the built SPA as static assets and
   // forwards /api/* to the Python sidecar through a Cloudflare Quick Tunnel.
-  // Keep this aligned with the Worker connected in the Cloudflare dashboard.
+  // Change "name" to the Worker name you created in the dashboard.
   "name": "agentic-odi",
   "main": "./infra/cloudflare/worker.ts",
-  "compatibility_date": "2026-10-19",
-// `npx wrangler preview` (Workers Builds preview command) refuses to run
-// without a `previews` block, even when Previews need no extra settings.
-// Assets and compatibility settings stay at the top level; Previews do not
-// inherit production vars or secrets, so set SIDECAR_URL per Preview with
-// `npx wrangler preview secret put SIDECAR_URL`.
-// Set LLM_ORIGINS (comma/space separated) to allow direct browser calls to a
-// configured model endpoint in hosted mode, e.g.
-// `npx wrangler secret put LLM_ORIGINS` with value
-// "https://api.myprovider.com". Curated defaults (OpenAI, Anthropic, Google,
-// localhost) are always allowed.
-"previews": {},
+  "compatibility_date": "2024-09-23",
   "assets": {
     "directory": "./apps/studio/dist",
     "binding": "ASSETS",

@@ -225,21 +225,3 @@ def test_delete_outcome_cascades_evidence():
     repo.add_evidence(_evidence("e1", job_id="j1", outcome_id="o1"))
     assert repo.delete_outcome("o1") is True
     assert repo.get_evidence("e1") is None
-
-
-def test_reload_empties_in_memory_state() -> None:
-    repo = InMemoryRepository()
-    repo.add_job(Job(id="job-1", name="Job", description=""))
-    repo.add_customer_outcome(_customer_outcome("co-1"))
-
-    repo.reload()
-
-    assert repo.list_jobs() == []
-    assert repo.list_customer_outcomes() == []
-
-
-def test_reload_is_safe_on_an_empty_repository() -> None:
-    repo = InMemoryRepository()
-    repo.reload()
-    repo.reload()
-    assert repo.list_jobs() == []

@@ -1,6 +1,0 @@
-{
-  "vitest": true,
-  "autoAcceptChanges": "main",
-  "exitZeroOnChanges": "!(main)",
-  "skipUpdateCheck": true
-}

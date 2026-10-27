@@ -1,0 +1,10 @@
+{
+  "name": "agentic-odi-root",
+  "private": true,
+  "workspaces": [
+    "apps/studio"
+  ],
+  "scripts": {
+    "build": "npm run build --workspace=apps/studio"
+  }
+}

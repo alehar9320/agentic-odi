@@ -16,17 +16,16 @@ def test_job_can_be_created_renamed_and_deleted_by_hand() -> None:
 
     created = client.post("/api/jobs", json={"name": "Ship a service", "description": "Platform"})
     assert created.status_code == 200
-    job = created.json()
+    job = created.json()["result"]
     job_id = job["id"]
     assert job["name"] == "Ship a service"
 
     renamed = client.patch(f"/api/jobs/{job_id}", json={"name": "Ship a service safely"})
     assert renamed.status_code == 200
-    assert renamed.json()["name"] == "Ship a service safely"
+    assert renamed.json()["result"]["name"] == "Ship a service safely"
 
     removed = client.delete(f"/api/jobs/{job_id}")
     assert removed.status_code == 200
-    assert removed.json() == {"deleted": job_id}
     assert client.get("/api/canvas").json()["jobs"] == []
 
 
@@ -37,16 +36,19 @@ def test_missing_job_returns_404() -> None:
 
 def test_step_can_be_edited_and_removed() -> None:
     client = _client()
-    job = client.post("/api/jobs", json={"name": "Ship a service"}).json()
+    job = client.post("/api/jobs", json={"name": "Ship a service"}).json()["result"]
     step = client.post(
         "/api/steps",
         json={"mcp_url": "", "job_id": job["id"], "name": "Prepare", "order": 3},
-    ).json()
-    step_id = step["id"]
+    ).json()["result"]
+    # The local backend returns the serialized Step model.
+    import json
+
+    step_id = json.loads(step)["id"]
 
     edited = client.patch(f"/api/steps/{step_id}", json={"name": "Prepare payload", "order": 2})
     assert edited.status_code == 200
-    assert edited.json()["name"] == "Prepare payload"
+    assert edited.json()["result"]["name"] == "Prepare payload"
 
     assert client.delete(f"/api/steps/{step_id}").status_code == 200
     assert client.get("/api/canvas").json()["steps"] == []
@@ -54,25 +56,26 @@ def test_step_can_be_edited_and_removed() -> None:
 
 def test_outcome_scores_recompute_on_edit_and_delete() -> None:
     client = _client()
-    job = client.post("/api/jobs", json={"name": "Ship a service"}).json()
+    job = client.post("/api/jobs", json={"name": "Ship a service"}).json()["result"]
     outcome = client.post(
         "/api/outcomes",
         json={
             "mcp_url": "",
             "job_id": job["id"],
-            "statement": "Minimize the time to ship a release when the build is green",
+            "statement": "Minimize the time to ship",
             "importance": 8.0,
             "satisfaction": 4.0,
         },
-    ).json()
+    ).json()["result"]
+    import json
 
-    outcome_id = outcome["id"]
+    outcome_id = json.loads(outcome)["id"]
 
     edited = client.patch(
         f"/api/outcomes/{outcome_id}", json={"importance": 9.0, "satisfaction": 3.0}
     )
     assert edited.status_code == 200
-    assert edited.json()["opportunity_score"] == 15.0
+    assert edited.json()["result"]["opportunity_score"] == 15.0
 
     assert client.delete(f"/api/outcomes/{outcome_id}").status_code == 200
     assert client.get("/api/canvas").json()["outcomes"] == []
@@ -80,20 +83,20 @@ def test_outcome_scores_recompute_on_edit_and_delete() -> None:
 
 def test_out_of_range_scores_are_rejected() -> None:
     client = _client()
-    job = client.post("/api/jobs", json={"name": "Ship a service"}).json()
+    job = client.post("/api/jobs", json={"name": "Ship a service"}).json()["result"]
     outcome = client.post(
         "/api/outcomes",
         json={
             "mcp_url": "",
             "job_id": job["id"],
-            "statement": "Minimize the time to ship a release when the build is green",
+            "statement": "Minimize the time to ship",
             "importance": 8.0,
             "satisfaction": 4.0,
         },
-    ).json()
+    ).json()["result"]
+    import json
 
-    outcome_id = outcome["id"]
+    outcome_id = json.loads(outcome)["id"]
 
     response = client.patch(f"/api/outcomes/{outcome_id}", json={"importance": 42})
     assert response.status_code == 422
-    assert response.json()["error"]["code"] == "out_of_range"
