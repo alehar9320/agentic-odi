@@ -100,6 +100,17 @@ describe("ChangelogModal", () => {
     expect(screen.getAllByText("New")).toHaveLength(1);
   });
 
+  it("says why there is nothing to show when the local backend has no notes", async () => {
+    vi.mocked(studioApi.fetchChangelog).mockResolvedValue({ releases: [] });
+
+    render(<ChangelogModal isOpen={true} onClose={vi.fn()} />);
+
+    expect(
+      await screen.findByText(/release notes come from the studio service/i),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/v0\./)).toBeNull();
+  });
+
   it("closes on Escape key press", async () => {
     vi.mocked(studioApi.fetchChangelog).mockResolvedValueOnce({
       releases: [],
