@@ -52,7 +52,6 @@ log = logging.getLogger(__name__)
 #: missing must not be able to loop forever.
 MAX_TOOL_ROUNDS = 3
 
-<<<<<<< HEAD
 #: Tool names that change stored data. Everything else is a read, a surface, or
 #: a memory note — none of which needs a confirmation the user would learn to
 #: click through.
@@ -81,34 +80,6 @@ def is_mutating_tool(name: str) -> bool:
     return name in MUTATING_TOOLS or name.startswith(MUTATING_TOOL_PREFIXES)
 
 
-||||||| fcf59923
-=======
-#: Tool names that change stored data. Everything else is a read, a surface, or
-#: a memory note — none of which needs a confirmation the user would learn to
-#: click through.
-MUTATING_TOOL_PREFIXES: tuple[str, ...] = (
-    "add_",
-    "create_",
-    "update_",
-    "delete_",
-    "ingest_",
-    "remove_",
-)
-
-#: Attachments are context, not a corpus: five files, and a bounded slice of each.
-MAX_ATTACHMENTS = 5
-MAX_ATTACHMENT_TEXT = 20_000
-
-#: A single tool result is summarized for the source chip, never quoted whole.
-MAX_SOURCE_PREVIEW = 160
-
-
-def is_mutating_tool(name: str) -> bool:
-    """Whether a tool call changes stored data and should be confirmed."""
-    return name.startswith(MUTATING_TOOL_PREFIXES)
-
-
->>>>>>> origin/main
 SYSTEM_PROMPT = """You are an elite product strategist working inside The Living Studio, a room built for product managers.
 Your job is to help the PM choose and win the next opportunity that matters — to customers, the business, and their career.
 Outcome-Driven Innovation (ODI) is your private engine, not the conversation. Translate the PM's ambition into jobs, outcomes, and evidence silently, and speak in the PM's language.
