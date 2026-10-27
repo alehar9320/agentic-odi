@@ -10,7 +10,14 @@ from pydantic import BaseModel, ValidationError
 
 from agentic_odi_core.events import DEFAULT_DEVICE, DEFAULT_WORKSPACE, Event
 from agentic_odi_core.intent_store import IntentStore
-from agentic_odi_core.models import CustomerOutcome, Evidence, Job, Outcome, Step
+from agentic_odi_core.models import (
+    CustomerOutcome,
+    Evidence,
+    Job,
+    Outcome,
+    ScheduledWork,
+    Step,
+)
 from agentic_odi_core.repository import Repository, page, rank_outcomes
 
 
@@ -39,6 +46,7 @@ class SQLiteRepository(Repository):
         self.outcomes: dict[str, Outcome] = {}
         self.customer_outcomes: dict[str, CustomerOutcome] = {}
         self.evidence: dict[str, Evidence] = {}
+        self.scheduled_work: dict[str, ScheduledWork] = {}
         self._last_event_id = 0
         for ev in self.store.get_stream(workspace_id=self._workspace_id, replay_order=True):
             self._apply_event(ev)
@@ -107,6 +115,13 @@ class SQLiteRepository(Repository):
                 del self.evidence[key]
         elif et == "EVIDENCE_DELETED":
             self.evidence.pop(p["id"], None)
+        elif et == "SCHEDULED_WORK_CREATED":
+            self.scheduled_work[p["id"]] = ScheduledWork.model_validate(p)
+        elif et == "SCHEDULED_WORK_UPDATED":
+            self._merge_updates(self.scheduled_work, p, ScheduledWork)
+        elif et == "SCHEDULED_WORK_DELETED":
+            self.scheduled_work.pop(p["id"], None)
+
         elif et == "CUSTOMER_OUTCOME_DELETED":
             self.customer_outcomes.pop(p["id"], None)
         self._last_event_id = max(self._last_event_id, ev["id"])
@@ -403,6 +418,69 @@ class SQLiteRepository(Repository):
                 self.store.append(
                     "CUSTOMER_OUTCOME_DELETED",
                     {"id": outcome_id},
+                    workspace_id=self._workspace_id,
+                    device_id=self._device_id,
+                )
+                self._sync()
+                return True
+            return False
+
+    def add_scheduled_work(self, work: ScheduledWork) -> ScheduledWork:
+        with self._lock:
+            self.store.append(
+                "SCHEDULED_WORK_CREATED",
+                work.model_dump(),
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return work
+
+    def get_scheduled_work(self, work_id: str) -> ScheduledWork | None:
+        with self._lock:
+            self._sync()
+            return self.scheduled_work.get(work_id)
+
+    def list_scheduled_work(
+        self, job_id: str | None = None, status: str | None = None
+    ) -> list[ScheduledWork]:
+        with self._lock:
+            self._sync()
+            items = list(self.scheduled_work.values())
+            if job_id is not None:
+                items = [item for item in items if item.job_id == job_id]
+            if status is not None:
+                items = [item for item in items if item.status == status]
+            return items
+
+    def update_scheduled_work(self, work_id: str, updates: dict[str, Any]) -> ScheduledWork | None:
+        with self._lock:
+            self._sync()
+            work = self.scheduled_work.get(work_id)
+            if not work:
+                return None
+            current = work.model_dump(exclude_unset=True)
+            current.update(updates)
+            try:
+                new_work = work.model_validate(current)
+            except ValidationError:
+                return None
+            self.store.append(
+                "SCHEDULED_WORK_UPDATED",
+                {"id": work_id, "updates": updates},
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return new_work
+
+    def delete_scheduled_work(self, work_id: str) -> bool:
+        with self._lock:
+            self._sync()
+            if work_id in self.scheduled_work:
+                self.store.append(
+                    "SCHEDULED_WORK_DELETED",
+                    {"id": work_id},
                     workspace_id=self._workspace_id,
                     device_id=self._device_id,
                 )

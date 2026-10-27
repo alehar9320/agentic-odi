@@ -36,6 +36,11 @@ LOCAL_TOOLS = {
     "evaluate_outcome",
     "get_odi_framework_guidelines",
     "get_capabilities",
+    "schedule_work",
+    "get_scheduled_work",
+    "list_scheduled_work",
+    "cancel_scheduled_work",
+    "trigger_scheduled_work",
 }
 
 

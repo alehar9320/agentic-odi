@@ -282,3 +282,31 @@ def render_score(importance: float, satisfaction: float, score: float, *, as_jso
             {"importance": importance, "satisfaction": satisfaction, "opportunity_score": score}
         )
     return f"Opportunity score: {score:.2f}"
+
+
+def _cell(item: Any, key: str) -> str:
+    """A table cell, unwrapping enums so it reads `oneshot`, not `Trigger.ONESHOT`."""
+    value = item.get(key, "")
+    return str(getattr(value, "value", value))
+
+
+def render_scheduled_work_list(items: Any, *, as_json: bool) -> str:
+    if not isinstance(items, list):
+        return _json(items) if as_json else str(items)
+    if as_json:
+        return _json(items)
+    return _table(
+        ("id", "name", "agent_id", "trigger_type", "expression", "status"),
+        [
+            (
+                _cell(item, "id"),
+                _truncate(_cell(item, "name")),
+                _cell(item, "agent_id"),
+                _cell(item, "trigger_type"),
+                _cell(item, "schedule_expression"),
+                _cell(item, "status"),
+            )
+            for item in items
+        ],
+        empty="No scheduled work found.",
+    )

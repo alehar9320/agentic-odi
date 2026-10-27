@@ -464,6 +464,61 @@ class LocalBackend(Backend):
             raise BackendError(str(exc)) from None
         return artifact.model_dump()
 
+    def _schedule_work(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import JobNotFoundError, job_not_found
+
+        try:
+            work = self.service.schedule_work(
+                name=args["name"],
+                schedule_expression=args["schedule_expression"],
+                agent_id=args.get("agent_id", "default-agent"),
+                trigger_type=args.get("trigger_type", "oneshot"),
+                payload=args.get("payload"),
+                job_id=args.get("job_id"),
+            )
+        except JobNotFoundError:
+            raise BackendError(job_not_found(args.get("job_id") or "")) from None
+        except ValueError as exc:
+            raise BackendError(str(exc)) from None
+        return work.model_dump()
+
+    def _get_scheduled_work(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import ScheduledWorkNotFoundError, scheduled_work_not_found
+
+        work_id = args["work_id"]
+        try:
+            work = self.service.get_scheduled_work(work_id)
+        except ScheduledWorkNotFoundError:
+            raise BackendError(scheduled_work_not_found(work_id)) from None
+        return work.model_dump()
+
+    def _list_scheduled_work(self, args: dict[str, Any]) -> list[dict[str, Any]]:
+        items = self.service.list_scheduled_work(
+            job_id=args.get("job_id"),
+            status=args.get("status"),
+        )
+        return [item.model_dump() for item in items]
+
+    def _cancel_scheduled_work(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import ScheduledWorkNotFoundError, scheduled_work_not_found
+
+        work_id = args["work_id"]
+        try:
+            work = self.service.cancel_scheduled_work(work_id)
+        except ScheduledWorkNotFoundError:
+            raise BackendError(scheduled_work_not_found(work_id)) from None
+        return work.model_dump()
+
+    def _trigger_scheduled_work(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import ScheduledWorkNotFoundError, scheduled_work_not_found
+
+        work_id = args["work_id"]
+        try:
+            work = self.service.trigger_scheduled_work(work_id)
+        except ScheduledWorkNotFoundError:
+            raise BackendError(scheduled_work_not_found(work_id)) from None
+        return work.model_dump()
+
     def _get_odi_schema(self, args: dict[str, Any]) -> dict[str, Any]:
         from agentic_odi_core import odi_schema
 
@@ -535,6 +590,11 @@ _LOCAL_HANDLERS = {
     "list_evidence": LocalBackend._list_evidence,
     "delete_evidence": LocalBackend._delete_evidence,
     "promote_evidence": LocalBackend._promote_evidence,
+    "schedule_work": LocalBackend._schedule_work,
+    "get_scheduled_work": LocalBackend._get_scheduled_work,
+    "list_scheduled_work": LocalBackend._list_scheduled_work,
+    "cancel_scheduled_work": LocalBackend._cancel_scheduled_work,
+    "trigger_scheduled_work": LocalBackend._trigger_scheduled_work,
     "get_odi_schema": LocalBackend._get_odi_schema,
     "compute_opportunity": LocalBackend._compute_opportunity,
     "evaluate_outcome": LocalBackend._evaluate_outcome,
@@ -599,6 +659,7 @@ _LIST_TOOLS = frozenset(
         "get_outcomes",
         "list_customer_outcomes",
         "list_evidence",
+        "list_scheduled_work",
     }
 )
 
