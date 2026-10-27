@@ -1,7 +1,6 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import { useStudio } from "../../state/StudioContext";
-import { FailurePanel } from "../FailurePanel";
 import { GhostJobSteps } from "../Skeletons";
 
 // Ulwick Universal Job Process Phases (8 phases)
@@ -22,20 +21,25 @@ function phaseIndexFor(order: number, stepCount: number): number {
 }
 
 export function JobMap() {
-  const { canvasState, refreshCanvas, addStep, updateStep, deleteStep, updateJob, deleteJob } =
-    useStudio();
-  const canvas = canvasState.data;
+  const {
+    canvas,
+    canvasLoading,
+    addStep,
+    updateStep,
+    deleteStep,
+    updateJob,
+    deleteJob,
+  } = useStudio();
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+  const [stepName, setStepName] = useState("");
+  const [stepOrder, setStepOrder] = useState<number | null>(null);
   const [editingStepId, setEditingStepId] = useState<string | null>(null);
-  const [focusedStepId, setFocusedStepId] = useState<string | null>(null);
   const [editStepName, setEditStepName] = useState("");
   const [editStepOrder, setEditStepOrder] = useState(1);
   const [jobName, setJobName] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [busy, setBusy] = useState(false);
   const [selectedPhaseIndex, setSelectedPhaseIndex] = useState<number | null>(null);
-  const [addStepOpen, setAddStepOpen] = useState(false);
-  const [newStepName, setNewStepName] = useState("");
 
   const jobs = canvas?.jobs ?? [];
   const activeJob = jobs.find((job) => job.id === selectedJobId) ?? jobs[0];
@@ -43,6 +47,27 @@ export function JobMap() {
   const steps = (canvas?.steps ?? []).filter(
     (step) => !activeJobId || !step.job_id || step.job_id === activeJobId,
   );
+  const defaultOrder = steps.length + 1;
+
+  async function submit(event: React.FormEvent) {
+    event.preventDefault();
+    if (!stepName.trim() || busy || !activeJobId) {
+      return;
+    }
+    setBusy(true);
+    try {
+      await addStep({
+        job_id: activeJobId,
+        name: stepName.trim(),
+        order: stepOrder ?? defaultOrder,
+      });
+      setStepName("");
+      setStepOrder(null);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function saveStep(stepId: string) {
     if (!editStepName.trim()) {
       return;
@@ -51,40 +76,6 @@ export function JobMap() {
     try {
       await updateStep(stepId, { name: editStepName.trim(), order: editStepOrder });
       setEditingStepId(null);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  /** Swap a step with its neighbour, so order changes without a mouse. */
-  async function moveStep(stepId: string, direction: -1 | 1) {
-    const index = steps.findIndex((step) => step.id === stepId);
-    const target = index + direction;
-    if (index < 0 || target < 0 || target >= steps.length) {
-      return;
-    }
-    setBusy(true);
-    try {
-      await updateStep(steps[index].id ?? "", { order: target + 1 });
-      await updateStep(steps[target].id ?? "", { order: index + 1 });
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  const nextStepOrder =
-    steps.reduce((max, step, index) => Math.max(max, step.order ?? index + 1), 0) + 1;
-
-  async function saveNewStep() {
-    const name = newStepName.trim();
-    if (!activeJobId || !name) {
-      return;
-    }
-    setBusy(true);
-    try {
-      await addStep({ job_id: activeJobId, name, order: nextStepOrder });
-      setNewStepName("");
-      setAddStepOpen(false);
     } finally {
       setBusy(false);
     }
@@ -105,7 +96,7 @@ export function JobMap() {
   }
 
   // Map steps to 8 phases evenly or by order
-  const stepPhaseMapping = (() => {
+  const stepPhaseMapping = useMemo(() => {
     const buckets: Array<{ phase: (typeof UNIVERSAL_PHASES)[0]; steps: typeof steps }> =
       UNIVERSAL_PHASES.map((phase) => ({ phase, steps: [] }));
 
@@ -115,7 +106,7 @@ export function JobMap() {
     });
 
     return buckets;
-  })();
+  }, [steps]);
 
   const visibleSteps =
     selectedPhaseIndex === null
@@ -124,20 +115,6 @@ export function JobMap() {
           const order = step.order ?? idx + 1;
           return phaseIndexFor(order, steps.length) === selectedPhaseIndex;
         });
-
-  if (canvasState.kind === "error") {
-    // A failed canvas must not render as eight empty phases.
-    return (
-      <section className="fade-in">
-        <p className="section-title">Universal Job Map (8 Process Phases)</p>
-        <FailurePanel
-          error={canvasState.error}
-          onRetry={() => void refreshCanvas()}
-          retryText="reload"
-        />
-      </section>
-    );
-  }
 
   return (
     <section className="fade-in">
@@ -250,66 +227,10 @@ export function JobMap() {
         })}
       </div>
 
-      {/* A job has one step per phase: the domain refuses an order past 8. */}
-      {activeJobId && steps.length < UNIVERSAL_PHASES.length && (
-        <div className="jm-add">
-          {addStepOpen ? (
-            <form
-              className="form jm-add__form"
-              onSubmit={(event) => {
-                event.preventDefault();
-                void saveNewStep();
-              }}
-              onKeyDown={(event) => {
-                if (event.key === "Escape") {
-                  event.preventDefault();
-                  setAddStepOpen(false);
-                }
-              }}
-            >
-              <div className="field">
-                <label htmlFor="jm-new-step">New step name</label>
-                <input
-                  id="jm-new-step"
-                  className="input"
-                  autoFocus
-                  value={newStepName}
-                  onChange={(event) => setNewStepName(event.target.value)}
-                />
-              </div>
-              <div className="step__edit">
-                <button
-                  type="submit"
-                  className="quiet-action"
-                  disabled={busy || !newStepName.trim()}
-                >
-                  Save
-                </button>
-                <button
-                  type="button"
-                  className="quiet-action"
-                  onClick={() => setAddStepOpen(false)}
-                >
-                  Cancel
-                </button>
-              </div>
-            </form>
-          ) : (
-            <button type="button" className="quiet-action" onClick={() => setAddStepOpen(true)}>
-              Add step
-            </button>
-          )}
-        </div>
-      )}
-
-      {canvasState.kind === "loading" ? (
+      {canvasLoading && !canvas ? (
         <GhostJobSteps />
       ) : steps.length ? (
-        <div
-          role="list"
-          aria-label="Job steps"
-          style={{ display: "flex", flexDirection: "column", gap: 8 }}
-        >
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {visibleSteps.map((step) => {
             const index = steps.indexOf(step);
             const order = step.order ?? index + 1;
@@ -318,23 +239,6 @@ export function JobMap() {
               <div
                 className="step-row fade-in"
                 key={step.id ?? index}
-                role="listitem"
-                tabIndex={0}
-                aria-label={`Step ${order}: ${step.name ?? ""}`}
-                onFocus={() => setFocusedStepId(step.id ?? null)}
-                onBlur={() => setFocusedStepId(null)}
-                onKeyDown={(event) => {
-                  if (!step.id || busy || editingStepId === step.id) {
-                    return;
-                  }
-                  if (event.key === "ArrowUp") {
-                    event.preventDefault();
-                    void moveStep(step.id, -1);
-                  } else if (event.key === "ArrowDown") {
-                    event.preventDefault();
-                    void moveStep(step.id, 1);
-                  }
-                }}
                 style={{
                   display: "flex",
                   alignItems: "center",
@@ -397,7 +301,7 @@ export function JobMap() {
                           fontStyle: "italic",
                         }}
                       >
-                        {UNIVERSAL_PHASES[phaseIndexFor(order, steps.length)].name}
+                        Phase {phaseIndexFor(order, steps.length) + 1}
                       </span>
                       {step.id && (
                         <span className="step__actions">
@@ -420,26 +324,6 @@ export function JobMap() {
                           >
                             Remove
                           </button>
-                          <button
-                            type="button"
-                            className="quiet-action"
-                            disabled={busy || !step.id}
-                            aria-label="Move step up"
-                            aria-grabbed={focusedStepId === step.id}
-                            onClick={() => void moveStep(step.id ?? "", -1)}
-                          >
-                            Move up
-                          </button>
-                          <button
-                            type="button"
-                            className="quiet-action"
-                            disabled={busy || !step.id}
-                            aria-label="Move step down"
-                            aria-grabbed={focusedStepId === step.id}
-                            onClick={() => void moveStep(step.id ?? "", 1)}
-                          >
-                            Move down
-                          </button>
                         </span>
                       )}
                     </div>
@@ -452,10 +336,44 @@ export function JobMap() {
       ) : (
         <p className="toast toast--info" role="status">
           {selectedPhaseIndex === null
-            ? "No steps captured yet. Ask the studio to walk you through the job."
+            ? "No job steps registered yet. Ask the AI assistant to decompose the active job, or add the first one below."
             : "No steps land in this phase yet."}
         </p>
       )}
+
+      <details style={{ marginTop: 18 }}>
+        <summary style={{ cursor: "pointer", fontWeight: 600, color: "var(--studio-indigo)" }}>
+          ➕ Add Step to Universal Job Map
+        </summary>
+        <form onSubmit={submit} style={{ marginTop: 12 }}>
+          <div className="studio-field">
+            <label htmlFor="step-name">
+              Step Description (e.g., &apos;3. Prepare secrets payload&apos;)
+            </label>
+            <input
+              id="step-name"
+              className="studio-input"
+              value={stepName}
+              onChange={(event) => setStepName(event.target.value)}
+            />
+          </div>
+          <div className="studio-field">
+            <label htmlFor="step-order">Step Chronological Order</label>
+            <input
+              id="step-order"
+              className="studio-input"
+              type="number"
+              min={1}
+              max={20}
+              value={stepOrder ?? defaultOrder}
+              onChange={(event) => setStepOrder(Number(event.target.value))}
+            />
+          </div>
+          <button type="submit" className="studio-button" disabled={busy || !stepName.trim()}>
+            Add Step to Map
+          </button>
+        </form>
+      </details>
 
       {activeJobId && (
         <details className="disclosure" style={{ marginTop: 12 }}>

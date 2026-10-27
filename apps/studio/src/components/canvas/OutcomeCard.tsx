@@ -8,19 +8,17 @@ import {
 } from "../../lib/odi";
 import { useStudio } from "../../state/StudioContext";
 import type { Outcome } from "../../types";
-import { CopyIcon } from "../icons";
 
 export function OutcomeCard({ outcome }: { outcome: Outcome }) {
-  const { ask, canvasState, deleteOutcome, pushToast, saveThesis, updateOutcome } = useStudio();
-  // Records captured against this outcome, with their way back to the source.
-  const linkedEvidence = (canvasState.data?.evidence ?? []).filter(
+  const { requestSimulate, sendMessage, closePanel, deleteOutcome, updateOutcome, canvas } =
+    useStudio();
+
+  const linkedEvidence = (canvas?.evidence ?? []).filter(
     (item) => item.outcome_id === outcome.id,
   );
   const [showEvidence, setShowEvidence] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [editing, setEditing] = useState(false);
-  const [thesisOpen, setThesisOpen] = useState(false);
-  const [rationale, setRationale] = useState("");
   const [importance, setImportance] = useState(outcome.importance ?? 5);
   const [satisfaction, setSatisfaction] = useState(outcome.satisfaction ?? 5);
   const [saving, setSaving] = useState(false);
@@ -48,31 +46,35 @@ export function OutcomeCard({ outcome }: { outcome: Outcome }) {
         Opportunity <b>{formatOpportunityScore(opp)}</b>
       </p>
 
-      {showEvidence &&
-        (linkedEvidence.length > 0 ? (
-          <div className="card__evidence">
-            {linkedEvidence.map((item) => (
-              <p key={item.id}>
-                {item.content ? `“${item.content}” ` : ""}
-                <span className="evidence__meta">
-                  {item.source_name ? `Via ${item.source_name}` : "Captured by hand"}
-                  {item.url && (
+      {showEvidence && (
+        <div className="card__evidence">
+          {linkedEvidence.length > 0 ? (
+            linkedEvidence.map((evd) => (
+              <div key={evd.id} style={{ marginBottom: "0.5rem" }}>
+                <p style={{ margin: 0 }}>“{evd.content}”</p>
+                <small style={{ color: "var(--color-text-muted)" }}>
+                  Via {evd.source_name} ({evd.source_kind})
+                  {evd.url && (
                     <>
                       {" · "}
-                      <a href={item.url} target="_blank" rel="noopener noreferrer">
-                        Source ↗
+                      <a
+                        href={evd.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{ color: "var(--color-accent)", textDecoration: "underline" }}
+                      >
+                        Source Link ↗
                       </a>
                     </>
                   )}
-                </span>
-              </p>
-            ))}
-          </div>
-        ) : (
-          <p className="card__evidence">
-            {outcome.evidence?.trim() || "No transcript is linked to this outcome yet."}
-          </p>
-        ))}
+                </small>
+              </div>
+            ))
+          ) : (
+            <p>{outcome.evidence?.trim() || "No external evidence is linked to this outcome yet."}</p>
+          )}
+        </div>
+      )}
 
       {editing && (
         <form
@@ -131,39 +133,12 @@ export function OutcomeCard({ outcome }: { outcome: Outcome }) {
         <button
           type="button"
           className="quiet-action"
-          aria-label="Copy outcome statement"
-          title="Copy the statement"
-          onClick={() => {
-            if (!navigator.clipboard) {
-              pushToast("error", "Could not copy the statement.");
-              return;
-            }
-            void navigator.clipboard
-              .writeText(statement)
-              .then(() => pushToast("success", "Copied"))
-              .catch(() => pushToast("error", "Could not copy the statement."));
-          }}
-        >
-          <CopyIcon size={14} /> Copy
-        </button>
-        <button
-          type="button"
-          className="quiet-action"
           aria-expanded={showEvidence}
           onClick={() => setShowEvidence((prev) => !prev)}
         >
           {showEvidence ? "Hide evidence" : "Evidence"}
         </button>
-        <button
-          type="button"
-          className="quiet-action"
-          onClick={() =>
-            ask(
-              `Simulate the impact of a bet on ${outcomeId}: "${statement}". ` +
-                "What has to be true, and what changes if we ship it?",
-            )
-          }
-        >
+        <button type="button" className="quiet-action" onClick={() => requestSimulate(outcomeId)}>
           Simulate
         </button>
         {outcome.id && (
@@ -179,15 +154,10 @@ export function OutcomeCard({ outcome }: { outcome: Outcome }) {
         <button
           type="button"
           className="quiet-action"
-          aria-expanded={thesisOpen}
-          onClick={() => setThesisOpen((prev) => !prev)}
-        >
-          Save as thesis
-        </button>
-        <button
-          type="button"
-          className="quiet-action"
-          onClick={() => ask(`How should we solve outcome ${outcomeId}: "${statement}"?`)}
+          onClick={() => {
+            closePanel();
+            void sendMessage(`How should we solve outcome ${outcomeId}: "${statement}"?`);
+          }}
         >
           Ask
         </button>
@@ -209,50 +179,6 @@ export function OutcomeCard({ outcome }: { outcome: Outcome }) {
           </button>
         )}
       </div>
-
-      {thesisOpen && (
-        <form
-          className="card__edit"
-          aria-label={`Save ${outcomeId} as an opportunity thesis`}
-          onSubmit={(event) => {
-            event.preventDefault();
-            saveThesis({
-              outcome_id: outcomeId,
-              job_id: outcome.job_id,
-              statement,
-              importance: outcome.importance ?? null,
-              satisfaction: outcome.satisfaction ?? null,
-              opportunity_score: opp ?? null,
-              rationale: rationale.trim(),
-            });
-            setThesisOpen(false);
-            setRationale("");
-            pushToast("success", "Opportunity thesis saved");
-          }}
-        >
-          <label className="card__slider" htmlFor={`rationale-${outcomeId}`}>
-            Why this bet, and what has to be true?
-            <textarea
-              id={`rationale-${outcomeId}`}
-              value={rationale}
-              onChange={(event) => setRationale(event.target.value)}
-              rows={3}
-            />
-          </label>
-          <div className="card__edit-actions">
-            <button type="submit" className="button button--ghost">
-              Save thesis
-            </button>
-            <button
-              type="button"
-              className="quiet-action"
-              onClick={() => setThesisOpen(false)}
-            >
-              Cancel
-            </button>
-          </div>
-        </form>
-      )}
     </article>
   );
 }

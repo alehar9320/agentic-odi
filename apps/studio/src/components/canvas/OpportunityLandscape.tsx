@@ -1,27 +1,23 @@
 import { useMemo, useState } from "react";
 
-import { formatOpportunityScore, isUnderserved } from "../../lib/odi";
+import { isUnderserved } from "../../lib/odi";
 import { useStudio } from "../../state/StudioContext";
 import type { Outcome } from "../../types";
-import { FailurePanel } from "../FailurePanel";
 import { GhostMetrics, GhostOpportunityCards } from "../Skeletons";
 import { OutcomeCard } from "./OutcomeCard";
 
 type ViewMode = "matrix" | "cards" | "table";
 
 export function OpportunityLandscape() {
-  const { canvasState, deleteThesis, refreshCanvas, theses } = useStudio();
+  const { canvas, canvasLoading } = useStudio();
   const [underservedOnly, setUnderservedOnly] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedOutcomeId, setSelectedOutcomeId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("matrix");
   const [hoveredOutcome, setHoveredOutcome] = useState<Outcome | null>(null);
 
-  const canvas = canvasState.data;
   const jobs = useMemo(() => canvas?.jobs ?? [], [canvas]);
   const outcomes = useMemo(() => canvas?.outcomes ?? [], [canvas]);
-  const isLoading = canvasState.kind === "loading";
-  const isEmpty = canvasState.kind === "empty";
 
   const underservedCount = outcomes.filter((outcome) =>
     isUnderserved(outcome.opportunity_score),
@@ -102,26 +98,7 @@ export function OpportunityLandscape() {
         </div>
       </div>
 
-      {canvasState.kind === "error" ? (
-        <FailurePanel
-          error={canvasState.error}
-          onRetry={() => void refreshCanvas()}
-          retryText="reload"
-        />
-      ) : canvas?.warnings?.length ? (
-        <ul className="canvas-warnings" role="status">
-          {canvas.warnings.map((warning) => (
-            <li key={warning}>{warning}</li>
-          ))}
-        </ul>
-      ) : isEmpty ? (
-        <div className="studio-empty" role="status">
-          <p className="studio-empty__title">No opportunities yet</p>
-          <p className="studio-empty__body">
-            Capture an outcome and the landscape will show what is underserved.
-          </p>
-        </div>
-      ) : isLoading ? (
+      {canvasLoading && !canvas ? (
         <GhostMetrics />
       ) : (
         <div className="metric-grid" style={{ marginTop: 16, marginBottom: 16 }}>
@@ -146,52 +123,43 @@ export function OpportunityLandscape() {
       )}
 
       {/* Control Bar: Search & Filtering */}
-      {canvasState.kind === "error" ? null : (
-        <div style={{ display: "flex", gap: 12, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
-          <div style={{ flex: "1 1 240px" }}>
-            <input
-              type="text"
-              className="studio-input"
-              placeholder="Search opportunities / outcomes by statement or ID..."
-              value={searchQuery}
-              disabled={isLoading}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              style={{ width: "100%" }}
-            />
-          </div>
-          <label style={{ fontSize: "0.85rem", color: "var(--studio-text)", display: "flex", alignItems: "center", gap: 6, cursor: "pointer", userSelect: "none" }}>
-            <input
-              type="checkbox"
-              checked={underservedOnly}
-              disabled={isLoading}
-              onChange={(event) => setUnderservedOnly(event.target.checked)}
-              style={{ accentColor: "var(--studio-indigo)" }}
-            />
-            Show Underserved Only (&gt;10)
-          </label>
-          {searchQuery || underservedOnly ? (
-            <button
-              type="button"
-              className="studio-button"
-              style={{ fontSize: "0.78rem", padding: "4px 10px" }}
-              disabled={isLoading}
-              onClick={() => {
-                setSearchQuery("");
-                setUnderservedOnly(false);
-              }}
-            >
-              Clear Filters
-            </button>
-          ) : null}
+      <div style={{ display: "flex", gap: 12, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
+        <div style={{ flex: "1 1 240px" }}>
+          <input
+            type="text"
+            className="studio-input"
+            placeholder="Search opportunities / outcomes by statement or ID..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            style={{ width: "100%" }}
+          />
         </div>
-      )}
+        <label style={{ fontSize: "0.85rem", color: "var(--studio-text)", display: "flex", alignItems: "center", gap: 6, cursor: "pointer", userSelect: "none" }}>
+          <input
+            type="checkbox"
+            checked={underservedOnly}
+            onChange={(event) => setUnderservedOnly(event.target.checked)}
+            style={{ accentColor: "var(--studio-indigo)" }}
+          />
+          Show Underserved Only (&gt;10)
+        </label>
+        {searchQuery || underservedOnly ? (
+          <button
+            type="button"
+            className="studio-button"
+            style={{ fontSize: "0.78rem", padding: "4px 10px" }}
+            onClick={() => {
+              setSearchQuery("");
+              setUnderservedOnly(false);
+            }}
+          >
+            Clear Filters
+          </button>
+        ) : null}
+      </div>
 
-      {isLoading ? (
+      {canvasLoading && !canvas ? (
         <GhostOpportunityCards />
-      ) : canvasState.kind === "error" ? null : isEmpty ? (
-        <p className="caption" style={{ padding: 24, textAlign: "center", background: "var(--studio-surface)", borderRadius: 8 }}>
-          Capture an outcome to see it here.
-        </p>
       ) : viewMode === "matrix" ? (
         <OpportunityMatrixView
           outcomes={filteredOutcomes}
@@ -216,43 +184,6 @@ export function OpportunityLandscape() {
         <p className="caption" style={{ padding: 24, textAlign: "center", background: "var(--studio-surface)", borderRadius: 8 }}>
           No opportunities match the current filter criteria.
         </p>
-      )}
-
-      {theses.length > 0 && (
-        <section aria-label="Saved opportunity theses" style={{ marginTop: 28 }}>
-          <h2 className="catchup-title">Opportunity theses</h2>
-          <p className="caption">
-            Scored bets you saved to share, with the reasoning that makes them reviewable.
-          </p>
-          <div className="stack" style={{ marginTop: 12 }}>
-            {theses.map((thesis) => (
-              <article className="card" key={thesis.id} aria-label={`Thesis ${thesis.outcome_id}`}>
-                <header className="card__head">
-                  <span className="card__id">{thesis.outcome_id}</span>
-                  <span className="badge badge--blue">
-                    Opportunity {formatOpportunityScore(thesis.opportunity_score)}
-                  </span>
-                </header>
-                <p className="card__statement">{thesis.statement}</p>
-                <p className="card__meta">
-                  Importance <b>{thesis.importance ?? "—"}</b>
-                  <span aria-hidden="true"> · </span>
-                  Satisfaction <b>{thesis.satisfaction ?? "—"}</b>
-                </p>
-                {thesis.rationale ? <p className="card__evidence">{thesis.rationale}</p> : null}
-                <div className="card__actions">
-                  <button
-                    type="button"
-                    className="quiet-action quiet-action--danger"
-                    onClick={() => deleteThesis(thesis.id)}
-                  >
-                    Remove thesis
-                  </button>
-                </div>
-              </article>
-            ))}
-          </div>
-        </section>
       )}
     </section>
   );

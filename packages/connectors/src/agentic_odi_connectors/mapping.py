@@ -58,12 +58,7 @@ def _draft_from_record(
 ) -> EvidenceDraft:
     url = None
     if isinstance(record.raw, dict):
-        url = (
-            record.raw.get("url")
-            or record.raw.get("html_url")
-            or record.raw.get("link")
-            or record.raw.get("uri")
-        )
+        url = record.raw.get("url") or record.raw.get("html_url") or record.raw.get("link") or record.raw.get("uri")
     return EvidenceDraft(
         source_name=record.source_name,
         source_kind=record.source_kind,

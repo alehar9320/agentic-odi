@@ -7,7 +7,6 @@ import sqlite3
 from datetime import datetime, timezone
 from typing import Any
 
-from agentic_odi_core.errors import ConflictError, StoreError
 from agentic_odi_core.events import (
     DEFAULT_DEVICE,
     DEFAULT_WORKSPACE,
@@ -28,12 +27,7 @@ class IntentStore:
 
     def __init__(self, db_path: str = "intent_store.db", check_same_thread: bool = True) -> None:
         self.conn = sqlite3.connect(db_path, check_same_thread=check_same_thread)
-        # WAL lets readers and one writer work at once; the busy timeout makes
-        # a second writer wait for the lock (the CLI, the sidecar, and a test
-        # can all hold a connection to the same file) instead of raising
-        # "database is locked" the moment the lock is taken.
         self.conn.execute("PRAGMA journal_mode=WAL;")
-        self.conn.execute("PRAGMA busy_timeout=5000;")
         self._init_db()
 
     def _init_db(self) -> None:
@@ -122,9 +116,9 @@ class IntentStore:
             ).fetchone()
 
         if row is None:
-            raise StoreError(f"event {resolved_id} could not be stored")
+            raise RuntimeError(f"event {resolved_id} could not be stored")
         if row[2] != workspace_id:
-            raise ConflictError(f"event_id {resolved_id} already belongs to another workspace")
+            raise ValueError(f"event_id {resolved_id} already belongs to another workspace")
         return self._to_event(row)
 
     def get_stream(

@@ -156,11 +156,9 @@ export function isQuestionFilled(draft: SetupDraft, index: number): boolean {
 export type SetupIntent =
   | { kind: "skip" }
   | { kind: "explore" }
-  /** A step that belongs in the conversation, not in a view. */
-  | { kind: "talk"; text: string }
   | {
       kind: "panel";
-      panel: "landscape" | "jobmap" | "evidence" | "capture" | "settings";
+      panel: "landscape" | "jobmap" | "impact" | "evidence" | "capture" | "settings";
     };
 
 const SKIP_PHRASE = /\b(skip|pass|not sure|no idea|don'?t know|unsure)\b/i;
@@ -193,12 +191,7 @@ export function parseSetupIntent(text: string): SetupIntent | null {
       return { kind: "panel", panel: "jobmap" };
     }
     if (/impact|simulat/.test(lower)) {
-      return {
-        kind: "talk",
-        text:
-          "Simulate the impact of a bet on my most underserved opportunity. " +
-          "Ask me what the bet is, then show me what changes before and after.",
-      };
+      return { kind: "panel", panel: "impact" };
     }
     if (/evidence/.test(lower)) {
       return { kind: "panel", panel: "evidence" };
