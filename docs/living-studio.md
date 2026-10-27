@@ -136,28 +136,6 @@ When the LLM is unreachable the Studio keeps working:
 The user's context is sent with every chat request, so the assistant starts from
 the product, audience, job, and problem rather than asking for them again.
 
-### When the studio is not running
-
-The Living Studio is a local service, and it is the kind of thing that is easy to
-forget to start. When the sidecar is not reachable, the SPA does not pretend
-otherwise.
-
-- A **subtle strip** across the top of the window says the sidecar isn't running,
-  that the assistant is paused and live data is frozen, and offers **Recheck**
-  and **Start the sidecar** (opens Settings). It is dismissible for the session
-  and clears itself once the sidecar is reached again.
-- Sending a message does not fire off a doomed request: it drops a quiet in-thread
-  notice pointing to Settings, and the composer never spins.
-- The canvas keeps showing the last thing it drew instead of going blank; a failed
-  canvas is a failure panel with Retry, not an empty board.
-
-On the CLI, the same condition is `BackendError("could not reach MCP server …")`,
-rendered as `Error: …` followed by `Hint: Start the MCP server (python -m
-agentic_odi_mcp_server)…`. When the Studio is reached through the free
-Cloudflare Worker proxy, a missing `SIDECAR_URL` is reported to the browser as
-`{"error": {"code": "mcp_unreachable", "suggestion": "Start the studio sidecar
-…"}}` with `X-Request-ID` echoed for support.
-
 ### The thread is the room
 
 Capture, scoring, simulation, and decisions are conversations. The storefront

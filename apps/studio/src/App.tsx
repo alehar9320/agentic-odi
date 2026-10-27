@@ -5,7 +5,6 @@ import { ChangelogModal } from "./components/ChangelogModal";
 import { ChatStage } from "./components/chat/ChatStage";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { StudioBar } from "./components/layout/StudioBar";
-import { SidecarNotice } from "./components/notices/SidecarNotice";
 import { Toasts } from "./components/Toasts";
 import { WorkbenchRail } from "./components/workspace/WorkbenchRail";
 import { WorkspacePanel } from "./components/workspace/WorkspacePanel";
@@ -47,7 +46,6 @@ function StudioShell() {
 
   return (
     <div className="studio-app">
-      <SidecarNotice />
       <main className="stage">
         <StudioBar
           onHome={goHome}

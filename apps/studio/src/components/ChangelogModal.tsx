@@ -1,7 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { fetchChangelog } from "../api/studioApi";
-import { markReleasesRead, readReleaseVersions, unreadReleases } from "../lib/changelogRead";
 import type { ChangelogData } from "../types";
 
 interface ChangelogModalProps {
@@ -13,20 +12,6 @@ export function ChangelogModal({ isOpen, onClose }: ChangelogModalProps) {
   const [changelog, setChangelog] = useState<ChangelogData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [readVersions, setReadVersions] = useState<string[]>(() => readReleaseVersions());
-
-  const unread = useMemo(
-    () => unreadReleases(changelog?.releases ?? [], readVersions),
-    [changelog, readVersions],
-  );
-  const unreadVersions = useMemo(
-    () => new Set(unread.map((release) => release.version)),
-    [unread],
-  );
-
-  function markAllRead() {
-    setReadVersions(markReleasesRead((changelog?.releases ?? []).map((r) => r.version)));
-  }
 
   useEffect(() => {
     if (!isOpen) return;
@@ -81,11 +66,6 @@ export function ChangelogModal({ isOpen, onClose }: ChangelogModalProps) {
             <h2 id="changelog-modal-title" className="changelog-modal__title">
               Release Notes & Progress
             </h2>
-            {unread.length > 0 && (
-              <p className="changelog-modal__unread" role="status">
-                {unread.length} new
-              </p>
-            )}
           </div>
           <button
             type="button"
@@ -112,31 +92,15 @@ export function ChangelogModal({ isOpen, onClose }: ChangelogModalProps) {
             </div>
           )}
 
-          {!loading && !error && changelog && changelog.releases.length === 0 && (
-            <p className="changelog-modal__empty">
-              Release notes come from the studio service. Start it to see what changed.
-            </p>
-          )}
-
-          {!loading && !error && changelog && changelog.releases.length > 0 && (
+          {!loading && !error && changelog && (
             <div className="changelog-timeline">
               {changelog.releases.map((release) => (
-                <article
-                  key={release.version}
-                  className={
-                    unreadVersions.has(release.version)
-                      ? "changelog-release changelog-release--unread"
-                      : "changelog-release"
-                  }
-                >
+                <article key={release.version} className="changelog-release">
                   <div className="changelog-release__meta">
                     <span className="changelog-release__version">
                       v{release.version}
                     </span>
                     <time className="changelog-release__date">{release.date}</time>
-                    {unreadVersions.has(release.version) && (
-                      <span className="changelog-release__new">New</span>
-                    )}
                   </div>
 
                   <div className="changelog-release__content">
@@ -163,23 +127,13 @@ export function ChangelogModal({ isOpen, onClose }: ChangelogModalProps) {
           <span className="changelog-modal__quote">
             "Design is not just what it looks like and feels like. Design is how it works."
           </span>
-          <div className="changelog-modal__actions">
-            <button
-              type="button"
-              className="studio-button"
-              onClick={markAllRead}
-              disabled={unread.length === 0}
-            >
-              Mark all read
-            </button>
-            <button
-              type="button"
-              className="studio-button"
-              onClick={onClose}
-            >
-              Done
-            </button>
-          </div>
+          <button
+            type="button"
+            className="studio-button"
+            onClick={onClose}
+          >
+            Done
+          </button>
         </footer>
       </div>
     </div>

@@ -284,10 +284,6 @@ jobs:
           npm run gen:api-types
           git diff --exit-code -- src/api/schema.d.ts
 
-  # Component snapshots are published by `chromatic.yml`, which runs on push.
-  # Chromatic recommends push over pull_request because a PR run checks out an
-  # ephemeral merge commit that diffs against the wrong baseline.
-
   tauri-check:
     runs-on: ubuntu-latest
     timeout-minutes: 30

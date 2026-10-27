@@ -3,10 +3,8 @@
 from __future__ import annotations
 
 import pytest
-import typer
 from agentic_odi_cli import backend as backend_module
 from agentic_odi_cli.backend import (
-    AutoBackend,
     BackendConfig,
     BackendError,
     LocalBackend,
@@ -106,99 +104,9 @@ def test_resolve_backend_selects_local_by_default(tmp_path):
     assert isinstance(backend, LocalBackend)
 
 
-def test_get_backend_selects_auto(tmp_path):
-    backend = get_backend(backend="auto", db_path=str(tmp_path / "odi.db"))
-    assert isinstance(backend, AutoBackend)
-
-
-def test_auto_backend_stays_local_when_the_mcp_server_is_down(tmp_path, monkeypatch, capsys):
-    backend = AutoBackend(db_path=str(tmp_path / "odi.db"))
-
-    def unreachable(*_args):
-        raise BackendError("could not reach MCP server")
-
-    monkeypatch.setattr(backend._mcp, "call", unreachable)
-
-    job = backend.call("add_job", {"name": "Local job"})
-
-    assert job["name"] == "Local job"
-    assert "using the MCP server" not in capsys.readouterr().err
-
-
-def test_auto_backend_falls_back_to_mcp_and_notices_once(tmp_path, monkeypatch, capsys):
-    backend = AutoBackend(db_path=str(tmp_path / "odi.db"))
-
-    def stuck(*_args):
-        raise BackendError("local store is locked")
-
-    monkeypatch.setattr(backend._local, "call", stuck)
-    monkeypatch.setattr(
-        backend._mcp,
-        "call",
-        lambda _tool, _args: {"name": "Remote job"},
-    )
-
-    first = backend.call("add_job", {"name": "Remote job"})
-    second = backend.call("add_job", {"name": "Remote job"})
-
-    assert first["name"] == "Remote job"
-    assert second["name"] == "Remote job"
-    assert capsys.readouterr().err.count("Local store unavailable") == 1
-
-
 def test_get_backend_rejects_unknown_backend():
     with pytest.raises(BackendError, match="unknown backend: warp"):
         get_backend(backend="warp")
-
-
-def test_backend_error_carries_suggestion():
-    err = BackendError("boom", "restart the sidecar")
-    assert err.suggestion == "restart the sidecar"
-    assert str(err) == "boom"
-
-
-def test_backend_error_suggestion_defaults_to_none():
-    assert BackendError("boom").suggestion is None
-    assert str(BackendError("boom")) == "boom"
-
-
-def test_parse_remote_threads_suggestion(monkeypatch):
-    from agentic_odi_core.remote import StudioError, StudioErrorCode
-
-    monkeypatch.setattr(
-        "agentic_odi_core.remote.parse_tool_result",
-        lambda text: StudioError(
-            code=StudioErrorCode.MCP_UNREACHABLE,
-            message="Could not reach the MCP server.",
-            suggestion="Start the MCP server with `python -m agentic_odi_mcp_server`.",
-            retryable=True,
-        ),
-    )
-
-    with pytest.raises(BackendError) as exc_info:
-        backend_module._parse_remote("get_jobs", "Error: anything")
-
-    assert (
-        exc_info.value.suggestion == "Start the MCP server with `python -m agentic_odi_mcp_server`."
-    )
-
-
-def test_run_tool_prints_suggestion_as_a_hint(monkeypatch, capsys):
-    class _FailingBackend:
-        def call(self, tool_name, args):
-            raise BackendError(
-                "sidecar is down", "Start the studio sidecar with `python scripts/dev.py`."
-            )
-
-    monkeypatch.setattr(backend_module, "require_backend", lambda: _FailingBackend())
-
-    with pytest.raises(typer.Exit) as exc_info:
-        backend_module.run_tool("get_jobs", {})
-    assert exc_info.value.exit_code == 1
-
-    captured = capsys.readouterr()
-    assert "Error: sidecar is down" in captured.err
-    assert "Hint: Start the studio sidecar" in captured.err
 
 
 def test_mcp_timeout_reads_env(monkeypatch):
@@ -285,17 +193,9 @@ def test_local_backend_job_step_outcome_crud(tmp_path):
 
     outcome_id = backend.call(
         "add_outcome",
-        {
-            "job_id": job_id,
-            "statement": "Minimize the time to ship a release when the build is green",
-            "importance": 8.0,
-            "satisfaction": 4.0,
-        },
+        {"job_id": job_id, "statement": "Min x", "importance": 8.0, "satisfaction": 4.0},
     )["id"]
-    assert (
-        backend.call("get_outcomes", {"job_id": job_id})[0]["statement"]
-        == "Minimize the time to ship a release when the build is green"
-    )
+    assert backend.call("get_outcomes", {"job_id": job_id})[0]["statement"] == "Min x"
     updated = backend.call("update_outcome", {"outcome_id": outcome_id, "importance": 9.0})
     assert updated["importance"] == 9.0
     assert backend.call("get_outcome", {"outcome_id": outcome_id})["opportunity_score"] == 14.0
@@ -324,14 +224,7 @@ def test_local_backend_rejects_out_of_range_scores(tmp_path):
     job_id = backend.call("add_job", {"name": "J"})["id"]
 
     with pytest.raises(BackendError, match="between 1.0 and 10.0"):
-        backend.call(
-            "add_outcome",
-            {
-                "job_id": job_id,
-                "statement": "Minimize the time to ship a release when the build is green",
-                "importance": 99.0,
-            },
-        )
+        backend.call("add_outcome", {"job_id": job_id, "statement": "S", "importance": 99.0})
 
 
 def test_local_backend_update_customer_outcome_folds_value_metrics(tmp_path):

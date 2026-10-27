@@ -222,9 +222,7 @@ export function ToolPart({
 
   const tone = isError || payload?.status === "error" ? " is-error" : "";
   return (
-    // Polite, so a tool that starts, fails, or is declined is reported without
-    // interrupting the reply being read.
-    <p className={`tool-trace${tone}${running ? " is-running" : ""}`} aria-live="polite">
+    <p className={`tool-trace${tone}${running ? " is-running" : ""}`}>
       <span className="tool-trace__dot" aria-hidden="true" />
       {toolLabel(toolName)}
       {running ? " · working" : payload?.status === "declined" ? " · declined" : ""}
