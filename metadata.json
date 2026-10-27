@@ -3,7 +3,7 @@
   "checkpoint_id": "01M5YW5YSV01X9Y8G61DSSJ3D1",
   "strategy": "manual-commit",
   "branch": "ui-not-looking-like-shit",
-  "checkpoints_count": 10,
+  "checkpoints_count": 11,
   "files_touched": [
     "website/dist/404.html",
     "website/dist/assets/demo.js",
@@ -102,6 +102,13 @@
       "compact_transcript": "/9/transcript.jsonl",
       "content_hash": "/9/content_hash.txt",
       "prompt": "/9/prompt.txt"
+    },
+    {
+      "metadata": "/10/metadata.json",
+      "transcript": "/10/full.jsonl",
+      "compact_transcript": "/10/transcript.jsonl",
+      "content_hash": "/10/content_hash.txt",
+      "prompt": ""
     }
   ],
   "token_usage": {
