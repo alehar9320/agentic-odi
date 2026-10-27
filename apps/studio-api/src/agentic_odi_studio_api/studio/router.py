@@ -55,16 +55,10 @@ from agentic_odi_studio_api.studio.schemas import (
     AddConnectorRequest,
     AddOutcomeRequest,
     AddStepRequest,
-<<<<<<< HEAD
-    ApprovalDecisionRequest,
-    ApprovalDecisionResponse,
-||||||| fcf59923
-=======
     ApprovalDecisionRequest,
     ApprovalDecisionResponse,
     CapabilitiesResponse,
     CapabilityItem,
->>>>>>> origin/main
     ChatRequest,
     ConnectorListItem,
     ConnectorOperationResponse,
@@ -612,7 +606,6 @@ def create_conversation(request: Request) -> ConversationResponse:
     return ConversationResponse(conversation=_memory(request).create_conversation().to_dict())
 
 
-<<<<<<< HEAD
 @router.get("/conversations/{conversation_id}/tree", response_model=ConversationTreeResponse)
 def conversation_tree(conversation_id: str, request: Request) -> ConversationTreeResponse:
     """The whole branch tree, so a reload reopens the branch that was on screen."""
@@ -691,79 +684,7 @@ async def resolve_approval(
     return ApprovalDecisionResponse(ok=True, id=approval_id)
 
 
-||||||| fcf59923
-=======
-@router.get("/conversations/{conversation_id}/tree", response_model=ConversationTreeResponse)
-def conversation_tree(conversation_id: str, request: Request) -> ConversationTreeResponse:
-    """The whole branch tree, so a reload reopens the branch that was on screen."""
-    memory = _memory(request)
-    conversation = memory.get_conversation(conversation_id)
-    if conversation is None:
-        raise StudioHTTPError(
-            StudioError(
-                code=StudioErrorCode.NOT_FOUND,
-                message=f"Conversation {conversation_id} not found",
-            )
-        )
-    turns = memory.conversation_tree(conversation_id)
-    return ConversationTreeResponse(
-        conversation=conversation.to_dict(),
-        messages=[
-            TurnNode(
-                id=turn.message_id or f"turn-{turn.id}",
-                parent_id=turn.parent_id,
-                role=turn.role,
-                content=turn.content,
-                created_at=turn.created_at,
-            )
-            for turn in turns
-            if turn.role in {"user", "assistant"}
-        ],
-        head_id=conversation.head_id or (turns[-1].message_id if turns else None),
-    )
 
-
-@router.patch("/conversations/{conversation_id}", response_model=ConversationResponse)
-def patch_conversation(
-    conversation_id: str, body: UpdateConversationRequest, request: Request
-) -> ConversationResponse:
-    """Record the visible branch, or rename the thread."""
-    memory = _memory(request)
-    try:
-        if body.title is not None:
-            memory.update_title(conversation_id, body.title)
-        conversation = memory.set_head(conversation_id, body.head_id)
-    except ConversationNotFoundError as exc:
-        raise StudioHTTPError(
-            StudioError(
-                code=StudioErrorCode.NOT_FOUND,
-                message=f"Conversation {conversation_id} not found",
-            )
-        ) from exc
-    return ConversationResponse(conversation=conversation.to_dict())
-
-
-@router.post("/approvals/{approval_id}", response_model=ApprovalDecisionResponse)
-def resolve_approval(
-    approval_id: str, body: ApprovalDecisionRequest, request: Request
-) -> ApprovalDecisionResponse:
-    """Answer a paused write. The paused turn resumes on its own stream."""
-    try:
-        _approvals(request).resolve(
-            approval_id, ApprovalDecision(approved=body.approved, reason=body.reason)
-        )
-    except ApprovalNotFoundError as exc:
-        raise StudioHTTPError(
-            StudioError(
-                code=StudioErrorCode.NOT_FOUND,
-                message="That approval request is no longer waiting.",
-                suggestion="The turn may have ended or timed out. Send the request again.",
-            )
-        ) from exc
-    return ApprovalDecisionResponse(ok=True, id=approval_id)
-
-
->>>>>>> origin/main
 @router.post("/chat")
 async def post_chat(request: Request, body: ChatRequest) -> StreamingResponse:
     # The request id is the server's: the header the client sent (or one the
