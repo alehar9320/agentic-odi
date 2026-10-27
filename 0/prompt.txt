@@ -1,0 +1,59 @@
+You are a Senior Code Reviewer reviewing the completed "Max Studio Assistant-UI Integration" branch.
+
+## What Was Implemented
+
+The `ui-not-looking-like-shit` branch has been brought to the full "max" assistant-ui integration (reference: `feat/studio-assistant-ui-experience`):
+
+**Backend (studio-api):**
+- `studio/approvals.py` — `ApprovalRegistry` for mutating tool-call write-approval gates (open/resolve/discard/cancel_all/wait_for_decision), `apv_`-prefixed IDs, single-resolution.
+- `studio/schemas.py` — `AttachmentRef`, `ChatMessage.id/parent_id`, `ChatRequest` attachments/approvals/assistant_id, approval request/response, conversation tree models.
+- `studio/chat.py` — SSE stream emits `approval`/`reasoning`/`source`/`tool`/`message` events; approval gate only when `approvals=True`; declined/expired writes never execute; attachments bounded/truncated; `promote_evidence` gated; `add_connector` emits tool start/ok/error frames.
+- `studio/memory.py` — message_id/parent_id persistence, siblings, `conversation_tree()`, `set_head()`, legacy-row linear-chain migration.
+- `studio/router.py` — `PATCH /api/approvals/{id}`, `GET /api/conversations/{id}/tree`, `PATCH /api/conversations/{id}`, `POST /api/models`.
+- `studio/app.py` — `ApprovalRegistry` wired in lifespan, cancelled on shutdown, `/capabilities` returns `CAPABILITIES`.
+- `studio/probes.py` — `list_models()`.
+
+**Frontend (studio SPA):**
+- `src/types.ts` — `ChatPart` (text/reasoning/source/tool+approval/source/ui), `ChatAttachment`, `ChatMessage` (id/parentId), `ToolStatus`, `ToolApproval`, `TurnNode`, `ConversationTree`, `ModelList`.
+- `src/assistant/` — `convert.ts` (ThreadMessage↔ChatMessage), `attachments.ts` (AttachmentAdapter, 5MB ceiling), `parts.tsx` (ReasoningPart/SourcePart/SurfacePart/ToolPart/TypingPart/AssistantAvatar), `StudioRuntime.tsx` (AssistantRuntimeProvider wrapper).
+- `src/state/StudioContext.tsx` — regenerateFrom/editFrom/switchBranch/respondToApproval/fetchConversationTree/setConversationHead + runTurn branching primitive.
+- `src/components/chat/` — Conversation (MessagePrimitive/BranchPickerPrimitive), ChatStage (ThreadViewPrimitive), ThreadComposer (ComposerPrimitive.Attachment), composerParts; deleted Composer/RunActivity/TranscriptAnnouncer.
+- `src/App.tsx` — wrapped in StudioRuntimeProvider; Hero shows runtime suggestions; ModelPicker (~300 lines) with fetchModels, keyboard nav, probe-per-backend caching, offline UX.
+- Deleted `lib/thread.ts`, `lib/run.ts`, `lib/attachments.ts`, `lib/transcript.ts` (+ tests).
+
+## Requirements / Plan
+
+Plan file: /home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/docs/superpowers/plans/2025-10-26-studio-assistant-ui-max-integration.md
+All 15 tasks marked complete.
+
+## Git Range to Review
+
+**Base:** fcf59923
+**Head:** 43686562
+
+Diff file: /home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/.superpowers/sdd/2025-10-26-studio-assistant-ui-max-integration/review-fcf59923..43686562.diff
+
+Ledger: /home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/.superpowers/sdd/2025-10-26-studio-assistant-ui-max-integration/progress.md (read the "Ruling:" and "parked" lines to triage).
+
+## What to Check
+
+Review the full diff for: plan alignment (is all planned functionality present?), code quality (separation of concerns, error handling, type safety, edge cases), architecture (sound design, security, integration), testing (tests verify real behavior, all passing), production readiness (migrations, backward compat, documentation).
+
+Verification already run: frontend 307/307 tests pass, typecheck clean, lint clean (1 pre-existing warning); Python 1026/1026 pass, ruff/format/mypy clean.
+
+## Output Format
+
+### Strengths
+### Issues
+#### Critical (Must Fix)
+#### Important (Should Fix)
+#### Minor (Nice to Have)
+For each issue: file:line, what's wrong, why it matters, how to fix.
+
+### Recommendations
+
+### Assessment
+**Ready to merge?** Yes / No / With fixes
+**Reasoning:** [1-2 sentence technical assessment]
+
+Read the diff file once. It contains the commit list, stat summary, and full diff. Do not re-run git commands.
