@@ -2,9 +2,10 @@
 
 Banners are how the Studio tells the user about the state of the studio: the
 sidecar is down, the model is unreachable, a step was added, a write was
-rejected. Before this system, five components each owned their own markup, CSS,
-and idea of when to appear. Now one system owns all of it, and a new banner is a
-catalog entry — never a new component and never a new CSS class.
+rejected. Before this system, three of those surfaces were separate components,
+each with its own markup, CSS, and idea of when to appear. Now one system owns
+all three, and a new banner is a catalog entry — never a new component and never
+a new CSS class.
 
 ## The shape
 
@@ -60,6 +61,19 @@ anything beyond that collapses into a "+N more notices" affordance.
    `BannerBridge` if it is derived from studio state.
 
 No new component, no new CSS class, no new toast stack.
+
+## What is deliberately not a banner
+
+Two surfaces look like they belong here and do not, by design:
+
+- **`FailurePanel`** shows a failure *in place of the thing that failed* — the
+  canvas, a lens. A banner is a statement about the state of the studio, floating
+  over it; a failure panel replaces a region. Different idea, different job.
+- **The transcript `.notice`** is a line in the conversation history, with the
+  turn it belongs to. A banner is not history.
+
+Keeping them out is the point of a closed catalog: a banner means one specific
+thing, and the system stays legible because it does not absorb everything.
 
 ## Where the old surfaces went
 

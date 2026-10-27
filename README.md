@@ -183,9 +183,9 @@ on every streamed frame, and it is the id in the sidecar's per-turn log line.
 
 ### Banners
 
-Everything the Studio says about the state of the studio goes through one banner
-system: the sidecar strip, the offline strip, and the toast stack are now kinds
-in a single catalog, not three components. A banner is an entry in
+Everything the Studio says about the *state of the studio* goes through one
+banner system: the sidecar strip, the offline strip, and the toast stack are now
+kinds in a single catalog, not three components. A banner is an entry in
 `apps/studio/src/banners/catalog.ts` plus a `raise()` call — never a new
 component and never a new CSS class, so any number of banners stays consistent.
 
@@ -194,8 +194,9 @@ holds the layout still; a `corner` banner is a fixed stack for an event. Severit
 drives urgency and ARIA (`critical`/`warning` interrupt, `info`/`success` wait),
 a persistent banner never auto-expires, and anything past the visible cap
 collapses into a "+N more notices" affordance. The live region, timers, and
-dismissal come from `@radix-ui/react-toast`. See
-[Studio banners](docs/architecture/banners.md).
+dismissal come from `@radix-ui/react-toast`. A failure shown *in place of* the
+thing that failed (`FailurePanel`) and a line in the transcript are deliberately
+not banners. See [Studio banners](docs/architecture/banners.md).
 
 ### CLI at a glance
 
@@ -242,6 +243,7 @@ layout, updates, and release automation.
 | [Local LLM Backend](docs/local-llm.md) | Running a local OpenAI-compatible model with tool calling |
 | [Development](docs/development.md) | Lint, format, type checks, frontend checks, tests and the coverage map |
 | [Architecture](docs/architecture/README.md) | Workspace layout, dependency direction, data flow, and testing |
+| [Studio Banners](docs/architecture/banners.md) | The one banner system: the kind catalog, the store's dedupe rules, the two docks, and how to add a kind |
 | [Installation](docs/installation.md) | Binary install, updater behavior, and release automation |
 | [Deployment](docs/deployment.md) | Project site on GitHub Pages, Hosted Studio and PR preview URLs, the MCP server endpoint, and the free-plan Cloudflare Worker |
 | [Roadmap](docs/roadmap.md) | Completed and upcoming milestones |

@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
-**Goal:** Replace five hand-rolled "tell the user something" surfaces with one typed, modular banner system that renders any number of banners consistently.
+**Goal:** Replace the hand-rolled "tell the user something" surfaces that state a condition *about the studio* — the sidecar strip, the offline strip, the toast stack — with one typed, modular banner system that renders any number of banners consistently. `FailurePanel` and the transcript `.notice` stay, by design (see the spec's non-goals).
 
 **Architecture:** A dependency-free store module owns ordering, dedupe, and capping. A catalog module owns every banner kind's defaults. A provider bridges the store into React. A stack renders both docks through `@radix-ui/react-toast` (already vendored at `1.3.1`), so live-region semantics, timers, and dismissal come from the library, not hand-rolled code.
 
@@ -148,8 +148,11 @@
 
 ## Outcome
 
-All six tasks landed on `feat/banner-system`. The banner system is the only path
-a notice takes to the screen.
+All six tasks landed on `feat/banner-system`. Every surface that states a
+condition *about the studio* — the sidecar strip, the offline strip, the toast
+stack — now goes through one system. `FailurePanel` (a failure in place of the
+thing that failed) and the transcript `.notice` (a line in history) stay as they
+are, by design.
 
 - Unit suite: 52 files, 441 tests, green (banner tests stress-run 6×, full suite 4×).
 - Visual suite: 2 files, 6 snapshots, green (`BannerStack.visual.test.tsx` covers
