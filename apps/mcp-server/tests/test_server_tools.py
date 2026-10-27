@@ -111,7 +111,7 @@ async def test_add_outcome_without_both_scores_sets_no_opportunity_score():
             "add_outcome",
             {
                 "job_id": job_id,
-                "statement": "Outcome without full scores",
+                "statement": "Minimize the time to onboard when a customer signs up",
                 "importance": 7.0,
             },
         )
@@ -122,6 +122,22 @@ async def test_add_outcome_without_both_scores_sets_no_opportunity_score():
         outcome_data = json.loads(match.group(1)) if match else {}
 
         assert outcome_data.get("opportunity_score") is None
+
+
+@pytest.mark.asyncio
+async def test_add_outcome_rejects_a_vague_statement_with_the_fix():
+    async with Client(mcp) as client:
+        create_res = await client.call_tool("add_job", {"name": "Job", "description": "Desc"})
+        job_id = _extract_id(create_res.content[0].text)
+
+        res = await client.call_tool(
+            "add_outcome",
+            {"job_id": job_id, "statement": "Make it faster"},
+        )
+
+        text = res.content[0].text
+        assert text.startswith("Error: Outcome statement does not match the ODI format")
+        assert "Minimize" in text
 
 
 @pytest.mark.asyncio
@@ -137,3 +153,35 @@ async def test_get_odi_framework_guidelines_includes_expected_sections():
         assert "add_job" in text
         assert "add_outcome" in text
         assert "add_step" in text
+
+
+@pytest.mark.asyncio
+async def test_add_step_accepts_the_eight_job_map_stages():
+    async with Client(mcp) as client:
+        created = await client.call_tool("add_job", {"name": "Deploy a service"})
+        job_id = _extract_id(created.content[0].text)
+        assert job_id is not None
+
+        for order in range(1, 9):
+            result = await client.call_tool(
+                "add_step", {"job_id": job_id, "name": f"stage {order}", "order": order}
+            )
+            assert "Step created successfully" in result.content[0].text
+
+        listed = await client.call_tool("get_job_map", {"job_id": job_id})
+        assert [step["order"] for step in json.loads(listed.content[0].text)] == list(range(1, 9))
+
+
+@pytest.mark.asyncio
+async def test_add_step_rejects_an_order_outside_the_job_map():
+    async with Client(mcp) as client:
+        created = await client.call_tool("add_job", {"name": "Deploy a service"})
+        job_id = _extract_id(created.content[0].text)
+        assert job_id is not None
+
+        result = await client.call_tool(
+            "add_step", {"job_id": job_id, "name": "stage 9", "order": 9}
+        )
+
+        assert result.content[0].text.startswith("Error:")
+        assert "between 1 and 8" in result.content[0].text

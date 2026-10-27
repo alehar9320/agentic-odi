@@ -10,6 +10,7 @@ from agentic_odi_core import (
     CustomerOutcomeNotFoundError,
     EvidenceItemType,
     EvidenceNotFoundError,
+    InvalidOutcomeStatementError,
     JobNotFoundError,
     OdiError,
     ODIService,
@@ -91,6 +92,8 @@ def add_step(job_id: str, name: str, order: int) -> str:
         step = service.add_step(job_id=job_id, name=name, order=order)
     except JobNotFoundError:
         return job_not_found(job_id)
+    except ValueOutOfRangeError as exc:
+        return f"Error: {exc}"
     return f"Step created successfully: {step.model_dump_json()}"
 
 
@@ -125,6 +128,8 @@ def add_outcome(
         return _step_not_found(step_id)
     except ValueOutOfRangeError:
         return "Error: importance and satisfaction must be between 1.0 and 10.0"
+    except InvalidOutcomeStatementError as exc:
+        return f"Error: {exc}"
     return f"Outcome created successfully: {outcome.model_dump_json()}"
 
 

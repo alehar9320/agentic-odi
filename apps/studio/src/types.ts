@@ -36,6 +36,18 @@ export interface Evidence {
   outcome_id?: string | null;
 }
 
+export interface Thesis {
+  id: string;
+  outcome_id: string;
+  job_id?: string;
+  statement: string;
+  importance: number | null;
+  satisfaction: number | null;
+  opportunity_score: number | null;
+  rationale: string;
+  created_at: string;
+}
+
 export interface CanvasData {
   jobs: Job[];
   steps: Step[];
@@ -85,6 +97,12 @@ export interface StudioConfig {
 export interface LlmHealth {
   healthy: boolean;
   message: string;
+}
+
+/** What the configured backend reports it can serve, and why it reported none. */
+export interface ModelList {
+  models: string[];
+  error: string | null;
 }
 
 export interface McpHealth {
@@ -267,6 +285,8 @@ export interface Conversation {
   title: string;
   created_at: string;
   updated_at: string;
+  /** The visible branch head turn, when the conversation has branches. */
+  head_id?: string | null;
 }
 
 export interface ConversationTurn {
@@ -275,6 +295,10 @@ export interface ConversationTurn {
   role: "user" | "assistant" | "system" | "tool";
   content: string;
   created_at: string;
+  /** Stable client message id, when the turn was authored with one. */
+  message_id?: string | null;
+  /** The id of the turn this one answers, when it is a branch or edit. */
+  parent_id?: string | null;
 }
 
 export interface LatestConversation {

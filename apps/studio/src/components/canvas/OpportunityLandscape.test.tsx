@@ -22,6 +22,8 @@ const harness = vi.hoisted(() => ({
     requestSimulate: vi.fn(),
     sendMessage: vi.fn(),
     pushToast: vi.fn(),
+    theses: [],
+    deleteThesis: vi.fn(),
   },
 }));
 
@@ -59,6 +61,14 @@ describe("OpportunityLandscape Data Visualization", () => {
     expect(screen.getByText("Desired Outcome Statement")).toBeInTheDocument();
     expect(screen.getByText("Minimize time spent syncing secrets")).toBeInTheDocument();
     expect(screen.getByText("Minimize risk of configuration drift")).toBeInTheDocument();
+  });
+
+  it("disables search and filters while the canvas loads", () => {
+    harness.state.canvasState = { kind: "loading", data: null } as unknown as CanvasState;
+    render(<OpportunityLandscape />);
+
+    expect(screen.getByPlaceholderText(/Search opportunities/i)).toBeDisabled();
+    expect(screen.getByLabelText(/Show Underserved Only/i)).toBeDisabled();
   });
 
   it("toggles underserved filter checkbox", () => {
