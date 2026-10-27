@@ -1,0 +1,25 @@
+You are reviewing Task 6: frontend `types.ts` alignment with the assistant-ui message model.
+
+## What Was Requested
+Task brief: /home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/.superpowers/sdd/2025-10-26-studio-assistant-ui-max-integration/task-6-brief.md
+Cross-check against reference: `git show feat/studio-assistant-ui-experience:apps/studio/src/types.ts`
+
+## Diff Under Review
+Base: 1116ea8b
+Head: eba230fd
+Diff file: /home/alexa/repos/agentic-odi/repos/agentic-odi/ui-not-looking-like-shit/.superpowers/sdd/2025-10-26-studio-assistant-ui-max-integration/review-1116ea8b..eba230fd.diff
+
+## What to verify
+1. `types.ts` is byte-identical to `feat/studio-assistant-ui-experience:apps/studio/src/types.ts` — verify via the diff + reference.
+2. No unrelated files changed (only types.ts).
+3. The 102 typecheck errors are all caller-migration errors in thread.ts/StudioContext/transcript.ts — expected since Task 6 intentionally ported types first.
+
+## Output Format
+### Spec Compliance
+- ✅ / ❌ / ⚠️ with file:line references
+### Strengths
+### Issues
+#### Critical / Important / Minor
+### Assessment
+**Task quality:** Approved / Needs fixes
+**Reasoning:**
