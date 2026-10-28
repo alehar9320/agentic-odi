@@ -1,15 +1,9 @@
 name: release
 
-# release-please publishes the GitHub release via the API; that emits a
-# `release` event, not a tag push. Both paths are kept so hand-cut tags still
-# publish the CLI archives.
-
 on:
   push:
     tags:
       - "v*"
-  release:
-    types: [published]
 
 permissions:
   contents: write
@@ -79,7 +73,7 @@ jobs:
           path: checksums-${{ matrix.target }}.txt
           if-no-files-found: error
       - name: Upload assets
-        uses: softprops/action-gh-release@v3
+        uses: softprops/action-gh-release@v2
         with:
           files: |
             odi_*.tar.gz
@@ -102,7 +96,7 @@ jobs:
           echo "checksums.txt"
           cat checksums.txt
       - name: Upload checksums.txt
-        uses: softprops/action-gh-release@v3
+        uses: softprops/action-gh-release@v2
         with:
           files: checksums.txt
 
@@ -111,42 +105,8 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: Upload install scripts
-        uses: softprops/action-gh-release@v3
+        uses: softprops/action-gh-release@v2
         with:
           files: |
             scripts/install.sh
             scripts/install.ps1
-
-  release-instructions:
-    needs: [checksums, upload-installers]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - name: Setup uv
-        uses: ./.github/actions/setup
-        with:
-          python-version: "3.11"
-
-      # Tag to the semver tag (vX.Y.Z) so release-please/parsers/installers stay
-      # happy; surface the human-friendly release date in the title (the CLI's
-      # `--version` already prints "X.Y.Z (YYYY-MM-DD)" from build_info).
-      - name: Set the release title to include the date
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          tag="${{ github.ref_name }}"
-          version="${tag#v}"
-          date_utc="$(git log -1 --format=%cI)"
-          human_date="${date_utc:0:10}"
-          gh release edit "$tag" --repo "${{ github.repository }}" \
-            --title "v${version} — ${human_date}"
-          echo "Release title set to: v${version} — ${human_date}"
-
-      - name: Publish download & run instructions on the release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          python scripts/release_instructions.py \
-            --tag "${{ github.ref_name }}" \
-            --repo "${{ github.repository }}"

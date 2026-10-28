@@ -78,32 +78,6 @@ def classify_llm_error(exc: Exception) -> tuple[str, str]:
     return "error", message
 
 
-async def list_models(base_url: str, api_key: str) -> tuple[list[str], str | None]:
-    """Model ids the configured backend reports, and why that list is empty.
-
-    The browser cannot ask the backend itself — the model server is not
-    necessarily CORS-open, and its address may only be reachable from here —
-    so the sidecar asks on the user's behalf and never raises: a failed probe
-    is a message the picker can show, not a 500.
-    """
-    if not is_endpoint_reachable(base_url, timeout=0.4):
-        return [], OFFLINE_MESSAGE
-
-    client = AsyncOpenAI(base_url=base_url, api_key=api_key, timeout=2.0)
-    try:
-        page = await asyncio.wait_for(client.models.list(), timeout=2.0)
-    except Exception as exc:  # noqa: BLE001
-        status, detail = classify_llm_error(exc)
-        return [], f"{status}: {detail}"
-
-    # The async SDK returns an `AsyncPage`, whose items live on `.data`; the page
-    # itself is not synchronously iterable, so read the payload explicitly. A
-    # compatible server with an unusual shape yields no ids rather than a 500.
-    items = getattr(page, "data", None) or []
-    ids = {str(getattr(model, "id", "") or "") for model in items}
-    return sorted(model_id for model_id in ids if model_id), None
-
-
 async def check_llm_health(base_url: str, api_key: str, model_name: str) -> tuple[bool, str]:
     """Non-blocking LLM health probe with an instant socket pre-check."""
     if not is_endpoint_reachable(base_url, timeout=0.3):
