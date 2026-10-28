@@ -31,7 +31,7 @@ async def test_odi_workflow():
             "add_outcome",
             {
                 "job_id": job_id,
-                "statement": "Minimize the time it takes to find a specific song when searching",
+                "statement": "Minimize the time it takes to find a specific song when searching the catalog",
                 "importance": 8.5,
                 "satisfaction": 4.0,
             },
@@ -66,7 +66,7 @@ async def test_odi_workflow():
         assert len(outcomes_data) == 1
         assert (
             outcomes_data[0]["statement"]
-            == "Minimize the time it takes to find a specific song when searching"
+            == "Minimize the time it takes to find a specific song when searching the catalog"
         )
 
 

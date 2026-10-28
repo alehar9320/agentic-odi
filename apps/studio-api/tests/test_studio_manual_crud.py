@@ -71,7 +71,7 @@ def test_outcome_scores_recompute_on_edit_and_delete() -> None:
         json={
             "mcp_url": "",
             "job_id": job["id"],
-            "statement": "Minimize the time it takes to ship when releasing",
+            "statement": "Minimize the time to ship a release when the build is green",
             "importance": 8.0,
             "satisfaction": 4.0,
         },
@@ -97,7 +97,7 @@ def test_out_of_range_scores_are_rejected() -> None:
         json={
             "mcp_url": "",
             "job_id": job["id"],
-            "statement": "Minimize the time it takes to ship when releasing",
+            "statement": "Minimize the time to ship a release when the build is green",
             "importance": 8.0,
             "satisfaction": 4.0,
         },

@@ -6,7 +6,11 @@ import uuid
 from typing import Any
 
 from agentic_odi_core.errors import NotFoundError, ValidationError
-from agentic_odi_core.evaluation import require_outcome_statement
+from agentic_odi_core.evaluation import (
+    OutcomeStatementError,
+    evaluate_outcome_statement,
+    require_outcome_statement,
+)
 from agentic_odi_core.models import (
     JOB_STAGE_INDEX,
     BusinessValue,
@@ -61,6 +65,17 @@ class EvidenceNotFoundError(NotFoundError, ValueError):
 
 class ValueOutOfRangeError(ValidationError):
     pass
+
+
+class InvalidOutcomeStatementError(OutcomeStatementError):
+    """A statement does not match the ODI desired-outcome format.
+
+    Carries the individual issues so the caller can show the fix next to the
+    field that needs it instead of a single opaque message.
+    """
+
+    def __init__(self, verdict: dict[str, Any]) -> None:
+        super().__init__(verdict)
 
 
 def _first_line(text: str) -> str:
@@ -151,8 +166,11 @@ class ODIService:
     ) -> Step:
         if self.repo.get_job(job_id) is None:
             raise JobNotFoundError(job_id)
+        if not 1 <= order <= 8:
+            raise ValueOutOfRangeError("Step order must be between 1 and 8 (Ulwick's job map).")
         existing_outcomes = self.repo.get_outcomes(job_id)
-        if not existing_outcomes and not allow_empty_job_map:
+        existing_customer_outcomes = self.repo.list_customer_outcomes(job_id)
+        if not existing_outcomes and not existing_customer_outcomes and not allow_empty_job_map:
             raise ValidationError(
                 "Add at least one desired outcome before building the job map; "
                 "outcomes are what give the steps their meaning. "
@@ -184,6 +202,7 @@ class ODIService:
         importance: float,
         satisfaction: float,
         step_id: str | None = None,
+        validate_statement: bool = True,
     ) -> Outcome:
         if self.repo.get_job(job_id) is None:
             raise JobNotFoundError(job_id)
@@ -193,7 +212,10 @@ class ODIService:
             raise ValueOutOfRangeError("importance must be between 1.0 and 10.0")
         if not (1.0 <= satisfaction <= 10.0):
             raise ValueOutOfRangeError("satisfaction must be between 1.0 and 10.0")
-        require_outcome_statement(statement)
+        if validate_statement:
+            verdict = evaluate_outcome_statement(statement)
+            if not verdict["valid"]:
+                raise InvalidOutcomeStatementError(verdict)
         opportunity_score = compute_opportunity_score(importance, satisfaction)
         outcome = Outcome(
             id=str(uuid.uuid4()),

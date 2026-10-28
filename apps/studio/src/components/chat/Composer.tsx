@@ -1,9 +1,17 @@
-import { useEffect, useMemo, useState, type RefObject } from "react";
+import { useEffect, useId, useMemo, useState, type RefObject } from "react";
 
 import { isCommandDraft, matchCommands, type StudioCommand } from "../../lib/commands";
 import { useStudio } from "../../state/StudioContext";
 import { ArrowUpIcon, StopIcon } from "../icons";
+import { CommandPalette, ComposerHint, ConnectorChips } from "./composerParts";
 
+/**
+ * A controlled composer for conversations the runtime does not own.
+ *
+ * The setup wizard answers local questions before there is a thread, so it keeps
+ * its own text state. The thread's composer is `ThreadComposer`, which is bound
+ * to the assistant-ui runtime; the palette, chips, and hint are shared.
+ */
 interface ComposerProps {
   value: string;
   onChange: (value: string) => void;
@@ -30,8 +38,10 @@ export function Composer({
   autoFocus = false,
   placeholder,
 }: ComposerProps) {
-  const { settings, llmHealth, brief, connectorSuggestions, presets, dismissConnectorSuggestion, refreshConnectors } =
-    useStudio();
+  const { llmHealth } = useStudio();
+  // Two composers can be mounted at once (the thread's and the setup wizard's).
+  const inputId = useId();
+  const paletteId = useId();
   const [highlight, setHighlight] = useState(0);
   // Remember which draft was dismissed, so typing again re-opens the palette
   // without an effect that writes state on every keystroke.
@@ -114,57 +124,15 @@ export function Composer({
 
   return (
     <div className="composer">
-      {paletteOpen && (
-        <div className="palette" role="listbox" id="studio-command-palette" aria-label="Commands">
-          {matches.length ? (
-            matches.map((command, index) => (
-              <button
-                key={command.id}
-                type="button"
-                role="option"
-                aria-selected={index === activeIndex}
-                className={`palette__item${index === activeIndex ? " is-active" : ""}`}
-                onMouseEnter={() => setHighlight(index)}
-                onClick={() => choose(command)}
-              >
-                <code className="palette__name">{command.name}</code>
-                <span className="palette__text">
-                  <span className="palette__label">{command.label}</span>
-                  <span className="palette__description">{command.description}</span>
-                </span>
-              </button>
-            ))
-          ) : (
-            <p className="palette__empty">
-              No command matches. Type <code>/help</code> for the full list.
-            </p>
-          )}
-        </div>
-      )}
-
-      {connectorSuggestions.length > 0 && (
-        <div className="composer__suggestions" aria-label="Connector suggestions">
-          {connectorSuggestions.map((id) => {
-            const label = presets.find((preset) => preset.id === id)?.label ?? id;
-            return (
-              <button
-                key={id}
-                type="button"
-                className="composer__suggestion"
-                aria-label={`Added ${label}, dismiss`}
-                onClick={() => {
-                  dismissConnectorSuggestion(id);
-                  void refreshConnectors();
-                }}
-              >
-                <span>Added {label}</span>
-                <span aria-hidden>✕</span>
-              </button>
-            );
-          })}
-        </div>
-      )}
-
+      <CommandPalette
+        id={paletteId}
+        open={paletteOpen}
+        matches={matches}
+        activeIndex={activeIndex}
+        onHover={setHighlight}
+        onChoose={choose}
+      />
+      <ConnectorChips />
       <form
         className="composer__shell"
         onSubmit={(event) => {
@@ -174,11 +142,11 @@ export function Composer({
           }
         }}
       >
-        <label className="sr-only" htmlFor="studio-composer">
+        <label className="sr-only" htmlFor={inputId}>
           Message the studio
         </label>
         <textarea
-          id="studio-composer"
+          id={inputId}
           ref={inputRef}
           className="composer__input"
           rows={1}
@@ -190,7 +158,7 @@ export function Composer({
               : "What do you want to make happen?")
           }
           aria-expanded={paletteOpen}
-          aria-controls={paletteOpen ? "studio-command-palette" : undefined}
+          aria-controls={paletteOpen ? paletteId : undefined}
           aria-autocomplete="list"
           onChange={(event) => onChange(event.target.value)}
           onKeyDown={onTextareaKeyDown}
@@ -217,15 +185,7 @@ export function Composer({
           )}
         </div>
       </form>
-      <p className="composer__hint">
-        <span>
-          <kbd>Enter</kbd> to send · <kbd>/</kbd> for commands
-          {brief ? ` · ${brief.product_name || "your job"}` : ""}
-        </span>
-        <span className={`composer__status${offline ? " is-offline" : ""}`}>
-          {offline ? "Local guidance" : settings.model_name}
-        </span>
-      </p>
+      <ComposerHint />
     </div>
   );
 }

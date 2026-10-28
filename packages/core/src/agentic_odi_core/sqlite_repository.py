@@ -18,7 +18,7 @@ from agentic_odi_core.models import (
     Step,
     compute_opportunity_score,
 )
-from agentic_odi_core.repository import Repository, page
+from agentic_odi_core.repository import Repository, page, rank_outcomes
 
 
 class SQLiteRepository(Repository):
@@ -69,13 +69,17 @@ class SQLiteRepository(Repository):
             return
         for outcome in needs_backfill:
             updates: dict[str, Any] = {}
-            if outcome.importance is None:
-                updates["importance"] = 5.0
-            if outcome.satisfaction is None:
-                updates["satisfaction"] = 5.0
+            importance = outcome.importance
+            if importance is None:
+                importance = 5.0
+                updates["importance"] = importance
+            satisfaction = outcome.satisfaction
+            if satisfaction is None:
+                satisfaction = 5.0
+                updates["satisfaction"] = satisfaction
             updates["opportunity_score"] = compute_opportunity_score(
-                updates.get("importance", outcome.importance),
-                updates.get("satisfaction", outcome.satisfaction),
+                importance,
+                satisfaction,
             )
             self.store.append(
                 "OUTCOME_BACKFILLED",
@@ -303,7 +307,7 @@ class SQLiteRepository(Repository):
             outs = [o for o in self.outcomes.values() if o.job_id == job_id]
             if step_id is not None:
                 outs = [o for o in outs if o.step_id == step_id]
-            return page(outs, limit, offset)
+            return page(rank_outcomes(outs), limit, offset)
 
     def update_outcome(self, outcome_id: str, updates: dict) -> Outcome | None:
         with self._lock:

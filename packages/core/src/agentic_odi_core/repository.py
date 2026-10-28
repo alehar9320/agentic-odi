@@ -9,6 +9,17 @@ from agentic_odi_core.models import CustomerOutcome, Evidence, Job, Outcome, Ste
 _Item = TypeVar("_Item")
 
 
+def rank_outcomes(outcomes: list[Outcome]) -> list[Outcome]:
+    """Rank outcomes by opportunity score, highest first, unscored last."""
+    return sorted(
+        outcomes,
+        key=lambda outcome: (
+            outcome.opportunity_score is None,
+            -(outcome.opportunity_score or 0.0),
+        ),
+    )
+
+
 def page(items: list[_Item], limit: int | None = None, offset: int = 0) -> list[_Item]:
     """Slice a list for pagination; no arguments returns everything.
 
@@ -75,6 +86,7 @@ class Repository(Protocol):
     ) -> list[Evidence]: ...
     def delete_evidence(self, evidence_id: str) -> bool: ...
     def clear(self) -> None: ...
+    def reload(self) -> None: ...
 
 
 class InMemoryRepository:
@@ -182,7 +194,7 @@ class InMemoryRepository:
         outs = [o for o in self.outcomes.values() if o.job_id == job_id]
         if step_id is not None:
             outs = [o for o in outs if o.step_id == step_id]
-        return page(outs, limit, offset)
+        return page(rank_outcomes(outs), limit, offset)
 
     def update_outcome(self, outcome_id: str, updates: dict) -> Outcome | None:
         outcome = self.outcomes.get(outcome_id)
@@ -273,3 +285,7 @@ class InMemoryRepository:
         self.outcomes.clear()
         self.customer_outcomes.clear()
         self.evidence.clear()
+
+    def reload(self) -> None:
+        """Reset in-memory state; there is no external store to re-read."""
+        self.clear()

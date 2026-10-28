@@ -1,5 +1,18 @@
 import "@testing-library/jest-dom/vitest";
 
+// assistant-ui's viewport measures the scroll container. jsdom has no layout,
+// so the observer only needs to exist and to be inert.
+class ResizeObserverMock {
+  observe(): void {}
+  unobserve(): void {}
+  disconnect(): void {}
+}
+
+Object.defineProperty(globalThis, "ResizeObserver", {
+  value: ResizeObserverMock,
+  configurable: true,
+});
+
 // Node exposes an experimental localStorage global that shadows jsdom's and
 // lacks clear/removeItem. Replace it with a small deterministic store so the
 // app and the tests share one working implementation.
