@@ -556,3 +556,39 @@ def test_the_template_carries_the_machine_readable_diff_summary() -> None:
     assert "```json" in template
     for key in ("changed_files", "tests_added", "net_lines", "simulated", "breaking"):
         assert f'"{key}"' in template
+
+
+# --- False-positive control --------------------------------------------------
+
+
+def test_claims_inside_fenced_code_blocks_are_ignored() -> None:
+    body = (
+        "## How this was verified\n\n"
+        "```\n"
+        "293 files already formatted\n"
+        "162 source files\n"
+        "touched /tmp/nonexistent.json and shipped.py\n"
+        "```\n"
+    )
+
+    result = _truth(body)
+
+    assert result.warnings == []
+
+
+def test_fabrication_ignores_markdown_prose() -> None:
+    lines = [
+        ("docs/architecture/README.md", 82, "new TODO/FIXME/NotImplementedError/stub"),
+        ("docs/architecture/README.md", 83, "and 'mock' returns are flagged"),
+    ]
+
+    assert check_fabrication(lines) == []
+
+
+def test_fabrication_ignores_its_own_pattern_definitions() -> None:
+    lines = [
+        ("scripts/pr_guards.py", 387, 'r"\\b(?:TODO|FIXME)\\b|NotImplementedError"'),
+        ("scripts/pr_guards.py", 425, 'and ("return" in text or "mock" in text)'),
+    ]
+
+    assert check_fabrication(lines) == []

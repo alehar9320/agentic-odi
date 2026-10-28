@@ -233,6 +233,7 @@ _NAMED_FILE_RE = re.compile(
     r"(?<![\w/.-])([\w./-]*[\w-]+\.(?:py|tsx?|jsx?|json|md|css|ya?ml|toml|rs|html|sh|txt))(?![\w])"
 )
 _NUMBERED_ROW_RE = re.compile(r"(?m)^\s*\d+[.)]\s+\S")
+_FENCE_RE = re.compile(r"```.*?```", re.DOTALL)
 
 
 def parse_json_block(body: str) -> dict[str, object] | None:
@@ -306,6 +307,11 @@ def _named_file_exists(named: str, candidate_paths: Sequence[str]) -> bool:
     return False
 
 
+def _strip_fenced_blocks(text: str) -> str:
+    """Verification commands and their output are not claims."""
+    return _FENCE_RE.sub("", text)
+
+
 def _body_truth_warnings(
     body: str,
     title: str,
@@ -363,7 +369,7 @@ def check_body_truth(
 ) -> GuardResult:
     """Natural-language claims warn; the JSON block fails on a mismatch."""
     warnings = _body_truth_warnings(
-        body,
+        _strip_fenced_blocks(body),
         title,
         changed_files,
         tests_added,
@@ -387,6 +393,13 @@ _MEASUREMENT_RE = re.compile(
 _STUB_RE = re.compile(r"\b(?:TODO|FIXME)\b|NotImplementedError|pass\s+#\s*stub", re.IGNORECASE)
 
 
+FABRICATION_IGNORE_PATHS = frozenset({"scripts/pr_guards.py"})
+
+
+def _is_prose_path(path: str) -> bool:
+    return path.endswith((".md", ".rst", ".txt"))
+
+
 def _is_test_path(path: str) -> bool:
     parts = path.replace("\\", "/").split("/")
     name = parts[-1]
@@ -401,7 +414,7 @@ def check_fabrication(added_lines: Sequence[tuple[str, int, str]]) -> list[str]:
     """
     warnings: list[str] = []
     for path, lineno, text in added_lines:
-        if _is_test_path(path):
+        if _is_test_path(path) or _is_prose_path(path) or path in FABRICATION_IGNORE_PATHS:
             continue
         stripped = text.strip()
 
@@ -433,7 +446,12 @@ def check_fabrication(added_lines: Sequence[tuple[str, int, str]]) -> list[str]:
 def _unconditional_is_available(added_lines: Sequence[tuple[str, int, str]]) -> list[str]:
     warnings: list[str] = []
     for index, (path, _lineno, text) in enumerate(added_lines):
-        if "def is_available" not in text or _is_test_path(path):
+        if (
+            "def is_available" not in text
+            or _is_test_path(path)
+            or _is_prose_path(path)
+            or path in FABRICATION_IGNORE_PATHS
+        ):
             continue
         for later_path, later_line, later_text in added_lines[index + 1 : index + 4]:
             if later_path != path:
