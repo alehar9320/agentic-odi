@@ -3,25 +3,16 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
-import logging
 from typing import Any
 
 from agentic_odi_core import ODIService, ToolName
-from agentic_odi_core.remote import (
-    StudioError,
-    StudioErrorCode,
-    parse_tool_result,
-    tool_result_text,
-)
+from fastapi import HTTPException
 from fastmcp import Client as McpClient
-from fastmcp.exceptions import ToolError
 
-from agentic_odi_studio_api.studio.errors import StudioHTTPError
 from agentic_odi_studio_api.studio.probes import is_endpoint_reachable
 from agentic_odi_studio_api.studio.seed import seed_payload
-
-log = logging.getLogger(__name__)
 
 MCP_CALL_TIMEOUT = 3.0
 
@@ -31,25 +22,21 @@ async def fetch_canvas(mcp_url: str) -> dict[str, Any]:
     jobs: list[dict[str, Any]] = []
     outcomes: list[dict[str, Any]] = []
     steps: list[dict[str, Any]] = []
-    evidence: list[dict[str, Any]] = []
-    warnings: list[str] = []
 
     if not is_endpoint_reachable(mcp_url, timeout=0.3):
-        log.warning("MCP endpoint unreachable at %s — falling back to seed data", mcp_url)
-        return {**seed_payload(), "source": "seed", "warnings": ["MCP endpoint unreachable"]}
+        return {**seed_payload(), "source": "seed"}
 
-    try:
+    with contextlib.suppress(Exception):
         mcp_client = McpClient(mcp_url)
         async with mcp_client:
             raw_jobs = await asyncio.wait_for(
                 mcp_client.call_tool(ToolName.GET_JOBS.value, {}), timeout=1.5
             )
             try:
-                parsed_jobs = json.loads(tool_result_text(raw_jobs))
+                parsed_jobs = json.loads(str(raw_jobs))
                 if isinstance(parsed_jobs, list):
                     jobs = parsed_jobs
-            except Exception as exc:  # noqa: BLE001
-                log.warning("Failed to parse jobs from MCP: %s", exc)
+            except Exception:  # noqa: BLE001
                 jobs = []
 
             for job in jobs:
@@ -57,58 +44,28 @@ async def fetch_canvas(mcp_url: str) -> dict[str, Any]:
                 if not job_id:
                     continue
 
-                try:
+                with contextlib.suppress(Exception):
                     raw_steps = await asyncio.wait_for(
                         mcp_client.call_tool(ToolName.GET_JOB_MAP.value, {"job_id": job_id}),
                         timeout=1.0,
                     )
-                    parsed_steps = json.loads(tool_result_text(raw_steps))
+                    parsed_steps = json.loads(str(raw_steps))
                     if isinstance(parsed_steps, list):
                         steps.extend(parsed_steps)
-                except Exception as exc:  # noqa: BLE001
-                    msg = f"Failed to fetch steps for job {job_id}: {exc}"
-                    log.warning(msg)
-                    warnings.append(msg)
 
-                try:
+                with contextlib.suppress(Exception):
                     raw_outcomes = await asyncio.wait_for(
                         mcp_client.call_tool(ToolName.GET_OUTCOMES.value, {"job_id": job_id}),
                         timeout=1.0,
                     )
-                    parsed_outcomes = json.loads(tool_result_text(raw_outcomes))
+                    parsed_outcomes = json.loads(str(raw_outcomes))
                     if isinstance(parsed_outcomes, list):
                         outcomes.extend(parsed_outcomes)
-                except Exception as exc:  # noqa: BLE001
-                    msg = f"Failed to fetch outcomes for job {job_id}: {exc}"
-                    log.warning(msg)
-                    warnings.append(msg)
-
-            try:
-                raw_evidence = await asyncio.wait_for(
-                    mcp_client.call_tool(ToolName.LIST_EVIDENCE.value, {}), timeout=1.0
-                )
-                parsed_evidence = json.loads(tool_result_text(raw_evidence))
-                if isinstance(parsed_evidence, list):
-                    evidence = parsed_evidence
-            except Exception as exc:  # noqa: BLE001
-                msg = f"Failed to fetch evidence: {exc}"
-                log.warning(msg)
-                warnings.append(msg)
-    except Exception as exc:  # noqa: BLE001
-        log.warning("MCP canvas hydration failed entirely: %s", exc)
-        warnings.append(f"MCP hydration error: {exc}")
 
     if not jobs:
-        return {**seed_payload(), "source": "seed", "warnings": ["No jobs returned from MCP"]}
+        return {**seed_payload(), "source": "seed"}
 
-    return {
-        "jobs": jobs,
-        "steps": steps,
-        "outcomes": outcomes,
-        "evidence": evidence,
-        "source": "mcp",
-        "warnings": warnings,
-    }
+    return {"jobs": jobs, "steps": steps, "outcomes": outcomes, "source": "mcp"}
 
 
 def fetch_local_canvas(service: ODIService) -> dict[str, Any]:
@@ -120,55 +77,21 @@ def fetch_local_canvas(service: ODIService) -> dict[str, Any]:
         job_id = job["id"]
         steps.extend(step.model_dump() for step in service.get_job_map(job_id))
         outcomes.extend(outcome.model_dump() for outcome in service.get_outcomes(job_id))
-    evidence = [item.model_dump() for item in service.list_evidence()]
-    return {
-        "jobs": jobs,
-        "steps": steps,
-        "outcomes": outcomes,
-        "evidence": evidence,
-        "source": "local",
-    }
+    return {"jobs": jobs, "steps": steps, "outcomes": outcomes, "source": "local"}
 
 
 async def call_mcp_tool(mcp_url: str, tool: str, arguments: dict[str, Any]) -> str:
-    """Invoke an MCP tool, surfacing failures as typed HTTP errors."""
+    """Invoke an MCP tool, surfacing failures as HTTP 502."""
     if not is_endpoint_reachable(mcp_url, timeout=0.3):
-        raise StudioHTTPError(
-            StudioError(
-                code=StudioErrorCode.MCP_UNREACHABLE,
-                message=f"MCP server unreachable at {mcp_url}",
-                retryable=True,
-            )
-        )
+        raise HTTPException(status_code=502, detail=f"MCP server unreachable at {mcp_url}")
 
     try:
         async with McpClient(mcp_url) as mcp_client:
             result = await asyncio.wait_for(
                 mcp_client.call_tool(tool, arguments), timeout=MCP_CALL_TIMEOUT
             )
-    except StudioHTTPError:
+            return str(result)
+    except HTTPException:
         raise
-    except ToolError as exc:
-        # The tool ran and refused: that is the tool's failure, not the
-        # server's, and it is not worth retrying.
-        raise StudioHTTPError(
-            StudioError(
-                code=StudioErrorCode.MCP_TOOL_FAILED,
-                message=f"The {tool} tool failed: {exc}",
-                retryable=False,
-            )
-        ) from exc
     except Exception as exc:  # noqa: BLE001
-        raise StudioHTTPError(
-            StudioError(
-                code=StudioErrorCode.MCP_UNREACHABLE,
-                message=f"Error calling {tool}: {exc}",
-                retryable=True,
-            )
-        ) from exc
-
-    text = tool_result_text(result)
-    problem = parse_tool_result(text)
-    if problem is not None:
-        raise StudioHTTPError(problem)
-    return text
+        raise HTTPException(status_code=502, detail=f"Error calling {tool}: {exc}") from exc

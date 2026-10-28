@@ -10,7 +10,7 @@ export function Toasts() {
   return (
     <div className="toast-stack" role="status" aria-live="polite">
       {toasts.map((toast) => (
-        <div className={} key={toast.id}>
+        <div className={`toast toast--${toast.kind}`} key={toast.id}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
             <span style={{ whiteSpace: "pre-wrap", flex: 1 }}>{toast.message}</span>
             <button

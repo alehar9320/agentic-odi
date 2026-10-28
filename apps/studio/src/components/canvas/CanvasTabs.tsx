@@ -87,10 +87,10 @@ export function CanvasTabs() {
               key={tab.id}
               type="button"
               role="tab"
-              id={}
+              id={`tab-${tab.id}`}
               className="studio-tab"
               aria-selected={activeTab === tab.id}
-              aria-controls={}
+              aria-controls={`panel-${tab.id}`}
               tabIndex={activeTab === tab.id ? 0 : -1}
               onClick={() => setActiveTab(tab.id)}
               onKeyDown={(e) => handleKeyDown(e, idx)}
@@ -103,7 +103,7 @@ export function CanvasTabs() {
       )}
 
       {showTabs && (
-        <div role="tabpanel" id={} aria-labelledby={}>
+        <div role="tabpanel" id={`panel-${activeTab}`} aria-labelledby={`tab-${activeTab}`}>
           {renderPanel(activeTab)}
         </div>
       )}

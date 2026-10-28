@@ -104,12 +104,12 @@ export function ChatCopilot() {
 
       {/* Backdrop for Mobile Bottom Sheet */}
       <div
-        className={}
+        className={`chat-copilot__backdrop ${mobileOpen ? "chat-copilot__backdrop--open" : ""}`}
         onClick={() => setMobileOpen(false)}
         aria-hidden="true"
       />
 
-      <section className={}>
+      <section className={`chat-copilot ${mobileOpen ? "chat-copilot--open" : ""}`}>
         <div className="chat-copilot__header">
           <div>
             <h2 className="section-title" style={{ margin: 0 }}>💬 Agentic Studio Copilot</h2>
@@ -144,19 +144,19 @@ export function ChatCopilot() {
 
         <div className="chat-log" ref={logRef} role="log" aria-label="Chat with the studio copilot">
           {messages.map((message, index) => (
-            <div className={} key={index}>
+            <div className={`chat-bubble chat-bubble--${message.role}`} key={index}>
               {message.content}
             </div>
           ))}
           {toolActivity.map((tool, index) => (
-            <div className="chat-bubble chat-bubble--tool" key={}>
-              🛠️ {tool.name} · {tool.status}
-              {tool.preview ?  : ""}
+            <div className="chat-bubble chat-bubble--tool" key={`tool-${index}`}>
+              🛠️ {tool.name} - {tool.status}
+              {tool.preview ? ` — ${tool.preview}` : ""}
             </div>
           ))}
           {streaming && (
             <div className="thinking" role="status">
-              {thinkingPhase ?  : "Thinking…"}
+              {thinkingPhase ? `Synthesizing intent (${thinkingPhase})…` : "Thinking…"}
             </div>
           )}
         </div>

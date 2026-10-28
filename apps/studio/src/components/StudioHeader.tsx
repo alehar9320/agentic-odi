@@ -7,10 +7,10 @@ export function StudioHeader() {
     <header className="studio-header fade-in" role="banner">
       <div className="studio-header__brand">
         <div>
-          <h1 className="studio-header__title" style={{ margin: 0 }}>
+          <h1 className="studio-header__title">
             The Living Studio <span>| ODI</span>
           </h1>
-          <p className="studio-header__subtitle" style={{ margin: "2px 0 0" }}>
+          <p className="studio-header__subtitle">
             A Canvas of Human Intent. Zero file trees.
           </p>
         </div>
@@ -43,10 +43,10 @@ export function StudioHeader() {
               key={level}
               type="button"
               onClick={() => setEngagementLevel(level)}
-              aria-label={}
+              aria-label={`Engagement level ${level}`}
               style={{
-                background: engagementLevel === level ? "var(--studio-indigo-strong, #6366f1)" : "transparent",
-                color: engagementLevel === level ? "#fff" : "var(--studio-muted, #94a3b8)",
+                background: engagementLevel === level ? "var(--studio-indigo-strong)" : "transparent",
+                color: engagementLevel === level ? "#fff" : "var(--studio-muted)",
                 border: "none",
                 borderRadius: 999,
                 padding: "3px 8px",
