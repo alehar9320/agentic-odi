@@ -10,6 +10,8 @@ import {
   type ReactNode,
 } from "react";
 
+import { type Capability } from "../bff/capabilities/registry";
+
 import {
   addConnector as apiAddConnector,
   addObservation as apiAddObservation,
@@ -28,9 +30,10 @@ import {
   fetchConfig,
   fetchConnectorCatalog,
   fetchConnectors,
-  fetchConversationTree,
+  fetchConversationTree as apiFetchConversationTree,
   fetchLatestConversation,
   fetchMemory,
+  fetchModels,
   healthLlm,
   healthMcp,
   resolveApproval as apiResolveApproval,
@@ -44,24 +47,23 @@ import {
   type UpdateObservationPayload,
 } from "../api/studioApi";
 import type { RawSseEvent } from "../api/sse";
-import { capabilityRegistry, type Capability } from "../bff/capabilities/registry";
 import type {
   AddConnectorPayload,
+  ChatAttachment,
   AddOutcomePayload,
   AddStepPayload,
   CanvasData,
   CanvasState,
-  ChatAttachment,
   ChatMessage,
   ChatPart,
   ConnectorListItem,
   ConnectorPreset,
+  ConversationTree,
   Observation,
   StudioBrief,
   StudioConfig,
   StudioError,
   StudioNotification,
-  StudioTheme,
   Thesis,
   ToolStatus,
   TurnNode,
@@ -69,53 +71,6 @@ import type {
 } from "../types";
 import { catalogManifest } from "../ui/catalog";
 import { parseUiSpec } from "../ui/protocol";
-
-/**
- * The visible path of a persisted conversation: from the head back to the root.
- * Rows are ordered by insertion, so a legacy conversation with no head simply
- * resolves to its last turn.
- */
-export function pathToHead(nodes: TurnNode[], headId: string | null): TurnNode[] {
-  if (nodes.length === 0) {
-    return [];
-  }
-  const byId = new Map(nodes.map((node) => [node.id, node]));
-  const leafId = headId && byId.has(headId) ? headId : nodes[nodes.length - 1].id;
-  const path: TurnNode[] = [];
-  const seen = new Set<string>();
-  let current: string | null = leafId;
-  while (current && byId.has(current) && !seen.has(current)) {
-    seen.add(current);
-    const node = byId.get(current) as TurnNode;
-    path.push(node);
-    current = node.parent_id;
-  }
-  return path.reverse();
-}
-
-/** Persisted turns as the thread renders them. */
-export function turnsToMessages(
-  nodes: TurnNode[],
-  headId: string | null,
-): ChatMessage[] {
-  return pathToHead(nodes, headId).flatMap((node) => {
-    if (node.role !== "user" && node.role !== "assistant") {
-      return [];
-    }
-    const content = node.content ?? "";
-    return [
-      {
-        id: node.id,
-        parentId: node.parent_id,
-        role: node.role,
-        content,
-        parts: content ? [{ kind: "text" as const, text: content }] : [],
-      },
-    ];
-  });
-}
-
-/** Read the failure the sidecar reported on an SSE `error` event. */
 function readStudioError(raw: unknown): StudioError {
   if (raw && typeof raw === "object" && "code" in raw) {
     const error = raw as Partial<StudioError>;
@@ -140,9 +95,29 @@ const CANVAS_KEY = "studio.canvas";
 const DISPLAY_NAME_KEY = "studio.displayName";
 const BRIEF_KEY = "studio.brief";
 const SETUP_DISMISSED_KEY = "studio.setupDismissed";
-const SIDECAR_NOTICE_DISMISSED_KEY = "studio.sidecarNoticeDismissed";
 const NOTIFICATIONS_KEY = "studio.notifications";
+const SIDECAR_NOTICE_DISMISSED_KEY = "studio.sidecarNoticeDismissed";
 const THESES_KEY = "studio.theses";
+
+function loadSidecarNoticeDismissed(): boolean {
+  try {
+    return localStorage.getItem(SIDECAR_NOTICE_DISMISSED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function loadTheses(): Thesis[] {
+  try {
+    const raw = localStorage.getItem(THESES_KEY);
+    if (raw) {
+      return JSON.parse(raw) as Thesis[];
+    }
+  } catch {
+    /* storage unavailable */
+  }
+  return [];
+}
 
 /** How often the studio re-probes the model and the MCP server. */
 const HEALTH_POLL_INTERVAL_MS = 30_000;
@@ -152,7 +127,6 @@ export const EMPTY_CONFIG: StudioConfig = {
   api_key: "local",
   model_name: "local-tools-model",
   mcp_url: "http://localhost:8000/mcp",
-  theme: "dark",
 };
 
 export type ToastKind = "success" | "error" | "info";
@@ -161,12 +135,6 @@ export interface Toast {
   id: number;
   kind: ToastKind;
   message: string;
-}
-
-export interface ToolActivity {
-  name: string;
-  status: string;
-  preview?: string;
 }
 
 const SEED_NOTIFICATIONS: StudioNotification[] = [
@@ -231,27 +199,39 @@ export interface StudioContextValue {
   canvasError: StudioError | null;
   refreshCanvas: () => Promise<void>;
   llmHealth: { healthy: boolean | null; message: string };
+  /** Model ids the configured endpoint publishes. Empty means "type one". */
+  models: string[];
+  modelsLoading: boolean;
+  /** Why there is no catalog, when the provider would not list one. */
+  modelsMessage: string | null;
+  /** Re-ask the endpoint, optionally with unsaved connection settings. */
+  refreshModels: (config?: { base_url: string; api_key: string }) => Promise<void>;
   mcpReachable: boolean;
   sidecarReachable: boolean | null;
-  /** Whether the user has dismissed this session's sidecar-down notice. */
-  dismissedSidecarNotice: boolean;
-  /** Probe again now, e.g. after the user started the sidecar. */
-  recheckConnections: () => Promise<void>;
-  dismissSidecarNotice: () => void;
   /** Probe the sidecar, MCP server, and model. Optionally against unsaved config. */
   checkConnections: (override?: Partial<StudioConfig>) => Promise<ConnectionReport>;
   messages: ChatMessage[];
   streaming: boolean;
+  /** The sidecar's stage for the live turn: health_check, mcp_tools, model. */
   thinkingPhase: string | null;
-  sendMessage: (text: string, attachments?: ChatAttachment[]) => Promise<void>;
-  /** Re-answer the turn that follows `messageId`, as a sibling branch. */
+  sendMessage: (
+    text: string,
+    attachments?: ChatAttachment[],
+    /** Re-ask from this turn: it and everything after it are replaced. */
+    options?: { from?: string },
+  ) => Promise<void>;
+  /** Re-answer the turn ending at `messageId`, as a sibling branch. */
   regenerateFrom: (messageId: string | null) => Promise<void>;
-  /** Replace the user turn before `messageId`, as a sibling branch. */
+  /** Replace the user turn at `messageId`, as a sibling branch. */
   editFrom: (messageId: string | null, text: string, attachments?: ChatAttachment[]) => Promise<void>;
-  /** Take the branch the runtime switched to as the visible conversation. */
+  /** Take `branch` as the visible path and record it as the conversation head. */
   switchBranch: (messages: ChatMessage[]) => void;
-  /** Answer a paused write. The turn resumes on its own stream. */
+  /** Answer a paused write. The turn resumes on the stream it came from. */
   respondToApproval: (approvalId: string, approved: boolean, reason?: string) => Promise<void>;
+  /** Replay a persisted conversation's visible branch as the local transcript. */
+  fetchConversationTree: (conversationId: string) => Promise<ConversationTree>;
+  /** Record which branch of a conversation is visible. */
+  setConversationHead: (conversationId: string, headId: string | null) => Promise<void>;
   stopStreaming: () => void;
   clearChat: () => void;
   conversationId: string | null;
@@ -293,19 +273,12 @@ export interface StudioContextValue {
   presetError: StudioError | null;
   /** The failure behind an unreachable connector list, if any. */
   connectorsError: StudioError | null;
-  /** Probed availability of local and sidecar capabilities. */
-  capabilities: Capability[];
   refreshConnectors: () => Promise<void>;
   refreshPresets: () => Promise<void>;
-  refreshCapabilities: () => Promise<void>;
   addConnector: (payload: AddConnectorPayload) => Promise<void>;
   deleteConnector: (name: string) => Promise<void>;
   connectorSuggestions: string[];
   dismissConnectorSuggestion: (preset: string) => void;
-  /** Scored outcomes saved as shareable opportunity theses. */
-  theses: Thesis[];
-  saveThesis: (thesis: Omit<Thesis, "id" | "created_at">) => void;
-  deleteThesis: (thesisId: string) => void;
   notifications: StudioNotification[];
   unreadNotificationCount: number;
   markNotificationAsRead: (id: string) => void;
@@ -313,6 +286,17 @@ export interface StudioContextValue {
   dismissNotification: (id: string) => void;
   addNotification: (notification: Omit<StudioNotification, "id" | "timestamp" | "read">) => void;
   simulateBackgroundEvent: () => void;
+  /** Probed availability of local and sidecar capabilities. */
+  capabilities: Capability[];
+  /** Scored outcomes saved as shareable opportunity theses. */
+  theses: Thesis[];
+  saveThesis: (thesis: Omit<Thesis, "id" | "created_at">) => void;
+  deleteThesis: (thesisId: string) => void;
+  /** Whether the user has dismissed this session's sidecar-down notice. */
+  dismissedSidecarNotice: boolean;
+  /** Probe again now, e.g. after the user started the sidecar. */
+  recheckConnections: () => Promise<void>;
+  dismissSidecarNotice: () => void;
 }
 
 const StudioContext = createContext<StudioContextValue | null>(null);
@@ -343,15 +327,7 @@ function loadCanvasCache(): CanvasData | null {
 
 function loadSetupDismissed(): boolean {
   try {
-      return localStorage.getItem(SETUP_DISMISSED_KEY) === "1";
-  } catch {
-    return false;
-  }
-}
-
-function loadSidecarNoticeDismissed(): boolean {
-  try {
-    return localStorage.getItem(SIDECAR_NOTICE_DISMISSED_KEY) === "1";
+    return localStorage.getItem(SETUP_DISMISSED_KEY) === "1";
   } catch {
     return false;
   }
@@ -386,18 +362,6 @@ function loadBrief(): StudioBrief | null {
   }
 }
 
-function loadTheses(): Thesis[] {
-  try {
-    const raw = localStorage.getItem(THESES_KEY);
-    if (raw) {
-      return JSON.parse(raw) as Thesis[];
-    }
-  } catch {
-    /* ignore malformed cache */
-  }
-  return [];
-}
-
 function loadNotifications(): StudioNotification[] {
   try {
     const raw = localStorage.getItem(NOTIFICATIONS_KEY);
@@ -412,7 +376,6 @@ function loadNotifications(): StudioNotification[] {
 
 export function StudioProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<StudioConfig>(loadSettings);
-  const theme: StudioTheme = settings.theme === "light" ? "light" : "dark";
   const [displayName, setDisplayNameState] = useState<string>(loadDisplayName);
   const [brief, setBrief] = useState<StudioBrief | null>(loadBrief);
   const [setupOpen, setSetupOpen] = useState<boolean>(
@@ -428,26 +391,28 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     healthy: null,
     message: "Health not checked yet.",
   });
+  const [models, setModels] = useState<string[]>([]);
+  const [modelsLoading, setModelsLoading] = useState(false);
+  const [modelsMessage, setModelsMessage] = useState<string | null>(null);
+  const [capabilities] = useState<Capability[]>([]);
+  const [theses, setTheses] = useState<Thesis[]>(loadTheses);
+  const [dismissedSidecarNotice, setDismissedSidecarNotice] = useState<boolean>(loadSidecarNoticeDismissed);
   const [mcpReachable, setMcpReachable] = useState(false);
   const [sidecarReachable, setSidecarReachable] = useState<boolean | null>(null);
-  const [dismissedSidecarNotice, setDismissedSidecarNotice] = useState<boolean>(loadSidecarNoticeDismissed);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [memory, setMemory] = useState<Observation[]>([]);
   const [memoryLoading, setMemoryLoading] = useState(false);
   const [streaming, setStreaming] = useState(false);
   const [thinkingPhase, setThinkingPhase] = useState<string | null>(null);
-  const [toolActivity, setToolActivity] = useState<ToolActivity[]>([]);
   const [activePanel, setActivePanel] = useState<WorkspacePanelId | null>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [connectors, setConnectors] = useState<ConnectorListItem[]>([]);
   const [presets, setPresets] = useState<ConnectorPreset[]>([]);
   const [presetError, setPresetError] = useState<StudioError | null>(null);
   const [connectorsError, setConnectorsError] = useState<StudioError | null>(null);
-  const [capabilities, setCapabilities] = useState<Capability[]>([]);
   const [connectorSuggestions, setConnectorSuggestions] = useState<string[]>([]);
   const [notifications, setNotifications] = useState<StudioNotification[]>(loadNotifications);
-  const [theses, setTheses] = useState<Thesis[]>(loadTheses);
   const toastId = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -526,55 +491,26 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const refreshPresets = useCallback(async () => {
-    setPresetError(null);
-    try {
-      setPresets(await fetchConnectorCatalog());
-    } catch (error) {
-      // An unreachable catalog is a failure, not an empty catalog: the settings
-      // panel says so instead of offering a select with nothing in it.
-      setPresetError(asStudioError(error));
-      setPresets([]);
-    }
-  }, []);
-
-  const refreshCapabilities = useCallback(async () => {
-    try {
-      setCapabilities(await capabilityRegistry.statuses(settings));
-    } catch {
-      /* Capability probes are advisory; a probe failure leaves the list empty. */
-      setCapabilities([]);
-    }
-  }, [settings]);
-
-  const addConnector = useCallback(
-    async (payload: AddConnectorPayload) => {
+  /**
+   * Ask the configured endpoint what it serves. A provider that will not list
+   * models is not an error: the UI keeps the manual name and shows the reason.
+   */
+  const refreshModels = useCallback(
+    async (config?: { base_url: string; api_key: string }) => {
+      const target = config ?? { base_url: settings.base_url, api_key: settings.api_key };
+      setModelsLoading(true);
       try {
-        const response = await apiAddConnector(payload);
-        if (response.ok) {
-          pushToast("success", `Added connector ${response.name}`);
-        }
-        await refreshConnectors();
+        const result = await fetchModels(target);
+        setModels(result.models);
+        setModelsMessage(result.error);
       } catch (error) {
-        pushToast("error", `Error adding connector: ${(error as Error).message}`);
+        setModels([]);
+        setModelsMessage(asStudioError(error).message);
+      } finally {
+        setModelsLoading(false);
       }
     },
-    [pushToast, refreshConnectors],
-  );
-
-  const deleteConnector = useCallback(
-    async (name: string) => {
-      try {
-        const response = await apiDeleteConnector(name);
-        if (response.ok) {
-          pushToast("success", `Removed connector ${response.name}`);
-        }
-        await refreshConnectors();
-      } catch (error) {
-        pushToast("error", `Error removing connector: ${(error as Error).message}`);
-      }
-    },
-    [pushToast, refreshConnectors],
+    [settings.base_url, settings.api_key],
   );
 
   const saveThesis = useCallback((thesis: Omit<Thesis, "id" | "created_at">) => {
@@ -605,6 +541,57 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       return next;
     });
   }, []);
+
+  const dismissSidecarNotice = useCallback(() => {
+    setDismissedSidecarNotice(true);
+    try {
+      localStorage.setItem(SIDECAR_NOTICE_DISMISSED_KEY, "1");
+    } catch {
+      /* storage unavailable */
+    }
+  }, []);
+
+  const refreshPresets = useCallback(async () => {
+    setPresetError(null);
+    try {
+      setPresets(await fetchConnectorCatalog());
+    } catch (error) {
+      // An unreachable catalog is a failure, not an empty catalog: the settings
+      // panel says so instead of offering a select with nothing in it.
+      setPresetError(asStudioError(error));
+      setPresets([]);
+    }
+  }, []);
+
+  const addConnector = useCallback(
+    async (payload: AddConnectorPayload) => {
+      try {
+        const response = await apiAddConnector(payload);
+        if (response.ok) {
+          pushToast("success", `Added connector ${response.name}`);
+        }
+        await refreshConnectors();
+      } catch (error) {
+        pushToast("error", `Error adding connector: ${(error as Error).message}`);
+      }
+    },
+    [pushToast, refreshConnectors],
+  );
+
+  const deleteConnector = useCallback(
+    async (name: string) => {
+      try {
+        const response = await apiDeleteConnector(name);
+        if (response.ok) {
+          pushToast("success", `Removed connector ${response.name}`);
+        }
+        await refreshConnectors();
+      } catch (error) {
+        pushToast("error", `Error removing connector: ${(error as Error).message}`);
+      }
+    },
+    [pushToast, refreshConnectors],
+  );
 
   const simulateBackgroundEvent = useCallback(() => {
     const events: Array<Omit<StudioNotification, "id" | "timestamp" | "read">> = [
@@ -639,23 +626,24 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     pushToast("info", `Background Activity: ${chosen.title}`);
   }, [addNotification, pushToast]);
 
-  // The theme lives on <html> so every surface, portal, and native control
-  // follows one class instead of each component tracking its own copy.
-  useEffect(() => {
-    const root = document.documentElement;
-    root.classList.toggle("theme-light", theme === "light");
-    root.classList.toggle("theme-dark", theme === "dark");
-    root.style.colorScheme = theme;
-  }, [theme]);
-
-  const saveSettings = useCallback((config: StudioConfig) => {
-    setSettings(config);
-    try {
-      localStorage.setItem(SETTINGS_KEY, JSON.stringify(config));
-    } catch {
-      /* storage unavailable */
-    }
-  }, []);
+  const saveSettings = useCallback(
+    (config: StudioConfig) => {
+      const movedEndpoint =
+        config.base_url !== settings.base_url || config.api_key !== settings.api_key;
+      setSettings(config);
+      try {
+        localStorage.setItem(SETTINGS_KEY, JSON.stringify(config));
+      } catch {
+        /* storage unavailable */
+      }
+      // A new endpoint serves a different catalog; ask it before the reader
+      // opens the picker and sees the old one.
+      if (movedEndpoint) {
+        void refreshModels({ base_url: config.base_url, api_key: config.api_key });
+      }
+    },
+    [settings.base_url, settings.api_key, refreshModels],
+  );
 
   const setDisplayName = useCallback((name: string) => {
     setDisplayNameState(name);
@@ -696,17 +684,12 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const pushNotice = useCallback((text: string) => {
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: crypto.randomUUID(),
-        parentId: prev.length ? prev[prev.length - 1].id : null,
-        role: "notice",
-        content: text,
-      },
-    ]);
-  }, []);
+const pushNotice = useCallback((text: string) => {
+  setMessages((prev) => [
+    ...prev,
+    { role: "notice", id: crypto.randomUUID(), parentId: null, content: text },
+  ]);
+}, []);
 
   const checkConnections = useCallback(
     async (override: Partial<StudioConfig> = {}): Promise<ConnectionReport> => {
@@ -731,29 +714,14 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       setSidecarReachable(sidecar);
       setMcpReachable(mcp);
       setLlmHealth(llm);
-      void refreshCapabilities();
-      if (sidecar) {
-        setDismissedSidecarNotice(false);
-      }
       return { sidecarReachable: sidecar, mcpReachable: mcp, llmHealthy: llm.healthy };
     },
-    [settings, refreshCapabilities],
+    [settings],
   );
 
-  // Re-probe after the user acted on the sidecar notice (e.g. started the
-  // sidecar). Resolves once the report is in so the UI can stop showing "busy".
   const recheckConnections = useCallback(async () => {
     await checkConnections();
   }, [checkConnections]);
-
-  const dismissSidecarNotice = useCallback(() => {
-    setDismissedSidecarNotice(true);
-    try {
-      localStorage.setItem(SIDECAR_NOTICE_DISMISSED_KEY, "1");
-    } catch {
-      /* storage unavailable */
-    }
-  }, []);
 
   const refreshCanvas = useCallback(async () => {
     setCanvasState((prev) => ({ kind: "loading", data: prev.data }));
@@ -907,54 +875,32 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   }, []);
 
   /**
-   * One turn, from the user's words to the agent's last part.
-   *
-   * `base` is the visible path the turn answers, so the same machinery serves a
-   * new message, a regeneration, and an edit without three copies of the stream
-   * handling. The assistant-ui runtime owns the branch tree; this owns the
-   * visible path and the wire.
+   * Stream one assistant turn. `base` is the history sent to the model; when
+   * `userTurn` is given it is appended to that history, otherwise the last
+   * message of `base` is the turn being re-answered. The new assistant turn is
+   * parented to `assistantParentId`, which is how branches stay linked.
    */
   const runTurn = useCallback(
     async (
       base: ChatMessage[],
-      text: string,
-      attachments: ChatAttachment[] = [],
-      existingUserMessage?: ChatMessage,
+      userTurn: ChatMessage | null,
+      assistantParentId: string,
     ) => {
-      const trimmed = text.trim();
-      if ((!trimmed && attachments.length === 0) || streaming) {
+      if (streaming) {
         return;
       }
 
-      // The sidecar is confirmed down: don't start a doomed stream. The notice
-      // above the composer already explains what's wrong; just surface a quiet
-      // heads-up in-thread and stop.
-      if (sidecarReachable === false) {
-        pushNotice("The studio sidecar isn't running — live replies are paused. Start it from Settings.");
-        return;
-      }
+      const history: ChatMessage[] = userTurn ? [...base, userTurn] : base;
 
-      const userMessage: ChatMessage = existingUserMessage ?? {
-        id: crypto.randomUUID(),
-        parentId: base.length ? base[base.length - 1].id : null,
-        role: "user",
-        content: trimmed,
-        ...(attachments.length ? { attachments } : {}),
-      };
       const assistantId = crypto.randomUUID();
-      const history: ChatMessage[] =
-        existingUserMessage && base.at(-1)?.id === existingUserMessage.id
-          ? base
-          : [...base, userMessage];
-
+      const assistantIndex = history.length;
       setMessages([
         ...history,
-        { id: assistantId, parentId: userMessage.id, role: "assistant", content: "", parts: [] },
+        { role: "assistant", id: assistantId, parentId: assistantParentId, content: "", parts: [] },
       ]);
       setStreaming(true);
       setThinkingPhase("health_check");
       setOfflineReply(false);
-      setToolActivity([]);
 
       const controller = new AbortController();
       abortRef.current = controller;
@@ -964,98 +910,42 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       let failure: StudioError | null = null;
       let terminal = false;
       let stopped = false;
-      let toolSeq = 0;
 
       // Prose is appended to the open text part; a surface opens a new one, so
       // the transcript keeps the agent's order instead of gathering all prose
       // above all cards.
-      const appendText = (chunk: string) => {
-        if (!chunk) {
+      const appendText = (text: string) => {
+        if (!text) {
           return;
         }
-        content += chunk;
+        content += text;
         const last = parts[parts.length - 1];
         parts =
           last?.kind === "text"
-            ? [...parts.slice(0, -1), { kind: "text", text: last.text + chunk }]
-            : [...parts, { kind: "text", text: chunk }];
+            ? [...parts.slice(0, -1), { kind: "text", text: last.text + text }]
+            : [...parts, { kind: "text", text }];
       };
 
-      const appendReasoning = (chunk: string) => {
-        if (!chunk) {
-          return;
-        }
-        const last = parts[parts.length - 1];
-        parts =
-          last?.kind === "reasoning"
-            ? [...parts.slice(0, -1), { kind: "reasoning", text: last.text + chunk }]
-            : [...parts, { kind: "reasoning", text: chunk }];
-      };
-
-      /** The open tool part for a name, if one is still waiting. */
-      const openTool = (name: string) =>
-        [...parts]
-          .reverse()
-          .find(
-            (part): part is Extract<ChatPart, { kind: "tool" }> =>
-              part.kind === "tool" && part.name === name && part.status === "running",
-          );
-
-      const applyToolEvent = (
-        name: string,
-        status: ToolStatus,
-        preview?: string,
-        id?: string,
-      ) => {
-        const open = openTool(name);
-        if (status === "running") {
-          if (open) {
-            return;
-          }
-          toolSeq += 1;
-          parts = [
-            ...parts,
-            { kind: "tool", id: id ?? `tool-${toolSeq}`, name, status },
-          ];
-          return;
-        }
-        if (open) {
-          const next = {
-            ...open,
-            status,
-            ...(preview ? { preview } : {}),
-            // A result means the gate was answered; the question is spent.
-            approval: undefined,
-          };
-          parts = [...parts.filter((part) => part !== open), next];
-          return;
-        }
-        toolSeq += 1;
-        parts = [
-          ...parts,
-          {
-            kind: "tool",
-            id: id ?? `tool-${toolSeq}`,
-            name,
-            status,
-            ...(preview ? { preview } : {}),
-          },
-        ];
-      };
-
+      // The turn owns its own timeline, so a finished run stays inspectable and
+      // the next turn starts from nothing without a reset elsewhere.
       const publish = () => {
-        setMessages((prev) =>
-          prev.map((message) =>
-            message.id === assistantId
-              ? {
-                  ...message,
-                  content,
-                  parts: [...parts],
-                  ...(failure ? { error: failure, retryText: trimmed } : {}),
-                }
-              : message,
-          ),
-        );
+        setMessages((prev) => {
+          if (prev.length <= assistantIndex) {
+            return prev;
+          }
+          const next = [...prev];
+          const retryText = userTurn?.content ?? base[base.length - 1]?.content ?? "";
+          next[assistantIndex] = {
+            role: "assistant",
+            id: assistantId,
+            parentId: assistantParentId,
+            content,
+            parts: [...parts],
+            ...(failure ? { error: failure, retryText } : {}),
+            ...(stopped ? { stopped: true, retryText } : {}),
+          };
+          return next;
+        });
       };
 
       const handleEvent = (event: RawSseEvent) => {
@@ -1068,48 +958,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
             }
             break;
           }
-          case "reasoning": {
-            appendReasoning(String(event.data.text ?? ""));
-            publish();
-            break;
-          }
           case "delta": {
             appendText(String(event.data.text ?? ""));
-            publish();
-            break;
-          }
-          case "source": {
-            parts = [
-              ...parts,
-              {
-                kind: "source",
-                id: String(event.data.id ?? `src-${parts.length}`),
-                title: String(event.data.title ?? ""),
-                mediaType: String(event.data.mediaType ?? "application/json"),
-                ...(event.data.filename ? { filename: String(event.data.filename) } : {}),
-              },
-            ];
-            publish();
-            break;
-          }
-          case "approval": {
-            const approvalId = String(event.data.id ?? "");
-            if (!approvalId) {
-              break;
-            }
-            parts = [
-              ...parts,
-              {
-                kind: "tool",
-                id: String(event.data.tool_call_id ?? `approval-${approvalId}`),
-                name: String(event.data.name ?? ""),
-                status: "running",
-                approval: {
-                  id: approvalId,
-                  prompt: String(event.data.prompt ?? "Allow this change?"),
-                },
-              },
-            ];
             publish();
             break;
           }
@@ -1131,26 +981,35 @@ export function StudioProvider({ children }: { children: ReactNode }) {
             const status = String(event.data.status ?? "");
             const mapped: ToolStatus =
               status === "ok" || status === "error" || status === "declined" ? status : "running";
-            applyToolEvent(
-              name,
-              mapped,
-              event.data.preview ? String(event.data.preview) : undefined,
-            );
-            setToolActivity((prev) => [
-              ...prev,
-              { name, status, ...(event.data.preview ? { preview: String(event.data.preview) } : {}) },
-            ]);
+            const open = parts
+              .slice()
+              .reverse()
+              .find(
+                (part): part is Extract<ChatPart, { kind: "tool" }> =>
+                  part.kind === "tool" && part.name === name && part.status === "running",
+              );
+            if (mapped === "running") {
+              if (open) {
+                break;
+              }
+              parts = [...parts, { kind: "tool", id: `tool-${Date.now()}`, name, status: mapped }];
+            } else if (open) {
+              parts = [
+                ...parts.filter((part) => part !== open),
+                { ...open, status: mapped, approval: undefined },
+              ];
+            } else {
+              parts = [...parts, { kind: "tool", id: `tool-${Date.now()}`, name, status: mapped }];
+            }
             publish();
             break;
           }
           case "message": {
             terminal = true;
-            // The terminal frame is authoritative for the prose, but it must
-            // never erase structured parts: thinking, tool calls, citations,
-            // and surfaces sit between the paragraphs that frame them.
             content = String(event.data.content ?? content);
-            if (content && !parts.some((part) => part.kind === "text")) {
-              parts = [...parts, { kind: "text", text: content }];
+            const hasSurfaces = parts.some((part) => part.kind === "ui");
+            if (!hasSurfaces) {
+              parts = content ? [{ kind: "text", text: content }] : [];
             }
             publish();
             break;
@@ -1181,12 +1040,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
               const reason = String(event.data.error ?? "The connector could not be added.");
               setMessages((prev) => [
                 ...prev,
-                {
-                  id: crypto.randomUUID(),
-                  parentId: assistantId,
-                  role: "notice",
-                  content: `Connector failed: ${reason}`,
-                },
+                { role: "notice", id: crypto.randomUUID(), parentId: null, content: `Connector failed: ${reason}` },
               ]);
             } else {
               setConnectorSuggestions((prev) => {
@@ -1222,9 +1076,6 @@ export function StudioProvider({ children }: { children: ReactNode }) {
             brief,
             ui_catalog: catalogManifest(),
             conversation_id: conversationId,
-            attachments,
-            approvals: true,
-            assistant_id: assistantId,
           },
           handleEvent,
           controller.signal,
@@ -1232,12 +1083,17 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       } catch (error) {
         const aborted = (error as Error).name === "AbortError";
         if (aborted) {
-          // An abort is the user's own doing: drop the empty placeholder, keep
-          // the question, and report no failure — the assistant did not break.
+          // An abort is the user's own doing, so it is not a failure — but it is
+          // still a fact about the turn. Keep what arrived, stop any tool that
+          // was mid-flight, and leave the turn in place so the transcript says
+          // what happened instead of silently losing the question.
           stopped = true;
-          setMessages((prev) =>
-            prev.filter((message) => message.id !== assistantId || message.content !== ""),
+          parts = parts.map((part) =>
+            part.kind === "tool" && part.status === "running"
+              ? { ...part, status: "error" as ToolStatus }
+              : part,
           );
+          publish();
         } else {
           terminal = true;
           failure = asStudioError(error);
@@ -1260,26 +1116,56 @@ export function StudioProvider({ children }: { children: ReactNode }) {
         abortRef.current = null;
       }
     },
-    [
-      streaming,
-      settings,
-      brief,
-      conversationId,
-      refreshCanvas,
-      refreshConnectors,
-      sidecarReachable,
-      pushNotice,
-    ],
+    [streaming, settings, brief, conversationId, refreshCanvas, refreshConnectors],
   );
 
   const sendMessage = useCallback(
-    (text: string, attachments: ChatAttachment[] = []) => runTurn(messages, text, attachments),
-    [messages, runTurn],
+    async (
+      text: string,
+      attachments: ChatAttachment[] = [],
+      options: { from?: string } = {},
+    ) => {
+      const trimmed = text.trim();
+      if ((!trimmed && !attachments.length) || streaming) {
+        return;
+      }
+
+      // A re-ask replaces the turn it starts from: the old question and the
+      // answer it got are the same turn, and keeping both would read as a
+      // conversation the reader never had.
+      const cut = options.from
+        ? messages.findIndex((message) => message.id === options.from)
+        : -1;
+      const replaced = cut >= 0 ? messages.slice(0, cut) : messages;
+
+      // Files ride only on the newest turn. Re-sending megabytes of base64 with
+      // every later question would make each turn slower than the last.
+      const history: ChatMessage[] = replaced.map((message) =>
+        message.attachments
+          ? {
+              id: message.id,
+              parentId: message.parentId,
+              role: message.role,
+              content: message.content,
+              parts: message.parts,
+            }
+          : message,
+      );
+      const userMessage: ChatMessage = {
+        id: crypto.randomUUID(),
+        parentId: history.length ? history[history.length - 1].id : null,
+        role: "user",
+        content: trimmed,
+        ...(attachments.length ? { attachments: attachments as unknown as ChatAttachment[] } : {}),
+      };
+      await runTurn(history, userMessage, userMessage.id);
+    },
+    [messages, streaming, runTurn],
   );
 
   /**
-   * The turn after `messageId` is regenerated as a sibling, so the previous
-   * answer is still there behind the branch picker.
+   * Re-answer the turn ending at `messageId`: everything up to and including
+   * that message stays, and a new assistant branch grows from it.
    */
   const regenerateFrom = useCallback(
     async (messageId: string | null) => {
@@ -1300,48 +1186,55 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       if (!question || question.role !== "user") {
         return;
       }
-      await runTurn(
-        messages.slice(0, questionIndex + 1),
-        question.content,
-        question.attachments ?? [],
-        question,
-      );
+      const base = messages.slice(0, questionIndex + 1);
+      await runTurn(base, null, base[base.length - 1].id);
     },
     [messages, runTurn],
   );
 
+  /**
+   * Replace the user turn at `messageId` with edited words, at its original
+   * parent, and grow a new assistant branch from it.
+   */
   const editFrom = useCallback(
     async (messageId: string | null, text: string, attachments: ChatAttachment[] = []) => {
-      const index = messageId
-        ? messages.findIndex((message) => message.id === messageId)
-        : messages.length - 1;
-      const original = messages[index];
-      if (index < 0 || original?.role !== "user") {
+      const cut = messageId === null ? messages.length - 1 : messages.findIndex((message) => message.id === messageId);
+      if (cut < 0 || streaming) {
         return;
       }
+      const original = messages[cut];
+      const base = messages.slice(0, cut);
+      const trimmed = text.trim();
       const edited: ChatMessage = {
-        ...original,
-        id: crypto.randomUUID(),
-        content: text.trim(),
-        ...(attachments.length ? { attachments } : { attachments: undefined }),
+        id: original.id,
+        parentId: original.parentId ?? null,
+        role: "user",
+        content: trimmed,
+        ...(attachments.length ? { attachments } : { attachments: original.attachments }),
       };
-      await runTurn(messages.slice(0, index), edited.content, attachments, edited);
+      await runTurn(base, edited, edited.id);
     },
-    [messages, runTurn],
+    [messages, streaming, runTurn],
   );
 
+  /**
+   * Take `branch` as the visible path and record it as the conversation head,
+   * so a reload reopens the branch that was visible.
+   */
   const switchBranch = useCallback(
-    (next: ChatMessage[]) => {
-      setMessages(next);
-      const head = next.length ? next[next.length - 1].id : null;
+    (branch: ChatMessage[]) => {
+      setMessages(branch);
+      const head = branch.length ? branch[branch.length - 1].id : null;
       if (conversationId) {
-        // The branch a person chose is the one that opens next time.
         void apiSetConversationHead(conversationId, head).catch(() => undefined);
       }
     },
     [conversationId],
   );
 
+  /**
+   * Answer a paused write. The turn resumes on the stream it came from.
+   */
   const respondToApproval = useCallback(
     async (approvalId: string, approved: boolean, reason = "") => {
       try {
@@ -1349,26 +1242,40 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       } catch {
         pushToast("error", "That approval request is no longer waiting.");
       }
-      // The paused stream carries the outcome; the local question is spent
-      // either way, and a stale prompt must not invite a second click.
-      setMessages((prev) =>
-        prev.map((message) => ({
-          ...message,
-          ...(message.parts
-            ? {
-                parts: message.parts.map((part) =>
-                  part.kind === "tool" && part.approval?.id === approvalId
-                    ? { ...part, approval: undefined }
-                    : part,
-                ),
-              }
-            : {}),
-        })),
-      );
     },
     [pushToast],
   );
 
+  /**
+   * Replay a persisted conversation's visible branch as the local transcript.
+   */
+  const fetchConversationTree = useCallback(
+    async (conversationId: string): Promise<ConversationTree> => {
+      const tree = await apiFetchConversationTree(conversationId);
+      setConversationId(tree.conversation.id);
+      setMessages(
+        tree.messages
+          .filter((node: TurnNode) => node.role === "user" || node.role === "assistant")
+          .map((node: TurnNode) => ({
+            id: node.id,
+            parentId: node.parent_id,
+            role: node.role as "user" | "assistant",
+            content: node.content ?? "",
+            parts: node.content ? [{ kind: "text", text: node.content }] : [],
+          })),
+      );
+      return tree;
+    },
+    [],
+  );
+
+  /** Record which branch of a conversation is visible. */
+  const setConversationHead = useCallback(
+    async (conversationId: string, headId: string | null) => {
+      await apiSetConversationHead(conversationId, headId);
+    },
+    [],
+  );
 
   /** The single conversational exit from any lens. */
   const ask = useCallback(
@@ -1440,7 +1347,6 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       setMemory([]);
       setConversationId(null);
       setMessages([]);
-      setToolActivity([]);
     } catch {
       pushToast("error", "I couldn't clear what I've learned.");
     }
@@ -1450,7 +1356,6 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     abortRef.current?.abort();
     abortRef.current = null;
     setMessages([]);
-    setToolActivity([]);
     setStreaming(false);
     setThinkingPhase(null);
     setOfflineReply(false);
@@ -1483,24 +1388,28 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       if (cancelled) {
         return;
       }
-      void refreshCapabilities();
       void refreshCanvas();
       void refreshConnectors();
       void refreshPresets();
+      void refreshModels();
       void refreshMemory();
       void fetchLatestConversation()
-        .then(async ({ conversation }) => {
-          if (cancelled || !conversation) {
+        .then(({ conversation, turns }) => {
+          if (cancelled || !conversation || turns.length === 0) {
             return;
           }
           setConversationId(conversation.id);
-          // The tree, not the flat turn list: a conversation with branches
-          // must open on the branch that was visible when it was left.
-          const tree = await fetchConversationTree(conversation.id);
-          if (cancelled) {
-            return;
-          }
-          setMessages(turnsToMessages(tree.messages, tree.head_id));
+          setMessages(
+            turns
+              .filter((turn) => turn.role === "user" || turn.role === "assistant")
+              .map((turn) => ({
+                id: `saved-${turn.id}`,
+                parentId: null,
+                role: turn.role as "user" | "assistant",
+                content: turn.content,
+                parts: turn.content ? [{ kind: "text" as const, text: turn.content }] : [],
+              })),
+          );
         })
         .catch(() => undefined);
       void healthMcp(settings.mcp_url)
@@ -1572,21 +1481,23 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       canvasError,
       refreshCanvas,
       llmHealth,
+      models,
+      modelsLoading,
+      modelsMessage,
+      refreshModels,
       mcpReachable,
       sidecarReachable,
-      dismissedSidecarNotice,
-      dismissSidecarNotice,
-      recheckConnections,
       checkConnections,
       messages,
       streaming,
       thinkingPhase,
-      toolActivity,
       sendMessage,
       regenerateFrom,
       editFrom,
       switchBranch,
       respondToApproval,
+      fetchConversationTree,
+      setConversationHead,
       stopStreaming,
       clearChat,
       conversationId,
@@ -1617,19 +1528,14 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       dismissToast,
       connectors,
       connectorsError,
-      capabilities,
       presets,
       presetError,
       refreshConnectors,
       refreshPresets,
-      refreshCapabilities,
       addConnector,
       deleteConnector,
       connectorSuggestions,
       dismissConnectorSuggestion,
-      theses,
-      saveThesis,
-      deleteThesis,
       notifications,
       unreadNotificationCount,
       markNotificationAsRead,
@@ -1637,6 +1543,13 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       dismissNotification,
       addNotification,
       simulateBackgroundEvent,
+      capabilities,
+      theses,
+      saveThesis,
+      deleteThesis,
+      dismissedSidecarNotice,
+      dismissSidecarNotice,
+      recheckConnections,
     }),
     [
       settings,
@@ -1655,21 +1568,23 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       canvasError,
       refreshCanvas,
       llmHealth,
+      models,
+      modelsLoading,
+      modelsMessage,
+      refreshModels,
       mcpReachable,
       sidecarReachable,
-      dismissedSidecarNotice,
-      dismissSidecarNotice,
-      recheckConnections,
       checkConnections,
       messages,
       streaming,
       thinkingPhase,
-      toolActivity,
       sendMessage,
       regenerateFrom,
       editFrom,
       switchBranch,
       respondToApproval,
+      fetchConversationTree,
+      setConversationHead,
       stopStreaming,
       clearChat,
       conversationId,
@@ -1700,19 +1615,14 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       dismissToast,
       connectors,
       connectorsError,
-      capabilities,
       presets,
       presetError,
       refreshConnectors,
       refreshPresets,
-      refreshCapabilities,
       addConnector,
       deleteConnector,
       connectorSuggestions,
       dismissConnectorSuggestion,
-      theses,
-      saveThesis,
-      deleteThesis,
       notifications,
       unreadNotificationCount,
       markNotificationAsRead,
