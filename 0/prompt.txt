@@ -1,5 +1,1 @@
-Your objective is to push the changes to a new PR and verify that it is CI green. Before you do, review the quality of the delivery relative to objective. Any flaws, you address them, before you push the PR.
-
----
-
-Continue if you have next steps, or stop and ask for clarification if you are unsure how to proceed.
+Continue
