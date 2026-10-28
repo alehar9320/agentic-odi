@@ -322,7 +322,14 @@ html, body {
 /* ------------------------------------------------------------------ */
 button, input, select, textarea {
   font-family: inherit;
-  font-size: 0.95rem; /* Prevents auto-zoom on iOS safari (<16px triggers zoom) */
+}
+
+button {
+  font-size: 0.95rem;
+}
+
+input, select, textarea {
+  font-size: 16px;
 }
 
 .studio-button {
@@ -376,7 +383,7 @@ button, input, select, textarea {
   color: var(--studio-text);
   padding: 10px 14px;
   min-height: 44px;
-  font-size: 0.95rem;
+  font-size: 16px;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 

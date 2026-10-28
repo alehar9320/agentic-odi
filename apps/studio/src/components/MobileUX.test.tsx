@@ -55,6 +55,22 @@ describe("Mobile UX Micro-Improvements", () => {
     expect(screen.getByRole("button", { name: "Engagement level 2" })).toBeInTheDocument();
   });
 
+  it("gives engagement-level controls 44px touch targets", async () => {
+    await act(async () => {
+      render(
+        <StudioProvider>
+          <StudioHeader />
+        </StudioProvider>,
+      );
+    });
+
+    for (const level of [0, 1, 2]) {
+      expect(
+        screen.getByRole("button", { name: `Engagement level ${level}` }),
+      ).toHaveStyle({ minHeight: "44px", minWidth: "44px" });
+    }
+  });
+
   it("renders CanvasTabs with accessible tablist and tabs when engagement level >= 1", async () => {
     await act(async () => {
       render(
@@ -75,6 +91,27 @@ describe("Mobile UX Micro-Improvements", () => {
     expect(tabs.length).toBeGreaterThanOrEqual(5);
   });
 
+  it("moves focus when navigating CanvasTabs with arrow keys", async () => {
+    await act(async () => {
+      render(
+        <StudioProvider>
+          <TestTabsWrapper />
+        </StudioProvider>,
+      );
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Set L2" }));
+    });
+
+    const tabs = screen.getAllByRole("tab");
+    tabs[0].focus();
+    fireEvent.keyDown(tabs[0], { key: "ArrowRight" });
+
+    expect(tabs[1]).toHaveFocus();
+    expect(tabs[1]).toHaveAttribute("aria-selected", "true");
+  });
+
   it("renders ChatCopilot with mobile FAB and quick prompt pills", async () => {
     await act(async () => {
       render(
@@ -86,6 +123,10 @@ describe("Mobile UX Micro-Improvements", () => {
 
     const fab = screen.getByRole("button", { name: /Open AI Copilot Chat/i });
     expect(fab).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Close drawer" })).toHaveStyle({
+      minHeight: "44px",
+      minWidth: "44px",
+    });
 
     const quickPill = screen.getByRole("button", { name: /Define Job/i });
     expect(quickPill).toBeInTheDocument();

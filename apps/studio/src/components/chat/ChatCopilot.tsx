@@ -122,7 +122,7 @@ export function ChatCopilot() {
             className="studio-button studio-button--ghost mobile-only"
             onClick={() => setMobileOpen(false)}
             aria-label="Close drawer"
-            style={{ padding: "4px 10px", minHeight: "36px" }}
+            style={{ padding: "4px 10px", minHeight: "44px", minWidth: "44px" }}
           >
             ✕ Close
           </button>

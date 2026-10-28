@@ -1,3 +1,5 @@
+import { useRef } from "react";
+
 import { useStudio } from "../../state/StudioContext";
 import { DirectCapture } from "./DirectCapture";
 import { EvidenceStream } from "./EvidenceStream";
@@ -37,6 +39,7 @@ function renderPanel(tab: string) {
 
 export function CanvasTabs() {
   const { canvas, canvasLoading, canvasCached, activeTab, setActiveTab, engagementLevel } = useStudio();
+  const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
   const showTabs = engagementLevel >= 1;
 
@@ -45,10 +48,12 @@ export function CanvasTabs() {
       event.preventDefault();
       const nextIndex = (index + 1) % TABS.length;
       setActiveTab(TABS[nextIndex].id);
+      tabRefs.current[nextIndex]?.focus();
     } else if (event.key === "ArrowLeft") {
       event.preventDefault();
       const prevIndex = (index - 1 + TABS.length) % TABS.length;
       setActiveTab(TABS[prevIndex].id);
+      tabRefs.current[prevIndex]?.focus();
     }
   }
 
@@ -86,6 +91,9 @@ export function CanvasTabs() {
             <button
               key={tab.id}
               type="button"
+              ref={(element) => {
+                tabRefs.current[idx] = element;
+              }}
               role="tab"
               id={`tab-${tab.id}`}
               className="studio-tab"

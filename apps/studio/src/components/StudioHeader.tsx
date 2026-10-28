@@ -50,6 +50,8 @@ export function StudioHeader() {
                 border: "none",
                 borderRadius: 999,
                 padding: "3px 8px",
+                minHeight: "44px",
+                minWidth: "44px",
                 fontSize: "0.72rem",
                 fontWeight: 600,
                 cursor: "pointer",
