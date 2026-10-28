@@ -160,13 +160,6 @@ export function CheckIcon(props: IconProps) {
   );
 }
 
-export function PaperclipIcon(props: IconProps) {
-  return (
-    <Icon {...props}>
-      <path d="M20 11.5 12.6 19a4.6 4.6 0 0 1-6.5-6.5l7.6-7.6a3 3 0 0 1 4.3 4.3l-7.6 7.6a1.5 1.5 0 0 1-2.1-2.1l7-7" />
-    </Icon>
-  );
-}
 
 export function FileIcon(props: IconProps) {
   return (
@@ -221,15 +214,6 @@ export function MenuIcon(props: IconProps) {
   );
 }
 
-export function AlertIcon(props: IconProps) {
-  return (
-    <Icon {...props}>
-      <path d="M12 3.5 2.9 19.2a1 1 0 0 0 .87 1.5h16.46a1 1 0 0 0 .87-1.5z" />
-      <path d="M12 9.2v4.4" />
-      <path d="M12 17.2h.01" />
-    </Icon>
-  );
-}
 
 export function BellIcon(props: IconProps) {
   return (

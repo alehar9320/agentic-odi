@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 
-import { StudioRuntimeProvider } from "./assistant/StudioRuntime";
 import { ChangelogModal } from "./components/ChangelogModal";
 import { ChatStage } from "./components/chat/ChatStage";
 import { ErrorBoundary } from "./components/ErrorBoundary";
