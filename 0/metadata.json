@@ -1,0 +1,40 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M61K279HKV0W39DX3M2RMEAY",
+  "session_id": "ses_e86c0ebb4ffeAyfzsxiY2cHAfp",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-28T15:47:36.007757331Z",
+  "branch": "ui-not-looking-like-shit",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "apps/studio/src/state/StudioContext.tsx"
+  ],
+  "agent": "OpenCode",
+  "model": "big-pickle",
+  "turn_id": "8076e9b8783b",
+  "checkpoint_transcript_start": 866,
+  "transcript_lines_at_start": 866,
+  "compact_transcript_start": 866,
+  "token_usage": {
+    "input_tokens": 121120,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 20847488,
+    "output_tokens": 7824,
+    "api_call_count": 50
+  },
+  "session_metrics": {
+    "turn_count": 8
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-10-28T15:47:35.673754203Z",
+    "agent_lines": 2,
+    "agent_removed": 0,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 2,
+    "total_lines_changed": 2,
+    "agent_percentage": 100,
+    "metric_version": 2
+  }
+}
