@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING
 
 import typer
 
+from agentic_odi_cli import flags
 from agentic_odi_cli.backend import run_tool
 from agentic_odi_cli.render import render_saved
 
@@ -226,6 +227,13 @@ def add_connector(
     config: Path | None = ConfigOption,
 ) -> None:
     """Register a new external connector, optionally from a known preset."""
+    if not flags.is_enabled("experimental_connectors"):
+        typer.echo(
+            "Error: connector management requires the experimental_connectors flag. "
+            "Enable it with: agentic-odi settings flags set experimental_connectors true",
+            err=True,
+        )
+        raise typer.Exit(code=1)
     from agentic_odi_connectors.models import ConnectorConfig
     from agentic_odi_connectors.registry import DuplicateConnectorError, UnknownConnectorKindError
 
@@ -277,6 +285,13 @@ def health_connector(
     config: Path | None = ConfigOption,
 ) -> None:
     """Check whether a connector can reach its external system."""
+    if not flags.is_enabled("experimental_connectors"):
+        typer.echo(
+            "Error: connector management requires the experimental_connectors flag. "
+            "Enable it with: agentic-odi settings flags set experimental_connectors true",
+            err=True,
+        )
+        raise typer.Exit(code=1)
     from agentic_odi_connectors.registry import ConnectorNotFoundError, UnknownConnectorKindError
 
     try:
@@ -302,6 +317,13 @@ def ingest_connector(
     config: Path | None = ConfigOption,
 ) -> None:
     """Ingest connector records and optionally map them into ODI evidence."""
+    if not flags.is_enabled("experimental_connectors"):
+        typer.echo(
+            "Error: connector management requires the experimental_connectors flag. "
+            "Enable it with: agentic-odi settings flags set experimental_connectors true",
+            err=True,
+        )
+        raise typer.Exit(code=1)
     from agentic_odi_connectors.registry import ConnectorNotFoundError, UnknownConnectorKindError
 
     try:
