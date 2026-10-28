@@ -599,3 +599,9 @@ def test_the_warning_comment_never_edits_an_unrelated_comment() -> None:
 
     assert "--edit-last" not in workflow
     assert 'startswith("## PR guardrails")' in workflow
+
+
+def test_the_warning_comment_is_removed_when_warnings_are_fixed() -> None:
+    workflow = WORKFLOW.read_text(encoding="utf-8")
+
+    assert "--method DELETE" in workflow

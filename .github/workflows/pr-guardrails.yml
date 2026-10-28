@@ -87,14 +87,16 @@ jobs:
               } >> "$message"
             fi
           done
+          comment_id="$(gh api "repos/$REPO/issues/$PR_NUMBER/comments" --paginate \
+            --jq '.[] | select(.body | startswith("## PR guardrails")) | .id' |
+            head -n 1)"
           if [ -s "$message" ]; then
-            comment_id="$(gh api "repos/$REPO/issues/$PR_NUMBER/comments" --paginate \
-              --jq '.[] | select(.body | startswith("## PR guardrails")) | .id' |
-              head -n 1)"
             if [ -n "$comment_id" ]; then
               gh api --method PATCH "repos/$REPO/issues/comments/$comment_id" \
                 -F body=@"$message" >/dev/null
             else
               gh pr comment "$PR_NUMBER" --repo "$REPO" --body-file "$message"
             fi
+          elif [ -n "$comment_id" ]; then
+            gh api --method DELETE "repos/$REPO/issues/comments/$comment_id" >/dev/null
           fi
