@@ -45,7 +45,6 @@ import {
   type UpdateObservationPayload,
 } from "../api/studioApi";
 import type { RawSseEvent } from "../api/sse";
-import { capabilityRegistry, type Capability } from "../bff/capabilities/registry";
 import type {
   AddConnectorPayload,
   ChatAttachment,
@@ -63,58 +62,12 @@ import type {
   StudioConfig,
   StudioError,
   StudioNotification,
-  Thesis,
   ToolStatus,
   TurnNode,
   WorkspacePanelId,
 } from "../types";
 import { catalogManifest } from "../ui/catalog";
 import { parseUiSpec } from "../ui/protocol";
-
-/**
- * The visible path of a persisted conversation: from the head back to the root.
- * Rows are ordered by insertion, so a legacy conversation with no head simply
- * resolves to its last turn.
- */
-export function pathToHead(nodes: TurnNode[], headId: string | null): TurnNode[] {
-  if (nodes.length === 0) {
-    return [];
-  }
-  const byId = new Map(nodes.map((node) => [node.id, node]));
-  const leafId = headId && byId.has(headId) ? headId : nodes[nodes.length - 1].id;
-  const path: TurnNode[] = [];
-  const seen = new Set<string>();
-  let current: string | null = leafId;
-  while (current && byId.has(current) && !seen.has(current)) {
-    seen.add(current);
-    const node = byId.get(current) as TurnNode;
-    path.push(node);
-    current = node.parent_id;
-  }
-  return path.reverse();
-}
-
-/** Persisted turns as the thread renders them. */
-export function turnsToMessages(
-  nodes: TurnNode[],
-  headId: string | null,
-): ChatMessage[] {
-  return pathToHead(nodes, headId).flatMap((node) => {
-    if (node.role !== "user" && node.role !== "assistant") {
-      return [];
-    }
-    const content = node.content ?? "";
-    return [
-      {
-        id: node.id,
-        parentId: node.parent_id,
-        role: node.role,
-        content,
-        parts: content ? [{ kind: "text" as const, text: content }] : [],
-      },
-    ];
-  });
-}
 
 /** Read the failure the sidecar reported on an SSE `error` event. */
 function readStudioError(raw: unknown): StudioError {
@@ -141,9 +94,7 @@ const CANVAS_KEY = "studio.canvas";
 const DISPLAY_NAME_KEY = "studio.displayName";
 const BRIEF_KEY = "studio.brief";
 const SETUP_DISMISSED_KEY = "studio.setupDismissed";
-const SIDECAR_NOTICE_DISMISSED_KEY = "studio.sidecarNoticeDismissed";
 const NOTIFICATIONS_KEY = "studio.notifications";
-const THESES_KEY = "studio.theses";
 
 /** How often the studio re-probes the model and the MCP server. */
 const HEALTH_POLL_INTERVAL_MS = 30_000;
@@ -153,7 +104,6 @@ export const EMPTY_CONFIG: StudioConfig = {
   api_key: "local",
   model_name: "local-tools-model",
   mcp_url: "http://localhost:8000/mcp",
-  theme: "dark",
 };
 
 export type ToastKind = "success" | "error" | "info";
@@ -235,11 +185,6 @@ export interface StudioContextValue {
   refreshModels: (config?: { base_url: string; api_key: string }) => Promise<void>;
   mcpReachable: boolean;
   sidecarReachable: boolean | null;
-  /** Whether the user has dismissed this session's sidecar-down notice. */
-  dismissedSidecarNotice: boolean;
-  /** Probe again now, e.g. after the user started the sidecar. */
-  recheckConnections: () => Promise<void>;
-  dismissSidecarNotice: () => void;
   /** Probe the sidecar, MCP server, and model. Optionally against unsaved config. */
   checkConnections: (override?: Partial<StudioConfig>) => Promise<ConnectionReport>;
   messages: ChatMessage[];
@@ -305,19 +250,12 @@ export interface StudioContextValue {
   presetError: StudioError | null;
   /** The failure behind an unreachable connector list, if any. */
   connectorsError: StudioError | null;
-  /** Probed availability of local and sidecar capabilities. */
-  capabilities: Capability[];
   refreshConnectors: () => Promise<void>;
   refreshPresets: () => Promise<void>;
-  refreshCapabilities: () => Promise<void>;
   addConnector: (payload: AddConnectorPayload) => Promise<void>;
   deleteConnector: (name: string) => Promise<void>;
   connectorSuggestions: string[];
   dismissConnectorSuggestion: (preset: string) => void;
-  /** Scored outcomes saved as shareable opportunity theses. */
-  theses: Thesis[];
-  saveThesis: (thesis: Omit<Thesis, "id" | "created_at">) => void;
-  deleteThesis: (thesisId: string) => void;
   notifications: StudioNotification[];
   unreadNotificationCount: number;
   markNotificationAsRead: (id: string) => void;
@@ -355,15 +293,7 @@ function loadCanvasCache(): CanvasData | null {
 
 function loadSetupDismissed(): boolean {
   try {
-      return localStorage.getItem(SETUP_DISMISSED_KEY) === "1";
-  } catch {
-    return false;
-  }
-}
-
-function loadSidecarNoticeDismissed(): boolean {
-  try {
-    return localStorage.getItem(SIDECAR_NOTICE_DISMISSED_KEY) === "1";
+    return localStorage.getItem(SETUP_DISMISSED_KEY) === "1";
   } catch {
     return false;
   }
@@ -396,18 +326,6 @@ function loadBrief(): StudioBrief | null {
   } catch {
     return null;
   }
-}
-
-function loadTheses(): Thesis[] {
-  try {
-    const raw = localStorage.getItem(THESES_KEY);
-    if (raw) {
-      return JSON.parse(raw) as Thesis[];
-    }
-  } catch {
-    /* ignore malformed cache */
-  }
-  return [];
 }
 
 function loadNotifications(): StudioNotification[] {
@@ -444,7 +362,6 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [modelsMessage, setModelsMessage] = useState<string | null>(null);
   const [mcpReachable, setMcpReachable] = useState(false);
   const [sidecarReachable, setSidecarReachable] = useState<boolean | null>(null);
-  const [dismissedSidecarNotice, setDismissedSidecarNotice] = useState<boolean>(loadSidecarNoticeDismissed);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [memory, setMemory] = useState<Observation[]>([]);
@@ -457,10 +374,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [presets, setPresets] = useState<ConnectorPreset[]>([]);
   const [presetError, setPresetError] = useState<StudioError | null>(null);
   const [connectorsError, setConnectorsError] = useState<StudioError | null>(null);
-  const [capabilities, setCapabilities] = useState<Capability[]>([]);
   const [connectorSuggestions, setConnectorSuggestions] = useState<string[]>([]);
   const [notifications, setNotifications] = useState<StudioNotification[]>(loadNotifications);
-  const [theses, setTheses] = useState<Thesis[]>(loadTheses);
   const toastId = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -573,15 +488,6 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const refreshCapabilities = useCallback(async () => {
-    try {
-      setCapabilities(await capabilityRegistry.statuses(settings));
-    } catch {
-      /* Capability probes are advisory; a probe failure leaves the list empty. */
-      setCapabilities([]);
-    }
-  }, [settings]);
-
   const addConnector = useCallback(
     async (payload: AddConnectorPayload) => {
       try {
@@ -611,35 +517,6 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     },
     [pushToast, refreshConnectors],
   );
-
-  const saveThesis = useCallback((thesis: Omit<Thesis, "id" | "created_at">) => {
-    const saved: Thesis = {
-      ...thesis,
-      id: `THESIS-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-      created_at: new Date().toISOString(),
-    };
-    setTheses((prev) => {
-      const next = [saved, ...prev];
-      try {
-        localStorage.setItem(THESES_KEY, JSON.stringify(next));
-      } catch {
-        /* storage unavailable */
-      }
-      return next;
-    });
-  }, []);
-
-  const deleteThesis = useCallback((thesisId: string) => {
-    setTheses((prev) => {
-      const next = prev.filter((thesis) => thesis.id !== thesisId);
-      try {
-        localStorage.setItem(THESES_KEY, JSON.stringify(next));
-      } catch {
-        /* storage unavailable */
-      }
-      return next;
-    });
-  }, []);
 
   const simulateBackgroundEvent = useCallback(() => {
     const events: Array<Omit<StudioNotification, "id" | "timestamp" | "read">> = [
@@ -762,29 +639,10 @@ const pushNotice = useCallback((text: string) => {
       setSidecarReachable(sidecar);
       setMcpReachable(mcp);
       setLlmHealth(llm);
-      void refreshCapabilities();
-      if (sidecar) {
-        setDismissedSidecarNotice(false);
-      }
       return { sidecarReachable: sidecar, mcpReachable: mcp, llmHealthy: llm.healthy };
     },
-    [settings, refreshCapabilities],
+    [settings],
   );
-
-  // Re-probe after the user acted on the sidecar notice (e.g. started the
-  // sidecar). Resolves once the report is in so the UI can stop showing "busy".
-  const recheckConnections = useCallback(async () => {
-    await checkConnections();
-  }, [checkConnections]);
-
-  const dismissSidecarNotice = useCallback(() => {
-    setDismissedSidecarNotice(true);
-    try {
-      localStorage.setItem(SIDECAR_NOTICE_DISMISSED_KEY, "1");
-    } catch {
-      /* storage unavailable */
-    }
-  }, []);
 
   const refreshCanvas = useCallback(async () => {
     setCanvasState((prev) => ({ kind: "loading", data: prev.data }));
@@ -977,30 +835,17 @@ const pushNotice = useCallback((text: string) => {
       // Prose is appended to the open text part; a surface opens a new one, so
       // the transcript keeps the agent's order instead of gathering all prose
       // above all cards.
-      const appendText = (chunk: string) => {
-        if (!chunk) {
+      const appendText = (text: string) => {
+        if (!text) {
           return;
         }
-        content += chunk;
+        content += text;
         const last = parts[parts.length - 1];
         parts =
           last?.kind === "text"
-            ? [...parts.slice(0, -1), { kind: "text", text: last.text + chunk }]
-            : [...parts, { kind: "text", text: chunk }];
+            ? [...parts.slice(0, -1), { kind: "text", text: last.text + text }]
+            : [...parts, { kind: "text", text }];
       };
-
-      const appendReasoning = (chunk: string) => {
-        if (!chunk) {
-          return;
-        }
-        const last = parts[parts.length - 1];
-        parts =
-          last?.kind === "reasoning"
-            ? [...parts.slice(0, -1), { kind: "reasoning", text: last.text + chunk }]
-            : [...parts, { kind: "reasoning", text: chunk }];
-      };
-
-
 
       // The turn owns its own timeline, so a finished run stays inspectable and
       // the next turn starts from nothing without a reset elsewhere.
@@ -1034,48 +879,8 @@ const pushNotice = useCallback((text: string) => {
             }
             break;
           }
-          case "reasoning": {
-            appendReasoning(String(event.data.text ?? ""));
-            publish();
-            break;
-          }
           case "delta": {
             appendText(String(event.data.text ?? ""));
-            publish();
-            break;
-          }
-          case "source": {
-            parts = [
-              ...parts,
-              {
-                kind: "source",
-                id: String(event.data.id ?? `src-${parts.length}`),
-                title: String(event.data.title ?? ""),
-                mediaType: String(event.data.mediaType ?? "application/json"),
-                ...(event.data.filename ? { filename: String(event.data.filename) } : {}),
-              },
-            ];
-            publish();
-            break;
-          }
-          case "approval": {
-            const approvalId = String(event.data.id ?? "");
-            if (!approvalId) {
-              break;
-            }
-            parts = [
-              ...parts,
-              {
-                kind: "tool",
-                id: String(event.data.tool_call_id ?? `approval-${approvalId}`),
-                name: String(event.data.name ?? ""),
-                status: "running",
-                approval: {
-                  id: approvalId,
-                  prompt: String(event.data.prompt ?? "Allow this change?"),
-                },
-              },
-            ];
             publish();
             break;
           }
@@ -1122,12 +927,10 @@ const pushNotice = useCallback((text: string) => {
           }
           case "message": {
             terminal = true;
-            // The terminal frame is authoritative for the prose, but it must
-            // never erase structured parts: thinking, tool calls, citations,
-            // and surfaces sit between the paragraphs that frame them.
             content = String(event.data.content ?? content);
-            if (content && !parts.some((part) => part.kind === "text")) {
-              parts = [...parts, { kind: "text", text: content }];
+            const hasSurfaces = parts.some((part) => part.kind === "ui");
+            if (!hasSurfaces) {
+              parts = content ? [{ kind: "text", text: content }] : [];
             }
             publish();
             break;
@@ -1194,9 +997,6 @@ const pushNotice = useCallback((text: string) => {
             brief,
             ui_catalog: catalogManifest(),
             conversation_id: conversationId,
-            attachments,
-            approvals: true,
-            assistant_id: assistantId,
           },
           handleEvent,
           controller.signal,
@@ -1398,104 +1198,6 @@ const pushNotice = useCallback((text: string) => {
     [],
   );
 
-  const sendMessage = useCallback(
-    (text: string, attachments: ChatAttachment[] = []) => runTurn(messages, text, attachments),
-    [messages, runTurn],
-  );
-
-  /**
-   * The turn after `messageId` is regenerated as a sibling, so the previous
-   * answer is still there behind the branch picker.
-   */
-  const regenerateFrom = useCallback(
-    async (messageId: string | null) => {
-      const index = messageId
-        ? messages.findIndex((message) => message.id === messageId)
-        : messages.length - 1;
-      if (index < 0) {
-        return;
-      }
-      const target = messages[index];
-      const questionIndex =
-        target?.role === "user"
-          ? index
-          : target?.role === "assistant"
-            ? index - 1
-            : -1;
-      const question = messages[questionIndex];
-      if (!question || question.role !== "user") {
-        return;
-      }
-      await runTurn(
-        messages.slice(0, questionIndex + 1),
-        question.content,
-        question.attachments ?? [],
-        question,
-      );
-    },
-    [messages, runTurn],
-  );
-
-  const editFrom = useCallback(
-    async (messageId: string | null, text: string, attachments: ChatAttachment[] = []) => {
-      const index = messageId
-        ? messages.findIndex((message) => message.id === messageId)
-        : messages.length - 1;
-      const original = messages[index];
-      if (index < 0 || original?.role !== "user") {
-        return;
-      }
-      const edited: ChatMessage = {
-        ...original,
-        id: crypto.randomUUID(),
-        content: text.trim(),
-        ...(attachments.length ? { attachments } : { attachments: undefined }),
-      };
-      await runTurn(messages.slice(0, index), edited.content, attachments, edited);
-    },
-    [messages, runTurn],
-  );
-
-  const switchBranch = useCallback(
-    (next: ChatMessage[]) => {
-      setMessages(next);
-      const head = next.length ? next[next.length - 1].id : null;
-      if (conversationId) {
-        // The branch a person chose is the one that opens next time.
-        void apiSetConversationHead(conversationId, head).catch(() => undefined);
-      }
-    },
-    [conversationId],
-  );
-
-  const respondToApproval = useCallback(
-    async (approvalId: string, approved: boolean, reason = "") => {
-      try {
-        await apiResolveApproval(approvalId, approved, reason);
-      } catch {
-        pushToast("error", "That approval request is no longer waiting.");
-      }
-      // The paused stream carries the outcome; the local question is spent
-      // either way, and a stale prompt must not invite a second click.
-      setMessages((prev) =>
-        prev.map((message) => ({
-          ...message,
-          ...(message.parts
-            ? {
-                parts: message.parts.map((part) =>
-                  part.kind === "tool" && part.approval?.id === approvalId
-                    ? { ...part, approval: undefined }
-                    : part,
-                ),
-              }
-            : {}),
-        })),
-      );
-    },
-    [pushToast],
-  );
-
-
   /** The single conversational exit from any lens. */
   const ask = useCallback(
     (intent: string) => {
@@ -1607,15 +1309,14 @@ const pushNotice = useCallback((text: string) => {
       if (cancelled) {
         return;
       }
-      void refreshCapabilities();
       void refreshCanvas();
       void refreshConnectors();
       void refreshPresets();
       void refreshModels();
       void refreshMemory();
       void fetchLatestConversation()
-        .then(async ({ conversation }) => {
-          if (cancelled || !conversation) {
+        .then(({ conversation, turns }) => {
+          if (cancelled || !conversation || turns.length === 0) {
             return;
           }
           setConversationId(conversation.id);
@@ -1707,9 +1408,6 @@ const pushNotice = useCallback((text: string) => {
       refreshModels,
       mcpReachable,
       sidecarReachable,
-      dismissedSidecarNotice,
-      dismissSidecarNotice,
-      recheckConnections,
       checkConnections,
       messages,
       streaming,
@@ -1751,19 +1449,14 @@ const pushNotice = useCallback((text: string) => {
       dismissToast,
       connectors,
       connectorsError,
-      capabilities,
       presets,
       presetError,
       refreshConnectors,
       refreshPresets,
-      refreshCapabilities,
       addConnector,
       deleteConnector,
       connectorSuggestions,
       dismissConnectorSuggestion,
-      theses,
-      saveThesis,
-      deleteThesis,
       notifications,
       unreadNotificationCount,
       markNotificationAsRead,
@@ -1795,9 +1488,6 @@ const pushNotice = useCallback((text: string) => {
       refreshModels,
       mcpReachable,
       sidecarReachable,
-      dismissedSidecarNotice,
-      dismissSidecarNotice,
-      recheckConnections,
       checkConnections,
       messages,
       streaming,
@@ -1839,19 +1529,14 @@ const pushNotice = useCallback((text: string) => {
       dismissToast,
       connectors,
       connectorsError,
-      capabilities,
       presets,
       presetError,
       refreshConnectors,
       refreshPresets,
-      refreshCapabilities,
       addConnector,
       deleteConnector,
       connectorSuggestions,
       dismissConnectorSuggestion,
-      theses,
-      saveThesis,
-      deleteThesis,
       notifications,
       unreadNotificationCount,
       markNotificationAsRead,
