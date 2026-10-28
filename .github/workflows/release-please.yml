@@ -32,7 +32,7 @@ jobs:
             echo "configured=true" >> "$GITHUB_OUTPUT"
           else
             echo "configured=false" >> "$GITHUB_OUTPUT"
-            echo "::warning title=Release automation is degraded::RELEASE_PLEASE_APP_CLIENT_ID and/or RELEASE_PLEASE_APP_PRIVATE_KEY are missing, so release-please falls back to GITHUB_TOKEN. GitHub holds workflow runs created from GITHUB_TOKEN-authored pushes (\"This workflow requires approval from a maintainer\") and ignores the tag it creates, so this release needs a maintainer approval and ships without binaries. See 'Release automation' in README.md."
+            echo "::warning title=Release automation is degraded::RELEASE_PLEASE_APP_CLIENT_ID and/or RELEASE_PLEASE_APP_PRIVATE_KEY are missing, so release-please falls back to GITHUB_TOKEN. GitHub holds workflow runs created from GITHUB_TOKEN-authored pushes (\"This workflow requires approval from a maintainer\") and ignores the tag it creates, so this release needs a maintainer approval and ships without binaries. See 'Release automation' in docs/installation.md."
           fi
 
       - name: Create GitHub App token
