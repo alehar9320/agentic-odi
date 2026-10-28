@@ -31,10 +31,7 @@ curl -fsSL https://github.com/alehar9320/agentic-odi/releases/latest/download/in
 [![MCP](https://img.shields.io/badge/Model%20Context%20Protocol-enabled-8A2BE2)](https://modelcontextprotocol.io)
 [![GitHub Pages](https://img.shields.io/badge/GitHub%20Pages-site-blue?logo=github)](https://alehar9320.github.io/agentic-odi/)
 [![Buy me a coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-FFDD00?style=for-the-badge&logo=buymeacoffee&logoColor=000000)](https://buymeacoffee.com/signup)
-
-> **[![Experimental](https://img.shields.io/badge/Experimental-1e293b?style=for-the-badge)](https://github.com/alehar9320/agentic-odi)**
-
-> **Experimental test to learn and evaluate the feasibility of utilizing Model Context Protocol (MCP) for Outcome-Driven Innovation (ODI) specifications.**
+[![Experimental](https://img.shields.io/badge/Experimental-1e293b)](https://github.com/alehar9320/agentic-odi)
 
 </div>
 
