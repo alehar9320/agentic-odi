@@ -74,6 +74,30 @@ You can also trigger them manually:
 pre-commit run --all-files
 ```
 
+## PR Risk Classification
+
+Every pull request is automatically classified by the
+[PR Risk Classification](../.github/workflows/pr-risk.yml) workflow, which runs
+on `ubuntu-latest` at $0 cost with zero external dependencies. It scores the diff
+(0–100) across three factors and applies a single, mutually exclusive label:
+
+| Label | Meaning | Score |
+|---|---|---|
+| `safe to merge` | Low risk — small diff, docs-only, or tested source code | ≤ 20 |
+| `needs a look` | Medium risk — standard feature work or missing test updates | 21–50 |
+| `danger zone` | High risk — critical path (auth, migrations, billing, infra, workflows) or protected-file deletion | ≥ 51 |
+
+Scoring factors:
+
+- **File & line churn** — files changed and lines added/deleted (0–30 points).
+- **Critical path override** — touching `auth/`, `migrations/`, `billing/`,
+  `infra/`, `.github/workflows/`, or deleting a file in
+  `.ci/protected-files.txt` forces the danger zone.
+- **Test delta** — source code changed without a corresponding
+  `*.test.*`/`*.spec.*`/`tests/**` file adds 20 points.
+
+The workflow is silent: it updates labels only and never posts PR comments.
+
 ## Testing
 
 Tests use **pytest** with **pytest-asyncio** (strict mode) and run entirely

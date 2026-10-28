@@ -1,6 +1,7 @@
 import { render, screen, fireEvent, act } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
+import indexHtml from "../../index.html?raw";
 import { StudioProvider, useStudio } from "../state/StudioContext";
 import { StudioHeader } from "./StudioHeader";
 import { CanvasTabs } from "./canvas/CanvasTabs";
@@ -32,6 +33,13 @@ function TestTabsWrapper() {
 }
 
 describe("Mobile UX Micro-Improvements", () => {
+  it("keeps mobile browser zoom available while using safe-area viewport sizing", () => {
+    const viewport = indexHtml.match(/<meta name="viewport" content="([^"]+)"/i)?.[1];
+
+    expect(viewport).toContain("viewport-fit=cover");
+    expect(viewport).not.toMatch(/(?:maximum-scale|user-scalable)/i);
+  });
+
   it("renders StudioHeader with title and engagement level buttons", async () => {
     await act(async () => {
       render(
