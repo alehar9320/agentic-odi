@@ -1,0 +1,94 @@
+name: PR guardrails
+
+# Deterministic gates that a pull request cannot lie about its shape.
+# No repository secrets: the gates only need the checked-out repository.
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, edited]
+
+concurrency:
+  group: pr-guardrails-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  pr-guardrails:
+    name: PR guardrails
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # Full history so the cumulative base...HEAD diff and release tags exist.
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: ./.github/actions/setup
+
+      - name: Fetch the base branch
+        run: |
+          git fetch --no-tags origin \
+            "${{ github.base_ref }}:refs/remotes/origin/${{ github.base_ref }}"
+
+      # The diff-shape gate is the only gate that blocks, and it runs on the
+      # cumulative diff: a tree-replacement commit in the middle of a branch
+      # stays visible here.
+      - name: Diff-shape gate
+        if: always()
+        run: |
+          uv run python scripts/pr_guards.py diff-shape \
+            --base-ref "origin/${{ github.base_ref }}"
+
+      - name: Body-truth gate
+        if: always()
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          printf '%s' "$PR_BODY" > "$RUNNER_TEMP/pr-body.md"
+          uv run python scripts/pr_guards.py body-truth \
+            --base-ref "origin/${{ github.base_ref }}" \
+            --body-file "$RUNNER_TEMP/pr-body.md" \
+            --title "$PR_TITLE" \
+            --warnings-out "$RUNNER_TEMP/body-warnings.txt"
+
+      - name: Fabrication guard
+        if: always()
+        run: |
+          uv run python scripts/pr_guards.py fabrication \
+            --base-ref "origin/${{ github.base_ref }}" \
+            --warnings-out "$RUNNER_TEMP/fabrication-warnings.txt"
+
+      - name: Publish guardrail warnings
+        if: always()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          message="$RUNNER_TEMP/guardrail-warnings.md"
+          : > "$message"
+          for file in "$RUNNER_TEMP/body-warnings.txt" "$RUNNER_TEMP/fabrication-warnings.txt"; do
+            if [ -s "$file" ]; then
+              {
+                echo "## PR guardrails — warnings"
+                echo
+                echo '```'
+                cat "$file"
+                echo '```'
+              } >> "$message"
+            fi
+          done
+          if [ -s "$message" ]; then
+            gh pr comment "$PR_NUMBER" --repo "$REPO" --body-file "$message" \
+              --edit-last --create-if-none ||
+              echo "note: could not post the warning comment (fork or token permissions)"
+          fi
