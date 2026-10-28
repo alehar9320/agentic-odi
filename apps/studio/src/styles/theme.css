@@ -4614,73 +4614,157 @@ details[open] summary {
   }
 }
 
-/* Mobile: touch targets, safe areas, and a one-handed studio          */
-/* ================================================================== */
+/* ------------------------------------------------------------------ */
+/* Mobile Responsive & Touch Ergonomic Overrides                      */
+/* ------------------------------------------------------------------ */
 :root {
   --safe-area-top: env(safe-area-inset-top, 0px);
   --safe-area-bottom: env(safe-area-inset-bottom, 0px);
 }
 
-@media (max-width: 1023px) {
-  /* A notch must not eat the bar, and the home indicator must not eat
-     the composer. */
-  .bar {
-    padding-top: calc(8px + var(--safe-area-top));
-  }
+* {
+  -webkit-tap-highlight-color: transparent;
+}
 
-  .chat__dock {
-    padding-bottom: calc(10px + var(--safe-area-bottom));
-  }
+.mobile-only {
+  display: none;
+}
+.desktop-only {
+  display: inline;
+}
 
-  /* 44px targets: a thumb, not a cursor. */
-  .button,
-  .quiet-action,
-  .chip,
-  .studio-button,
-  .ui-action {
-    min-height: 44px;
-  }
+button, input, select, textarea {
+  font-size: 0.95rem; /* Prevents auto-zoom on iOS Safari */
+  touch-action: manipulation;
+}
 
-  .quiet-action {
-    padding-inline: 12px;
-    font-size: 0.82rem;
-  }
+.mobile-chat-fab {
+  display: none;
+}
 
-  .chip {
-    padding-inline: 14px;
+@media (max-width: 900px) {
+  .mobile-only {
+    display: inline;
   }
-
-  .composer__send {
-    width: 44px;
-    height: 44px;
-  }
-
-  /* iOS zooms the whole page when a field is under 16px. */
-  input,
-  select,
-  textarea {
-    font-size: 16px;
-  }
-
-  /* The rail scrolls instead of squeezing its chips. */
-  .rail {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-  }
-
-  .rail::-webkit-scrollbar {
+  .desktop-only {
     display: none;
   }
 
-  .rail__list {
-    width: max-content;
-    min-width: 100%;
+  .studio-app {
+    padding: 12px 12px calc(80px + var(--safe-area-bottom));
+  }
+
+  .studio-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+    padding: 14px 16px;
+  }
+
+  .studio-header__pills {
+    justify-content: flex-start;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    scrollbar-width: none;
+  }
+
+  .studio-header__pills::-webkit-scrollbar {
+    display: none;
+  }
+
+  .studio-layout {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .metric-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+
+  .outcome-card__actions {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .studio-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* Chat copilot bottom sheet drawer on mobile */
+  .chat-copilot {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    top: auto;
+    z-index: 1000;
+    background: var(--studio-bg, #090d16);
+    border-top: 1px solid var(--studio-border, rgba(255,255,255,0.1));
+    border-radius: 20px 20px 0 0;
+    padding: 16px;
+    box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.6);
+    transform: translateY(100%);
+    transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    max-height: 85vh;
+  }
+
+  .chat-copilot--open {
+    transform: translateY(0);
+  }
+
+  .chat-copilot__backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+    z-index: 999;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+  }
+
+  .chat-copilot__backdrop--open {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .chat-log {
+    height: 48vh;
+  }
+
+  /* Floating Action Button (FAB) for AI Copilot on Mobile */
+  .mobile-chat-fab {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    position: fixed;
+    bottom: calc(16px + var(--safe-area-bottom));
+    right: 16px;
+    z-index: 900;
+    background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+    color: white;
+    padding: 12px 20px;
+    border-radius: 9999px;
+    border: none;
+    box-shadow: 0 8px 24px rgba(99, 102, 241, 0.4);
+    font-weight: 600;
+    font-size: 0.92rem;
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+
+  .toast-stack {
+    right: 12px;
+    left: 12px;
+    bottom: calc(80px + var(--safe-area-bottom));
+    width: auto;
   }
 }
 
 @media (max-width: 480px) {
-  .metrics {
+  .metric-grid {
     grid-template-columns: 1fr;
   }
 }

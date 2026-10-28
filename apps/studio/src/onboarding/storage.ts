@@ -114,4 +114,3 @@ export function clearOnboardingState(
     // Nothing to do.
   }
 }
-

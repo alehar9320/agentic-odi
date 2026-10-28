@@ -182,4 +182,3 @@ MCP tool result (text)
   `{"error": mcp_unreachable}` with a suggestion to start the sidecar and with
   `X-Request-ID` echoed for support. It is logged on the Worker but never leaks
   internals.
-

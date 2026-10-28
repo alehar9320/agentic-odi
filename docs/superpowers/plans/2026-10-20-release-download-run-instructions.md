@@ -192,6 +192,6 @@ git commit -m "feat(release): publish download & run instructions on every relea
 4. **Review Focus:** Each of the five failure modes has a task whose tests or behavior pin it (1→Task 3 `needs`; 2→Task 1 `apply_instructions` markers; 3→Task 1 append/replace preserving body; 4→Task 2 graceful degradation; 5→Task 1 archive table + both installer one-liners).
 5. **Proportion:** Plan is roughly 1:1 with the change; code blocks are signatures/tests/short algorithms only.
 
-**Plan complete and saved to `docs/superpowers/plans/2026-10-20-release-download-run-instructions.md`. Please review the plan. Does it capture what you want?** 
+**Plan complete and saved to `docs/superpowers/plans/2026-10-20-release-download-run-instructions.md`. Please review the plan. Does it capture what you want?**
 
 I've made the how-it-gets-made calls myself (Python + `gh` + `release.yml` job + pytest unit tests + markers for idempotency), so nothing here is waiting on you. Once you confirm, I can implement it directly (Native execution) since the tasks are tightly coupled through `scripts/release_instructions.py` — there are only three tasks and the interfaces are fixed by this plan.
