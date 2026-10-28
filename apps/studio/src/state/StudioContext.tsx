@@ -973,7 +973,6 @@ const pushNotice = useCallback((text: string) => {
       let failure: StudioError | null = null;
       let terminal = false;
       let stopped = false;
-      let toolSeq = 0;
 
       // Prose is appended to the open text part; a surface opens a new one, so
       // the transcript keeps the agent's order instead of gathering all prose
@@ -1000,15 +999,6 @@ const pushNotice = useCallback((text: string) => {
             ? [...parts.slice(0, -1), { kind: "reasoning", text: last.text + chunk }]
             : [...parts, { kind: "reasoning", text: chunk }];
       };
-
-      /** The open tool part for a name, if one is still waiting. */
-      const openTool = (name: string) =>
-        [...parts]
-          .reverse()
-          .find(
-            (part): part is Extract<ChatPart, { kind: "tool" }> =>
-              part.kind === "tool" && part.name === name && part.status === "running",
-          );
 
 
 
