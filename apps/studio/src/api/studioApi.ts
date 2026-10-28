@@ -552,15 +552,6 @@ export async function resolveApproval(
     async () => ({ ok: true, id: approvalId }),
   );
 }
-  approvalId: string,
-  approved: boolean,
-  reason = "",
-): Promise<{ ok: boolean; id: string }> {
-  return postJson<{ ok: boolean; id: string }>(
-    `/api/approvals/${encodeURIComponent(approvalId)}`,
-    { approved, reason },
-  );
-}
 
 export async function createConversation(): Promise<Conversation> {
   return withLocal(

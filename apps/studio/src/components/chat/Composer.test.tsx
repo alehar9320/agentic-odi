@@ -198,3 +198,14 @@ describe("Composer keyboard focus", () => {
     expect(document.activeElement).toBe(send);
   });
 
+  it("keeps the stop control focusable while a reply streams", () => {
+    vi.mocked(useStudio).mockReturnValue(stubContext({ connectorSuggestions: [] }));
+
+    render(<Composer {...baseProps} streaming />);
+    const stop = screen.getByRole("button", { name: "Stop generating" });
+    stop.focus();
+
+    expect(stop.tabIndex).toBe(0);
+    expect(document.activeElement).toBe(stop);
+  });
+});
