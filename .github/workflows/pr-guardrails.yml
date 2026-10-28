@@ -88,7 +88,13 @@ jobs:
             fi
           done
           if [ -s "$message" ]; then
-            gh pr comment "$PR_NUMBER" --repo "$REPO" --body-file "$message" \
-              --edit-last --create-if-none ||
-              echo "note: could not post the warning comment (fork or token permissions)"
+            comment_id="$(gh api "repos/$REPO/issues/$PR_NUMBER/comments" --paginate \
+              --jq '.[] | select(.body | startswith("## PR guardrails")) | .id' |
+              head -n 1)"
+            if [ -n "$comment_id" ]; then
+              gh api --method PATCH "repos/$REPO/issues/comments/$comment_id" \
+                -F body=@"$message" >/dev/null
+            else
+              gh pr comment "$PR_NUMBER" --repo "$REPO" --body-file "$message"
+            fi
           fi

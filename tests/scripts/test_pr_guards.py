@@ -592,3 +592,10 @@ def test_fabrication_ignores_its_own_pattern_definitions() -> None:
     ]
 
     assert check_fabrication(lines) == []
+
+
+def test_the_warning_comment_never_edits_an_unrelated_comment() -> None:
+    workflow = WORKFLOW.read_text(encoding="utf-8")
+
+    assert "--edit-last" not in workflow
+    assert 'startswith("## PR guardrails")' in workflow
