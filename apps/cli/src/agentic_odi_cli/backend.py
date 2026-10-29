@@ -521,6 +521,51 @@ class LocalBackend(Backend):
         return compute_opportunity_score(importance, satisfaction)
 
 
+    def _list_conversations(self, args: dict[str, Any]) -> list[dict[str, Any]]:
+        items = self.service.list_conversations(
+            limit=args.get("limit"), offset=args.get("offset") or 0
+        )
+        return [item.model_dump() for item in items]
+
+    def _get_conversation(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import ConversationNotFoundError, conversation_not_found
+
+        conversation_id = args["conversation_id"]
+        try:
+            conversation = self.service.get_conversation(conversation_id)
+        except ConversationNotFoundError:
+            raise BackendError(conversation_not_found(conversation_id)) from None
+        messages = self.service.conversation_thread(
+            conversation_id, limit=args.get("message_limit") or 200
+        )
+        return {
+            "conversation": conversation.model_dump(),
+            "messages": [message.model_dump() for message in messages],
+        }
+
+    def _list_observations(self, args: dict[str, Any]) -> list[dict[str, Any]]:
+        items = self.service.list_observations(
+            status=args.get("status"), limit=args.get("limit"), offset=args.get("offset") or 0
+        )
+        return [item.model_dump() for item in items]
+
+    def _confirm_observation(self, args: dict[str, Any]) -> dict[str, Any]:
+        return self._set_observation_status(args, "confirmed")
+
+    def _dismiss_observation(self, args: dict[str, Any]) -> dict[str, Any]:
+        return self._set_observation_status(args, "dismissed")
+
+    def _set_observation_status(self, args: dict[str, Any], status: str) -> dict[str, Any]:
+        from agentic_odi_core import ObservationNotFoundError, observation_not_found
+
+        observation_id = args["observation_id"]
+        try:
+            observation = self.service.set_observation_status(observation_id, status)
+        except ObservationNotFoundError:
+            raise BackendError(observation_not_found(observation_id)) from None
+        return observation.model_dump()
+
+
 _LOCAL_HANDLERS = {
     "add_job": LocalBackend._add_job,
     "get_jobs": LocalBackend._get_jobs,
@@ -553,6 +598,11 @@ _LOCAL_HANDLERS = {
     "get_odi_framework_guidelines": LocalBackend._get_odi_framework_guidelines,
     "get_capabilities": LocalBackend._get_capabilities,
     "get_capabilities_manifest": LocalBackend._get_capabilities_manifest,
+    "list_conversations": LocalBackend._list_conversations,
+    "get_conversation": LocalBackend._get_conversation,
+    "list_observations": LocalBackend._list_observations,
+    "confirm_observation": LocalBackend._confirm_observation,
+    "dismiss_observation": LocalBackend._dismiss_observation,
 }
 
 
@@ -617,6 +667,8 @@ _LIST_TOOLS = frozenset(
         "get_outcomes",
         "list_customer_outcomes",
         "list_evidence",
+        "list_conversations",
+        "list_observations",
     }
 )
 

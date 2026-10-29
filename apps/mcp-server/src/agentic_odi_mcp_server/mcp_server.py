@@ -6,11 +6,13 @@ from typing import Any
 from agentic_odi_core import (
     ODI_ASSISTANT_PROMPT,
     ODI_FRAMEWORK_GUIDELINES,
+    ConversationNotFoundError,
     CustomerOutcomeNotFoundError,
     EvidenceItemType,
     EvidenceNotFoundError,
     JobNotFoundError,
     JobStage,
+    ObservationNotFoundError,
     OdiError,
     ODIService,
     OutcomeNotFoundError,
@@ -49,6 +51,14 @@ def _step_not_found(step_id: str | None) -> str:
 
 def _outcome_not_found(outcome_id: str | None) -> str:
     return f"Error: Outcome with ID {outcome_id} not found."
+
+
+def _conversation_not_found(conversation_id: str) -> str:
+    return f"Error: Conversation with ID {conversation_id} not found."
+
+
+def _observation_not_found(observation_id: str) -> str:
+    return f"Error: Observation with ID {observation_id} not found."
 
 
 def _evidence_not_found(evidence_id: str, hint: str | None = None) -> str:
@@ -528,6 +538,64 @@ async def evaluate_outcome(ctx: Context, statement: str, job_id: str | None = No
 @mcp.tool
 def get_odi_schema() -> str:
     return json.dumps(odi_schema())
+
+
+@mcp.tool
+def list_conversations(limit: int | None = None, offset: int = 0) -> str:
+    """List stored conversations, most recently active first."""
+    items = service.list_conversations(limit=limit, offset=offset)
+    return json.dumps([item.model_dump(mode="json") for item in items])
+
+
+@mcp.tool
+def get_conversation(conversation_id: str, message_limit: int = 200) -> str:
+    """Read one conversation with its messages, oldest first.
+
+    ``message_limit`` keeps the most recent turns, which is what resuming a
+    thread needs; a stored UI surface arrives in the message's ``parts``.
+    """
+    try:
+        conversation = service.get_conversation(conversation_id)
+    except ConversationNotFoundError:
+        return _conversation_not_found(conversation_id)
+    messages = service.conversation_thread(conversation_id, limit=message_limit)
+    return json.dumps(
+        {
+            "conversation": conversation.model_dump(mode="json"),
+            "messages": [message.model_dump(mode="json") for message in messages],
+        }
+    )
+
+
+@mcp.tool
+def list_observations(status: str | None = None, limit: int | None = None, offset: int = 0) -> str:
+    """List what the agent learned, newest first, optionally filtered by status."""
+    items = service.list_observations(status=status, limit=limit, offset=offset)
+    return json.dumps([item.model_dump(mode="json") for item in items])
+
+
+@mcp.tool
+def confirm_observation(observation_id: str) -> str:
+    """Confirm an observation, which is how a fact earns a place in future prompts."""
+    try:
+        observation = service.set_observation_status(observation_id, "confirmed")
+    except ObservationNotFoundError:
+        return _observation_not_found(observation_id)
+    except (OdiError, ValueError) as exc:
+        return f"Error: {exc}"
+    return f"Observation confirmed: {observation.model_dump_json()}"
+
+
+@mcp.tool
+def dismiss_observation(observation_id: str) -> str:
+    """Dismiss an observation; a dismissed one never re-enters a prompt."""
+    try:
+        observation = service.set_observation_status(observation_id, "dismissed")
+    except ObservationNotFoundError:
+        return _observation_not_found(observation_id)
+    except (OdiError, ValueError) as exc:
+        return f"Error: {exc}"
+    return f"Observation dismissed: {observation.model_dump_json()}"
 
 
 def main() -> None:

@@ -2,11 +2,25 @@
 
 from __future__ import annotations
 
-from typing import Protocol, TypeVar
+from datetime import datetime, timezone
+from typing import Any, Protocol, TypeVar
 
-from agentic_odi_core.models import CustomerOutcome, Evidence, Job, Outcome, Step
+from pydantic import BaseModel
+
+from agentic_odi_core.models import (
+    Brief,
+    Conversation,
+    CustomerOutcome,
+    Evidence,
+    Job,
+    Message,
+    Observation,
+    Outcome,
+    Step,
+)
 
 _Item = TypeVar("_Item")
+_Model = TypeVar("_Model", bound=BaseModel)
 
 
 def rank_outcomes(outcomes: list[Outcome]) -> list[Outcome]:
@@ -34,12 +48,52 @@ def page(items: list[_Item], limit: int | None = None, offset: int = 0) -> list[
     return sliced if limit is None else sliced[:limit]
 
 
+def epoch_seconds(moment: datetime) -> float:
+    """Comparable timestamp for ordering; a naive value is read as UTC."""
+    aware = moment if moment.tzinfo else moment.replace(tzinfo=timezone.utc)
+    return aware.timestamp()
+
+
+def thread_window(messages: list[Message], limit: int | None, before: str | None) -> list[Message]:
+    """Select the window of a thread to return, oldest first.
+
+    ``before`` is a message id used as a backwards cursor, so a client paging
+    through history asks for "what came before this one". ``limit`` then keeps
+    the most recent entries of that window, which is what a reload needs: the
+    tail of the thread, still in order.
+    """
+    if limit is not None and limit < 0:
+        raise ValueError("limit must be >= 0")
+    window = messages
+    if before is not None:
+        cut = next((index for index, item in enumerate(window) if item.id == before), len(window))
+        window = window[:cut]
+    if limit is None:
+        return list(window)
+    return list(window[-limit:]) if limit else []
+
+
+def apply_updates(entity: _Model, updates: dict[str, Any]) -> _Model:
+    """Merge updates over the fields a stored entity actually carries.
+
+    ``exclude_unset`` matters: revalidating a full dump would re-require
+    derived fields the model computes for itself.
+    """
+    current = entity.model_dump(exclude_unset=True)
+    current.update(updates)
+    return type(entity).model_validate(current)
+
+
 class Repository(Protocol):
     jobs: dict[str, Job]
     steps: dict[str, Step]
     outcomes: dict[str, Outcome]
     customer_outcomes: dict[str, CustomerOutcome]
     evidence: dict[str, Evidence]
+    conversations: dict[str, Conversation]
+    messages: dict[str, Message]
+    observations: dict[str, Observation]
+    brief: Brief | None
 
     def add_job(self, job: Job) -> Job: ...
     def list_jobs(self, limit: int | None = None, offset: int = 0) -> list[Job]: ...
@@ -85,6 +139,26 @@ class Repository(Protocol):
         offset: int = 0,
     ) -> list[Evidence]: ...
     def delete_evidence(self, evidence_id: str) -> bool: ...
+    def add_conversation(self, conversation: Conversation) -> Conversation: ...
+    def get_conversation(self, conversation_id: str) -> Conversation | None: ...
+    def list_conversations(
+        self, limit: int | None = None, offset: int = 0
+    ) -> list[Conversation]: ...
+    def update_conversation(self, conversation_id: str, updates: dict) -> Conversation | None: ...
+    def delete_conversation(self, conversation_id: str) -> bool: ...
+    def add_message(self, message: Message) -> Message: ...
+    def get_message(self, message_id: str) -> Message | None: ...
+    def list_messages(
+        self, conversation_id: str, limit: int | None = None, before: str | None = None
+    ) -> list[Message]: ...
+    def add_observation(self, observation: Observation) -> Observation: ...
+    def get_observation(self, observation_id: str) -> Observation | None: ...
+    def list_observations(
+        self, status: str | None = None, limit: int | None = None, offset: int = 0
+    ) -> list[Observation]: ...
+    def update_observation(self, observation_id: str, updates: dict) -> Observation | None: ...
+    def save_brief(self, brief: Brief) -> Brief: ...
+    def get_brief(self) -> Brief | None: ...
     def clear(self) -> None: ...
     def reload(self) -> None: ...
 
@@ -96,6 +170,10 @@ class InMemoryRepository:
         self.outcomes: dict[str, Outcome] = {}
         self.customer_outcomes: dict[str, CustomerOutcome] = {}
         self.evidence: dict[str, Evidence] = {}
+        self.conversations: dict[str, Conversation] = {}
+        self.messages: dict[str, Message] = {}
+        self.observations: dict[str, Observation] = {}
+        self.brief: Brief | None = None
 
     def add_job(self, job: Job) -> Job:
         self.jobs[job.id] = job
@@ -279,12 +357,94 @@ class InMemoryRepository:
             return True
         return False
 
+    def add_conversation(self, conversation: Conversation) -> Conversation:
+        self.conversations[conversation.id] = conversation
+        return conversation
+
+    def get_conversation(self, conversation_id: str) -> Conversation | None:
+        return self.conversations.get(conversation_id)
+
+    def list_conversations(self, limit: int | None = None, offset: int = 0) -> list[Conversation]:
+        ordered = sorted(
+            self.conversations.values(),
+            key=lambda conversation: epoch_seconds(conversation.updated_at),
+            reverse=True,
+        )
+        return page(ordered, limit, offset)
+
+    def update_conversation(self, conversation_id: str, updates: dict) -> Conversation | None:
+        conversation = self.conversations.get(conversation_id)
+        if not conversation:
+            return None
+        new_conversation = apply_updates(conversation, updates)
+        self.conversations[conversation_id] = new_conversation
+        return new_conversation
+
+    def delete_conversation(self, conversation_id: str) -> bool:
+        if conversation_id not in self.conversations:
+            return False
+        del self.conversations[conversation_id]
+        for key in [k for k, v in self.messages.items() if v.conversation_id == conversation_id]:
+            del self.messages[key]
+        return True
+
+    def add_message(self, message: Message) -> Message:
+        self.messages[message.id] = message
+        return message
+
+    def get_message(self, message_id: str) -> Message | None:
+        return self.messages.get(message_id)
+
+    def list_messages(
+        self, conversation_id: str, limit: int | None = None, before: str | None = None
+    ) -> list[Message]:
+        thread = [m for m in self.messages.values() if m.conversation_id == conversation_id]
+        return thread_window(thread, limit, before)
+
+    def add_observation(self, observation: Observation) -> Observation:
+        self.observations[observation.id] = observation
+        return observation
+
+    def get_observation(self, observation_id: str) -> Observation | None:
+        return self.observations.get(observation_id)
+
+    def list_observations(
+        self, status: str | None = None, limit: int | None = None, offset: int = 0
+    ) -> list[Observation]:
+        items = sorted(
+            self.observations.values(),
+            key=lambda observation: epoch_seconds(observation.created_at),
+            reverse=True,
+        )
+        if status is not None:
+            items = [item for item in items if item.status == status]
+        return page(items, limit, offset)
+
+    def update_observation(self, observation_id: str, updates: dict) -> Observation | None:
+        observation = self.observations.get(observation_id)
+        if not observation:
+            return None
+        new_observation = apply_updates(observation, updates)
+        self.observations[observation_id] = new_observation
+        return new_observation
+
+    def save_brief(self, brief: Brief) -> Brief:
+        self.brief = brief
+        return brief
+
+    def get_brief(self) -> Brief | None:
+        return self.brief
+
     def clear(self) -> None:
         self.jobs.clear()
         self.steps.clear()
         self.outcomes.clear()
         self.customer_outcomes.clear()
         self.evidence.clear()
+        self.conversations.clear()
+        self.messages.clear()
+        self.observations.clear()
+        self.brief = None
 
     def reload(self) -> None:
         """Reset in-memory state; there is no external store to re-read."""

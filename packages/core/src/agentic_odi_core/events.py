@@ -96,4 +96,6 @@ def resolve_device_id(path: Path | None = None) -> str:
     device_path.parent.mkdir(parents=True, exist_ok=True)
     device_id = uuid.uuid4().hex
     device_path.write_text(device_id + "\n", encoding="utf-8")
+    # The id names this install, so it stays owner-readable only.
+    os.chmod(device_path, 0o600)
     return device_id

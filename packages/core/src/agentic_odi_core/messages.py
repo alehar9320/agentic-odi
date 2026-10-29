@@ -73,6 +73,7 @@ CAPABILITIES = """Here is what I can help you with as your Agentic ODI assistant
 📊 **Customer Outcomes**: Manage ODI-aligned customer outcomes with customer value, business value, and opportunity scoring.
 🧪 **Evaluate Outcomes**: Call `evaluate_outcome(statement)` to check a statement against the ODI format before saving it.
 🧾 **Evidence**: Capture and promote research records from connectors with `add_evidence`, `list_evidence`, and `promote_evidence`.
+🧠 **Memory**: Read the running thread with `list_conversations` and `get_conversation`; read what the agent learned with `list_observations`, then `confirm_observation` or `dismiss_observation`. Only a person confirms — an agent never confirms its own memory.
 📖 **ODI Framework Guidelines**: Call `get_odi_framework_guidelines()` to see which tool to use at each ODI stage.
 🧬 **Schema**: Call `get_odi_schema()` for the canonical JSON schema of every ODI entity.
 
@@ -100,3 +101,11 @@ def evidence_not_found(evidence_id: str | None, hint: str | None = None) -> str:
     if hint:
         message = f"{message}. {hint}"
     return message
+
+
+def conversation_not_found(conversation_id: str | None) -> str:
+    return f"Conversation not found: {conversation_id}"
+
+
+def observation_not_found(observation_id: str | None) -> str:
+    return f"Observation not found: {observation_id}"

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime, timezone
 from typing import Any
 
 from agentic_odi_core.errors import NotFoundError, ValidationError
@@ -13,13 +14,20 @@ from agentic_odi_core.evaluation import (
 )
 from agentic_odi_core.models import (
     JOB_STAGE_INDEX,
+    Brief,
     BusinessValue,
+    Conversation,
     CustomerOutcome,
     CustomerValue,
     Evidence,
     EvidenceItemType,
     Job,
     JobStage,
+    Message,
+    MessageRole,
+    Observation,
+    ObservationCategory,
+    ObservationStatus,
     Outcome,
     Step,
     compute_opportunity_score,
@@ -63,6 +71,18 @@ class EvidenceNotFoundError(NotFoundError, ValueError):
         super().__init__(evidence_id, "evidence", hint)
 
 
+class ConversationNotFoundError(NotFoundError):
+    def __init__(self, conversation_id: str) -> None:
+        self.conversation_id = conversation_id
+        super().__init__(conversation_id, "conversation")
+
+
+class ObservationNotFoundError(NotFoundError):
+    def __init__(self, observation_id: str) -> None:
+        self.observation_id = observation_id
+        super().__init__(observation_id, "observation")
+
+
 class ValueOutOfRangeError(ValidationError):
     pass
 
@@ -84,6 +104,14 @@ def _first_line(text: str) -> str:
         if stripped:
             return stripped
     return ""
+
+
+_TITLE_LENGTH = 80
+
+
+def _now_iso() -> str:
+    """A JSON-safe timestamp, since updates travel to the event log as payloads."""
+    return datetime.now(timezone.utc).isoformat()
 
 
 class ODIService:
@@ -405,3 +433,135 @@ class ODIService:
 
     def compute_opportunity(self, importance: float, satisfaction: float) -> float:
         return compute_opportunity_score(importance, satisfaction)
+
+    def start_conversation(self, title: str | None = None) -> Conversation:
+        return self.repo.add_conversation(Conversation(title=title))
+
+    def list_conversations(self, limit: int | None = None, offset: int = 0) -> list[Conversation]:
+        return self.repo.list_conversations(limit=limit, offset=offset)
+
+    def get_conversation(self, conversation_id: str) -> Conversation:
+        conversation = self.repo.get_conversation(conversation_id)
+        if conversation is None:
+            raise ConversationNotFoundError(conversation_id)
+        return conversation
+
+    def conversation_thread(
+        self, conversation_id: str, limit: int | None = None, before: str | None = None
+    ) -> list[Message]:
+        """The thread oldest first — the order a reloaded transcript renders in."""
+        self.get_conversation(conversation_id)
+        return self.repo.list_messages(conversation_id, limit=limit, before=before)
+
+    def append_message(
+        self,
+        conversation_id: str,
+        role: MessageRole,
+        content: str = "",
+        parts: list[dict[str, Any]] | None = None,
+        tool_calls: list[dict[str, Any]] | None = None,
+        model: str | None = None,
+        tokens_in: int | None = None,
+        tokens_out: int | None = None,
+    ) -> Message:
+        conversation = self.get_conversation(conversation_id)
+        message = self.repo.add_message(
+            Message(
+                conversation_id=conversation_id,
+                role=role,
+                content=content,
+                parts=list(parts or []),
+                tool_calls=list(tool_calls or []),
+                model=model,
+                tokens_in=tokens_in,
+                tokens_out=tokens_out,
+            )
+        )
+        updates: dict[str, Any] = {"updated_at": _now_iso()}
+        if conversation.title is None and role == "user":
+            title = _first_line(content)[:_TITLE_LENGTH]
+            if title:
+                updates["title"] = title
+        self.repo.update_conversation(conversation_id, updates)
+        return message
+
+    def update_conversation(self, conversation_id: str, updates: dict[str, Any]) -> Conversation:
+        updated = self.repo.update_conversation(
+            conversation_id, {**updates, "updated_at": _now_iso()}
+        )
+        if updated is None:
+            raise ConversationNotFoundError(conversation_id)
+        return updated
+
+    def delete_conversation(self, conversation_id: str) -> None:
+        if not self.repo.delete_conversation(conversation_id):
+            raise ConversationNotFoundError(conversation_id)
+
+    def remember(
+        self,
+        text: str,
+        category: ObservationCategory = "other",
+        conversation_id: str | None = None,
+        source_message_id: str | None = None,
+    ) -> Observation:
+        """Write what the agent learned as a proposal, never as a confirmed fact."""
+        stripped = text.strip()
+        if not stripped:
+            raise ValidationError("an observation needs text")
+        return self.repo.add_observation(
+            Observation(
+                text=stripped,
+                category=category,
+                conversation_id=conversation_id,
+                source_message_id=source_message_id,
+            )
+        )
+
+    def list_observations(
+        self, status: str | None = None, limit: int | None = None, offset: int = 0
+    ) -> list[Observation]:
+        return self.repo.list_observations(status=status, limit=limit, offset=offset)
+
+    def confirmed_observations(self) -> list[Observation]:
+        """The only observations an agent may carry forward into a prompt."""
+        return self.repo.list_observations(status="confirmed")
+
+    def get_observation(self, observation_id: str) -> Observation:
+        observation = self.repo.get_observation(observation_id)
+        if observation is None:
+            raise ObservationNotFoundError(observation_id)
+        return observation
+
+    def update_observation(self, observation_id: str, updates: dict[str, Any]) -> Observation:
+        updated = self.repo.update_observation(
+            observation_id, {**updates, "updated_at": _now_iso()}
+        )
+        if updated is None:
+            raise ObservationNotFoundError(observation_id)
+        return updated
+
+    def set_observation_status(self, observation_id: str, status: ObservationStatus) -> Observation:
+        if status not in ("confirmed", "dismissed", "proposed"):
+            raise ValidationError(f"unknown observation status: {status}")
+        return self.update_observation(observation_id, {"status": status})
+
+    def save_brief(
+        self,
+        product_name: str = "",
+        product_url: str = "",
+        target_user: str = "",
+        job_statement: str = "",
+        core_problem: str = "",
+    ) -> Brief:
+        return self.repo.save_brief(
+            Brief(
+                product_name=product_name,
+                product_url=product_url,
+                target_user=target_user,
+                job_statement=job_statement,
+                core_problem=core_problem,
+            )
+        )
+
+    def get_brief(self) -> Brief | None:
+        return self.repo.get_brief()
