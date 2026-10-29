@@ -10,7 +10,14 @@ from pydantic import BaseModel, ValidationError
 
 from agentic_odi_core.events import DEFAULT_DEVICE, DEFAULT_WORKSPACE, Event
 from agentic_odi_core.intent_store import IntentStore
-from agentic_odi_core.models import CustomerOutcome, Evidence, Job, Outcome, Step
+from agentic_odi_core.models import (
+    CustomerOutcome,
+    Evidence,
+    Job,
+    Outcome,
+    Step,
+    compute_opportunity_score,
+)
 from agentic_odi_core.repository import Repository, page, sort_outcomes
 
 
@@ -31,7 +38,9 @@ class SQLiteRepository(Repository):
         self._device_id = device_id or os.environ.get("AGENTIC_ODI_DEVICE_ID", DEFAULT_DEVICE)
         self.store = IntentStore(db_path, check_same_thread=False)
         self._last_event_id = 0
+        self._backfilled = False
         self._load_snapshot()
+        self._backfill_legacy_outcomes()
 
     def _load_snapshot(self) -> None:
         self.jobs: dict[str, Job] = {}
@@ -42,6 +51,44 @@ class SQLiteRepository(Repository):
         self._last_event_id = 0
         for ev in self.store.get_stream(workspace_id=self._workspace_id, replay_order=True):
             self._apply_event(ev)
+
+    def _backfill_legacy_outcomes(self) -> None:
+        """One-time migration: backfill null scores on legacy outcomes.
+
+        Assigns importance=5.0, satisfaction=5.0 to any outcome missing either
+        score, records an OUTCOME_BACKFILLED event per outcome, and marks the
+        repository as backfilled so reloads do not repeat the migration.
+        """
+        if self._backfilled:
+            return
+        needs_backfill = [
+            o for o in self.outcomes.values() if o.importance is None or o.satisfaction is None
+        ]
+        if not needs_backfill:
+            self._backfilled = True
+            return
+        for outcome in needs_backfill:
+            updates: dict[str, Any] = {}
+            importance = outcome.importance
+            if importance is None:
+                importance = 5.0
+                updates["importance"] = importance
+            satisfaction = outcome.satisfaction
+            if satisfaction is None:
+                satisfaction = 5.0
+                updates["satisfaction"] = satisfaction
+            updates["opportunity_score"] = compute_opportunity_score(
+                importance,
+                satisfaction,
+            )
+            self.store.append(
+                "OUTCOME_BACKFILLED",
+                {"id": outcome.id, "updates": updates},
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+        self._sync()
+        self._backfilled = True
 
     def _sync(self) -> None:
         for ev in self.store.get_stream(workspace_id=self._workspace_id):
@@ -419,3 +466,8 @@ class SQLiteRepository(Repository):
     def reload(self) -> None:
         """Re‑load the local snapshot from the event store."""
         self._load_snapshot()
+
+    def close(self) -> None:
+        """Close the event store and let SQLite clean up its journal files."""
+        with self._lock:
+            self.store.close()

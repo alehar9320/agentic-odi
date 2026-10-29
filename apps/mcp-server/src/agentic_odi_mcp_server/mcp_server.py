@@ -4,19 +4,22 @@ import json
 from typing import Any
 
 from agentic_odi_core import (
-    CAPABILITIES,
     ODI_ASSISTANT_PROMPT,
     ODI_FRAMEWORK_GUIDELINES,
     CustomerOutcomeNotFoundError,
     EvidenceItemType,
     EvidenceNotFoundError,
     JobNotFoundError,
+    JobStage,
     OdiError,
     ODIService,
     OutcomeNotFoundError,
+    OutcomeStatementError,
     StepNotFoundError,
     ValueOutOfRangeError,
     build_repository,
+    capability_manifest,
+    capability_summary,
     compute_opportunity_score,
     evaluate_outcome_statement,
     job_not_found,
@@ -86,12 +89,26 @@ def get_job(job_id: str) -> str:
 
 
 @mcp.tool
-def add_step(job_id: str, name: str, order: int) -> str:
+def add_step(
+    job_id: str,
+    name: str,
+    order: int,
+    stage: JobStage | None = None,
+    allow_empty_job_map: bool = False,
+) -> str:
     try:
-        step = service.add_step(job_id=job_id, name=name, order=order)
+        step = service.add_step(
+            job_id=job_id,
+            name=name,
+            order=order,
+            stage=stage,
+            allow_empty_job_map=allow_empty_job_map,
+        )
     except JobNotFoundError:
         return job_not_found(job_id)
     except ValueOutOfRangeError as exc:
+        return f"Error: {exc}"
+    except OdiError as exc:
         return f"Error: {exc}"
     return f"Step created successfully: {step.model_dump_json()}"
 
@@ -109,8 +126,8 @@ def get_job_map(job_id: str, limit: int | None = None, offset: int = 0) -> str:
 def add_outcome(
     job_id: str,
     statement: str,
-    importance: float | None = None,
-    satisfaction: float | None = None,
+    importance: float,
+    satisfaction: float,
     step_id: str | None = None,
 ) -> str:
     try:
@@ -127,6 +144,8 @@ def add_outcome(
         return _step_not_found(step_id)
     except ValueOutOfRangeError:
         return "Error: importance and satisfaction must be between 1.0 and 10.0"
+    except OutcomeStatementError as exc:
+        return f"Error: {exc}"
     return f"Outcome created successfully: {outcome.model_dump_json()}"
 
 
@@ -276,7 +295,12 @@ def get_odi_framework_guidelines() -> str:
 
 @mcp.tool
 def get_capabilities() -> str:
-    return CAPABILITIES
+    return capability_summary()
+
+
+@mcp.tool
+def get_capabilities_manifest() -> str:
+    return json.dumps(capability_manifest())
 
 
 @mcp.tool
@@ -362,6 +386,8 @@ def update_outcome(
         updated = service.update_outcome(outcome_id, updates)
     except OutcomeNotFoundError:
         return _outcome_not_found(outcome_id)
+    except OutcomeStatementError as exc:
+        return f"Error: {exc}"
     except ValueOutOfRangeError:
         return "Error: importance and satisfaction must be between 1.0 and 10.0"
     return f"Outcome updated successfully: {updated.model_dump_json()}"

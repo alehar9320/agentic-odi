@@ -2,25 +2,29 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { OnboardingProvider } from "../onboarding/OnboardingProvider";
+import { UpdateProvider, createUpdateService } from "../updater";
+import type { UpdateTransport } from "../updater/types";
 import { SettingsPanel } from "./SettingsPanel";
 
 vi.mock("../state/StudioContext", () => ({
   useStudio: vi.fn(),
 }));
-vi.mock("./updater/useUpdater", () => ({
-  useUpdater: vi.fn(() => ({
-    checking: false,
-    available: false,
-    version: null,
-    progress: null,
-    error: null,
-    check: vi.fn(),
-  })),
-}));
 
 import { useStudio } from "../state/StudioContext";
-import { useUpdater } from "./updater/useUpdater";
 import type { StudioContextValue } from "../state/StudioContext";
+
+const transport: UpdateTransport = {
+  supported: () => false,
+  currentVersion: async () => "0.11.0",
+  check: async () => null,
+  relaunch: async () => undefined,
+};
+
+const service = createUpdateService({
+  transport,
+  storage: null,
+  document: null,
+});
 
 const stubContext = (overrides: Record<string, unknown> = {}) =>
   ({
@@ -62,9 +66,11 @@ const stubContext = (overrides: Record<string, unknown> = {}) =>
 
 function renderPanel() {
   return render(
-    <OnboardingProvider enabled={false}>
-      <SettingsPanel />
-    </OnboardingProvider>,
+    <UpdateProvider service={service}>
+      <OnboardingProvider enabled={false}>
+        <SettingsPanel />
+      </OnboardingProvider>
+    </UpdateProvider>,
   );
 }
 
@@ -75,12 +81,25 @@ describe("SettingsPanel connectors", () => {
 
     renderPanel();
 
-    expect(screen.getByText(/notion/)).toBeInTheDocument();
+    expect(screen.getAllByText(/notion/).length).toBeGreaterThan(0);
     fireEvent.click(screen.getByRole("button", { name: /remove notion/i }));
     expect(del).toHaveBeenCalledWith("notion");
   });
 
-  it("adds a connector from a selected preset", () => {
+  it("groups presets by capability area with id, auth, and a connect control", () => {
+    vi.mocked(useStudio).mockReturnValue(stubContext({ connectors: [] }));
+
+    renderPanel();
+
+    expect(
+      screen.getByRole("region", { name: /voice of customer/i }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("notion")).toBeInTheDocument();
+    expect(screen.getByText(/OAuth/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /connect notion/i })).toBeInTheDocument();
+  });
+
+  it("adds a connector from its row", () => {
     const add = vi.fn().mockResolvedValue({ ok: true, name: "notion" });
     vi.mocked(useStudio).mockReturnValue(
       stubContext({ addConnector: add, connectors: [] }),
@@ -88,29 +107,34 @@ describe("SettingsPanel connectors", () => {
 
     renderPanel();
 
-    fireEvent.change(screen.getByRole("combobox", { name: /add preset/i }), {
-      target: { value: "notion" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: /add preset/i }));
+    fireEvent.click(screen.getByRole("button", { name: /connect notion/i }));
     expect(add).toHaveBeenCalledWith({ preset: "notion" });
   });
 
-  it("leaves update errors inline instead of toasting them", () => {
-    const pushToast = vi.fn();
-    vi.mocked(useStudio).mockReturnValue(stubContext({ pushToast }));
-    vi.mocked(useUpdater).mockReturnValueOnce({
-      checking: false,
-      available: false,
-      version: null,
-      progress: null,
-      error: "Update check failed.",
-      check: vi.fn(),
-    });
+  it("does not pretend unconnectable sources are connection rows", () => {
+    vi.mocked(useStudio).mockReturnValue(stubContext());
 
     renderPanel();
-    fireEvent.click(screen.getByRole("button", { name: /check for updates/i }));
 
-    expect(pushToast).not.toHaveBeenCalled();
+    expect(screen.queryByText(/gong transcripts/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/slack friction stream/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/product telemetry/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/no data source is connected yet/i)).toBeInTheDocument();
+  });
+
+  it("toggles API key visibility", () => {
+    vi.mocked(useStudio).mockReturnValue(stubContext());
+
+    renderPanel();
+
+    const input = screen.getByLabelText("API key") as HTMLInputElement;
+    expect(input.type).toBe("password");
+
+    fireEvent.click(screen.getByRole("button", { name: /show api key/i }));
+    expect(input.type).toBe("text");
+
+    fireEvent.click(screen.getByRole("button", { name: /hide api key/i }));
+    expect(input.type).toBe("password");
   });
 
   it("shows an empty state when no connectors are registered", () => {
@@ -148,7 +172,7 @@ describe("SettingsPanel connector catalog failures", () => {
     expect(refresh).toHaveBeenCalled();
   });
 
-  it("disables adding a preset while the catalog is in error", () => {
+  it("offers no connect control while the catalog is in error", () => {
     vi.mocked(useStudio).mockReturnValue(
       stubContext({
         presets: [],
@@ -162,7 +186,7 @@ describe("SettingsPanel connector catalog failures", () => {
 
     renderPanel();
 
-    expect(screen.getByRole("button", { name: /add preset/i })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: /^connect /i })).toBeNull();
   });
 });
 
