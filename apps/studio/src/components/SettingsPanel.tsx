@@ -79,6 +79,7 @@ export function SettingsPanel() {
     refreshConnectors,
     addConnector,
     deleteConnector,
+    openCustomize,
     sidecarReachable,
     capabilities,
   } = useStudio();
@@ -238,6 +239,13 @@ export function SettingsPanel() {
       ) : (
         <>
           <h3 className="settings__title">Connectors</h3>
+          <button
+            type="button"
+            className="button settings__manage"
+            onClick={() => openCustomize()}
+          >
+            Manage connectors
+          </button>
           {connectorsError ? (
             <FailurePanel
               error={connectorsError}

@@ -117,10 +117,12 @@ The server speaks the Model Context Protocol. Any MCP client can reach it:
 }
 ```
 
-Register MCP or REST connectors (Notion, PostHog, Exa, Linear, GitHub) in the
-Studio's **Settings → Connectors**, conversationally, or via
-`agentic-odi connectors add <preset>`. See
-[External Connectors](docs/connectors.md).
+Register MCP or REST connectors (Notion, PostHog, Exa, Linear, GitHub) on the
+Studio's **Customize** page — installed connectors first, then a trusted vendor
+marketplace, then conversationally, or via `agentic-odi connectors add <preset>`.
+A listing that needs a token names the environment variable to set; no credential
+is stored in the app. MCP servers install today; A2A agents are marked "coming
+soon". See [External Connectors](docs/connectors.md).
 
 ## Documentation
 
