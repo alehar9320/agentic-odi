@@ -22,6 +22,9 @@ it is merged; the link is the proof.
 - [x] **Pull request guardrails** — diff-shape, body-truth, and fabrication gates on the cumulative diff ([PR #273](https://github.com/alehar9320/agentic-odi/pull/273)).
 - [x] **Browser-level Studio suite** — the conversation, an outcome capture, the landscape, the workspace views, and the passthrough backend, driven against the real stack ([PR #267](https://github.com/alehar9320/agentic-odi/pull/267)).
 - [x] **Offline-first CLI and hosted Studio** — the terminal REPL with `/connect`, and the Living Studio served from a Cloudflare Worker ([v0.7.0](https://github.com/alehar9320/agentic-odi/releases/tag/v0.7.0)).
+- [x] **EvidenceDraft validation at ingest** — connector records conform before they enter the store ([PR #287](https://github.com/alehar9320/agentic-odi/pull/287)).
+- [x] **Tool spec validation on MCP startup** — the server refuses to serve a malformed registry ([PR #288](https://github.com/alehar9320/agentic-odi/pull/288)).
+- [x] **Keyboard navigation for the feed and job map** — phase cards, step rows, and both dialogs are operable without a mouse ([PR #297](https://github.com/alehar9320/agentic-odi/pull/297)).
 
 ## In flight
 
@@ -31,7 +34,6 @@ counted as done.
 
 - [ ] **Resume the last job, step, or outcome after a reload** — the Studio keeps its place in browser storage ([PR #299](https://github.com/alehar9320/agentic-odi/pull/299)).
 - [ ] **Rate-limit the ingest sink** — a token bucket sheds a high-volume batch instead of exhausting memory ([PR #298](https://github.com/alehar9320/agentic-odi/pull/298)).
-- [ ] **Keyboard navigation for the feed and job map** — phase cards, step rows, and both dialogs are operable without a mouse ([PR #297](https://github.com/alehar9320/agentic-odi/pull/297)).
 - [ ] **Job validation at the model level** — name and description constraints live in `packages/core` ([PR #296](https://github.com/alehar9320/agentic-odi/pull/296)).
 - [ ] **MCP connection limits** — timeout and pool settings so a hanging connection is bounded ([PR #294](https://github.com/alehar9320/agentic-odi/pull/294)).
 - [ ] **`odi data export`** — back the ODI state up as JSON ([PR #293](https://github.com/alehar9320/agentic-odi/pull/293)).
@@ -39,8 +41,6 @@ counted as done.
 - [ ] **Merge candidate evidence into one outcome** — the review step for duplicate candidates ([PR #291](https://github.com/alehar9320/agentic-odi/pull/291)).
 - [ ] **`odi connectors list-presets`** — discover and copy a preset from the terminal ([PR #290](https://github.com/alehar9320/agentic-odi/pull/290)).
 - [ ] **`odi connectors health`** — every registered connector's health in one table ([PR #289](https://github.com/alehar9320/agentic-odi/pull/289)).
-- [ ] **Tool spec validation on MCP startup** — the server refuses to serve a malformed registry ([PR #288](https://github.com/alehar9320/agentic-odi/pull/288)).
-- [ ] **EvidenceDraft validation at ingest** — connector records conform before they enter the store ([PR #287](https://github.com/alehar9320/agentic-odi/pull/287)).
 - [ ] **MCP `/health` store probe** — the server reports whether its SQLite store is reachable ([PR #286](https://github.com/alehar9320/agentic-odi/pull/286)).
 - [ ] **Durable sessions and a real memory** — the conversation survives a reload ([PR #285](https://github.com/alehar9320/agentic-odi/pull/285)).
 - [ ] **Accept or reject a candidate without losing evidence** — the review half of candidate extraction ([PR #284](https://github.com/alehar9320/agentic-odi/pull/284)).

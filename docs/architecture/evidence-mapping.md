@@ -30,6 +30,11 @@ maps each record field-for-field (`mapping.py:53-78`):
 Catalog records are skipped unless `include_catalog=True` (`mapping.py:45-49`):
 a connector's own catalog describes the connector, not the customer's job.
 
+Each draft is an `EvidenceDraft` model, so building it validates the required
+fields and the item-type enum before anything reaches the service. The package
+also exports `validate_evidence_draft()` for a draft that arrives as a plain
+dict; the CLI path builds the model directly.
+
 ## Why a separate draft
 
 The connector package does not import the ODI service. That keeps a vendor
