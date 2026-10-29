@@ -1,11 +1,5 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-
-const toast = vi.hoisted(() => ({ pushToast: vi.fn() }));
-
-vi.mock("../state/StudioContext", () => ({
-  useStudio: () => ({ pushToast: toast.pushToast }),
-}));
 
 import { UiActionContext } from "./actions";
 import { CATALOG, catalogManifest } from "./catalog";
@@ -41,24 +35,6 @@ describe("UiRenderer", () => {
     expect(screen.getByLabelText("Outcome O-1")).toBeInTheDocument();
     expect(screen.getByText("Underserved · 15.0")).toBeInTheDocument();
     expect(screen.getByText("Minimize propagation time")).toBeInTheDocument();
-  });
-
-  it("marks a sample outcome card as bundled data", () => {
-    renderSpec({
-      type: "outcome-card",
-      props: {
-        id: "O-SAMPLE",
-        statement: "Minimize the time to propagate secrets",
-        importance: 9,
-        satisfaction: 3,
-        sample: true,
-      },
-    });
-
-    expect(screen.getByText("Sample")).toHaveAttribute(
-      "title",
-      "This is bundled sample data, not yours.",
-    );
   });
 
   it("prefers an explicit opportunity score when the agent supplies one", () => {
@@ -134,21 +110,6 @@ describe("UiRenderer", () => {
     expect(screen.getByRole("status")).toHaveTextContent("hover-car");
   });
 
-  it("copies the raw spec of an unsupported surface", async () => {
-    const writeText = vi.fn().mockResolvedValue(undefined);
-    Object.defineProperty(navigator, "clipboard", {
-      value: { writeText },
-      configurable: true,
-    });
-    renderSpec({ type: "hover-car", props: {} });
-
-    fireEvent.click(screen.getByRole("button", { name: /copy raw spec/i }));
-
-    await waitFor(() => {
-      expect(writeText).toHaveBeenCalledWith(expect.stringContaining('"type": "hover-car"'));
-    });
-  });
-
   it("dispatches an action as an intent for the agent", () => {
     const { onIntent } = renderSpec({
       type: "outcome-card",
@@ -215,41 +176,6 @@ describe("registry parity", () => {
     const types = new Set(CATALOG.map((component) => component.type));
     for (const type of Object.keys(NODE_COMPONENTS)) {
       expect(types.has(type), type).toBe(true);
-    }
-  });
-});
-
-describe("impact simulation provenance", () => {
-  const simulation = {
-    outcome: { id: "O-1", statement: "Minimize propagation time" },
-    bet: "Automate secret sync",
-    before: ["Copy-paste into CI"],
-    after: ["One command"],
-  };
-
-  it("marks a simulated bet and says no model backs the number", () => {
-    renderSpec({ type: "impact-simulation", props: { ...simulation, provenance: "simulated" } });
-
-    expect(screen.getByText("Simulated")).toBeInTheDocument();
-    expect(screen.getByText(/no model behind this number/i)).toBeInTheDocument();
-  });
-
-  it("refuses a simulation that does not say where it came from", () => {
-    const result = parseUiSpec(
-      { type: "impact-simulation", props: simulation },
-      catalogManifest(),
-    );
-
-    expect(result.ok).toBe(false);
-  });
-
-  it("refuses a simulation that claims to be measured or live", () => {
-    for (const provenance of ["live", "measured"]) {
-      const result = parseUiSpec(
-        { type: "impact-simulation", props: { ...simulation, provenance } },
-        catalogManifest(),
-      );
-      expect(result.ok).toBe(false);
     }
   });
 });

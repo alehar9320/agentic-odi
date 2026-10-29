@@ -1,11 +1,8 @@
 import { GOAL_STEP_INDEX, STEPS, type GoalId, type WizardStepId } from "./content";
 
 /**
- * Pure flow rules for the product tour. No React, no storage, no DOM — the
+ * Pure flow rules for the first-run tour. No React, no storage, no DOM — the
  * whole sequence can be reasoned about and tested as plain functions.
- *
- * Nothing here opens the tour. Opening is a deliberate action, handled by the
- * provider; these functions only move through the flow once it is open.
  */
 
 export const ONBOARDING_VERSION = 1;
@@ -41,6 +38,11 @@ export function clampStep(step: number): number {
 
 export function stepAt(step: number): WizardStepId {
   return STEPS[clampStep(step)].id;
+}
+
+/** A tour the user has neither finished nor skipped should greet them. */
+export function shouldAutoOpen(state: OnboardingState): boolean {
+  return state.status === "pending" || state.status === "active";
 }
 
 export function isFinished(state: OnboardingState): boolean {

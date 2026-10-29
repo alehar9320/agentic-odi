@@ -15,26 +15,6 @@ def test_steps_add_and_list_job_map(tmp_path):
     runner = CliRunner()
     job_id = _job_id(runner, db)
 
-    # An outcome must exist before steps can be added.
-    runner.invoke(
-        app,
-        [
-            "--db",
-            db,
-            "desired-outcomes",
-            "add",
-            "--job-id",
-            job_id,
-            "--statement",
-            "Minimize the time it takes to deploy when releasing",
-            "--importance",
-            "8",
-            "--satisfaction",
-            "4",
-            "--json",
-        ],
-    )
-
     add = runner.invoke(
         app,
         ["--db", db, "steps", "add", "--job-id", job_id, "--name", "S", "--order", "1"],
@@ -49,27 +29,6 @@ def test_steps_full_lifecycle(tmp_path):
     db = str(tmp_path / "odi.db")
     runner = CliRunner()
     job_id = _job_id(runner, db)
-
-    # An outcome must exist before steps can be added.
-    runner.invoke(
-        app,
-        [
-            "--db",
-            db,
-            "desired-outcomes",
-            "add",
-            "--job-id",
-            job_id,
-            "--statement",
-            "Minimize the time it takes to deploy when releasing",
-            "--importance",
-            "8",
-            "--satisfaction",
-            "4",
-            "--json",
-        ],
-    )
-
     added = runner.invoke(
         app,
         ["--db", db, "steps", "add", "--job-id", job_id, "--name", "S", "--order", "1", "--json"],

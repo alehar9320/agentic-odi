@@ -6,20 +6,13 @@ import uuid
 from typing import Any
 
 from agentic_odi_core.errors import NotFoundError, ValidationError
-from agentic_odi_core.evaluation import (
-    OutcomeStatementError,
-    evaluate_outcome_statement,
-    require_outcome_statement,
-)
 from agentic_odi_core.models import (
-    JOB_STAGE_INDEX,
     BusinessValue,
     CustomerOutcome,
     CustomerValue,
     Evidence,
     EvidenceItemType,
     Job,
-    JobStage,
     Outcome,
     Step,
     compute_opportunity_score,
@@ -65,17 +58,6 @@ class EvidenceNotFoundError(NotFoundError, ValueError):
 
 class ValueOutOfRangeError(ValidationError):
     pass
-
-
-class InvalidOutcomeStatementError(OutcomeStatementError):
-    """A statement does not match the ODI desired-outcome format.
-
-    Carries the individual issues so the caller can show the fix next to the
-    field that needs it instead of a single opaque message.
-    """
-
-    def __init__(self, verdict: dict[str, Any]) -> None:
-        super().__init__(verdict)
 
 
 def _first_line(text: str) -> str:
@@ -132,14 +114,12 @@ class ODIService:
         existing = self.repo.get_outcome(outcome_id)
         if existing is None:
             raise OutcomeNotFoundError(outcome_id)
-        statement = updates.get("statement", existing.statement)
         importance = updates.get("importance", existing.importance)
         satisfaction = updates.get("satisfaction", existing.satisfaction)
         if importance is not None and not (1.0 <= importance <= 10.0):
-            raise ValueOutOfRangeError("importance must be between 1.0 and 10.0")
+            raise ValueOutOfRangeError()
         if satisfaction is not None and not (1.0 <= satisfaction <= 10.0):
-            raise ValueOutOfRangeError("satisfaction must be between 1.0 and 10.0")
-        require_outcome_statement(statement)
+            raise ValueOutOfRangeError()
         if importance is not None and satisfaction is not None:
             updates = dict(updates)
             updates["opportunity_score"] = compute_opportunity_score(importance, satisfaction)
@@ -156,67 +136,37 @@ class ODIService:
         if not ok:
             raise OutcomeNotFoundError(outcome_id)
 
-    def add_step(
-        self,
-        job_id: str,
-        name: str,
-        order: int,
-        stage: JobStage | None = None,
-        allow_empty_job_map: bool = False,
-    ) -> Step:
+    def add_step(self, job_id: str, name: str, order: int) -> Step:
         if self.repo.get_job(job_id) is None:
             raise JobNotFoundError(job_id)
-        if not 1 <= order <= 8:
-            raise ValueOutOfRangeError("Step order must be between 1 and 8 (Ulwick's job map).")
-        existing_outcomes = self.repo.get_outcomes(job_id)
-        existing_customer_outcomes = self.repo.list_customer_outcomes(job_id)
-        if not existing_outcomes and not existing_customer_outcomes and not allow_empty_job_map:
-            raise ValidationError(
-                "Add at least one desired outcome before building the job map; "
-                "outcomes are what give the steps their meaning. "
-                "Use allow_empty_job_map=True to stage a map deliberately (audited)."
-            )
-        stage_index = JOB_STAGE_INDEX.get(stage) if stage is not None else None
-        step = Step(
-            id=str(uuid.uuid4()),
-            job_id=job_id,
-            name=name,
-            order=order,
-            stage=stage,
-            stage_index=stage_index,
-        )
+        step = Step(id=str(uuid.uuid4()), job_id=job_id, name=name, order=order)
         return self.repo.add_step(step)
 
     def get_job_map(self, job_id: str, limit: int | None = None, offset: int = 0) -> list[Step]:
-        # Sort by canonical stage_index when present, falling back to order:
-        # a page of the map must be the first steps by stage, not whichever
-        # steps happened to be stored first.
-        steps = list(self.repo.get_steps_for_job(job_id))
-        steps.sort(key=lambda s: (s.stage_index if s.stage_index is not None else 99, s.order))
+        # Sort before slicing: a page of the map must be the first steps by
+        # order, not whichever steps happened to be stored first.
+        steps = sorted(self.repo.get_steps_for_job(job_id), key=lambda s: s.order)
         return page(steps, limit, offset)
 
     def add_outcome(
         self,
         job_id: str,
         statement: str,
-        importance: float,
-        satisfaction: float,
+        importance: float | None = None,
+        satisfaction: float | None = None,
         step_id: str | None = None,
-        validate_statement: bool = True,
     ) -> Outcome:
         if self.repo.get_job(job_id) is None:
             raise JobNotFoundError(job_id)
         if step_id is not None and self.repo.get_step(step_id) is None:
             raise StepNotFoundError(step_id)
-        if not (1.0 <= importance <= 10.0):
-            raise ValueOutOfRangeError("importance must be between 1.0 and 10.0")
-        if not (1.0 <= satisfaction <= 10.0):
-            raise ValueOutOfRangeError("satisfaction must be between 1.0 and 10.0")
-        if validate_statement:
-            verdict = evaluate_outcome_statement(statement)
-            if not verdict["valid"]:
-                raise InvalidOutcomeStatementError(verdict)
-        opportunity_score = compute_opportunity_score(importance, satisfaction)
+        if importance is not None and not (1.0 <= importance <= 10.0):
+            raise ValueOutOfRangeError()
+        if satisfaction is not None and not (1.0 <= satisfaction <= 10.0):
+            raise ValueOutOfRangeError()
+        opportunity_score = None
+        if importance is not None and satisfaction is not None:
+            opportunity_score = compute_opportunity_score(importance, satisfaction)
         outcome = Outcome(
             id=str(uuid.uuid4()),
             job_id=job_id,
@@ -234,9 +184,8 @@ class ODIService:
         step_id: str | None = None,
         limit: int | None = None,
         offset: int = 0,
-        sort: str = "opportunity_score",
     ) -> list[Outcome]:
-        return self.repo.get_outcomes(job_id, step_id, limit=limit, offset=offset, sort=sort)
+        return self.repo.get_outcomes(job_id, step_id, limit=limit, offset=offset)
 
     def add_customer_outcome(
         self,
@@ -391,10 +340,6 @@ class ODIService:
                 or _first_line(evidence.content)
                 or "Untitled outcome"
             )
-            if importance is None or satisfaction is None:
-                raise ValidationError(
-                    "Promoting evidence to an outcome requires both importance and satisfaction scores."
-                )
             return self.add_outcome(
                 target_job_id,
                 text,

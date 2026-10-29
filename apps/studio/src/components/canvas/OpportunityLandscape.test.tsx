@@ -20,11 +20,8 @@ const harness = vi.hoisted(() => ({
     canvasState: { kind: "ready", data: null } as unknown as CanvasState,
     refreshCanvas: vi.fn(),
     requestSimulate: vi.fn(),
-    openPanel: vi.fn(),
     sendMessage: vi.fn(),
     pushToast: vi.fn(),
-    theses: [],
-    deleteThesis: vi.fn(),
   },
 }));
 
@@ -64,38 +61,6 @@ describe("OpportunityLandscape Data Visualization", () => {
     expect(screen.getByText("Minimize risk of configuration drift")).toBeInTheDocument();
   });
 
-  it("disables search and filters while the canvas loads", () => {
-    harness.state.canvasState = { kind: "loading", data: null } as unknown as CanvasState;
-    render(<OpportunityLandscape />);
-
-    expect(screen.getByPlaceholderText(/Search opportunities/i)).toBeDisabled();
-    expect(screen.getByLabelText(/Show Underserved Only/i)).toBeDisabled();
-  });
-
-  it("selects an outcome from a keyboard-focused table row", () => {
-    render(<OpportunityLandscape />);
-    fireEvent.click(screen.getByText("📋 Table View"));
-
-    const row = screen.getByRole("row", { name: /Minimize time spent syncing secrets/i });
-    row.focus();
-    expect(row).toHaveFocus();
-
-    fireEvent.keyDown(row, { key: "Enter" });
-
-    expect(row).toHaveAttribute("aria-selected", "true");
-  });
-
-  it("toggles table selection with Space", () => {
-    render(<OpportunityLandscape />);
-    fireEvent.click(screen.getByText("📋 Table View"));
-
-    const row = screen.getByRole("row", { name: /Minimize time spent syncing secrets/i });
-    fireEvent.keyDown(row, { key: " " });
-    expect(row).toHaveAttribute("aria-selected", "true");
-
-    fireEvent.keyDown(row, { key: " " });
-    expect(row).toHaveAttribute("aria-selected", "false");
-  });
   it("toggles underserved filter checkbox", () => {
     render(<OpportunityLandscape />);
     const checkbox = screen.getByLabelText(/Show Underserved Only/i);
@@ -150,33 +115,6 @@ describe("OpportunityLandscape canvas states", () => {
     render(<OpportunityLandscape />);
 
     expect(screen.getByText(/mcp endpoint unreachable/i)).toBeInTheDocument();
-  });
-
-  it("says when the board is demo data rather than the user's work", () => {
-    render(<OpportunityLandscape />);
-
-    expect(screen.getByText(/demo data/i)).toBeInTheDocument();
-    expect(screen.getByText(/nothing here comes from your research/i)).toBeInTheDocument();
-  });
-
-  it("points a demo canvas at the settings panel", () => {
-    harness.state.openPanel = vi.fn();
-    render(<OpportunityLandscape />);
-
-    fireEvent.click(screen.getByRole("button", { name: /connect a data source/i }));
-
-    expect(harness.state.openPanel).toHaveBeenCalledWith("settings");
-  });
-
-  it("shows no sample-data notice for a live canvas", () => {
-    harness.state.canvasState = {
-      kind: "ready",
-      data: { ...mockCanvasData, source: "mcp" },
-    } as unknown as CanvasState;
-
-    render(<OpportunityLandscape />);
-
-    expect(screen.queryByText(/demo data/i)).toBeNull();
   });
 
   it("shows the skeleton while a warm canvas reloads", () => {

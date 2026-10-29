@@ -34,9 +34,6 @@ export const ATTACHMENT_ACCEPT = [
 ].join(",");
 
 const TEXT_LIKE = /^(text\/|application\/(json|yaml|x-yaml)$)/;
-const SUPPORTED_IMAGE_TYPES = new Set(
-  ATTACHMENT_ACCEPT.split(",").filter((type) => type.startsWith("image/")),
-);
 
 export function isTextLike(name: string, contentType: string): boolean {
   if (TEXT_LIKE.test(contentType)) {
@@ -47,43 +44,6 @@ export function isTextLike(name: string, contentType: string): boolean {
 
 export function isImageLike(contentType: string): boolean {
   return contentType.startsWith("image/");
-}
-
-/**
- * Why a dropped or pasted file cannot become an attachment, or null if it can.
- *
- * The file input already honours `accept`; a drop bypasses it, so the same
- * rule is applied here rather than letting an unreadable file become a chip
- * that promises content the model will never see.
- */
-export function attachmentRejection(file: File): string | null {
-  if (isImageLike(file.type)) {
-    if (!SUPPORTED_IMAGE_TYPES.has(file.type)) {
-      return `${file.name} is not an image the studio can read (PNG, JPEG, WebP, GIF).`;
-    }
-    if (file.size > MAX_IMAGE_BYTES) {
-      return `${file.name} is larger than ${Math.floor(MAX_IMAGE_BYTES / (1024 * 1024))} MB.`;
-    }
-    return null;
-  }
-  if (isTextLike(file.name, file.type)) {
-    return null;
-  }
-  return `${file.name} is not a text or image file the studio can read.`;
-}
-
-/** A short size for an attachment chip; empty when there is nothing to say. */
-export function formatFileSize(bytes: number): string {
-  if (!bytes || bytes < 0) {
-    return "";
-  }
-  if (bytes < 1024) {
-    return `${bytes} B`;
-  }
-  if (bytes < 1024 * 1024) {
-    return `${Math.round(bytes / 1024)} KB`;
-  }
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 function readAsDataUrl(file: File): Promise<string> {
@@ -176,11 +136,6 @@ export function createAttachmentAdapter(): AttachmentAdapter {
 
 /** Process-wide, because the runtime adapter outlives a render. */
 const ATTACHMENTS = new Map<string, ChatAttachment>();
-
-/** The extraction for one attachment, for showing what was actually sent. */
-export function preparedAttachmentById(id: string): ChatAttachment | undefined {
-  return ATTACHMENTS.get(id);
-}
 
 /** The extraction for the attachments the runtime handed back on a send. */
 export function preparedAttachments(

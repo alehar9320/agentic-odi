@@ -3,17 +3,13 @@ import { useEffect, useState } from "react";
 import { StudioRuntimeProvider } from "./assistant/StudioRuntime";
 import { ChangelogModal } from "./components/ChangelogModal";
 import { ChatStage } from "./components/chat/ChatStage";
-import { ConnectorSuggestionModal } from "./components/customize/ConnectorSuggestionModal";
-import { CustomizePage } from "./components/customize/CustomizePage";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { StudioBar } from "./components/layout/StudioBar";
-import { SidecarNotice } from "./components/notices/SidecarNotice";
 import { Toasts } from "./components/Toasts";
 import { WorkbenchRail } from "./components/workspace/WorkbenchRail";
 import { WorkspacePanel } from "./components/workspace/WorkspacePanel";
 import { FirstRunWizard, OnboardingProvider } from "./onboarding";
 import { StudioProvider, useStudio } from "./state/StudioContext";
-import { UpdateBanner, UpdateProvider } from "./updater";
 
 /**
  * One room, one intelligence.
@@ -24,20 +20,18 @@ import { UpdateBanner, UpdateProvider } from "./updater";
  * composer never leaves the screen.
  */
 function StudioShell() {
-  const { closePanel, clearChat, closeSetup, customizeOpen, closeCustomize } = useStudio();
+  const { closePanel, clearChat, closeSetup } = useStudio();
   const [showChangelog, setShowChangelog] = useState(false);
 
   function goHome() {
     clearChat();
     closePanel();
     closeSetup();
-    closeCustomize();
   }
 
   function newConversation() {
     clearChat();
     closePanel();
-    closeCustomize();
   }
 
   useEffect(() => {
@@ -52,28 +46,21 @@ function StudioShell() {
 
   return (
     <div className="studio-app">
-      <SidecarNotice />
       <main className="stage">
         <StudioBar
           onHome={goHome}
           onNew={newConversation}
           onChangelog={() => setShowChangelog(true)}
         />
-        <UpdateBanner />
-        {customizeOpen ? (
-          <CustomizePage />
-        ) : (
-          <div className="stage__split">
-            <div className="stage__thread">
-              <WorkbenchRail />
-              <ChatStage />
-            </div>
-            <WorkspacePanel />
+        <div className="stage__split">
+          <div className="stage__thread">
+            <WorkbenchRail />
+            <ChatStage />
           </div>
-        )}
+          <WorkspacePanel />
+        </div>
       </main>
       <ChangelogModal isOpen={showChangelog} onClose={() => setShowChangelog(false)} />
-      <ConnectorSuggestionModal />
       <Toasts />
     </div>
   );
@@ -82,16 +69,14 @@ function StudioShell() {
 export default function App() {
   return (
     <ErrorBoundary>
-      <UpdateProvider>
-        <StudioProvider>
-          <StudioRuntimeProvider>
-            <OnboardingProvider>
-              <StudioShell />
-              <FirstRunWizard />
-            </OnboardingProvider>
-          </StudioRuntimeProvider>
-        </StudioProvider>
-      </UpdateProvider>
+      <StudioProvider>
+        <StudioRuntimeProvider>
+          <OnboardingProvider>
+            <StudioShell />
+            <FirstRunWizard />
+          </OnboardingProvider>
+        </StudioRuntimeProvider>
+      </StudioProvider>
     </ErrorBoundary>
   );
 }

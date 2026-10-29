@@ -22,8 +22,7 @@ function phaseIndexFor(order: number, stepCount: number): number {
 }
 
 export function JobMap() {
-  const { canvasState, refreshCanvas, addStep, updateStep, deleteStep, updateJob, deleteJob } =
-    useStudio();
+  const { canvasState, refreshCanvas, updateStep, deleteStep, updateJob, deleteJob } = useStudio();
   const canvas = canvasState.data;
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [editingStepId, setEditingStepId] = useState<string | null>(null);
@@ -34,8 +33,6 @@ export function JobMap() {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [busy, setBusy] = useState(false);
   const [selectedPhaseIndex, setSelectedPhaseIndex] = useState<number | null>(null);
-  const [addStepOpen, setAddStepOpen] = useState(false);
-  const [newStepName, setNewStepName] = useState("");
 
   const jobs = canvas?.jobs ?? [];
   const activeJob = jobs.find((job) => job.id === selectedJobId) ?? jobs[0];
@@ -67,24 +64,6 @@ export function JobMap() {
     try {
       await updateStep(steps[index].id ?? "", { order: target + 1 });
       await updateStep(steps[target].id ?? "", { order: index + 1 });
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  const nextStepOrder =
-    steps.reduce((max, step, index) => Math.max(max, step.order ?? index + 1), 0) + 1;
-
-  async function saveNewStep() {
-    const name = newStepName.trim();
-    if (!activeJobId || !name) {
-      return;
-    }
-    setBusy(true);
-    try {
-      await addStep({ job_id: activeJobId, name, order: nextStepOrder });
-      setNewStepName("");
-      setAddStepOpen(false);
     } finally {
       setBusy(false);
     }
@@ -143,8 +122,8 @@ export function JobMap() {
     <section className="fade-in">
       <p className="section-title">Universal Job Map (8 Process Phases)</p>
       <p className="caption">
-        Ulwick Universal Job Steps: Define ➔ Locate ➔ Prepare ➔ Confirm ➔ Execute ➔ Monitor ➔ Modify
-        ➔ Conclude
+        Ulwick Universal Job Steps: Deconstruct human execution into 8 predictable phases to uncover
+        latent friction.
       </p>
 
       {jobs.length > 1 && (
@@ -250,58 +229,6 @@ export function JobMap() {
         })}
       </div>
 
-      {/* A job has one step per phase: the domain refuses an order past 8. */}
-      {activeJobId && steps.length < UNIVERSAL_PHASES.length && (
-        <div className="jm-add">
-          {addStepOpen ? (
-            <form
-              className="form jm-add__form"
-              onSubmit={(event) => {
-                event.preventDefault();
-                void saveNewStep();
-              }}
-              onKeyDown={(event) => {
-                if (event.key === "Escape") {
-                  event.preventDefault();
-                  setAddStepOpen(false);
-                }
-              }}
-            >
-              <div className="field">
-                <label htmlFor="jm-new-step">New step name</label>
-                <input
-                  id="jm-new-step"
-                  className="input"
-                  autoFocus
-                  value={newStepName}
-                  onChange={(event) => setNewStepName(event.target.value)}
-                />
-              </div>
-              <div className="step__edit">
-                <button
-                  type="submit"
-                  className="quiet-action"
-                  disabled={busy || !newStepName.trim()}
-                >
-                  Save
-                </button>
-                <button
-                  type="button"
-                  className="quiet-action"
-                  onClick={() => setAddStepOpen(false)}
-                >
-                  Cancel
-                </button>
-              </div>
-            </form>
-          ) : (
-            <button type="button" className="quiet-action" onClick={() => setAddStepOpen(true)}>
-              Add step
-            </button>
-          )}
-        </div>
-      )}
-
       {canvasState.kind === "loading" ? (
         <GhostJobSteps />
       ) : steps.length ? (
@@ -397,7 +324,7 @@ export function JobMap() {
                           fontStyle: "italic",
                         }}
                       >
-                        {UNIVERSAL_PHASES[phaseIndexFor(order, steps.length)].name}
+                        Phase {phaseIndexFor(order, steps.length) + 1}
                       </span>
                       {step.id && (
                         <span className="step__actions">

@@ -1,8 +1,7 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import App from "../../App";
-import type { StudioNotification } from "../../types";
 
 vi.mock("../../api/studioApi", () => ({
   fetchConfig: vi.fn(async () => ({
@@ -57,82 +56,52 @@ const BRIEF = {
   core_problem: "A missed config key costs hours",
 };
 
-function seedNotifications(notifications: StudioNotification[]): void {
-  window.localStorage.setItem("studio.notifications", JSON.stringify(notifications));
-}
-
-function notification(overrides: Partial<StudioNotification> = {}): StudioNotification {
-  return {
-    id: "NOTIF-1",
-    title: "Opportunity Score Shift Identified",
-    message: "An outcome was rescored.",
-    category: "outcome",
-    timestamp: new Date().toISOString(),
-    read: false,
-    simulated: false,
-    ...overrides,
-  };
-}
-
 beforeEach(() => {
   window.localStorage.clear();
   window.localStorage.setItem("studio.brief", JSON.stringify(BRIEF));
 });
 
 describe("Catch Up & Notification System", () => {
-  it("starts with an honest empty feed instead of fabricated activity", async () => {
+  it("renders the bell icon in header with unread count and opens Catch Up panel", async () => {
     render(<App />);
 
     const bellBtn = await screen.findByRole("button", { name: /catch up notifications/i });
-    expect(within(bellBtn).queryByText("2")).toBeNull();
+    expect(bellBtn).toBeInTheDocument();
+    // Default seed notifications include 2 unread
+    expect(within(bellBtn).getByText("2")).toBeInTheDocument();
 
     fireEvent.click(bellBtn);
 
     expect(await screen.findByRole("heading", { name: /while you were away/i })).toBeInTheDocument();
-    expect(screen.getByText(/no activity yet/i)).toBeInTheDocument();
-    expect(screen.queryByText(/opportunity score shift identified/i)).toBeNull();
+    expect(screen.getByRole("tab", { name: /unread \(2\)/i })).toBeInTheDocument();
   });
 
-  it("filters notifications by category", async () => {
-    seedNotifications([
-      notification(),
-      notification({
-        id: "NOTIF-2",
-        title: "Friction Collapse Simulation Complete",
-        category: "simulation",
-        read: true,
-      }),
-    ]);
+  it("filters notifications by status and category", async () => {
     render(<App />);
 
     fireEvent.click(await screen.findByRole("button", { name: /catch up notifications/i }));
     await screen.findByRole("heading", { name: /while you were away/i });
 
-    fireEvent.click(screen.getByRole("tab", { name: /outcome shifts \(1\)/i }));
+    const unreadTab = screen.getByRole("tab", { name: /unread \(2\)/i });
+    fireEvent.click(unreadTab);
 
     expect(screen.getByText(/Opportunity Score Shift Identified/i)).toBeInTheDocument();
-    expect(screen.queryByText(/Friction Collapse Simulation Complete/i)).toBeNull();
+    expect(screen.getByText(/Friction Collapse Simulation Complete/i)).toBeInTheDocument();
+    expect(screen.queryByText(/New Customer Telemetry Signal/i)).toBeNull();
   });
 
-  it("marks simulated events and keeps them out of the unread count", async () => {
-    seedNotifications([
-      notification({
-        id: "NOTIF-SIM",
-        title: "New Opportunity Uncovered",
-        simulated: true,
-      }),
-    ]);
+  it("marks all notifications as read when requested", async () => {
     render(<App />);
 
-    const bellBtn = await screen.findByRole("button", { name: /catch up notifications/i });
-    expect(within(bellBtn).queryByText("1")).toBeNull();
-
-    fireEvent.click(bellBtn);
+    fireEvent.click(await screen.findByRole("button", { name: /catch up notifications/i }));
     await screen.findByRole("heading", { name: /while you were away/i });
 
-    expect(screen.getByText(/new opportunity uncovered/i)).toBeInTheDocument();
-    expect(screen.getByText(/^simulated$/i)).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: /unread \(0\)/i })).toBeInTheDocument();
+    const markAllBtn = screen.getByRole("button", { name: /mark all as read/i });
+    fireEvent.click(markAllBtn);
+
+    await waitFor(() => {
+      expect(screen.getByRole("tab", { name: /unread \(0\)/i })).toBeInTheDocument();
+    });
   });
 
   it("simulates a background system update on demand", async () => {
@@ -145,19 +114,9 @@ describe("Catch Up & Notification System", () => {
     fireEvent.click(simBtn);
 
     expect(await screen.findByText(/Background Activity:/i)).toBeInTheDocument();
-    expect(screen.getByText(/^simulated$/i)).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: /unread \(0\)/i })).toBeInTheDocument();
   });
 
   it("navigates to target workspace panel upon notification action", async () => {
-    seedNotifications([
-      notification({
-        title: "Rescored outcome",
-        targetPanel: "landscape",
-        actionText: "View Landscape",
-        chatPrompt: "Why did this outcome move?",
-      }),
-    ]);
     render(<App />);
 
     fireEvent.click(await screen.findByRole("button", { name: /catch up notifications/i }));

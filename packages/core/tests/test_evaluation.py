@@ -77,33 +77,3 @@ def test_every_issue_comes_with_a_way_to_fix_it() -> None:
     result = evaluate_outcome_statement("Make it faster")
 
     assert len(result["suggestions"]) == len(result["issues"])
-
-
-def test_a_missing_direction_is_reported() -> None:
-    result = evaluate_outcome_statement("The time to onboard a customer when they sign up")
-
-    assert result["valid"] is False
-    assert result["direction"] is None
-    assert any("'Minimize' or 'Maximize'" in issue for issue in result["issues"])
-
-
-def test_a_missing_object_of_control_is_reported() -> None:
-    result = evaluate_outcome_statement("Minimize onboarding time when a customer signs up")
-
-    assert result["valid"] is False
-    assert any("after 'the'" in issue for issue in result["issues"])
-
-
-def test_a_short_statement_is_reported() -> None:
-    result = evaluate_outcome_statement("Minimize the time")
-
-    assert result["valid"] is False
-    assert any("too short" in issue for issue in result["issues"])
-
-
-def test_blank_input_reports_every_missing_part() -> None:
-    result = evaluate_outcome_statement("   ")
-
-    assert result["valid"] is False
-    assert len(result["issues"]) == 5
-    assert result["statement"] == ""

@@ -19,18 +19,10 @@ def add(
     job_id: str = typer.Option(..., help="Job ID the step belongs to"),
     name: str = typer.Option(..., help="Step name"),
     order: int = typer.Option(..., help="Step order"),
-    stage: str | None = typer.Option(default=None, help="Universal Job Map stage"),
-    allow_empty_job_map: bool = typer.Option(
-        False, "--allow-empty-job-map", help="Explicitly stage a map before capturing outcomes"
-    ),
     json_output: bool = JSON_OPTION,
 ) -> None:
     """Add a Step to a Job."""
     args: dict[str, Any] = {"job_id": job_id, "name": name, "order": order}
-    if stage is not None:
-        args["stage"] = stage
-    if allow_empty_job_map:
-        args["allow_empty_job_map"] = True
     typer.echo(
         render_saved("created", run_tool("add_step", args), as_json=json_output, noun="Step")
     )

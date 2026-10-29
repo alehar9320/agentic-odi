@@ -14,7 +14,6 @@ from pathlib import Path
 
 CONFIG_PATH_ENV = "AGENTIC_ODI_CONNECTORS_CONFIG"
 CACHE_PATH_ENV = "AGENTIC_ODI_CONNECTORS_CACHE"
-MARKETPLACE_CACHE_PATH_ENV = "AGENTIC_ODI_MARKETPLACE_CACHE"
 
 
 def config_path() -> Path:
@@ -33,19 +32,4 @@ def cache_path() -> Path:
     return Path.home() / ".cache" / "agentic-odi" / "connector-health.json"
 
 
-def marketplace_cache_path() -> Path:
-    """Return the path to the marketplace search cache file."""
-    env = os.getenv(MARKETPLACE_CACHE_PATH_ENV)
-    if env:
-        return Path(env)
-    return Path.home() / ".cache" / "agentic-odi" / "marketplace.json"
-
-
-__all__ = [
-    "CACHE_PATH_ENV",
-    "CONFIG_PATH_ENV",
-    "MARKETPLACE_CACHE_PATH_ENV",
-    "cache_path",
-    "config_path",
-    "marketplace_cache_path",
-]
+__all__ = ["CACHE_PATH_ENV", "CONFIG_PATH_ENV", "cache_path", "config_path"]

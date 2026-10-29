@@ -74,7 +74,7 @@ Tests live next to their package (`packages/*/tests`, `apps/*/tests`). `testpath
 - `test_insight_commands.py` — `evaluate`, guidelines, and capabilities on the local backend.
 - `test_backend.py`, `test_backend_edges.py`, `test_backend_selection.py` — local vs MCP backend selection and errors.
 - `test_context.py` — the global backend context.
-- `test_chat_cli.py`, `test_chat_runtime.py`, `test_chat_wizard.py` — chat command, interactive loop and handlers (including reasoning kept out of the answer, and the terminal-only `thinking…` hint), and first-run wizard.
+- `test_chat_cli.py`, `test_chat_runtime.py`, `test_chat_wizard.py` — chat command, interactive loop and handlers, and first-run wizard.
 - `test_connectors_cli.py`, `test_connectors_edges.py` — `connectors` subcommands and their edges.
 - `test_onboard.py` — first-run onboarding signal extraction and gating.
 - `test_update.py`, `test_update_command.py`, `test_update_edges.py`, `test_update_check.py` — update checks and installation.
@@ -131,35 +131,3 @@ npm --prefix apps/studio test -- --run
 npm --prefix apps/studio run build
 cd apps/studio/src-tauri && cargo fmt --check && cargo clippy -- -D warnings && cargo check
 ```
-
-The self-updater lives in `apps/studio/src/updater/` and is covered by vitest:
-`machine.test.ts` (state transitions), `service.test.ts` (scheduling,
-download, and install), `transport.test.ts` (Tauri boundary), and the
-`UpdateBanner`/`UpdateSettings` component tests. `StudioBar.test.tsx` and
-`SettingsPanel.test.tsx` cover the UI integration points.
-
-## End-to-end
-
-The browser-level suite lives in `apps/studio/e2e/` and runs with
-[Playwright](https://playwright.dev). It drives the real Studio against the
-real sidecar and MCP server — no mocked network calls — so it covers the
-seams that neither pytest nor vitest can: the SPA's assumptions about the
-sidecar's response shapes, the sidecar's hydration of the canvas, and the
-first-run wizard's ordering relative to the rest of the app.
-
-```bash
-npm --prefix apps/studio run build      # the sidecar serves apps/studio/dist
-npm --prefix apps/studio run test:e2e
-```
-
-Playwright's `webServer` array starts the MCP server, the Studio sidecar, and
-a second sidecar on the MCP passthrough backend. Two projects run against
-them: `chromium` for the local backend (the product default) and
-`mcp-backend` for the passthrough.
-
-Locators bind to what a user perceives — a role, a label, or visible text —
-never to a `data-testid`, of which the application has none.
-
-CI runs the suite in the `e2e` job. It is deliberately non-blocking: set the
-repository variable `AGENTIC_ODI_E2E` to `false` to skip it, and the
-`continue-on-error` on the job keeps a failure from turning CI red.

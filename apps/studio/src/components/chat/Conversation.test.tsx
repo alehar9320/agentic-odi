@@ -114,7 +114,7 @@ describe("Conversation", () => {
     expect(container.textContent).toContain("Minimize the time it takes to propagate secrets");
   });
 
-  it("keeps reasoning behind a disclosure that opens on request", () => {
+  it("renders reasoning as a disclosure beside the answer", () => {
     const { container } = renderTurn([
       {
         id: "m-1",
@@ -128,77 +128,9 @@ describe("Conversation", () => {
       },
     ]);
 
-    const toggle = screen.getByRole("button", { name: /Thought process/ });
-    const panel = container.querySelector(".reasoning__body") as HTMLElement;
-    expect(toggle).toHaveAttribute("aria-expanded", "false");
-    expect(panel.hidden).toBe(true);
-
-    fireEvent.click(toggle);
-
-    expect(toggle).toHaveAttribute("aria-expanded", "true");
-    expect(panel.hidden).toBe(false);
-    expect(panel.textContent).toContain("Weighing the scored outcomes");
-  });
-
-  it("opens reasoning while it is written, then reports how long it took", async () => {
-    harness.state.streaming = true;
-    const turn: ChatMessage[] = [
-      {
-        id: "a-1",
-        parentId: null,
-        role: "assistant",
-        content: "",
-        parts: [{ kind: "reasoning", text: "Weighing the scored outcomes." }],
-      },
-    ];
-    harness.state.messages = turn;
-    const { rerender } = render(
-      <StudioRuntimeProvider>
-        <Conversation />
-      </StudioRuntimeProvider>,
-    );
-
-    const thinking = screen.getByRole("button", { name: /Thinking/ });
-    expect(thinking).toHaveAttribute("aria-expanded", "true");
-
-    harness.state.streaming = false;
-    rerender(
-      <StudioRuntimeProvider>
-        <Conversation />
-      </StudioRuntimeProvider>,
-    );
-
-    await screen.findByRole("button", { name: /Thought for \d+s/ });
-  });
-
-  it("names the phase while a reply has no text yet", () => {
-    harness.state.streaming = true;
-    harness.state.thinkingPhase = "mcp_tools";
-    const { container } = renderTurn([
-      { id: "u-1", parentId: null, role: "user", content: "Check this bet" },
-      { id: "a-1", parentId: "u-1", role: "assistant", content: "", parts: [] },
-    ]);
-
-    expect(screen.getByRole("status")).toHaveTextContent("Opening your studio tools");
-    expect(container.querySelector(".message--assistant")).toHaveAttribute(
-      "aria-busy",
-      "true",
-    );
-
-    harness.state.streaming = false;
-    harness.state.thinkingPhase = null;
-  });
-
-  it("marks a settled reply as no longer busy", () => {
-    const { container } = renderTurn([
-      { id: "u-1", parentId: null, role: "user", content: "Check this bet" },
-      { id: "a-1", parentId: "u-1", role: "assistant", content: "A useful reply." },
-    ]);
-
-    expect(container.querySelector(".message--assistant")).toHaveAttribute(
-      "aria-busy",
-      "false",
-    );
+    const summary = container.querySelector("summary.reasoning__summary");
+    expect(summary?.textContent).toContain("Thought for a moment");
+    expect(container.textContent).toContain("Weighing the scored outcomes");
   });
 
   it("renders a source chip for what the turn read", () => {
@@ -225,54 +157,6 @@ describe("Conversation", () => {
     expect(chip?.textContent).toContain("get_jobs — JOB-1 Retention");
   });
 
-  it("labels assistant actions and explains reply alternatives", () => {
-    const { container } = renderTurn([
-      { id: "u-1", parentId: null, role: "user", content: "Check this bet" },
-      { id: "a-1", parentId: "u-1", role: "assistant", content: "A useful reply." },
-    ]);
-
-    expect(screen.getByRole("button", { name: "Copy reply" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Regenerate reply" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Edit message" })).toBeInTheDocument();
-    expect(container.querySelector(".branch-picker")).toBeNull();
-  });
-
-  it("switches between contextual alternative replies through the thread runtime", () => {
-    const firstPath: ChatMessage[] = [
-      { id: "u-1", parentId: null, role: "user", content: "Check this bet" },
-      { id: "a-1", parentId: "u-1", role: "assistant", content: "First reply." },
-    ];
-    harness.state.messages = firstPath;
-    const { container, rerender } = render(
-      <StudioRuntimeProvider>
-        <Conversation />
-      </StudioRuntimeProvider>,
-    );
-
-    expect(container.querySelector(".branch-picker")).toBeNull();
-
-    harness.state.messages = [
-      firstPath[0],
-      { id: "a-2", parentId: "u-1", role: "assistant", content: "Alternative reply." },
-    ];
-    rerender(
-      <StudioRuntimeProvider>
-        <Conversation />
-      </StudioRuntimeProvider>,
-    );
-
-    // The group is named, and the position stays readable text rather than
-    // being replaced by an aria-label of its own.
-    expect(screen.getByRole("group", { name: "Reply alternatives" })).toHaveTextContent(
-      "Alternative 2 of 2",
-    );
-    const previous = screen.getByRole("button", { name: "Previous alternative" });
-    expect(screen.getByRole("button", { name: "Next alternative" })).toBeInTheDocument();
-    expect(previous).not.toBeDisabled();
-    fireEvent.click(previous);
-    expect(harness.state.switchBranch).toHaveBeenCalledWith(firstPath);
-  });
-
   it("turns a card action into the user's next message", () => {
     harness.state.sendMessage = vi.fn<(text: string) => Promise<void>>();
     renderTurn([
@@ -288,47 +172,6 @@ describe("Conversation", () => {
     fireEvent.click(document.querySelector("button.ui-action") as HTMLButtonElement);
 
     expect(harness.state.sendMessage).toHaveBeenCalledWith("Simulate O-1");
-  });
-});
-
-describe("Conversation offline context", () => {
-  it("marks a content-less offline turn as local guidance", () => {
-    harness.state.offlineReply = true;
-    const { container } = renderTurn([
-      {
-        id: "m-1",
-        parentId: null,
-        role: "assistant",
-        content: "",
-        parts: [{ kind: "ui", id: "ui-1", node: outcomeCard() }],
-      },
-    ]);
-
-    expect(screen.getByText("Local guidance")).toBeInTheDocument();
-    expect(container.querySelector(".message__tag")).not.toBeNull();
-    harness.state.offlineReply = false;
-  });
-});
-
-
-describe("Conversation live regions", () => {
-  it("announces tool traces politely as they arrive", () => {
-    const { container } = renderTurn([
-      {
-        id: "m-1",
-        parentId: null,
-        role: "assistant",
-        content: "Working",
-        parts: [
-          { kind: "text", text: "Working" },
-          { kind: "tool", id: "call-1", name: "list_jobs", status: "ok" },
-        ],
-      },
-    ]);
-
-    const trace = container.querySelector(".tool-trace") as HTMLElement;
-    expect(trace.textContent).toContain("list jobs");
-    expect(trace).toHaveAttribute("aria-live", "polite");
   });
 });
 

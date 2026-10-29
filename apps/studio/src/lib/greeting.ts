@@ -55,10 +55,7 @@ function plural(count: number, one: string, many = `${one}s`): string {
 export function greetingCandidates(context: GreetingContext): Greeting[] {
   const name = cleanName(context.displayName);
   const greeting = timeOfDayGreeting(context.now);
-  // The first frame is an invitation, not a clock. A greeting is warm but it
-  // says nothing about why the person is here; the question does.
   const candidates: Greeting[] = [
-    { id: "capability-win", text: "What do you want to win?", kind: "capability" },
     {
       id: "greeting",
       text: name ? `${greeting}, ${name}` : greeting,
@@ -89,6 +86,11 @@ export function greetingCandidates(context: GreetingContext): Greeting[] {
   }
 
   candidates.push(
+    {
+      id: "capability-win",
+      text: "What are you trying to win this quarter?",
+      kind: "capability",
+    },
     {
       id: "capability-opportunity",
       text: "What opportunity is on your mind?",

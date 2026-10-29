@@ -7,9 +7,9 @@ import {
   advanceTour,
   createOnboardingState,
   finishTour,
-  isFinished,
   retreatTour,
   selectGoal,
+  shouldAutoOpen,
   skipStepTour,
   skipTour,
   startTour,
@@ -29,18 +29,14 @@ export function OnboardingProvider({ children, enabled }: OnboardingProviderProp
   const [state, setState] = useState<OnboardingState>(
     () => readOnboardingState() ?? createOnboardingState(),
   );
-  // The tour never opens by itself. The stage is the first impression; the
-  // tour is an answer to "show me around", from the home stage or Settings.
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState<boolean>(() => featureEnabled && shouldAutoOpen(state));
 
-  // Persist every transition so closing the app mid-tour resumes where it left
-  // off. A pending tour that was never opened is not a record worth writing.
+  // Persist every transition so closing the app mid-tour resumes where it left off.
   useEffect(() => {
-    if (!featureEnabled || (!open && state.status === "pending")) {
-      return;
+    if (featureEnabled) {
+      writeOnboardingState(state);
     }
-    writeOnboardingState(state);
-  }, [featureEnabled, open, state]);
+  }, [featureEnabled, state]);
 
   const chooseGoal = useCallback((goal: GoalId) => {
     setState((prev) => selectGoal(prev, goal));
@@ -68,16 +64,6 @@ export function OnboardingProvider({ children, enabled }: OnboardingProviderProp
     setOpen(false);
   }, []);
 
-  /** Open the tour where it was left, or from the top once it is finished. */
-  const openTour = useCallback(() => {
-    if (!featureEnabled) {
-      return;
-    }
-    setState((prev) => (isFinished(prev) ? startTour(prev) : prev));
-    setOpen(true);
-  }, [featureEnabled]);
-
-  /** Replay from the first step, forgetting the previous choice. */
   const restart = useCallback(() => {
     if (!featureEnabled) {
       return;
@@ -97,7 +83,6 @@ export function OnboardingProvider({ children, enabled }: OnboardingProviderProp
       back,
       complete,
       skip,
-      openTour,
       restart,
     }),
     [
@@ -110,7 +95,6 @@ export function OnboardingProvider({ children, enabled }: OnboardingProviderProp
       back,
       complete,
       skip,
-      openTour,
       restart,
     ],
   );

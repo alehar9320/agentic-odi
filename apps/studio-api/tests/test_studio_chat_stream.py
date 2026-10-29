@@ -305,24 +305,6 @@ def test_mutating_tools_are_named_by_prefix() -> None:
     assert not chat.is_mutating_tool("render_ui")
 
 
-def test_model_receives_visible_turn_history_in_order() -> None:
-    request = _request(
-        messages=[
-            ChatMessage(role="user", content="Earlier question", id="m-1"),
-            ChatMessage(role="assistant", content="Earlier answer", id="m-2"),
-            ChatMessage(role="user", content="Latest question", id="m-3"),
-        ]
-    )
-
-    messages = chat._to_openai_messages(request)
-
-    assert messages[1:] == [
-        {"role": "user", "content": "Earlier question"},
-        {"role": "assistant", "content": "Earlier answer"},
-        {"role": "user", "content": "Latest question"},
-    ]
-
-
 def test_attachment_text_is_part_of_the_user_turn_the_model_reads() -> None:
     request = _request(
         attachments=[

@@ -184,10 +184,6 @@ export const CATALOG: readonly UiCatalogEntry[] = [
         description: "Omit it — the score is computed from importance and satisfaction.",
       },
       evidence: { type: "string", description: "The customer voice behind the rating." },
-      sample: {
-        type: "boolean",
-        description: "True when this is bundled sample data rather than the user's own.",
-      },
     },
     ["id", "statement", "importance", "satisfaction"],
   ),
@@ -254,13 +250,8 @@ export const CATALOG: readonly UiCatalogEntry[] = [
         },
       },
       verdict: { type: "string", description: "One sentence: build it, reshape it, or drop it." },
-      provenance: {
-        enum: ["simulated"],
-        description:
-          "Must be `simulated`: no computation backs these numbers yet. Never present them as measurements.",
-      },
     },
-    ["outcome", "bet", "before", "after", "provenance"],
+    ["outcome", "bet", "before", "after"],
   ),
   entry(
     "evidence-quote",

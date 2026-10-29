@@ -24,14 +24,6 @@ python -m agentic_odi_cli connectors catalog --json
 | Product strategy & backlog alignment (`strategy-alignment`) | `linear`, `github`, `jira`, `miro`, `figma` |
 | Strategy & knowledge management output (`knowledge-output`) | `slack` |
 
-`docs/connectors-catalog.json` is the catalog as JSON, committed so a drift shows
-up in review. `packages/connectors/tests/test_catalog.py` fails when it stops
-matching the code; regenerate it after adding or editing a preset:
-
-```bash
-uv run python -m agentic_odi_cli connectors catalog --json > docs/connectors-catalog.json
-```
-
 Register one with `--preset`; `--name` defaults to the preset id:
 
 ```bash
@@ -75,10 +67,6 @@ Ingested records are normalized (`catalog`, `resource`, `tool_result`) and
 appended to the in-process ingest sink. They are **not** written into the ODI
 jobs/outcomes store — mapping ingested evidence onto ODI artifacts is still on
 the [roadmap](roadmap.md).
-
-Pass `--dry-run` to fetch and normalize without writing anything: it prints the
-record count, the first normalized record, and — when `--job-id`, `--step-id`,
-or `--outcome-id` is given — how many evidence drafts the ingest would create.
 
 Additional kinds (REST, webhooks, and so on) can register against the same
 `Connector` protocol later.

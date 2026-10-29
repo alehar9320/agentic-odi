@@ -2,7 +2,6 @@ import { useMemo, useState, type KeyboardEvent } from "react";
 
 import { useStudio } from "../../state/StudioContext";
 import type { Evidence } from "../../types";
-import { SignalIcon } from "../icons";
 
 const ORDER_KEY = "agentic-odi.evidence-order";
 
@@ -24,7 +23,7 @@ function writeStoredOrder(ids: string[]) {
 }
 
 export function EvidenceStream() {
-  const { canvasState, openPanel } = useStudio();
+  const { canvasState } = useStudio();
   const evidence = useMemo(() => canvasState.data?.evidence ?? [], [canvasState.data]);
   const jobs = useMemo(() => canvasState.data?.jobs ?? [], [canvasState.data]);
   const [storedOrder, setStoredOrder] = useState<string[]>(readStoredOrder);
@@ -89,23 +88,10 @@ export function EvidenceStream() {
   if (ordered.length === 0) {
     return (
       <section className="stack" aria-label="Customer evidence">
-        <div className="evidence-empty">
-          <span className="evidence-empty__icon" aria-hidden="true">
-            <SignalIcon size={22} />
-          </span>
-          <p className="evidence-empty__title">No evidence captured yet.</p>
-          <p className="evidence-empty__body">
-            Nothing has been ingested in this build. Connect a source and the quotes, calls, and
-            signals it brings will land here, linked to the job and outcome they support.
-          </p>
-          <button
-            type="button"
-            className="button button--ghost"
-            onClick={() => openPanel("settings")}
-          >
-            Connect a source in Settings
-          </button>
-        </div>
+        <p className="notice">
+          No evidence captured yet. Connect a source or paste a quote, and the records will appear
+          here.
+        </p>
       </section>
     );
   }

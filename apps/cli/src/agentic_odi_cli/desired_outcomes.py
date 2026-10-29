@@ -7,14 +7,10 @@ owns the former; ``customer-outcomes`` owns the latter.
 
 from __future__ import annotations
 
-import csv
-import io
-import json
 from typing import Any
 
 import typer
 
-from agentic_odi_cli import flags
 from agentic_odi_cli.backend import run_tool
 from agentic_odi_cli.render import render_deleted, render_outcome, render_outcome_list, render_saved
 
@@ -22,33 +18,22 @@ desired_outcomes_app = typer.Typer(help="Manage desired Outcomes.")
 
 JSON_OPTION = typer.Option(False, "--json", help="Emit machine-readable JSON.")
 
-EXPORT_FIELDS = (
-    "id",
-    "job_id",
-    "step_id",
-    "statement",
-    "importance",
-    "satisfaction",
-    "opportunity_score",
-)
-
 
 @desired_outcomes_app.command("add")
 def add(
     job_id: str = typer.Option(..., help="Job ID the outcome belongs to"),
     statement: str = typer.Option(..., help="Desired outcome statement"),
-    importance: float = typer.Option(..., min=1.0, max=10.0, help="Importance score (1-10)"),
-    satisfaction: float = typer.Option(..., min=1.0, max=10.0, help="Satisfaction score (1-10)"),
+    importance: float | None = typer.Option(default=None, min=1.0, max=10.0),
+    satisfaction: float | None = typer.Option(default=None, min=1.0, max=10.0),
     step_id: str | None = typer.Option(default=None, help="Optional Step ID"),
     json_output: bool = JSON_OPTION,
 ) -> None:
     """Add a desired Outcome to a Job."""
-    args: dict[str, Any] = {
-        "job_id": job_id,
-        "statement": statement,
-        "importance": importance,
-        "satisfaction": satisfaction,
-    }
+    args: dict[str, Any] = {"job_id": job_id, "statement": statement}
+    if importance is not None:
+        args["importance"] = importance
+    if satisfaction is not None:
+        args["satisfaction"] = satisfaction
     if step_id is not None:
         args["step_id"] = step_id
     typer.echo(
@@ -67,35 +52,6 @@ def list_outcomes(
     if step_id is not None:
         args["step_id"] = step_id
     typer.echo(render_outcome_list(run_tool("get_outcomes", args), as_json=json_output))
-
-
-@desired_outcomes_app.command("export")
-def export(
-    job_id: str = typer.Option(..., help="Job ID to export outcomes for"),
-    step_id: str | None = typer.Option(default=None, help="Filter by Step ID"),
-    output_format: str = typer.Option("csv", "--format", help="Output format: csv or json."),
-) -> None:
-    """Export desired Outcomes to stdout, ready to pipe into another tool."""
-    fmt = output_format.lower()
-    if fmt not in {"csv", "json"}:
-        typer.echo(f"Error: unknown format '{output_format}', expected csv or json", err=True)
-        raise typer.Exit(code=1)
-    args: dict[str, Any] = {"job_id": job_id}
-    if step_id is not None:
-        args["step_id"] = step_id
-    outcomes = run_tool("get_outcomes", args)
-    if not isinstance(outcomes, list):
-        typer.echo(str(outcomes))
-        return
-    if fmt == "json":
-        typer.echo(json.dumps(outcomes, indent=2))
-        return
-    buffer = io.StringIO()
-    writer = csv.DictWriter(buffer, fieldnames=EXPORT_FIELDS, extrasaction="ignore")
-    writer.writeheader()
-    for item in outcomes:
-        writer.writerow({field: item.get(field, "") for field in EXPORT_FIELDS})
-    typer.echo(buffer.getvalue(), nl=False)
 
 
 @desired_outcomes_app.command("get")
@@ -132,30 +88,6 @@ def update(
             "updated", run_tool("update_outcome", args), as_json=json_output, noun="Outcome"
         )
     )
-
-
-@desired_outcomes_app.command("evaluate")
-def evaluate(
-    statement: str = typer.Argument(..., help="Outcome statement to check"),
-    job_id: str | None = typer.Option(default=None, help="Job to compare against"),
-    json_output: bool = JSON_OPTION,
-) -> None:
-    """Evaluate an outcome statement against ODI format rules."""
-    args: dict[str, Any] = {"statement": statement}
-    if job_id is not None:
-        args["job_id"] = job_id
-    result = run_tool("evaluate_outcome", args)
-    if json_output:
-        typer.echo(result if isinstance(result, str) else json.dumps(result))
-        return
-    parsed = json.loads(result) if isinstance(result, str) else result
-    verdict = "passes" if parsed.get("valid") else "needs work"
-    typer.echo(f"{verdict}: {statement}")
-    for problem in parsed.get("issues", []):
-        typer.echo(f"  - {problem}")
-    if flags.is_enabled("advanced_metrics"):
-        for suggestion in parsed.get("suggestions", []):
-            typer.echo(f"  Suggestion: {suggestion}")
 
 
 @desired_outcomes_app.command("delete")

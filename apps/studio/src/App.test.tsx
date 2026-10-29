@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import App from "./App";
@@ -98,43 +98,16 @@ beforeEach(() => {
 });
 
 describe("studio shell", () => {
-  it("opens as a conversation with an invitation and suggestion pills", async () => {
+  it("opens as a conversation with a greeting and suggestion pills", async () => {
     render(<App />);
 
     expect(
-      await screen.findByRole("heading", { name: "What do you want to win?" }),
+      await screen.findByRole("heading", { name: /^Good (morning|afternoon|evening)/ }),
     ).toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: /message the studio/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /sharpen an opportunity/i })).toBeInTheDocument();
-    expect(screen.getByText("Turn a hunch into something defensible")).toBeInTheDocument();
-    expect(screen.getByText("Look across what you already know")).toBeInTheDocument();
     // The classic UI is secondary: no workspace surface until you ask for one.
     expect(screen.queryByRole("heading", { name: /opportunity landscape/i })).toBeNull();
-  });
-
-  it("sends the runtime prompt when a contextual starter card is selected", async () => {
-    render(<App />);
-
-    const start = await screen.findByRole("button", { name: /sharpen an opportunity/i });
-    await act(async () => {
-      fireEvent.click(start);
-    });
-
-    const { streamChat } = await import("./api/studioApi");
-    await waitFor(() => {
-      expect(streamChat).toHaveBeenCalledWith(
-        expect.objectContaining({
-          messages: [
-            expect.objectContaining({
-              content:
-                "I have an opportunity in mind. Ask me what it is, then help me sharpen it into something I can defend.",
-            }),
-          ],
-        }),
-        expect.any(Function),
-        expect.any(AbortSignal),
-      );
-    });
   });
 
   it("opens a workspace view beside the conversation and keeps the composer", async () => {
@@ -200,7 +173,6 @@ describe("studio shell", () => {
     expect(await screen.findByText("Where do I start?")).toBeInTheDocument();
     expect(await screen.findByText("job")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /copy reply/i })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /sharpen an opportunity/i })).not.toBeInTheDocument();
   });
 
   it("returns home from the wordmark", async () => {
@@ -217,7 +189,7 @@ describe("studio shell", () => {
       expect(screen.queryByText("Where do I start?")).toBeNull();
     });
     expect(
-      screen.getByRole("heading", { name: "What do you want to win?" }),
+      screen.getByRole("heading", { name: /^Good (morning|afternoon|evening)/ }),
     ).toBeInTheDocument();
   });
 
@@ -280,36 +252,29 @@ describe("first-run tour", () => {
     window.localStorage.setItem("studio.flags.firstRunWizard", "on");
   }
 
-  it("does not put a tour in front of a first-time user", async () => {
+  it("greets a first-time user before the context conversation", async () => {
     prepareFreshRun();
     render(<App />);
 
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
     expect(
-      await screen.findByRole("heading", { name: "What do you want to win?" }),
+      screen.getByRole("heading", { name: "What do you want to win?" }),
     ).toBeInTheDocument();
-    expect(screen.queryByRole("dialog")).toBeNull();
-    // No interview behind it either: the stage is the first thing that asks.
-    expect(screen.queryByText("What are you building?", { selector: "strong" })).toBeNull();
-    expect(screen.getByRole("textbox", { name: /message the studio/i })).toBeInTheDocument();
-  });
+    // The setup conversation is already waiting behind the tour.
+    expect(screen.getByText("What are you building?", { selector: "strong" })).toBeInTheDocument();
 
-  it("opens the tour when the stage offers it", async () => {
-    prepareFreshRun();
-    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Skip the tour" }));
 
-    fireEvent.click(await screen.findByRole("button", { name: "Show me around" }));
-
-    const dialog = await screen.findByRole("dialog");
-    expect(within(dialog).getByRole("heading", { level: 2 })).toHaveTextContent(
-      "What do you want to win?",
-    );
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog")).toBeNull();
+    });
+    expect(screen.getByText("What are you building?", { selector: "strong" })).toBeInTheDocument();
   });
 
   it("starts the boss-priority conversation from the tour", async () => {
     prepareFreshRun();
     render(<App />);
 
-    fireEvent.click(await screen.findByRole("button", { name: "Show me around" }));
     fireEvent.click(await screen.findByRole("button", { name: "Continue" }));
     fireEvent.click(screen.getByRole("button", { name: /My boss handed me a priority/ }));
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
@@ -332,7 +297,6 @@ describe("first-run tour", () => {
     prepareFreshRun();
     render(<App />);
 
-    fireEvent.click(await screen.findByRole("button", { name: "Show me around" }));
     fireEvent.click(await screen.findByRole("button", { name: "Continue" }));
     fireEvent.click(screen.getByRole("button", { name: /Help me find the next one/ }));
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
@@ -348,15 +312,12 @@ describe("first-run tour", () => {
 });
 
 describe("first run", () => {
-  it("opens the context conversation from the stage and creates the job when accepted", async () => {
+  it("asks for context conversationally and creates the job when accepted", async () => {
     window.localStorage.removeItem("studio.brief");
     const { createJob } = await import("./api/studioApi");
     render(<App />);
 
-    // The stage first; the interview is an answer, not a gate.
-    fireEvent.click(
-      await screen.findByRole("button", { name: /tell me what you're building/i }),
-    );
+    // No modal: the questions arrive as chat, with the composer ready.
     expect(
       await screen.findByText("What are you building?", { selector: "strong" }),
     ).toBeInTheDocument();
@@ -398,49 +359,30 @@ describe("first run", () => {
     expect(screen.queryByRole("button", { name: /explore on my own/i })).toBeNull();
   });
 
-  it("does not open the context interview by itself", async () => {
+  it("lets people explore instead of answering, and remembers that choice", async () => {
     window.localStorage.removeItem("studio.brief");
+    const { unmount } = render(<App />);
+
+    fireEvent.click(await screen.findByRole("button", { name: /explore on my own/i }));
+
+    expect(
+      await screen.findByRole("heading", { name: /^Good (morning|afternoon|evening)/ }),
+    ).toBeInTheDocument();
+    expect(window.localStorage.getItem("studio.setupDismissed")).toBe("1");
+
+    unmount();
     render(<App />);
 
     expect(
-      await screen.findByRole("heading", { name: "What do you want to win?" }),
+      await screen.findByRole("heading", { name: /^Good (morning|afternoon|evening)/ }),
     ).toBeInTheDocument();
     expect(screen.queryByText("What are you building?", { selector: "strong" })).toBeNull();
-    expect(window.localStorage.getItem("studio.setupDismissed")).toBeNull();
-  });
-
-  it("asks for context once the studio has answered something", async () => {
-    window.localStorage.removeItem("studio.brief");
-    render(<App />);
-
-    expect(
-      await screen.findByRole("heading", { name: "What do you want to win?" }),
-    ).toBeInTheDocument();
-    // Nothing to correct before the first exchange.
-    expect(screen.queryByText(/I don't know your product yet/)).toBeNull();
-
-    const composer = screen.getByRole("textbox", { name: /message the studio/i });
-    fireEvent.change(composer, { target: { value: "Where do I start?" } });
-    fireEvent.click(screen.getByRole("button", { name: /send message/i }));
-
-    expect(
-      await screen.findByText(/I don't know your product yet/),
-    ).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: /add context/i }));
-
-    expect(
-      await screen.findByText("What are you building?", { selector: "strong" }),
-    ).toBeInTheDocument();
   });
 
   it("lets a workspace surface take over from the setup conversation", async () => {
     window.localStorage.removeItem("studio.brief");
     render(<App />);
 
-    fireEvent.click(
-      await screen.findByRole("button", { name: /tell me what you're building/i }),
-    );
     expect(
       await screen.findByText("What are you building?", { selector: "strong" }),
     ).toBeInTheDocument();
@@ -454,7 +396,7 @@ describe("first run", () => {
 
     // Closing the surface returns to the home stage, not back into setup.
     expect(
-      await screen.findByRole("heading", { name: "What do you want to win?" }),
+      await screen.findByRole("heading", { name: /^Good (morning|afternoon|evening)/ }),
     ).toBeInTheDocument();
     expect(screen.queryByText("What are you building?", { selector: "strong" })).toBeNull();
   });

@@ -7,6 +7,8 @@ import {
   finishTour,
   retreatTour,
   selectGoal,
+  shouldAutoOpen,
+  skipTour,
   startTour,
   stepAt,
 } from "./machine";
@@ -42,6 +44,13 @@ describe("onboarding machine", () => {
       goal: null,
       version: 1,
     });
+  });
+
+  it("auto-opens only while the tour is unfinished", () => {
+    expect(shouldAutoOpen(createOnboardingState())).toBe(true);
+    expect(shouldAutoOpen({ ...createOnboardingState(), status: "active" })).toBe(true);
+    expect(shouldAutoOpen(finishTour(createOnboardingState()))).toBe(false);
+    expect(shouldAutoOpen(skipTour(createOnboardingState()))).toBe(false);
   });
 
   it("moves forward through the flow", () => {

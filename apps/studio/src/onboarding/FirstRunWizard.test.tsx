@@ -29,33 +29,10 @@ import { FirstRunWizard } from "./FirstRunWizard";
 import { OnboardingProvider } from "./OnboardingProvider";
 import { useOnboarding } from "./context";
 
-function TourOpener() {
-  const { openTour } = useOnboarding();
-  return (
-    <button type="button" onClick={openTour}>
-      Show me around
-    </button>
-  );
-}
-
-/** Render and let the user ask for the tour, the only way it can open. */
 function renderWizard(enabled = true) {
-  const utils = render(
-    <OnboardingProvider enabled={enabled}>
-      <FirstRunWizard />
-      <TourOpener />
-    </OnboardingProvider>,
-  );
-  fireEvent.click(screen.getByRole("button", { name: "Show me around" }));
-  return utils;
-}
-
-/** Render without opening anything. */
-function renderClosed(enabled = true) {
   return render(
     <OnboardingProvider enabled={enabled}>
       <FirstRunWizard />
-      <TourOpener />
     </OnboardingProvider>,
   );
 }
@@ -92,14 +69,7 @@ describe("FirstRunWizard", () => {
     studio.sendMessage.mockClear();
   });
 
-  it("never opens by itself, even on a fresh run", () => {
-    renderClosed();
-
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    expect(stored()).toBeNull();
-  });
-
-  it("greets a user who asks for the tour and focuses the step heading", () => {
+  it("greets a first-time user and focuses the step heading", () => {
     renderWizard();
 
     expect(screen.getByRole("dialog")).toHaveAttribute("aria-modal", "true");
@@ -176,7 +146,7 @@ describe("FirstRunWizard", () => {
     expect(studio.openSetup).not.toHaveBeenCalled();
 
     unmount();
-    renderClosed();
+    renderWizard();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
@@ -231,29 +201,17 @@ describe("FirstRunWizard", () => {
     );
   });
 
-  it("starts from the top once the tour is finished", () => {
+  it("does not reappear after completion", () => {
     seed({ status: "done", step: 3, goal: "have-opportunity", version: 1 });
 
     renderWizard();
-
-    expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent(
-      "What do you want to win?",
-    );
-  });
-
-  it("stays closed after completion until it is asked for", () => {
-    seed({ status: "done", step: 3, goal: "have-opportunity", version: 1 });
-
-    renderClosed();
 
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
   it("stays completely inert when the feature flag is off", () => {
-    renderClosed(false);
+    renderWizard(false);
 
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Show me around" }));
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(window.localStorage.getItem(ONBOARDING_STORAGE_KEY)).toBeNull();
   });
@@ -264,7 +222,6 @@ describe("FirstRunWizard", () => {
     render(
       <OnboardingProvider>
         <FirstRunWizard />
-        <TourOpener />
       </OnboardingProvider>,
     );
 

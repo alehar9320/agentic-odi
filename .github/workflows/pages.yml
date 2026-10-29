@@ -48,7 +48,8 @@ jobs:
           echo "OK: critical source files present"
 
       # The site is generated from the repository's own sources, so it is
-      # built here rather than copied. This produces the artifact that goes live.
+      # built here rather than copied. website/dist/ is the committed copy a
+      # reviewer reads; this step produces the artifact that goes live.
       - name: Build site
         run: uv run python website/tools/build_site.py --out _site
 

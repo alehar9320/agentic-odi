@@ -10,7 +10,6 @@ from typing import TYPE_CHECKING
 
 import typer
 
-from agentic_odi_cli import flags
 from agentic_odi_cli.backend import run_tool
 from agentic_odi_cli.render import render_saved
 
@@ -120,26 +119,9 @@ def _run(coro, name: str):
 @connectors_app.command("list")
 def list_connectors(
     config: Path | None = ConfigOption,
-    as_json: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
     """List configured external connectors."""
     items = _registry(config).list_all()
-    if as_json:
-        typer.echo(
-            json.dumps(
-                [
-                    {
-                        "name": item.name,
-                        "kind": item.kind,
-                        "url": item.settings.get("url"),
-                        "enabled": item.enabled,
-                    }
-                    for item in items
-                ],
-                indent=2,
-            )
-        )
-        return
     if not items:
         typer.echo("No connectors configured.")
         return
@@ -244,13 +226,6 @@ def add_connector(
     config: Path | None = ConfigOption,
 ) -> None:
     """Register a new external connector, optionally from a known preset."""
-    if not flags.is_enabled("experimental_connectors"):
-        typer.echo(
-            "Error: connector management requires the experimental_connectors flag. "
-            "Enable it with: agentic-odi settings flags set experimental_connectors true",
-            err=True,
-        )
-        raise typer.Exit(code=1)
     from agentic_odi_connectors.models import ConnectorConfig
     from agentic_odi_connectors.registry import DuplicateConnectorError, UnknownConnectorKindError
 
@@ -303,13 +278,6 @@ def health_connector(
     config: Path | None = ConfigOption,
 ) -> None:
     """Check whether a connector can reach its external system."""
-    if not flags.is_enabled("experimental_connectors"):
-        typer.echo(
-            "Error: connector management requires the experimental_connectors flag. "
-            "Enable it with: agentic-odi settings flags set experimental_connectors true",
-            err=True,
-        )
-        raise typer.Exit(code=1)
     from agentic_odi_connectors.registry import ConnectorNotFoundError, UnknownConnectorKindError
 
     try:
@@ -336,19 +304,9 @@ def ingest_connector(
     outcome_id: str | None = typer.Option(
         None, "--outcome-id", help="Link evidence to a desired Outcome."
     ),
-    dry_run: bool = typer.Option(
-        False, "--dry-run", help="Fetch and validate records without writing anything."
-    ),
     config: Path | None = ConfigOption,
 ) -> None:
     """Ingest connector records and optionally map them into ODI evidence."""
-    if not flags.is_enabled("experimental_connectors"):
-        typer.echo(
-            "Error: connector management requires the experimental_connectors flag. "
-            "Enable it with: agentic-odi settings flags set experimental_connectors true",
-            err=True,
-        )
-        raise typer.Exit(code=1)
     from agentic_odi_connectors.registry import ConnectorNotFoundError, UnknownConnectorKindError
 
     try:
@@ -358,24 +316,11 @@ def ingest_connector(
         typer.echo(f"Error: {exc}", err=True)
         raise typer.Exit(code=1) from exc
     batch = _run(connector.ingest(), name)
-    drafts = None
-    if job_id is not None or step_id is not None or outcome_id is not None:
-        drafts = drafts_from_batch(batch, job_id=job_id, step_id=step_id, outcome_id=outcome_id)
-    if dry_run:
-        preview: dict[str, object] = {
-            "dry_run": True,
-            "connector": name,
-            "records": len(batch.records),
-            "sample": batch.records[0].model_dump(mode="json") if batch.records else None,
-        }
-        if drafts is not None:
-            preview["evidence_drafts"] = len(drafts)
-        typer.echo(json.dumps(preview, indent=2))
-        return
     get_default_sink().append(batch)
     typer.echo(batch.model_dump_json())
-    if drafts is None:
+    if job_id is None and step_id is None and outcome_id is None:
         return
+    drafts = drafts_from_batch(batch, job_id=job_id, step_id=step_id, outcome_id=outcome_id)
     for draft in drafts:
         typer.echo(
             render_saved(

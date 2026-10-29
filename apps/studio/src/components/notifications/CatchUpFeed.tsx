@@ -71,7 +71,7 @@ export function CatchUpFeed() {
   const [activeFilter, setActiveFilter] = useState<FilterType>("all");
 
   const filteredNotifications = notifications.filter((item) => {
-    if (activeFilter === "unread") return !item.read && !item.simulated;
+    if (activeFilter === "unread") return !item.read;
     if (activeFilter === "outcome") return item.category === "outcome";
     if (activeFilter === "signals")
       return item.category === "simulation" || item.category === "evidence";
@@ -97,11 +97,8 @@ export function CatchUpFeed() {
     }
   }
 
-  // Simulated events stay visible in "All", but they are demonstrations, not
-  // activity the studio observed. Counting them would inflate the summary.
-  const realNotifications = notifications.filter((n) => !n.simulated);
-  const outcomeCount = realNotifications.filter((n) => n.category === "outcome").length;
-  const signalCount = realNotifications.filter(
+  const outcomeCount = notifications.filter((n) => n.category === "outcome").length;
+  const signalCount = notifications.filter(
     (n) => n.category === "simulation" || n.category === "evidence",
   ).length;
 
@@ -200,13 +197,9 @@ export function CatchUpFeed() {
       {filteredNotifications.length === 0 ? (
         <div className="card empty-note catchup-empty">
           <span className="catchup-empty__icon">✨</span>
-          <p className="catchup-empty__title">
-            {notifications.length === 0 ? "No activity yet" : "You're all caught up!"}
-          </p>
+          <p className="catchup-empty__title">You're all caught up!</p>
           <p className="catchup-empty__hint">
-            {notifications.length === 0
-              ? "Updates appear here as the studio captures evidence and outcomes. Anything simulated is labelled."
-              : "No updates found for this filter."}
+            No updates found for this filter.
           </p>
         </div>
       ) : (
@@ -214,9 +207,7 @@ export function CatchUpFeed() {
           {filteredNotifications.map((item) => (
             <article
               key={item.id}
-              className={`card catchup-card${!item.read ? " is-unread" : ""}${
-                item.simulated ? " is-simulated" : ""
-              }`}
+              className={`card catchup-card${!item.read ? " is-unread" : ""}`}
               onClick={() => handleAction(item)}
             >
               <div className="card__head">
@@ -228,14 +219,6 @@ export function CatchUpFeed() {
                       {item.category.toUpperCase()}
                     </span>
                   </span>
-                  {item.simulated ? (
-                    <span
-                      className="badge badge--amber"
-                      title="Demonstration event, not recorded activity"
-                    >
-                      Simulated
-                    </span>
-                  ) : null}
                   <span className="card__id">{formatRelativeTime(item.timestamp)}</span>
                 </div>
 

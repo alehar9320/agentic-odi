@@ -19,10 +19,6 @@ from agentic_odi_cli.customer_outcomes import customer_outcomes_app, score
 from agentic_odi_cli.desired_outcomes import desired_outcomes_app
 from agentic_odi_cli.evidence import evidence_app
 from agentic_odi_cli.jobs import jobs_app
-from agentic_odi_cli.onboard import maybe_run_first_launch
-from agentic_odi_cli.profile import app as profile_app
-from agentic_odi_cli.render import render_job_summary
-from agentic_odi_cli.settings import settings_app
 from agentic_odi_cli.steps import steps_app
 from agentic_odi_cli.version import __version__  # noqa: F401  (re-exported for tests)
 
@@ -78,9 +74,7 @@ def main(
         help="Show verbose version information (with --version)",
     ),
     backend: str | None = typer.Option(
-        None,
-        "--backend",
-        help="Backend to use: auto (local, then MCP) | local (SQLite) | mcp (remote server).",
+        None, "--backend", help="Backend to use: local (SQLite) | mcp (remote server)."
     ),
     db: str | None = typer.Option(
         None, "--db", help="Path to the local SQLite database (local backend)."
@@ -91,8 +85,6 @@ def main(
     context.set_options(backend=backend, db_path=db, mcp_url=mcp_url)
     if not no_update:
         threading.Thread(target=_startup_auto_update, args=(no_update,), daemon=True).start()
-
-    maybe_run_first_launch(invoked_subcommand=ctx.invoked_subcommand)
 
     if ctx.invoked_subcommand is None:
         # No subcommand: start the conversational experience when attached to a
@@ -194,59 +186,10 @@ def guidelines_cmd() -> None:
     typer.echo(run_tool("get_odi_framework_guidelines", {}))
 
 
-capabilities_app = typer.Typer(name="capabilities", help="Inspect the assistant's tool surface.")
-
-
-@capabilities_app.command(name="tools")
-def capabilities_tools() -> None:
-    """List tool names only."""
-    from agentic_odi_core import TOOL_NAMES
-
-    for name in TOOL_NAMES:
-        typer.echo(name)
-
-
-@capabilities_app.callback(invoke_without_command=True)
-def capabilities_cmd(
-    ctx: typer.Context,
-    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON manifest."),
-) -> None:
+@app.command(name="capabilities")
+def capabilities_cmd() -> None:
     """Print what the assistant can do."""
-    if ctx.invoked_subcommand is not None:
-        return
-    from agentic_odi_core import capability_manifest, capability_summary
-
-    if json_output:
-        typer.echo(json.dumps(capability_manifest(), indent=2))
-    else:
-        typer.echo(capability_summary())
-
-
-app.add_typer(capabilities_app, name="capabilities")
-app.add_typer(settings_app, name="settings")
-app.add_typer(profile_app, name="profile")
-app.add_typer(profile_app, name="setup", hidden=True)
-
-
-@app.command(name="summary")
-def summary(
-    job_id: str = typer.Argument(..., help="Job ID"),
-    top: int = typer.Option(5, "--top", help="How many underserved outcomes to show."),
-    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
-) -> None:
-    """Summarize a Job's map coverage and its biggest opportunities."""
-    job = run_tool("get_job", {"job_id": job_id})
-    steps = run_tool("get_job_map", {"job_id": job_id})
-    outcomes = run_tool("get_outcomes", {"job_id": job_id})
-    typer.echo(
-        render_job_summary(
-            job if isinstance(job, dict) else {},
-            steps if isinstance(steps, list) else [],
-            outcomes if isinstance(outcomes, list) else [],
-            top=top,
-            as_json=json_output,
-        )
-    )
+    typer.echo(run_tool("get_capabilities", {}))
 
 
 @app.command(name="version")
@@ -387,8 +330,19 @@ def wizard() -> None:
         created_job = run_tool("add_job", job_args)
         job_id = created_job["id"]
 
-        created_customer_outcome_ids: list[str] = []
+        created_step_ids: list[str] = []
+        for s in steps:
+            created_step = run_tool(
+                "add_step", {"job_id": job_id, "name": s["name"], "order": s["order"]}
+            )
+            created_step_ids.append(created_step["id"])
+
         for o in outcomes:
+            step_id = (
+                created_step_ids[o["step_index"]]
+                if o["step_index"] is not None and o["step_index"] < len(created_step_ids)
+                else None
+            )
             outcome_args: dict[str, Any] = {
                 "job_id": job_id,
                 "customer_value": {
@@ -404,26 +358,9 @@ def wizard() -> None:
                     "statement": o["business_statement"],
                 },
             }
-            created_customer_outcome = run_tool("add_customer_outcome", outcome_args)
-            created_customer_outcome_ids.append(created_customer_outcome["id"])
-
-        created_step_ids: list[str] = []
-        for s in steps:
-            created_step = run_tool(
-                "add_step", {"job_id": job_id, "name": s["name"], "order": s["order"]}
-            )
-            created_step_ids.append(created_step["id"])
-
-        for index, outcome in enumerate(outcomes):
-            step_index = outcome["step_index"]
-            if step_index is not None and step_index < len(created_step_ids):
-                run_tool(
-                    "update_customer_outcome",
-                    {
-                        "outcome_id": created_customer_outcome_ids[index],
-                        "step_id": created_step_ids[step_index],
-                    },
-                )
+            if step_id:
+                outcome_args["step_id"] = step_id
+            run_tool("add_customer_outcome", outcome_args)
 
         typer.echo(
             f"\nSuccessfully created Job {job_id} with {len(steps)} step(s) and {len(outcomes)} outcome(s)."

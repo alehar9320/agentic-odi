@@ -368,13 +368,8 @@ def test_canvas_reads_local_repository() -> None:
     repo = InMemoryRepository()
     service = ODIService(repo)
     job = service.add_job(name="Local job", description="Stored locally")
-    service.add_outcome(
-        job_id=job.id,
-        statement="Minimize the time it takes to deploy when releasing",
-        importance=8.0,
-        satisfaction=3.0,
-    )
     service.add_step(job_id=job.id, name="Local step", order=1)
+    service.add_outcome(job_id=job.id, statement="Minimize time", importance=8.0, satisfaction=3.0)
     service.add_evidence(
         source_name="Gong",
         source_kind="mcp",
@@ -388,19 +383,13 @@ def test_canvas_reads_local_repository() -> None:
     assert body["source"] == "local"
     assert body["jobs"][0]["id"] == job.id
     assert body["steps"][0]["name"] == "Local step"
-    assert body["outcomes"][0]["statement"] == "Minimize the time it takes to deploy when releasing"
+    assert body["outcomes"][0]["statement"] == "Minimize time"
     assert body["evidence"][0]["name"] == "Call with Ada"
 
 
 def test_post_step_uses_local_service() -> None:
     repo = InMemoryRepository()
     job = ODIService(repo).add_job(name="Local job")
-    ODIService(repo).add_outcome(
-        job_id=job.id,
-        statement="Minimize the time it takes to deploy when releasing",
-        importance=8.0,
-        satisfaction=3.0,
-    )
 
     response = TestClient(create_app(repo)).post(
         "/api/steps",
@@ -420,17 +409,14 @@ def test_post_outcome_uses_local_service() -> None:
         json={
             "mcp_url": "http://unused",
             "job_id": job.id,
-            "statement": "Minimize the time to ship a release when the build is green",
+            "statement": "Minimize effort",
             "importance": 9.0,
             "satisfaction": 4.0,
         },
     )
 
     assert response.status_code == 200
-    assert (
-        ODIService(repo).get_outcomes(job.id)[0].statement
-        == "Minimize the time to ship a release when the build is green"
-    )
+    assert ODIService(repo).get_outcomes(job.id)[0].statement == "Minimize effort"
 
 
 # ---------------------------------------------------------------------------

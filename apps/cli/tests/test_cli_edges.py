@@ -12,12 +12,8 @@ from typer.testing import CliRunner
 
 def test_no_args_launches_chat_when_attached_to_a_terminal(monkeypatch) -> None:
     seen: list = []
-    output: list[str] = []
-    fake_stdout = SimpleNamespace(
-        isatty=lambda: True, write=lambda s: output.append(s), flush=lambda: None
-    )
     monkeypatch.setattr(cli_module.sys, "stdin", SimpleNamespace(isatty=lambda: True))
-    monkeypatch.setattr(cli_module.sys, "stdout", fake_stdout)
+    monkeypatch.setattr(cli_module.sys, "stdout", SimpleNamespace(isatty=lambda: True))
     monkeypatch.setattr("agentic_odi_cli.chat.run_chat", lambda config: seen.append(config))
 
     ctx: Any = SimpleNamespace(invoked_subcommand=None)

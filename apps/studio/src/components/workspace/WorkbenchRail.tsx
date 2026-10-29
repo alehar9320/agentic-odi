@@ -1,6 +1,5 @@
 import { useMemo, type ReactNode } from "react";
 
-import { canvasStatus } from "../../lib/canvasProvenance";
 import { useStudio } from "../../state/StudioContext";
 import type { WorkspacePanelId } from "../../types";
 import { CompassIcon, RouteIcon, SignalIcon, SparkIcon } from "../icons";
@@ -69,22 +68,13 @@ export function WorkbenchRail() {
     return rail;
   }, [canvas, memory]);
 
-  const status = canvasStatus(canvas);
-
-  if (items.length === 0 && !status) {
+  if (items.length === 0) {
     return null;
   }
 
   return (
     <nav className="rail" aria-label="Your work">
       <ul className="rail__list">
-        {status ? (
-          <li>
-            <span className="rail__status" title={status.detail}>
-              {status.label}
-            </span>
-          </li>
-        ) : null}
         {items.map((item) => {
           const open = activePanel === item.id;
           return (
