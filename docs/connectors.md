@@ -58,6 +58,11 @@ python -m agentic_odi_cli connectors add mcp --name internal --url https://mcp.i
 python -m agentic_odi_cli connectors list
 ```
 
+Omit `--name` from `connectors health` to check every configured connector in
+one pass. It prints a markdown table of connector, status, and latency, names
+the error for each unreachable connector, and exits non-zero if any failed —
+so it can gate a deployment.
+
 > [!NOTE]
 > Presets cover MCP servers with a hosted endpoint. Servers you run yourself
 > (Snowflake, BigQuery, Google Drive, Brave Search, and similar) are added with
