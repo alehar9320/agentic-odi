@@ -50,7 +50,6 @@ ALLOWED_EXTERNAL_PREFIXES = (
     "https://codecov.io",
     "https://developers.cloudflare.com",
     "https://docs.entire.io",
-    "https://www.chromatic.com",
     "https://freebuff.com",
     "https://pi.dev",
     # A placeholder in the connector documentation. It is not routable, and
@@ -63,7 +62,6 @@ ALLOWED_EXTERNAL_PREFIXES = (
     "http://localhost:5173",
     "http://127.0.0.1:8100",
     "http://127.0.0.1:8001",
-    "http://127.0.0.1:11434",
 )
 
 # The strings the site must carry. These are promises, not decoration.
@@ -481,6 +479,4 @@ def test_every_page_resolves_its_own_assets(page: str):
 @pytest.mark.parametrize("page", all_pages())
 def test_page_weights_are_within_budget(page: str):
     size = _built_root(page).stat().st_size
-    # The MCP reference is the long pole: every tool's argument table lives on
-    # that one page, so it grows with each paginated list tool we add.
-    assert size <= 64 * 1024, f"{page}: {size} bytes"
+    assert size <= 60 * 1024, f"{page}: {size} bytes"

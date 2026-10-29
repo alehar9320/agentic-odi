@@ -1,8 +1,9 @@
 # Running The Living Studio
 
 **The Living Studio** is the conversational GUI for Outcome-Driven Innovation:
-an interactive Opportunity Landscape, Universal Job Map, and WYSIWYG Impact
-Simulation, paired with an autonomous agent connected to the MCP server.
+an interactive Opportunity Landscape, Universal Job Map, WYSIWYG Impact
+Simulation, and Causal Lineage inspection, paired with an autonomous agent
+connected to the MCP server.
 
 The Studio runs three ways locally, plus a hosted deployment. All of them serve
 the same SPA, which talks only to the sidecar on `http://127.0.0.1:8100` — the
@@ -40,20 +41,14 @@ The Studio opens as a conversation, not a dashboard.
 | **First-run tour** | A four-step, skippable welcome on the very first visit: what the studio is, which ambition brought you here, the live state of your sidecar/MCP/model (with inline repair when the model is down), and the first move. The four doors are **I have one in mind**, **My boss handed me a priority**, **Help me find the next one**, and **Pressure-test a bet**; each starts the matching conversation. Replay it from **Settings → Replay the welcome tour**. |
 | **First run** | A short conversation in the chat, not a form: what you are building, who feels the problem, the job they are trying to get done, then where it hurts. One question at a time, with a reflection before the next ask, quick replies, and **Explore on my own** always visible. Skipping is allowed; answers and progress are kept as a draft. Re-open it any time with `/start`, the home stage's context pill, or Settings. |
 | **Hero** | One rotating headline above the composer: a greeting (time of day, plus your name if you set one in Settings), the product/job you set up, what is already on the canvas, or an intent-first prompt such as *What are you trying to win this quarter?* It cycles every few seconds and stays still under `prefers-reduced-motion`. |
-| **Starter cards** | Below the headline, three canvas-aware conversation cards pair a clear next move with a short reason: **Sharpen an opportunity**, **Pressure-test a bet** or **Find the next opportunity**, and **Capture what you heard** or **Name the job**. Select one to start that prompt in the thread; the cards disappear once the conversation begins. **Opportunity landscape** remains a separate, quiet shortcut. |
-| **Composer** | Docked at the bottom of the transcript. `Enter` sends, `Shift`+`Enter` adds a line, `Cmd/Ctrl`+`K` focuses it, `/` opens the command palette, and the paperclip attaches a text file or an image. Files can also be dropped anywhere on the composer or pasted from the clipboard, and each one is shown with a size (and a thumbnail, for images) plus a remove control before it is sent; a file the studio cannot read is refused with the reason instead of becoming a chip that promises content the model will never see. The hint row's **Model** control lists the ids the configured backend reports and writes the choice through the same Settings store as the Base URL field. The send button becomes a stop button while a reply streams. |
+| **Suggestion pills** | Below the headline. **Sharpen an opportunity** always starts a conversation; the next pill becomes **Pressure-test a bet** once outcomes exist, or **Find the next opportunity** before that. **Capture what you heard** replaces the landscape pill once a job exists. They change as the canvas fills up. |
+| **Composer** | Docked at the bottom of the transcript. `Enter` sends, `Shift`+`Enter` adds a line, `Cmd/Ctrl`+`K` focuses it, and `/` opens the command palette. The send button becomes a stop button while a reply streams. |
 | **Bar** | The only persistent chrome: home, new conversation, catch-up, live model status, and settings. There is no navigation drawer to compete with the thread. |
 | **Rail** | Above the conversation, and only once the thread has produced something: `Landscape · N`, `Job map · N`, `Evidence · N`, `What I know · N`. Every item is derived from the canvas and the memory, so the strip is a record of the work rather than a fixed menu. |
 | **Lens** | A view docks to the right of the thread on wide screens and becomes a full-height sheet on narrow ones. The transcript and the composer stay on screen and stay usable; `Esc`, **Close**, or the rail chip closes it. Every lens ends in one sentence that re-enters the conversation — *Ask which to chase*, *Walk me through the job*, *Weigh the evidence* — so leaving a view is never a return to a menu. Settings and catch-up use the same lens. |
 
 Replies render Markdown (headings, lists, emphasis, inline and fenced code).
-While a turn has produced no text yet, an activity line names the phase (*Waking
-the model*, *Opening your studio tools*, *Thinking*) with a shimmer and an
-elapsed hint; the phase is announced once to assistive technology, and the reply
-is marked busy until it settles so a screen reader reads the answer, not every
-token. Reasoning sits above the answer in a disclosure that opens while it is
-being written and collapses to *Thought for Ns* afterwards, and every tool call
-is a trace chip with the source the turn actually read.
+Tool calls appear inline as small trace chips while the agent works.
 
 ### Slash commands
 
@@ -135,47 +130,6 @@ When the LLM is unreachable the Studio keeps working:
 The user's context is sent with every chat request, so the assistant starts from
 the product, audience, job, and problem rather than asking for them again.
 
-### When the studio is not running
-
-The Living Studio is a local service, and it is the kind of thing that is easy to
-forget to start. When the sidecar is not reachable, the SPA does not pretend
-otherwise.
-
-- A **subtle strip** across the top of the window says the sidecar isn't running,
-  that the assistant is paused and live data is frozen, and offers **Recheck**
-  and **Start the sidecar** (opens Settings). It is dismissible for the session
-  and clears itself once the sidecar is reached again.
-- Sending a message does not fire off a doomed request: it drops a quiet in-thread
-  notice pointing to Settings, and the composer never spins.
-- The canvas keeps showing the last thing it drew instead of going blank; a failed
-  canvas is a failure panel with Retry, not an empty board.
-
-On the CLI, the same condition is `BackendError("could not reach MCP server …")`,
-rendered as `Error: …` followed by `Hint: Start the MCP server (python -m
-agentic_odi_mcp_server)…`. When the Studio is reached through the free
-Cloudflare Worker proxy, a missing `SIDECAR_URL` is reported to the browser as
-`{"error": {"code": "mcp_unreachable", "suggestion": "Start the studio sidecar
-…"}}` with `X-Request-ID` echoed for support.
-
-### What the canvas is made of
-
-Every canvas response carries its provenance: `live` when the sidecar read your
-store, `empty` when it read your store and found nothing, and `seed` when it is
-showing the built-in demonstration because the MCP server could not be reached.
-The sidecar says this in the payload (`provenance.kind`, `provenance.reason`,
-and record counts); it never dresses the prototype up as your data.
-
-The studio repeats that label where a person can see it: the rail shows a
-**DEMO** or **OFFLINE** chip, the Opportunity Landscape shows a sample-data
-notice, and an impact simulation must carry `provenance: live | simulated` before
-it renders. The catch-up feed starts empty rather than inventing activity, and
-every event produced by **Simulate update** is marked **Simulated** and excluded
-from the unread count. The catch-up feed has no server-side event source yet:
-its only content is the local simulator, which
-[#79](https://github.com/alehar9320/agentic-odi/issues/79) replaces. Connector rows in Settings come from the real connector
-store, grouped by capability area; nothing is pre-listed as though it were
-already connected.
-
 ### The thread is the room
 
 Capture, scoring, simulation, and decisions are conversations. The storefront
@@ -187,62 +141,6 @@ doing the work.
 That is also enforced in the agent's system prompt: it is told to keep every
 artifact in the conversation, never to send the PM to a panel, and to end each
 reply with the next move as an action on the surface.
-
-### The conversation runtime
-
-The transcript is not a hand-rolled message list. It runs on **assistant-ui**,
-a React runtime for streaming assistants, bound to the Studio's own store with
-`useExternalStoreRuntime`, so the thread gains real conversation capabilities
-without giving up the message model the sidecar already understands.
-
-| Capability | What it means here |
-|---|---|
-| **Streaming** | `delta` frames append to the open prose part; the send button becomes stop. Before the first token, the last message shows the current phase with a shimmering label and dots. When you scroll away during a reply, a keyboard-accessible **Latest message** control returns you to the live end without interrupting assistant-ui's follow behavior. Empty-thread starter cards pair each suggested move with its reason, then give way to the conversation after the first turn. |
-| **Reasoning** | `reasoning` frames render in a disclosure that starts open while the model is thinking, then reads *Thought for Ns* and can be reopened. Never persisted, never counted as the answer. |
-| **Tools** | Each MCP call is a trace chip with its status and a short preview of what came back. |
-| **Approval** | A writing tool (`add_`, `create_`, `update_`, `delete_`, `ingest_`, `remove_`) pauses the turn until you answer **Allow** or **Decline**. A decline is a tool result, not an error: the model is told no and may propose something else. |
-| **Sources** | Every tool call that returned data emits a `source`, titled with the tool and a preview. Provenance is what the turn actually read; a citation is never invented. |
-| **Attachments** | Attach from the paperclip, by dropping files on the composer, or by pasting a screenshot. The composer describes accepted text-like files (`.md`, `.mdx`, `.json`, `.csv`, `.yaml`, `.yml`, `.log`, `text/*`) and images (PNG/JPEG/WebP/GIF, at most 5 MB); a drop or paste of anything else is refused with the reason. Chips show a name, size, an image preview, and a remove control. Text is extracted in the browser, capped at 20,000 characters, and sent with the turn. Nothing is stored server-side. |
-| **Model** | The hint row's picker asks the sidecar (`POST /api/models`) which ids the configured backend serves, keeps the configured model selectable even when the backend omits it, and saves the choice through `saveSettings`, so Settings and the composer never disagree. An unreachable or empty backend is explained in the menu rather than shown as an empty list. |
-| **Branching** | **Edit** a user turn or **Regenerate** a reply and both versions are kept as siblings. **Alternative 2 of 3** with `‹`/`›` steps between them, and the visible branch is saved as the conversation's `head_id`, so a reload reopens the branch you were reading. |
-| **Suggestions** | The empty-stage pills are chosen from the canvas and handed to the runtime as suggestion prompts. |
-| **Generative UI** | A validated `UiNode` travels as an assistant-ui **data part** (`data-odi-surface`) and renders through the same `UiRenderer`. The catalog stays ours and server-validated. |
-| **Voice** | Deliberately not wired yet. The seam is `adapters.dictation` plus `ComposerPrimitive.Dictate`: no backend change and no message-model change. It waits because Tauri's WebKit webview support for the Web Speech API is uneven, and a microphone button that works in only one shell is worse than none. |
-
-#### Where the bridge lives
-
-| File | Role |
-|---|---|
-| `apps/studio/src/assistant/convert.ts` | The only mapping between `ChatMessage`/`ChatPart` and assistant-ui parts, in both directions. Pure, and tested without a runtime. |
-| `apps/studio/src/assistant/StudioRuntime.tsx` | `useExternalStoreRuntime`: `onNew`, `onEdit`, `onReload`, `onCancel`, `setMessages`, `onRespondToToolApproval`, suggestions, attachments. |
-| `apps/studio/src/assistant/attachments.ts` | The attachment adapter and the browser-side text/image extraction. |
-| `apps/studio/src/assistant/parts.tsx` | One renderer per part: text, reasoning, tool (with its approval), source, file, generated surface. |
-| `apps/studio/src/components/chat/Conversation.tsx` | `MessagePrimitive.Parts`, the branch picker, the action bar, and the in-place edit composer. |
-| `apps/studio/src/components/chat/ThreadComposer.tsx` | `ComposerPrimitive` plus the slash palette, connector chips, attachment drop/paste, and attachment-format/size guidance. |
-| `apps/studio/src/components/chat/ModelPicker.tsx` | The composer's model listbox: opens the sidecar's `/api/models`, keeps the configured id selectable, and saves through Settings. |
-
-The sidecar remains the source of truth for what happened. Its additions are
-opt-in and additive: `reasoning`, `source`, and `approval` stream events;
-`attachments` and `approvals` on `/api/chat`; `GET
-/api/conversations/{id}/tree`; `PATCH /api/conversations/{id}`; and `POST
-/api/models`, which lists the configured backend's ids without raising when it
-is offline. A client that sends none of these sees exactly the stream it saw
-before, which is what the CLI and older clients do.
-
-The approval gate is per-process and single-user by design. `ApprovalRegistry`
-waits on an `asyncio` future, `POST /api/approvals/{id}` answers it, and a
-timeout (300 s) or a cancelled turn resolves as a declined write, so a turn can
-never hang and a double click can never run a tool twice. That is the right size
-for a loopback sidecar with one person at the keyboard; it is not a durable job
-queue, and it is not pretending to be one.
-
-#### Extending the conversation
-
-A new kind of part is added in exactly two places — the mapping in `convert.ts`
-and the component in `parts.tsx` — and then registered in the `components` map
-in `Conversation.tsx`. Do not add a second message list, and never let an unknown
-part reach the screen as JSON: the converter drops what it does not understand on
-purpose, and `convert.test.ts` holds that line.
 
 ### What it remembers
 
@@ -293,18 +191,6 @@ turns, and continues with the same `conversation_id` on the next message. **New
 conversation** starts a fresh one without touching the memory; **Forget
 everything** removes both. The composer stays usable while the restore is in
 flight, and a restore failure simply leaves the room empty.
-
-### Printing and export
-
-The bar's overflow menu has **Export → Markdown**. The file labels every
-speaker, keeps the prose as Markdown, and writes each agent-composed surface as
-a fenced JSON block, so a thread can be pasted into a doc or a ticket without
-the reader needing the Studio.
-
-Printing (`Cmd`/`Ctrl`+`P`) lays the open conversation out for A4: the bar,
-rail, composer, and floating chrome are hidden, the palette switches to paper,
-and cards stay whole instead of splitting across sheets. An open lens prints
-below the thread instead of being clipped off-screen.
 
 ## Rich responses
 
@@ -429,44 +315,16 @@ Actions secrets.
 
 | Secret | Purpose |
 |---|---|
-| `TAURI_SIGNING_PRIVATE_KEY` | Signs updater artifacts (`.sig`) and the `latest.json` manifest. A release fails loudly without it. Generate with `npm --prefix apps/studio run tauri signer generate`. |
+| `TAURI_SIGNING_PRIVATE_KEY` | Signs updater artifacts (`.sig`) and the `latest.json` manifest. A tagged release fails loudly without it. Generate with `npm --prefix apps/studio run tauri signer generate`. |
 | `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | Password for the private key (optional when the key has none). |
 | `APPLE_CERTIFICATE` / `APPLE_CERTIFICATE_PASSWORD` | macOS Developer ID certificate (base64 `.p12`) and its password. |
 | `APPLE_SIGNING_IDENTITY` | macOS signing identity. |
 | `APPLE_ID` / `APPLE_PASSWORD` / `APPLE_TEAM_ID` | macOS notarization credentials. |
 | `WINDOWS_CERTIFICATE` / `WINDOWS_CERTIFICATE_PASSWORD` | Windows Authenticode PFX (base64) and its password; imported by CI and injected into the bundle config. |
 
-Releases are published by `.github/workflows/tauri-release.yml`. It starts when
-a GitHub release is **published**, and on a `v*` tag push for hand-cut tags.
-The published release is what matters: release-please creates releases through
-the API, which never emits a tag-push event, so a tag-only trigger would leave
-every release without binaries. A `verify` job fails the release unless
-`latest.json` advertises the release version and carries a signed artifact for
-Linux, Windows, and both macOS architectures.
-
-`release-please` bumps the desktop app version from `extra-files`
-(`apps/studio/package.json`, `apps/studio/src-tauri/tauri.conf.json`, and
-`apps/studio/src-tauri/Cargo.toml`), so the installed version moves with every
-release. Without that sync the updater can never see a newer manifest.
-
-The app checks four seconds after launch, every six hours, and when the window
-returns to the foreground after that interval. A found update downloads in the
-background; the shell shows one quiet bar above the conversation with progress
-and a single action. macOS and Linux stage the update as soon as its signature
-verifies, so it also applies on the next ordinary launch. **Restart now** in the
-bar, **Settings → Software update**, or the version line in the sidebar applies
-it immediately. Windows needs the app to exit before its installer runs, so it
-offers **Update & restart** instead. Dismissing the bar is safe: a staged update
-still applies on the next launch, and check failures are reported in Settings
-rather than interrupting the conversation.
-
-In-app updates are inactive in the browser build and in `tauri dev`; both say so
-in **Settings → Software update**.
-
-`scripts/verify-desktop-update.sh` proves the path locally: it builds signed
-0.1.0 and 0.2.0 AppImages against a throwaway key and a local `latest.json`,
-runs 0.1.0 until it replaces its own file with 0.2.0, then runs the result and
-asserts it checks without downloading anything.
+Releases are published by `.github/workflows/tauri-release.yml` when a `v*` tag
+is pushed. The desktop app checks for updates on startup and via
+**Settings → Check for updates**.
 
 ### Managing the updater signing key
 
@@ -536,56 +394,18 @@ CI, or attached to a build artifact.
 > If the private key leaks, treat auto-updates as compromised: generate a new
 > pair, rotate the Actions secret, and publish a freshly signed release.
 
+> [!IMPORTANT]
+> **Migration note.** The Streamlit UI has been removed. The Living Studio now
+> lives in `apps/studio/` (browser SPA + Tauri desktop app) and is served by the
+> `apps/studio-api` sidecar on port **8100** (previously Streamlit's `8501`).
+> Start everything with `python scripts/dev.py`. All `AGENTIC_ODI_*` environment
+> variable names, the demo dataset, and the ODI formulas are unchanged.
+
 ## Connecting an LLM
 
 The Studio needs an OpenAI-compatible LLM backend with tool-calling support to
 drive the agent. For a fully local setup, see
 [Local LLM Backend](local-llm.md).
-
-## Reviewing the conversation by hand
-
-Timing, focus rings, drop targets, and menu placement are not things a test can
-judge. Start the stack against a local model and a database of its own — a second
-checkout sharing `~/.agentic-odi` can otherwise leave this one with a schema it
-cannot open:
-
-```bash
-AGENTIC_ODI_STUDIO_DB=~/.agentic-odi/studio-review.db \
-AGENTIC_ODI_BASE_URL=http://127.0.0.1:11434/v1 \
-AGENTIC_ODI_MODEL=qwen2.5-coder:14b \
-npm --prefix apps/studio run dev:full          # http://localhost:5173
-```
-
-Each row below names a state to reach and what is worth your own eyes.
-
-| State | How to reach it | What to judge |
-|---|---|---|
-| Activity line | A turn whose first token is slow: a cold model, or a long prompt | The label moves *Waking the model* → *Opening your studio tools* → *Thinking*, the dots animate, an elapsed count appears after 3 s, and the reply does not jump the layout when it arrives |
-| Streaming prose | Any turn | The caret trails the last word, the send button is a stop button, and scrolling away offers **Latest message** without fighting the follow |
-| Reasoning | A backend that streams `reasoning_content` or `reasoning` | The disclosure opens while it is written, settles to *Thought for Ns*, reopens on click, and never repeats the answer |
-| Tool trace and sources | A model that emits real `tool_calls` | The dot pulses while the tool runs, the chip previews what came back, and the source names the tool the turn actually read |
-| Approval | The same, asking it to write ("add a step to …") | The turn pauses for **Allow**/**Decline**, a decline reads as a tool result and not an error, and a double click runs the tool once |
-| Model picker | **Model** in the hint row; open it twice; narrow the window first | The list matches the backend, the configured id stays selectable, arrows/Home/End/Enter/Escape work, an offline backend explains itself and its Settings button is reachable from the keyboard, and it probes once per backend |
-| Attachments | Paperclip, drag a file onto the composer, paste a screenshot, then drop a `.exe` | Thumbnail, name, size, and remove on the chip; the unreadable file is refused with its reason; the sent turn shows the same; the paperclip has a visible focus ring |
-| Branches | Edit your own turn, then regenerate a reply | **Alternative N of M** with `‹`/`›`, and a reload reopens the branch you were reading |
-| Reduced motion, narrow window | Turn on OS reduce-motion; then drag the window narrow | Shimmer, dots, and cycling stop; the lens becomes a sheet, the composer stays usable, and menus stay on screen |
-
-Two things surprise people on a local model:
-
-- **Warm it first.** Loading a 14B model can take minutes, while the sidecar gives
-  a completion 15 s; the first turn after the model has been idle that long fails
-  as *The model could not be reached*. The error is retryable and the retry works
-  once the load finishes. Preload it right before a review with
-  `curl -X POST localhost:11434/api/generate -d '{"model":"qwen2.5-coder:14b"}'`,
-  or start Ollama with `OLLAMA_KEEP_ALIVE=2h` so an idle pause does not unload it
-  (Ollama's own default is five minutes, and every later request re-applies it).
-- **A model that prints JSON is not calling a tool.** Some coder models write
-  `{"name": "get_jobs", …}` as prose; nothing is traced, so no chip and no
-  source appears. Judge those rows on a model that returns `tool_calls`.
-
-Settings come from the browser before they come from the sidecar: if the composer
-still points at an old backend, set **Base URL** and **Model** in Settings once —
-the picker writes the same place.
 
 ## Agent-Driven Testing
 

@@ -1,0 +1,996 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Agentic ODI — Ground agents in verified customer outcomes</title>
+  <meta name="description" content="An MCP server that hands your agents verified customer outcomes, and the evidence behind them.">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#0a0b0e">
+
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Agentic ODI">
+  <meta property="og:title" content="Agentic ODI — Ground agents in verified customer outcomes">
+  <meta property="og:description" content="An MCP server that hands your agents verified customer outcomes, and the evidence behind them.">
+  <meta property="og:url" content="https://alehar9320.github.io/agentic-odi/">
+  <meta property="og:image" content="https://alehar9320.github.io/agentic-odi/assets/og.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Agentic ODI — Ground agents in verified customer outcomes">
+  <meta name="twitter:description" content="An MCP server that hands your agents verified customer outcomes, and the evidence behind them.">
+  <meta name="twitter:image" content="https://alehar9320.github.io/agentic-odi/assets/og.png">
+
+  <link rel="canonical" href="https://alehar9320.github.io/agentic-odi/">
+  <link rel="stylesheet" href="assets/tokens.css">
+  <link rel="stylesheet" href="assets/style.css">
+  <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+  <link rel="icon" type="image/png" href="assets/favicon.png" sizes="32x32">
+  <link rel="sitemap" type="application/xml" href="https://alehar9320.github.io/agentic-odi/sitemap.xml">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <header class="site-header">
+    <div class="site-header__inner">
+      <a class="brand" href="https://alehar9320.github.io/agentic-odi/">
+        <img src="assets/mark.svg" alt="" width="24" height="24" aria-hidden="true">
+        <span class="brand__name">Agentic&nbsp;ODI</span>
+      </a>
+      <nav class="site-nav" aria-label="Primary">
+        <a href="https://alehar9320.github.io/agentic-odi/#studio">The&nbsp;Studio</a>
+        <a href="https://alehar9320.github.io/agentic-odi/#how">How&nbsp;it&nbsp;works</a>
+        <a href="https://alehar9320.github.io/agentic-odi/docs/">Docs</a>
+      </nav>
+      <a class="btn btn--primary btn--sm" href="https://alehar9320.github.io/agentic-odi/#run">Run it in 60 seconds</a>
+    </div>
+  </header>
+
+  <main id="main">
+
+<!-- ── Hero ─────────────────────────────────────────────────────── -->
+<section id="top" class="hero">
+  <div class="shell">
+    <div class="hero__inner">
+      <p class="eyebrow eyebrow--pill hero__eyebrow">Experimental</p>
+      <h1 class="hero__title">Your roadmap is a guess.</h1>
+      <p class="hero__sub">An MCP server that hands your agents verified customer outcomes — and the evidence behind them.</p>
+      <div class="hero__actions">
+        <a class="btn btn--primary" href="#run">Run it in 60 seconds</a>
+        <a class="btn btn--ghost" href="https://agentic-odi.alehar.workers.dev/">Open the Living Studio</a>
+      </div>
+      <a class="hero__cue" href="#problem"><span></span>Keep reading</a>
+    </div>
+  </div>
+</section>
+
+<!-- ── The Living Studio ────────────────────────────────────────── -->
+<section id="studio" class="section" aria-labelledby="studio-title">
+  <div class="shell">
+    <div class="section__head" data-reveal>
+      <p class="eyebrow">The Living Studio</p>
+      <h2 id="studio-title" class="section__title">One room. Ask it like a colleague.</h2>
+      <p class="lead">
+        The transcript and the composer never leave the screen. Describe a job, or what a
+        customer said, and the agent composes the surface that answers it — scored
+        outcomes, opportunity boards, job maps — inline, in the same room.
+      </p>
+    </div>
+
+    <div class="demo" data-demo data-reveal>
+      <div class="demo__notice">
+        <p class="demo__label">Scripted preview</p>
+        <p class="demo__disclaimer">
+          These are canned responses from a fixed script. The live Studio talks to a real MCP server.
+          <a href="https://agentic-odi.alehar.workers.dev/">Open the live Studio</a>
+        </p>
+      </div>
+
+      <div class="demo__frame glass">
+        <div class="demo__bar">
+          <span class="demo__brand">
+            <img src="assets/mark.svg" alt="" width="18" height="18" aria-hidden="true">
+            Agentic&nbsp;ODI
+          </span>
+          <span class="demo__health"><span class="demo__dot" aria-hidden="true"></span>Local sidecar</span>
+        </div>
+
+        <div class="demo__transcript" data-demo-transcript>
+          <div class="demo__exchange">
+            <div class="demo__msg demo__msg--user">
+              <p class="demo__bubble demo__bubble--user">A customer told us they still reconcile invoices by hand every Friday.</p>
+            </div>
+            <div class="demo__msg demo__msg--assistant">
+              <span class="demo__avatar" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/>
+                  <circle cx="12" cy="12" r="3"/>
+                </svg>
+              </span>
+              <div class="demo__msg-body">
+                <p class="demo__reply">That is a job with a real running cost. Here is the outcome underneath it.</p>
+                <article class="surface" data-surface="outcome-card">
+  <div class="surface__head">
+    <span class="surface__id">OUT-1</span>
+    <span class="pill pill--accent">Opportunity 13.0</span>
+  </div>
+  <p class="surface__statement">Reconcile invoices without manual effort</p>
+  <div class="surface__scores">
+    <span>Importance 8</span>
+    <span aria-hidden="true">·</span>
+    <span>Satisfaction 3</span>
+  </div>
+  <div class="meter">
+    <div class="meter__head"><span>Opportunity</span><span>13.0</span></div>
+    <div class="meter__track">
+      <div class="meter__fill" style="width: 65.0%"></div>
+    </div>
+  </div>
+</article>
+
+
+              </div>
+            </div>
+          </div>
+          <div class="demo__exchange">
+            <div class="demo__msg demo__msg--user">
+              <p class="demo__bubble demo__bubble--user">Which of these should we build first?</p>
+            </div>
+            <div class="demo__msg demo__msg--assistant">
+              <span class="demo__avatar" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/>
+                  <circle cx="12" cy="12" r="3"/>
+                </svg>
+              </span>
+              <div class="demo__msg-body">
+                <p class="demo__reply">Ranked by opportunity, these three are furthest from satisfied.</p>
+                <article class="surface" data-surface="opportunity-board">
+  <div class="surface__head">
+    <span class="surface__id">Opportunity board</span>
+    <span class="pill">3 outcomes</span>
+  </div>
+  <div class="stack">
+    <div class="surface__row">
+      <p class="surface__statement">Reconcile invoices without manual effort</p>
+      <div class="surface__scores">
+        <span>Importance 8</span>
+        <span aria-hidden="true">·</span>
+        <span>Satisfaction 3</span>
+        <span aria-hidden="true">·</span>
+        <span class="surface__opportunity">13.0</span>
+      </div>
+      <div class="meter">
+        <div class="meter__track">
+          <div class="meter__fill" style="width: 65.0%"></div>
+        </div>
+      </div>
+    </div>
+    <div class="surface__row">
+      <p class="surface__statement">Catch a failed payment before it churns</p>
+      <div class="surface__scores">
+        <span>Importance 9</span>
+        <span aria-hidden="true">·</span>
+        <span>Satisfaction 6</span>
+        <span aria-hidden="true">·</span>
+        <span class="surface__opportunity">12.0</span>
+      </div>
+      <div class="meter">
+        <div class="meter__track">
+          <div class="meter__fill" style="width: 60.0%"></div>
+        </div>
+      </div>
+    </div>
+    <div class="surface__row">
+      <p class="surface__statement">Hand a refund back in one step</p>
+      <div class="surface__scores">
+        <span>Importance 6</span>
+        <span aria-hidden="true">·</span>
+        <span>Satisfaction 5</span>
+        <span aria-hidden="true">·</span>
+        <span class="surface__opportunity">7.0</span>
+      </div>
+      <div class="meter">
+        <div class="meter__track">
+          <div class="meter__fill" style="width: 35.0%"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</article>
+
+
+              </div>
+            </div>
+          </div>
+          <div class="demo__exchange">
+            <div class="demo__msg demo__msg--user">
+              <p class="demo__bubble demo__bubble--user">Show me the job behind that.</p>
+            </div>
+            <div class="demo__msg demo__msg--assistant">
+              <span class="demo__avatar" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/>
+                  <circle cx="12" cy="12" r="3"/>
+                </svg>
+              </span>
+              <div class="demo__msg-body">
+                <p class="demo__reply">Here it is, step by step.</p>
+                <article class="surface" data-surface="job-map">
+  <div class="surface__head">
+    <span class="surface__id">Job map</span>
+    <span class="pill">Reconcile invoices</span>
+  </div>
+  <ol class="jobmap">
+    <li class="jobmap__step">
+      <span class="jobmap__index">01</span>
+      <span>Collect the statements</span>
+    </li>
+    <li class="jobmap__step">
+      <span class="jobmap__index">02</span>
+      <span>Match each line</span>
+    </li>
+    <li class="jobmap__step">
+      <span class="jobmap__index">03</span>
+      <span>Review the exceptions</span>
+    </li>
+    <li class="jobmap__step">
+      <span class="jobmap__index">04</span>
+      <span>File and close</span>
+    </li>
+  </ol>
+</article>
+
+
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="demo__live" data-demo-live hidden>
+          <div class="demo__thread" data-demo-thread aria-live="polite"></div>
+
+          <div class="demo__composer">
+            <label class="sr-only" for="demo-input">Describe a job or a customer frustration</label>
+            <textarea id="demo-input" class="demo__input" rows="1" placeholder="Describe a job, or a customer frustration…"></textarea>
+            <button class="demo__send" type="button" data-demo-send aria-label="Send">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M5 12h14M13 6l6 6-6 6"/>
+              </svg>
+            </button>
+          </div>
+
+          <div class="demo__chips" role="group" aria-label="Try one of these">
+            <button class="demo__chip" type="button" data-demo-chip data-exchange="0">A customer still reconciles invoices by hand</button>
+            <button class="demo__chip" type="button" data-demo-chip data-exchange="1">Which of these should we build first?</button>
+            <button class="demo__chip" type="button" data-demo-chip data-exchange="2">Show me the job behind that</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Problem ──────────────────────────────────────────────────── -->
+<section id="problem" class="section" aria-labelledby="problem-title">
+  <div class="shell">
+    <div class="section__head" data-reveal>
+      <p class="eyebrow">The problem</p>
+      <h2 id="problem-title" class="section__title">Opinion is expensive.</h2>
+    </div>
+
+    <div class="beats">
+      <article class="beat" data-reveal>
+        <p class="beat__quote">Roadmaps set by whoever talks loudest.</p>
+        <p class="beat__support">Decisions default to seniority, not evidence.</p>
+      </article>
+      <article class="beat" data-reveal>
+        <p class="beat__quote">Features for customers who never asked.</p>
+        <p class="beat__support">Nobody validated the outcome; only the idea.</p>
+      </article>
+      <article class="beat" data-reveal>
+        <p class="beat__quote">Agents fluent in everything, grounded in nothing.</p>
+        <p class="beat__support">A model will confidently invent your customer.</p>
+      </article>
+    </div>
+
+    <p class="closer" data-reveal>Add it up and the roadmap isn&#39;t a plan. It&#39;s a guess.</p>
+  </div>
+</section>
+
+<!-- ── Insight ──────────────────────────────────────────────────── -->
+<section id="insight" class="section" aria-labelledby="insight-title">
+  <div class="shell">
+    <div class="section__head" data-reveal>
+      <p class="eyebrow">The method</p>
+      <h2 id="insight-title" class="section__title">Ask for outcomes, not opinions.</h2>
+    </div>
+
+    <div class="insight">
+      <div class="stack" data-reveal>
+        <p class="lead">Outcome-Driven Innovation asks customers how much each desired outcome matters and how satisfied they are with it today.</p>
+        <p class="lead">The gap between importance and satisfaction is where products win or die.</p>
+        <p class="lead">Agentic ODI stores those outcomes, scores them, and serves them to any agent over MCP.</p>
+
+        <p class="formula">
+          <span class="formula__label">Opportunity =</span>
+          <span class="formula__expr">importance + <span class="formula__gap">max(importance - satisfaction, 0)</span></span>
+        </p>
+
+        <p class="statline">
+          <span class="statline__value">86% innovation success rate</span>
+          <span class="statline__source">— as reported in ODI literature (Strategyn)</span>
+        </p>
+      </div>
+
+      <figure class="gap" data-reveal>
+        <div class="gap__row">
+          <span>Importance</span>
+          <span class="gap__track"><span class="gap__fill" style="width: 80%"></span></span>
+          <span class="gap__value">8</span>
+        </div>
+        <div class="gap__row">
+          <span>Satisfaction</span>
+          <span class="gap__track"><span class="gap__fill gap__fill--satisfaction" style="width: 30%"></span></span>
+          <span class="gap__value">3</span>
+        </div>
+        <div class="gap__row">
+          <span>Opportunity</span>
+          <span class="gap__track"><span class="gap__fill" style="width: 100%"></span></span>
+          <span class="gap__value">13.0</span>
+        </div>
+        <figcaption class="gap__note">
+          Illustrative scores. The gap between importance and satisfaction is the
+          opportunity: 8 + max(8 &minus; 3, 0) = 13.0.
+        </figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<!-- ── Surfaces ─────────────────────────────────────────────────── -->
+<section id="surfaces" class="section" aria-labelledby="surfaces-title">
+  <div class="shell">
+    <div class="section__head" data-reveal>
+      <p class="eyebrow">The surfaces</p>
+      <h2 id="surfaces-title" class="section__title section__title--wide">The agent composes, it does not describe.</h2>
+      <p class="lead">The studio answers with a card from a closed catalog, rendered inline in the conversation. Seven shapes, each one a thing you can act on.</p>
+    </div>
+
+    <div class="grid grid--3">
+      <article class="surface-card" data-reveal>
+        <div class="surface-card__head">
+          <h3 class="surface-card__title">Outcome</h3>
+          <code class="surface-card__type">outcome-card</code>
+        </div>
+        <article class="surface" data-surface="outcome-card">
+  <div class="surface__head">
+    <span class="surface__id">OUT-1</span>
+    <span class="pill pill--accent">Opportunity 13.0</span>
+  </div>
+  <p class="surface__statement">Reconcile invoices without manual effort</p>
+  <div class="surface__scores">
+    <span>Importance 8</span>
+    <span aria-hidden="true">·</span>
+    <span>Satisfaction 3</span>
+  </div>
+  <div class="meter">
+    <div class="meter__head"><span>Opportunity</span><span>13.0</span></div>
+    <div class="meter__track">
+      <div class="meter__fill" style="width: 65.0%"></div>
+    </div>
+  </div>
+</article>
+
+
+        <p class="surface-card__blurb">A desired outcome with its importance, its satisfaction, and the gap between them.</p>
+      </article>
+      <article class="surface-card" data-reveal>
+        <div class="surface-card__head">
+          <h3 class="surface-card__title">Opportunity board</h3>
+          <code class="surface-card__type">opportunity-board</code>
+        </div>
+        <article class="surface" data-surface="opportunity-board">
+  <div class="surface__head">
+    <span class="surface__id">Opportunity board</span>
+    <span class="pill">3 outcomes</span>
+  </div>
+  <div class="stack">
+    <div class="surface__row">
+      <p class="surface__statement">Reconcile invoices without manual effort</p>
+      <div class="surface__scores">
+        <span>Importance 8</span>
+        <span aria-hidden="true">·</span>
+        <span>Satisfaction 3</span>
+        <span aria-hidden="true">·</span>
+        <span class="surface__opportunity">13.0</span>
+      </div>
+      <div class="meter">
+        <div class="meter__track">
+          <div class="meter__fill" style="width: 65.0%"></div>
+        </div>
+      </div>
+    </div>
+    <div class="surface__row">
+      <p class="surface__statement">Catch a failed payment before it churns</p>
+      <div class="surface__scores">
+        <span>Importance 9</span>
+        <span aria-hidden="true">·</span>
+        <span>Satisfaction 6</span>
+        <span aria-hidden="true">·</span>
+        <span class="surface__opportunity">12.0</span>
+      </div>
+      <div class="meter">
+        <div class="meter__track">
+          <div class="meter__fill" style="width: 60.0%"></div>
+        </div>
+      </div>
+    </div>
+    <div class="surface__row">
+      <p class="surface__statement">Hand a refund back in one step</p>
+      <div class="surface__scores">
+        <span>Importance 6</span>
+        <span aria-hidden="true">·</span>
+        <span>Satisfaction 5</span>
+        <span aria-hidden="true">·</span>
+        <span class="surface__opportunity">7.0</span>
+      </div>
+      <div class="meter">
+        <div class="meter__track">
+          <div class="meter__fill" style="width: 35.0%"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</article>
+
+
+        <p class="surface-card__blurb">Several scored outcomes, ranked by the opportunity each one leaves open.</p>
+      </article>
+      <article class="surface-card" data-reveal>
+        <div class="surface-card__head">
+          <h3 class="surface-card__title">Impact simulation</h3>
+          <code class="surface-card__type">impact-simulation</code>
+        </div>
+        <article class="surface" data-surface="impact-simulation">
+  <div class="surface__head">
+    <span class="surface__id">Impact simulation</span>
+    <span class="pill">Bet</span>
+  </div>
+  <p class="surface__statement">Auto-match invoices against receipts</p>
+  <div class="compare">
+    <div class="compare__col compare__col--before">
+      <span class="compare__label">Today</span>
+      Two hours a week, per finance lead, matching lines by hand.
+    </div>
+    <div class="compare__col compare__col--after">
+      <span class="compare__label">If we do this</span>
+      Exceptions only. The team reviews what did not match.
+    </div>
+  </div>
+</article>
+
+
+        <p class="surface-card__blurb">What changes if you take the bet, set against what happens if you do not.</p>
+      </article>
+      <article class="surface-card" data-reveal>
+        <div class="surface-card__head">
+          <h3 class="surface-card__title">Evidence</h3>
+          <code class="surface-card__type">evidence-quote</code>
+        </div>
+        <article class="surface" data-surface="evidence-quote">
+  <div class="surface__head">
+    <span class="surface__id">Evidence</span>
+    <span class="pill pill--positive">Support call</span>
+  </div>
+  <figure class="evidence">
+    <blockquote class="evidence__quote">I spend every Friday matching invoices to receipts. It is the part of the job I dread.</blockquote>
+    <figcaption class="evidence__meta">Call transcript, ingested 12 March</figcaption>
+  </figure>
+</article>
+
+
+        <p class="surface-card__blurb">The customer words behind a score, with where they came from.</p>
+      </article>
+      <article class="surface-card" data-reveal>
+        <div class="surface-card__head">
+          <h3 class="surface-card__title">Job map</h3>
+          <code class="surface-card__type">job-map</code>
+        </div>
+        <article class="surface" data-surface="job-map">
+  <div class="surface__head">
+    <span class="surface__id">Job map</span>
+    <span class="pill">Reconcile invoices</span>
+  </div>
+  <ol class="jobmap">
+    <li class="jobmap__step">
+      <span class="jobmap__index">01</span>
+      <span>Collect the statements</span>
+    </li>
+    <li class="jobmap__step">
+      <span class="jobmap__index">02</span>
+      <span>Match each line</span>
+    </li>
+    <li class="jobmap__step">
+      <span class="jobmap__index">03</span>
+      <span>Review the exceptions</span>
+    </li>
+    <li class="jobmap__step">
+      <span class="jobmap__index">04</span>
+      <span>File and close</span>
+    </li>
+  </ol>
+</article>
+
+
+        <p class="surface-card__blurb">The steps of the job-to-be-done, in the order the customer does them.</p>
+      </article>
+      <article class="surface-card" data-reveal>
+        <div class="surface-card__head">
+          <h3 class="surface-card__title">Thesis</h3>
+          <code class="surface-card__type">opportunity-thesis</code>
+        </div>
+        <article class="surface" data-surface="opportunity-thesis">
+  <div class="surface__head">
+    <span class="surface__id">Opportunity</span>
+    <span class="pill pill--accent">Gap 5</span>
+  </div>
+  <p class="surface__statement">Reconcile invoices without manual effort</p>
+  <p class="evidence__meta">Finance leads spend two hours a week matching lines by hand.</p>
+  <p class="surface__statement">The work is not the matching. It is the exceptions nobody has time to chase.</p>
+  <p class="surface__scores">Next move: Run a one-week pilot with the three highest-volume vendors.</p>
+</article>
+
+
+        <p class="surface-card__blurb">One opportunity argued in plain language: the scores, the gap, the thesis, and the next move.</p>
+      </article>
+      <article class="surface-card" data-reveal>
+        <div class="surface-card__head">
+          <h3 class="surface-card__title">Decision</h3>
+          <code class="surface-card__type">decision-record</code>
+        </div>
+        <article class="surface" data-surface="decision-record">
+  <div class="surface__head">
+    <span class="surface__id">Decision</span>
+    <span class="pill pill--warning">Decided</span>
+  </div>
+  <p class="surface__statement">Automate invoice matching before we build a refund flow</p>
+  <p class="evidence__meta">Opportunity 13.0 against 7.0, and two evidence quotes in the last quarter.</p>
+</article>
+
+
+        <p class="surface-card__blurb">What was decided, and the evidence it rests on.</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ── How it works ─────────────────────────────────────────────── -->
+<section id="how" class="section" aria-labelledby="how-title">
+  <div class="shell">
+    <div class="section__head" data-reveal>
+      <p class="eyebrow">How it works</p>
+      <h2 id="how-title" class="section__title">Three moves, one loop.</h2>
+    </div>
+
+    <div class="steps">
+      <article class="step" data-reveal>
+        <h3 class="step__title">Talk</h3>
+        <p class="step__body">One room. Describe a job, or paste what a customer said. The studio captures jobs, steps, and desired outcomes from plain language — and every score stays editable by hand.</p>
+      </article>
+      <article class="step" data-reveal>
+        <h3 class="step__title">Ask</h3>
+        <p class="step__body">Any agent calls the same MCP tools the studio uses: job maps, outcomes, evidence, opportunity scores. Thirty tools, at decision time, from your own machine or the hosted server.</p>
+      </article>
+      <article class="step" data-reveal>
+        <h3 class="step__title">Steer</h3>
+        <p class="step__body">The team decides from the same picture. Scored outcomes, opportunity boards, and bet simulations, composed inline by the agent and reviewable by a human.</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ── Connectors ────────────────────────────────────────────────── -->
+<section id="connectors" class="section" aria-labelledby="connectors-title">
+  <div class="shell">
+    <div class="section__head" data-reveal>
+      <p class="eyebrow">Connectors</p>
+      <h2 id="connectors-title" class="section__title section__title--wide">Bring your own tools.</h2>
+      <p class="lead">
+        The studio reads from where your customer evidence already lives. 16
+        presets ship today, and the registry takes your own MCP or REST server in the same
+        shape.
+      </p>
+    </div>
+
+    <div class="connector-group" data-reveal>
+      <h3 class="connector-group__title">Voice of customer &amp; qualitative research</h3>
+      <div class="connector-list">
+        <article class="connector" id="connector-notion">
+          <div class="connector__head">
+            <span class="connector__name">Notion</span>
+            <span class="pill pill--accent">Recommended</span>
+          </div>
+          <p class="connector__summary">Interview notes, feedback logs, and PRDs from Notion pages.</p>
+        </article>
+        <article class="connector" id="connector-gong">
+          <div class="connector__head">
+            <span class="connector__name">Gong</span>
+            <span class="pill">oauth</span>
+          </div>
+          <p class="connector__summary">Sales and success call transcripts with direct customer quotes.</p>
+        </article>
+        <article class="connector" id="connector-fireflies">
+          <div class="connector__head">
+            <span class="connector__name">Fireflies.ai</span>
+            <span class="pill">oauth</span>
+          </div>
+          <p class="connector__summary">Meeting transcripts and summaries for unmet-need mining.</p>
+        </article>
+        <article class="connector" id="connector-intercom">
+          <div class="connector__head">
+            <span class="connector__name">Intercom</span>
+            <span class="pill">oauth</span>
+          </div>
+          <p class="connector__summary">Support conversations and recurring customer frustrations.</p>
+        </article>
+        <article class="connector" id="connector-confluence">
+          <div class="connector__head">
+            <span class="connector__name">Atlassian Confluence</span>
+            <span class="pill">oauth</span>
+          </div>
+          <p class="connector__summary">Existing PRDs, research write-ups, and product documentation.</p>
+        </article>
+      </div>
+    </div>
+    <div class="connector-group" data-reveal>
+      <h3 class="connector-group__title">Quantitative data &amp; opportunity scoring</h3>
+      <div class="connector-list">
+        <article class="connector" id="connector-posthog">
+          <div class="connector__head">
+            <span class="connector__name">PostHog</span>
+            <span class="pill pill--accent">Recommended</span>
+          </div>
+          <p class="connector__summary">Feature usage, funnels, and drop-off rates for outcome scoring.</p>
+        </article>
+        <article class="connector" id="connector-amplitude">
+          <div class="connector__head">
+            <span class="connector__name">Amplitude</span>
+            <span class="pill">oauth</span>
+          </div>
+          <p class="connector__summary">Behavioral cohorts and adoption metrics behind each outcome.</p>
+        </article>
+        <article class="connector" id="connector-mixpanel">
+          <div class="connector__head">
+            <span class="connector__name">Mixpanel</span>
+            <span class="pill">oauth</span>
+          </div>
+          <p class="connector__summary">Event analytics for importance and satisfaction evidence.</p>
+        </article>
+      </div>
+    </div>
+    <div class="connector-group" data-reveal>
+      <h3 class="connector-group__title">Market &amp; competitive intelligence</h3>
+      <div class="connector-list">
+        <article class="connector" id="connector-exa">
+          <div class="connector__head">
+            <span class="connector__name">Exa</span>
+            <span class="pill pill--accent">Recommended</span>
+          </div>
+          <p class="connector__summary">Semantic web search for competitor launches and market gaps.</p>
+          <p class="connector__env">EXA_API_KEY</p>
+        </article>
+        <article class="connector" id="connector-tavily">
+          <div class="connector__head">
+            <span class="connector__name">Tavily</span>
+            <span class="pill">api key</span>
+          </div>
+          <p class="connector__summary">Research-focused web search for pricing and industry trends.</p>
+          <p class="connector__env">TAVILY_API_KEY</p>
+        </article>
+      </div>
+    </div>
+    <div class="connector-group" data-reveal>
+      <h3 class="connector-group__title">Product strategy &amp; backlog alignment</h3>
+      <div class="connector-list">
+        <article class="connector" id="connector-linear">
+          <div class="connector__head">
+            <span class="connector__name">Linear</span>
+            <span class="pill pill--accent">Recommended</span>
+          </div>
+          <p class="connector__summary">Cross-reference prioritized outcomes with the existing backlog.</p>
+        </article>
+        <article class="connector" id="connector-github">
+          <div class="connector__head">
+            <span class="connector__name">GitHub</span>
+            <span class="pill pill--accent">Recommended</span>
+          </div>
+          <p class="connector__summary">Issues, projects, and PRs to draft tickets from outcomes.</p>
+          <p class="connector__env">GITHUB_PERSONAL_ACCESS_TOKEN</p>
+        </article>
+        <article class="connector" id="connector-jira">
+          <div class="connector__head">
+            <span class="connector__name">Atlassian Jira</span>
+            <span class="pill">oauth</span>
+          </div>
+          <p class="connector__summary">Epics and issues to align delivery work with desired outcomes.</p>
+        </article>
+        <article class="connector" id="connector-miro">
+          <div class="connector__head">
+            <span class="connector__name">Miro</span>
+            <span class="pill">oauth</span>
+          </div>
+          <p class="connector__summary">Outcome matrices and customer journey maps on a shared board.</p>
+        </article>
+        <article class="connector" id="connector-figma">
+          <div class="connector__head">
+            <span class="connector__name">Figma</span>
+            <span class="pill">oauth</span>
+          </div>
+          <p class="connector__summary">FigJam maps and design context for outcome workshops.</p>
+        </article>
+      </div>
+    </div>
+    <div class="connector-group" data-reveal>
+      <h3 class="connector-group__title">Strategy &amp; knowledge management output</h3>
+      <div class="connector-list">
+        <article class="connector" id="connector-slack">
+          <div class="connector__head">
+            <span class="connector__name">Slack</span>
+            <span class="pill">oauth</span>
+          </div>
+          <p class="connector__summary">Post opportunity-score digests and JTBD insights to channels.</p>
+        </article>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Run it ────────────────────────────────────────────────────── -->
+<section id="run" class="section" aria-labelledby="run-title">
+  <div class="shell">
+    <div class="section__head" data-reveal>
+      <p class="eyebrow">Run it</p>
+      <h2 id="run-title" class="section__title">Run it in 60 seconds.</h2>
+      <p class="lead">Clone the workspace, or install the binary. Either way you get the MCP server and the Living Studio.</p>
+    </div>
+
+    <div class="run" data-reveal>
+      <div class="tabs" data-tabs>
+        <div class="tabs__list" role="tablist" aria-label="How to install">
+          <button
+            class="tabs__tab"
+            type="button"
+            role="tab"
+            id="tab-uv"
+            aria-controls="panel-uv"
+            aria-selected="true"
+            tabindex="0"
+          >uv workspace</button>
+          <button
+            class="tabs__tab"
+            type="button"
+            role="tab"
+            id="tab-binary"
+            aria-controls="panel-binary"
+            aria-selected="false"
+            tabindex="-1"
+          >Prebuilt binary</button>
+        </div>
+
+        <div
+          class="tabs__panel"
+          role="tabpanel"
+          id="panel-uv"
+          aria-labelledby="tab-uv"
+        >
+          <div class="codeblock">
+            <button class="copy-btn" type="button" data-copy>Copy</button>
+            <code>git clone https://github.com/alehar9320/agentic-odi.git
+cd agentic-odi
+uv sync --all-packages
+npm --prefix apps/studio run build
+python scripts/dev.py</code>
+          </div>
+        </div>
+        <div
+          class="tabs__panel"
+          role="tabpanel"
+          id="panel-binary"
+          aria-labelledby="tab-binary"
+hidden        >
+          <div class="codeblock">
+            <button class="copy-btn" type="button" data-copy>Copy</button>
+            <code>curl -fsSL https://github.com/alehar9320/agentic-odi/releases/latest/download/install.sh | sh
+agentic-odi --version</code>
+          </div>
+        </div>
+      </div>
+
+      <div class="run__grid">
+        <div>
+          <h3 class="run__label">Point an MCP client at it</h3>
+          <div class="codeblock">
+            <button class="copy-btn" type="button" data-copy>Copy</button>
+            <code>{
+  &#34;mcpServers&#34;: {
+    &#34;agentic-odi&#34;: { &#34;url&#34;: &#34;http://localhost:8000/mcp&#34; }
+  }
+}</code>
+          </div>
+        </div>
+
+        <div>
+          <h3 class="run__label">Where it runs</h3>
+          <div class="endpoints">
+            <div class="endpoint">
+              <span class="endpoint__name">MCP server</span>
+              <span class="endpoint__url">
+                <code>http://localhost:8000/mcp</code>
+                <button class="copy-btn copy-btn--inline" type="button" data-copy>Copy</button>
+              </span>
+              <span class="endpoint__note">Runs with scripts/dev.py. The same tools the studio uses.</span>
+            </div>
+            <div class="endpoint">
+              <span class="endpoint__name">The Living Studio</span>
+              <span class="endpoint__url">
+                <code>http://127.0.0.1:8100</code>
+                <button class="copy-btn copy-btn--inline" type="button" data-copy>Copy</button>
+              </span>
+              <span class="endpoint__note">Runs with scripts/dev.py. The chat-first interface.</span>
+            </div>
+            <div class="endpoint">
+              <span class="endpoint__name">Hosted MCP server</span>
+              <span class="endpoint__url">
+                <code>https://agentic-odi.fastmcp.app/mcp</code>
+                <button class="copy-btn copy-btn--inline" type="button" data-copy>Copy</button>
+              </span>
+              <span class="endpoint__note">Authentication required. Ask the maintainers for credentials, and point any MCP client at it.</span>
+            </div>
+            <div class="endpoint">
+              <span class="endpoint__name">Hosted Studio</span>
+              <span class="endpoint__url">
+                <code>https://agentic-odi.alehar.workers.dev/</code>
+                <button class="copy-btn copy-btn--inline" type="button" data-copy>Copy</button>
+              </span>
+              <span class="endpoint__note">The public interface. Live data needs the local sidecar.</span>
+            </div>
+            <div class="endpoint">
+              <span class="endpoint__name">Test chat</span>
+              <span class="endpoint__url">
+                <code>https://horizon.prefect.io/alhase/servers/agentic-odi/chat</code>
+                <button class="copy-btn copy-btn--inline" type="button" data-copy>Copy</button>
+              </span>
+              <span class="endpoint__note">Talk to the hosted MCP server in a browser. Requires a free Prefect account.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <p class="run__note">
+        Hosted credentials come from the maintainers &mdash;
+        <a href="https://github.com/alehar9320/agentic-odi/issues">open an issue</a>.
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- ── The MCP surface ──────────────────────────────────────────── -->
+<section id="tools" class="section" aria-labelledby="tools-title">
+  <div class="shell">
+    <div class="section__head" data-reveal>
+      <p class="eyebrow">The MCP surface</p>
+      <h2 id="tools-title" class="section__title">Thirty tools. One contract.</h2>
+      <p class="lead">Every tool the server exposes is listed, with its arguments, in the reference. A few of them:</p>
+    </div>
+
+    <div class="grid grid--3">
+      <article class="tool" data-reveal>
+        <span class="tool__name">get_job_map</span>
+        <p class="tool__purpose">Return a Job&#39;s ordered steps.</p>
+        <code class="tool__sig">get_job_map(job_id: str)</code>
+      </article>
+      <article class="tool" data-reveal>
+        <span class="tool__name">get_outcomes</span>
+        <p class="tool__purpose">List the desired outcomes of a Job or step.</p>
+        <code class="tool__sig">get_outcomes(job_id: str, step_id: str | None = None)</code>
+      </article>
+      <article class="tool" data-reveal>
+        <span class="tool__name">compute_opportunity</span>
+        <p class="tool__purpose">Score an importance and satisfaction pair.</p>
+        <code class="tool__sig">compute_opportunity(importance: float, satisfaction: float)</code>
+      </article>
+      <article class="tool" data-reveal>
+        <span class="tool__name">evaluate_outcome</span>
+        <p class="tool__purpose">Check a statement against the ODI format before saving it.</p>
+        <code class="tool__sig">evaluate_outcome(statement: str, job_id: str | None = None)</code>
+      </article>
+      <article class="tool" data-reveal>
+        <span class="tool__name">add_evidence</span>
+        <p class="tool__purpose">Attach a research record as evidence.</p>
+        <code class="tool__sig">add_evidence(source_name: str, source_kind: str, name: str, content: str, item_type: EvidenceItemType = &#39;manual&#39;, raw: dict[str, Any] | None = None, job_id: str | None = None, step_id: str | None = None, outcome_id: str | None = None)</code>
+      </article>
+      <article class="tool" data-reveal>
+        <span class="tool__name">promote_evidence</span>
+        <p class="tool__purpose">Promote a record into a Job, outcome, or customer outcome.</p>
+        <code class="tool__sig">promote_evidence(evidence_id: str, target: str, job_id: str | None = None, statement: str | None = None, name: str | None = None, importance: float | None = None, satisfaction: float | None = None)</code>
+      </article>
+    </div>
+
+    <p class="section__more" data-reveal>
+      <a class="btn btn--ghost" href="https://alehar9320.github.io/agentic-odi/docs/mcp/">See all 30 tools</a>
+    </p>
+  </div>
+</section>
+
+<!-- ── Status ───────────────────────────────────────────────────── -->
+<section id="status" class="section" aria-labelledby="status-title">
+  <div class="shell">
+    <div class="section__head" data-reveal>
+      <p class="eyebrow">Status</p>
+      <h2 id="status-title" class="section__title">
+        Experimental
+        <span class="pill pill--warning">Experimental</span>
+      </h2>
+    </div>
+
+    <div class="status-grid">
+      <div class="card" data-reveal>
+        <h3 class="card__title">What works today</h3>
+        <ul class="status-list">
+          <li>30 MCP tools over jobs, steps, desired outcomes, customer outcomes, and evidence.</li>
+          <li>7 agent-composed surfaces, from a closed catalog the studio owns.</li>
+          <li>16 connector presets — Notion, Gong, PostHog, Linear, GitHub, and more.</li>
+          <li>A local-first CLI: full entity CRUD, interactive chat, `schema`, and `score`.</li>
+          <li>A SQLite store, so the data outlives the session.</li>
+          <li>The Living Studio, as a web app and as a Tauri desktop app.</li>
+          <li>A hosted MCP server, for testing and verifying MCP over the wire.</li>
+          <li>A hosted Studio on Cloudflare Workers.</li>
+        </ul>
+      </div>
+
+      <div class="card" data-reveal>
+        <h3 class="card__title">What&#39;s next</h3>
+        <p class="card__body">
+          Nothing is queued. The roadmap is a list of what has already shipped, and it is
+          empty of promises &mdash; which is the point.
+        </p>
+      </div>
+    </div>
+
+    <p class="status-note" data-reveal>We don&#39;t publish dates.</p>
+    <p class="status-note status-note--muted" data-reveal>
+      Questions? Open an issue.
+      <a href="https://github.com/alehar9320/agentic-odi/issues">Open an issue</a>.
+    </p>
+  </div>
+</section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="shell">
+      <div class="site-footer__top">
+        <div class="site-footer__brand">
+          <img src="assets/mark.svg" alt="" width="24" height="24" aria-hidden="true">
+          <span class="brand__name">Agentic&nbsp;ODI</span>
+        </div>
+        <p class="site-footer__tagline">Built with outcomes, not guesses.</p>
+      </div>
+      <nav class="site-footer__nav" aria-label="Footer">
+        <a href="https://github.com/alehar9320/agentic-odi">GitHub</a>
+        <a href="https://github.com/alehar9320/agentic-odi/issues">Issues</a>
+        <a href="https://alehar9320.github.io/agentic-odi/docs/">Docs</a>
+        <a href="https://agentic-odi.alehar.workers.dev/">Hosted Studio</a>
+        <a href="https://horizon.prefect.io/alhase/servers/agentic-odi/chat">Test chat</a>
+      </nav>
+      <p class="site-footer__legal">
+        &copy; 2026 Agentic ODI maintainers &middot; All rights reserved
+      </p>
+      <p class="site-footer__note">
+        Experimental. We don't publish dates &mdash; this page changes when the code does.
+      </p>
+    </div>
+  </footer>
+
+  <script defer src="assets/main.js"></script>
+<script defer src="assets/demo.js"></script>
+</body>
+</html>

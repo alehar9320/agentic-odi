@@ -73,12 +73,9 @@ def _heading_renderer(markdown: MarkdownIt) -> None:
     A guide's own top-level heading is the page's title, and the template
     renders it. So a level-one heading inside the body is demoted to level
     two, and the page keeps exactly one ``<h1>``.
-
-    Each heading also ends in a link to itself, so a reader can send someone
-    straight to a section instead of the top of the page.
     """
 
-    def render_open(tokens: list, index: int, options, env, **kwargs) -> str:  # noqa: ANN001
+    def render(tokens: list, index: int, options, env, **kwargs) -> str:  # noqa: ANN001
         token = tokens[index]
         level = int(token.tag[1])
         if level == 1:
@@ -88,22 +85,10 @@ def _heading_renderer(markdown: MarkdownIt) -> None:
         if not text and index + 1 < len(tokens):
             text = tokens[index + 1].content
         anchor = _unique_anchor(env, text)
-        env["heading_open_anchor"] = (anchor, level)
         return f'<h{level} id="{anchor}">'
 
-    def render_close(tokens: list, index: int, options, env, **kwargs) -> str:  # noqa: ANN001
-        anchor, level = env.pop("heading_open_anchor", (None, 2))
-        if anchor is None:
-            return tokens[index].tag
-        return (
-            f'<a class="heading-anchor" href="#{anchor}"'
-            ' aria-label="Copy link to this section" title="Copy link">#</a>'
-            f"</h{level}>"
-        )
-
     renderer: Any = markdown.renderer
-    renderer.rules["heading_open"] = render_open
-    renderer.rules["heading_close"] = render_close
+    renderer.rules["heading_open"] = render
 
 
 def _unique_anchor(env: dict, text: str) -> str:
@@ -196,13 +181,11 @@ def headings(html: str) -> list[dict[str, str]]:
     """The headings in a rendered page, for a table of contents."""
     found: list[dict[str, str]] = []
     for match in re.finditer(r'<h([23]) id="([^"]+)">(.*?)</h\1>', html, re.DOTALL):
-        # The section link is decoration, not part of the heading's name.
-        body = re.sub(r'<a class="heading-anchor".*?</a>', "", match.group(3), flags=re.DOTALL)
         found.append(
             {
                 "level": match.group(1),
                 "anchor": match.group(2),
-                "text": re.sub(r"<[^>]+>", "", body).strip(),
+                "text": re.sub(r"<[^>]+>", "", match.group(3)).strip(),
             }
         )
     return found

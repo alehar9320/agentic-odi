@@ -10,11 +10,7 @@ export function Toasts() {
   return (
     <div className="toast-stack" role="status" aria-live="polite">
       {toasts.map((toast) => (
-        <div
-          className={`toast toast--${toast.kind}`}
-          key={toast.id}
-          role={toast.kind === "error" ? "alert" : undefined}
-        >
+        <div className={`toast toast--${toast.kind}`} key={toast.id}>
           <span style={{ whiteSpace: "pre-wrap" }}>{toast.message}</span>
           <button
             type="button"

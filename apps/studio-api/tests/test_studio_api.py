@@ -289,7 +289,6 @@ def test_chat_live_tool_loop_emits_tool_and_final_message(
 
     monkeypatch.setattr(chat, "check_llm_health", _healthy)
     monkeypatch.setattr(chat, "McpClient", _FakeMcpClient)
-    monkeypatch.setattr(chat, "is_endpoint_reachable", lambda url, timeout: True)
     monkeypatch.setattr(chat, "AsyncOpenAI", lambda **kwargs: _FakeOpenAI(streams, **kwargs))
 
     events = _stream("/api/chat", _chat_body("list the jobs"))
@@ -314,7 +313,6 @@ def test_chat_live_without_tools_streams_plain_reply(
 
     monkeypatch.setattr(chat, "check_llm_health", _healthy)
     monkeypatch.setattr(chat, "McpClient", _FakeMcpClient)
-    monkeypatch.setattr(chat, "is_endpoint_reachable", lambda url, timeout: True)
     monkeypatch.setattr(chat, "AsyncOpenAI", lambda **kwargs: _FakeOpenAI(streams, **kwargs))
 
     events = _stream("/api/chat", _chat_body("hi"))
@@ -340,7 +338,7 @@ def test_add_step_surfaces_mcp_failure_as_502() -> None:
     )
 
     assert response.status_code == 502
-    assert response.json()["error"]["code"] == "mcp_unreachable"
+    assert "detail" in response.json()
 
 
 def test_add_outcome_surfaces_mcp_failure_as_502() -> None:
@@ -356,7 +354,7 @@ def test_add_outcome_surfaces_mcp_failure_as_502() -> None:
     )
 
     assert response.status_code == 502
-    assert response.json()["error"]["code"] == "mcp_unreachable"
+    assert "detail" in response.json()
 
 
 # ---------------------------------------------------------------------------
@@ -368,39 +366,20 @@ def test_canvas_reads_local_repository() -> None:
     repo = InMemoryRepository()
     service = ODIService(repo)
     job = service.add_job(name="Local job", description="Stored locally")
-    service.add_outcome(
-        job_id=job.id,
-        statement="Minimize the time it takes to deploy when releasing",
-        importance=8.0,
-        satisfaction=3.0,
-    )
     service.add_step(job_id=job.id, name="Local step", order=1)
-    service.add_evidence(
-        source_name="Gong",
-        source_kind="mcp",
-        name="Call with Ada",
-        content="Deploys break whenever a secret rotates.",
-        job_id=job.id,
-    )
+    service.add_outcome(job_id=job.id, statement="Minimize time", importance=8.0, satisfaction=3.0)
 
     body = TestClient(create_app(repo)).get("/api/canvas").json()
 
     assert body["source"] == "local"
     assert body["jobs"][0]["id"] == job.id
     assert body["steps"][0]["name"] == "Local step"
-    assert body["outcomes"][0]["statement"] == "Minimize the time it takes to deploy when releasing"
-    assert body["evidence"][0]["name"] == "Call with Ada"
+    assert body["outcomes"][0]["statement"] == "Minimize time"
 
 
 def test_post_step_uses_local_service() -> None:
     repo = InMemoryRepository()
     job = ODIService(repo).add_job(name="Local job")
-    ODIService(repo).add_outcome(
-        job_id=job.id,
-        statement="Minimize the time it takes to deploy when releasing",
-        importance=8.0,
-        satisfaction=3.0,
-    )
 
     response = TestClient(create_app(repo)).post(
         "/api/steps",
@@ -420,17 +399,14 @@ def test_post_outcome_uses_local_service() -> None:
         json={
             "mcp_url": "http://unused",
             "job_id": job.id,
-            "statement": "Minimize the time to ship a release when the build is green",
+            "statement": "Minimize effort",
             "importance": 9.0,
             "satisfaction": 4.0,
         },
     )
 
     assert response.status_code == 200
-    assert (
-        ODIService(repo).get_outcomes(job.id)[0].statement
-        == "Minimize the time to ship a release when the build is green"
-    )
+    assert ODIService(repo).get_outcomes(job.id)[0].statement == "Minimize effort"
 
 
 # ---------------------------------------------------------------------------

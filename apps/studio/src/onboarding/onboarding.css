@@ -445,12 +445,6 @@
   background: rgba(6, 7, 10, 0.4);
 }
 
-.wizard-footer__skips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-}
-
 .wizard-footer__actions {
   display: flex;
   flex-wrap: wrap;

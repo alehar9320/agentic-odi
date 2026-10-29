@@ -31,12 +31,12 @@ class PageSignals:
         self,
         title: str,
         meta_description: str,
-        domain: str | None = None,
-        primary_user: str | None = None,
-        business_model: str | None = None,
-        core_problem: str | None = None,
-        current_focus: str | None = None,
-        confidence: float | None = None,
+        domain: str | None,
+        primary_user: str | None,
+        business_model: str | None,
+        core_problem: str | None,
+        current_focus: str | None,
+        confidence: str | None,
     ) -> None:
         self.title = title
         self.meta_description = meta_description
@@ -55,7 +55,6 @@ class PageSignals:
 
 DOMAIN_KEYWORDS: dict[str, int] = {
     "devtools": 3,
-    "developer": 2,
     "error": 2,
     "tracking": 1,
     "monitoring": 1,
@@ -63,71 +62,9 @@ DOMAIN_KEYWORDS: dict[str, int] = {
     "performance": 1,
     "analytics": 1,
     "optimization": 1,
-    "saas": 2,
-    "api": 2,
-    "platform": 1,
-    "infrastructure": 1,
-    "security": 1,
-    "auth": 1,
-    "payment": 1,
-    "ecommerce": 1,
-    "retail": 1,
-    "healthcare": 1,
-    "finance": 1,
-}
-
-BUSINESS_MODEL_KEYWORDS = {
-    "saas": "SaaS subscription",
-    "subscription": "SaaS subscription",
-    "api": "API usage-based",
-    "usage": "API usage-based",
-    "ecommerce": "E-commerce transaction",
-    "retail": "E-commerce transaction",
-    "marketplace": "Marketplace",
-    "freemium": "Freemium",
-    "enterprise": "Enterprise license",
-}
-
-PRIMARY_USER_KEYWORDS = {
-    "developer": "Software developers",
-    "dev": "Software developers",
-    "engineer": "Software engineers",
-    "engineering": "Software engineers",
-    "devops": "DevOps engineers",
-    "sre": "Site reliability engineers",
-    "pm": "Product managers",
-    "product": "Product managers",
-    "designer": "Product designers",
-    "data": "Data analysts",
-    "analyst": "Data analysts",
-    "marketing": "Marketing teams",
-    "sales": "Sales teams",
-    "support": "Customer support",
 }
 
 CONFIDENCE_THRESHOLD = 3
-
-
-def _infer_from_text(text: str, keyword_map: dict[str, str]) -> tuple[str | None, float]:
-    """Derive a value from text using keyword matching.
-
-    Returns (value, confidence) where confidence is 0.0-1.0.
-    """
-    lowered = text.lower()
-    best_match: str | None = None
-    best_score = 0
-    for keyword, value in keyword_map.items():
-        count = lowered.count(keyword)
-        if count:
-            score = count
-            if score > best_score:
-                best_score = score
-                best_match = value
-    if best_match is None:
-        return None, 0.0
-    # Confidence: cap at 1.0 based on score relative to threshold
-    confidence = min(best_score / float(CONFIDENCE_THRESHOLD), 1.0)
-    return best_match, confidence
 
 
 def infer_baseline(signals: PageSignals) -> tuple[profile.Baseline, dict[str, int]]:
@@ -143,26 +80,10 @@ def infer_baseline(signals: PageSignals) -> tuple[profile.Baseline, dict[str, in
             scores[keyword] = count * weight
 
     top_keyword = max(scores, key=lambda keyword: scores[keyword], default=None)
-    confidence = min(scores[top_keyword] / float(CONFIDENCE_THRESHOLD), 1.0) if top_keyword else 0.0
+    confidence = "high" if top_keyword and scores[top_keyword] >= CONFIDENCE_THRESHOLD else "low"
 
+    # Map domain from signals; fall back to empty string if none
     domain = signals.domain or ""
-
-    # Infer primary_user, business_model, core_problem, current_focus from text
-    primary_user, pu_conf = _infer_from_text(text, PRIMARY_USER_KEYWORDS)
-    business_model, bm_conf = _infer_from_text(text, BUSINESS_MODEL_KEYWORDS)
-
-    # core_problem from the title (stripped of common suffixes)
-    core_problem = None
-    if signals.title:
-        cp = signals.title.strip()
-        for suffix in (" | ", " - ", " — ", " : "):
-            if suffix in cp:
-                cp = cp.split(suffix)[0].strip()
-                break
-        core_problem = cp if cp else None
-
-    # current_focus is the top domain keyword
-    current_focus = top_keyword if top_keyword else None
 
     return profile.Baseline(
         schema_version=1,
@@ -170,12 +91,11 @@ def infer_baseline(signals: PageSignals) -> tuple[profile.Baseline, dict[str, in
         product_name=None,
         product_url=None,
         domain=domain,
-        primary_user=primary_user,
-        business_model=business_model,
-        core_problem=core_problem,
-        current_focus=current_focus,
+        primary_user=signals.primary_user,
+        business_model=signals.business_model,
+        core_problem=signals.core_problem,
+        current_focus=signals.current_focus,
         confidence=confidence,
-        inferred=True,
     ), scores
 
 
@@ -200,7 +120,7 @@ def fetch_signals(url: str, timeout: float = 8.0) -> tuple[profile.Baseline | Pa
 
     signals = _extract_signals(response.text, str(response.url))
     baseline, scores = infer_baseline(signals)
-    low_confidence = baseline.confidence is not None and baseline.confidence < 0.5
+    low_confidence = baseline.confidence == "low"
     return baseline, low_confidence
 
 
@@ -213,7 +133,7 @@ def _default_signals(low_confidence: bool = False) -> tuple[PageSignals, bool]:
         business_model=None,
         core_problem=None,
         current_focus=None,
-        confidence=0.3 if low_confidence else 0.0,
+        confidence="low" if low_confidence else "high",
     ), low_confidence
 
 
@@ -242,15 +162,33 @@ def _extract_signals(html: str, url: str) -> PageSignals:
     parsed = urlparse(url)
     domain = parsed.hostname or None
 
+    # Simple primary_user and business_model extraction from title/meta
+    # (placeholder: derive from title tokens)
+    primary_user = None
+    business_model = None
+    core_problem = None
+    current_focus = None
+
+    # Compute confidence based on keyword scores
+    scores = {}
+    text = (title or "") + " " + (meta_description or "")
+    for keyword, weight in DOMAIN_KEYWORDS.items():
+        count = text.lower().count(keyword)
+        if count:
+            scores[keyword] = count * weight
+
+    top_keyword = max(scores, key=lambda keyword: scores[keyword], default=None)
+    confidence = "high" if top_keyword and scores[top_keyword] >= CONFIDENCE_THRESHOLD else "low"
+
     return PageSignals(
         title=title,
         meta_description=meta_description,
         domain=domain,
-        primary_user=None,
-        business_model=None,
-        core_problem=None,
-        current_focus=None,
-        confidence=0.0,
+        primary_user=primary_user,
+        business_model=business_model,
+        core_problem=core_problem,
+        current_focus=current_focus,
+        confidence=confidence,
     )
 
 

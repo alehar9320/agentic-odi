@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}{{ page.title }}{% endblock %}</title>
   <meta name="description" content="{% block description %}{{ page.description }}{% endblock %}">
-  <meta name="color-scheme" content="dark light">
+  <meta name="color-scheme" content="dark">
   <meta name="theme-color" content="#0a0b0e">
 
   <meta property="og:type" content="website">
@@ -20,7 +20,6 @@
   <meta name="twitter:image" content="{{ pages_url }}assets/og.png">
 
   <link rel="canonical" href="{{ pages_url }}{{ page.path if page.path != 'index.html' else '' }}">
-  <script src="{{ prefix }}assets/theme.js"></script>
   <link rel="stylesheet" href="{{ prefix }}assets/tokens.css">
   <link rel="stylesheet" href="{{ prefix }}assets/style.css">
   <link rel="icon" type="image/svg+xml" href="{{ prefix }}assets/favicon.svg">
@@ -41,26 +40,7 @@
         <a href="{{ pages_url }}#how">How&nbsp;it&nbsp;works</a>
         <a href="{{ pages_url }}docs/">Docs</a>
       </nav>
-      <div class="site-header__actions">
-      <button
-        class="theme-toggle"
-        type="button"
-        aria-label="Switch to the light theme"
-        title="Switch theme"
-      >
-        <svg class="theme-toggle__sun" viewBox="0 0 24 24" width="17" height="17" aria-hidden="true" focusable="false">
-          <circle cx="12" cy="12" r="4.2" fill="none" stroke="currentColor" stroke-width="1.8"></circle>
-          <path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
-        </svg>
-        <svg class="theme-toggle__moon" viewBox="0 0 24 24" width="17" height="17" aria-hidden="true" focusable="false">
-          <path d="M20 14.2A8.4 8.4 0 0 1 9.8 4a8.5 8.5 0 1 0 10.2 10.2Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"></path>
-        </svg>
-      </button>
-      <button class="site-search" type="button" data-search-open aria-label="Search the docs (Control K)">
-        Search <kbd>Ctrl K</kbd>
-      </button>
       <a class="btn btn--primary btn--sm" href="{{ pages_url }}#run">Run it in 60 seconds</a>
-      </div>
     </div>
   </header>
 
@@ -92,20 +72,6 @@
       </p>
     </div>
   </footer>
-
-  <div class="search" data-search data-site-url="{{ pages_url }}"
-       data-index-url="{{ pages_url }}assets/search-index.json" hidden>
-    <div class="search__scrim" data-search-close></div>
-    <div class="search__panel" role="dialog" aria-modal="true" aria-label="Search the docs">
-      <div class="search__field">
-        <input class="search__input" type="search" placeholder="Search the docs"
-               aria-label="Search the docs" autocomplete="off" data-search-input>
-        <button class="search__close" type="button" data-search-close aria-label="Close search">Esc</button>
-      </div>
-      <p class="search__hint" data-search-hint>Type to search every guide and reference page.</p>
-      <ul class="search__results" data-search-results></ul>
-    </div>
-  </div>
 
   <script defer src="{{ prefix }}assets/main.js"></script>
   {% block scripts %}{% endblock %}

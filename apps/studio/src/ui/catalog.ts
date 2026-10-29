@@ -250,13 +250,8 @@ export const CATALOG: readonly UiCatalogEntry[] = [
         },
       },
       verdict: { type: "string", description: "One sentence: build it, reshape it, or drop it." },
-      provenance: {
-        enum: ["simulated"],
-        description:
-          "Must be `simulated`: no computation backs these numbers yet. Never present them as measurements.",
-      },
     },
-    ["outcome", "bet", "before", "after", "provenance"],
+    ["outcome", "bet", "before", "after"],
   ),
   entry(
     "evidence-quote",

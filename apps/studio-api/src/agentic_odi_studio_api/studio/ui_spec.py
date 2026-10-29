@@ -21,15 +21,6 @@ MAX_CHILDREN = 32
 
 RENDER_UI_TOOL = "render_ui"
 
-# Surfaces whose content can be mistaken for a measurement must say whether
-# they describe live data or a demonstration. The client's catalog carries the
-# same rule; this is the server-side backstop for an older or edited manifest.
-REQUIRED_PROVENANCE: dict[str, tuple[str, ...]] = {
-    # #95 adds a real computation; until then a simulation can only be a label,
-    # never a measurement.
-    "impact-simulation": ("simulated",),
-}
-
 
 def _is_number(value: Any) -> bool:
     return isinstance(value, (int, float)) and not isinstance(value, bool)
@@ -146,13 +137,6 @@ class UiCatalog:
         if problem:
             return problem
 
-        allowed_labels = REQUIRED_PROVENANCE.get(name)
-        if allowed_labels is not None:
-            label = props.get("provenance")
-            if label not in allowed_labels:
-                allowed = ", ".join(allowed_labels)
-                return f"`{name}.props.provenance` must be one of: {allowed}"
-
         children = node.get("children")
         if children is not None and not isinstance(children, list):
             return f"`{name}.children` must be an array"
@@ -247,11 +231,4 @@ class UiCatalog:
         return None
 
 
-__all__ = [
-    "MAX_CHILDREN",
-    "MAX_DEPTH",
-    "MAX_NODES",
-    "RENDER_UI_TOOL",
-    "REQUIRED_PROVENANCE",
-    "UiCatalog",
-]
+__all__ = ["MAX_CHILDREN", "MAX_DEPTH", "MAX_NODES", "RENDER_UI_TOOL", "UiCatalog"]

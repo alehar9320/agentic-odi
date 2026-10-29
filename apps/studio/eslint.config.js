@@ -6,15 +6,7 @@ import tseslint from "typescript-eslint";
 
 export default tseslint.config(
   {
-    ignores: [
-      "dist",
-      "coverage",
-      "src-tauri/target",
-      "src/api/schema.d.ts",
-      "node_modules",
-      // Chromatic's captured archives and the Storybook it builds from them.
-      ".vitest",
-    ],
+    ignores: ["dist", "coverage", "src-tauri/target", "src/api/schema.d.ts", "node_modules"],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,
