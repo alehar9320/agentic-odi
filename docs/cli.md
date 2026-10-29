@@ -199,6 +199,22 @@ check works with or without a running server.
 stage. `capabilities --json` emits the full machine-readable manifest.
 `capabilities tools` lists tool names only.
 
+## The factual case for a job
+
+```bash
+agentic-odi brief export --job-id JOB-1                # markdown to stdout
+agentic-odi brief export --job-id JOB-1 --format html  # standalone HTML document
+agentic-odi brief export --job-id JOB-1 --out case.md  # write a file, print its path
+```
+
+`brief export` renders the same deterministic case the Studio shows: the job,
+the decision under consideration, the underserved outcomes with their score,
+band, and sources, and the risks. Every numeral comes from a recorded
+measurement; a field nobody supplied renders `not measured`, never `0`. The
+`--format html` document inlines its own print styles, so it opens and prints
+with no app CSS and no network access. `--generated-at` stamps a fixed
+timestamp when you need byte-identical output.
+
 ## Inspect settings and feature flags
 
 ```bash

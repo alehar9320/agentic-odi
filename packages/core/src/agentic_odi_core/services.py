@@ -5,6 +5,7 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
+from agentic_odi_core.brief import BriefInput, BriefOutcome
 from agentic_odi_core.compare import (
     MAX_COMPARE_OUTCOMES,
     MIN_COMPARE_OUTCOMES,
@@ -553,3 +554,45 @@ class ODIService:
     def latest_decision(self, job_id: str) -> Decision | None:
         history = self.repo.list_decisions(job_id, limit=None)
         return history[-1] if history else None
+
+    # ------------------------------------------------------------------ brief
+
+    def build_brief(self, job_id: str, *, generated_at: str) -> BriefInput:
+        """Assemble the brief inputs for a job from what is actually recorded.
+
+        The clock is supplied, never read here, so a rendered brief is
+        reproducible. Every measurement comes from the stored records; a field
+        nobody supplied stays ``None`` and the renderer shows it as
+        ``not measured`` rather than a zero.
+        """
+        job = self.repo.get_job(job_id)
+        if job is None:
+            raise JobNotFoundError(job_id)
+        outcomes = self.repo.get_outcomes(job_id)
+        brief_outcomes: list[BriefOutcome] = []
+        for outcome in outcomes:
+            evidence = self.repo.list_evidence(outcome_id=outcome.id)
+            brief_outcomes.append(
+                BriefOutcome(
+                    outcome_id=outcome.id,
+                    statement=outcome.statement,
+                    score=outcome.opportunity_score,
+                    n=None,
+                    method=None,
+                    quote=None,
+                    sources=tuple(record.name for record in evidence),
+                )
+            )
+        decision = self.latest_decision(job_id)
+        consideration = None
+        if decision is not None:
+            chosen = ", ".join(decision.chosen_outcome_ids)
+            consideration = f"Recorded decision {decision.id} chose {chosen}."
+        return BriefInput(
+            job_id=job.id,
+            job_name=job.name,
+            generated_at=generated_at,
+            outcomes=tuple(brief_outcomes),
+            decision_consideration=consideration,
+            evidence_count=len(self.repo.list_evidence(job_id=job_id)),
+        )
