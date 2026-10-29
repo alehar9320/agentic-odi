@@ -694,3 +694,17 @@ avoid encoding an unapproved convention as code. When its gate clears:
 Do not start B3 (interval) before the bootstrap convention is approved, B4 before B3
 lands, B6.1 before the delta semantics are approved, or M2-19 (blind scoring) before
 its trusted-viewer authorization decision.
+
+## Seams added ahead of the gates
+
+`packages/core/src/agentic_odi_core/trust.py` names the contract each blocked
+increment must satisfy, without encoding an unapproved convention:
+
+- `OpportunityInterval` and `opportunity_interval` (B3 — bootstrap convention).
+- `classify_confidence` (B4.1 — confidence table).
+- `OutcomeDelta` / `DeltaDirection` and `outcome_delta` (B6.1 — delta semantics).
+
+Each callable raises `TrustContractPendingError` naming the blocking decision
+instead of returning a fabricated band, class or direction; `test_trust_seams.py`
+pins the refusal. When a gate clears, replace the raise with the approved
+implementation and drop the corresponding seam test.

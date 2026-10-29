@@ -367,6 +367,14 @@ the opportunity landscape render them as `est.`, never `n=0`, and show both
 counts (`n=40/12 (survey)`) when the dimensions differ. An `estimate` claiming a
 count above one is rejected before the write.
 
+Each accepted score change is also recorded as a `ScoreSnapshot` in the same
+append-only event log, so a score's history replays with the store. The sidecar
+exposes it at `GET /api/outcomes/{outcome_id}/history`; `ScoreSnapshot` is
+exported from `types.ts` and read through `fetchOutcomeHistory`. A snapshot
+carries the score and its sample/method companions plus an optional `note`
+(max 500 chars) recording why the number was given. A rejected mutation writes
+no snapshot, so the history never shows a change that did not happen.
+
 The conversation keeps the order the agent produced: a `delta` appends to the
 open prose part, a `ui` event opens a card, and the next `delta` opens a new
 paragraph after it. The opportunity score is computed from importance and

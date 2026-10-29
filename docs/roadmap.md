@@ -76,3 +76,5 @@ The open issues this milestone still has to answer, grouped by what they change.
 - [ ] **The docs must be the truth** — README, architecture, and a roadmap that tracks reality (this change).
 - [x] **Outcome sample and method** — every desired-outcome score carries `importance_n`, `satisfaction_n` and `score_method` (`estimate`, `survey`, `import`) through the model, service, SQLite replay, MCP tools, CLI and Studio API; an unknown count renders as `est.`, and an `estimate` that claims a sample above one is refused before the write ([PR #281](https://github.com/alehar9320/agentic-odi/pull/281)).
 
+- [x] **Score history** — every accepted score change is written as an append-only `ScoreSnapshot` alongside the score's sample and method, with an optional `note`. `desired-outcomes history`, `get_outcome_history` and `GET /api/outcomes/{id}/history` replay the trail; a rejected mutation writes no snapshot, so history never shows a change that did not happen ([PR #281](https://github.com/alehar9320/agentic-odi/pull/281)).
+
