@@ -42,5 +42,4 @@ class ChatRequest(BaseModel):
     api_key: str = ""
     model: str
     mcp_url: str
-    routing_mode: str = "auto"
     messages: list[ChatMessage] = Field(default_factory=list)
