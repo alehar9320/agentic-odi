@@ -54,7 +54,7 @@
     "id": "surfaces",
     "eyebrow": "The surfaces",
     "title": "The agent composes, it does not describe.",
-    "blurb": "The studio answers with a card from a closed catalog, rendered inline in the conversation. Seven shapes, each one a thing you can act on.",
+    "blurb": "The studio answers with a card from a closed catalog, rendered inline in the conversation. Eight shapes, each one a thing you can act on.",
     "cards": [
       {
         "type": "outcome-card",
@@ -162,6 +162,25 @@
           "decision": "Automate invoice matching before we build a refund flow",
           "status": "Decided",
           "rationale": "Opportunity 13.0 against 7.0, and two evidence quotes in the last quarter."
+        }
+      },
+      {
+        "type": "candidate-queue",
+        "title": "Review queue",
+        "blurb": "Proposed outcomes beside the sentences they came from, so a person accepts, edits, merges, or rejects with the evidence in view.",
+        "data": {
+          "candidates": [
+            {
+              "statement": "Minimize the time it takes to reconcile invoices",
+              "quote": "I match every invoice to a receipt by hand, every Friday.",
+              "source": "Ana · onboarding call"
+            },
+            {
+              "statement": "Minimize the effort to catch a failed payment",
+              "quote": "We only find out a card failed when the customer emails us.",
+              "source": "Bea · finance call"
+            }
+          ]
         }
       }
     ]

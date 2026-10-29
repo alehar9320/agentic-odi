@@ -424,3 +424,128 @@ export function DecisionRecord({ node }: NodeProps) {
     </article>
   );
 }
+
+/* ------------------------------------------------------------------ */
+/* candidate-queue                                                     */
+/* ------------------------------------------------------------------ */
+
+const QUEUE_STATE_TONE: Record<string, Tone> = {
+  loading: "info",
+  ready: "neutral",
+  empty: "neutral",
+  failed: "critical",
+};
+
+const DECISION_TONE: Record<string, Tone> = {
+  proposed: "info",
+  accepted: "positive",
+  merged: "positive",
+  rejected: "critical",
+};
+
+/**
+ * The review queue: each proposed candidate beside the sentence it came from.
+ *
+ * The card is a view, never an actor. Every decision is an intent the agent
+ * turns into the same `PATCH /api/candidates/{id}` call the CLI uses, so there
+ * is one state machine and one audit trail. A candidate is only ever shown as
+ * decided because the agent said the write succeeded — this component never
+ * removes a row on a click.
+ */
+export function CandidateQueue({ node }: NodeProps) {
+  const interviewId = str(node.props, "interviewId");
+  const state = str(node.props, "state", "ready");
+  const message = str(node.props, "message");
+  const target = str(node.props, "target");
+  const candidates = recordList(node.props.candidates);
+  const actions = readActions(node.props);
+
+  const header = (
+    <header className="ui-card__head">
+      <span className="ui-card__id">Review queue</span>
+      <ScorePill tone={QUEUE_STATE_TONE[state] ?? "neutral"}>{state}</ScorePill>
+    </header>
+  );
+
+  if (state === "loading") {
+    return (
+      <article
+        className="ui-card ui-card--queue"
+        aria-busy="true"
+        aria-label="Loading the review queue"
+      >
+        {header}
+        <p className="ui-caption">Loading the proposed candidates…</p>
+        <ActionRow actions={actions} />
+      </article>
+    );
+  }
+
+  if (state === "failed") {
+    return (
+      <article
+        className="ui-card ui-card--queue ui-card--urgent"
+        aria-label="The review queue could not be loaded"
+      >
+        {header}
+        <p className="ui-card__statement">{message || "The review queue could not be loaded."}</p>
+        <ActionRow actions={actions} />
+      </article>
+    );
+  }
+
+  if (state === "empty" || candidates.length === 0) {
+    return (
+      <article className="ui-card ui-card--queue" aria-label="Nothing to review">
+        {header}
+        <p className="ui-caption">{message || "Nothing is waiting for review."}</p>
+        <ActionRow actions={actions} />
+      </article>
+    );
+  }
+
+  return (
+    <article className="ui-card ui-card--queue" aria-label="Review queue">
+      {header}
+      <p className="ui-caption">
+        {target
+          ? `Merging folds a candidate's sentence into outcome ${target}.`
+          : "A merge needs an accepted outcome to fold into; accept one first."}
+      </p>
+
+      <ol className="ui-queue">
+        {candidates.map((candidate, index) => {
+          const id = str(candidate, "id", "candidate");
+          const statement = str(candidate, "statement");
+          const quote = str(candidate, "quote");
+          const source = str(candidate, "source");
+          const decision = str(candidate, "decision");
+          const note = str(candidate, "note");
+          const confidence = candidate.confidence;
+          return (
+            <li className="ui-queue__item" key={`${id}-${index}`}>
+              <div className="ui-queue__head">
+                <span className="ui-card__id">{id}</span>
+                {decision ? (
+                  <ScorePill tone={DECISION_TONE[decision] ?? "neutral"}>{decision}</ScorePill>
+                ) : typeof confidence === "number" ? (
+                  <span className="ui-caption">{Math.round(confidence * 100)}% confidence</span>
+                ) : null}
+              </div>
+              <p className="ui-card__statement">{statement}</p>
+              <blockquote className="ui-quote">
+                <Markdown source={quote} />
+              </blockquote>
+              {source ? <p className="ui-caption">From {source}</p> : null}
+              {note ? <p className="ui-queue__note">{note}</p> : null}
+            </li>
+          );
+        })}
+      </ol>
+
+      {interviewId ? <p className="ui-caption">Interview {interviewId}</p> : null}
+
+      <ActionRow actions={actions} />
+    </article>
+  );
+}

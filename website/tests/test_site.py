@@ -315,6 +315,7 @@ def test_surfaces_section_shows_every_catalog_card():
         "job-map",
         "opportunity-thesis",
         "decision-record",
+        "candidate-queue",
     ):
         assert card in html
 
