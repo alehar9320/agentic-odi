@@ -43,6 +43,33 @@ JOB_STAGE_INDEX: dict[JobStage, int] = {
     stage: index + 1 for index, stage in enumerate(JOB_STAGE_ORDER)
 }
 
+JOB_STAGE_DESCRIPTIONS: dict[JobStage, str] = {
+    JobStage.DEFINE: "Determine goals and criteria",
+    JobStage.LOCATE: "Gather inputs and resources",
+    JobStage.PREPARE: "Set up context and workspace",
+    JobStage.CONFIRM: "Verify readiness to execute",
+    JobStage.EXECUTE: "Carry out core job work",
+    JobStage.MONITOR: "Track performance and errors",
+    JobStage.MODIFY: "Adjust inputs or workflows",
+    JobStage.CONCLUDE: "Finish and store outputs",
+}
+
+
+def job_stage_catalog() -> list[dict[str, str]]:
+    """The eight Universal Job Map stages as display data.
+
+    ``apps/studio/src/domain/jobStages.ts`` is generated from this function
+    (``scripts/gen_job_stages.py``); a contract test fails if the two drift.
+    """
+    return [
+        {
+            "id": stage.value,
+            "name": f"{index}. {stage.value.capitalize()}",
+            "desc": JOB_STAGE_DESCRIPTIONS[stage],
+        }
+        for index, stage in enumerate(JOB_STAGE_ORDER, start=1)
+    ]
+
 
 class BusinessImpactCategory(str, Enum):
     REVENUE_GROWTH = "revenue_growth"
@@ -172,6 +199,42 @@ class CustomerOutcome(BaseModel):
     @property
     def opportunity_score(self) -> float:
         return self.customer_value.opportunity_score
+
+
+class SignalKind(str, Enum):
+    """The facts a signal may report. Every kind here has a real producer."""
+
+    OUTCOME_SCORED = "outcome_scored"
+    OPPORTUNITY_CROSSED = "opportunity_crossed"
+    EVIDENCE_INGESTED = "evidence_ingested"
+    EVIDENCE_PROMOTED = "evidence_promoted"
+    JOB_ADDED = "job_added"
+    JOB_MAP_COMPLETED = "job_map_completed"
+
+
+SignalSeverity = Literal["info", "notice", "urgent"]
+
+
+class Signal(BaseModel):
+    """One fact that happened in the store, surfaced in the Catch Up feed."""
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    kind: SignalKind
+    title: str = Field(..., max_length=120, description="One line, at most 120 characters")
+    detail: str | None = None
+    subject_kind: (
+        Literal["job", "step", "outcome", "evidence", "connector", "agent_work"] | None
+    ) = None
+    subject_id: str | None = None
+    severity: SignalSeverity = "info"
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    read_at: datetime | None = None
+    dismissed_at: datetime | None = None
+    #: True when the attention budget withheld this signal from the feed.
+    suppressed: bool = False
+    fingerprint: str = Field(
+        ..., description="sha256 of kind|subject_kind|subject_id|discriminator"
+    )
 
 
 class V2MOM(BaseModel):

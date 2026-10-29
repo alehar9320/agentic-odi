@@ -181,6 +181,26 @@ agentic-odi evidence promote <evidence-id> --to outcome --job-id <job-id>
 `connectors ingest --job-id <job-id>` maps every evidence-bearing record in the
 ingested batch into evidence in one step.
 
+## The signal inbox
+
+Writes emit signals — a job added, an outcome re-scored, evidence promoted, a
+job map covering all eight stages. Reads never emit, and an empty inbox means the
+workspace was genuinely quiet. Deletions are recorded data, not news, so they
+emit nothing.
+
+```bash
+agentic-odi signals list                 # newest first
+agentic-odi signals list --unread --limit 5
+agentic-odi signals unread --json
+agentic-odi signals read <signal-id>
+agentic-odi signals dismiss <signal-id>
+```
+
+At most 20 signals per day are surfaced (`AGENTIC_ODI_SIGNAL_BUDGET`); `urgent`
+ones — an opportunity score crossing 10 upward — bypass that cap. Suppressed
+signals stay in the store and stay reachable by id.
+See [The Signal Inbox](architecture/notifications.md).
+
 ## Schema, scoring, and guidance
 
 ```bash

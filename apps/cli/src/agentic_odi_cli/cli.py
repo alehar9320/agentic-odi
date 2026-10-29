@@ -25,6 +25,7 @@ from agentic_odi_cli.profile import setup_wizard
 from agentic_odi_cli.render import render_job_summary
 from agentic_odi_cli.schedule import schedule_app
 from agentic_odi_cli.settings import settings_app
+from agentic_odi_cli.signals import signals_app
 from agentic_odi_cli.steps import steps_app
 from agentic_odi_cli.version import __version__  # noqa: F401  (re-exported for tests)
 
@@ -42,6 +43,11 @@ app.add_typer(steps_app, name="steps", help="Manage Job-map Steps.")
 app.add_typer(desired_outcomes_app, name="desired-outcomes", help="Manage desired Outcomes.")
 app.add_typer(evidence_app, name="evidence", help="Manage evidence captured from connectors.")
 app.add_typer(customer_outcomes_app, name="customer-outcomes", help="Manage Customer Outcomes")
+app.add_typer(
+    signals_app,
+    name="signals",
+    help="Read the signal inbox — real changes worth attention.",
+)
 app.add_typer(
     customer_outcomes_app,
     name="outcomes",
