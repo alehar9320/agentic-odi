@@ -5,13 +5,11 @@ import { ChangelogModal } from "./components/ChangelogModal";
 import { ChatStage } from "./components/chat/ChatStage";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { StudioBar } from "./components/layout/StudioBar";
-import { SidecarNotice } from "./components/notices/SidecarNotice";
 import { Toasts } from "./components/Toasts";
 import { WorkbenchRail } from "./components/workspace/WorkbenchRail";
 import { WorkspacePanel } from "./components/workspace/WorkspacePanel";
 import { FirstRunWizard, OnboardingProvider } from "./onboarding";
 import { StudioProvider, useStudio } from "./state/StudioContext";
-import { UpdateBanner, UpdateProvider } from "./updater";
 
 /**
  * One room, one intelligence.
@@ -48,14 +46,12 @@ function StudioShell() {
 
   return (
     <div className="studio-app">
-      <SidecarNotice />
       <main className="stage">
         <StudioBar
           onHome={goHome}
           onNew={newConversation}
           onChangelog={() => setShowChangelog(true)}
         />
-        <UpdateBanner />
         <div className="stage__split">
           <div className="stage__thread">
             <WorkbenchRail />
@@ -73,16 +69,14 @@ function StudioShell() {
 export default function App() {
   return (
     <ErrorBoundary>
-      <UpdateProvider>
-        <StudioProvider>
-          <StudioRuntimeProvider>
-            <OnboardingProvider>
-              <StudioShell />
-              <FirstRunWizard />
-            </OnboardingProvider>
-          </StudioRuntimeProvider>
-        </StudioProvider>
-      </UpdateProvider>
+      <StudioProvider>
+        <StudioRuntimeProvider>
+          <OnboardingProvider>
+            <StudioShell />
+            <FirstRunWizard />
+          </OnboardingProvider>
+        </StudioRuntimeProvider>
+      </StudioProvider>
     </ErrorBoundary>
   );
 }

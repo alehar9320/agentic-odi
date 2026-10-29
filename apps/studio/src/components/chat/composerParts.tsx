@@ -9,7 +9,6 @@
 
 import { type ReactNode } from "react";
 import { useAuiState } from "@assistant-ui/react";
-
 import { isCommandDraft, type StudioCommand } from "../../lib/commands";
 import { useStudio } from "../../state/StudioContext";
 import { BoltIcon, CaptureIcon, CompassIcon, SparkIcon } from "../icons";
@@ -23,28 +22,20 @@ const PILL_ICONS: ReactNode[] = [
 interface QuickPill {
   id: string;
   label: string;
-  description?: string;
   icon: ReactNode;
   run: () => void;
   conversational?: boolean;
 }
 
 export function SuggestionPills() {
-  const { canvas, llmHealth, openPanel, streaming, sendMessage, messages } = useStudio();
+  const { canvas, llmHealth, openPanel, streaming, sendMessage } = useStudio();
   const suggestions = useAuiState((state) => state.thread.suggestions);
-
-  // The starter prompts belong to the empty state. Once a conversation is
-  // under way the composer offers the next turn, not the tour.
-  if (messages.length > 0) {
-    return null;
-  }
 
   const jobs = canvas?.jobs.length ?? 0;
 
   const pills: QuickPill[] = suggestions.map((suggestion, index) => ({
     id: `suggestion-${index}`,
     label: suggestion.title ?? suggestion.prompt,
-    description: suggestion.label,
     icon: PILL_ICONS[index % PILL_ICONS.length],
     run: () => void sendMessage(suggestion.prompt),
     conversational: true,
@@ -72,66 +63,25 @@ export function SuggestionPills() {
         <button
           key={pill.id}
           type="button"
-          className={`suggestion${pill.conversational ? " suggestion--card" : ""}`}
+          className="suggestion"
           disabled={Boolean(pill.conversational && streaming)}
           onClick={pill.run}
         >
           {pill.icon}
-          {pill.conversational ? (
-            <span className="suggestion__copy">
-              <span className="suggestion__title">{pill.label}</span>
-              {pill.description ? (
-                <span className="suggestion__description">{pill.description}</span>
-              ) : null}
-            </span>
-          ) : (
-            pill.label
-          )}
+          {pill.label}
         </button>
       ))}
     </div>
   );
 }
 
-function CommandOption({
-  command,
-  active,
-  onHover,
-  onChoose,
-}: {
-  command: StudioCommand;
-  active: boolean;
-  onHover: () => void;
-  onChoose: (command: StudioCommand) => void;
-}) {
-  return (
-    <button
-      type="button"
-      role="option"
-      aria-selected={active}
-      className={`palette__item${active ? " is-active" : ""}`}
-      onMouseEnter={onHover}
-      onClick={() => onChoose(command)}
-    >
-      <code className="palette__name">{command.name}</code>
-      <span className="palette__text">
-        <span className="palette__label">{command.label}</span>
-        <span className="palette__description">{command.description}</span>
-      </span>
-    </button>
-  );
-}
-
 export function CommandPalette({
-  id,
   open,
   matches,
   activeIndex,
   onHover,
   onChoose,
 }: {
-  /** Unique per composer: two composers can be mounted at once. */
-  id: string;
   open: boolean;
   matches: StudioCommand[];
   activeIndex: number;
@@ -142,31 +92,25 @@ export function CommandPalette({
     return null;
   }
 
-  // Group the matches under their category, keeping the flat match index so
-  // arrow keys still walk one ordered list.
-  const groups = new Map<string, { command: StudioCommand; index: number }[]>();
-  matches.forEach((command, index) => {
-    const bucket = groups.get(command.category) ?? [];
-    bucket.push({ command, index });
-    groups.set(command.category, bucket);
-  });
-
   return (
-    <div className="palette" role="listbox" id={id} aria-label="Commands">
+    <div className="palette" role="listbox" id="studio-command-palette" aria-label="Commands">
       {matches.length ? (
-        [...groups.entries()].map(([category, entries]) => (
-          <div key={category} className="palette__group" role="group" aria-label={category}>
-            <p className="palette__group-title">{category}</p>
-            {entries.map(({ command, index }) => (
-              <CommandOption
-                key={command.id}
-                command={command}
-                active={index === activeIndex}
-                onHover={() => onHover(index)}
-                onChoose={onChoose}
-              />
-            ))}
-          </div>
+        matches.map((command, index) => (
+          <button
+            key={command.id}
+            type="button"
+            role="option"
+            aria-selected={index === activeIndex}
+            className={`palette__item${index === activeIndex ? " is-active" : ""}`}
+            onMouseEnter={() => onHover(index)}
+            onClick={() => onChoose(command)}
+          >
+            <code className="palette__name">{command.name}</code>
+            <span className="palette__text">
+              <span className="palette__label">{command.label}</span>
+              <span className="palette__description">{command.description}</span>
+            </span>
+          </button>
         ))
       ) : (
         <p className="palette__empty">
@@ -198,13 +142,13 @@ export function ConnectorChips() {
             key={id}
             type="button"
             className="composer__suggestion"
-            aria-label={`Dismiss suggestion: ${label}`}
+            aria-label={`Added ${label}, dismiss`}
             onClick={() => {
               dismissConnectorSuggestion(id);
               void refreshConnectors();
             }}
           >
-            <span>Suggested: {label}</span>
+            <span>Added {label}</span>
             <span aria-hidden>✕</span>
           </button>
         );
@@ -213,22 +157,20 @@ export function ConnectorChips() {
   );
 }
 
-export function ComposerHint({ trailing }: { trailing?: ReactNode } = {}) {
+export function ComposerHint() {
   const { settings, llmHealth, brief } = useStudio();
   const offline = llmHealth.healthy === false;
 
   return (
-    <div className="composer__hint">
+    <p className="composer__hint">
       <span>
         <kbd>Enter</kbd> to send · <kbd>/</kbd> for commands
         {brief ? ` · ${brief.product_name || "your job"}` : ""}
       </span>
-      <span className="composer__hint-end">
-        {offline ? <span className="composer__status is-offline">Local guidance</span> : null}
-        {trailing ??
-          (offline ? null : <span className="composer__status">{settings.model_name}</span>)}
+      <span className={`composer__status${offline ? " is-offline" : ""}`}>
+        {offline ? "Local guidance" : settings.model_name}
       </span>
-    </div>
+    </p>
   );
 }
 

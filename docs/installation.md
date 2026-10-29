@@ -66,30 +66,15 @@ Releases are cut and published by CI with no approval step:
 2. The `release-please` workflow arms auto-merge on that PR. `main` requires the
    `CI green` check (ruleset `main-requires-ci-green`), so the PR merges itself
    as soon as CI passes — nobody clicks merge.
-3. The merge cuts tag `vX.Y.Z` and publishes the GitHub Release; the published
-   release starts the `release` and `Tauri Release` workflows, which attach the
-   CLI archives, `checksums.txt`, the install scripts, the desktop bundles, and
-   the signed `latest.json` updater manifest. (`Tauri Release` also accepts a
-   `v*` tag push for hand-cut tags, but release-please publishes through the
-   API, so the release event is the path that actually runs.) The
-   `release-instructions` job then sets a human-friendly release title
-   (`vX.Y.Z — YYYY-MM-DD`, the date pulled from the tagged commit — the same
-   `RELEASE_DATE_UTC` the CLI prints via `odi --version`) and appends an
-   end-user "## 📦 Download & Run" section to the release page, listing the
-   per-platform CLI archives, `checksums.txt`, and the install scripts, plus
-   one-line install and quick-run commands — and a "Living Studio (desktop)"
-   subsection with install commands for each Tauri bundle (`.deb`, `.AppImage`,
-   `.dmg`, `.msi`). All edits are idempotent on re-runs.
+3. The merge cuts tag `vX.Y.Z` and the GitHub Release; the tag starts the
+   `release` and `Tauri Release` workflows, which attach the CLI archives,
+   `checksums.txt`, the install scripts, and the desktop bundles to it.
+   The `release-instructions` job then appends an end-user "## 📦 Download &
+   Run" section to the release page, listing the per-platform archives,
+   `checksums.txt`, and the install scripts, plus one-line install and
+   quick-run commands (idempotent on re-runs).
 4. `e2e-install` runs after `release` succeeds and installs the published binary
    on Linux, macOS, and Windows.
-
-**Version sync (no manual work).** release-please is the single writer of every
-version literal in the repo — the six `pyproject.toml` files, the CLI
-`_build_info.py`, and the Studio `Cargo.toml` / `tauri.conf.json` — via the
-`extra-files` entries in `release-please-config.json`. The
-`tests/scripts/test_version_sync.py` gate asserts they all match
-`.release-please-manifest.json`, so a release PR stays green and auto-merges;
-there is no longer a `chore: sync the declared version` step to do by hand.
 
 **One-time setup (GitHub App).** GitHub holds workflow runs that start from
 `GITHUB_TOKEN`-authored pushes ("This workflow requires approval from a

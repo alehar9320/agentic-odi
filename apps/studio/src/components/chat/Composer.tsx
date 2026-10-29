@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useState, type RefObject } from "react";
+import { useEffect, useMemo, useState, type RefObject } from "react";
 
 import { isCommandDraft, matchCommands, type StudioCommand } from "../../lib/commands";
 import { useStudio } from "../../state/StudioContext";
@@ -39,9 +39,6 @@ export function Composer({
   placeholder,
 }: ComposerProps) {
   const { llmHealth } = useStudio();
-  // Two composers can be mounted at once (the thread's and the setup wizard's).
-  const inputId = useId();
-  const paletteId = useId();
   const [highlight, setHighlight] = useState(0);
   // Remember which draft was dismissed, so typing again re-opens the palette
   // without an effect that writes state on every keystroke.
@@ -125,7 +122,6 @@ export function Composer({
   return (
     <div className="composer">
       <CommandPalette
-        id={paletteId}
         open={paletteOpen}
         matches={matches}
         activeIndex={activeIndex}
@@ -133,6 +129,7 @@ export function Composer({
         onChoose={choose}
       />
       <ConnectorChips />
+
       <form
         className="composer__shell"
         onSubmit={(event) => {
@@ -142,11 +139,11 @@ export function Composer({
           }
         }}
       >
-        <label className="sr-only" htmlFor={inputId}>
+        <label className="sr-only" htmlFor="studio-composer">
           Message the studio
         </label>
         <textarea
-          id={inputId}
+          id="studio-composer"
           ref={inputRef}
           className="composer__input"
           rows={1}
@@ -158,7 +155,7 @@ export function Composer({
               : "What do you want to make happen?")
           }
           aria-expanded={paletteOpen}
-          aria-controls={paletteOpen ? paletteId : undefined}
+          aria-controls={paletteOpen ? "studio-command-palette" : undefined}
           aria-autocomplete="list"
           onChange={(event) => onChange(event.target.value)}
           onKeyDown={onTextareaKeyDown}

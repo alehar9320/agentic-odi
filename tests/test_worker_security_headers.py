@@ -56,9 +56,8 @@ def test_the_content_security_policy_covers_the_studio() -> None:
 
 def test_every_response_path_applies_the_headers() -> None:
     source = _source()
-    # Assets, local capabilities, the configured-sidecar error, the proxy, and
-    # the unreachable error.
-    assert source.count("return secure(") == 5
+    # Assets, the configured-sidecar error, the proxy, and the unreachable error.
+    assert source.count("return secure(") == 4
     assert source.count("secure(\n        await fetch(") == 1
     assert "new Response(response.body, {" in source, (
         "the header helper must reuse the body stream so SSE keeps streaming"

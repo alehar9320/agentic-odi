@@ -44,7 +44,6 @@ import {
   type UpdateObservationPayload,
 } from "../api/studioApi";
 import type { RawSseEvent } from "../api/sse";
-import { capabilityRegistry, type Capability } from "../bff/capabilities/registry";
 import type {
   AddConnectorPayload,
   AddOutcomePayload,
@@ -62,7 +61,6 @@ import type {
   StudioError,
   StudioNotification,
   StudioTheme,
-  Thesis,
   ToolStatus,
   TurnNode,
   WorkspacePanelId,
@@ -140,9 +138,7 @@ const CANVAS_KEY = "studio.canvas";
 const DISPLAY_NAME_KEY = "studio.displayName";
 const BRIEF_KEY = "studio.brief";
 const SETUP_DISMISSED_KEY = "studio.setupDismissed";
-const SIDECAR_NOTICE_DISMISSED_KEY = "studio.sidecarNoticeDismissed";
 const NOTIFICATIONS_KEY = "studio.notifications";
-const THESES_KEY = "studio.theses";
 
 /** How often the studio re-probes the model and the MCP server. */
 const HEALTH_POLL_INTERVAL_MS = 30_000;
@@ -233,11 +229,6 @@ export interface StudioContextValue {
   llmHealth: { healthy: boolean | null; message: string };
   mcpReachable: boolean;
   sidecarReachable: boolean | null;
-  /** Whether the user has dismissed this session's sidecar-down notice. */
-  dismissedSidecarNotice: boolean;
-  /** Probe again now, e.g. after the user started the sidecar. */
-  recheckConnections: () => Promise<void>;
-  dismissSidecarNotice: () => void;
   /** Probe the sidecar, MCP server, and model. Optionally against unsaved config. */
   checkConnections: (override?: Partial<StudioConfig>) => Promise<ConnectionReport>;
   messages: ChatMessage[];
@@ -293,19 +284,12 @@ export interface StudioContextValue {
   presetError: StudioError | null;
   /** The failure behind an unreachable connector list, if any. */
   connectorsError: StudioError | null;
-  /** Probed availability of local and sidecar capabilities. */
-  capabilities: Capability[];
   refreshConnectors: () => Promise<void>;
   refreshPresets: () => Promise<void>;
-  refreshCapabilities: () => Promise<void>;
   addConnector: (payload: AddConnectorPayload) => Promise<void>;
   deleteConnector: (name: string) => Promise<void>;
   connectorSuggestions: string[];
   dismissConnectorSuggestion: (preset: string) => void;
-  /** Scored outcomes saved as shareable opportunity theses. */
-  theses: Thesis[];
-  saveThesis: (thesis: Omit<Thesis, "id" | "created_at">) => void;
-  deleteThesis: (thesisId: string) => void;
   notifications: StudioNotification[];
   unreadNotificationCount: number;
   markNotificationAsRead: (id: string) => void;
@@ -343,15 +327,7 @@ function loadCanvasCache(): CanvasData | null {
 
 function loadSetupDismissed(): boolean {
   try {
-      return localStorage.getItem(SETUP_DISMISSED_KEY) === "1";
-  } catch {
-    return false;
-  }
-}
-
-function loadSidecarNoticeDismissed(): boolean {
-  try {
-    return localStorage.getItem(SIDECAR_NOTICE_DISMISSED_KEY) === "1";
+    return localStorage.getItem(SETUP_DISMISSED_KEY) === "1";
   } catch {
     return false;
   }
@@ -386,18 +362,6 @@ function loadBrief(): StudioBrief | null {
   }
 }
 
-function loadTheses(): Thesis[] {
-  try {
-    const raw = localStorage.getItem(THESES_KEY);
-    if (raw) {
-      return JSON.parse(raw) as Thesis[];
-    }
-  } catch {
-    /* ignore malformed cache */
-  }
-  return [];
-}
-
 function loadNotifications(): StudioNotification[] {
   try {
     const raw = localStorage.getItem(NOTIFICATIONS_KEY);
@@ -430,7 +394,6 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   });
   const [mcpReachable, setMcpReachable] = useState(false);
   const [sidecarReachable, setSidecarReachable] = useState<boolean | null>(null);
-  const [dismissedSidecarNotice, setDismissedSidecarNotice] = useState<boolean>(loadSidecarNoticeDismissed);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [memory, setMemory] = useState<Observation[]>([]);
@@ -444,10 +407,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [presets, setPresets] = useState<ConnectorPreset[]>([]);
   const [presetError, setPresetError] = useState<StudioError | null>(null);
   const [connectorsError, setConnectorsError] = useState<StudioError | null>(null);
-  const [capabilities, setCapabilities] = useState<Capability[]>([]);
   const [connectorSuggestions, setConnectorSuggestions] = useState<string[]>([]);
   const [notifications, setNotifications] = useState<StudioNotification[]>(loadNotifications);
-  const [theses, setTheses] = useState<Thesis[]>(loadTheses);
   const toastId = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -538,15 +499,6 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const refreshCapabilities = useCallback(async () => {
-    try {
-      setCapabilities(await capabilityRegistry.statuses(settings));
-    } catch {
-      /* Capability probes are advisory; a probe failure leaves the list empty. */
-      setCapabilities([]);
-    }
-  }, [settings]);
-
   const addConnector = useCallback(
     async (payload: AddConnectorPayload) => {
       try {
@@ -576,35 +528,6 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     },
     [pushToast, refreshConnectors],
   );
-
-  const saveThesis = useCallback((thesis: Omit<Thesis, "id" | "created_at">) => {
-    const saved: Thesis = {
-      ...thesis,
-      id: `THESIS-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-      created_at: new Date().toISOString(),
-    };
-    setTheses((prev) => {
-      const next = [saved, ...prev];
-      try {
-        localStorage.setItem(THESES_KEY, JSON.stringify(next));
-      } catch {
-        /* storage unavailable */
-      }
-      return next;
-    });
-  }, []);
-
-  const deleteThesis = useCallback((thesisId: string) => {
-    setTheses((prev) => {
-      const next = prev.filter((thesis) => thesis.id !== thesisId);
-      try {
-        localStorage.setItem(THESES_KEY, JSON.stringify(next));
-      } catch {
-        /* storage unavailable */
-      }
-      return next;
-    });
-  }, []);
 
   const simulateBackgroundEvent = useCallback(() => {
     const events: Array<Omit<StudioNotification, "id" | "timestamp" | "read">> = [
@@ -731,29 +654,10 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       setSidecarReachable(sidecar);
       setMcpReachable(mcp);
       setLlmHealth(llm);
-      void refreshCapabilities();
-      if (sidecar) {
-        setDismissedSidecarNotice(false);
-      }
       return { sidecarReachable: sidecar, mcpReachable: mcp, llmHealthy: llm.healthy };
     },
-    [settings, refreshCapabilities],
+    [settings],
   );
-
-  // Re-probe after the user acted on the sidecar notice (e.g. started the
-  // sidecar). Resolves once the report is in so the UI can stop showing "busy".
-  const recheckConnections = useCallback(async () => {
-    await checkConnections();
-  }, [checkConnections]);
-
-  const dismissSidecarNotice = useCallback(() => {
-    setDismissedSidecarNotice(true);
-    try {
-      localStorage.setItem(SIDECAR_NOTICE_DISMISSED_KEY, "1");
-    } catch {
-      /* storage unavailable */
-    }
-  }, []);
 
   const refreshCanvas = useCallback(async () => {
     setCanvasState((prev) => ({ kind: "loading", data: prev.data }));
@@ -915,26 +819,13 @@ export function StudioProvider({ children }: { children: ReactNode }) {
    * visible path and the wire.
    */
   const runTurn = useCallback(
-    async (
-      base: ChatMessage[],
-      text: string,
-      attachments: ChatAttachment[] = [],
-      existingUserMessage?: ChatMessage,
-    ) => {
+    async (base: ChatMessage[], text: string, attachments: ChatAttachment[] = []) => {
       const trimmed = text.trim();
       if ((!trimmed && attachments.length === 0) || streaming) {
         return;
       }
 
-      // The sidecar is confirmed down: don't start a doomed stream. The notice
-      // above the composer already explains what's wrong; just surface a quiet
-      // heads-up in-thread and stop.
-      if (sidecarReachable === false) {
-        pushNotice("The studio sidecar isn't running — live replies are paused. Start it from Settings.");
-        return;
-      }
-
-      const userMessage: ChatMessage = existingUserMessage ?? {
+      const userMessage: ChatMessage = {
         id: crypto.randomUUID(),
         parentId: base.length ? base[base.length - 1].id : null,
         role: "user",
@@ -942,10 +833,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
         ...(attachments.length ? { attachments } : {}),
       };
       const assistantId = crypto.randomUUID();
-      const history: ChatMessage[] =
-        existingUserMessage && base.at(-1)?.id === existingUserMessage.id
-          ? base
-          : [...base, userMessage];
+      const history: ChatMessage[] = [...base, userMessage];
 
       setMessages([
         ...history,
@@ -1267,8 +1155,6 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       conversationId,
       refreshCanvas,
       refreshConnectors,
-      sidecarReachable,
-      pushNotice,
     ],
   );
 
@@ -1289,23 +1175,12 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       if (index < 0) {
         return;
       }
-      const target = messages[index];
-      const questionIndex =
-        target?.role === "user"
-          ? index
-          : target?.role === "assistant"
-            ? index - 1
-            : -1;
-      const question = messages[questionIndex];
+      const base = messages.slice(0, index + 1);
+      const question = base[base.length - 1];
       if (!question || question.role !== "user") {
         return;
       }
-      await runTurn(
-        messages.slice(0, questionIndex + 1),
-        question.content,
-        question.attachments ?? [],
-        question,
-      );
+      await runTurn(base, question.content, question.attachments ?? []);
     },
     [messages, runTurn],
   );
@@ -1315,17 +1190,10 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       const index = messageId
         ? messages.findIndex((message) => message.id === messageId)
         : messages.length - 1;
-      const original = messages[index];
-      if (index < 0 || original?.role !== "user") {
+      if (index < 0) {
         return;
       }
-      const edited: ChatMessage = {
-        ...original,
-        id: crypto.randomUUID(),
-        content: text.trim(),
-        ...(attachments.length ? { attachments } : { attachments: undefined }),
-      };
-      await runTurn(messages.slice(0, index), edited.content, attachments, edited);
+      await runTurn(messages.slice(0, index + 1), text, attachments);
     },
     [messages, runTurn],
   );
@@ -1483,7 +1351,6 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       if (cancelled) {
         return;
       }
-      void refreshCapabilities();
       void refreshCanvas();
       void refreshConnectors();
       void refreshPresets();
@@ -1574,9 +1441,6 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       llmHealth,
       mcpReachable,
       sidecarReachable,
-      dismissedSidecarNotice,
-      dismissSidecarNotice,
-      recheckConnections,
       checkConnections,
       messages,
       streaming,
@@ -1617,19 +1481,14 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       dismissToast,
       connectors,
       connectorsError,
-      capabilities,
       presets,
       presetError,
       refreshConnectors,
       refreshPresets,
-      refreshCapabilities,
       addConnector,
       deleteConnector,
       connectorSuggestions,
       dismissConnectorSuggestion,
-      theses,
-      saveThesis,
-      deleteThesis,
       notifications,
       unreadNotificationCount,
       markNotificationAsRead,
@@ -1657,9 +1516,6 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       llmHealth,
       mcpReachable,
       sidecarReachable,
-      dismissedSidecarNotice,
-      dismissSidecarNotice,
-      recheckConnections,
       checkConnections,
       messages,
       streaming,
@@ -1700,19 +1556,14 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       dismissToast,
       connectors,
       connectorsError,
-      capabilities,
       presets,
       presetError,
       refreshConnectors,
       refreshPresets,
-      refreshCapabilities,
       addConnector,
       deleteConnector,
       connectorSuggestions,
       dismissConnectorSuggestion,
-      theses,
-      saveThesis,
-      deleteThesis,
       notifications,
       unreadNotificationCount,
       markNotificationAsRead,

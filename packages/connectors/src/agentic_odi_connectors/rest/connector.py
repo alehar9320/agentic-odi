@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import json
 import time
-import urllib.parse
 import urllib.request
 from collections.abc import Callable
 from typing import Any
@@ -82,10 +81,6 @@ def _store_health(name: str, status: HealthStatus) -> None:
     _save_health_cache(cache)
 
 
-# A malformed cursor chain must not become an unbounded crawl.
-MAX_PAGES = 100
-
-
 def _default_fetch(
     method: str,
     url: str,
@@ -125,7 +120,7 @@ class RestConnector(Connector):
         self.kind = kind or type(self).kind
         self._fetch = fetcher or _default_fetch
 
-    def _request(self, url: str | None = None) -> FetchResult:
+    def _request(self) -> FetchResult:
         body = None
         headers = dict(self.settings.headers)
         if self.settings.json_body is not None:
@@ -133,24 +128,11 @@ class RestConnector(Connector):
             headers.setdefault("Content-Type", "application/json")
         return self._fetch(
             self.settings.method,
-            url or self.settings.url,
+            self.settings.url,
             headers,
             body,
             self.settings.timeout,
         )
-
-    def _next_url(self, payload: Any) -> str | None:
-        """Resolve the next page the response points at, when paging is on."""
-        if self.settings.pagination is None:
-            return None
-        value = _lookup(payload, self.settings.pagination.next_path)
-        if not isinstance(value, str) or not value:
-            return None
-        if value.startswith(("http://", "https://")):
-            return value
-        # A relative cursor (e.g. "/records?page=2") is relative to the
-        # request that produced it, not to the process working directory.
-        return urllib.parse.urljoin(self.settings.url, value)
 
     def _items(self, payload: Any) -> list[Any]:
         if self.settings.records_key:
@@ -219,31 +201,22 @@ class RestConnector(Connector):
 
     async def ingest(self) -> IngestBatch:
         batch = IngestBatch(connector_name=self.name)
-        url: str | None = None
-        seen: set[str] = set()
-        for _ in range(MAX_PAGES):
-            try:
-                status, body = self._request(url)
-            except Exception as exc:  # noqa: BLE001
-                batch.errors.append(str(exc))
-                return batch
-            if not 200 <= status < 400:
-                batch.errors.append(f"HTTP {status} from {url or self.settings.url}")
-                return batch
-            text = body.decode("utf-8", errors="replace")
-            try:
-                payload: Any = json.loads(text)
-            except json.JSONDecodeError:
-                payload = text
-            records = self._items(payload)
-            for item in records:
-                batch.records.append(self._record(item, len(batch.records)))
-            next_url = self._next_url(payload)
-            if next_url is None or next_url in seen:
-                return batch
-            seen.add(next_url)
-            url = next_url
-        batch.errors.append(f"Stopped after {MAX_PAGES} pages; pagination did not terminate.")
+        try:
+            status, body = self._request()
+        except Exception as exc:  # noqa: BLE001
+            batch.errors.append(str(exc))
+            return batch
+        if not 200 <= status < 400:
+            batch.errors.append(f"HTTP {status} from {self.settings.url}")
+            return batch
+        text = body.decode("utf-8", errors="replace")
+        try:
+            payload: Any = json.loads(text)
+        except json.JSONDecodeError:
+            payload = text
+        records = self._items(payload)
+        for index, item in enumerate(records):
+            batch.records.append(self._record(item, index))
         return batch
 
 
