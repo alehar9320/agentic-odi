@@ -66,6 +66,9 @@ def test_post_outcome_returns_the_normalized_result(monkeypatch) -> None:
                 "statement": "Minimize the time to ship a release when the build is green",
                 "importance": 8.5,
                 "satisfaction": 3.5,
+                "importance_n": None,
+                "satisfaction_n": None,
+                "score_method": "estimate",
             },
         )
     ]

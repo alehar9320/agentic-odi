@@ -878,6 +878,16 @@ export interface components {
             importance: number;
             /** Satisfaction */
             satisfaction: number;
+            /** Importance N */
+            importance_n?: number | null;
+            /** Satisfaction N */
+            satisfaction_n?: number | null;
+            /**
+             * Score Method
+             * @default estimate
+             * @enum {string}
+             */
+            score_method: "estimate" | "survey" | "import";
         };
         /** AddStepRequest */
         AddStepRequest: {
@@ -1549,6 +1559,12 @@ export interface components {
             importance?: number | null;
             /** Satisfaction */
             satisfaction?: number | null;
+            /** Importance N */
+            importance_n?: number | null;
+            /** Satisfaction N */
+            satisfaction_n?: number | null;
+            /** Score Method */
+            score_method?: ("estimate" | "survey" | "import") | null;
             /**
              * Mcp Url
              * @default

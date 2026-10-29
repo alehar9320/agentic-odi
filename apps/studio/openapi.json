@@ -2900,6 +2900,40 @@
             "maximum": 10.0,
             "minimum": 1.0,
             "title": "Satisfaction"
+          },
+          "importance_n": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Importance N"
+          },
+          "satisfaction_n": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Satisfaction N"
+          },
+          "score_method": {
+            "default": "estimate",
+            "enum": [
+              "estimate",
+              "survey",
+              "import"
+            ],
+            "title": "Score Method",
+            "type": "string"
           }
         },
         "type": "object",
@@ -4539,6 +4573,46 @@
               }
             ],
             "title": "Satisfaction"
+          },
+          "importance_n": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Importance N"
+          },
+          "satisfaction_n": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Satisfaction N"
+          },
+          "score_method": {
+            "anyOf": [
+              {
+                "enum": [
+                  "estimate",
+                  "survey",
+                  "import"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score Method"
           },
           "mcp_url": {
             "type": "string",

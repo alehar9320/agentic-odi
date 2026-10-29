@@ -561,6 +561,9 @@ async def post_outcome(body: AddOutcomeRequest, request: Request) -> dict:
                 "statement": body.statement,
                 "importance": body.importance,
                 "satisfaction": body.satisfaction,
+                "importance_n": body.importance_n,
+                "satisfaction_n": body.satisfaction_n,
+                "score_method": body.score_method,
             },
         )
         return _payload_from_text(result)
@@ -570,6 +573,9 @@ async def post_outcome(body: AddOutcomeRequest, request: Request) -> dict:
             statement=body.statement,
             importance=body.importance,
             satisfaction=body.satisfaction,
+            importance_n=body.importance_n,
+            satisfaction_n=body.satisfaction_n,
+            score_method=body.score_method,
         )
     except Exception as exc:  # noqa: BLE001
         raise _as_http_error(exc) from exc

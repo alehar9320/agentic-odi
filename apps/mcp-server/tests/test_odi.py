@@ -15,24 +15,30 @@ def extract_id(result_str):
 async def test_add_outcome_records_sample_metadata():
     async with Client(mcp) as client:
         job_text = (
-            await client.call_tool("add_job", {"name": "Onboard customers", "description": ""})
-        ).content[0].text
+            (await client.call_tool("add_job", {"name": "Onboard customers", "description": ""}))
+            .content[0]
+            .text
+        )
         job_id = extract_id(job_text)
 
         survey_text = (
-            await client.call_tool(
-                "add_outcome",
-                {
-                    "job_id": job_id,
-                    "statement": "Minimize the time it takes to onboard a customer when they sign up",
-                    "importance": 8.0,
-                    "satisfaction": 6.0,
-                    "importance_n": 40,
-                    "satisfaction_n": 40,
-                    "score_method": "survey",
-                },
+            (
+                await client.call_tool(
+                    "add_outcome",
+                    {
+                        "job_id": job_id,
+                        "statement": "Minimize the time it takes to onboard a customer when they sign up",
+                        "importance": 8.0,
+                        "satisfaction": 6.0,
+                        "importance_n": 40,
+                        "satisfaction_n": 40,
+                        "score_method": "survey",
+                    },
+                )
             )
-        ).content[0].text
+            .content[0]
+            .text
+        )
         assert "Outcome created successfully" in survey_text
         assert '"score_method":"survey"' in survey_text
         assert '"importance_n":40' in survey_text
@@ -42,22 +48,28 @@ async def test_add_outcome_records_sample_metadata():
 async def test_add_outcome_refuses_an_estimate_with_a_count():
     async with Client(mcp) as client:
         job_text = (
-            await client.call_tool("add_job", {"name": "Onboard customers", "description": ""})
-        ).content[0].text
+            (await client.call_tool("add_job", {"name": "Onboard customers", "description": ""}))
+            .content[0]
+            .text
+        )
         job_id = extract_id(job_text)
 
         text = (
-            await client.call_tool(
-                "add_outcome",
-                {
-                    "job_id": job_id,
-                    "statement": "Minimize the time it takes to onboard a customer when they sign up",
-                    "importance": 8.0,
-                    "satisfaction": 6.0,
-                    "importance_n": 40,
-                },
+            (
+                await client.call_tool(
+                    "add_outcome",
+                    {
+                        "job_id": job_id,
+                        "statement": "Minimize the time it takes to onboard a customer when they sign up",
+                        "importance": 8.0,
+                        "satisfaction": 6.0,
+                        "importance_n": 40,
+                    },
+                )
             )
-        ).content[0].text
+            .content[0]
+            .text
+        )
         assert text.startswith("Error:")
 
 

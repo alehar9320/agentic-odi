@@ -54,6 +54,9 @@ class AddOutcomeRequest(BaseModel):
     statement: str
     importance: float = Field(ge=1.0, le=10.0)
     satisfaction: float = Field(ge=1.0, le=10.0)
+    importance_n: int | None = Field(default=None, ge=1)
+    satisfaction_n: int | None = Field(default=None, ge=1)
+    score_method: Literal["estimate", "survey", "import"] = "estimate"
 
 
 class CreateJobRequest(BaseModel):
@@ -80,6 +83,9 @@ class UpdateOutcomeRequest(BaseModel):
     statement: str | None = None
     importance: float | None = None
     satisfaction: float | None = None
+    importance_n: int | None = Field(default=None, ge=1)
+    satisfaction_n: int | None = Field(default=None, ge=1)
+    score_method: Literal["estimate", "survey", "import"] | None = None
     mcp_url: str = ""
 
 

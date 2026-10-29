@@ -20,6 +20,9 @@ export interface Outcome {
   importance?: number | null;
   satisfaction?: number | null;
   opportunity_score?: number | null;
+  importance_n?: number | null;
+  satisfaction_n?: number | null;
+  score_method?: "estimate" | "survey" | "import";
   evidence?: string;
   telemetry?: string;
 }
@@ -386,6 +389,9 @@ export interface AddOutcomePayload {
   statement: string;
   importance: number;
   satisfaction: number;
+  importance_n?: number | null;
+  satisfaction_n?: number | null;
+  score_method?: "estimate" | "survey" | "import";
 }
 
 export interface ConnectorPreset {

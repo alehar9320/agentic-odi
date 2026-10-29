@@ -35,6 +35,51 @@ def test_missing_job_returns_404() -> None:
     assert response.status_code == 404
 
 
+def test_outcome_accepts_and_returns_sample_metadata() -> None:
+    client = _client()
+    job = client.post("/api/jobs", json={"name": "Ship a service"}).json()
+
+    created = client.post(
+        "/api/outcomes",
+        json={
+            "mcp_url": "",
+            "job_id": job["id"],
+            "statement": "Minimize the time it takes to deploy when releasing",
+            "importance": 8.0,
+            "satisfaction": 4.0,
+            "importance_n": 40,
+            "satisfaction_n": 40,
+            "score_method": "survey",
+        },
+    )
+
+    assert created.status_code == 200
+    body = created.json()
+    assert body["score_method"] == "survey"
+    assert body["importance_n"] == 40
+    assert body["satisfaction_n"] == 40
+
+
+def test_outcome_defaults_to_an_estimate() -> None:
+    client = _client()
+    job = client.post("/api/jobs", json={"name": "Ship a service"}).json()
+
+    created = client.post(
+        "/api/outcomes",
+        json={
+            "mcp_url": "",
+            "job_id": job["id"],
+            "statement": "Minimize the time it takes to deploy when releasing",
+            "importance": 8.0,
+            "satisfaction": 4.0,
+        },
+    )
+
+    assert created.status_code == 200
+    assert created.json()["score_method"] == "estimate"
+    assert created.json()["importance_n"] is None
+
+
 def test_step_can_be_edited_and_removed() -> None:
     client = _client()
     job = client.post("/api/jobs", json={"name": "Ship a service"}).json()

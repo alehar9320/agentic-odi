@@ -24,6 +24,7 @@ from agentic_odi_core import (
     OutcomeNotFoundError,
     OutcomeStatementError,
     ScheduledWorkNotFoundError,
+    ScoreMethod,
     SignalNotFoundError,
     StepNotFoundError,
     ToolName,
@@ -167,7 +168,7 @@ def add_outcome(
     step_id: str | None = None,
     importance_n: int | None = None,
     satisfaction_n: int | None = None,
-    score_method: str = "estimate",
+    score_method: ScoreMethod = "estimate",
 ) -> str:
     """Add a desired Outcome to a Job.
 
@@ -434,7 +435,7 @@ def update_outcome(
     step_id: str | None = None,
     importance_n: int | None = None,
     satisfaction_n: int | None = None,
-    score_method: str | None = None,
+    score_method: ScoreMethod | None = None,
 ) -> str:
     """Update an Outcome's statement, scores, or sample metadata.
 
