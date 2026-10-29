@@ -14,6 +14,15 @@ async def _new_job(client) -> str:
 async def test_step_and_outcome_get_update_delete():
     async with Client(mcp) as client:
         job_id = await _new_job(client)
+        await client.call_tool(
+            "add_outcome",
+            {
+                "job_id": job_id,
+                "statement": "Minimize the time it takes to deploy when releasing",
+                "importance": 8,
+                "satisfaction": 4,
+            },
+        )
         step = await client.call_tool("add_step", {"job_id": job_id, "name": "S", "order": 1})
         step_id = json.loads(step.content[0].text.split(": ", 1)[1])["id"]  # type: ignore[index]
 

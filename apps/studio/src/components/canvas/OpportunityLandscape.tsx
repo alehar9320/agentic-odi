@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 
+import { canvasStatus } from "../../lib/canvasProvenance";
 import { formatOpportunityScore, isUnderserved } from "../../lib/odi";
 import { useStudio } from "../../state/StudioContext";
 import type { Outcome } from "../../types";
@@ -10,7 +11,7 @@ import { OutcomeCard } from "./OutcomeCard";
 type ViewMode = "matrix" | "cards" | "table";
 
 export function OpportunityLandscape() {
-  const { canvasState, deleteThesis, refreshCanvas, theses } = useStudio();
+  const { canvasState, deleteThesis, openPanel, refreshCanvas, theses } = useStudio();
   const [underservedOnly, setUnderservedOnly] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedOutcomeId, setSelectedOutcomeId] = useState<string | null>(null);
@@ -22,6 +23,7 @@ export function OpportunityLandscape() {
   const outcomes = useMemo(() => canvas?.outcomes ?? [], [canvas]);
   const isLoading = canvasState.kind === "loading";
   const isEmpty = canvasState.kind === "empty";
+  const provenance = canvasStatus(canvas);
 
   const underservedCount = outcomes.filter((outcome) =>
     isUnderserved(outcome.opportunity_score),
@@ -101,6 +103,19 @@ export function OpportunityLandscape() {
           </button>
         </div>
       </div>
+
+      {provenance ? (
+        <p className="canvas-provenance" role="status">
+          <strong>Demo data.</strong> Nothing here comes from your research.{" "}
+          <button
+            type="button"
+            className="quiet-action"
+            onClick={() => openPanel("settings")}
+          >
+            Connect a data source
+          </button>
+        </p>
+      ) : null}
 
       {canvasState.kind === "error" ? (
         <FailurePanel

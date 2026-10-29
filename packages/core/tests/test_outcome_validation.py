@@ -18,7 +18,7 @@ def test_add_outcome_rejects_a_vague_statement_with_its_issues(
     job = service.add_job("Onboard customers")
 
     with pytest.raises(InvalidOutcomeStatementError) as raised:
-        service.add_outcome(job.id, "Make it faster")
+        service.add_outcome(job.id, "Make it faster", importance=8.0, satisfaction=4.0)
 
     assert raised.value.issues
     assert any("Minimize" in issue or "Maximize" in issue for issue in raised.value.issues)
@@ -31,6 +31,8 @@ def test_add_outcome_accepts_a_well_formed_statement(service: ODIService) -> Non
     outcome = service.add_outcome(
         job.id,
         "Minimize the time it takes to onboard a customer when they sign up.",
+        importance=8.0,
+        satisfaction=4.0,
     )
 
     assert outcome.statement.startswith("Minimize the time")
@@ -43,6 +45,8 @@ def test_seeded_data_can_opt_out_of_the_statement_guard(service: ODIService) -> 
     outcome = service.add_outcome(
         job.id,
         "Make it faster",
+        importance=8.0,
+        satisfaction=4.0,
         validate_statement=False,
     )
 
