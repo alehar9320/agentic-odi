@@ -502,3 +502,63 @@ def render_strategy(strategy: Any, *, as_json: bool) -> str:
         lines.append("")
         lines.append("No rejected paths recorded — this is a conclusion, not a recommendation.")
     return "\n".join(lines)
+
+
+def render_interview(item: Any, *, as_json: bool) -> str:
+    """Render one interview as a labelled block or JSON."""
+    if not isinstance(item, dict):
+        return _json(item) if as_json else str(item)
+    if as_json:
+        return _json(item)
+    return _block(
+        [
+            ("id", item.get("id", "")),
+            ("title", item.get("title", "")),
+            ("participant", item.get("participant_label", "")),
+            ("role", item.get("participant_role") or ""),
+            ("job_id", item.get("job_id") or ""),
+            ("conducted_at", item.get("conducted_at") or ""),
+            ("source_kind", item.get("source_kind", "")),
+        ]
+    )
+
+
+def render_interview_list(items: Any, *, as_json: bool) -> str:
+    """Render interviews as an aligned table or JSON."""
+    if not isinstance(items, list):
+        return _json(items) if as_json else str(items)
+    if as_json:
+        return _json(items)
+    return _table(
+        ("id", "title", "participant", "role"),
+        [
+            (
+                str(item.get("id", "")),
+                _truncate(str(item.get("title", ""))),
+                _truncate(str(item.get("participant_label", ""))),
+                _truncate(str(item.get("participant_role") or "")),
+            )
+            for item in items
+        ],
+        empty="No interviews found.",
+    )
+
+
+def render_quote_list(items: Any, *, as_json: bool) -> str:
+    """Render quotes as an aligned table or JSON, with ordinal and speaker."""
+    if not isinstance(items, list):
+        return _json(items) if as_json else str(items)
+    if as_json:
+        return _json(items)
+    return _table(
+        ("#", "speaker", "text"),
+        [
+            (
+                str(item.get("ordinal", "")),
+                _truncate(str(item.get("speaker") or "—"), 18),
+                _truncate(str(item.get("text", ""))),
+            )
+            for item in items
+        ],
+        empty="No quotes found.",
+    )
