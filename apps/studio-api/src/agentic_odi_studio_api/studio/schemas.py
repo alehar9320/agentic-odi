@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Literal
 
-from agentic_odi_core.models import DecisionConfidence, JobStage
+from agentic_odi_core.models import BetStatus, DecisionConfidence, JobStage, ScoreMethod
 from pydantic import BaseModel, Field
 
 if TYPE_CHECKING:
@@ -53,6 +53,9 @@ class AddOutcomeRequest(BaseModel):
     statement: str
     importance: float = Field(ge=1.0, le=10.0)
     satisfaction: float = Field(ge=1.0, le=10.0)
+    importance_n: int | None = Field(None, ge=1)
+    satisfaction_n: int | None = Field(None, ge=1)
+    score_method: ScoreMethod = "estimate"
 
 
 class RejectedOptionRequest(BaseModel):
@@ -100,6 +103,39 @@ class UpdateOutcomeRequest(BaseModel):
     statement: str | None = None
     importance: float | None = None
     satisfaction: float | None = None
+    importance_n: int | None = Field(None, ge=1)
+    satisfaction_n: int | None = Field(None, ge=1)
+    score_method: ScoreMethod | None = None
+    at: str | None = None
+    note: str | None = None
+    mcp_url: str = ""
+
+
+class ReviewDecisionRequest(BaseModel):
+    """Re-examine a past decision against today's numbers."""
+
+    decision_id: str = Field(min_length=1)
+    today: str | None = None
+    mcp_url: str = ""
+
+
+class RecordBetRequest(BaseModel):
+    """Record a bet: a hypothesis with its baseline captured at creation."""
+
+    mcp_url: str = ""
+    decision_id: str = Field(min_length=1)
+    outcome_id: str = Field(min_length=1)
+    hypothesis: str = Field(min_length=1)
+    target: float
+    measure_by: str = Field(min_length=1)
+    baseline: float | None = None
+
+
+class AdvanceBetRequest(BaseModel):
+    """Advance a bet. The bet is named by the path, so it is not in the body."""
+
+    status: BetStatus
+    at: str | None = None
     mcp_url: str = ""
 
 

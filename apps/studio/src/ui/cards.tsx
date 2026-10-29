@@ -620,3 +620,139 @@ export function Roadmap({ node }: NodeProps) {
     </article>
   );
 }
+
+/* ------------------------------------------------------------------ */
+/* decision-review                                                     */
+/* ------------------------------------------------------------------ */
+
+const REVIEW_TONE: Record<string, Tone> = {
+  improved: "positive",
+  degraded: "warning",
+  "no change": "neutral",
+  no_evidence: "neutral",
+  orphaned: "critical",
+};
+
+/** A signed change with its sign, or `not measured` when a snapshot lacked it. */
+function reviewChange(value: unknown): string {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return NOT_MEASURED;
+  }
+  const sign = value > 0 ? "+" : "";
+  return `${sign}${formatOpportunityScore(value)}`;
+}
+
+function ReviewOutcomeRow({ item }: { item: Record<string, unknown> }) {
+  const statement = str(item, "statement");
+  const state = str(item, "state");
+  return (
+    <li className="ui-review__outcome">
+      <div className="ui-review__head">
+        <p className="ui-review__statement">{statement || str(item, "outcome_id")}</p>
+        <ScorePill tone={REVIEW_TONE[state] ?? "neutral"}>{state || "no_evidence"}</ScorePill>
+      </div>
+      <div className="ui-review__meta">
+        <span>Satisfaction: {reviewChange(item.satisfaction_change)}</span>
+        <span>Importance: {reviewChange(item.importance_change)}</span>
+        <span>Opportunity: {reviewChange(item.opportunity_change)}</span>
+      </div>
+    </li>
+  );
+}
+
+export function DecisionReview({ node }: NodeProps) {
+  const title = str(node.props, "title");
+  const summary = str(node.props, "summary");
+  const decidedAt = str(node.props, "decided_at");
+  const daysElapsed =
+    typeof node.props.days_elapsed === "number" ? node.props.days_elapsed : null;
+  const outcomes = recordList(node.props.outcomes);
+
+  return (
+    <article className="ui-card ui-card--review" aria-label={title || "Decision review"}>
+      <header className="ui-card__head">
+        <span className="ui-card__id">Decision review</span>
+        {daysElapsed != null ? (
+          <span className="ui-review__elapsed">{daysElapsed} days ago</span>
+        ) : null}
+      </header>
+
+      {title ? <h4 className="ui-card__title">{title}</h4> : null}
+      {decidedAt ? <p className="ui-review__decided">Decided {decidedAt}</p> : null}
+      {summary ? <p className="ui-review__summary">{summary}</p> : null}
+
+      {outcomes.length > 0 ? (
+        <ul className="ui-review__outcomes">
+          {outcomes.map((item, index) => (
+            <ReviewOutcomeRow key={`${str(item, "outcome_id")}-${index}`} item={item} />
+          ))}
+        </ul>
+      ) : (
+        <p className="ui-brief__empty">This decision chose no outcomes yet.</p>
+      )}
+
+      <ActionRow actions={readActions(node.props)} />
+    </article>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* bet                                                                 */
+/* ------------------------------------------------------------------ */
+
+const BET_TONE: Record<string, Tone> = {
+  planned: "neutral",
+  running: "info",
+  measured: "positive",
+  abandoned: "critical",
+};
+
+/** A measurement with no sign, or `not measured` when none was supplied. */
+function measurement(value: unknown): string {
+  return typeof value === "number" && Number.isFinite(value)
+    ? formatOpportunityScore(value)
+    : NOT_MEASURED;
+}
+
+export function Bet({ node }: NodeProps) {
+  const title = str(node.props, "title");
+  const hypothesis = str(node.props, "hypothesis");
+  const outcomeId = str(node.props, "outcome_id");
+  const measureBy = str(node.props, "measure_by");
+  const status = str(node.props, "status");
+
+  return (
+    <article className="ui-card ui-card--bet" aria-label={title || "Bet"}>
+      <header className="ui-card__head">
+        <span className="ui-card__id">Bet</span>
+        {status ? <ScorePill tone={BET_TONE[status] ?? "neutral"}>{status}</ScorePill> : null}
+      </header>
+
+      {title ? <h4 className="ui-card__title">{title}</h4> : null}
+      <p className="ui-bet__hypothesis">{hypothesis}</p>
+
+      <dl className="ui-fields">
+        <div className="ui-field">
+          <dt>Baseline</dt>
+          <dd>{measurement(node.props.baseline)}</dd>
+        </div>
+        <div className="ui-field">
+          <dt>Target</dt>
+          <dd>{measurement(node.props.target)}</dd>
+        </div>
+        <div className="ui-field">
+          <dt>Measure by</dt>
+          <dd>{measureBy || NOT_MEASURED}</dd>
+        </div>
+        {outcomeId ? (
+          <div className="ui-field">
+            <dt>Serves</dt>
+            <dd>{outcomeId}</dd>
+          </div>
+        ) : null}
+      </dl>
+
+      <ActionRow actions={readActions(node.props)} />
+    </article>
+  );
+}

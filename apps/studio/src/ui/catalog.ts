@@ -450,6 +450,79 @@ export const CATALOG: readonly UiCatalogEntry[] = [
     },
     ["entries", "exclusion_note"],
   ),
+  entry(
+    "decision-review",
+    "leaf",
+    "A past decision re-examined against today's numbers: how long ago it was made and, per chosen outcome, what moved. Each outcome reads improved, degraded, no change, no evidence, or orphaned. Render it once, then one sentence — never restate in prose what the card shows.",
+    {
+      title: { type: "string" },
+      decided_at: { type: "string", description: "When the decision was recorded." },
+      days_elapsed: {
+        type: "integer",
+        minimum: 0,
+        description: "Days between the decision and the supplied today.",
+      },
+      stale: {
+        type: "boolean",
+        description: "True when the decision is older than a quarter. Never a reason to hide it.",
+      },
+      summary: {
+        type: "string",
+        description: "One line naming how many outcomes moved and how many could not be measured.",
+      },
+      outcomes: {
+        type: "array",
+        minItems: 0,
+        maxItems: 40,
+        items: {
+          type: "object",
+          properties: {
+            outcome_id: { type: "string" },
+            statement: {
+              type: "string",
+              description: "The outcome statement. Omit it when the outcome was deleted.",
+            },
+            state: {
+              enum: ["improved", "degraded", "no change", "no_evidence", "orphaned"],
+              description:
+                "A missing measurement is \"no_evidence\"; a deleted outcome is \"orphaned\". Neither is a change.",
+            },
+            satisfaction_change: {
+              type: "number",
+              description:
+                "The signed satisfaction delta. Omit it when either snapshot lacked the metric; the card shows \"not measured\".",
+            },
+            importance_change: { type: "number" },
+            opportunity_change: { type: "number" },
+          },
+          required: ["outcome_id", "state"],
+        },
+      },
+    },
+    ["outcomes"],
+  ),
+  entry(
+    "bet",
+    "leaf",
+    "A recorded expectation: the hypothesis, the outcome it targets, the baseline captured at creation, the target, and the date to look. Render it once, then one sentence — never restate in prose what the card shows.",
+    {
+      title: { type: "string" },
+      hypothesis: { type: "string", description: "What we expect to happen, in plain words." },
+      outcome_id: { type: "string", description: "The outcome the bet targets." },
+      baseline: {
+        type: "number",
+        description:
+          "The measurement captured when the bet was created. It is stored, never recomputed from the live score.",
+      },
+      target: { type: "number", description: "The number we intend to reach." },
+      measure_by: { type: "string", description: "The date we will look at the number." },
+      status: {
+        enum: ["planned", "running", "measured", "abandoned"],
+        description: "Where the bet is in its life. measured and abandoned are terminal.",
+      },
+    },
+    ["hypothesis", "baseline", "target", "measure_by", "status"],
+  ),
 ];
 
 const CATALOG_TYPES = new Set(CATALOG.map((component) => component.type));

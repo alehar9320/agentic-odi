@@ -233,6 +233,9 @@ class LocalBackend(Backend):
                 importance=float(args["importance"]),
                 satisfaction=float(args["satisfaction"]),
                 step_id=step_id,
+                importance_n=args.get("importance_n"),
+                satisfaction_n=args.get("satisfaction_n"),
+                score_method=args.get("score_method", "estimate"),
             )
         except JobNotFoundError:
             raise BackendError(job_not_found(args["job_id"])) from None
@@ -240,6 +243,8 @@ class LocalBackend(Backend):
             raise BackendError(step_not_found(step_id)) from None
         except ValueOutOfRangeError as exc:
             raise BackendError(_VALUE_RANGE_ERROR) from exc
+        except ValueError as exc:
+            raise BackendError(str(exc)) from None
         return outcome.model_dump()
 
     def _get_outcomes(self, args: dict[str, Any]) -> list[dict[str, Any]]:
@@ -265,15 +270,27 @@ class LocalBackend(Backend):
 
         updates: dict[str, Any] = {
             key: args[key]
-            for key in ("statement", "importance", "satisfaction", "step_id")
+            for key in (
+                "statement",
+                "importance",
+                "satisfaction",
+                "step_id",
+                "importance_n",
+                "satisfaction_n",
+                "score_method",
+            )
             if key in args
         }
         try:
-            outcome = self.service.update_outcome(args["outcome_id"], updates)
+            outcome = self.service.update_outcome(
+                args["outcome_id"], updates, at=args.get("at"), note=args.get("note")
+            )
         except OutcomeNotFoundError:
             raise BackendError(outcome_not_found(args["outcome_id"])) from None
         except ValueOutOfRangeError as exc:
             raise BackendError(_VALUE_RANGE_ERROR) from exc
+        except ValueError as exc:
+            raise BackendError(str(exc)) from None
         return outcome.model_dump()
 
     def _delete_outcome(self, args: dict[str, Any]) -> str:
@@ -625,6 +642,115 @@ class LocalBackend(Backend):
         )
         return [d.model_dump(mode="json") for d in decisions]
 
+    def _review_decision(self, args: dict[str, Any]) -> dict[str, Any]:
+        from datetime import date as _date
+
+        from agentic_odi_core import DecisionNotFoundError
+
+        try:
+            today = _date.fromisoformat(str(args["today"]))
+        except (KeyError, ValueError) as exc:
+            raise BackendError("today must be an ISO-8601 date") from exc
+        try:
+            review = self.service.review_decision(args["decision_id"], today=today)
+        except DecisionNotFoundError:
+            raise BackendError(f"decision not found: {args['decision_id']}") from None
+        return {
+            "decision_id": review.decision_id,
+            "job_id": review.job_id,
+            "decided_at": review.decided_at,
+            "days_elapsed": review.days_elapsed,
+            "stale": review.stale,
+            "summary": review.summary(),
+            "outcomes": [
+                {
+                    "outcome_id": o.outcome_id,
+                    "statement": o.statement,
+                    "state": o.state,
+                    "satisfaction_change": o.satisfaction_change,
+                    "importance_change": o.importance_change,
+                    "opportunity_change": o.opportunity_change,
+                }
+                for o in review.outcomes
+            ],
+        }
+
+    def _get_outcome_history(self, args: dict[str, Any]) -> list[dict[str, Any]]:
+        from agentic_odi_core import outcome_not_found
+
+        outcome_id = args["outcome_id"]
+        if self.service.get_outcome(outcome_id) is None:
+            raise BackendError(outcome_not_found(outcome_id))
+        return [s.model_dump(mode="json") for s in self.service.list_score_snapshots(outcome_id)]
+
+    def _get_outcome_delta(self, args: dict[str, Any]) -> dict[str, Any] | None:
+        from agentic_odi_core import outcome_delta, outcome_not_found
+
+        outcome_id = args["outcome_id"]
+        if self.service.get_outcome(outcome_id) is None:
+            raise BackendError(outcome_not_found(outcome_id))
+        delta = outcome_delta(
+            self.service.list_score_snapshots(), outcome_id, since=args.get("since")
+        )
+        if delta is None:
+            return None
+        return {
+            "importance": delta.importance,
+            "satisfaction": delta.satisfaction,
+            "opportunity": delta.opportunity,
+            "direction": delta.direction,
+        }
+
+    def _record_bet(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import (
+            DecisionNotFoundError,
+            OutcomeNotFoundError,
+            outcome_not_found,
+        )
+
+        try:
+            bet = self.service.record_bet(
+                decision_id=args["decision_id"],
+                outcome_id=args["outcome_id"],
+                hypothesis=args["hypothesis"],
+                target=float(args["target"]),
+                measure_by=args["measure_by"],
+                baseline=args.get("baseline"),
+            )
+        except DecisionNotFoundError:
+            raise BackendError(f"decision not found: {args['decision_id']}") from None
+        except OutcomeNotFoundError as exc:
+            raise BackendError(outcome_not_found(exc.outcome_id)) from None
+        except ValueError as exc:
+            raise BackendError(str(exc)) from None
+        return bet.model_dump(mode="json")
+
+    def _get_bet(self, args: dict[str, Any]) -> dict[str, Any]:
+        bet = self.service.get_bet(args["bet_id"])
+        if bet is None:
+            raise BackendError(f"bet not found: {args['bet_id']}")
+        return bet.model_dump(mode="json")
+
+    def _list_bets(self, args: dict[str, Any]) -> list[dict[str, Any]]:
+        bets = self.service.list_bets(
+            job_id=args.get("job_id"),
+            decision_id=args.get("decision_id"),
+            limit=args.get("limit"),
+            offset=args.get("offset", 0),
+        )
+        return [b.model_dump(mode="json") for b in bets]
+
+    def _advance_bet(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import BetNotFoundError
+
+        try:
+            bet = self.service.advance_bet(args["bet_id"], args["status"], at=args.get("at"))
+        except BetNotFoundError:
+            raise BackendError(f"bet not found: {args['bet_id']}") from None
+        except ValueError as exc:
+            raise BackendError(str(exc)) from None
+        return bet.model_dump(mode="json")
+
 
 _LOCAL_HANDLERS = {
     "add_job": LocalBackend._add_job,
@@ -660,6 +786,13 @@ _LOCAL_HANDLERS = {
     "record_decision": LocalBackend._record_decision,
     "get_decision": LocalBackend._get_decision,
     "list_decisions": LocalBackend._list_decisions,
+    "review_decision": LocalBackend._review_decision,
+    "get_outcome_history": LocalBackend._get_outcome_history,
+    "get_outcome_delta": LocalBackend._get_outcome_delta,
+    "record_bet": LocalBackend._record_bet,
+    "get_bet": LocalBackend._get_bet,
+    "list_bets": LocalBackend._list_bets,
+    "advance_bet": LocalBackend._advance_bet,
     "get_odi_framework_guidelines": LocalBackend._get_odi_framework_guidelines,
     "get_capabilities": LocalBackend._get_capabilities,
     "get_capabilities_manifest": LocalBackend._get_capabilities_manifest,

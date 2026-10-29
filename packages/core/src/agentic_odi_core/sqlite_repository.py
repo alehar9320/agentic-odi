@@ -11,11 +11,13 @@ from pydantic import BaseModel, ValidationError
 from agentic_odi_core.events import DEFAULT_DEVICE, DEFAULT_WORKSPACE, Event
 from agentic_odi_core.intent_store import IntentStore
 from agentic_odi_core.models import (
+    Bet,
     CustomerOutcome,
     Decision,
     Evidence,
     Job,
     Outcome,
+    ScoreSnapshot,
     Step,
     compute_opportunity_score,
 )
@@ -50,6 +52,8 @@ class SQLiteRepository(Repository):
         self.customer_outcomes: dict[str, CustomerOutcome] = {}
         self.evidence: dict[str, Evidence] = {}
         self.decisions: dict[str, Decision] = {}
+        self.bets: dict[str, Bet] = {}
+        self.score_snapshots: list[ScoreSnapshot] = []
         self._last_event_id = 0
         for ev in self.store.get_stream(workspace_id=self._workspace_id, replay_order=True):
             self._apply_event(ev)
@@ -112,6 +116,12 @@ class SQLiteRepository(Repository):
             self.decisions[p["id"]] = Decision.model_validate(p)
         elif et == "DECISION_UPDATED":
             self._merge_updates(self.decisions, p, Decision)
+        elif et == "BET_CREATED":
+            self.bets[p["id"]] = Bet.model_validate(p)
+        elif et == "BET_UPDATED":
+            self._merge_updates(self.bets, p, Bet)
+        elif et == "SCORE_SNAPSHOT_RECORDED":
+            self.score_snapshots.append(ScoreSnapshot.model_validate(p))
         elif et == "EVIDENCE_CREATED":
             self.evidence[p["id"]] = Evidence.model_validate(p)
         elif et == "JOB_UPDATED":
@@ -125,14 +135,25 @@ class SQLiteRepository(Repository):
         elif et == "JOB_DELETED":
             job_id = p["id"]
             self.jobs.pop(job_id, None)
+            job_outcome_ids = {k for k, v in self.outcomes.items() if v.job_id == job_id}
+            job_decision_ids = {k for k, v in self.decisions.items() if v.job_id == job_id}
             for key in [k for k, v in self.steps.items() if v.job_id == job_id]:
                 del self.steps[key]
-            for key in [k for k, v in self.outcomes.items() if v.job_id == job_id]:
-                del self.outcomes[key]
+            for key in job_outcome_ids:
+                self.outcomes.pop(key, None)
             for key in [k for k, v in self.customer_outcomes.items() if v.job_id == job_id]:
                 del self.customer_outcomes[key]
-            for key in [k for k, v in self.decisions.items() if v.job_id == job_id]:
-                del self.decisions[key]
+            for key in job_decision_ids:
+                self.decisions.pop(key, None)
+            for key in [
+                k
+                for k, v in self.bets.items()
+                if v.decision_id in job_decision_ids or v.outcome_id in job_outcome_ids
+            ]:
+                del self.bets[key]
+            self.score_snapshots = [
+                s for s in self.score_snapshots if s.outcome_id not in job_outcome_ids
+            ]
             for key in [
                 k
                 for k, v in self.evidence.items()
@@ -144,10 +165,16 @@ class SQLiteRepository(Repository):
         elif et == "STEP_DELETED":
             step_id = p["id"]
             self.steps.pop(step_id, None)
-            for key in [k for k, v in self.outcomes.items() if v.step_id == step_id]:
-                del self.outcomes[key]
+            step_outcome_ids = {k for k, v in self.outcomes.items() if v.step_id == step_id}
+            for key in step_outcome_ids:
+                self.outcomes.pop(key, None)
             for key in [k for k, v in self.customer_outcomes.items() if v.step_id == step_id]:
                 del self.customer_outcomes[key]
+            for key in [k for k, v in self.bets.items() if v.outcome_id in step_outcome_ids]:
+                del self.bets[key]
+            self.score_snapshots = [
+                s for s in self.score_snapshots if s.outcome_id not in step_outcome_ids
+            ]
             for key in [
                 k
                 for k, v in self.evidence.items()
@@ -160,6 +187,9 @@ class SQLiteRepository(Repository):
             self.outcomes.pop(outcome_id, None)
             for key in [k for k, v in self.evidence.items() if v.outcome_id == outcome_id]:
                 del self.evidence[key]
+            for key in [k for k, v in self.bets.items() if v.outcome_id == outcome_id]:
+                del self.bets[key]
+            self.score_snapshots = [s for s in self.score_snapshots if s.outcome_id != outcome_id]
         elif et == "EVIDENCE_DELETED":
             self.evidence.pop(p["id"], None)
         elif et == "CUSTOMER_OUTCOME_DELETED":
@@ -505,6 +535,72 @@ class SQLiteRepository(Repository):
             )
             self._sync()
             return self.decisions.get(decision_id)
+
+    def add_bet(self, bet: Bet) -> Bet:
+        with self._lock:
+            self.store.append(
+                "BET_CREATED",
+                bet.model_dump(mode="json"),
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return bet
+
+    def get_bet(self, bet_id: str) -> Bet | None:
+        with self._lock:
+            self._sync()
+            return self.bets.get(bet_id)
+
+    def list_bets(
+        self,
+        job_id: str | None = None,
+        decision_id: str | None = None,
+        limit: int | None = None,
+        offset: int = 0,
+    ) -> list[Bet]:
+        with self._lock:
+            self._sync()
+            items = list(self.bets.values())
+            if job_id is not None:
+                decision_ids = {d.id for d in self.decisions.values() if d.job_id == job_id}
+                items = [b for b in items if b.decision_id in decision_ids]
+            if decision_id is not None:
+                items = [b for b in items if b.decision_id == decision_id]
+            return page(items, limit, offset)
+
+    def update_bet(self, bet_id: str, updates: dict) -> Bet | None:
+        with self._lock:
+            self._sync()
+            if bet_id not in self.bets:
+                return None
+            self.store.append(
+                "BET_UPDATED",
+                {"id": bet_id, "updates": updates},
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return self.bets.get(bet_id)
+
+    def add_score_snapshot(self, snapshot: ScoreSnapshot) -> ScoreSnapshot:
+        with self._lock:
+            self.store.append(
+                "SCORE_SNAPSHOT_RECORDED",
+                snapshot.model_dump(mode="json"),
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return snapshot
+
+    def list_score_snapshots(self, outcome_id: str | None = None) -> list[ScoreSnapshot]:
+        with self._lock:
+            self._sync()
+            items = self.score_snapshots
+            if outcome_id is not None:
+                items = [s for s in items if s.outcome_id == outcome_id]
+            return list(items)
 
     def clear(self) -> None:
         with self._lock:

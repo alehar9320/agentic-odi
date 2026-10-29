@@ -43,6 +43,13 @@ class ToolName(str, Enum):
     RECORD_DECISION = "record_decision"
     GET_DECISION = "get_decision"
     LIST_DECISIONS = "list_decisions"
+    REVIEW_DECISION = "review_decision"
+    GET_OUTCOME_HISTORY = "get_outcome_history"
+    GET_OUTCOME_DELTA = "get_outcome_delta"
+    RECORD_BET = "record_bet"
+    GET_BET = "get_bet"
+    LIST_BETS = "list_bets"
+    ADVANCE_BET = "advance_bet"
     EVALUATE_OUTCOME = "evaluate_outcome"
     GET_ODI_SCHEMA = "get_odi_schema"
     COMPUTE_OPPORTUNITY = "compute_opportunity"
@@ -178,7 +185,16 @@ TOOL_SPECS: dict[str, ToolSpec] = {
         name="add_outcome",
         summary="Add a desired Outcome to a Job.",
         effect=_derive_effect("add_outcome"),
-        arguments=("job_id", "statement", "importance", "satisfaction", "step_id"),
+        arguments=(
+            "job_id",
+            "statement",
+            "importance",
+            "satisfaction",
+            "step_id",
+            "importance_n",
+            "satisfaction_n",
+            "score_method",
+        ),
         required=("job_id", "statement", "importance", "satisfaction"),
         returns="The created Outcome.",
         stage="2",
@@ -205,7 +221,18 @@ TOOL_SPECS: dict[str, ToolSpec] = {
         name="update_outcome",
         summary="Update an Outcome's statement or scores.",
         effect=_derive_effect("update_outcome"),
-        arguments=("outcome_id", "statement", "importance", "satisfaction", "step_id"),
+        arguments=(
+            "outcome_id",
+            "statement",
+            "importance",
+            "satisfaction",
+            "step_id",
+            "importance_n",
+            "satisfaction_n",
+            "score_method",
+            "at",
+            "note",
+        ),
         required=("outcome_id",),
         returns="The updated Outcome.",
         stage="2",
@@ -416,6 +443,95 @@ TOOL_SPECS: dict[str, ToolSpec] = {
         arguments=("job_id", "limit", "offset"),
         required=("job_id",),
         returns="An ordered list of Decisions, including superseded ones.",
+        stage="6",
+    ),
+    ToolName.REVIEW_DECISION.value: ToolSpec(
+        name="review_decision",
+        summary=(
+            "Re-examine a past decision against today's numbers. Each chosen "
+            "outcome is improved, degraded, no change, no evidence, or orphaned."
+        ),
+        effect=_derive_effect("review_decision"),
+        arguments=("decision_id", "today"),
+        required=("decision_id", "today"),
+        returns=(
+            "The review: days elapsed and, per chosen outcome, its state. A "
+            "missing measurement is 'no evidence', never 'no change'."
+        ),
+        stage="6",
+    ),
+    ToolName.GET_OUTCOME_HISTORY.value: ToolSpec(
+        name="get_outcome_history",
+        summary="Every recorded score snapshot for an outcome, oldest first.",
+        effect=_derive_effect("get_outcome_history"),
+        arguments=("outcome_id",),
+        required=("outcome_id",),
+        returns="The snapshots in chronological order; empty when nothing is recorded.",
+        stage="6",
+    ),
+    ToolName.GET_OUTCOME_DELTA.value: ToolSpec(
+        name="get_outcome_delta",
+        summary=(
+            "The signed change for an outcome between the nearest snapshot at or "
+            "before 'since' (or the earliest) and the latest."
+        ),
+        effect=_derive_effect("get_outcome_delta"),
+        arguments=("outcome_id", "since"),
+        required=("outcome_id",),
+        returns=(
+            "Signed importance, satisfaction and opportunity deltas plus a "
+            "direction. A metric nobody measured is null, never 0."
+        ),
+        stage="6",
+    ),
+    ToolName.RECORD_BET.value: ToolSpec(
+        name="record_bet",
+        summary=(
+            "Record a bet: a hypothesis with a baseline captured at creation, a "
+            "target, and a date to look at the number."
+        ),
+        effect=_derive_effect("record_bet"),
+        arguments=(
+            "decision_id",
+            "outcome_id",
+            "hypothesis",
+            "target",
+            "measure_by",
+            "baseline",
+        ),
+        required=("decision_id", "outcome_id", "hypothesis", "target", "measure_by"),
+        returns="The created Bet, with its baseline stored rather than recomputed.",
+        stage="6",
+    ),
+    ToolName.GET_BET.value: ToolSpec(
+        name="get_bet",
+        summary="Get a single bet by ID.",
+        effect=_derive_effect("get_bet"),
+        arguments=("bet_id",),
+        required=("bet_id",),
+        returns="The Bet, or an error string if not found.",
+        stage="6",
+    ),
+    ToolName.LIST_BETS.value: ToolSpec(
+        name="list_bets",
+        summary="List bets, filtered by job or decision.",
+        effect=_derive_effect("list_bets"),
+        arguments=("job_id", "decision_id", "limit", "offset"),
+        required=(),
+        returns="The bets in creation order.",
+        stage="6",
+    ),
+    ToolName.ADVANCE_BET.value: ToolSpec(
+        name="advance_bet",
+        summary=(
+            "Move a bet to a new status. planned -> running -> measured, or "
+            "planned -> abandoned. An illegal transition is refused and names "
+            "the legal ones."
+        ),
+        effect=_derive_effect("advance_bet"),
+        arguments=("bet_id", "status", "at"),
+        required=("bet_id", "status"),
+        returns="The updated Bet.",
         stage="6",
     ),
     ToolName.GET_ODI_SCHEMA.value: ToolSpec(

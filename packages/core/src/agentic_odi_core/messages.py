@@ -57,6 +57,14 @@ Follow this sequence when guiding a user through the ODI process:
 - **Tools**: `propose_strategy(job_id?)`.
 - Always state the strategies you rejected and why.
 
+### Stage 7: Review the Decision (the loop closes)
+- **When**: A recorded decision is older than a quarter. Offer the review; do not run it unasked.
+- **Ask the user**: 'This decision is more than a quarter old — want me to check it against today's numbers?'
+- **Tools to use**:
+  - `review_decision(decision_id, today)` — compares each chosen outcome's score at decision time with the latest, and reports `improved`, `degraded`, `no change`, `no evidence`, or `orphaned`. A missing measurement is `no evidence`, never `no change`.
+  - `get_outcome_history(outcome_id)` / `get_outcome_delta(outcome_id, since?)` — the score snapshots behind the review.
+  - `record_bet(decision_id, outcome_id, hypothesis, target, measure_by)` — turn a decision into a bet with its baseline captured now, then `advance_bet` it through planned → running → measured.
+
 ### General Rule
 Never skip stages. Always confirm the user has a Job defined (Stage 1) before capturing Outcomes (Stage 2), always capture Outcomes (Stage 2) before building the Job Map (Stage 3), and always score outcomes (Stage 2) before computing opportunity (Stage 4). If a tool rejects a write, read the message, fix the statement or the numbers, and try once. Do not retry the same call unchanged."""
 
@@ -73,6 +81,8 @@ CAPABILITIES = """Here is what I can help you with as your Agentic ODI assistant
 📊 **Customer Outcomes**: Manage ODI-aligned customer outcomes with customer value, business value, and opportunity scoring.
 🧪 **Evaluate Outcomes**: Call `evaluate_outcome(statement)` to check a statement against the ODI format before saving it.
 🧾 **Evidence**: Capture and promote research records from connectors with `add_evidence`, `list_evidence`, and `promote_evidence`.
+🔁 **Decide & review**: Record a decision with `record_decision`, derive a `get_roadmap`, review it with `review_decision`, and track a bet with `record_bet` / `advance_bet`.
+📈 **Score history**: Read an outcome's `get_outcome_history` and `get_outcome_delta` to see what actually moved.
 📖 **ODI Framework Guidelines**: Call `get_odi_framework_guidelines()` to see which tool to use at each ODI stage.
 🧬 **Schema**: Call `get_odi_schema()` for the canonical JSON schema of every ODI entity.
 

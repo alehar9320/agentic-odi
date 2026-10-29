@@ -47,6 +47,14 @@ from agentic_odi_core.evaluation import (
     statement_to_dict,
 )
 from agentic_odi_core.factory import build_repository
+from agentic_odi_core.history import (
+    NOT_MEASURED as DELTA_NOT_MEASURED,
+)
+from agentic_odi_core.history import (
+    Delta,
+    outcome_delta,
+    outcome_history,
+)
 from agentic_odi_core.messages import (
     CAPABILITIES,
     ODI_ASSISTANT_PROMPT,
@@ -58,8 +66,12 @@ from agentic_odi_core.messages import (
     step_not_found,
 )
 from agentic_odi_core.models import (
+    BET_TRANSITIONS,
     JOB_STAGE_INDEX,
     JOB_STAGE_ORDER,
+    TERMINAL_BET_STATUSES,
+    Bet,
+    BetStatus,
     BusinessImpactCategory,
     BusinessValue,
     CustomerOutcome,
@@ -72,6 +84,8 @@ from agentic_odi_core.models import (
     Job,
     JobStage,
     Outcome,
+    ScoreMethod,
+    ScoreSnapshot,
     Step,
     ValueMetric,
     compute_opportunity_score,
@@ -83,6 +97,17 @@ from agentic_odi_core.remote import (
     tool_result_text,
 )
 from agentic_odi_core.repository import InMemoryRepository, Repository
+from agentic_odi_core.review import (
+    NO_CHANGE,
+    ORPHANED,
+    REVIEW_STATES,
+    DecisionReview,
+    OutcomeReview,
+    render_review,
+)
+from agentic_odi_core.review import (
+    review_decision as build_decision_review,
+)
 from agentic_odi_core.roadmap import (
     Roadmap,
     RoadmapEntry,
@@ -92,6 +117,7 @@ from agentic_odi_core.roadmap import (
 from agentic_odi_core.router import ModelRouter, ModelTier, OnDeviceLLMEngine, RoutingMode
 from agentic_odi_core.schema import odi_schema
 from agentic_odi_core.services import (
+    BetNotFoundError,
     CustomerOutcomeNotFoundError,
     DecisionNotFoundError,
     EvidenceNotFoundError,
@@ -110,6 +136,24 @@ from agentic_odi_core.steve_jobs import (
 
 __all__ = [
     "BusinessImpactCategory",
+    "BET_TRANSITIONS",
+    "TERMINAL_BET_STATUSES",
+    "Bet",
+    "BetStatus",
+    "BetNotFoundError",
+    "ScoreMethod",
+    "ScoreSnapshot",
+    "Delta",
+    "DELTA_NOT_MEASURED",
+    "outcome_delta",
+    "outcome_history",
+    "NO_CHANGE",
+    "ORPHANED",
+    "REVIEW_STATES",
+    "DecisionReview",
+    "OutcomeReview",
+    "render_review",
+    "build_decision_review",
     "MAX_COMPARE_OUTCOMES",
     "MIN_COMPARE_OUTCOMES",
     "CompareCandidate",

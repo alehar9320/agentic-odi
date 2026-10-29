@@ -163,8 +163,7 @@ shared tooling at the root. Packages live in `packages/`, runnable services in
 
 | Path | Distribution | Description |
 |---|---|---|
-| **`packages/core/`** | `agentic-odi-core` | Domain models, the `ODIService` layer, in-memory and SQLite repositories, the shared MCP tool contract, opportunity-score computation, and the deterministic factual **brief** renderer (`brief.py`), and the **roadmap**
-derivation (`roadmap.py`) that groups a decision log into quarters. |
+| **`packages/core/`** | `agentic-odi-core` | Domain models, the `ODIService` layer, in-memory and SQLite repositories, the shared MCP tool contract, opportunity-score computation, the deterministic factual **brief** renderer (`brief.py`), the **roadmap** derivation (`roadmap.py`) that groups a decision log into quarters, and the **decision review** (`review.py`) that compares a recorded decision against today's snapshots. |
 | **`packages/connectors/`** | `agentic-odi-connectors` | Pluggable MCP and REST connectors with presets and an ingest sink. |
 | **`apps/mcp-server/`** | `agentic-odi-mcp-server` | FastMCP server exposing Jobs, Steps, Desired Outcomes, Customer Outcomes, Evidence, and context tools over HTTP. SQLite by default. |
 | **`apps/studio-api/`** | `agentic-odi-studio-api` | FastAPI **Living Studio sidecar**: config, health, canvas, local mutations, MCP passthrough, SSE chat, conversations, and PM memory. |

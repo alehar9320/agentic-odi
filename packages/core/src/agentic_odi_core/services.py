@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import math
 import uuid
-from datetime import date
+from datetime import date, datetime, timezone
 from typing import Any
+
+from pydantic import ValidationError as PydanticValidationError
 
 from agentic_odi_core.brief import BriefInput, BriefOutcome
 from agentic_odi_core.compare import (
@@ -14,7 +17,7 @@ from agentic_odi_core.compare import (
     OutcomeComparison,
     align_outcomes,
 )
-from agentic_odi_core.errors import NotFoundError, ValidationError
+from agentic_odi_core.errors import ConflictError, NotFoundError, ValidationError
 from agentic_odi_core.evaluation import (
     OutcomeStatementError,
     evaluate_outcome_statement,
@@ -22,6 +25,9 @@ from agentic_odi_core.evaluation import (
 )
 from agentic_odi_core.models import (
     JOB_STAGE_INDEX,
+    MAX_SNAPSHOT_NOTE,
+    Bet,
+    BetStatus,
     BusinessValue,
     CustomerOutcome,
     CustomerValue,
@@ -33,10 +39,13 @@ from agentic_odi_core.models import (
     JobStage,
     Outcome,
     Rejection,
+    ScoreMethod,
+    ScoreSnapshot,
     Step,
     compute_opportunity_score,
 )
 from agentic_odi_core.repository import Repository, page
+from agentic_odi_core.review import DecisionReview, review_decision
 from agentic_odi_core.roadmap import Roadmap, build_roadmap
 
 
@@ -68,6 +77,12 @@ class DecisionNotFoundError(NotFoundError):
     def __init__(self, decision_id: str) -> None:
         self.decision_id = decision_id
         super().__init__(decision_id, "decision")
+
+
+class BetNotFoundError(NotFoundError):
+    def __init__(self, bet_id: str) -> None:
+        self.bet_id = bet_id
+        super().__init__(bet_id, "bet")
 
 
 class EvidenceNotFoundError(NotFoundError, ValueError):
@@ -103,6 +118,29 @@ def _first_line(text: str) -> str:
         if stripped:
             return stripped
     return ""
+
+
+def _now_iso() -> str:
+    """The current UTC timestamp, ISO-8601.
+
+    Only called at a write boundary when the caller did not supply ``at``; every
+    pure renderer and derivation takes its clock as an argument instead.
+    """
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _require_finite(value: float, field: str) -> None:
+    """Refuse NaN/inf: a nonfinite number is not a measurement."""
+    if not math.isfinite(value):
+        raise ValidationError(f"{field} must be a finite number.")
+
+
+def _require_iso_date(value: str, field: str) -> None:
+    """Refuse a value that is not a plain ISO-8601 calendar date."""
+    try:
+        date.fromisoformat(value.strip())
+    except ValueError as exc:
+        raise ValidationError(f"{field} must be an ISO-8601 date, got {value!r}.") from exc
 
 
 class ODIService:
@@ -147,7 +185,42 @@ class ODIService:
         if not ok:
             raise StepNotFoundError(step_id)
 
-    def update_outcome(self, outcome_id: str, updates: dict[str, Any]) -> Outcome:
+    def _capture_snapshot(
+        self,
+        outcome: Outcome,
+        *,
+        at: str,
+        note: str | None = None,
+    ) -> ScoreSnapshot:
+        """Record one accepted score state. The single writer for every path.
+
+        Called from ``add_outcome``, ``update_outcome``, and
+        ``promote_evidence``. Append-only: a snapshot is never edited. ``at`` is
+        supplied by the caller so the write is reproducible.
+        """
+        if note is not None and len(note) > MAX_SNAPSHOT_NOTE:
+            raise ValidationError(f"A snapshot note may be at most {MAX_SNAPSHOT_NOTE} characters.")
+        snapshot = ScoreSnapshot(
+            outcome_id=outcome.id,
+            at=at,
+            importance=outcome.importance,
+            satisfaction=outcome.satisfaction,
+            opportunity_score=outcome.opportunity_score,
+            importance_n=outcome.importance_n,
+            satisfaction_n=outcome.satisfaction_n,
+            score_method=outcome.score_method,
+            note=note,
+        )
+        return self.repo.add_score_snapshot(snapshot)
+
+    def update_outcome(
+        self,
+        outcome_id: str,
+        updates: dict[str, Any],
+        *,
+        at: str | None = None,
+        note: str | None = None,
+    ) -> Outcome:
         existing = self.repo.get_outcome(outcome_id)
         if existing is None:
             raise OutcomeNotFoundError(outcome_id)
@@ -159,15 +232,23 @@ class ODIService:
         if satisfaction is not None and not (1.0 <= satisfaction <= 10.0):
             raise ValueOutOfRangeError("satisfaction must be between 1.0 and 10.0")
         require_outcome_statement(statement)
+        updates = dict(updates)
         if importance is not None and satisfaction is not None:
-            updates = dict(updates)
             updates["opportunity_score"] = compute_opportunity_score(importance, satisfaction)
         else:
-            updates = dict(updates)
             updates["opportunity_score"] = None
+        # Validate the *whole* resulting record before mutating, so switching a
+        # survey to an estimate with a sample still attached fails atomically.
+        current = existing.model_dump(exclude_unset=True)
+        current.update(updates)
+        try:
+            Outcome.model_validate(current)
+        except PydanticValidationError as exc:
+            raise ValidationError(_first_line(str(exc))) from exc
         res = self.repo.update_outcome(outcome_id, updates)
         if not res:
             raise OutcomeNotFoundError(outcome_id)
+        self._capture_snapshot(res, at=at or _now_iso(), note=note)
         return res
 
     def delete_outcome(self, outcome_id: str) -> None:
@@ -222,6 +303,11 @@ class ODIService:
         satisfaction: float,
         step_id: str | None = None,
         validate_statement: bool = True,
+        importance_n: int | None = None,
+        satisfaction_n: int | None = None,
+        score_method: ScoreMethod = "estimate",
+        at: str | None = None,
+        note: str | None = None,
     ) -> Outcome:
         if self.repo.get_job(job_id) is None:
             raise JobNotFoundError(job_id)
@@ -236,16 +322,24 @@ class ODIService:
             if not verdict["valid"]:
                 raise InvalidOutcomeStatementError(verdict)
         opportunity_score = compute_opportunity_score(importance, satisfaction)
-        outcome = Outcome(
-            id=str(uuid.uuid4()),
-            job_id=job_id,
-            step_id=step_id,
-            statement=statement,
-            importance=importance,
-            satisfaction=satisfaction,
-            opportunity_score=opportunity_score,
-        )
-        return self.repo.add_outcome(outcome)
+        try:
+            outcome = Outcome(
+                id=str(uuid.uuid4()),
+                job_id=job_id,
+                step_id=step_id,
+                statement=statement,
+                importance=importance,
+                satisfaction=satisfaction,
+                opportunity_score=opportunity_score,
+                importance_n=importance_n,
+                satisfaction_n=satisfaction_n,
+                score_method=score_method,
+            )
+        except PydanticValidationError as exc:
+            raise ValidationError(_first_line(str(exc))) from exc
+        stored = self.repo.add_outcome(outcome)
+        self._capture_snapshot(stored, at=at or _now_iso(), note=note)
+        return stored
 
     def get_outcomes(
         self,
@@ -583,6 +677,121 @@ class ODIService:
     def latest_decision(self, job_id: str) -> Decision | None:
         history = self.repo.list_decisions(job_id, limit=None)
         return history[-1] if history else None
+
+    # -------------------------------------------------------------------- bets
+
+    def record_bet(
+        self,
+        decision_id: str,
+        outcome_id: str,
+        hypothesis: str,
+        target: float,
+        measure_by: str,
+        *,
+        baseline: float | None = None,
+        at: str | None = None,
+    ) -> Bet:
+        """Create a bet, capturing its baseline at creation (E1/ALH-46).
+
+        ``baseline`` is copied from the outcome's current score when the caller
+        does not supply one, and stored — never recomputed. The whole value of a
+        bet is that its starting point cannot move with the score. A bet without
+        a decision is refused, and the outcome must belong to that decision.
+        """
+        decision = self.repo.get_decision(decision_id)
+        if decision is None:
+            raise DecisionNotFoundError(decision_id)
+        hypothesis = hypothesis.strip()
+        if not hypothesis:
+            raise ValidationError("A bet needs a hypothesis.")
+        outcome = self.repo.get_outcome(outcome_id)
+        if outcome is None:
+            raise OutcomeNotFoundError(outcome_id)
+        # A linked decision's existence alone does not prove the outcome belongs
+        # to it; the outcome must be one the decision chose.
+        if outcome_id not in decision.chosen_outcome_ids:
+            raise ValidationError(
+                f"Outcome {outcome_id} is not one the decision {decision_id} chose."
+            )
+        if baseline is None:
+            if outcome.opportunity_score is None:
+                raise ValidationError(
+                    "This outcome has no score to capture as a baseline; "
+                    "supply one explicitly or score the outcome first."
+                )
+            baseline = outcome.opportunity_score
+        _require_finite(baseline, "baseline")
+        _require_finite(target, "target")
+        _require_iso_date(measure_by, "measure_by")
+
+        bet = Bet(
+            decision_id=decision_id,
+            outcome_id=outcome_id,
+            hypothesis=hypothesis,
+            baseline=baseline,
+            target=target,
+            measure_by=measure_by,
+            status=BetStatus.PLANNED,
+            measured_at=at if at is not None else None,
+        )
+        return self.repo.add_bet(bet)
+
+    def get_bet(self, bet_id: str) -> Bet | None:
+        return self.repo.get_bet(bet_id)
+
+    def list_bets(
+        self,
+        job_id: str | None = None,
+        decision_id: str | None = None,
+        limit: int | None = None,
+        offset: int = 0,
+    ) -> list[Bet]:
+        return self.repo.list_bets(job_id, decision_id, limit=limit, offset=offset)
+
+    def advance_bet(self, bet_id: str, status: BetStatus | str, *, at: str | None = None) -> Bet:
+        """Move a bet to a new status, refusing an illegal transition.
+
+        The refusal names the legal successors, and no event is appended when the
+        transition is refused.
+        """
+        bet = self.repo.get_bet(bet_id)
+        if bet is None:
+            raise BetNotFoundError(bet_id)
+        try:
+            resolved = BetStatus(status)
+        except ValueError as exc:
+            raise ValidationError(
+                f"Unknown bet status: {status!r}. Use one of {[s.value for s in BetStatus]}."
+            ) from exc
+        if resolved not in bet.next_statuses():
+            legal = [s.value for s in bet.next_statuses()] or ["(terminal)"]
+            raise ConflictError(
+                f"A bet cannot move from {bet.status.value} to {resolved.value}. "
+                f"Legal next: {', '.join(legal)}."
+            )
+        updates: dict[str, Any] = {"status": resolved.value}
+        if resolved is BetStatus.MEASURED:
+            updates["measured_at"] = at or _now_iso()
+        return self.repo.update_bet(bet_id, updates) or bet
+
+    # ------------------------------------------------------------------ review
+
+    def review_decision(self, decision_id: str, *, today: date) -> DecisionReview:
+        """Re-examine a past decision against today's numbers (C8/ALH-39).
+
+        ``today`` is supplied so the review is reproducible. Every chosen
+        outcome is one of improved, degraded, no evidence, no change, or
+        orphaned; a missing measurement is never reported as no change.
+        """
+        decision = self.repo.get_decision(decision_id)
+        if decision is None:
+            raise DecisionNotFoundError(decision_id)
+        outcomes = self.repo.get_outcomes(decision.job_id, limit=None)
+        snapshots = self.repo.list_score_snapshots()
+        return review_decision(decision, outcomes, snapshots, today=today)
+
+    def list_score_snapshots(self, outcome_id: str | None = None) -> list[ScoreSnapshot]:
+        return self.repo.list_score_snapshots(outcome_id)
 
     # ------------------------------------------------------------------ brief
 

@@ -84,7 +84,8 @@ M1 · The Loop Closes — 2026-11  (factual spine; the acceptance path for this 
   C6.2 ALH-158 odi decide + POST /api/decisions       area/core,mcp,cli ← depends C6
   C7  ALH-38  build_roadmap derivation                area/core,studio ← depends C6
   C7.2 ALH-160 render roadmap (md + card)             area/core,studio ← depends C7
-  C8  ALH-39  decision review vs today's numbers      area/core,studio ← depends C7
+  C8  ALH-39  decision review vs today's numbers      area/core,studio,cli ← depends C7
+  E1  ALH-46  a bet is a thing you can track          area/core,mcp,cli,studio ← depends C6, B6
 
 W1  ALH-64  opportunity value model/persistence only  area/studio,core,cli (capture/display split: ALH-186/188/189)
 D   ALH-40/41/161/42/43/182/184 segments & strategy   area/core,mcp,studio,cli
@@ -357,33 +358,31 @@ unknown/unavailable — not zero, success, or permission.
 
 ---
 
-## Blocker record — C8 and E1 wait on B6
+## Blocker record — C8 and E1 (B6 landed)
 
 `C8 · ALH-39` (decision review) and `E1 · ALH-46` (a bet is a trackable thing)
-both declare `Depends on: C6, B6`. `B6 · ALH-29` (`ScoreSnapshot`) is **not on
-`main`**: no `ScoreSnapshot` model, no snapshot writer, no `outcome_history` /
-`outcome_delta` read exists in `packages/core`. The plan's rule is to stop and
-record the missing choice rather than stub it, so both increments are held here
-instead of guessed at.
+both declared `Depends on: C6, B6`. `B6 · ALH-29` (`ScoreSnapshot`) has now
+landed on this branch: the `ScoreSnapshot` model, the single `_capture_snapshot`
+writer called from `add_outcome`, `update_outcome`, and `promote_evidence`, and
+the `outcome_history` / `outcome_delta` reads all exist in `packages/core`. With
+that contract present, both increments are implemented against it rather than
+stubbed.
 
-What is pinned now, so the blocked work does not invent a contract later:
+What is pinned, so the blocked work does not invent a contract later:
 
-- **A baseline is supplied, never derived.** `roadmap.build_roadmap` takes
-  explicit `baselines`/`targets` maps and renders `not measured` when a key is
-  absent. The live outcome score is never read as a baseline — `ALH-46` requires
-  the baseline to be captured at creation precisely so it cannot drift.
+- **A baseline is supplied, never derived.** `record_bet` copies the outcome's
+  current score at creation (or the explicit `baseline`) and stores it; the live
+  score is never read back as a baseline — `ALH-46` requires the baseline to be
+  captured at creation precisely so it cannot drift.
 - **A missing measurement is not zero progress.** The roadmap counts what it
-  excluded and why; the review must keep a missing snapshot distinct from `no
-  change` and from `degraded`.
+  excluded and why; the review keeps a missing snapshot distinct from `no
+  change` and from `degraded` (`no evidence`).
 - **Direction is per metric.** `ALH-39` records that opportunity-score direction
   is not satisfaction direction, and that the result schema needs all five
   required states (`improved | degraded | no_evidence` plus the literal `no
-  change` and `orphaned`), not the three the description first declared.
+  change` and `orphaned`), not the three the description first declared. The
+  comparison point is never after the decision, and a chosen outcome that no
+  longer exists is `orphaned` rather than a crash.
 
-Unblocking order: land `B6`/`ALH-29` (snapshot capture on every score-mutating
-path) and its read slice `ALH-203` (`outcome_history` / `outcome_delta` with the
-approved baseline and sign policy), then C8 and E1 read that one contract rather
-than re-deriving a baseline.
-
-Completed in this pillar without B6: `C1`, `C1.2`, `C2`, `C3`, `C4`, `C6`,
-`C6.2`, `C7`, `C7.2`.
+Completed in this pillar: `C1`, `C1.2`, `C2`, `C3`, `C4`, `C6`, `C6.2`, `C7`,
+`C7.2`, `C8`, `E1`.

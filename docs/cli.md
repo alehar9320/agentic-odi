@@ -251,6 +251,41 @@ decision contributes no rows. `--today` pins the window so the output is
 reproducible; `--horizon` sets how many quarters it spans. A baseline or target
 nobody measured prints `not measured`, never `0`.
 
+## Review a past decision
+
+```bash
+agentic-odi review show --decision-id DEC-1
+agentic-odi review show --decision-id DEC-1 --today 2027-01-30
+agentic-odi review show --decision-id DEC-1 --json
+```
+
+`review show` compares each outcome a decision chose against the latest score
+snapshot and prints one line per outcome: `improved`, `degraded`, `no change`,
+`no evidence`, or `orphaned`. It writes nothing. A missing measurement stays
+`no evidence`, never `no change`; an outcome that no longer exists is `orphaned`,
+never a crash. `--today` pins the comparison date so the day count and the
+verdicts are reproducible. The same projection backs `POST /api/decisions/review`
+and the Studio's decision-review card.
+
+## Track a bet
+
+```bash
+agentic-odi bets add --decision-id DEC-1 --outcome-id OUT-1 \
+  --hypothesis "Auto-matching halves the weekly reconciliation time" \
+  --target 17 --measure-by 2026-04-01
+agentic-odi bets list --job-id JOB-1
+agentic-odi bets show --bet-id BET-1
+agentic-odi bets advance --bet-id BET-1 --status running
+agentic-odi bets advance --bet-id BET-1 --status measured --at 2026-04-02T00:00:00Z
+```
+
+`bets add` records an expectation and captures its baseline at creation — the
+outcome's current opportunity score, or the explicit `--baseline` — and stores
+it. The baseline is never recomputed from the live score, so the starting point
+cannot drift. The outcome must be one the decision chose. `bets advance` moves a
+bet through `planned → running → measured` (or `abandoned`); an illegal
+transition is refused by name. `--at` pins the transition timestamp.
+
 ## Inspect settings and feature flags
 
 ```bash

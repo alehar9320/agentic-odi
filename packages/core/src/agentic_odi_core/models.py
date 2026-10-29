@@ -6,7 +6,7 @@ import uuid
 from enum import Enum
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, computed_field
+from pydantic import BaseModel, Field, computed_field, model_validator
 
 
 class Direction(str, Enum):
@@ -78,6 +78,9 @@ class Step(BaseModel):
     )
 
 
+ScoreMethod = Literal["estimate", "survey", "import"]
+
+
 class Outcome(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     job_id: str = Field(..., description="The ID of the Job this outcome relates to")
@@ -94,6 +97,26 @@ class Outcome(BaseModel):
     opportunity_score: float | None = Field(
         None, description="Opportunity score (Importance + max(Importance - Satisfaction, 0))"
     )
+    # Sample size and method (B1/ALH-24). ``None`` is honest: nobody recorded a
+    # count. An estimate may not claim a sample, so a count above one requires a
+    # non-estimate method — asserted below rather than defaulted to 1.
+    importance_n: int | None = Field(None, ge=1, description="People behind the importance score")
+    satisfaction_n: int | None = Field(
+        None, ge=1, description="People behind the satisfaction score"
+    )
+    score_method: ScoreMethod = Field(
+        "estimate", description="How the scores were obtained: estimate, survey, or import"
+    )
+
+    @model_validator(mode="after")
+    def _sample_requires_a_method(self) -> Outcome:
+        counts = [n for n in (self.importance_n, self.satisfaction_n) if n is not None]
+        if any(n > 1 for n in counts) and self.score_method == "estimate":
+            raise ValueError(
+                "A sample size above one requires a non-estimate score_method "
+                "(survey or import); an estimate cannot have asked anyone."
+            )
+        return self
 
 
 class ValueMetric(BaseModel):
@@ -209,3 +232,82 @@ class Decision(BaseModel):
     superseded_by: str | None = Field(
         None, description="The ID of the decision that replaced this one"
     )
+
+
+MAX_SNAPSHOT_NOTE = 500
+
+
+class ScoreSnapshot(BaseModel):
+    """An append-only record of an outcome's accepted score state (B6/ALH-29).
+
+    Written by one helper on every score-mutating path, so "did it move?" is a
+    subtraction rather than a memory test. The snapshot stores the score *and*
+    its sample/method companions: a history of bare numbers cannot answer
+    whether the evidence changed or the estimate did.
+    """
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    outcome_id: str = Field(..., description="The Outcome this snapshot records")
+    at: str = Field(..., description="ISO-8601 timestamp, supplied at write time")
+    importance: float | None = Field(None, description="Importance score at this moment")
+    satisfaction: float | None = Field(None, description="Satisfaction score at this moment")
+    opportunity_score: float | None = Field(None, description="Derived opportunity score")
+    importance_n: int | None = Field(None, description="Sample size behind importance")
+    satisfaction_n: int | None = Field(None, description="Sample size behind satisfaction")
+    score_method: ScoreMethod = Field("estimate", description="How the scores were obtained")
+    note: str | None = Field(
+        None,
+        max_length=MAX_SNAPSHOT_NOTE,
+        description="Optional reason for the change, at most 500 characters",
+    )
+
+
+class BetStatus(str, Enum):
+    """A bet's lifecycle. ``measured`` and ``abandoned`` are terminal."""
+
+    PLANNED = "planned"
+    RUNNING = "running"
+    MEASURED = "measured"
+    ABANDONED = "abandoned"
+
+
+#: Legal transitions. ``planned`` starts a bet; ``running`` is it underway;
+#: ``measured`` is it answered; ``abandoned`` is it dropped. A terminal state
+#: has no successors, so an illegal transition can name the legal ones.
+BET_TRANSITIONS: dict[BetStatus, tuple[BetStatus, ...]] = {
+    BetStatus.PLANNED: (BetStatus.RUNNING, BetStatus.ABANDONED),
+    BetStatus.RUNNING: (BetStatus.MEASURED,),
+    BetStatus.MEASURED: (),
+    BetStatus.ABANDONED: (),
+}
+
+#: Terminal states, derived so they cannot drift from ``BET_TRANSITIONS``.
+TERMINAL_BET_STATUSES: frozenset[BetStatus] = frozenset(
+    status for status, successors in BET_TRANSITIONS.items() if not successors
+)
+
+
+class Bet(BaseModel):
+    """A recorded expectation: a hypothesis with a baseline that cannot drift.
+
+    ``baseline`` is captured at creation and stored, never recomputed, because
+    the whole point of a bet is that its starting point does not move with the
+    score. ``measure_by`` is a date, not a datetime: a bet is looked at on a day.
+    """
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    decision_id: str = Field(..., description="The Decision this bet follows from")
+    outcome_id: str = Field(..., description="The Outcome this bet targets")
+    hypothesis: str = Field(..., min_length=1, description="What we expect to happen")
+    baseline: float = Field(..., description="The score captured at creation, never recomputed")
+    target: float = Field(..., description="The score we expect to reach")
+    measure_by: str = Field(..., description="ISO-8601 date we will look at the number")
+    status: BetStatus = Field(BetStatus.PLANNED)
+    measured_at: str | None = Field(None, description="ISO-8601 timestamp when measured")
+
+    def next_statuses(self) -> tuple[BetStatus, ...]:
+        """The legal successors of the current status, or ``()`` when terminal."""
+        return BET_TRANSITIONS[self.status]
+
+    def is_terminal(self) -> bool:
+        return self.status in TERMINAL_BET_STATUSES

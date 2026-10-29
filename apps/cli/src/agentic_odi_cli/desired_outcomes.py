@@ -115,6 +115,10 @@ def update(
     importance: float | None = typer.Option(default=None, min=1.0, max=10.0),
     satisfaction: float | None = typer.Option(default=None, min=1.0, max=10.0),
     step_id: str | None = typer.Option(default=None, help="Move to a Step"),
+    at: str | None = typer.Option(
+        default=None, help="ISO-8601 timestamp of the change. Defaults to now in UTC."
+    ),
+    note: str | None = typer.Option(default=None, help="Why the score changed."),
     json_output: bool = JSON_OPTION,
 ) -> None:
     """Update a desired Outcome."""
@@ -127,6 +131,10 @@ def update(
         args["satisfaction"] = satisfaction
     if step_id is not None:
         args["step_id"] = step_id
+    if at is not None:
+        args["at"] = at
+    if note is not None:
+        args["note"] = note
     typer.echo(
         render_saved(
             "updated", run_tool("update_outcome", args), as_json=json_output, noun="Outcome"

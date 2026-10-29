@@ -432,3 +432,94 @@ describe("roadmap", () => {
     }
   });
 });
+
+describe("decision-review", () => {
+  const fullProps = {
+    title: "Is publishing still the right bet?",
+    decided_at: "2026-01-15T00:00:00Z",
+    days_elapsed: 76,
+    stale: false,
+    summary: "1 moved, 1 without evidence.",
+    outcomes: [
+      {
+        outcome_id: "out-1",
+        statement: "Minimize the time to publish a plugin",
+        state: "improved",
+        satisfaction_change: 2.1,
+        importance_change: 0,
+        opportunity_change: -2.1,
+      },
+      { outcome_id: "out-2", state: "orphaned" },
+    ],
+  };
+
+  it("renders each outcome with its state and signed change", () => {
+    renderSpec({ type: "decision-review", props: fullProps });
+
+    expect(screen.getByLabelText("Is publishing still the right bet?")).toBeInTheDocument();
+    expect(screen.getByText("Minimize the time to publish a plugin")).toBeInTheDocument();
+    expect(screen.getByText("improved")).toBeInTheDocument();
+    expect(screen.getByText("Satisfaction: +2.1")).toBeInTheDocument();
+    expect(screen.getByText("76 days ago")).toBeInTheDocument();
+  });
+
+  it("shows an orphaned outcome by id and never as a change", () => {
+    renderSpec({ type: "decision-review", props: fullProps });
+
+    expect(screen.getByText("out-2")).toBeInTheDocument();
+    expect(screen.getByText("orphaned")).toBeInTheDocument();
+  });
+
+  it("renders a missing change as not measured, never as zero", () => {
+    renderSpec({ type: "decision-review", props: fullProps });
+
+    // The orphaned outcome has no deltas: three axes read "not measured".
+    expect(screen.getAllByText(/not measured/).length).toBe(3);
+    expect(screen.queryByText("Satisfaction: 0.0")).not.toBeInTheDocument();
+  });
+
+  it("rejects a review missing its required outcomes prop", () => {
+    const result = parseUiSpec(
+      { type: "decision-review", props: { title: "x" } },
+      catalogManifest(),
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.reason).toContain("decision-review");
+    }
+  });
+});
+
+describe("bet", () => {
+  const fullProps = {
+    title: "Publishing gets under five minutes",
+    hypothesis: "Cutting the release checklist halves publish time",
+    outcome_id: "out-1",
+    baseline: 3,
+    target: 7.5,
+    measure_by: "2026-04-01",
+    status: "running",
+  };
+
+  it("renders the hypothesis, baseline, target and date", () => {
+    renderSpec({ type: "bet", props: fullProps });
+
+    expect(screen.getByLabelText("Publishing gets under five minutes")).toBeInTheDocument();
+    expect(screen.getByText("Cutting the release checklist halves publish time")).toBeInTheDocument();
+    expect(screen.getByText("3.0")).toBeInTheDocument();
+    expect(screen.getByText("7.5")).toBeInTheDocument();
+    expect(screen.getByText("2026-04-01")).toBeInTheDocument();
+    expect(screen.getByText("running")).toBeInTheDocument();
+  });
+
+  it("rejects a bet missing its required baseline prop", () => {
+    const result = parseUiSpec(
+      { type: "bet", props: { hypothesis: "h", target: 7, measure_by: "2026-04-01", status: "planned" } },
+      catalogManifest(),
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.reason).toContain("bet");
+    }
+  });
+});

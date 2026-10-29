@@ -10,6 +10,7 @@ from typing import Any
 from agentic_odi_core import (
     ODI_ASSISTANT_PROMPT,
     ODI_FRAMEWORK_GUIDELINES,
+    BetNotFoundError,
     CustomerOutcomeNotFoundError,
     DecisionNotFoundError,
     EvidenceItemType,
@@ -33,6 +34,9 @@ from agentic_odi_core import (
 )
 from agentic_odi_core import (
     customer_outcome_not_found as _cust_not_found,
+)
+from agentic_odi_core import (
+    outcome_delta as outcome_delta_read,
 )
 from fastmcp import Context, FastMCP
 from pydantic import ValidationError
@@ -78,6 +82,18 @@ def _step_not_found(step_id: str | None) -> str:
 
 def _outcome_not_found(outcome_id: str | None) -> str:
     return f"Error: Outcome with ID {outcome_id} not found."
+
+
+def _bet_not_found(bet_id: str | None) -> str:
+    return f"Error: Bet with ID {bet_id} not found."
+
+
+def _first_line(text: str) -> str:
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped:
+            return stripped
+    return ""
 
 
 def _evidence_not_found(evidence_id: str, hint: str | None = None) -> str:
@@ -158,6 +174,9 @@ def add_outcome(
     importance: float,
     satisfaction: float,
     step_id: str | None = None,
+    importance_n: int | None = None,
+    satisfaction_n: int | None = None,
+    score_method: str = "estimate",
 ) -> str:
     try:
         outcome = service.add_outcome(
@@ -166,6 +185,9 @@ def add_outcome(
             importance=importance,
             satisfaction=satisfaction,
             step_id=step_id,
+            importance_n=importance_n,
+            satisfaction_n=satisfaction_n,
+            score_method=score_method,  # type: ignore[arg-type]
         )
     except JobNotFoundError:
         return f"Error: Job with ID {job_id} not found."
@@ -175,6 +197,8 @@ def add_outcome(
         return "Error: importance and satisfaction must be between 1.0 and 10.0"
     except OutcomeStatementError as exc:
         return f"Error: {exc}"
+    except ValidationError as exc:
+        return f"Error: {_first_line(str(exc))}"
     return f"Outcome created successfully: {outcome.model_dump_json()}"
 
 
@@ -401,6 +425,11 @@ def update_outcome(
     importance: float | None = None,
     satisfaction: float | None = None,
     step_id: str | None = None,
+    importance_n: int | None = None,
+    satisfaction_n: int | None = None,
+    score_method: str | None = None,
+    at: str | None = None,
+    note: str | None = None,
 ) -> str:
     updates: dict = {}
     if statement is not None:
@@ -411,14 +440,22 @@ def update_outcome(
         updates["satisfaction"] = satisfaction
     if step_id is not None:
         updates["step_id"] = step_id
+    if importance_n is not None:
+        updates["importance_n"] = importance_n
+    if satisfaction_n is not None:
+        updates["satisfaction_n"] = satisfaction_n
+    if score_method is not None:
+        updates["score_method"] = score_method
     try:
-        updated = service.update_outcome(outcome_id, updates)
+        updated = service.update_outcome(outcome_id, updates, at=at, note=note)
     except OutcomeNotFoundError:
         return _outcome_not_found(outcome_id)
     except OutcomeStatementError as exc:
         return f"Error: {exc}"
     except ValueOutOfRangeError:
         return "Error: importance and satisfaction must be between 1.0 and 10.0"
+    except ValidationError as exc:
+        return f"Error: {_first_line(str(exc))}"
     return f"Outcome updated successfully: {updated.model_dump_json()}"
 
 
@@ -687,6 +724,121 @@ def list_decisions(job_id: str, limit: int | None = None, offset: int = 0) -> st
         return job_not_found(job_id)
     decisions = service.list_decisions(job_id, limit=limit, offset=offset)
     return json.dumps([d.model_dump(mode="json") for d in decisions])
+
+
+@mcp.tool
+def review_decision(decision_id: str, today: str) -> str:
+    """Re-examine a past decision against today's numbers."""
+    try:
+        parsed_today = date.fromisoformat(today)
+    except ValueError:
+        return "Error: today must be an ISO-8601 date"
+    try:
+        review = service.review_decision(decision_id, today=parsed_today)
+    except DecisionNotFoundError:
+        return f"Error: decision not found: {decision_id}"
+    payload = {
+        "decision_id": review.decision_id,
+        "job_id": review.job_id,
+        "decided_at": review.decided_at,
+        "days_elapsed": review.days_elapsed,
+        "stale": review.stale,
+        "summary": review.summary(),
+        "outcomes": [
+            {
+                "outcome_id": o.outcome_id,
+                "statement": o.statement,
+                "state": o.state,
+                "satisfaction_change": o.satisfaction_change,
+                "importance_change": o.importance_change,
+                "opportunity_change": o.opportunity_change,
+            }
+            for o in review.outcomes
+        ],
+    }
+    return json.dumps(payload)
+
+
+@mcp.tool
+def get_outcome_history(outcome_id: str) -> str:
+    if service.get_outcome(outcome_id) is None:
+        return _outcome_not_found(outcome_id)
+    snapshots = service.list_score_snapshots(outcome_id)
+    return json.dumps([s.model_dump(mode="json") for s in snapshots])
+
+
+@mcp.tool
+def get_outcome_delta(outcome_id: str, since: str | None = None) -> str:
+    if service.get_outcome(outcome_id) is None:
+        return _outcome_not_found(outcome_id)
+    delta = outcome_delta_read(service.list_score_snapshots(), outcome_id, since=since)
+    if delta is None:
+        return json.dumps(None)
+    return json.dumps(
+        {
+            "importance": delta.importance,
+            "satisfaction": delta.satisfaction,
+            "opportunity": delta.opportunity,
+            "direction": delta.direction,
+        }
+    )
+
+
+@mcp.tool
+def record_bet(
+    decision_id: str,
+    outcome_id: str,
+    hypothesis: str,
+    target: float,
+    measure_by: str,
+    baseline: float | None = None,
+) -> str:
+    try:
+        bet = service.record_bet(
+            decision_id,
+            outcome_id,
+            hypothesis,
+            target,
+            measure_by,
+            baseline=baseline,
+        )
+    except DecisionNotFoundError:
+        return f"Error: decision not found: {decision_id}"
+    except OutcomeNotFoundError:
+        return _outcome_not_found(outcome_id)
+    except (OdiError, ValueError) as exc:
+        return f"Error: {exc}"
+    return f"Bet recorded successfully: {bet.model_dump_json()}"
+
+
+@mcp.tool
+def get_bet(bet_id: str) -> str:
+    bet = service.get_bet(bet_id)
+    if bet is None:
+        return _bet_not_found(bet_id)
+    return bet.model_dump_json()
+
+
+@mcp.tool
+def list_bets(
+    job_id: str | None = None,
+    decision_id: str | None = None,
+    limit: int | None = None,
+    offset: int = 0,
+) -> str:
+    bets = service.list_bets(job_id, decision_id, limit=limit, offset=offset)
+    return json.dumps([b.model_dump(mode="json") for b in bets])
+
+
+@mcp.tool
+def advance_bet(bet_id: str, status: str, at: str | None = None) -> str:
+    try:
+        bet = service.advance_bet(bet_id, status, at=at)
+    except BetNotFoundError:
+        return _bet_not_found(bet_id)
+    except (OdiError, ValueError) as exc:
+        return f"Error: {exc}"
+    return f"Bet advanced successfully: {bet.model_dump_json()}"
 
 
 @mcp.tool

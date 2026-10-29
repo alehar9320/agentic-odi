@@ -12,6 +12,7 @@ from typing import Any
 from pydantic import BaseModel
 
 from agentic_odi_core.models import (
+    Bet,
     BusinessValue,
     CustomerOutcome,
     CustomerValue,
@@ -19,6 +20,7 @@ from agentic_odi_core.models import (
     Evidence,
     Job,
     Outcome,
+    ScoreSnapshot,
     Step,
     ValueMetric,
 )
@@ -33,6 +35,8 @@ _SCHEMA_MODELS: dict[str, type[BaseModel]] = {
     "CustomerOutcome": CustomerOutcome,
     "Decision": Decision,
     "Evidence": Evidence,
+    "ScoreSnapshot": ScoreSnapshot,
+    "Bet": Bet,
 }
 
 

@@ -33,3 +33,9 @@ As we validate the feasibility of this architecture, our next milestones include
 - [x] **Agentic Integration**: Hook the CLI chat up to an LLM (via the
   `openai` package) so the LLM can *discover* the ODI tools and intelligently
   request customer insights when ideating features.
+- [x] **Decide, then close the loop**: Record a decision with its rejected
+  options, derive and render the outcome roadmap, review a past decision against
+  today's numbers, and track a bet from its captured baseline to measured — the
+  same projection behind the MCP tools, `odi decide`/`odi roadmap`/`odi review`/
+  `odi bets`, the Studio API, and the Studio cards. A missing measurement stays
+  `not measured` / `no evidence`, never `0` and never `no change`.
