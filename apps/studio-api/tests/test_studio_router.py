@@ -170,6 +170,17 @@ def test_local_job_create_returns_the_job_object() -> None:
 def test_local_step_create_returns_the_step_object() -> None:
     client = _client("local")
     job = client.post("/api/jobs", json={"name": "Ship a service"}).json()
+    # An outcome must exist before steps can be added.
+    client.post(
+        "/api/outcomes",
+        json={
+            "mcp_url": "",
+            "job_id": job["id"],
+            "statement": "Minimize the time it takes to deploy when releasing",
+            "importance": 8.0,
+            "satisfaction": 4.0,
+        },
+    )
 
     response = client.post(
         "/api/steps",
@@ -224,7 +235,7 @@ def test_local_create_routes_map_domain_errors() -> None:
         },
     )
     assert out_of_range.status_code == 422
-    assert out_of_range.json()["error"]["code"] == "out_of_range"
+    assert out_of_range.json()["error"]["code"] == "validation"
 
     missing_job = client.post(
         "/api/steps",
@@ -279,6 +290,16 @@ def test_get_job_by_unknown_id_is_404() -> None:
 def test_get_steps_lists_a_job_map() -> None:
     client = _client("local")
     job_id = client.post("/api/jobs", json={"mcp_url": "", "name": "Ship"}).json()["id"]
+    client.post(
+        "/api/outcomes",
+        json={
+            "mcp_url": "",
+            "job_id": job_id,
+            "statement": "Minimize the time to ship a service when the build is ready",
+            "importance": 8.0,
+            "satisfaction": 4.0,
+        },
+    )
     client.post("/api/steps", json={"mcp_url": "", "job_id": job_id, "name": "Execute", "order": 1})
 
     response = client.get("/api/steps", params={"job_id": job_id})
@@ -292,6 +313,17 @@ def test_get_steps_without_a_job_lists_every_step() -> None:
     client = _client("local")
     first = client.post("/api/jobs", json={"mcp_url": "", "name": "One"}).json()["id"]
     second = client.post("/api/jobs", json={"mcp_url": "", "name": "Two"}).json()["id"]
+    for job_id in (first, second):
+        client.post(
+            "/api/outcomes",
+            json={
+                "mcp_url": "",
+                "job_id": job_id,
+                "statement": "Minimize the time to ship a service when the build is ready",
+                "importance": 8.0,
+                "satisfaction": 4.0,
+            },
+        )
     client.post("/api/steps", json={"mcp_url": "", "job_id": first, "name": "A", "order": 1})
     client.post("/api/steps", json={"mcp_url": "", "job_id": second, "name": "B", "order": 1})
 

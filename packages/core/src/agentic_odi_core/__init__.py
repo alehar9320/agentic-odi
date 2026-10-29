@@ -8,7 +8,15 @@ Pydantic's identically named class. Import it from
 ``agentic_odi_core.errors`` instead.
 """
 
-from agentic_odi_core.contract import TOOL_NAMES, TOOL_SPECS, ToolName, ToolSpec
+from agentic_odi_core.contract import (
+    TOOL_NAMES,
+    TOOL_SPECS,
+    ToolEffect,
+    ToolName,
+    ToolSpec,
+    capability_manifest,
+    capability_summary,
+)
 from agentic_odi_core.errors import (
     ConflictError,
     NotFoundError,
@@ -18,7 +26,11 @@ from agentic_odi_core.errors import (
     StoreError,
     error_status,
 )
-from agentic_odi_core.evaluation import evaluate_outcome_statement
+from agentic_odi_core.evaluation import (
+    OutcomeStatementError,
+    evaluate_outcome_statement,
+    statement_to_dict,
+)
 from agentic_odi_core.factory import build_repository
 from agentic_odi_core.messages import (
     CAPABILITIES,
@@ -31,6 +43,8 @@ from agentic_odi_core.messages import (
     step_not_found,
 )
 from agentic_odi_core.models import (
+    JOB_STAGE_INDEX,
+    JOB_STAGE_ORDER,
     BusinessImpactCategory,
     BusinessValue,
     CustomerOutcome,
@@ -39,6 +53,7 @@ from agentic_odi_core.models import (
     Evidence,
     EvidenceItemType,
     Job,
+    JobStage,
     Outcome,
     Step,
     ValueMetric,
@@ -51,6 +66,7 @@ from agentic_odi_core.remote import (
     tool_result_text,
 )
 from agentic_odi_core.repository import InMemoryRepository, Repository
+from agentic_odi_core.router import ModelRouter, ModelTier, OnDeviceLLMEngine, RoutingMode
 from agentic_odi_core.schema import odi_schema
 from agentic_odi_core.services import (
     CustomerOutcomeNotFoundError,
@@ -61,6 +77,10 @@ from agentic_odi_core.services import (
     OutcomeNotFoundError,
     StepNotFoundError,
     ValueOutOfRangeError,
+)
+from agentic_odi_core.steve_jobs import (
+    format_opportunity_score_insight,
+    generate_steve_jobs_response,
 )
 
 __all__ = [
@@ -77,6 +97,11 @@ __all__ = [
     "EvidenceNotFoundError",
     "Job",
     "JobNotFoundError",
+    "JobStage",
+    "JOB_STAGE_INDEX",
+    "JOB_STAGE_ORDER",
+    "ModelRouter",
+    "ModelTier",
     "NotFoundError",
     "ODIService",
     "ODI_ASSISTANT_PROMPT",
@@ -84,7 +109,10 @@ __all__ = [
     "OdiError",
     "Outcome",
     "OutcomeNotFoundError",
+    "OutcomeStatementError",
+    "OnDeviceLLMEngine",
     "RateLimitError",
+    "RoutingMode",
     "SerializationError",
     "Step",
     "StepNotFoundError",
@@ -99,6 +127,9 @@ __all__ = [
     "TOOL_SPECS",
     "ToolName",
     "ToolSpec",
+    "ToolEffect",
+    "capability_manifest",
+    "capability_summary",
     "Repository",
     "build_repository",
     "compute_opportunity_score",
@@ -106,10 +137,13 @@ __all__ = [
     "error_status",
     "evaluate_outcome_statement",
     "evidence_not_found",
+    "format_opportunity_score_insight",
+    "generate_steve_jobs_response",
     "job_not_found",
     "odi_schema",
     "outcome_not_found",
     "parse_tool_result",
+    "statement_to_dict",
     "step_not_found",
     "tool_result_text",
 ]

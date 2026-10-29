@@ -13,7 +13,7 @@ from site_support import ROOT
 
 def _tree(root):
     return {
-        str(path.relative_to(root)): path.read_bytes()
+        path.relative_to(root).as_posix(): path.read_bytes()
         for path in sorted(root.rglob("*"))
         if path.is_file()
     }
@@ -87,7 +87,7 @@ def test_the_search_index_covers_every_page(tmp_path):
     build_site.build(tmp_path)
     entries = json.loads((tmp_path / "search-index.json").read_text(encoding="utf-8"))
     pages = {
-        str(path.relative_to(tmp_path))
+        path.relative_to(tmp_path).as_posix()
         for path in tmp_path.rglob("*.html")
         if path.name != "404.html"
     }

@@ -70,10 +70,13 @@ describe("ModelPicker", () => {
     render(<ModelPicker />);
 
     fireEvent.click(trigger());
-    await screen.findByRole("option", { name: /beta/ });
+    const current = await screen.findByRole("option", { name: /alpha/ });
+    // Focus lands on the option in an effect after the list renders; key on it
+    // directly so a slow render cannot send the keystroke to the trigger.
+    await waitFor(() => expect(current).toHaveFocus());
 
-    fireEvent.keyDown(document.activeElement as Element, { key: "ArrowDown" });
-    fireEvent.keyDown(document.activeElement as Element, { key: "Enter" });
+    fireEvent.keyDown(current, { key: "ArrowDown" });
+    fireEvent.keyDown(current, { key: "Enter" });
 
     expect(harness.state.saveSettings).toHaveBeenCalledWith(
       expect.objectContaining({ model_name: "beta" }),
