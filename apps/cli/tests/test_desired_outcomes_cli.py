@@ -94,6 +94,10 @@ def test_outcomes_add_unknown_job_reports_error(tmp_path):
             "nope",
             "--statement",
             "Minimize the time to ship a release when the build is green",
+            "--importance",
+            "8",
+            "--satisfaction",
+            "4",
         ],
     )
 
