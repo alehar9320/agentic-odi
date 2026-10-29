@@ -129,9 +129,24 @@ def get(
     outcome_id: str = typer.Argument(..., help="Outcome ID"), json_output: bool = JSON_OPTION
 ) -> None:
     """Get a desired Outcome by ID."""
-    typer.echo(
-        render_outcome(run_tool("get_outcome", {"outcome_id": outcome_id}), as_json=json_output)
-    )
+    outcome = run_tool("get_outcome", {"outcome_id": outcome_id})
+    latest_note = None if json_output else _latest_note(outcome_id)
+    typer.echo(render_outcome(outcome, as_json=json_output, latest_note=latest_note))
+
+
+def _latest_note(outcome_id: str) -> str | None:
+    """The reason recorded with the most recent accepted score change.
+
+    Read from the snapshot history rather than the Outcome record: a note is
+    metadata on a score change, not a field. The most recent snapshot's note is
+    returned when present; an outcome with no history, or a latest change with
+    no reason, yields ``None`` so the detail line is omitted rather than faked.
+    """
+    snapshots = run_tool("get_outcome_history", {"outcome_id": outcome_id})
+    if not isinstance(snapshots, list) or not snapshots:
+        return None
+    note = snapshots[-1].get("note")
+    return note or None
 
 
 @desired_outcomes_app.command("update")

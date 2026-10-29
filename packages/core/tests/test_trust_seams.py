@@ -15,10 +15,18 @@ from agentic_odi_core.trust import (
     BootstrapConvention,
     ConfidenceTable,
     DeltaSemantics,
+    ImportPolicy,
+    IntervalProvenancePolicy,
+    RetentionPolicy,
     TrustContractPendingError,
+    aggregate_survey,
     classify_confidence,
     opportunity_interval,
     outcome_delta,
+    parse_survey,
+    persisted_interval,
+    rank_outcomes_honestly,
+    retain_survey_inputs,
 )
 
 _STATEMENT = "Minimize the time it takes to onboard a new engineer when they join."
@@ -68,16 +76,55 @@ def test_outcome_delta_refuses_until_the_semantics_are_approved() -> None:
     assert caught.value.decision == DeltaSemantics
 
 
+def test_survey_import_refuses_until_the_import_policy_is_approved() -> None:
+    with pytest.raises(TrustContractPendingError) as parsed:
+        parse_survey([{"outcome": "o-1", "importance": 8, "satisfaction": 6}])
+    assert parsed.value.decision == ImportPolicy
+
+    with pytest.raises(TrustContractPendingError) as aggregated:
+        aggregate_survey([])
+    assert aggregated.value.decision == ImportPolicy
+
+
+def test_retained_inputs_refuse_until_the_retention_policy_is_approved() -> None:
+    with pytest.raises(TrustContractPendingError) as caught:
+        retain_survey_inputs([])
+
+    assert caught.value.decision == RetentionPolicy
+
+
+def test_persisted_interval_refuses_until_its_provenance_is_approved() -> None:
+    with pytest.raises(TrustContractPendingError) as caught:
+        persisted_interval(_outcome(), [])
+
+    assert caught.value.decision == IntervalProvenancePolicy
+
+
+def test_honest_ranking_refuses_until_the_confidence_table_is_approved() -> None:
+    with pytest.raises(TrustContractPendingError) as caught:
+        rank_outcomes_honestly([_outcome()])
+
+    assert caught.value.decision == ConfidenceTable
+
+
 def test_the_seams_are_exported_from_the_package_root() -> None:
     import agentic_odi_core as core
 
     for name in (
         "OpportunityInterval",
         "OutcomeDelta",
+        "SurveyAggregate",
+        "RetainedSurveyInput",
+        "IntervalProvenance",
         "TrustContractPendingError",
         "opportunity_interval",
         "classify_confidence",
         "outcome_delta",
+        "parse_survey",
+        "aggregate_survey",
+        "retain_survey_inputs",
+        "persisted_interval",
+        "rank_outcomes_honestly",
     ):
         assert name in core.__all__
         assert hasattr(core, name)

@@ -322,3 +322,44 @@ def test_history_reports_an_unknown_outcome(tmp_path) -> None:
     history = runner.invoke(app, ["--db", db, "desired-outcomes", "history", "missing"])
 
     assert history.exit_code != 0
+
+
+def test_show_renders_the_latest_accepted_note(tmp_path) -> None:
+    runner = CliRunner()
+    db = str(tmp_path / "odi.db")
+    job_id = _job_id(runner, db)
+    added = _add(runner, db, job_id, "--why", "first pass")
+
+    runner.invoke(
+        app,
+        [
+            "--db",
+            db,
+            "desired-outcomes",
+            "update",
+            added["id"],
+            "--satisfaction",
+            "6",
+            "--why",
+            "after the review",
+        ],
+    )
+
+    shown = runner.invoke(app, ["--db", db, "desired-outcomes", "get", added["id"]])
+
+    assert shown.exit_code == 0, shown.output
+    assert "note" in shown.output
+    assert "after the review" in shown.output
+    assert "first pass" not in shown.output
+
+
+def test_show_omits_the_note_line_when_no_reason_was_recorded(tmp_path) -> None:
+    runner = CliRunner()
+    db = str(tmp_path / "odi.db")
+    job_id = _job_id(runner, db)
+    added = _add(runner, db, job_id)
+
+    shown = runner.invoke(app, ["--db", db, "desired-outcomes", "get", added["id"]])
+
+    assert shown.exit_code == 0, shown.output
+    assert "note" not in shown.output

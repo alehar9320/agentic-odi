@@ -196,24 +196,31 @@ def _sample_label(outcome: dict[str, Any]) -> str:
     return f"n={importance_n or '?'}/{satisfaction_n or '?'} ({method})"
 
 
-def render_outcome(outcome: Any, *, as_json: bool) -> str:
-    """Render one desired Outcome as a labelled block or JSON."""
+def render_outcome(outcome: Any, *, as_json: bool, latest_note: str | None = None) -> str:
+    """Render one desired Outcome as a labelled block or JSON.
+
+    ``latest_note`` is the reason recorded with the most recent accepted score
+    change. It is snapshot metadata, not an Outcome field, so it is shown as a
+    separate line and omitted entirely when empty — an absent reason renders
+    nothing rather than a placeholder.
+    """
     if not isinstance(outcome, dict):
         return _json(outcome) if as_json else str(outcome)
     if as_json:
         return _json(outcome)
-    return _block(
-        [
-            ("id", outcome.get("id", "")),
-            ("job_id", outcome.get("job_id", "")),
-            ("step_id", outcome.get("step_id") or ""),
-            ("statement", outcome.get("statement", "")),
-            ("importance", _num(outcome.get("importance", ""))),
-            ("satisfaction", _num(outcome.get("satisfaction", ""))),
-            ("opportunity", _num(outcome.get("opportunity_score", ""))),
-            ("sample", _sample_label(outcome)),
-        ]
-    )
+    rows = [
+        ("id", outcome.get("id", "")),
+        ("job_id", outcome.get("job_id", "")),
+        ("step_id", outcome.get("step_id") or ""),
+        ("statement", outcome.get("statement", "")),
+        ("importance", _num(outcome.get("importance", ""))),
+        ("satisfaction", _num(outcome.get("satisfaction", ""))),
+        ("opportunity", _num(outcome.get("opportunity_score", ""))),
+        ("sample", _sample_label(outcome)),
+    ]
+    if latest_note:
+        rows.append(("note", latest_note))
+    return _block(rows)
 
 
 JOB_MAP_STAGES = 8

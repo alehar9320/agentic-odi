@@ -168,6 +168,11 @@ score and its sample/method companions. A change that fails validation writes
 neither a score change nor a row, so the history never records a rejected edit.
 The reason is history metadata, not part of the outcome record.
 
+`get` shows the reason from the most recent accepted change as a `note` line, so
+the detail view carries the same "why" as the history. When no reason was
+recorded, or the outcome has no history yet, the line is omitted rather than
+shown empty.
+
 # One-screen report: job header, phase coverage, biggest opportunities
 agentic-odi summary <job-id>
 agentic-odi summary <job-id> --top 3 --json
