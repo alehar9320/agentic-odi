@@ -165,6 +165,41 @@ The MCP server contract test compares the live FastMCP registry with
 both places. The CLI local-backend contract test keeps `_LOCAL_HANDLERS` aligned
 with the same tool names.
 
+### End-to-end testing
+
+The browser-level suite lives in `apps/studio/e2e/` and runs with
+[Playwright](https://playwright.dev). It drives the real Studio against the
+real sidecar and MCP server, with no mocked network calls, so it covers the
+seams the other tiers cannot: the SPA's assumptions about the sidecar's
+response shapes, the sidecar's hydration of the canvas, and the first-run
+wizard's ordering relative to the rest of the app.
+
+```bash
+npm --prefix apps/studio run build      # the sidecar serves apps/studio/dist
+npm --prefix apps/studio run test:e2e
+npm --prefix apps/studio run test:e2e:ui   # the Playwright UI
+```
+
+The first run needs the browser once:
+
+```bash
+npx --prefix apps/studio playwright install chromium
+```
+
+Playwright's `webServer` array starts the MCP server, the Studio sidecar, and
+a second sidecar on the MCP passthrough backend. Two projects run against
+them: `chromium` for the local backend (the product default) and
+`mcp-backend` for the passthrough.
+
+Locators bind to what a user perceives — a role, a label, or visible text —
+never to a `data-testid`, of which the application has none. When a test
+needs data behind it, it seeds through the API rather than through the UI, so
+the test stays about the view it is actually checking.
+
+CI runs the suite in the `e2e` job. It is deliberately non-blocking: set the
+repository variable `AGENTIC_ODI_E2E` to `false` to skip it, and the
+`continue-on-error` on the job keeps a failure from turning CI red.
+
 ## Test Coverage
 
 CI runs the suite on Python **3.10, 3.11, and 3.12** and uploads one combined
@@ -180,6 +215,13 @@ tracks `main`, which is the baseline every PR is compared against:
   tolerates a 1% dip from `codecov.yml`.
 - **Patch** status is informational for now, so new code can land while the
   suite catches up.
+
+Codecov itself never fails the build (`fail_ci_if_error: false`), so the same
+floor is enforced locally: `[tool.coverage.report] fail_under` in
+`pyproject.toml` makes any run with `--cov` fail below **89%** — the 90% target
+minus codecov's 1% tolerance. The current measurement is ~89.2%, so the gate has
+little slack; raise `fail_under` as coverage improves rather than lowering it to
+unblock a change.
 
 To reproduce the report locally:
 
@@ -222,6 +264,7 @@ uv run pytest \
 | `tests/scripts/` | `scripts/dev.py` startup, port checks, signals, and shutdown |
 | `apps/studio/src/**/*.test.ts` | SPA units: ODI math, transport bridge, SSE parser, sidecar client |
 | `apps/studio/src/**/*.visual.test.tsx` | Component states captured for Chromatic visual review |
+| `apps/studio/e2e/` | Browser journeys against the real stack: the conversation, capturing an outcome, the opportunity landscape, the workspace views, and the MCP passthrough backend |
 | `website/tests/` | Static site integrity, OG art reproducibility, and README sync |
 
 > [!TIP]

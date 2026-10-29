@@ -1,9 +1,8 @@
 # Running The Living Studio
 
 **The Living Studio** is the conversational GUI for Outcome-Driven Innovation:
-an interactive Opportunity Landscape, Universal Job Map, WYSIWYG Impact
-Simulation, and Causal Lineage inspection, paired with an autonomous agent
-connected to the MCP server.
+an interactive Opportunity Landscape, Universal Job Map, and WYSIWYG Impact
+Simulation, paired with an autonomous agent connected to the MCP server.
 
 The Studio runs three ways locally, plus a hosted deployment. All of them serve
 the same SPA, which talks only to the sidecar on `http://127.0.0.1:8100` — the
@@ -43,7 +42,8 @@ The Studio opens as a conversation, not a dashboard.
 | **Hero** | One rotating headline above the composer: a greeting (time of day, plus your name if you set one in Settings), the product/job you set up, what is already on the canvas, or an intent-first prompt such as *What are you trying to win this quarter?* It cycles every few seconds and stays still under `prefers-reduced-motion`. |
 | **Starter cards** | Below the headline, three canvas-aware conversation cards pair a clear next move with a short reason: **Sharpen an opportunity**, **Pressure-test a bet** or **Find the next opportunity**, and **Capture what you heard** or **Name the job**. Select one to start that prompt in the thread; the cards disappear once the conversation begins. **Opportunity landscape** remains a separate, quiet shortcut. |
 | **Composer** | Docked at the bottom of the transcript. `Enter` sends, `Shift`+`Enter` adds a line, `Cmd/Ctrl`+`K` focuses it, `/` opens the command palette, and the paperclip attaches a text file or an image. Files can also be dropped anywhere on the composer or pasted from the clipboard, and each one is shown with a size (and a thumbnail, for images) plus a remove control before it is sent; a file the studio cannot read is refused with the reason instead of becoming a chip that promises content the model will never see. The hint row's **Model** control lists the ids the configured backend reports and writes the choice through the same Settings store as the Base URL field. The send button becomes a stop button while a reply streams. |
-| **Bar** | The only persistent chrome: home, new conversation, catch-up, live model status, and settings. There is no navigation drawer to compete with the thread. |
+| **Bar** | The only persistent chrome: home, new conversation, catch-up, live model status, **Customize**, and settings. There is no navigation drawer to compete with the thread. |
+| **Customize** | The one place to manage connectors. It replaces the conversation while open (the bar stays, so leaving is one gesture) and shows three bands: what is installed, read from the same `connectors.json` the CLI uses; a handful of curated picks as non-gating examples; and the marketplace, populated from the trusted vendor registry so a listing can be added by id. Capability areas filter the shelf, a listing that needs a token names its environment variable and stores nothing, a listing that cannot be installed says why, and an unreachable marketplace is reported rather than shown as an empty list. A studio with nothing installed suggests a connector when one would help; dismissing the suggestion keeps it dismissed. |
 | **Rail** | Above the conversation, and only once the thread has produced something: `Landscape · N`, `Job map · N`, `Evidence · N`, `What I know · N`. Every item is derived from the canvas and the memory, so the strip is a record of the work rather than a fixed menu. |
 | **Lens** | A view docks to the right of the thread on wide screens and becomes a full-height sheet on narrow ones. The transcript and the composer stay on screen and stay usable; `Esc`, **Close**, or the rail chip closes it. Every lens ends in one sentence that re-enters the conversation — *Ask which to chase*, *Walk me through the job*, *Weigh the evidence* — so leaving a view is never a return to a menu. Settings and catch-up use the same lens. |
 
@@ -157,6 +157,25 @@ agentic_odi_mcp_server)…`. When the Studio is reached through the free
 Cloudflare Worker proxy, a missing `SIDECAR_URL` is reported to the browser as
 `{"error": {"code": "mcp_unreachable", "suggestion": "Start the studio sidecar
 …"}}` with `X-Request-ID` echoed for support.
+
+### What the canvas is made of
+
+Every canvas response carries its provenance: `live` when the sidecar read your
+store, `empty` when it read your store and found nothing, and `seed` when it is
+showing the built-in demonstration because the MCP server could not be reached.
+The sidecar says this in the payload (`provenance.kind`, `provenance.reason`,
+and record counts); it never dresses the prototype up as your data.
+
+The studio repeats that label where a person can see it: the rail shows a
+**DEMO** or **OFFLINE** chip, the Opportunity Landscape shows a sample-data
+notice, and an impact simulation must carry `provenance: live | simulated` before
+it renders. The catch-up feed starts empty rather than inventing activity, and
+every event produced by **Simulate update** is marked **Simulated** and excluded
+from the unread count. The catch-up feed has no server-side event source yet:
+its only content is the local simulator, which
+[#79](https://github.com/alehar9320/agentic-odi/issues/79) replaces. Connector rows in Settings come from the real connector
+store, grouped by capability area; nothing is pre-listed as though it were
+already connected.
 
 ### The thread is the room
 
