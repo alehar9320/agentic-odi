@@ -40,6 +40,15 @@ def add(
     importance: float = typer.Option(..., min=1.0, max=10.0, help="Importance score (1-10)"),
     satisfaction: float = typer.Option(..., min=1.0, max=10.0, help="Satisfaction score (1-10)"),
     step_id: str | None = typer.Option(default=None, help="Optional Step ID"),
+    importance_n: int | None = typer.Option(
+        default=None, min=1, help="People behind the importance score, when known"
+    ),
+    satisfaction_n: int | None = typer.Option(
+        default=None, min=1, help="People behind the satisfaction score, when known"
+    ),
+    method: str | None = typer.Option(
+        default=None, help="How the score was obtained: estimate (default), survey or import"
+    ),
     json_output: bool = JSON_OPTION,
 ) -> None:
     """Add a desired Outcome to a Job."""
@@ -51,6 +60,12 @@ def add(
     }
     if step_id is not None:
         args["step_id"] = step_id
+    if importance_n is not None:
+        args["importance_n"] = importance_n
+    if satisfaction_n is not None:
+        args["satisfaction_n"] = satisfaction_n
+    if method is not None:
+        args["score_method"] = method
     typer.echo(
         render_saved("created", run_tool("add_outcome", args), as_json=json_output, noun="Outcome")
     )
@@ -115,6 +130,13 @@ def update(
     importance: float | None = typer.Option(default=None, min=1.0, max=10.0),
     satisfaction: float | None = typer.Option(default=None, min=1.0, max=10.0),
     step_id: str | None = typer.Option(default=None, help="Move to a Step"),
+    importance_n: int | None = typer.Option(default=None, min=1, help="People behind importance"),
+    satisfaction_n: int | None = typer.Option(
+        default=None, min=1, help="People behind satisfaction"
+    ),
+    method: str | None = typer.Option(
+        default=None, help="How the score was obtained: estimate, survey or import"
+    ),
     json_output: bool = JSON_OPTION,
 ) -> None:
     """Update a desired Outcome."""
@@ -127,6 +149,12 @@ def update(
         args["satisfaction"] = satisfaction
     if step_id is not None:
         args["step_id"] = step_id
+    if importance_n is not None:
+        args["importance_n"] = importance_n
+    if satisfaction_n is not None:
+        args["satisfaction_n"] = satisfaction_n
+    if method is not None:
+        args["score_method"] = method
     typer.echo(
         render_saved(
             "updated", run_tool("update_outcome", args), as_json=json_output, noun="Outcome"

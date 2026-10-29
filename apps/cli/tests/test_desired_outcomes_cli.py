@@ -175,3 +175,99 @@ def test_export_rejects_an_unknown_format(tmp_path) -> None:
 
     assert result.exit_code == 1
     assert "unknown format" in result.output
+
+
+def test_add_outcome_passes_sample_metadata(tmp_path) -> None:
+    runner = CliRunner()
+    db = str(tmp_path / "odi.db")
+    job_id = _job_id(runner, db)
+
+    added = _add(
+        runner,
+        db,
+        job_id,
+        "--importance-n",
+        "40",
+        "--satisfaction-n",
+        "40",
+        "--method",
+        "survey",
+    )
+
+    assert added["score_method"] == "survey"
+    assert added["importance_n"] == 40
+    assert added["satisfaction_n"] == 40
+
+
+def test_add_outcome_defaults_to_an_estimate(tmp_path) -> None:
+    runner = CliRunner()
+    db = str(tmp_path / "odi.db")
+    job_id = _job_id(runner, db)
+
+    added = _add(runner, db, job_id)
+
+    assert added["score_method"] == "estimate"
+    assert added["importance_n"] is None
+
+
+def test_add_outcome_rejects_an_estimate_with_a_count(tmp_path) -> None:
+    runner = CliRunner()
+    db = str(tmp_path / "odi.db")
+    job_id = _job_id(runner, db)
+
+    result = runner.invoke(
+        app,
+        [
+            "--db",
+            db,
+            "desired-outcomes",
+            "add",
+            "--job-id",
+            job_id,
+            "--statement",
+            "Minimize the onboarding time when a customer signs up",
+            "--importance",
+            "8",
+            "--satisfaction",
+            "4",
+            "--importance-n",
+            "40",
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "estimate" in result.output
+
+
+def test_show_renders_est_for_unknown_counts(tmp_path) -> None:
+    runner = CliRunner()
+    db = str(tmp_path / "odi.db")
+    job_id = _job_id(runner, db)
+    added = _add(runner, db, job_id)
+
+    shown = runner.invoke(app, ["--db", db, "desired-outcomes", "get", added["id"]])
+
+    assert shown.exit_code == 0, shown.output
+    assert "est." in shown.output
+
+
+def test_show_renders_both_counts_when_they_differ(tmp_path) -> None:
+    runner = CliRunner()
+    db = str(tmp_path / "odi.db")
+    job_id = _job_id(runner, db)
+    added = _add(
+        runner,
+        db,
+        job_id,
+        "--importance-n",
+        "40",
+        "--satisfaction-n",
+        "12",
+        "--method",
+        "survey",
+    )
+
+    shown = runner.invoke(app, ["--db", db, "desired-outcomes", "get", added["id"]])
+
+    assert shown.exit_code == 0, shown.output
+    assert "n=40/12 (survey)" in shown.output

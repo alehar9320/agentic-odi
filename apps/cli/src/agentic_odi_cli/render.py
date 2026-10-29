@@ -178,6 +178,23 @@ def render_step_list(steps: Any, *, as_json: bool) -> str:
     )
 
 
+def _sample_label(outcome: dict[str, Any]) -> str:
+    """Describe how many people stand behind a score, and how it was obtained.
+
+    An estimate, or a score with no recorded sample, reads as ``est.`` — never
+    as a fabricated ``n``. A recorded sample shows both counts when they differ,
+    so a thin dimension is visible rather than averaged away.
+    """
+    importance_n = outcome.get("importance_n")
+    satisfaction_n = outcome.get("satisfaction_n")
+    method = outcome.get("score_method") or "estimate"
+    if method == "estimate" or (importance_n is None and satisfaction_n is None):
+        return "est."
+    if importance_n == satisfaction_n:
+        return f"n={importance_n} ({method})"
+    return f"n={importance_n or '?'}/{satisfaction_n or '?'} ({method})"
+
+
 def render_outcome(outcome: Any, *, as_json: bool) -> str:
     """Render one desired Outcome as a labelled block or JSON."""
     if not isinstance(outcome, dict):
@@ -193,6 +210,7 @@ def render_outcome(outcome: Any, *, as_json: bool) -> str:
             ("importance", _num(outcome.get("importance", ""))),
             ("satisfaction", _num(outcome.get("satisfaction", ""))),
             ("opportunity", _num(outcome.get("opportunity_score", ""))),
+            ("sample", _sample_label(outcome)),
         ]
     )
 

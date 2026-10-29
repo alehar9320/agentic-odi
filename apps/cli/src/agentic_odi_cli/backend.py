@@ -35,6 +35,10 @@ DEFAULT_BACKEND = "local"
 DEFAULT_MCP_URL = "http://localhost:8000/mcp"
 
 _VALUE_RANGE_ERROR = "importance and satisfaction must be between 1.0 and 10.0"
+_SAMPLE_METHOD_ERROR = (
+    "score_method 'estimate' cannot carry a sample count above 1; "
+    "use 'survey' or 'import' when people were asked"
+)
 
 _CUSTOMER_VALUE_FIELDS = (
     "direction",
@@ -247,6 +251,8 @@ class LocalBackend(Backend):
         )
 
         step_id = args.get("step_id")
+        from pydantic import ValidationError
+
         try:
             outcome = self.service.add_outcome(
                 job_id=args["job_id"],
@@ -254,13 +260,22 @@ class LocalBackend(Backend):
                 importance=float(args["importance"]),
                 satisfaction=float(args["satisfaction"]),
                 step_id=step_id,
+                importance_n=args.get("importance_n"),
+                satisfaction_n=args.get("satisfaction_n"),
+                score_method=args.get("score_method", "estimate"),
             )
         except JobNotFoundError:
             raise BackendError(job_not_found(args["job_id"])) from None
         except StepNotFoundError:
             raise BackendError(step_not_found(step_id)) from None
         except ValueOutOfRangeError as exc:
-            raise BackendError(_VALUE_RANGE_ERROR) from exc
+            raise BackendError(
+                _SAMPLE_METHOD_ERROR if "estimate" in str(exc) else _VALUE_RANGE_ERROR
+            ) from exc
+        except ValidationError as exc:
+            raise BackendError(
+                _SAMPLE_METHOD_ERROR if "estimate" in str(exc) else str(exc)
+            ) from exc
         return outcome.model_dump()
 
     def _get_outcomes(self, args: dict[str, Any]) -> list[dict[str, Any]]:
@@ -288,10 +303,19 @@ class LocalBackend(Backend):
 
     def _update_outcome(self, args: dict[str, Any]) -> dict[str, Any]:
         from agentic_odi_core import OutcomeNotFoundError, ValueOutOfRangeError, outcome_not_found
+        from pydantic import ValidationError
 
         updates: dict[str, Any] = {
             key: args[key]
-            for key in ("statement", "importance", "satisfaction", "step_id")
+            for key in (
+                "statement",
+                "importance",
+                "satisfaction",
+                "step_id",
+                "importance_n",
+                "satisfaction_n",
+                "score_method",
+            )
             if key in args
         }
         try:
@@ -299,7 +323,13 @@ class LocalBackend(Backend):
         except OutcomeNotFoundError:
             raise BackendError(outcome_not_found(args["outcome_id"])) from None
         except ValueOutOfRangeError as exc:
-            raise BackendError(_VALUE_RANGE_ERROR) from exc
+            raise BackendError(
+                _SAMPLE_METHOD_ERROR if "estimate" in str(exc) else _VALUE_RANGE_ERROR
+            ) from exc
+        except ValidationError as exc:
+            raise BackendError(
+                _SAMPLE_METHOD_ERROR if "estimate" in str(exc) else str(exc)
+            ) from exc
         return outcome.model_dump()
 
     def _delete_outcome(self, args: dict[str, Any]) -> str:

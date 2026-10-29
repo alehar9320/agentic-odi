@@ -142,6 +142,7 @@ only when you intentionally need to stage a map before capturing outcomes.
 
 # Desired Outcomes
 agentic-odi desired-outcomes add --job-id <job-id> --statement "Minimize the time it takes to get a working environment" --importance 8 --satisfaction 4
+agentic-odi desired-outcomes add --job-id <job-id> --statement "Minimize the time it takes to onboard" --importance 8 --satisfaction 4 --importance-n 40 --satisfaction-n 40 --method survey
 agentic-odi desired-outcomes list --job-id <job-id>
 agentic-odi desired-outcomes get <outcome-id>
 agentic-odi desired-outcomes update <outcome-id> --satisfaction 6
@@ -149,6 +150,14 @@ agentic-odi desired-outcomes delete <outcome-id> --yes
 agentic-odi desired-outcomes export --job-id <job-id> --format csv > outcomes.csv
 agentic-odi desired-outcomes export --job-id <job-id> --format json | jq '.[].opportunity_score'
 agentic-odi desired-outcomes evaluate "Minimize the time to ship when onboarding"
+
+Every outcome score carries its sample and method. `--importance-n` and
+`--satisfaction-n` record how many people stand behind each score, when known;
+`--method` records how the score was obtained (`estimate`, `survey`, or
+`import`). Omit all three for a single-person estimate — the default — and the
+rendered `sample` line reads `est.`. A count above one with `method=estimate` is
+refused, because an estimate cannot have asked people. When the two counts
+differ, `get` shows both (`n=40/12 (survey)`) so a thin dimension stays visible.
 
 # One-screen report: job header, phase coverage, biggest opportunities
 agentic-odi summary <job-id>
