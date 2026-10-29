@@ -3,6 +3,10 @@ import { describe, expect, it, vi } from "vitest";
 
 import { OutcomeCard } from "./OutcomeCard";
 
+vi.mock("../../api/studioApi", () => ({
+  fetchOutcomeHistory: vi.fn().mockResolvedValue([]),
+}));
+
 vi.mock("../../state/StudioContext", () => ({
   useStudio: () => ({
     ask: vi.fn(),
@@ -10,6 +14,7 @@ vi.mock("../../state/StudioContext", () => ({
     deleteOutcome: vi.fn(),
     pushToast: vi.fn(),
     updateOutcome: vi.fn(),
+    settings: { mcp_url: "http://localhost:8000/mcp" },
   }),
 }));
 

@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
+import { fetchOutcomeHistory } from "../../api/studioApi";
 import {
   formatOpportunityScore,
   formatSample,
@@ -12,7 +13,8 @@ import type { Outcome } from "../../types";
 import { CopyIcon } from "../icons";
 
 export function OutcomeCard({ outcome, sample = false }: { outcome: Outcome; sample?: boolean }) {
-  const { ask, canvasState, deleteOutcome, pushToast, saveThesis, updateOutcome } = useStudio();
+  const { ask, canvasState, deleteOutcome, pushToast, saveThesis, settings, updateOutcome } =
+    useStudio();
   // Records captured against this outcome, with their way back to the source.
   const linkedEvidence = (canvasState.data?.evidence ?? []).filter(
     (item) => item.outcome_id === outcome.id,
@@ -25,10 +27,36 @@ export function OutcomeCard({ outcome, sample = false }: { outcome: Outcome; sam
   const [importance, setImportance] = useState(outcome.importance ?? 5);
   const [satisfaction, setSatisfaction] = useState(outcome.satisfaction ?? 5);
   const [saving, setSaving] = useState(false);
+  // The reason recorded with the most recent accepted score change. It is
+  // snapshot metadata, not an Outcome field, so it is fetched from history and
+  // tagged with its outcome so a switch never shows the previous one's note.
+  const [noteFor, setNoteFor] = useState<{ id: string; note: string | null } | null>(null);
+
+  const outcomeId = outcome.id ?? "O";
+  useEffect(() => {
+    const id = outcome.id;
+    if (!id || sample) return;
+    let cancelled = false;
+    void fetchOutcomeHistory(id, settings.mcp_url)
+      .then((snapshots) => {
+        if (cancelled) return;
+        const noted = [...snapshots].reverse().find((snapshot) => snapshot.note);
+        setNoteFor({ id, note: noted?.note ?? null });
+      })
+      .catch(() => {
+        // History is supporting context: a failure leaves the line absent
+        // rather than blocking the card.
+        if (!cancelled) setNoteFor({ id, note: null });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [outcome.id, sample, settings.mcp_url]);
+
+  const latestNote = !sample && noteFor?.id === outcome.id ? noteFor.note : null;
 
   const opp = outcome.opportunity_score;
   const statement = outcome.statement ?? "Untitled outcome";
-  const outcomeId = outcome.id ?? "O";
   const underserved = isUnderserved(opp);
   const pill = opportunityPill(opp);
 
@@ -60,6 +88,14 @@ export function OutcomeCard({ outcome, sample = false }: { outcome: Outcome; sam
           {formatSample(outcome)}
         </span>
       </p>
+
+      {latestNote ? (
+        <p className="card__meta" data-testid="outcome-note">
+          <span title="The reason recorded with the most recent accepted score change">
+            Note <b>{latestNote}</b>
+          </span>
+        </p>
+      ) : null}
 
       {showEvidence &&
         (linkedEvidence.length > 0 ? (

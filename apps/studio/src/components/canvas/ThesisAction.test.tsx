@@ -3,6 +3,10 @@ import { describe, expect, it, vi } from "vitest";
 
 import { OutcomeCard } from "./OutcomeCard";
 
+vi.mock("../../api/studioApi", () => ({
+  fetchOutcomeHistory: vi.fn().mockResolvedValue([]),
+}));
+
 const saveThesis = vi.fn();
 const pushToast = vi.fn();
 
@@ -16,6 +20,7 @@ vi.mock("../../state/StudioContext", () => ({
     // The card lists the records captured against its outcome; give it an
     // empty canvas so the assertions here stay about the thesis action.
     canvasState: { kind: "ready", data: { jobs: [], steps: [], outcomes: [], source: "seed" } },
+    settings: { mcp_url: "http://localhost:8000/mcp" },
   }),
 }));
 

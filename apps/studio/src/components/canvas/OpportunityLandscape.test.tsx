@@ -4,6 +4,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { CanvasState } from "../../types";
 import { OpportunityLandscape } from "./OpportunityLandscape";
 
+vi.mock("../../api/studioApi", () => ({
+  fetchOutcomeHistory: vi.fn().mockResolvedValue([]),
+}));
+
 // Mock StudioContext
 const mockCanvasData = {
   jobs: [{ id: "JOB-1", name: "Deploy Service" }],
@@ -25,6 +29,7 @@ const harness = vi.hoisted(() => ({
     pushToast: vi.fn(),
     theses: [],
     deleteThesis: vi.fn(),
+    settings: { mcp_url: "http://localhost:8000/mcp" },
   },
 }));
 
