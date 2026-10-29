@@ -175,42 +175,6 @@ export interface ToolActivity {
   preview?: string;
 }
 
-const SEED_NOTIFICATIONS: StudioNotification[] = [
-  {
-    id: "NOTIF-101",
-    title: "Opportunity Score Shift Identified",
-    message: "Minimize time to propagate secrets (O-1) opportunity score reached 15.3 (High Priority).",
-    category: "outcome",
-    timestamp: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
-    read: false,
-    targetPanel: "landscape",
-    targetId: "O-1",
-    actionText: "View Landscape",
-    chatPrompt: "How can we address the high opportunity score for secret propagation?",
-  },
-  {
-    id: "NOTIF-102",
-    title: "Friction Collapse Simulation Complete",
-    message: "Background simulation calculated a 68% deployment velocity increase upon automation.",
-    category: "simulation",
-    timestamp: new Date(Date.now() - 45 * 60 * 1000).toISOString(),
-    read: false,
-    actionText: "Talk it through",
-    chatPrompt: "Summarize the friction collapse simulation results.",
-  },
-  {
-    id: "NOTIF-103",
-    title: "New Customer Telemetry Signal",
-    message: "Evidence ingested: 'Config key mismatches account for 40% of deployment rollbacks'.",
-    category: "evidence",
-    timestamp: new Date(Date.now() - 120 * 60 * 1000).toISOString(),
-    read: true,
-    targetPanel: "evidence",
-    actionText: "View Evidence",
-    chatPrompt: "What evidence do we have regarding deployment config errors?",
-  },
-];
-
 export interface ConnectionReport {
   sidecarReachable: boolean;
   mcpReachable: boolean;
@@ -432,7 +396,9 @@ function loadNotifications(): StudioNotification[] {
   } catch {
     /* ignore malformed cache */
   }
-  return SEED_NOTIFICATIONS;
+  // First run has no activity yet. Showing fabricated updates here would make
+  // the feed lie about work the studio never did.
+  return [];
 }
 
 export function StudioProvider({ children }: { children: ReactNode }) {
@@ -495,7 +461,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const unreadNotificationCount = useMemo(
-    () => notifications.filter((n) => !n.read).length,
+    () => notifications.filter((n) => !n.read && !n.simulated).length,
     [notifications],
   );
 
@@ -724,6 +690,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const simulateBackgroundEvent = useCallback(() => {
     const events: Array<Omit<StudioNotification, "id" | "timestamp" | "read">> = [
       {
+        simulated: false,
         title: "Telemetry Ingestion Complete",
         message: "Analyzed workflow traces: 82% of users report friction during cluster config.",
         category: "evidence",
@@ -732,6 +699,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
         chatPrompt: "What friction was reported during cluster config?",
       },
       {
+        simulated: false,
         title: "New Opportunity Uncovered",
         message: "Automating validation rules elevated satisfaction target by +2.4 points.",
         category: "outcome",
@@ -740,6 +708,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
         chatPrompt: "Show me details on the validation rules opportunity.",
       },
       {
+        simulated: false,
         title: "AI Job Step Insight",
         message: "Suggested adding 'Verify secret parity across clusters' to Phase 4 of Job Map.",
         category: "job",
@@ -750,7 +719,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     ];
 
     const chosen = events[Math.floor(Math.random() * events.length)];
-    addNotification(chosen);
+    addNotification({ ...chosen, simulated: true });
     pushToast("info", `Background Activity: ${chosen.title}`);
   }, [addNotification, pushToast]);
 

@@ -2,9 +2,25 @@ import { useState } from "react";
 
 import { useOnboarding } from "../onboarding/context";
 import { useStudio } from "../state/StudioContext";
-import type { StudioConfig } from "../types";
+import type { ConnectorPreset, StudioConfig } from "../types";
 import { FailurePanel } from "./FailurePanel";
 import { UpdateSettings } from "../updater";
+
+const PRESET_AREAS: ConnectorPreset["area"][] = [
+  "voice-of-customer",
+  "quantitative-data",
+  "market-intelligence",
+  "strategy-alignment",
+  "knowledge-output",
+];
+
+const AREA_LABELS: Record<ConnectorPreset["area"], string> = {
+  "voice-of-customer": "Voice of customer & qualitative research",
+  "quantitative-data": "Quantitative data & opportunity scoring",
+  "market-intelligence": "Market & competitive intelligence",
+  "strategy-alignment": "Product strategy & backlog alignment",
+  "knowledge-output": "Strategy & knowledge management output",
+};
 
 export function SettingsPanel() {
   const {
@@ -31,20 +47,17 @@ export function SettingsPanel() {
     capabilities,
   } = useStudio();
   const { enabled: tourEnabled, restart: restartTour } = useOnboarding();
-  const [selectedPreset, setSelectedPreset] = useState("");
   const [showApiKey, setShowApiKey] = useState(false);
 
   function update<K extends keyof StudioConfig>(key: K, value: StudioConfig[K]): void {
     saveSettings({ ...settings, [key]: value });
   }
 
-  const handleAddPreset = () => {
-    if (!selectedPreset) {
-      return;
-    }
-    void addConnector({ preset: selectedPreset });
-    setSelectedPreset("");
-  };
+  const presetGroups = PRESET_AREAS.map((area) => ({
+    area,
+    label: AREA_LABELS[area],
+    presets: presets.filter((preset) => preset.area === area),
+  })).filter((group) => group.presets.length > 0);
 
   return (
     <div className="settings">
@@ -224,43 +237,50 @@ export function SettingsPanel() {
               ))}
             </ul>
           )}
-          <div className="field">
-            <label htmlFor="connector-preset">Add a preset</label>
-            {presetError ? (
-              <FailurePanel
-                error={presetError}
-                retryText="reload"
-                onRetry={() => void refreshPresets()}
-              />
-            ) : (
-              <select
-                id="connector-preset"
-                aria-label="Add preset"
-                value={selectedPreset}
-                onChange={(event) => setSelectedPreset(event.target.value)}
-              >
-                <option value="" disabled>
-                  Select a preset
-                </option>
-                {presets.map((preset) => (
-                  <option key={preset.id} value={preset.id}>
-                    {preset.label}
-                  </option>
-                ))}
-              </select>
-            )}
-          </div>
+          <h4 className="settings__title">Add a data source</h4>
+          {presetError ? (
+            <FailurePanel
+              error={presetError}
+              retryText="reload"
+              onRetry={() => void refreshPresets()}
+            />
+          ) : presetGroups.length === 0 ? (
+            <p className="muted">No presets available.</p>
+          ) : (
+            <div className="settings__presets">
+              {presetGroups.map((group) => (
+                <section
+                  key={group.area}
+                  className="settings__preset-group"
+                  aria-label={group.label}
+                >
+                  <h5 className="settings__preset-title">{group.label}</h5>
+                  <ul className="connection-list">
+                    {group.presets.map((preset) => (
+                      <li key={preset.id}>
+                        <span className="connection-list__value">
+                          {preset.label}{" "}
+                          <code className="settings__preset-id">{preset.id}</code>
+                          {" · "}
+                          {preset.auth === "oauth" ? "OAuth" : "No auth"}
+                        </span>
+                        <button
+                          type="button"
+                          className="button button--ghost"
+                          aria-label={`Connect ${preset.label}`}
+                          onClick={() => void addConnector({ preset: preset.id })}
+                        >
+                          Connect
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              ))}
+            </div>
+          )}
           </>
       )}
-      <button
-        type="button"
-        className="button button--ghost"
-        aria-label="Add preset"
-        disabled={!selectedPreset || Boolean(presetError)}
-        onClick={handleAddPreset}
-      >
-        Add
-      </button>
 
       <div className="settings__actions">
         <button type="button" className="button" onClick={clearChat}>

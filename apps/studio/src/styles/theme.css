@@ -5072,3 +5072,52 @@ details[open] summary {
     display: none;
   }
 }
+
+.rail__status {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 7px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--faint);
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+}
+
+.canvas-provenance {
+  margin: 12px 0 0;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.canvas-provenance strong {
+  color: var(--text);
+}
+
+.catchup-card.is-simulated {
+  border-style: dashed;
+  opacity: 0.88;
+}
+
+.settings__preset-group {
+  margin-top: 10px;
+}
+
+.settings__preset-title {
+  margin: 0 0 4px;
+  color: var(--faint);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.settings__preset-id {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
