@@ -38,6 +38,22 @@ vi.mock("./api/studioApi", () => ({
   updateOutcome: vi.fn(async () => ({ ok: true })),
   deleteOutcome: vi.fn(async () => ({ ok: true })),
   fetchMemory: vi.fn(async () => []),
+  fetchSignals: vi.fn(async () => [
+    {
+      id: "sig-1",
+      kind: "job_added",
+      title: 'Job added: "Propagate secrets"',
+      subject_kind: "job",
+      subject_id: "JOB-402",
+      severity: "info",
+      created_at: "2026-10-22T10:00:00+00:00",
+      suppressed: false,
+      fingerprint: "fp-1",
+    },
+  ]),
+  fetchUnreadSignalCount: vi.fn(async () => 1),
+  markSignalRead: vi.fn(async () => ({ id: "sig-1" })),
+  dismissSignal: vi.fn(async () => ({ id: "sig-1" })),
   fetchConnectorCatalog: vi.fn(async () => []),
   fetchConnectors: vi.fn(async () => []),
   asStudioError: (error: unknown) => ({
@@ -257,6 +273,65 @@ describe("studio shell", () => {
     expect(screen.getByText("Local guidance")).toBeInTheDocument();
   });
 
+  it("stops a running stream on Escape before closing the workspace", async () => {
+    const { streamChat } = await import("./api/studioApi");
+    vi.mocked(streamChat).mockImplementationOnce(
+      (_request, _onEvent, signal) =>
+        new Promise<void>((_resolve, reject) => {
+          signal?.addEventListener("abort", () => {
+            const error = new Error("aborted");
+            error.name = "AbortError";
+            reject(error);
+          });
+        }),
+    );
+    render(<App />);
+
+    const composer = await screen.findByRole("textbox", { name: /message the studio/i });
+    fireEvent.change(composer, { target: { value: "Where do I start?" } });
+    fireEvent.click(screen.getByRole("button", { name: /send message/i }));
+    await screen.findByRole("button", { name: /stop generating/i });
+
+    fireEvent.click(screen.getByRole("button", { name: /^landscape/i }));
+    expect(
+      await screen.findByRole("heading", { name: /opportunity landscape/i }),
+    ).toBeInTheDocument();
+
+    fireEvent.keyDown(window, { key: "Escape" });
+
+    await waitFor(() => {
+      expect(screen.queryByRole("button", { name: /stop generating/i })).toBeNull();
+    });
+    expect(screen.getByRole("heading", { name: /opportunity landscape/i })).toBeInTheDocument();
+
+    fireEvent.keyDown(window, { key: "Escape" });
+
+    await waitFor(() => {
+      expect(screen.queryByRole("heading", { name: /opportunity landscape/i })).toBeNull();
+    });
+  });
+
+  it("closes the setup conversation when starting a new conversation", async () => {
+    window.localStorage.removeItem("studio.brief");
+    render(<App />);
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: /tell me what you're building/i }),
+    );
+    expect(
+      await screen.findByText("What are you building?", { selector: "strong" }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /new conversation/i }));
+
+    await waitFor(() => {
+      expect(screen.queryByText("What are you building?", { selector: "strong" })).toBeNull();
+    });
+    expect(
+      screen.getByRole("heading", { name: "What do you want to win?" }),
+    ).toBeInTheDocument();
+  });
+
   it("starts a new conversation from the drawer", async () => {
     render(<App />);
 
@@ -382,6 +457,12 @@ describe("first run", () => {
       await screen.findByText("Where does it hurt most?", { selector: "strong" }),
     ).toBeInTheDocument();
     fireEvent.change(composer, { target: { value: "A missed config key costs hours" } });
+    fireEvent.keyDown(composer, { key: "Enter" });
+
+    expect(
+      await screen.findByText("What is your vision for this domain?", { selector: "strong" }),
+    ).toBeInTheDocument();
+    fireEvent.change(composer, { target: { value: "Zero downtime deploys" } });
     fireEvent.keyDown(composer, { key: "Enter" });
 
     expect(

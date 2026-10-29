@@ -72,6 +72,11 @@ per-platform archives with SHA-256 checksums for a manual download. See
   the thread.
 - **Local-first by default.** The CLI and server work with no network and no
   account. Point them at a remote MCP server with one flag.
+- **A catch-up that means something.** Writes emit signals — an outcome
+  re-scored, evidence promoted, a job map completed — stored in the same
+  event log and read by the CLI, any MCP client, and the Studio's bell.
+  Nothing is invented, and the feed is deduped and budgeted so it stays
+  worth opening.
 
 ## How it works
 
@@ -105,6 +110,9 @@ uv run python scripts/dev.py        # start the MCP server + Studio together
 | MCP Server | http://localhost:8000/mcp |
 | The Living Studio | http://127.0.0.1:8100 |
 
+Run the MCP server on another port with `python -m agentic_odi_mcp_server --port 8010`
+or `AGENTIC_ODI_MCP_PORT=8010`. The flag wins over the environment variable.
+
 - **Hot reload:** `npm --prefix apps/studio run dev:full` (Vite on
   http://localhost:5173).
 - **Desktop app:** `npm --prefix apps/studio run tauri dev`.
@@ -115,6 +123,7 @@ uv run python scripts/dev.py        # start the MCP server + Studio together
 ```bash
 odi jobs list
 odi desired-outcomes list --job-id <id>
+odi signals unread                    # what changed while you were away
 odi score 8 2                        # → 14.00
 odi                                  # interactive chat in a terminal
 ```
@@ -147,6 +156,7 @@ soon". See [External Connectors](docs/connectors.md).
 | [External Connectors](docs/connectors.md) | Presets, the registry, and the `Connector` protocol |
 | [Local LLM Backend](docs/local-llm.md) | Running a local OpenAI-compatible model with tool calling |
 | [Architecture](docs/architecture/README.md) | Workspace layout, dependency direction, data flow, and testing |
+| [Studio Banners](docs/architecture/banners.md) | The Studio's unified notice system |
 | [Development](docs/development.md) | Lint, types, frontend checks, tests, and PR risk labels |
 | [Installation](docs/installation.md) | Binary install, updater behavior, and release automation |
 | [Deployment](docs/deployment.md) | Project site, Hosted Studio, MCP endpoint, and the Cloudflare Worker |

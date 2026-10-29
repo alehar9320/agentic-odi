@@ -51,6 +51,7 @@ let chatAborts = false;
 let chatFailure: Error | null = null;
 let connectorFetches = 0;
 let llmHealthFetches = 0;
+let signalFetches = 0;
 let approvalCalls: Record<string, unknown>[] = [];
 let headPatches: Record<string, unknown>[] = [];
 
@@ -177,6 +178,13 @@ function route(
   if (url === "/api/health/llm") {
     llmHealthFetches += 1;
     return json({ healthy: true, message: "ok" });
+  }
+  if (url.startsWith("/api/signals/unread-count")) {
+    return json({ count: 0 });
+  }
+  if (url.startsWith("/api/signals")) {
+    signalFetches += 1;
+    return json([]);
   }
   return json({});
 }
@@ -538,6 +546,45 @@ describe("StudioContext health polling", () => {
     });
     expect(llmHealthFetches).toBeGreaterThan(afterInterval);
     expect(result.current.llmHealth.healthy).toBe(true);
+  });
+});
+
+describe("StudioContext signal inbox", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    signalFetches = 0;
+    vi.useFakeTimers();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)),
+    );
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it("loads the inbox on boot and keeps polling while the window is visible", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(signalFetches).toBeGreaterThan(0);
+    expect(result.current.signals).toEqual([]);
+    expect(result.current.signalsError).toBeNull();
+
+    const afterBoot = signalFetches;
+    await act(async () => {
+      vi.advanceTimersByTime(60_000);
+    });
+    expect(signalFetches).toBeGreaterThan(afterBoot);
+
+    const afterInterval = signalFetches;
+    await act(async () => {
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+    expect(signalFetches).toBeGreaterThan(afterInterval);
   });
 });
 

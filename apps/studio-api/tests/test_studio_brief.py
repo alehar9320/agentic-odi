@@ -6,13 +6,20 @@ import asyncio
 import json
 
 from agentic_odi_studio_api.studio import chat
-from agentic_odi_studio_api.studio.schemas import ChatMessage, ChatRequest, StudioBrief
+from agentic_odi_studio_api.studio.schemas import V2MOM, ChatMessage, ChatRequest, StudioBrief
 
 BRIEF = StudioBrief(
     product_name="Ambient",
     target_user="Platform engineers",
     job_statement="Get a service from commit to production",
     core_problem="A missed config key costs hours",
+    v2mom=V2MOM(
+        vision="Zero friction deploys",
+        values=["Speed", "Security"],
+        methods=["Automate checks"],
+        obstacles=["Legacy pipelines"],
+        measures=["Deploy time < 5m"],
+    ),
 )
 
 
@@ -33,6 +40,17 @@ def test_system_prompt_carries_the_brief() -> None:
     assert "Ambient" in system
     assert "Platform engineers" in system
     assert "Get a service from commit to production" in system
+
+
+def test_system_prompt_carries_the_v2mom() -> None:
+    messages = chat._to_openai_messages(_request())
+
+    system = messages[0]["content"]
+    assert "Zero friction deploys" in system
+    assert "Speed, Security" in system
+    assert "Automate checks" in system
+    assert "Legacy pipelines" in system
+    assert "Deploy time < 5m" in system
 
 
 def test_system_prompt_is_unchanged_without_a_brief() -> None:

@@ -6,6 +6,7 @@ import { OutcomeCard } from "./OutcomeCard";
 vi.mock("../../state/StudioContext", () => ({
   useStudio: () => ({
     ask: vi.fn(),
+    canvasState: { data: { evidence: [] } },
     deleteOutcome: vi.fn(),
     pushToast: vi.fn(),
     updateOutcome: vi.fn(),

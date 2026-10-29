@@ -182,9 +182,10 @@ The studio repeats that label where a person can see it: the rail shows a
 notice, and an impact simulation must carry `provenance: live | simulated` before
 it renders. The catch-up feed starts empty rather than inventing activity, and
 every event produced by **Simulate update** is marked **Simulated** and excluded
-from the unread count. The catch-up feed has no server-side event source yet:
-its only content is the local simulator, which
-[#79](https://github.com/alehar9320/agentic-odi/issues/79) replaces. Connector rows in Settings come from the real connector
+from the unread count. Its real content is the store's signal inbox
+([The Signal Inbox](architecture/notifications.md)): the bell count comes from
+`/api/signals/unread-count`, the feed loads on boot, re-reads after every canvas
+refresh, and polls once a minute while the window is visible. Connector rows in Settings come from the real connector
 store, grouped by capability area; nothing is pre-listed as though it were
 already connected.
 

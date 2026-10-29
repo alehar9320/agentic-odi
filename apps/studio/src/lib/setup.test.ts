@@ -16,8 +16,8 @@ import {
 } from "./setup";
 
 describe("setup conversation model", () => {
-  it("asks four questions, each skippable by design", () => {
-    expect(QUESTION_COUNT).toBe(4);
+  it("asks five questions, each skippable by design", () => {
+    expect(QUESTION_COUNT).toBe(5);
   });
 
   it("resumes at the first unanswered question", () => {
@@ -32,6 +32,7 @@ describe("setup conversation model", () => {
         target_user: "Engineers",
         job_statement: "Ship",
         core_problem: "Drift",
+        vision: "No friction",
       }),
     ).toBe(REVIEW_INDEX);
   });
@@ -87,6 +88,7 @@ describe("setup conversation model", () => {
       target_user: "Engineers",
       job_statement: "Ship",
       core_problem: "Drift",
+      v2mom: { vision: "Zero downtime" },
     });
     expect(firstUnanswered(draft)).toBe(REVIEW_INDEX);
     expect(questionContent(0, draft)).toContain("You said: “Ambient”");

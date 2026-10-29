@@ -40,11 +40,13 @@ from agentic_odi_core.messages import (
     evidence_not_found,
     job_not_found,
     outcome_not_found,
+    scheduled_work_not_found,
     step_not_found,
 )
 from agentic_odi_core.models import (
     JOB_STAGE_INDEX,
     JOB_STAGE_ORDER,
+    V2MOM,
     BusinessImpactCategory,
     BusinessValue,
     CustomerOutcome,
@@ -55,9 +57,15 @@ from agentic_odi_core.models import (
     Job,
     JobStage,
     Outcome,
+    ScheduledWork,
+    ScheduledWorkStatus,
+    ScheduledWorkTriggerType,
+    Signal,
+    SignalKind,
     Step,
     ValueMetric,
     compute_opportunity_score,
+    job_stage_catalog,
 )
 from agentic_odi_core.remote import (
     StudioError,
@@ -75,6 +83,9 @@ from agentic_odi_core.services import (
     JobNotFoundError,
     ODIService,
     OutcomeNotFoundError,
+    ScheduledWorkNotFoundError,
+    SignalBudget,
+    SignalNotFoundError,
     StepNotFoundError,
     ValueOutOfRangeError,
 )
@@ -84,6 +95,11 @@ from agentic_odi_core.steve_jobs import (
 )
 
 __all__ = [
+    "ScheduledWork",
+    "ScheduledWorkNotFoundError",
+    "ScheduledWorkStatus",
+    "ScheduledWorkTriggerType",
+    "scheduled_work_not_found",
     "BusinessImpactCategory",
     "BusinessValue",
     "CAPABILITIES",
@@ -117,6 +133,10 @@ __all__ = [
     "Step",
     "StepNotFoundError",
     "StoreError",
+    "Signal",
+    "SignalBudget",
+    "SignalKind",
+    "SignalNotFoundError",
     "StudioError",
     "StudioErrorCode",
     "ValueMetric",
@@ -128,6 +148,7 @@ __all__ = [
     "ToolName",
     "ToolSpec",
     "ToolEffect",
+    "V2MOM",
     "capability_manifest",
     "capability_summary",
     "Repository",
@@ -140,6 +161,7 @@ __all__ = [
     "format_opportunity_score_insight",
     "generate_steve_jobs_response",
     "job_not_found",
+    "job_stage_catalog",
     "odi_schema",
     "outcome_not_found",
     "parse_tool_result",

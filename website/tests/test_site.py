@@ -482,6 +482,8 @@ def test_every_page_resolves_its_own_assets(page: str):
 @pytest.mark.parametrize("page", all_pages())
 def test_page_weights_are_within_budget(page: str):
     size = _built_root(page).stat().st_size
-    # The MCP reference is the long pole: every tool's argument table lives on
-    # that one page, so it grows with each paginated list tool we add.
-    assert size <= 64 * 1024, f"{page}: {size} bytes"
+    # The MCP reference is the long pole: every tool's argument table and the
+    # whole ODI schema live on that one page, so it grows with each paginated
+    # list tool and each entity we add. The V2MOM entity, the five
+    # scheduled-work tools, and the three signal tools bring the page to ~78 KB.
+    assert size <= 78 * 1024, f"{page}: {size} bytes"
