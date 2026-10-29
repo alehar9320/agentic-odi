@@ -131,6 +131,8 @@ agentic-odi desired-outcomes list --job-id <job-id>
 agentic-odi desired-outcomes get <outcome-id>
 agentic-odi desired-outcomes update <outcome-id> --satisfaction 6
 agentic-odi desired-outcomes delete <outcome-id> --yes
+agentic-odi desired-outcomes export --job-id <job-id> --format csv > outcomes.csv
+agentic-odi desired-outcomes export --job-id <job-id> --format json | jq '.[].opportunity_score'
 agentic-odi desired-outcomes evaluate "Minimize the time to ship when onboarding"
 ```
 
@@ -138,7 +140,9 @@ agentic-odi desired-outcomes evaluate "Minimize the time to ship when onboarding
 checks a statement against the ODI format rules before saving.
 ```
 
-Add `--json` to any command for machine-readable output.
+Add `--json` to any command for machine-readable output. `export` writes to
+stdout only — CSV has one row per outcome with the same fields the table shows
+plus `job_id` and `step_id`, so it pipes straight into a spreadsheet or `jq`.
 
 ## Evidence
 
