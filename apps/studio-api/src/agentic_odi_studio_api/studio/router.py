@@ -131,7 +131,10 @@ def _as_http_error(exc: Exception) -> StudioHTTPError:
             StudioError(code=StudioErrorCode.VALIDATION, message=str(exc)),
             status_code=422,
         )
-    if isinstance(exc, (JobNotFoundError, StepNotFoundError, OutcomeNotFoundError)):
+    if isinstance(
+        exc,
+        (JobNotFoundError, StepNotFoundError, OutcomeNotFoundError, EvidenceNotFoundError),
+    ):
         return StudioHTTPError(StudioError(code=StudioErrorCode.NOT_FOUND, message=str(exc)))
     if isinstance(exc, ValueOutOfRangeError):
         return StudioHTTPError(StudioError(code=StudioErrorCode.OUT_OF_RANGE, message=str(exc)))

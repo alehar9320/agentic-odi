@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { StudioContextValue } from "../../state/StudioContext";
@@ -40,7 +40,7 @@ const evidence: Evidence[] = [
 
 const openPanel = vi.fn();
 
-function renderWith(items: Evidence[] = evidence) {
+function renderWith(items: Evidence[] = evidence, overrides: Partial<StudioContextValue> = {}) {
   vi.mocked(useStudio).mockReturnValue({
     openPanel,
     canvasState: {
@@ -56,6 +56,8 @@ function renderWith(items: Evidence[] = evidence) {
         source: "local",
       },
     },
+    promoteEvidence: vi.fn().mockResolvedValue(undefined),
+    ...overrides,
   } as unknown as StudioContextValue);
   return render(<EvidenceStream />);
 }
@@ -124,6 +126,33 @@ describe("EvidenceStream", () => {
       "e3",
       "e1",
     ]);
+  });
+
+  it("turns a quote into a scored outcome with the right payload", async () => {
+    const promoteEvidence = vi.fn().mockResolvedValue(undefined);
+    renderWith(undefined, { promoteEvidence });
+
+    fireEvent.click(screen.getByRole("button", { name: /Turn Call with Ada into an outcome/ }));
+
+    expect(screen.getByLabelText("Desired outcome")).toHaveValue(
+      "Deploys break whenever a secret rotates.",
+    );
+    fireEvent.change(screen.getByLabelText("Desired outcome"), {
+      target: { value: "Minimize the time it takes to rotate deployment secrets." },
+    });
+    fireEvent.change(screen.getByLabelText(/^Importance/), { target: { value: "9" } });
+    fireEvent.change(screen.getByLabelText(/^Current satisfaction/), { target: { value: "2" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save outcome" }));
+
+    await waitFor(() =>
+      expect(promoteEvidence).toHaveBeenCalledWith("e1", {
+        target: "outcome",
+        job_id: "j1",
+        statement: "Minimize the time it takes to rotate deployment secrets.",
+        importance: 9,
+        satisfaction: 2,
+      }),
+    );
   });
 
   it("restores a stored order on mount", () => {
