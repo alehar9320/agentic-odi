@@ -417,7 +417,10 @@ def test_promote_evidence_creates_a_scored_outcome() -> None:
 
     assert response.status_code == 200
     outcome = response.json()["result"]
-    assert outcome["statement"] == "Minimize the time it takes to sync a secret across environments when rotating keys"
+    assert (
+        outcome["statement"]
+        == "Minimize the time it takes to sync a secret across environments when rotating keys"
+    )
     assert outcome["importance"] == 9
     assert outcome["satisfaction"] == 2
     assert outcome["opportunity_score"] == 16
