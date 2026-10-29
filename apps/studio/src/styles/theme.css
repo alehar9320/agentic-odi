@@ -406,16 +406,7 @@ a {
   line-height: 1.55;
 }
 
-.hero__pills {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 7px;
-  margin-top: 2px;
-}
-
-/* The quiet second row: context and the optional tour, never competing with
-   the three starters. */
+/* The quiet second row: context and the optional tour. */
 .hero__aside {
   display: flex;
   flex-wrap: wrap;
@@ -728,6 +719,14 @@ a {
 .composer__send--stop {
   background: rgba(255, 255, 255, 0.14);
   color: var(--text);
+}
+
+.composer__pills {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 2px;
 }
 
 .composer__hint {
@@ -1612,53 +1611,6 @@ input[type="range"] {
   font-size: 0.72rem;
 }
 
-/* ------------------------------------------------------------------ */
-/* Toasts                                                             */
-/* ------------------------------------------------------------------ */
-.toast-stack {
-  position: fixed;
-  right: 18px;
-  bottom: 18px;
-  z-index: 1000;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  max-width: 360px;
-}
-
-.toast {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 10px 12px;
-  border: 1px solid var(--line-strong);
-  border-radius: 11px;
-  background: rgba(16, 18, 23, 0.96);
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
-  color: var(--text);
-  font-size: 0.8rem;
-}
-
-.toast--success {
-  border-color: rgba(74, 222, 128, 0.4);
-}
-
-.toast--error {
-  border-color: rgba(248, 113, 113, 0.4);
-}
-
-.toast--info {
-  border-color: rgba(139, 140, 248, 0.4);
-}
-
-.toast button {
-  border: 0;
-  background: transparent;
-  color: var(--faint);
-  font-size: 0.9rem;
-  cursor: pointer;
-}
 
 /* ------------------------------------------------------------------ */
 /* Error fallback                                                     */
@@ -1734,65 +1686,6 @@ input[type="range"] {
   }
 }
 
-/* ------------------------------------------------------------------ */
-/* Offline                                                            */
-/* ------------------------------------------------------------------ */
-.offline {
-  display: flex;
-  flex: none;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px 16px;
-  margin: 6px 22px 0;
-  padding: 10px 14px;
-  border: 1px solid rgba(245, 158, 11, 0.24);
-  border-radius: 12px;
-  background: rgba(245, 158, 11, 0.06);
-  color: var(--muted);
-  font-size: 0.78rem;
-  line-height: 1.45;
-}
-
-.offline__text strong {
-  color: var(--text);
-}
-
-.offline__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-/* ------------------------------------------------------------------ */
-/* Sidecar notice                                                     */
-/* ------------------------------------------------------------------ */
-.sidecar-notice {
-  display: flex;
-  flex: none;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px 16px;
-  margin: 6px 22px 0;
-  padding: 10px 14px;
-  border: 1px solid rgba(239, 68, 68, 0.24);
-  border-radius: 12px;
-  background: rgba(239, 68, 68, 0.06);
-  color: var(--muted);
-  font-size: 0.78rem;
-  line-height: 1.45;
-}
-
-.sidecar-notice__text strong {
-  color: var(--text);
-}
-
-.sidecar-notice__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
 
 /* ------------------------------------------------------------------ */
 /* Transcript notices and tags                                        */
@@ -2236,10 +2129,6 @@ input[type="range"] {
 
   .setup__replies {
     margin-left: 0;
-  }
-
-  .offline {
-    margin-inline: 14px;
   }
 
   .chat__welcome {
@@ -3322,7 +3211,7 @@ input[type="range"] {
 .bar,
 .outcome-card,
 .settings-drawer,
-.toast,
+.banner,
 .changelog-modal {
   backdrop-filter: blur(12px) saturate(160%);
   -webkit-backdrop-filter: blur(12px) saturate(160%);
@@ -3450,25 +3339,6 @@ details[open] summary {
     opacity: 1;
     transform: scale(1.02);
   }
-}
-
-/* 11. Toast stack pop & elastic slide-in */
-@keyframes toastSlideIn {
-  0% {
-    opacity: 0;
-    transform: translateX(40px) scale(0.9);
-  }
-  70% {
-    transform: translateX(-4px) scale(1.02);
-  }
-  100% {
-    opacity: 1;
-    transform: translateX(0) scale(1);
-  }
-}
-
-.toast {
-  animation: toastSlideIn 0.35s var(--ease-apple-spring) forwards;
 }
 
 /* 17. Quick prompt button shimmer / pulse glow */
@@ -4530,6 +4400,165 @@ details[open] summary {
 }
 
 /* ------------------------------------------------------------------ */
+/* Banners: one system for everything the studio has to say            */
+/* ------------------------------------------------------------------ */
+.banner-dock {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.banner-dock > * {
+  pointer-events: auto;
+}
+
+/* A top banner is a page strip: it holds the layout still rather than
+   floating over the thread, so reading position never shifts under it. */
+.banner-dock--top {
+  position: sticky;
+  top: 0;
+  z-index: 900;
+  padding: 8px 22px 0;
+}
+
+.banner-dock--corner {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 1000;
+  width: min(380px, calc(100vw - 36px));
+}
+
+.banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px 16px;
+  padding: 10px 14px;
+  border: 1px solid var(--line-strong);
+  border-left-width: 3px;
+  border-radius: 12px;
+  background: var(--bg-raised);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.28);
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.banner__text {
+  min-width: 0;
+}
+
+.banner__title {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.banner__body {
+  margin-top: 2px;
+}
+
+.banner__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.banner__action,
+.banner__dismiss {
+  padding: 5px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.banner__action:hover,
+.banner__dismiss:hover {
+  background: var(--surface-hover);
+}
+
+.banner__action--primary {
+  border-color: transparent;
+  background: var(--accent-strong);
+  color: #fff;
+}
+
+.banner__dismiss {
+  color: var(--muted);
+}
+
+/* Severity is one class and one accent, so a new banner cannot invent a look. */
+.banner--info {
+  border-left-color: var(--accent);
+}
+
+.banner--success {
+  border-left-color: var(--green);
+}
+
+.banner--warning {
+  border-left-color: var(--amber);
+}
+
+.banner--critical {
+  border-left-color: #ef4444;
+}
+
+.banner-overflow {
+  padding: 6px 14px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--faint);
+  font-size: 0.72rem;
+}
+
+/* Radix needs a viewport to position toasts into; ours are the docks above. */
+.banner-viewport {
+  position: fixed;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  outline: none;
+}
+
+.banner-viewport--top {
+  top: 0;
+  left: 0;
+  right: 0;
+}
+
+.banner-viewport--corner {
+  right: 18px;
+  bottom: 18px;
+  width: min(380px, calc(100vw - 36px));
+}
+
+@keyframes bannerIn {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.banner {
+  animation: bannerIn 0.28s var(--ease-apple-spring, ease-out);
+}
+
 /* Customize: the connector shelf                                     */
 /* ------------------------------------------------------------------ */
 .pill-customize {

@@ -103,5 +103,6 @@ settings, not files; change them with `gh api` and record it here.
 ## Related
 
 - [Data flow](data-flow.md)
+- [Studio banners](banners.md)
 - [Testing](testing.md)
 - [Decisions (ADRs)](adr/README.md) — why the architecture looks the way it does

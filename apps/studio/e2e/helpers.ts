@@ -60,11 +60,14 @@ export function lens(page: Page) {
  * The offline notice, which offers the by-hand routes when no model is
  * reachable.
  *
- * It is a `role="status"` region, and it is the only place outside the hero
- * that offers "Capture an outcome" — scoping to it keeps the two apart.
+ * It is a live region — `status` while the notice is quiet, `alert` once the
+ * banner system marks it urgent — and it is the only place outside the hero
+ * that offers "Capture an outcome", so scoping to it keeps the two apart.
  */
 export function offlineNotice(page: Page) {
-  return page.getByRole("status").filter({ hasText: "Working by hand" });
+  // Radix also mirrors toast text into a hidden live region, so match the
+  // rendered banner itself rather than any element that carries the words.
+  return page.locator(".banner").filter({ hasText: "Working by hand" });
 }
 
 /** Send a message through the composer and wait for the reply to land. */

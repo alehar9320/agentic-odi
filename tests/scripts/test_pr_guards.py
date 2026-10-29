@@ -530,12 +530,19 @@ def test_the_default_config_documents_the_thresholds() -> None:
     assert "uv.lock" in config["generated_exclusions"]
 
 
-def test_the_allowlist_is_empty_by_default_so_deletions_are_denied() -> None:
+def test_the_allowlist_only_approves_banner_component_replacements() -> None:
     import yaml
 
     allowlist = yaml.safe_load(ALLOWLIST.read_text(encoding="utf-8"))
 
-    assert allowlist in (None, [])
+    assert {entry["path"] for entry in allowlist} == {
+        "apps/studio/src/components/Toasts.test.tsx",
+        "apps/studio/src/components/Toasts.tsx",
+        "apps/studio/src/components/chat/OfflineNotice.tsx",
+        "apps/studio/src/components/notices/SidecarNotice.test.tsx",
+        "apps/studio/src/components/notices/SidecarNotice.tsx",
+    }
+    assert all(entry["issue"] == 264 and entry["reason"] for entry in allowlist)
 
 
 def test_the_template_asks_for_experience_verification_and_scope() -> None:

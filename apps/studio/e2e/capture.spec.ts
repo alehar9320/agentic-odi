@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { offlineNotice, openStudio, rail } from "./helpers";
+import { offlineNotice, openStudio, rail, resetRepository } from "./helpers";
 
 /**
  * Capturing an outcome by hand is the promise the Studio makes when no model
@@ -11,6 +11,12 @@ import { offlineNotice, openStudio, rail } from "./helpers";
  * repository — so it is the test that would catch a seam breaking.
  */
 test.describe("capturing an outcome", () => {
+  test.beforeEach(async ({ request }) => {
+    // The sidecar repository is shared by the whole run, so a retry or a later
+    // test must not inherit the job the previous attempt already created.
+    await resetRepository(request);
+  });
+
   test("records an outcome and shows it in the landscape", async ({ page }) => {
     await openStudio(page);
 
@@ -23,14 +29,14 @@ test.describe("capturing an outcome", () => {
     // A job first: an outcome is always a metric for a job.
     await panel.getByLabel("Job name").fill("Ship a service to production");
     await panel.getByRole("button", { name: "Add job" }).click();
-    await expect(page.getByRole("status").filter({ hasText: "Job created" })).toBeVisible();
+    await expect(page.locator(".banner").filter({ hasText: "Job created" })).toBeVisible();
 
     // Then the outcome itself.
     await panel
       .getByLabel("Desired outcome")
       .fill("Minimize the time to deploy a service when releasing a hotfix");
     await panel.getByRole("button", { name: "Record outcome" }).click();
-    await expect(page.getByRole("status").filter({ hasText: "Outcome captured" })).toBeVisible();
+    await expect(page.locator(".banner").filter({ hasText: "Outcome captured" })).toBeVisible();
 
     // The outcome is now part of the canvas.
     await rail(page).getByRole("button", { name: /^Landscape,/ }).click();
@@ -77,6 +83,11 @@ test.describe("capturing an outcome", () => {
     await offlineNotice(page).getByRole("button", { name: "Capture an outcome" }).click();
 
     const panel = page.getByRole("complementary", { name: "Capture by hand" });
+    // An outcome always belongs to a job, so the repository starts empty here.
+    await panel.getByLabel("Job name").fill("Ship a service to production");
+    await panel.getByRole("button", { name: "Add job" }).click();
+    await expect(page.locator(".banner").filter({ hasText: "Job created" })).toBeVisible();
+
     await expect(panel.getByRole("button", { name: "Record outcome" })).toBeDisabled();
 
     await panel.getByLabel("Desired outcome").fill("Minimize the wait");

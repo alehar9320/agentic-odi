@@ -52,7 +52,7 @@ test.describe("the Studio on the MCP backend", () => {
       .getByLabel("Desired outcome")
       .fill("Minimize the time to propagate secrets when rotating credentials");
     await panel.getByRole("button", { name: "Record outcome" }).click();
-    await expect(page.getByRole("status").filter({ hasText: "Outcome captured" })).toBeVisible();
+    await expect(page.locator(".banner").filter({ hasText: "Outcome captured" })).toBeVisible();
 
     // The outcome really landed in the MCP server.
     const canvas = await request.get(`/api/canvas?mcp_url=${encodeURIComponent(MCP_URL)}`);
