@@ -29,7 +29,9 @@ import {
   fetchConnectorCatalog,
   fetchConnectors,
   fetchConversationTree,
+  fetchFeatured,
   fetchLatestConversation,
+  fetchMarketplace,
   fetchMemory,
   healthLlm,
   healthMcp,
@@ -56,6 +58,10 @@ import type {
   ChatPart,
   ConnectorListItem,
   ConnectorPreset,
+  ConnectorSuggestion,
+  CustomizeTarget,
+  MarketplaceListing,
+  MarketplaceSearch,
   Observation,
   StudioBrief,
   StudioConfig,
@@ -266,6 +272,25 @@ export interface StudioContextValue {
   deleteConnector: (name: string) => Promise<void>;
   connectorSuggestions: string[];
   dismissConnectorSuggestion: (preset: string) => void;
+  /** Whether the Customize page is on stage. */
+  customizeOpen: boolean;
+  /** Where Customize should land: a prefilled query, or one listing to focus. */
+  customizeTarget: CustomizeTarget | null;
+  openCustomize: (target?: CustomizeTarget) => void;
+  closeCustomize: () => void;
+  /** Marketplace results for the Customize page's current filters. */
+  marketplace: MarketplaceSearch | null;
+  marketplaceError: StudioError | null;
+  marketplaceLoading: boolean;
+  searchMarketplace: (params?: { q?: string; area?: string }) => Promise<void>;
+  /** Editor's picks, fetched once per session. */
+  featured: MarketplaceListing[];
+  featuredError: StudioError | null;
+  refreshFeatured: () => Promise<void>;
+  installFromMarketplace: (listing: MarketplaceListing) => Promise<boolean>;
+  /** The one connector the studio suggests next, or null when nothing applies. */
+  connectorSuggestion: ConnectorSuggestion | null;
+  dismissConnectorModal: () => void;
   /** Scored outcomes saved as shareable opportunity theses. */
   theses: Thesis[];
   saveThesis: (thesis: Omit<Thesis, "id" | "created_at">) => void;
@@ -412,6 +437,15 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [connectorsError, setConnectorsError] = useState<StudioError | null>(null);
   const [capabilities, setCapabilities] = useState<Capability[]>([]);
   const [connectorSuggestions, setConnectorSuggestions] = useState<string[]>([]);
+  const [customizeOpen, setCustomizeOpen] = useState(false);
+  const [customizeTarget, setCustomizeTarget] = useState<CustomizeTarget | null>(null);
+  const [marketplace, setMarketplace] = useState<MarketplaceSearch | null>(null);
+  const [marketplaceError, setMarketplaceError] = useState<StudioError | null>(null);
+  const [marketplaceLoading, setMarketplaceLoading] = useState(false);
+  const marketplaceSeq = useRef(0);
+  const [featured, setFeatured] = useState<MarketplaceListing[]>([]);
+  const [featuredError, setFeaturedError] = useState<StudioError | null>(null);
+  const [connectorModalDismissed, setConnectorModalDismissed] = useState(false);
   const [notifications, setNotifications] = useState<StudioNotification[]>(loadNotifications);
   const [theses, setTheses] = useState<Thesis[]>(loadTheses);
   const toastId = useRef(0);
@@ -430,6 +464,29 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     () => notifications.filter((n) => !n.read && !n.simulated).length,
     [notifications],
   );
+
+  /**
+   * The one connector the studio offers next. An agent suggestion wins, since
+   * it is grounded in what the user just asked for; otherwise a studio with no
+   * connectors at all points at its first Editor's pick, because a thin studio
+   * is the other way users learn connectors exist.
+   */
+  const connectorSuggestion = useMemo<ConnectorSuggestion | null>(() => {
+    if (connectorModalDismissed || customizeOpen) {
+      return null;
+    }
+    const suggested = connectorSuggestions[0];
+    if (suggested) {
+      const match = featured.find(
+        (item) => item.name === suggested || item.title === suggested || item.id === suggested,
+      );
+      return { id: suggested, listing: match ?? null, reason: "agent" };
+    }
+    if (connectors.length === 0 && featured.length > 0) {
+      return { id: featured[0].id, listing: featured[0], reason: "empty" };
+    }
+    return null;
+  }, [connectorModalDismissed, connectorSuggestions, connectors, customizeOpen, featured]);
 
   const markNotificationAsRead = useCallback(
     (id: string) => {
@@ -542,6 +599,64 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     },
     [pushToast, refreshConnectors],
   );
+
+  const refreshFeatured = useCallback(async () => {
+    setFeaturedError(null);
+    try {
+      setFeatured((await fetchFeatured(6)).listings);
+    } catch (error) {
+      // An unreachable shelf is a failure, not an empty shelf.
+      setFeaturedError(asStudioError(error));
+      setFeatured([]);
+    }
+  }, []);
+
+  const searchMarketplace = useCallback(async (params: { q?: string; area?: string } = {}) => {
+    // A slower earlier request must not overwrite a newer one's results.
+    const seq = ++marketplaceSeq.current;
+    setMarketplaceLoading(true);
+    setMarketplaceError(null);
+    try {
+      const result = await fetchMarketplace({ q: params.q, area: params.area, limit: 50 });
+      if (seq !== marketplaceSeq.current) return;
+      setMarketplace(result);
+    } catch (error) {
+      if (seq !== marketplaceSeq.current) return;
+      setMarketplaceError(asStudioError(error));
+      setMarketplace(null);
+    } finally {
+      if (seq === marketplaceSeq.current) setMarketplaceLoading(false);
+    }
+  }, []);
+
+  const openCustomize = useCallback((target?: CustomizeTarget) => {
+    setCustomizeTarget(target ?? null);
+    setCustomizeOpen(true);
+  }, []);
+
+  const closeCustomize = useCallback(() => {
+    setCustomizeOpen(false);
+    setCustomizeTarget(null);
+  }, []);
+
+  const installFromMarketplace = useCallback(
+    async (listing: MarketplaceListing) => {
+      try {
+        const response = await apiAddConnector({ marketplace_id: listing.id });
+        if (response.ok) {
+          pushToast("success", `Added connector ${response.name}`);
+        }
+        await refreshConnectors();
+        return true;
+      } catch (error) {
+        pushToast("error", `Error adding connector: ${(error as Error).message}`);
+        return false;
+      }
+    },
+    [pushToast, refreshConnectors],
+  );
+
+  const dismissConnectorModal = useCallback(() => setConnectorModalDismissed(true), []);
 
   const saveThesis = useCallback((thesis: Omit<Thesis, "id" | "created_at">) => {
     const saved: Thesis = {
@@ -1456,6 +1571,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       void refreshCanvas();
       void refreshConnectors();
       void refreshPresets();
+      void refreshFeatured();
       void refreshMemory();
       void fetchLatestConversation()
         .then(async ({ conversation }) => {
@@ -1596,6 +1712,20 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       deleteConnector,
       connectorSuggestions,
       dismissConnectorSuggestion,
+      customizeOpen,
+      customizeTarget,
+      openCustomize,
+      closeCustomize,
+      marketplace,
+      marketplaceError,
+      marketplaceLoading,
+      searchMarketplace,
+      featured,
+      featuredError,
+      refreshFeatured,
+      installFromMarketplace,
+      connectorSuggestion,
+      dismissConnectorModal,
       theses,
       saveThesis,
       deleteThesis,
@@ -1679,6 +1809,20 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       deleteConnector,
       connectorSuggestions,
       dismissConnectorSuggestion,
+      customizeOpen,
+      customizeTarget,
+      openCustomize,
+      closeCustomize,
+      marketplace,
+      marketplaceError,
+      marketplaceLoading,
+      searchMarketplace,
+      featured,
+      featuredError,
+      refreshFeatured,
+      installFromMarketplace,
+      connectorSuggestion,
+      dismissConnectorModal,
       theses,
       saveThesis,
       deleteThesis,

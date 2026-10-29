@@ -22,6 +22,7 @@ from agentic_odi_cli.jobs import jobs_app
 from agentic_odi_cli.onboard import maybe_run_first_launch
 from agentic_odi_cli.profile import app as profile_app
 from agentic_odi_cli.profile import setup_wizard
+from agentic_odi_cli.render import render_job_summary
 from agentic_odi_cli.settings import settings_app
 from agentic_odi_cli.steps import steps_app
 from agentic_odi_cli.version import __version__  # noqa: F401  (re-exported for tests)
@@ -226,6 +227,27 @@ app.add_typer(capabilities_app, name="capabilities")
 app.add_typer(settings_app, name="settings")
 app.add_typer(profile_app, name="profile")
 app.command(name="setup", help="Configure product baseline interactively.")(setup_wizard)
+
+
+@app.command(name="summary")
+def summary(
+    job_id: str = typer.Argument(..., help="Job ID"),
+    top: int = typer.Option(5, "--top", help="How many underserved outcomes to show."),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
+) -> None:
+    """Summarize a Job's map coverage and its biggest opportunities."""
+    job = run_tool("get_job", {"job_id": job_id})
+    steps = run_tool("get_job_map", {"job_id": job_id})
+    outcomes = run_tool("get_outcomes", {"job_id": job_id})
+    typer.echo(
+        render_job_summary(
+            job if isinstance(job, dict) else {},
+            steps if isinstance(steps, list) else [],
+            outcomes if isinstance(outcomes, list) else [],
+            top=top,
+            as_json=json_output,
+        )
+    )
 
 
 @app.command(name="version")

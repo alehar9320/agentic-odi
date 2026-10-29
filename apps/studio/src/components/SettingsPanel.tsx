@@ -4,7 +4,44 @@ import { useOnboarding } from "../onboarding/context";
 import { useStudio } from "../state/StudioContext";
 import type { ConnectorPreset, StudioConfig } from "../types";
 import { FailurePanel } from "./FailurePanel";
-import { UpdateSettings } from "../updater";
+import { UpdateSettings, useUpdateService, useUpdateSnapshot } from "../updater";
+import { detectPlatform } from "../updater/platform";
+
+const PLATFORM_LABELS: Record<ReturnType<typeof detectPlatform>, string> = {
+  macos: "macOS",
+  windows: "Windows",
+  linux: "Linux",
+  unknown: "Desktop",
+};
+
+/**
+ * The honest facts about this build: which version, cut when, for which
+ * platform, and what the updater thinks. Read-only — the controls live in
+ * the Software update section above.
+ */
+function AboutSection() {
+  const service = useUpdateService();
+  const snapshot = useUpdateSnapshot();
+  const platform = detectPlatform();
+
+  return (
+    <section className="settings__about" aria-labelledby="settings-about-heading">
+      <h3 className="settings__title" id="settings-about-heading">
+        About
+      </h3>
+      <dl>
+        <dt>Version</dt>
+        <dd>{snapshot.currentVersion ? `v${snapshot.currentVersion}` : "—"}</dd>
+        <dt>Build</dt>
+        <dd>{__STUDIO_BUILD_DATE__}</dd>
+        <dt>Platform</dt>
+        <dd>{PLATFORM_LABELS[platform]}</dd>
+        <dt>Updates</dt>
+        <dd>{service.statusLine()}</dd>
+      </dl>
+    </section>
+  );
+}
 
 const PRESET_AREAS: ConnectorPreset["area"][] = [
   "voice-of-customer",
@@ -42,6 +79,7 @@ export function SettingsPanel() {
     refreshConnectors,
     addConnector,
     deleteConnector,
+    openCustomize,
     sidecarReachable,
     capabilities,
   } = useStudio();
@@ -201,6 +239,13 @@ export function SettingsPanel() {
       ) : (
         <>
           <h3 className="settings__title">Connectors</h3>
+          <button
+            type="button"
+            className="button settings__manage"
+            onClick={() => openCustomize()}
+          >
+            Manage connectors
+          </button>
           {connectorsError ? (
             <FailurePanel
               error={connectorsError}
@@ -294,6 +339,8 @@ export function SettingsPanel() {
       ) : null}
 
       <UpdateSettings />
+
+      <AboutSection />
 
       <details className="disclosure">
         <summary>How the studio works</summary>

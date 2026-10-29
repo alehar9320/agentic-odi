@@ -11,6 +11,8 @@ import pytest
 from agentic_odi_core import ODIService
 from agentic_odi_studio_api.studio import mcp_data
 from agentic_odi_studio_api.studio.errors import StudioHTTPError
+from fastmcp.client.client import CallToolResult
+from mcp.types import TextContent
 
 
 class _FakeClient:
@@ -257,6 +259,96 @@ def test_call_mcp_tool_reports_a_tool_error_as_a_tool_failure(monkeypatch) -> No
 
     assert exc_info.value.status_code == 500
     assert exc_info.value.error.code.value == "mcp_tool_failed"
+
+
+class _ResultClient:
+    """A client whose ``call_tool`` returns a real ``CallToolResult``.
+
+    ``fastmcp.Client.call_tool`` returns a ``CallToolResult`` object, not a
+    string, so ``str(result)`` is its ``repr`` rather than the tool's text. A
+    stub that returns a bare string hides that, which is how the canvas could
+    hydrate to nothing and silently fall back to seed data.
+    """
+
+    payloads: dict[str, Any] = {}
+    error: Exception | None = None
+    calls: list[tuple[str, dict[str, Any]]] = []
+
+    def __init__(self, url: str) -> None:
+        self.url = url
+
+    async def __aenter__(self) -> _ResultClient:
+        return self
+
+    async def __aexit__(self, *exc: Any) -> bool:
+        return False
+
+    async def call_tool(self, name: str, arguments: dict[str, Any]) -> CallToolResult:
+        self.calls.append((name, arguments))
+        if self.error is not None:
+            raise self.error
+        text = str(self.payloads.get(name, "[]"))
+        return CallToolResult(
+            content=[TextContent(type="text", text=text)],
+            structured_content={"result": text},
+            meta=None,
+        )
+
+
+def test_fetch_canvas_hydrates_from_real_tool_results(monkeypatch) -> None:
+    """A real ``CallToolResult`` must hydrate the canvas, not fall back to seed."""
+    _ResultClient.calls = []
+    _ResultClient.error = None
+    _ResultClient.payloads = {
+        "get_jobs": json.dumps([{"id": "job-1"}]),
+        "get_job_map": json.dumps([{"id": "step-1", "job_id": "job-1"}]),
+        "get_outcomes": json.dumps([{"id": "outcome-1", "job_id": "job-1"}]),
+        "list_evidence": json.dumps([{"id": "evidence-1", "job_id": "job-1"}]),
+    }
+    monkeypatch.setattr(mcp_data, "is_endpoint_reachable", lambda url, timeout: True)
+    monkeypatch.setattr(mcp_data, "McpClient", _ResultClient)
+
+    payload = asyncio.run(mcp_data.fetch_canvas("http://mcp"))
+
+    assert payload["source"] == "mcp"
+    assert payload["jobs"] == [{"id": "job-1"}]
+    assert payload["steps"] == [{"id": "step-1", "job_id": "job-1"}]
+    assert payload["outcomes"] == [{"id": "outcome-1", "job_id": "job-1"}]
+    assert payload["evidence"] == [{"id": "evidence-1", "job_id": "job-1"}]
+    assert payload["warnings"] == []
+
+
+def test_call_mcp_tool_returns_the_text_of_a_real_tool_result(monkeypatch) -> None:
+    _ResultClient.calls = []
+    _ResultClient.error = None
+    _ResultClient.payloads = {"get_jobs": "[]"}
+    monkeypatch.setattr(mcp_data, "is_endpoint_reachable", lambda url, timeout: True)
+    monkeypatch.setattr(mcp_data, "McpClient", _ResultClient)
+
+    result = asyncio.run(mcp_data.call_mcp_tool("http://mcp", "get_jobs", {}))
+
+    assert result == "[]"
+
+
+def test_call_mcp_tool_raises_when_a_real_tool_result_reports_an_error(monkeypatch) -> None:
+    """A tool-level failure must not be relayed as a success."""
+    _ResultClient.calls = []
+    _ResultClient.error = None
+    _ResultClient.payloads = {"add_outcome": "Error: Job with ID JOB-402 not found."}
+    monkeypatch.setattr(mcp_data, "is_endpoint_reachable", lambda url, timeout: True)
+    monkeypatch.setattr(mcp_data, "McpClient", _ResultClient)
+
+    with pytest.raises(StudioHTTPError) as exc_info:
+        asyncio.run(
+            mcp_data.call_mcp_tool(
+                "http://mcp", "add_outcome", {"job_id": "JOB-402", "statement": "x"}
+            )
+        )
+
+    # The tool's own text is classified, so a missing job is a 404, not a 200.
+    assert exc_info.value.status_code == 404
+    assert exc_info.value.error.code.value == "not_found"
+    assert "JOB-402" in exc_info.value.error.message
 
 
 class _Record:

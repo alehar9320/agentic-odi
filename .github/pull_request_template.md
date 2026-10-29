@@ -58,3 +58,16 @@ paste it here:
 ## Related issue
 
 <!-- Closes #123, refs #456, or "none". -->
+
+## Agent metadata
+
+<!-- Coding agents: fill in the block below. It is read by the labeler
+     workflow to tag this PR. Humans may leave it as-is; the defaults claim
+     nothing. Keep the HTML comment markers exactly as they are, and keep the
+     JSON on one line or pretty-printed — both parse. A block that cannot be
+     parsed gets the "telemetry invalid" label.
+
+     has_breaking_changes: true only if this changes behavior callers depend on.
+     agent_confidence:     high | medium | low. "low" requests a deep dive. -->
+
+<!-- AGENT_METADATA {"has_breaking_changes": false, "agent_confidence": "high"} -->
