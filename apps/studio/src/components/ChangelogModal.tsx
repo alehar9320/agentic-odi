@@ -112,7 +112,13 @@ export function ChangelogModal({ isOpen, onClose }: ChangelogModalProps) {
             </div>
           )}
 
-          {!loading && !error && changelog && (
+          {!loading && !error && changelog && changelog.releases.length === 0 && (
+            <p className="changelog-modal__empty">
+              Release notes come from the studio service. Start it to see what changed.
+            </p>
+          )}
+
+          {!loading && !error && changelog && changelog.releases.length > 0 && (
             <div className="changelog-timeline">
               {changelog.releases.map((release) => (
                 <article

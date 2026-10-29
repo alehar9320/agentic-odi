@@ -147,7 +147,6 @@ const SETTINGS_KEY = "studio.settings";
 const CANVAS_KEY = "studio.canvas";
 const DISPLAY_NAME_KEY = "studio.displayName";
 const BRIEF_KEY = "studio.brief";
-const SETUP_DISMISSED_KEY = "studio.setupDismissed";
 const SIDECAR_NOTICE_DISMISSED_KEY = "studio.sidecarNoticeDismissed";
 const NOTIFICATIONS_KEY = "studio.notifications";
 const THESES_KEY = "studio.theses";
@@ -337,14 +336,6 @@ function loadCanvasCache(): CanvasData | null {
   return null;
 }
 
-function loadSetupDismissed(): boolean {
-  try {
-      return localStorage.getItem(SETUP_DISMISSED_KEY) === "1";
-  } catch {
-    return false;
-  }
-}
-
 function loadSidecarNoticeDismissed(): boolean {
   try {
     return localStorage.getItem(SIDECAR_NOTICE_DISMISSED_KEY) === "1";
@@ -413,9 +404,9 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const theme: StudioTheme = settings.theme === "light" ? "light" : "dark";
   const [displayName, setDisplayNameState] = useState<string>(loadDisplayName);
   const [brief, setBrief] = useState<StudioBrief | null>(loadBrief);
-  const [setupOpen, setSetupOpen] = useState<boolean>(
-    () => loadBrief() === null && !loadSetupDismissed(),
-  );
+  // The context conversation is never a gate. It opens from the stage, from a
+  // hint once the studio has answered something, from /start, or from Settings.
+  const [setupOpen, setSetupOpen] = useState(false);
   const [offlineReply, setOfflineReply] = useState(false);
   const [canvasState, setCanvasState] = useState<CanvasState>(() => {
     const cached = loadCanvasCache();
@@ -762,7 +753,6 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     setSetupOpen(false);
     try {
       localStorage.setItem(BRIEF_KEY, JSON.stringify(next));
-      localStorage.removeItem(SETUP_DISMISSED_KEY);
     } catch {
       /* storage unavailable */
     }
@@ -771,20 +761,10 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const openSetup = useCallback(() => {
     setActivePanel(null);
     setSetupOpen(true);
-    try {
-      localStorage.removeItem(SETUP_DISMISSED_KEY);
-    } catch {
-      /* storage unavailable */
-    }
   }, []);
 
   const closeSetup = useCallback(() => {
     setSetupOpen(false);
-    try {
-      localStorage.setItem(SETUP_DISMISSED_KEY, "1");
-    } catch {
-      /* storage unavailable */
-    }
   }, []);
 
   const pushNotice = useCallback((text: string) => {
