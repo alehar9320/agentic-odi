@@ -1,15 +1,121 @@
 name: release
 
+# Attaching assets has to survive the way release-please cuts a tag.
+#
+# release-please creates the tag and publishes the GitHub Release with the
+# repository GITHUB_TOKEN, and GitHub does not start workflow runs for events
+# that token produces. A `push: tags` trigger alone therefore never fired (this
+# workflow had zero runs, and every release shipped with no archives, no
+# checksums.txt, and no install scripts). The workflow listens on the published
+# release and on the release-please run itself, neither of which is subject to
+# that block, and `workflow_dispatch` is the manual self-heal path. `push: tags`
+# stays for tags created by hand. The `resolve` job gates every path, so a run
+# that finds the release complete does nothing instead of rebuilding every
+# platform.
 on:
   push:
     tags:
       - "v*"
+  release:
+    types: [published]
+  workflow_run:
+    workflows: ["release-please"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to (re)build assets for (default: the latest release)"
+        required: false
+        type: string
+      force:
+        description: "Rebuild even when the release already has every asset"
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: write
 
 jobs:
+  resolve:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      tag: ${{ steps.gate.outputs.tag }}
+      version: ${{ steps.gate.outputs.version }}
+      should_build: ${{ steps.gate.outputs.should_build }}
+      should_publish: ${{ steps.gate.outputs.should_publish }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Resolve the tag and check for missing assets
+        id: gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          DISPATCH_TAG: ${{ inputs.tag }}
+          RUN_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          FORCE: ${{ inputs.force }}
+        run: |
+          set -euo pipefail
+          tag=""
+          case "$EVENT" in
+            push)              tag="${GITHUB_REF_NAME}" ;;
+            release)           tag="${GITHUB_REF_NAME}" ;;
+            workflow_dispatch) tag="$DISPATCH_TAG" ;;
+            workflow_run)      tag="$RUN_BRANCH" ;;
+          esac
+          # A branch name, an empty dispatch input, or anything that is not a
+          # version tag means "repair the current release".
+          case "$tag" in
+            v[0-9]*) ;;
+            *)
+              echo "No explicit v* tag for a '$EVENT' run (got '$tag'); using the latest release."
+              tag="$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name)"
+              ;;
+          esac
+          args=(--stream cli --tag "$tag" --repo "$GITHUB_REPOSITORY")
+          if [ "$FORCE" = "true" ]; then args+=(--force); fi
+          python3 scripts/release_assets.py "${args[@]}" >> "$GITHUB_OUTPUT"
+          cat "$GITHUB_OUTPUT"
+
+  # A release that ships a binary reporting a different version than its tag is
+  # a trust failure, so the tag is checked against the source before any build.
+  # The tag comes from `resolve` so this also holds on workflow_run and
+  # workflow_dispatch, where GITHUB_REF_NAME is a branch.
+  version:
+    needs: resolve
+    if: needs.resolve.outputs.should_build == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.resolve.outputs.tag }}
+      - name: Setup uv
+        uses: ./.github/actions/setup
+        with:
+          python-version: "3.11"
+      - name: The tag matches the version the CLI reports
+        run: |
+          set -euo pipefail
+          tag="${{ needs.resolve.outputs.tag }}"
+          tag_version="${GITHUB_REF_NAME#v}"
+          case "$GITHUB_REF_NAME" in
+            v[0-9]*) ;;
+            *) tag_version="${tag#v}" ;;
+          esac
+          reported="$(uv run python -m agentic_odi_cli --version)"
+          # `--version` prints "<version> (<date>)" when a build date is set.
+          cli_version="${reported%% *}"
+          if [ "$cli_version" != "$tag_version" ]; then
+            echo "::error::Tag v${tag_version} does not match the CLI version ${cli_version}. Bump the declared version before tagging."
+            exit 1
+          fi
+          echo "OK: version ${cli_version} matches tag v${tag_version}"
+
   build:
+    needs: [resolve, version]
+    if: needs.resolve.outputs.should_build == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -34,7 +140,12 @@ jobs:
     # glibc floor is needed later, use a manylinux_2_28 image instead.
     runs-on: ${{ matrix.runner }}
     steps:
+      # Build the tagged tree, not the default branch: on a `workflow_run` or
+      # `workflow_dispatch` the default ref is main, which may be ahead of the
+      # release being repaired.
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.resolve.outputs.tag }}
       - name: Setup uv
         uses: ./.github/actions/setup
         with:
@@ -43,7 +154,7 @@ jobs:
         env:
           TARGET: ${{ matrix.target }}
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
+          VERSION="${{ needs.resolve.outputs.version }}"
           RELEASE_DATE_UTC="$(git log -1 --format=%cI)"
           export VERSION RELEASE_DATE_UTC
           bash scripts/build_binary.sh
@@ -75,12 +186,14 @@ jobs:
       - name: Upload assets
         uses: softprops/action-gh-release@v3
         with:
+          tag_name: ${{ needs.resolve.outputs.tag }}
           files: |
             odi_*.tar.gz
             odi_*.zip
 
   checksums:
-    needs: build
+    needs: [resolve, build]
+    if: needs.resolve.outputs.should_build == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v8
@@ -98,24 +211,47 @@ jobs:
       - name: Upload checksums.txt
         uses: softprops/action-gh-release@v3
         with:
+          tag_name: ${{ needs.resolve.outputs.tag }}
           files: checksums.txt
 
   upload-installers:
+    needs: resolve
+    if: needs.resolve.outputs.should_build == 'true'
     runs-on: ubuntu-latest
     steps:
+      # Upload the installers from the tagged tree so they match the binaries
+      # built for the same tag.
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.resolve.outputs.tag }}
       - name: Upload install scripts
         uses: softprops/action-gh-release@v3
         with:
+          tag_name: ${{ needs.resolve.outputs.tag }}
           files: |
             scripts/install.sh
             scripts/install.ps1
 
   release-instructions:
-    needs: [checksums, upload-installers]
+    # Publish the end-user "Download & Run" text after the assets are attached.
+    # `always()` plus the result checks let this also repair a release whose
+    # assets are already complete but whose page has no instructions yet, which
+    # is why the asset jobs are allowed to be `skipped`.
+    needs: [resolve, checksums, upload-installers]
+    if: >-
+      always()
+      && !cancelled()
+      && needs.resolve.outputs.should_publish == 'true'
+      && (needs.checksums.result == 'success' || needs.checksums.result == 'skipped')
+      && (needs.upload-installers.result == 'success' || needs.upload-installers.result == 'skipped')
     runs-on: ubuntu-latest
     steps:
+      # Use the tooling from the default branch, not the tag, so improvements to
+      # the instructions apply to repaired releases too. The asset list is read
+      # from the release itself.
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.repository.default_branch }}
       - name: Setup uv
         uses: ./.github/actions/setup
         with:
@@ -129,11 +265,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          tag="${{ github.ref_name }}"
-          version="${tag#v}"
-          date_utc="$(git log -1 --format=%cI)"
+          tag="${{ needs.resolve.outputs.tag }}"
+          version="${{ needs.resolve.outputs.version }}"
+          date_utc="$(gh api "repos/$GITHUB_REPOSITORY/commits/$tag" --jq '.commit.committer.date')"
           human_date="${date_utc:0:10}"
-          gh release edit "$tag" --repo "${{ github.repository }}" \
+          gh release edit "$tag" --repo "$GITHUB_REPOSITORY" \
             --title "v${version} — ${human_date}"
           echo "Release title set to: v${version} — ${human_date}"
 
@@ -142,5 +278,5 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           python scripts/release_instructions.py \
-            --tag "${{ github.ref_name }}" \
+            --tag "${{ needs.resolve.outputs.tag }}" \
             --repo "${{ github.repository }}"

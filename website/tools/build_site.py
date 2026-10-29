@@ -340,7 +340,7 @@ def _render_pages(env: Environment) -> dict[str, str]:
         tool_signatures={tool["name"]: _signature(tool) for tool in tools},
         catalog_cards=cards,
         odi_schema=odi_schema,
-        odi_schema_json=json.dumps(odi_schema, indent=2, sort_keys=True),
+        odi_schema_json=json.dumps(odi_schema, indent=1, sort_keys=True),
         works_today=_works_today(tools, cards, connectors),
         roadmap_pending=roadmap_pending,
         formula_base=formula_base,
@@ -423,7 +423,7 @@ def _tree(root: Path) -> dict[str, bytes]:
     if not root.is_dir():
         return {}
     return {
-        str(path.relative_to(root)): path.read_bytes()
+        path.relative_to(root).as_posix(): path.read_bytes()
         for path in sorted(root.rglob("*"))
         if path.is_file()
     }

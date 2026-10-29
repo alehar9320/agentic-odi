@@ -2,9 +2,14 @@
 
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
+from agentic_odi_core import BusinessValue, CustomerValue
+from agentic_odi_core.models import JobStage
 from pydantic import BaseModel, Field
+
+if TYPE_CHECKING:
+    from agentic_odi_connectors.marketplace import MarketplaceListing
 
 
 class ChatMessage(BaseModel):
@@ -39,14 +44,16 @@ class AddStepRequest(BaseModel):
     job_id: str
     name: str
     order: int
+    stage: JobStage | None = None
+    allow_empty_job_map: bool = False
 
 
 class AddOutcomeRequest(BaseModel):
     mcp_url: str
     job_id: str
     statement: str
-    importance: float
-    satisfaction: float
+    importance: float = Field(ge=1.0, le=10.0)
+    satisfaction: float = Field(ge=1.0, le=10.0)
 
 
 class CreateJobRequest(BaseModel):
@@ -74,6 +81,23 @@ class UpdateOutcomeRequest(BaseModel):
     importance: float | None = None
     satisfaction: float | None = None
     mcp_url: str = ""
+
+
+class AddCustomerOutcomeRequest(BaseModel):
+    mcp_url: str = ""
+    job_id: str
+    customer_value: CustomerValue
+    business_value: BusinessValue
+    step_id: str | None = None
+
+
+class UpdateCustomerOutcomeRequest(BaseModel):
+    """Both values are replaced wholesale — a partial score would be ambiguous."""
+
+    mcp_url: str = ""
+    customer_value: CustomerValue | None = None
+    business_value: BusinessValue | None = None
+    step_id: str | None = None
 
 
 class StudioBrief(BaseModel):
@@ -113,6 +137,7 @@ class ChatRequest(BaseModel):
     api_key: str = ""
     model: str
     mcp_url: str
+    routing_mode: str = "auto"
     messages: list[ChatMessage] = Field(default_factory=list)
     brief: StudioBrief | None = None
     ui_catalog: UiCatalogRequest | None = None
@@ -140,12 +165,51 @@ class AddConnectorRequest(BaseModel):
     name: str | None = None
     preset: str | None = None
     url: str | None = None
+    # A marketplace listing id (`official:…` / `preset:…`) instead of a preset.
+    marketplace_id: str | None = None
 
 
 class ConnectorListItem(BaseModel):
     name: str
     kind: str
     enabled: bool = True
+
+
+class MarketplaceListingOut(BaseModel):
+    id: str
+    name: str
+    title: str | None = None
+    summary: str = ""
+    version: str = ""
+    url: str | None = None
+    source: str = "official"
+    area: str | None = None
+    repository: str | None = None
+    docs: str | None = None
+    env_vars: list[str] = Field(default_factory=list)
+    headers: dict[str, str] = Field(default_factory=dict)
+    auth: str = "none"
+    installable: bool = False
+    verified: bool = False
+    pull_count: int = 0
+    is_recommended: bool = False
+    unavailable_reason: str | None = None
+    # The registry name an install produces, so the shelf can match a listing
+    # against the installed list without re-deriving the slug itself.
+    connector_name: str = ""
+
+    @classmethod
+    def from_listing(cls, listing: MarketplaceListing) -> MarketplaceListingOut:
+        return cls(**listing.model_dump(), connector_name=listing.connector_name)
+
+
+class MarketplaceSearchResponse(BaseModel):
+    listings: list[MarketplaceListingOut] = Field(default_factory=list)
+    areas: dict[str, str] = Field(default_factory=dict)
+    cached: bool = False
+    # Connection types the page can offer, with the ones not yet supported
+    # listed so the UI can show them as "coming soon".
+    types: list[dict[str, object]] = Field(default_factory=list)
 
 
 class ConnectorOperationResponse(BaseModel):

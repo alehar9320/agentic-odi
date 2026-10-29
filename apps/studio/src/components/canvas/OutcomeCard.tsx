@@ -10,7 +10,7 @@ import { useStudio } from "../../state/StudioContext";
 import type { Outcome } from "../../types";
 import { CopyIcon } from "../icons";
 
-export function OutcomeCard({ outcome }: { outcome: Outcome }) {
+export function OutcomeCard({ outcome, sample = false }: { outcome: Outcome; sample?: boolean }) {
   const { ask, canvasState, deleteOutcome, pushToast, saveThesis, updateOutcome } = useStudio();
   // Records captured against this outcome, with their way back to the source.
   const linkedEvidence = (canvasState.data?.evidence ?? []).filter(
@@ -36,6 +36,14 @@ export function OutcomeCard({ outcome }: { outcome: Outcome }) {
       <header className="card__head">
         <span className="card__id">{outcomeId}</span>
         <span className={`badge badge--${pill.variant}`}>{pill.label}</span>
+        {sample ? (
+          <span
+            className="badge badge--amber"
+            title="This is bundled sample data, not yours."
+          >
+            Sample
+          </span>
+        ) : null}
       </header>
 
       <p className="card__statement">{statement}</p>
@@ -150,6 +158,7 @@ export function OutcomeCard({ outcome }: { outcome: Outcome }) {
           type="button"
           className="quiet-action"
           aria-expanded={showEvidence}
+          title="Inspect customer interview transcripts and evidence line"
           onClick={() => setShowEvidence((prev) => !prev)}
         >
           {showEvidence ? "Hide evidence" : "Evidence"}
@@ -157,6 +166,7 @@ export function OutcomeCard({ outcome }: { outcome: Outcome }) {
         <button
           type="button"
           className="quiet-action"
+          title="Ask the studio what a bet on this outcome would change"
           onClick={() =>
             ask(
               `Simulate the impact of a bet on ${outcomeId}: "${statement}". ` +
@@ -187,6 +197,7 @@ export function OutcomeCard({ outcome }: { outcome: Outcome }) {
         <button
           type="button"
           className="quiet-action"
+          title="Consult the studio on strategic solutions for this outcome"
           onClick={() => ask(`How should we solve outcome ${outcomeId}: "${statement}"?`)}
         >
           Ask

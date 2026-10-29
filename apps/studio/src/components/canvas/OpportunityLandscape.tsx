@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 
+import { canvasStatus } from "../../lib/canvasProvenance";
 import { formatOpportunityScore, isUnderserved } from "../../lib/odi";
 import { useStudio } from "../../state/StudioContext";
 import type { Outcome } from "../../types";
@@ -10,7 +11,7 @@ import { OutcomeCard } from "./OutcomeCard";
 type ViewMode = "matrix" | "cards" | "table";
 
 export function OpportunityLandscape() {
-  const { canvasState, deleteThesis, refreshCanvas, theses } = useStudio();
+  const { canvasState, deleteThesis, openPanel, refreshCanvas, theses } = useStudio();
   const [underservedOnly, setUnderservedOnly] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedOutcomeId, setSelectedOutcomeId] = useState<string | null>(null);
@@ -18,10 +19,12 @@ export function OpportunityLandscape() {
   const [hoveredOutcome, setHoveredOutcome] = useState<Outcome | null>(null);
 
   const canvas = canvasState.data;
+  const sample = canvas?.source === "seed";
   const jobs = useMemo(() => canvas?.jobs ?? [], [canvas]);
   const outcomes = useMemo(() => canvas?.outcomes ?? [], [canvas]);
   const isLoading = canvasState.kind === "loading";
   const isEmpty = canvasState.kind === "empty";
+  const provenance = canvasStatus(canvas);
 
   const underservedCount = outcomes.filter((outcome) =>
     isUnderserved(outcome.opportunity_score),
@@ -69,7 +72,7 @@ export function OpportunityLandscape() {
             Opportunity Landscape
           </p>
           <p className="caption" style={{ marginTop: 4, margin: 0, color: "var(--studio-muted)" }}>
-            Interactive 2D Opportunity Matrix mapping Importance vs. Satisfaction. High Opportunity (&gt;10) targets pulse as primary innovation levers.
+            Interactive 2D Opportunity Matrix mapping Importance vs. Satisfaction. Scores above 10 mark underserved market needs and pulse as primary innovation levers.
           </p>
         </div>
 
@@ -101,6 +104,19 @@ export function OpportunityLandscape() {
           </button>
         </div>
       </div>
+
+      {provenance ? (
+        <p className="canvas-provenance" role="status">
+          <strong>Demo data.</strong> Nothing here comes from your research.{" "}
+          <button
+            type="button"
+            className="quiet-action"
+            onClick={() => openPanel("settings")}
+          >
+            Connect a data source
+          </button>
+        </p>
+      ) : null}
 
       {canvasState.kind === "error" ? (
         <FailurePanel
@@ -199,6 +215,7 @@ export function OpportunityLandscape() {
           onSelectOutcome={(id) => setSelectedOutcomeId(selectedOutcomeId === id ? null : id)}
           onHoverOutcome={setHoveredOutcome}
           activeOutcome={activeOutcome}
+          sample={sample}
         />
       ) : viewMode === "table" ? (
         <OpportunityTableView
@@ -209,7 +226,7 @@ export function OpportunityLandscape() {
       ) : sortedOutcomes.length ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           {sortedOutcomes.map((outcome, index) => (
-            <OutcomeCard outcome={outcome} key={outcome.id ?? index} />
+            <OutcomeCard outcome={outcome} sample={sample} key={outcome.id ?? index} />
           ))}
         </div>
       ) : (
@@ -264,6 +281,7 @@ interface MatrixViewProps {
   onSelectOutcome: (id: string) => void;
   onHoverOutcome: (outcome: Outcome | null) => void;
   activeOutcome: Outcome | null;
+  sample: boolean;
 }
 
 function OpportunityMatrixView({
@@ -272,6 +290,7 @@ function OpportunityMatrixView({
   onSelectOutcome,
   onHoverOutcome,
   activeOutcome,
+  sample,
 }: MatrixViewProps) {
   return (
     <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: 16 }}>
@@ -429,7 +448,7 @@ function OpportunityMatrixView({
       <div>
         {activeOutcome ? (
           <div style={{ position: "sticky", top: 16 }}>
-            <OutcomeCard outcome={activeOutcome} />
+            <OutcomeCard outcome={activeOutcome} sample={sample} />
           </div>
         ) : (
           <div
@@ -481,7 +500,16 @@ function OpportunityTableView({
             return (
               <tr
                 key={outcome.id ?? idx}
+                role="row"
+                tabIndex={0}
+                aria-selected={isSelected}
                 onClick={() => outcome.id && onSelectOutcome(outcome.id)}
+                onKeyDown={(event) => {
+                  if ((event.key === "Enter" || event.key === " ") && outcome.id) {
+                    event.preventDefault();
+                    onSelectOutcome(outcome.id);
+                  }
+                }}
                 style={{
                   borderBottom: "1px solid var(--studio-border)",
                   cursor: "pointer",
