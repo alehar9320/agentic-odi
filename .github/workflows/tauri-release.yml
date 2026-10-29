@@ -128,7 +128,10 @@ jobs:
           args: ${{ matrix.args }}
 
   # A release without a usable latest.json cannot update anybody. Fail the
-  # release loudly instead of leaving a quiet download that installs nothing.
+  # release loudly instead of leaving a quiet download that installs nothing:
+  # the manifest must advertise this tag, every platform must point at an
+  # artifact that is attached to the Release with its .sig twin, and every
+  # advertised URL must actually resolve.
   verify:
     needs: [build]
     runs-on: ubuntu-latest
@@ -160,10 +163,28 @@ jobs:
             echo "The desktop app version is out of sync with the release; see the release-please extra-files config."
             exit 1
           fi
+          asset_names="$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG" --jq '[.assets[].name]')"
           for key in linux-x86_64 windows-x86_64 darwin-aarch64 darwin-x86_64; do
             if ! jq -e --arg k "$key" '.platforms[$k].url and .platforms[$k].signature' "$manifest" > /dev/null; then
               echo "::error::latest.json is missing a signed $key artifact."
               exit 1
             fi
+            url="$(jq -r --arg k "$key" '.platforms[$k].url' "$manifest")"
+            # Asset URLs are percent-encoded; release asset names are not.
+            name="${url##*/}"
+            name="${name//%20/ }"
+            if ! printf '%s' "$asset_names" | jq -e --arg n "$name" 'index($n) != null' > /dev/null; then
+              echo "::error::$key points at \"$name\", which is not attached to the $TAG release."
+              exit 1
+            fi
+            if ! printf '%s' "$asset_names" | jq -e --arg n "$name" 'index($n + ".sig") != null' > /dev/null; then
+              echo "::error::$key artifact \"$name\" has no matching $name.sig on the release."
+              exit 1
+            fi
+            if ! curl -fsIL --retry 3 --retry-delay 5 --max-time 20 "$url" > /dev/null; then
+              echo "::error::$key updater download does not resolve: $url"
+              exit 1
+            fi
+            echo "OK: $key -> \"$name\" is attached, signed, and downloadable"
           done
           echo "OK: $TAG publishes a signed updater manifest for every platform"

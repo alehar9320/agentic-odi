@@ -4,6 +4,11 @@ import react from "@vitejs/plugin-react";
 export default defineConfig({
   plugins: [react()],
   clearScreen: false,
+  // Settings → About reports which build is running; the release workflow's
+  // date is baked in at build time. Applies to vitest transforms too.
+  define: {
+    __STUDIO_BUILD_DATE__: JSON.stringify(new Date().toISOString().slice(0, 10)),
+  },
   server: {
     port: 5173,
     strictPort: true,

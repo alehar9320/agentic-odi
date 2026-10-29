@@ -82,14 +82,33 @@ Releases are cut and published by CI with no approval step:
    `.dmg`, `.msi`). All edits are idempotent on re-runs.
 4. `e2e-install` runs after `release` succeeds and installs the published binary
    on Linux, macOS, and Windows.
+5. The `Tauri Release` workflow ends in a `verify` job that fails the release
+   unless `latest.json` is attached to the tag's Release, advertises exactly the
+   tag's version, and names an artifact for each of `linux-x86_64`,
+   `windows-x86_64`, `darwin-aarch64`, and `darwin-x86_64` that is attached to
+   the Release with its `.sig` twin and downloads with HTTP 200. A release with
+   a broken updater manifest goes red, not quietly wrong.
 
 **Version sync (no manual work).** release-please is the single writer of every
 version literal in the repo — the six `pyproject.toml` files, the CLI
-`_build_info.py`, and the Studio `Cargo.toml` / `tauri.conf.json` — via the
-`extra-files` entries in `release-please-config.json`. The
-`tests/scripts/test_version_sync.py` gate asserts they all match
-`.release-please-manifest.json`, so a release PR stays green and auto-merges;
-there is no longer a `chore: sync the declared version` step to do by hand.
+`_build_info.py`, and the Studio `package.json` / `Cargo.toml` /
+`tauri.conf.json` — via the `extra-files` entries in
+`release-please-config.json`. The `tests/scripts/test_version_sync.py` gate
+asserts they all match `.release-please-manifest.json`, so a release PR stays
+green and auto-merges; there is no longer a `chore: sync the declared version`
+step to do by hand. The same check is runnable directly:
+`uv run python scripts/check_version_parity.py` prints the one version, or
+lists every drifted file and exits non-zero.
+
+**Updater proof.** `scripts/verify-desktop-update.sh` builds signed 0.1.0 and
+0.2.0 AppImages against a local `latest.json` with a throwaway key, runs the
+app, and asserts it replaces its own file and then reports no update. It runs
+headless every Sunday in the `updater-e2e` job of the CI workflow (schedule or
+`workflow_dispatch` only; it deliberately stays out of the `CI green` gate so
+it never blocks a PR), and needs no repository secret. It is also runnable
+from a workstation with `bash scripts/verify-desktop-update.sh`. The running
+version is visible in the app itself: the top bar shows it, and Settings →
+About lists the version, build date, platform, and update status.
 
 **One-time setup (GitHub App).** GitHub holds workflow runs that start from
 `GITHUB_TOKEN`-authored pushes ("This workflow requires approval from a
@@ -102,6 +121,11 @@ to need a maintainer. A release-only GitHub App avoids both:
 2. Install the App on this repository.
 3. Add repository secrets `RELEASE_PLEASE_APP_CLIENT_ID` (the App's client ID)
    and `RELEASE_PLEASE_APP_PRIVATE_KEY` (a generated private key).
+4. Turn on automatic branch cleanup so merged release PRs delete their branch:
+   `gh repo edit alehar9320/agentic-odi --delete-branch-on-merge` (this is a
+   repository setting, not a `release-please-config.json` key). Existing stale
+   branches from before that setting need a one-time sweep — delete only
+   branches whose pull requests are closed, never ones still open.
 
 Until those secrets exist, the `release-please` workflow logs a warning and falls
 back to `GITHUB_TOKEN`: releases still happen, but the release PR needs a
