@@ -234,6 +234,25 @@ agentic-odi interviews quotes <interview-id>
 agentic-odi interviews delete <interview-id> --yes
 ```
 
+### Import a transcript
+
+`interviews import` turns a transcript file into one interview plus its quotes
+in a single step. The format is detected from the extension and the content, or
+set with `--format md|txt|vtt|srt`. A malformed transcript is refused before
+anything is written, so a failure never leaves a half-imported interview.
+
+```bash
+agentic-odi interviews import session.vtt \
+  --title "Ana — onboarding" --participant "Ana" --job-id <job-id>
+cat session.vtt | agentic-odi interviews import - \
+  --title "Ana — onboarding" --participant "Ana"
+```
+
+In a cue file (`.vtt`/`.srt`) each cue becomes one quote with its start and end
+times; `<v Speaker>` voice tags become the quote's speaker. In markdown, each
+`**Speaker:**` block becomes one quote; wrapped lines fold into it. In plain
+text, each paragraph becomes one quote with no speaker.
+
 `participant_label` is free text such as `"Ana"` or `"Participant 3"` — never a
 real name, email, or company. Quotes are ordered by a service-assigned ordinal;
 deleting an interview removes its quotes and nothing else.
