@@ -206,4 +206,5 @@ For the full Kiro tool reference including subagent dispatch patterns and git wo
 - Keep `README.md` current in the same task whenever code, commands, dependencies, or capabilities change.
 - Architecture and data-flow details live in `docs/architecture/`; update them when the package graph or runtime boundaries change.
 - Superpowers artifacts belong under `docs/superpowers/`: designs in `docs/superpowers/specs/YYYY-MM-DD-<topic>-design.md`, plans in `docs/superpowers/plans/YYYY-MM-DD-<topic>.md`.
+- Gated trust increments: when a feature waits on an unapproved decision, add its shape and a refusing seam in `packages/core/src/agentic_odi_core/trust.py` (raise `TrustContractPendingError` naming the blocking decision) rather than inventing a default. `packages/core/tests/test_trust_seams.py` pins each refusal.
 - Run `uv run pytest` from the root; see `.agents/workflows/test.md` and `docs/architecture/testing.md` for focused commands.
