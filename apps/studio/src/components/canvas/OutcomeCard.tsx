@@ -10,8 +10,9 @@ import { useStudio } from "../../state/StudioContext";
 import type { Outcome } from "../../types";
 import { CopyIcon } from "../icons";
 
-export function OutcomeCard({ outcome }: { outcome: Outcome }) {
+export function OutcomeCard({ outcome, sample = false }: { outcome: Outcome; sample?: boolean }) {
   const { ask, deleteOutcome, pushToast, saveThesis, updateOutcome } = useStudio();
+
   const [showEvidence, setShowEvidence] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -32,6 +33,14 @@ export function OutcomeCard({ outcome }: { outcome: Outcome }) {
       <header className="card__head">
         <span className="card__id">{outcomeId}</span>
         <span className={`badge badge--${pill.variant}`}>{pill.label}</span>
+        {sample ? (
+          <span
+            className="badge badge--amber"
+            title="This is bundled sample data, not yours."
+          >
+            Sample
+          </span>
+        ) : null}
       </header>
 
       <p className="card__statement">{statement}</p>
