@@ -38,6 +38,7 @@ class ToolName(str, Enum):
     LIST_EVIDENCE = "list_evidence"
     DELETE_EVIDENCE = "delete_evidence"
     PROMOTE_EVIDENCE = "promote_evidence"
+    COMPARE_OUTCOMES = "compare_outcomes"
     RECORD_DECISION = "record_decision"
     GET_DECISION = "get_decision"
     LIST_DECISIONS = "list_decisions"
@@ -342,6 +343,21 @@ TOOL_SPECS: dict[str, ToolSpec] = {
         required=("statement",),
         returns="A verdict with coded issues and suggestions.",
         stage="2",
+    ),
+    ToolName.COMPARE_OUTCOMES.value: ToolSpec(
+        name="compare_outcomes",
+        summary=(
+            "Align two or three outcomes on the same axes: one row per metric, "
+            "one column per outcome. Never names a winner."
+        ),
+        effect=_derive_effect("compare_outcomes"),
+        arguments=("outcome_ids",),
+        required=("outcome_ids",),
+        returns=(
+            "Aligned rows over the given column order. A metric nobody measured "
+            "renders 'not measured'; a real 0 stays 0."
+        ),
+        stage="6",
     ),
     ToolName.RECORD_DECISION.value: ToolSpec(
         name="record_decision",

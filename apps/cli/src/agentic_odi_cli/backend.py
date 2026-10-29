@@ -520,6 +520,23 @@ class LocalBackend(Backend):
             raise BackendError(_VALUE_RANGE_ERROR)
         return compute_opportunity_score(importance, satisfaction)
 
+    def _compare_outcomes(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import OutcomeNotFoundError, outcome_not_found
+
+        outcome_ids = args["outcome_ids"]
+        try:
+            comparison = self.service.compare_outcomes(outcome_ids)
+        except OutcomeNotFoundError as exc:
+            raise BackendError(outcome_not_found(exc.outcome_id)) from exc
+        return {
+            "columns": list(comparison.columns),
+            "statements": list(comparison.statements),
+            "rows": [
+                {"metric": row.metric, "label": row.label, "cells": list(row.cells)}
+                for row in comparison.rows
+            ],
+        }
+
     def _record_decision(self, args: dict[str, Any]) -> dict[str, Any]:
         from agentic_odi_core import (
             DecisionNotFoundError,
@@ -602,6 +619,7 @@ _LOCAL_HANDLERS = {
     "get_odi_schema": LocalBackend._get_odi_schema,
     "compute_opportunity": LocalBackend._compute_opportunity,
     "evaluate_outcome": LocalBackend._evaluate_outcome,
+    "compare_outcomes": LocalBackend._compare_outcomes,
     "record_decision": LocalBackend._record_decision,
     "get_decision": LocalBackend._get_decision,
     "list_decisions": LocalBackend._list_decisions,

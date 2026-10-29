@@ -54,7 +54,7 @@
     "id": "surfaces",
     "eyebrow": "The surfaces",
     "title": "The agent composes, it does not describe.",
-    "blurb": "The studio answers with a card from a closed catalog, rendered inline in the conversation. Eight shapes, each one a thing you can act on.",
+    "blurb": "The studio answers with a card from a closed catalog, rendered inline in the conversation. Nine shapes, each one a thing you can act on.",
     "cards": [
       {
         "type": "outcome-card",
@@ -191,6 +191,19 @@
           ],
           "evidence_count": 2,
           "generated_at": "2026-10-29T10:00:00Z"
+        }
+      },
+      {
+        "type": "outcome-compare",
+        "title": "Comparison",
+        "blurb": "Two bets on the same axes, one row per metric and one column per bet, so the choice is visible instead of argued.",
+        "data": {
+          "columns": ["OUT-1", "OUT-2"],
+          "rows": [
+            {"metric": "score", "label": "Opportunity score", "cells": ["13", "7"]},
+            {"metric": "sample_size", "label": "Sample size", "cells": ["12", "not measured"]},
+            {"metric": "stage", "label": "Job stage", "cells": ["Execute", "Execute"]}
+          ]
         }
       }
     ]

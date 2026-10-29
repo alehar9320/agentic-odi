@@ -1,5 +1,5 @@
 {#
-  The eight ODI cards the agent may compose, rendered as the shipped catalog
+  The nine ODI cards the agent may compose, rendered as the shipped catalog
   renders them. These are the agent's closed catalog — a stable contract —
   not the Studio's canvas view names, which are in flux.
 #}
@@ -127,6 +127,33 @@
 </article>
 {% endmacro %}
 
+{% macro outcome_compare(data) %}
+<article class="surface" data-surface="outcome-compare">
+  <div class="surface__head">
+    <span class="surface__id">Comparison</span>
+    <span class="pill">{{ data.columns | length }} outcomes</span>
+  </div>
+  <div class="ui-table-wrap">
+    <table class="surface__compare">
+      <thead>
+        <tr>
+          <th scope="col">Axis</th>
+          {% for column in data.columns %}<th scope="col">{{ column }}</th>{% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in data.rows %}
+        <tr>
+          <th scope="row">{{ row.label }}</th>
+          {% for cell in row.cells %}<td>{{ cell }}</td>{% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</article>
+{% endmacro %}
+
 {% macro opportunity_brief(data) %}
 <article class="surface" data-surface="opportunity-brief">
   <div class="surface__head">
@@ -164,5 +191,6 @@
   {% elif card.type == "opportunity-thesis" %}{{ opportunity_thesis(card.data) }}
   {% elif card.type == "decision-record" %}{{ decision_record(card.data) }}
   {% elif card.type == "opportunity-brief" %}{{ opportunity_brief(card.data) }}
+  {% elif card.type == "outcome-compare" %}{{ outcome_compare(card.data) }}
   {% endif %}
 {% endmacro %}

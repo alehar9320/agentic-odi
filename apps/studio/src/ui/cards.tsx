@@ -417,6 +417,63 @@ export function DecisionRecord({ node }: NodeProps) {
 }
 
 /* ------------------------------------------------------------------ */
+/* outcome-compare                                                     */
+/* ------------------------------------------------------------------ */
+
+function compareCell(value: unknown): { text: string; measured: boolean } {
+  const text = typeof value === "string" ? value : value == null ? "" : String(value);
+  return { text, measured: text !== "not measured" };
+}
+
+export function OutcomeCompare({ node }: NodeProps) {
+  const title = str(node.props, "title");
+  const columns = stringList(node.props.columns);
+  const rows = recordList(node.props.rows).map((row) => ({
+    label: str(row, "label"),
+    cells: (Array.isArray(row.cells) ? row.cells : []).map(compareCell),
+  }));
+
+  return (
+    <article className="ui-card ui-card--compare" aria-label={title || "Comparison"}>
+      {title ? <h4 className="ui-card__title">{title}</h4> : null}
+
+      {rows.length > 0 && columns.length > 0 ? (
+        <div className="ui-table-wrap">
+          <table className="ui-table ui-table--compare">
+            <thead>
+              <tr>
+                <th scope="col">Axis</th>
+                {columns.map((column, index) => (
+                  <th scope="col" key={`${column}-${index}`}>
+                    {column}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row, index) => (
+                <tr key={`${row.label}-${index}`}>
+                  <th scope="row">{row.label}</th>
+                  {row.cells.map((cell, cellIndex) => (
+                    <td key={cellIndex} className={cell.measured ? undefined : "ui-table__missing"}>
+                      {cell.text || "—"}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <p className="ui-brief__empty">Nothing to compare yet — pick two outcomes.</p>
+      )}
+
+      <ActionRow actions={readActions(node.props)} />
+    </article>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /* opportunity-brief                                                   */
 /* ------------------------------------------------------------------ */
 

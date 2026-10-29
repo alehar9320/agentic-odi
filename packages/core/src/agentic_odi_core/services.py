@@ -5,6 +5,13 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
+from agentic_odi_core.compare import (
+    MAX_COMPARE_OUTCOMES,
+    MIN_COMPARE_OUTCOMES,
+    CompareCandidate,
+    OutcomeComparison,
+    align_outcomes,
+)
 from agentic_odi_core.errors import NotFoundError, ValidationError
 from agentic_odi_core.evaluation import (
     OutcomeStatementError,
@@ -417,6 +424,47 @@ class ODIService:
         return compute_opportunity_score(importance, satisfaction)
 
     # ------------------------------------------------------------- decisions
+
+    def compare_outcomes(self, outcome_ids: list[str]) -> OutcomeComparison:
+        """Align two or three outcomes on shared axes for a side-by-side read.
+
+        The ids are taken explicitly and in order: the comparison never widens
+        the request or deduplicates it silently. Each outcome is read once —
+        no per-outcome fetch beyond its own record and its evidence — and the
+        whole call leaves repository and event state unchanged.
+        """
+        if len(outcome_ids) < MIN_COMPARE_OUTCOMES:
+            raise ValidationError(
+                f"compare needs at least {MIN_COMPARE_OUTCOMES} outcomes; got {len(outcome_ids)}"
+            )
+        if len(outcome_ids) > MAX_COMPARE_OUTCOMES:
+            raise ValidationError(
+                f"compare accepts at most {MAX_COMPARE_OUTCOMES} outcomes; got {len(outcome_ids)}"
+            )
+        if len(set(outcome_ids)) != len(outcome_ids):
+            raise ValidationError("compare ids must be distinct")
+
+        candidates: list[CompareCandidate] = []
+        for outcome_id in outcome_ids:
+            outcome = self.repo.get_outcome(outcome_id)
+            if outcome is None:
+                raise OutcomeNotFoundError(outcome_id)
+            step = self.repo.get_step(outcome.step_id) if outcome.step_id else None
+            evidence = self.repo.list_evidence(outcome_id=outcome_id)
+            candidates.append(
+                CompareCandidate(
+                    outcome_id=outcome.id,
+                    statement=outcome.statement,
+                    score=outcome.opportunity_score,
+                    importance=outcome.importance,
+                    satisfaction=outcome.satisfaction,
+                    stage=step.name if step else None,
+                    evidence_count=len(evidence),
+                    sample_size=None,
+                    effort=None,
+                )
+            )
+        return align_outcomes(candidates)
 
     def record_decision(
         self,

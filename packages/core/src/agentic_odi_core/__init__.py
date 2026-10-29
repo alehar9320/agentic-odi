@@ -15,6 +15,14 @@ from agentic_odi_core.brief import (
     render_brief,
     select_underserved,
 )
+from agentic_odi_core.compare import (
+    MAX_COMPARE_OUTCOMES,
+    MIN_COMPARE_OUTCOMES,
+    CompareCandidate,
+    CompareRow,
+    OutcomeComparison,
+    align_outcomes,
+)
 from agentic_odi_core.contract import (
     TOOL_NAMES,
     TOOL_SPECS,
@@ -96,6 +104,12 @@ from agentic_odi_core.steve_jobs import (
 
 __all__ = [
     "BusinessImpactCategory",
+    "MAX_COMPARE_OUTCOMES",
+    "MIN_COMPARE_OUTCOMES",
+    "CompareCandidate",
+    "CompareRow",
+    "OutcomeComparison",
+    "align_outcomes",
     "BusinessValue",
     "BriefInput",
     "BriefOutcome",

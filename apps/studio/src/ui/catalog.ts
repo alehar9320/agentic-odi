@@ -334,6 +334,41 @@ export const CATALOG: readonly UiCatalogEntry[] = [
     ["title", "bet", "rationale"],
   ),
   entry(
+    "outcome-compare",
+    "leaf",
+    "Two or three outcomes on the same axes, one row per metric and one column per outcome, so a choice is visible instead of argued. Use when comparing bets; never name a winner.",
+    {
+      title: { type: "string" },
+      columns: {
+        type: "array",
+        minItems: 2,
+        maxItems: 3,
+        description: "One entry per outcome, in the order they should read. Ids are opaque labels.",
+        items: { type: "string" },
+      },
+      rows: {
+        type: "array",
+        minItems: 1,
+        items: {
+          type: "object",
+          properties: {
+            metric: { type: "string", description: "The axis, e.g. \"score\" or \"sample_size\"." },
+            label: { type: "string", description: "The human-readable axis name." },
+            cells: {
+              type: "array",
+              items: {
+                type: "string",
+                description: "One cell per column. A missing measurement is the literal \"not measured\".",
+              },
+            },
+          },
+          required: ["label", "cells"],
+        },
+      },
+    },
+    ["columns", "rows"],
+  ),
+  entry(
     "opportunity-brief",
     "leaf",
     "The factual review case for one job: the decision, the underserved outcomes with their score, band, sample and quote, and the sources. Render it once, then one sentence — never describe in prose what the card shows.",

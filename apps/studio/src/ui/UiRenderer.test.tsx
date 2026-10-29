@@ -311,3 +311,53 @@ describe("impact simulation provenance", () => {
     }
   });
 });
+
+describe("outcome compare", () => {
+  it("renders a comparison with aligned rows and keyboard-readable headers", () => {
+    renderSpec({
+      type: "outcome-compare",
+      props: {
+        title: "Publishing speed vs support cost",
+        columns: ["O-1", "O-2"],
+        rows: [
+          { metric: "score", label: "Opportunity score", cells: ["13", "12"] },
+          { metric: "sample_size", label: "Sample size", cells: ["not measured", "12"] },
+        ],
+      },
+    });
+
+    expect(screen.getByLabelText("Publishing speed vs support cost")).toBeInTheDocument();
+    // Header cells are real table headers, so a screen reader can read across.
+    expect(screen.getByRole("columnheader", { name: "O-1" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "O-2" })).toBeInTheDocument();
+    expect(screen.getByRole("rowheader", { name: "Sample size" })).toBeInTheDocument();
+  });
+
+  it("renders a missing comparison cell as not measured, never zero", () => {
+    renderSpec({
+      type: "outcome-compare",
+      props: {
+        columns: ["O-1", "O-2"],
+        rows: [{ metric: "score", label: "Opportunity score", cells: ["not measured", "0"] }],
+      },
+    });
+
+    expect(screen.getByText("not measured")).toBeInTheDocument();
+    expect(screen.getByText("0")).toBeInTheDocument();
+  });
+
+  it("refuses a comparison with fewer than two columns", () => {
+    const result = parseUiSpec(
+      {
+        type: "outcome-compare",
+        props: {
+          columns: ["O-1"],
+          rows: [{ label: "Opportunity score", cells: ["13"] }],
+        },
+      },
+      catalogManifest(),
+    );
+
+    expect(result.ok).toBe(false);
+  });
+});

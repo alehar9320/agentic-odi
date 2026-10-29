@@ -560,6 +560,32 @@ async def evaluate_outcome(ctx: Context, statement: str, job_id: str | None = No
 
 
 @mcp.tool
+def compare_outcomes(outcome_ids: list[str]) -> str:
+    """Align two or three outcomes on the same axes.
+
+    One row per metric, one column per outcome, in the given order. A metric
+    nobody measured renders the literal "not measured"; a real recorded 0 stays
+    0. The tool never declares a winner.
+    """
+    try:
+        comparison = service.compare_outcomes(outcome_ids)
+    except OutcomeNotFoundError as exc:
+        return _outcome_not_found(exc.outcome_id)
+    except (OdiError, ValueError) as exc:
+        return f"Error: {exc}"
+    return json.dumps(
+        {
+            "columns": list(comparison.columns),
+            "statements": list(comparison.statements),
+            "rows": [
+                {"metric": row.metric, "label": row.label, "cells": list(row.cells)}
+                for row in comparison.rows
+            ],
+        }
+    )
+
+
+@mcp.tool
 async def record_decision(
     ctx: Context,
     job_id: str,

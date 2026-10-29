@@ -417,6 +417,32 @@ async def get_outcomes(
     return {"ok": True, "result": [item.model_dump(mode="json") for item in outcomes]}
 
 
+@router.get("/compare")
+async def get_compare(
+    request: Request,
+    outcome_ids: str = Query(""),
+) -> dict:
+    """Align two or three outcomes on shared axes, one row per metric.
+
+    The ids are taken explicitly and in order, so the surface cannot compare a
+    different set than the one the user saw. A missing metric renders the
+    literal ``not measured``; a real recorded ``0`` stays ``0``.
+    """
+    ids = [item.strip() for item in outcome_ids.split(",") if item.strip()]
+    try:
+        comparison = _service(request).compare_outcomes(ids)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return {
+        "columns": list(comparison.columns),
+        "statements": list(comparison.statements),
+        "rows": [
+            {"metric": row.metric, "label": row.label, "cells": list(row.cells)}
+            for row in comparison.rows
+        ],
+    }
+
+
 @router.post("/jobs")
 async def post_job(body: CreateJobRequest, request: Request) -> dict:
     """Create a Job — works with the model offline because it is manual."""

@@ -317,7 +317,7 @@ eight-stage job map, an opportunity thesis, or a decision record.
 Three properties keep this safe and cheap to extend:
 
 - **The catalog is closed and owned by the SPA.**
-  `apps/studio/src/ui/catalog.ts` declares nine primitives and eight cards, their
+  `apps/studio/src/ui/catalog.ts` declares nine primitives and nine cards, their
   JSON Schema props, and the description the model reads. There is no HTML, no
   eval, and no third-party component in the path. Prose is rendered by the same
   `Markdown` component the transcript already used.
