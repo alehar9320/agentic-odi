@@ -329,6 +329,13 @@ a {
   scrollbar-gutter: stable;
 }
 
+/* Keyboard readers can scroll history without a mouse (WCAG 2.1.1). */
+.chat__scroll:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+  border-radius: 14px;
+}
+
 .chat__latest {
   position: absolute;
   z-index: 1;
@@ -356,9 +363,38 @@ a {
 }
 
 .chat__dock {
+  position: relative;
   flex: none;
-  padding: 6px 22px 16px;
+  padding: 6px 22px calc(16px + env(safe-area-inset-bottom, 0px));
   background: linear-gradient(to top, var(--bg) 60%, transparent);
+}
+
+/* Scroll anchor: floats above the composer only while the reader is behind. */
+.chat__jump {
+  position: absolute;
+  top: -34px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+}
+
+.chat__jump-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--bg-raised);
+  color: var(--muted);
+  font-size: 0.75rem;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.38);
+  cursor: pointer;
+}
+
+.chat__jump-button:hover {
+  border-color: rgba(139, 140, 248, 0.5);
+  color: var(--text);
 }
 
 .chat__dock > * {
@@ -689,6 +725,20 @@ a {
   color: #6f7480;
 }
 
+/* iOS zooms into a field under 16px; the composer should never lurch. */
+@media (max-width: 640px) {
+  .composer__input {
+    font-size: 16px;
+  }
+}
+
+@media (pointer: coarse) {
+  .composer__send {
+    width: 40px;
+    height: 40px;
+  }
+}
+
 .composer__actions {
   display: flex;
   align-items: center;
@@ -758,6 +808,199 @@ a {
   color: var(--amber);
 }
 
+/* Attachments: what is about to be sent, and what was sent */
+.composer.is-dragging .composer__shell {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(139, 140, 248, 0.16);
+}
+
+.attach-tray {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 8px;
+  padding: 0;
+  list-style: none;
+}
+
+.attach {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  padding: 4px 6px 4px 4px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.attach__thumb {
+  width: 30px;
+  height: 30px;
+  flex: none;
+  border-radius: 7px;
+  object-fit: cover;
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.attach__thumb--file {
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+}
+
+.attach__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.25;
+}
+
+.attach__name {
+  overflow: hidden;
+  max-width: 24ch;
+  color: var(--text);
+  font-size: 0.75rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.attach__meta {
+  color: var(--faint);
+  font-size: 0.66rem;
+}
+
+.attach__remove {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  flex: none;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--faint);
+  font-size: 0.68rem;
+  cursor: pointer;
+}
+
+.attach__remove:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+}
+
+.attach__remove:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.composer__attach-error {
+  margin: 0 0 8px;
+  color: var(--amber);
+  font-size: 0.74rem;
+}
+
+.composer__attach {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex: none;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--faint);
+  cursor: pointer;
+}
+
+.composer__attach:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+}
+
+.composer__attach:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.composer__attach:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.attach-sent {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin: 0 0 6px;
+  padding: 0;
+  list-style: none;
+}
+
+.attach-sent__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  padding: 2px 8px 2px 3px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--muted);
+  font-size: 0.7rem;
+}
+
+.attach-sent__thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.composer__model {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  max-width: 45%;
+  min-width: 0;
+}
+
+.composer__model-select {
+  max-width: 100%;
+  padding: 0 15px 0 3px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--faint);
+  font-family: inherit;
+  font-size: 0.66rem;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.composer__model-select:hover {
+  color: var(--text);
+}
+
+.composer__model-select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.composer__model-select option {
+  background: var(--bg-raised);
+  color: var(--text);
+}
+
+.composer__model-caret {
+  position: absolute;
+  right: 2px;
+  color: var(--faint);
+  font-size: 0.62rem;
+  pointer-events: none;
+}
+
 /* Transcript */
 .conversation {
   display: flex;
@@ -786,6 +1029,32 @@ a {
   line-height: 1.55;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+/* Editing a question happens in the bubble it was asked in. */
+.message__bubble--edit {
+  width: 82%;
+  white-space: normal;
+}
+
+.message__edit-input {
+  display: block;
+  width: 100%;
+  min-height: 1.6rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  line-height: 1.55;
+  resize: none;
+  outline: none;
+}
+
+.message__actions--pinned {
+  justify-content: flex-end;
+  margin-top: 8px;
+  opacity: 1;
 }
 
 .message--assistant {
@@ -843,42 +1112,160 @@ a {
   color: var(--text);
 }
 
-.traces {
+/* Run activity: what the turn is doing, and what it did */
+.run {
+  margin-top: 10px;
+  font-size: 0.76rem;
+  line-height: 1.5;
+}
+
+.run--live {
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin: 12px 0 0;
+  flex-direction: column;
+  gap: 7px;
+  padding: 8px 11px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.run__now {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--muted);
+}
+
+.run__pulse {
+  width: 6px;
+  height: 6px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: run-pulse 1.4s ease-out infinite;
+}
+
+@keyframes run-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(139, 140, 248, 0.45);
+  }
+  70% {
+    box-shadow: 0 0 0 6px rgba(139, 140, 248, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(139, 140, 248, 0);
+  }
+}
+
+.run__steps {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.trace {
+.run__step {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 7px;
+  min-width: 0;
+  color: var(--faint);
+}
+
+.run__mark {
+  display: inline-flex;
+  align-self: center;
+  color: var(--faint);
+}
+
+.run__step--ok .run__mark {
+  color: var(--green);
+}
+
+.run__step--error .run__mark {
+  color: var(--amber);
+}
+
+.run__label {
+  color: var(--muted);
+}
+
+.run__step--error .run__label {
+  color: var(--text);
+}
+
+.run__time {
+  margin-left: auto;
+  color: var(--faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.run__preview {
+  flex-basis: 100%;
+  overflow: hidden;
+  padding-left: 19px;
+  color: var(--faint);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.run--settled {
+  margin-top: 10px;
+  color: var(--faint);
+}
+
+.run__summary {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  max-width: 100%;
-  padding: 3px 9px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.02);
+  padding: 2px 6px;
+  margin-left: -6px;
+  border-radius: 6px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.run__summary::-webkit-details-marker {
+  display: none;
+}
+
+.run__summary::before {
+  content: "›";
+  display: inline-block;
   color: var(--faint);
-  font-size: 0.71rem;
+  transition: transform 0.15s ease;
 }
 
-.trace__dot {
-  width: 5px;
-  height: 5px;
-  flex: none;
-  border-radius: 50%;
-  background: var(--accent);
+.run--settled[open] .run__summary::before {
+  transform: rotate(90deg);
 }
 
-.trace__preview {
-  max-width: 30ch;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.run__summary:hover {
   color: var(--muted);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.run__summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.run--settled .run__steps {
+  margin-top: 6px;
+}
+
+.stopped {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  color: var(--faint);
+  font-size: 0.76rem;
 }
 
 /* The wait before the first token: a quiet, moving line of text reads as work
@@ -1320,6 +1707,19 @@ a {
 .field__hint {
   margin: 0;
   color: var(--faint);
+  font-size: 0.7rem;
+  line-height: 1.45;
+}
+
+.settings__model-state {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.settings__model-state .muted {
   font-size: 0.7rem;
   line-height: 1.45;
 }

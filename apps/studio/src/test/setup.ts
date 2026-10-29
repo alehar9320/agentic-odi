@@ -48,3 +48,18 @@ Object.defineProperty(globalThis, "localStorage", {
   value: new MemoryStorage(),
   configurable: true,
 });
+
+// jsdom does not implement ResizeObserver, which the assistant-ui viewport
+// primitives subscribe to. Provide a no-op stub so the studio shell can render.
+if (typeof globalThis.ResizeObserver === "undefined") {
+  class ResizeObserver {
+    observe(): void {}
+    unobserve(): void {}
+    disconnect(): void {}
+  }
+  Object.defineProperty(globalThis, "ResizeObserver", {
+    value: ResizeObserver,
+    configurable: true,
+    writable: true,
+  });
+}

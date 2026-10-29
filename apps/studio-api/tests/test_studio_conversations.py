@@ -2,7 +2,10 @@
 
 The thread is stored in the core event log, so the routes answer the same way
 whether the sidecar is running its own tools or fronting an MCP server, and the
-``remember`` tool reaches the client as a ``memory`` event it can confirm.
+``remember`` tool reaches the client as a ``memory`` event it can confirm. The
+branch tree and a rename that keeps the selected branch are covered here, and
+the pre-core rows are covered in ``test_studio_memory.py``: together they are
+the behaviour the Studio relies on when a person reloads the page.
 """
 
 from __future__ import annotations
@@ -21,6 +24,10 @@ from fastapi.testclient import TestClient
 BACKENDS = ("local", "mcp")
 
 
+def _memory() -> StudioMemory:
+    return StudioMemory(":memory:")
+
+
 def _pair(backend: str) -> tuple[TestClient, StudioMemory]:
     """One store behind the canvas, the thread, and the routes."""
     repo = InMemoryRepository()
@@ -33,6 +40,90 @@ def _thread(memory: StudioMemory) -> str:
     memory.append_turn(conversation.id, "user", "list jobs", "m-1")
     memory.append_turn(conversation.id, "assistant", "here they are", "m-2", "m-1")
     return conversation.id
+
+
+# -- the branch tree the sidecar keeps --------------------------------------
+
+
+def test_turns_keep_the_client_message_ids() -> None:
+    memory = _memory()
+    conversation = memory.create_conversation()
+
+    memory.append_turn(conversation.id, "user", "list jobs", "m-1", None)
+    memory.append_turn(conversation.id, "assistant", "here they are", "m-2", "m-1")
+
+    turns = memory.list_turns(conversation.id)
+    assert [(turn.id, turn.parent_id) for turn in turns] == [("m-1", None), ("m-2", "m-1")]
+    assert memory.get_conversation(conversation.id).head_id == "m-2"  # type: ignore[union-attr]
+
+
+def test_a_second_answer_to_the_same_question_is_a_sibling() -> None:
+    memory = _memory()
+    conversation = memory.create_conversation()
+
+    memory.append_turn(conversation.id, "user", "list jobs", "m-1", None)
+    memory.append_turn(conversation.id, "assistant", "first", "m-2", "m-1")
+    memory.append_turn(conversation.id, "assistant", "second", "m-3", "m-1")
+
+    parents = {turn.id: turn.parent_id for turn in memory.conversation_tree(conversation.id)}
+    assert parents == {"m-1": None, "m-2": "m-1", "m-3": "m-1"}
+
+    memory.set_head(conversation.id, "m-2")
+    assert memory.get_conversation(conversation.id).head_id == "m-2"  # type: ignore[union-attr]
+
+
+def test_rename_keeps_the_tree() -> None:
+    memory = _memory()
+    conversation = memory.create_conversation()
+
+    renamed = memory.update_title(conversation.id, "Retention work")
+
+    assert renamed.title == "Retention work"
+    assert renamed.head_id is None
+
+
+def test_the_tree_endpoint_returns_messages_and_the_head() -> None:
+    memory = _memory()
+    conversation = memory.create_conversation()
+    memory.append_turn(conversation.id, "user", "list jobs", "m-1", None)
+    memory.append_turn(conversation.id, "assistant", "here they are", "m-2", "m-1")
+    app = create_app(repo=InMemoryRepository(), memory=memory)
+    client = TestClient(app)
+
+    body = client.get(f"/api/conversations/{conversation.id}/tree").json()
+
+    assert body["conversation"]["id"] == conversation.id
+    assert body["head_id"] == "m-2"
+    assert [message["id"] for message in body["messages"]] == ["m-1", "m-2"]
+    assert body["messages"][1]["parent_id"] == "m-1"
+    assert body["messages"][1]["content"] == "here they are"
+
+
+def test_renaming_a_conversation_keeps_the_selected_branch() -> None:
+    memory = _memory()
+    conversation = memory.create_conversation()
+    memory.append_turn(conversation.id, "user", "list jobs", "m-1", None)
+    memory.append_turn(conversation.id, "assistant", "first", "m-2", "m-1")
+    memory.append_turn(conversation.id, "assistant", "second", "m-3", "m-1")
+    memory.set_head(conversation.id, "m-2")
+    app = create_app(repo=InMemoryRepository(), memory=memory)
+    client = TestClient(app)
+
+    response = client.patch(f"/api/conversations/{conversation.id}", json={"title": "Renamed"})
+
+    assert response.status_code == 200
+    assert response.json()["conversation"]["head_id"] == "m-2"
+    assert memory.get_conversation(conversation.id).head_id == "m-2"  # type: ignore[union-attr]
+
+
+def test_an_approval_can_be_answered_through_the_api() -> None:
+    app = create_app(repo=InMemoryRepository(), memory=_memory())
+    client = TestClient(app)
+
+    response = client.post("/api/approvals/apv_missing", json={"approved": True})
+
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "not_found"
 
 
 # -- the routes, under both backends ---------------------------------------

@@ -38,6 +38,7 @@ import {
   fetchLatestConversation,
   fetchMarketplace,
   fetchMemory,
+  fetchModels,
   fetchSettings as apiFetchSettings,
   fetchSignals,
   fetchUnreadSignalCount,
@@ -311,6 +312,12 @@ export interface StudioContextValue {
   canvasError: StudioError | null;
   refreshCanvas: () => Promise<void>;
   llmHealth: { healthy: boolean | null; message: string };
+  /** Model ids the configured endpoint publishes. Empty means "type one". */
+  models: string[];
+  modelsLoading: boolean;
+  /** Why the endpoint would not list models, if it would not. */
+  modelsMessage: string | null;
+  refreshModels: (config?: { base_url: string; api_key: string }) => Promise<void>;
   mcpReachable: boolean;
   sidecarReachable: boolean | null;
   /** Whether the user has dismissed this session's sidecar-down notice. */
@@ -571,6 +578,9 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     healthy: null,
     message: "Health not checked yet.",
   });
+  const [models, setModels] = useState<string[]>([]);
+  const [modelsLoading, setModelsLoading] = useState(false);
+  const [modelsMessage, setModelsMessage] = useState<string | null>(null);
   const [mcpReachable, setMcpReachable] = useState(false);
   const [sidecarReachable, setSidecarReachable] = useState<boolean | null>(null);
   const [dismissedSidecarNotice, setDismissedSidecarNotice] = useState<boolean>(loadSidecarNoticeDismissed);
@@ -737,6 +747,28 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       setCapabilities([]);
     }
   }, [settings]);
+
+  /**
+   * Ask the configured endpoint what it serves. A provider that will not list
+   * models is not an error: the UI keeps the manual name and shows the reason.
+   */
+  const refreshModels = useCallback(
+    async (config?: { base_url: string; api_key: string }) => {
+      const target = config ?? { base_url: settings.base_url, api_key: settings.api_key };
+      setModelsLoading(true);
+      try {
+        const result = await fetchModels(target);
+        setModels(result.models);
+        setModelsMessage(result.error);
+      } catch (error) {
+        setModels([]);
+        setModelsMessage(asStudioError(error).message);
+      } finally {
+        setModelsLoading(false);
+      }
+    },
+    [settings.base_url, settings.api_key],
+  );
 
   const addConnector = useCallback(
     async (payload: AddConnectorPayload) => {
@@ -2078,6 +2110,10 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       canvasError,
       refreshCanvas,
       llmHealth,
+      models,
+      modelsLoading,
+      modelsMessage,
+      refreshModels,
       mcpReachable,
       sidecarReachable,
       dismissedSidecarNotice,
@@ -2185,6 +2221,10 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       canvasError,
       refreshCanvas,
       llmHealth,
+      models,
+      modelsLoading,
+      modelsMessage,
+      refreshModels,
       mcpReachable,
       sidecarReachable,
       dismissedSidecarNotice,

@@ -1080,6 +1080,8 @@ def patch_conversation(
     try:
         if body.title is not None:
             memory.update_title(conversation_id, body.title)
+        # A rename must not clear the selected branch; only touch the head when
+        # the caller actually sent one.
         if body.archived is not None:
             memory.set_archived(conversation_id, body.archived)
         if "head_id" in body.model_fields_set:
@@ -1103,7 +1105,7 @@ def delete_conversation(conversation_id: str, request: Request) -> dict:
 
 
 @router.post("/approvals/{approval_id}", response_model=ApprovalDecisionResponse)
-def resolve_approval(
+async def resolve_approval(
     approval_id: str, body: ApprovalDecisionRequest, request: Request
 ) -> ApprovalDecisionResponse:
     """Answer a paused write. The paused turn resumes on its own stream."""

@@ -38,6 +38,10 @@ const stubContext = (overrides: Record<string, unknown> = {}) =>
     clearChat: vi.fn(),
     refreshCanvas: vi.fn().mockResolvedValue(undefined),
     llmHealth: { healthy: null, message: "" },
+    models: [] as string[],
+    modelsLoading: false,
+    modelsMessage: null as string | null,
+    refreshModels: vi.fn().mockResolvedValue(undefined),
     mcpReachable: false,
     pushToast: vi.fn(),
     connectors: [{ name: "notion", kind: "mcp", enabled: true }],
@@ -74,6 +78,36 @@ function renderPanel() {
     </UpdateProvider>,
   );
 }
+
+describe("SettingsPanel model catalog", () => {
+  it("offers the endpoint's models as suggestions and keeps typing free", () => {
+    vi.mocked(useStudio).mockReturnValue(
+      stubContext({ models: ["local-tools-model", "qwen3-8b"] }),
+    );
+
+    renderPanel();
+
+    const model = screen.getByLabelText(/^model/i);
+    expect(model).toHaveAttribute("list", "studio-model-options");
+    expect(document.getElementById("studio-model-options")?.children).toHaveLength(2);
+    expect(screen.getByText(/2 models available/i)).toBeInTheDocument();
+  });
+
+  it("says why there is no catalog instead of pretending the list is empty", () => {
+    const refresh = vi.fn().mockResolvedValue(undefined);
+    vi.mocked(useStudio).mockReturnValue(
+      stubContext({ models: [], modelsMessage: "connection_error: connection refused", refreshModels: refresh }),
+    );
+
+    renderPanel();
+
+    expect(screen.getByLabelText(/^model/i)).not.toHaveAttribute("list");
+    expect(screen.getByText(/connection refused/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /find models/i }));
+    expect(refresh).toHaveBeenCalled();
+  });
+});
 
 describe("SettingsPanel connectors", () => {
   it("renders registered connectors and removes one on click", () => {

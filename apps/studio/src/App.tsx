@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 
-import { StudioRuntimeProvider } from "./assistant/StudioRuntime";
 import { BannerBridge, useBannerActionDispatcher } from "./banners/BannerBridge";
 import { BannerProvider, useBanner } from "./banners/BannerProvider";
 import { BannerStack } from "./banners/BannerStack";
@@ -14,6 +13,7 @@ import { StudioBar } from "./components/layout/StudioBar";
 import { WorkbenchRail } from "./components/workspace/WorkbenchRail";
 import { WorkspacePanel } from "./components/workspace/WorkspacePanel";
 import { FirstRunWizard, OnboardingProvider } from "./onboarding";
+import { StudioRuntimeProvider } from "./assistant/StudioRuntime";
 import { StudioProvider, useStudio } from "./state/StudioContext";
 import { UpdateBanner, UpdateProvider } from "./updater";
 
