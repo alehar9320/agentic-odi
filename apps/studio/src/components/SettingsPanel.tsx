@@ -67,6 +67,7 @@ export function SettingsPanel() {
     setDisplayName,
     brief,
     openSetup,
+    closeSetup,
     clearChat,
     refreshCanvas,
     llmHealth,
@@ -325,7 +326,14 @@ export function SettingsPanel() {
       )}
 
       <div className="settings__actions">
-        <button type="button" className="button" onClick={clearChat}>
+        <button
+          type="button"
+          className="button"
+          onClick={() => {
+            closeSetup();
+            clearChat();
+          }}
+        >
           Start a new conversation
         </button>
         <button type="button" className="button button--ghost" onClick={() => void refreshCanvas()}>

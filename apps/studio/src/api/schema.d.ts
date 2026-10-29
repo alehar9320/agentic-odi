@@ -405,7 +405,10 @@ export interface paths {
         /** Get Evidence Records */
         get: operations["get_evidence_records_api_evidence_get"];
         put?: never;
-        /** Post Evidence */
+        /**
+         * Post Evidence
+         * @description Capture a research record, keeping the knowledge where it already lives.
+         */
         post: operations["post_evidence_api_evidence_post"];
         delete?: never;
         options?: never;
@@ -635,6 +638,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/evidence/{evidence_id}/promote": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Promote Evidence
+         * @description Promote a record into a Job or a Desired Outcome.
+         */
+        post: operations["promote_evidence_api_evidence__evidence_id__promote_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/{full_path}": {
         parameters: {
             query?: never;
@@ -681,37 +704,41 @@ export interface components {
             /** Step Id */
             step_id?: string | null;
         };
-        /** AddEvidenceRequest */
+        /**
+         * AddEvidenceRequest
+         * @description A research record delegated from an external tool, or captured by hand.
+         */
         AddEvidenceRequest: {
-            /**
-             * Mcp Url
-             * @default
-             */
-            mcp_url: string;
             /** Source Name */
             source_name: string;
-            /** Source Kind */
+            /**
+             * Source Kind
+             * @default manual
+             */
             source_kind: string;
             /** Name */
             name: string;
             /** Content */
             content: string;
+            /** Url */
+            url?: string | null;
             /**
              * Item Type
              * @default manual
              * @enum {string}
              */
             item_type: "catalog" | "resource" | "tool_result" | "manual" | "note";
-            /** Raw */
-            raw?: {
-                [key: string]: unknown;
-            };
             /** Job Id */
             job_id?: string | null;
             /** Step Id */
             step_id?: string | null;
             /** Outcome Id */
             outcome_id?: string | null;
+            /**
+             * Mcp Url
+             * @default
+             */
+            mcp_url: string;
         };
         /** AddOutcomeRequest */
         AddOutcomeRequest: {
@@ -1208,6 +1235,32 @@ export interface components {
             } | null;
             /** Confidence */
             confidence?: number | null;
+        };
+        /**
+         * PromoteEvidenceRequest
+         * @description Turn a captured record into a Job or a Desired Outcome.
+         */
+        PromoteEvidenceRequest: {
+            /**
+             * Target
+             * @enum {string}
+             */
+            target: "job" | "outcome";
+            /** Job Id */
+            job_id?: string | null;
+            /** Statement */
+            statement?: string | null;
+            /** Name */
+            name?: string | null;
+            /** Importance */
+            importance?: number | null;
+            /** Satisfaction */
+            satisfaction?: number | null;
+            /**
+             * Mcp Url
+             * @default
+             */
+            mcp_url: string;
         };
         /**
          * StudioBrief
@@ -2966,6 +3019,43 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    promote_evidence_api_evidence__evidence_id__promote_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                evidence_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PromoteEvidenceRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
             /** @description Validation Error */

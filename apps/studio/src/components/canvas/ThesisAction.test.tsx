@@ -13,6 +13,9 @@ vi.mock("../../state/StudioContext", () => ({
     pushToast,
     saveThesis,
     updateOutcome: vi.fn(),
+    // The card lists the records captured against its outcome; give it an
+    // empty canvas so the assertions here stay about the thesis action.
+    canvasState: { kind: "ready", data: { jobs: [], steps: [], outcomes: [], source: "seed" } },
   }),
 }));
 
