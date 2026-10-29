@@ -45,4 +45,26 @@ describe("createSseParser", () => {
 
     expect(events).toEqual([{ event: "connector", data: { action: "registered", name: "gong" } }]);
   });
+
+  it("parses memory frames, the agent's proposals", () => {
+    const parser = createSseParser();
+
+    const events = parser.push(
+      'event: memory\ndata: {"observation":{"id":"o-1","text":"Approvals are the bottleneck","category":"constraint","status":"proposed"}}\n\n',
+    );
+
+    expect(events).toEqual([
+      {
+        event: "memory",
+        data: {
+          observation: {
+            id: "o-1",
+            text: "Approvals are the bottleneck",
+            category: "constraint",
+            status: "proposed",
+          },
+        },
+      },
+    ]);
+  });
 });

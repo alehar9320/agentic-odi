@@ -2,7 +2,8 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import App from "./App";
-import { healthLlm } from "./api/studioApi";
+import { fetchConversationTree, healthLlm } from "./api/studioApi";
+import type { ConversationTree } from "./types";
 
 vi.mock("./api/studioApi", () => ({
   fetchConfig: vi.fn(async () => ({
@@ -56,6 +57,37 @@ vi.mock("./api/studioApi", () => ({
   updateObservation: vi.fn(),
   deleteObservation: vi.fn(async () => ({ ok: true })),
   clearMemory: vi.fn(async () => ({ ok: true })),
+  fetchConversationTree: vi.fn(async () => ({
+    conversation: {
+      id: "c-new",
+      title: null,
+      created_at: "2026-10-22T10:00:00+00:00",
+      updated_at: "2026-10-22T10:00:00+00:00",
+      head_id: null,
+    },
+    messages: [],
+    head_id: null,
+  })),
+  fetchConversations: vi.fn(async () => []),
+  setConversationArchived: vi.fn(async () => ({ id: "c-new", archived: true })),
+  deleteConversation: vi.fn(async () => ({ deleted: "c-new" })),
+  appendMessage: vi.fn(async () => undefined),
+  fetchBrief: vi.fn(async () => null),
+  saveBrief: vi.fn(async (brief: unknown) => brief),
+  fetchSettings: vi.fn(async () => ({
+    base_url: "http://localhost:8001/v1",
+    model: "local-tools-model",
+    mcp_url: "http://localhost:8000/mcp",
+    has_api_key: false,
+    masked: "",
+  })),
+  saveSettings: vi.fn(async () => ({
+    base_url: "http://localhost:8001/v1",
+    model: "local-tools-model",
+    mcp_url: "http://localhost:8000/mcp",
+    has_api_key: false,
+    masked: "",
+  })),
   streamChat: vi.fn(
     async (
       _request: unknown,
@@ -76,6 +108,18 @@ const BRIEF = {
   job_id: "JOB-402",
 };
 
+/** The empty thread the mocked sidecar answers with, unless a test picks one. */
+const EMPTY_TREE: ConversationTree = {
+  conversation: {
+    id: "c-new",
+    title: "",
+    created_at: "2026-10-22T10:00:00+00:00",
+    updated_at: "2026-10-22T10:00:00+00:00",
+  },
+  messages: [],
+  head_id: null,
+};
+
 beforeEach(() => {
   for (const key of [
     "studio.brief",
@@ -85,6 +129,7 @@ beforeEach(() => {
     "studio.setupDismissed",
     "studio.setupDraft",
     "studio.onboarding",
+    "studio.conversationId",
   ]) {
     window.localStorage.removeItem(key);
   }
@@ -95,6 +140,7 @@ beforeEach(() => {
     healthy: true,
     message: "LLM backend is reachable.",
   });
+  vi.mocked(fetchConversationTree).mockResolvedValue(EMPTY_TREE);
 });
 
 describe("studio shell", () => {
@@ -201,6 +247,47 @@ describe("studio shell", () => {
     expect(await screen.findByText("job")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /copy reply/i })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /sharpen an opportunity/i })).not.toBeInTheDocument();
+  });
+
+  it("reloads the page with the thread it was left on", async () => {
+    vi.mocked(fetchConversationTree).mockResolvedValue({
+      conversation: {
+        id: "c-old",
+        title: "Secrets rotation",
+        created_at: "2026-10-22T10:00:00+00:00",
+        updated_at: "2026-10-22T10:04:00+00:00",
+        head_id: "m-2",
+      },
+      messages: [
+        {
+          id: "m-1",
+          parent_id: null,
+          role: "user",
+          content: "The approval step is what hurts.",
+          created_at: "2026-10-22T10:03:00+00:00",
+        },
+        {
+          id: "m-2",
+          parent_id: "m-1",
+          role: "assistant",
+          content: "Then let us start with approvals.",
+          created_at: "2026-10-22T10:04:00+00:00",
+        },
+      ],
+      head_id: "m-2",
+    });
+    window.localStorage.setItem("studio.conversationId", "c-old");
+
+    const first = render(<App />);
+    expect(await screen.findByText("The approval step is what hurts.")).toBeInTheDocument();
+    expect(await screen.findByText("Then let us start with approvals.")).toBeInTheDocument();
+    first.unmount();
+
+    // A reload is a fresh process with the same store: nothing may be invented
+    // locally to fill the gap.
+    render(<App />);
+    expect(await screen.findByText("The approval step is what hurts.")).toBeInTheDocument();
+    expect(screen.getByText("Then let us start with approvals.")).toBeInTheDocument();
   });
 
   it("returns home from the wordmark", async () => {

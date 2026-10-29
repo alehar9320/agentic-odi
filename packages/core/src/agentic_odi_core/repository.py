@@ -77,10 +77,14 @@ def apply_updates(entity: _Model, updates: dict[str, Any]) -> _Model:
     """Merge updates over the fields a stored entity actually carries.
 
     ``exclude_unset`` matters: revalidating a full dump would re-require
-    derived fields the model computes for itself.
+    derived fields the model computes for itself. A generated id is unset but
+    must never be re-rolled, so it is pinned back explicitly.
     """
     current = entity.model_dump(exclude_unset=True)
     current.update(updates)
+    identifier = getattr(entity, "id", None)
+    if identifier is not None:
+        current["id"] = identifier
     return type(entity).model_validate(current)
 
 
@@ -157,6 +161,7 @@ class Repository(Protocol):
         self, status: str | None = None, limit: int | None = None, offset: int = 0
     ) -> list[Observation]: ...
     def update_observation(self, observation_id: str, updates: dict) -> Observation | None: ...
+    def delete_observation(self, observation_id: str) -> bool: ...
     def save_brief(self, brief: Brief) -> Brief: ...
     def get_brief(self) -> Brief | None: ...
     def clear(self) -> None: ...
@@ -427,6 +432,9 @@ class InMemoryRepository:
         new_observation = apply_updates(observation, updates)
         self.observations[observation_id] = new_observation
         return new_observation
+
+    def delete_observation(self, observation_id: str) -> bool:
+        return self.observations.pop(observation_id, None) is not None
 
     def save_brief(self, brief: Brief) -> Brief:
         self.brief = brief

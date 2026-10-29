@@ -463,11 +463,15 @@ class ODIService:
         model: str | None = None,
         tokens_in: int | None = None,
         tokens_out: int | None = None,
+        message_id: str | None = None,
+        parent_id: str | None = None,
     ) -> Message:
         conversation = self.get_conversation(conversation_id)
         message = self.repo.add_message(
             Message(
+                id=message_id or str(uuid.uuid4()),
                 conversation_id=conversation_id,
+                parent_id=parent_id,
                 role=role,
                 content=content,
                 parts=list(parts or []),
@@ -477,7 +481,7 @@ class ODIService:
                 tokens_out=tokens_out,
             )
         )
-        updates: dict[str, Any] = {"updated_at": _now_iso()}
+        updates: dict[str, Any] = {"updated_at": _now_iso(), "head_id": message.id}
         if conversation.title is None and role == "user":
             title = _first_line(content)[:_TITLE_LENGTH]
             if title:
@@ -503,6 +507,8 @@ class ODIService:
         category: ObservationCategory = "other",
         conversation_id: str | None = None,
         source_message_id: str | None = None,
+        data: dict[str, Any] | None = None,
+        confidence: float = 0.5,
     ) -> Observation:
         """Write what the agent learned as a proposal, never as a confirmed fact."""
         stripped = text.strip()
@@ -514,6 +520,8 @@ class ODIService:
                 category=category,
                 conversation_id=conversation_id,
                 source_message_id=source_message_id,
+                data=dict(data or {}),
+                confidence=confidence,
             )
         )
 
@@ -544,6 +552,10 @@ class ODIService:
         if status not in ("confirmed", "dismissed", "proposed"):
             raise ValidationError(f"unknown observation status: {status}")
         return self.update_observation(observation_id, {"status": status})
+
+    def delete_observation(self, observation_id: str) -> None:
+        if not self.repo.delete_observation(observation_id):
+            raise ObservationNotFoundError(observation_id)
 
     def save_brief(
         self,

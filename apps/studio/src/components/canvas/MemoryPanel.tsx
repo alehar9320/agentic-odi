@@ -2,21 +2,40 @@ import { useMemo, useState, type FormEvent } from "react";
 
 import { useStudio } from "../../state/StudioContext";
 import { GhostMemory } from "../Skeletons";
-import type { Observation, ObservationKind, ObservationStatus } from "../../types";
+import type { Observation, ObservationCategory, ObservationStatus } from "../../types";
 
-const KIND_LABELS: Record<ObservationKind, string> = {
+const CATEGORY_LABELS: Record<ObservationCategory, string> = {
   career: "Your role",
   opportunity: "The opportunity",
   business: "The business",
-  stakeholder: "A stakeholder",
+  customer: "Your customer",
   constraint: "A constraint",
+  decision: "A decision",
+  stakeholder: "A stakeholder",
   evidence: "Evidence",
   preference: "How you work",
+  other: "A note",
 };
+
+function SourceLine({
+  observation,
+  lines,
+}: {
+  observation: Observation;
+  lines: Map<string, string>;
+}) {
+  const said = observation.source_message_id
+    ? lines.get(observation.source_message_id)
+    : undefined;
+  if (!said) {
+    return null;
+  }
+  return <p className="memory-item__source">You said: {said.slice(0, 140)}</p>;
+}
 
 function byStatus(a: Observation, b: Observation): number {
   if (a.status !== b.status) {
-    return a.status === "suggested" ? -1 : 1;
+    return a.status === "proposed" ? -1 : 1;
   }
   return a.created_at.localeCompare(b.created_at);
 }
@@ -31,6 +50,7 @@ export function MemoryPanel() {
   const {
     memory,
     memoryLoading,
+    messages,
     addObservation,
     updateObservation,
     deleteObservation,
@@ -40,11 +60,22 @@ export function MemoryPanel() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [editing, setEditing] = useState<{ id: string; text: string } | null>(null);
   const [adding, setAdding] = useState(false);
-  const [addKind, setAddKind] = useState<ObservationKind>("constraint");
+  const [addCategory, setAddCategory] = useState<ObservationCategory>("constraint");
   const [addText, setAddText] = useState("");
 
   const items = useMemo(() => [...memory].sort(byStatus), [memory]);
-  const suggested = items.filter((item) => item.status === "suggested");
+  // A note is easier to judge next to the line it came from, when that line is
+  // still on screen.
+  const userLines = useMemo(() => {
+    const lines = new Map<string, string>();
+    for (const message of messages) {
+      if (message.role === "user" && message.content.trim()) {
+        lines.set(message.id, message.content.trim());
+      }
+    }
+    return lines;
+  }, [messages]);
+  const proposed = items.filter((item) => item.status === "proposed");
   const confirmed = items.filter((item) => item.status === "confirmed");
 
   async function decide(observation: Observation, status: ObservationStatus) {
@@ -79,7 +110,7 @@ export function MemoryPanel() {
     if (!text) {
       return;
     }
-    await addObservation({ kind: addKind, text, confirmed: true });
+    await addObservation({ category: addCategory, text, confirmed: true });
     setAddText("");
     setAdding(false);
   }
@@ -128,13 +159,14 @@ export function MemoryPanel() {
         </div>
       )}
 
-      {suggested.length > 0 && (
+      {proposed.length > 0 && (
         <section className="memory-group" aria-label="Not confirmed yet">
           <h3 className="memory-group__title">Did I get this right?</h3>
           <ul className="memory-list">
-            {suggested.map((observation) => (
+            {proposed.map((observation) => (
               <li key={observation.id} className="memory-item memory-item--suggested">
-                <p className="memory-item__kind">{KIND_LABELS[observation.kind]}</p>
+                <p className="memory-item__kind">{CATEGORY_LABELS[observation.category]}</p>
+                <SourceLine observation={observation} lines={userLines} />
                 {body(observation)}
                 <div className="memory-item__actions">
                   <button
@@ -174,7 +206,7 @@ export function MemoryPanel() {
             {confirmed.map((observation) => (
               <li key={observation.id} className="memory-item">
                 <div className="memory-item__head">
-                  <p className="memory-item__kind">{KIND_LABELS[observation.kind]}</p>
+                  <p className="memory-item__kind">{CATEGORY_LABELS[observation.category]}</p>
                   <div className="memory-item__actions">
                     <button
                       type="button"
@@ -206,10 +238,10 @@ export function MemoryPanel() {
           <label className="memory-add__field">
             <span>What kind of note?</span>
             <select
-              value={addKind}
-              onChange={(event) => setAddKind(event.target.value as ObservationKind)}
+              value={addCategory}
+              onChange={(event) => setAddCategory(event.target.value as ObservationCategory)}
             >
-              {Object.entries(KIND_LABELS).map(([value, label]) => (
+              {Object.entries(CATEGORY_LABELS).map(([value, label]) => (
                 <option key={value} value={value}>
                   {label}
                 </option>

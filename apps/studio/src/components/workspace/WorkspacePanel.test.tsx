@@ -22,6 +22,7 @@ const studio = vi.hoisted(() => ({
     source: "seed" as const,
   },
   canvasLoading: false,
+  theses: [],
   canvasState: { kind: "ready", data: null } as unknown,
   canvasError: null,
   refreshCanvas: vi.fn(),

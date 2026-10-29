@@ -27,6 +27,7 @@ from agentic_odi_studio_api.studio.errors import (
 )
 from agentic_odi_studio_api.studio.memory import StudioMemory
 from agentic_odi_studio_api.studio.router import router as studio_router
+from agentic_odi_studio_api.studio.settings import StudioSettings
 
 CORS_ORIGINS = [
     "tauri://localhost",
@@ -56,7 +57,9 @@ def create_app(
     backend: str | None = None,
     connectors: ConnectorService | None = None,
     memory: StudioMemory | None = None,
+    settings: StudioSettings | None = None,
 ) -> FastAPI:
+    owns_store = repo is None
     if repo is None:
         repo = SQLiteRepository()
     service = ODIService(repo)
@@ -78,7 +81,10 @@ def create_app(
     app.state.service = service
     app.state.backend = backend or os.environ.get("AGENTIC_ODI_BACKEND") or DEFAULT_BACKEND
     app.state.connectors = connectors or ConnectorService()
-    app.state.memory = memory or StudioMemory()
+    # One store, one truth: the thread and the canvas are appended to the same
+    # event log, so the CLI and the MCP server read the conversation too.
+    app.state.memory = memory or StudioMemory(repo, import_legacy=owns_store)
+    app.state.settings = settings or StudioSettings()
     app.state.approvals = approvals
 
     app.add_middleware(

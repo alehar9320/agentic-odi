@@ -191,6 +191,8 @@ class SQLiteRepository(Repository):
             self.observations[observation.id] = observation
         elif et == "OBSERVATION_UPDATED":
             self._merge_updates(self.observations, p, Observation)
+        elif et == "OBSERVATION_DELETED":
+            self.observations.pop(p["id"], None)
         elif et == "BRIEF_SAVED":
             self.brief = Brief.model_validate(p)
         self._last_event_id = max(self._last_event_id, ev["id"])
@@ -601,6 +603,15 @@ class SQLiteRepository(Repository):
             self._append("OBSERVATION_UPDATED", {"id": observation_id, "updates": updates})
             self._sync()
             return self.observations.get(observation_id)
+
+    def delete_observation(self, observation_id: str) -> bool:
+        with self._lock:
+            self._sync()
+            if observation_id not in self.observations:
+                return False
+            self._append("OBSERVATION_DELETED", {"id": observation_id})
+            self._sync()
+            return True
 
     def save_brief(self, brief: Brief) -> Brief:
         with self._lock:

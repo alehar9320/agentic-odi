@@ -177,7 +177,16 @@ class CustomerOutcome(BaseModel):
 
 MessageRole = Literal["user", "assistant", "tool", "system"]
 ObservationCategory = Literal[
-    "career", "opportunity", "business", "customer", "constraint", "decision", "other"
+    "career",
+    "opportunity",
+    "business",
+    "customer",
+    "constraint",
+    "decision",
+    "stakeholder",
+    "evidence",
+    "preference",
+    "other",
 ]
 ObservationStatus = Literal["proposed", "confirmed", "dismissed"]
 
@@ -198,6 +207,7 @@ class Conversation(BaseModel):
     workspace_id: str = Field(DEFAULT_WORKSPACE, description="Workspace that owns this thread")
     device_id: str = Field(DEFAULT_DEVICE, description="Device that started this thread")
     archived: bool = Field(False, description="Archived threads stay readable but leave the rail")
+    head_id: str | None = Field(None, description="Message id of the branch currently on screen")
 
 
 class Message(BaseModel):
@@ -209,6 +219,9 @@ class Message(BaseModel):
 
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     conversation_id: str = Field(..., description="Owning conversation")
+    parent_id: str | None = Field(
+        None, description="Message this turn answers; siblings share a parent to branch"
+    )
     role: MessageRole
     content: str = Field("", description="Plain-text content of the turn")
     parts: list[dict[str, Any]] = Field(
@@ -236,6 +249,10 @@ class Observation(BaseModel):
     text: str = Field(..., max_length=300, description="The fact, in the person's words")
     category: ObservationCategory = "other"
     status: ObservationStatus = "proposed"
+    data: dict[str, Any] = Field(
+        default_factory=dict, description="Structured detail behind the text"
+    )
+    confidence: float = Field(0.5, description="How sure the agent claims to be, 0 to 1")
     source_message_id: str | None = Field(None, description="Turn the fact came from")
     created_at: datetime = Field(default_factory=_utcnow)
     updated_at: datetime = Field(default_factory=_utcnow)

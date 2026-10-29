@@ -1,7 +1,7 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { StudioProvider, useStudio } from "./StudioContext";
+import { EMPTY_CONFIG, StudioProvider, useStudio } from "./StudioContext";
 
 const CONVERSATION = {
   id: "c-1",
@@ -12,12 +12,11 @@ const CONVERSATION = {
 
 const OBSERVATION = {
   id: "o-1",
-  kind: "career",
+  category: "career",
   text: "Accountable for activation.",
   data: {},
   status: "confirmed",
   confidence: 0.9,
-  source_turn: 1,
   created_at: "2026-10-22T10:00:00+00:00",
   updated_at: "2026-10-22T10:00:00+00:00",
 };
@@ -41,7 +40,7 @@ let chatAttempts = 0;
 
 const DEFAULT_CHAT_STREAM =
   'event: conversation\ndata: {"id":"c-2","title":"hello"}\n\n' +
-  'event: memory\ndata: {"observation":{"id":"o-2","kind":"preference","text":"Prefers short updates.","data":{},"status":"suggested","confidence":0.7,"source_turn":null,"created_at":"2026-10-22T10:01:00+00:00","updated_at":"2026-10-22T10:01:00+00:00"}}\n\n' +
+  'event: memory\ndata: {"observation":{"id":"o-2","category":"preference","text":"Prefers short updates.","data":{},"status":"proposed","confidence":0.7,"created_at":"2026-10-22T10:01:00+00:00","updated_at":"2026-10-22T10:01:00+00:00"}}\n\n' +
   'event: delta\ndata: {"text":"Hi"}\n\n' +
   'event: message\ndata: {"content":"Hi"}\n\n';
 
@@ -52,7 +51,29 @@ let chatFailure: Error | null = null;
 let connectorFetches = 0;
 let llmHealthFetches = 0;
 let approvalCalls: Record<string, unknown>[] = [];
+let settingsPosts: Record<string, unknown>[] = [];
+let deletedConversations: string[] = [];
+let briefBody: unknown = { brief: null };
+let treeMessages: Record<string, unknown>[] = [
+  {
+    id: "t-1",
+    parent_id: null,
+    role: "user",
+    content: "I own activation.",
+    created_at: "2026-10-22T10:00:00+00:00",
+  },
+  {
+    id: "t-2",
+    parent_id: "t-1",
+    role: "assistant",
+    content: "Tell me more.",
+    created_at: "2026-10-22T10:00:01+00:00",
+  },
+];
+let treeHead: string | null = "t-2";
 let headPatches: Record<string, unknown>[] = [];
+let treeFetches = 0;
+let latestFetches = 0;
 
 function route(
   input: RequestInfo | URL,
@@ -101,10 +122,32 @@ function route(
     connectorFetches += 1;
     return json([]);
   }
-  if (url === "/api/memory/observations") {
+  if (url === "/api/observations" || url === "/api/memory/observations") {
     return json({ observations: [OBSERVATION] });
   }
+  if (url === "/api/settings") {
+    if (init?.method === "POST") {
+      settingsPosts.push(JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>);
+    }
+    return json({
+      base_url: "http://llm",
+      model: "m",
+      mcp_url: "http://mcp",
+      has_api_key: true,
+      masked: "sk…9320",
+    });
+  }
+  if (url === "/api/brief") {
+    if (init?.method === "POST") {
+      briefBody = { brief: JSON.parse(String(init.body ?? "{}")) };
+    }
+    return json(briefBody);
+  }
+  if (url.startsWith("/api/conversations?")) {
+    return json({ conversations: [CONVERSATION] });
+  }
   if (url === "/api/conversations/latest") {
+    latestFetches += 1;
     return json({
       conversation: CONVERSATION,
       turns: [
@@ -133,27 +176,13 @@ function route(
     headPatches.push(JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>);
     return json({ conversation: CONVERSATION });
   }
-  if (url === "/api/conversations/c-1/tree") {
-    return json({
-      conversation: CONVERSATION,
-      messages: [
-        {
-          id: "t-1",
-          parent_id: null,
-          role: "user",
-          content: "I own activation.",
-          created_at: "2026-10-22T10:00:00+00:00",
-        },
-        {
-          id: "t-2",
-          parent_id: "t-1",
-          role: "assistant",
-          content: "Tell me more.",
-          created_at: "2026-10-22T10:00:01+00:00",
-        },
-      ],
-      head_id: "t-2",
-    });
+  if (url.startsWith("/api/conversations/") && url.endsWith("/tree")) {
+    treeFetches += 1;
+    return json({ conversation: CONVERSATION, messages: treeMessages, head_id: treeHead });
+  }
+  if (init?.method === "DELETE" && url.startsWith("/api/conversations/")) {
+    deletedConversations.push(url.split("/").pop() as string);
+    return json({ deleted: url.split("/").pop() });
   }
   if (url === "/api/conversations") {
     return json({
@@ -175,21 +204,54 @@ function route(
   return json({});
 }
 
+function defaultTree(): Record<string, unknown>[] {
+  return [
+    {
+      id: "t-1",
+      parent_id: null,
+      role: "user",
+      content: "I own activation.",
+      created_at: "2026-10-22T10:00:00+00:00",
+    },
+    {
+      id: "t-2",
+      parent_id: "t-1",
+      role: "assistant",
+      content: "Tell me more.",
+      created_at: "2026-10-22T10:00:01+00:00",
+    },
+  ];
+}
+
+/** Every module-level fixture back to its starting value, plus the fetch stub. */
+function resetScene(): void {
+  localStorage.clear();
+  sessionStorage.clear();
+  chatBody = null;
+  chatStream = null;
+  chatFailure = null;
+  chatAttempts = 0;
+  chatAborts = false;
+  canvasFails = false;
+  connectorFetches = 0;
+  llmHealthFetches = 0;
+  approvalCalls = [];
+  headPatches = [];
+  settingsPosts = [];
+  deletedConversations = [];
+  briefBody = { brief: null };
+  treeMessages = defaultTree();
+  treeHead = "t-2";
+  treeFetches = 0;
+  latestFetches = 0;
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)),
+  );
+}
+
 describe("StudioContext memory and resume", () => {
-  beforeEach(() => {
-    localStorage.clear();
-    chatBody = null;
-    chatStream = null;
-    chatFailure = null;
-    chatAttempts = 0;
-    chatAborts = false;
-    canvasFails = false;
-    connectorFetches = 0;
-    llmHealthFetches = 0;
-    approvalCalls = [];
-    headPatches = [];
-    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
-  });
+  beforeEach(resetScene);
 
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -376,20 +438,7 @@ describe("StudioContext memory and resume", () => {
 });
 
 describe("StudioContext failures", () => {
-  beforeEach(() => {
-    localStorage.clear();
-    chatBody = null;
-    chatStream = null;
-    chatFailure = null;
-    chatAttempts = 0;
-    chatAborts = false;
-    canvasFails = false;
-    connectorFetches = 0;
-    llmHealthFetches = 0;
-    approvalCalls = [];
-    headPatches = [];
-    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
-  });
+  beforeEach(resetScene);
 
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -457,22 +506,11 @@ describe("StudioContext failures", () => {
 });
 
 describe("StudioContext sidecar down", () => {
-  let configFails: boolean;
-
   beforeEach(() => {
-    configFails = true;
-    localStorage.clear();
-    chatBody = null;
-    chatStream = null;
-    chatFailure = null;
-    chatAttempts = 0;
-    chatAborts = false;
-    canvasFails = false;
-    connectorFetches = 0;
-    llmHealthFetches = 0;
+    resetScene();
     vi.stubGlobal(
       "fetch",
-      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init, configFails)),
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init, true)),
     );
   });
 
@@ -497,16 +535,8 @@ describe("StudioContext sidecar down", () => {
 
 describe("StudioContext health polling", () => {
   beforeEach(() => {
-    localStorage.clear();
-    chatBody = null;
-    chatStream = null;
-    chatFailure = null;
-    chatAborts = false;
-    canvasFails = false;
-    connectorFetches = 0;
-    llmHealthFetches = 0;
     vi.useFakeTimers();
-    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
+    resetScene();
   });
 
   afterEach(() => {
@@ -537,16 +567,8 @@ describe("StudioContext health polling", () => {
 
 describe("StudioContext theme", () => {
   beforeEach(() => {
-    localStorage.clear();
+    resetScene();
     document.documentElement.className = "";
-    chatBody = null;
-    chatStream = null;
-    chatFailure = null;
-    chatAborts = false;
-    canvasFails = false;
-    connectorFetches = 0;
-    llmHealthFetches = 0;
-    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
   });
 
   afterEach(() => {
@@ -583,19 +605,7 @@ describe("StudioContext theme", () => {
 });
 
 describe("StudioContext canvas state", () => {
-  beforeEach(() => {
-    localStorage.clear();
-    chatBody = null;
-    chatStream = null;
-    chatFailure = null;
-    chatAborts = false;
-    canvasFails = false;
-    connectorFetches = 0;
-    llmHealthFetches = 0;
-    approvalCalls = [];
-    headPatches = [];
-    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
-  });
+  beforeEach(resetScene);
 
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -619,19 +629,7 @@ describe("StudioContext canvas state", () => {
 });
 
 describe("StudioContext stopped turns", () => {
-  beforeEach(() => {
-    localStorage.clear();
-    chatBody = null;
-    chatStream = null;
-    chatFailure = null;
-    chatAborts = false;
-    canvasFails = false;
-    connectorFetches = 0;
-    llmHealthFetches = 0;
-    approvalCalls = [];
-    headPatches = [];
-    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
-  });
+  beforeEach(resetScene);
 
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -653,19 +651,7 @@ describe("StudioContext stopped turns", () => {
 });
 
 describe("StudioContext write approval and branches", () => {
-  beforeEach(() => {
-    localStorage.clear();
-    chatBody = null;
-    chatStream = null;
-    chatFailure = null;
-    chatAborts = false;
-    canvasFails = false;
-    connectorFetches = 0;
-    llmHealthFetches = 0;
-    approvalCalls = [];
-    headPatches = [];
-    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
-  });
+  beforeEach(resetScene);
 
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -720,5 +706,247 @@ describe("StudioContext write approval and branches", () => {
 
     expect(result.current.messages.map((message) => message.id)).toEqual(["b-1", "b-2"]);
     await waitFor(() => expect(headPatches).toEqual([{ head_id: "b-2" }]));
+  });
+});
+
+describe("StudioContext persistence the person can rely on", () => {
+  beforeEach(resetScene);
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("keeps the provider key out of the durable browser cache", async () => {
+    localStorage.setItem(
+      "studio.settings",
+      JSON.stringify({
+        base_url: "http://llm",
+        model_name: "m",
+        mcp_url: "http://mcp",
+        theme: "dark",
+      }),
+    );
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
+
+    act(() => {
+      result.current.saveSettings({
+        ...EMPTY_CONFIG,
+        base_url: "http://llm",
+        model_name: "m",
+        mcp_url: "http://mcp",
+        api_key: "sk-live-9320",
+      });
+    });
+
+    expect(localStorage.getItem("studio.settings")).not.toContain("sk-live-9320");
+    expect(sessionStorage.getItem("studio.apiKey")).toBe("sk-live-9320");
+    await waitFor(() => expect(settingsPosts).toHaveLength(1));
+    expect(settingsPosts[0]).toMatchObject({
+      base_url: "http://llm",
+      model: "m",
+      mcp_url: "http://mcp",
+      api_key: "sk-live-9320",
+    });
+    await waitFor(() => expect(result.current.settingsSummary?.masked).toBe("sk…9320"));
+  });
+
+  it("moves a key an older build left in localStorage into this tab only", async () => {
+    localStorage.setItem(
+      "studio.settings",
+      JSON.stringify({ base_url: "http://llm", theme: "dark", api_key: "sk-leaked" }),
+    );
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+
+    await waitFor(() => expect(result.current.settings.api_key).toBe("sk-leaked"));
+    expect(sessionStorage.getItem("studio.apiKey")).toBe("sk-leaked");
+    const cached = JSON.parse(localStorage.getItem("studio.settings") ?? "{}");
+    expect(cached).not.toHaveProperty("api_key");
+  });
+
+  it("leaves the stored key alone when the field is saved empty", async () => {
+    localStorage.setItem(
+      "studio.settings",
+      JSON.stringify({
+        base_url: "http://llm",
+        model_name: "m",
+        mcp_url: "http://mcp",
+        theme: "dark",
+      }),
+    );
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
+
+    act(() => {
+      result.current.saveSettings({ ...EMPTY_CONFIG, api_key: "" });
+    });
+
+    await waitFor(() => expect(settingsPosts).toHaveLength(1));
+    expect(settingsPosts[0]).not.toHaveProperty("api_key");
+    // The tab holds nothing, so the sidecar substitutes the key it already has.
+    expect(sessionStorage.getItem("studio.apiKey")).toBe("");
+    expect(result.current.settings.api_key).toBe("");
+  });
+
+  it("restores the exact thread, cards and all", async () => {
+    treeMessages = [
+      {
+        id: "t-1",
+        parent_id: null,
+        role: "user",
+        content: "Score this outcome.",
+        created_at: "2026-10-22T10:00:00+00:00",
+        parts: [{ kind: "text", text: "Score this outcome." }],
+      },
+      {
+        id: "t-2",
+        parent_id: "t-1",
+        role: "assistant",
+        content: "",
+        created_at: "2026-10-22T10:00:01+00:00",
+        parts: [
+          { kind: "reasoning", text: "Comparing importance against satisfaction." },
+          {
+            kind: "ui",
+            id: "u-1",
+            node: {
+              type: "outcome-card",
+              props: {
+                id: "O-1",
+                statement: "Ship faster",
+                importance: 9,
+                satisfaction: 3,
+              },
+            },
+          },
+          { kind: "ui", id: "u-2", node: { type: "hologram", props: {} } },
+          {
+            kind: "tool",
+            id: "tool-1",
+            name: "add_job",
+            status: "running",
+            preview: "creating…",
+            approval: { question: "May I write this?" },
+          },
+          {
+            kind: "source",
+            id: "s-1",
+            title: "Q3 activation review",
+            mediaType: "application/json",
+          },
+        ],
+      },
+    ];
+
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.messages).toHaveLength(2));
+
+    expect(result.current.messages[1].parts).toEqual([
+      { kind: "reasoning", text: "Comparing importance against satisfaction." },
+      {
+        kind: "ui",
+        id: "u-1",
+        node: {
+          type: "outcome-card",
+          props: { id: "O-1", statement: "Ship faster", importance: 9, satisfaction: 3 },
+          children: [],
+        },
+      },
+      {
+        kind: "ui",
+        id: "u-2",
+        node: { type: "hologram", props: {}, children: [], unsupported: true },
+      },
+      // The turn that was still running is over: it never comes back as pending.
+      { kind: "tool", id: "tool-1", name: "add_job", status: "declined", preview: "creating…" },
+      { kind: "source", id: "s-1", title: "Q3 activation review", mediaType: "application/json" },
+    ]);
+  });
+
+  it("reopens the thread it was left on without asking which one is newest", async () => {
+    const first = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(first.result.current.conversationId).toBe("c-1"));
+    await waitFor(() => expect(localStorage.getItem("studio.conversationId")).toBe("c-1"));
+    first.unmount();
+
+    latestFetches = 0;
+    treeFetches = 0;
+    const second = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(second.result.current.conversationId).toBe("c-1"));
+
+    expect(treeFetches).toBeGreaterThan(0);
+    expect(latestFetches).toBe(0);
+    second.unmount();
+  });
+
+  it("archives the thread being left instead of erasing it", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
+
+    act(() => result.current.clearChat());
+
+    await waitFor(() => expect(headPatches).toEqual([{ archived: true }]));
+    expect(deletedConversations).toEqual([]);
+    expect(result.current.messages).toEqual([]);
+  });
+
+  it("opens a saved thread and deletes one for good", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.conversations).toHaveLength(1));
+
+    await act(async () => {
+      await result.current.deleteConversation("c-9");
+    });
+    expect(deletedConversations).toEqual(["c-9"]);
+
+    await act(async () => {
+      await result.current.openConversation("c-1");
+    });
+    expect(result.current.conversationId).toBe("c-1");
+    expect(result.current.messages.map((message) => message.content)).toEqual([
+      "I own activation.",
+      "Tell me more.",
+    ]);
+  });
+
+  it("announces a guess and leaves the verdict to the person", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
+
+    await act(async () => {
+      await result.current.sendMessage("I own activation end to end.");
+    });
+
+    expect(result.current.toasts).toContainEqual(
+      expect.objectContaining({ kind: "info", message: "Noted: Prefers short updates." }),
+    );
+    expect(result.current.notifications).toContainEqual(
+      expect.objectContaining({
+        category: "memory",
+        title: "New thing I learned",
+        message: "Prefers short updates.",
+        targetPanel: "memory",
+        targetId: "o-2",
+      }),
+    );
+    expect(result.current.memory.find((item) => item.id === "o-2")?.status).toBe("proposed");
+  });
+
+  it("hydrates the brief the CLI wrote from the sidecar", async () => {
+    briefBody = {
+      brief: {
+        id: "brief-1",
+        updated_at: "2026-10-22T10:00:00+00:00",
+        product_name: "Agentic ODI",
+        target_user: "product teams",
+        job_statement: "Ship the improvements that matter",
+        core_problem: "Nobody agrees on what matters",
+      },
+    };
+
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+
+    await waitFor(() => expect(result.current.brief?.product_name).toBe("Agentic ODI"));
+    expect(result.current.brief).not.toHaveProperty("id");
   });
 });

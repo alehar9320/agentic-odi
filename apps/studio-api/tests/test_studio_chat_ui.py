@@ -264,7 +264,7 @@ def _named_tool_call(name: str, arguments: dict[str, Any]) -> Any:
     )
 
 
-def test_remember_stores_a_suggested_observation(monkeypatch) -> None:
+def test_remember_proposes_an_observation_the_pm_must_confirm(monkeypatch) -> None:
     from agentic_odi_studio_api.studio.memory import StudioMemory
 
     memory = StudioMemory(":memory:")
@@ -276,7 +276,7 @@ def test_remember_stores_a_suggested_observation(monkeypatch) -> None:
                     _chunk(
                         tool_calls=[
                             _named_tool_call(
-                                "remember", {"kind": "career", "text": "Owns activation."}
+                                "remember", {"category": "career", "text": "Owns activation."}
                             )
                         ]
                     )
@@ -293,15 +293,16 @@ def test_remember_stores_a_suggested_observation(monkeypatch) -> None:
 
     assert "memory" in events
     payload = json.loads(events["memory"][0])["observation"]
-    assert payload["status"] == "suggested"
-    assert payload["kind"] == "career"
+    assert payload["status"] == "proposed"
+    assert payload["category"] == "career"
     observations = memory.list_observations()
     assert [item.text for item in observations] == ["Owns activation."]
     assert json.loads(events["message"][-1])["content"] == "I'll keep that in mind."
     memory.close()
 
 
-def test_remember_rejects_an_invalid_kind(monkeypatch) -> None:
+def test_an_agent_cannot_confirm_its_own_memory(monkeypatch) -> None:
+    """A proposal stays out of the prompt until the person confirms it."""
     from agentic_odi_studio_api.studio.memory import StudioMemory
 
     memory = StudioMemory(":memory:")
@@ -309,7 +310,41 @@ def test_remember_rejects_an_invalid_kind(monkeypatch) -> None:
         monkeypatch,
         [
             _FakeStream(
-                [_chunk(tool_calls=[_named_tool_call("remember", {"kind": "x", "text": "y"})])]
+                [
+                    _chunk(
+                        tool_calls=[
+                            _named_tool_call(
+                                "remember", {"category": "career", "text": "Owns activation."}
+                            )
+                        ]
+                    )
+                ]
+            ),
+            _FakeStream([_chunk("I'll keep that in mind.")]),
+        ],
+    )
+
+    async def _run() -> list[str]:
+        return [frame async for frame in chat.stream_chat(_request(), memory=memory)]
+
+    asyncio.run(_run())
+
+    assert memory.memory_context() == ""
+    observation = memory.list_observations()[0]
+    memory.update_observation(observation.id, status="confirmed")
+    assert "Owns activation." in memory.memory_context()
+    memory.close()
+
+
+def test_remember_rejects_an_unknown_category(monkeypatch) -> None:
+    from agentic_odi_studio_api.studio.memory import StudioMemory
+
+    memory = StudioMemory(":memory:")
+    _install(
+        monkeypatch,
+        [
+            _FakeStream(
+                [_chunk(tool_calls=[_named_tool_call("remember", {"category": "x", "text": "y"})])]
             ),
             _FakeStream([_chunk("Sorry.")]),
         ],
@@ -322,5 +357,28 @@ def test_remember_rejects_an_invalid_kind(monkeypatch) -> None:
 
     assert "memory" not in events
     assert any(json.loads(item)["status"] == "error" for item in events["tool"])
+    assert memory.list_observations() == []
+    memory.close()
+
+
+def test_remember_without_a_category_is_an_error(monkeypatch) -> None:
+    """The old ``kind`` argument must not silently file a fact under ``other``."""
+    from agentic_odi_studio_api.studio.memory import StudioMemory
+
+    memory = StudioMemory(":memory:")
+    _install(
+        monkeypatch,
+        [
+            _FakeStream([_chunk(tool_calls=[_named_tool_call("remember", {"text": "y"})])]),
+            _FakeStream([_chunk("Sorry.")]),
+        ],
+    )
+
+    async def _run() -> list[str]:
+        return [frame async for frame in chat.stream_chat(_request(), memory=memory)]
+
+    events = _events(asyncio.run(_run()))
+
+    assert "memory" not in events
     assert memory.list_observations() == []
     memory.close()

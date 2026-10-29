@@ -5,6 +5,7 @@ import type {
   AddOutcomePayload,
   AddStepPayload,
   CanvasData,
+  ChatPart,
   ChangelogData,
   ChatStreamRequest,
   ConnectorHealth,
@@ -20,12 +21,15 @@ import type {
   McpHealth,
   ModelList,
   Observation,
-  ObservationKind,
+  ObservationCategory,
   ObservationStatus,
   Outcome,
+  SettingsSummary,
   Step,
+  StudioBrief,
   StudioConfig,
   StudioError,
+  StoredBrief,
 } from "../types";
 import { createSseParser, type RawSseEvent } from "./sse";
 
@@ -423,37 +427,53 @@ export async function streamChat(
 }
 
 
-export async function fetchMemory(): Promise<Observation[]> {
+export async function fetchMemory(status?: ObservationStatus): Promise<Observation[]> {
   return withLocal(
     () =>
-      getJson<{ observations: Observation[] }>("/api/memory/observations").then(
-        (body) => body.observations,
-      ),
-    (bff) => bff.memory.listObservations(),
+      getJson<{ observations: Observation[] }>(
+        `/api/observations${status ? `?status=${status}` : ""}`,
+      ).then((body) => body.observations ?? []),
+    async (bff) => {
+      const all = await bff.memory.listObservations(true);
+      return status ? all.filter((observation) => observation.status === status) : all;
+    },
   );
 }
 
 export interface AddObservationPayload {
-  kind: ObservationKind;
+  category?: ObservationCategory;
   text: string;
   data?: Record<string, unknown>;
   confidence?: number;
+  /** Only a person confirms; the agent proposing a fact never sets this. */
   confirmed?: boolean;
+  conversation_id?: string | null;
+  source_message_id?: string | null;
 }
 
 export async function addObservation(payload: AddObservationPayload): Promise<Observation> {
   return withLocal(
     () =>
-      postJson<{ observation: Observation }>("/api/memory/observations", payload).then(
+      postJson<{ observation: Observation }>("/api/observations", payload).then(
         (body) => body.observation,
       ),
-    (bff) => bff.memory.addObservation(payload),
+    (bff) =>
+      bff.memory.addObservation({
+        category: payload.category,
+        text: payload.text,
+        data: payload.data,
+        confidence: payload.confidence,
+        confirmed: payload.confirmed,
+        conversationId: payload.conversation_id,
+        sourceMessageId: payload.source_message_id,
+      }),
   );
 }
 
 export interface UpdateObservationPayload {
   text?: string;
   status?: ObservationStatus;
+  category?: ObservationCategory;
   data?: Record<string, unknown>;
   confidence?: number;
 }
@@ -466,7 +486,7 @@ export async function updateObservation(
     () =>
       sendJson<{ observation: Observation }>(
         "PATCH",
-        `/api/memory/observations/${encodeURIComponent(observationId)}`,
+        `/api/observations/${encodeURIComponent(observationId)}`,
         payload,
       ).then((body) => body.observation),
     (bff) => bff.memory.updateObservation(observationId, payload),
@@ -475,10 +495,7 @@ export async function updateObservation(
 
 export function deleteObservation(observationId: string): Promise<{ ok: boolean }> {
   return withLocal(
-    () =>
-      deleteJson<{ ok: boolean }>(
-        `/api/memory/observations/${encodeURIComponent(observationId)}`,
-      ),
+    () => deleteJson<{ ok: boolean }>(`/api/observations/${encodeURIComponent(observationId)}`),
     async (bff) => bff.memory.deleteObservation(observationId),
   );
 }
@@ -490,10 +507,87 @@ export function clearMemory(): Promise<{ ok: boolean }> {
   );
 }
 
+/** The brief the CLI and MCP server also read; `localStorage` is only its cache. */
+export async function fetchBrief(): Promise<StudioBrief | null> {
+  const body = await getJson<{ brief: StoredBrief | null }>("/api/brief");
+  return body.brief ? toBrief(body.brief) : null;
+}
+
+export function saveBrief(brief: StudioBrief): Promise<StudioBrief | null> {
+  return postJson<{ brief: StoredBrief | null }>("/api/brief", brief).then((body) =>
+    body.brief ? toBrief(body.brief) : null
+  );
+}
+
+/** Storage columns belong to the sidecar; the browser keeps only the brief. */
+function toBrief(stored: StoredBrief): StudioBrief {
+  const { product_name, target_user, job_statement, core_problem } = stored;
+  const brief: StudioBrief = { product_name, target_user, job_statement, core_problem };
+  if (stored.product_url !== undefined) {
+    brief.product_url = stored.product_url;
+  }
+  if (stored.job_id !== undefined) {
+    brief.job_id = stored.job_id;
+  }
+  return brief;
+}
+
+/**
+ * Endpoint settings, with the provider key kept on the sidecar: the SPA is
+ * handed a mask, never the secret it sent.
+ */
+export function fetchSettings(): Promise<SettingsSummary> {
+  return getJson<SettingsSummary>("/api/settings");
+}
+
+export function saveSettings(payload: {
+  base_url: string;
+  model: string;
+  mcp_url: string;
+  /** Omitted or null leaves the stored key alone; a value replaces it. */
+  api_key?: string | null;
+}): Promise<SettingsSummary> {
+  return postJson<SettingsSummary>("/api/settings", payload);
+}
+
 export function fetchLatestConversation(): Promise<LatestConversation> {
   return withLocal(
     () => getJson<LatestConversation>("/api/conversations/latest"),
     async (bff) => bff.memory.latestConversation(),
+  );
+}
+
+/** Newest first, archived included: the switcher decides what to show. */
+export async function fetchConversations(limit = 20): Promise<Conversation[]> {
+  return withLocal(
+    () =>
+      getJson<{ conversations: Conversation[] }>(
+        `/api/conversations?limit=${encodeURIComponent(String(limit))}`,
+      ).then((body) => body.conversations ?? []),
+    async (bff) => bff.memory.listConversations(),
+  );
+}
+
+/** The transcript and the branch that was on screen. */
+export async function fetchConversation(conversationId: string): Promise<ConversationTree> {
+  return withLocal(
+    () =>
+      getJson<ConversationTree>(`/api/conversations/${encodeURIComponent(conversationId)}`),
+    async (bff) => {
+      const tree = await bff.memory.conversationTree(conversationId);
+      return {
+        conversation: tree.conversation,
+        messages: tree.messages.map((turn) => ({
+          id: turn.id,
+          parent_id: turn.parent_id ?? null,
+          role: turn.role,
+          content: turn.content,
+          created_at: turn.created_at,
+          ...(turn.parts ? { parts: turn.parts } : {}),
+        })),
+        head_id: tree.head_id,
+      };
+    },
   );
 }
 
@@ -509,11 +603,12 @@ export async function fetchConversationTree(conversationId: string): Promise<Con
       return {
         conversation: tree.conversation,
         messages: tree.messages.map((turn) => ({
-          id: String(turn.message_id ?? turn.id),
+          id: turn.id,
           parent_id: turn.parent_id ?? null,
           role: turn.role,
           content: turn.content,
           created_at: turn.created_at,
+          ...(turn.parts ? { parts: turn.parts } : {}),
         })),
         head_id: tree.head_id,
       };
@@ -534,6 +629,70 @@ export async function setConversationHead(
         { head_id: headId },
       ).then((body) => body.conversation),
     async (bff) => bff.memory.setConversationHead(conversationId, headId),
+  );
+}
+
+/** Archive is the reversible goodbyes; only ``deleteConversation`` loses the thread. */
+export async function setConversationArchived(
+  conversationId: string,
+  archived: boolean,
+): Promise<Conversation> {
+  return withLocal(
+    () =>
+      sendJson<{ conversation: Conversation }>(
+        "PATCH",
+        `/api/conversations/${encodeURIComponent(conversationId)}`,
+        { archived },
+      ).then((body) => body.conversation),
+    async (bff) => bff.memory.setConversationArchived(conversationId, archived),
+  );
+}
+
+export async function deleteConversation(
+  conversationId: string,
+): Promise<{ deleted: string }> {
+  return withLocal(
+    () =>
+      deleteJson<{ deleted: string }>(
+        `/api/conversations/${encodeURIComponent(conversationId)}`,
+      ),
+    async (bff) => {
+      await bff.memory.deleteConversation(conversationId);
+      return { deleted: conversationId };
+    },
+  );
+}
+
+/** Persist a turn the sidecar did not produce, keyed by the client's own id. */
+export async function appendMessage(
+  conversationId: string,
+  message: {
+    role: "user" | "assistant" | "tool" | "system";
+    content: string;
+    id?: string | null;
+    parent_id?: string | null;
+    parts?: ChatPart[];
+  },
+): Promise<void> {
+  await withLocal(
+    () =>
+      postJson<unknown>(`/api/conversations/${encodeURIComponent(conversationId)}/messages`, {
+        role: message.role,
+        content: message.content,
+        id: message.id ?? null,
+        parent_id: message.parent_id ?? null,
+        parts: message.parts ?? [],
+      }),
+    async (bff) => {
+      await bff.memory.appendTurn(
+        conversationId,
+        message.role,
+        message.content,
+        message.id ?? null,
+        message.parent_id ?? null,
+        message.parts ?? [],
+      );
+    },
   );
 }
 

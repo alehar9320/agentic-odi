@@ -197,6 +197,14 @@ export function MenuIcon(props: IconProps) {
   );
 }
 
+export function ThreadsIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M7 8h10M7 12h6M4 4.5h16v11H9l-4 3.5v-3.5H4z" />
+    </Icon>
+  );
+}
+
 export function AlertIcon(props: IconProps) {
   return (
     <Icon {...props}>

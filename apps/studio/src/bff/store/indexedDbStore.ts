@@ -1,7 +1,7 @@
 import { openDB, type DBSchema, type IDBPDatabase } from "idb";
 
 import type { Observation } from "../../types";
-import { nowIso } from "../id";
+import { newId, nowIso } from "../id";
 import {
   bySeq,
   type LocalStore,
@@ -14,7 +14,7 @@ import {
 } from "./types";
 
 const DB_NAME = "agentic-odi-studio";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 interface StudioDb extends DBSchema {
   meta: { key: string; value: { key: string; value: number } };
@@ -40,11 +40,21 @@ interface StudioDb extends DBSchema {
     indexes: { "by-updated": string };
   };
   turns: {
-    key: number;
+    key: string;
     value: StoredTurn;
-    indexes: { "by-conversation": string };
+    indexes: { "by-conversation": string; "by-seq": number };
   };
 }
+
+const STORE_NAMES = [
+  "meta",
+  "jobs",
+  "steps",
+  "outcomes",
+  "observations",
+  "conversations",
+  "turns",
+] as const;
 
 export class IndexedDbLocalStore implements LocalStore {
   readonly durable = true;
@@ -56,7 +66,17 @@ export class IndexedDbLocalStore implements LocalStore {
 
   static async open(): Promise<IndexedDbLocalStore> {
     const db = await openDB<StudioDb>(DB_NAME, DB_VERSION, {
-      upgrade(database) {
+      upgrade(database, oldVersion) {
+        if (oldVersion > 0) {
+          // This cache is a browser-local copy of what the sidecar stores durably,
+          // so a shape change rebuilds the stores instead of migrating rows that
+          // the next connection replaces anyway.
+          for (const name of STORE_NAMES) {
+            if (database.objectStoreNames.contains(name)) {
+              database.deleteObjectStore(name);
+            }
+          }
+        }
         database.createObjectStore("meta", { keyPath: "key" });
         const jobs = database.createObjectStore("jobs", { keyPath: "id" });
         jobs.createIndex("by-seq", "seq");
@@ -74,11 +94,11 @@ export class IndexedDbLocalStore implements LocalStore {
           keyPath: "id",
         });
         conversations.createIndex("by-updated", "updated_at");
-        const turns = database.createObjectStore("turns", {
-          keyPath: "id",
-          autoIncrement: true,
-        });
+        // Turn ids are the client's own message ids, so a thread rebuilt here
+        // branches exactly the way it branches on the sidecar.
+        const turns = database.createObjectStore("turns", { keyPath: "id" });
         turns.createIndex("by-conversation", "conversation_id");
+        turns.createIndex("by-seq", "seq");
       },
     });
     return new IndexedDbLocalStore(db);
@@ -200,13 +220,28 @@ export class IndexedDbLocalStore implements LocalStore {
     return next;
   }
 
-  async listTurns(conversationId: string): Promise<StoredTurn[]> {
-    return this.db.getAllFromIndex("turns", "by-conversation", conversationId);
+  async deleteConversation(id: string): Promise<void> {
+    await this.db.delete("conversations", id);
+    await this.clearTurns(id);
   }
 
-  async appendTurn(turn: Omit<StoredTurn, "id">): Promise<StoredTurn> {
-    const id = await this.db.add("turns", turn as StoredTurn);
-    return { ...turn, id: Number(id) };
+  async listTurns(conversationId: string): Promise<StoredTurn[]> {
+    const turns = await this.db.getAllFromIndex(
+      "turns",
+      "by-conversation",
+      conversationId,
+    );
+    return turns.sort(bySeq);
+  }  async appendTurn(
+    turn: Omit<StoredTurn, "id" | "seq"> & { id?: string },
+  ): Promise<StoredTurn> {
+    const stored: StoredTurn = {
+      ...turn,
+      id: turn.id ?? newId(),
+      seq: await this.nextSeq(),
+    };
+    await this.db.put("turns", stored);
+    return stored;
   }
 
   async conversationTree(conversationId: string): Promise<{
@@ -219,19 +254,18 @@ export class IndexedDbLocalStore implements LocalStore {
       throw new Error(`Conversation ${conversationId} not found`);
     }
     const turns = await this.listTurns(conversationId);
+    // A turn written without a parent answers the one before it: the local
+    // fallback has no branching until the client says otherwise.
     let previous: string | null = null;
     const messages = turns.map((turn) => {
-      if (!turn.message_id) {
-        turn = { ...turn, message_id: `turn-${turn.id}`, parent_id: previous };
-      }
-      previous = turn.message_id;
-      return turn;
+      const node: StoredTurn = { ...turn, parent_id: turn.parent_id ?? previous };
+      previous = node.id;
+      return node;
     });
     return {
       conversation,
       messages,
-      head_id:
-        conversation.head_id ?? messages[messages.length - 1]?.message_id ?? null,
+      head_id: conversation.head_id ?? messages[messages.length - 1]?.id ?? null,
     };
   }
 

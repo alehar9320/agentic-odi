@@ -45,9 +45,17 @@ apps/cli ──────────────▶ packages/connectors
 
 - `SQLiteRepository` is the production default for the CLI, MCP server, and Studio API.
 - The default database is `~/.agentic-odi/odi.db`, overridable with `AGENTIC_ODI_DB`.
-- Studio conversation history and PM memory use a separate SQLite database,
-  `~/.agentic-odi/studio.db`, overridable with `AGENTIC_ODI_STUDIO_DB`. They are
-  sidecar-local and never enter the ODI repository or the MCP contract.
+- Studio conversation history and PM memory are stored there as events, not in a
+  database of their own, so the CLI and the MCP server read the same thread the
+  Studio wrote. A pre-core `~/.agentic-odi/studio.db` is imported once and
+  renamed `studio.db.imported`; `AGENTIC_ODI_STUDIO_DB` points at that legacy file.
+- The provider key is the one thing the sidecar keeps out of the event log: it
+  lives in `~/.agentic-odi/studio.json` (`0600`, `AGENTIC_ODI_STUDIO_SETTINGS`)
+  and the SPA only ever receives a mask.
+- Every event carries a `workspace_id` (`AGENTIC_ODI_WORKSPACE`, default `local`)
+  and threads carry a real `device_id`, created once at `~/.agentic-odi/device_id`
+  or set with `AGENTIC_ODI_DEVICE_ID`. Sync is deliberately not implemented; the
+  data is only made durable and portable in format.
 - `build_repository()` chooses SQLite by default and `InMemoryRepository` when `AGENTIC_ODI_DB=:memory:`, which is what tests use.
 - The CLI selects its backend with `--backend local|mcp` or `AGENTIC_ODI_BACKEND`.
 - The Studio API selects `local` (direct service calls) or `mcp` (passthrough) with `AGENTIC_ODI_BACKEND` or `create_app(backend=...)`.

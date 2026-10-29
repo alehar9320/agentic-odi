@@ -44,6 +44,7 @@ export function SettingsPanel() {
     deleteConnector,
     sidecarReachable,
     capabilities,
+    settingsSummary,
   } = useStudio();
   const { enabled: tourEnabled, restart: restartTour } = useOnboarding();
   const [showApiKey, setShowApiKey] = useState(false);
@@ -119,6 +120,12 @@ export function SettingsPanel() {
             {showApiKey ? "Hide" : "Show"}
           </button>
         </div>
+        {!settings.api_key && settingsSummary?.has_api_key && (
+          <p className="field__hint">
+            Stored on this machine as {settingsSummary.masked}. Typing here replaces it; the studio
+            never reads it back.
+          </p>
+        )}
       </div>
       <div className="field">
         <label htmlFor="model-name">Model</label>

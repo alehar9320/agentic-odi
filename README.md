@@ -56,6 +56,11 @@ curl -fsSL https://github.com/alehar9320/agentic-odi/releases/latest/download/in
 - **A conversation, not a form.** The Living Studio turns "a customer still
   reconciles invoices by hand" into a scored outcome, a job map, and a ranked
   opportunity board — inline in the thread.
+- **The thread survives you.** Conversations and what the agent learned are
+  appended to the same event log as the canvas, so a reload restores the exact
+  thread with the cards it showed, and `list_conversations`, `get_conversation`,
+  `list_observations`, `confirm_observation`, and `dismiss_observation` are MCP
+  tools any agent can call.
 - **Local-first by default.** The CLI and server work with no network and no
   account. Point them at a remote MCP server with one flag.
 
@@ -150,9 +155,9 @@ shared tooling at the root. Packages live in `packages/`, runnable services in
 
 | Path | Distribution | Description |
 |---|---|---|
-| **`packages/core/`** | `agentic-odi-core` | Domain models, the `ODIService` layer, in-memory and SQLite repositories, the shared MCP tool contract, and opportunity-score computation. |
+| **`packages/core/`** | `agentic-odi-core` | Domain models including the conversation, message, observation, and brief entities, the `ODIService` layer, in-memory and SQLite repositories, the shared MCP tool contract, and opportunity-score computation. |
 | **`packages/connectors/`** | `agentic-odi-connectors` | Pluggable MCP and REST connectors with presets and an ingest sink. |
-| **`apps/mcp-server/`** | `agentic-odi-mcp-server` | FastMCP server exposing Jobs, Steps, Desired Outcomes, Customer Outcomes, Evidence, and context tools over HTTP. SQLite by default. |
+| **`apps/mcp-server/`** | `agentic-odi-mcp-server` | FastMCP server exposing Jobs, Steps, Desired Outcomes, Customer Outcomes, Evidence, conversations, observations, and context tools over HTTP. SQLite by default. |
 | **`apps/studio-api/`** | `agentic-odi-studio-api` | FastAPI **Living Studio sidecar**: config, health, canvas, local mutations, MCP passthrough, SSE chat, conversations, and PM memory. |
 | **`apps/cli/`** | `agentic-odi-cli` | Typer CLI with interactive chat, full entity CRUD, `schema`, `connectors`, and local or remote data access. |
 | **`apps/studio/`** | React + TypeScript + Vite | **The Living Studio** SPA and Tauri 2 desktop shell, built on [assistant-ui](https://www.assistant-ui.com). Installed desktop builds **update themselves** in the background and apply on restart. |

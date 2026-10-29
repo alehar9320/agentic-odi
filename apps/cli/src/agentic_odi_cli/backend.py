@@ -26,6 +26,7 @@ import typer
 
 if TYPE_CHECKING:
     from agentic_odi_core import ODIService
+    from agentic_odi_core.models import ObservationStatus
 
 # Kept as literals so importing the CLI does not pull in the core package
 # (``agentic-odi --version`` must stay lightweight). ``tests/contract`` asserts
@@ -520,7 +521,6 @@ class LocalBackend(Backend):
             raise BackendError(_VALUE_RANGE_ERROR)
         return compute_opportunity_score(importance, satisfaction)
 
-
     def _list_conversations(self, args: dict[str, Any]) -> list[dict[str, Any]]:
         items = self.service.list_conversations(
             limit=args.get("limit"), offset=args.get("offset") or 0
@@ -555,7 +555,9 @@ class LocalBackend(Backend):
     def _dismiss_observation(self, args: dict[str, Any]) -> dict[str, Any]:
         return self._set_observation_status(args, "dismissed")
 
-    def _set_observation_status(self, args: dict[str, Any], status: str) -> dict[str, Any]:
+    def _set_observation_status(
+        self, args: dict[str, Any], status: ObservationStatus
+    ) -> dict[str, Any]:
         from agentic_odi_core import ObservationNotFoundError, observation_not_found
 
         observation_id = args["observation_id"]

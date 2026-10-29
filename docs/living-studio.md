@@ -255,27 +255,35 @@ change the next answer.
 | `career` | The PM's role, remit, and what success looks like for them |
 | `opportunity` | The opportunity or bet currently in play |
 | `business` | Goals, metrics, and commercial constraints |
-| `stakeholder` | Who else matters and what they care about |
+| `customer` | Who the customer is and what they are trying to get done |
 | `constraint` | Time, budget, policy, or technical limits |
+| `decision` | A call the PM made and stands behind |
+| `stakeholder` | Who else matters and what they care about |
 | `evidence` | What has actually been heard or measured |
 | `preference` | How the PM likes to work and be spoken to |
+| `other` | Anything worth keeping that fits none of the above |
 
-Each note is `suggested` or `confirmed`. Suggested notes appear first under
-**What I know** with **Yes, that's right**, **That's not it**, and **Edit**;
+Each note is `proposed`, `confirmed`, or `dismissed`. Proposed notes appear first
+under **What I know** with **Yes, that's right**, **That's not it**, and **Edit**;
 confirmed notes can be edited or forgotten. The PM can also add a note by hand.
-Nothing is silently promoted: the agent may propose, but the person decides.
+Nothing is silently promoted: the agent may propose, but the person decides, and
+only `confirmed` notes are carried into the next prompt — a dismissed one never
+comes back, in this session or the next.
 
 The agent writes notes through a `remember` tool during a normal reply. The
 sidecar applies it, emits a `memory` SSE event, and the panel updates without a
 refresh. Memory writes are best-effort — a database failure never turns a good
 answer into an error.
 
-Storage is a separate SQLite file from the ODI repository:
-`~/.agentic-odi/studio.db`, overridable with `AGENTIC_ODI_STUDIO_DB`
-(`:memory:` is supported and is what the tests use). The API is small:
+Notes are stored in the same event-sourced database as the canvas, not in a file
+the sidecar keeps to itself, so `agentic-odi` on the command line and any agent
+speaking MCP read the same memory the Studio wrote. The API is small, and
+`/api/observations` answers as `GET`, `POST`, `PATCH` and `DELETE` with the same
+shapes:
 
 | Method | Path | Purpose |
 |---|---|---|
+| `GET` | `/api/observations?status=proposed` | Filtered by status; dismissed rows only when asked |
 | `GET` | `/api/memory/observations` | Everything the agent believes |
 | `POST` | `/api/memory/observations` | Add a note by hand |
 | `PATCH` | `/api/memory/observations/{id}` | Edit text, confidence, or status |
@@ -287,12 +295,36 @@ thread, because the server deletes the conversations behind it.
 
 ### The thread comes back
 
-Conversations are stored beside the memory. On launch the SPA asks
-`GET /api/conversations/latest`, restores that thread's user and assistant
-turns, and continues with the same `conversation_id` on the next message. **New
-conversation** starts a fresh one without touching the memory; **Forget
-everything** removes both. The composer stays usable while the restore is in
-flight, and a restore failure simply leaves the room empty.
+Conversations and notes live in the same store, so closing the laptop costs
+nothing. On launch the SPA reopens the thread it was left on — `localStorage`
+remembers the id, and with nothing remembered it asks `GET
+/api/conversations/latest` — and restores it exactly: the same turn ids, the same
+parents, and the same ordered parts, which means the cards it showed you come
+back as cards rather than as prose. A stored
+surface the current catalog no longer understands degrades to the unsupported
+placeholder instead of breaking the reload, and a turn that was still mid-flight
+when the tab died is restored as declined, never as pending. **New conversation**
+archives the thread you were on rather than erasing it; the bar's conversation
+list reopens any stored thread and deletes one only when you ask for it by name.
+**Forget everything** is the explicit path that removes history, and it is a
+two-step confirmation. The composer stays usable while the restore is in flight,
+and a restore failure simply leaves the room empty.
+
+Each thread is stamped with the workspace (`AGENTIC_ODI_WORKSPACE`, default
+`local`) and a device id created once at `~/.agentic-odi/device_id` (`0600`), so
+the history is portable in format even though sync is deliberately not
+implemented yet — two installs are no longer indistinguishable.
+
+The brief is a stored entity behind `GET`/`PUT /api/brief`; `localStorage` keeps
+a copy so the room is not empty while the sidecar warms up, but the CLI and the
+MCP server read the same brief the Studio shows.
+
+The provider key is the one setting that never enters the browser's durable
+storage. `POST /api/settings` writes it to `~/.agentic-odi/studio.json` with mode
+`0600`, `GET /api/settings` returns only `has_api_key` and a mask like
+`sk-…4f2a`, and a chat turn sent without a key gets the stored one substituted
+server-side. A key typed into this tab is held in `sessionStorage` for the tab
+alone; `localStorage` holds only the base URL, model, MCP URL, and theme.
 
 ### Printing and export
 
@@ -545,12 +577,13 @@ drive the agent. For a fully local setup, see
 ## Reviewing the conversation by hand
 
 Timing, focus rings, drop targets, and menu placement are not things a test can
-judge. Start the stack against a local model and a database of its own — a second
-checkout sharing `~/.agentic-odi` can otherwise leave this one with a schema it
-cannot open:
+judge. Start the stack against a local model, with a store and a settings file of
+its own — a second checkout sharing `~/.agentic-odi` can otherwise leave this one
+with a schema it cannot open, and the conversation now lives in that same store:
 
 ```bash
-AGENTIC_ODI_STUDIO_DB=~/.agentic-odi/studio-review.db \
+AGENTIC_ODI_DB=~/.agentic-odi/review-odi.db \
+AGENTIC_ODI_STUDIO_SETTINGS=~/.agentic-odi/review-studio.json \
 AGENTIC_ODI_BASE_URL=http://127.0.0.1:11434/v1 \
 AGENTIC_ODI_MODEL=qwen2.5-coder:14b \
 npm --prefix apps/studio run dev:full          # http://localhost:5173

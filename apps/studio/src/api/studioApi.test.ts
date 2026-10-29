@@ -7,8 +7,17 @@ import {
   addStep,
   checkConnectorHealth,
   clearMemory,
+  appendMessage,
   createConversation,
   deleteConnector,
+  deleteConversation,
+  fetchBrief,
+  fetchConversationTree,
+  fetchConversations,
+  fetchSettings,
+  saveBrief,
+  saveSettings,
+  setConversationArchived,
   deleteObservation,
   fetchLatestConversation,
   fetchMemory,
@@ -276,12 +285,11 @@ describe("connectors", () => {
 describe("memory", () => {
   const observation = {
     id: "o-1",
-    kind: "career",
+    category: "career",
     text: "Owns activation.",
     data: {},
-    status: "suggested",
+    status: "proposed",
     confidence: 0.8,
-    source_turn: 1,
     created_at: "2026-10-22T10:00:00+00:00",
     updated_at: "2026-10-22T10:00:00+00:00",
   };
@@ -289,19 +297,19 @@ describe("memory", () => {
   it("fetchMemory unwraps the observations array", async () => {
     mockJson({ observations: [observation] });
     await expect(fetchMemory()).resolves.toEqual([observation]);
-    expect(fetch).toHaveBeenCalledWith("/api/memory/observations", expect.objectContaining({ headers: expect.any(Object) }));
+    expect(fetch).toHaveBeenCalledWith("/api/observations", expect.objectContaining({ headers: expect.any(Object) }));
   });
 
   it("addObservation posts the observation", async () => {
     mockJson({ observation });
     await expect(
-      addObservation({ kind: "career", text: "Owns activation.", confirmed: true }),
+      addObservation({ category: "career", text: "Owns activation.", confirmed: true }),
     ).resolves.toEqual(observation);
     expect(fetch).toHaveBeenCalledWith(
-      "/api/memory/observations",
+      "/api/observations",
       expect.objectContaining({
         method: "POST",
-        body: JSON.stringify({ kind: "career", text: "Owns activation.", confirmed: true }),
+        body: JSON.stringify({ category: "career", text: "Owns activation.", confirmed: true }),
       }),
     );
   });
@@ -312,8 +320,29 @@ describe("memory", () => {
       status: "confirmed",
     });
     expect(fetch).toHaveBeenCalledWith(
-      "/api/memory/observations/o-1",
+      "/api/observations/o-1",
       expect.objectContaining({ method: "PATCH" }),
+    );
+  });
+
+  it("fetchMemory asks for one status when given it", async () => {
+    mockJson({ observations: [] });
+    await expect(fetchMemory("confirmed")).resolves.toEqual([]);
+    expect(fetch).toHaveBeenCalledWith(
+      "/api/observations?status=confirmed",
+      expect.objectContaining({ headers: expect.any(Object) }),
+    );
+  });
+
+  it("a dismissed observation is written away, never re-read into a prompt", async () => {
+    mockJson({ observation: { ...observation, status: "dismissed" } });
+    await updateObservation("o-1", { status: "dismissed" });
+    expect(fetch).toHaveBeenCalledWith(
+      "/api/observations/o-1",
+      expect.objectContaining({
+        method: "PATCH",
+        body: JSON.stringify({ status: "dismissed" }),
+      }),
     );
   });
 
@@ -321,7 +350,7 @@ describe("memory", () => {
     mockJson({ ok: true });
     await deleteObservation("o-1");
     expect(fetch).toHaveBeenCalledWith(
-      "/api/memory/observations/o-1",
+      "/api/observations/o-1",
       expect.objectContaining({ method: "DELETE" }),
     );
     await clearMemory();
@@ -487,5 +516,151 @@ describe("typed failures", () => {
         satisfaction: 3,
       }),
     ).rejects.toMatchObject({ error: { code: "not_found" } });
+  });
+});
+
+describe("settings, brief, and threads", () => {
+  it("fetchSettings hands back a mask, never the key", async () => {
+    mockJson({ base_url: "http://llm", model: "m", mcp_url: "u", has_api_key: true, masked: "sk…9320" });
+
+    await expect(fetchSettings()).resolves.toEqual({
+      base_url: "http://llm",
+      model: "m",
+      mcp_url: "u",
+      has_api_key: true,
+      masked: "sk…9320",
+    });
+    expect(fetch).toHaveBeenCalledWith(
+      "/api/settings",
+      expect.objectContaining({ headers: expect.any(Object) }),
+    );
+  });
+
+  it("saveSettings sends the key only when the person typed one", async () => {
+    mockJson({ base_url: "http://llm", model: "m", mcp_url: "u", has_api_key: false, masked: "" });
+
+    await saveSettings({ base_url: "http://llm", model: "m", mcp_url: "u" });
+    expect(fetch).toHaveBeenCalledWith(
+      "/api/settings",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ base_url: "http://llm", model: "m", mcp_url: "u" }),
+      }),
+    );
+
+    await saveSettings({ base_url: "http://llm", model: "m", mcp_url: "u", api_key: "sk-new" });
+    expect(fetch).toHaveBeenLastCalledWith(
+      "/api/settings",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ base_url: "http://llm", model: "m", mcp_url: "u", api_key: "sk-new" }),
+      }),
+    );
+  });
+
+  it("the brief round-trips without the storage columns", async () => {
+    mockJson({
+      brief: {
+        id: "b-1",
+        updated_at: "2026-10-22T10:00:00+00:00",
+        product_name: "Living Studio",
+        target_user: "PMs",
+        job_statement: "Get to the insight.",
+        core_problem: "Notes die in threads.",
+      },
+    });
+    await expect(fetchBrief()).resolves.toEqual({
+      product_name: "Living Studio",
+      target_user: "PMs",
+      job_statement: "Get to the insight.",
+      core_problem: "Notes die in threads.",
+    });
+
+    await saveBrief({
+      product_name: "Living Studio",
+      target_user: "PMs",
+      job_statement: "Get to the insight.",
+      core_problem: "Notes die in threads.",
+    });
+    expect(fetch).toHaveBeenLastCalledWith(
+      "/api/brief",
+      expect.objectContaining({ method: "POST" }),
+    );
+  });
+
+  it("an empty brief is a null, not an error", async () => {
+    mockJson({ brief: null });
+    await expect(fetchBrief()).resolves.toBeNull();
+  });
+
+  it("lists, archives, and deletes conversations", async () => {
+    mockJson({ conversations: [{ id: "c-1", title: null, created_at: "x", updated_at: "y", head_id: null, archived: true }] });
+    const list = await fetchConversations();
+    expect(list[0].archived).toBe(true);
+    expect(fetch).toHaveBeenLastCalledWith(
+      "/api/conversations?limit=20",
+      expect.objectContaining({ headers: expect.any(Object) }),
+    );
+
+    mockJson({ conversation: { id: "c-1", archived: true } });
+    await setConversationArchived("c-1", true);
+    expect(fetch).toHaveBeenLastCalledWith(
+      "/api/conversations/c-1",
+      expect.objectContaining({ method: "PATCH", body: JSON.stringify({ archived: true }) }),
+    );
+
+    mockJson({ deleted: "c-1" });
+    await expect(deleteConversation("c-1")).resolves.toEqual({ deleted: "c-1" });
+    expect(fetch).toHaveBeenLastCalledWith(
+      "/api/conversations/c-1",
+      expect.objectContaining({ method: "DELETE" }),
+    );
+  });
+
+  it("reads back a thread with the parts it stored", async () => {
+    mockJson({
+      conversation: { id: "c-1", title: "Activation", created_at: "x", updated_at: "y", head_id: "m-2" },
+      messages: [
+        { id: "m-1", parent_id: null, role: "user", content: "hi", created_at: "x" },
+        {
+          id: "m-2",
+          parent_id: "m-1",
+          role: "assistant",
+          content: "hello",
+          created_at: "y",
+          parts: [{ kind: "text", text: "hello" }],
+        },
+      ],
+      head_id: "m-2",
+    });
+
+    const tree = await fetchConversationTree("c-1");
+    expect(tree.messages.map((turn) => turn.id)).toEqual(["m-1", "m-2"]);
+    expect(tree.messages[1].parts).toEqual([{ kind: "text", text: "hello" }]);
+    expect(tree.head_id).toBe("m-2");
+  });
+
+  it("appends a turn with its own id, parent, and parts", async () => {
+    mockJson({ ok: true });
+    await appendMessage("c-1", {
+      role: "assistant",
+      content: "hello",
+      id: "m-2",
+      parent_id: "m-1",
+      parts: [{ kind: "text", text: "hello" }],
+    });
+    expect(fetch).toHaveBeenCalledWith(
+      "/api/conversations/c-1/messages",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          role: "assistant",
+          content: "hello",
+          id: "m-2",
+          parent_id: "m-1",
+          parts: [{ kind: "text", text: "hello" }],
+        }),
+      }),
+    );
   });
 });

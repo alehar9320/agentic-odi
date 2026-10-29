@@ -27,8 +27,15 @@ A console script is also installed, so `agentic-odi --version` works the same wa
 | Option | Environment variable | Default | Meaning |
 |---|---|---|---|
 | `--backend auto\|local\|mcp` | `AGENTIC_ODI_BACKEND` | `local` | Run in-process against SQLite, call a remote MCP server, or (`auto`) try local first and fall back to MCP. |
-| `--db PATH` | `AGENTIC_ODI_DB` | `~/.agentic-odi/odi.db` | Store path for the `local` backend. |
+| `--db PATH` | `AGENTIC_ODI_DB` | `~/.agentic-odi/odi.db` | Store path for the `local` backend. The Studio's conversations and the agent's observations are appended to this same log, so a thread written in the browser is readable here. |
 | `--mcp-url URL` | `AGENTIC_ODI_MCP_URL` | `http://localhost:8000/mcp` | Server URL for the `mcp` backend. |
+
+Two more variables shape *what* is written rather than where.
+`AGENTIC_ODI_WORKSPACE` (default `local`) is stamped on every conversation,
+turn, observation, and brief, and `AGENTIC_ODI_DEVICE_ID` overrides the id
+created once at `~/.agentic-odi/device_id` with mode `0600`, so each event says
+which install wrote it. Neither turns on sync: the data is durable and portable
+in format, and it still never leaves the machine.
 
 Data commands print readable tables and blocks by default; add `--json` for
 machine-readable output. Diagnostics go to stderr and failures exit non-zero
