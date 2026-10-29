@@ -1,25 +1,6 @@
 <div align="center">
 
-<img src="brand/assets/odi-mascot-256.png" alt="Odi the Otter" width="150" />
-
 # Agentic ODI
-
-### Your roadmap is a guess. This makes it evidence.
-
-An **MCP server** that hands your agents verified customer outcomes — the jobs,
-desired outcomes, and opportunity scores that rank them.
-
-[![Open the Living Studio](https://img.shields.io/badge/Open%20the%20Living%20Studio-F38020?style=for-the-badge&logo=cloudflare&logoColor=white)](https://agentic-odi.alehar.workers.dev/)
-[![Run it locally](https://img.shields.io/badge/Run%20it%20locally-1e293b?style=for-the-badge&logo=gnubash&logoColor=white)](#quick-start)
-
-**Try it now — nothing to install.** The Studio opens in your browser; live data
-and chat need the local sidecar below.
-
-**Or install the CLI in one line** (Linux, macOS, Windows):
-
-```bash
-curl -fsSL https://github.com/alehar9320/agentic-odi/releases/latest/download/install.sh | sh
-```
 
 [![CI](https://github.com/alehar9320/agentic-odi/actions/workflows/ci.yml/badge.svg)](https://github.com/alehar9320/agentic-odi/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/alehar9320/agentic-odi/branch/main/graph/badge.svg)](https://codecov.io/gh/alehar9320/agentic-odi)
@@ -29,118 +10,27 @@ curl -fsSL https://github.com/alehar9320/agentic-odi/releases/latest/download/in
 [![FastMCP](https://img.shields.io/badge/FastMCP-powered-orange)](https://github.com/jlowin/fastmcp)
 [![pytest](https://img.shields.io/badge/tests-pytest-blue)](https://pytest.org)
 [![MCP](https://img.shields.io/badge/Model%20Context%20Protocol-enabled-8A2BE2)](https://modelcontextprotocol.io)
-[![Buy me a coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-FFDD00?style=for-the-badge&logo=buymeacoffee&logoColor=000000)](https://buymeacoffee.com/signup)
 
 > **[![Experimental](https://img.shields.io/badge/Experimental-1e293b?style=for-the-badge)](https://github.com/alehar9320/agentic-odi)**
 
 > **Experimental test to learn and evaluate the feasibility of utilizing Model Context Protocol (MCP) for Outcome-Driven Innovation (ODI) specifications.**
-[![GitHub Pages](https://img.shields.io/badge/GitHub%20Pages-site-blue?logo=github)](https://alehar9320.github.io/agentic-odi/)
 
 </div>
 
 ---
 
-## Why this exists
+**Agentic ODI** explores how the [Model Context Protocol](https://modelcontextprotocol.io)
+can turn [Outcome-Driven Innovation](https://strategyn.com/outcome-driven-innovation/)
+into a live, agent-queryable source of context. Instead of feeding LLMs
+disconnected prompts, an MCP-powered ODI server acts as the "brain" of customer
+needs — letting agents invent, evaluate, and ideate solutions anchored in
+verified, measurable customer outcomes (Job Maps, Desired Outcomes, and
+Opportunity Scores).
 
-- **Roadmaps are set by whoever talks loudest.** Decisions default to seniority,
-  not evidence.
-- **Teams build features for customers who never asked.** The idea gets
-  validated; the outcome never does.
-- **Agents are fluent in everything and grounded in nothing.** A model will
-  confidently invent your customer.
+This repository is an experimental testbed for understanding server–client MCP
+communication streams, built on [`FastMCP`](https://github.com/jlowin/fastmcp).
 
-## What you get
-
-- **A brain for customer needs.** Jobs, desired outcomes, evidence, and
-  opportunity scores in one store — queryable by any MCP client.
-- **A conversation, not a form.** The Living Studio turns "a customer still
-  reconciles invoices by hand" into a scored outcome, a job map, and a ranked
-  opportunity board — inline in the thread.
-- **Local-first by default.** The CLI and server work with no network and no
-  account. Point them at a remote MCP server with one flag.
-
-## How it works
-
-Outcome-Driven Innovation asks customers two numbers per outcome — how much it
-**matters** and how **satisfied** they are today. The gap is where products win
-or die:
-
-```text
-Opportunity Score = Importance + max(Importance − Satisfaction, 0)
-```
-
-Score **> 10** → underserved, innovate. **= 10** → served, maintain.
-**< 10** → overserved, disrupt. ODI reports an **86% innovation success rate**
-(as reported in the [Strategyn](https://strategyn.com/outcome-driven-innovation/) literature).
-
-## Quick Start
-
-**Run the full stack locally.** Prerequisites: Python 3.10+,
-[uv](https://docs.astral.sh/uv/), and Node.js for the Studio build.
-
-```bash
-git clone https://github.com/alehar9320/agentic-odi.git
-cd agentic-odi
-uv sync --all-packages              # install the whole workspace
-npm --prefix apps/studio run build  # build the Living Studio once
-uv run python scripts/dev.py        # start the MCP server + Studio together
-```
-
-| Service | URL |
-|---|---|
-| MCP Server | http://localhost:8000/mcp |
-| The Living Studio | http://127.0.0.1:8100 |
-
-- **Hot reload:** `npm --prefix apps/studio run dev:full` (Vite on
-  http://localhost:5173).
-- **Desktop app:** `npm --prefix apps/studio run tauri dev`.
-- **No model? No problem.** Without an OpenAI-compatible LLM every job, step,
-  and outcome stays editable by hand. See [Local LLM Backend](docs/local-llm.md).
-- **Just the CLI:** it is local-first, so data commands need no server at all.
-
-```bash
-odi jobs list
-odi desired-outcomes list --job-id <id>
-odi score 8 2                        # → 14.00
-odi                                  # interactive chat in a terminal
-```
-
-## Connect your agent
-
-The server speaks the Model Context Protocol. Any MCP client can reach it:
-
-```json
-{
-  "mcpServers": {
-    "agentic-odi": { "url": "http://localhost:8000/mcp" }
-  }
-}
-```
-
-Register MCP or REST connectors (Notion, PostHog, Exa, Linear, GitHub) in the
-Studio's **Settings → Connectors**, conversationally, or via
-`agentic-odi connectors add <preset>`. See
-[External Connectors](docs/connectors.md).
-
-## Documentation
-
-| Guide | Contents |
-|---|---|
-| [The Living Studio](docs/living-studio.md) | The chat-first interface, first run, approvals, memory, and the desktop app |
-| [CLI Reference](docs/cli.md) | Backends, chat, entities, scoring, and environment variables |
-| [External Connectors](docs/connectors.md) | Presets, the registry, and the `Connector` protocol |
-| [Local LLM Backend](docs/local-llm.md) | Running a local OpenAI-compatible model with tool calling |
-| [Architecture](docs/architecture/README.md) | Workspace layout, dependency direction, data flow, and testing |
-| [Development](docs/development.md) | Lint, types, frontend checks, tests, and PR risk labels |
-| [Installation](docs/installation.md) | Binary install, updater behavior, and release automation |
-| [Deployment](docs/deployment.md) | Project site, Hosted Studio, MCP endpoint, and the Cloudflare Worker |
-| [Roadmap](docs/roadmap.md) | Completed and upcoming milestones |
-| [Superpowers](docs/superpowers.md) | Pi, OpenCode, and Freebuff integration |
-
-Every guide is also published on the
-[project site](https://alehar9320.github.io/agentic-odi/docs/), rendered from
-these files. The site adds a quick start, a generated MCP tool reference, the
-connector catalog, and client-side search over every page (`Ctrl`/`Cmd`+`K`).
+We don't publish dates. This page changes when the code does.
 
 ## Code Overview
 
@@ -150,43 +40,105 @@ shared tooling at the root. Packages live in `packages/`, runnable services in
 
 | Path | Distribution | Description |
 |---|---|---|
-| **`packages/core/`** | `agentic-odi-core` | Domain models, the `ODIService` layer, in-memory and SQLite repositories, the shared MCP tool contract, and opportunity-score computation. |
+| **`packages/core/`** | `agentic-odi-core` | Domain models, the `ODIService` business-logic layer, repository implementations (in-memory and SQLite), the shared MCP tool contract, and ODI opportunity-score computation. |
 | **`packages/connectors/`** | `agentic-odi-connectors` | Pluggable MCP and REST connectors with presets and an ingest sink. |
-| **`apps/mcp-server/`** | `agentic-odi-mcp-server` | FastMCP server exposing Jobs, Steps, Desired Outcomes, Customer Outcomes, Evidence, and context tools over HTTP. SQLite by default. |
-| **`apps/studio-api/`** | `agentic-odi-studio-api` | FastAPI **Living Studio sidecar**: config, health, canvas, local mutations, MCP passthrough, SSE chat, conversations, and PM memory. |
-| **`apps/cli/`** | `agentic-odi-cli` | Typer CLI with interactive chat, full entity CRUD, `schema`, `connectors`, and local or remote data access. |
-| **`apps/studio/`** | React + TypeScript + Vite | **The Living Studio** SPA and Tauri 2 desktop shell, built on [assistant-ui](https://www.assistant-ui.com). Installed desktop builds **update themselves** in the background and apply on restart. |
+| **`apps/mcp-server/`** | `agentic-odi-mcp-server` | FastMCP server exposing Jobs, Steps, Desired Outcomes, Customer Outcomes, Evidence, and context tools over HTTP. Persists to SQLite by default. |
+| **`apps/studio-api/`** | `agentic-odi-studio-api` | FastAPI **Living Studio sidecar**. Serves config, health, canvas data, local mutations, MCP passthrough, SSE chat, and the built SPA. |
+| **`apps/cli/`** | `agentic-odi-cli` | Typer CLI with interactive chat plus full entity CRUD, `schema`, `connectors`, and local-first (`--backend local`) or remote (`--backend mcp`) data access. |
+| **`apps/studio/`** | React + TypeScript + Vite | **The Living Studio** SPA and Tauri 2 desktop shell. |
 | **`infra/cloudflare/`** | Worker | Free-plan Workers Static Assets deployment and sidecar tunnel. |
 | **`scripts/`** | — | Dev launcher, binary build, installer tests. |
 | **`tests/contract/`** | — | Cross-package MCP contract tests. |
 
+See [Architecture](docs/architecture/README.md) for the dependency graph, data
+flow, and testing strategy.
+
+## Quick Start
+
+**Prerequisites:** Python 3.10+ and the [uv](https://docs.astral.sh/uv/) package
+manager.
+
+```bash
+# Install the entire workspace (all five Python projects plus dev tooling)
+uv sync --all-packages
+
+# Build the Studio SPA, then launch the MCP server and Living Studio together
+npm --prefix apps/studio run build
+python scripts/dev.py
+```
+
+| Service | URL |
+|---|---|
+| MCP Server | http://localhost:8000/mcp |
+| The Living Studio | http://127.0.0.1:8100 |
+
+For hot reload, `npm --prefix apps/studio run dev:full` starts the MCP server, the
+sidecar, and Vite together on http://localhost:5173. For the desktop app, use
+`npm --prefix apps/studio run tauri dev`. See
+[Running The Living Studio](docs/living-studio.md).
+
+The Studio needs an OpenAI-compatible LLM with tool-calling support to drive its
+agent — see the [Local LLM Backend](docs/local-llm.md).
+
+### CLI at a glance
+
+The CLI is local-first, so data commands work without a running server:
+
+```bash
+python -m agentic_odi_cli --version          # print the Agentic ODI version
+python -m agentic_odi_cli --help             # show available options and commands
+python -m agentic_odi_cli       # start interactive chat in a terminal
+agentic-odi jobs list            # Jobs-to-be-Done
+agentic-odi steps list --job-id <id>
+agentic-odi desired-outcomes list --job-id <id>
+agentic-odi customer-outcomes list
+agentic-odi evidence list --job-id <id>
+agentic-odi schema               # canonical JSON schema for every entity
+agentic-odi score 8 2            # ODI opportunity score → 14.00
+```
+
+Add `--backend mcp` to route data commands through a running MCP server
+(`python -m agentic_odi_mcp_server`). See the [CLI Reference](docs/cli.md).
+
+### Install the binary
+
+Prebuilt binaries are available for Linux, macOS, and Windows:
+
+```bash
+curl -fsSL https://github.com/alehar9320/agentic-odi/releases/latest/download/install.sh | sh
+```
+
+The installer symlinks `odi`, `odipm`, `odi-cli`, and `agentic-odi` into
+`~/.local/bin/`. See [Installation](docs/installation.md) for the install
+layout, updates, and release automation.
+
+## Documentation
+
+| Guide | Contents |
+|---|---|
+| [CLI Reference](docs/cli.md) | Backends, interactive chat, Jobs/Steps/desired Outcomes/Customer Outcomes/evidence, `connectors`, scoring, environment variables |
+| [External Connectors](docs/connectors.md) | The MCP ingest connector, presets, and the `Connector` protocol |
+| [Running The Living Studio](docs/living-studio.md) | Run modes, desktop signing and updates, agent-driven testing (`/dev`, `/test`) |
+| [Local LLM Backend](docs/local-llm.md) | Running a local OpenAI-compatible model with tool calling |
+| [Development](docs/development.md) | Lint, format, type checks, frontend checks, tests and the coverage map |
+| [Architecture](docs/architecture/README.md) | Workspace layout, dependency direction, data flow, and testing |
+| [Installation](docs/installation.md) | Binary install, updater behavior, and release automation |
+| [Deployment](docs/deployment.md) | Hosted chat UI, the MCP server endpoint, and the free-plan Cloudflare Worker |
+| [Roadmap](docs/roadmap.md) | Completed and upcoming milestones |
+| [Superpowers](docs/superpowers.md) | Pi, OpenCode, and Freebuff integration |
+
 ## Contributing
 
-Contributions are welcome. Run the checks that CI runs before opening a pull
-request:
-
-```bash
-uv run ruff check . && uv run ruff format --check .
-uv run mypy apps packages && uv run pytest
-```
-
-See [Development](docs/development.md) for the frontend checks, the coverage
-map, and how every pull request is automatically risk-classified.
-
-## Brand
-
-**Odi the Otter** is the mascot — a golden-ratio-derived pixel otter appearing in
-the CLI, the Studio, the desktop icon, and this page. The artwork is original,
-generated by a committed script, and documented in
-[brand/README.md](brand/README.md).
-
-```bash
-uv run python brand/tools/render.py   # regenerate every Odi asset
-```
+Contributions are welcome! This project uses [Ruff](https://docs.astral.sh/ruff/)
+for linting and formatting and [pytest](https://pytest.org/) for tests. Make sure
+your change passes the [lint, format, and test checks](docs/development.md) before
+opening a pull request.
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+No license has been specified for this repository yet. Until one is added, all
+rights reserved by the maintainers. Please reach out before reuse or
+redistribution.
 
 ---
 

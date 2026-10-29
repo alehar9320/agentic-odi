@@ -26,70 +26,22 @@ uv run bandit -c pyproject.toml -r apps packages website/
 The SPA and Tauri shell mirror their CI jobs locally:
 
 ```bash
-npm --prefix apps/studio run lint        # ESLint
-npm --prefix apps/studio run typecheck   # tsc --noEmit
-npm --prefix apps/studio test -- --run   # Vitest on jsdom (run once)
-npm --prefix apps/studio run test:visual # Vitest Browser Mode → Chromatic archives
-npm --prefix apps/studio run build       # production build → apps/studio/dist
+npm --prefix apps/studio run lint       # ESLint
+npm --prefix apps/studio run typecheck  # tsc --noEmit
+npm --prefix apps/studio test -- --run  # Vitest (run once)
+npm --prefix apps/studio run build      # production build → apps/studio/dist
 cd apps/studio/src-tauri && cargo fmt --check && cargo clippy -- -D warnings && cargo check
 ```
-
-### Visual tests
-
-`npm test` runs the jsdom suite and deliberately ignores `*.visual.test.tsx`.
-Those files render one component state in Chromium under
-`vitest.visual.config.ts`, and the `Chromatic` workflow publishes them on every
-branch push so a reviewer can compare pixels component by component. Each test costs one billed snapshot per
-build on the free 5,000/month allowance, which is why the two suites are split by
-filename instead of running every test in a browser. Browser mode needs Chromium
-locally: `npx playwright install chromium`. See
-[Deployment](deployment.md) for the project setup and budget rules.
-
-### Conversational UI coverage
-
-The agent-composed surfaces and the first-run tour are covered at these levels. `ChatStage.test.tsx` also covers the latest-message control while following a streamed turn and returning to the live end:
-
-| File | What it covers |
-|---|---|
-| `apps/studio/src/ui/protocol.test.ts` | Spec parsing: prop types, enums, ranges, required props, depth/node/size ceilings, unknown types |
-| `apps/studio/src/ui/UiRenderer.test.tsx` | Card rendering, computed opportunity scores, action dispatch, per-node failure isolation, catalog/registry parity |
-| `apps/studio/src/assistant/convert.test.ts` | Every part mapping in both directions, unknown parts dropped, `content` preserved for history |
-| `apps/studio/src/api/studioApi.test.ts` | Chat request serialization: visible-path messages and attachment fields match the sidecar schema |
-| `apps/studio/src/components/chat/Conversation.test.tsx` | Prose and surfaces interleaved in the agent's order through the real runtime; card actions become messages; named alternative N of M and its switch; reasoning disclosure opens on request; the phase is announced and the reply is busy while streaming; failure retry |
-| `apps/studio/src/components/chat/Composer.test.tsx` | Send, stop, the slash palette, keyboard focus, dropped and pasted attachments, refusal of unreadable files, and accessible attachment format/size limits in the runtime-bound composer |
-| `apps/studio/src/components/chat/ModelPicker.test.tsx` | Listing and marking the configured model, selection writes through `saveSettings`, arrow/Enter/Escape operation, an unreachable backend explained with a Settings path, one probe per backend |
-| `apps/studio/src/assistant/attachments.test.ts` | Acceptance by extension and type, the 5 MB image ceiling, and human-readable sizes |
-| `apps/studio-api/tests/test_studio_models.py` | Model listing sorted and deduplicated, offline without connecting, failed probe returned as a message, `/api/models` response shape |
-| `apps/studio/src/state/StudioContext.test.tsx` | New, regenerate, and edit turns against a stubbed stream, branch switching, approval answers |
-| `apps/studio-api/tests/test_studio_ui_spec.py` | Catalog validation and `render_ui` tool-schema generation |
-| `apps/studio-api/tests/test_studio_chat_ui.py` | `render_ui` interception, `ui` SSE events, and the correction fed back to the model |
-| `apps/studio-api/tests/test_studio_chat_stream.py` | Reasoning and source events, attachment prompt assembly, terminal-event invariants |
-| `apps/studio-api/tests/test_studio_chat_branches.py` | Turn ids and sibling branches: edit and regenerate produce a tree, not a rewrite |
-| `apps/studio-api/tests/test_studio_conversations.py` | Branch tree endpoint, `head_id` patch, legacy linear fallback |
-| `apps/studio-api/tests/test_studio_approvals.py` | Gate lifecycle: resolve, timeout, double resolve, unknown id |
-| `apps/studio/src/features/flags.test.ts` | Flag precedence (query → storage → env → default), value parsing, local overrides |
-| `apps/studio/src/onboarding/machine.test.ts` | Tour transitions, no forward motion without a goal, versioned storage, malformed records |
-| `apps/studio/src/onboarding/FirstRunWizard.test.tsx` | Auto-open, full flow to a destination, skip/Escape, focus trap, resume, replay, inline model repair, flag off |
-| `apps/studio/src/App.test.tsx` | First-run ordering: tour over the context conversation, job handoff, chosen surface opens, contextual starter-card labels and prompts, flag off in shell tests |
 
 ## Website Checks (GitHub Pages)
 
 The `website/` static site is part of the main CI workflow. Its tests assert the
-committed OG art is reproducible and that the publish pipeline
-(`website/tests/test_pages_deploy.py`) still exists:
+committed OG art is reproducible and that `index.html` stays in sync with the
+README:
 
 ```bash
 uv run --directory website pytest tests/
 ```
-
-The site is generated at CI time and never committed. CI runs `build_site.py` to
-produce `_site` and uploads it as the `website-site` artifact for review.
-
-Publishing happens in `.github/workflows/pages.yml`: it runs those tests,
-builds `_site` from `website/`, and deploys the artifact with
-`actions/deploy-pages` on every push to `main`. There is no `gh-pages` branch,
-so that workflow is the only thing that keeps
-<https://alehar9320.github.io/agentic-odi/> online.
 
 ## Formatting workflow
 
@@ -121,30 +73,6 @@ You can also trigger them manually:
 ```bash
 pre-commit run --all-files
 ```
-
-## PR Risk Classification
-
-Every pull request is automatically classified by the
-[PR Risk Classification](../.github/workflows/pr-risk.yml) workflow, which runs
-on `ubuntu-latest` at $0 cost with zero external dependencies. It scores the diff
-(0–100) across three factors and applies a single, mutually exclusive label:
-
-| Label | Meaning | Score |
-|---|---|---|
-| `safe to merge` | Low risk — small diff, docs-only, or tested source code | ≤ 20 |
-| `needs a look` | Medium risk — standard feature work or missing test updates | 21–50 |
-| `danger zone` | High risk — critical path (auth, migrations, billing, infra, workflows) or protected-file deletion | ≥ 51 |
-
-Scoring factors:
-
-- **File & line churn** — files changed and lines added/deleted (0–30 points).
-- **Critical path override** — touching `auth/`, `migrations/`, `billing/`,
-  `infra/`, `.github/workflows/`, or deleting a file in
-  `.ci/protected-files.txt` forces the danger zone.
-- **Test delta** — source code changed without a corresponding
-  `*.test.*`/`*.spec.*`/`tests/**` file adds 20 points.
-
-The workflow is silent: it updates labels only and never posts PR comments.
 
 ## Testing
 
@@ -221,7 +149,6 @@ uv run pytest \
 | `tests/contract/` | Live MCP tool surface and CLI local-handler parity |
 | `tests/scripts/` | `scripts/dev.py` startup, port checks, signals, and shutdown |
 | `apps/studio/src/**/*.test.ts` | SPA units: ODI math, transport bridge, SSE parser, sidecar client |
-| `apps/studio/src/**/*.visual.test.tsx` | Component states captured for Chromatic visual review |
 | `website/tests/` | Static site integrity, OG art reproducibility, and README sync |
 
 > [!TIP]

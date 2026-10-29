@@ -1,6 +1,6 @@
 [project]
 name = "agentic-odi-studio-api"
-version = "0.13.0"
+version = "0.1.0"
 description = "FastAPI sidecar for the Agentic ODI Living Studio."
 requires-python = ">=3.10"
 dependencies = [

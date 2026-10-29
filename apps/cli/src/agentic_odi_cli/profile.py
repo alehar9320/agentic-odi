@@ -27,8 +27,7 @@ class Baseline:
     business_model: str | None = None
     core_problem: str | None = None
     current_focus: str | None = None
-    confidence: float | None = None
-    inferred: bool = False
+    confidence: str | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -106,46 +105,6 @@ def save_baseline(b: Baseline) -> Path:
         f.write(json.dumps(b.to_dict()))
     os.replace(tmp, target)
     return target
-
-
-@app.command(name="show")
-def show_profile() -> None:
-    """Show the current baseline profile."""
-    b = load_baseline()
-    if b is None:
-        typer.echo("No baseline found. Run `agentic-odi setup` to create one.")
-        raise typer.Exit(code=1)
-    typer.echo(json.dumps(b.to_dict(), indent=2))
-
-
-@app.command(name="set")
-def set_profile(
-    key: str = typer.Argument(..., help="Baseline field to set"),
-    value: str = typer.Argument(..., help="Value to set"),
-) -> None:
-    """Set a baseline field."""
-    valid_keys = {
-        "product_name",
-        "product_url",
-        "domain",
-        "primary_user",
-        "business_model",
-        "core_problem",
-        "current_focus",
-    }
-    if key not in valid_keys:
-        typer.echo(f"Error: Unknown baseline field '{key}'", err=True)
-        raise typer.Exit(code=1)
-    b = load_baseline() or Baseline()
-    setattr(b, key, value)
-    save_baseline(b)
-    typer.echo(f"Baseline field '{key}' set to {value!r}.")
-
-
-@app.command(name="path")
-def profile_path() -> None:
-    """Print the path to the baseline file."""
-    typer.echo(str(baseline_file()))
 
 
 def backup_baseline() -> Path | None:
@@ -235,7 +194,7 @@ def load_llm_config_dict() -> dict[str, str]:
     """
     try:
         p = load_llm_profile()
-    except (ValueError, OSError):
+    except Exception:  # noqa: BLE001
         return {}
     if p is None:
         return {}

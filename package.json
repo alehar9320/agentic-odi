@@ -1,0 +1,13 @@
+{
+  "name": "agentic-odi-root",
+  "private": true,
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "workspaces": [
+    "apps/studio"
+  ],
+  "scripts": {
+    "build": "npm --prefix apps/studio run build"
+  }
+}

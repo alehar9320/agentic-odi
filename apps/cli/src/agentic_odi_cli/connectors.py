@@ -10,7 +10,6 @@ from typing import TYPE_CHECKING
 
 import typer
 
-from agentic_odi_cli import flags
 from agentic_odi_cli.backend import run_tool
 from agentic_odi_cli.render import render_saved
 
@@ -57,17 +56,12 @@ def drafts_from_batch(
 
 
 def _config_path(config: Path | None) -> Path:
-    """Resolve the registry file exactly as the connectors package does.
-
-    The explicit ``--config`` value wins; otherwise the shared resolver owns
-    the environment variable and the default location, so the CLI and every
-    other entry point read the same file.
-    """
     if config is not None:
         return config
-    from agentic_odi_connectors.paths import config_path
-
-    return config_path()
+    env = os.getenv("AGENTIC_ODI_CONNECTORS_FILE")
+    if env:
+        return Path(env)
+    return Path.cwd() / ".agentic-odi" / "connectors.json"
 
 
 def _registry(config: Path | None) -> ConnectorRegistry:
@@ -91,7 +85,7 @@ ConfigOption = typer.Option(
     None,
     "--config",
     help="Path to the connectors JSON registry.",
-    envvar="AGENTIC_ODI_CONNECTORS_CONFIG",
+    envvar="AGENTIC_ODI_CONNECTORS_FILE",
 )
 
 _CONNECTOR_TIMEOUT = 30.0
@@ -120,26 +114,9 @@ def _run(coro, name: str):
 @connectors_app.command("list")
 def list_connectors(
     config: Path | None = ConfigOption,
-    as_json: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
     """List configured external connectors."""
     items = _registry(config).list_all()
-    if as_json:
-        typer.echo(
-            json.dumps(
-                [
-                    {
-                        "name": item.name,
-                        "kind": item.kind,
-                        "url": item.settings.get("url"),
-                        "enabled": item.enabled,
-                    }
-                    for item in items
-                ],
-                indent=2,
-            )
-        )
-        return
     if not items:
         typer.echo("No connectors configured.")
         return
@@ -244,13 +221,6 @@ def add_connector(
     config: Path | None = ConfigOption,
 ) -> None:
     """Register a new external connector, optionally from a known preset."""
-    if not flags.is_enabled("experimental_connectors"):
-        typer.echo(
-            "Error: connector management requires the experimental_connectors flag. "
-            "Enable it with: agentic-odi settings flags set experimental_connectors true",
-            err=True,
-        )
-        raise typer.Exit(code=1)
     from agentic_odi_connectors.models import ConnectorConfig
     from agentic_odi_connectors.registry import DuplicateConnectorError, UnknownConnectorKindError
 
@@ -299,17 +269,9 @@ def add_connector(
 @connectors_app.command("health")
 def health_connector(
     name: str = typer.Option(..., "--name", help="Connector name."),
-    no_cache: bool = typer.Option(False, "--no-cache", help="Ignore a cached health result."),
     config: Path | None = ConfigOption,
 ) -> None:
     """Check whether a connector can reach its external system."""
-    if not flags.is_enabled("experimental_connectors"):
-        typer.echo(
-            "Error: connector management requires the experimental_connectors flag. "
-            "Enable it with: agentic-odi settings flags set experimental_connectors true",
-            err=True,
-        )
-        raise typer.Exit(code=1)
     from agentic_odi_connectors.registry import ConnectorNotFoundError, UnknownConnectorKindError
 
     try:
@@ -318,10 +280,6 @@ def health_connector(
     except (ConnectorNotFoundError, UnknownConnectorKindError) as exc:
         typer.echo(f"Error: {exc}", err=True)
         raise typer.Exit(code=1) from exc
-    if no_cache:
-        from agentic_odi_connectors.rest.connector import clear_health_cache
-
-        clear_health_cache(name)
     status = _run(connector.health(), name)
     typer.echo(status.model_dump_json())
     if not status.ok:
@@ -339,13 +297,6 @@ def ingest_connector(
     config: Path | None = ConfigOption,
 ) -> None:
     """Ingest connector records and optionally map them into ODI evidence."""
-    if not flags.is_enabled("experimental_connectors"):
-        typer.echo(
-            "Error: connector management requires the experimental_connectors flag. "
-            "Enable it with: agentic-odi settings flags set experimental_connectors true",
-            err=True,
-        )
-        raise typer.Exit(code=1)
     from agentic_odi_connectors.registry import ConnectorNotFoundError, UnknownConnectorKindError
 
     try:

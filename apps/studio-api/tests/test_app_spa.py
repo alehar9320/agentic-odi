@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from agentic_odi_core.messages import CAPABILITIES
 from agentic_odi_core.repository import InMemoryRepository
 from agentic_odi_studio_api import app as app_module
 from agentic_odi_studio_api import main as main_module
@@ -13,14 +12,11 @@ def _client() -> TestClient:
     return TestClient(app_module.create_app(InMemoryRepository()))
 
 
-def test_capabilities_endpoint_returns_the_capability_list() -> None:
+def test_capabilities_endpoint_reports_local() -> None:
     response = _client().get("/capabilities")
 
     assert response.status_code == 200
-    assert response.json() == {"capabilities": CAPABILITIES}
-    # The body must say what the assistant can do, not which backend is loaded.
-    assert "Job Maps" in response.json()["capabilities"]
-    assert response.json()["capabilities"] != "local"
+    assert response.json() == {"capabilities": "local"}
 
 
 def test_spa_fallback_serves_index_for_unknown_routes(monkeypatch, tmp_path) -> None:
@@ -47,11 +43,10 @@ def test_spa_fallback_serves_existing_files(monkeypatch, tmp_path) -> None:
 def test_spa_fallback_returns_404_without_index(monkeypatch, tmp_path) -> None:
     monkeypatch.setattr(app_module, "SPA_DIST", tmp_path)
 
-    response = _client().get("/missing", headers={"X-Request-ID": "req-9"})
+    response = _client().get("/missing")
 
     assert response.status_code == 404
-    assert response.json()["error"]["code"] == "not_found"
-    assert response.json()["error"]["request_id"] == "req-9"
+    assert response.json() == {"detail": "Not Found"}
 
 
 def test_spa_fallback_can_be_disabled(monkeypatch, tmp_path) -> None:
@@ -62,7 +57,7 @@ def test_spa_fallback_can_be_disabled(monkeypatch, tmp_path) -> None:
     response = _client().get("/missing")
 
     assert response.status_code == 404
-    assert response.json()["error"]["code"] == "not_found"
+    assert response.json() == {"detail": "Not Found"}
 
 
 def test_spa_assets_are_mounted(monkeypatch, tmp_path) -> None:

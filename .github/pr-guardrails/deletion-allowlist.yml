@@ -1,7 +1,0 @@
-# Deletions are denied by default. Add one entry per approved deletion, with the
-# issue that tracks it. Glob patterns are supported.
-#
-# - path: "apps/old/thing.tsx"
-#   issue: "<issue-number>"
-#   reason: "Replaced by apps/new/thing.tsx in <issue-number>"
-[]
