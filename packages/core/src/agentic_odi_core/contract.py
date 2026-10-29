@@ -43,6 +43,7 @@ class ToolName(str, Enum):
     DELETE_INTERVIEW = "delete_interview"
     ADD_QUOTE = "add_quote"
     LIST_QUOTES = "list_quotes"
+    IMPORT_TRANSCRIPT = "import_transcript"
     PROMOTE_EVIDENCE = "promote_evidence"
     EVALUATE_OUTCOME = "evaluate_outcome"
     GET_ODI_SCHEMA = "get_odi_schema"
@@ -385,6 +386,23 @@ TOOL_SPECS: dict[str, ToolSpec] = {
         arguments=("interview_id",),
         required=("interview_id",),
         returns="A list of InterviewQuotes ordered by ordinal.",
+    ),
+    ToolName.IMPORT_TRANSCRIPT.value: ToolSpec(
+        name="import_transcript",
+        summary="Parse a transcript and persist it as one interview with its quotes.",
+        effect=_derive_effect("import_transcript"),
+        arguments=(
+            "text",
+            "title",
+            "participant_label",
+            "filename",
+            "format",
+            "job_id",
+            "participant_role",
+            "conducted_at",
+        ),
+        required=("text", "title", "participant_label"),
+        returns="The created Interview and the number of quotes.",
     ),
     ToolName.PROMOTE_EVIDENCE.value: ToolSpec(
         name="promote_evidence",
