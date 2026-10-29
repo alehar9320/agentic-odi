@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import os
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from agentic_odi_core import ODIService
+from agentic_odi_core.messages import CAPABILITIES
 from agentic_odi_core.remote import StudioError, StudioErrorCode
 from agentic_odi_core.repository import Repository
 from agentic_odi_core.sqlite_repository import SQLiteRepository
@@ -14,6 +17,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+from agentic_odi_studio_api.studio.approvals import ApprovalRegistry
 from agentic_odi_studio_api.studio.connectors import ConnectorService
 from agentic_odi_studio_api.studio.errors import (
     RequestIdMiddleware,
@@ -56,11 +60,26 @@ def create_app(
     if repo is None:
         repo = SQLiteRepository()
     service = ODIService(repo)
-    app = FastAPI(title="Agentic ODI Studio API")
+    # Pending write approvals live for the life of the process: a local sidecar
+    # serves one person and has no durable run state to resume into.
+    approvals = ApprovalRegistry()
+
+    @asynccontextmanager
+    async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+        yield
+        # Nothing may outlive the process waiting on a decision.
+        approvals.cancel_all()
+
+    app = FastAPI(
+        title="Agentic ODI Studio API",
+        openapi_url="/api/openapi.json",
+        lifespan=lifespan,
+    )
     app.state.service = service
     app.state.backend = backend or os.environ.get("AGENTIC_ODI_BACKEND") or DEFAULT_BACKEND
     app.state.connectors = connectors or ConnectorService()
     app.state.memory = memory or StudioMemory()
+    app.state.approvals = approvals
 
     app.add_middleware(
         CORSMiddleware,
@@ -78,7 +97,7 @@ def create_app(
 
     @app.get("/capabilities")
     def capabilities() -> dict:
-        return {"capabilities": app.state.backend}
+        return {"capabilities": CAPABILITIES}
 
     app.include_router(studio_router)
 

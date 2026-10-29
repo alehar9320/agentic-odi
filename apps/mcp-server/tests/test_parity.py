@@ -36,7 +36,7 @@ async def test_step_and_outcome_get_update_delete():
             "add_outcome",
             {
                 "job_id": job_id,
-                "statement": "Minimize the time it takes to ship when releasing",
+                "statement": "Minimize the time to ship a release when the build is green",
                 "importance": 8,
                 "satisfaction": 4,
             },
@@ -114,7 +114,7 @@ async def test_update_outcome_out_of_range_returns_error_string():
             "add_outcome",
             {
                 "job_id": job_id,
-                "statement": "Minimize the time it takes to deploy when releasing",
+                "statement": "Minimize the time to ship a release when the build is green",
                 "importance": 8,
                 "satisfaction": 4,
             },
@@ -140,3 +140,22 @@ async def test_evaluate_outcome_reports_a_missing_job_as_an_error_string():
     text = res.content[0].text  # type: ignore[index]
     assert text == "Job not found: missing"
     assert "{" not in text
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("statement", "expected_valid"),
+    [
+        ("Minimize the time to onboard a customer when they sign up", True),
+        ("Make it better", False),
+    ],
+)
+async def test_evaluate_outcome_round_trips_as_json(statement: str, expected_valid: bool):
+    async with Client(mcp) as client:
+        res = await client.call_tool("evaluate_outcome", {"statement": statement})
+
+    payload = json.loads(res.content[0].text)  # type: ignore[index]
+    assert payload["valid"] is expected_valid
+    assert isinstance(payload["issues"], list)
+    assert all(isinstance(issue, str) for issue in payload["issues"])
+    assert (payload["issues"] == []) is expected_valid

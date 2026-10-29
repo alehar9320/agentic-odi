@@ -14,6 +14,8 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).resolve().parents[2]
 MANIFEST = ROOT / ".ci" / "protected-files.txt"
 
@@ -28,8 +30,20 @@ def _protected_paths() -> list[Path]:
     return paths
 
 
-def _base_ref() -> str:
-    """The ref to diff against.
+def _resolves(ref: str) -> bool:
+    return (
+        subprocess.run(
+            ["git", "rev-parse", "--verify", "--quiet", ref],
+            cwd=ROOT,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        ).returncode
+        == 0
+    )
+
+
+def _base_ref() -> str | None:
+    """The ref to diff against, or None when this checkout has no history.
 
     CI checkouts are shallow (fetch-depth 1), so HEAD's ancestors are missing
     and neither origin/main nor HEAD~1 may exist. Unshallow so we can diff the
@@ -59,7 +73,9 @@ def _base_ref() -> str:
         except subprocess.CalledProcessError:
             continue
     # Direct push to main with no fetchable default branch: compare to HEAD~1.
-    return "HEAD~1"
+    if _resolves("HEAD~1"):
+        return "HEAD~1"
+    return None
 
 
 def _deleted_files(base: str) -> set[str]:
@@ -79,6 +95,13 @@ def _deleted_files(base: str) -> set[str]:
 
 def test_no_protected_file_is_deleted() -> None:
     base = _base_ref()
+    if base is None:
+        # Red, not skipped: an unchecked tree could be hiding a deletion. Say
+        # why, so the fix (check out with the parent commit) is obvious.
+        pytest.fail(
+            "Cannot check protected files: this checkout has no base commit to diff "
+            "against. Check out with history (actions/checkout fetch-depth: 2)."
+        )
     deleted = _deleted_files(base)
     violations = []
     for path in _protected_paths():

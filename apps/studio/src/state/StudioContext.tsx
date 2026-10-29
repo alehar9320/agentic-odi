@@ -28,10 +28,13 @@ import {
   fetchConfig,
   fetchConnectorCatalog,
   fetchConnectors,
+  fetchConversationTree,
   fetchLatestConversation,
   fetchMemory,
   healthLlm,
   healthMcp,
+  resolveApproval as apiResolveApproval,
+  setConversationHead as apiSetConversationHead,
   streamChat,
   updateJob as apiUpdateJob,
   updateObservation as apiUpdateObservation,
@@ -41,12 +44,14 @@ import {
   type UpdateObservationPayload,
 } from "../api/studioApi";
 import type { RawSseEvent } from "../api/sse";
+import { capabilityRegistry, type Capability } from "../bff/capabilities/registry";
 import type {
   AddConnectorPayload,
   AddOutcomePayload,
   AddStepPayload,
   CanvasData,
   CanvasState,
+  ChatAttachment,
   ChatMessage,
   ChatPart,
   ConnectorListItem,
@@ -56,10 +61,59 @@ import type {
   StudioConfig,
   StudioError,
   StudioNotification,
+  StudioTheme,
+  Thesis,
+  ToolStatus,
+  TurnNode,
   WorkspacePanelId,
 } from "../types";
 import { catalogManifest } from "../ui/catalog";
 import { parseUiSpec } from "../ui/protocol";
+
+/**
+ * The visible path of a persisted conversation: from the head back to the root.
+ * Rows are ordered by insertion, so a legacy conversation with no head simply
+ * resolves to its last turn.
+ */
+export function pathToHead(nodes: TurnNode[], headId: string | null): TurnNode[] {
+  if (nodes.length === 0) {
+    return [];
+  }
+  const byId = new Map(nodes.map((node) => [node.id, node]));
+  const leafId = headId && byId.has(headId) ? headId : nodes[nodes.length - 1].id;
+  const path: TurnNode[] = [];
+  const seen = new Set<string>();
+  let current: string | null = leafId;
+  while (current && byId.has(current) && !seen.has(current)) {
+    seen.add(current);
+    const node = byId.get(current) as TurnNode;
+    path.push(node);
+    current = node.parent_id;
+  }
+  return path.reverse();
+}
+
+/** Persisted turns as the thread renders them. */
+export function turnsToMessages(
+  nodes: TurnNode[],
+  headId: string | null,
+): ChatMessage[] {
+  return pathToHead(nodes, headId).flatMap((node) => {
+    if (node.role !== "user" && node.role !== "assistant") {
+      return [];
+    }
+    const content = node.content ?? "";
+    return [
+      {
+        id: node.id,
+        parentId: node.parent_id,
+        role: node.role,
+        content,
+        parts: content ? [{ kind: "text" as const, text: content }] : [],
+      },
+    ];
+  });
+}
 
 /** Read the failure the sidecar reported on an SSE `error` event. */
 function readStudioError(raw: unknown): StudioError {
@@ -86,7 +140,9 @@ const CANVAS_KEY = "studio.canvas";
 const DISPLAY_NAME_KEY = "studio.displayName";
 const BRIEF_KEY = "studio.brief";
 const SETUP_DISMISSED_KEY = "studio.setupDismissed";
+const SIDECAR_NOTICE_DISMISSED_KEY = "studio.sidecarNoticeDismissed";
 const NOTIFICATIONS_KEY = "studio.notifications";
+const THESES_KEY = "studio.theses";
 
 /** How often the studio re-probes the model and the MCP server. */
 const HEALTH_POLL_INTERVAL_MS = 30_000;
@@ -96,6 +152,7 @@ export const EMPTY_CONFIG: StudioConfig = {
   api_key: "local",
   model_name: "local-tools-model",
   mcp_url: "http://localhost:8000/mcp",
+  theme: "dark",
 };
 
 export type ToastKind = "success" | "error" | "info";
@@ -176,13 +233,25 @@ export interface StudioContextValue {
   llmHealth: { healthy: boolean | null; message: string };
   mcpReachable: boolean;
   sidecarReachable: boolean | null;
+  /** Whether the user has dismissed this session's sidecar-down notice. */
+  dismissedSidecarNotice: boolean;
+  /** Probe again now, e.g. after the user started the sidecar. */
+  recheckConnections: () => Promise<void>;
+  dismissSidecarNotice: () => void;
   /** Probe the sidecar, MCP server, and model. Optionally against unsaved config. */
   checkConnections: (override?: Partial<StudioConfig>) => Promise<ConnectionReport>;
   messages: ChatMessage[];
   streaming: boolean;
   thinkingPhase: string | null;
-  toolActivity: ToolActivity[];
-  sendMessage: (text: string) => Promise<void>;
+  sendMessage: (text: string, attachments?: ChatAttachment[]) => Promise<void>;
+  /** Re-answer the turn that follows `messageId`, as a sibling branch. */
+  regenerateFrom: (messageId: string | null) => Promise<void>;
+  /** Replace the user turn before `messageId`, as a sibling branch. */
+  editFrom: (messageId: string | null, text: string, attachments?: ChatAttachment[]) => Promise<void>;
+  /** Take the branch the runtime switched to as the visible conversation. */
+  switchBranch: (messages: ChatMessage[]) => void;
+  /** Answer a paused write. The turn resumes on its own stream. */
+  respondToApproval: (approvalId: string, approved: boolean, reason?: string) => Promise<void>;
   stopStreaming: () => void;
   clearChat: () => void;
   conversationId: string | null;
@@ -224,12 +293,19 @@ export interface StudioContextValue {
   presetError: StudioError | null;
   /** The failure behind an unreachable connector list, if any. */
   connectorsError: StudioError | null;
+  /** Probed availability of local and sidecar capabilities. */
+  capabilities: Capability[];
   refreshConnectors: () => Promise<void>;
   refreshPresets: () => Promise<void>;
+  refreshCapabilities: () => Promise<void>;
   addConnector: (payload: AddConnectorPayload) => Promise<void>;
   deleteConnector: (name: string) => Promise<void>;
   connectorSuggestions: string[];
   dismissConnectorSuggestion: (preset: string) => void;
+  /** Scored outcomes saved as shareable opportunity theses. */
+  theses: Thesis[];
+  saveThesis: (thesis: Omit<Thesis, "id" | "created_at">) => void;
+  deleteThesis: (thesisId: string) => void;
   notifications: StudioNotification[];
   unreadNotificationCount: number;
   markNotificationAsRead: (id: string) => void;
@@ -267,7 +343,15 @@ function loadCanvasCache(): CanvasData | null {
 
 function loadSetupDismissed(): boolean {
   try {
-    return localStorage.getItem(SETUP_DISMISSED_KEY) === "1";
+      return localStorage.getItem(SETUP_DISMISSED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function loadSidecarNoticeDismissed(): boolean {
+  try {
+    return localStorage.getItem(SIDECAR_NOTICE_DISMISSED_KEY) === "1";
   } catch {
     return false;
   }
@@ -302,6 +386,18 @@ function loadBrief(): StudioBrief | null {
   }
 }
 
+function loadTheses(): Thesis[] {
+  try {
+    const raw = localStorage.getItem(THESES_KEY);
+    if (raw) {
+      return JSON.parse(raw) as Thesis[];
+    }
+  } catch {
+    /* ignore malformed cache */
+  }
+  return [];
+}
+
 function loadNotifications(): StudioNotification[] {
   try {
     const raw = localStorage.getItem(NOTIFICATIONS_KEY);
@@ -316,6 +412,7 @@ function loadNotifications(): StudioNotification[] {
 
 export function StudioProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<StudioConfig>(loadSettings);
+  const theme: StudioTheme = settings.theme === "light" ? "light" : "dark";
   const [displayName, setDisplayNameState] = useState<string>(loadDisplayName);
   const [brief, setBrief] = useState<StudioBrief | null>(loadBrief);
   const [setupOpen, setSetupOpen] = useState<boolean>(
@@ -333,6 +430,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   });
   const [mcpReachable, setMcpReachable] = useState(false);
   const [sidecarReachable, setSidecarReachable] = useState<boolean | null>(null);
+  const [dismissedSidecarNotice, setDismissedSidecarNotice] = useState<boolean>(loadSidecarNoticeDismissed);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [memory, setMemory] = useState<Observation[]>([]);
@@ -346,8 +444,10 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [presets, setPresets] = useState<ConnectorPreset[]>([]);
   const [presetError, setPresetError] = useState<StudioError | null>(null);
   const [connectorsError, setConnectorsError] = useState<StudioError | null>(null);
+  const [capabilities, setCapabilities] = useState<Capability[]>([]);
   const [connectorSuggestions, setConnectorSuggestions] = useState<string[]>([]);
   const [notifications, setNotifications] = useState<StudioNotification[]>(loadNotifications);
+  const [theses, setTheses] = useState<Thesis[]>(loadTheses);
   const toastId = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -438,6 +538,15 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const refreshCapabilities = useCallback(async () => {
+    try {
+      setCapabilities(await capabilityRegistry.statuses(settings));
+    } catch {
+      /* Capability probes are advisory; a probe failure leaves the list empty. */
+      setCapabilities([]);
+    }
+  }, [settings]);
+
   const addConnector = useCallback(
     async (payload: AddConnectorPayload) => {
       try {
@@ -467,6 +576,35 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     },
     [pushToast, refreshConnectors],
   );
+
+  const saveThesis = useCallback((thesis: Omit<Thesis, "id" | "created_at">) => {
+    const saved: Thesis = {
+      ...thesis,
+      id: `THESIS-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      created_at: new Date().toISOString(),
+    };
+    setTheses((prev) => {
+      const next = [saved, ...prev];
+      try {
+        localStorage.setItem(THESES_KEY, JSON.stringify(next));
+      } catch {
+        /* storage unavailable */
+      }
+      return next;
+    });
+  }, []);
+
+  const deleteThesis = useCallback((thesisId: string) => {
+    setTheses((prev) => {
+      const next = prev.filter((thesis) => thesis.id !== thesisId);
+      try {
+        localStorage.setItem(THESES_KEY, JSON.stringify(next));
+      } catch {
+        /* storage unavailable */
+      }
+      return next;
+    });
+  }, []);
 
   const simulateBackgroundEvent = useCallback(() => {
     const events: Array<Omit<StudioNotification, "id" | "timestamp" | "read">> = [
@@ -500,6 +638,15 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     addNotification(chosen);
     pushToast("info", `Background Activity: ${chosen.title}`);
   }, [addNotification, pushToast]);
+
+  // The theme lives on <html> so every surface, portal, and native control
+  // follows one class instead of each component tracking its own copy.
+  useEffect(() => {
+    const root = document.documentElement;
+    root.classList.toggle("theme-light", theme === "light");
+    root.classList.toggle("theme-dark", theme === "dark");
+    root.style.colorScheme = theme;
+  }, [theme]);
 
   const saveSettings = useCallback((config: StudioConfig) => {
     setSettings(config);
@@ -550,7 +697,15 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const pushNotice = useCallback((text: string) => {
-    setMessages((prev) => [...prev, { role: "notice", content: text }]);
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: crypto.randomUUID(),
+        parentId: prev.length ? prev[prev.length - 1].id : null,
+        role: "notice",
+        content: text,
+      },
+    ]);
   }, []);
 
   const checkConnections = useCallback(
@@ -576,10 +731,29 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       setSidecarReachable(sidecar);
       setMcpReachable(mcp);
       setLlmHealth(llm);
+      void refreshCapabilities();
+      if (sidecar) {
+        setDismissedSidecarNotice(false);
+      }
       return { sidecarReachable: sidecar, mcpReachable: mcp, llmHealthy: llm.healthy };
     },
-    [settings],
+    [settings, refreshCapabilities],
   );
+
+  // Re-probe after the user acted on the sidecar notice (e.g. started the
+  // sidecar). Resolves once the report is in so the UI can stop showing "busy".
+  const recheckConnections = useCallback(async () => {
+    await checkConnections();
+  }, [checkConnections]);
+
+  const dismissSidecarNotice = useCallback(() => {
+    setDismissedSidecarNotice(true);
+    try {
+      localStorage.setItem(SIDECAR_NOTICE_DISMISSED_KEY, "1");
+    } catch {
+      /* storage unavailable */
+    }
+  }, []);
 
   const refreshCanvas = useCallback(async () => {
     setCanvasState((prev) => ({ kind: "loading", data: prev.data }));
@@ -732,16 +906,51 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     abortRef.current?.abort();
   }, []);
 
-  const sendMessage = useCallback(
-    async (text: string) => {
+  /**
+   * One turn, from the user's words to the agent's last part.
+   *
+   * `base` is the visible path the turn answers, so the same machinery serves a
+   * new message, a regeneration, and an edit without three copies of the stream
+   * handling. The assistant-ui runtime owns the branch tree; this owns the
+   * visible path and the wire.
+   */
+  const runTurn = useCallback(
+    async (
+      base: ChatMessage[],
+      text: string,
+      attachments: ChatAttachment[] = [],
+      existingUserMessage?: ChatMessage,
+    ) => {
       const trimmed = text.trim();
-      if (!trimmed || streaming) {
+      if ((!trimmed && attachments.length === 0) || streaming) {
         return;
       }
 
-      const history: ChatMessage[] = [...messages, { role: "user", content: trimmed }];
-      const assistantIndex = history.length;
-      setMessages([...history, { role: "assistant", content: "", parts: [] }]);
+      // The sidecar is confirmed down: don't start a doomed stream. The notice
+      // above the composer already explains what's wrong; just surface a quiet
+      // heads-up in-thread and stop.
+      if (sidecarReachable === false) {
+        pushNotice("The studio sidecar isn't running — live replies are paused. Start it from Settings.");
+        return;
+      }
+
+      const userMessage: ChatMessage = existingUserMessage ?? {
+        id: crypto.randomUUID(),
+        parentId: base.length ? base[base.length - 1].id : null,
+        role: "user",
+        content: trimmed,
+        ...(attachments.length ? { attachments } : {}),
+      };
+      const assistantId = crypto.randomUUID();
+      const history: ChatMessage[] =
+        existingUserMessage && base.at(-1)?.id === existingUserMessage.id
+          ? base
+          : [...base, userMessage];
+
+      setMessages([
+        ...history,
+        { id: assistantId, parentId: userMessage.id, role: "assistant", content: "", parts: [] },
+      ]);
       setStreaming(true);
       setThinkingPhase("health_check");
       setOfflineReply(false);
@@ -755,33 +964,98 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       let failure: StudioError | null = null;
       let terminal = false;
       let stopped = false;
+      let toolSeq = 0;
 
       // Prose is appended to the open text part; a surface opens a new one, so
       // the transcript keeps the agent's order instead of gathering all prose
       // above all cards.
-      const appendText = (text: string) => {
-        if (!text) {
+      const appendText = (chunk: string) => {
+        if (!chunk) {
           return;
         }
-        content += text;
+        content += chunk;
         const last = parts[parts.length - 1];
         parts =
           last?.kind === "text"
-            ? [...parts.slice(0, -1), { kind: "text", text: last.text + text }]
-            : [...parts, { kind: "text", text }];
+            ? [...parts.slice(0, -1), { kind: "text", text: last.text + chunk }]
+            : [...parts, { kind: "text", text: chunk }];
+      };
+
+      const appendReasoning = (chunk: string) => {
+        if (!chunk) {
+          return;
+        }
+        const last = parts[parts.length - 1];
+        parts =
+          last?.kind === "reasoning"
+            ? [...parts.slice(0, -1), { kind: "reasoning", text: last.text + chunk }]
+            : [...parts, { kind: "reasoning", text: chunk }];
+      };
+
+      /** The open tool part for a name, if one is still waiting. */
+      const openTool = (name: string) =>
+        [...parts]
+          .reverse()
+          .find(
+            (part): part is Extract<ChatPart, { kind: "tool" }> =>
+              part.kind === "tool" && part.name === name && part.status === "running",
+          );
+
+      const applyToolEvent = (
+        name: string,
+        status: ToolStatus,
+        preview?: string,
+        id?: string,
+      ) => {
+        const open = openTool(name);
+        if (status === "running") {
+          if (open) {
+            return;
+          }
+          toolSeq += 1;
+          parts = [
+            ...parts,
+            { kind: "tool", id: id ?? `tool-${toolSeq}`, name, status },
+          ];
+          return;
+        }
+        if (open) {
+          const next = {
+            ...open,
+            status,
+            ...(preview ? { preview } : {}),
+            // A result means the gate was answered; the question is spent.
+            approval: undefined,
+          };
+          parts = [...parts.filter((part) => part !== open), next];
+          return;
+        }
+        toolSeq += 1;
+        parts = [
+          ...parts,
+          {
+            kind: "tool",
+            id: id ?? `tool-${toolSeq}`,
+            name,
+            status,
+            ...(preview ? { preview } : {}),
+          },
+        ];
       };
 
       const publish = () => {
-        setMessages((prev) => {
-          const next = [...prev];
-          next[assistantIndex] = {
-            role: "assistant",
-            content,
-            parts: [...parts],
-            ...(failure ? { error: failure, retryText: trimmed } : {}),
-          };
-          return next;
-        });
+        setMessages((prev) =>
+          prev.map((message) =>
+            message.id === assistantId
+              ? {
+                  ...message,
+                  content,
+                  parts: [...parts],
+                  ...(failure ? { error: failure, retryText: trimmed } : {}),
+                }
+              : message,
+          ),
+        );
       };
 
       const handleEvent = (event: RawSseEvent) => {
@@ -794,8 +1068,48 @@ export function StudioProvider({ children }: { children: ReactNode }) {
             }
             break;
           }
+          case "reasoning": {
+            appendReasoning(String(event.data.text ?? ""));
+            publish();
+            break;
+          }
           case "delta": {
             appendText(String(event.data.text ?? ""));
+            publish();
+            break;
+          }
+          case "source": {
+            parts = [
+              ...parts,
+              {
+                kind: "source",
+                id: String(event.data.id ?? `src-${parts.length}`),
+                title: String(event.data.title ?? ""),
+                mediaType: String(event.data.mediaType ?? "application/json"),
+                ...(event.data.filename ? { filename: String(event.data.filename) } : {}),
+              },
+            ];
+            publish();
+            break;
+          }
+          case "approval": {
+            const approvalId = String(event.data.id ?? "");
+            if (!approvalId) {
+              break;
+            }
+            parts = [
+              ...parts,
+              {
+                kind: "tool",
+                id: String(event.data.tool_call_id ?? `approval-${approvalId}`),
+                name: String(event.data.name ?? ""),
+                status: "running",
+                approval: {
+                  id: approvalId,
+                  prompt: String(event.data.prompt ?? "Allow this change?"),
+                },
+              },
+            ];
             publish();
             break;
           }
@@ -812,22 +1126,31 @@ export function StudioProvider({ children }: { children: ReactNode }) {
             }
             break;
           }
-          case "tool":
+          case "tool": {
+            const name = String(event.data.name ?? "");
+            const status = String(event.data.status ?? "");
+            const mapped: ToolStatus =
+              status === "ok" || status === "error" || status === "declined" ? status : "running";
+            applyToolEvent(
+              name,
+              mapped,
+              event.data.preview ? String(event.data.preview) : undefined,
+            );
             setToolActivity((prev) => [
               ...prev,
-              {
-                name: String(event.data.name ?? ""),
-                status: String(event.data.status ?? ""),
-                preview: event.data.preview ? String(event.data.preview) : undefined,
-              },
+              { name, status, ...(event.data.preview ? { preview: String(event.data.preview) } : {}) },
             ]);
+            publish();
             break;
+          }
           case "message": {
             terminal = true;
+            // The terminal frame is authoritative for the prose, but it must
+            // never erase structured parts: thinking, tool calls, citations,
+            // and surfaces sit between the paragraphs that frame them.
             content = String(event.data.content ?? content);
-            const hasSurfaces = parts.some((part) => part.kind === "ui");
-            if (!hasSurfaces) {
-              parts = content ? [{ kind: "text", text: content }] : [];
+            if (content && !parts.some((part) => part.kind === "text")) {
+              parts = [...parts, { kind: "text", text: content }];
             }
             publish();
             break;
@@ -858,7 +1181,12 @@ export function StudioProvider({ children }: { children: ReactNode }) {
               const reason = String(event.data.error ?? "The connector could not be added.");
               setMessages((prev) => [
                 ...prev,
-                { role: "notice", content: `Connector failed: ${reason}` },
+                {
+                  id: crypto.randomUUID(),
+                  parentId: assistantId,
+                  role: "notice",
+                  content: `Connector failed: ${reason}`,
+                },
               ]);
             } else {
               setConnectorSuggestions((prev) => {
@@ -894,6 +1222,9 @@ export function StudioProvider({ children }: { children: ReactNode }) {
             brief,
             ui_catalog: catalogManifest(),
             conversation_id: conversationId,
+            attachments,
+            approvals: true,
+            assistant_id: assistantId,
           },
           handleEvent,
           controller.signal,
@@ -904,13 +1235,9 @@ export function StudioProvider({ children }: { children: ReactNode }) {
           // An abort is the user's own doing: drop the empty placeholder, keep
           // the question, and report no failure — the assistant did not break.
           stopped = true;
-          setMessages((prev) => {
-            const next = [...prev];
-            if (next.length && next[next.length - 1].role === "assistant" && !next[next.length - 1].content) {
-              next.pop();
-            }
-            return next;
-          });
+          setMessages((prev) =>
+            prev.filter((message) => message.id !== assistantId || message.content !== ""),
+          );
         } else {
           terminal = true;
           failure = asStudioError(error);
@@ -934,15 +1261,114 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       }
     },
     [
-      messages,
       streaming,
       settings,
       brief,
       conversationId,
       refreshCanvas,
       refreshConnectors,
+      sidecarReachable,
+      pushNotice,
     ],
   );
+
+  const sendMessage = useCallback(
+    (text: string, attachments: ChatAttachment[] = []) => runTurn(messages, text, attachments),
+    [messages, runTurn],
+  );
+
+  /**
+   * The turn after `messageId` is regenerated as a sibling, so the previous
+   * answer is still there behind the branch picker.
+   */
+  const regenerateFrom = useCallback(
+    async (messageId: string | null) => {
+      const index = messageId
+        ? messages.findIndex((message) => message.id === messageId)
+        : messages.length - 1;
+      if (index < 0) {
+        return;
+      }
+      const target = messages[index];
+      const questionIndex =
+        target?.role === "user"
+          ? index
+          : target?.role === "assistant"
+            ? index - 1
+            : -1;
+      const question = messages[questionIndex];
+      if (!question || question.role !== "user") {
+        return;
+      }
+      await runTurn(
+        messages.slice(0, questionIndex + 1),
+        question.content,
+        question.attachments ?? [],
+        question,
+      );
+    },
+    [messages, runTurn],
+  );
+
+  const editFrom = useCallback(
+    async (messageId: string | null, text: string, attachments: ChatAttachment[] = []) => {
+      const index = messageId
+        ? messages.findIndex((message) => message.id === messageId)
+        : messages.length - 1;
+      const original = messages[index];
+      if (index < 0 || original?.role !== "user") {
+        return;
+      }
+      const edited: ChatMessage = {
+        ...original,
+        id: crypto.randomUUID(),
+        content: text.trim(),
+        ...(attachments.length ? { attachments } : { attachments: undefined }),
+      };
+      await runTurn(messages.slice(0, index), edited.content, attachments, edited);
+    },
+    [messages, runTurn],
+  );
+
+  const switchBranch = useCallback(
+    (next: ChatMessage[]) => {
+      setMessages(next);
+      const head = next.length ? next[next.length - 1].id : null;
+      if (conversationId) {
+        // The branch a person chose is the one that opens next time.
+        void apiSetConversationHead(conversationId, head).catch(() => undefined);
+      }
+    },
+    [conversationId],
+  );
+
+  const respondToApproval = useCallback(
+    async (approvalId: string, approved: boolean, reason = "") => {
+      try {
+        await apiResolveApproval(approvalId, approved, reason);
+      } catch {
+        pushToast("error", "That approval request is no longer waiting.");
+      }
+      // The paused stream carries the outcome; the local question is spent
+      // either way, and a stale prompt must not invite a second click.
+      setMessages((prev) =>
+        prev.map((message) => ({
+          ...message,
+          ...(message.parts
+            ? {
+                parts: message.parts.map((part) =>
+                  part.kind === "tool" && part.approval?.id === approvalId
+                    ? { ...part, approval: undefined }
+                    : part,
+                ),
+              }
+            : {}),
+        })),
+      );
+    },
+    [pushToast],
+  );
+
 
   /** The single conversational exit from any lens. */
   const ask = useCallback(
@@ -1057,25 +1483,24 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       if (cancelled) {
         return;
       }
+      void refreshCapabilities();
       void refreshCanvas();
       void refreshConnectors();
       void refreshPresets();
       void refreshMemory();
       void fetchLatestConversation()
-        .then(({ conversation, turns }) => {
-          if (cancelled || !conversation || turns.length === 0) {
+        .then(async ({ conversation }) => {
+          if (cancelled || !conversation) {
             return;
           }
           setConversationId(conversation.id);
-          setMessages(
-            turns
-              .filter((turn) => turn.role === "user" || turn.role === "assistant")
-              .map((turn) => ({
-                role: turn.role as "user" | "assistant",
-                content: turn.content,
-                parts: turn.content ? [{ kind: "text", text: turn.content }] : [],
-              })),
-          );
+          // The tree, not the flat turn list: a conversation with branches
+          // must open on the branch that was visible when it was left.
+          const tree = await fetchConversationTree(conversation.id);
+          if (cancelled) {
+            return;
+          }
+          setMessages(turnsToMessages(tree.messages, tree.head_id));
         })
         .catch(() => undefined);
       void healthMcp(settings.mcp_url)
@@ -1149,12 +1574,19 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       llmHealth,
       mcpReachable,
       sidecarReachable,
+      dismissedSidecarNotice,
+      dismissSidecarNotice,
+      recheckConnections,
       checkConnections,
       messages,
       streaming,
       thinkingPhase,
       toolActivity,
       sendMessage,
+      regenerateFrom,
+      editFrom,
+      switchBranch,
+      respondToApproval,
       stopStreaming,
       clearChat,
       conversationId,
@@ -1185,14 +1617,19 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       dismissToast,
       connectors,
       connectorsError,
+      capabilities,
       presets,
       presetError,
       refreshConnectors,
       refreshPresets,
+      refreshCapabilities,
       addConnector,
       deleteConnector,
       connectorSuggestions,
       dismissConnectorSuggestion,
+      theses,
+      saveThesis,
+      deleteThesis,
       notifications,
       unreadNotificationCount,
       markNotificationAsRead,
@@ -1220,12 +1657,19 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       llmHealth,
       mcpReachable,
       sidecarReachable,
+      dismissedSidecarNotice,
+      dismissSidecarNotice,
+      recheckConnections,
       checkConnections,
       messages,
       streaming,
       thinkingPhase,
       toolActivity,
       sendMessage,
+      regenerateFrom,
+      editFrom,
+      switchBranch,
+      respondToApproval,
       stopStreaming,
       clearChat,
       conversationId,
@@ -1256,14 +1700,19 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       dismissToast,
       connectors,
       connectorsError,
+      capabilities,
       presets,
       presetError,
       refreshConnectors,
       refreshPresets,
+      refreshCapabilities,
       addConnector,
       deleteConnector,
       connectorSuggestions,
       dismissConnectorSuggestion,
+      theses,
+      saveThesis,
+      deleteThesis,
       notifications,
       unreadNotificationCount,
       markNotificationAsRead,

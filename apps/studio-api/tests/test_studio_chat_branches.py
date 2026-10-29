@@ -9,6 +9,7 @@ from typing import Any
 
 from agentic_odi_studio_api.studio import chat
 from agentic_odi_studio_api.studio.connectors import ConnectorService
+from agentic_odi_studio_api.studio.memory import StudioMemory
 from agentic_odi_studio_api.studio.schemas import ChatMessage, ChatRequest
 
 
@@ -144,6 +145,23 @@ def _tool_call(arguments: str, name: str = "get_jobs") -> Any:
         id="call-1",
         function=SimpleNamespace(name=name, arguments=arguments),
     )
+
+
+def test_retrying_a_persisted_question_does_not_duplicate_its_turn() -> None:
+    memory = StudioMemory(":memory:")
+    conversation = memory.create_conversation()
+
+    chat._persist_turn(memory, conversation.id, "user", "list jobs", "user-1", None)
+    chat._persist_turn(
+        memory, conversation.id, "assistant", "first answer", "assistant-1", "user-1"
+    )
+    chat._persist_turn(memory, conversation.id, "user", "list jobs", "user-1", None)
+
+    turns = memory.list_turns(conversation.id)
+    assert [(turn.message_id, turn.role, turn.content) for turn in turns] == [
+        ("user-1", "user", "list jobs"),
+        ("assistant-1", "assistant", "first answer"),
+    ]
 
 
 def test_stream_chat_falls_back_to_empty_arguments_for_invalid_json(monkeypatch) -> None:

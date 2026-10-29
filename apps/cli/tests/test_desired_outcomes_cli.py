@@ -25,7 +25,7 @@ def _add(runner: CliRunner, db: str, job_id: str, *extra: str) -> dict:
             "--job-id",
             job_id,
             "--statement",
-            "Minimize the time it takes to onboard when releasing",
+            "Minimize the onboarding time when a customer signs up",
             "--importance",
             "8",
             "--satisfaction",
@@ -50,7 +50,7 @@ def test_outcomes_add_computes_score(tmp_path):
     listed = runner.invoke(app, ["--db", db, "desired-outcomes", "list", "--job-id", job_id])
     assert (
         listed.exit_code == 0
-        and "Minimize the time it takes to onboard when releasing" in listed.output
+        and "Minimize the onboarding time when a customer signs up" in listed.output
     )
 
 
@@ -63,7 +63,7 @@ def test_outcomes_full_lifecycle(tmp_path):
     fetched = runner.invoke(app, ["--db", db, "desired-outcomes", "get", outcome_id, "--json"])
     assert (
         json.loads(fetched.output)["statement"]
-        == "Minimize the time it takes to onboard when releasing"
+        == "Minimize the onboarding time when a customer signs up"
     )
 
     updated = runner.invoke(
@@ -93,7 +93,7 @@ def test_outcomes_add_unknown_job_reports_error(tmp_path):
             "--job-id",
             "nope",
             "--statement",
-            "Minimize the time it takes to deploy when releasing",
+            "Minimize the time to ship a release when the build is green",
             "--importance",
             "8",
             "--satisfaction",

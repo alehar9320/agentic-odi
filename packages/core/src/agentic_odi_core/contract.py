@@ -58,7 +58,10 @@ TOOL_SPECS: dict[str, ToolSpec] = {
     ToolName.GET_JOB.value: ToolSpec(("job_id",), ("job_id",)),
     ToolName.UPDATE_JOB.value: ToolSpec(("job_id", "name", "description"), ("job_id",)),
     ToolName.DELETE_JOB.value: ToolSpec(("job_id",), ("job_id",)),
-    ToolName.ADD_STEP.value: ToolSpec(("job_id", "name", "order"), ("job_id", "name", "order")),
+    ToolName.ADD_STEP.value: ToolSpec(
+        ("job_id", "name", "order", "stage", "allow_empty_job_map"),
+        ("job_id", "name", "order"),
+    ),
     ToolName.GET_JOB_MAP.value: ToolSpec(("job_id", "limit", "offset"), ("job_id",)),
     ToolName.GET_STEP.value: ToolSpec(("step_id",), ("step_id",)),
     ToolName.UPDATE_STEP.value: ToolSpec(("step_id", "name", "order"), ("step_id",)),
