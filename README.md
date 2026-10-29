@@ -105,6 +105,9 @@ uv run python scripts/dev.py        # start the MCP server + Studio together
 | MCP Server | http://localhost:8000/mcp |
 | The Living Studio | http://127.0.0.1:8100 |
 
+Run the MCP server on another port with `python -m agentic_odi_mcp_server --port 8010`
+or `AGENTIC_ODI_MCP_PORT=8010`. The flag wins over the environment variable.
+
 - **Hot reload:** `npm --prefix apps/studio run dev:full` (Vite on
   http://localhost:5173).
 - **Desktop app:** `npm --prefix apps/studio run tauri dev`.

@@ -5,6 +5,9 @@
   "name": "agentic-odi",
   "main": "./infra/cloudflare/worker.ts",
   "compatibility_date": "2026-10-19",
+  "build": {
+    "command": "npm --prefix apps/studio run build"
+  },
 // `npx wrangler preview` (Workers Builds preview command) refuses to run
 // without a `previews` block, even when Previews need no extra settings.
 // Assets and compatibility settings stay at the top level; Previews do not
