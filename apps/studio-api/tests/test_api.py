@@ -9,3 +9,15 @@ def test_health():
     r = client.get("/health")
     assert r.status_code == 200
     assert r.json()["status"] == "ok"
+
+
+def test_openapi_contract_describes_the_api_routes():
+    client = TestClient(create_app(InMemoryRepository()))
+
+    response = client.get("/api/openapi.json")
+
+    assert response.status_code == 200
+    paths = response.json()["paths"]
+    assert len(paths) >= 3
+    assert "/api/canvas" in paths
+    assert "/api/config" in paths

@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+
+{% block body %}
+<div class="doc">
+  <aside class="doc__nav" aria-label="Documentation">
+    <a class="doc__back" href="{{ pages_url }}">← Agentic ODI</a>
+    {% for group in nav.groups %}
+    <div class="doc__group">
+      <p class="doc__group-title">{{ group.title }}</p>
+      <ul class="doc__list">
+        {% for guide in group.guides %}
+        <li>
+          <a class="doc__link{% if guide.slug == page.slug %} is-current{% endif %}"
+             href="{{ pages_url }}docs/{{ guide.slug }}/">{{ guide.title }}</a>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endfor %}
+  </aside>
+
+  <article class="doc__body">
+    <header class="doc__head">
+      <p class="eyebrow">{{ page.group_title }}</p>
+      <h1 class="doc__title">{{ page.title }}</h1>
+      {% if page.blurb %}<p class="lead">{{ page.blurb }}</p>{% endif %}
+    </header>
+
+    <div class="prose">
+      {{ page.body | safe }}
+    </div>
+
+    {% if page.toc %}
+    <nav class="doc__toc" aria-label="On this page">
+      <p class="doc__toc-title">On this page</p>
+      <ul>
+        {% for heading in page.toc %}
+        <li class="doc__toc-item doc__toc-item--{{ heading.level }}">
+          <a href="#{{ heading.anchor }}">{{ heading.text }}</a>
+        </li>
+        {% endfor %}
+      </ul>
+    </nav>
+    {% endif %}
+
+    <nav class="doc__pager" aria-label="Documentation">
+      {% if page.previous %}
+      <a class="doc__pager-link doc__pager-link--prev" href="{{ pages_url }}docs/{{ page.previous.slug }}/">
+        <span class="doc__pager-label">Previous</span>
+        <span class="doc__pager-title">{{ page.previous.title }}</span>
+      </a>
+      {% endif %}
+      {% if page.next %}
+      <a class="doc__pager-link doc__pager-link--next" href="{{ pages_url }}docs/{{ page.next.slug }}/">
+        <span class="doc__pager-label">Next</span>
+        <span class="doc__pager-title">{{ page.next.title }}</span>
+      </a>
+      {% endif %}
+    </nav>
+  </article>
+</div>
+{% endblock %}

@@ -79,3 +79,16 @@ def test_unknown_backend_exits_nonzero(tmp_path, monkeypatch):
     runner = CliRunner()
     result = runner.invoke(app, ["--backend", "nope", *ADD_ARGS])
     assert result.exit_code != 0
+
+
+def test_score_prints_exactly_two_decimals(monkeypatch):
+    monkeypatch.setenv("AGENTIC_ODI_DB", ":memory:")
+    runner = CliRunner()
+
+    fourteen = runner.invoke(app, ["score", "8", "2"])
+    whole = runner.invoke(app, ["score", "5", "5"])
+
+    assert fourteen.exit_code == 0
+    assert "Opportunity score: 14.00" in fourteen.output
+    assert whole.exit_code == 0
+    assert "Opportunity score: 5.00" in whole.output

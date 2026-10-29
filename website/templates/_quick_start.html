@@ -1,0 +1,97 @@
+{#
+  The quick start. The one page a repository file cannot be: it is the join
+  between the landing page's promise and the reference's depth.
+#}
+
+<p class="doc__lede">
+  Four steps, from an empty machine to a running studio with an agent attached to a
+  real MCP server. Nothing here needs an account.
+</p>
+
+<ol class="quickstart">
+  <li class="quickstart__step">
+    <h2 class="quickstart__title">Get the code</h2>
+    <p class="quickstart__body">
+      You need Python 3.10 or newer and
+      <a href="https://docs.astral.sh/uv/">uv</a>. Clone the workspace and install every
+      package in it.
+    </p>
+    <div class="codeblock">
+      <button class="copy-btn" type="button" data-copy>Copy</button>
+      <code>git clone https://github.com/alehar9320/agentic-odi.git
+cd agentic-odi
+uv sync --all-packages</code>
+    </div>
+    <p class="quickstart__aside">
+      Prefer a binary? The
+      <a href="{{ pages_url }}docs/installation/">installer</a> puts
+      <code>odi</code>, <code>odipm</code>, <code>odi-cli</code>, and
+      <code>agentic-odi</code> on your path for Linux, macOS, and Windows.
+    </p>
+  </li>
+
+  <li class="quickstart__step">
+    <h2 class="quickstart__title">Build the studio</h2>
+    <p class="quickstart__body">
+      The Living Studio is a React and TypeScript app. Build it once; the server
+      serves the built assets.
+    </p>
+    <div class="codeblock">
+      <button class="copy-btn" type="button" data-copy>Copy</button>
+      <code>npm --prefix apps/studio run build</code>
+    </div>
+  </li>
+
+  <li class="quickstart__step">
+    <h2 class="quickstart__title">Run both services</h2>
+    <p class="quickstart__body">
+      One command starts the MCP server and the studio sidecar together.
+    </p>
+    <div class="codeblock">
+      <button class="copy-btn" type="button" data-copy>Copy</button>
+      <code>python scripts/dev.py</code>
+    </div>
+    <table class="quickstart__table">
+      <thead>
+        <tr><th>Service</th><th>URL</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>MCP server</td><td><code>http://localhost:8000/mcp</code></td></tr>
+        <tr><td>The Living Studio</td><td><code>http://127.0.0.1:8100</code></td></tr>
+      </tbody>
+    </table>
+    <p class="quickstart__aside">
+      For hot reload, <code>npm --prefix apps/studio run dev:full</code> starts the MCP
+      server, the sidecar, and Vite together. For the desktop app, use
+      <code>npm --prefix apps/studio run tauri dev</code>.
+    </p>
+  </li>
+
+  <li class="quickstart__step">
+    <h2 class="quickstart__title">Point an agent at it</h2>
+    <p class="quickstart__body">
+      The server speaks the Model Context Protocol. Any MCP client can reach it.
+    </p>
+    <div class="codeblock">
+      <button class="copy-btn" type="button" data-copy>Copy</button>
+      <code>{
+  "mcpServers": {
+    "agentic-odi": { "url": "http://localhost:8000/mcp" }
+  }
+}</code>
+    </div>
+    <p class="quickstart__aside">
+      Every tool is listed in the
+      <a href="{{ pages_url }}docs/mcp/">MCP tool reference</a>. The studio itself is
+      optional &mdash; the server is the product, and the studio is one client of it.
+    </p>
+  </li>
+</ol>
+
+<h2 class="quickstart__heading">Where to go next</h2>
+<ul class="quickstart__links">
+  <li><a href="{{ pages_url }}docs/studio/">The Living Studio</a> &mdash; the interface, its first run, and the desktop app.</li>
+  <li><a href="{{ pages_url }}docs/cli/">CLI reference</a> &mdash; the same data from the terminal, with no server running.</li>
+  <li><a href="{{ pages_url }}docs/connectors/">Connectors</a> &mdash; pull evidence in from where your customers already talk.</li>
+  <li><a href="{{ pages_url }}docs/deployment/">Deployment</a> &mdash; the hosted server, the hosted studio, and previews.</li>
+</ul>

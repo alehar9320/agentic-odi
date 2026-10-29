@@ -169,6 +169,9 @@ cython_debug/
 
 # Local development and agent harness state
 .worktrees/
+
+# GitHub Pages build output (see .github/workflows/pages.yml)
+_site/
 .opencode/plans/
 .opencode/node_modules/
 .pi/git/
@@ -176,3 +179,7 @@ cython_debug/
 .entire/tmp/
 .freebuff/
 .qodo/
+node_modules/
+
+# Generated site output is built in CI and never committed.
+_site/

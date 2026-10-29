@@ -2,7 +2,19 @@
   "release-type": "simple",
   "packages": {
     ".": {
-      "release-type": "simple"
+      "release-type": "simple",
+      "extra-files": [
+        {"type": "toml", "path": "pyproject.toml", "jsonpath": "$.project.version"},
+        {"type": "toml", "path": "packages/core/pyproject.toml", "jsonpath": "$.project.version"},
+        {"type": "toml", "path": "packages/connectors/pyproject.toml", "jsonpath": "$.project.version"},
+        {"type": "toml", "path": "apps/cli/pyproject.toml", "jsonpath": "$.project.version"},
+        {"type": "toml", "path": "apps/mcp-server/pyproject.toml", "jsonpath": "$.project.version"},
+        {"type": "toml", "path": "apps/studio-api/pyproject.toml", "jsonpath": "$.project.version"},
+        {"type": "generic", "path": "apps/cli/src/agentic_odi_cli/_build_info.py"},
+        {"type": "json", "path": "apps/studio/package.json", "jsonpath": "$.version"},
+        {"type": "json", "path": "apps/studio/src-tauri/tauri.conf.json", "jsonpath": "$.version"},
+        {"type": "toml", "path": "apps/studio/src-tauri/Cargo.toml", "jsonpath": "$.package.version"}
+      ]
     }
   }
 }

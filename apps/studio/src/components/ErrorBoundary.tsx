@@ -22,16 +22,13 @@ export class ErrorBoundary extends Component<Props, State> {
   render() {
     if (this.state.error) {
       return (
-        <div className="studio-app">
-          <div className="studio-card" role="alert">
-            <h2 className="section-title">The Studio hit an unexpected error</h2>
-            <p className="caption">{this.state.error.message}</p>
-            <button
-              type="button"
-              className="studio-button"
-              onClick={() => window.location.reload()}
-            >
-              Reload the Studio
+        <div className="error-page">
+          <div className="error-page__card" role="alert">
+            <p className="hero__eyebrow">Living Studio</p>
+            <h1 className="error-page__title">Something broke on the way to the canvas.</h1>
+            <p className="hero__sub">{this.state.error.message}</p>
+            <button type="button" className="button" onClick={() => window.location.reload()}>
+              Reload the studio
             </button>
           </div>
         </div>
