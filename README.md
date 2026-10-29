@@ -92,6 +92,13 @@ Score **> 10** → underserved, innovate. **= 10** → served, maintain.
 **< 10** → overserved, disrupt. ODI reports an **86% innovation success rate**
 (as reported in the [Strategyn](https://strategyn.com/outcome-driven-innovation/) literature).
 
+Every score also carries **who stands behind it**. `score_method` records whether
+the number is a one-person `estimate`, a `survey`, or an `import`, and
+`importance_n` / `satisfaction_n` record how many people answered. An unknown
+count stays unknown — the CLI renders it as `est.`, never `n=0` — and an
+`estimate` that claims a sample above one is refused before the write. See
+[CLI reference](docs/cli.md#desired-outcomes) for the flags.
+
 ## Quick Start
 
 **Run the full stack locally.** Prerequisites: Python 3.10+,

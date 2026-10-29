@@ -360,6 +360,13 @@ importance, satisfaction, the gap in plain words, the thesis itself, and the
 smallest next move. It is the shape the agent reaches for when the PM is deciding
 what to chase, rather than when they are inspecting a single score.
 
+An outcome score carries its sample and method: `score_method` is `estimate`,
+`survey`, or `import`, and `importance_n` / `satisfaction_n` hold how many people
+stand behind each dimension when known. Omitted counts stay unknown — the CLI and
+the opportunity landscape render them as `est.`, never `n=0`, and show both
+counts (`n=40/12 (survey)`) when the dimensions differ. An `estimate` claiming a
+count above one is rejected before the write.
+
 The conversation keeps the order the agent produced: a `delta` appends to the
 open prose part, a `ui` event opens a card, and the next `delta` opens a new
 paragraph after it. The opportunity score is computed from importance and

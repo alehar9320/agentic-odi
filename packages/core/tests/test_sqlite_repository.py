@@ -561,7 +561,7 @@ def _write_legacy_outcome(db_path: str, outcome_id: str = "legacy-1") -> None:
 
 def _method_backfill_events(db_path: str) -> list[dict]:
     repo = SQLiteRepository(db_path)
-    events = [e for e in repo.store.get_stream() if e["type"] == "OUTCOME_METHOD_BACKFILLED"]
+    events = [dict(e) for e in repo.store.get_stream() if e["type"] == "OUTCOME_METHOD_BACKFILLED"]
     repo.close()
     return events
 
@@ -608,7 +608,9 @@ def test_method_backfill_does_not_touch_a_new_row(tmp_path) -> None:
 
     assert _method_backfill_events(db_path) == []
     reopened = SQLiteRepository(db_path)
-    assert reopened.get_outcome("new-1").score_method == "survey"
+    reopened_outcome = reopened.get_outcome("new-1")
+    assert reopened_outcome is not None
+    assert reopened_outcome.score_method == "survey"
     reopened.close()
 
 
@@ -618,6 +620,7 @@ def test_method_backfill_preserves_the_original_score(tmp_path) -> None:
 
     repo = SQLiteRepository(db_path)
     reloaded = repo.get_outcome("legacy-1")
+    assert reloaded is not None
     assert (reloaded.importance, reloaded.satisfaction) == (8.0, 6.0)
     assert reloaded.opportunity_score == 10.0
     repo.close()

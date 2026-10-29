@@ -23,12 +23,13 @@ Follow this sequence when guiding a user through the ODI process:
 - **Object of control**: The thing being acted on (named after 'the').
 - **Contextual clarifier**: When it happens (when, while, before, after, during, if, as).
 - **Scores**: Both `importance` and `satisfaction` are required (1–10). An outcome without them cannot be compared to anything.
+- **Sample and method**: A score is only as strong as who stands behind it. When you score from one person's judgment, leave `importance_n`/`satisfaction_n` unset and `score_method` at its `estimate` default. When the score comes from asking people, pass the number who answered as `importance_n`/`satisfaction_n` and set `score_method="survey"` (or `"import"` for a pasted dataset). An `estimate` with a count above 1 is refused — do not invent a sample you do not have, and do not report an unknown count as 0 or 1.
 - **Expectation**: Qualitative interviews typically uncover 50–150 desired outcome statements.
 - **Tools to use**:
-  - `add_outcome(job_id, statement, importance, satisfaction)` — Capture each desired outcome with scores.
-  - `get_outcomes(job_id)` — Review all outcomes captured for a Job.
+  - `add_outcome(job_id, statement, importance, satisfaction, importance_n?, satisfaction_n?, score_method?)` — Capture each desired outcome with scores and, when known, its sample and method.
+  - `get_outcomes(job_id)` — Review all outcomes captured for a Job, including `score_method` and the counts.
   - `evaluate_outcome(statement, job_id?)` — **Pre-write check**: run this before `add_outcome` to confirm the statement matches the ODI format. It returns coded issues and suggestions for any failure.
-  - `update_outcome(outcome_id, ...)` — Correct a statement or scores; the same validation applies.
+  - `update_outcome(outcome_id, ...)` — Correct a statement, scores, or sample metadata; the same whole-record validation applies.
 
 ### Stage 3: Build the Job Map
 - **When**: After key outcomes are captured. Never build a map on a job with zero outcomes — outcomes are what give the steps their meaning.

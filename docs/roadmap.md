@@ -74,3 +74,5 @@ The open issues this milestone still has to answer, grouped by what they change.
 ### The docs stay true
 
 - [ ] **The docs must be the truth** — README, architecture, and a roadmap that tracks reality (this change).
+- [x] **Outcome sample and method** — every desired-outcome score carries `importance_n`, `satisfaction_n` and `score_method` (`estimate`, `survey`, `import`) through the model, service, SQLite replay, MCP tools, CLI and Studio API; an unknown count renders as `est.`, and an `estimate` that claims a sample above one is refused before the write ([PR #281](https://github.com/alehar9320/agentic-odi/pull/281)).
+
