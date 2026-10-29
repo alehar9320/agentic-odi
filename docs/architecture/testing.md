@@ -26,6 +26,7 @@ Tests live next to their package (`packages/*/tests`, `apps/*/tests`). `testpath
 - `test_repository.py` — `InMemoryRepository` behavior.
 - `test_sqlite_repository.py` — SQLite persistence and round-trips.
 - `test_repository_factory.py` — `build_repository()` variant selection.
+- `test_repository_health.py` — both repositories report store reachability.
 - `test_schema.py` — schema creation and migration.
 - `test_events.py` — event-store schema and legacy-database backfill.
 - `test_intent_store.py` — append-only Intent Store ordering.
@@ -46,6 +47,7 @@ Tests live next to their package (`packages/*/tests`, `apps/*/tests`). `testpath
 - `test_tool_branches.py` — branch coverage for prompts, errors, and full updates.
 - `test_server_tools.py` — server-level tool registration and transport wiring.
 - `test_tool_spec_validation.py` — startup refuses a contract/registry mismatch.
+- `test_health.py` — the `get_health` tool reports accessible and degraded stores.
 - `conftest.py` — sets `AGENTIC_ODI_DB=:memory:` before the server imports.
 
 ### `apps/studio-api/tests/`

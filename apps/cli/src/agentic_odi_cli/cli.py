@@ -178,6 +178,21 @@ def schema_cmd() -> None:
     typer.echo(json.dumps(run_tool("get_odi_schema", {}), indent=2))
 
 
+@app.command(name="health")
+def health_cmd(
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
+) -> None:
+    """Check that the ODI store is reachable."""
+    result = run_tool("get_health", {})
+    parsed = json.loads(result) if isinstance(result, str) else result
+    if json_output:
+        typer.echo(json.dumps(parsed))
+    else:
+        typer.echo(f"{parsed['status']}: store {parsed['store']}")
+    if parsed.get("status") != "ok":
+        raise typer.Exit(code=1)
+
+
 @app.command(name="evaluate")
 def evaluate_cmd(
     statement: str = typer.Argument(..., help="Outcome statement to check"),
