@@ -30,6 +30,7 @@ from agentic_odi_core import (
     ObservationNotFoundError,
     ODIService,
     Repository,
+    V2MOM,
 )
 from agentic_odi_core.errors import ValidationError
 from agentic_odi_core.models import MessageRole, ObservationCategory, ObservationStatus
@@ -239,7 +240,11 @@ class StudioMemory:
 
     def save_brief(self, values: dict[str, Any]) -> Brief:
         fields = {key: str(values.get(key, "") or "") for key in BRIEF_FIELDS}
-        return self.service.save_brief(**fields)
+        vision = values.get("v2mom")
+        return self.service.save_brief(
+            **fields,
+            v2mom=None if vision is None else V2MOM.model_validate(vision),
+        )
 
     # -- prompt context ----------------------------------------------------
 

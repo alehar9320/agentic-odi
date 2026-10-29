@@ -3433,6 +3433,16 @@
             "title": "Core Problem",
             "default": ""
           },
+          "v2mom": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/V2MOM"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "updated_at": {
             "type": "string",
             "title": "Updated At",
@@ -3485,6 +3495,16 @@
             "type": "string",
             "title": "Core Problem",
             "default": ""
+          },
+          "v2mom": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/V2MOM"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -5195,6 +5215,7 @@
           "vision": {
             "type": "string",
             "title": "Vision",
+            "description": "What you want to achieve or create",
             "default": ""
           },
           "values": {
@@ -5202,33 +5223,37 @@
               "type": "string"
             },
             "type": "array",
-            "title": "Values"
+            "title": "Values",
+            "description": "Principles and beliefs that guide decisions"
           },
           "methods": {
             "items": {
               "type": "string"
             },
             "type": "array",
-            "title": "Methods"
+            "title": "Methods",
+            "description": "Actions and strategies to achieve the vision"
           },
           "obstacles": {
             "items": {
               "type": "string"
             },
             "type": "array",
-            "title": "Obstacles"
+            "title": "Obstacles",
+            "description": "Challenges and risks that stand in the way"
           },
           "measures": {
             "items": {
               "type": "string"
             },
             "type": "array",
-            "title": "Measures"
+            "title": "Measures",
+            "description": "Metrics and key results that measure success"
           }
         },
         "type": "object",
         "title": "V2MOM",
-        "description": "The domain's V2MOM artifact: Vision, Values, Methods, Obstacles, Measures.\n\nOnly ``vision`` is captured today, by the context conversation; the other\nfour fields have no input path yet and arrive empty."
+        "description": "The domain's V2MOM artifact: Vision, Values, Methods, Obstacles, Measures.\n\nOnly ``vision`` has an input path today, in the Studio's context\nconversation. Nothing extracts the other four from a conversation and no\nsurface captures them, so a V2MOM in practice is its vision and four empty\nlists."
       },
       "ValidationError": {
         "properties": {

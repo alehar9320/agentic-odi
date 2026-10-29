@@ -33,6 +33,7 @@ from agentic_odi_core.models import (
     ScheduledWorkStatus,
     ScheduledWorkTriggerType,
     Step,
+    V2MOM,
     compute_opportunity_score,
 )
 from agentic_odi_core.repository import Repository, page
@@ -582,6 +583,7 @@ class ODIService:
         target_user: str = "",
         job_statement: str = "",
         core_problem: str = "",
+        v2mom: V2MOM | None = None,
     ) -> Brief:
         return self.repo.save_brief(
             Brief(
@@ -590,6 +592,7 @@ class ODIService:
                 target_user=target_user,
                 job_statement=job_statement,
                 core_problem=core_problem,
+                v2mom=v2mom,
             )
         )
 

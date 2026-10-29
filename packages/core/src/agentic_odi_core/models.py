@@ -264,23 +264,6 @@ class Observation(BaseModel):
     workspace_id: str = Field(DEFAULT_WORKSPACE, description="Workspace that owns this fact")
 
 
-class Brief(BaseModel):
-    """The standing context block: what the person is building and for whom.
-
-    One per workspace, with a stable id, so the CLI, the MCP server, and the
-    Studio all read the same brief instead of each keeping its own copy.
-    """
-
-    id: str = Field(BRIEF_ID, description="Stable id — one brief per workspace")
-    product_name: str = ""
-    product_url: str = ""
-    target_user: str = ""
-    job_statement: str = ""
-    core_problem: str = ""
-    updated_at: datetime = Field(default_factory=_utcnow)
-    workspace_id: str = Field(DEFAULT_WORKSPACE, description="Workspace that owns this brief")
-
-
 class V2MOM(BaseModel):
     """The domain's V2MOM artifact: Vision, Values, Methods, Obstacles, Measures.
 
@@ -303,6 +286,24 @@ class V2MOM(BaseModel):
     measures: list[str] = Field(
         default_factory=list, description="Metrics and key results that measure success"
     )
+
+
+class Brief(BaseModel):
+    """The standing context block: what the person is building and for whom.
+
+    One per workspace, with a stable id, so the CLI, the MCP server, and the
+    Studio all read the same brief instead of each keeping its own copy.
+    """
+
+    id: str = Field(BRIEF_ID, description="Stable id — one brief per workspace")
+    product_name: str = ""
+    product_url: str = ""
+    target_user: str = ""
+    job_statement: str = ""
+    core_problem: str = ""
+    v2mom: V2MOM | None = Field(None, description="The vision this brief is aiming at")
+    updated_at: datetime = Field(default_factory=_utcnow)
+    workspace_id: str = Field(DEFAULT_WORKSPACE, description="Workspace that owns this brief")
 
 
 class ScheduledWorkStatus(str, Enum):

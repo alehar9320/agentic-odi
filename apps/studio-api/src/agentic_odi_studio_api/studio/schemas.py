@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Literal
 
 from agentic_odi_core import BusinessValue, CustomerValue
-from agentic_odi_core.models import JobStage
+from agentic_odi_core.models import JobStage, V2MOM
 from pydantic import BaseModel, Field
 
 if TYPE_CHECKING:
@@ -81,20 +81,6 @@ class UpdateOutcomeRequest(BaseModel):
     importance: float | None = None
     satisfaction: float | None = None
     mcp_url: str = ""
-
-
-class V2MOM(BaseModel):
-    """The domain's V2MOM artifact: Vision, Values, Methods, Obstacles, Measures.
-
-    Only ``vision`` is captured today, by the context conversation; the other
-    four fields have no input path yet and arrive empty.
-    """
-
-    vision: str = ""
-    values: list[str] = Field(default_factory=list)
-    methods: list[str] = Field(default_factory=list)
-    obstacles: list[str] = Field(default_factory=list)
-    measures: list[str] = Field(default_factory=list)
 
 
 class AddCustomerOutcomeRequest(BaseModel):
@@ -402,6 +388,7 @@ class BriefModel(BaseModel):
     target_user: str = ""
     job_statement: str = ""
     core_problem: str = ""
+    v2mom: V2MOM | None = None
     updated_at: str = ""
 
 
@@ -415,6 +402,7 @@ class BriefUpdateRequest(BaseModel):
     target_user: str = ""
     job_statement: str = ""
     core_problem: str = ""
+    v2mom: V2MOM | None = None
 
 
 class SettingsUpdateRequest(BaseModel):

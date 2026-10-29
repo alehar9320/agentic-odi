@@ -1050,6 +1050,7 @@ export interface components {
              * @default
              */
             core_problem: string;
+            v2mom?: components["schemas"]["V2MOM"] | null;
             /**
              * Updated At
              * @default
@@ -1087,6 +1088,7 @@ export interface components {
              * @default
              */
             core_problem: string;
+            v2mom?: components["schemas"]["V2MOM"] | null;
         };
         /**
          * BusinessImpactCategory
@@ -1798,22 +1800,37 @@ export interface components {
          * V2MOM
          * @description The domain's V2MOM artifact: Vision, Values, Methods, Obstacles, Measures.
          *
-         *     Only ``vision`` is captured today, by the context conversation; the other
-         *     four fields have no input path yet and arrive empty.
+         *     Only ``vision`` has an input path today, in the Studio's context
+         *     conversation. Nothing extracts the other four from a conversation and no
+         *     surface captures them, so a V2MOM in practice is its vision and four empty
+         *     lists.
          */
         V2MOM: {
             /**
              * Vision
+             * @description What you want to achieve or create
              * @default
              */
             vision: string;
-            /** Values */
+            /**
+             * Values
+             * @description Principles and beliefs that guide decisions
+             */
             values?: string[];
-            /** Methods */
+            /**
+             * Methods
+             * @description Actions and strategies to achieve the vision
+             */
             methods?: string[];
-            /** Obstacles */
+            /**
+             * Obstacles
+             * @description Challenges and risks that stand in the way
+             */
             obstacles?: string[];
-            /** Measures */
+            /**
+             * Measures
+             * @description Metrics and key results that measure success
+             */
             measures?: string[];
         };
         /** ValidationError */

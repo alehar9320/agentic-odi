@@ -573,6 +573,9 @@ function toBrief(stored: StoredBrief): StudioBrief {
   if (stored.job_id !== undefined) {
     brief.job_id = stored.job_id;
   }
+  if (stored.v2mom !== undefined) {
+    brief.v2mom = stored.v2mom;
+  }
   return brief;
 }
 

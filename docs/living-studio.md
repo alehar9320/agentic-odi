@@ -327,9 +327,10 @@ Each thread is stamped with the workspace (`AGENTIC_ODI_WORKSPACE`, default
 the history is portable in format even though sync is deliberately not
 implemented yet — two installs are no longer indistinguishable.
 
-The brief is a stored entity behind `GET`/`PUT /api/brief`; `localStorage` keeps
-a copy so the room is not empty while the sidecar warms up, but the CLI and the
-MCP server read the same brief the Studio shows.
+The brief is a stored entity behind `GET`/`PUT /api/brief`, appended to the same
+event log as the canvas; `localStorage` keeps a copy so the room is not empty
+while the sidecar warms up. The CLI and the MCP server read that same store,
+though neither exposes a brief command yet.
 
 The provider key is the one setting that never enters the browser's durable
 storage. `POST /api/settings` writes it to `~/.agentic-odi/studio.json` with mode
