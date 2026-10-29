@@ -105,5 +105,5 @@ def test_blank_input_reports_every_missing_part() -> None:
     result = evaluate_outcome_statement("   ")
 
     assert result["valid"] is False
-    assert len(result["issues"]) == 4
+    assert len(result["issues"]) == 5
     assert result["statement"] == ""
