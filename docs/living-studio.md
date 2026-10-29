@@ -345,11 +345,13 @@ below the thread instead of being clipped off-screen.
 The copilot does not only talk. When a surface carries the evidence better than a
 paragraph, the agent renders one **inline in the conversation**: a scored
 outcome, a ranked opportunity board, a before/after simulation of a bet, a
-customer quote with its lineage, the eight-stage job map, an opportunity thesis, or a decision record.
+customer quote with its lineage, the eight-stage job map, an opportunity thesis,
+a decision record, or the candidate review queue with each proposal beside the
+sentence it came from.
 Three properties keep this safe and cheap to extend:
 
 - **The catalog is closed and owned by the SPA.**
-  `apps/studio/src/ui/catalog.ts` declares nine primitives and seven cards, their
+  `apps/studio/src/ui/catalog.ts` declares nine primitives and eight cards, their
   JSON Schema props, and the description the model reads. There is no HTML, no
   eval, and no third-party component in the path. Prose is rendered by the same
   `Markdown` component the transcript already used.
