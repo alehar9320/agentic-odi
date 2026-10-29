@@ -83,6 +83,20 @@ class UpdateOutcomeRequest(BaseModel):
     mcp_url: str = ""
 
 
+class V2MOM(BaseModel):
+    """The domain's V2MOM artifact: Vision, Values, Methods, Obstacles, Measures.
+
+    Only ``vision`` is captured today, by the context conversation; the other
+    four fields have no input path yet and arrive empty.
+    """
+
+    vision: str = ""
+    values: list[str] = Field(default_factory=list)
+    methods: list[str] = Field(default_factory=list)
+    obstacles: list[str] = Field(default_factory=list)
+    measures: list[str] = Field(default_factory=list)
+
+
 class AddCustomerOutcomeRequest(BaseModel):
     mcp_url: str = ""
     job_id: str
@@ -108,6 +122,7 @@ class StudioBrief(BaseModel):
     target_user: str = ""
     job_statement: str = ""
     core_problem: str = ""
+    v2mom: V2MOM | None = None
 
 
 class UiCatalogRequest(BaseModel):
@@ -336,6 +351,16 @@ class CapabilityItem(BaseModel):
 
 class CapabilitiesResponse(BaseModel):
     capabilities: list[CapabilityItem]
+
+
+class ScheduleWorkRequest(BaseModel):
+    mcp_url: str = ""
+    name: str
+    schedule_expression: str
+    agent_id: str = "default-agent"
+    trigger_type: str = "oneshot"
+    payload: dict[str, Any] = Field(default_factory=dict)
+    job_id: str | None = None
 
 
 class AddEvidenceRequest(BaseModel):

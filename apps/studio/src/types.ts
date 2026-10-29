@@ -75,6 +75,7 @@ export interface CanvasData {
   outcomes: Outcome[];
   /** Captured research records, in capture order until the user reorders them. */
   evidence?: Evidence[];
+  scheduled_work?: ScheduledWork[];
   source: "mcp" | "seed" | "local";
   /** Why the board is not what the server actually holds, when the sidecar knows. */
   warnings?: string[];
@@ -207,6 +208,18 @@ export interface ChatMessage {
  * The user's context, captured on first run. Kept in local storage and sent to
  * the sidecar so every reply starts from the user's actual product and job.
  */
+/**
+ * The domain's V2MOM artifact. Only `vision` is captured today, by the setup
+ * conversation; the other four fields have no input path yet.
+ */
+export interface V2Mom {
+  vision?: string;
+  values?: string[];
+  methods?: string[];
+  obstacles?: string[];
+  measures?: string[];
+}
+
 export interface StudioBrief {
   product_name: string;
   product_url?: string;
@@ -214,6 +227,7 @@ export interface StudioBrief {
   job_statement: string;
   core_problem: string;
   job_id?: string;
+  v2mom?: V2Mom;
 }
 
 /**
@@ -227,6 +241,7 @@ export type WorkspacePanelId =
   | "capture"
   | "memory"
   | "catchup"
+  | "schedule"
   | "settings";
 
 export type NotificationCategory = "outcome" | "simulation" | "evidence" | "job" | "insight";
@@ -461,4 +476,18 @@ export interface ChangelogRelease {
 
 export interface ChangelogData {
   releases: ChangelogRelease[];
+}
+
+export interface ScheduledWork {
+  id: string;
+  name: string;
+  agent_id: string;
+  trigger_type: "oneshot" | "cron" | "interval";
+  schedule_expression: string;
+  payload?: Record<string, unknown>;
+  status: "pending" | "scheduled" | "running" | "completed" | "failed" | "cancelled";
+  job_id?: string | null;
+  created_at: string;
+  last_run_at?: string | null;
+  result_summary?: string | null;
 }

@@ -115,6 +115,7 @@ def test_fetch_canvas_hydrates_jobs_steps_and_outcomes(monkeypatch) -> None:
     assert payload["steps"] == [{"id": "step-1", "job_id": "job-1"}]
     assert payload["outcomes"] == [{"id": "outcome-1", "job_id": "job-1"}]
     assert payload["evidence"] == [{"id": "evidence-1", "job_id": "job-1"}]
+    assert payload["scheduled_work"] == []
     assert payload["source"] == "mcp"
     assert payload["warnings"] == []
     assert payload["provenance"]["kind"] == "live"
@@ -127,6 +128,7 @@ def test_fetch_canvas_hydrates_jobs_steps_and_outcomes(monkeypatch) -> None:
     }
     assert _FakeClient.calls == [
         ("get_jobs", {}),
+        ("list_scheduled_work", {}),
         ("get_job_map", {"job_id": "job-1"}),
         ("get_outcomes", {"job_id": "job-1"}),
         ("list_evidence", {}),
@@ -157,8 +159,10 @@ def test_fetch_canvas_skips_invalid_json_and_jobs_without_ids(monkeypatch) -> No
     assert payload["outcomes"] == []
     assert _FakeClient.calls == [
         ("get_jobs", {}),
+        ("list_scheduled_work", {}),
         ("list_evidence", {}),
         ("get_jobs", {}),
+        ("list_scheduled_work", {}),
         ("list_evidence", {}),
     ]
 
@@ -373,6 +377,9 @@ class _FakeService:
         return []
 
     def list_evidence(self) -> list[_Record]:
+        return []
+
+    def list_scheduled_work(self) -> list[_Record]:
         return []
 
 

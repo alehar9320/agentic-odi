@@ -2147,6 +2147,238 @@
         }
       }
     },
+    "/api/schedule": {
+      "get": {
+        "summary": "Get Scheduled Work",
+        "operationId": "get_scheduled_work_api_schedule_get",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Job Id"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "name": "mcp_url",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Mcp Url"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Get Scheduled Work Api Schedule Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Post Scheduled Work",
+        "operationId": "post_scheduled_work_api_schedule_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScheduleWorkRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Post Scheduled Work Api Schedule Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/schedule/{work_id}/trigger": {
+      "post": {
+        "summary": "Post Trigger Scheduled Work",
+        "operationId": "post_trigger_scheduled_work_api_schedule__work_id__trigger_post",
+        "parameters": [
+          {
+            "name": "work_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Work Id"
+            }
+          },
+          {
+            "name": "mcp_url",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Mcp Url"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Post Trigger Scheduled Work Api Schedule  Work Id  Trigger Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/schedule/{work_id}/cancel": {
+      "post": {
+        "summary": "Post Cancel Scheduled Work",
+        "operationId": "post_cancel_scheduled_work_api_schedule__work_id__cancel_post",
+        "parameters": [
+          {
+            "name": "work_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Work Id"
+            }
+          },
+          {
+            "name": "mcp_url",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Mcp Url"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Post Cancel Scheduled Work Api Schedule  Work Id  Cancel Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/evidence/{evidence_id}/promote": {
       "post": {
         "summary": "Promote Evidence",
@@ -3723,6 +3955,55 @@
         "title": "PromoteEvidenceRequest",
         "description": "Turn a captured record into a Job or a Desired Outcome."
       },
+      "ScheduleWorkRequest": {
+        "properties": {
+          "mcp_url": {
+            "type": "string",
+            "title": "Mcp Url",
+            "default": ""
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "schedule_expression": {
+            "type": "string",
+            "title": "Schedule Expression"
+          },
+          "agent_id": {
+            "type": "string",
+            "title": "Agent Id",
+            "default": "default-agent"
+          },
+          "trigger_type": {
+            "type": "string",
+            "title": "Trigger Type",
+            "default": "oneshot"
+          },
+          "payload": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Payload"
+          },
+          "job_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "schedule_expression"
+        ],
+        "title": "ScheduleWorkRequest"
+      },
       "StudioBrief": {
         "properties": {
           "product_name": {
@@ -3749,6 +4030,16 @@
             "type": "string",
             "title": "Core Problem",
             "default": ""
+          },
+          "v2mom": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/V2MOM"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -4051,6 +4342,46 @@
         },
         "type": "object",
         "title": "UpdateStepRequest"
+      },
+      "V2MOM": {
+        "properties": {
+          "vision": {
+            "type": "string",
+            "title": "Vision",
+            "default": ""
+          },
+          "values": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Values"
+          },
+          "methods": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Methods"
+          },
+          "obstacles": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Obstacles"
+          },
+          "measures": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Measures"
+          }
+        },
+        "type": "object",
+        "title": "V2MOM",
+        "description": "The domain's V2MOM artifact: Vision, Values, Methods, Obstacles, Measures.\n\nOnly ``vision`` is captured today, by the context conversation; the other\nfour fields have no input path yet and arrive empty."
       },
       "ValidationError": {
         "properties": {

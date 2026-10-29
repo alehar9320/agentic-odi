@@ -253,7 +253,14 @@ export interface StudioContextValue {
   deleteEvidence: (evidenceId: string) => Promise<void>;
   promoteEvidence: (
     evidenceId: string,
-    payload: { target: "job" | "outcome"; job_id?: string; statement?: string; name?: string },
+    payload: {
+      target: "job" | "outcome";
+      job_id?: string;
+      statement?: string;
+      name?: string;
+      importance?: number;
+      satisfaction?: number;
+    },
   ) => Promise<void>;
   activePanel: WorkspacePanelId | null;
   openPanel: (panel: WorkspacePanelId) => void;
@@ -977,19 +984,22 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const promoteEvidence = useCallback(
     async (
       evidenceId: string,
-      payload: { target: "job" | "outcome"; job_id?: string; statement?: string; name?: string },
+      payload: {
+        target: "job" | "outcome";
+        job_id?: string;
+        statement?: string;
+        name?: string;
+        importance?: number;
+        satisfaction?: number;
+      },
     ) => {
-      try {
-        await apiPromoteEvidence(evidenceId, { ...payload, mcp_url: settings.mcp_url });
-        pushToast("success", `Promoted the evidence to a ${payload.target}.`);
-        await refreshCanvas();
-      } catch (error) {
-        pushToast("error", `Could not promote the evidence: ${(error as Error).message}`);
-      }
+      // The form keeps the error beside the quote it came from.
+      await apiPromoteEvidence(evidenceId, { ...payload, mcp_url: settings.mcp_url });
+      pushToast("success", `Promoted the evidence to a ${payload.target}.`);
+      await refreshCanvas();
     },
     [settings.mcp_url, pushToast, refreshCanvas],
   );
-
   const closePanel = useCallback(() => setActivePanel(null), []);
 
   const openPanel = useCallback(
@@ -1702,6 +1712,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       offlineReply,
       addStep,
       addOutcome,
+      promoteEvidence,
       createJob,
       updateJob,
       deleteJob,
@@ -1710,7 +1721,6 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       updateOutcome,
       deleteOutcome,
       deleteEvidence,
-      promoteEvidence,
       activePanel,
       openPanel,
       closePanel,
@@ -1801,6 +1811,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       offlineReply,
       addStep,
       addOutcome,
+      promoteEvidence,
       createJob,
       updateJob,
       deleteJob,
@@ -1809,7 +1820,6 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       updateOutcome,
       deleteOutcome,
       deleteEvidence,
-      promoteEvidence,
       activePanel,
       openPanel,
       closePanel,
