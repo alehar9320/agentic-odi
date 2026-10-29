@@ -27,6 +27,7 @@ class ToolName(str, Enum):
     GET_OUTCOMES = "get_outcomes"
     GET_OUTCOME = "get_outcome"
     UPDATE_OUTCOME = "update_outcome"
+    GET_OUTCOME_HISTORY = "get_outcome_history"
     DELETE_OUTCOME = "delete_outcome"
     ADD_CUSTOMER_OUTCOME = "add_customer_outcome"
     GET_CUSTOMER_OUTCOME = "get_customer_outcome"
@@ -191,6 +192,7 @@ TOOL_SPECS: dict[str, ToolSpec] = {
             "importance_n",
             "satisfaction_n",
             "score_method",
+            "note",
         ),
         required=("job_id", "statement", "importance", "satisfaction"),
         returns="The created Outcome.",
@@ -227,10 +229,20 @@ TOOL_SPECS: dict[str, ToolSpec] = {
             "importance_n",
             "satisfaction_n",
             "score_method",
+            "note",
         ),
         required=("outcome_id",),
         returns="The updated Outcome.",
         stage="2",
+    ),
+    ToolName.GET_OUTCOME_HISTORY.value: ToolSpec(
+        name="get_outcome_history",
+        summary="List the accepted score snapshots for an Outcome, oldest first.",
+        effect=_derive_effect("get_outcome_history"),
+        arguments=("outcome_id",),
+        required=("outcome_id",),
+        returns="A list of score snapshots, oldest first.",
+        stage="4",
     ),
     ToolName.DELETE_OUTCOME.value: ToolSpec(
         name="delete_outcome",

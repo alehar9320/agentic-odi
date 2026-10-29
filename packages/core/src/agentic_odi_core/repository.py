@@ -11,6 +11,7 @@ from agentic_odi_core.models import (
     Job,
     Outcome,
     ScheduledWork,
+    ScoreSnapshot,
     Signal,
     Step,
 )
@@ -87,6 +88,7 @@ class Repository(Protocol):
     evidence: dict[str, Evidence]
     signals: dict[str, Signal]
     scheduled_work: dict[str, ScheduledWork]
+    score_snapshots: list[ScoreSnapshot]
 
     def add_job(self, job: Job) -> Job: ...
     def list_jobs(self, limit: int | None = None, offset: int = 0) -> list[Job]: ...
@@ -147,6 +149,8 @@ class Repository(Protocol):
     def update_scheduled_work(self, work_id: str, updates: dict) -> ScheduledWork | None: ...
     def delete_scheduled_work(self, work_id: str) -> bool: ...
 
+    def add_score_snapshot(self, snapshot: ScoreSnapshot) -> ScoreSnapshot: ...
+    def list_score_snapshots(self, outcome_id: str | None = None) -> list[ScoreSnapshot]: ...
     def clear(self) -> None: ...
     def reload(self) -> None: ...
     def commit(self) -> None: ...
@@ -163,6 +167,7 @@ class InMemoryRepository:
         self.evidence: dict[str, Evidence] = {}
         self.signals: dict[str, Signal] = {}
         self.scheduled_work: dict[str, ScheduledWork] = {}
+        self.score_snapshots: list[ScoreSnapshot] = []
 
     def add_job(self, job: Job) -> Job:
         self.jobs[job.id] = job
@@ -279,6 +284,7 @@ class InMemoryRepository:
             del self.outcomes[outcome_id]
             for key in [k for k, v in self.evidence.items() if v.outcome_id == outcome_id]:
                 del self.evidence[key]
+            self.score_snapshots = [s for s in self.score_snapshots if s.outcome_id != outcome_id]
             return True
         return False
 
@@ -414,6 +420,15 @@ class InMemoryRepository:
             return True
         return False
 
+    def add_score_snapshot(self, snapshot: ScoreSnapshot) -> ScoreSnapshot:
+        self.score_snapshots.append(snapshot)
+        return snapshot
+
+    def list_score_snapshots(self, outcome_id: str | None = None) -> list[ScoreSnapshot]:
+        if outcome_id is None:
+            return list(self.score_snapshots)
+        return [s for s in self.score_snapshots if s.outcome_id == outcome_id]
+
     def clear(self) -> None:
         self.jobs.clear()
         self.scheduled_work.clear()
@@ -422,6 +437,7 @@ class InMemoryRepository:
         self.customer_outcomes.clear()
         self.evidence.clear()
         self.signals.clear()
+        self.score_snapshots.clear()
 
     def reload(self) -> None:
         """Reset in-memory state; there is no external store to re-read."""

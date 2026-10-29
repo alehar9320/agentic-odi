@@ -62,6 +62,7 @@ from agentic_odi_core.models import (
     ScheduledWorkStatus,
     ScheduledWorkTriggerType,
     ScoreMethod,
+    ScoreSnapshot,
     Signal,
     SignalKind,
     Step,
@@ -69,6 +70,7 @@ from agentic_odi_core.models import (
     compute_opportunity_score,
     create_job,
     job_stage_catalog,
+    utc_now_iso,
 )
 from agentic_odi_core.remote import (
     StudioError,
@@ -89,12 +91,22 @@ from agentic_odi_core.services import (
     ScheduledWorkNotFoundError,
     SignalBudget,
     SignalNotFoundError,
+    SnapshotNoteError,
     StepNotFoundError,
     ValueOutOfRangeError,
 )
 from agentic_odi_core.steve_jobs import (
     format_opportunity_score_insight,
     generate_steve_jobs_response,
+)
+from agentic_odi_core.trust import (
+    DeltaDirection,
+    OpportunityInterval,
+    OutcomeDelta,
+    TrustContractPendingError,
+    classify_confidence,
+    opportunity_interval,
+    outcome_delta,
 )
 
 __all__ = [
@@ -110,6 +122,7 @@ __all__ = [
     "CustomerOutcome",
     "CustomerOutcomeNotFoundError",
     "CustomerValue",
+    "DeltaDirection",
     "Direction",
     "Evidence",
     "EvidenceItemType",
@@ -131,9 +144,13 @@ __all__ = [
     "OutcomeNotFoundError",
     "OutcomeStatementError",
     "OnDeviceLLMEngine",
+    "OpportunityInterval",
+    "OutcomeDelta",
     "RateLimitError",
     "RoutingMode",
     "ScoreMethod",
+    "ScoreSnapshot",
+    "SnapshotNoteError",
     "SerializationError",
     "Step",
     "StepNotFoundError",
@@ -154,8 +171,12 @@ __all__ = [
     "ToolSpec",
     "ToolEffect",
     "V2MOM",
+    "TrustContractPendingError",
     "capability_manifest",
     "capability_summary",
+    "classify_confidence",
+    "opportunity_interval",
+    "outcome_delta",
     "Repository",
     "build_repository",
     "compute_opportunity_score",
@@ -174,4 +195,5 @@ __all__ = [
     "statement_to_dict",
     "step_not_found",
     "tool_result_text",
+    "utc_now_iso",
 ]

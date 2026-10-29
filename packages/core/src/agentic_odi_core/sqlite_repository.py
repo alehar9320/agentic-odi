@@ -18,6 +18,7 @@ from agentic_odi_core.models import (
     Job,
     Outcome,
     ScheduledWork,
+    ScoreSnapshot,
     Signal,
     Step,
     compute_opportunity_score,
@@ -63,6 +64,7 @@ class SQLiteRepository(Repository):
         self.evidence: dict[str, Evidence] = {}
         self.signals: dict[str, Signal] = {}
         self.scheduled_work: dict[str, ScheduledWork] = {}
+        self.score_snapshots: list[ScoreSnapshot] = []
         self._last_event_id = 0
         self._legacy_method_ids = set()
         self._method_backfilled_ids = set()
@@ -154,6 +156,8 @@ class SQLiteRepository(Repository):
             self.customer_outcomes[p["id"]] = CustomerOutcome.model_validate(p)
         elif et == "EVIDENCE_CREATED":
             self.evidence[p["id"]] = Evidence.model_validate(p)
+        elif et == "SCORE_SNAPSHOT_RECORDED":
+            self.score_snapshots.append(ScoreSnapshot.model_validate(p))
         elif et == "JOB_UPDATED":
             self._merge_updates(self.jobs, p, Job)
         elif et == "STEP_UPDATED":
@@ -198,6 +202,7 @@ class SQLiteRepository(Repository):
             self.outcomes.pop(outcome_id, None)
             for key in [k for k, v in self.evidence.items() if v.outcome_id == outcome_id]:
                 del self.evidence[key]
+            self.score_snapshots = [s for s in self.score_snapshots if s.outcome_id != outcome_id]
         elif et == "EVIDENCE_DELETED":
             self.evidence.pop(p["id"], None)
         elif et == "SCHEDULED_WORK_CREATED":
@@ -502,6 +507,24 @@ class SQLiteRepository(Repository):
             )
             self._sync()
             return True
+
+    def add_score_snapshot(self, snapshot: ScoreSnapshot) -> ScoreSnapshot:
+        with self._lock:
+            self.store.append(
+                "SCORE_SNAPSHOT_RECORDED",
+                snapshot.model_dump(),
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return snapshot
+
+    def list_score_snapshots(self, outcome_id: str | None = None) -> list[ScoreSnapshot]:
+        with self._lock:
+            self._sync()
+            if outcome_id is None:
+                return list(self.score_snapshots)
+            return [s for s in self.score_snapshots if s.outcome_id == outcome_id]
 
     def delete_customer_outcome(self, outcome_id: str) -> bool:
         with self._lock:

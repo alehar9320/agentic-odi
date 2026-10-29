@@ -11,7 +11,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from agentic_odi_core.models import Outcome
+from agentic_odi_core.models import Outcome, ScoreSnapshot
 from agentic_odi_core.repository import InMemoryRepository, Repository
 from agentic_odi_core.sqlite_repository import SQLiteRepository
 
@@ -66,3 +66,34 @@ def test_unknown_counts_stay_unknown_after_reload(repo: Repository) -> None:
     assert loaded.importance_n is None
     assert loaded.satisfaction_n is None
     assert loaded.score_method == "estimate"
+
+
+def test_score_snapshots_survive_every_repository(repo: Repository) -> None:
+    repo.add_score_snapshot(
+        ScoreSnapshot(
+            id="snap-1",
+            outcome_id="outcome-1",
+            importance=8.0,
+            satisfaction=6.0,
+            opportunity_score=10.0,
+            importance_n=40,
+            satisfaction_n=40,
+            method="survey",
+            note="from the Q3 survey",
+        )
+    )
+
+    history = _reopen(repo).list_score_snapshots("outcome-1")
+
+    assert len(history) == 1
+    only = history[0]
+    assert (only.importance, only.satisfaction, only.opportunity_score) == (8.0, 6.0, 10.0)
+    assert (only.importance_n, only.satisfaction_n, only.method) == (40, 40, "survey")
+    assert only.note == "from the Q3 survey"
+
+
+def test_a_snapshot_note_stays_unknown_after_reload(repo: Repository) -> None:
+    repo.add_score_snapshot(ScoreSnapshot(id="snap-1", outcome_id="outcome-1"))
+    loaded = _reopen(repo).list_score_snapshots("outcome-1")
+    assert loaded[0].note is None
+    assert loaded[0].importance_n is None

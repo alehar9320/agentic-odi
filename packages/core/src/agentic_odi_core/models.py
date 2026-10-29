@@ -93,6 +93,16 @@ JOB_NAME_MAX_LENGTH = 64
 JOB_DESCRIPTION_MAX_LENGTH = 500
 ScoreMethod = Literal["estimate", "survey", "import"]
 
+SCORE_SNAPSHOT_NOTE_MAX = 500
+
+
+def utc_now_iso() -> str:
+    """Return the current UTC time as an ISO-8601 string.
+
+    One helper so every snapshot timestamp shares a format and timezone.
+    """
+    return datetime.now(timezone.utc).isoformat()
+
 
 class Job(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -166,6 +176,37 @@ class Outcome(BaseModel):
                 "use 'survey' or 'import' when people were asked"
             )
         return self
+
+
+class ScoreSnapshot(BaseModel):
+    """One accepted score state, kept so "did it move?" is a subtraction.
+
+    A snapshot records the score *and* its sample/method companions, because a
+    history of bare numbers cannot answer "did the evidence change or the
+    estimate?". It is written by one helper on every score-mutating path and
+    lives in the append-only event log, so replay reproduces it.
+
+    A snapshot is only written for an *accepted* mutation; a validation failure
+    creates neither a score change nor a snapshot.
+    """
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    outcome_id: str = Field(..., description="The outcome this snapshot belongs to")
+    at: str = Field(
+        default_factory=utc_now_iso,
+        description="ISO-8601 UTC timestamp of the accepted mutation",
+    )
+    importance: float | None = Field(None, ge=1.0, le=10.0)
+    satisfaction: float | None = Field(None, ge=1.0, le=10.0)
+    opportunity_score: float | None = None
+    importance_n: int | None = Field(None, ge=1)
+    satisfaction_n: int | None = Field(None, ge=1)
+    method: ScoreMethod = "estimate"
+    note: str | None = Field(
+        None,
+        max_length=SCORE_SNAPSHOT_NOTE_MAX,
+        description="Why the number was given, when the caller recorded one",
+    )
 
 
 class ValueMetric(BaseModel):

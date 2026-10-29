@@ -18,6 +18,7 @@ from agentic_odi_core.evaluation import (
 from agentic_odi_core.models import (
     JOB_STAGE_INDEX,
     JOB_STAGE_ORDER,
+    SCORE_SNAPSHOT_NOTE_MAX,
     BusinessValue,
     CustomerOutcome,
     CustomerValue,
@@ -30,6 +31,7 @@ from agentic_odi_core.models import (
     ScheduledWorkStatus,
     ScheduledWorkTriggerType,
     ScoreMethod,
+    ScoreSnapshot,
     Signal,
     SignalKind,
     Step,
@@ -128,6 +130,42 @@ class SignalBudget:
         if _SEVERITY_RANK[severity] < _SEVERITY_RANK[self.min_severity]:
             return False
         return surfaced_today < self.daily_cap
+
+
+class SnapshotNoteError(ValueOutOfRangeError):
+    """A score snapshot note is longer than the allowed limit.
+
+    A subclass of :class:`ValueOutOfRangeError` so callers that already handle
+    an out-of-range value keep working, while the note path can report the
+    limit by name.
+    """
+
+
+def _validate_snapshot_note(note: str | None) -> str | None:
+    """Reject an over-long note before any score mutation is attempted."""
+    if note is not None and len(note) > SCORE_SNAPSHOT_NOTE_MAX:
+        raise SnapshotNoteError(f"note must be {SCORE_SNAPSHOT_NOTE_MAX} characters or fewer")
+    return note
+
+
+def _snapshot_from_outcome(outcome: Outcome, note: str | None = None) -> ScoreSnapshot:
+    """Capture an accepted outcome's score, sample and method as one snapshot.
+
+    The single place a snapshot is built, so every score-mutating path records
+    the same shape. A snapshot stores the companions of the score, because a
+    history of bare numbers cannot answer "did the evidence change or the
+    estimate?".
+    """
+    return ScoreSnapshot(
+        outcome_id=outcome.id,
+        importance=outcome.importance,
+        satisfaction=outcome.satisfaction,
+        opportunity_score=outcome.opportunity_score,
+        importance_n=outcome.importance_n,
+        satisfaction_n=outcome.satisfaction_n,
+        method=outcome.score_method,
+        note=note,
+    )
 
 
 class InvalidOutcomeStatementError(OutcomeStatementError):
@@ -299,7 +337,12 @@ class ODIService:
         if not ok:
             raise StepNotFoundError(step_id)
 
-    def update_outcome(self, outcome_id: str, updates: dict[str, Any]) -> Outcome:
+    def update_outcome(
+        self,
+        outcome_id: str,
+        updates: dict[str, Any],
+        note: str | None = None,
+    ) -> Outcome:
         existing = self.repo.get_outcome(outcome_id)
         if existing is None:
             raise OutcomeNotFoundError(outcome_id)
@@ -317,6 +360,7 @@ class ODIService:
         importance_n = updates.get("importance_n", existing.importance_n)
         satisfaction_n = updates.get("satisfaction_n", existing.satisfaction_n)
         _reject_estimate_with_a_sample(method, importance_n, satisfaction_n)
+        _validate_snapshot_note(note)
         require_outcome_statement(statement)
         if importance is not None and satisfaction is not None:
             updates = dict(updates)
@@ -328,6 +372,7 @@ class ODIService:
         if not res:
             raise OutcomeNotFoundError(outcome_id)
         self._emit_outcome_updates(existing, res)
+        self._record_score_snapshot(res, note)
         return res
 
     def _emit_outcome_updates(self, before: Outcome, after: Outcome) -> None:
@@ -372,6 +417,21 @@ class ODIService:
             severity="notice",
             discriminator="all-stages",
         )
+
+    def _record_score_snapshot(self, outcome: Outcome, note: str | None = None) -> ScoreSnapshot:
+        """Write one snapshot for an accepted score state.
+
+        Called from every score-mutating path, so a future path cannot skip the
+        history. The snapshot records the *accepted* state, so it is written
+        after the mutation succeeds and never for a rejected one.
+        """
+        return self.repo.add_score_snapshot(_snapshot_from_outcome(outcome, note))
+
+    def get_score_history(self, outcome_id: str) -> list[ScoreSnapshot]:
+        """Return an outcome's snapshots in the order they were accepted."""
+        if self.repo.get_outcome(outcome_id) is None:
+            raise OutcomeNotFoundError(outcome_id)
+        return self.repo.list_score_snapshots(outcome_id)
 
     def delete_outcome(self, outcome_id: str) -> None:
         ok = self.repo.delete_outcome(outcome_id)
@@ -430,6 +490,7 @@ class ODIService:
         importance_n: int | None = None,
         satisfaction_n: int | None = None,
         score_method: ScoreMethod = "estimate",
+        note: str | None = None,
     ) -> Outcome:
         if self.repo.get_job(job_id) is None:
             raise JobNotFoundError(job_id)
@@ -440,6 +501,7 @@ class ODIService:
         if not (1.0 <= satisfaction <= 10.0):
             raise ValueOutOfRangeError("satisfaction must be between 1.0 and 10.0")
         _reject_estimate_with_a_sample(score_method, importance_n, satisfaction_n)
+        _validate_snapshot_note(note)
         if validate_statement:
             verdict = evaluate_outcome_statement(statement)
             if not verdict["valid"]:
@@ -457,7 +519,9 @@ class ODIService:
             satisfaction_n=satisfaction_n,
             score_method=score_method,
         )
-        return self.repo.add_outcome(outcome)
+        created = self.repo.add_outcome(outcome)
+        self._record_score_snapshot(created, note)
+        return created
 
     def get_outcomes(
         self,
