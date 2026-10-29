@@ -22,6 +22,7 @@ Tests live next to their package (`packages/*/tests`, `apps/*/tests`). `testpath
 ### `packages/core/tests/`
 
 - `test_models.py` — domain models and their validation rules.
+- `test_job_validation.py` — Job name and description constraints and `create_job()`.
 - `test_service.py` — `ODIService` CRUD, Opportunity Score, and thesis rendering.
 - `test_repository.py` — `InMemoryRepository` behavior.
 - `test_sqlite_repository.py` — SQLite persistence and round-trips.

@@ -455,7 +455,7 @@ def test_connectors_ingest_maps_records_to_evidence(tmp_path: Path, monkeypatch)
             str(config),
         ],
     )
-    job_result = runner.invoke(app, ["--db", db, "jobs", "add", "--name", "J", "--json"])
+    job_result = runner.invoke(app, ["--db", db, "jobs", "add", "--name", "Job", "--json"])
     job_id = json.loads(job_result.output)["id"]
     batch = IngestBatch(
         connector_name="gong",

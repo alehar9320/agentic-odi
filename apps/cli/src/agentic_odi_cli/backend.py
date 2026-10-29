@@ -84,6 +84,19 @@ def mcp_timeout() -> float:
         return DEFAULT_MCP_TIMEOUT
 
 
+def _validation_summary(exc: Exception) -> str:
+    """One line naming the first field a model rejected."""
+    errors = getattr(exc, "errors", None)
+    if not callable(errors):
+        return str(exc)
+    try:
+        first = errors()[0]
+    except (IndexError, TypeError):
+        return str(exc)
+    location = ".".join(str(part) for part in first.get("loc", ()))
+    return f"{location}: {first.get('msg', exc)}" if location else str(first.get("msg", exc))
+
+
 def _validation_message(exc: Exception) -> str:
     errors = getattr(exc, "errors", None)
     if callable(errors):
@@ -119,12 +132,15 @@ class LocalBackend(Backend):
 
     def call(self, tool_name: str, args: dict[str, Any]) -> Any:
         from agentic_odi_core import OdiError
+        from pydantic import ValidationError
 
         handler = _LOCAL_HANDLERS.get(tool_name)
         if handler is None:
             raise NotImplementedError(f"Unknown tool: {tool_name}")
         try:
             return handler(self, args)
+        except ValidationError as exc:
+            raise BackendError(_validation_summary(exc)) from exc
         except OdiError as exc:
             raise BackendError(str(exc)) from exc
 
