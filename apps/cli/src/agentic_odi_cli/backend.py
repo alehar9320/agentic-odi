@@ -220,7 +220,9 @@ class LocalBackend(Backend):
     def _update_step(self, args: dict[str, Any]) -> dict[str, Any]:
         from agentic_odi_core import StepNotFoundError, step_not_found
 
-        updates: dict[str, Any] = {key: args[key] for key in ("name", "order") if key in args}
+        updates: dict[str, Any] = {
+            key: args[key] for key in ("name", "order", "stage") if key in args
+        }
         try:
             step = self.service.update_step(args["step_id"], updates)
         except StepNotFoundError:

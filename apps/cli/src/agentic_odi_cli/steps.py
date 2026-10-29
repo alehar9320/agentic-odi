@@ -58,6 +58,7 @@ def update(
     step_id: str = typer.Argument(..., help="Step ID"),
     name: str | None = typer.Option(default=None, help="New step name"),
     order: int | None = typer.Option(default=None, help="New step order"),
+    stage: str | None = typer.Option(default=None, help="New Universal Job Map stage"),
     json_output: bool = JSON_OPTION,
 ) -> None:
     """Update an existing Step."""
@@ -66,6 +67,8 @@ def update(
         args["name"] = name
     if order is not None:
         args["order"] = order
+    if stage is not None:
+        args["stage"] = stage
     typer.echo(
         render_saved("updated", run_tool("update_step", args), as_json=json_output, noun="Step")
     )
