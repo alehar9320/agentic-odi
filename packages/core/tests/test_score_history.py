@@ -11,6 +11,7 @@ decision, so only the recorded states are asserted.
 
 from __future__ import annotations
 
+import inspect
 from pathlib import Path
 
 import pytest
@@ -182,3 +183,36 @@ def test_a_snapshot_with_a_zero_count_is_rejected() -> None:
 def test_a_snapshot_timestamp_is_iso_utc() -> None:
     snapshot = ScoreSnapshot(outcome_id="outcome-1")
     assert snapshot.at.endswith("+00:00")
+
+
+def test_the_score_writing_service_methods_are_the_named_ones() -> None:
+    """A new score-mutating path cannot skip the history.
+
+    Every public ``ODIService`` method that writes a snapshot is enumerated from
+    its source, so adding a score-mutating entry point and forgetting the
+    snapshot fails here instead of silently leaving a gap in the trail.
+    """
+    writers = {
+        name
+        for name, member in inspect.getmembers(ODIService, inspect.isfunction)
+        if not name.startswith("_") and "_record_score_snapshot" in inspect.getsource(member)
+    }
+
+    assert writers == {"add_outcome", "update_outcome"}
+
+
+def test_each_named_score_writer_records_a_snapshot(repo: Repository) -> None:
+    service = _service(repo)
+    written: list[ScoreSnapshot] = []
+    original = repo.add_score_snapshot
+
+    def spy(snapshot: ScoreSnapshot) -> ScoreSnapshot:
+        written.append(snapshot)
+        return original(snapshot)
+
+    repo.add_score_snapshot = spy  # type: ignore[method-assign]
+
+    outcome = _add(service)  # add_outcome
+    service.update_outcome(outcome.id, {"satisfaction": 4.0})  # update_outcome
+
+    assert [snapshot.outcome_id for snapshot in written] == [outcome.id, outcome.id]
