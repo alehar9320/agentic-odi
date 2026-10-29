@@ -332,19 +332,8 @@ def wizard() -> None:
         created_job = run_tool("add_job", job_args)
         job_id = created_job["id"]
 
-        created_step_ids: list[str] = []
-        for s in steps:
-            created_step = run_tool(
-                "add_step", {"job_id": job_id, "name": s["name"], "order": s["order"]}
-            )
-            created_step_ids.append(created_step["id"])
-
+        created_outcomes: list[tuple[dict[str, Any], str]] = []
         for o in outcomes:
-            step_id = (
-                created_step_ids[o["step_index"]]
-                if o["step_index"] is not None and o["step_index"] < len(created_step_ids)
-                else None
-            )
             outcome_args: dict[str, Any] = {
                 "job_id": job_id,
                 "customer_value": {
@@ -360,9 +349,28 @@ def wizard() -> None:
                     "statement": o["business_statement"],
                 },
             }
-            if step_id:
-                outcome_args["step_id"] = step_id
-            run_tool("add_customer_outcome", outcome_args)
+            created_outcome = run_tool("add_customer_outcome", outcome_args)
+            created_outcomes.append((o, created_outcome["id"]))
+
+        created_step_ids: list[str] = []
+        for s in steps:
+            created_step = run_tool(
+                "add_step", {"job_id": job_id, "name": s["name"], "order": s["order"]}
+            )
+            created_step_ids.append(created_step["id"])
+
+        for outcome, outcome_id in created_outcomes:
+            step_id = (
+                created_step_ids[outcome["step_index"]]
+                if outcome["step_index"] is not None
+                and outcome["step_index"] < len(created_step_ids)
+                else None
+            )
+            if step_id is not None:
+                run_tool(
+                    "update_customer_outcome",
+                    {"outcome_id": outcome_id, "step_id": step_id},
+                )
 
         typer.echo(
             f"\nSuccessfully created Job {job_id} with {len(steps)} step(s) and {len(outcomes)} outcome(s)."
