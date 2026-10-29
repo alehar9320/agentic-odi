@@ -33,7 +33,6 @@ if TYPE_CHECKING:
 
 DEFAULT_BACKEND = "local"
 DEFAULT_MCP_URL = "http://localhost:8000/mcp"
-DEFAULT_MCP_TIMEOUT = 30.0
 
 _VALUE_RANGE_ERROR = "importance and satisfaction must be between 1.0 and 10.0"
 
@@ -75,13 +74,9 @@ class BackendError(Exception):
 
 def mcp_timeout() -> float:
     """Resolve the MCP call timeout in seconds (``AGENTIC_ODI_MCP_TIMEOUT``)."""
-    raw = os.environ.get("AGENTIC_ODI_MCP_TIMEOUT")
-    if not raw:
-        return DEFAULT_MCP_TIMEOUT
-    try:
-        return float(raw)
-    except ValueError:
-        return DEFAULT_MCP_TIMEOUT
+    from agentic_odi_core import MCPConnectionConfig
+
+    return MCPConnectionConfig.from_env().timeout
 
 
 def _validation_message(exc: Exception) -> str:
@@ -693,7 +688,7 @@ def _call_mcp(tool: str, args: dict[str, Any], mcp_url: str, timeout: float) -> 
         typer.echo(f"[debug] MCP call: {tool} args={args}", err=True)
 
     async def _run() -> str:
-        async with Client(mcp_url) as client:
+        async with Client(mcp_url, timeout=timeout, init_timeout=timeout) as client:
             result = await client.call_tool(tool, args)
             return result.content[0].text  # type: ignore[index]
 

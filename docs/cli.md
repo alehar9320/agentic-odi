@@ -36,6 +36,19 @@ Data commands print readable tables and blocks by default; add `--json` for
 machine-readable output. Diagnostics go to stderr and failures exit non-zero
 (`0` success, `1` error, `2` usage error).
 
+## MCP connection limits
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `AGENTIC_ODI_MCP_TIMEOUT` | `30.0` | Seconds allowed for one MCP call and for the connection handshake. Invalid or non-positive values fall back to the default. |
+| `AGENTIC_ODI_MCP_KEEPALIVE` | `15.0` | Keepalive interval in seconds for MCP sessions; `0` disables keepalive. |
+
+Both values are parsed by `agentic_odi_core.MCPConnectionConfig.from_env()`.
+The CLI hands the timeout to the FastMCP client for every call, so a frozen
+server fails with a clear error instead of hanging. FastMCP has no
+keepalive-interval setting yet, so the interval is carried for transports that
+support session keepalive.
+
 ## Interactive chat
 
 `agentic-odi chat` (or simply `agentic-odi` in a terminal) starts an

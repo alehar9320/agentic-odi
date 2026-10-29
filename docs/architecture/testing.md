@@ -34,6 +34,7 @@ Tests live next to their package (`packages/*/tests`, `apps/*/tests`). `testpath
 - `test_evidence_not_found.py` — actionable evidence-not-found errors.
 - `test_consent_pause.py` — acting tools wait for PM consent.
 - `test_remote.py` — shared MCP tool-result and error parser.
+- `test_connection.py` — MCP timeout and keepalive settings read from the environment.
 - `test_messages.py` — framework guidelines and shared assistant messages.
 
 ### `apps/mcp-server/tests/`

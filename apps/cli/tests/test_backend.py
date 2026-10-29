@@ -208,6 +208,33 @@ def test_mcp_timeout_reads_env(monkeypatch):
     assert mcp_timeout() == 30.0
 
 
+def test_mcp_calls_bound_the_client_with_the_configured_timeout(monkeypatch):
+    created = {}
+
+    class _FakeResult:
+        content = [type("_Block", (), {"text": "[]"})()]
+
+    class _FakeClient:
+        def __init__(self, url, **kwargs):
+            created["url"] = url
+            created["kwargs"] = kwargs
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *exc_info):
+            return False
+
+        async def call_tool(self, tool, args):
+            return _FakeResult()
+
+    monkeypatch.setattr("fastmcp.Client", _FakeClient)
+
+    backend_module._call_mcp("get_jobs", {}, "http://example/mcp", 12.0)
+
+    assert created["kwargs"] == {"timeout": 12.0, "init_timeout": 12.0}
+
+
 def test_mcp_backend_parses_list_payload(monkeypatch):
     backend = MCPBackend(mcp_url="http://example/mcp")
     monkeypatch.setattr(
