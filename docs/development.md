@@ -26,24 +26,12 @@ uv run bandit -c pyproject.toml -r apps packages website/
 The SPA and Tauri shell mirror their CI jobs locally:
 
 ```bash
-npm --prefix apps/studio run lint        # ESLint
-npm --prefix apps/studio run typecheck   # tsc --noEmit
-npm --prefix apps/studio test -- --run   # Vitest on jsdom (run once)
-npm --prefix apps/studio run test:visual # Vitest Browser Mode → Chromatic archives
-npm --prefix apps/studio run build       # production build → apps/studio/dist
+npm --prefix apps/studio run lint       # ESLint
+npm --prefix apps/studio run typecheck  # tsc --noEmit
+npm --prefix apps/studio test -- --run  # Vitest (run once)
+npm --prefix apps/studio run build      # production build → apps/studio/dist
 cd apps/studio/src-tauri && cargo fmt --check && cargo clippy -- -D warnings && cargo check
 ```
-
-### Visual tests
-
-`npm test` runs the jsdom suite and deliberately ignores `*.visual.test.tsx`.
-Those files render one component state in Chromium under
-`vitest.visual.config.ts`, and the `Chromatic` workflow publishes them on every
-branch push so a reviewer can compare pixels component by component. Each test costs one billed snapshot per
-build on the free 5,000/month allowance, which is why the two suites are split by
-filename instead of running every test in a browser. Browser mode needs Chromium
-locally: `npx playwright install chromium`. See
-[Deployment](deployment.md) for the project setup and budget rules.
 
 ### Conversational UI coverage
 
@@ -122,30 +110,6 @@ You can also trigger them manually:
 pre-commit run --all-files
 ```
 
-## PR Risk Classification
-
-Every pull request is automatically classified by the
-[PR Risk Classification](../.github/workflows/pr-risk.yml) workflow, which runs
-on `ubuntu-latest` at $0 cost with zero external dependencies. It scores the diff
-(0–100) across three factors and applies a single, mutually exclusive label:
-
-| Label | Meaning | Score |
-|---|---|---|
-| `safe to merge` | Low risk — small diff, docs-only, or tested source code | ≤ 20 |
-| `needs a look` | Medium risk — standard feature work or missing test updates | 21–50 |
-| `danger zone` | High risk — critical path (auth, migrations, billing, infra, workflows) or protected-file deletion | ≥ 51 |
-
-Scoring factors:
-
-- **File & line churn** — files changed and lines added/deleted (0–30 points).
-- **Critical path override** — touching `auth/`, `migrations/`, `billing/`,
-  `infra/`, `.github/workflows/`, or deleting a file in
-  `.ci/protected-files.txt` forces the danger zone.
-- **Test delta** — source code changed without a corresponding
-  `*.test.*`/`*.spec.*`/`tests/**` file adds 20 points.
-
-The workflow is silent: it updates labels only and never posts PR comments.
-
 ## Testing
 
 Tests use **pytest** with **pytest-asyncio** (strict mode) and run entirely
@@ -221,7 +185,6 @@ uv run pytest \
 | `tests/contract/` | Live MCP tool surface and CLI local-handler parity |
 | `tests/scripts/` | `scripts/dev.py` startup, port checks, signals, and shutdown |
 | `apps/studio/src/**/*.test.ts` | SPA units: ODI math, transport bridge, SSE parser, sidecar client |
-| `apps/studio/src/**/*.visual.test.tsx` | Component states captured for Chromatic visual review |
 | `website/tests/` | Static site integrity, OG art reproducibility, and README sync |
 
 > [!TIP]

@@ -415,12 +415,3 @@ def test_concurrent_writers_both_land_even_when_the_lock_is_contended(tmp_path):
     assert failures == []
     reopened = SQLiteRepository(db_path=db)
     assert len(reopened.list_jobs()) == 60
-
-
-def test_reload_keeps_the_snapshot_on_disk(tmp_path) -> None:
-    repo = SQLiteRepository(str(tmp_path / "odi.db"))
-    repo.add_job(Job(id="job-1", name="Job", description=""))
-
-    repo.reload()
-
-    assert [job.id for job in repo.list_jobs()] == ["job-1"]

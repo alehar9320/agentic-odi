@@ -117,13 +117,13 @@ export function ConnectorChips() {
             key={id}
             type="button"
             className="composer__suggestion"
-            aria-label={`Dismiss suggestion: ${label}`}
+            aria-label={`Added ${label}, dismiss`}
             onClick={() => {
               dismissConnectorSuggestion(id);
               void refreshConnectors();
             }}
           >
-            <span>Suggested: {label}</span>
+            <span>Added {label}</span>
             <span aria-hidden>✕</span>
           </button>
         );

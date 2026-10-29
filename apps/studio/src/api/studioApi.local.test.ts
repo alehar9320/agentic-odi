@@ -83,17 +83,6 @@ describe("fetchMemory fallback", () => {
   });
 });
 
-describe("fetchChangelog fallback", () => {
-  it("falls back to the local BFF when the sidecar returns 502", async () => {
-    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ detail: "Sidecar unreachable" }, 502));
-    vi.mocked(bff.fetchChangelog).mockResolvedValueOnce({ releases: [] });
-
-    const changelog = await fetchChangelog();
-    expect(changelog.releases).toEqual([]);
-    expect(bff.fetchChangelog).toHaveBeenCalled();
-  });
-});
-
 describe("streamChat fallback", () => {
   it("falls back to the local BFF when the sidecar returns 502", async () => {
     vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ detail: "SIDECAR_URL is not configured" }, 502));
@@ -112,5 +101,16 @@ describe("streamChat fallback", () => {
       streamChat({ base_url: "", api_key: "", model: "", mcp_url: "", messages: [] }, () => {}),
     ).rejects.toThrow();
     expect(bff.chat.stream).not.toHaveBeenCalled();
+  });
+});
+
+describe("fetchChangelog fallback", () => {
+  it("falls back to the local BFF when the sidecar returns 502", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ detail: "Sidecar unreachable" }, 502));
+    vi.mocked(bff.fetchChangelog).mockResolvedValueOnce({ releases: [] });
+
+    const changelog = await fetchChangelog();
+    expect(changelog.releases).toEqual([]);
+    expect(bff.fetchChangelog).toHaveBeenCalled();
   });
 });

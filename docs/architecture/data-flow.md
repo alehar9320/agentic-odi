@@ -7,7 +7,6 @@
 | `packages/core` | `Job`, `Step`, `Outcome`, `CustomerOutcome`, `ODIService`, repository protocol | SQLite event log + snapshots |
 | `apps/mcp-server` | MCP tool adapters over `ODIService` | `build_repository()` selects SQLite in production and in-memory for `AGENTIC_ODI_DB=:memory:` |
 | `apps/studio-api` | Studio API, canvas projection, chat tool loop, conversation history, PM memory | Via the same repository when the local backend is active; conversations and memory in `~/.agentic-odi/studio.db` |
-| `packages/connectors` | Connector protocol, presets, record mapping | Shared `connectors.json` registry; ingested batches land in an in-process sink |
 | `apps/studio` | Presentation state, the visible conversation path, optimistic canvas updates; the conversation runtime is assistant-ui | Browser cache only |
 | `apps/cli` | Terminal rendering, local/remote backend selection | SQLite directly for `local`, no local writes for `mcp` |
 
@@ -67,28 +66,6 @@ feeds the canvas; it only supplies bounded context to the next chat turn.
 
 The SPA sends `mcp_url` with every data request for compatibility. In `local` mode the sidecar ignores it; in `mcp` mode it is required for canvas and mutations.
 
-### Connectors
-
-Connectors are the one path where data enters from outside the local store, and
-it has two halves: a durable registry and a volatile ingest buffer.
-
-```text
-connectors add [--preset] / connectors catalog
-  -> ConnectorRegistry
-  -> connectors.json            (shared registry; `${VAR}` placeholders, no secrets)
-
-connectors ingest [--dry-run]
-  -> Connector.ingest()         (MCP client or REST call, bounded by a timeout)
-  -> IngestBatch                (normalized catalog/resource/tool_result records)
-  -> IngestSink                 (in-process, gone when the command exits)
-  -> drafts_from_batch -> add_evidence -> Repository   (only when a link id is given)
-```
-
-The sink is a hand-off buffer, not storage: nothing survives the process, and
-`--dry-run` stops before both the sink append and the evidence writes. Evidence
-mapping is the only way connector data reaches the ODI repository, and it goes
-through the same `ODIService.add_evidence` path as a hand-entered record.
-
 ## The Conversation
 
 One turn is one SSE stream, and the SPA renders it as typed parts rather than a
@@ -135,9 +112,7 @@ ODIService.get_jobs / get_job_map / get_outcomes
   -> JSON (CLI --json, MCP text payload, Studio canvas)
 ```
 
-Desired outcomes come back ranked by opportunity score (highest first, unscored
-last) unless a caller asks for insertion order. The Studio canvas falls back to
-the demo seed only in `mcp` mode when MCP is unreachable or returns no jobs. `local` mode returns exactly what is in the local database, including an empty canvas.
+The Studio canvas falls back to the demo seed only in `mcp` mode when MCP is unreachable or returns no jobs. `local` mode returns exactly what is in the local database, including an empty canvas.
 
 ## Configuration
 
@@ -147,8 +122,6 @@ the demo seed only in `mcp` mode when MCP is unreachable or returns no jobs. `lo
 | `AGENTIC_ODI_BACKEND` | CLI, Studio API | `local` |
 | `AGENTIC_ODI_MCP_URL` | CLI, Studio defaults | `http://localhost:8000/mcp` |
 | `AGENTIC_ODI_STUDIO_DB` | Studio API memory | `~/.agentic-odi/studio.db` |
-| `AGENTIC_ODI_CONNECTORS_CONFIG` | connectors registry (CLI, Studio, MCP) | `~/.config/agentic-odi/connectors.json` |
-| `AGENTIC_ODI_CONNECTOR_TIMEOUT` | connector health/ingest calls | `30` seconds |
 | `AGENTIC_ODI_STUDIO_DIST` | Studio API, dev launcher | `apps/studio/dist` |
 | `AGENTIC_ODI_REPO_ROOT` | Tauri shell | auto-detected |
 | `AGENTIC_ODI_BASE_URL` | CLI chat, Studio chat | `http://localhost:8001/v1` |
@@ -160,7 +133,6 @@ the demo seed only in `mcp` mode when MCP is unreachable or returns no jobs. `lo
 - The SPA runs in a browser or Tauri webview and only trusts the sidecar origin.
 - The sidecar may reach MCP and the LLM; CORS is restricted to known Studio origins.
 - MCP is an HTTP service with no authentication in local development. Do not expose it directly to the internet; the Cloudflare setup tunnels the sidecar, not MCP.
-- The Tauri desktop shell contacts the GitHub releases endpoint for `latest.json`, verifies the artifact signatures against the key pinned in `tauri.conf.json`, and only stages an update after verification. The updater cannot be reached from the browser build.
 
 ## The Failure Path
 
@@ -195,18 +167,4 @@ MCP tool result (text)
   model, the round and tool counts, the error count, the duration, and the
   outcome. Sensitive keys are dropped rather than redacted, so no token, key,
   or customer quote can reach the log.
-- **Two layers of error shaping.** The sidecar (and the Worker that proxies it)
-  return the server-shaped `StudioError` over HTTP, so the SPA reads it whole.
-  When the sidecar never answers at all — a network failure in the browser — the
-  SPA classifies the failure client-side (`TypeError` → `mcp_unreachable`) and
-  surfaces the same `SidecarNotice` strip plus a non-retryable in-thread notice,
-  instead of a generic "something went wrong".
-- **CLI hints.** `BackendError(message, suggestion)` is rendered as `Error: …` on
-  stderr with a trailing `Hint: …` line, so a `BackendError("could not reach MCP
-  server …")` tells the user exactly what to start.
-- **Hosted proxied path.** The free Cloudflare Worker forwards `/api/*` to
-  `SIDECAR_URL`; a missing/unreachable sidecar is reported to the browser as
-  `{"error": mcp_unreachable}` with a suggestion to start the sidecar and with
-  `X-Request-ID` echoed for support. It is logged on the Worker but never leaks
-  internals.
 

@@ -1,15 +1,13 @@
 {
   "name": "agentic-odi-studio",
   "private": true,
-  "version": "0.12.0",
+  "version": "0.1.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "test": "vitest",
-    "test:visual": "vitest run --config vitest.visual.config.ts",
-    "chromatic": "chromatic --vitest",
     "lint": "eslint .",
     "typecheck": "tsc -b --noEmit",
     "gen:api-types": "openapi-typescript openapi.json -o src/api/schema.d.ts",
@@ -21,13 +19,11 @@
     "@assistant-ui/react-markdown": "^0.14.24",
     "@tauri-apps/api": "^2.12.4",
     "@tauri-apps/plugin-updater": "^2.14.0",
-    "@tauri-apps/plugin-process": "^2.4.0",
     "idb": "^8.0.4",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"
   },
   "devDependencies": {
-    "@chromatic-com/vitest": "^1.0.1",
     "@eslint/js": "^10.0.1",
     "@tauri-apps/cli": "^2.12.3",
     "@testing-library/jest-dom": "^7.0.1",
@@ -35,8 +31,6 @@
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.2",
-    "@vitest/browser-playwright": "^4.1.12",
-    "chromatic": "^18.13.3",
     "concurrently": "^9.2.1",
     "eslint": "^10.12.0",
     "eslint-plugin-react-hooks": "^7.1.1",
@@ -45,14 +39,9 @@
     "globals": "^17.13.0",
     "jsdom": "^29.1.1",
     "openapi-typescript": "^7.13.0",
-    "playwright": "^1.64.1",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.71.2",
     "vite": "^8.3.4",
-    "vitest": "^4.1.12",
-    "vitest-browser-react": "^2.3.0"
-  },
-  "overrides": {
-    "storybook": "10.6.3"
+    "vitest": "^4.1.11"
   }
 }

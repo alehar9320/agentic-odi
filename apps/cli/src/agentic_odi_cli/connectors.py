@@ -119,26 +119,9 @@ def _run(coro, name: str):
 @connectors_app.command("list")
 def list_connectors(
     config: Path | None = ConfigOption,
-    as_json: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
     """List configured external connectors."""
     items = _registry(config).list_all()
-    if as_json:
-        typer.echo(
-            json.dumps(
-                [
-                    {
-                        "name": item.name,
-                        "kind": item.kind,
-                        "url": item.settings.get("url"),
-                        "enabled": item.enabled,
-                    }
-                    for item in items
-                ],
-                indent=2,
-            )
-        )
-        return
     if not items:
         typer.echo("No connectors configured.")
         return

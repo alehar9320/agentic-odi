@@ -1,16 +1,9 @@
 name: Tauri Release
 
-# release-please creates the GitHub release through the API, which does not
-# emit a `push` event for the tag. Listening for the published release is what
-# actually starts the desktop build (and therefore publishes latest.json, which
-# the in-app updater depends on). `push` stays for tags created by hand.
-
 on:
   push:
     tags:
       - "v*"
-  release:
-    types: [published]
   workflow_dispatch:
     inputs:
       tag:
@@ -126,44 +119,3 @@ jobs:
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
-
-  # A release without a usable latest.json cannot update anybody. Fail the
-  # release loudly instead of leaving a quiet download that installs nothing.
-  verify:
-    needs: [build]
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - name: Verify the signed updater manifest covers every platform
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ inputs.tag || github.ref_name }}
-        run: |
-          set -euo pipefail
-          version="${TAG#v}"
-          dir="$(mktemp -d)"
-          for attempt in 1 2 3 4 5 6; do
-            if gh release download "$TAG" --pattern latest.json --dir "$dir" --clobber; then
-              break
-            fi
-            echo "latest.json not available yet (attempt $attempt); retrying…"
-            sleep 10
-          done
-          manifest="$dir/latest.json"
-          if [ ! -f "$manifest" ]; then
-            echo "::error::latest.json was not published for $TAG, so installed apps cannot update."
-            exit 1
-          fi
-          manifest_version="$(jq -r '.version // empty' "$manifest")"
-          if [ "$manifest_version" != "$version" ]; then
-            echo "::error::latest.json advertises $manifest_version but the tag is $version."
-            echo "The desktop app version is out of sync with the release; see the release-please extra-files config."
-            exit 1
-          fi
-          for key in linux-x86_64 windows-x86_64 darwin-aarch64 darwin-x86_64; do
-            if ! jq -e --arg k "$key" '.platforms[$k].url and .platforms[$k].signature' "$manifest" > /dev/null; then
-              echo "::error::latest.json is missing a signed $key artifact."
-              exit 1
-            fi
-          done
-          echo "OK: $TAG publishes a signed updater manifest for every platform"

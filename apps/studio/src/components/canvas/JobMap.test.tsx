@@ -53,41 +53,6 @@ describe("JobMap Interactive Visualization", () => {
     expect(row).not.toHaveTextContent("Phase 1");
   });
 
-  it("adds a step from the inline form", async () => {
-    harness.state.addStep.mockResolvedValue(undefined);
-    render(<JobMap />);
-
-    fireEvent.click(screen.getByRole("button", { name: /add step/i }));
-    fireEvent.change(screen.getByLabelText(/new step name/i), {
-      target: { value: "Confirm the deployment target" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
-
-    await screen.findByRole("button", { name: /add step/i });
-    expect(harness.state.addStep).toHaveBeenCalledWith({
-      job_id: "JOB-1",
-      name: "Confirm the deployment target",
-      order: 3,
-    });
-  });
-
-  it("stops offering a step once the eight phases are filled", () => {
-    harness.state.canvasState = {
-      kind: "ready",
-      data: {
-        ...mockCanvasData,
-        steps: Array.from({ length: 8 }, (_, index) => ({
-          id: `STEP-${index + 1}`,
-          name: `Step ${index + 1}`,
-          order: index + 1,
-        })),
-      },
-    };
-    render(<JobMap />);
-
-    expect(screen.queryByRole("button", { name: /add step/i })).toBeNull();
-  });
-
   it("filters job steps when clicking a phase card", () => {
     render(<JobMap />);
     const phase1 = screen.getAllByText("1. Define")[0];

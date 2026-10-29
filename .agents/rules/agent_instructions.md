@@ -165,8 +165,6 @@ Update the relevant file whenever any of the following change:
 
 - ✅ **Update docs in the same task** as the change that triggered it — never defer to a follow-up.
 - ✅ **Keep README short**: it stays a high-level orientation page. Push detail into `docs/` and link to it rather than growing the README.
-- ✅ **Optimize the first five seconds**: the top of the README carries the one-line value proposition and two distinct calls to action — try the hosted Living Studio, or run the full stack locally. Keep the `curl … install.sh | sh` one-liner in the hero.
-- ✅ **Use the fixed section order**: `Why this exists` → `What you get` → `How it works` → `Quick Start` → `Connect your agent` → `Documentation` → `Code Overview` → `Contributing`. Prose sections stay bulleted and skimmable.
 - ✅ **Keep the Quick Start accurate**: always reflect `uv run python scripts/dev.py` as the recommended launch command.
 - ✅ **Keep Prerequisites up to date**: add any new `pip install` dependency immediately.
 - ✅ **Mark Roadmap items `[x]` when completed** — do not leave stale unchecked items.
