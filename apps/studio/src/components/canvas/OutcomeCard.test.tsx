@@ -9,6 +9,9 @@ const harness = vi.hoisted(() => ({
     deleteOutcome: vi.fn(),
     updateOutcome: vi.fn(),
     pushToast: vi.fn(),
+    // The card lists the records captured against its outcome, so the canvas
+    // has to be there even when this test only cares about the copy action.
+    canvasState: { kind: "ready", data: { jobs: [], steps: [], outcomes: [], source: "seed" } },
   },
 }));
 

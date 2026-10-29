@@ -14,6 +14,35 @@ class Direction(str, Enum):
     MAXIMIZE = "maximize"
 
 
+class JobStage(str, Enum):
+    """Ulwick's Universal Job Map stages, in canonical order."""
+
+    DEFINE = "define"
+    LOCATE = "locate"
+    PREPARE = "prepare"
+    CONFIRM = "confirm"
+    EXECUTE = "execute"
+    MONITOR = "monitor"
+    MODIFY = "modify"
+    CONCLUDE = "conclude"
+
+
+JOB_STAGE_ORDER: list[JobStage] = [
+    JobStage.DEFINE,
+    JobStage.LOCATE,
+    JobStage.PREPARE,
+    JobStage.CONFIRM,
+    JobStage.EXECUTE,
+    JobStage.MONITOR,
+    JobStage.MODIFY,
+    JobStage.CONCLUDE,
+]
+
+JOB_STAGE_INDEX: dict[JobStage, int] = {
+    stage: index + 1 for index, stage in enumerate(JOB_STAGE_ORDER)
+}
+
+
 class BusinessImpactCategory(str, Enum):
     REVENUE_GROWTH = "revenue_growth"
     COST_REDUCTION = "cost_reduction"
@@ -41,6 +70,12 @@ class Step(BaseModel):
     job_id: str = Field(..., description="The ID of the Job this step belongs to")
     name: str = Field(..., description="The name of the job step")
     order: int = Field(..., description="The chronological order of this step in the job map")
+    stage: JobStage | None = Field(
+        None, description="The Universal Job Map stage this step belongs to"
+    )
+    stage_index: int | None = Field(
+        None, ge=1, le=8, description="Position (1-8) in the canonical stage order"
+    )
 
 
 class Outcome(BaseModel):
@@ -50,9 +85,11 @@ class Outcome(BaseModel):
     statement: str = Field(
         ..., description="The desired outcome statement (e.g., 'Minimize the time it takes to...')"
     )
-    importance: float | None = Field(None, ge=1.0, le=10.0, description="Importance score (1-10)")
+    importance: float | None = Field(
+        default=None, ge=1.0, le=10.0, description="Importance score (1-10)"
+    )
     satisfaction: float | None = Field(
-        None, ge=1.0, le=10.0, description="Current satisfaction score (1-10)"
+        default=None, ge=1.0, le=10.0, description="Current satisfaction score (1-10)"
     )
     opportunity_score: float | None = Field(
         None, description="Opportunity score (Importance + max(Importance - Satisfaction, 0))"
@@ -104,12 +141,17 @@ class Evidence(BaseModel):
 
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     source_name: str = Field(..., description="Connector or person that produced the record")
-    source_kind: str = Field(..., description="Connector kind, e.g. mcp, rest, webhook, manual")
+    source_kind: str = Field(
+        ..., description="Connector kind, e.g. mcp, rest, webhook, manual — or demo for a fixture"
+    )
     item_type: EvidenceItemType = Field(
         "manual", description="Normalized record kind produced by the connector"
     )
     name: str = Field(..., description="Short human-readable label for the record")
     content: str = Field(..., description="Normalized text content of the record")
+    url: str | None = Field(
+        None, description="External URL/link to the signal/evidence in the source system"
+    )
     raw: dict[str, Any] = Field(default_factory=dict, description="Original record payload")
     job_id: str | None = Field(None, description="Job this evidence supports")
     step_id: str | None = Field(None, description="Job-map Step this evidence supports")

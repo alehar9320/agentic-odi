@@ -27,7 +27,8 @@ class Baseline:
     business_model: str | None = None
     core_problem: str | None = None
     current_focus: str | None = None
-    confidence: str | None = None
+    confidence: float | None = None
+    inferred: bool = False
 
     def to_dict(self) -> dict:
         return {
@@ -225,3 +226,93 @@ def save_llm_profile(p: LLMProfile) -> Path:
         f.write(json.dumps(d))
     os.replace(tmp, target)
     return target
+
+
+# ---------------------------------------------------------------------------
+# Typer Commands for profile & setup
+# ---------------------------------------------------------------------------
+
+
+@app.command("show")
+def show_profile(
+    as_json: bool = typer.Option(False, "--json", help="Format output as JSON"),
+) -> None:
+    """Show current product baseline profile."""
+    b = load_baseline()
+    if b is None:
+        if as_json:
+            typer.echo(json.dumps({}))
+        else:
+            typer.echo("No profile configured. Run 'agentic-odi setup' to create one.")
+        return
+    if as_json:
+        typer.echo(json.dumps(b.to_dict(), indent=2))
+        return
+    typer.echo(f"Product Name: {b.product_name or ''}")
+    typer.echo(f"Product URL:  {b.product_url or ''}")
+    typer.echo(f"Domain:       {b.domain or ''}")
+    typer.echo(f"Primary User: {b.primary_user or ''}")
+    typer.echo(f"Business:     {b.business_model or ''}")
+    typer.echo(f"Core Problem: {b.core_problem or ''}")
+    typer.echo(f"Focus:        {b.current_focus or ''}")
+    typer.echo(f"Confidence:   {b.confidence or ''}")
+
+
+@app.command("path")
+def path_cmd() -> None:
+    """Print path to the baseline profile JSON file."""
+    typer.echo(str(baseline_file()))
+
+
+@app.command("set")
+def set_profile(
+    product_name: str | None = typer.Option(None, help="Product name"),
+    domain: str | None = typer.Option(None, help="Domain"),
+    primary_user: str | None = typer.Option(None, help="Primary user persona"),
+    business_model: str | None = typer.Option(None, help="Business model"),
+    core_problem: str | None = typer.Option(None, help="Core problem solved"),
+    current_focus: str | None = typer.Option(None, help="Current focus"),
+) -> None:
+    """Set profile values non-interactively."""
+    b = load_baseline() or Baseline(schema_version=1, source="cli")
+    if product_name is not None:
+        b.product_name = product_name
+    if domain is not None:
+        b.domain = domain
+    if primary_user is not None:
+        b.primary_user = primary_user
+    if business_model is not None:
+        b.business_model = business_model
+    if core_problem is not None:
+        b.core_problem = core_problem
+    if current_focus is not None:
+        b.current_focus = current_focus
+    p = save_baseline(b)
+    typer.echo(f"Profile saved to {p}")
+
+
+def setup_wizard() -> None:
+    """Run interactive baseline setup wizard."""
+    typer.echo("Agentic ODI — Product Baseline Setup Wizard")
+    typer.echo("==========================================")
+    existing = load_baseline() or Baseline()
+
+    p_name = typer.prompt("Product Name", default=existing.product_name or "")
+    domain = typer.prompt("Domain", default=existing.domain or "")
+    p_user = typer.prompt("Primary User", default=existing.primary_user or "")
+    b_model = typer.prompt("Business Model", default=existing.business_model or "")
+    c_prob = typer.prompt("Core Problem", default=existing.core_problem or "")
+    c_focus = typer.prompt("Current Focus", default=existing.current_focus or "")
+
+    b = Baseline(
+        schema_version=1,
+        source="wizard",
+        product_name=p_name or None,
+        domain=domain or None,
+        primary_user=p_user or None,
+        business_model=b_model or None,
+        core_problem=c_prob or None,
+        current_focus=c_focus or None,
+    )
+    p = save_baseline(b)
+    typer.echo(f"Baseline configured successfully and saved to {p}")

@@ -37,6 +37,7 @@ function sse(body: string): Response {
 }
 
 let chatBody: Record<string, unknown> | null = null;
+let chatAttempts = 0;
 
 const DEFAULT_CHAT_STREAM =
   'event: conversation\ndata: {"id":"c-2","title":"hello"}\n\n' +
@@ -53,11 +54,16 @@ let llmHealthFetches = 0;
 let approvalCalls: Record<string, unknown>[] = [];
 let headPatches: Record<string, unknown>[] = [];
 
-function route(input: RequestInfo | URL, init?: RequestInit): Response {
+function route(
+  input: RequestInfo | URL,
+  init?: RequestInit,
+  configFails = false,
+): Response {
   const url = String(input);
 
   if (url === "/api/chat") {
     chatBody = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
+    chatAttempts += 1;
     if (chatAborts) {
       const error = new Error("The user aborted a request.");
       error.name = "AbortError";
@@ -69,6 +75,9 @@ function route(input: RequestInfo | URL, init?: RequestInit): Response {
     return sse(chatStream ?? DEFAULT_CHAT_STREAM);
   }
   if (url === "/api/config") {
+    if (configFails) {
+      throw new TypeError("fetch failed");
+    }
     return json({
       defaults: { base_url: "http://llm", api_key: "k", model_name: "m", mcp_url: "http://mcp" },
     });
@@ -84,6 +93,12 @@ function route(input: RequestInfo | URL, init?: RequestInit): Response {
   }
   if (url === "/api/connectors/catalog") {
     return json([]);
+  }
+  if (url.startsWith("/api/marketplace/servers")) {
+    return json({ listings: [], areas: {}, cached: false, types: [{ id: "mcp", label: "MCP servers", available: true }] });
+  }
+  if (url.startsWith("/api/marketplace/featured")) {
+    return json({ listings: [], areas: {}, cached: false, types: [] });
   }
   if (url === "/api/connectors") {
     if (init?.method === "POST") {
@@ -172,6 +187,7 @@ describe("StudioContext memory and resume", () => {
     chatBody = null;
     chatStream = null;
     chatFailure = null;
+    chatAttempts = 0;
     chatAborts = false;
     canvasFails = false;
     connectorFetches = 0;
@@ -183,6 +199,86 @@ describe("StudioContext memory and resume", () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+  });
+
+  it("sends the visible conversation path as model context", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.messages).toHaveLength(2));
+
+    await act(async () => {
+      await result.current.sendMessage("What should I do next?");
+    });
+
+    expect(chatBody?.messages).toEqual([
+      { id: "t-1", parent_id: null, role: "user", content: "I own activation." },
+      { id: "t-2", parent_id: "t-1", role: "assistant", content: "Tell me more." },
+      expect.objectContaining({ role: "user", content: "What should I do next?", parent_id: "t-2" }),
+    ]);
+  });
+
+  it("regenerates an answer from its existing user turn without duplicating it", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.messages).toHaveLength(2));
+
+    await act(async () => {
+      await result.current.regenerateFrom("t-1");
+    });
+
+    expect(chatBody?.messages).toEqual([
+      { id: "t-1", parent_id: null, role: "user", content: "I own activation." },
+    ]);
+    expect(result.current.messages.map((message) => message.content)).toEqual([
+      "I own activation.",
+      "Hi",
+    ]);
+    expect(result.current.messages.filter((message) => message.role === "user")).toHaveLength(1);
+    expect(result.current.messages.at(-1)).toMatchObject({ role: "assistant", parentId: "t-1" });
+  });
+
+  it("edits a user turn by replacing it at its original parent", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.messages).toHaveLength(2));
+
+    await act(async () => {
+      await result.current.editFrom("t-1", "I own onboarding.");
+    });
+
+    expect(chatBody?.messages).toEqual([
+      expect.objectContaining({ role: "user", content: "I own onboarding.", parent_id: null }),
+    ]);
+    expect(result.current.messages.map((message) => message.content)).toEqual([
+      "I own onboarding.",
+      "Hi",
+    ]);
+    expect(result.current.messages[0].parentId).toBeNull();
+  });
+
+  it("serializes attachments with the sidecar's snake-case fields", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
+
+    await act(async () => {
+      await result.current.sendMessage("Read this", [
+        {
+          id: "file-1",
+          name: "notes.md",
+          contentType: "text/markdown",
+          size: 12,
+          text: "Useful context",
+          dataUrl: "data:image/png;base64,AAAA",
+        },
+      ]);
+    });
+
+    expect(chatBody?.attachments).toEqual([
+      {
+        name: "notes.md",
+        content_type: "text/markdown",
+        size: 12,
+        text: "Useful context",
+        data_url: "data:image/png;base64,AAAA",
+      },
+    ]);
   });
 
   it("resumes the latest conversation and loads what it learned", async () => {
@@ -236,6 +332,30 @@ describe("StudioContext memory and resume", () => {
     );
   });
 
+  it("persists a saved opportunity thesis", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
+
+    act(() => {
+      result.current.saveThesis({
+        outcome_id: "O-1",
+        job_id: "JOB-1",
+        statement: "Minimize the time to ship when the build is green.",
+        importance: 9,
+        satisfaction: 3,
+        opportunity_score: 15,
+        rationale: "Shipping fast is the bet.",
+      });
+    });
+
+    expect(result.current.theses).toHaveLength(1);
+    const stored = JSON.parse(localStorage.getItem("studio.theses") ?? "[]");
+    expect(stored[0]).toMatchObject({
+      outcome_id: "O-1",
+      rationale: "Shipping fast is the bet.",
+    });
+  });
+
   it("sends the conversation id and applies memory events", async () => {
     const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
     await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
@@ -267,6 +387,7 @@ describe("StudioContext failures", () => {
     chatBody = null;
     chatStream = null;
     chatFailure = null;
+    chatAttempts = 0;
     chatAborts = false;
     canvasFails = false;
     connectorFetches = 0;
@@ -338,6 +459,45 @@ describe("StudioContext failures", () => {
 
     expect(result.current.messages.some((message) => message.role === "notice")).toBe(true);
     expect(connectorFetches).toBeGreaterThan(before);
+  });
+});
+
+describe("StudioContext sidecar down", () => {
+  let configFails: boolean;
+
+  beforeEach(() => {
+    configFails = true;
+    localStorage.clear();
+    chatBody = null;
+    chatStream = null;
+    chatFailure = null;
+    chatAttempts = 0;
+    chatAborts = false;
+    canvasFails = false;
+    connectorFetches = 0;
+    llmHealthFetches = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init, configFails)),
+    );
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("does not hit /api/chat when the sidecar is known to be down", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+
+    await waitFor(() => expect(result.current.sidecarReachable).toBe(false));
+
+    await act(async () => {
+      await result.current.sendMessage("list the jobs");
+    });
+
+    expect(chatAttempts).toBe(0);
+    expect(result.current.streaming).toBe(false);
+    expect(result.current.messages.some((message) => message.role === "notice")).toBe(true);
   });
 });
 

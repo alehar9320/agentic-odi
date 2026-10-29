@@ -1,8 +1,7 @@
 """Shared fixtures and helpers for the website contract tests.
 
-The tests verify what the *sources* produce, so they read a fresh build, not
-the committed output. The committed output is a separate concern, covered by
-``build_site.py --check`` and by ``test_generated.py``.
+The tests verify what the *sources* produce by building fresh into a temp
+dir. Nothing reads a checked-in build output.
 """
 
 from __future__ import annotations
@@ -15,8 +14,6 @@ from pathlib import Path
 SITE = Path(__file__).resolve().parents[1]
 ROOT = SITE.parents[0]
 TOOLS = SITE / "tools"
-DIST = SITE / "dist"
-
 # The tool modules live in website/tools, which pytest does not put on the path.
 sys.path.insert(0, str(TOOLS))
 
@@ -65,7 +62,7 @@ def all_pages() -> list[str]:
     """Every built HTML page, as a path relative to the built site root."""
     assert _BUILT is not None, "the site was not built"
     return sorted(
-        str(p.relative_to(_BUILT)) for p in _BUILT.rglob("*.html") if p.name != "404.html"
+        p.relative_to(_BUILT).as_posix() for p in _BUILT.rglob("*.html") if p.name != "404.html"
     )
 
 

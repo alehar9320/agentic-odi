@@ -31,9 +31,42 @@ export interface Evidence {
   item_type?: string;
   name?: string;
   content?: string;
+  /** Deep link back to the record in the tool that holds it, when it has one. */
+  url?: string | null;
   job_id?: string | null;
   step_id?: string | null;
   outcome_id?: string | null;
+}
+
+export interface Thesis {
+  id: string;
+  outcome_id: string;
+  job_id?: string;
+  statement: string;
+  importance: number | null;
+  satisfaction: number | null;
+  opportunity_score: number | null;
+  rationale: string;
+  created_at: string;
+}
+
+export type CanvasProvenanceKind = "live" | "seed" | "empty";
+
+/**
+ * Where the canvas came from. The sidecar labels every response so the studio
+ * can say "sample data" instead of presenting the prototype as the user's work.
+ * Optional because a canvas cached by an older build has no provenance.
+ */
+export interface CanvasProvenance {
+  kind: CanvasProvenanceKind;
+  reason: string;
+  generated_at: string;
+  record_counts: {
+    jobs: number;
+    steps: number;
+    outcomes: number;
+    evidence: number;
+  };
 }
 
 export interface CanvasData {
@@ -45,6 +78,7 @@ export interface CanvasData {
   source: "mcp" | "seed" | "local";
   /** Why the board is not what the server actually holds, when the sidecar knows. */
   warnings?: string[];
+  provenance?: CanvasProvenance;
 }
 
 /**
@@ -85,6 +119,12 @@ export interface StudioConfig {
 export interface LlmHealth {
   healthy: boolean;
   message: string;
+}
+
+/** What the configured backend reports it can serve, and why it reported none. */
+export interface ModelList {
+  models: string[];
+  error: string | null;
 }
 
 export interface McpHealth {
@@ -198,6 +238,8 @@ export interface StudioNotification {
   category: NotificationCategory;
   timestamp: string;
   read: boolean;
+  /** True for a demonstration event. Simulated events never count as unread. */
+  simulated: boolean;
   targetPanel?: WorkspacePanelId;
   targetId?: string;
   actionText?: string;
@@ -267,6 +309,8 @@ export interface Conversation {
   title: string;
   created_at: string;
   updated_at: string;
+  /** The visible branch head turn, when the conversation has branches. */
+  head_id?: string | null;
 }
 
 export interface ConversationTurn {
@@ -275,6 +319,10 @@ export interface ConversationTurn {
   role: "user" | "assistant" | "system" | "tool";
   content: string;
   created_at: string;
+  /** Stable client message id, when the turn was authored with one. */
+  message_id?: string | null;
+  /** The id of the turn this one answers, when it is a branch or edit. */
+  parent_id?: string | null;
 }
 
 export interface LatestConversation {
@@ -338,6 +386,66 @@ export interface AddConnectorPayload {
   name?: string;
   preset?: string;
   url?: string;
+  marketplace_id?: string;
+}
+
+/**
+ * One discoverable connector on the Customize page. Mirrors the sidecar's
+ * `MarketplaceListingOut`; `installable` is false for entries we can see but
+ * cannot reach, and `unavailable_reason` explains why.
+ */
+export interface MarketplaceListing {
+  id: string;
+  name: string;
+  title: string | null;
+  summary: string;
+  version: string;
+  url: string | null;
+  source: "official" | "preset";
+  area: string | null;
+  repository: string | null;
+  docs: string | null;
+  env_vars: string[];
+  headers: Record<string, string>;
+  auth: "none" | "oauth";
+  installable: boolean;
+  verified: boolean;
+  pull_count: number;
+  is_recommended: boolean;
+  unavailable_reason: string | null;
+  /** The registry name an install produces; matches the installed connector list. */
+  connector_name: string;
+}
+
+/** A connection type the page can offer. A2A ships as an unavailable placeholder. */
+export interface ConnectionType {
+  id: string;
+  label: string;
+  available: boolean;
+  note?: string;
+}
+
+export interface MarketplaceSearch {
+  listings: MarketplaceListing[];
+  areas: Record<string, string>;
+  cached: boolean;
+  types: ConnectionType[];
+}
+
+/** What the user asked Customize to open on, when a chat suggestion sent them. */
+export interface CustomizeTarget {
+  query?: string;
+  listingId?: string;
+}
+
+/**
+ * The connector the studio offers to install next, with why it is offering it.
+ * `empty` is the discovery nudge: the studio noticed it has nothing to read.
+ */
+export interface ConnectorSuggestion {
+  id: string;
+  listing: MarketplaceListing | null;
+  reason: "agent" | "empty";
 }
 
 export interface ChangelogCategory {

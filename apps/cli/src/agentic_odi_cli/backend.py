@@ -58,7 +58,19 @@ _BUSINESS_VALUE_FIELDS = {
 
 
 class BackendError(Exception):
-    """A user-facing failure: not found, invalid input, or unreachable server."""
+    """A user-facing failure: not found, invalid input, or unreachable server.
+
+    ``suggestion`` (when given) is rendered as a trailing hint so the user has a
+    next action instead of just a red line.
+    """
+
+    def __init__(self, message: str, suggestion: str | None = None) -> None:
+        super().__init__(message)
+        self.suggestion = suggestion
+
+    @property
+    def message(self) -> str:
+        return self.args[0] if self.args else ""
 
 
 def mcp_timeout() -> float:
@@ -121,7 +133,12 @@ class LocalBackend(Backend):
         return job.model_dump()
 
     def _get_jobs(self, args: dict[str, Any]) -> list[dict[str, Any]]:
-        return [job.model_dump() for job in self.service.get_jobs()]
+        kwargs: dict[str, Any] = {}
+        if "limit" in args:
+            kwargs["limit"] = args["limit"]
+        if "offset" in args:
+            kwargs["offset"] = args["offset"]
+        return [job.model_dump() for job in self.service.get_jobs(**kwargs)]
 
     def _get_job(self, args: dict[str, Any]) -> dict[str, Any]:
         from agentic_odi_core import job_not_found
@@ -157,7 +174,11 @@ class LocalBackend(Backend):
 
         try:
             step = self.service.add_step(
-                job_id=args["job_id"], name=args["name"], order=args["order"]
+                job_id=args["job_id"],
+                name=args["name"],
+                order=args["order"],
+                stage=args.get("stage"),
+                allow_empty_job_map=args.get("allow_empty_job_map", False),
             )
         except JobNotFoundError:
             raise BackendError(job_not_found(args["job_id"])) from None
@@ -169,7 +190,12 @@ class LocalBackend(Backend):
         job_id = args["job_id"]
         if self.service.get_job(job_id) is None:
             raise BackendError(job_not_found(job_id))
-        return [step.model_dump() for step in self.service.get_job_map(job_id)]
+        kwargs: dict[str, Any] = {"job_id": job_id}
+        if "limit" in args:
+            kwargs["limit"] = args["limit"]
+        if "offset" in args:
+            kwargs["offset"] = args["offset"]
+        return [step.model_dump() for step in self.service.get_job_map(**kwargs)]
 
     def _get_step(self, args: dict[str, Any]) -> dict[str, Any]:
         from agentic_odi_core import step_not_found
@@ -214,8 +240,8 @@ class LocalBackend(Backend):
             outcome = self.service.add_outcome(
                 job_id=args["job_id"],
                 statement=args["statement"],
-                importance=args.get("importance"),
-                satisfaction=args.get("satisfaction"),
+                importance=float(args["importance"]),
+                satisfaction=float(args["satisfaction"]),
                 step_id=step_id,
             )
         except JobNotFoundError:
@@ -232,7 +258,12 @@ class LocalBackend(Backend):
         job_id = args["job_id"]
         if self.service.get_job(job_id) is None:
             raise BackendError(job_not_found(job_id))
-        outcomes = self.service.get_outcomes(job_id=job_id, step_id=args.get("step_id"))
+        kwargs: dict[str, Any] = {"job_id": job_id, "step_id": args.get("step_id")}
+        if "limit" in args:
+            kwargs["limit"] = args["limit"]
+        if "offset" in args:
+            kwargs["offset"] = args["offset"]
+        outcomes = self.service.get_outcomes(**kwargs)
         return [outcome.model_dump() for outcome in outcomes]
 
     def _get_outcome(self, args: dict[str, Any]) -> dict[str, Any]:
@@ -298,7 +329,12 @@ class LocalBackend(Backend):
         return outcome.model_dump()
 
     def _list_customer_outcomes(self, args: dict[str, Any]) -> list[dict[str, Any]]:
-        outcomes = self.service.list_customer_outcomes(args.get("job_id"))
+        kwargs: dict[str, Any] = {"job_id": args.get("job_id")}
+        if "limit" in args:
+            kwargs["limit"] = args["limit"]
+        if "offset" in args:
+            kwargs["offset"] = args["offset"]
+        outcomes = self.service.list_customer_outcomes(**kwargs)
         return [outcome.model_dump() for outcome in outcomes]
 
     def _update_customer_outcome(self, args: dict[str, Any]) -> dict[str, Any]:
@@ -367,6 +403,7 @@ class LocalBackend(Backend):
                 name=args["name"],
                 content=args["content"],
                 item_type=args.get("item_type", "manual"),
+                url=args.get("url"),
                 raw=args.get("raw"),
                 job_id=args.get("job_id"),
                 step_id=args.get("step_id"),
@@ -397,11 +434,16 @@ class LocalBackend(Backend):
         return evidence.model_dump()
 
     def _list_evidence(self, args: dict[str, Any]) -> list[dict[str, Any]]:
-        items = self.service.list_evidence(
-            job_id=args.get("job_id"),
-            step_id=args.get("step_id"),
-            outcome_id=args.get("outcome_id"),
-        )
+        kwargs: dict[str, Any] = {
+            "job_id": args.get("job_id"),
+            "step_id": args.get("step_id"),
+            "outcome_id": args.get("outcome_id"),
+        }
+        if "limit" in args:
+            kwargs["limit"] = args["limit"]
+        if "offset" in args:
+            kwargs["offset"] = args["offset"]
+        items = self.service.list_evidence(**kwargs)
         return [item.model_dump() for item in items]
 
     def _delete_evidence(self, args: dict[str, Any]) -> str:
@@ -459,9 +501,12 @@ class LocalBackend(Backend):
 
     def _evaluate_outcome(self, args: dict[str, Any]) -> str:
         from agentic_odi_core import job_not_found
-        from agentic_odi_core.evaluation import evaluate_outcome_statement
+        from agentic_odi_core.evaluation import (
+            evaluate_outcome_statement,
+            statement_to_dict,
+        )
 
-        result = evaluate_outcome_statement(args["statement"])
+        result = statement_to_dict(evaluate_outcome_statement(args["statement"]))
         job_id = args.get("job_id")
         if job_id is not None:
             if self.service.get_job(job_id) is None:
@@ -483,9 +528,14 @@ class LocalBackend(Backend):
         return ODI_FRAMEWORK_GUIDELINES
 
     def _get_capabilities(self, args: dict[str, Any]) -> str:
-        from agentic_odi_core import CAPABILITIES
+        from agentic_odi_core import capability_summary
 
-        return CAPABILITIES
+        return capability_summary()
+
+    def _get_capabilities_manifest(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import capability_manifest
+
+        return capability_manifest()
 
     def _compute_opportunity(self, args: dict[str, Any]) -> float:
         from agentic_odi_core import compute_opportunity_score
@@ -528,6 +578,7 @@ _LOCAL_HANDLERS = {
     "evaluate_outcome": LocalBackend._evaluate_outcome,
     "get_odi_framework_guidelines": LocalBackend._get_odi_framework_guidelines,
     "get_capabilities": LocalBackend._get_capabilities,
+    "get_capabilities_manifest": LocalBackend._get_capabilities_manifest,
 }
 
 
@@ -546,6 +597,11 @@ class MCPBackend(Backend):
 def _call_mcp(tool: str, args: dict[str, Any], mcp_url: str, timeout: float) -> str:
     from fastmcp import Client
 
+    from agentic_odi_cli import flags
+
+    if flags.is_enabled("developer_mode"):
+        typer.echo(f"[debug] MCP call: {tool} args={args}", err=True)
+
     async def _run() -> str:
         async with Client(mcp_url) as client:
             result = await client.call_tool(tool, args)
@@ -557,9 +613,15 @@ def _call_mcp(tool: str, args: dict[str, Any], mcp_url: str, timeout: float) -> 
     try:
         return asyncio.run(_guarded())
     except asyncio.TimeoutError as exc:
-        raise BackendError(f"timed out after {timeout:.0f}s contacting {mcp_url}") from exc
+        raise BackendError(
+            f"timed out after {timeout:.0f}s contacting {mcp_url}",
+            "Check the MCP server and network, then retry or raise AGENTIC_ODI_MCP_TIMEOUT.",
+        ) from exc
     except Exception as exc:  # noqa: BLE001
-        raise BackendError(f"could not reach MCP server at {mcp_url}: {exc}") from exc
+        raise BackendError(
+            f"could not reach MCP server at {mcp_url}: {exc}",
+            "Start the MCP server (python -m agentic_odi_mcp_server) and check AGENTIC_ODI_MCP_URL.",
+        ) from exc
 
 
 _FLOAT_TOOLS = frozenset({"compute_opportunity"})
@@ -592,7 +654,7 @@ def _parse_remote(tool_name: str, text: str) -> Any:
     stripped = text.strip()
     problem = parse_tool_result(stripped)
     if problem is not None:
-        raise BackendError(problem.message)
+        raise BackendError(problem.message, problem.suggestion)
 
     if tool_name in _FLOAT_TOOLS:
         return _extract_float(stripped)
@@ -634,6 +696,34 @@ def _extract_float(text: str) -> float:
 
 
 @dataclass
+class AutoBackend(Backend):
+    """Prefer the local store, and reach for the MCP server if it fails.
+
+    A locked or unreachable local store used to make every command fail even
+    when an MCP server was running. Auto keeps the local-first path but does
+    not let a local failure end the command.
+    """
+
+    def __init__(self, db_path: str | None = None, mcp_url: str | None = None) -> None:
+        self._local = LocalBackend(db_path=db_path)
+        self._mcp = MCPBackend(mcp_url=mcp_url)
+        self._announced = False
+
+    def call(self, tool_name: str, args: dict[str, Any]) -> Any:
+        try:
+            return self._local.call(tool_name, args)
+        except (BackendError, NotImplementedError) as local_error:
+            try:
+                result = self._mcp.call(tool_name, args)
+            except BackendError as mcp_error:
+                raise local_error from mcp_error
+            if not self._announced:
+                typer.echo("Local store unavailable; using the MCP server.", err=True)
+                self._announced = True
+            return result
+
+
+@dataclass
 class BackendConfig:
     backend: str | None = None
     db_path: str | None = None
@@ -648,6 +738,8 @@ def get_backend(
         return LocalBackend(db_path=db_path)
     if resolved in {"mcp", "remote"}:
         return MCPBackend(mcp_url=mcp_url)
+    if resolved == "auto":
+        return AutoBackend(db_path=db_path, mcp_url=mcp_url)
     raise BackendError(f"unknown backend: {resolved}")
 
 
@@ -673,4 +765,6 @@ def run_tool(tool_name: str, args: dict[str, Any]) -> Any:
         if message.startswith("Error: "):
             message = message[len("Error: ") :]
         typer.secho(f"Error: {message}", fg="red", err=True)
+        if exc.suggestion:
+            typer.secho(f"Hint: {exc.suggestion}", fg="yellow", err=True)
         raise typer.Exit(code=1) from exc

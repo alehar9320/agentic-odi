@@ -36,14 +36,25 @@ describe("timeOfDayGreeting", () => {
 });
 
 describe("greetingCandidates", () => {
-  it("leads with a plain greeting when no name is known", () => {
+  it("leads with the invitation, not the clock", () => {
     const [first] = greetingCandidates(context());
-    expect(first).toEqual({ id: "greeting", text: "Good morning", kind: "greeting" });
+    expect(first).toEqual({
+      id: "capability-win",
+      text: "What do you want to win?",
+      kind: "capability",
+    });
   });
 
-  it("uses the display name when one is available", () => {
-    const [first] = greetingCandidates(context({ displayName: "  Ada  " }));
-    expect(first.text).toBe("Good morning, Ada");
+  it("uses the display name in the greeting that follows", () => {
+    const greeting = greetingCandidates(context({ displayName: "  Ada  " })).find(
+      (candidate) => candidate.id === "greeting",
+    );
+    expect(greeting?.text).toBe("Good morning, Ada");
+  });
+
+  it("offers one greeting and one invitation first", () => {
+    const kinds = greetingCandidates(context()).slice(0, 2).map(({ kind }) => kind);
+    expect(kinds).toEqual(["capability", "greeting"]);
   });
 
   it("reflects the opportunity landscape once outcomes exist", () => {
