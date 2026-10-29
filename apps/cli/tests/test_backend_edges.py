@@ -183,6 +183,27 @@ def test_extract_json_returns_text_for_malformed_payloads() -> None:
     assert backend._extract_json("{not valid json") == "{not valid json"
 
 
+def test_extract_json_skips_a_stray_brace_in_leading_text() -> None:
+    text = 'Created job {draft}: {"id": "JOB-1", "name": "Deploy"}'
+
+    assert backend._extract_json(text) == {"id": "JOB-1", "name": "Deploy"}
+
+
+def test_extract_json_keeps_the_outer_wrapper_when_payloads_nest() -> None:
+    text = 'Done: {"job": {"id": "JOB-1"}, "steps": [{"id": "STEP-1"}]} trailing prose'
+
+    assert backend._extract_json(text) == {
+        "job": {"id": "JOB-1"},
+        "steps": [{"id": "STEP-1"}],
+    }
+
+
+def test_extract_json_skips_a_stray_bracket_before_an_array() -> None:
+    text = 'records [draft]: ["a", "b"]'
+
+    assert backend._extract_json(text) == ["a", "b"]
+
+
 def test_extract_float_rejects_unparseable_scores() -> None:
     with pytest.raises(backend.BackendError, match="Opportunity score: nope"):
         backend._extract_float("Opportunity score: nope")

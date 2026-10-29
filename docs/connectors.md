@@ -1,7 +1,7 @@
 # External Connectors (MCP Ingest)
 
-Connectors are named integrations stored in `.agentic-odi/connectors.json` (or a
-path you pass with `--config` / `AGENTIC_ODI_CONNECTORS_FILE`). The first kind is
+Connectors are named integrations stored in `~/.config/agentic-odi/connectors.json`
+(or a path you pass with `--config` / `AGENTIC_ODI_CONNECTORS_CONFIG`). The first kind is
 `mcp`: Agentic ODI acts as an MCP **client** and pulls catalog, resources, and
 optional tool results from an external MCP **server**.
 

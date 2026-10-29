@@ -180,9 +180,9 @@ def test_canvas_falls_back_to_seed_when_mcp_unreachable() -> None:
 @pytest.mark.parametrize(
     ("prompt", "expected"),
     [
-        ("Give me the ODI Stage-by-Stage guidelines.", "Stage 1"),
-        ("Simulate the impact of an Auto-Sync Agent.", "WYSIWYG Impact Simulation Result"),
-        ("Show me the evidence from a customer call.", "Causal Lineage"),
+        ("Give me the ODI Stage-by-Stage guidelines.", "ODI, stage by stage"),
+        ("Simulate the impact of an Auto-Sync Agent.", "Simulate the bet by hand"),
+        ("Show me the evidence from a customer call.", "Evidence needs a source"),
     ],
 )
 def test_chat_offline_fallbacks_stream_deltas_and_message(prompt: str, expected: str) -> None:
@@ -196,12 +196,13 @@ def test_chat_offline_fallbacks_stream_deltas_and_message(prompt: str, expected:
     assert streamed == content
 
 
-def test_chat_offline_default_echoes_intent() -> None:
+def test_chat_offline_default_points_at_manual_work() -> None:
     events = _stream("/api/chat", _chat_body("hello world"))
 
     content = json.loads(events["message"][-1])["content"]
-    assert '"hello world"' in content
-    assert "Opportunity Score of 15.3" in content
+    assert "no model is reachable" in content
+    assert "/capture" in content
+    assert "/help" in content
 
 
 def _delta_chunk(content: str | None = None, tool_calls: list[Any] | None = None) -> Any:
@@ -288,6 +289,7 @@ def test_chat_live_tool_loop_emits_tool_and_final_message(
 
     monkeypatch.setattr(chat, "check_llm_health", _healthy)
     monkeypatch.setattr(chat, "McpClient", _FakeMcpClient)
+    monkeypatch.setattr(chat, "is_endpoint_reachable", lambda url, timeout: True)
     monkeypatch.setattr(chat, "AsyncOpenAI", lambda **kwargs: _FakeOpenAI(streams, **kwargs))
 
     events = _stream("/api/chat", _chat_body("list the jobs"))
@@ -312,6 +314,7 @@ def test_chat_live_without_tools_streams_plain_reply(
 
     monkeypatch.setattr(chat, "check_llm_health", _healthy)
     monkeypatch.setattr(chat, "McpClient", _FakeMcpClient)
+    monkeypatch.setattr(chat, "is_endpoint_reachable", lambda url, timeout: True)
     monkeypatch.setattr(chat, "AsyncOpenAI", lambda **kwargs: _FakeOpenAI(streams, **kwargs))
 
     events = _stream("/api/chat", _chat_body("hi"))
@@ -337,7 +340,7 @@ def test_add_step_surfaces_mcp_failure_as_502() -> None:
     )
 
     assert response.status_code == 502
-    assert "detail" in response.json()
+    assert response.json()["error"]["code"] == "mcp_unreachable"
 
 
 def test_add_outcome_surfaces_mcp_failure_as_502() -> None:
@@ -353,7 +356,7 @@ def test_add_outcome_surfaces_mcp_failure_as_502() -> None:
     )
 
     assert response.status_code == 502
-    assert "detail" in response.json()
+    assert response.json()["error"]["code"] == "mcp_unreachable"
 
 
 # ---------------------------------------------------------------------------
@@ -365,20 +368,39 @@ def test_canvas_reads_local_repository() -> None:
     repo = InMemoryRepository()
     service = ODIService(repo)
     job = service.add_job(name="Local job", description="Stored locally")
+    service.add_outcome(
+        job_id=job.id,
+        statement="Minimize the time it takes to deploy when releasing",
+        importance=8.0,
+        satisfaction=3.0,
+    )
     service.add_step(job_id=job.id, name="Local step", order=1)
-    service.add_outcome(job_id=job.id, statement="Minimize time", importance=8.0, satisfaction=3.0)
+    service.add_evidence(
+        source_name="Gong",
+        source_kind="mcp",
+        name="Call with Ada",
+        content="Deploys break whenever a secret rotates.",
+        job_id=job.id,
+    )
 
     body = TestClient(create_app(repo)).get("/api/canvas").json()
 
     assert body["source"] == "local"
     assert body["jobs"][0]["id"] == job.id
     assert body["steps"][0]["name"] == "Local step"
-    assert body["outcomes"][0]["statement"] == "Minimize time"
+    assert body["outcomes"][0]["statement"] == "Minimize the time it takes to deploy when releasing"
+    assert body["evidence"][0]["name"] == "Call with Ada"
 
 
 def test_post_step_uses_local_service() -> None:
     repo = InMemoryRepository()
     job = ODIService(repo).add_job(name="Local job")
+    ODIService(repo).add_outcome(
+        job_id=job.id,
+        statement="Minimize the time it takes to deploy when releasing",
+        importance=8.0,
+        satisfaction=3.0,
+    )
 
     response = TestClient(create_app(repo)).post(
         "/api/steps",
@@ -398,11 +420,138 @@ def test_post_outcome_uses_local_service() -> None:
         json={
             "mcp_url": "http://unused",
             "job_id": job.id,
-            "statement": "Minimize effort",
+            "statement": "Minimize the time to ship a release when the build is green",
             "importance": 9.0,
             "satisfaction": 4.0,
         },
     )
 
     assert response.status_code == 200
-    assert ODIService(repo).get_outcomes(job.id)[0].statement == "Minimize effort"
+    assert (
+        ODIService(repo).get_outcomes(job.id)[0].statement
+        == "Minimize the time to ship a release when the build is green"
+    )
+
+
+# ---------------------------------------------------------------------------
+# /api/changelog
+# ---------------------------------------------------------------------------
+
+
+def test_get_changelog_returns_parsed_or_fallback_data() -> None:
+    response = _client().get("/api/changelog")
+    assert response.status_code == 200
+    data = response.json()
+    assert "releases" in data
+    assert len(data["releases"]) > 0
+    release = data["releases"][0]
+    assert "version" in release
+    assert "date" in release
+    assert "categories" in release
+
+
+# ---------------------------------------------------------------------------
+# /api/memory and /api/conversations
+# ---------------------------------------------------------------------------
+
+
+def _stream_with(client: TestClient, path: str, payload: dict[str, Any]) -> dict[str, list[str]]:
+    with client.stream("POST", path, json=payload) as response:
+        assert response.status_code == 200
+        return _sse_events("".join(response.iter_text()))
+
+
+def test_memory_observation_crud() -> None:
+    client = _client()
+
+    created = client.post(
+        "/api/memory/observations",
+        json={"kind": "career", "text": "Owns activation."},
+    )
+    assert created.status_code == 200
+    observation = created.json()["observation"]
+    assert observation["status"] == "suggested"
+
+    listed = client.get("/api/memory/observations").json()["observations"]
+    assert [item["id"] for item in listed] == [observation["id"]]
+
+    patched = client.patch(
+        f"/api/memory/observations/{observation['id']}",
+        json={"status": "confirmed", "text": "Owns activation end to end."},
+    )
+    assert patched.status_code == 200
+    assert patched.json()["observation"]["status"] == "confirmed"
+    assert patched.json()["observation"]["text"] == "Owns activation end to end."
+
+    assert client.delete(f"/api/memory/observations/{observation['id']}").status_code == 200
+    assert client.get("/api/memory/observations").json()["observations"] == []
+    assert client.delete(f"/api/memory/observations/{observation['id']}").status_code == 404
+
+
+def test_memory_rejects_unknown_kind_and_blank_text() -> None:
+    client = _client()
+
+    assert (
+        client.post("/api/memory/observations", json={"kind": "nonsense", "text": "x"}).status_code
+        == 422
+    )
+    assert (
+        client.post("/api/memory/observations", json={"kind": "career", "text": "   "}).status_code
+        == 422
+    )
+
+
+def test_pm_authored_context_can_start_confirmed() -> None:
+    client = _client()
+    response = client.post(
+        "/api/memory/observations",
+        json={"kind": "opportunity", "text": "Activation is the bet.", "confirmed": True},
+    )
+    assert response.status_code == 200
+    assert response.json()["observation"]["status"] == "confirmed"
+
+
+def test_conversation_endpoints_and_chat_persistence() -> None:
+    client = _client()
+
+    assert client.get("/api/conversations/latest").json() == {
+        "conversation": None,
+        "turns": [],
+    }
+
+    events = _stream_with(client, "/api/chat", _chat_body("hello there"))
+    conversation = json.loads(events["conversation"][0])
+    assert conversation["id"]
+    assert conversation["title"] == "hello there"
+
+    latest = client.get("/api/conversations/latest").json()
+    assert latest["conversation"]["id"] == conversation["id"]
+    assert [turn["role"] for turn in latest["turns"]] == ["user", "assistant"]
+
+
+def test_chat_resumes_an_existing_conversation() -> None:
+    client = _client()
+    created = client.post("/api/conversations").json()["conversation"]
+
+    events = _stream_with(
+        client,
+        "/api/chat",
+        {**_chat_body("second message"), "conversation_id": created["id"]},
+    )
+    conversation = json.loads(events["conversation"][0])
+    assert conversation["id"] == created["id"]
+    latest = client.get("/api/conversations/latest").json()
+    assert len(latest["turns"]) == 2
+
+
+def test_clear_memory_removes_conversations_and_observations() -> None:
+    client = _client()
+    _stream_with(client, "/api/chat", _chat_body("hello"))
+    client.post("/api/memory/observations", json={"kind": "career", "text": "Owns activation."})
+
+    assert client.delete("/api/memory").status_code == 200
+    assert client.get("/api/conversations/latest").json() == {
+        "conversation": None,
+        "turns": [],
+    }
+    assert client.get("/api/memory/observations").json()["observations"] == []

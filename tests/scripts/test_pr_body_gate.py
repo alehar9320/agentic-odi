@@ -1,4 +1,4 @@
-"""The pull request template and its body-truth guardrail."""
+"""The pull request template and the CI gate that requires a non-empty body."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 TEMPLATE = ROOT / ".github" / "pull_request_template.md"
-GUARDRAIL_WORKFLOW = ROOT / ".github" / "workflows" / "pr-guardrails.yml"
+WORKFLOW = ROOT / ".github" / "workflows" / "ci.yml"
 
 REQUIRED_SECTIONS = (
     "## Summary",
@@ -25,18 +25,18 @@ def test_the_template_asks_for_the_required_sections() -> None:
         assert section in template, f"{section} is missing from the PR template"
 
 
-def test_guardrail_workflow_checks_pull_request_body_truth() -> None:
-    workflow = GUARDRAIL_WORKFLOW.read_text(encoding="utf-8")
+def test_ci_runs_the_body_gate_only_for_pull_requests() -> None:
+    workflow = WORKFLOW.read_text(encoding="utf-8")
 
-    assert "pull_request:" in workflow
-    assert "uv run python scripts/pr_guards.py body-truth" in workflow
+    assert "\n  pr-body:\n" in workflow
+    assert "github.event_name == 'pull_request'" in workflow
 
 
-def test_the_guardrail_passes_pr_body_and_title_to_the_truth_check() -> None:
-    workflow = GUARDRAIL_WORKFLOW.read_text(encoding="utf-8")
+def test_the_gate_reads_the_body_through_the_api_and_fails_when_empty() -> None:
+    workflow = WORKFLOW.read_text(encoding="utf-8")
+    gate = workflow.split("\n  pr-body:\n", 1)[1].split("\n  lint:\n", 1)[0]
 
-    assert "PR_BODY: ${{ github.event.pull_request.body }}" in workflow
-    assert "PR_TITLE: ${{ github.event.pull_request.title }}" in workflow
-    assert "printf '%s' \"$PR_BODY\"" in workflow
-    assert "--body-file \"$RUNNER_TEMP/pr-body.md\"" in workflow
-    assert '--title "$PR_TITLE"' in workflow
+    assert "gh pr view" in gate
+    assert "--json body" in gate
+    assert "tr -d '[:space:]'" in gate, "whitespace-only bodies must count as empty"
+    assert "exit 1" in gate

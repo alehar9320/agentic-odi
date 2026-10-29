@@ -45,7 +45,25 @@ apps/studio SPA
 apps/studio SPA
   -> /api/chat
   -> stream_chat -> OpenAI-compatible LLM -> MCP tool calls
+  -> StudioMemory (conversation turns + remembered observations)
+
+apps/studio SPA
+  -> POST /api/approvals/{id}
+  -> ApprovalRegistry -> resolves the paused turn's pending gate
+
+apps/studio SPA
+  -> POST /api/models
+  -> probes.list_models -> OpenAI-compatible LLM (model ids)
 ```
+
+`/api/models` is read-only discovery for the composer's picker. It answers the
+SPA rather than the browser because the model server may only be reachable from
+the sidecar's host and is not necessarily CORS-open. A refused connection is
+returned as `error` beside an empty list, not as a 5xx: an unreachable model
+server is a normal state the picker explains.
+
+The studio memory is a separate SQLite file, not an ODI repository. It never
+feeds the canvas; it only supplies bounded context to the next chat turn.
 
 The SPA sends `mcp_url` with every data request for compatibility. In `local` mode the sidecar ignores it; in `mcp` mode it is required for canvas and mutations.
 
@@ -142,3 +160,53 @@ the demo seed only in `mcp` mode when MCP is unreachable or returns no jobs. `lo
 - The SPA runs in a browser or Tauri webview and only trusts the sidecar origin.
 - The sidecar may reach MCP and the LLM; CORS is restricted to known Studio origins.
 - MCP is an HTTP service with no authentication in local development. Do not expose it directly to the internet; the Cloudflare setup tunnels the sidecar, not MCP.
+- The Tauri desktop shell contacts the GitHub releases endpoint for `latest.json`, verifies the artifact signatures against the key pinned in `tauri.conf.json`, and only stages an update after verification. The updater cannot be reached from the browser build.
+
+## The Failure Path
+
+A failure is a first-class result, not an empty success. The path is the same
+for the CLI, the sidecar, and the SPA.
+
+```text
+MCP tool result (text)
+  -> agentic_odi_core.remote.parse_tool_result
+  -> StudioError { code, message, detail, suggestion, retryable, request_id }
+  -> sidecar: StudioHTTPError -> HTTP status + {"error": StudioError}
+  -> SPA: StudioApiError -> FailurePanel (message, detail, suggestion, Retry)
+```
+
+- **One error body.** Every HTTP failure is `{"error": StudioError}`. The SPA
+  also reads a legacy `{"detail": "..."}` body, so an older sidecar still
+  produces a readable message. Write routes no longer wrap their result in
+  `{"ok": true, "result": ...}`: a success is the object, a delete is
+  `{"deleted": id}`.
+- **One terminal chat event.** Every `/api/chat` stream ends with exactly one
+  `message` or one `error`. A recoverable tool error stays a tool result the
+  model can read, but it is reported as `status: "error"` and counted. A fatal
+  failure ends the stream with `event: error` carrying the `StudioError`.
+- **Request ids.** The sidecar accepts or mints `X-Request-ID`, echoes it on
+  the response, and puts it on every SSE frame. The MCP server's own log line
+  and the `Execution` record (#82) do not carry it yet, and authentication
+  (#90) is out of scope.
+- **The canvas is a union.** `CanvasState` is `loading | ready | empty |
+  error`. An empty canvas is an invitation; a failed canvas is a failure panel
+  with Retry. The two never look the same.
+- **The turn log is safe.** One JSON line per turn carries the request id, the
+  model, the round and tool counts, the error count, the duration, and the
+  outcome. Sensitive keys are dropped rather than redacted, so no token, key,
+  or customer quote can reach the log.
+- **Two layers of error shaping.** The sidecar (and the Worker that proxies it)
+  return the server-shaped `StudioError` over HTTP, so the SPA reads it whole.
+  When the sidecar never answers at all — a network failure in the browser — the
+  SPA classifies the failure client-side (`TypeError` → `mcp_unreachable`) and
+  surfaces the same `SidecarNotice` strip plus a non-retryable in-thread notice,
+  instead of a generic "something went wrong".
+- **CLI hints.** `BackendError(message, suggestion)` is rendered as `Error: …` on
+  stderr with a trailing `Hint: …` line, so a `BackendError("could not reach MCP
+  server …")` tells the user exactly what to start.
+- **Hosted proxied path.** The free Cloudflare Worker forwards `/api/*` to
+  `SIDECAR_URL`; a missing/unreachable sidecar is reported to the browser as
+  `{"error": mcp_unreachable}` with a suggestion to start the sidecar and with
+  `X-Request-ID` echoed for support. It is logged on the Worker but never leaks
+  internals.
+

@@ -37,4 +37,12 @@ describe("createSseParser", () => {
       { event: "canvas_dirty", data: { value: true } },
     ]);
   });
+
+  it("parses connector frames", () => {
+    const parser = createSseParser();
+
+    const events = parser.push('event: connector\ndata: {"action":"registered","name":"gong"}\n\n');
+
+    expect(events).toEqual([{ event: "connector", data: { action: "registered", name: "gong" } }]);
+  });
 });

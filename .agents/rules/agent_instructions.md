@@ -156,6 +156,7 @@ Update the relevant file whenever any of the following change:
 | New CLI command or flag | `docs/cli.md` |
 | New connector kind | `docs/connectors.md` |
 | New workflow or agent instruction | `docs/living-studio.md` |
+| New message part or conversation capability | `docs/living-studio.md` (conversation runtime) |
 | Deployment URL or cloud setup changes | `docs/deployment.md` |
 | Roadmap item completed or added | `docs/roadmap.md` |
 | Test layout or coverage changes | `docs/development.md` |
@@ -199,7 +200,44 @@ Update the relevant file whenever any of the following change:
 - **External connectors**: Integrations live in the `packages/connectors` workspace package. New kinds implement `agentic_odi_connectors.protocol.Connector` and register via `register_kind`. Do not write ingested records into `jobs_db` / outcomes unless a later mapping task says so.
 - **MCP client vs ODI server**: The ODI FastMCP **server** exposes product tools. The MCP **client connector** uses `fastmcp.Client` over HTTP to ingest data from *external* MCP servers. Prefer in-memory `Client(server)` tests for that connector, same as server tests.
 
-### 5. Testing Strategy (FastMCP)
+### 5. Conversation UI (assistant-ui)
+
+The Studio's transcript is [assistant-ui](https://www.assistant-ui.com) bound to
+our own store; it is not a hand-rolled message list. Do not replace it, wrap it in
+a second one, or re-implement streaming, the composer, attachments, branches, or
+approval prompts beside it.
+
+- **One bridge.** `apps/studio/src/assistant/convert.ts` is the only mapping
+  between `ChatMessage`/`ChatPart` and assistant-ui parts. It is pure and tested
+  without a runtime. A new part type is added there, rendered in `parts.tsx`, and
+  registered in the `components` map in `Conversation.tsx` — three files, never a
+  fourth path.
+- **The store stays ours.** `state/StudioContext.tsx` owns messages, ids,
+  `parentId`, streaming state, memory, and canvas invalidation. The runtime is
+  presentation: `useExternalStoreRuntime` in `assistant/StudioRuntime.tsx` maps
+  `onNew`, `onEdit`, `onReload`, `onCancel`, `setMessages`, and
+  `onRespondToToolApproval` onto context actions. Do not let component state
+  become a second source of truth.
+- **The SSE contract stays additive.** The sidecar is a Python tool loop; it is
+  not migrating to Vercel's AI SDK stream protocol. New capability arrives as a
+  new event (`reasoning`, `source`, `approval`, `ui`, …) or a new opt-in request
+  field, and a client that sends neither must see the old stream unchanged.
+- **The ODI catalog stays ours.** Generated surfaces travel as assistant-ui
+  `data-*` parts and render through `UiRenderer`. assistant-ui's generic
+  generative-UI vocabulary is not a replacement for the server-validated catalog.
+- **No fabricated provenance.** A source names what a turn actually read; a part
+  the converter does not understand is dropped, never printed as JSON.
+- **Approvals gate writes, not reads.** `approvals: true` pauses mutating tools
+  only; the gate is in-process, single-user, timeout-bound, and resolving a gate
+  twice must not run a tool twice.
+- **Voice is a seam, not a feature.** It is deliberately deferred: `adapters.dictation`
+  plus `ComposerPrimitive.Dictate`, no backend change. Do not ship a microphone
+  that only works in the browser shell.
+- **Keep it honest in the docs.** A capability that lands here is described in
+  `docs/living-studio.md` → *The conversation runtime*, with its test in
+  `docs/development.md`, in the same change.
+
+### 6. Testing Strategy (FastMCP)
 - **First-Class Documentation**: Treat tests as living documentation that demonstrate how features work while protecting against regressions.
 - **Speed & Isolation**: Tests must be fast (< 1s) and self-contained. Use `@pytest.mark.integration` or `@pytest.mark.client_process` for slower, integration, or resource-dependent tests.
 - **Structure**: This repo is a uv workspace. Mirror each project's code structure in its own `tests/` directory (e.g., `apps/mcp-server/src/agentic_odi_mcp_server/mcp_server.py` -> `apps/mcp-server/tests/test_server_tools.py`, `packages/connectors/src/agentic_odi_connectors/mcp/connector.py` -> `packages/connectors/tests/test_mcp_connector.py`).
