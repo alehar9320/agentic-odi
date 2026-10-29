@@ -1,9 +1,8 @@
 # Running The Living Studio
 
 **The Living Studio** is the conversational GUI for Outcome-Driven Innovation:
-an interactive Opportunity Landscape, Universal Job Map, WYSIWYG Impact
-Simulation, and Causal Lineage inspection, paired with an autonomous agent
-connected to the MCP server.
+an interactive Opportunity Landscape, Universal Job Map, and WYSIWYG Impact
+Simulation, paired with an autonomous agent connected to the MCP server.
 
 The Studio runs three ways locally, plus a hosted deployment. All of them serve
 the same SPA, which talks only to the sidecar on `http://127.0.0.1:8100` — the
@@ -41,76 +40,20 @@ The Studio opens as a conversation, not a dashboard.
 | **First-run tour** | A four-step, skippable welcome on the very first visit: what the studio is, which ambition brought you here, the live state of your sidecar/MCP/model (with inline repair when the model is down), and the first move. The four doors are **I have one in mind**, **My boss handed me a priority**, **Help me find the next one**, and **Pressure-test a bet**; each starts the matching conversation. Replay it from **Settings → Replay the welcome tour**. |
 | **First run** | A short conversation in the chat, not a form: what you are building, who feels the problem, the job they are trying to get done, then where it hurts. One question at a time, with a reflection before the next ask, quick replies, and **Explore on my own** always visible. Skipping is allowed; answers and progress are kept as a draft. Re-open it any time with `/start`, the home stage's context pill, or Settings. |
 | **Hero** | One rotating headline above the composer: a greeting (time of day, plus your name if you set one in Settings), the product/job you set up, what is already on the canvas, or an intent-first prompt such as *What are you trying to win this quarter?* It cycles every few seconds and stays still under `prefers-reduced-motion`. |
-| **Suggestion pills** | Below the headline. **Sharpen an opportunity** always starts a conversation; the next pill becomes **Pressure-test a bet** once outcomes exist, or **Find the next opportunity** before that. **Capture what you heard** replaces the landscape pill once a job exists. They change as the canvas fills up. |
-| **Composer** | Docked at the bottom of the transcript. `Enter` sends, `Shift`+`Enter` adds a line, `Cmd/Ctrl`+`K` focuses it, `/` opens the command palette, and `Esc` stops a reply that is still streaming. The send button becomes a stop button while a reply streams. On touch screens the field stays at 16px so mobile browsers do not zoom into it. |
-| **Attachments** | The paperclip, a drag onto the composer, or a paste stages images and text files (up to 6, 8 MB each) as chips with a thumbnail and a size; a file the model could not read is refused in words instead of attached by name. Files ride only on the turn that sends them — the next question does not re-upload them — and a turn that fails or is stopped keeps them for **Ask again**. |
-| **Model picker** | The model name under the composer is a selector when the endpoint publishes a catalog (`POST /api/models`, asked at boot and again whenever the base URL or key changes); the configured name is always an option, and picking one changes the model used by the next message. A provider that will not list its models leaves the name as plain text, with the reason in its tooltip, and Settings keeps the free-text field plus the known models as suggestions. |
-| **Transcript** | A focusable, labelled log: the arrow keys, `Page Up`/`Page Down`, and `Home`/`End` scroll history without a mouse. If you scroll back while the studio replies, **Jump to latest** returns you to the newest turn and puts focus in the transcript. |
+| **Starter cards** | Below the headline, three canvas-aware conversation cards pair a clear next move with a short reason: **Sharpen an opportunity**, **Pressure-test a bet** or **Find the next opportunity**, and **Capture what you heard** or **Name the job**. Select one to start that prompt in the thread; the cards disappear once the conversation begins. **Opportunity landscape** remains a separate, quiet shortcut. |
+| **Composer** | Docked at the bottom of the transcript. `Enter` sends, `Shift`+`Enter` adds a line, `Cmd/Ctrl`+`K` focuses it, `/` opens the command palette, and the paperclip attaches a text file or an image. Files can also be dropped anywhere on the composer or pasted from the clipboard, and each one is shown with a size (and a thumbnail, for images) plus a remove control before it is sent; a file the studio cannot read is refused with the reason instead of becoming a chip that promises content the model will never see. The hint row's **Model** control lists the ids the configured backend reports and writes the choice through the same Settings store as the Base URL field. The send button becomes a stop button while a reply streams. |
 | **Bar** | The only persistent chrome: home, new conversation, catch-up, live model status, and settings. There is no navigation drawer to compete with the thread. |
 | **Rail** | Above the conversation, and only once the thread has produced something: `Landscape · N`, `Job map · N`, `Evidence · N`, `What I know · N`. Every item is derived from the canvas and the memory, so the strip is a record of the work rather than a fixed menu. |
 | **Lens** | A view docks to the right of the thread on wide screens and becomes a full-height sheet on narrow ones. The transcript and the composer stay on screen and stay usable; `Esc`, **Close**, or the rail chip closes it. Every lens ends in one sentence that re-enters the conversation — *Ask which to chase*, *Walk me through the job*, *Weigh the evidence* — so leaving a view is never a return to a menu. Settings and catch-up use the same lens. |
 
 Replies render Markdown (headings, lists, emphasis, inline and fenced code).
-
-Every settled answer carries **Copy** and **Answer again** in the transcript,
-and every question carries **Edit**. Both re-asks replace the turn in place —
-Answer again keeps the question, Edit changes it — so a weak answer never leaves
-two copies of the question stacked in the thread. Editing uses assistant-ui's
-edit composer: the bubble becomes a field with Cancel and Send, and the rest of
-the thread waits until you decide.
-
-### The thread runs on assistant-ui
-
-The studio's conversation is not a bespoke list of bubbles. `Conversation`
-mounts assistant-ui's `AssistantRuntimeProvider` with an external-store runtime
-over the messages the sidecar already owns (`apps/studio/src/assistant/convert.ts` maps
-a `ChatMessage` to a `ThreadMessageLike`), and renders the transcript through
-`ThreadPrimitive.Messages` with `MessagePrimitive`-scoped action bars. What that
-buys is the thread machinery a hand-built list has to keep reinventing: stable
-message identity, copy, edit and reload wired to the runtime's own
-capabilities, and the primitives the rest of the surface can grow into
-(branching, queued sends, dictation, attachment adapters).
-
-The store stays authoritative. The sidecar writes the transcript, memory
-restores it, and every turn carries fields a generic chat message has no room
-for — run steps, a failure, a stopped run, the agent's surfaces. Those travel in
-`metadata.custom` and as data parts, so the runtime never has to hold studio
-state and the studio never has to fork the runtime. A reload is one call:
-`sendMessage(question, files, { from: questionId })` drops that turn and every
-later one before asking again.
-
-### Run activity
-
-Every tool call is one row in the turn's timeline, not one row per event. While
-a turn streams, the studio names the work in flight — *Reading your jobs*,
-*Adding an outcome*, or the sidecar's own stage (*Waking the model*, *Opening
-your studio tools*, *Thinking*) — so a slow turn never looks like a stalled one.
-Each row carries its own outcome and duration, and a failed call keeps the
-tool's own words, so the transcript says which call broke instead of only that
-something did.
-
-When the turn settles the timeline collapses to a single line — `2 tools ·
-1.9s`, plus `1 failed` when it applies — which opens to the full list. The
-steps live on the turn itself (`ChatMessage.tools`), so the record survives the
-next question instead of being reset per run. The reducer that folds `tool`
-SSE events into turn steps lives in the runtime's `runTurn`
-(`apps/studio/src/assistant/StudioRuntime.tsx`), kept pure and testable, with
-each part rendered by `apps/studio/src/assistant/parts.tsx`.
-
-Stopping a run is a fact the transcript keeps. `Esc` (or the stop button) halts
-the stream, any tool still in flight is marked stopped, whatever prose arrived
-stays in place, and the turn says *Stopped by you* with **Ask again** — not a
-failure, because nothing broke, and not a silent disappearance, because the
-question is still on screen.
-
-Screen readers are not handed a streaming firehose. The transcript is not a
-live region; each settled reply is announced once, as prose with the Markdown
-markers removed, through a polite status region. The run's current step
-announces as it changes, each step's outcome is read as part of its row, a
-stopped turn is spoken as stopped rather than as a reply, failures arrive as an
-alert with their retry, and every turn is
-labelled with who said it — "You said", "Studio said", "Studio notice" — so
-navigating turn by turn keeps its author.
+While a turn has produced no text yet, an activity line names the phase (*Waking
+the model*, *Opening your studio tools*, *Thinking*) with a shimmer and an
+elapsed hint; the phase is announced once to assistive technology, and the reply
+is marked busy until it settles so a screen reader reads the answer, not every
+token. Reasoning sits above the answer in a disclosure that opens while it is
+being written and collapses to *Thought for Ns* afterwards, and every tool call
+is a trace chip with the source the turn actually read.
 
 ### Slash commands
 
@@ -178,18 +121,60 @@ and asks what changed rather than asking everything again.
 
 ### Without a model
 
-When the LLM is unreachable the Studio keeps working: a **Working by hand** strip explains the state and offers capture, job map, and context; messages still return deterministic ODI guidance labelled **Local guidance**; jobs, steps, and outcomes can be created, edited, and removed through the same local repository. Settings → Base URL and Model reconnect the assistant whenever you are ready. The user's context is sent with every chat request, so the assistant starts from the product, audience, job, and problem rather than asking for them again.
+When the LLM is unreachable the Studio keeps working:
+
+- A **Working by hand** strip explains the state and offers capture, job map,
+  and context.
+- Messages still return deterministic ODI guidance from the sidecar, labelled
+  **Local guidance**.
+- Jobs can be created, renamed, and deleted; steps added, edited, and removed;
+  outcomes recorded, re-scored, and removed. All of it goes through the same
+  local repository the model uses.
+- Settings → Base URL and Model reconnect the assistant whenever you are ready.
+
+The user's context is sent with every chat request, so the assistant starts from
+the product, audience, job, and problem rather than asking for them again.
 
 ### When the studio is not running
 
-The Living Studio is a local service. When the sidecar is not reachable, the SPA does not pretend otherwise:
+The Living Studio is a local service, and it is the kind of thing that is easy to
+forget to start. When the sidecar is not reachable, the SPA does not pretend
+otherwise.
 
-- A strip across the top of the window says the sidecar isn't running and the assistant is paused, with **Recheck** and **Start the sidecar**.
-- Sending a message drops a quiet in-thread notice pointing to Settings; the composer never spins.
-- The canvas keeps showing the last thing it drew instead of going blank.
+- A **subtle strip** across the top of the window says the sidecar isn't running,
+  that the assistant is paused and live data is frozen, and offers **Recheck**
+  and **Start the sidecar** (opens Settings). It is dismissible for the session
+  and clears itself once the sidecar is reached again.
+- Sending a message does not fire off a doomed request: it drops a quiet in-thread
+  notice pointing to Settings, and the composer never spins.
+- The canvas keeps showing the last thing it drew instead of going blank; a failed
+  canvas is a failure panel with Retry, not an empty board.
 
-On the CLI, the same condition is `BackendError("could not reach MCP server …")`. Through the free Cloudflare Worker proxy, a missing `SIDECAR_URL` is reported as `{"error": {"code": "mcp_unreachable", …}}` with `X-Request-ID` echoed for support.
+On the CLI, the same condition is `BackendError("could not reach MCP server …")`,
+rendered as `Error: …` followed by `Hint: Start the MCP server (python -m
+agentic_odi_mcp_server)…`. When the Studio is reached through the free
+Cloudflare Worker proxy, a missing `SIDECAR_URL` is reported to the browser as
+`{"error": {"code": "mcp_unreachable", "suggestion": "Start the studio sidecar
+…"}}` with `X-Request-ID` echoed for support.
 
+### What the canvas is made of
+
+Every canvas response carries its provenance: `live` when the sidecar read your
+store, `empty` when it read your store and found nothing, and `seed` when it is
+showing the built-in demonstration because the MCP server could not be reached.
+The sidecar says this in the payload (`provenance.kind`, `provenance.reason`,
+and record counts); it never dresses the prototype up as your data.
+
+The studio repeats that label where a person can see it: the rail shows a
+**DEMO** or **OFFLINE** chip, the Opportunity Landscape shows a sample-data
+notice, and an impact simulation must carry `provenance: live | simulated` before
+it renders. The catch-up feed starts empty rather than inventing activity, and
+every event produced by **Simulate update** is marked **Simulated** and excluded
+from the unread count. The catch-up feed has no server-side event source yet:
+its only content is the local simulator, which
+[#79](https://github.com/alehar9320/agentic-odi/issues/79) replaces. Connector rows in Settings come from the real connector
+store, grouped by capability area; nothing is pre-listed as though it were
+already connected.
 
 ### The thread is the room
 
@@ -205,20 +190,24 @@ reply with the next move as an action on the surface.
 
 ### The conversation runtime
 
-The transcript runs on **assistant-ui**, bound to the Studio's store with `useExternalStoreRuntime`, so the thread gains real conversation capabilities without giving up the sidecar's message model.
+The transcript is not a hand-rolled message list. It runs on **assistant-ui**,
+a React runtime for streaming assistants, bound to the Studio's own store with
+`useExternalStoreRuntime`, so the thread gains real conversation capabilities
+without giving up the message model the sidecar already understands.
 
 | Capability | What it means here |
 |---|---|
-| **Streaming** | `delta` frames append to the open prose part; the send button becomes stop. Before the first token, the last message shows the current phase. A keyboard-accessible **Latest message** control returns you to the live end. |
+| **Streaming** | `delta` frames append to the open prose part; the send button becomes stop. Before the first token, the last message shows the current phase with a shimmering label and dots. When you scroll away during a reply, a keyboard-accessible **Latest message** control returns you to the live end without interrupting assistant-ui's follow behavior. Empty-thread starter cards pair each suggested move with its reason, then give way to the conversation after the first turn. |
 | **Reasoning** | `reasoning` frames render in a disclosure that starts open while the model is thinking, then reads *Thought for Ns* and can be reopened. Never persisted, never counted as the answer. |
 | **Tools** | Each MCP call is a trace chip with its status and a short preview of what came back. |
-| **Approval** | A writing tool pauses the turn until you answer **Allow** or **Decline**. A decline is a tool result, not an error: the model is told no and may propose something else. |
-| **Sources** | Every tool call that returned data emits a `source`, titled with the tool and a preview of what came back. |
+| **Approval** | A writing tool (`add_`, `create_`, `update_`, `delete_`, `ingest_`, `remove_`) pauses the turn until you answer **Allow** or **Decline**. A decline is a tool result, not an error: the model is told no and may propose something else. |
+| **Sources** | Every tool call that returned data emits a `source`, titled with the tool and a preview. Provenance is what the turn actually read; a citation is never invented. |
 | **Attachments** | Attach from the paperclip, by dropping files on the composer, or by pasting a screenshot. The composer describes accepted text-like files (`.md`, `.mdx`, `.json`, `.csv`, `.yaml`, `.yml`, `.log`, `text/*`) and images (PNG/JPEG/WebP/GIF, at most 5 MB); a drop or paste of anything else is refused with the reason. Chips show a name, size, an image preview, and a remove control. Text is extracted in the browser, capped at 20,000 characters, and sent with the turn. Nothing is stored server-side. |
-| **Model** | The hint row's picker asks the sidecar (`POST /api/models`) which ids the configured backend serves, keeps the configured model selectable even when the backend omits it, and saves the choice through `saveSettings`, so Settings and the composer never disagree. |
+| **Model** | The hint row's picker asks the sidecar (`POST /api/models`) which ids the configured backend serves, keeps the configured model selectable even when the backend omits it, and saves the choice through `saveSettings`, so Settings and the composer never disagree. An unreachable or empty backend is explained in the menu rather than shown as an empty list. |
 | **Branching** | **Edit** a user turn or **Regenerate** a reply and both versions are kept as siblings. **Alternative 2 of 3** with `‹`/`›` steps between them, and the visible branch is saved as the conversation's `head_id`, so a reload reopens the branch you were reading. |
 | **Suggestions** | The empty-stage pills are chosen from the canvas and handed to the runtime as suggestion prompts. |
-| **Generative UI** | A validated `UiNode` travels as an assistant-ui **data part** (`data-odi-surface`) and renders through `UiRenderer`. The catalog stays ours and server-validated. |
+| **Generative UI** | A validated `UiNode` travels as an assistant-ui **data part** (`data-odi-surface`) and renders through the same `UiRenderer`. The catalog stays ours and server-validated. |
+| **Voice** | Deliberately not wired yet. The seam is `adapters.dictation` plus `ComposerPrimitive.Dictate`: no backend change and no message-model change. It waits because Tauri's WebKit webview support for the Web Speech API is uneven, and a microphone button that works in only one shell is worse than none. |
 
 #### Where the bridge lives
 
@@ -240,15 +229,26 @@ opt-in and additive: `reasoning`, `source`, and `approval` stream events;
 is offline. A client that sends none of these sees exactly the stream it saw
 before, which is what the CLI and older clients do.
 
-The approval gate is per-process and single-user: `ApprovalRegistry` waits on an `asyncio` future, `POST /api/approvals/{id}` answers it, and a timeout or cancelled turn resolves as a declined write, so a turn can never hang and a double click can never run a tool twice.
+The approval gate is per-process and single-user by design. `ApprovalRegistry`
+waits on an `asyncio` future, `POST /api/approvals/{id}` answers it, and a
+timeout (300 s) or a cancelled turn resolves as a declined write, so a turn can
+never hang and a double click can never run a tool twice. That is the right size
+for a loopback sidecar with one person at the keyboard; it is not a durable job
+queue, and it is not pretending to be one.
 
 #### Extending the conversation
 
-A new part is added in two places — `convert.ts` and `parts.tsx` — then registered in `Conversation.tsx`. The converter drops unknown parts on purpose.
+A new kind of part is added in exactly two places — the mapping in `convert.ts`
+and the component in `parts.tsx` — and then registered in the `components` map
+in `Conversation.tsx`. Do not add a second message list, and never let an unknown
+part reach the screen as JSON: the converter drops what it does not understand on
+purpose, and `convert.test.ts` holds that line.
 
 ### What it remembers
 
-The studio keeps a small, local model of the person it is helping.
+The studio keeps a small, local, editable model of the person it is helping. It
+is not a profile and not a transcript index; it is the handful of things that
+change the next answer.
 
 | Kind | What it captures |
 |---|---|

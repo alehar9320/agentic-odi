@@ -115,12 +115,25 @@ describe("SettingsPanel connectors", () => {
 
     renderPanel();
 
-    expect(screen.getByText(/notion/)).toBeInTheDocument();
+    expect(screen.getAllByText(/notion/).length).toBeGreaterThan(0);
     fireEvent.click(screen.getByRole("button", { name: /remove notion/i }));
     expect(del).toHaveBeenCalledWith("notion");
   });
 
-  it("adds a connector from a selected preset", () => {
+  it("groups presets by capability area with id, auth, and a connect control", () => {
+    vi.mocked(useStudio).mockReturnValue(stubContext({ connectors: [] }));
+
+    renderPanel();
+
+    expect(
+      screen.getByRole("region", { name: /voice of customer/i }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("notion")).toBeInTheDocument();
+    expect(screen.getByText(/OAuth/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /connect notion/i })).toBeInTheDocument();
+  });
+
+  it("adds a connector from its row", () => {
     const add = vi.fn().mockResolvedValue({ ok: true, name: "notion" });
     vi.mocked(useStudio).mockReturnValue(
       stubContext({ addConnector: add, connectors: [] }),
@@ -128,10 +141,7 @@ describe("SettingsPanel connectors", () => {
 
     renderPanel();
 
-    fireEvent.change(screen.getByRole("combobox", { name: /add preset/i }), {
-      target: { value: "notion" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: /add preset/i }));
+    fireEvent.click(screen.getByRole("button", { name: /connect notion/i }));
     expect(add).toHaveBeenCalledWith({ preset: "notion" });
   });
 
@@ -196,7 +206,7 @@ describe("SettingsPanel connector catalog failures", () => {
     expect(refresh).toHaveBeenCalled();
   });
 
-  it("disables adding a preset while the catalog is in error", () => {
+  it("offers no connect control while the catalog is in error", () => {
     vi.mocked(useStudio).mockReturnValue(
       stubContext({
         presets: [],
@@ -210,7 +220,7 @@ describe("SettingsPanel connector catalog failures", () => {
 
     renderPanel();
 
-    expect(screen.getByRole("button", { name: /add preset/i })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: /^connect /i })).toBeNull();
   });
 });
 

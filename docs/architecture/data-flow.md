@@ -45,18 +45,15 @@ apps/studio SPA
 apps/studio SPA
   -> /api/chat
   -> stream_chat -> OpenAI-compatible LLM -> MCP tool calls
-  -> attachments (base64 bytes on the newest user turn) -> image or text part
   -> StudioMemory (conversation turns + remembered observations)
 
-apps/studio SPA (conversation)
-  -> ChatMessage[] (the store the sidecar fills)
-  -> toThreadMessages -> useExternalStoreRuntime -> ThreadPrimitive.Messages
-  -> ActionBar copy / reload (reload -> sendMessage(question, files, {from}))
+apps/studio SPA
+  -> POST /api/approvals/{id}
+  -> ApprovalRegistry -> resolves the paused turn's pending gate
 
 apps/studio SPA
-  -> /api/models
-  -> list_models -> OpenAI-compatible /v1/models
-  -> {models, message}; an endpoint that will not list is not an error
+  -> POST /api/models
+  -> probes.list_models -> OpenAI-compatible LLM (model ids)
 ```
 
 `/api/models` is read-only discovery for the composer's picker. It answers the
@@ -194,19 +191,6 @@ MCP tool result (text)
 - **The canvas is a union.** `CanvasState` is `loading | ready | empty |
   error`. An empty canvas is an invitation; a failed canvas is a failure panel
   with Retry. The two never look the same.
-- **The thread runtime never owns studio state.** `Conversation` maps the store
-  into assistant-ui once per render (`assistant/convert.ts`) and hands it to an
-  external-store runtime; run steps, failures, stopped turns, and surfaces ride
-  in `metadata.custom` and data parts. A regenerate is a store operation
-  (`sendMessage(text, files, {from})`), not a runtime fork, so the transcript
-  the sidecar and memory own stays the only transcript.
-- **Attachments are bytes, not paths.** A user turn carries `{name, media_type,
-  data}` with base64 bytes; an image becomes an `image_url` part and a text file
-  becomes a labelled text part. The sidecar re-checks every attachment (valid
-  base64, non-empty, 8 MB ceiling, UTF-8 for non-images) and ends the turn with
-  one `error` event when one fails, so a filename is never sent as if it were a
-  file. Only the newest turn carries files: the SPA strips them from history, and
-  the sidecar names them in the remembered turn text instead.
 - **The turn log is safe.** One JSON line per turn carries the request id, the
   model, the round and tool counts, the error count, the duration, and the
   outcome. Sensitive keys are dropped rather than redacted, so no token, key,

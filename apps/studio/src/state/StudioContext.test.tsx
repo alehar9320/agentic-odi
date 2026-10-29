@@ -125,6 +125,14 @@ function route(
       ],
     });
   }
+  if (url.startsWith("/api/approvals/")) {
+    approvalCalls.push(JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>);
+    return json({ ok: true, id: url.split("/").pop() });
+  }
+  if (init?.method === "PATCH" && url.startsWith("/api/conversations/")) {
+    headPatches.push(JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>);
+    return json({ conversation: CONVERSATION });
+  }
   if (url === "/api/conversations/c-1/tree") {
     return json({
       conversation: CONVERSATION,
@@ -156,14 +164,6 @@ function route(
         updated_at: "2026-10-22T10:00:00+00:00",
       },
     });
-  }
-  if (init?.method === "PATCH" && url.startsWith("/api/conversations/")) {
-    headPatches.push(JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>);
-    return json({ conversation: CONVERSATION });
-  }
-  if (url.startsWith("/api/approvals/")) {
-    approvalCalls.push(JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>);
-    return json({ ok: true, id: url.split("/").pop() });
   }
   if (url === "/api/health/mcp") {
     return json({ reachable: true });
@@ -204,13 +204,74 @@ describe("StudioContext memory and resume", () => {
     });
 
     expect(chatBody?.messages).toEqual([
-      { id: "saved-1", parent_id: null, role: "user", content: "I own activation." },
-      { id: "saved-2", parent_id: "saved-1", role: "assistant", content: "Tell me more." },
-      expect.objectContaining({
-        role: "user",
-        content: "What should I do next?",
-        parent_id: "saved-2",
-      }),
+      { id: "t-1", parent_id: null, role: "user", content: "I own activation." },
+      { id: "t-2", parent_id: "t-1", role: "assistant", content: "Tell me more." },
+      expect.objectContaining({ role: "user", content: "What should I do next?", parent_id: "t-2" }),
+    ]);
+  });
+
+  it("regenerates an answer from its existing user turn without duplicating it", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.messages).toHaveLength(2));
+
+    await act(async () => {
+      await result.current.regenerateFrom("t-1");
+    });
+
+    expect(chatBody?.messages).toEqual([
+      { id: "t-1", parent_id: null, role: "user", content: "I own activation." },
+    ]);
+    expect(result.current.messages.map((message) => message.content)).toEqual([
+      "I own activation.",
+      "Hi",
+    ]);
+    expect(result.current.messages.filter((message) => message.role === "user")).toHaveLength(1);
+    expect(result.current.messages.at(-1)).toMatchObject({ role: "assistant", parentId: "t-1" });
+  });
+
+  it("edits a user turn by replacing it at its original parent", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.messages).toHaveLength(2));
+
+    await act(async () => {
+      await result.current.editFrom("t-1", "I own onboarding.");
+    });
+
+    expect(chatBody?.messages).toEqual([
+      expect.objectContaining({ role: "user", content: "I own onboarding.", parent_id: null }),
+    ]);
+    expect(result.current.messages.map((message) => message.content)).toEqual([
+      "I own onboarding.",
+      "Hi",
+    ]);
+    expect(result.current.messages[0].parentId).toBeNull();
+  });
+
+  it("serializes attachments with the sidecar's snake-case fields", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
+
+    await act(async () => {
+      await result.current.sendMessage("Read this", [
+        {
+          id: "file-1",
+          name: "notes.md",
+          contentType: "text/markdown",
+          size: 12,
+          text: "Useful context",
+          dataUrl: "data:image/png;base64,AAAA",
+        },
+      ]);
+    });
+
+    expect(chatBody?.attachments).toEqual([
+      {
+        name: "notes.md",
+        content_type: "text/markdown",
+        size: 12,
+        text: "Useful context",
+        data_url: "data:image/png;base64,AAAA",
+      },
     ]);
   });
 
@@ -591,7 +652,7 @@ describe("StudioContext stopped turns", () => {
   });
 });
 
-describe("StudioContext branches and approvals", () => {
+describe("StudioContext write approval and branches", () => {
   beforeEach(() => {
     localStorage.clear();
     chatBody = null;
@@ -610,72 +671,7 @@ describe("StudioContext branches and approvals", () => {
     vi.unstubAllGlobals();
   });
 
-  it("regenerates an answer from its existing user turn without duplicating it", async () => {
-    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
-    await waitFor(() => expect(result.current.messages).toHaveLength(2));
-
-    await act(async () => {
-      await result.current.regenerateFrom("saved-1");
-    });
-
-    expect(chatBody?.messages).toEqual([
-      { id: "saved-1", parent_id: null, role: "user", content: "I own activation." },
-    ]);
-    expect(result.current.messages.map((message) => message.content)).toEqual([
-      "I own activation.",
-      "Hi",
-    ]);
-    expect(result.current.messages.filter((message) => message.role === "user")).toHaveLength(1);
-    expect(result.current.messages.at(-1)).toMatchObject({ role: "assistant", parentId: "saved-1" });
-  });
-
-  it("edits a user turn by replacing it at its original parent", async () => {
-    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
-    await waitFor(() => expect(result.current.messages).toHaveLength(2));
-
-    await act(async () => {
-      await result.current.editFrom("saved-1", "I own onboarding.");
-    });
-
-    expect(chatBody?.messages).toEqual([
-      expect.objectContaining({ role: "user", content: "I own onboarding." }),
-    ]);
-    expect(result.current.messages.map((message) => message.content)).toEqual([
-      "I own onboarding.",
-      "Hi",
-    ]);
-    expect(result.current.messages[0].parentId).toBeNull();
-  });
-
-  it("serializes attachments with the sidecar's fields", async () => {
-    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
-    await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
-
-    await act(async () => {
-      await result.current.sendMessage("Read this", [
-        {
-          id: "file-1",
-          name: "notes.md",
-          contentType: "text/markdown",
-          size: 12,
-          text: "Useful context",
-          dataUrl: "data:image/png;base64,AAAA",
-        },
-      ]);
-    });
-
-    expect(chatBody?.attachments).toEqual([
-      {
-        name: "notes.md",
-        content_type: "text/markdown",
-        size: 12,
-        text: "Useful context",
-        data_url: "data:image/png;base64,AAAA",
-      },
-    ]);
-  });
-
-  it("answers a paused write", async () => {
+  it("holds a write as a question until the person answers it", async () => {
     chatStream =
       'event: approval\ndata: {"id":"apv_1","tool_call_id":"call-1","name":"add_job","prompt":"Allow the assistant to add job?"}\n\n' +
       'event: message\ndata: {"content":"Added."}\n\n';
@@ -687,11 +683,28 @@ describe("StudioContext branches and approvals", () => {
       await result.current.sendMessage("add a job for Retention");
     });
 
+    const part = result.current.messages
+      .flatMap((message) => message.parts ?? [])
+      .find((candidate) => candidate.kind === "tool" && candidate.name === "add_job");
+    expect(part).toBeDefined();
+
     await act(async () => {
       await result.current.respondToApproval("apv_1", true, "yes please");
     });
 
     expect(approvalCalls).toEqual([{ approved: true, reason: "yes please" }]);
+  });
+
+  it("asks the server for approval before any write", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
+
+    await act(async () => {
+      await result.current.sendMessage("hello");
+    });
+
+    expect(chatBody).toMatchObject({ approvals: true });
+    expect(typeof chatBody?.assistant_id).toBe("string");
   });
 
   it("persists the branch a person switched to", async () => {
@@ -707,32 +720,5 @@ describe("StudioContext branches and approvals", () => {
 
     expect(result.current.messages.map((message) => message.id)).toEqual(["b-1", "b-2"]);
     await waitFor(() => expect(headPatches).toEqual([{ head_id: "b-2" }]));
-  });
-
-  it("loads the conversation tree as the visible path", async () => {
-    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
-    await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
-
-    await act(async () => {
-      await result.current.fetchConversationTree("c-1");
-    });
-
-    expect(result.current.messages.map((message) => message.id)).toEqual(["t-1", "t-2"]);
-    expect(result.current.messages.map((message) => message.content)).toEqual([
-      "I own activation.",
-      "Tell me more.",
-    ]);
-    expect(result.current.conversationId).toBe("c-1");
-  });
-
-  it("records which branch is visible", async () => {
-    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
-    await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
-
-    await act(async () => {
-      await result.current.setConversationHead("c-1", "t-1");
-    });
-
-    expect(headPatches).toEqual([{ head_id: "t-1" }]);
   });
 });

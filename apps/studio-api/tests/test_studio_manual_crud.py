@@ -38,6 +38,17 @@ def test_missing_job_returns_404() -> None:
 def test_step_can_be_edited_and_removed() -> None:
     client = _client()
     job = client.post("/api/jobs", json={"name": "Ship a service"}).json()
+    # An outcome must exist before steps can be added.
+    client.post(
+        "/api/outcomes",
+        json={
+            "mcp_url": "",
+            "job_id": job["id"],
+            "statement": "Minimize the time it takes to deploy when releasing",
+            "importance": 8.0,
+            "satisfaction": 4.0,
+        },
+    )
     step = client.post(
         "/api/steps",
         json={"mcp_url": "", "job_id": job["id"], "name": "Prepare", "order": 3},
