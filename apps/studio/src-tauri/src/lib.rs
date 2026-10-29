@@ -58,6 +58,9 @@ fn shutdown(children: &mut Vec<Child>) {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_updater::Builder::new().build())
+        // The updater installs the new bundle; this plugin performs the
+        // in-place relaunch that makes the staged update take effect.
+        .plugin(tauri_plugin_process::init())
         .manage(Sidecars(Mutex::new(Vec::new())))
         .setup(|app| {
             match find_repo_root() {

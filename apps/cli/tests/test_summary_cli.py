@@ -14,27 +14,10 @@ def _seed(db: str) -> str:
     job = runner.invoke(app, ["--db", db, "jobs", "add", "--name", "Deploy a service", "--json"])
     assert job.exit_code == 0, job.output
     job_id = json.loads(job.output)["id"]
-    for order in (1, 4):
-        step = runner.invoke(
-            app,
-            [
-                "--db",
-                db,
-                "steps",
-                "add",
-                "--job-id",
-                job_id,
-                "--name",
-                f"stage {order}",
-                "--order",
-                str(order),
-            ],
-        )
-        assert step.exit_code == 0, step.output
     for statement, importance, satisfaction in (
         ("Minimize the time to deploy when a fix is ready", 9, 3),
-        ("Maximize the services shipped while the team is small", 8, 4),
-        ("Minimize rework after a rollback when the release is hot", 4, 4),
+        ("Maximize the number of services shipped when the team is small", 8, 4),
+        ("Minimize the number of rework attempts after a rollback when the release is hot", 4, 4),
     ):
         outcome = runner.invoke(
             app,
@@ -54,6 +37,23 @@ def _seed(db: str) -> str:
             ],
         )
         assert outcome.exit_code == 0, outcome.output
+    for order in (1, 4):
+        step = runner.invoke(
+            app,
+            [
+                "--db",
+                db,
+                "steps",
+                "add",
+                "--job-id",
+                job_id,
+                "--name",
+                f"stage {order}",
+                "--order",
+                str(order),
+            ],
+        )
+        assert step.exit_code == 0, step.output
     return job_id
 
 

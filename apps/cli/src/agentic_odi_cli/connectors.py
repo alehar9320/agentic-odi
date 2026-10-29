@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING
 
 import typer
 
+from agentic_odi_cli import flags
 from agentic_odi_cli.backend import run_tool
 from agentic_odi_cli.render import render_saved
 
@@ -119,9 +120,26 @@ def _run(coro, name: str):
 @connectors_app.command("list")
 def list_connectors(
     config: Path | None = ConfigOption,
+    as_json: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
     """List configured external connectors."""
     items = _registry(config).list_all()
+    if as_json:
+        typer.echo(
+            json.dumps(
+                [
+                    {
+                        "name": item.name,
+                        "kind": item.kind,
+                        "url": item.settings.get("url"),
+                        "enabled": item.enabled,
+                    }
+                    for item in items
+                ],
+                indent=2,
+            )
+        )
+        return
     if not items:
         typer.echo("No connectors configured.")
         return
@@ -226,6 +244,13 @@ def add_connector(
     config: Path | None = ConfigOption,
 ) -> None:
     """Register a new external connector, optionally from a known preset."""
+    if not flags.is_enabled("experimental_connectors"):
+        typer.echo(
+            "Error: connector management requires the experimental_connectors flag. "
+            "Enable it with: agentic-odi settings flags set experimental_connectors true",
+            err=True,
+        )
+        raise typer.Exit(code=1)
     from agentic_odi_connectors.models import ConnectorConfig
     from agentic_odi_connectors.registry import DuplicateConnectorError, UnknownConnectorKindError
 
@@ -278,6 +303,13 @@ def health_connector(
     config: Path | None = ConfigOption,
 ) -> None:
     """Check whether a connector can reach its external system."""
+    if not flags.is_enabled("experimental_connectors"):
+        typer.echo(
+            "Error: connector management requires the experimental_connectors flag. "
+            "Enable it with: agentic-odi settings flags set experimental_connectors true",
+            err=True,
+        )
+        raise typer.Exit(code=1)
     from agentic_odi_connectors.registry import ConnectorNotFoundError, UnknownConnectorKindError
 
     try:
@@ -307,6 +339,13 @@ def ingest_connector(
     config: Path | None = ConfigOption,
 ) -> None:
     """Ingest connector records and optionally map them into ODI evidence."""
+    if not flags.is_enabled("experimental_connectors"):
+        typer.echo(
+            "Error: connector management requires the experimental_connectors flag. "
+            "Enable it with: agentic-odi settings flags set experimental_connectors true",
+            err=True,
+        )
+        raise typer.Exit(code=1)
     from agentic_odi_connectors.registry import ConnectorNotFoundError, UnknownConnectorKindError
 
     try:
