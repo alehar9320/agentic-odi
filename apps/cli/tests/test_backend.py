@@ -372,6 +372,42 @@ def test_local_backend_rejects_out_of_range_scores(tmp_path):
         )
 
 
+def test_local_backend_reports_an_over_long_note_as_a_note_error(tmp_path):
+    """A bad note is not a bad score: the message must name the note, not the range."""
+    backend = LocalBackend(db_path=str(tmp_path / "odi.db"))
+    job_id = backend.call("add_job", {"name": "Job"})["id"]
+    statement = "Minimize the time to ship a release when the build is green"
+
+    with pytest.raises(BackendError, match="note must be 500 characters or fewer") as added:
+        backend.call(
+            "add_outcome",
+            {
+                "job_id": job_id,
+                "statement": statement,
+                "importance": 8.0,
+                "satisfaction": 5.0,
+                "note": "x" * 501,
+            },
+        )
+    assert "between 1.0 and 10.0" not in added.value.args[0]
+
+    outcome_id = backend.call(
+        "add_outcome",
+        {"job_id": job_id, "statement": statement, "importance": 8.0, "satisfaction": 5.0},
+    )["id"]
+
+    with pytest.raises(BackendError, match="note must be 500 characters or fewer") as updated:
+        backend.call(
+            "update_outcome",
+            {"outcome_id": outcome_id, "satisfaction": 6.0, "note": "y" * 501},
+        )
+    assert "between 1.0 and 10.0" not in updated.value.args[0]
+
+    # Neither rejection may leave a trace in the history.
+    history = backend.call("get_outcome_history", {"outcome_id": outcome_id})
+    assert len(history) == 1
+
+
 def test_local_backend_update_customer_outcome_folds_value_metrics(tmp_path):
     backend = LocalBackend(db_path=str(tmp_path / "odi.db"))
     job_id = backend.call("add_job", {"name": "Job"})["id"]

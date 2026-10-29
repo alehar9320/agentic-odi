@@ -244,6 +244,7 @@ class LocalBackend(Backend):
     def _add_outcome(self, args: dict[str, Any]) -> dict[str, Any]:
         from agentic_odi_core import (
             JobNotFoundError,
+            SnapshotNoteError,
             StepNotFoundError,
             ValueOutOfRangeError,
             job_not_found,
@@ -269,6 +270,10 @@ class LocalBackend(Backend):
             raise BackendError(job_not_found(args["job_id"])) from None
         except StepNotFoundError:
             raise BackendError(step_not_found(step_id)) from None
+        except SnapshotNoteError as exc:
+            # Before ValueOutOfRangeError: a bad note is not a bad score, and the
+            # fixed range message would misreport it.
+            raise BackendError(str(exc)) from exc
         except ValueOutOfRangeError as exc:
             raise BackendError(
                 _SAMPLE_METHOD_ERROR if "estimate" in str(exc) else _VALUE_RANGE_ERROR
@@ -312,7 +317,12 @@ class LocalBackend(Backend):
         return [snapshot.model_dump() for snapshot in snapshots]
 
     def _update_outcome(self, args: dict[str, Any]) -> dict[str, Any]:
-        from agentic_odi_core import OutcomeNotFoundError, ValueOutOfRangeError, outcome_not_found
+        from agentic_odi_core import (
+            OutcomeNotFoundError,
+            SnapshotNoteError,
+            ValueOutOfRangeError,
+            outcome_not_found,
+        )
         from pydantic import ValidationError
 
         updates: dict[str, Any] = {
@@ -334,6 +344,10 @@ class LocalBackend(Backend):
             )
         except OutcomeNotFoundError:
             raise BackendError(outcome_not_found(args["outcome_id"])) from None
+        except SnapshotNoteError as exc:
+            # Before ValueOutOfRangeError: a bad note is not a bad score, and the
+            # fixed range message would misreport it.
+            raise BackendError(str(exc)) from exc
         except ValueOutOfRangeError as exc:
             raise BackendError(
                 _SAMPLE_METHOD_ERROR if "estimate" in str(exc) else _VALUE_RANGE_ERROR
