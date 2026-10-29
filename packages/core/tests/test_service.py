@@ -179,7 +179,7 @@ def test_job_not_found_error_exposes_the_job_id() -> None:
     error = JobNotFoundError("job-1")
 
     assert error.job_id == "job-1"
-    assert str(error) == "job-1"
+    assert str(error) == "job not found: job-1"
 
 
 def test_add_customer_outcome_accepts_dict_payloads(service: ODIService) -> None:

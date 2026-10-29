@@ -7,6 +7,7 @@ import sqlite3
 from datetime import datetime, timezone
 from typing import Any
 
+from agentic_odi_core.errors import ConflictError, StoreError
 from agentic_odi_core.events import (
     DEFAULT_DEVICE,
     DEFAULT_WORKSPACE,
@@ -121,9 +122,9 @@ class IntentStore:
             ).fetchone()
 
         if row is None:
-            raise RuntimeError(f"event {resolved_id} could not be stored")
+            raise StoreError(f"event {resolved_id} could not be stored")
         if row[2] != workspace_id:
-            raise ValueError(f"event_id {resolved_id} already belongs to another workspace")
+            raise ConflictError(f"event_id {resolved_id} already belongs to another workspace")
         return self._to_event(row)
 
     def get_stream(

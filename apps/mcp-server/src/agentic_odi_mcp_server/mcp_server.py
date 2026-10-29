@@ -51,8 +51,11 @@ def _outcome_not_found(outcome_id: str | None) -> str:
     return f"Error: Outcome with ID {outcome_id} not found."
 
 
-def _evidence_not_found(evidence_id: str) -> str:
-    return f"Error: Evidence with ID {evidence_id} not found."
+def _evidence_not_found(evidence_id: str, hint: str | None = None) -> str:
+    message = f"Error: Evidence with ID {evidence_id} not found."
+    if hint:
+        message = f"{message} {hint}"
+    return message
 
 
 @mcp.prompt
@@ -425,7 +428,7 @@ async def add_evidence(
         return _step_not_found(step_id)
     except OutcomeNotFoundError:
         return _outcome_not_found(outcome_id)
-    except ValueError as exc:
+    except (OdiError, ValueError) as exc:
         return f"Error: {exc}"
     await ctx.report_progress(2, 2, "Evidence stored")
     return f"Evidence created successfully: {evidence.model_dump_json()}"
@@ -435,7 +438,10 @@ async def add_evidence(
 def get_evidence(evidence_id: str) -> str:
     evidence = service.get_evidence(evidence_id)
     if evidence is None:
-        return _evidence_not_found(evidence_id)
+        return _evidence_not_found(
+            evidence_id,
+            "List the stored records with list_evidence() to find a valid id.",
+        )
     return evidence.model_dump_json()
 
 
@@ -458,8 +464,8 @@ def list_evidence(
 def delete_evidence(evidence_id: str) -> str:
     try:
         service.delete_evidence(evidence_id)
-    except EvidenceNotFoundError:
-        return _evidence_not_found(evidence_id)
+    except EvidenceNotFoundError as exc:
+        return _evidence_not_found(evidence_id, exc.hint)
     return f"Evidence deleted successfully: {evidence_id}"
 
 
@@ -483,8 +489,8 @@ def promote_evidence(
             importance=importance,
             satisfaction=satisfaction,
         )
-    except EvidenceNotFoundError:
-        return _evidence_not_found(evidence_id)
+    except EvidenceNotFoundError as exc:
+        return _evidence_not_found(evidence_id, exc.hint)
     except JobNotFoundError:
         return job_not_found(job_id or "")
     except StepNotFoundError:
@@ -493,7 +499,7 @@ def promote_evidence(
         return _outcome_not_found(None)
     except ValueOutOfRangeError:
         return "Error: importance and satisfaction must be between 1.0 and 10.0"
-    except ValueError as exc:
+    except (OdiError, ValueError) as exc:
         return f"Error: {exc}"
     label = "Job" if target == "job" else "Outcome"
     return f"{label} created successfully: {artifact.model_dump_json()}"
