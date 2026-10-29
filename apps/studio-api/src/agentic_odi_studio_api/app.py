@@ -8,6 +8,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from agentic_odi_core import ODIService
+from agentic_odi_core.messages import CAPABILITIES
 from agentic_odi_core.remote import StudioError, StudioErrorCode
 from agentic_odi_core.repository import Repository
 from agentic_odi_core.sqlite_repository import SQLiteRepository
@@ -96,7 +97,7 @@ def create_app(
 
     @app.get("/capabilities")
     def capabilities() -> dict:
-        return {"capabilities": app.state.backend}
+        return {"capabilities": CAPABILITIES}
 
     app.include_router(studio_router)
 

@@ -27,6 +27,7 @@ const PILL_ICONS: ReactNode[] = [
 interface HeroPill {
   id: string;
   label: string;
+  description?: string;
   icon: ReactNode;
   run: () => void;
   conversational?: boolean;
@@ -95,6 +96,7 @@ export function Hero() {
   const pills: HeroPill[] = suggestions.map((suggestion, index) => ({
     id: `suggestion-${index}`,
     label: suggestion.title ?? suggestion.prompt,
+    description: suggestion.label,
     icon: PILL_ICONS[index % PILL_ICONS.length],
     run: () => void sendMessage(suggestion.prompt),
     conversational: true,
@@ -134,12 +136,21 @@ export function Hero() {
           <button
             key={pill.id}
             type="button"
-            className="suggestion"
+            className={`suggestion${pill.conversational ? " suggestion--card" : ""}`}
             disabled={Boolean(pill.conversational && streaming)}
             onClick={pill.run}
           >
             {pill.icon}
-            {pill.label}
+            {pill.conversational ? (
+              <span className="suggestion__copy">
+                <span className="suggestion__title">{pill.label}</span>
+                {pill.description ? (
+                  <span className="suggestion__description">{pill.description}</span>
+                ) : null}
+              </span>
+            ) : (
+              pill.label
+            )}
           </button>
         ))}
         <button

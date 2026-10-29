@@ -8,6 +8,7 @@ import {
   type StoredOutcome,
   type StoredStep,
   type StoredTurn,
+  type WorkspaceSnapshot,
 } from "./types";
 
 /** Session-only fallback for browsers that deny IndexedDB. */
@@ -172,6 +173,55 @@ export class MemoryLocalStore implements LocalStore {
         this.turns.splice(index, 1);
       }
     }
+  }
+
+  async snapshot(): Promise<WorkspaceSnapshot> {
+    const jobs = await this.listJobs();
+    const steps = await this.listSteps();
+    const outcomes = await this.listOutcomes();
+    const observations = await this.listObservations();
+    const conversations = await this.listConversations();
+    return {
+      version: 1,
+      jobs,
+      steps,
+      outcomes,
+      observations,
+      conversations,
+      turns: [...this.turns],
+    };
+  }
+
+  async restore(snapshot: WorkspaceSnapshot): Promise<void> {
+    this.jobs.clear();
+    for (const job of snapshot.jobs) {
+      this.jobs.set(job.id, job);
+    }
+    this.steps.clear();
+    for (const step of snapshot.steps) {
+      this.steps.set(step.id, step);
+    }
+    this.outcomes.clear();
+    for (const outcome of snapshot.outcomes) {
+      this.outcomes.set(outcome.id, outcome);
+    }
+    this.observations.clear();
+    for (const observation of snapshot.observations) {
+      this.observations.set(observation.id, observation);
+    }
+    this.conversations.clear();
+    for (const conversation of snapshot.conversations) {
+      this.conversations.set(conversation.id, conversation);
+    }
+    this.turns.length = 0;
+    this.turns.push(...snapshot.turns);
+    this.seq = Math.max(
+      0,
+      ...snapshot.jobs.map((job) => job.seq),
+      ...snapshot.steps.map((step) => step.seq),
+      ...snapshot.outcomes.map((outcome) => outcome.seq),
+    );
+    this.turnId = Math.max(0, ...snapshot.turns.map((turn) => turn.id ?? 0));
   }
 
   async clearAll(): Promise<void> {

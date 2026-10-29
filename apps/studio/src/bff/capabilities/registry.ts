@@ -1,3 +1,4 @@
+import { apiUrl } from "../../bridge/desktopBridge";
 import type { StudioConfig } from "../../types";
 
 export type CapabilityId =
@@ -97,6 +98,32 @@ function isEndpointConfigured(settings: StudioConfig): boolean {
   );
 }
 
+/** Probe a same-origin sidecar route. In the browser this is the Worker
+ * origin; in Tauri it is the local sidecar at 127.0.0.1:8100. When
+ * `capabilityId` is given the route is expected to return a capabilities
+ * manifest and the probe only succeeds if that capability is advertised
+ * as available. This keeps the Worker's local-only manifest (which marks
+ * sidecar capabilities unavailable) from being mistaken for a real sidecar. */
+async function probeSidecar(path: string, capabilityId?: CapabilityId): Promise<boolean> {
+  try {
+    const response = await fetch(apiUrl(path), {
+      signal: AbortSignal.timeout(2000),
+    });
+    if (!response.ok) {
+      return false;
+    }
+    if (!capabilityId) {
+      return true;
+    }
+    const body = (await response.json()) as { capabilities?: Array<{ id: string; available?: boolean }> };
+    return body.capabilities?.some(
+      (capability) => capability.id === capabilityId && capability.available === true,
+    ) ?? false;
+  } catch {
+    return false;
+  }
+}
+
 export class CapabilityRegistry {
   private readonly probes: CapabilityProbe[] = [
     {
@@ -115,25 +142,25 @@ export class CapabilityRegistry {
       id: "sidecar-llm",
       label: localStatuses["sidecar-llm"].label,
       description: localStatuses["sidecar-llm"].description,
-      check: async (settings) => this.probeSidecar(settings.base_url, "/api/capabilities"),
+      check: async () => probeSidecar("/api/capabilities", "sidecar-llm"),
     },
     {
       id: "sidecar-connectors",
       label: localStatuses["sidecar-connectors"].label,
       description: localStatuses["sidecar-connectors"].description,
-      check: async (settings) => this.probeSidecar(settings.base_url, "/api/connectors"),
+      check: async () => probeSidecar("/api/connectors"),
     },
     {
       id: "sidecar-mcp",
       label: localStatuses["sidecar-mcp"].label,
       description: localStatuses["sidecar-mcp"].description,
-      check: async (settings) => this.probeSidecar(settings.base_url, "/api/health/mcp"),
+      check: async () => probeSidecar("/api/health/mcp"),
     },
     {
       id: "sidecar-import",
       label: localStatuses["sidecar-import"].label,
       description: localStatuses["sidecar-import"].description,
-      check: async (settings) => this.probeSidecar(settings.base_url, "/api/capabilities"),
+      check: async () => probeSidecar("/api/capabilities", "sidecar-import"),
     },
   ];
 
@@ -161,17 +188,6 @@ export class CapabilityRegistry {
       localStatuses["deterministic-assistant"],
       ...results,
     ];
-  }
-
-  private async probeSidecar(baseUrl: string, path: string): Promise<boolean> {
-    try {
-      const response = await fetch(`${baseUrl.replace(/\/$/, "")}${path}`, {
-        signal: AbortSignal.timeout(2000),
-      });
-      return response.ok;
-    } catch {
-      return false;
-    }
   }
 }
 

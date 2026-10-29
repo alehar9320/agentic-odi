@@ -502,3 +502,44 @@ def test_connectors_ingest_maps_records_to_evidence(tmp_path: Path, monkeypatch)
     payload = json.loads(listed.output)
     assert [item["content"] for item in payload] == ["Onboarding is slow"]
     assert all(item["name"] != "mcp-catalog" for item in payload)
+
+
+def test_connectors_list_json_prints_expected_fields(tmp_path: Path) -> None:
+    config = tmp_path / "connectors.json"
+    runner.invoke(
+        app,
+        [
+            "connectors",
+            "add",
+            "mcp",
+            "--name",
+            "gong",
+            "--url",
+            "http://localhost:9000/mcp",
+            "--config",
+            str(config),
+        ],
+    )
+
+    result = runner.invoke(app, ["connectors", "list", "--config", str(config), "--json"])
+
+    assert result.exit_code == 0
+    payload = json.loads(_strip(result.output))
+    assert isinstance(payload, list)
+    assert payload == [
+        {
+            "name": "gong",
+            "kind": "mcp",
+            "url": "http://localhost:9000/mcp",
+            "enabled": True,
+        }
+    ]
+
+
+def test_connectors_list_json_is_an_empty_array(tmp_path: Path) -> None:
+    config = tmp_path / "connectors.json"
+
+    result = runner.invoke(app, ["connectors", "list", "--config", str(config), "--json"])
+
+    assert result.exit_code == 0
+    assert json.loads(_strip(result.output)) == []

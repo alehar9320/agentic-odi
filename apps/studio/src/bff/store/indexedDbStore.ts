@@ -10,6 +10,7 @@ import {
   type StoredOutcome,
   type StoredStep,
   type StoredTurn,
+  type WorkspaceSnapshot,
 } from "./types";
 
 const DB_NAME = "agentic-odi-studio";
@@ -238,6 +239,57 @@ export class IndexedDbLocalStore implements LocalStore {
     const tx = this.db.transaction("turns", "readwrite");
     const keys = await tx.store.index("by-conversation").getAllKeys(conversationId);
     await Promise.all(keys.map((key) => tx.store.delete(key)));
+    await tx.done;
+  }
+
+  async snapshot(): Promise<WorkspaceSnapshot> {
+    const [jobs, steps, outcomes, observations, conversations] = await Promise.all([
+      this.listJobs(),
+      this.listSteps(),
+      this.listOutcomes(),
+      this.listObservations(),
+      this.listConversations(),
+    ]);
+    const turnLists = await Promise.all(
+      conversations.map((conversation) => this.listTurns(conversation.id)),
+    );
+    const turns = turnLists.flat();
+    return {
+      version: 1,
+      jobs,
+      steps,
+      outcomes,
+      observations,
+      conversations,
+      turns,
+    };
+  }
+
+  async restore(snapshot: WorkspaceSnapshot): Promise<void> {
+    await this.clearAll();
+    const tx = this.db.transaction(
+      [
+        "jobs",
+        "steps",
+        "outcomes",
+        "observations",
+        "conversations",
+        "turns",
+      ],
+      "readwrite",
+    );
+    await Promise.all([
+      ...snapshot.jobs.map((job) => tx.objectStore("jobs").put(job)),
+      ...snapshot.steps.map((step) => tx.objectStore("steps").put(step)),
+      ...snapshot.outcomes.map((outcome) => tx.objectStore("outcomes").put(outcome)),
+      ...snapshot.observations.map((observation) =>
+        tx.objectStore("observations").put(observation),
+      ),
+      ...snapshot.conversations.map((conversation) =>
+        tx.objectStore("conversations").put(conversation),
+      ),
+      ...snapshot.turns.map((turn) => tx.objectStore("turns").put(turn)),
+    ]);
     await tx.done;
   }
 

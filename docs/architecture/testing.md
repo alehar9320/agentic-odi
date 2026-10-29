@@ -74,7 +74,7 @@ Tests live next to their package (`packages/*/tests`, `apps/*/tests`). `testpath
 - `test_insight_commands.py` — `evaluate`, guidelines, and capabilities on the local backend.
 - `test_backend.py`, `test_backend_edges.py`, `test_backend_selection.py` — local vs MCP backend selection and errors.
 - `test_context.py` — the global backend context.
-- `test_chat_cli.py`, `test_chat_runtime.py`, `test_chat_wizard.py` — chat command, interactive loop and handlers, and first-run wizard.
+- `test_chat_cli.py`, `test_chat_runtime.py`, `test_chat_wizard.py` — chat command, interactive loop and handlers (including reasoning kept out of the answer, and the terminal-only `thinking…` hint), and first-run wizard.
 - `test_connectors_cli.py`, `test_connectors_edges.py` — `connectors` subcommands and their edges.
 - `test_onboard.py` — first-run onboarding signal extraction and gating.
 - `test_update.py`, `test_update_command.py`, `test_update_edges.py`, `test_update_check.py` — update checks and installation.
@@ -131,3 +131,9 @@ npm --prefix apps/studio test -- --run
 npm --prefix apps/studio run build
 cd apps/studio/src-tauri && cargo fmt --check && cargo clippy -- -D warnings && cargo check
 ```
+
+The self-updater lives in `apps/studio/src/updater/` and is covered by vitest:
+`machine.test.ts` (state transitions), `service.test.ts` (scheduling,
+download, and install), `transport.test.ts` (Tauri boundary), and the
+`UpdateBanner`/`UpdateSettings` component tests. `StudioBar.test.tsx` and
+`SettingsPanel.test.tsx` cover the UI integration points.
