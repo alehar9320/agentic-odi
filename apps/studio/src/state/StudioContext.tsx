@@ -54,6 +54,7 @@ import {
 } from "../api/studioApi";
 import type { RawSseEvent } from "../api/sse";
 import { capabilityRegistry, type Capability } from "../bff/capabilities/registry";
+import { loadSession, saveSession, type StudioSession } from "../lib/session";
 import type {
   AddConnectorPayload,
   AddOutcomePayload,
@@ -343,6 +344,8 @@ export interface StudioContextValue {
   dismissSignal: (id: string) => void;
   /** Mark read, then open the lens on whatever the signal is about. */
   focusSignalSubject: (signal: Signal) => void;
+  /** Point the studio at a subject and remember it for the next visit. */
+  focusSubject: (kind: SignalSubjectKind, id: string) => void;
   focusedSubject: { kind: SignalSubjectKind; id: string } | null;
   /** The job that owns the focused subject, so canvas panels can select it. */
   focusedJobId: string | null;
@@ -361,6 +364,31 @@ function loadSettings(): StudioConfig {
     /* ignore malformed cache */
   }
   return EMPTY_CONFIG;
+}
+
+function loadFocusedSubject(): { kind: SignalSubjectKind; id: string } | null {
+  const session = loadSession();
+  if (!session) {
+    return null;
+  }
+  if (session.job_id) {
+    return { kind: "job", id: session.job_id };
+  }
+  if (session.step_id) {
+    return { kind: "step", id: session.step_id };
+  }
+  if (session.outcome_id) {
+    return { kind: "outcome", id: session.outcome_id };
+  }
+  return null;
+}
+
+function sessionForSubject(kind: SignalSubjectKind, id: string): StudioSession {
+  return {
+    job_id: kind === "job" ? id : null,
+    step_id: kind === "step" ? id : null,
+    outcome_id: kind === "outcome" ? id : null,
+  };
 }
 
 function loadCanvasCache(): CanvasData | null {
@@ -470,7 +498,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [focusedSubject, setFocusedSubject] = useState<{
     kind: SignalSubjectKind;
     id: string;
-  } | null>(null);
+  } | null>(loadFocusedSubject);
   const [customizeOpen, setCustomizeOpen] = useState(false);
   const [customizeTarget, setCustomizeTarget] = useState<CustomizeTarget | null>(null);
   const [marketplace, setMarketplace] = useState<MarketplaceSearch | null>(null);
@@ -1078,6 +1106,18 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   );
 
   /**
+   * Point the studio at a subject and persist it, so a reload can resume on
+   * the same job, step, or outcome. Evidence has no session slot.
+   */
+  const focusSubject = useCallback((kind: SignalSubjectKind, id: string) => {
+    setFocusedSubject({ kind, id });
+    if (kind === "evidence") {
+      return;
+    }
+    saveSession(sessionForSubject(kind, id));
+  }, []);
+
+  /**
    * What a card does when activated: read the signal, then take the person to
    * the record it names. This is the job `targetId` never did.
    */
@@ -1091,13 +1131,13 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       if (!kind || !id) {
         return;
       }
-      setFocusedSubject({ kind, id });
+      focusSubject(kind, id);
       const panel = PANEL_FOR_SUBJECT[kind];
       if (panel) {
         openPanel(panel);
       }
     },
-    [markSignalAsRead, openPanel],
+    [markSignalAsRead, openPanel, focusSubject],
   );
 
   /** The job owning the focused subject, so canvas panels can select it. */
@@ -1899,6 +1939,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       markSignalAsRead,
       dismissSignal,
       focusSignalSubject,
+      focusSubject,
       focusedSubject,
       focusedJobId,
       simulateBackgroundEvent,
@@ -2005,6 +2046,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       markSignalAsRead,
       dismissSignal,
       focusSignalSubject,
+      focusSubject,
       focusedSubject,
       focusedJobId,
       simulateBackgroundEvent,

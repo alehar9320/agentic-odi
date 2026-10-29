@@ -19,6 +19,7 @@ const mocks = vi.hoisted(() => ({
   deleteStep: vi.fn(async () => undefined),
   updateJob: vi.fn(async () => undefined),
   deleteJob: vi.fn(async () => undefined),
+  focusSubject: vi.fn(),
 }));
 
 const harness = vi.hoisted(() => ({
@@ -75,6 +76,29 @@ describe("JobMap Interactive Visualization", () => {
 
     expect(screen.getByRole("combobox", { name: "Job" })).toHaveValue("JOB-2");
     expect(screen.getByText("Sign the renewal")).toBeInTheDocument();
+  });
+
+  it("records the job the user picks in the session", () => {
+    harness.state.canvasState = {
+      kind: "ready",
+      data: {
+        jobs: [
+          { id: "JOB-1", name: "Deploy Service" },
+          { id: "JOB-2", name: "Review contracts" },
+        ],
+        steps: [],
+        outcomes: [],
+        source: "seed" as const,
+      },
+    };
+
+    render(<JobMap />);
+
+    fireEvent.change(screen.getByRole("combobox", { name: "Job" }), {
+      target: { value: "JOB-2" },
+    });
+
+    expect(mocks.focusSubject).toHaveBeenCalledWith("job", "JOB-2");
   });
 
   it("names the Ulwick phase on each step row", () => {
