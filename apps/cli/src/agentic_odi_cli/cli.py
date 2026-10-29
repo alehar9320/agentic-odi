@@ -223,6 +223,38 @@ def capabilities_cmd(
 
 
 app.add_typer(capabilities_app, name="capabilities")
+
+
+@app.command(name="spine")
+def spine_cmd(
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
+) -> None:
+    """Report which stages of the quote-to-measurement spine are implemented.
+
+    Until the spine stages land, this prints the honest gap — each stage with the
+    issue that implements it — rather than a fabricated number.
+    """
+    from agentic_odi_core import seam_inventory, spine_summary
+
+    if json_output:
+        inventory = [
+            {
+                "id": status.id,
+                "available": status.available,
+                "owner": {
+                    "issue": status.owner.issue,
+                    "title": status.owner.title,
+                    "issue_title": status.owner.issue_title,
+                    "module": status.owner.module,
+                },
+            }
+            for status in seam_inventory()
+        ]
+        typer.echo(json.dumps({"seams": inventory}, indent=2))
+    else:
+        typer.echo(spine_summary())
+
+
 app.add_typer(settings_app, name="settings")
 app.add_typer(profile_app, name="profile")
 app.add_typer(profile_app, name="setup", hidden=True)

@@ -190,6 +190,8 @@ agentic-odi guidelines        # the ODI stage-by-stage guide
 agentic-odi capabilities      # what the assistant can do
 agentic-odi capabilities --json   # machine-readable manifest
 agentic-odi capabilities tools  # tool names only
+agentic-odi spine             # which stages of the quote-to-measurement spine exist
+agentic-odi spine --json      # the same, machine-readable
 ```
 
 `evaluate` returns the same verdict the `evaluate_outcome` MCP tool does, so the
@@ -198,6 +200,11 @@ check works with or without a running server.
 `capabilities` groups every tool by effect (read/write/destructive) and by ODI
 stage. `capabilities --json` emits the full machine-readable manifest.
 `capabilities tools` lists tool names only.
+
+`spine` reports which stages of the quote → candidate → outcome → score → brief →
+decision → bet → measure pipeline are implemented in this build, and names the
+issue that owns each stage that is not. Until those stages land it prints
+"nothing yet" — it never fabricates a number to fill a gap.
 
 ## Inspect settings and feature flags
 

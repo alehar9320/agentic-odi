@@ -197,3 +197,37 @@ ALH-129 and the rest of the M4/M5 tree all name spine contracts (memo, brief,
 decision, approval, template engine, demo loader) that do not exist in the tree.
 Per the children's own rule, the correct action is to report the missing stage by
 reference rather than invent a stub.
+
+## Wave 1d · The spine seam (delivered)
+
+The blocked children cannot be built for real until the spine exists, but they
+can be built *against a stable shape* now. This wave adds that shape so work can
+proceed in parallel and each blocked child is a drop-in replacement rather than a
+rewrite.
+
+- `packages/core/src/agentic_odi_core/spine.py` — `SpineStage` (the seven ordered
+  stages), `SEAM_OWNERS` (each stage's owning issue, so a gap is reported by
+  reference), a `Protocol` per stage, an `Unavailable*` stub per stage that
+  raises the typed `StageNotImplemented` (an `OdiError`), a `Spine` container,
+  and an inventory (`seam_inventory` / `missing_stages` / `spine_summary`).
+- `packages/core/tests/test_spine.py` — 34 tests: the stub refuses rather than
+  fabricating, the refusal names its owner, the inventory reports "nothing yet",
+  a wired stage flips only its own status, the wire shapes stay out of
+  `odi_schema()`, and the seven stages compose end to end through labelled test
+  doubles.
+- `apps/cli/src/agentic_odi_cli/cli.py` — `agentic-odi spine [--json]`, the
+  surface that lets a person see the honest gap.
+- `docs/architecture/spine.md`, `docs/cli.md` — the seam's contract and the
+  command.
+
+**Why stubs, and why they refuse.** A stub that returns a placeholder is
+indistinguishable from real data once it reaches a brief. Every stub here raises
+instead, so nothing downstream can render a number the spine did not produce.
+The wire shapes (`CandidateOutcome`, `ScoreSample`, …) carry no `id` factory and
+no persistence wiring; when a stage lands, its real model replaces the wire shape
+and takes on the full persistence checklist.
+
+This is the seam ALH-63's end-to-end spine test and ALH-59's guides will extend:
+a consumer depends on `Spine` and a `Protocol`, wires the real implementation
+when it lands, and reads `spine_summary()` to render the gap meanwhile.
+
