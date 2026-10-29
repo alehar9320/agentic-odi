@@ -71,6 +71,10 @@ export function SettingsPanel() {
     clearChat,
     refreshCanvas,
     llmHealth,
+    models,
+    modelsLoading,
+    modelsMessage,
+    refreshModels,
     mcpReachable,
     connectors,
     connectorsError,
@@ -165,14 +169,42 @@ export function SettingsPanel() {
         </div>
       </div>
       <div className="field">
-        <label htmlFor="model-name">Model</label>
+        <label htmlFor="model-name">
+          Model <span className="field__hint">pick from your endpoint, or type one</span>
+        </label>
         <input
           id="model-name"
           className="input"
+          list={models.length ? "studio-model-options" : undefined}
           value={settings.model_name}
           spellCheck={false}
           onChange={(event) => update("model_name", event.target.value)}
         />
+        {models.length ? (
+          <datalist id="studio-model-options">
+            {models.map((model) => (
+              <option key={model} value={model} />
+            ))}
+          </datalist>
+        ) : null}
+        <div className="settings__model-state">
+          <button
+            type="button"
+            className="quiet-action"
+            disabled={modelsLoading}
+            onClick={() => void refreshModels()}
+          >
+            {modelsLoading ? "Looking for models…" : "Find models"}
+          </button>
+          {models.length ? (
+            <span className="muted">
+              {models.length} model{models.length === 1 ? "" : "s"} available
+            </span>
+          ) : modelsMessage ? (
+            // The endpoint would not list what it serves; typing still works.
+            <span className="muted">Type the model name — {modelsMessage}</span>
+          ) : null}
+        </div>
       </div>
 
       <h3 className="settings__title">Studio bridge</h3>

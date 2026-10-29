@@ -28,7 +28,7 @@ const harness = vi.hoisted(() => ({
     brief: null as unknown,
     settings: { base_url: "http://llm", api_key: "k", model_name: "m", mcp_url: "http://mcp" },
     mcpReachable: true,
-    llmHealth: { healthy: true as boolean | null, message: "ok" },
+    llmHealth: { healthy: true, message: "ok" },
     connectorSuggestions: [] as string[],
     presets: [] as unknown[],
     dismissConnectorSuggestion: vi.fn(),

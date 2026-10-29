@@ -55,7 +55,7 @@ describe("toThreadMessageLike", () => {
 
     expect((message.content as unknown as { type: string }[]).map((part) => part.type)).toEqual([
       "text",
-      `data-${SURFACE_PART}`,
+      "data",
       "text",
     ]);
   });
@@ -67,8 +67,9 @@ describe("toThreadMessageLike", () => {
       }),
     );
 
-    const part = (message.content as { type: string; id?: string; data?: UiNode }[])[0];
-    expect(part.type).toBe(`data-${SURFACE_PART}`);
+    const part = (message.content as { type: string; name?: string; id?: string; data?: UiNode }[])[0];
+    expect(part.type).toBe("data");
+    expect(part.name).toBe(SURFACE_PART);
     expect(part.id).toBe("ui-1");
     expect(part.data).toEqual(card);
   });

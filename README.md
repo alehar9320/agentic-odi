@@ -118,6 +118,9 @@ or `AGENTIC_ODI_MCP_PORT=8010`. The flag wins over the environment variable.
 - **Desktop app:** `npm --prefix apps/studio run tauri dev`.
 - **No model? No problem.** Without an OpenAI-compatible LLM every job, step,
   and outcome stays editable by hand. See [Local LLM Backend](docs/local-llm.md).
+- **A real conversation runtime.** The Studio uses assistant-ui over its
+  sidecar-owned transcript, with attachments, tool traces, approvals, and
+  branch-aware editing and regeneration. See [The Living Studio](docs/living-studio.md).
 - **Just the CLI:** it is local-first, so data commands need no server at all.
 
 ```bash
