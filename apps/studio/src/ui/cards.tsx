@@ -415,3 +415,88 @@ export function DecisionRecord({ node }: NodeProps) {
     </article>
   );
 }
+
+/* ------------------------------------------------------------------ */
+/* opportunity-brief                                                   */
+/* ------------------------------------------------------------------ */
+
+const NOT_MEASURED = "not measured";
+
+/** A band label for a score, or `not measured` when none was supplied. */
+function briefBand(band: string, score: number | null): string {
+  if (score == null) {
+    return NOT_MEASURED;
+  }
+  const label = band || (isUnderserved(score) ? "underserved" : "overserved");
+  return `${label} · ${formatOpportunityScore(score)}`;
+}
+
+function BriefOutcomeRow({ item }: { item: Record<string, unknown> }) {
+  const statement = str(item, "statement");
+  const band = str(item, "band");
+  const score = typeof item.score === "number" && Number.isFinite(item.score) ? item.score : null;
+  const n = typeof item.n === "number" && Number.isFinite(item.n) ? item.n : null;
+  const method = str(item, "method");
+  const quote = str(item, "quote");
+  const source = str(item, "source");
+
+  return (
+    <li className="ui-brief__outcome">
+      <p className="ui-brief__statement">{statement}</p>
+      <div className="ui-brief__meta">
+        <ScorePill tone={score == null ? "neutral" : isUnderserved(score) ? "warning" : "positive"}>
+          {briefBand(band, score)}
+        </ScorePill>
+        <span className="ui-brief__sample">Sample: {n == null ? NOT_MEASURED : n}</span>
+        {method ? <span className="ui-brief__method">Method: {method}</span> : null}
+      </div>
+      {quote ? <blockquote className="ui-brief__quote">“{quote}”</blockquote> : null}
+      {source ? <p className="ui-brief__source">Source: {source}</p> : null}
+    </li>
+  );
+}
+
+export function OpportunityBrief({ node }: NodeProps) {
+  const title = str(node.props, "title");
+  const job = str(node.props, "job");
+  const decision = str(node.props, "decision");
+  const generatedAt = str(node.props, "generated_at");
+  const evidenceCount =
+    typeof node.props.evidence_count === "number" ? node.props.evidence_count : null;
+  const outcomes = recordList(node.props.outcomes);
+
+  return (
+    <article className="ui-card ui-card--brief" aria-label={title || "Opportunity brief"}>
+      <header className="ui-card__head">
+        <span className="ui-card__id">The case</span>
+        {evidenceCount != null ? (
+          <span className="ui-brief__evidence">{evidenceCount} evidence records</span>
+        ) : null}
+      </header>
+
+      <h4 className="ui-card__title">{title}</h4>
+      <p className="ui-brief__job">{job}</p>
+
+      {decision ? (
+        <div className="ui-brief__decision">
+          <span className="ui-brief__decision-label">The decision we are considering</span>
+          <p>{decision}</p>
+        </div>
+      ) : null}
+
+      {outcomes.length > 0 ? (
+        <ul className="ui-brief__outcomes">
+          {outcomes.map((item, index) => (
+            <BriefOutcomeRow key={`${str(item, "statement")}-${index}`} item={item} />
+          ))}
+        </ul>
+      ) : (
+        <p className="ui-brief__empty">No scored outcomes yet — nothing to show here.</p>
+      )}
+
+      {generatedAt ? <p className="ui-brief__generated">Generated {generatedAt}</p> : null}
+
+      <ActionRow actions={readActions(node.props)} />
+    </article>
+  );
+}

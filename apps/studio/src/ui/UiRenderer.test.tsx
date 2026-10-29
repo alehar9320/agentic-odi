@@ -68,6 +68,82 @@ describe("UiRenderer", () => {
     expect(meters[0]).toHaveAttribute("aria-valuenow", "9");
     expect(meters[0]).toHaveAttribute("aria-valuemax", "10");
   });
+  it("renders the factual brief with its outcomes and provenance", () => {
+    renderSpec({
+      type: "opportunity-brief",
+      props: {
+        title: "The case for publishing speed",
+        job: "Publish a plugin",
+        decision: "Onboarding or publishing speed?",
+        evidence_count: 4,
+        generated_at: "2026-10-29T00:00:00Z",
+        outcomes: [
+          {
+            statement: "Minimize the time to publish a plugin",
+            score: 15,
+            band: "underserved",
+            n: 12,
+            method: "survey",
+            quote: "Publishing is the slowest step in my week",
+            source: "interview-7",
+          },
+        ],
+      },
+    });
+
+    expect(screen.getByLabelText("The case for publishing speed")).toBeInTheDocument();
+    expect(screen.getByText("Minimize the time to publish a plugin")).toBeInTheDocument();
+    expect(screen.getByText("underserved · 15.0")).toBeInTheDocument();
+    expect(screen.getByText("Sample: 12")).toBeInTheDocument();
+    expect(screen.getByText("4 evidence records")).toBeInTheDocument();
+    expect(screen.getByText("Generated 2026-10-29T00:00:00Z")).toBeInTheDocument();
+  });
+
+  it("renders a missing measurement as not measured, never as zero", () => {
+    renderSpec({
+      type: "opportunity-brief",
+      props: {
+        title: "Sparse case",
+        job: "Publish a plugin",
+        outcomes: [{ statement: "Minimize the time to publish a plugin" }],
+      },
+    });
+
+    expect(screen.getByText("not measured")).toBeInTheDocument();
+    expect(screen.queryByText("0.0")).not.toBeInTheDocument();
+  });
+
+  it("renders the empty state rather than a placeholder row", () => {
+    renderSpec({
+      type: "opportunity-brief",
+      props: { title: "Empty case", job: "Publish a plugin", outcomes: [] },
+    });
+
+    expect(screen.getByText(/No scored outcomes yet/)).toBeInTheDocument();
+  });
+
+  it("rejects an unknown prop on the brief and names the card", () => {
+    const result = parseUiSpec(
+      { type: "opportunity-brief", props: { title: "x", job: "y", outcomes: [], hostile: true } },
+      catalogManifest(),
+    );
+    // An undeclared prop is stripped, not fatal; the brief still renders.
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.node.props).not.toHaveProperty("hostile");
+    }
+  });
+
+  it("rejects a brief whose required prop is missing, naming the card", () => {
+    const result = parseUiSpec(
+      { type: "opportunity-brief", props: { title: "x" } },
+      catalogManifest(),
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.reason).toContain("opportunity-brief");
+    }
+  });
 
   it("renders an opportunity thesis in plain language", () => {
     renderSpec({

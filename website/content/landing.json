@@ -54,7 +54,7 @@
     "id": "surfaces",
     "eyebrow": "The surfaces",
     "title": "The agent composes, it does not describe.",
-    "blurb": "The studio answers with a card from a closed catalog, rendered inline in the conversation. Seven shapes, each one a thing you can act on.",
+    "blurb": "The studio answers with a card from a closed catalog, rendered inline in the conversation. Eight shapes, each one a thing you can act on.",
     "cards": [
       {
         "type": "outcome-card",
@@ -162,6 +162,35 @@
           "decision": "Automate invoice matching before we build a refund flow",
           "status": "Decided",
           "rationale": "Opportunity 13.0 against 7.0, and two evidence quotes in the last quarter."
+        }
+      },
+      {
+        "type": "opportunity-brief",
+        "title": "Opportunity brief",
+        "blurb": "The factual case for one job: the decision, the underserved outcomes with their score, band, and sample size, and the sources.",
+        "data": {
+          "job": "Reconcile invoices",
+          "decision": "Automate invoice matching before we build a refund flow",
+          "outcomes": [
+            {
+              "statement": "Minimize the time it takes to reconcile invoices when a statement arrives",
+              "score": 13.0,
+              "band": "underserved",
+              "n": 12,
+              "method": "survey",
+              "source": "Q1 finance survey"
+            },
+            {
+              "statement": "Minimize the effort it takes to hand a refund back when a customer asks",
+              "score": 7.0,
+              "band": "appropriate",
+              "n": 12,
+              "method": "survey",
+              "source": "Q1 finance survey"
+            }
+          ],
+          "evidence_count": 2,
+          "generated_at": "2026-10-29T10:00:00Z"
         }
       }
     ]

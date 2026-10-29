@@ -36,6 +36,25 @@ export interface Evidence {
   outcome_id?: string | null;
 }
 
+export interface DecisionRejection {
+  outcome_id: string;
+  reason: string;
+}
+
+/** A recorded choice: what was chosen, what was rejected, and why. */
+export interface Decision {
+  id: string;
+  job_id: string;
+  chosen_outcome_ids: string[];
+  rejected: DecisionRejection[];
+  rationale: string;
+  decided_by: string;
+  decided_at: string;
+  confidence: "low" | "medium" | "high";
+  superseded_at?: string | null;
+  superseded_by?: string | null;
+}
+
 export interface Thesis {
   id: string;
   outcome_id: string;

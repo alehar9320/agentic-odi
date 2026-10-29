@@ -333,6 +333,43 @@ export const CATALOG: readonly UiCatalogEntry[] = [
     },
     ["title", "bet", "rationale"],
   ),
+  entry(
+    "opportunity-brief",
+    "leaf",
+    "The factual review case for one job: the decision, the underserved outcomes with their score, band, sample and quote, and the sources. Render it once, then one sentence — never describe in prose what the card shows.",
+    {
+      title: { type: "string" },
+      job: { type: "string", description: "The job-to-be-done the case is for." },
+      decision: {
+        type: "string",
+        description: "The decision being considered. Omit it when none is recorded.",
+      },
+      outcomes: {
+        type: "array",
+        minItems: 0,
+        maxItems: 12,
+        items: {
+          type: "object",
+          properties: {
+            statement: { type: "string" },
+            score: { type: "number", minimum: 0, maximum: 20 },
+            band: { enum: ["underserved", "appropriate", "overserved", "unscored"] },
+            n: { type: "integer", minimum: 0, description: "Sample size, when measured." },
+            method: { type: "string", description: "How the score was measured." },
+            quote: { type: "string", description: "A verbatim customer signal, when captured." },
+            source: { type: "string", description: "Where the measurement came from." },
+          },
+          required: ["statement"],
+        },
+      },
+      evidence_count: { type: "integer", minimum: 0 },
+      generated_at: {
+        type: "string",
+        description: "Supplied generation timestamp; the client never reads its own clock.",
+      },
+    },
+    ["title", "job", "outcomes"],
+  ),
 ];
 
 const CATALOG_TYPES = new Set(CATALOG.map((component) => component.type));

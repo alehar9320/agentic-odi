@@ -8,6 +8,7 @@ const manifest: UiCatalogManifest = catalogManifest();
 const DOMAIN_CARDS = [
   "outcome-card",
   "opportunity-board",
+  "opportunity-brief",
   "impact-simulation",
   "evidence-quote",
   "job-map",
