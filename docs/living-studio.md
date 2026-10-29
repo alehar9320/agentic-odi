@@ -136,6 +136,28 @@ When the LLM is unreachable the Studio keeps working:
 The user's context is sent with every chat request, so the assistant starts from
 the product, audience, job, and problem rather than asking for them again.
 
+### When the studio is not running
+
+The Living Studio is a local service, and it is the kind of thing that is easy to
+forget to start. When the sidecar is not reachable, the SPA does not pretend
+otherwise.
+
+- A **subtle strip** across the top of the window says the sidecar isn't running,
+  that the assistant is paused and live data is frozen, and offers **Recheck**
+  and **Start the sidecar** (opens Settings). It is dismissible for the session
+  and clears itself once the sidecar is reached again.
+- Sending a message does not fire off a doomed request: it drops a quiet in-thread
+  notice pointing to Settings, and the composer never spins.
+- The canvas keeps showing the last thing it drew instead of going blank; a failed
+  canvas is a failure panel with Retry, not an empty board.
+
+On the CLI, the same condition is `BackendError("could not reach MCP server …")`,
+rendered as `Error: …` followed by `Hint: Start the MCP server (python -m
+agentic_odi_mcp_server)…`. When the Studio is reached through the free
+Cloudflare Worker proxy, a missing `SIDECAR_URL` is reported to the browser as
+`{"error": {"code": "mcp_unreachable", "suggestion": "Start the studio sidecar
+…"}}` with `X-Request-ID` echoed for support.
+
 ### The thread is the room
 
 Capture, scoring, simulation, and decisions are conversations. The storefront
@@ -389,16 +411,44 @@ Actions secrets.
 
 | Secret | Purpose |
 |---|---|
-| `TAURI_SIGNING_PRIVATE_KEY` | Signs updater artifacts (`.sig`) and the `latest.json` manifest. A tagged release fails loudly without it. Generate with `npm --prefix apps/studio run tauri signer generate`. |
+| `TAURI_SIGNING_PRIVATE_KEY` | Signs updater artifacts (`.sig`) and the `latest.json` manifest. A release fails loudly without it. Generate with `npm --prefix apps/studio run tauri signer generate`. |
 | `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | Password for the private key (optional when the key has none). |
 | `APPLE_CERTIFICATE` / `APPLE_CERTIFICATE_PASSWORD` | macOS Developer ID certificate (base64 `.p12`) and its password. |
 | `APPLE_SIGNING_IDENTITY` | macOS signing identity. |
 | `APPLE_ID` / `APPLE_PASSWORD` / `APPLE_TEAM_ID` | macOS notarization credentials. |
 | `WINDOWS_CERTIFICATE` / `WINDOWS_CERTIFICATE_PASSWORD` | Windows Authenticode PFX (base64) and its password; imported by CI and injected into the bundle config. |
 
-Releases are published by `.github/workflows/tauri-release.yml` when a `v*` tag
-is pushed. The desktop app checks for updates on startup and via
-**Settings → Check for updates**.
+Releases are published by `.github/workflows/tauri-release.yml`. It starts when
+a GitHub release is **published**, and on a `v*` tag push for hand-cut tags.
+The published release is what matters: release-please creates releases through
+the API, which never emits a tag-push event, so a tag-only trigger would leave
+every release without binaries. A `verify` job fails the release unless
+`latest.json` advertises the release version and carries a signed artifact for
+Linux, Windows, and both macOS architectures.
+
+`release-please` bumps the desktop app version from `extra-files`
+(`apps/studio/package.json`, `apps/studio/src-tauri/tauri.conf.json`, and
+`apps/studio/src-tauri/Cargo.toml`), so the installed version moves with every
+release. Without that sync the updater can never see a newer manifest.
+
+The app checks four seconds after launch, every six hours, and when the window
+returns to the foreground after that interval. A found update downloads in the
+background; the shell shows one quiet bar above the conversation with progress
+and a single action. macOS and Linux stage the update as soon as its signature
+verifies, so it also applies on the next ordinary launch. **Restart now** in the
+bar, **Settings → Software update**, or the version line in the sidebar applies
+it immediately. Windows needs the app to exit before its installer runs, so it
+offers **Update & restart** instead. Dismissing the bar is safe: a staged update
+still applies on the next launch, and check failures are reported in Settings
+rather than interrupting the conversation.
+
+In-app updates are inactive in the browser build and in `tauri dev`; both say so
+in **Settings → Software update**.
+
+`scripts/verify-desktop-update.sh` proves the path locally: it builds signed
+0.1.0 and 0.2.0 AppImages against a throwaway key and a local `latest.json`,
+runs 0.1.0 until it replaces its own file with 0.2.0, then runs the result and
+asserts it checks without downloading anything.
 
 ### Managing the updater signing key
 
