@@ -33,3 +33,16 @@ As we validate the feasibility of this architecture, our next milestones include
 - [x] **Agentic Integration**: Hook the CLI chat up to an LLM (via the
   `openai` package) so the LLM can *discover* the ODI tools and intelligently
   request customer insights when ideating features.
+- [x] **Store version and migration guard**: The SQLite event log carries a
+  `schema_meta` version, migrates in one transaction, and refuses a database
+  newer than the build with both versions named — `agentic-odi store` reports it.
+- [x] **The ODI spine, end to end**: quote → candidate → outcome → score → brief
+  → decision → bet → measure now runs on the real store, with a person's
+  acceptance the only path from a proposal to an outcome and an unmeasured bet
+  reporting `None` rather than a fabricated zero.
+- [x] **A labelled demo workspace**: `agentic-odi demo load` fills a store with
+  a typed, `origin="demo"` corpus so a newcomer sees a filled canvas without
+  doing the research first; a second load is a no-op.
+- [x] **Pin the contract, fail on drift**: the MCP tool contract is snapshotted
+  against the live registry, so a rename, a requiredness change, or a missing
+  tool fails CI instead of drifting silently.

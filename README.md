@@ -140,6 +140,9 @@ soon". See [External Connectors](docs/connectors.md).
 | Guide | Contents |
 |---|---|
 | [The Living Studio](docs/living-studio.md) | The chat-first interface, first run, approvals, memory, and the desktop app |
+| [Interviews](docs/interviews.md) | Quote → candidate → outcome: propose, review, and accept |
+| [Scoring](docs/scoring.md) | The opportunity score, its basis, bands, and the landscape |
+| [Decisions](docs/decision.md) | Brief → decision → bet → measure, and the honest empty states |
 | [CLI Reference](docs/cli.md) | Backends, chat, entities, scoring, and environment variables |
 | [External Connectors](docs/connectors.md) | Presets, the registry, and the `Connector` protocol |
 | [Local LLM Backend](docs/local-llm.md) | Running a local OpenAI-compatible model with tool calling |

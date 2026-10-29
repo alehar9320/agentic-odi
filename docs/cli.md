@@ -151,6 +151,50 @@ Add `--json` to any command for machine-readable output. `export` writes to
 stdout only — CSV has one row per outcome with the same fields the table shows
 plus `job_id` and `step_id`, so it pipes straight into a spreadsheet or `jq`.
 
+## Propose and review outcomes
+
+`candidates` turns a quote into proposed outcomes, then records a person's
+decision on each. Extraction **proposes only**; a candidate becomes an Outcome
+only when it is accepted, and that write goes through the same outcome validator
+as any other. See [Interviews](interviews.md) for the full walkthrough.
+
+```bash
+# Propose outcomes from one quote (nothing is accepted).
+agentic-odi candidates extract --quote-id <quote-id> \
+  --quote "Minimize the time it takes to onboard when a customer signs up." \
+  --job-id <job-id>
+
+# Review what was proposed.
+agentic-odi candidates list --job-id <job-id>
+agentic-odi candidates list --status proposed --json
+agentic-odi candidates show <candidate-id>
+
+# Record a person's decision: accept, reject, or merge.
+agentic-odi candidates accept <candidate-id> --importance 9 --satisfaction 4
+agentic-odi candidates accept <candidate-id> --importance 9 --satisfaction 4 \
+  --statement "Minimize the time it takes to onboard a customer when they sign up."
+agentic-odi candidates reject <candidate-id> --reason "names a solution, not an outcome"
+agentic-odi candidates merge <candidate-id> --merged-into <outcome-id>
+```
+
+`accept` creates **exactly one** Outcome and links its evidence. An
+already-decided candidate is refused rather than re-accepted, so a retry cannot
+double-write. `reject` requires a reason and keeps it. `merge` folds a
+near-duplicate into an existing Outcome and creates no outcome.
+
+## Load the sample workspace
+
+`demo` loads a labelled corpus so you can see a filled canvas before you have
+research of your own. Every row it writes carries `origin="demo"`; loading is
+additive and a second load is a no-op. `clear` removes only the `origin="demo"`
+rows and never touches your own data.
+
+```bash
+agentic-odi demo load            # 1 job, 8 steps, 40 outcomes, 12 evidence rows
+agentic-odi demo load --json     # the same counts, machine-readable
+agentic-odi demo clear --yes     # remove only the sample rows
+```
+
 ## Evidence
 
 Evidence is research captured from connectors (or entered by hand) and linked to
@@ -205,6 +249,18 @@ stage. `capabilities --json` emits the full machine-readable manifest.
 decision → bet → measure pipeline are implemented in this build, and names the
 issue that owns each stage that is not. Until those stages land it prints
 "nothing yet" — it never fabricates a number to fill a gap.
+
+`store` reports the local store's schema version and whether it is openable:
+
+```bash
+agentic-odi store            # store path and schema version
+agentic-odi store --json     # the same, machine-readable
+```
+
+It opens the store through the same path every command uses, so a refusal here
+is the refusal you would hit elsewhere — a database newer than this build is
+refused naming both versions and the upgrade command, not a bare
+"incompatible".
 
 ## Inspect settings and feature flags
 

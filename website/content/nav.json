@@ -10,6 +10,14 @@
       ]
     },
     {
+      "title": "The loop",
+      "guides": [
+        { "slug": "interviews", "title": "Interviews", "source": "docs/interviews.md", "blurb": "Quote → candidate → outcome: propose, review, accept." },
+        { "slug": "scoring", "title": "Scoring", "source": "docs/scoring.md", "blurb": "The opportunity score, its basis, bands, and the landscape." },
+        { "slug": "decision", "title": "Decisions", "source": "docs/decision.md", "blurb": "Brief → decision → bet → measure, and the honest empty states." }
+      ]
+    },
+    {
       "title": "Build",
       "guides": [
         { "slug": "cli", "title": "CLI reference", "source": "docs/cli.md", "blurb": "Backends, chat, entities, and scoring." },
