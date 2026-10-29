@@ -18,6 +18,9 @@ export interface OnboardingController {
   back: () => void;
   complete: () => void;
   skip: () => void;
+  /** Open the tour, resuming stored progress unless it is already finished. */
+  openTour: () => void;
+  /** Replay from the first step. */
   restart: () => void;
 }
 

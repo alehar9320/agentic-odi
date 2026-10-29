@@ -1,6 +1,6 @@
 import { apiUrl } from "../bridge/desktopBridge";
 import { nowIso } from "./id";
-import type { CanvasData, Observation } from "../types";
+import type { CanvasData, ChangelogData, Observation } from "../types";
 import type { LocalStore } from "./store/types";
 import type { WorkspaceSnapshot } from "./store/types";
 import { openLocalStore } from "./store/openStore";
@@ -32,6 +32,14 @@ export class StudioBff {
 
   async fetchCanvas(): Promise<CanvasData> {
     return this.data.fetchCanvas();
+  }
+
+  /**
+   * The changelog comes from the sidecar's release data. Without it there is
+   * nothing honest to show, so return an empty list rather than inventing notes.
+   */
+  async fetchChangelog(): Promise<ChangelogData> {
+    return { releases: [] };
   }
 
   /** Serialize the whole local workspace (canvas, memory, conversations) to JSON. */

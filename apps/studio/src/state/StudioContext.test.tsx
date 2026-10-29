@@ -115,6 +115,12 @@ function route(
   if (url === "/api/connectors/catalog") {
     return json([]);
   }
+  if (url.startsWith("/api/marketplace/servers")) {
+    return json({ listings: [], areas: {}, cached: false, types: [{ id: "mcp", label: "MCP servers", available: true }] });
+  }
+  if (url.startsWith("/api/marketplace/featured")) {
+    return json({ listings: [], areas: {}, cached: false, types: [] });
+  }
   if (url === "/api/connectors") {
     if (init?.method === "POST") {
       return json({ ok: true, name: "gong" });

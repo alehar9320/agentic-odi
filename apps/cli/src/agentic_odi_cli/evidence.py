@@ -35,6 +35,7 @@ def add(
     source_name: str = typer.Option(..., help="Where the record came from"),
     name: str = typer.Option(..., help="Short label for the record"),
     content: str = typer.Option(..., help="Normalized text content"),
+    url: str | None = typer.Option(default=None, help="External link to evidence in source system"),
     source_kind: str = typer.Option("manual", help="Connector kind or 'manual'"),
     item_type: str = typer.Option(
         "manual", help="catalog | resource | tool_result | manual | note"
@@ -52,6 +53,8 @@ def add(
         "name": name,
         "content": content,
     }
+    if url is not None:
+        args["url"] = url
     if job_id is not None:
         args["job_id"] = job_id
     if step_id is not None:

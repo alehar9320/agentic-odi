@@ -3,6 +3,8 @@ import { useEffect, useState } from "react";
 import { StudioRuntimeProvider } from "./assistant/StudioRuntime";
 import { ChangelogModal } from "./components/ChangelogModal";
 import { ChatStage } from "./components/chat/ChatStage";
+import { ConnectorSuggestionModal } from "./components/customize/ConnectorSuggestionModal";
+import { CustomizePage } from "./components/customize/CustomizePage";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { StudioBar } from "./components/layout/StudioBar";
 import { SidecarNotice } from "./components/notices/SidecarNotice";
@@ -22,29 +24,44 @@ import { UpdateBanner, UpdateProvider } from "./updater";
  * composer never leaves the screen.
  */
 function StudioShell() {
-  const { closePanel, clearChat, closeSetup } = useStudio();
+  const {
+    closePanel,
+    clearChat,
+    closeSetup,
+    customizeOpen,
+    closeCustomize,
+    streaming,
+    stopStreaming,
+  } = useStudio();
   const [showChangelog, setShowChangelog] = useState(false);
 
   function goHome() {
     clearChat();
     closePanel();
     closeSetup();
+    closeCustomize();
   }
 
   function newConversation() {
     clearChat();
     closePanel();
+    closeSetup();
+    closeCustomize();
   }
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
+        if (streaming) {
+          stopStreaming();
+          return;
+        }
         closePanel();
       }
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [closePanel]);
+  }, [closePanel, streaming, stopStreaming]);
 
   return (
     <div className="studio-app">
@@ -56,15 +73,20 @@ function StudioShell() {
           onChangelog={() => setShowChangelog(true)}
         />
         <UpdateBanner />
-        <div className="stage__split">
-          <div className="stage__thread">
-            <WorkbenchRail />
-            <ChatStage />
+        {customizeOpen ? (
+          <CustomizePage />
+        ) : (
+          <div className="stage__split">
+            <div className="stage__thread">
+              <WorkbenchRail />
+              <ChatStage />
+            </div>
+            <WorkspacePanel />
           </div>
-          <WorkspacePanel />
-        </div>
+        )}
       </main>
       <ChangelogModal isOpen={showChangelog} onClose={() => setShowChangelog(false)} />
+      <ConnectorSuggestionModal />
       <Toasts />
     </div>
   );

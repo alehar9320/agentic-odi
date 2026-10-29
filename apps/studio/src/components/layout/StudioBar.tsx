@@ -8,6 +8,7 @@ import {
   BellIcon,
   MenuIcon,
   MoonIcon,
+  PlugIcon,
   PlusIcon,
   SettingsIcon,
   SunIcon,
@@ -47,6 +48,7 @@ export function StudioBar({
     unreadNotificationCount,
     markAllNotificationsAsRead,
     openPanel,
+    openCustomize,
     pushToast,
     saveSettings,
     settings,
@@ -125,6 +127,17 @@ export function StudioBar({
       </div>
 
       <div className="bar__right">
+        <button
+          type="button"
+          className="studio-pill pill-customize"
+          onClick={() => openCustomize()}
+          aria-label="Customize connectors"
+          title="Customize connectors"
+        >
+          <PlugIcon size={15} />
+          Customize
+        </button>
+
         <button
           type="button"
           className="studio-pill pill-changelog"

@@ -16,6 +16,7 @@ from agentic_odi_core.models import (
     Message,
     Observation,
     Outcome,
+    ScheduledWork,
     Step,
 )
 
@@ -88,6 +89,23 @@ def apply_updates(entity: _Model, updates: dict[str, Any]) -> _Model:
     return type(entity).model_validate(current)
 
 
+OUTCOME_SORTS = ("opportunity_score", "insertion")
+
+
+def sort_outcomes(items: list[Outcome], sort: str = "opportunity_score") -> list[Outcome]:
+    """Order outcomes for reading, best opportunity first by default.
+
+    ``opportunity_score`` puts the highest scores first and leaves unscored
+    outcomes last, since a missing score is not evidence of low opportunity.
+    ``insertion`` keeps whatever order the store produced.
+    """
+    if sort == "insertion":
+        return list(items)
+    if sort not in OUTCOME_SORTS:
+        raise ValueError(f"Unknown outcome sort: {sort}")
+    return rank_outcomes(items)
+
+
 class Repository(Protocol):
     jobs: dict[str, Job]
     steps: dict[str, Step]
@@ -98,6 +116,7 @@ class Repository(Protocol):
     messages: dict[str, Message]
     observations: dict[str, Observation]
     brief: Brief | None
+    scheduled_work: dict[str, ScheduledWork]
 
     def add_job(self, job: Job) -> Job: ...
     def list_jobs(self, limit: int | None = None, offset: int = 0) -> list[Job]: ...
@@ -119,6 +138,7 @@ class Repository(Protocol):
         step_id: str | None = None,
         limit: int | None = None,
         offset: int = 0,
+        sort: str = "opportunity_score",
     ) -> list[Outcome]: ...
     def update_outcome(self, outcome_id: str, updates: dict) -> Outcome | None: ...
     def delete_outcome(self, outcome_id: str) -> bool: ...
@@ -164,8 +184,18 @@ class Repository(Protocol):
     def delete_observation(self, observation_id: str) -> bool: ...
     def save_brief(self, brief: Brief) -> Brief: ...
     def get_brief(self) -> Brief | None: ...
+    def add_scheduled_work(self, work: ScheduledWork) -> ScheduledWork: ...
+    def get_scheduled_work(self, work_id: str) -> ScheduledWork | None: ...
+    def list_scheduled_work(
+        self, job_id: str | None = None, status: str | None = None
+    ) -> list[ScheduledWork]: ...
+    def update_scheduled_work(self, work_id: str, updates: dict) -> ScheduledWork | None: ...
+    def delete_scheduled_work(self, work_id: str) -> bool: ...
+
     def clear(self) -> None: ...
     def reload(self) -> None: ...
+    def commit(self) -> None: ...
+    def close(self) -> None: ...
 
 
 class InMemoryRepository:
@@ -179,6 +209,7 @@ class InMemoryRepository:
         self.messages: dict[str, Message] = {}
         self.observations: dict[str, Observation] = {}
         self.brief: Brief | None = None
+        self.scheduled_work: dict[str, ScheduledWork] = {}
 
     def add_job(self, job: Job) -> Job:
         self.jobs[job.id] = job
@@ -273,11 +304,12 @@ class InMemoryRepository:
         step_id: str | None = None,
         limit: int | None = None,
         offset: int = 0,
+        sort: str = "opportunity_score",
     ) -> list[Outcome]:
         outs = [o for o in self.outcomes.values() if o.job_id == job_id]
         if step_id is not None:
             outs = [o for o in outs if o.step_id == step_id]
-        return page(rank_outcomes(outs), limit, offset)
+        return page(sort_outcomes(outs, sort), limit, offset)
 
     def update_outcome(self, outcome_id: str, updates: dict) -> Outcome | None:
         outcome = self.outcomes.get(outcome_id)
@@ -443,8 +475,42 @@ class InMemoryRepository:
     def get_brief(self) -> Brief | None:
         return self.brief
 
+    def add_scheduled_work(self, work: ScheduledWork) -> ScheduledWork:
+        self.scheduled_work[work.id] = work
+        return work
+
+    def get_scheduled_work(self, work_id: str) -> ScheduledWork | None:
+        return self.scheduled_work.get(work_id)
+
+    def list_scheduled_work(
+        self, job_id: str | None = None, status: str | None = None
+    ) -> list[ScheduledWork]:
+        items = list(self.scheduled_work.values())
+        if job_id is not None:
+            items = [item for item in items if item.job_id == job_id]
+        if status is not None:
+            items = [item for item in items if item.status == status]
+        return items
+
+    def update_scheduled_work(self, work_id: str, updates: dict) -> ScheduledWork | None:
+        work = self.scheduled_work.get(work_id)
+        if not work:
+            return None
+        current = work.model_dump(exclude_unset=True)
+        current.update(updates)
+        new_work = work.model_validate(current)
+        self.scheduled_work[work_id] = new_work
+        return new_work
+
+    def delete_scheduled_work(self, work_id: str) -> bool:
+        if work_id in self.scheduled_work:
+            del self.scheduled_work[work_id]
+            return True
+        return False
+
     def clear(self) -> None:
         self.jobs.clear()
+        self.scheduled_work.clear()
         self.steps.clear()
         self.outcomes.clear()
         self.customer_outcomes.clear()
@@ -457,3 +523,9 @@ class InMemoryRepository:
     def reload(self) -> None:
         """Reset in-memory state; there is no external store to re-read."""
         self.clear()
+
+    def commit(self) -> None:
+        """No-op: an in-memory store has nothing to flush."""
+
+    def close(self) -> None:
+        """No-op: an in-memory store holds no resources."""

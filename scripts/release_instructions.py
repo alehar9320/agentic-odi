@@ -1,7 +1,7 @@
 """Generate and publish end-user "Download & Run" instructions for a GitHub release.
 
 Pure functions:
-    build_instructions_section(tag, repo, artifacts, checksums_text) -> str
+    build_instructions_section(tag, repo, artifacts, checksums_text, released) -> str
     apply_instructions(body, section) -> str
 
 CLI (``main``): fetches the release body/assets via ``gh``, grabs
@@ -79,6 +79,8 @@ _STUDIO_PLATFORM = {
     ".dmg": "macOS (dmg)",
     ".exe": "Windows (exe)",
 }
+# Order the table by platform, then installer type, so the rows read sensibly.
+_STUDIO_ORDER = (".deb", ".AppImage", ".dmg", ".exe")
 
 
 def _is_cli_archive(name: str) -> bool:
@@ -118,7 +120,14 @@ def _build_studio_section(tag: str, repo: str, studio_artifacts: list[dict]) -> 
     lines.append("")
     lines.append("| Platform | Bundle | Install |")
     lines.append("| --- | --- | --- |")
-    for a in sorted(studio_artifacts, key=lambda x: x["name"]):
+    ordered = sorted(
+        studio_artifacts,
+        key=lambda a: next(
+            (i for i, ext in enumerate(_STUDIO_ORDER) if a["name"].endswith(ext)),
+            len(_STUDIO_ORDER),
+        ),
+    )
+    for a in ordered:
         name = a["name"]
         url = a["browser_download_url"]
         command = _studio_install_command(name)
@@ -137,46 +146,133 @@ def _build_studio_section(tag: str, repo: str, studio_artifacts: list[dict]) -> 
     return lines
 
 
+def _verify_block(dl_base: str, name: str, target: str) -> list[str]:
+    """A copy-pasteable checksum check for one archive (no bare URL lines)."""
+    if name.endswith(".zip"):
+        return [
+            "```powershell",
+            f"Invoke-WebRequest -Uri {dl_base}/checksums.txt -OutFile checksums.txt",
+            f"$file = '{name}'",
+            "$expected = (Select-String -Path checksums.txt -Pattern $file).Line.Split()[0]",
+            "$actual = (Get-FileHash -Algorithm SHA256 $file).Hash.ToLower()",
+            (
+                'if ($actual -eq $expected) { "OK: $file verified" } '
+                'else { throw "Checksum mismatch for $file" }'
+            ),
+            "```",
+        ]
+    # macOS ships `shasum`; Linux ships `sha256sum`. Both accept `-c -` on stdin.
+    checker = "shasum -a 256 -c -" if target.startswith("macos") else "sha256sum -c -"
+    return [
+        "```bash",
+        f"curl -fsSL -O {dl_base}/checksums.txt",
+        f"grep '{name}' checksums.txt | {checker}",
+        "```",
+    ]
+
+
+def _manual_extract_lines(cli_artifacts: list[dict], version: str) -> list[str]:
+    """Hand-extraction commands using the real archive names when we have them."""
+    unix = next(
+        (a["name"] for a in cli_artifacts if a["name"] == f"odi_{version}_linux_x86_64.tar.gz"),
+        None,
+    ) or next((a["name"] for a in cli_artifacts if not a["name"].endswith(".zip")), None)
+    windows = next((a["name"] for a in cli_artifacts if a["name"].endswith(".zip")), None)
+    lines: list[str] = []
+    if unix or windows:
+        if unix:
+            lines.append("```bash")
+            lines.append(f"tar -xzf {unix}   # Linux / macOS")
+            lines.append("./odi --version")
+            lines.append("```")
+        if windows:
+            lines.append("```powershell")
+            lines.append(f"Expand-Archive {windows} -DestinationPath odi   # Windows")
+            lines.append(".\\odi\\odi.exe --version")
+            lines.append("```")
+    else:
+        lines.append("```bash")
+        lines.append(f"tar -xzf odi_{version}_<platform>.tar.gz   # Linux / macOS")
+        lines.append("./odi --version")
+        lines.append("```")
+        lines.append("```powershell")
+        lines.append(f"Expand-Archive odi_{version}_windows_x86_64.zip -DestinationPath odi")
+        lines.append(".\\odi\\odi.exe --version")
+        lines.append("```")
+    return lines
+
+
 def build_instructions_section(
-    tag: str, repo: str, artifacts: list[dict], checksums_text: str
+    tag: str,
+    repo: str,
+    artifacts: list[dict],
+    checksums_text: str,
+    released: str = "",
 ) -> str:
-    version = tag.lstrip("v")
+    version = tag[1:] if tag.startswith("v") else tag
     dl_base = f"{GITHUB_RELEASES}/{repo}/releases/download/{tag}"
 
-    cli_artifacts = [a for a in artifacts if _is_cli_archive(a["name"])]
+    cli_artifacts = sorted(
+        (a for a in artifacts if _is_cli_archive(a["name"])), key=lambda x: x["name"]
+    )
     studio_artifacts = [a for a in artifacts if _is_studio_bundle(a["name"])]
+
+    checksums_url = f"{dl_base}/checksums.txt"
 
     lines: list[str] = []
     lines.append("## 📦 Download & Run")
     lines.append("")
+    lead = f"Prebuilt binaries for **Agentic ODI {version}**"
+    if released:
+        lead += f" (released {released})"
     lines.append(
-        f"Prebuilt binaries for **Agentic ODI {version}** are attached to this release. "
-        "Pick the archive for your platform, verify its SHA-256 against ``checksums.txt``, "
-        "then install with the one-liner below."
+        f"{lead} are attached to this release. Pick your platform and follow the "
+        "four steps below — no clone and no Python toolchain required."
     )
     lines.append("")
 
+    lines.append("### 1. Download the archive for your platform")
+    lines.append("")
     if cli_artifacts:
-        lines.append("| Platform | Archive | Download | SHA-256 |")
-        lines.append("| --- | --- | --- | --- |")
-        for a in sorted(cli_artifacts, key=lambda x: x["name"]):
+        lines.append("| Platform | Archive | SHA-256 |")
+        lines.append("| --- | --- | --- |")
+        for a in cli_artifacts:
             name = a["name"]
             target = _archive_target(name)
             url = a["browser_download_url"]
             digest = _hash_for(checksums_text, name) or "—"
-            lines.append(f"| {_platform(target)} | {name} | [download]({url}) | `{digest}` |")
+            lines.append(f"| {_platform(target)} | [{name}]({url}) | `{digest}` |")
+        lines.append("")
+    else:
+        lines.append("The per-platform archives are listed under **Assets** on this release page.")
         lines.append("")
 
-    lines.append("### Verify")
-    lines.append("Download ``checksums.txt`` from this release and verify the archive you picked:")
+    lines.append("### 2. Verify the download")
     lines.append("")
-    lines.append("```bash")
-    lines.append(f"curl -fsSL -O {dl_base}/checksums.txt")
-    lines.append("sha256sum -c checksums.txt   # or: shasum -a 256 -c checksums.txt")
-    lines.append("```")
+    if cli_artifacts:
+        lines.append(
+            "Every archive's SHA-256 is in the table above and in "
+            f"[`checksums.txt`]({checksums_url}). Fetch the manifest and check the "
+            "archive you downloaded:"
+        )
+    else:
+        lines.append(
+            f"Every archive's SHA-256 is recorded in "
+            f"[`checksums.txt`]({checksums_url}). Fetch the manifest and check the "
+            "archive you downloaded:"
+        )
     lines.append("")
+    if cli_artifacts:
+        for a in cli_artifacts:
+            lines.append(f"**{_platform(_archive_target(a['name']))}**")
+            lines.extend(_verify_block(dl_base, a["name"], _archive_target(a["name"])))
+            lines.append("")
+    else:
+        lines.extend(_verify_block(dl_base, f"odi_{version}_<platform>.tar.gz", "linux_x86_64"))
+        lines.append("")
 
-    lines.append("### Install (one liner)")
+    lines.append("### 3. Install")
+    lines.append("")
     lines.append("**Linux / macOS**")
     lines.append("```bash")
     lines.append(f"curl -fsSL {dl_base}/install.sh | sh")
@@ -187,19 +283,31 @@ def build_instructions_section(
     lines.append("# shorthand: install.ps1 | iex")
     lines.append("```")
     lines.append("")
-
-    lines.append("### Install manually")
     lines.append(
-        "Extract the archive, then add the folder containing the ``odi`` executable to your ``PATH``."
+        f"The installer verifies the checksum, unpacks the binary under "
+        f"`~/.local/share/agentic-odi/versions/{version}/`, and symlinks `odi`, "
+        "`odipm`, `odi-cli`, and `agentic-odi` into `~/.local/bin/` "
+        "(Windows: `%LOCALAPPDATA%\\agentic-odi\\`)."
     )
     lines.append("")
-    lines.append("```bash")
-    lines.append(f"tar -xzf odi_{version}_<platform>.tar.gz   # or unzip the .zip on Windows")
-    lines.append('export PATH="$PWD:$PATH"')
-    lines.append("```")
+    lines.append(
+        'If `~/.local/bin` is not on your `PATH`, add it: `export PATH="$HOME/.local/bin:$PATH"`.'
+    )
+    lines.append("")
+    lines.append("<details>")
+    lines.append("<summary>Prefer to install by hand?</summary>")
+    lines.append("")
+    lines.append(
+        "Extract the archive you downloaded, then run `odi` straight from the "
+        "extracted folder (or copy it somewhere on your `PATH`):"
+    )
+    lines.append("")
+    lines.extend(_manual_extract_lines(cli_artifacts, version))
+    lines.append("")
+    lines.append("</details>")
     lines.append("")
 
-    lines.append("### Quick start")
+    lines.append("### 4. Quick start")
     lines.append("```bash")
     lines.append("odi --version")
     lines.append("odi --help")
@@ -210,16 +318,20 @@ def build_instructions_section(
     if studio_artifacts:
         lines.extend(_build_studio_section(tag, repo, studio_artifacts))
 
-    lines.append("### Related artifacts")
-    for kind in ("checksums.txt", "install.sh", "install.ps1"):
-        match = next((a for a in artifacts if a["name"] == kind), None)
-        if match:
-            lines.append(f"- [{kind}]({match['browser_download_url']})")
-    lines.append("")
+    related = [
+        (kind, next((a for a in artifacts if a["name"] == kind), None))
+        for kind in ("checksums.txt", "install.sh", "install.ps1")
+    ]
+    if any(match for _, match in related):
+        lines.append("### Related artifacts")
+        for kind, match in related:
+            if match:
+                lines.append(f"- [{kind}]({match['browser_download_url']})")
+        lines.append("")
 
     lines.append(
         "> macOS may quarantine the downloaded binary "
-        "(``xattr -d com.apple.quarantine odi`` if needed). "
+        "(`xattr -d com.apple.quarantine odi` if needed). "
         'Windows SmartScreen may warn for unsigned binaries; choose "More info → Run anyway" '
         "if you trust the release."
     )
@@ -273,8 +385,10 @@ def main(argv: list[str] | None = None) -> int:
         print("error: --repo or GITHUB_REPOSITORY is required", file=sys.stderr)
         return 2
 
-    view = _run(["gh", "release", "view", tag, "--repo", repo, "--json", "body"])
-    body = json.loads(view.stdout).get("body", "") or ""
+    view = _run(["gh", "release", "view", tag, "--repo", repo, "--json", "body,publishedAt"])
+    release = json.loads(view.stdout)
+    body = release.get("body", "") or ""
+    released = (release.get("publishedAt") or "")[:10]
 
     assets: list[dict] = []
     try:
@@ -296,7 +410,7 @@ def main(argv: list[str] | None = None) -> int:
     except subprocess.CalledProcessError:
         checksums_text = ""
 
-    section = build_instructions_section(tag, repo, assets, checksums_text)
+    section = build_instructions_section(tag, repo, assets, checksums_text, released)
     new_body = apply_instructions(body, section)
 
     if args.dry_run:

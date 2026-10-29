@@ -395,6 +395,59 @@ def test_canvas_reads_local_repository() -> None:
     assert body["evidence"][0]["name"] == "Call with Ada"
 
 
+def test_promote_evidence_creates_a_scored_outcome() -> None:
+    repo = InMemoryRepository()
+    service = ODIService(repo)
+    job = service.add_job(name="Local job")
+    item = service.add_evidence(
+        source_name="Gong",
+        source_kind="mcp",
+        name="Call with Ada",
+        content="Third time staging broke after a secret rotation.",
+        job_id=job.id,
+    )
+
+    response = TestClient(create_app(repo)).post(
+        f"/api/evidence/{item.id}/promote",
+        json={
+            "target": "outcome",
+            "job_id": job.id,
+            "statement": "Minimize the time it takes to sync a secret across environments when rotating keys",
+            "importance": 9,
+            "satisfaction": 2,
+        },
+    )
+
+    assert response.status_code == 200
+    outcome = response.json()["result"]
+    assert (
+        outcome["statement"]
+        == "Minimize the time it takes to sync a secret across environments when rotating keys"
+    )
+    assert outcome["importance"] == 9
+    assert outcome["satisfaction"] == 2
+    assert outcome["opportunity_score"] == 16
+
+
+def test_promote_unknown_evidence_is_a_404() -> None:
+    repo = InMemoryRepository()
+    job = ODIService(repo).add_job(name="Local job")
+
+    response = TestClient(create_app(repo)).post(
+        "/api/evidence/missing/promote",
+        json={
+            "target": "outcome",
+            "job_id": job.id,
+            "statement": "Minimize the time it takes to sync a secret across environments when rotating keys",
+            "importance": 9,
+            "satisfaction": 2,
+        },
+    )
+
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "not_found"
+
+
 def test_post_step_uses_local_service() -> None:
     repo = InMemoryRepository()
     job = ODIService(repo).add_job(name="Local job")

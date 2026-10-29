@@ -21,6 +21,9 @@ from agentic_odi_cli.evidence import evidence_app
 from agentic_odi_cli.jobs import jobs_app
 from agentic_odi_cli.onboard import maybe_run_first_launch
 from agentic_odi_cli.profile import app as profile_app
+from agentic_odi_cli.profile import setup_wizard
+from agentic_odi_cli.render import render_job_summary
+from agentic_odi_cli.schedule import schedule_app
 from agentic_odi_cli.settings import settings_app
 from agentic_odi_cli.steps import steps_app
 from agentic_odi_cli.version import __version__  # noqa: F401  (re-exported for tests)
@@ -32,6 +35,9 @@ app = typer.Typer(
 )
 app.add_typer(connectors_app, name="connectors")
 app.add_typer(jobs_app, name="jobs", help="Manage Jobs-to-be-Done.")
+app.add_typer(
+    schedule_app, name="schedule", help="Schedule and manage background cloud agent tasks."
+)
 app.add_typer(steps_app, name="steps", help="Manage Job-map Steps.")
 app.add_typer(desired_outcomes_app, name="desired-outcomes", help="Manage desired Outcomes.")
 app.add_typer(evidence_app, name="evidence", help="Manage evidence captured from connectors.")
@@ -224,13 +230,44 @@ def capabilities_cmd(
 app.add_typer(capabilities_app, name="capabilities")
 app.add_typer(settings_app, name="settings")
 app.add_typer(profile_app, name="profile")
-app.add_typer(profile_app, name="setup", hidden=True)
+app.command(name="setup", help="Configure product baseline interactively.")(setup_wizard)
+
+
+@app.command(name="summary")
+def summary(
+    job_id: str = typer.Argument(..., help="Job ID"),
+    top: int = typer.Option(5, "--top", help="How many underserved outcomes to show."),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
+) -> None:
+    """Summarize a Job's map coverage and its biggest opportunities."""
+    job = run_tool("get_job", {"job_id": job_id})
+    steps = run_tool("get_job_map", {"job_id": job_id})
+    outcomes = run_tool("get_outcomes", {"job_id": job_id})
+    typer.echo(
+        render_job_summary(
+            job if isinstance(job, dict) else {},
+            steps if isinstance(steps, list) else [],
+            outcomes if isinstance(outcomes, list) else [],
+            top=top,
+            as_json=json_output,
+        )
+    )
 
 
 @app.command(name="version")
-def version_cmd() -> None:
+def version_cmd(
+    verbose: bool = typer.Option(
+        False,
+        "--verbose",
+        "-v",
+        help="Show verbose version information (including build metadata).",
+    ),
+) -> None:
     """Show CLI version."""
-    typer.echo(version.build_summary())
+    if verbose:
+        typer.echo(version.verbose_summary())
+    else:
+        typer.echo(version.build_summary())
 
 
 @app.command(name="wizard")

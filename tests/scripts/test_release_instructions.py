@@ -158,10 +158,10 @@ def test_main_publishes_instructions(monkeypatch, capsys):
     assert "## 📦 Download & Run" in out
 
 
-def _fenced_block_after(section: str, heading: str) -> list[str]:
-    """Return the lines of the first ```bash block after ``heading``."""
+def _fenced_block_after(section: str, heading: str, language: str = "bash") -> list[str]:
+    """Return the lines of the first fenced block of ``language`` after ``heading``."""
     rest = section.split(heading, 1)[1]
-    body = rest.split("```bash", 1)[1].split("```", 1)[0]
+    body = rest.split(f"```{language}", 1)[1].split("```", 1)[0]
     return [line for line in body.strip().splitlines() if line.strip()]
 
 
@@ -170,7 +170,7 @@ def test_verify_block_is_one_copy_pasteable_curl_command():
 
     section = build_instructions_section("v0.7.0", "alehar9320/agentic-odi", [], "")
 
-    block = _fenced_block_after(section, "### Verify")
+    block = _fenced_block_after(section, "### 2. Verify the download")
     urls = [line for line in block if line.startswith("http")]
     curl_lines = [line for line in block if line.startswith("curl")]
 
@@ -183,6 +183,48 @@ def test_verify_block_is_one_copy_pasteable_curl_command():
         "-O",
         "https://github.com/alehar9320/agentic-odi/releases/download/v0.7.0/checksums.txt",
     ]
+
+
+def test_verify_block_checks_only_the_downloaded_archive():
+    """`checksums.txt` lists every platform, so `-c` on the whole file would fail."""
+    section = build_instructions_section("v0.12.0", "alehar9320/agentic-odi", CLI_ARTIFACTS, "")
+
+    linux = _fenced_block_after(section, "**Linux (x86_64)**")
+    # The check must name the one archive this platform downloaded.
+    assert any("odi_0.12.0_linux_x86_64.tar.gz" in line for line in linux)
+    assert any(line.startswith("grep ") for line in linux)
+    assert not any("sha256sum -c checksums.txt" in line for line in linux)
+
+    mac = _fenced_block_after(section, "**macOS (Intel)**")
+    assert any("shasum -a 256 -c -" in line for line in mac)
+
+    windows = _fenced_block_after(section, "**Windows (x86_64)**", language="powershell")
+    assert any("Get-FileHash" in line for line in windows)
+
+
+def test_instructions_are_numbered_steps_with_a_quick_start():
+    section = build_instructions_section("v0.12.0", "alehar9320/agentic-odi", [], "")
+
+    for heading in (
+        "### 1. Download the archive for your platform",
+        "### 2. Verify the download",
+        "### 3. Install",
+        "### 4. Quick start",
+    ):
+        assert heading in section
+    assert "odi --version" in section
+    assert "odi jobs list" in section
+
+
+def test_instructions_surface_the_release_date_when_known():
+    section = build_instructions_section("v0.12.0", "alehar9320/agentic-odi", [], "", "2026-10-21")
+    assert "released 2026-10-21" in section
+
+
+def test_manual_install_uses_real_archive_names_when_available():
+    section = build_instructions_section("v0.12.0", "alehar9320/agentic-odi", CLI_ARTIFACTS, "")
+    assert "tar -xzf odi_0.12.0_linux_x86_64.tar.gz" in section
+    assert "Expand-Archive odi_0.12.0_windows_x86_64.zip" in section
 
 
 STUDIO_ARTIFACTS = [
@@ -212,6 +254,11 @@ CLI_ARTIFACTS = [
     {
         "name": "odi_0.12.0_linux_x86_64.tar.gz",
         "browser_download_url": "https://github.com/alehar9320/agentic-odi/releases/download/v0.12.0/odi_0.12.0_linux_x86_64.tar.gz",
+        "size": 12345,
+    },
+    {
+        "name": "odi_0.12.0_macos_x86_64.tar.gz",
+        "browser_download_url": "https://github.com/alehar9320/agentic-odi/releases/download/v0.12.0/odi_0.12.0_macos_x86_64.tar.gz",
         "size": 12345,
     },
     {

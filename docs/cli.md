@@ -15,12 +15,14 @@ uv sync --all-packages
 ## Launching
 
 ```bash
-python -m agentic_odi_cli --version   # print the Agentic ODI version
-python -m agentic_odi_cli --help      # show available options and commands
-python -m agentic_odi_cli             # start interactive chat in a terminal (help when piped)
+python -m agentic_odi_cli --version            # print the Agentic ODI version
+python -m agentic_odi_cli --version --verbose  # print version with build metadata
+python -m agentic_odi_cli --help               # show available options and commands
+python -m agentic_odi_cli                      # start interactive chat in a terminal (help when piped)
 ```
 
-A console script is also installed, so `agentic-odi --version` works the same way.
+A console script is also installed, so `agentic-odi --version` and
+`agentic-odi version --verbose` work the same way.
 
 ## Global options
 
@@ -138,14 +140,25 @@ agentic-odi desired-outcomes list --job-id <job-id>
 agentic-odi desired-outcomes get <outcome-id>
 agentic-odi desired-outcomes update <outcome-id> --satisfaction 6
 agentic-odi desired-outcomes delete <outcome-id> --yes
+agentic-odi desired-outcomes export --job-id <job-id> --format csv > outcomes.csv
+agentic-odi desired-outcomes export --job-id <job-id> --format json | jq '.[].opportunity_score'
 agentic-odi desired-outcomes evaluate "Minimize the time to ship when onboarding"
+
+# One-screen report: job header, phase coverage, biggest opportunities
+agentic-odi summary <job-id>
+agentic-odi summary <job-id> --top 3 --json
 ```
 
 `--importance` and `--satisfaction` (1–10) are now required on `add`. `evaluate`
 checks a statement against the ODI format rules before saving.
-```
 
-Add `--json` to any command for machine-readable output.
+`summary` shows how many of the eight job-map phases the Job covers, which are
+still missing, and the underserved outcomes (score above 10) in descending
+order. `--top` caps that list; `--json` returns the same data for a script.
+
+Add `--json` to any command for machine-readable output. `export` writes to
+stdout only — CSV has one row per outcome with the same fields the table shows
+plus `job_id` and `step_id`, so it pipes straight into a spreadsheet or `jq`.
 
 ## Evidence
 
@@ -213,14 +226,16 @@ gates raw MCP trace debugging.
 
 ```bash
 agentic-odi profile show
-agentic-odi profile set domain "acme.test"
+agentic-odi profile show --json
+agentic-odi profile set --product-name "My Product" --domain "acme.test"
 agentic-odi profile path
-agentic-odi setup       # alias for profile; runs the first-run baseline wizard
+agentic-odi setup       # interactive baseline wizard
 ```
 
-`profile show` prints the baseline as JSON. `profile set` updates a baseline
-field. `profile path` prints the baseline file path. `setup` is an alias for
-`profile` that runs the interactive first-run baseline wizard on first launch.
+`profile show` prints the baseline fields; add `--json` to emit the raw JSON.
+`profile set` updates any subset of baseline fields with explicit options.
+`profile path` prints the baseline file path. `setup` runs the interactive
+baseline wizard.
 
 ## Manage Customer Outcomes
 
@@ -267,6 +282,22 @@ agentic-odi outcomes score 8 2
 Set `AGENTIC_ODI_MCP_URL` (or `--mcp-url`) to point to a non-default server when
 using `--backend mcp` (default: `http://localhost:8000/mcp`).
 
+## Schedule Work
+
+Schedule, inspect, cancel, and trigger background cloud agent work tasks:
+
+```bash
+# Schedule a task
+agentic-odi schedule create --name "Nightly ODI Audit" --expression "0 0 * * *" --trigger-type cron
+
+# List, inspect, trigger, and cancel
+agentic-odi schedule list
+agentic-odi schedule list --json
+agentic-odi schedule show <work-id>
+agentic-odi schedule trigger <work-id>
+agentic-odi schedule cancel <work-id>
+```
+
 ## Connectors
 
 The `connectors` group manages external MCP integrations. See
@@ -280,6 +311,7 @@ python -m agentic_odi_cli connectors list
 python -m agentic_odi_cli connectors list --json   # name, kind, url, enabled per connector
 python -m agentic_odi_cli connectors health --name github
 python -m agentic_odi_cli connectors ingest --name github
+python -m agentic_odi_cli connectors ingest --name github --dry-run   # preview only
 ```
 
 ## Updates

@@ -51,6 +51,7 @@ ALLOWED_EXTERNAL_PREFIXES = (
     "https://developers.cloudflare.com",
     "https://docs.entire.io",
     "https://www.chromatic.com",
+    "https://playwright.dev",
     "https://freebuff.com",
     "https://pi.dev",
     # A placeholder in the connector documentation. It is not routable, and
@@ -481,6 +482,9 @@ def test_every_page_resolves_its_own_assets(page: str):
 @pytest.mark.parametrize("page", all_pages())
 def test_page_weights_are_within_budget(page: str):
     size = _built_root(page).stat().st_size
-    # The MCP reference is the long pole: every tool's argument table lives on
-    # that one page, so it grows with each paginated list tool we add.
-    assert size <= 72 * 1024, f"{page}: {size} bytes"
+    # The MCP reference is the long pole: every tool's argument table and the
+    # whole ODI schema live on that one page, so it grows with each paginated
+    # list tool and each entity we add. The V2MOM entity, the five
+    # scheduled-work tools, and the five conversation and observation tools
+    # together bring the page to ~80 KB.
+    assert size <= 82 * 1024, f"{page}: {size} bytes"

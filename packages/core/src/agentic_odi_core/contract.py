@@ -49,6 +49,11 @@ class ToolName(str, Enum):
     LIST_OBSERVATIONS = "list_observations"
     CONFIRM_OBSERVATION = "confirm_observation"
     DISMISS_OBSERVATION = "dismiss_observation"
+    SCHEDULE_WORK = "schedule_work"
+    GET_SCHEDULED_WORK = "get_scheduled_work"
+    LIST_SCHEDULED_WORK = "list_scheduled_work"
+    CANCEL_SCHEDULED_WORK = "cancel_scheduled_work"
+    TRIGGER_SCHEDULED_WORK = "trigger_scheduled_work"
 
 
 class ToolEffect(str, Enum):
@@ -187,7 +192,7 @@ TOOL_SPECS: dict[str, ToolSpec] = {
         name="get_outcomes",
         summary="List desired Outcomes for a Job.",
         effect=_derive_effect("get_outcomes"),
-        arguments=("job_id", "step_id", "limit", "offset"),
+        arguments=("job_id", "step_id", "limit", "offset", "sort"),
         required=("job_id",),
         returns="A list of Outcomes.",
         stage="2",
@@ -288,6 +293,7 @@ TOOL_SPECS: dict[str, ToolSpec] = {
             "source_kind",
             "name",
             "content",
+            "url",
             "item_type",
             "raw",
             "job_id",
@@ -419,6 +425,45 @@ TOOL_SPECS: dict[str, ToolSpec] = {
         arguments=("observation_id",),
         required=("observation_id",),
         returns="The dismissed Observation.",
+    ),
+    ToolName.SCHEDULE_WORK.value: ToolSpec(
+        name="schedule_work",
+        summary="Schedule agent work with a cron or one-shot expression.",
+        effect=_derive_effect("schedule_work"),
+        arguments=("name", "schedule_expression", "agent_id", "trigger_type", "payload", "job_id"),
+        required=("name", "schedule_expression"),
+        returns="The created scheduled work item.",
+    ),
+    ToolName.GET_SCHEDULED_WORK.value: ToolSpec(
+        name="get_scheduled_work",
+        summary="Get a scheduled work item by ID.",
+        effect=_derive_effect("get_scheduled_work"),
+        arguments=("work_id",),
+        required=("work_id",),
+        returns="The scheduled work item, or an error string if not found.",
+    ),
+    ToolName.LIST_SCHEDULED_WORK.value: ToolSpec(
+        name="list_scheduled_work",
+        summary="List scheduled work, optionally filtered by Job or status.",
+        effect=_derive_effect("list_scheduled_work"),
+        arguments=("job_id", "status"),
+        returns="A list of scheduled work items.",
+    ),
+    ToolName.CANCEL_SCHEDULED_WORK.value: ToolSpec(
+        name="cancel_scheduled_work",
+        summary="Cancel a scheduled work item.",
+        effect=_derive_effect("cancel_scheduled_work"),
+        arguments=("work_id",),
+        required=("work_id",),
+        returns="The cancelled scheduled work item.",
+    ),
+    ToolName.TRIGGER_SCHEDULED_WORK.value: ToolSpec(
+        name="trigger_scheduled_work",
+        summary="Dispatch a scheduled work item immediately.",
+        effect=_derive_effect("trigger_scheduled_work"),
+        arguments=("work_id",),
+        required=("work_id",),
+        returns="The dispatched scheduled work item.",
     ),
 }
 

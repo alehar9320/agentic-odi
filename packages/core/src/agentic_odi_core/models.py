@@ -148,12 +148,17 @@ class Evidence(BaseModel):
 
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     source_name: str = Field(..., description="Connector or person that produced the record")
-    source_kind: str = Field(..., description="Connector kind, e.g. mcp, rest, webhook, manual")
+    source_kind: str = Field(
+        ..., description="Connector kind, e.g. mcp, rest, webhook, manual — or demo for a fixture"
+    )
     item_type: EvidenceItemType = Field(
         "manual", description="Normalized record kind produced by the connector"
     )
     name: str = Field(..., description="Short human-readable label for the record")
     content: str = Field(..., description="Normalized text content of the record")
+    url: str | None = Field(
+        None, description="External URL/link to the signal/evidence in the source system"
+    )
     raw: dict[str, Any] = Field(default_factory=dict, description="Original record payload")
     job_id: str | None = Field(None, description="Job this evidence supports")
     step_id: str | None = Field(None, description="Job-map Step this evidence supports")
@@ -274,3 +279,70 @@ class Brief(BaseModel):
     core_problem: str = ""
     updated_at: datetime = Field(default_factory=_utcnow)
     workspace_id: str = Field(DEFAULT_WORKSPACE, description="Workspace that owns this brief")
+
+
+class V2MOM(BaseModel):
+    """The domain's V2MOM artifact: Vision, Values, Methods, Obstacles, Measures.
+
+    Only ``vision`` has an input path today, in the Studio's context
+    conversation. Nothing extracts the other four from a conversation and no
+    surface captures them, so a V2MOM in practice is its vision and four empty
+    lists.
+    """
+
+    vision: str = Field("", description="What you want to achieve or create")
+    values: list[str] = Field(
+        default_factory=list, description="Principles and beliefs that guide decisions"
+    )
+    methods: list[str] = Field(
+        default_factory=list, description="Actions and strategies to achieve the vision"
+    )
+    obstacles: list[str] = Field(
+        default_factory=list, description="Challenges and risks that stand in the way"
+    )
+    measures: list[str] = Field(
+        default_factory=list, description="Metrics and key results that measure success"
+    )
+
+
+class ScheduledWorkStatus(str, Enum):
+    PENDING = "pending"
+    SCHEDULED = "scheduled"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
+class ScheduledWorkTriggerType(str, Enum):
+    ONESHOT = "oneshot"
+    CRON = "cron"
+    INTERVAL = "interval"
+
+
+class ScheduledWork(BaseModel):
+    """A scheduled task or agent run in the cloud."""
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str = Field(..., description="Name or title of the scheduled work task")
+    agent_id: str = Field(
+        "default-agent", description="ID/alias of the agent assigned to run the work"
+    )
+    trigger_type: ScheduledWorkTriggerType = Field(
+        ScheduledWorkTriggerType.ONESHOT, description="Trigger mechanism (oneshot, cron, interval)"
+    )
+    schedule_expression: str = Field(
+        ...,
+        description="ISO timestamp, relative delay, or cron expression (e.g. '0 * * * *' or '+1h')",
+    )
+    payload: dict[str, Any] = Field(
+        default_factory=dict, description="Parameters or prompt for the cloud task"
+    )
+    status: ScheduledWorkStatus = Field(
+        ScheduledWorkStatus.SCHEDULED, description="Current status of the task"
+    )
+    job_id: str | None = Field(None, description="Associated ODI Job ID, if any")
+    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    last_run_at: str | None = Field(None, description="ISO timestamp of last execution")
+    next_run_at: str | None = Field(None, description="ISO timestamp of next scheduled execution")
+    result_summary: str | None = Field(None, description="Execution outcome or error summary")

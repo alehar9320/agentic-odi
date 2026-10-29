@@ -1,6 +1,6 @@
 [project]
 name = "agentic-odi"
-version = "0.13.0"
+version = "0.14.0"
 description = "Outcome-Driven Innovation (ODI): an MCP server, chat client, CLI, and external connectors."
 requires-python = ">=3.10"
 
@@ -69,3 +69,9 @@ source = [
     "agentic_odi_mcp_server",
     "agentic_odi_studio_api",
 ]
+
+[tool.coverage.report]
+# The project target is 90% (see codecov.yml) and codecov tolerates a 1% dip,
+# so CI fails at the same floor rather than a release later. Raise this number
+# as tests land; it is a ratchet, not an aspiration.
+fail_under = 89

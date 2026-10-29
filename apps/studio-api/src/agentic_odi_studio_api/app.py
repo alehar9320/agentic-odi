@@ -25,6 +25,7 @@ from agentic_odi_studio_api.studio.errors import (
     register_error_handlers,
     request_id_for,
 )
+from agentic_odi_studio_api.studio.marketplace import StudioMarketplace
 from agentic_odi_studio_api.studio.memory import StudioMemory
 from agentic_odi_studio_api.studio.router import router as studio_router
 from agentic_odi_studio_api.studio.settings import StudioSettings
@@ -57,6 +58,7 @@ def create_app(
     backend: str | None = None,
     connectors: ConnectorService | None = None,
     memory: StudioMemory | None = None,
+    marketplace: StudioMarketplace | None = None,
     settings: StudioSettings | None = None,
 ) -> FastAPI:
     owns_store = repo is None
@@ -80,7 +82,9 @@ def create_app(
     )
     app.state.service = service
     app.state.backend = backend or os.environ.get("AGENTIC_ODI_BACKEND") or DEFAULT_BACKEND
-    app.state.connectors = connectors or ConnectorService()
+    resolved_marketplace = marketplace or StudioMarketplace()
+    app.state.marketplace = resolved_marketplace
+    app.state.connectors = connectors or ConnectorService(marketplace=resolved_marketplace)
     # One store, one truth: the thread and the canvas are appended to the same
     # event log, so the CLI and the MCP server read the conversation too.
     app.state.memory = memory or StudioMemory(repo, import_legacy=owns_store)

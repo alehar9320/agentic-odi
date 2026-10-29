@@ -1,3 +1,5 @@
+from agentic_odi_core.contract import capability_summary
+
 ODI_ASSISTANT_PROMPT = """You are an expert in Outcome-Driven Innovation (ODI). Your purpose is to help users discover, define, and prioritize high-value jobs, desired outcomes, and opportunities."""
 
 ODI_FRAMEWORK_GUIDELINES = """## Outcome-Driven Innovation (ODI) — Stage-by-Stage Tool Guide
@@ -65,19 +67,7 @@ def get_odi_framework_guidelines() -> str:
     return ODI_FRAMEWORK_GUIDELINES
 
 
-CAPABILITIES = """Here is what I can help you with as your Agentic ODI assistant:
-
-🎯 **Manage Jobs-to-be-Done (JTBD)**: Add, list, and retrieve Jobs.
-🗺️ **Build Job Maps**: Break down a Job into ordered Steps.
-📊 **Track Desired Outcomes**: Record outcomes with importance/satisfaction scores and calculate Opportunity Scores.
-📊 **Customer Outcomes**: Manage ODI-aligned customer outcomes with customer value, business value, and opportunity scoring.
-🧪 **Evaluate Outcomes**: Call `evaluate_outcome(statement)` to check a statement against the ODI format before saving it.
-🧾 **Evidence**: Capture and promote research records from connectors with `add_evidence`, `list_evidence`, and `promote_evidence`.
-🧠 **Memory**: Read the running thread with `list_conversations` and `get_conversation`; read what the agent learned with `list_observations`, then `confirm_observation` or `dismiss_observation`. Only a person confirms — an agent never confirms its own memory.
-📖 **ODI Framework Guidelines**: Call `get_odi_framework_guidelines()` to see which tool to use at each ODI stage.
-🧬 **Schema**: Call `get_odi_schema()` for the canonical JSON schema of every ODI entity.
-
-💡 **Tip**: Ask me to 'get started' and I will guide you step-by-step through the ODI process from intent to opportunity scoring!"""
+CAPABILITIES = capability_summary()
 
 
 def job_not_found(job_id: str) -> str:
@@ -109,3 +99,10 @@ def conversation_not_found(conversation_id: str | None) -> str:
 
 def observation_not_found(observation_id: str | None) -> str:
     return f"Observation not found: {observation_id}"
+
+
+def scheduled_work_not_found(work_id: str | None, hint: str | None = None) -> str:
+    message = f"Scheduled work not found: {work_id}"
+    if hint:
+        message = f"{message}. {hint}"
+    return message

@@ -16,7 +16,7 @@ def test_the_version_job_runs_before_the_builds() -> None:
     workflow = _workflow()
 
     assert "\n  version:\n" in workflow
-    assert "needs: [version]" in workflow
+    assert "needs: [resolve, version]" in workflow
 
 
 def test_the_gate_compares_the_tag_with_the_cli_version() -> None:

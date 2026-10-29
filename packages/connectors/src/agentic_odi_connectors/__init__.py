@@ -15,6 +15,15 @@ from agentic_odi_connectors.catalog import (
 )
 from agentic_odi_connectors.factory import build_connector, known_kinds, register_kind
 from agentic_odi_connectors.mapping import EvidenceDraft, drafts_from_batch
+from agentic_odi_connectors.marketplace import (
+    MarketplaceCache,
+    MarketplaceListing,
+    MarketplaceService,
+    connector_config_from_listing,
+    env_vars_in_listing,
+    listing_from_preset,
+    listing_from_registry_record,
+)
 from agentic_odi_connectors.models import (
     ConfigurationError,
     ConnectorConfig,
@@ -117,6 +126,9 @@ __all__ = [
     "IngestBatch",
     "IngestRecord",
     "IngestSink",
+    "MarketplaceCache",
+    "MarketplaceListing",
+    "MarketplaceService",
     "McpConnectorSettings",
     "UnknownAreaError",
     "RestConnectorSettings",
@@ -124,11 +136,15 @@ __all__ = [
     "UnknownPresetError",
     "build_connector",
     "config_path",
+    "connector_config_from_listing",
     "connector_config_from_preset",
     "drafts_from_batch",
+    "env_vars_in_listing",
     "get_default_sink",
     "get_preset",
     "known_kinds",
     "list_presets",
+    "listing_from_preset",
+    "listing_from_registry_record",
     "register_kind",
 ]
