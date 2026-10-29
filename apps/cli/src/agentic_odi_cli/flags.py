@@ -25,7 +25,7 @@ DEFAULT_FLAGS: dict[str, FlagSpec] = {
     "experimental_connectors": FlagSpec(
         key="experimental_connectors",
         description="Enable experimental MCP connectors and ingest sources",
-        default=False,
+        default=True,
     ),
     "auto_update": FlagSpec(
         key="auto_update",

@@ -32,6 +32,17 @@ connectors_app = typer.Typer(
 )
 
 
+@connectors_app.callback()
+def connectors_callback() -> None:
+    if not flags.is_enabled("experimental_connectors"):
+        typer.echo(
+            "Error: Feature 'experimental_connectors' is disabled. "
+            "Enable it with 'agentic-odi settings flags set experimental_connectors true'.",
+            err=True,
+        )
+        raise typer.Exit(code=1)
+
+
 def build_connector(config: ConnectorConfig) -> Connector:
     from agentic_odi_connectors.factory import build_connector as _build_connector
 
