@@ -161,18 +161,18 @@ bite first:
   ```
 - Consumes: `evaluation.classify_opportunity`, `repository.rank_outcomes` conventions.
 
-- [ ] **Step 1: Write the failing golden-file test.** Fixture job with three scored outcomes, one
+- [x] **Step 1: Write the failing golden-file test.** Fixture job with three scored outcomes, one
   unscored, one with a quote containing `<script>`. Assert `render_brief` output equals a committed
   golden file byte-for-byte; assert the unscored outcome produces an omission-with-reason line;
   assert `<script>` appears escaped.
-- [ ] **Step 2: Run it and verify it fails** (`uv run pytest packages/core -k brief`).
-- [ ] **Step 3: Implement `brief.py`** with `select_underserved` reusing `rank_outcomes` (ties broken
+- [x] **Step 2: Run it and verify it fails** (`uv run pytest packages/core -k brief`).
+- [x] **Step 3: Implement `brief.py`** with `select_underserved` reusing `rank_outcomes` (ties broken
   by stable insertion order — **record this choice**), sections *The job* · *The decision we are
   considering* · *Underserved outcomes* · *Sources*, omission-with-one-line-reason for empty sections.
-- [ ] **Step 4: Add the numeral-walk test** that collects every numeral in the output and proves it
+- [x] **Step 4: Add the numeral-walk test** that collects every numeral in the output and proves it
   exists in the fixture, plus a value-to-source association assertion and a hostile-text escape
   assertion.
-- [ ] **Step 5: Run tests, ruff, mypy.** Commit.
+- [x] **Step 5: Run tests, ruff, mypy.** Commit.
 
 **Readiness to pin first:** input fixture/schema, the "three most underserved" selection + tie-break,
 and which input supplies the decision-consideration text. Record in the test module docstring.
@@ -184,12 +184,12 @@ and which input supplies the decision-consideration text. Record in the test mod
 **Interfaces:** `render_brief` gains three deterministic sections; each supported claim names the
 outcome ids it rests on; the build section names the lowest-score outcome; risks names the holes.
 
-- [ ] **Step 1: Write failing tests** for the three sections, the singular case (one measured
+- [x] **Step 1: Write failing tests** for the three sections, the singular case (one measured
   outcome names the missing comparison), and the "no recorded holes says so in one line" case.
-- [ ] **Step 2: Verify failure.**
-- [ ] **Step 3: Implement the templates.** **Blocker:** confirm lowest-score vs highest-underserved
+- [x] **Step 2: Verify failure.**
+- [x] **Step 3: Implement the templates.** **Blocker:** confirm lowest-score vs highest-underserved
   and its tie-break before writing the build section — record the answer in the PR.
-- [ ] **Step 4: Extend the numeral walk to the new sections.** Run tests, ruff, mypy. Commit.
+- [x] **Step 4: Extend the numeral walk to the new sections.** Run tests, ruff, mypy. Commit.
 
 ## Task 3: C2 — `opportunity_brief` card in the thread (`ALH-33`)
 
@@ -197,13 +197,13 @@ outcome ids it rests on; the build section names the lowest-score outcome; risks
 `apps/studio/src/ui/protocol.test.ts`, `apps/studio-api/.../studio/ui_spec.py`,
 `apps/studio-api/.../studio/chat.py` (one prompt line), `docs/living-studio.md`.
 
-- [ ] **Step 1: Write failing parity tests** — catalog entry ↔ card ↔ server validator, from one
+- [x] **Step 1: Write failing parity tests** — catalog entry ↔ card ↔ server validator, from one
   shared fixture (full/empty/partly-measured). Unknown prop is rejected by `UiCatalog.validate` and
   the error is fed back to the model.
-- [ ] **Step 2: Verify failure** (`npm --prefix apps/studio test -- --run` + `uv run pytest apps/studio-api`).
-- [ ] **Step 3: Add the catalog entry + card + validator**, reconcile nullable measurement fields and
+- [x] **Step 2: Verify failure** (`npm --prefix apps/studio test -- --run` + `uv run pytest apps/studio-api`).
+- [x] **Step 3: Add the catalog entry + card + validator**, reconcile nullable measurement fields and
   provenance (`method`/`source`) with Task 1's renderer; `generated_at` from supplied context.
-- [ ] **Step 4: Add the one prompt line** (render once, then one sentence). Keyboard-reachable.
+- [x] **Step 4: Add the one prompt line** (render once, then one sentence). Keyboard-reachable.
   Run both suites + ruff + mypy. Commit.
 
 ## Task 4: C3 — weigh two bets side by side (`ALH-34`)
@@ -212,12 +212,12 @@ outcome ids it rests on; the build section names the lowest-score outcome; risks
 `packages/core/.../services.py`; `outcome_compare` catalog entry + card; tests in
 `apps/studio-api/tests/test_studio_compare.py`.
 
-- [ ] **Step 1: Write failing API tests** for 2 and 3 ids, a 4th refused naming the limit, and
+- [x] **Step 1: Write failing API tests** for 2 and 3 ids, a 4th refused naming the limit, and
   `not measured` for a missing metric while real `0` stays `0`.
-- [ ] **Step 2: Verify failure.**
-- [ ] **Step 3: Implement aligned rows** (one row per metric, one cell per outcome) over
+- [x] **Step 2: Verify failure.**
+- [x] **Step 3: Implement aligned rows** (one row per metric, one cell per outcome) over
   `rank_outcomes` + per-outcome metrics; no per-outcome fetch; no "winner".
-- [ ] **Step 4: Add the catalog entry + card**, keyboard-readable headers, server/card parity from
+- [x] **Step 4: Add the catalog entry + card**, keyboard-readable headers, server/card parity from
   the same fixture. Run suites + ruff + mypy. Commit.
 
 ## Task 5: C4 — export the case (`ALH-35`)
@@ -225,13 +225,13 @@ outcome ids it rests on; the build section names the lowest-score outcome; risks
 **Files:** Create `apps/cli/src/agentic_odi_cli/brief.py` (`odi brief export`); reuse
 `apps/studio/src/styles/print.css` tokens; tests in `apps/cli/tests/test_brief_cli.py`; `docs/cli.md`.
 
-- [ ] **Step 1: Write failing CLI tests** — export writes a file and prints its path; HTML opens with
+- [x] **Step 1: Write failing CLI tests** — export writes a file and prints its path; HTML opens with
   no app CSS; a missing job exits 1 with a message; snapshot banner asserted; adversarial quotes
   escaped; unknown format exits nonzero.
-- [ ] **Step 2: Verify failure** (`uv run pytest apps/cli -k brief`).
-- [ ] **Step 3: Implement** one function over Task 1's markdown + an HTML wrapper that inlines the
+- [x] **Step 2: Verify failure** (`uv run pytest apps/cli -k brief`).
+- [x] **Step 3: Implement** one function over Task 1's markdown + an HTML wrapper that inlines the
   print tokens; no new dependency; pin overwrite/partial-file behaviour.
-- [ ] **Step 4: Add `docs/cli.md` entry.** Run suites + ruff + mypy. Commit.
+- [x] **Step 4: Add `docs/cli.md` entry.** Run suites + ruff + mypy. Commit.
 
 ## Task 6: C6 — record the decision (`ALH-37`)
 
@@ -242,17 +242,17 @@ outcome ids it rests on; the build section names the lowest-score outcome; risks
 `apps/studio-api/.../studio/schemas.py` + `types.ts`. New `test_decisions.py` +
 `test_persistence_parity.py`.
 
-- [ ] **Step 1: Write failing tests** — two decisions → two-entry ordered history; empty rationale
+- [x] **Step 1: Write failing tests** — two decisions → two-entry ordered history; empty rationale
   refused; superseded decision stays readable after reload/replay; job deletion cascades with the
   cascade in the event payload; foreign/missing outcome ids, whitespace rejection reason, invalid
   confidence fail without an event.
-- [ ] **Step 2: Verify failure** (`uv run pytest packages/core -k decision`).
-- [ ] **Step 3: Add the entity + service + supersession.** **Pin first:** `superseded_at`/
+- [x] **Step 2: Verify failure** (`uv run pytest packages/core -k decision`).
+- [x] **Step 3: Add the entity + service + supersession.** **Pin first:** `superseded_at`/
   `superseded_by` shape, actor/timestamp provenance, latest/history tie-break, chosen/rejected overlap
   validation. `rejected` is a list of `{outcome_id, reason}` (not a JSON blob, not comma-separated);
   referenced outcomes must resolve within the decision's job.
-- [ ] **Step 4: Wire the full persistence checklist + MCP tool + contract.**
-- [ ] **Step 5: Add `test_persistence_parity.py`** covering in-memory, SQLite/replay, remote.
+- [x] **Step 4: Wire the full persistence checklist + MCP tool + contract.**
+- [x] **Step 5: Add `test_persistence_parity.py`** covering in-memory, SQLite/replay, remote.
   Run suites + ruff + mypy. Commit.
 
 ## Task 7: C6.2 — record from CLI and API (`ALH-158`)
@@ -260,15 +260,15 @@ outcome ids it rests on; the build section names the lowest-score outcome; risks
 **Files:** `POST /api/decisions` in `studio/router.py` + schemas; `odi decide` in the CLI;
 `docs/cli.md`; shared-fixture tests in `apps/cli` and `apps/studio-api`.
 
-- [ ] **Step 1: Write failing tests** — both surfaces persist equal fields and the same predecessor
+- [x] **Step 1: Write failing tests** — both surfaces persist equal fields and the same predecessor
   through one service call; empty rationale refused identically; unknown job is not a success; error
   output has no traceback.
-- [ ] **Step 2: Verify failure** (`uv run pytest apps/cli apps/studio-api -k decision`).
-- [ ] **Step 3: Implement** argument parsing/transport only; project service errors to the shared
+- [x] **Step 2: Verify failure** (`uv run pytest apps/cli apps/studio-api -k decision`).
+- [x] **Step 3: Implement** argument parsing/transport only; project service errors to the shared
   body; name the superseded decision in both responses. **Pin first:** repeated id/reason encoding,
   explicit `decided_by` source, confidence vocabulary, HTTP fixture, retry/double-submit behaviour at
   the service contract.
-- [ ] **Step 4: Add `docs/cli.md`** (rejection-reason syntax + supersession). Run suites + ruff +
+- [x] **Step 4: Add `docs/cli.md`** (rejection-reason syntax + supersession). Run suites + ruff +
   mypy. Commit.
 
 ## Task 8: C7 — derive the outcome roadmap (`ALH-38`)
@@ -290,35 +290,35 @@ def build_roadmap(job_id, decisions, outcomes, *, horizon: int = 4, today: date)
     """Return (entries in date order, count of undecided outcomes excluded)."""
 ```
 
-- [ ] **Step 1: Write failing tests** — three decisions → three entries in date order; an undecided
+- [x] **Step 1: Write failing tests** — three decisions → three entries in date order; an undecided
   outcome excluded and counted; empty set returns the one-line `no decisions yet`; quarter boundaries
   in UTC; same-date decisions; missing baseline/target; supersession; horizon edges.
-- [ ] **Step 2: Verify failure** (`uv run pytest packages/core -k roadmap`).
-- [ ] **Step 3: Implement** the derivation only — no separate store, entries are outcome statements,
+- [x] **Step 2: Verify failure** (`uv run pytest packages/core -k roadmap`).
+- [x] **Step 3: Implement** the derivation only — no separate store, entries are outcome statements,
   `today` explicit so tests are clock-independent. **Pin first:** `decided-but-unmoved`, baseline/
   target provenance, supersession/repeated outcomes, `horizon=4` meaning. Missing measurement is never
   zero progress.
-- [ ] **Step 4: Add the golden derivation test.** Run suites + ruff + mypy. Commit.
+- [x] **Step 4: Add the golden derivation test.** Run suites + ruff + mypy. Commit.
 
 ## Task 9: C7.2 — render the roadmap (`ALH-160`)
 
 **Files:** Extend `roadmap.py` with a markdown renderer; `roadmap` catalog entry + card; tests.
 
-- [ ] **Step 1: Write failing tests** — markdown and card show the same supplied facts (statement,
+- [x] **Step 1: Write failing tests** — markdown and card show the same supplied facts (statement,
   baseline, target, decision); exclusion footer present.
-- [ ] **Step 2: Verify failure.**
-- [ ] **Step 3: Implement** the markdown renderer + catalog entry + card + validator + parity test.
+- [x] **Step 2: Verify failure.**
+- [x] **Step 3: Implement** the markdown renderer + catalog entry + card + validator + parity test.
   Run suites + ruff + mypy. Commit.
 
 ## Task 10: C8 — the decision review (`ALH-39`)
 
 **Files:** `packages/core/.../review.py` (or extend `roadmap.py`); studio card; tests.
 
-- [ ] **Step 1: Write failing tests** — a past decision is compared against today's numbers and
+- [x] **Step 1: Write failing tests** — a past decision is compared against today's numbers and
   flagged stale per the pinned metric direction; no-change/orphaned schema handled; missing
   measurement stays unknown, never "moved".
-- [ ] **Step 2: Verify failure.**
-- [ ] **Step 3: Implement.** **Pin first:** review metric direction and no-change/orphaned schema.
+- [x] **Step 2: Verify failure.**
+- [x] **Step 3: Implement.** **Pin first:** review metric direction and no-change/orphaned schema.
   Run suites + ruff + mypy. Commit.
 
 ---

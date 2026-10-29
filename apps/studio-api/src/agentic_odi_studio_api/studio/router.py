@@ -857,7 +857,7 @@ async def patch_outcome(outcome_id: str, body: UpdateOutcomeRequest, request: Re
     return outcome.model_dump(mode="json")
 
 
-@router.put("/outcomes/{outcome_id}/value")
+@router.patch("/outcomes/{outcome_id}/value")
 async def set_outcome_value(
     outcome_id: str, body: SetOutcomeValueRequest, request: Request
 ) -> dict:

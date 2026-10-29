@@ -39,7 +39,7 @@ def _seed(client: TestClient) -> tuple[str, str]:
 def test_value_records_a_market_estimate_with_its_source():
     client = _client()
     _, outcome_id = _seed(client)
-    response = client.put(
+    response = client.patch(
         f"/api/outcomes/{outcome_id}/value",
         json={
             "estimate": 250000.0,
@@ -59,7 +59,7 @@ def test_value_records_a_market_estimate_with_its_source():
 def test_value_never_derives_from_the_score():
     client = _client()
     _, outcome_id = _seed(client)
-    body = client.put(
+    body = client.patch(
         f"/api/outcomes/{outcome_id}/value",
         json={"estimate": 4.0, "unit": "users"},
     ).json()
@@ -70,7 +70,7 @@ def test_value_never_derives_from_the_score():
 def test_a_market_basis_without_a_source_is_refused_and_writes_nothing():
     client = _client()
     _, outcome_id = _seed(client)
-    response = client.put(
+    response = client.patch(
         f"/api/outcomes/{outcome_id}/value",
         json={"estimate": 1.0, "unit": "currency", "basis": "market"},
     )
@@ -87,7 +87,7 @@ def test_a_market_basis_without_a_source_is_refused_and_writes_nothing():
 def test_clearing_the_estimate_nulls_the_companions():
     client = _client()
     _, outcome_id = _seed(client)
-    client.put(
+    client.patch(
         f"/api/outcomes/{outcome_id}/value",
         json={
             "estimate": 100.0,
@@ -97,7 +97,7 @@ def test_clearing_the_estimate_nulls_the_companions():
             "source": "beta cohort",
         },
     )
-    cleared = client.put(f"/api/outcomes/{outcome_id}/value", json={"estimate": None})
+    cleared = client.patch(f"/api/outcomes/{outcome_id}/value", json={"estimate": None})
     assert cleared.status_code == 200
     body = cleared.json()
     assert body["value_estimate"] is None
@@ -107,14 +107,14 @@ def test_clearing_the_estimate_nulls_the_companions():
 
 
 def test_an_unknown_outcome_is_a_404():
-    response = _client().put("/api/outcomes/nope/value", json={"estimate": 1.0, "unit": "users"})
+    response = _client().patch("/api/outcomes/nope/value", json={"estimate": 1.0, "unit": "users"})
     assert response.status_code == 404
 
 
 def test_a_negative_estimate_is_refused_by_the_schema():
     client = _client()
     _, outcome_id = _seed(client)
-    response = client.put(
+    response = client.patch(
         f"/api/outcomes/{outcome_id}/value",
         json={"estimate": -1.0, "unit": "users"},
     )
