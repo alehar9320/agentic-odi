@@ -85,6 +85,13 @@ uv run --directory website pytest tests/
 The site is generated at CI time and never committed. CI runs `build_site.py` to
 produce `_site` and uploads it as the `website-site` artifact for review.
 
+Every published page gets its own social card, rendered by the build from the
+page's own title, section, and a figure the page states. A page the build emits
+without a card fails the build, so a shared link can never fall back to someone
+else's image. The one committed image, `website/assets/og.png`, is the generic
+fallback; regenerate it with `uv run python website/tools/make_og.py` after
+changing the card layout.
+
 Publishing happens in `.github/workflows/pages.yml`: it runs those tests,
 builds `_site` from `website/`, and deploys the artifact with
 `actions/deploy-pages` on every push to `main`. There is no `gh-pages` branch,

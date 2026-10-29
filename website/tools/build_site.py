@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Any
 
 import extract
+import make_og
 import markdown_render
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
@@ -186,6 +187,11 @@ def _load_json(name: str) -> Any:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def _og_image(path: str) -> str:
+    """The absolute URL of a page's own social card."""
+    return f"{PAGES_URL}assets/og/{make_og.og_name(path)}"
+
+
 def _page_context(**extra: Any) -> dict[str, Any]:
     """The context every page receives."""
     context: dict[str, Any] = {
@@ -194,6 +200,9 @@ def _page_context(**extra: Any) -> dict[str, Any]:
         "depth": 0,
         "prefix": "",
         "year": "2026",
+        # The generic card is the fallback; every real page overrides it with
+        # its own card, which the build generates from the page's content.
+        "og_image": f"{PAGES_URL}assets/og.png",
     }
     context.update(extra)
     return context
@@ -281,6 +290,7 @@ def _render_docs(env: Environment, nav: dict[str, Any], context: dict[str, Any])
         page_context["page"]["body"] = body
         page_context["page"]["toc"] = toc
         page_context["prefix"] = "../../"
+        page_context["og_image"] = _og_image(output)
         rendered[output] = env.get_template("doc.html").render(**page_context)
 
     return rendered
@@ -307,6 +317,7 @@ def _render_docs_index(env: Environment, nav: dict[str, Any], context: dict[str,
         "toc": [],
     }
     page_context["prefix"] = "../"
+    page_context["og_image"] = _og_image("docs/index.html")
     return env.get_template("docs_index.html").render(**page_context)
 
 
@@ -359,6 +370,7 @@ def _render_pages(env: Environment) -> dict[str, str]:
         "path": "index.html",
         "depth": 0,
     }
+    landing_context["og_image"] = _og_image("index.html")
     rendered["index.html"] = env.get_template("landing.html").render(**landing_context)
 
     rendered["docs/index.html"] = _render_docs_index(env, nav, context)
@@ -375,6 +387,23 @@ def _page_url(name: str) -> str:
     if name == "index.html":
         return ""
     return name[: -len("index.html")]
+
+
+def _page_sections() -> dict[str, str]:
+    """Each page's section label, from the nav groups.
+
+    A card's chip names the section the page belongs to. The nav is the one
+    place that already groups the guides, so the label comes from there rather
+    than from a second list that would drift.
+    """
+    nav = _load_json("nav.json")
+    sections: dict[str, str] = {}
+    for group in nav.get("groups", []):
+        for guide in group.get("guides", []):
+            sections[f"docs/{guide['slug']}/index.html"] = group["title"]
+    sections["index.html"] = "Overview"
+    sections["docs/index.html"] = "Documentation"
+    return sections
 
 
 def _search_entry(name: str, page: str) -> dict[str, str]:
@@ -440,6 +469,18 @@ def build(out_dir: Path, *, check: bool = False) -> int:
     rendered = _render_pages(env)
 
     files: dict[str, bytes] = {name: html.encode("utf-8") for name, html in rendered.items()}
+    # One card per published page. A page the build emits without a card is a
+    # page whose shared link would show someone else's image, so this is a hard
+    # failure rather than a warning. (404 is not published, so it has no card.)
+    pages_for_cards = {name: html for name, html in rendered.items() if name != "404.html"}
+    cards = make_og.render_site(pages_for_cards, PAGES_URL, _page_sections())
+    missing = sorted(
+        name for name in pages_for_cards if f"assets/og/{make_og.og_name(name)}" not in cards
+    )
+    if missing:
+        raise SystemExit(f"no social card was generated for: {', '.join(missing)}")
+    files.update(cards)
+
     urls = ["/"]
     for name in sorted(rendered):
         if name in {"index.html", "404.html"}:
