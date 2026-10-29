@@ -196,10 +196,18 @@ export function JobMap() {
           const isSelected = selectedPhaseIndex === idx;
 
           return (
-            <div
+            <button
               key={phase.id}
+              type="button"
+              aria-pressed={isSelected}
+              aria-label={`Filter steps by ${phase.name}`}
               onClick={() => setSelectedPhaseIndex(isSelected ? null : idx)}
               style={{
+                display: "block",
+                width: "100%",
+                textAlign: "left",
+                font: "inherit",
+                color: "inherit",
                 background: isSelected
                   ? "rgba(129, 140, 248, 0.2)"
                   : hasSteps
@@ -217,17 +225,19 @@ export function JobMap() {
                 position: "relative",
               }}
             >
-              <div
+              <span
                 style={{
+                  display: "block",
                   fontSize: "0.78rem",
                   fontWeight: 700,
                   color: hasSteps ? "var(--studio-text)" : "var(--studio-muted)",
                 }}
               >
                 {phase.name}
-              </div>
-              <div
+              </span>
+              <span
                 style={{
+                  display: "block",
                   fontSize: "0.7rem",
                   color: "var(--studio-muted)",
                   marginTop: 2,
@@ -236,8 +246,8 @@ export function JobMap() {
                 }}
               >
                 {phase.desc}
-              </div>
-              <div
+              </span>
+              <span
                 style={{
                   marginTop: 8,
                   display: "flex",
@@ -256,8 +266,8 @@ export function JobMap() {
                 >
                   {bucket.steps.length} {bucket.steps.length === 1 ? "step" : "steps"}
                 </span>
-              </div>
-            </div>
+              </span>
+            </button>
           );
         })}
       </div>

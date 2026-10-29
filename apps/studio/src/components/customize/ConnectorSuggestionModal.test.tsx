@@ -108,6 +108,28 @@ describe("ConnectorSuggestionModal", () => {
     expect(openCustomize).toHaveBeenCalledWith({ query: "gong" });
   });
 
+  it("moves focus into the dialog and traps Tab at both ends", () => {
+    vi.mocked(useStudio).mockReturnValue(
+      stubContext({
+        connectorSuggestion: { id: "gong", listing: LISTING, reason: "agent" },
+      }),
+    );
+
+    render(<ConnectorSuggestionModal />);
+
+    const dialog = screen.getByRole("dialog", { name: "Connector suggestion" });
+    const close = screen.getByRole("button", { name: "Dismiss" });
+    expect(close).toHaveFocus();
+
+    const notNow = screen.getByRole("button", { name: "Not now" });
+    notNow.focus();
+    fireEvent.keyDown(dialog, { key: "Tab" });
+    expect(close).toHaveFocus();
+
+    fireEvent.keyDown(dialog, { key: "Tab", shiftKey: true });
+    expect(notNow).toHaveFocus();
+  });
+
   it("dismisses for good when the user says not now", () => {
     const dismissSuggestion = vi.fn();
     const dismissModal = vi.fn();

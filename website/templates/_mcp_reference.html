@@ -30,7 +30,7 @@
   {% if tool.params %}
   <table class="tool-doc__args">
     <thead>
-      <tr><th>Argument</th><th>Type</th><th>Required</th><th>Default</th></tr>
+      <tr><th>Argument</th><th>Type</th><th>Required</th></tr>
     </thead>
     <tbody>
       {% for param in tool.params %}
@@ -38,7 +38,6 @@
         <td><code>{{ param.name }}</code></td>
         <td><code>{{ param.annotation or "—" }}</code></td>
         <td>{{ "yes" if param.required else "no" }}</td>
-        <td><code>{{ param.default if param.default is not none else "—" }}</code></td>
       </tr>
       {% endfor %}
     </tbody>

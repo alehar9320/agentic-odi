@@ -136,6 +136,13 @@ describe("Catch Up reads the signal inbox", () => {
     expect(fetchSignals).toHaveBeenCalled();
   });
 
+  it("exposes the feed as a named region for landmark navigation", async () => {
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: "Signal inbox: no unread signals" }));
+
+    expect(await screen.findByRole("region", { name: "Signal inbox" })).toBeInTheDocument();
+  });
+
   it("counts unread signals from the unread-count endpoint, not the page it happens to show", async () => {
     // The store holds a budgeted inbox: the badge reports all of it.
     serveFeed([signal(), signal({ id: "sig-2", read_at: new Date().toISOString() })], 3);
