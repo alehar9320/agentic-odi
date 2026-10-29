@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, computed_field
+from pydantic import BaseModel, Field, computed_field, model_validator
 
 
 class Direction(str, Enum):
@@ -91,6 +91,7 @@ JOB_NAME_PATTERN = r"^[A-Za-z0-9 _-]+$"
 JOB_NAME_MIN_LENGTH = 3
 JOB_NAME_MAX_LENGTH = 64
 JOB_DESCRIPTION_MAX_LENGTH = 500
+ScoreMethod = Literal["estimate", "survey", "import"]
 
 
 class Job(BaseModel):
@@ -143,6 +144,28 @@ class Outcome(BaseModel):
     opportunity_score: float | None = Field(
         None, description="Opportunity score (Importance + max(Importance - Satisfaction, 0))"
     )
+    importance_n: int | None = Field(
+        default=None, ge=1, description="People behind the importance score, when known"
+    )
+    satisfaction_n: int | None = Field(
+        default=None, ge=1, description="People behind the satisfaction score, when known"
+    )
+    score_method: ScoreMethod = Field(
+        default="estimate",
+        description="How the score was obtained: a one-person estimate, a survey, or an import",
+    )
+
+    @model_validator(mode="after")
+    def _count_requires_a_sample(self) -> Outcome:
+        # A count above one means people were asked; an estimate cannot have asked them.
+        if self.score_method == "estimate" and (
+            (self.importance_n or 0) > 1 or (self.satisfaction_n or 0) > 1
+        ):
+            raise ValueError(
+                "score_method 'estimate' cannot carry a sample count above 1; "
+                "use 'survey' or 'import' when people were asked"
+            )
+        return self
 
 
 class ValueMetric(BaseModel):
