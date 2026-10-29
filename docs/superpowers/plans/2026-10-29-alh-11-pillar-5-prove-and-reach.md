@@ -173,3 +173,27 @@ with an invented stub").
 Independent M5 craft children (ALH-121 theme, ALH-122 locale, ALH-132 OG cards)
 touch only Studio/site and can be scheduled any time; they are deliberately out
 of Wave 1 because they are large and unrelated to the foundation guard.
+
+## Wave 1c · ALH-132: a social card for every docs page (delivered)
+
+Executed after Wave 1 because it is dependency-free and bounded (size S): it
+extends the existing site generator and needs no spine stage.
+
+- `website/tools/make_og.py` — per-page cards (`page_card`, `render_page`,
+  `render_site`). The figure is read back out of the page's own visible text, so
+  a number in markup never becomes a claimed figure; a page with no figure draws
+  no number rather than a `0`. The generic `render()` defaults are unchanged, so
+  the committed `assets/og.png` stays byte-identical.
+- `website/tools/build_site.py` — renders one card per published page and fails
+  the build if a published page has no card.
+- `website/templates/base.html` — each page emits its own `og:image` /
+  `twitter:image` plus alt text.
+- `website/tests/test_og_pages.py` — 43 assertions covering existence,
+  uniqueness, the no-figure fallback, the figure rule, safe unique paths, hard
+  titles, and the build gate.
+
+Still blocked, unchanged by this wave: ALH-59, ALH-120, ALH-121, ALH-122, ALH-127,
+ALH-129 and the rest of the M4/M5 tree all name spine contracts (memo, brief,
+decision, approval, template engine, demo loader) that do not exist in the tree.
+Per the children's own rule, the correct action is to report the missing stage by
+reference rather than invent a stub.
