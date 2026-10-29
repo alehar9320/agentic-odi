@@ -22,6 +22,7 @@ import {
   deleteConnector as apiDeleteConnector,
   deleteJob as apiDeleteJob,
   deleteObservation as apiDeleteObservation,
+  deleteEvidence as apiDeleteEvidence,
   deleteOutcome as apiDeleteOutcome,
   deleteStep as apiDeleteStep,
   fetchCanvas,
@@ -35,6 +36,7 @@ import {
   fetchMemory,
   healthLlm,
   healthMcp,
+  promoteEvidence as apiPromoteEvidence,
   resolveApproval as apiResolveApproval,
   setConversationHead as apiSetConversationHead,
   streamChat,
@@ -248,6 +250,18 @@ export interface StudioContextValue {
     payload: { statement?: string; importance?: number; satisfaction?: number },
   ) => Promise<void>;
   deleteOutcome: (outcomeId: string) => Promise<void>;
+  deleteEvidence: (evidenceId: string) => Promise<void>;
+  promoteEvidence: (
+    evidenceId: string,
+    payload: {
+      target: "job" | "outcome";
+      job_id?: string;
+      statement?: string;
+      name?: string;
+      importance?: number;
+      satisfaction?: number;
+    },
+  ) => Promise<void>;
   activePanel: WorkspacePanelId | null;
   openPanel: (panel: WorkspacePanelId) => void;
   closePanel: () => void;
@@ -954,6 +968,38 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     [settings.mcp_url, pushToast, refreshCanvas],
   );
 
+  const deleteEvidence = useCallback(
+    async (evidenceId: string) => {
+      try {
+        await apiDeleteEvidence(evidenceId, settings.mcp_url);
+        pushToast("success", "Evidence removed.");
+        await refreshCanvas();
+      } catch (error) {
+        pushToast("error", `Could not remove the evidence: ${(error as Error).message}`);
+      }
+    },
+    [settings.mcp_url, pushToast, refreshCanvas],
+  );
+
+  const promoteEvidence = useCallback(
+    async (
+      evidenceId: string,
+      payload: {
+        target: "job" | "outcome";
+        job_id?: string;
+        statement?: string;
+        name?: string;
+        importance?: number;
+        satisfaction?: number;
+      },
+    ) => {
+      // The form keeps the error beside the quote it came from.
+      await apiPromoteEvidence(evidenceId, { ...payload, mcp_url: settings.mcp_url });
+      pushToast("success", `Promoted the evidence to a ${payload.target}.`);
+      await refreshCanvas();
+    },
+    [settings.mcp_url, pushToast, refreshCanvas],
+  );
   const closePanel = useCallback(() => setActivePanel(null), []);
 
   const openPanel = useCallback(
@@ -1666,6 +1712,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       offlineReply,
       addStep,
       addOutcome,
+      promoteEvidence,
       createJob,
       updateJob,
       deleteJob,
@@ -1673,6 +1720,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       deleteStep,
       updateOutcome,
       deleteOutcome,
+      deleteEvidence,
       activePanel,
       openPanel,
       closePanel,
@@ -1763,6 +1811,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       offlineReply,
       addStep,
       addOutcome,
+      promoteEvidence,
       createJob,
       updateJob,
       deleteJob,
@@ -1770,6 +1819,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       deleteStep,
       updateOutcome,
       deleteOutcome,
+      deleteEvidence,
       activePanel,
       openPanel,
       closePanel,

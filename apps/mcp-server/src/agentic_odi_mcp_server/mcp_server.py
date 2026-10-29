@@ -1,6 +1,8 @@
 """Agentic ODI MCP Server (FastMCP)."""
 
+import argparse
 import json
+import os
 import signal
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -18,6 +20,7 @@ from agentic_odi_core import (
     ODIService,
     OutcomeNotFoundError,
     OutcomeStatementError,
+    ScheduledWorkNotFoundError,
     StepNotFoundError,
     ValueOutOfRangeError,
     build_repository,
@@ -27,6 +30,7 @@ from agentic_odi_core import (
     evaluate_outcome_statement,
     job_not_found,
     odi_schema,
+    scheduled_work_not_found,
 )
 from agentic_odi_core import (
     customer_outcome_not_found as _cust_not_found,
@@ -435,6 +439,7 @@ async def add_evidence(
     source_kind: str,
     name: str,
     content: str,
+    url: str | None = None,
     item_type: EvidenceItemType = "manual",
     raw: dict[str, Any] | None = None,
     job_id: str | None = None,
@@ -449,6 +454,7 @@ async def add_evidence(
             item_type=item_type,
             name=name,
             content=content,
+            url=url,
             raw=raw,
             job_id=job_id,
             step_id=step_id,
@@ -558,8 +564,98 @@ async def evaluate_outcome(ctx: Context, statement: str, job_id: str | None = No
 
 
 @mcp.tool
+def schedule_work(
+    name: str,
+    schedule_expression: str,
+    agent_id: str = "default-agent",
+    trigger_type: str = "oneshot",
+    payload: dict[str, Any] | None = None,
+    job_id: str | None = None,
+) -> str:
+    try:
+        work = service.schedule_work(
+            name=name,
+            schedule_expression=schedule_expression,
+            agent_id=agent_id,
+            trigger_type=trigger_type,
+            payload=payload,
+            job_id=job_id,
+        )
+    except JobNotFoundError:
+        return job_not_found(job_id or "")
+    except ValueError as exc:
+        return f"Error: {exc}"
+    return f"Scheduled work created successfully: {work.model_dump_json()}"
+
+
+@mcp.tool
+def get_scheduled_work(work_id: str) -> str:
+    try:
+        work = service.get_scheduled_work(work_id)
+    except ScheduledWorkNotFoundError:
+        return scheduled_work_not_found(work_id)
+    return work.model_dump_json()
+
+
+@mcp.tool
+def list_scheduled_work(
+    job_id: str | None = None,
+    status: str | None = None,
+) -> str:
+    items = service.list_scheduled_work(job_id=job_id, status=status)
+    return json.dumps([item.model_dump() for item in items])
+
+
+@mcp.tool
+def cancel_scheduled_work(work_id: str) -> str:
+    try:
+        work = service.cancel_scheduled_work(work_id)
+    except ScheduledWorkNotFoundError:
+        return scheduled_work_not_found(work_id)
+    return f"Scheduled work cancelled successfully: {work.model_dump_json()}"
+
+
+@mcp.tool
+def trigger_scheduled_work(work_id: str) -> str:
+    try:
+        work = service.trigger_scheduled_work(work_id)
+    except ScheduledWorkNotFoundError:
+        return scheduled_work_not_found(work_id)
+    return f"Scheduled work dispatched: {work.model_dump_json()}"
+
+
+@mcp.tool
 def get_odi_schema() -> str:
     return json.dumps(odi_schema())
+
+
+DEFAULT_PORT = 8000
+
+
+def resolve_port(cli_port: int | None = None) -> int:
+    """Return the HTTP port for the server: flag, then env var, then default."""
+    if cli_port is not None:
+        return cli_port
+    raw = os.environ.get("AGENTIC_ODI_MCP_PORT")
+    if raw is None or not raw.strip():
+        return DEFAULT_PORT
+    try:
+        return int(raw)
+    except ValueError as exc:
+        raise ValueError(f"AGENTIC_ODI_MCP_PORT must be an integer, got {raw!r}") from exc
+
+
+def main(argv: list[str] | None = None) -> None:
+    parser = argparse.ArgumentParser(description="Run the Agentic ODI MCP server over HTTP.")
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=None,
+        help=f"Port to listen on (default: $AGENTIC_ODI_MCP_PORT or {DEFAULT_PORT}).",
+    )
+    args = parser.parse_args(argv)
+    setup_graceful_shutdown()
+    mcp.run(transport="http", port=resolve_port(args.port))
 
 
 def setup_graceful_shutdown() -> None:
@@ -580,11 +676,6 @@ def setup_graceful_shutdown() -> None:
 
     for sig in (signal.SIGINT, signal.SIGTERM):
         signal.signal(sig, _chain(signal.getsignal(sig)))
-
-
-def main() -> None:
-    setup_graceful_shutdown()
-    mcp.run(transport="http", port=8000)
 
 
 if __name__ == "__main__":

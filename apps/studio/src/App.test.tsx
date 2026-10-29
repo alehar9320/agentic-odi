@@ -257,6 +257,27 @@ describe("studio shell", () => {
     expect(screen.getByText("Local guidance")).toBeInTheDocument();
   });
 
+  it("closes the setup conversation when starting a new conversation", async () => {
+    window.localStorage.removeItem("studio.brief");
+    render(<App />);
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: /tell me what you're building/i }),
+    );
+    expect(
+      await screen.findByText("What are you building?", { selector: "strong" }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /new conversation/i }));
+
+    await waitFor(() => {
+      expect(screen.queryByText("What are you building?", { selector: "strong" })).toBeNull();
+    });
+    expect(
+      screen.getByRole("heading", { name: "What do you want to win?" }),
+    ).toBeInTheDocument();
+  });
+
   it("starts a new conversation from the drawer", async () => {
     render(<App />);
 
@@ -382,6 +403,12 @@ describe("first run", () => {
       await screen.findByText("Where does it hurt most?", { selector: "strong" }),
     ).toBeInTheDocument();
     fireEvent.change(composer, { target: { value: "A missed config key costs hours" } });
+    fireEvent.keyDown(composer, { key: "Enter" });
+
+    expect(
+      await screen.findByText("What is your vision for this domain?", { selector: "strong" }),
+    ).toBeInTheDocument();
+    fireEvent.change(composer, { target: { value: "Zero downtime deploys" } });
     fireEvent.keyDown(composer, { key: "Enter" });
 
     expect(
