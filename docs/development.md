@@ -26,16 +26,30 @@ uv run bandit -c pyproject.toml -r apps packages website/
 The SPA and Tauri shell mirror their CI jobs locally:
 
 ```bash
-npm --prefix apps/studio run lint       # ESLint
-npm --prefix apps/studio run typecheck  # tsc --noEmit
-npm --prefix apps/studio test -- --run  # Vitest (run once)
-npm --prefix apps/studio run build      # production build → apps/studio/dist
+npm --prefix apps/studio run lint        # ESLint
+npm --prefix apps/studio run typecheck   # tsc --noEmit
+npm --prefix apps/studio test -- --run   # Vitest on jsdom (run once)
+npm --prefix apps/studio run test:visual # Vitest Browser Mode → Chromatic archives
+npm --prefix apps/studio run build       # production build → apps/studio/dist
 cd apps/studio/src-tauri && cargo fmt --check && cargo clippy -- -D warnings && cargo check
 ```
 
+### Visual tests
+
+`npm test` runs the jsdom suite and deliberately ignores `*.visual.test.tsx`.
+Those files render one component state in Chromium under
+`vitest.visual.config.ts`, and the `Chromatic` workflow publishes them on every
+branch push so a reviewer can compare pixels component by component. Each test costs one billed snapshot per
+build on the free 5,000/month allowance, which is why the two suites are split by
+filename instead of running every test in a browser. Browser mode needs Chromium
+locally: `npx playwright install chromium`. See
+[Deployment](deployment.md) for the project setup and budget rules.
+
 ### Conversational UI coverage
 
-The agent-composed surfaces and the first-run tour are covered at these levels. `ChatStage.test.tsx` also covers the latest-message control while following a streamed turn and returning to the live end:
+The agent-composed surfaces, first-minute guidance, and the product tour are
+covered at these levels. `ChatStage.test.tsx` also covers the latest-message
+control while following a streamed turn and returning to the live end:
 
 | File | What it covers |
 |---|---|
@@ -57,8 +71,9 @@ The agent-composed surfaces and the first-run tour are covered at these levels. 
 | `apps/studio-api/tests/test_studio_approvals.py` | Gate lifecycle: resolve, timeout, double resolve, unknown id |
 | `apps/studio/src/features/flags.test.ts` | Flag precedence (query → storage → env → default), value parsing, local overrides |
 | `apps/studio/src/onboarding/machine.test.ts` | Tour transitions, no forward motion without a goal, versioned storage, malformed records |
-| `apps/studio/src/onboarding/FirstRunWizard.test.tsx` | Auto-open, full flow to a destination, skip/Escape, focus trap, resume, replay, inline model repair, flag off |
-| `apps/studio/src/App.test.tsx` | First-run ordering: tour over the context conversation, job handoff, chosen surface opens, contextual starter-card labels and prompts, flag off in shell tests |
+| `apps/studio/src/onboarding/FirstRunWizard.test.tsx` | Never auto-opens, explicit open, full flow to a destination, skip/Escape, focus trap, resume, replay, inline model repair, flag off |
+| `apps/studio/src/lib/guidance.test.ts` | One hint at a time, context before evidence, silence before the first exchange, permanent dismissal, defensive storage |
+| `apps/studio/src/App.test.tsx` | First-minute ordering: no tour or interview over the stage, tour on request, context hint after the first reply, job handoff, chosen surface opens, flag off in shell tests |
 
 ## Website Checks (GitHub Pages)
 
@@ -110,6 +125,74 @@ You can also trigger them manually:
 pre-commit run --all-files
 ```
 
+## PR Risk Classification
+
+Every pull request is automatically classified by the
+[PR Risk Classification](../.github/workflows/pr-risk.yml) workflow, which runs
+on `ubuntu-latest` at $0 cost with zero external dependencies. It scores the diff
+(0–100) across three factors and applies a single, mutually exclusive label:
+
+| Label | Meaning | Score |
+|---|---|---|
+| `safe to merge` | Low risk — small diff, docs-only, or tested source code | ≤ 20 |
+| `needs a look` | Medium risk — standard feature work or missing test updates | 21–50 |
+| `danger zone` | High risk — critical path (auth, migrations, billing, infra, workflows) or protected-file deletion | ≥ 51 |
+
+Scoring factors:
+
+- **File & line churn** — files changed and lines added/deleted (0–30 points).
+- **Critical path override** — touching `auth/`, `migrations/`, `billing/`,
+  `infra/`, `.github/workflows/`, or deleting a file in
+  `.ci/protected-files.txt` forces the danger zone.
+- **Test delta** — source code changed without a corresponding
+  `*.test.*`/`*.spec.*`/`tests/**` file adds 20 points.
+
+### PR labels
+
+The same workflow also labels every pull request so a reviewer can read its
+shape at a glance, without opening the diff. Labelling is deterministic — no
+LLM calls, no network beyond the GitHub API — so it cannot invent a label.
+
+| Axis | Labels | What it tells a reviewer |
+|---|---|---|
+| Provenance | `🤖 agent`, `👤 human` | Whether a coding agent or a human wrote it. Detected from the PR author, the branch prefix, and the commit identities, because agents in this repository push on the owner's account. |
+| Size | `size/XS` … `size/XL` | How much there is to read: <50, 50–249, 250–799, 800–1999, 2000+ lines changed. |
+| Domain | `area/studio`, `area/cli`, `area/core`, `area/infra`, `area/docs`, … | Which components the diff touches. A PR can carry several. |
+| Supply chain | `dependencies` | A manifest or lockfile changed (`package-lock.json`, `pyproject.toml`, `Cargo.lock`, `go.sum`, …). Worth a careful read even when the diff is one line. |
+| Agent telemetry | `breaking change`, `needs deep dive`, `telemetry invalid` | What the agent declared about its own work. |
+
+#### Agent telemetry
+
+Coding agents declare what they know in the pull request body. Add this block to
+the description; the [pull request
+template](../.github/pull_request_template.md) already includes it:
+
+```html
+<!-- AGENT_METADATA {"has_breaking_changes": true, "agent_confidence": "low"} -->
+```
+
+- `has_breaking_changes: true` applies `breaking change`.
+- `agent_confidence: "low"` applies `needs deep dive`.
+- A block that cannot be parsed applies `telemetry invalid`. The workflow keeps
+  going either way and never fails the check suite on a malformed block.
+
+Human authors can leave the block alone: the shipped defaults claim nothing.
+
+Labels are managed idempotently. Each run adds the labels it computed and
+removes the ones it previously added that no longer apply, so re-pushing a
+branch corrects the size label instead of stacking a second one. The set of
+labels this system owns is defined once, in `scripts/pr_labels.py`:
+
+```bash
+python3 scripts/pr_labels.py --managed          # list every managed label
+echo '{"author":{"login":"x","type":"User"},"files":[]}' | python3 scripts/pr_labels.py
+```
+
+The risk tier labels (`safe to merge`, `needs a look`, `danger zone`) and the
+merge-state labels (`ready-for-merge`, `merge-conflict`) are owned by other
+workflows and are deliberately left alone. The workflow is silent: it updates
+labels only and never posts PR comments.
+
 ## Testing
 
 Tests use **pytest** with **pytest-asyncio** (strict mode) and run entirely
@@ -129,6 +212,41 @@ The MCP server contract test compares the live FastMCP registry with
 both places. The CLI local-backend contract test keeps `_LOCAL_HANDLERS` aligned
 with the same tool names.
 
+### End-to-end testing
+
+The browser-level suite lives in `apps/studio/e2e/` and runs with
+[Playwright](https://playwright.dev). It drives the real Studio against the
+real sidecar and MCP server, with no mocked network calls, so it covers the
+seams the other tiers cannot: the SPA's assumptions about the sidecar's
+response shapes, the sidecar's hydration of the canvas, and the first-run
+wizard's ordering relative to the rest of the app.
+
+```bash
+npm --prefix apps/studio run build      # the sidecar serves apps/studio/dist
+npm --prefix apps/studio run test:e2e
+npm --prefix apps/studio run test:e2e:ui   # the Playwright UI
+```
+
+The first run needs the browser once:
+
+```bash
+npx --prefix apps/studio playwright install chromium
+```
+
+Playwright's `webServer` array starts the MCP server, the Studio sidecar, and
+a second sidecar on the MCP passthrough backend. Two projects run against
+them: `chromium` for the local backend (the product default) and
+`mcp-backend` for the passthrough.
+
+Locators bind to what a user perceives — a role, a label, or visible text —
+never to a `data-testid`, of which the application has none. When a test
+needs data behind it, it seeds through the API rather than through the UI, so
+the test stays about the view it is actually checking.
+
+CI runs the suite in the `e2e` job. It is deliberately non-blocking: set the
+repository variable `AGENTIC_ODI_E2E` to `false` to skip it, and the
+`continue-on-error` on the job keeps a failure from turning CI red.
+
 ## Test Coverage
 
 CI runs the suite on Python **3.10, 3.11, and 3.12** and uploads one combined
@@ -144,6 +262,13 @@ tracks `main`, which is the baseline every PR is compared against:
   tolerates a 1% dip from `codecov.yml`.
 - **Patch** status is informational for now, so new code can land while the
   suite catches up.
+
+Codecov itself never fails the build (`fail_ci_if_error: false`), so the same
+floor is enforced locally: `[tool.coverage.report] fail_under` in
+`pyproject.toml` makes any run with `--cov` fail below **89%** — the 90% target
+minus codecov's 1% tolerance. The current measurement is ~89.2%, so the gate has
+little slack; raise `fail_under` as coverage improves rather than lowering it to
+unblock a change.
 
 To reproduce the report locally:
 
@@ -185,6 +310,8 @@ uv run pytest \
 | `tests/contract/` | Live MCP tool surface and CLI local-handler parity |
 | `tests/scripts/` | `scripts/dev.py` startup, port checks, signals, and shutdown |
 | `apps/studio/src/**/*.test.ts` | SPA units: ODI math, transport bridge, SSE parser, sidecar client |
+| `apps/studio/src/**/*.visual.test.tsx` | Component states captured for Chromatic visual review |
+| `apps/studio/e2e/` | Browser journeys against the real stack: the conversation, capturing an outcome, the opportunity landscape, the workspace views, and the MCP passthrough backend |
 | `website/tests/` | Static site integrity, OG art reproducibility, and README sync |
 
 > [!TIP]

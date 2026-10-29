@@ -1,9 +1,9 @@
 /**
- * First-run onboarding for The Living Studio.
+ * The optional product tour for The Living Studio.
  *
- * The app only needs the provider and the wizard; everything else stays inside
- * this module. Replay is available through `useOnboarding` when the feature
- * flag is on.
+ * Nothing here opens by itself: the home stage and Settings ask the provider
+ * for it. The app needs only the provider and the wizard; everything else stays
+ * inside this module.
  */
 export { FirstRunWizard } from "./FirstRunWizard";
 export { OnboardingProvider } from "./OnboardingProvider";

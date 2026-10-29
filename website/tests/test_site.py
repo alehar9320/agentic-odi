@@ -50,6 +50,8 @@ ALLOWED_EXTERNAL_PREFIXES = (
     "https://codecov.io",
     "https://developers.cloudflare.com",
     "https://docs.entire.io",
+    "https://www.chromatic.com",
+    "https://playwright.dev",
     "https://freebuff.com",
     "https://pi.dev",
     # A placeholder in the connector documentation. It is not routable, and

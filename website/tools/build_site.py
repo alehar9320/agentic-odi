@@ -11,6 +11,7 @@ Nothing here runs at request time. The output is committed to
 from __future__ import annotations
 
 import argparse
+import html as html_module
 import json
 import re
 import shutil
@@ -339,7 +340,7 @@ def _render_pages(env: Environment) -> dict[str, str]:
         tool_signatures={tool["name"]: _signature(tool) for tool in tools},
         catalog_cards=cards,
         odi_schema=odi_schema,
-        odi_schema_json=json.dumps(odi_schema, indent=2, sort_keys=True),
+        odi_schema_json=json.dumps(odi_schema, indent=1, sort_keys=True),
         works_today=_works_today(tools, cards, connectors),
         roadmap_pending=roadmap_pending,
         formula_base=formula_base,
@@ -369,6 +370,40 @@ def _render_pages(env: Environment) -> dict[str, str]:
     return rendered
 
 
+def _page_url(name: str) -> str:
+    """A page's path relative to the site root, without a leading slash."""
+    if name == "index.html":
+        return ""
+    return name[: -len("index.html")]
+
+
+def _search_entry(name: str, page: str) -> dict[str, str]:
+    """One search-index entry: a page's title, path, and description."""
+    heading = re.search(r"<h1[^>]*>(.*?)</h1>", page, re.DOTALL)
+    title = _plain_text(heading.group(1)) if heading else SITE_NAME
+    description = re.search(r'<meta\s+name="description"\s+content="([^"]*)"', page)
+    excerpt = html_module.unescape(description.group(1)) if description else ""
+    return {"title": title, "url": _page_url(name), "excerpt": excerpt}
+
+
+def _plain_text(fragment: str) -> str:
+    """A fragment's visible text, with tags and entities resolved."""
+    text = html_module.unescape(re.sub(r"<[^>]+>", "", fragment))
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def _search_index(rendered: dict[str, str]) -> str:
+    """The client-side search index, built from the pages themselves.
+
+    Paths are relative to the site root so the same index works under the
+    project site's subpath and under a pull-request preview.
+    """
+    entries = [
+        _search_entry(name, page) for name, page in sorted(rendered.items()) if name != "404.html"
+    ]
+    return json.dumps(entries, indent=2, ensure_ascii=False) + "\n"
+
+
 def _sitemap(urls: list[str]) -> str:
     entries = "\n".join(f"  <url><loc>{PAGES_URL.rstrip('/')}{url}</loc></url>" for url in urls)
     return (
@@ -388,7 +423,7 @@ def _tree(root: Path) -> dict[str, bytes]:
     if not root.is_dir():
         return {}
     return {
-        str(path.relative_to(root)): path.read_bytes()
+        path.relative_to(root).as_posix(): path.read_bytes()
         for path in sorted(root.rglob("*"))
         if path.is_file()
     }
@@ -412,6 +447,7 @@ def build(out_dir: Path, *, check: bool = False) -> int:
         urls.append("/" + name[: -len("index.html")])
     files["sitemap.xml"] = _sitemap(urls).encode("utf-8")
     files["robots.txt"] = _robots().encode("utf-8")
+    files["search-index.json"] = _search_index(rendered).encode("utf-8")
     files["assets/tokens.css"] = _tokens_css().encode("utf-8")
 
     for asset in sorted(ASSETS.rglob("*")):

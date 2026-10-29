@@ -106,6 +106,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/models": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Models
+         * @description The model ids this backend serves, for the composer's model picker.
+         */
+        post: operations["post_models_api_models_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/connectors/catalog": {
         parameters: {
             query?: never;
@@ -115,6 +135,40 @@ export interface paths {
         };
         /** Get Connectors Catalog */
         get: operations["get_connectors_catalog_api_connectors_catalog_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/marketplace/servers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Search Marketplace */
+        get: operations["search_marketplace_api_marketplace_servers_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/marketplace/featured": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Featured Marketplace */
+        get: operations["featured_marketplace_api_marketplace_featured_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -504,6 +558,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/{full_path}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Spa Fallback */
+        get: operations["spa_fallback__full_path__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -516,6 +587,8 @@ export interface components {
             preset?: string | null;
             /** Url */
             url?: string | null;
+            /** Marketplace Id */
+            marketplace_id?: string | null;
         };
         /** AddOutcomeRequest */
         AddOutcomeRequest: {
@@ -632,6 +705,11 @@ export interface components {
             model: string;
             /** Mcp Url */
             mcp_url: string;
+            /**
+             * Routing Mode
+             * @default auto
+             */
+            routing_mode: string;
             /** Messages */
             messages?: components["schemas"]["ChatMessage"][];
             brief?: components["schemas"]["StudioBrief"] | null;
@@ -780,10 +858,112 @@ export interface components {
              */
             stream: boolean;
         };
+        /** MarketplaceListingOut */
+        MarketplaceListingOut: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Title */
+            title?: string | null;
+            /**
+             * Summary
+             * @default
+             */
+            summary: string;
+            /**
+             * Version
+             * @default
+             */
+            version: string;
+            /** Url */
+            url?: string | null;
+            /**
+             * Source
+             * @default official
+             */
+            source: string;
+            /** Area */
+            area?: string | null;
+            /** Repository */
+            repository?: string | null;
+            /** Docs */
+            docs?: string | null;
+            /** Env Vars */
+            env_vars?: string[];
+            /** Headers */
+            headers?: {
+                [key: string]: string;
+            };
+            /**
+             * Auth
+             * @default none
+             */
+            auth: string;
+            /**
+             * Installable
+             * @default false
+             */
+            installable: boolean;
+            /**
+             * Verified
+             * @default false
+             */
+            verified: boolean;
+            /**
+             * Pull Count
+             * @default 0
+             */
+            pull_count: number;
+            /**
+             * Is Recommended
+             * @default false
+             */
+            is_recommended: boolean;
+            /** Unavailable Reason */
+            unavailable_reason?: string | null;
+            /**
+             * Connector Name
+             * @default
+             */
+            connector_name: string;
+        };
+        /** MarketplaceSearchResponse */
+        MarketplaceSearchResponse: {
+            /** Listings */
+            listings?: components["schemas"]["MarketplaceListingOut"][];
+            /** Areas */
+            areas?: {
+                [key: string]: string;
+            };
+            /**
+             * Cached
+             * @default false
+             */
+            cached: boolean;
+            /** Types */
+            types?: {
+                [key: string]: unknown;
+            }[];
+        };
         /** McpHealthRequest */
         McpHealthRequest: {
             /** Mcp Url */
             mcp_url: string;
+        };
+        /**
+         * ModelListRequest
+         * @description Which backend to ask for its model ids. The key travels in the body, not
+         *     the query string, so it never lands in a URL or an access log.
+         */
+        ModelListRequest: {
+            /** Base Url */
+            base_url: string;
+            /**
+             * Api Key
+             * @default
+             */
+            api_key: string;
         };
         /** ObservationCreateRequest */
         ObservationCreateRequest: {
@@ -1158,6 +1338,41 @@ export interface operations {
             };
         };
     };
+    post_models_api_models_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ModelListRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_connectors_catalog_api_connectors_catalog_get: {
         parameters: {
             query?: never;
@@ -1176,6 +1391,72 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     }[];
+                };
+            };
+        };
+    };
+    search_marketplace_api_marketplace_servers_get: {
+        parameters: {
+            query?: {
+                /** @description Substring to match against name, title, or summary. */
+                q?: string;
+                /** @description Capability area filter. */
+                area?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarketplaceSearchResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    featured_marketplace_api_marketplace_featured_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarketplaceSearchResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -1998,6 +2279,37 @@ export interface operations {
                 "application/json": components["schemas"]["LlmProxyRequest"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    spa_fallback__full_path__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                full_path: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {

@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from "react";
 
 import { conversationToMarkdown, downloadMarkdown, exportFilename } from "../../lib/export";
 import { useStudio } from "../../state/StudioContext";
-import { BellIcon, MenuIcon, MoonIcon, PlusIcon, SettingsIcon, SunIcon } from "../icons";
+import { useUpdateSnapshot } from "../../updater";
+import { BellIcon, MenuIcon, MoonIcon, PlugIcon, PlusIcon, SettingsIcon, SunIcon } from "../icons";
 import { OdiMascot } from "../OdiMascot";
 
 /**
@@ -23,11 +24,14 @@ export function StudioBar({
     llmHealth,
     messages,
     unreadNotificationCount,
+    markAllNotificationsAsRead,
     openPanel,
+    openCustomize,
     pushToast,
     saveSettings,
     settings,
-  } = useStudio();
+  }    = useStudio();
+  const update = useUpdateSnapshot();
   const theme = settings.theme === "light" ? "light" : "dark";
   const nextTheme = theme === "dark" ? "light" : "dark";
   const [menuOpen, setMenuOpen] = useState(false);
@@ -64,6 +68,12 @@ export function StudioBar({
 
   const status =
     llmHealth.healthy === null ? "Connecting" : llmHealth.healthy ? "Live" : "Local mode";
+  const updateReady = update.phase === "ready";
+  const versionLabel = updateReady
+    ? "Update ready"
+    : update.currentVersion
+      ? `v${update.currentVersion}`
+      : null;
 
   return (
     <header className="bar">
@@ -83,6 +93,17 @@ export function StudioBar({
       </div>
 
       <div className="bar__right">
+        <button
+          type="button"
+          className="studio-pill pill-customize"
+          onClick={() => openCustomize()}
+          aria-label="Customize connectors"
+          title="Customize connectors"
+        >
+          <PlugIcon size={15} />
+          Customize
+        </button>
+
         <button
           type="button"
           className="studio-pill pill-changelog"
@@ -117,7 +138,10 @@ export function StudioBar({
           className="icon-button bar__bell"
           aria-label="Catch up notifications"
           title="Activity & Catch Up"
-          onClick={() => openPanel("catchup")}
+          onClick={() => {
+            markAllNotificationsAsRead();
+            openPanel("catchup");
+          }}
         >
           <BellIcon size={17} />
           {unreadNotificationCount > 0 && (
@@ -131,6 +155,7 @@ export function StudioBar({
           type="button"
           className="bar__health"
           onClick={() => openPanel("settings")}
+          aria-label={`Model status: ${status}. ${llmHealth.message}`}
           title={llmHealth.message}
         >
           <span
@@ -140,6 +165,21 @@ export function StudioBar({
           />
           {status}
         </button>
+
+        {versionLabel && (
+          <button
+            type="button"
+            className={`bar__version${updateReady ? " is-accent" : ""}`}
+            onClick={() => openPanel("settings")}
+            title={
+              update.currentVersion
+                ? `Living Studio ${update.currentVersion} — open software update settings`
+                : "Open software update settings"
+            }
+          >
+            {versionLabel}
+          </button>
+        )}
 
         <button
           type="button"

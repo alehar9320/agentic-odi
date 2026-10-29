@@ -14,6 +14,15 @@ async def _new_job(client) -> str:
 async def test_step_and_outcome_get_update_delete():
     async with Client(mcp) as client:
         job_id = await _new_job(client)
+        await client.call_tool(
+            "add_outcome",
+            {
+                "job_id": job_id,
+                "statement": "Minimize the time it takes to deploy when releasing",
+                "importance": 8,
+                "satisfaction": 4,
+            },
+        )
         step = await client.call_tool("add_step", {"job_id": job_id, "name": "S", "order": 1})
         step_id = json.loads(step.content[0].text.split(": ", 1)[1])["id"]  # type: ignore[index]
 
@@ -27,7 +36,7 @@ async def test_step_and_outcome_get_update_delete():
             "add_outcome",
             {
                 "job_id": job_id,
-                "statement": "Min x",
+                "statement": "Minimize the time to ship a release when the build is green",
                 "importance": 8,
                 "satisfaction": 4,
             },
@@ -103,7 +112,12 @@ async def test_update_outcome_out_of_range_returns_error_string():
         job_id = await _new_job(client)
         out = await client.call_tool(
             "add_outcome",
-            {"job_id": job_id, "statement": "Min x", "importance": 8, "satisfaction": 4},
+            {
+                "job_id": job_id,
+                "statement": "Minimize the time to ship a release when the build is green",
+                "importance": 8,
+                "satisfaction": 4,
+            },
         )
         outcome_id = json.loads(out.content[0].text.split(": ", 1)[1])["id"]  # type: ignore[index]
 
@@ -145,3 +159,39 @@ async def test_evaluate_outcome_round_trips_as_json(statement: str, expected_val
     assert isinstance(payload["issues"], list)
     assert all(isinstance(issue, str) for issue in payload["issues"])
     assert (payload["issues"] == []) is expected_valid
+    assert payload["statement"] == statement
+
+
+@pytest.mark.asyncio
+async def test_promote_evidence_reports_a_missing_evidence_id():
+    async with Client(mcp) as client:
+        res = await client.call_tool(
+            "promote_evidence", {"evidence_id": "EV-MISSING", "target": "job"}
+        )
+
+    text = res.content[0].text  # type: ignore[index]
+    assert text.startswith("Error:")
+    assert "EV-MISSING" in text
+    assert "list_evidence" in text
+
+
+@pytest.mark.asyncio
+async def test_promote_evidence_rejects_an_unknown_target():
+    async with Client(mcp) as client:
+        added = await client.call_tool(
+            "add_evidence",
+            {
+                "source_name": "Gong",
+                "source_kind": "manual",
+                "name": "Onboarding call",
+                "content": "Customers wait three days for a staging environment.",
+            },
+        )
+        evidence_id = json.loads(added.content[0].text.split(": ", 1)[1])["id"]  # type: ignore[index]
+
+        res = await client.call_tool(
+            "promote_evidence", {"evidence_id": evidence_id, "target": "slide"}
+        )
+
+    text = res.content[0].text  # type: ignore[index]
+    assert text == "Error: Unknown promotion target: slide"

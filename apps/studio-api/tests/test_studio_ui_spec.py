@@ -305,6 +305,7 @@ def test_tolerates_a_bad_optional_array_item() -> None:
             "before": ["45 minutes"],
             "after": ["30 seconds"],
             "metrics": [{"label": "Time to value"}],
+            "provenance": "simulated",
         },
     }
 
@@ -345,3 +346,37 @@ def test_rejects_a_tree_deeper_than_the_limit() -> None:
 
 def test_rejects_a_surface_that_is_not_an_object() -> None:
     assert _catalog().validate("just text") == "a UI node must be an object"
+
+
+def _simulation(**overrides: Any) -> dict[str, Any]:
+    props = {
+        "outcome": {"id": "O-1", "statement": "Minimize manual secret propagation"},
+        "bet": "Automate secret sync",
+        "before": ["Copy-paste into CI"],
+        "after": ["One command"],
+    }
+    props.update(overrides)
+    return {"type": "impact-simulation", "props": props}
+
+
+def test_an_impact_simulation_must_carry_a_provenance_label() -> None:
+    problem = _catalog().validate(_simulation())
+
+    assert problem is not None
+    assert "provenance" in problem
+
+
+def test_an_impact_simulation_rejects_an_unknown_provenance_label() -> None:
+    problem = _catalog().validate(_simulation(provenance="estimated"))
+
+    assert problem is not None
+    assert "provenance" in problem
+
+
+def test_an_impact_simulation_accepts_a_simulated_label() -> None:
+    assert _catalog().validate(_simulation(provenance="simulated")) is None
+
+
+def test_an_impact_simulation_rejects_a_measured_or_live_label() -> None:
+    assert _catalog().validate(_simulation(provenance="live")) is not None
+    assert _catalog().validate(_simulation(provenance="measured")) is not None

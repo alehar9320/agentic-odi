@@ -17,6 +17,7 @@ import type {
   Job,
   LatestConversation,
   LlmHealth,
+  MarketplaceSearch,
   McpHealth,
   ModelList,
   Observation,
@@ -62,10 +63,72 @@ export function isTransportFailure(error: unknown): boolean {
   return false;
 }
 
+/** Map an HTTP status the sidecar/worker returned (with no body) to a code. */
+function codeForStatus(status: number): string {
+  if (status === 404) return "not_found";
+  if (status === 409) return "conflict";
+  if (status === 422 || status === 400) return "validation";
+  if (status === 401 || status === 403) return "unauthorized";
+  if (status === 429) return "rate_limit";
+  if (status === 502 || status === 503) return "mcp_unreachable";
+  if (status >= 500) return "internal";
+  return "internal";
+}
+
+const MESSAGE_FOR_CODE: Partial<Record<string, string>> = {
+  mcp_unreachable: "The studio sidecar isn't reachable.",
+  not_found: "That resource wasn't found.",
+  validation: "The request was invalid.",
+  conflict: "That conflicts with the current state.",
+  rate_limit: "You're moving too fast.",
+  unauthorized: "You're not authorized.",
+};
+
+const SUGGESTION_FOR_CODE: Partial<Record<string, string>> = {
+  mcp_unreachable:
+    "Start the studio sidecar with `python scripts/dev.py` (or `npm --prefix apps/studio run dev:full`), then click Recheck.",
+  not_found: "Check the identifier and try again.",
+  validation: "Fix the input and try again.",
+  conflict: "Reload and try again.",
+  rate_limit: "Wait a moment, then retry.",
+  unauthorized: "Check your credentials and try again.",
+};
+
+const RETRYABLE_FOR_CODE: Partial<Record<string, boolean>> = {
+  mcp_unreachable: true,
+  rate_limit: true,
+};
+
+function retryableForCode(code: string): boolean {
+  return RETRYABLE_FOR_CODE[code] ?? false;
+}
+
+/** Describe a non-ok response the sidecar/worker returned. */
+function describeStatus(status: number): StudioError {
+  const code = codeForStatus(status);
+  return {
+    code,
+    message: MESSAGE_FOR_CODE[code] ?? `Request failed (${status})`,
+    suggestion: SUGGESTION_FOR_CODE[code],
+    retryable: retryableForCode(code),
+  };
+}
+
 /** Turn anything thrown into the shared error shape. */
 export function asStudioError(error: unknown): StudioError {
   if (error instanceof StudioApiError) {
     return error.error;
+  }
+  // A network-level failure means the sidecar (or the Worker that fronts it)
+  // never answered: frame it as a sidecar problem with a path back, not a
+  // generic "something went wrong".
+  if (error instanceof TypeError || (error instanceof Error && /fetch failed|network error/i.test(error.message))) {
+    return {
+      code: "mcp_unreachable",
+      message: MESSAGE_FOR_CODE.mcp_unreachable ?? "The studio sidecar isn't reachable.",
+      suggestion: SUGGESTION_FOR_CODE.mcp_unreachable,
+      retryable: RETRYABLE_FOR_CODE.mcp_unreachable ?? true,
+    };
   }
   if (error instanceof Error) {
     return {
@@ -101,25 +164,20 @@ async function studioError(response: Response): Promise<StudioApiError> {
     );
   }
   if (typeof body.detail === "string" && body.detail) {
+    const code = codeForStatus(response.status);
     return new StudioApiError(
       {
-        code: "internal",
+        code,
         message: body.detail,
-        retryable: false,
+        suggestion: SUGGESTION_FOR_CODE[code],
+        retryable: retryableForCode(code),
       },
       response.status,
       false,
     );
   }
-  return new StudioApiError(
-    {
-      code: "internal",
-      message: `Request failed (${response.status})`,
-      retryable: false,
-    },
-    response.status,
-    false,
-  );
+  const described = describeStatus(response.status);
+  return new StudioApiError(described, response.status, false);
 }
 
 async function getJson<T>(path: string): Promise<T> {
@@ -279,6 +337,48 @@ export function fetchConnectorCatalog(): Promise<ConnectorPreset[]> {
 
 export function fetchConnectors(): Promise<ConnectorListItem[]> {
   return getJson<ConnectorListItem[]>("/api/connectors");
+}
+
+/**
+ * Search the marketplace. `area` and `q` are server-side filters so a narrow
+ * query does not depend on the page having fetched everything first.
+ */
+export async function fetchMarketplace(params: {
+  q?: string;
+  area?: string;
+  limit?: number;
+} = {}): Promise<MarketplaceSearch> {
+  const search = new URLSearchParams();
+  if (params.q) search.set("q", params.q);
+  if (params.area) search.set("area", params.area);
+  if (params.limit) search.set("limit", String(params.limit));
+  const suffix = search.toString();
+  return normalizeMarketplace(
+    await getJson<Partial<MarketplaceSearch>>(
+      `/api/marketplace/servers${suffix ? `?${suffix}` : ""}`,
+    ),
+  );
+}
+
+/** Editor's picks: the curated presets, recommended first. */
+export async function fetchFeatured(limit = 6): Promise<MarketplaceSearch> {
+  return normalizeMarketplace(
+    await getJson<Partial<MarketplaceSearch>>(`/api/marketplace/featured?limit=${limit}`),
+  );
+}
+
+/**
+ * The local BFF fallback may answer with a subset of the search shape, so a
+ * missing list becomes an empty one here rather than an undefined that callers
+ * would have to guard at every read.
+ */
+function normalizeMarketplace(body: Partial<MarketplaceSearch>): MarketplaceSearch {
+  return {
+    listings: body.listings ?? [],
+    areas: body.areas ?? {},
+    cached: body.cached ?? false,
+    types: body.types ?? [],
+  };
 }
 
 export function addConnector(payload: AddConnectorPayload): Promise<ConnectorOperationResponse> {

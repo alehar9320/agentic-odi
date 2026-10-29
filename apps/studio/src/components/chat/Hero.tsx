@@ -7,6 +7,7 @@ import {
   nextGreeting,
 } from "../../lib/greeting";
 import { isUnderserved } from "../../lib/odi";
+import { useOnboarding } from "../../onboarding/context";
 import { useStudio } from "../../state/StudioContext";
 import { BoltIcon, CaptureIcon, CompassIcon, SparkIcon } from "../icons";
 
@@ -44,6 +45,7 @@ export function Hero() {
   const { displayName, canvas, llmHealth, openPanel, streaming, brief, openSetup, sendMessage } =
     useStudio();
   const suggestions = useAuiState((state) => state.thread.suggestions);
+  const { enabled: tourEnabled, openTour } = useOnboarding();
   const [now, setNow] = useState(() => new Date());
   const [currentId, setCurrentId] = useState<string | null>(null);
 
@@ -77,10 +79,14 @@ export function Hero() {
     ],
   );
 
+  // The first frame is always the invitation; rotation starts from it.
   const current = candidates.find((candidate) => candidate.id === currentId) ?? candidates[0];
+  // A first run gets one still sentence. Changing the headline while someone is
+  // deciding what to say is the opposite of focus.
+  const firstRun = !brief && jobs === 0 && outcomes === 0;
 
   useEffect(() => {
-    if (prefersReducedMotion()) {
+    if (firstRun || prefersReducedMotion()) {
       return;
     }
     const timer = window.setInterval(() => {
@@ -91,7 +97,7 @@ export function Hero() {
       setCurrentId((id) => nextGreeting(candidates, id ?? current?.id)?.id ?? null);
     }, GREETING_ROTATION_MS);
     return () => window.clearInterval(timer);
-  }, [candidates, current?.id]);
+  }, [candidates, current?.id, firstRun]);
 
   const pills: HeroPill[] = suggestions.map((suggestion, index) => ({
     id: `suggestion-${index}`,
@@ -124,12 +130,12 @@ export function Hero() {
         {brief?.product_name ? `Living Studio · ${brief.product_name}` : "Living Studio"}
       </p>
       <h1 className="hero__line" key={current?.id ?? "greeting"}>
-        {current?.text ?? "Good morning"}
+        {current?.text ?? "What do you want to win?"}
       </h1>
       <p className="hero__sub">
         {brief?.target_user
-          ? `For ${brief.target_user}. Tell me where they get stuck, and we'll turn it into something you can defend.`
-          : "Name what you're trying to win. I'll help you test whether it's worth it — and what to do next."}
+          ? `For ${brief.target_user}. Tell me where they get stuck.`
+          : "One sentence is enough. I'll help you test whether it's worth chasing."}
       </p>
       <div className="hero__pills" aria-label="Suggested next steps">
         {pills.map((pill) => (
@@ -153,14 +159,26 @@ export function Hero() {
             )}
           </button>
         ))}
+      </div>
+      <div className="hero__aside">
         <button
           type="button"
-          className="suggestion suggestion--quiet"
+          className="hero__tour"
           onClick={openSetup}
           title="Tell me about your product, audience, and job"
         >
           {brief ? "Edit context" : "Tell me what you're building"}
         </button>
+        {tourEnabled ? (
+          <>
+            <span className="hero__aside-divider" aria-hidden="true">
+              ·
+            </span>
+            <button type="button" className="hero__tour" onClick={openTour}>
+              Show me around
+            </button>
+          </>
+        ) : null}
       </div>
     </div>
   );

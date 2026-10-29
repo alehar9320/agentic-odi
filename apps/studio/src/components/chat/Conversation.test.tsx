@@ -291,6 +291,47 @@ describe("Conversation", () => {
   });
 });
 
+describe("Conversation offline context", () => {
+  it("marks a content-less offline turn as local guidance", () => {
+    harness.state.offlineReply = true;
+    const { container } = renderTurn([
+      {
+        id: "m-1",
+        parentId: null,
+        role: "assistant",
+        content: "",
+        parts: [{ kind: "ui", id: "ui-1", node: outcomeCard() }],
+      },
+    ]);
+
+    expect(screen.getByText("Local guidance")).toBeInTheDocument();
+    expect(container.querySelector(".message__tag")).not.toBeNull();
+    harness.state.offlineReply = false;
+  });
+});
+
+
+describe("Conversation live regions", () => {
+  it("announces tool traces politely as they arrive", () => {
+    const { container } = renderTurn([
+      {
+        id: "m-1",
+        parentId: null,
+        role: "assistant",
+        content: "Working",
+        parts: [
+          { kind: "text", text: "Working" },
+          { kind: "tool", id: "call-1", name: "list_jobs", status: "ok" },
+        ],
+      },
+    ]);
+
+    const trace = container.querySelector(".tool-trace") as HTMLElement;
+    expect(trace.textContent).toContain("list jobs");
+    expect(trace).toHaveAttribute("aria-live", "polite");
+  });
+});
+
 describe("Conversation failures", () => {
   it("shows the failure, the suggestion, and a retry that re-sends the question", () => {
     harness.state.sendMessage = vi.fn<(text: string) => Promise<void>>();
