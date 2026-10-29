@@ -153,3 +153,53 @@ describe("IndexedDbLocalStore", () => {
     second.close();
   });
 });
+
+describe("IndexedDbLocalStore thread deletion", () => {
+  async function seed(store: IndexedDbLocalStore) {
+    await store.putConversation({
+      id: "c-1",
+      title: "Chat",
+      created_at: "2026-01-01T00:00:00Z",
+      updated_at: "2026-01-01T00:00:00Z",
+      head_id: "m-4",
+    });
+    for (const [messageId, parentId, role] of [
+      ["m-1", null, "user"],
+      ["m-2", "m-1", "assistant"],
+      ["m-3", "m-1", "assistant"],
+      ["m-4", "m-3", "user"],
+    ] as const) {
+      await store.appendTurn({
+        conversation_id: "c-1",
+        role,
+        content: messageId,
+        created_at: "2026-01-01T00:00:00Z",
+        message_id: messageId,
+        parent_id: parentId,
+      });
+    }
+  }
+
+  it("deletes a turn tree and repoints the head at what is left", async () => {
+    const store = await makeStore();
+    await seed(store);
+
+    await store.deleteTurnTree("c-1", "m-2");
+
+    const tree = await store.conversationTree("c-1");
+    expect(tree.messages.map((turn) => turn.message_id)).toEqual(["m-1", "m-3", "m-4"]);
+    expect(tree.head_id).toBe("m-4");
+    store.close();
+  });
+
+  it("deletes a conversation and every turn in it", async () => {
+    const store = await makeStore();
+    await seed(store);
+
+    await store.deleteConversation("c-1");
+
+    expect(await store.listConversations()).toEqual([]);
+    expect(await store.listTurns("c-1")).toEqual([]);
+    store.close();
+  });
+});

@@ -34,6 +34,54 @@ export function PanelLeftIcon(props: IconProps) {
   );
 }
 
+export function HistoryIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M3 12a9 9 0 1 0 3-6.7" />
+      <path d="M3 4v5h5" />
+      <path d="M12 8v4l3 2" />
+    </Icon>
+  );
+}
+
+export function ThumbUpIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M7 10v10H4a1 1 0 0 1-1-1v-8a1 1 0 0 1 1-1z" />
+      <path d="M7 10l4-7a2 2 0 0 1 2 2v4h5a2 2 0 0 1 2 2.3l-1.2 7A2 2 0 0 1 16.8 20H7" />
+    </Icon>
+  );
+}
+
+export function ThumbDownIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M17 14V4h3a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1z" />
+      <path d="M17 14l-4 7a2 2 0 0 1-2-2v-4H6a2 2 0 0 1-2-2.3l1.2-7A2 2 0 0 1 7.2 4H17" />
+    </Icon>
+  );
+}
+
+export function MicIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <rect x="9" y="3" width="6" height="11" rx="3" />
+      <path d="M5 11a7 7 0 0 0 14 0" />
+      <path d="M12 18v3" />
+    </Icon>
+  );
+}
+
+export function TrashIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M4 7h16" />
+      <path d="M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+      <path d="M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13" />
+    </Icon>
+  );
+}
+
 export function PlusIcon(props: IconProps) {
   return (
     <Icon {...props}>
@@ -122,6 +170,14 @@ export function ChevronDownIcon(props: IconProps) {
   );
 }
 
+export function PencilIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M4 20h4L20 8a2.8 2.8 0 0 0-4-4L4 16z" />
+      <path d="m14.5 5.5 4 4" />
+    </Icon>
+  );
+}
 export function CloseIcon(props: IconProps) {
   return (
     <Icon {...props}>

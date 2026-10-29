@@ -33,7 +33,7 @@ import { useStudio } from "../../state/StudioContext";
 import type { StudioError } from "../../types";
 import { UiActionContext } from "../../ui/actions";
 import { FailurePanel } from "../FailurePanel";
-import { CheckIcon, CopyIcon } from "../icons";
+import { CheckIcon, CopyIcon, ThumbDownIcon, ThumbUpIcon, TrashIcon } from "../icons";
 import { Markdown } from "./Markdown";
 
 const PHASE_LABEL: Record<string, string> = {
@@ -50,7 +50,8 @@ function phaseLabel(phase: string | null): string {
 }
 
 function AssistantMessage() {
-  const { thinkingPhase, offlineReply, sendMessage } = useStudio();
+  const { thinkingPhase, offlineReply, sendMessage, deleteMessage } = useStudio();
+  const messageId = useAuiState((state) => state.message.id);
   const running = useAuiState((state) => state.message.status?.type === "running");
   const copied = useAuiState((state) => state.message.isCopied);
   const hasText = useAuiState((state) =>
@@ -137,6 +138,29 @@ function AssistantMessage() {
             <ActionBarPrimitive.Reload className="quiet-action" aria-label="Regenerate reply">
               Regenerate
             </ActionBarPrimitive.Reload>
+            <ActionBarPrimitive.FeedbackPositive
+              className="quiet-action quiet-action--icon"
+              aria-label="Good reply"
+              title="Good reply"
+            >
+              <ThumbUpIcon size={14} />
+            </ActionBarPrimitive.FeedbackPositive>
+            <ActionBarPrimitive.FeedbackNegative
+              className="quiet-action quiet-action--icon"
+              aria-label="Bad reply"
+              title="Bad reply"
+            >
+              <ThumbDownIcon size={14} />
+            </ActionBarPrimitive.FeedbackNegative>
+            <button
+              type="button"
+              className="quiet-action quiet-action--icon"
+              aria-label="Delete reply"
+              title="Delete reply"
+              onClick={() => deleteMessage(messageId)}
+            >
+              <TrashIcon size={14} />
+            </button>
           </ActionBarPrimitive.Root>
         ) : null}
       </div>
@@ -145,6 +169,8 @@ function AssistantMessage() {
 }
 
 function UserMessage() {
+  const { deleteMessage } = useStudio();
+  const messageId = useAuiState((state) => state.message.id);
   const copied = useAuiState((state) => state.message.isCopied);
 
   return (
@@ -188,6 +214,15 @@ function UserMessage() {
         >
           {copied ? "Copied" : "Copy"}
         </ActionBarPrimitive.Copy>
+        <button
+          type="button"
+          className="quiet-action quiet-action--icon"
+          aria-label="Delete message"
+          title="Delete message and its reply"
+          onClick={() => deleteMessage(messageId)}
+        >
+          <TrashIcon size={14} />
+        </button>
       </ActionBarPrimitive.Root>
     </article>
   );

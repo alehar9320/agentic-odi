@@ -3,7 +3,16 @@ import { useEffect, useRef, useState } from "react";
 import { conversationToMarkdown, downloadMarkdown, exportFilename } from "../../lib/export";
 import { useStudio } from "../../state/StudioContext";
 import { useUpdateSnapshot } from "../../updater";
-import { BellIcon, MenuIcon, MoonIcon, PlugIcon, PlusIcon, SettingsIcon, SunIcon } from "../icons";
+import {
+  BellIcon,
+  HistoryIcon,
+  MenuIcon,
+  MoonIcon,
+  PlugIcon,
+  PlusIcon,
+  SettingsIcon,
+  SunIcon,
+} from "../icons";
 import { OdiMascot } from "../OdiMascot";
 
 /**
@@ -15,10 +24,14 @@ export function StudioBar({
   onHome,
   onNew,
   onChangelog,
+  onHistory,
+  historyOpen = false,
 }: {
   onHome: () => void;
   onNew: () => void;
   onChangelog: () => void;
+  onHistory?: () => void;
+  historyOpen?: boolean;
 }) {
   const {
     llmHealth,
@@ -121,6 +134,19 @@ export function StudioBar({
         >
           <PlusIcon size={17} />
         </button>
+
+        {onHistory ? (
+          <button
+            type="button"
+            className={`icon-button${historyOpen ? " is-active" : ""}`}
+            aria-label="Conversation history"
+            aria-pressed={historyOpen}
+            title="Conversation history"
+            onClick={onHistory}
+          >
+            <HistoryIcon size={17} />
+          </button>
+        ) : null}
 
         <button
           type="button"

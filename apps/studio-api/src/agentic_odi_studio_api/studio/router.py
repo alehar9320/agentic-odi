@@ -68,9 +68,11 @@ from agentic_odi_studio_api.studio.schemas import (
     ChatRequest,
     ConnectorListItem,
     ConnectorOperationResponse,
+    ConversationListResponse,
     ConversationResponse,
     ConversationTreeResponse,
     CreateJobRequest,
+    DeleteConversationResponse,
     LatestConversationResponse,
     LlmHealthRequest,
     LlmProxyRequest,
@@ -897,9 +899,54 @@ def latest_conversation(request: Request) -> LatestConversationResponse:
     )
 
 
+@router.get("/conversations", response_model=ConversationListResponse)
+def list_conversations(request: Request) -> ConversationListResponse:
+    """Every thread this sidecar remembers, newest first."""
+    return ConversationListResponse(
+        conversations=[
+            conversation.to_dict() for conversation in _memory(request).list_conversations()
+        ]
+    )
+
+
 @router.post("/conversations", response_model=ConversationResponse)
 def create_conversation(request: Request) -> ConversationResponse:
     return ConversationResponse(conversation=_memory(request).create_conversation().to_dict())
+
+
+@router.delete(
+    "/conversations/{conversation_id}/messages/{message_id}",
+    response_model=DeleteConversationResponse,
+)
+def delete_message(
+    conversation_id: str, message_id: str, request: Request
+) -> DeleteConversationResponse:
+    """Remove one turn and every turn that answered it."""
+    try:
+        _memory(request).delete_turn_tree(conversation_id, message_id)
+    except ConversationNotFoundError as exc:
+        raise StudioHTTPError(
+            StudioError(
+                code=StudioErrorCode.NOT_FOUND,
+                message=f"Conversation {conversation_id} not found",
+            )
+        ) from exc
+    return DeleteConversationResponse(deleted=message_id)
+
+
+@router.delete("/conversations/{conversation_id}", response_model=DeleteConversationResponse)
+def delete_conversation(conversation_id: str, request: Request) -> DeleteConversationResponse:
+    """Forget a thread and its turns."""
+    try:
+        _memory(request).delete_conversation(conversation_id)
+    except ConversationNotFoundError as exc:
+        raise StudioHTTPError(
+            StudioError(
+                code=StudioErrorCode.NOT_FOUND,
+                message=f"Conversation {conversation_id} not found",
+            )
+        ) from exc
+    return DeleteConversationResponse(deleted=conversation_id)
 
 
 @router.get("/conversations/{conversation_id}/tree", response_model=ConversationTreeResponse)

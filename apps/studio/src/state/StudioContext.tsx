@@ -20,7 +20,9 @@ import {
   createConversation as apiCreateConversation,
   createJob as apiCreateJob,
   deleteConnector as apiDeleteConnector,
+  deleteConversation as apiDeleteConversation,
   deleteJob as apiDeleteJob,
+  deleteMessage as apiDeleteMessage,
   deleteObservation as apiDeleteObservation,
   deleteEvidence as apiDeleteEvidence,
   deleteOutcome as apiDeleteOutcome,
@@ -31,6 +33,7 @@ import {
   fetchConnectorCatalog,
   fetchConnectors,
   fetchConversationTree,
+  fetchConversations,
   fetchFeatured,
   fetchLatestConversation,
   fetchMarketplace,
@@ -42,6 +45,7 @@ import {
   healthMcp,
   markSignalRead as apiMarkSignalRead,
   promoteEvidence as apiPromoteEvidence,
+  renameConversation as apiRenameConversation,
   resolveApproval as apiResolveApproval,
   setConversationHead as apiSetConversationHead,
   streamChat,
@@ -66,6 +70,7 @@ import type {
   ConnectorListItem,
   ConnectorPreset,
   ConnectorSuggestion,
+  Conversation,
   CustomizeTarget,
   MarketplaceListing,
   MarketplaceSearch,
@@ -251,6 +256,16 @@ export interface StudioContextValue {
   stopStreaming: () => void;
   clearChat: () => void;
   conversationId: string | null;
+  /** Every thread this sidecar remembers, newest first. */
+  conversations: Conversation[];
+  conversationsLoading: boolean;
+  refreshConversations: () => Promise<void>;
+  /** Replay a persisted thread and make it the visible conversation. */
+  openConversation: (conversationId: string) => Promise<void>;
+  deleteConversation: (conversationId: string) => Promise<void>;
+  renameConversation: (conversationId: string, title: string) => Promise<void>;
+  /** Remove a message and every turn that answered it. */
+  deleteMessage: (messageId: string) => void;
   memory: Observation[];
   memoryLoading: boolean;
   refreshMemory: () => Promise<void>;
@@ -450,6 +465,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [dismissedSidecarNotice, setDismissedSidecarNotice] = useState<boolean>(loadSidecarNoticeDismissed);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [conversationsLoading, setConversationsLoading] = useState(false);
   const [memory, setMemory] = useState<Observation[]>([]);
   const [memoryLoading, setMemoryLoading] = useState(false);
   const [streaming, setStreaming] = useState(false);
@@ -1669,6 +1686,18 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     }
   }, [pushToast]);
 
+  /** The threads the sidecar remembers, for the history list. */
+  const refreshConversations = useCallback(async () => {
+    setConversationsLoading(true);
+    try {
+      setConversations(await fetchConversations());
+    } catch {
+      // History is a convenience; a failed list must not blank the studio.
+    } finally {
+      setConversationsLoading(false);
+    }
+  }, []);
+
   const clearChat = useCallback(() => {
     abortRef.current?.abort();
     abortRef.current = null;
@@ -1679,11 +1708,88 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     setOfflineReply(false);
     setConversationId(null);
     void apiCreateConversation()
-      .then((conversation) =>
-        setConversationId((current) => current ?? conversation.id),
-      )
+      .then((conversation) => {
+        setConversationId((current) => current ?? conversation.id);
+        void refreshConversations();
+      })
       .catch(() => undefined);
-  }, []);
+  }, [refreshConversations]);
+
+  /** Replay a persisted thread and make it the one the composer continues. */
+  const openConversation = useCallback(
+    async (id: string) => {
+      abortRef.current?.abort();
+      try {
+        const tree = await fetchConversationTree(id);
+        setConversationId(tree.conversation.id);
+        setMessages(turnsToMessages(tree.messages, tree.head_id));
+        setStreaming(false);
+        setThinkingPhase(null);
+      } catch (error) {
+        pushToast("error", asStudioError(error).message);
+      }
+    },
+    [pushToast],
+  );
+
+  const deleteConversation = useCallback(
+    async (id: string) => {
+      try {
+        await apiDeleteConversation(id);
+        setConversations((prev) => prev.filter((conversation) => conversation.id !== id));
+        if (conversationId === id) {
+          clearChat();
+        }
+      } catch (error) {
+        pushToast("error", asStudioError(error).message);
+      }
+    },
+    [conversationId, clearChat, pushToast],
+  );
+
+  const renameConversation = useCallback(
+    async (id: string, title: string) => {
+      try {
+        const next = await apiRenameConversation(id, title);
+        setConversations((prev) =>
+          prev.map((conversation) => (conversation.id === id ? next : conversation)),
+        );
+      } catch (error) {
+        pushToast("error", asStudioError(error).message);
+      }
+    },
+    [pushToast],
+  );
+
+  /**
+   * Remove a turn and the turns that answered it.
+   *
+   * The runtime owns the delete affordance; the store owns which messages are
+   * visible, so the subtree goes first and the sidecar is told after. A branch
+   * that answered the same question is a sibling, not a descendant, and stays.
+   */
+  const deleteMessage = useCallback(
+    (messageId: string) => {
+      setMessages((prev) => {
+        const doomed = new Set<string>([messageId]);
+        let grew = true;
+        while (grew) {
+          grew = false;
+          for (const message of prev) {
+            if (message.parentId && doomed.has(message.parentId) && !doomed.has(message.id)) {
+              doomed.add(message.id);
+              grew = true;
+            }
+          }
+        }
+        return prev.filter((message) => !doomed.has(message.id));
+      });
+      if (conversationId) {
+        void apiDeleteMessage(conversationId, messageId).catch(() => undefined);
+      }
+    },
+    [conversationId],
+  );
 
   // Initial hydration: env defaults, canvas, health probes.
   useEffect(() => {
@@ -1707,6 +1813,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
         return;
       }
       void refreshCapabilities();
+      void refreshConversations();
       void refreshCanvas();
       void refreshConnectors();
       void refreshPresets();
@@ -1836,6 +1943,13 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       stopStreaming,
       clearChat,
       conversationId,
+      conversations,
+      conversationsLoading,
+      refreshConversations,
+      openConversation,
+      deleteConversation,
+      renameConversation,
+      deleteMessage,
       memory,
       memoryLoading,
       refreshMemory,
@@ -1942,6 +2056,13 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       stopStreaming,
       clearChat,
       conversationId,
+      conversations,
+      conversationsLoading,
+      refreshConversations,
+      openConversation,
+      deleteConversation,
+      renameConversation,
+      deleteMessage,
       memory,
       memoryLoading,
       refreshMemory,

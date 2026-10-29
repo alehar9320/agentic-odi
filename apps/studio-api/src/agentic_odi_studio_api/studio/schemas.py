@@ -333,6 +333,16 @@ class UpdateConversationRequest(BaseModel):
     title: str | None = Field(default=None, max_length=200)
 
 
+class ConversationListResponse(BaseModel):
+    """The threads a client can choose from, newest first."""
+
+    conversations: list[ConversationModel] = Field(default_factory=list)
+
+
+class DeleteConversationResponse(BaseModel):
+    deleted: str
+
+
 class LlmProxyMessage(BaseModel):
     role: Literal["system", "user", "assistant", "tool"]
     content: str = ""

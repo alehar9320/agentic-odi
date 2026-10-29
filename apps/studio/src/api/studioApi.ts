@@ -575,6 +575,55 @@ export function clearMemory(): Promise<{ ok: boolean }> {
   );
 }
 
+/** Every thread this sidecar remembers, newest first. */
+export function fetchConversations(): Promise<Conversation[]> {
+  return withLocal(
+    () =>
+      getJson<{ conversations?: Conversation[] }>("/api/conversations").then(
+        (body) => body.conversations ?? [],
+      ),
+    (bff) => bff.memory.listConversations(),
+  );
+}
+
+/** Give a thread a new title. */
+export async function renameConversation(
+  conversationId: string,
+  title: string,
+): Promise<Conversation> {
+  return withLocal(
+    () =>
+      sendJson<{ conversation: Conversation }>(
+        "PATCH",
+        `/api/conversations/${encodeURIComponent(conversationId)}`,
+        { title },
+      ).then((body) => body.conversation),
+    (bff) => bff.memory.renameConversation(conversationId, title),
+  );
+}
+
+/** Remove one turn and every turn that answered it. */
+export async function deleteMessage(conversationId: string, messageId: string): Promise<void> {
+  await withLocal<void>(
+    () =>
+      deleteJson<{ deleted: string }>(
+        `/api/conversations/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(messageId)}`,
+      ).then(() => undefined),
+    (bff) => bff.memory.deleteMessage(conversationId, messageId),
+  );
+}
+
+/** Forget a thread and its turns. */
+export async function deleteConversation(conversationId: string): Promise<void> {
+  await withLocal<void>(
+    () =>
+      deleteJson<{ deleted: string }>(
+        `/api/conversations/${encodeURIComponent(conversationId)}`,
+      ).then(() => undefined),
+    (bff) => bff.memory.deleteConversation(conversationId),
+  );
+}
+
 export function fetchLatestConversation(): Promise<LatestConversation> {
   return withLocal(
     () => getJson<LatestConversation>("/api/conversations/latest"),

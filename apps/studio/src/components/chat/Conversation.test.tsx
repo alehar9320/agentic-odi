@@ -15,12 +15,22 @@ const harness = vi.hoisted(() => ({
     toolActivity: [] as unknown[],
     offlineReply: false,
     canvas: null,
+    conversationId: null as string | null,
+    conversations: [] as unknown[],
+    conversationsLoading: false,
     regenerateFrom: vi.fn(),
     editFrom: vi.fn(),
     switchBranch: vi.fn(),
     respondToApproval: vi.fn(),
     stopStreaming: vi.fn(),
     sendMessage: vi.fn<(text: string) => Promise<void>>(),
+    clearChat: vi.fn(),
+    openConversation: vi.fn(),
+    deleteConversation: vi.fn(),
+    renameConversation: vi.fn(),
+    refreshConversations: vi.fn(),
+    deleteMessage: vi.fn(),
+    pushToast: vi.fn(),
   },
 }));
 
@@ -364,5 +374,46 @@ describe("Conversation failures", () => {
     fireEvent.click(retry);
 
     expect(harness.state.sendMessage).toHaveBeenCalledWith("list the jobs");
+  });
+});
+
+describe("Conversation verdicts and deletion", () => {
+  function settledTurn() {
+    return [
+      { id: "m-1", parentId: null, role: "user" as const, content: "list the jobs" },
+      {
+        id: "m-2",
+        parentId: "m-1",
+        role: "assistant" as const,
+        content: "There are three.",
+        parts: [{ kind: "text" as const, text: "There are three." }],
+      },
+    ];
+  }
+
+  it("records a verdict through the runtime's feedback adapter", () => {
+    localStorage.clear();
+    renderTurn(settledTurn());
+
+    fireEvent.click(screen.getByRole("button", { name: "Good reply" }));
+
+    const stored = JSON.parse(localStorage.getItem("studio.feedback") ?? "{}");
+    expect(stored["m-2"]).toMatchObject({ type: "positive" });
+  });
+
+  it("deletes a reply and asks the store to take its descendants", () => {
+    renderTurn(settledTurn());
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete reply" }));
+
+    expect(harness.state.deleteMessage).toHaveBeenCalledWith("m-2");
+  });
+
+  it("deletes a question the same way", () => {
+    renderTurn(settledTurn());
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete message" }));
+
+    expect(harness.state.deleteMessage).toHaveBeenCalledWith("m-1");
   });
 });

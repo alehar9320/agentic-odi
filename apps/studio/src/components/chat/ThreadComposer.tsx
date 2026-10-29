@@ -7,7 +7,7 @@
  * setup wizard's composer.
  */
 
-import { ComposerPrimitive, useAui, useAuiState } from "@assistant-ui/react";
+import { ComposerPrimitive, QueueItemPrimitive, useAui, useAuiState } from "@assistant-ui/react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 
 import {
@@ -20,7 +20,7 @@ import {
 } from "../../assistant/attachments";
 import { isSlashCommand, matchCommands, type StudioCommand } from "../../lib/commands";
 import { useStudio } from "../../state/StudioContext";
-import { ArrowUpIcon, PaperclipIcon, StopIcon } from "../icons";
+import { ArrowUpIcon, MicIcon, PaperclipIcon, StopIcon } from "../icons";
 import { CommandPalette, ComposerHint, ConnectorChips, SuggestionPills, paletteOpenFor } from "./composerParts";
 import { ModelPicker } from "./ModelPicker";
 
@@ -180,6 +180,23 @@ function ComposerBody({
       />
       <ConnectorChips />
       <AttachmentRow />
+      <ComposerPrimitive.Queue>
+        {({ queueItem }) => (
+          <div className="composer__queued" role="listitem" key={queueItem.id}>
+            <span className="composer__queued-label" aria-hidden="true">
+              Next
+            </span>
+            <QueueItemPrimitive.Text className="composer__queued-text" />
+            <QueueItemPrimitive.Remove
+              className="composer__queued-remove"
+              aria-label="Remove queued message"
+              title="Remove queued message"
+            >
+              ✕
+            </QueueItemPrimitive.Remove>
+          </div>
+        )}
+      </ComposerPrimitive.Queue>
       <div className="composer__shell">
         <label className="sr-only" htmlFor={inputId}>
           Message the studio
@@ -219,16 +236,43 @@ function ComposerBody({
           >
             <PaperclipIcon size={16} />
           </ComposerPrimitive.AddAttachment>
+          <ComposerPrimitive.Dictate
+            className="composer__attach"
+            aria-label="Dictate a message"
+            title="Dictate a message"
+          >
+            <MicIcon size={16} />
+          </ComposerPrimitive.Dictate>
+          <ComposerPrimitive.StopDictation
+            className="composer__attach is-listening"
+            aria-label="Stop dictating"
+            title="Stop dictating"
+          >
+            <StopIcon size={16} />
+          </ComposerPrimitive.StopDictation>
           <span id={attachmentHelpId} className="sr-only">
             {ATTACHMENT_HELP}
           </span>
           {running ? (
-            <ComposerPrimitive.Cancel
-              className="composer__send composer__send--stop"
-              aria-label="Stop generating"
-            >
-              <StopIcon size={16} />
-            </ComposerPrimitive.Cancel>
+            <>
+              {/* A draft typed mid-reply is a follow-up, not a cancel: the
+                  runtime buffers it and runs it when this reply settles. */}
+              {text.trim() ? (
+                <ComposerPrimitive.Send
+                  className="composer__send"
+                  aria-label="Queue message"
+                  title="Send when this reply finishes"
+                >
+                  <ArrowUpIcon size={18} />
+                </ComposerPrimitive.Send>
+              ) : null}
+              <ComposerPrimitive.Cancel
+                className="composer__send composer__send--stop"
+                aria-label="Stop generating"
+              >
+                <StopIcon size={16} />
+              </ComposerPrimitive.Cancel>
+            </>
           ) : (
             <ComposerPrimitive.Send className="composer__send" aria-label="Send message">
               <ArrowUpIcon size={18} />

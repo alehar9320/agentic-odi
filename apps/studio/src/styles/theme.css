@@ -3820,6 +3820,7 @@ details[open] summary {
 }
 
 .stage__split {
+  position: relative;
   display: flex;
   flex: 1;
   min-width: 0;
@@ -5655,4 +5656,246 @@ details[open] summary {
 .settings__preset-id {
   color: var(--muted);
   font-size: 0.72rem;
+}
+
+/* ── Conversation history ─────────────────────────────────────────────── */
+
+.history {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: none;
+  width: 244px;
+  padding: 14px 10px;
+  border-right: 1px solid var(--line);
+  background: var(--bg-sunk, var(--bg));
+  overflow-y: auto;
+}
+
+.history__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 6px;
+}
+
+.history__heading {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--muted);
+}
+
+.history__title {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.history__list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.history__new {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  padding: 7px 9px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 9px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.history__new:hover {
+  border-color: rgba(139, 140, 248, 0.5);
+  color: var(--text);
+}
+
+.history__item {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  border-radius: 9px;
+}
+
+.history__item:hover,
+.history__item[data-active="true"] {
+  background: var(--bg-raised);
+}
+
+.history__trigger {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 9px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.8rem;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.history__trigger:hover {
+  color: var(--text);
+}
+
+.history__item[data-active="true"] .history__trigger {
+  color: var(--text);
+}
+
+.history__delete {
+  flex: none;
+  padding: 5px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--faint);
+  cursor: pointer;
+  opacity: 0;
+}
+
+.history__item:hover .history__delete,
+.history__delete:focus-visible {
+  opacity: 1;
+}
+
+.history__delete:hover {
+  color: var(--amber);
+}
+
+.history__status {
+  margin: 0;
+  padding: 0 8px;
+  color: var(--faint);
+  font-size: 0.72rem;
+}
+
+@media (max-width: 1023px) {
+  .history {
+    position: absolute;
+    z-index: 20;
+    inset: 0 auto 0 0;
+    height: 100%;
+    box-shadow: 20px 0 44px rgba(0, 0, 0, 0.34);
+  }
+}
+
+.history__action {
+  flex: none;
+  padding: 5px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--faint);
+  cursor: pointer;
+  opacity: 0;
+}
+
+.history__item:hover .history__action,
+.history__item:focus-within .history__action,
+.history__action:focus-visible {
+  opacity: 1;
+}
+
+.history__action:hover {
+  color: var(--text);
+}
+
+.history__rename {
+  flex: 1;
+  min-width: 0;
+}
+
+.history__rename-input {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.8rem;
+}
+
+.history__rename-input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* ── Queued follow-ups ────────────────────────────────────────────────── */
+
+.composer__queued {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 10px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 9px;
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+.composer__queued-label {
+  flex: none;
+  color: var(--faint);
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.composer__queued-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.composer__queued-remove {
+  flex: none;
+  padding: 2px 5px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--faint);
+  cursor: pointer;
+}
+
+.composer__queued-remove:hover {
+  color: var(--text);
+}
+
+/* Icon-only action in a message action bar. */
+.quiet-action--icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.composer__attach.is-listening {
+  color: var(--amber);
+  animation: dictation-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes dictation-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
 }

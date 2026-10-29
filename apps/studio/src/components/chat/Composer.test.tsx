@@ -1,6 +1,6 @@
 import { createRef } from "react";
 
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import type { StudioContextValue } from "../../state/StudioContext";
@@ -11,6 +11,7 @@ vi.mock("../../state/StudioContext", () => ({
 }));
 vi.mock("../../lib/commands", () => ({
   isCommandDraft: () => false,
+  isSlashCommand: () => false,
   matchCommands: () => [],
 }));
 
@@ -39,6 +40,16 @@ const stubContext = (overrides: Record<string, unknown> = {}) =>
     presets: [preset],
     dismissConnectorSuggestion: vi.fn(),
     refreshConnectors: vi.fn().mockResolvedValue(undefined),
+    conversationId: null,
+    conversations: [],
+    conversationsLoading: false,
+    openConversation: vi.fn(),
+    deleteConversation: vi.fn(),
+    renameConversation: vi.fn(),
+    refreshConversations: vi.fn(),
+    deleteMessage: vi.fn(),
+    clearChat: vi.fn(),
+    pushToast: vi.fn(),
     ...overrides,
   }) as unknown as StudioContextValue;
 
@@ -113,27 +124,31 @@ describe("ThreadComposer attachment guidance", () => {
 async function renderThreadComposer(overrides: Record<string, unknown> = {}) {
   const { StudioRuntimeProvider } = await import("../../assistant/StudioRuntime");
   const { ThreadComposer } = await import("./ThreadComposer");
-  vi.mocked(useStudio).mockReturnValue(
-    stubContext({
-      connectorSuggestions: [],
-      messages: [],
-      streaming: false,
-      canvas: null,
-      pushToast: vi.fn(),
-      sendMessage: vi.fn(async () => {}),
-      regenerateFrom: vi.fn(async () => {}),
-      editFrom: vi.fn(async () => {}),
-      switchBranch: vi.fn(),
-      respondToApproval: vi.fn(async () => {}),
-      stopStreaming: vi.fn(),
-      ...overrides,
-    }),
-  );
-  return render(
-    <StudioRuntimeProvider>
-      <ThreadComposer onCommand={() => {}} />
-    </StudioRuntimeProvider>,
-  );
+  // The stub is handed back so a test can settle the run: the runtime reads
+  // `streaming` again on the next render, and a copy of the value would not move.
+  const studio = stubContext({
+    connectorSuggestions: [],
+    messages: [],
+    streaming: false,
+    canvas: null,
+    pushToast: vi.fn(),
+    sendMessage: vi.fn(async () => {}),
+    regenerateFrom: vi.fn(async () => {}),
+    editFrom: vi.fn(async () => {}),
+    switchBranch: vi.fn(),
+    respondToApproval: vi.fn(async () => {}),
+    stopStreaming: vi.fn(),
+    ...overrides,
+  }) as unknown as Record<string, unknown>;
+  vi.mocked(useStudio).mockReturnValue(studio as unknown as StudioContextValue);
+  return {
+    ...render(
+      <StudioRuntimeProvider>
+        <ThreadComposer onCommand={() => {}} />
+      </StudioRuntimeProvider>,
+    ),
+    studio,
+  };
 }
 
 describe("ThreadComposer attachments", () => {
@@ -207,5 +222,38 @@ describe("Composer keyboard focus", () => {
 
     expect(stop.tabIndex).toBe(0);
     expect(document.activeElement).toBe(stop);
+  });
+});
+
+describe("ThreadComposer queue", () => {
+  it("buffers a follow-up instead of dropping it while a reply streams", async () => {
+    const sendMessage = vi.fn<(text: string, files?: unknown) => Promise<void>>(
+      async () => {},
+    );
+    const { rerender, studio } = await renderThreadComposer({
+      streaming: true,
+      sendMessage,
+    });
+    const box = screen.getByRole("textbox", { name: "Message the studio" });
+
+    fireEvent.change(box, { target: { value: "and then?" } });
+    fireEvent.keyDown(box, { key: "Enter" });
+
+    expect(await screen.findByText("Next")).toBeInTheDocument();
+    expect(screen.getByText("and then?")).toBeInTheDocument();
+    expect(sendMessage).not.toHaveBeenCalled();
+
+    // The next turn runs on its own once the live one settles.
+    const { StudioRuntimeProvider } = await import("../../assistant/StudioRuntime");
+    const { ThreadComposer } = await import("./ThreadComposer");
+    studio.streaming = false;
+    rerender(
+      <StudioRuntimeProvider>
+        <ThreadComposer onCommand={() => {}} />
+      </StudioRuntimeProvider>,
+    );
+
+    await waitFor(() => expect(sendMessage).toHaveBeenCalledTimes(1));
+    expect(sendMessage.mock.calls[0][0]).toBe("and then?");
   });
 });

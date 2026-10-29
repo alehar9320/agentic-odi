@@ -23,13 +23,29 @@ const TOOL_RESULT: Record<string, Record<string, unknown>> = {
   declined: { status: "declined" },
 };
 
-function toPart(part: ChatPart): LikePart | null {
+/**
+ * What the conversion needs to know beyond the message itself.
+ *
+ * `live` marks the assistant turn that is streaming right now. assistant-ui
+ * renders part statuses, so a thinking disclosure only says *Thinking…* and a
+ * tool only says *working* while the run is actually live; once the run settles
+ * the same parts are complete and read as history.
+ */
+export interface ConvertOptions {
+  live?: boolean;
+}
+
+function toPart(part: ChatPart, live: boolean): LikePart | null {
   switch (part.kind) {
     case "text":
-      return { type: "text", text: part.text };
+      return { type: "text", text: part.text, ...(live ? { status: { type: "running" } } : {}) };
 
     case "reasoning":
-      return { type: "reasoning", text: part.text };
+      return {
+        type: "reasoning",
+        text: part.text,
+        status: { type: live ? ("running" as const) : ("complete" as const) },
+      };
 
     case "ui":
       return { type: "data", name: SURFACE_PART, id: part.id, data: part.node };
@@ -98,7 +114,12 @@ function attachmentParts(attachments: ChatAttachment[]) {
  * `content` stays the concatenated prose so history replays byte-identically;
  * `parts` is what the thread shows.
  */
-export function toThreadMessageLike(message: ChatMessage): ThreadMessageLike {
+export function toThreadMessageLike(
+  message: ChatMessage,
+  options: ConvertOptions = {},
+): ThreadMessageLike {
+  const live = options.live === true;
+
   if (message.role === "notice") {
     return {
       id: message.id,
@@ -108,7 +129,7 @@ export function toThreadMessageLike(message: ChatMessage): ThreadMessageLike {
   }
 
   const parts = (message.parts ?? []).flatMap((part) => {
-    const converted = toPart(part);
+    const converted = toPart(part, live);
     return converted ? [converted] : [];
   });
 
@@ -136,7 +157,9 @@ export function toThreadMessageLike(message: ChatMessage): ThreadMessageLike {
             error: message.error as never,
           },
         }
-      : {}),
+      : live
+        ? { status: { type: "running" as const } }
+        : {}),
     ...(failed || message.retryText
       ? {
           metadata: {

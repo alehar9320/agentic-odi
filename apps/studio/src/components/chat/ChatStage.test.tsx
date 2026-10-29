@@ -34,6 +34,14 @@ const harness = vi.hoisted(() => ({
     dismissConnectorSuggestion: vi.fn(),
     refreshConnectors: vi.fn(),
     pushToast: vi.fn(),
+    conversationId: null as string | null,
+    conversations: [] as unknown[],
+    conversationsLoading: false,
+    openConversation: vi.fn(),
+    deleteConversation: vi.fn(),
+    renameConversation: vi.fn(),
+    refreshConversations: vi.fn(),
+    deleteMessage: vi.fn(),
   },
 }));
 

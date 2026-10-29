@@ -172,6 +172,51 @@ export class LocalMemoryService {
     return this.store.getConversation(id);
   }
 
+  /**
+   * The threads with something in them, newest first.
+   *
+   * A conversation is created before its first turn, so an empty one is the
+   * room the client is standing in, not history. Listing those would fill the
+   * sidebar with untitled stubs every time somebody pressed *new*.
+   */
+  async listConversations(): Promise<Conversation[]> {
+    const conversations = await this.store.listConversations();
+    const filled = await Promise.all(
+      conversations.map(async (conversation) =>
+        (await this.store.listTurns(conversation.id)).length > 0 ? conversation : null,
+      ),
+    );
+    return filled.filter((conversation): conversation is StoredConversation => conversation !== null);
+  }
+
+  async deleteConversation(id: string): Promise<void> {
+    if (!(await this.store.getConversation(id))) {
+      throw notFound("Conversation", id);
+    }
+    await this.store.deleteConversation(id);
+  }
+
+  async deleteMessage(conversationId: string, messageId: string): Promise<void> {
+    if (!(await this.store.getConversation(conversationId))) {
+      throw notFound("Conversation", conversationId);
+    }
+    await this.store.deleteTurnTree(conversationId, messageId);
+  }
+
+  async renameConversation(id: string, title: string): Promise<Conversation> {
+    const conversation = await this.store.getConversation(id);
+    if (!conversation) {
+      throw notFound("Conversation", id);
+    }
+    const next: StoredConversation = {
+      ...conversation,
+      title: title.trim().slice(0, 200),
+      updated_at: nowIso(),
+    };
+    await this.store.putConversation(next);
+    return next;
+  }
+
   async setConversationHead(
     id: string,
     headId: string | null,

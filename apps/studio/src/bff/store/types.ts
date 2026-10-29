@@ -88,6 +88,8 @@ export interface LocalStore {
   getConversation(id: string): Promise<StoredConversation | undefined>;
   putConversation(conversation: StoredConversation): Promise<void>;
   setConversationHead(id: string, headId: string | null): Promise<StoredConversation>;
+  deleteConversation(id: string): Promise<void>;
+  deleteTurnTree(conversationId: string, messageId: string): Promise<void>;
   listTurns(conversationId: string): Promise<ConversationTurn[]>;
   appendTurn(turn: Omit<StoredTurn, "id">): Promise<StoredTurn>;
   clearTurns(conversationId: string): Promise<void>;

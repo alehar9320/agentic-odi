@@ -291,6 +291,36 @@ class StudioMemory:
             ).fetchone()
         return None if row is None else self._conversation_from_row(row)
 
+    def list_conversations(self, limit: int = 50) -> list[Conversation]:
+        """The threads with something in them, newest first.
+
+        A conversation is created before its first turn, so an empty one is the
+        room the client is standing in rather than history; listing those would
+        fill the sidebar with untitled stubs every time somebody pressed *new*.
+        The cap keeps a long-lived sidecar from returning a database.
+        """
+        with self._lock:
+            rows = self._connection.execute(
+                "SELECT * FROM conversations WHERE EXISTS ("
+                "SELECT 1 FROM turns WHERE turns.conversation_id = conversations.id"
+                ") ORDER BY updated_at DESC, created_at DESC LIMIT ?",
+                (max(1, limit),),
+            ).fetchall()
+        return [self._conversation_from_row(row) for row in rows]
+
+    def delete_conversation(self, conversation_id: str) -> None:
+        """Remove a thread and its turns. The turns go first, explicitly."""
+        with self._lock, self._connection:
+            exists = self._connection.execute(
+                "SELECT 1 FROM conversations WHERE id = ?", (conversation_id,)
+            ).fetchone()
+            if exists is None:
+                raise ConversationNotFoundError(conversation_id)
+            self._connection.execute(
+                "DELETE FROM turns WHERE conversation_id = ?", (conversation_id,)
+            )
+            self._connection.execute("DELETE FROM conversations WHERE id = ?", (conversation_id,))
+
     def append_turn(
         self,
         conversation_id: str,
@@ -335,6 +365,61 @@ class StudioMemory:
                 "UPDATE conversations SET updated_at = ? WHERE id = ?",
                 (now, conversation_id),
             )
+
+    def delete_turn_tree(self, conversation_id: str, message_id: str) -> None:
+        """Drop a turn and everything that answered it.
+
+        Branching means a turn is a node, not a row: deleting the question must
+        take the answers it produced, and a sibling branch must survive. The
+        recursive walk follows ``parent_id`` from the named turn.
+        """
+        with self._lock, self._connection:
+            conversation = self._connection.execute(
+                "SELECT head_id FROM conversations WHERE id = ?", (conversation_id,)
+            ).fetchone()
+            if conversation is None:
+                raise ConversationNotFoundError(conversation_id)
+            rows = self._connection.execute(
+                "SELECT id, message_id, parent_id FROM turns WHERE conversation_id = ? ORDER BY id ASC",
+                (conversation_id,),
+            ).fetchall()
+
+            # A turn is identified by the message id the client knows, or by its
+            # own row when an older build stored a turn without one.
+            def key_of(row: sqlite3.Row) -> str:
+                return row["message_id"] or f"turn-{row['id']}"
+
+            doomed: set[str] = {message_id}
+            grew = True
+            while grew:
+                grew = False
+                for row in rows:
+                    parent = row["parent_id"]
+                    if parent and parent in doomed and key_of(row) not in doomed:
+                        doomed.add(key_of(row))
+                        grew = True
+            doomed_ids = [row["id"] for row in rows if key_of(row) in doomed]
+            if doomed_ids:
+                self._connection.execute(
+                    "DELETE FROM turns WHERE id IN (" + ",".join("?" for _ in doomed_ids) + ")",
+                    tuple(doomed_ids),
+                )
+            # The visible branch only moves when the turn it ended on was one of
+            # the deleted ones; then it falls back to the question above, not to
+            # whichever turn happens to be last in some other branch.
+            head = conversation["head_id"]
+            if head is None or head in doomed:
+                deleted = next((row for row in rows if key_of(row) == message_id), None)
+                parent = deleted["parent_id"] if deleted is not None else None
+                keep = [key_of(row) for row in rows if key_of(row) not in doomed]
+                if parent and parent not in doomed:
+                    head = parent
+                else:
+                    head = keep[-1] if keep else None
+                self._connection.execute(
+                    "UPDATE conversations SET head_id = ? WHERE id = ?",
+                    (head, conversation_id),
+                )
 
     def list_turns(self, conversation_id: str) -> list[Turn]:
         with self._lock:

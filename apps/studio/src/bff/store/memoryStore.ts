@@ -175,6 +175,50 @@ export class MemoryLocalStore implements LocalStore {
     }
   }
 
+  async deleteConversation(id: string): Promise<void> {
+    await this.clearTurns(id);
+    this.conversations.delete(id);
+  }
+
+  async deleteTurnTree(conversationId: string, messageId: string): Promise<void> {
+    const turns = this.turns.filter((turn) => turn.conversation_id === conversationId);
+    const doomed = new Set<string>([messageId]);
+    let grew = true;
+    while (grew) {
+      grew = false;
+      for (const turn of turns) {
+        const id = turn.message_id ?? `turn-${turn.id}`;
+        if (turn.parent_id && doomed.has(turn.parent_id) && !doomed.has(id)) {
+          doomed.add(id);
+          grew = true;
+        }
+      }
+    }
+    for (let index = this.turns.length - 1; index >= 0; index -= 1) {
+      const turn = this.turns[index];
+      if (
+        turn.conversation_id === conversationId &&
+        doomed.has(turn.message_id ?? `turn-${turn.id}`)
+      ) {
+        this.turns.splice(index, 1);
+      }
+    }
+    const keyOf = (turn: StoredTurn) => turn.message_id ?? `turn-${turn.id}`;
+    const conversation = this.conversations.get(conversationId);
+    if (conversation && (conversation.head_id === null || doomed.has(conversation.head_id))) {
+      // Only a branch that ended on a deleted turn moves, and then it falls
+      // back to the question above rather than to another branch's last turn.
+      const parent = turns.find((turn) => keyOf(turn) === messageId)?.parent_id ?? null;
+      const remaining = this.turns.filter((turn) => turn.conversation_id === conversationId);
+      const last = remaining[remaining.length - 1];
+      this.conversations.set(conversationId, {
+        ...conversation,
+        head_id:
+          parent && !doomed.has(parent) ? parent : last ? keyOf(last) : null,
+      });
+    }
+  }
+
   async snapshot(): Promise<WorkspaceSnapshot> {
     const jobs = await this.listJobs();
     const steps = await this.listSteps();

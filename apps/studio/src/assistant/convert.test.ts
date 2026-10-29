@@ -79,7 +79,27 @@ describe("toThreadMessageLike", () => {
       assistant({ parts: [{ kind: "reasoning", text: "weighing options" }] }),
     );
 
-    expect(message.content).toEqual([{ type: "reasoning", text: "weighing options" }]);
+    expect(message.content).toEqual([
+      { type: "reasoning", text: "weighing options", status: { type: "complete" } },
+    ]);
+  });
+
+  it("marks the live turn's parts as running until it settles", () => {
+    const message = toThreadMessageLike(
+      assistant({
+        parts: [
+          { kind: "text", text: "Looking" },
+          { kind: "reasoning", text: "weighing options" },
+        ],
+      }),
+      { live: true },
+    );
+
+    expect(message.status).toEqual({ type: "running" });
+    expect(message.content).toEqual([
+      { type: "text", text: "Looking", status: { type: "running" } },
+      { type: "reasoning", text: "weighing options", status: { type: "running" } },
+    ]);
   });
 
   it("maps a finished tool call to a result, not a question", () => {

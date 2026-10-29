@@ -43,7 +43,8 @@ The Studio opens as a conversation, not a dashboard.
 | **Hero** | One headline above the composer. A first run holds a single invitation — *What do you want to win?* — and never changes while you think. With context or canvas data it becomes a quiet rotation: a greeting (time of day, plus your name if you set one in Settings), the product/job you set up, or what is already on the canvas. It stays still under `prefers-reduced-motion`. |
 | **Starter cards** | Below the headline, three canvas-aware conversation cards pair a clear next move with a short reason: **Sharpen an opportunity**, **Pressure-test a bet** or **Find the next opportunity**, and **Capture what you heard** or **Name the job**. Select one to start that prompt in the thread; the cards disappear once the conversation begins. **Opportunity landscape** remains a separate, quiet shortcut. |
 | **Composer** | Docked at the bottom of the transcript. `Enter` sends, `Shift`+`Enter` adds a line, `Cmd/Ctrl`+`K` focuses it, `/` opens the command palette, and the paperclip attaches a text file or an image. Files can also be dropped anywhere on the composer or pasted from the clipboard, and each one is shown with a size (and a thumbnail, for images) plus a remove control before it is sent; a file the studio cannot read is refused with the reason instead of becoming a chip that promises content the model will never see. The hint row's **Model** control lists the ids the configured backend reports and writes the choice through the same Settings store as the Base URL field. The send button becomes a stop button while a reply streams. |
-| **Bar** | The only persistent chrome: home, new conversation, catch-up, live model status, **Customize**, and settings. There is no navigation drawer to compete with the thread. |
+| **History** | The bar's clock opens the sidecar's conversations, newest first: replay, rename in place, or forget a thread. Empty threads are not listed. |
+| **Bar** | The only persistent chrome: home, new conversation, history, catch-up, live model status, **Customize**, and settings. There is no navigation drawer to compete with the thread. |
 | **Customize** | The one place to manage connectors. It replaces the conversation while open (the bar stays, so leaving is one gesture) and shows three bands: what is installed, read from the same `connectors.json` the CLI uses; a handful of curated picks as non-gating examples; and the marketplace, populated from the trusted vendor registry so a listing can be added by id. Capability areas filter the shelf, a listing that needs a token names its environment variable and stores nothing, a listing that cannot be installed says why, and an unreachable marketplace is reported rather than shown as an empty list. A studio with nothing installed suggests a connector when one would help; dismissing the suggestion keeps it dismissed. |
 | **Rail** | Above the conversation, and only once the thread has produced something: `Landscape · N`, `Job map · N`, `Evidence · N`, `What I know · N`. Every item is derived from the canvas and the memory, so the strip is a record of the work rather than a fixed menu. |
 | **Lens** | A view docks to the right of the thread on wide screens and becomes a full-height sheet on narrow ones. The transcript and the composer stay on screen and stay usable; `Esc`, **Close**, or the rail chip closes it. Every lens ends in one sentence that re-enters the conversation — *Ask which to chase*, *Walk me through the job*, *Weigh the evidence* — so leaving a view is never a return to a menu. Settings and catch-up use the same lens. |
@@ -220,27 +221,30 @@ without giving up the message model the sidecar already understands.
 | **Branching** | **Edit** a user turn or **Regenerate** a reply and both versions are kept as siblings. **Alternative 2 of 3** with `‹`/`›` steps between them, and the visible branch is saved as the conversation's `head_id`, so a reload reopens the branch you were reading. |
 | **Suggestions** | The empty-stage pills are chosen from the canvas and handed to the runtime as suggestion prompts. |
 | **Generative UI** | A validated `UiNode` travels as an assistant-ui **data part** (`data-odi-surface`) and renders through the same `UiRenderer`. The catalog stays ours and server-validated. |
-| **Voice** | Deliberately not wired yet. The seam is `adapters.dictation` plus `ComposerPrimitive.Dictate`: no backend change and no message-model change. It waits because Tauri's WebKit webview support for the Web Speech API is uneven, and a microphone button that works in only one shell is worse than none. |
+| **Turn controls** | A send during a reply is queued as **Next** (`createMessageQueue`) and runs when it settles. Thumbs record a browser-local verdict; **Delete** removes a turn and every answer below it. |
+| **Voice** | `ComposerPrimitive.Dictate` uses `WebSpeechDictationAdapter` where the Web Speech API exists, and shows no microphone where it does not. |
 
 #### Where the bridge lives
 
 | File | Role |
 |---|---|
 | `apps/studio/src/assistant/convert.ts` | The only mapping between `ChatMessage`/`ChatPart` and assistant-ui parts, in both directions. Pure, and tested without a runtime. |
-| `apps/studio/src/assistant/StudioRuntime.tsx` | `useExternalStoreRuntime`: `onNew`, `onEdit`, `onReload`, `onCancel`, `setMessages`, `onRespondToToolApproval`, suggestions, attachments. |
+| `apps/studio/src/assistant/StudioRuntime.tsx` | `useExternalStoreRuntime`: every action, plus suggestions, attachments, queue, feedback, dictation, and the thread list. |
 | `apps/studio/src/assistant/attachments.ts` | The attachment adapter and the browser-side text/image extraction. |
 | `apps/studio/src/assistant/parts.tsx` | One renderer per part: text, reasoning, tool (with its approval), source, file, generated surface. |
 | `apps/studio/src/components/chat/Conversation.tsx` | `MessagePrimitive.Parts`, the branch picker, the action bar, and the in-place edit composer. |
-| `apps/studio/src/components/chat/ThreadComposer.tsx` | `ComposerPrimitive` plus the slash palette, connector chips, attachment drop/paste, and attachment-format/size guidance. |
+| `apps/studio/src/components/chat/ThreadComposer.tsx` | `ComposerPrimitive` plus the slash palette, connector chips, attachment drop/paste, the queued row, and attachment-format/size guidance. |
+| `apps/studio/src/components/layout/HistorySidebar.tsx` | The thread list. |
 | `apps/studio/src/components/chat/ModelPicker.tsx` | The composer's model listbox: opens the sidecar's `/api/models`, keeps the configured id selectable, and saves through Settings. |
 
 The sidecar remains the source of truth for what happened. Its additions are
 opt-in and additive: `reasoning`, `source`, and `approval` stream events;
-`attachments` and `approvals` on `/api/chat`; `GET
-/api/conversations/{id}/tree`; `PATCH /api/conversations/{id}`; and `POST
-/api/models`, which lists the configured backend's ids without raising when it
-is offline. A client that sends none of these sees exactly the stream it saw
-before, which is what the CLI and older clients do.
+`attachments` and `approvals` on `/api/chat`; `GET /api/conversations`; `GET
+/api/conversations/{id}/tree`; `PATCH /api/conversations/{id}`; `DELETE` for a
+conversation and its messages; and `POST /api/models`, which lists the configured
+backend's ids without raising when it is offline. A client that sends none of
+these sees exactly the stream it saw before, which is what the CLI and older
+clients do.
 
 The approval gate is per-process and single-user by design. `ApprovalRegistry`
 waits on an `asyncio` future, `POST /api/approvals/{id}` answers it, and a
@@ -306,6 +310,10 @@ turns, and continues with the same `conversation_id` on the next message. **New
 conversation** starts a fresh one without touching the memory; **Forget
 everything** removes both. The composer stays usable while the restore is in
 flight, and a restore failure simply leaves the room empty.
+
+The history sidebar uses `GET /api/conversations`, replays with `GET
+/api/conversations/{id}/tree`, renames with `PATCH`, and forgets with `DELETE`;
+the browser-local store does the same against IndexedDB.
 
 ### Printing and export
 

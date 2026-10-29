@@ -9,6 +9,7 @@ import { ChatStage } from "./components/chat/ChatStage";
 import { ConnectorSuggestionModal } from "./components/customize/ConnectorSuggestionModal";
 import { CustomizePage } from "./components/customize/CustomizePage";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { HistorySidebar } from "./components/layout/HistorySidebar";
 import { StudioBar } from "./components/layout/StudioBar";
 import { WorkbenchRail } from "./components/workspace/WorkbenchRail";
 import { WorkspacePanel } from "./components/workspace/WorkspacePanel";
@@ -38,6 +39,7 @@ function StudioShell() {
   const { view } = useBanner();
   const { onIntent, onAction, onDismiss } = useBannerActionDispatcher();
   const [showChangelog, setShowChangelog] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   function goHome() {
     clearChat();
@@ -83,12 +85,15 @@ function StudioShell() {
           onHome={goHome}
           onNew={newConversation}
           onChangelog={() => setShowChangelog(true)}
+          onHistory={() => setHistoryOpen((open) => !open)}
+          historyOpen={historyOpen}
         />
         <UpdateBanner />
         {customizeOpen ? (
           <CustomizePage />
         ) : (
           <div className="stage__split">
+            <HistorySidebar open={historyOpen} onClose={() => setHistoryOpen(false)} />
             <div className="stage__thread">
               <WorkbenchRail />
               <ChatStage />

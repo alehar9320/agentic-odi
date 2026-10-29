@@ -54,6 +54,8 @@ let llmHealthFetches = 0;
 let signalFetches = 0;
 let approvalCalls: Record<string, unknown>[] = [];
 let headPatches: Record<string, unknown>[] = [];
+let conversationList: Record<string, unknown>[] = [];
+let deletedPaths: string[] = [];
 
 function route(
   input: RequestInfo | URL,
@@ -137,8 +139,23 @@ function route(
     return json({ ok: true, id: url.split("/").pop() });
   }
   if (init?.method === "PATCH" && url.startsWith("/api/conversations/")) {
-    headPatches.push(JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>);
-    return json({ conversation: CONVERSATION });
+    const patch = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
+    headPatches.push(patch);
+    const id = url.split("/").pop();
+    const updated = {
+      ...(conversationList.find((conversation) => conversation.id === id) ?? CONVERSATION),
+      ...(patch.title ? { title: String(patch.title) } : {}),
+    };
+    conversationList = conversationList.map((conversation) =>
+      conversation.id === id ? updated : conversation,
+    );
+    return json({ conversation: updated });
+  }
+  if (init?.method === "DELETE" && url.startsWith("/api/conversations/")) {
+    deletedPaths.push(url);
+    const id = url.split("/").pop() ?? "";
+    conversationList = conversationList.filter((conversation) => conversation.id !== id);
+    return json({ deleted: id });
   }
   if (url === "/api/conversations/c-1/tree") {
     return json({
@@ -163,14 +180,17 @@ function route(
     });
   }
   if (url === "/api/conversations") {
-    return json({
-      conversation: {
-        id: "c-new",
-        title: "",
-        created_at: "2026-10-22T10:00:00+00:00",
-        updated_at: "2026-10-22T10:00:00+00:00",
-      },
-    });
+    if (init?.method === "POST") {
+      return json({
+        conversation: {
+          id: "c-new",
+          title: "",
+          created_at: "2026-10-22T10:00:00+00:00",
+          updated_at: "2026-10-22T10:00:00+00:00",
+        },
+      });
+    }
+    return json({ conversations: conversationList });
   }
   if (url === "/api/health/mcp") {
     return json({ reachable: true });
@@ -773,5 +793,92 @@ describe("StudioContext write approval and branches", () => {
 
     expect(result.current.messages.map((message) => message.id)).toEqual(["b-1", "b-2"]);
     await waitFor(() => expect(headPatches).toEqual([{ head_id: "b-2" }]));
+  });
+});
+
+describe("StudioContext thread history", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    chatBody = null;
+    chatStream = null;
+    chatFailure = null;
+    chatAborts = false;
+    canvasFails = false;
+    connectorFetches = 0;
+    llmHealthFetches = 0;
+    approvalCalls = [];
+    headPatches = [];
+    deletedPaths = [];
+    conversationList = [{ ...CONVERSATION }];
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("lists the threads the sidecar remembers", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+
+    await waitFor(() =>
+      expect(result.current.conversations.map((conversation) => conversation.id)).toEqual(["c-1"]),
+    );
+  });
+
+  it("replays a remembered thread and makes it the one the composer continues", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
+
+    await act(async () => {
+      await result.current.openConversation("c-1");
+    });
+
+    expect(result.current.conversationId).toBe("c-1");
+    expect(result.current.messages.map((message) => message.content)).toEqual([
+      "I own activation.",
+      "Tell me more.",
+    ]);
+  });
+
+  it("renames a thread in the list, not only on the server", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.conversations).toHaveLength(1));
+
+    await act(async () => {
+      await result.current.renameConversation("c-1", "Sharper title");
+    });
+
+    expect(result.current.conversations[0].title).toBe("Sharper title");
+  });
+
+  it("forgets a thread and moves the reader to a fresh one when it was open", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
+
+    await act(async () => {
+      await result.current.deleteConversation("c-1");
+    });
+
+    expect(deletedPaths).toEqual(["/api/conversations/c-1"]);
+    await waitFor(() => expect(result.current.conversationId).toBe("c-new"));
+    expect(result.current.messages).toEqual([]);
+  });
+
+  it("removes a message and the turns that answered it, locally and on the server", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
+
+    await act(async () => {
+      await result.current.openConversation("c-1");
+    });
+
+    act(() => {
+      result.current.deleteMessage("t-1");
+    });
+
+    expect(result.current.messages).toEqual([]);
+    await waitFor(() =>
+      expect(deletedPaths).toEqual(["/api/conversations/c-1/messages/t-1"]),
+    );
   });
 });
