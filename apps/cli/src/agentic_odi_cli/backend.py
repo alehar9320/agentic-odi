@@ -601,6 +601,33 @@ class LocalBackend(Backend):
             raise BackendError(_VALUE_RANGE_ERROR)
         return compute_opportunity_score(importance, satisfaction)
 
+    def _list_signals(self, args: dict[str, Any]) -> list[dict[str, Any]]:
+        signals = self.service.list_signals(
+            unread_only=bool(args.get("unread_only", False)),
+            limit=int(args.get("limit", 50)),
+        )
+        return [signal.model_dump(mode="json") for signal in signals]
+
+    def _mark_signal_read(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import SignalNotFoundError
+
+        signal_id = args["signal_id"]
+        try:
+            signal = self.service.mark_signal_read(signal_id)
+        except SignalNotFoundError:
+            raise BackendError(f"signal not found: {signal_id}") from None
+        return signal.model_dump(mode="json")
+
+    def _dismiss_signal(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import SignalNotFoundError
+
+        signal_id = args["signal_id"]
+        try:
+            signal = self.service.dismiss_signal(signal_id)
+        except SignalNotFoundError:
+            raise BackendError(f"signal not found: {signal_id}") from None
+        return signal.model_dump(mode="json")
+
 
 _LOCAL_HANDLERS = {
     "add_job": LocalBackend._add_job,
@@ -639,6 +666,9 @@ _LOCAL_HANDLERS = {
     "get_odi_framework_guidelines": LocalBackend._get_odi_framework_guidelines,
     "get_capabilities": LocalBackend._get_capabilities,
     "get_capabilities_manifest": LocalBackend._get_capabilities_manifest,
+    "list_signals": LocalBackend._list_signals,
+    "mark_signal_read": LocalBackend._mark_signal_read,
+    "dismiss_signal": LocalBackend._dismiss_signal,
 }
 
 
@@ -703,6 +733,7 @@ _LIST_TOOLS = frozenset(
         "get_outcomes",
         "list_customer_outcomes",
         "list_evidence",
+        "list_signals",
         "list_scheduled_work",
     }
 )

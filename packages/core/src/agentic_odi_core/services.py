@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+import hashlib
+import os
 import uuid
+from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Any
 
 from agentic_odi_core.errors import NotFoundError, ValidationError
@@ -13,6 +17,7 @@ from agentic_odi_core.evaluation import (
 )
 from agentic_odi_core.models import (
     JOB_STAGE_INDEX,
+    JOB_STAGE_ORDER,
     BusinessValue,
     CustomerOutcome,
     CustomerValue,
@@ -24,6 +29,8 @@ from agentic_odi_core.models import (
     ScheduledWork,
     ScheduledWorkStatus,
     ScheduledWorkTriggerType,
+    Signal,
+    SignalKind,
     Step,
     compute_opportunity_score,
 )
@@ -82,6 +89,46 @@ class ValueOutOfRangeError(ValidationError):
     pass
 
 
+class SignalNotFoundError(NotFoundError):
+    def __init__(self, signal_id: str) -> None:
+        self.signal_id = signal_id
+        super().__init__(signal_id, "signal")
+
+
+DEFAULT_SIGNAL_DAILY_CAP = 20
+
+_SEVERITY_RANK: dict[str, int] = {"info": 0, "notice": 1, "urgent": 2}
+
+
+@dataclass
+class SignalBudget:
+    """The attention budget: a daily cap on surfaced signals and a floor.
+
+    Signals past the cap are still recorded but marked ``suppressed``, so the
+    badge never counts them. ``urgent`` signals bypass the cap entirely — a cap
+    that can be silenced by an emergency is not a budget.
+    """
+
+    daily_cap: int = DEFAULT_SIGNAL_DAILY_CAP
+    min_severity: str = "info"
+
+    @classmethod
+    def from_env(cls) -> SignalBudget:
+        raw = os.environ.get("AGENTIC_ODI_SIGNAL_BUDGET", "")
+        try:
+            cap = int(raw) if raw else DEFAULT_SIGNAL_DAILY_CAP
+        except ValueError:
+            cap = DEFAULT_SIGNAL_DAILY_CAP
+        return cls(daily_cap=max(cap, 0))
+
+    def surfaces(self, severity: str, surfaced_today: int) -> bool:
+        if severity == "urgent":
+            return True
+        if _SEVERITY_RANK[severity] < _SEVERITY_RANK[self.min_severity]:
+            return False
+        return surfaced_today < self.daily_cap
+
+
 class InvalidOutcomeStatementError(OutcomeStatementError):
     """A statement does not match the ODI desired-outcome format.
 
@@ -101,13 +148,103 @@ def _first_line(text: str) -> str:
     return ""
 
 
+def _opportunity_crossing(before: float | None, after: float | None) -> tuple[str, str] | None:
+    """Did the opportunity score cross 10, and in which direction?
+
+    Crossing up is urgent — a big unserved opportunity just surfaced;
+    crossing down is a notice.
+    """
+    if before is None or after is None:
+        return None
+    if before < 10.0 <= after:
+        return ("up", "urgent")
+    if before >= 10.0 > after:
+        return ("down", "notice")
+    return None
+
+
 class ODIService:
-    def __init__(self, repo: Repository) -> None:
+    def __init__(self, repo: Repository, budget: SignalBudget | None = None) -> None:
         self.repo = repo
+        #: ``None`` re-reads ``AGENTIC_ODI_SIGNAL_BUDGET`` per signal so a
+        #: long-running sidecar picks up a changed cap without a restart.
+        self.budget = budget
+
+    def record_signal(
+        self,
+        kind: SignalKind,
+        title: str,
+        subject_kind: str | None = None,
+        subject_id: str | None = None,
+        severity: str = "info",
+        detail: str | None = None,
+        discriminator: str = "",
+    ) -> Signal:
+        """Record one fact. A signal with the same fingerprint already exists.
+
+        ``discriminator`` is the thing that changed (a new score, a record id);
+        the fingerprint is sha256 over ``kind|subject_kind|subject_id|
+        discriminator``, so re-recording the same fact returns the first signal
+        instead of spamming the feed.
+        """
+        fingerprint = hashlib.sha256(
+            "|".join([kind.value, subject_kind or "", subject_id or "", discriminator]).encode(
+                "utf-8"
+            )
+        ).hexdigest()
+        for existing in self.repo.signals.values():
+            if existing.fingerprint == fingerprint:
+                return existing
+        budget = self.budget or SignalBudget.from_env()
+        today = datetime.now(timezone.utc).date()
+        surfaced_today = sum(
+            1
+            for signal in self.repo.signals.values()
+            if signal.created_at.date() == today
+            and not signal.suppressed
+            and signal.severity != "urgent"
+        )
+        signal = Signal(
+            kind=kind,
+            title=title[:120],
+            detail=detail,
+            subject_kind=subject_kind,  # type: ignore[arg-type]
+            subject_id=subject_id,
+            severity=severity,  # type: ignore[arg-type]
+            suppressed=not budget.surfaces(severity, surfaced_today),
+            fingerprint=fingerprint,
+        )
+        return self.repo.add_signal(signal)
+
+    def list_signals(self, unread_only: bool = False, limit: int = 50) -> list[Signal]:
+        return self.repo.list_signals(unread_only=unread_only, limit=limit)
+
+    def mark_signal_read(self, signal_id: str) -> Signal:
+        signal = self.repo.mark_signal_read(signal_id)
+        if signal is None:
+            raise SignalNotFoundError(signal_id)
+        return signal
+
+    def dismiss_signal(self, signal_id: str) -> Signal:
+        signal = self.repo.dismiss_signal(signal_id)
+        if signal is None:
+            raise SignalNotFoundError(signal_id)
+        return signal
+
+    def count_unread_signals(self) -> int:
+        return self.repo.count_unread_signals()
 
     def add_job(self, name: str, description: str | None = None) -> Job:
         job = Job(name=name, description=description)
-        return self.repo.add_job(job)
+        job = self.repo.add_job(job)
+        self.record_signal(
+            SignalKind.JOB_ADDED,
+            f'Job added: "{job.name}"',
+            subject_kind="job",
+            subject_id=job.id,
+            discriminator=job.id,
+        )
+        return job
 
     def get_jobs(self, limit: int | None = None, offset: int = 0) -> list[Job]:
         return self.repo.list_jobs(limit=limit, offset=offset)
@@ -136,6 +273,8 @@ class ODIService:
         res = self.repo.update_step(step_id, updates)
         if not res:
             raise StepNotFoundError(step_id)
+        if "stage" in updates:
+            self._emit_job_map_completed(res.job_id)
         return res
 
     def delete_step(self, step_id: str) -> None:
@@ -164,7 +303,51 @@ class ODIService:
         res = self.repo.update_outcome(outcome_id, updates)
         if not res:
             raise OutcomeNotFoundError(outcome_id)
+        self._emit_outcome_updates(existing, res)
         return res
+
+    def _emit_outcome_updates(self, before: Outcome, after: Outcome) -> None:
+        if before.importance != after.importance or before.satisfaction != after.satisfaction:
+            self.record_signal(
+                SignalKind.OUTCOME_SCORED,
+                f'Outcome re-scored: "{after.statement[:60]}"',
+                subject_kind="outcome",
+                subject_id=after.id,
+                detail=(
+                    f"importance {before.importance} -> {after.importance}, "
+                    f"satisfaction {before.satisfaction} -> {after.satisfaction}"
+                ),
+                discriminator=f"importance={after.importance},satisfaction={after.satisfaction}",
+            )
+        crossing = _opportunity_crossing(before.opportunity_score, after.opportunity_score)
+        if crossing is not None:
+            direction, severity = crossing
+            self.record_signal(
+                SignalKind.OPPORTUNITY_CROSSED,
+                f'Opportunity score crossed 10 ({direction}): "{after.statement[:60]}"',
+                subject_kind="outcome",
+                subject_id=after.id,
+                severity=severity,
+                detail=f"{before.opportunity_score} -> {after.opportunity_score}",
+                discriminator=f"{direction}:{after.opportunity_score}",
+            )
+
+    def _emit_job_map_completed(self, job_id: str) -> None:
+        stages = {
+            step.stage for step in self.repo.get_steps_for_job(job_id) if step.stage is not None
+        }
+        if len(stages) < len(JOB_STAGE_ORDER):
+            return
+        job = self.repo.get_job(job_id)
+        label = job.name if job is not None else job_id
+        self.record_signal(
+            SignalKind.JOB_MAP_COMPLETED,
+            f'Job map complete: "{label}" covers all {len(JOB_STAGE_ORDER)} stages',
+            subject_kind="job",
+            subject_id=job_id,
+            severity="notice",
+            discriminator="all-stages",
+        )
 
     def delete_outcome(self, outcome_id: str) -> None:
         ok = self.repo.delete_outcome(outcome_id)
@@ -200,7 +383,9 @@ class ODIService:
             stage=stage,
             stage_index=stage_index,
         )
-        return self.repo.add_step(step)
+        step = self.repo.add_step(step)
+        self._emit_job_map_completed(job_id)
+        return step
 
     def get_job_map(self, job_id: str, limit: int | None = None, offset: int = 0) -> list[Step]:
         # Sort by canonical stage_index when present, falling back to order:
@@ -353,7 +538,15 @@ class ODIService:
             step_id=step_id,
             outcome_id=outcome_id,
         )
-        return self.repo.add_evidence(evidence)
+        evidence = self.repo.add_evidence(evidence)
+        self.record_signal(
+            SignalKind.EVIDENCE_INGESTED,
+            f'Evidence from "{evidence.source_name}": {evidence.name[:60]}',
+            subject_kind="evidence",
+            subject_id=evidence.id,
+            discriminator=evidence.id,
+        )
+        return evidence
 
     def get_evidence(self, evidence_id: str) -> Evidence | None:
         return self.repo.get_evidence(evidence_id)
@@ -412,13 +605,22 @@ class ODIService:
                 raise ValidationError(
                     "Promoting evidence to an outcome requires both importance and satisfaction scores."
                 )
-            return self.add_outcome(
+            outcome = self.add_outcome(
                 target_job_id,
                 text,
                 importance=importance,
                 satisfaction=satisfaction,
                 step_id=evidence.step_id,
             )
+            self.record_signal(
+                SignalKind.EVIDENCE_PROMOTED,
+                f'Evidence promoted to an outcome: "{outcome.statement[:60]}"',
+                subject_kind="outcome",
+                subject_id=outcome.id,
+                severity="notice",
+                discriminator=outcome.id,
+            )
+            return outcome
         raise ValidationError(f"Unknown promotion target: {target}")
 
     def compute_opportunity(self, importance: float, satisfaction: float) -> float:

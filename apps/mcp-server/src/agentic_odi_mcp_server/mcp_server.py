@@ -21,6 +21,7 @@ from agentic_odi_core import (
     OutcomeNotFoundError,
     OutcomeStatementError,
     ScheduledWorkNotFoundError,
+    SignalNotFoundError,
     StepNotFoundError,
     ValueOutOfRangeError,
     build_repository,
@@ -71,6 +72,7 @@ steps_db = _repo.steps
 outcomes_db = _repo.outcomes
 customer_outcomes_db = _repo.customer_outcomes
 evidence_db = _repo.evidence
+signals_db = _repo.signals
 
 
 def _step_not_found(step_id: str | None) -> str:
@@ -627,6 +629,31 @@ def trigger_scheduled_work(work_id: str) -> str:
 @mcp.tool
 def get_odi_schema() -> str:
     return json.dumps(odi_schema())
+
+
+@mcp.tool
+def list_signals(unread_only: bool = False, limit: int = 50) -> str:
+    """List recorded signals, newest first; ``unread_only`` trims to the badge."""
+    signals = service.list_signals(unread_only=unread_only, limit=limit)
+    return json.dumps([signal.model_dump(mode="json") for signal in signals])
+
+
+@mcp.tool
+def mark_signal_read(signal_id: str) -> str:
+    try:
+        signal = service.mark_signal_read(signal_id)
+    except SignalNotFoundError:
+        return f"Error: Signal with ID {signal_id} not found."
+    return f"Signal marked as read: {signal.model_dump_json()}"
+
+
+@mcp.tool
+def dismiss_signal(signal_id: str) -> str:
+    try:
+        signal = service.dismiss_signal(signal_id)
+    except SignalNotFoundError:
+        return f"Error: Signal with ID {signal_id} not found."
+    return f"Signal dismissed: {signal.model_dump_json()}"
 
 
 DEFAULT_PORT = 8000

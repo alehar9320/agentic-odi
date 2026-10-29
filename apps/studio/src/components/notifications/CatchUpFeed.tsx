@@ -1,10 +1,33 @@
 import { useState } from "react";
 
 import { useStudio } from "../../state/StudioContext";
-import type { NotificationCategory, StudioNotification, WorkspacePanelId } from "../../types";
-import { BoltIcon, CheckIcon, CompassIcon, RouteIcon, SignalIcon, SparkIcon } from "../icons";
+import type { Signal, SignalKind, SignalSeverity } from "../../types";
+import { FailurePanel } from "../FailurePanel";
+import {
+  BoltIcon,
+  CheckIcon,
+  CompassIcon,
+  RouteIcon,
+  SignalIcon,
+  SparkIcon,
+} from "../icons";
 
-type FilterType = "all" | "unread" | "outcome" | "signals";
+type FilterType = "all" | "unread" | "urgent" | "outcome" | "evidence";
+
+const KIND_LABEL: Record<SignalKind, string> = {
+  job_added: "Job",
+  outcome_scored: "Outcome",
+  opportunity_crossed: "Opportunity",
+  evidence_ingested: "Evidence",
+  evidence_promoted: "Evidence",
+  job_map_completed: "Job map",
+};
+
+const SEVERITY_BADGE: Record<SignalSeverity, string> = {
+  info: "badge--blue",
+  notice: "badge--green",
+  urgent: "badge--amber",
+};
 
 function formatRelativeTime(isoString: string): string {
   try {
@@ -24,114 +47,95 @@ function formatRelativeTime(isoString: string): string {
   }
 }
 
-function getCategoryIcon(category: NotificationCategory) {
-  switch (category) {
-    case "outcome":
-      return <CompassIcon size={16} />;
-    case "simulation":
-      return <BoltIcon size={16} />;
-    case "evidence":
-      return <SignalIcon size={16} />;
-    case "job":
-      return <RouteIcon size={16} />;
-    case "insight":
-    default:
-      return <SparkIcon size={16} />;
-  }
+function kindIcon(kind: SignalKind) {
+  if (kind === "job_added" || kind === "job_map_completed") return <RouteIcon size={16} />;
+  if (kind === "outcome_scored" || kind === "opportunity_crossed") return <CompassIcon size={16} />;
+  if (kind === "evidence_promoted") return <SparkIcon size={16} />;
+  return <SignalIcon size={16} />;
 }
 
-function getCategoryBadgeClass(category: NotificationCategory): string {
-  switch (category) {
-    case "outcome":
-      return "badge--blue";
-    case "simulation":
-      return "badge--amber";
-    case "evidence":
-      return "badge--green";
-    case "job":
-    case "insight":
-    default:
-      return "badge--blue";
-  }
+function isOutcomeSignal(signal: Signal): boolean {
+  return signal.kind === "outcome_scored" || signal.kind === "opportunity_crossed";
 }
 
+function isEvidenceSignal(signal: Signal): boolean {
+  return signal.kind === "evidence_ingested" || signal.kind === "evidence_promoted";
+}
+
+/**
+ * The inbox the store actually holds. Simulated events (#78) stay visible so a
+ * developer can see what a full feed looks like, but they are labelled and are
+ * counted nowhere — the numbers on this page describe recorded activity only.
+ */
 export function CatchUpFeed() {
   const {
-    notifications,
-    unreadNotificationCount,
-    markNotificationAsRead,
-    markAllNotificationsAsRead,
-    dismissNotification,
-    openPanel,
-    closePanel,
-    sendMessage,
+    signals,
+    signalsError,
+    unreadSignalCount,
+    refreshSignals,
+    markSignalAsRead,
+    dismissSignal,
+    focusSignalSubject,
     simulateBackgroundEvent,
   } = useStudio();
 
   const [activeFilter, setActiveFilter] = useState<FilterType>("all");
 
-  const filteredNotifications = notifications.filter((item) => {
-    if (activeFilter === "unread") return !item.read && !item.simulated;
-    if (activeFilter === "outcome") return item.category === "outcome";
-    if (activeFilter === "signals")
-      return item.category === "simulation" || item.category === "evidence";
+  const recorded = signals.filter((signal) => !signal.simulated);
+  const unread = recorded.filter((signal) => !signal.read_at);
+  const urgentCount = unread.filter((signal) => signal.severity === "urgent").length;
+  const outcomeCount = recorded.filter(isOutcomeSignal).length;
+  const evidenceCount = recorded.filter(isEvidenceSignal).length;
+
+  const visible = signals.filter((signal) => {
+    if (activeFilter === "unread") return !signal.simulated && !signal.read_at;
+    if (activeFilter === "urgent") return !signal.simulated && signal.severity === "urgent";
+    if (activeFilter === "outcome") return isOutcomeSignal(signal) && !signal.simulated;
+    if (activeFilter === "evidence") return isEvidenceSignal(signal) && !signal.simulated;
     return true;
   });
 
-  function handleAction(notif: StudioNotification) {
-    markNotificationAsRead(notif.id);
-    if (notif.targetPanel) {
-      openPanel(notif.targetPanel as WorkspacePanelId);
-    } else if (notif.chatPrompt) {
-      closePanel();
-      void sendMessage(notif.chatPrompt);
+  function activate(signal: Signal) {
+    focusSignalSubject(signal);
+  }
+
+  function handleCardKey(event: React.KeyboardEvent, signal: Signal) {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      activate(signal);
     }
   }
 
-  function handleAskAssistant(notif: StudioNotification, e: React.MouseEvent) {
-    e.stopPropagation();
-    markNotificationAsRead(notif.id);
-    if (notif.chatPrompt) {
-      closePanel();
-      void sendMessage(notif.chatPrompt);
-    }
-  }
-
-  // Simulated events stay visible in "All", but they are demonstrations, not
-  // activity the studio observed. Counting them would inflate the summary.
-  const realNotifications = notifications.filter((n) => !n.simulated);
-  const outcomeCount = realNotifications.filter((n) => n.category === "outcome").length;
-  const signalCount = realNotifications.filter(
-    (n) => n.category === "simulation" || n.category === "evidence",
-  ).length;
+  const chips: Array<{ id: FilterType; label: string; count: number }> = [
+    { id: "all", label: "All", count: recorded.length },
+    { id: "unread", label: "Unread", count: unreadSignalCount },
+    { id: "urgent", label: "Urgent", count: urgentCount },
+    { id: "outcome", label: "Outcome shifts", count: outcomeCount },
+    { id: "evidence", label: "Evidence", count: evidenceCount },
+  ];
 
   return (
-    <div className="stack catchup-feed" aria-label="Catch up activity feed">
-      {/* Executive Summary Header */}
+    <div className="stack catchup-feed" aria-label="Signal inbox">
       <section className="catchup-summary card" aria-label="Summary while you were away">
         <div className="card__head">
           <div>
-            <span className="hero__eyebrow">Intent & Outcome Feed</span>
-            <h2 className="catchup-title">
-              While you were away
-            </h2>
+            <span className="hero__eyebrow">Signals from the store</span>
+            <h2 className="catchup-title">While you were away</h2>
           </div>
           <div className="catchup-summary__actions">
-            {unreadNotificationCount > 0 && (
-              <button
-                type="button"
-                className="button button--ghost"
-                onClick={markAllNotificationsAsRead}
-                title="Mark all notifications as read"
-              >
-                Mark all as read
-              </button>
-            )}
+            <button
+              type="button"
+              className="button button--ghost"
+              onClick={() => void refreshSignals()}
+              title="Re-read the inbox from the store"
+            >
+              Refresh
+            </button>
             <button
               type="button"
               className="button button--ghost"
               onClick={simulateBackgroundEvent}
-              title="Simulate a background system update while away"
+              title="Add a labelled demonstration signal. It is not recorded in the store."
             >
               + Simulate update
             </button>
@@ -140,165 +144,154 @@ export function CatchUpFeed() {
 
         <div className="metrics catchup-metrics">
           <div className="metric">
-            <span className="metric__label">Unread Signals</span>
-            <span className="metric__value metric__value--accent">
-              {unreadNotificationCount}
-            </span>
+            <span className="metric__label">Unread signals</span>
+            <span className="metric__value metric__value--accent">{unreadSignalCount}</span>
           </div>
           <div className="metric">
-            <span className="metric__label">Outcome Shifts</span>
+            <span className="metric__label">Urgent</span>
+            <span className="metric__value">{urgentCount}</span>
+          </div>
+          <div className="metric">
+            <span className="metric__label">Outcome shifts</span>
             <span className="metric__value">{outcomeCount}</span>
-          </div>
-          <div className="metric">
-            <span className="metric__label">Simulations & Evidence</span>
-            <span className="metric__value">{signalCount}</span>
           </div>
         </div>
       </section>
 
-      {/* Filter Chips */}
-      <div className="chips" role="tablist" aria-label="Filter notifications">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={activeFilter === "all"}
-          className={`chip${activeFilter === "all" ? " is-on" : ""}`}
-          onClick={() => setActiveFilter("all")}
-        >
-          All ({notifications.length})
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={activeFilter === "unread"}
-          className={`chip${activeFilter === "unread" ? " is-on" : ""}`}
-          onClick={() => setActiveFilter("unread")}
-        >
-          Unread ({unreadNotificationCount})
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={activeFilter === "outcome"}
-          className={`chip${activeFilter === "outcome" ? " is-on" : ""}`}
-          onClick={() => setActiveFilter("outcome")}
-        >
-          Outcome Shifts ({outcomeCount})
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={activeFilter === "signals"}
-          className={`chip${activeFilter === "signals" ? " is-on" : ""}`}
-          onClick={() => setActiveFilter("signals")}
-        >
-          Simulations & Telemetry ({signalCount})
-        </button>
+      {signalsError ? (
+        <FailurePanel error={signalsError} onRetry={() => void refreshSignals()} />
+      ) : null}
+
+      <div className="chips" role="group" aria-label="Filter signals">
+        {chips.map((chip) => (
+          <button
+            key={chip.id}
+            type="button"
+            className={`chip${activeFilter === chip.id ? " is-on" : ""}`}
+            aria-pressed={activeFilter === chip.id}
+            onClick={() => setActiveFilter(chip.id)}
+          >
+            {chip.label} ({chip.count})
+          </button>
+        ))}
       </div>
 
-      {/* Notifications List */}
-      {filteredNotifications.length === 0 ? (
+      {visible.length === 0 ? (
         <div className="card empty-note catchup-empty">
-          <span className="catchup-empty__icon">✨</span>
+          <span className="catchup-empty__icon" aria-hidden="true">
+            <BoltIcon size={18} />
+          </span>
           <p className="catchup-empty__title">
-            {notifications.length === 0 ? "No activity yet" : "You're all caught up!"}
+            {recorded.length === 0 ? "Nothing happened while you were away." : "No signals match."}
           </p>
           <p className="catchup-empty__hint">
-            {notifications.length === 0
-              ? "Updates appear here as the studio captures evidence and outcomes. Anything simulated is labelled."
-              : "No updates found for this filter."}
+            {recorded.length === 0
+              ? "This inbox only fills from real changes: an outcome re-scored, evidence captured, a job map completed."
+              : "Try another filter."}
           </p>
         </div>
       ) : (
         <div className="cards">
-          {filteredNotifications.map((item) => (
-            <article
-              key={item.id}
-              className={`card catchup-card${!item.read ? " is-unread" : ""}${
-                item.simulated ? " is-simulated" : ""
-              }`}
-              onClick={() => handleAction(item)}
-            >
-              <div className="card__head">
-                <div className="catchup-card__meta">
-                  {!item.read && <span className="status-dot" title="Unread signal" />}
-                  <span className={`badge ${getCategoryBadgeClass(item.category)}`}>
-                    <span className="catchup-card__badge">
-                      {getCategoryIcon(item.category)}
-                      {item.category.toUpperCase()}
+          {visible.map((item) => {
+            const unreadCard = !item.simulated && !item.read_at;
+            return (
+              <article
+                key={item.id}
+                role="button"
+                tabIndex={0}
+                aria-label={`${item.title}. Activate to ${
+                  item.subject_id ? `open the ${item.subject_kind ?? "record"} it names` : "mark as read"
+                }`}
+                className={`card catchup-card${unreadCard ? " is-unread" : ""}${
+                  item.simulated ? " is-simulated" : ""
+                }`}
+                onClick={() => activate(item)}
+                onKeyDown={(event) => handleCardKey(event, item)}
+              >
+                <div className="card__head">
+                  <div className="catchup-card__meta">
+                    {unreadCard && <span className="status-dot" title="Unread signal" />}
+                    <span className={`badge ${SEVERITY_BADGE[item.severity]}`}>
+                      <span className="catchup-card__badge">
+                        {kindIcon(item.kind)}
+                        {KIND_LABEL[item.kind].toUpperCase()} · {item.severity}
+                      </span>
                     </span>
-                  </span>
-                  {item.simulated ? (
-                    <span
-                      className="badge badge--amber"
-                      title="Demonstration event, not recorded activity"
-                    >
-                      Simulated
-                    </span>
-                  ) : null}
-                  <span className="card__id">{formatRelativeTime(item.timestamp)}</span>
-                </div>
+                    {item.simulated ? (
+                      <span
+                        className="badge badge--amber"
+                        title="Demonstration event, not recorded in the store"
+                      >
+                        Simulated
+                      </span>
+                    ) : null}
+                    <span className="card__id">{formatRelativeTime(item.created_at)}</span>
+                  </div>
 
-                <div className="catchup-card__controls">
-                  {!item.read && (
+                  <div className="catchup-card__controls">
+                    {!item.read_at && !item.simulated ? (
+                      <button
+                        type="button"
+                        className="quiet-action"
+                        title="Mark as read"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          markSignalAsRead(item.id);
+                        }}
+                      >
+                        <CheckIcon size={14} />
+                        Read
+                      </button>
+                    ) : null}
                     <button
                       type="button"
-                      className="quiet-action"
-                      title="Mark as read"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        markNotificationAsRead(item.id);
+                      className="quiet-action quiet-action--danger"
+                      title="Dismiss this signal"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        dismissSignal(item.id);
                       }}
                     >
-                      <CheckIcon size={14} />
-                      Read
+                      Dismiss
+                    </button>
+                  </div>
+                </div>
+
+                <h3 className="catchup-card__title">{item.title}</h3>
+                {item.detail ? <p className="card__statement catchup-card__body">{item.detail}</p> : null}
+
+                <div className="card__actions">
+                  {item.subject_id ? (
+                    <button
+                      type="button"
+                      className="button button--ghost catchup-card__action"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        activate(item);
+                      }}
+                    >
+                      {item.subject_kind === "outcome" || item.subject_kind === "step"
+                        ? "View outcome"
+                        : item.subject_kind === "evidence"
+                          ? "Open the evidence"
+                          : `Open the ${item.subject_kind ?? "record"}`} →
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="button button--ghost catchup-card__action"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        markSignalAsRead(item.id);
+                      }}
+                    >
+                      Mark as read
                     </button>
                   )}
-                  <button
-                    type="button"
-                    className="quiet-action quiet-action--danger"
-                    title="Dismiss"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      dismissNotification(item.id);
-                    }}
-                  >
-                    Dismiss
-                  </button>
                 </div>
-              </div>
-
-              <h3 className="catchup-card__title">{item.title}</h3>
-              <p className="card__statement catchup-card__body">
-                {item.message}
-              </p>
-
-              <div className="card__actions">
-                {item.actionText && (
-                  <button
-                    type="button"
-                    className="button button--ghost catchup-card__action"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleAction(item);
-                    }}
-                  >
-                    {item.actionText} →
-                  </button>
-                )}
-                {item.chatPrompt && (
-                  <button
-                    type="button"
-                    className="button catchup-card__action"
-                    onClick={(e) => handleAskAssistant(item, e)}
-                  >
-                    <SparkIcon size={14} className="catchup-card__action-icon" />
-                    Ask Assistant
-                  </button>
-                )}
-              </div>
-            </article>
-          ))}
+              </article>
+            );
+          })}
         </div>
       )}
     </div>

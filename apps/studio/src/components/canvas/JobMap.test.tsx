@@ -1,6 +1,7 @@
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { JOB_STAGES } from "../../domain/jobStages";
 import { JobMap } from "./JobMap";
 
 const mockCanvasData = {
@@ -25,6 +26,7 @@ const harness = vi.hoisted(() => ({
     canvasState: { kind: "ready", data: null } as unknown,
     refreshCanvas: vi.fn(),
     addStep: vi.fn(),
+    focusedJobId: null as string | null,
     ...mocks,
   },
 }));
@@ -36,6 +38,7 @@ vi.mock("../../state/StudioContext", () => ({
 describe("JobMap Interactive Visualization", () => {
   beforeEach(() => {
     harness.state.canvasState = { kind: "ready", data: mockCanvasData };
+    harness.state.focusedJobId = null;
   });
 
   it("renders 8 universal process phases", () => {
@@ -43,6 +46,35 @@ describe("JobMap Interactive Visualization", () => {
     expect(screen.getByText("Universal Job Map (8 Process Phases)")).toBeInTheDocument();
     expect(screen.getAllByText("1. Define")[0]).toBeInTheDocument();
     expect(screen.getByText("8. Conclude")).toBeInTheDocument();
+  });
+
+  it("renders the stage descriptions from the shared constant, with no second copy", () => {
+    render(<JobMap />);
+
+    for (const stage of JOB_STAGES) {
+      expect(screen.getByText(stage.desc)).toBeInTheDocument();
+    }
+  });
+
+  it("follows the job a signal points at", () => {
+    harness.state.canvasState = {
+      kind: "ready",
+      data: {
+        jobs: [
+          { id: "JOB-1", name: "Deploy Service" },
+          { id: "JOB-2", name: "Review contracts" },
+        ],
+        steps: [{ id: "STEP-9", job_id: "JOB-2", name: "Sign the renewal", order: 1 }],
+        outcomes: [],
+        source: "seed" as const,
+      },
+    };
+    harness.state.focusedJobId = "JOB-2";
+
+    render(<JobMap />);
+
+    expect(screen.getByRole("combobox", { name: "Job" })).toHaveValue("JOB-2");
+    expect(screen.getByText("Sign the renewal")).toBeInTheDocument();
   });
 
   it("names the Ulwick phase on each step row", () => {

@@ -14,6 +14,8 @@ from agentic_odi_core.models import (
     Evidence,
     Job,
     Outcome,
+    Signal,
+    SignalKind,
     Step,
 )
 from agentic_odi_core.sqlite_repository import SQLiteRepository
@@ -481,3 +483,58 @@ def test_close_leaves_no_wal_or_shm_sidecars(tmp_path) -> None:
     assert db_path.exists()
     assert list(tmp_path.glob("odi.db-wal")) == []
     assert list(tmp_path.glob("odi.db-shm")) == []
+
+
+def test_signals_survive_a_reload_from_the_event_log(tmp_path) -> None:
+    db = str(tmp_path / "odi.db")
+    repo = SQLiteRepository(db_path=db)
+    quiet = Signal(
+        id="sig-1",
+        kind=SignalKind.JOB_ADDED,
+        title='Job added: "Onboard"',
+        subject_kind="job",
+        subject_id="job-1",
+        suppressed=True,
+        fingerprint="fp-1",
+    )
+    loud = Signal(
+        id="sig-2",
+        kind=SignalKind.OPPORTUNITY_CROSSED,
+        title="Opportunity score crossed 10 (up)",
+        subject_kind="outcome",
+        subject_id="o-1",
+        severity="urgent",
+        fingerprint="fp-2",
+    )
+    fresh = Signal(
+        id="sig-3",
+        kind=SignalKind.EVIDENCE_INGESTED,
+        title='Evidence from "gong": call',
+        subject_kind="evidence",
+        subject_id="e-1",
+        fingerprint="fp-3",
+    )
+    repo.add_signal(quiet)
+    repo.add_signal(loud)
+    repo.add_signal(fresh)
+
+    assert repo.mark_signal_read("sig-2") is not None
+
+    reopened = SQLiteRepository(db_path=db)
+    restored_quiet = reopened.get_signal("sig-1")
+    restored_loud = reopened.get_signal("sig-2")
+    assert restored_quiet is not None and restored_loud is not None
+    assert restored_quiet.created_at == quiet.created_at
+    assert restored_quiet.suppressed is True
+    assert restored_loud.severity == "urgent"
+    assert restored_loud.read_at is not None
+
+    assert [signal.id for signal in reopened.list_signals()] == ["sig-3", "sig-2"]
+    assert [signal.id for signal in reopened.list_signals(unread_only=True)] == ["sig-3"]
+    assert reopened.count_unread_signals() == 1
+
+    assert reopened.dismiss_signal("sig-3") is not None
+    assert reopened.count_unread_signals() == 0
+
+    assert reopened.mark_signal_read("missing") is None
+    assert reopened.dismiss_signal("missing") is None

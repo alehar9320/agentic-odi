@@ -337,6 +337,27 @@ def render_evidence_list(items: Any, *, as_json: bool) -> str:
     )
 
 
+def render_signal_list(signals: Any, *, as_json: bool) -> str:
+    """Render the signal inbox as an aligned table or JSON."""
+    if not isinstance(signals, list):
+        return _json(signals) if as_json else str(signals)
+    if as_json:
+        return _json(signals)
+    return _table(
+        ("id", "severity", "kind", "title"),
+        [
+            (
+                str(item.get("id", "")),
+                str(item.get("severity", "")),
+                str(item.get("kind", "")),
+                _truncate(str(item.get("title", ""))),
+            )
+            for item in signals
+        ],
+        empty="No signals yet — the inbox is only fed by real changes.",
+    )
+
+
 def render_saved(verb: str, outcome: Any, *, as_json: bool, noun: str = "Customer outcome") -> str:
     """Confirm a create/update, showing the record by default."""
     if not isinstance(outcome, dict):
