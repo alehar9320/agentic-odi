@@ -15,6 +15,8 @@ import typer
 
 from agentic_odi_cli.backend import run_tool
 from agentic_odi_cli.render import (
+    render_candidate,
+    render_candidate_list,
     render_deleted,
     render_interview,
     render_interview_list,
@@ -171,5 +173,79 @@ def delete(
             run_tool("delete_interview", {"interview_id": interview_id}),
             as_json=json_output,
             noun="interview",
+        )
+    )
+
+
+@interviews_app.command("extract")
+def extract(
+    quote_id: str = typer.Argument(..., help="Quote ID to propose candidates from"),
+    stage_hint: str | None = typer.Option(None, help="Optional job-stage hint for the extractor"),
+    json_output: bool = JSON_OPTION,
+) -> None:
+    """Propose outcome candidates from one quote.
+
+    Valid proposals are stored ``proposed``; a proposal that fails the ODI
+    statement check is stored ``rejected`` with the validator's reason. No
+    Outcome is created — a person accepts a candidate later.
+    """
+    args: dict[str, Any] = {"quote_id": quote_id}
+    if stage_hint is not None:
+        args["stage_hint"] = stage_hint
+    candidates = run_tool("extract_candidates", args)
+    typer.echo(render_candidate_list(candidates, as_json=json_output))
+
+
+candidates_app = typer.Typer(help="Review outcome candidates proposed from quotes.")
+
+
+@candidates_app.command("list")
+def list_candidates(
+    interview_id: str | None = typer.Option(None, help="Only candidates for this interview"),
+    status: str | None = typer.Option(None, help="Only candidates with this status"),
+    limit: int | None = typer.Option(None, help="Maximum candidates to return"),
+    offset: int = typer.Option(0, help="Skip this many candidates first"),
+    json_output: bool = JSON_OPTION,
+) -> None:
+    """List outcome candidates."""
+    args: dict[str, Any] = {"offset": offset}
+    if interview_id is not None:
+        args["interview_id"] = interview_id
+    if status is not None:
+        args["status"] = status
+    if limit is not None:
+        args["limit"] = limit
+    typer.echo(render_candidate_list(run_tool("list_candidates", args), as_json=json_output))
+
+
+@candidates_app.command("get")
+def get_candidate(
+    candidate_id: str = typer.Argument(..., help="Outcome candidate ID"),
+    json_output: bool = JSON_OPTION,
+) -> None:
+    """Get an outcome candidate by ID."""
+    typer.echo(
+        render_candidate(
+            run_tool("get_candidate", {"candidate_id": candidate_id}), as_json=json_output
+        )
+    )
+
+
+@candidates_app.command("delete")
+def delete_candidate(
+    candidate_id: str = typer.Argument(..., help="Outcome candidate ID"),
+    yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation"),
+    json_output: bool = JSON_OPTION,
+) -> None:
+    """Delete an outcome candidate."""
+    if not yes:
+        confirm = typer.confirm(f"Delete outcome candidate {candidate_id}?")
+        if not confirm:
+            raise typer.Exit()
+    typer.echo(
+        render_deleted(
+            run_tool("delete_candidate", {"candidate_id": candidate_id}),
+            as_json=json_output,
+            noun="outcome candidate",
         )
     )
