@@ -66,9 +66,10 @@ def test_extract_stores_proposed_and_rejected(service: ODIService) -> None:
 
 def test_extract_creates_no_outcome(service: ODIService) -> None:
     interview_id, quote_id = _interview_with_quote(service)
-    job_id = service.get_interview(interview_id).job_id
+    interview = service.get_interview(interview_id)
+    assert interview is not None and interview.job_id is not None
     service.extract_candidates(quote_id, ScriptedExtractor([Proposal(VALID)]))
-    assert service.get_outcomes(job_id) == []
+    assert service.get_outcomes(interview.job_id) == []
 
 
 def test_extract_is_idempotent_and_does_not_reset_decisions(service: ODIService) -> None:
@@ -82,7 +83,9 @@ def test_extract_is_idempotent_and_does_not_reset_decisions(service: ODIService)
 
     assert second == []
     assert len(service.list_candidates()) == 2
-    assert service.get_candidate(first[0].id).status == CandidateStatus.ACCEPTED
+    accepted = service.get_candidate(first[0].id)
+    assert accepted is not None
+    assert accepted.status == CandidateStatus.ACCEPTED
 
 
 def test_extract_collapses_normalised_duplicates(service: ODIService) -> None:

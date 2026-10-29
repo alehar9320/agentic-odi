@@ -18,12 +18,15 @@ from agentic_odi_connectors.registry import (
     DuplicateConnectorError,
 )
 from agentic_odi_core import (
+    CandidateNotFoundError,
+    CandidateStatus,
     EvidenceNotFoundError,
     JobNotFoundError,
     OdiError,
     ODIService,
     OutcomeNotFoundError,
     OutcomeStatementError,
+    QuoteNotFoundError,
     StepNotFoundError,
     ToolName,
     ValueOutOfRangeError,
@@ -77,6 +80,7 @@ from agentic_odi_studio_api.studio.schemas import (
     ConversationResponse,
     ConversationTreeResponse,
     CreateJobRequest,
+    DecideCandidateRequest,
     LatestConversationResponse,
     LlmHealthRequest,
     LlmProxyRequest,
@@ -158,6 +162,8 @@ def _as_http_error(exc: Exception) -> StudioHTTPError:
         exc,
         (JobNotFoundError, StepNotFoundError, OutcomeNotFoundError, EvidenceNotFoundError),
     ):
+        return StudioHTTPError(StudioError(code=StudioErrorCode.NOT_FOUND, message=str(exc)))
+    if isinstance(exc, (CandidateNotFoundError, QuoteNotFoundError)):
         return StudioHTTPError(StudioError(code=StudioErrorCode.NOT_FOUND, message=str(exc)))
     if isinstance(exc, ValueOutOfRangeError):
         return StudioHTTPError(StudioError(code=StudioErrorCode.OUT_OF_RANGE, message=str(exc)))
@@ -885,6 +891,126 @@ async def get_evidence(
     if record is None:
         raise _as_http_error(EvidenceNotFoundError(evidence_id))
     return {"ok": True, "result": record.model_dump(mode="json")}
+
+
+@router.get("/candidates")
+async def get_candidates(
+    request: Request,
+    interview_id: str | None = Query(None),
+    status: str | None = Query(None),
+    mcp_url: str | None = Query(None),
+) -> dict:
+    """List proposed candidates, filtered by interview and/or status."""
+    parsed: CandidateStatus | None = None
+    if status:
+        try:
+            parsed = CandidateStatus(status)
+        except ValueError as exc:
+            raise StudioHTTPError(
+                StudioError(
+                    code=StudioErrorCode.VALIDATION,
+                    message=f"Unknown candidate status: {status}",
+                    suggestion="Use one of: proposed, accepted, rejected, merged.",
+                ),
+                status_code=422,
+            ) from exc
+    if _uses_mcp(request):
+        target = _require_mcp_url(mcp_url or "")
+        arguments: dict[str, Any] = {}
+        if interview_id:
+            arguments["interview_id"] = interview_id
+        if parsed:
+            arguments["status"] = parsed.value
+        result = await call_mcp_tool(target, ToolName.LIST_CANDIDATES.value, arguments)
+        return {"ok": True, "result": _json_or_raw(result)}
+    service = _service(request)
+    candidates = service.list_candidates(interview_id, parsed)
+    return {"ok": True, "result": [item.model_dump(mode="json") for item in candidates]}
+
+
+@router.patch("/candidates/{candidate_id}")
+async def patch_candidate(
+    candidate_id: str, body: DecideCandidateRequest, request: Request
+) -> dict:
+    """Accept, reject, or edit one candidate without losing its evidence.
+
+    ``{"status": "accepted"}`` needs the outcome's importance and satisfaction;
+    ``{"status": "rejected"}`` needs a nonblank reason; omitting ``status``
+    edits the statement only.
+    """
+    if body.status == "accepted" and (body.importance is None or body.satisfaction is None):
+        raise StudioHTTPError(
+            StudioError(
+                code=StudioErrorCode.VALIDATION,
+                message="Accepting a candidate requires importance and satisfaction.",
+                suggestion="Send both scores so the new outcome is measurable.",
+            ),
+            status_code=422,
+        )
+    if body.status == "rejected" and not (body.reason or "").strip():
+        raise StudioHTTPError(
+            StudioError(
+                code=StudioErrorCode.VALIDATION,
+                message="Rejecting a candidate requires a nonblank reason.",
+                suggestion="Say why the candidate is not a real need.",
+            ),
+            status_code=422,
+        )
+
+    if _uses_mcp(request):
+        target = _require_mcp_url(body.mcp_url)
+        if body.status == "accepted":
+            arguments: dict[str, Any] = {
+                "candidate_id": candidate_id,
+                "importance": body.importance,
+                "satisfaction": body.satisfaction,
+            }
+            if body.statement is not None:
+                arguments["statement"] = body.statement
+            if body.step_id is not None:
+                arguments["step_id"] = body.step_id
+            result = await call_mcp_tool(target, ToolName.ACCEPT_CANDIDATE.value, arguments)
+            return {"ok": True, "result": _json_or_raw(result)}
+        if body.status == "rejected":
+            result = await call_mcp_tool(
+                target,
+                ToolName.REJECT_CANDIDATE.value,
+                {"candidate_id": candidate_id, "reason": body.reason},
+            )
+            return {"ok": True, "result": _json_or_raw(result)}
+        result = await call_mcp_tool(
+            target,
+            ToolName.UPDATE_CANDIDATE.value,
+            {"candidate_id": candidate_id, "statement": body.statement},
+        )
+        return {"ok": True, "result": _json_or_raw(result)}
+
+    service = _service(request)
+    try:
+        if body.status == "accepted":
+            candidate, outcome, evidence = service.accept_candidate(
+                candidate_id,
+                importance=body.importance,  # type: ignore[arg-type]
+                satisfaction=body.satisfaction,  # type: ignore[arg-type]
+                statement=body.statement,
+                step_id=body.step_id,
+            )
+            return {
+                "ok": True,
+                "result": candidate.model_dump(mode="json"),
+                "outcome": outcome.model_dump(mode="json"),
+                "evidence": evidence.model_dump(mode="json"),
+            }
+        if body.status == "rejected":
+            candidate = service.reject_candidate(candidate_id, reason=body.reason or "")
+            return {"ok": True, "result": candidate.model_dump(mode="json")}
+        updates: dict[str, Any] = {}
+        if body.statement is not None:
+            updates["statement"] = body.statement
+        candidate = service.update_candidate(candidate_id, updates)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return {"ok": True, "result": candidate.model_dump(mode="json")}
 
 
 @router.get("/memory/observations", response_model=ObservationListResponse)
