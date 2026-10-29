@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from collections.abc import Callable
 from datetime import datetime, timezone
 from typing import Any
 
@@ -22,20 +23,66 @@ _COLUMNS = {
     "server_seq": "INTEGER",
 }
 
+#: The store's own file format version. Bump this only when a migration is
+#: registered below; an additive field that needs no data change must not bump it.
+CURRENT_SCHEMA_VERSION = 1
+
+#: Migrations keyed by the version they produce: ``MIGRATIONS[n]`` upgrades a
+#: store from ``n - 1`` to ``n``. They run in order inside one transaction, and
+#: a step that raises rolls the whole migration back. A store whose file is
+#: newer than the code is refused rather than silently downgraded.
+MIGRATIONS: dict[int, Callable[[sqlite3.Connection], None]] = {}
+
+_UPGRADE_COMMAND = "odi update"
+
 
 class IntentStore:
     """SQLite implementation of the append-only event contract."""
 
     def __init__(self, db_path: str = "intent_store.db", check_same_thread: bool = True) -> None:
+        self._db_path = db_path
         self.conn = sqlite3.connect(db_path, check_same_thread=check_same_thread)
-        # WAL lets readers and one writer work at once; the busy timeout makes
-        # a second writer wait for the lock (the CLI, the sidecar, and a test
-        # can all hold a connection to the same file) instead of raising
-        # "database is locked" the moment the lock is taken.
-        self.conn.execute("PRAGMA journal_mode=WAL;")
-        self.conn.execute("PRAGMA busy_timeout=5000;")
         self._closed = False
-        self._init_db()
+        try:
+            # Read the stamped version before any write. Switching to WAL or
+            # creating a table would rewrite the file header, and a future-version
+            # refusal must leave the file byte-for-byte unchanged.
+            self.conn.execute("PRAGMA busy_timeout=5000;")
+            self._refuse_future_version(self._read_version())
+            # WAL lets readers and one writer work at once; the busy timeout makes
+            # a second writer wait for the lock (the CLI, the sidecar, and a test
+            # can all hold a connection to the same file) instead of raising
+            # "database is locked" the moment the lock is taken.
+            self.conn.execute("PRAGMA journal_mode=WAL;")
+            self._init_db()
+        except sqlite3.OperationalError as exc:
+            self._close_quietly()
+            raise StoreError(self._unwritable_message(exc)) from exc
+        except BaseException:
+            self._close_quietly()
+            raise
+
+    def _unwritable_message(self, exc: sqlite3.OperationalError) -> str:
+        return (
+            f"the store at {self._db_path} could not be opened for writing: {exc}. "
+            "Make the file and its directory writable, or point AGENTIC_ODI_DB at "
+            "another path."
+        )
+
+    def _refuse_future_version(self, version: int | None) -> None:
+        if version is not None and version > CURRENT_SCHEMA_VERSION:
+            raise StoreError(
+                f"the store at {self._db_path} was written by a newer build "
+                f"(schema v{version}); this build supports schema "
+                f"v{CURRENT_SCHEMA_VERSION}. Run `{_UPGRADE_COMMAND}` to upgrade, "
+                "or use the newer build."
+            )
+
+    def _close_quietly(self) -> None:
+        try:
+            self.conn.close()
+        except sqlite3.Error:
+            pass
 
     def _init_db(self) -> None:
         with self.conn:
@@ -73,6 +120,95 @@ class IntentStore:
                 )
                 """
             )
+        self.ensure_version()
+
+    def _read_version(self) -> int | None:
+        """Return the stamped version, or ``None`` when no version is stamped.
+
+        A table that holds anything other than exactly one integer version row
+        is malformed metadata, not a version, so it is refused by name.
+        """
+        exists = self.conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='schema_meta'"
+        ).fetchone()
+        if exists is None:
+            return None
+        rows = self.conn.execute("SELECT version FROM schema_meta").fetchall()
+        if len(rows) != 1:
+            raise StoreError(
+                f"the store at {self._db_path} has malformed schema_meta: "
+                f"expected exactly one version row, found {len(rows)}."
+            )
+        value = rows[0][0]
+        if isinstance(value, bool) or not isinstance(value, int):
+            raise StoreError(
+                f"the store at {self._db_path} has malformed schema_meta: "
+                f"version is {value!r}, not an integer."
+            )
+        return value
+
+    def _stamp_version(self, version: int) -> None:
+        now = datetime.now(timezone.utc).isoformat()
+        self.conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS schema_meta (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                version INTEGER NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+            """
+        )
+        self.conn.execute(
+            """
+            INSERT INTO schema_meta (id, version, updated_at) VALUES (1, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET version = excluded.version,
+                updated_at = excluded.updated_at
+            """,
+            (version, now),
+        )
+
+    def ensure_version(self) -> int:
+        """Stamp or migrate the store to :data:`CURRENT_SCHEMA_VERSION`.
+
+        A current-version store is left untouched. An older (or unstamped)
+        store is migrated forward inside one transaction, so a failure leaves
+        the version, the schema and the data exactly as they were. A newer
+        store is refused, naming both versions and the upgrade command.
+        """
+        version = self._read_version()
+        if version is None:
+            # No stamp: today's code baseline. Stamp v1, then migrate forward.
+            version = 1
+            with self.conn:
+                self._stamp_version(version)
+
+        self._refuse_future_version(version)
+        if version == CURRENT_SCHEMA_VERSION:
+            return version
+
+        self._migrate(version)
+        return CURRENT_SCHEMA_VERSION
+
+    def _migrate(self, from_version: int) -> None:
+        # `with self.conn:` autocommits DDL in CPython's sqlite3, so an explicit
+        # transaction is the only way to roll a failed migration back together
+        # with its schema changes. A half-migrated event log is unrecoverable.
+        self.conn.execute("BEGIN")
+        try:
+            for target in range(from_version + 1, CURRENT_SCHEMA_VERSION + 1):
+                step = MIGRATIONS.get(target)
+                if step is None:
+                    raise StoreError(
+                        f"no migration registered for schema v{target} "
+                        f"(store at {self._db_path} is at v{from_version}); "
+                        "this build is missing a migration step."
+                    )
+                step(self.conn)
+            self._stamp_version(CURRENT_SCHEMA_VERSION)
+        except BaseException:
+            self.conn.execute("ROLLBACK")
+            raise
+        self.conn.execute("COMMIT")
 
     def _migrate_events_table(self) -> None:
         existing = {row[1] for row in self.conn.execute("PRAGMA table_info(events)").fetchall()}
