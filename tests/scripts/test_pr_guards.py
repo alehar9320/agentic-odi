@@ -5,7 +5,7 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
-from pr_guards import (
+from scripts.pr_guards import (
     GuardConfig,
     build_diff_args,
     changed_files_from_status,
@@ -229,7 +229,7 @@ def test_cumulative_diff_catches_a_mid_branch_tree_replacement(tmp_path: Path) -
 # --- Body truth: natural-language rules (warnings) ---------------------------
 
 
-from pr_guards import check_body_truth, check_json_block, parse_json_block  # noqa: E402
+from scripts.pr_guards import check_body_truth, check_json_block, parse_json_block  # noqa: E402
 
 
 def _truth(body: str, title: str = "", **overrides: object):
@@ -357,7 +357,7 @@ def test_a_json_block_mismatch_is_an_error_in_the_full_gate() -> None:
 # --- Fabrication guard (warnings) -------------------------------------------
 
 
-from pr_guards import check_fabrication  # noqa: E402
+from scripts.pr_guards import check_fabrication  # noqa: E402
 
 
 def test_a_fabricated_mock_result_warns() -> None:
@@ -449,7 +449,7 @@ def test_fabrication_findings_are_warnings_not_errors() -> None:
 # --- Diff scanning helpers ---------------------------------------------------
 
 
-from pr_guards import count_tests_added, parse_added_lines  # noqa: E402
+from scripts.pr_guards import count_tests_added, parse_added_lines  # noqa: E402
 
 
 def test_parse_added_lines_tracks_paths_and_line_numbers() -> None:
