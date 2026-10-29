@@ -65,10 +65,9 @@ export function lens(page: Page) {
  * that offers "Capture an outcome", so scoping to it keeps the two apart.
  */
 export function offlineNotice(page: Page) {
-  return page
-    .getByRole("status")
-    .or(page.getByRole("alert"))
-    .filter({ hasText: "Working by hand" });
+  // Radix also mirrors toast text into a hidden live region, so match the
+  // rendered banner itself rather than any element that carries the words.
+  return page.locator(".banner").filter({ hasText: "Working by hand" });
 }
 
 /** Send a message through the composer and wait for the reply to land. */

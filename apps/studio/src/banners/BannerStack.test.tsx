@@ -79,6 +79,24 @@ describe("BannerStack", () => {
     expect(onDismiss).toHaveBeenCalledWith("sidecar-down");
   });
 
+  it("keeps each banner in the dock it names", () => {
+    render(
+      <BannerStack
+        banners={[
+          banner(),
+          banner({ id: "toast-1", kind: "success", title: "Saved.", body: "", dock: "corner" }),
+        ]}
+        overflow={0}
+        onDismiss={() => {}}
+        onIntent={() => {}}
+      />,
+    );
+    expect(screen.getByText("The studio sidecar isn't running.").closest("ol")).toHaveClass(
+      "banner-dock--top",
+    );
+    expect(screen.getByText("Saved.").closest("ol")).toHaveClass("banner-dock--corner");
+  });
+
   it("shows how many banners are hidden behind the cap", () => {
     render(
       <BannerStack
