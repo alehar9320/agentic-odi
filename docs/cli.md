@@ -134,11 +134,18 @@ agentic-odi desired-outcomes delete <outcome-id> --yes
 agentic-odi desired-outcomes export --job-id <job-id> --format csv > outcomes.csv
 agentic-odi desired-outcomes export --job-id <job-id> --format json | jq '.[].opportunity_score'
 agentic-odi desired-outcomes evaluate "Minimize the time to ship when onboarding"
+
+# One-screen report: job header, phase coverage, biggest opportunities
+agentic-odi summary <job-id>
+agentic-odi summary <job-id> --top 3 --json
 ```
 
 `--importance` and `--satisfaction` (1–10) are now required on `add`. `evaluate`
 checks a statement against the ODI format rules before saving.
-```
+
+`summary` shows how many of the eight job-map phases the Job covers, which are
+still missing, and the underserved outcomes (score above 10) in descending
+order. `--top` caps that list; `--json` returns the same data for a script.
 
 Add `--json` to any command for machine-readable output. `export` writes to
 stdout only — CSV has one row per outcome with the same fields the table shows
