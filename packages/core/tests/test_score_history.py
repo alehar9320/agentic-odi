@@ -131,6 +131,30 @@ def test_history_of_an_unknown_outcome_is_refused(repo: Repository) -> None:
         service.get_score_history("no-such-outcome")
 
 
+def test_equal_timestamps_keep_event_order_across_a_reload(repo: Repository) -> None:
+    """Ordering is by event order, not by timestamp, so a tie cannot shuffle it."""
+    service = _service(repo)
+    outcome = _add(service)
+    for value in (5.0, 4.0, 3.0):
+        repo.add_score_snapshot(
+            ScoreSnapshot(
+                outcome_id=outcome.id,
+                at="2026-01-01T00:00:00+00:00",
+                importance=8.0,
+                satisfaction=value,
+                opportunity_score=8.0 + value,
+            )
+        )
+
+    history = _reopen(repo).get_score_history(outcome.id)
+
+    # The creation snapshot keeps its own timestamp; the three added snapshots
+    # share one, and still replay in the order they were appended.
+    assert history[0].satisfaction == 6.0
+    assert [s.at for s in history[1:]] == ["2026-01-01T00:00:00+00:00"] * 3
+    assert [s.satisfaction for s in history] == [6.0, 5.0, 4.0, 3.0]
+
+
 def test_deleting_an_outcome_drops_its_history(repo: Repository) -> None:
     service = _service(repo)
     outcome = _add(service)
