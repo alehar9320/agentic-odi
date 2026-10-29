@@ -273,6 +273,7 @@ python -m agentic_odi_cli connectors list
 python -m agentic_odi_cli connectors list --json   # name, kind, url, enabled per connector
 python -m agentic_odi_cli connectors health --name github
 python -m agentic_odi_cli connectors ingest --name github
+python -m agentic_odi_cli connectors ingest --name github --dry-run   # preview only
 ```
 
 ## Updates
