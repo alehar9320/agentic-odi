@@ -150,6 +150,8 @@ otherwise.
   notice pointing to Settings, and the composer never spins.
 - The canvas keeps showing the last thing it drew instead of going blank; a failed
   canvas is a failure panel with Retry, not an empty board.
+- **What's New** still opens in front-end-only mode; without the sidecar, it
+  explains that release notes are unavailable rather than showing invented notes.
 
 On the CLI, the same condition is `BackendError("could not reach MCP server …")`,
 rendered as `Error: …` followed by `Hint: Start the MCP server (python -m
