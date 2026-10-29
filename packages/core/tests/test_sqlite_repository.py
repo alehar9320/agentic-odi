@@ -43,7 +43,14 @@ def test_add_and_read_back_every_entity(tmp_path) -> None:
     job = repo.add_job(Job(id="job-1", name="Onboard customers"))
     step = repo.add_step(Step(id="step-1", job_id="job-1", name="Prepare", order=1))
     outcome = repo.add_outcome(
-        Outcome(id="outcome-1", job_id="job-1", step_id="step-1", statement="Minimize time")
+        Outcome(
+            id="outcome-1",
+            job_id="job-1",
+            step_id="step-1",
+            statement="Minimize time",
+            importance=5.0,
+            satisfaction=5.0,
+        )
     )
     customer_outcome = repo.add_customer_outcome(_customer_outcome("job-1"))
 
@@ -66,7 +73,15 @@ def test_snapshot_reloads_every_event_type_from_disk(tmp_path) -> None:
     repo = SQLiteRepository(db_path)
     repo.add_job(Job(id="job-1", name="Onboard customers"))
     repo.add_step(Step(id="step-1", job_id="job-1", name="Prepare", order=1))
-    repo.add_outcome(Outcome(id="outcome-1", job_id="job-1", statement="Minimize time"))
+    repo.add_outcome(
+        Outcome(
+            id="outcome-1",
+            job_id="job-1",
+            statement="Minimize time",
+            importance=5.0,
+            satisfaction=5.0,
+        )
+    )
     created = repo.add_customer_outcome(_customer_outcome("job-1"))
     customer_value = created.customer_value.model_dump()
     customer_value["importance"] = 9.0
@@ -220,7 +235,11 @@ def test_delete_job_cascades_after_reopen(tmp_path):
     repo = SQLiteRepository(db_path=db)
     repo.add_job(Job(id="j1", name="Job"))
     repo.add_step(Step(id="s1", job_id="j1", name="Step", order=1))
-    repo.add_outcome(Outcome(id="o1", job_id="j1", step_id="s1", statement="Min x"))
+    repo.add_outcome(
+        Outcome(
+            id="o1", job_id="j1", step_id="s1", statement="Min x", importance=5.0, satisfaction=5.0
+        )
+    )
     repo.delete_job("j1")
 
     reopened = SQLiteRepository(db_path=db)
@@ -232,7 +251,9 @@ def test_delete_job_cascades_after_reopen(tmp_path):
 def test_update_outcome_persists(tmp_path):
     db = str(tmp_path / "odi.db")
     repo = SQLiteRepository(db_path=db)
-    repo.add_outcome(Outcome(id="o1", job_id="j1", statement="Min x"))
+    repo.add_outcome(
+        Outcome(id="o1", job_id="j1", statement="Min x", importance=5.0, satisfaction=5.0)
+    )
     repo.update_outcome("o1", {"statement": "Max y", "opportunity_score": 5.0})
     assert SQLiteRepository(db_path=db).get_outcome("o1").statement == "Max y"  # type: ignore[union-attr]
 
@@ -264,8 +285,14 @@ def test_delete_missing_returns_false_and_cascade_events_replay(tmp_path):
 
     repo.add_job(Job(id="j1", name="Job"))
     repo.add_step(Step(id="s1", job_id="j1", name="Step", order=1))
-    repo.add_outcome(Outcome(id="o1", job_id="j1", step_id="s1", statement="Min x"))
-    repo.add_outcome(Outcome(id="o2", job_id="j1", statement="Unbound"))
+    repo.add_outcome(
+        Outcome(
+            id="o1", job_id="j1", step_id="s1", statement="Min x", importance=5.0, satisfaction=5.0
+        )
+    )
+    repo.add_outcome(
+        Outcome(id="o2", job_id="j1", statement="Unbound", importance=5.0, satisfaction=5.0)
+    )
     assert repo.delete_step("s1") is True
     assert repo.delete_outcome("o2") is True
     assert repo.delete_job("j1") is True
