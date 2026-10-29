@@ -78,8 +78,43 @@ jobs:
           python3 scripts/release_assets.py "${args[@]}" >> "$GITHUB_OUTPUT"
           cat "$GITHUB_OUTPUT"
 
-  build:
+  # A release that ships a binary reporting a different version than its tag is
+  # a trust failure, so the tag is checked against the source before any build.
+  # The tag comes from `resolve` so this also holds on workflow_run and
+  # workflow_dispatch, where GITHUB_REF_NAME is a branch.
+  version:
     needs: resolve
+    if: needs.resolve.outputs.should_build == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.resolve.outputs.tag }}
+      - name: Setup uv
+        uses: ./.github/actions/setup
+        with:
+          python-version: "3.11"
+      - name: The tag matches the version the CLI reports
+        run: |
+          set -euo pipefail
+          tag="${{ needs.resolve.outputs.tag }}"
+          tag_version="${GITHUB_REF_NAME#v}"
+          case "$GITHUB_REF_NAME" in
+            v[0-9]*) ;;
+            *) tag_version="${tag#v}" ;;
+          esac
+          reported="$(uv run python -m agentic_odi_cli --version)"
+          # `--version` prints "<version> (<date>)" when a build date is set.
+          cli_version="${reported%% *}"
+          if [ "$cli_version" != "$tag_version" ]; then
+            echo "::error::Tag v${tag_version} does not match the CLI version ${cli_version}. Bump the declared version before tagging."
+            exit 1
+          fi
+          echo "OK: version ${cli_version} matches tag v${tag_version}"
+
+  build:
+    needs: [resolve, version]
     if: needs.resolve.outputs.should_build == 'true'
     strategy:
       fail-fast: false
