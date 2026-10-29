@@ -354,3 +354,36 @@ factual case → comparison → recorded decision → derived/rendered roadmap, 
 default regression, human-explicit acceptance, and the collaboration/role rollout appropriate to each
 later increment. Missing measurements, sources, value, or approval remain visible as
 unknown/unavailable — not zero, success, or permission.
+
+---
+
+## Blocker record — C8 and E1 wait on B6
+
+`C8 · ALH-39` (decision review) and `E1 · ALH-46` (a bet is a trackable thing)
+both declare `Depends on: C6, B6`. `B6 · ALH-29` (`ScoreSnapshot`) is **not on
+`main`**: no `ScoreSnapshot` model, no snapshot writer, no `outcome_history` /
+`outcome_delta` read exists in `packages/core`. The plan's rule is to stop and
+record the missing choice rather than stub it, so both increments are held here
+instead of guessed at.
+
+What is pinned now, so the blocked work does not invent a contract later:
+
+- **A baseline is supplied, never derived.** `roadmap.build_roadmap` takes
+  explicit `baselines`/`targets` maps and renders `not measured` when a key is
+  absent. The live outcome score is never read as a baseline — `ALH-46` requires
+  the baseline to be captured at creation precisely so it cannot drift.
+- **A missing measurement is not zero progress.** The roadmap counts what it
+  excluded and why; the review must keep a missing snapshot distinct from `no
+  change` and from `degraded`.
+- **Direction is per metric.** `ALH-39` records that opportunity-score direction
+  is not satisfaction direction, and that the result schema needs all five
+  required states (`improved | degraded | no_evidence` plus the literal `no
+  change` and `orphaned`), not the three the description first declared.
+
+Unblocking order: land `B6`/`ALH-29` (snapshot capture on every score-mutating
+path) and its read slice `ALH-203` (`outcome_history` / `outcome_delta` with the
+approved baseline and sign policy), then C8 and E1 read that one contract rather
+than re-deriving a baseline.
+
+Completed in this pillar without B6: `C1`, `C1.2`, `C2`, `C3`, `C4`, `C6`,
+`C6.2`, `C7`, `C7.2`.
