@@ -292,6 +292,55 @@ jobs:
   # Chromatic recommends push over pull_request because a PR run checks out an
   # ephemeral merge commit that diffs against the wrong baseline.
 
+  # The browser-level suite. It drives the real Studio against the real
+  # sidecar and MCP server, so it is slower than the other jobs and can be
+  # flakier than a unit test.
+  #
+  # Two ways to turn it off, neither of which needs a code change:
+  #   - set the repository variable AGENTIC_ODI_E2E to "false"
+  #   - remove the continue-on-error below
+  # A skipped e2e job does not fail CI green; see the ci-green job.
+  e2e:
+    name: End-to-end
+    if: ${{ vars.AGENTIC_ODI_E2E != 'false' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "lts/*"
+          cache: npm
+          cache-dependency-path: apps/studio/package-lock.json
+
+      - name: Install dependencies
+        working-directory: apps/studio
+        run: npm ci
+
+      - name: Build the Studio
+        working-directory: apps/studio
+        run: npm run build
+
+      - name: Install the browser
+        working-directory: apps/studio
+        run: npx playwright install --with-deps chromium
+
+      - name: Run the end-to-end suite
+        working-directory: apps/studio
+        run: npm run test:e2e
+
+      - name: Upload the Playwright report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report
+          path: apps/studio/playwright-report
+          if-no-files-found: ignore
+          retention-days: 7
+
   tauri-check:
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -437,17 +486,40 @@ jobs:
   ci-green:
     name: CI green
     runs-on: ubuntu-latest
-    needs: [lint, typecheck, security, test, smoke, website, studio, tauri-check, tauri-build]
+    needs: [lint, typecheck, security, test, smoke, website, studio, tauri-check, tauri-build, e2e]
     if: always()
     steps:
       - name: Verify all required jobs succeeded
+        env:
+          # The e2e job is optional: it is skipped when the AGENTIC_ODI_E2E
+          # repository variable is set to "false", and that must not turn CI
+          # red. Every other job has to succeed.
+          E2E_RESULT: ${{ needs.e2e.result }}
+          LINT: ${{ needs.lint.result }}
+          TYPECHECK: ${{ needs.typecheck.result }}
+          SECURITY: ${{ needs.security.result }}
+          TEST: ${{ needs.test.result }}
+          SMOKE: ${{ needs.smoke.result }}
+          WEBSITE: ${{ needs.website.result }}
+          STUDIO: ${{ needs.studio.result }}
+          TAURI_CHECK: ${{ needs.tauri-check.result }}
+          TAURI_BUILD: ${{ needs.tauri-build.result }}
         run: |
-          results='${{ join(needs.*.result, ' ') }}'
-          echo "Job results: $results"
-          for result in $results; do
+          failed=0
+          for job in LINT TYPECHECK SECURITY TEST SMOKE WEBSITE STUDIO TAURI_CHECK TAURI_BUILD; do
+            result="${!job}"
+            echo "$job: $result"
             if [ "$result" != "success" ]; then
-              echo "::error::A required job did not succeed ($results)"
-              exit 1
+              echo "::error::$job did not succeed ($result)"
+              failed=1
             fi
           done
+          echo "e2e: $E2E_RESULT"
+          if [ "$E2E_RESULT" != "success" ] && [ "$E2E_RESULT" != "skipped" ]; then
+            echo "::error::e2e did not succeed ($E2E_RESULT)"
+            failed=1
+          fi
+          if [ "$failed" -ne 0 ]; then
+            exit 1
+          fi
           echo "OK: all required jobs succeeded"
