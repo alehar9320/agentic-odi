@@ -11,6 +11,7 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  issues: write # gh label create lives under the issues API
 
 concurrency:
   group: label-merge-conflicts-${{ github.ref }}
@@ -26,9 +27,11 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh label create merge-conflict --color b60205 \
-            --description "Pull request has merge conflicts" --force || true
-          gh label create merge-ready --color 28a745 \
-            --description "Pull request merges cleanly into main" --force || true
+            --description "Pull request has merge conflicts" \
+            --repo "$GITHUB_REPOSITORY" --force
+          gh label create ready-for-merge --color 00aa00 \
+            --description "CI is green and no merge conflicts; ready to merge" \
+            --repo "$GITHUB_REPOSITORY" --force
 
       - name: Collect target PR numbers
         env:
@@ -55,11 +58,11 @@ jobs:
                 gh pr edit "$number" --repo "$GITHUB_REPOSITORY" \
                   --add-label merge-conflict >/dev/null
                 gh pr edit "$number" --repo "$GITHUB_REPOSITORY" \
-                  --remove-label merge-ready >/dev/null || true
+                  --remove-label ready-for-merge >/dev/null || true
                 ;;
               clean)
                 gh pr edit "$number" --repo "$GITHUB_REPOSITORY" \
-                  --add-label merge-ready >/dev/null
+                  --add-label ready-for-merge >/dev/null
                 gh pr edit "$number" --repo "$GITHUB_REPOSITORY" \
                   --remove-label merge-conflict >/dev/null || true
                 ;;
@@ -67,7 +70,7 @@ jobs:
                 gh pr edit "$number" --repo "$GITHUB_REPOSITORY" \
                   --remove-label merge-conflict >/dev/null || true
                 gh pr edit "$number" --repo "$GITHUB_REPOSITORY" \
-                  --remove-label merge-ready >/dev/null || true
+                  --remove-label ready-for-merge >/dev/null || true
                 ;;
             esac
             echo "PR #$number: $state"

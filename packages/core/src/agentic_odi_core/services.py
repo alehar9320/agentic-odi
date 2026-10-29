@@ -234,8 +234,9 @@ class ODIService:
         step_id: str | None = None,
         limit: int | None = None,
         offset: int = 0,
+        sort: str = "opportunity_score",
     ) -> list[Outcome]:
-        return self.repo.get_outcomes(job_id, step_id, limit=limit, offset=offset)
+        return self.repo.get_outcomes(job_id, step_id, limit=limit, offset=offset, sort=sort)
 
     def add_customer_outcome(
         self,
@@ -297,6 +298,7 @@ class ODIService:
         name: str,
         content: str,
         item_type: EvidenceItemType = "manual",
+        url: str | None = None,
         raw: dict[str, Any] | None = None,
         job_id: str | None = None,
         step_id: str | None = None,
@@ -330,6 +332,7 @@ class ODIService:
             item_type=item_type,
             name=name,
             content=content,
+            url=url,
             raw=raw or {},
             job_id=resolved_job_id,
             step_id=step_id,

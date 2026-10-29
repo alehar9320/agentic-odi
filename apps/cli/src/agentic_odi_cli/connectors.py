@@ -336,6 +336,9 @@ def ingest_connector(
     outcome_id: str | None = typer.Option(
         None, "--outcome-id", help="Link evidence to a desired Outcome."
     ),
+    dry_run: bool = typer.Option(
+        False, "--dry-run", help="Fetch and validate records without writing anything."
+    ),
     config: Path | None = ConfigOption,
 ) -> None:
     """Ingest connector records and optionally map them into ODI evidence."""
@@ -355,11 +358,24 @@ def ingest_connector(
         typer.echo(f"Error: {exc}", err=True)
         raise typer.Exit(code=1) from exc
     batch = _run(connector.ingest(), name)
+    drafts = None
+    if job_id is not None or step_id is not None or outcome_id is not None:
+        drafts = drafts_from_batch(batch, job_id=job_id, step_id=step_id, outcome_id=outcome_id)
+    if dry_run:
+        preview: dict[str, object] = {
+            "dry_run": True,
+            "connector": name,
+            "records": len(batch.records),
+            "sample": batch.records[0].model_dump(mode="json") if batch.records else None,
+        }
+        if drafts is not None:
+            preview["evidence_drafts"] = len(drafts)
+        typer.echo(json.dumps(preview, indent=2))
+        return
     get_default_sink().append(batch)
     typer.echo(batch.model_dump_json())
-    if job_id is None and step_id is None and outcome_id is None:
+    if drafts is None:
         return
-    drafts = drafts_from_batch(batch, job_id=job_id, step_id=step_id, outcome_id=outcome_id)
     for draft in drafts:
         typer.echo(
             render_saved(
@@ -372,6 +388,7 @@ def ingest_connector(
                         "item_type": draft.item_type,
                         "name": draft.name,
                         "content": draft.content,
+                        "url": draft.url,
                         "raw": draft.raw,
                         "job_id": draft.job_id,
                         "step_id": draft.step_id,

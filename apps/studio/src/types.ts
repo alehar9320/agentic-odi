@@ -31,6 +31,8 @@ export interface Evidence {
   item_type?: string;
   name?: string;
   content?: string;
+  /** Deep link back to the record in the tool that holds it, when it has one. */
+  url?: string | null;
   job_id?: string | null;
   step_id?: string | null;
   outcome_id?: string | null;
@@ -349,14 +351,6 @@ export interface AddOutcomePayload {
   satisfaction: number;
 }
 
-export interface PromoteEvidencePayload {
-  mcp_url: string;
-  job_id: string;
-  statement: string;
-  importance: number;
-  satisfaction: number;
-}
-
 export interface ConnectorPreset {
   id: string;
   label: string;
@@ -392,6 +386,66 @@ export interface AddConnectorPayload {
   name?: string;
   preset?: string;
   url?: string;
+  marketplace_id?: string;
+}
+
+/**
+ * One discoverable connector on the Customize page. Mirrors the sidecar's
+ * `MarketplaceListingOut`; `installable` is false for entries we can see but
+ * cannot reach, and `unavailable_reason` explains why.
+ */
+export interface MarketplaceListing {
+  id: string;
+  name: string;
+  title: string | null;
+  summary: string;
+  version: string;
+  url: string | null;
+  source: "official" | "preset";
+  area: string | null;
+  repository: string | null;
+  docs: string | null;
+  env_vars: string[];
+  headers: Record<string, string>;
+  auth: "none" | "oauth";
+  installable: boolean;
+  verified: boolean;
+  pull_count: number;
+  is_recommended: boolean;
+  unavailable_reason: string | null;
+  /** The registry name an install produces; matches the installed connector list. */
+  connector_name: string;
+}
+
+/** A connection type the page can offer. A2A ships as an unavailable placeholder. */
+export interface ConnectionType {
+  id: string;
+  label: string;
+  available: boolean;
+  note?: string;
+}
+
+export interface MarketplaceSearch {
+  listings: MarketplaceListing[];
+  areas: Record<string, string>;
+  cached: boolean;
+  types: ConnectionType[];
+}
+
+/** What the user asked Customize to open on, when a chat suggestion sent them. */
+export interface CustomizeTarget {
+  query?: string;
+  listingId?: string;
+}
+
+/**
+ * The connector the studio offers to install next, with why it is offering it.
+ * `empty` is the discovery nudge: the studio noticed it has nothing to read.
+ */
+export interface ConnectorSuggestion {
+  id: string;
+  listing: MarketplaceListing | null;
+  reason: "agent" | "empty";
 }
 
 export interface ChangelogCategory {

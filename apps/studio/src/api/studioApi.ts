@@ -17,13 +17,13 @@ import type {
   Job,
   LatestConversation,
   LlmHealth,
+  MarketplaceSearch,
   McpHealth,
   ModelList,
   Observation,
   ObservationKind,
   ObservationStatus,
   Outcome,
-  PromoteEvidencePayload,
   Step,
   StudioConfig,
   StudioError,
@@ -238,7 +238,10 @@ export async function fetchConfig(): Promise<StudioConfig> {
 }
 
 export function fetchChangelog(): Promise<ChangelogData> {
-  return getJson<ChangelogData>("/api/changelog");
+  return withLocal(
+    () => getJson<ChangelogData>("/api/changelog"),
+    (bff) => bff.fetchChangelog(),
+  );
 }
 
 export async function fetchCanvas(mcpUrl: string): Promise<CanvasData> {
@@ -279,16 +282,6 @@ export function addStep(payload: AddStepPayload): Promise<Step> {
 
 export function addOutcome(payload: AddOutcomePayload): Promise<Outcome> {
   return postJson<Outcome>("/api/outcomes", payload);
-}
-
-export function promoteEvidence(
-  evidenceId: string,
-  payload: PromoteEvidencePayload,
-): Promise<Outcome> {
-  return postJson<Outcome>(
-    `/api/evidence/${encodeURIComponent(evidenceId)}/promote`,
-    payload,
-  );
 }
 
 export function createJob(payload: CreateJobPayload): Promise<Job> {
@@ -344,6 +337,48 @@ export function fetchConnectorCatalog(): Promise<ConnectorPreset[]> {
 
 export function fetchConnectors(): Promise<ConnectorListItem[]> {
   return getJson<ConnectorListItem[]>("/api/connectors");
+}
+
+/**
+ * Search the marketplace. `area` and `q` are server-side filters so a narrow
+ * query does not depend on the page having fetched everything first.
+ */
+export async function fetchMarketplace(params: {
+  q?: string;
+  area?: string;
+  limit?: number;
+} = {}): Promise<MarketplaceSearch> {
+  const search = new URLSearchParams();
+  if (params.q) search.set("q", params.q);
+  if (params.area) search.set("area", params.area);
+  if (params.limit) search.set("limit", String(params.limit));
+  const suffix = search.toString();
+  return normalizeMarketplace(
+    await getJson<Partial<MarketplaceSearch>>(
+      `/api/marketplace/servers${suffix ? `?${suffix}` : ""}`,
+    ),
+  );
+}
+
+/** Editor's picks: the curated presets, recommended first. */
+export async function fetchFeatured(limit = 6): Promise<MarketplaceSearch> {
+  return normalizeMarketplace(
+    await getJson<Partial<MarketplaceSearch>>(`/api/marketplace/featured?limit=${limit}`),
+  );
+}
+
+/**
+ * The local BFF fallback may answer with a subset of the search shape, so a
+ * missing list becomes an empty one here rather than an undefined that callers
+ * would have to guard at every read.
+ */
+function normalizeMarketplace(body: Partial<MarketplaceSearch>): MarketplaceSearch {
+  return {
+    listings: body.listings ?? [],
+    areas: body.areas ?? {},
+    cached: body.cached ?? false,
+    types: body.types ?? [],
+  };
 }
 
 export function addConnector(payload: AddConnectorPayload): Promise<ConnectorOperationResponse> {
@@ -432,8 +467,6 @@ export async function streamChat(
     await bff.chat.stream(request, onEvent, signal);
   }
 }
-
-
 export async function fetchMemory(): Promise<Observation[]> {
   return withLocal(
     () =>
@@ -571,5 +604,44 @@ export async function createConversation(): Promise<Conversation> {
         (body) => body.conversation,
       ),
     async (bff) => bff.memory.createConversation(),
+  );
+}
+
+export function addEvidence(payload: {
+  source_name: string;
+  source_kind?: string;
+  name: string;
+  content: string;
+  url?: string;
+  item_type?: string;
+  job_id?: string;
+  step_id?: string;
+  outcome_id?: string;
+  mcp_url: string;
+}): Promise<{ ok: boolean }> {
+  return postJson<{ ok: boolean }>("/api/evidence", payload);
+}
+
+export function deleteEvidence(evidenceId: string, mcpUrl: string): Promise<{ ok: boolean }> {
+  return deleteJson<{ ok: boolean }>(
+    `/api/evidence/${encodeURIComponent(evidenceId)}?mcp_url=${encodeURIComponent(mcpUrl)}`,
+  );
+}
+
+export function promoteEvidence(
+  evidenceId: string,
+  payload: {
+    target: "job" | "outcome";
+    job_id?: string;
+    statement?: string;
+    name?: string;
+    importance?: number;
+    satisfaction?: number;
+    mcp_url: string;
+  },
+): Promise<{ ok: boolean }> {
+  return postJson<{ ok: boolean }>(
+    `/api/evidence/${encodeURIComponent(evidenceId)}/promote`,
+    payload,
   );
 }

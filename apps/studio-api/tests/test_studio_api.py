@@ -407,22 +407,20 @@ def test_promote_evidence_creates_a_scored_outcome() -> None:
     response = TestClient(create_app(repo)).post(
         f"/api/evidence/{item.id}/promote",
         json={
+            "target": "outcome",
             "job_id": job.id,
-            "statement": "Minimize the time it takes to rotate deployment secrets when a commit lands.",
+            "statement": "Minimize the time it takes to sync a secret across environments when rotating keys",
             "importance": 9,
             "satisfaction": 2,
         },
     )
 
     assert response.status_code == 200
-    body = response.json()
-    assert (
-        body["statement"]
-        == "Minimize the time it takes to rotate deployment secrets when a commit lands."
-    )
-    assert body["importance"] == 9
-    assert body["satisfaction"] == 2
-    assert body["opportunity_score"] == 16
+    outcome = response.json()["result"]
+    assert outcome["statement"] == "Minimize the time it takes to sync a secret across environments when rotating keys"
+    assert outcome["importance"] == 9
+    assert outcome["satisfaction"] == 2
+    assert outcome["opportunity_score"] == 16
 
 
 def test_promote_unknown_evidence_is_a_404() -> None:
@@ -432,8 +430,9 @@ def test_promote_unknown_evidence_is_a_404() -> None:
     response = TestClient(create_app(repo)).post(
         "/api/evidence/missing/promote",
         json={
+            "target": "outcome",
             "job_id": job.id,
-            "statement": "Minimize the time it takes to rotate deployment secrets when a commit lands.",
+            "statement": "Minimize the time it takes to sync a secret across environments when rotating keys",
             "importance": 9,
             "satisfaction": 2,
         },
