@@ -34,5 +34,12 @@ export default defineConfig({
     // would also collect the Playwright specs in `e2e/`. Scope it to the unit
     // tests so the two runners never overlap.
     include: ["src/**/*.test.{ts,tsx}"],
+    coverage: {
+      provider: "v8",
+      reporter: ["text", "lcov"],
+      // Measured on the suite as it stands (issue #88). Raise these as the
+      // untested surfaces gain tests; never lower them to unblock a change.
+      thresholds: { statements: 74, branches: 65, functions: 75, lines: 74 },
+    },
   },
 });

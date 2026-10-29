@@ -127,7 +127,62 @@ Cross-package checks only:
 
 ## Coverage
 
-CI runs the root suite on Python 3.10, 3.11, and 3.12, collects coverage for every `agentic_odi_*` distribution, and uploads `coverage.xml` from the 3.12 job. Codecov requires 90% project coverage; patch coverage is advisory. Python tests and `apps/studio/**` are excluded from the report by `codecov.yml`.
+The authoritative Python gate is the `test` job, not Codecov. Pytest runs with
+`--cov-fail-under=89` on every run, which is token-free and therefore gates a
+fork PR the same way it gates `main`. The current measurement is **89.75%**
+(7,720 statements, 791 missed). On pull requests, `scripts/coverage_floor.py`
+refuses a `pyproject.toml` whose `fail_under` is lower than the base branch's,
+so the floor can only ratchet upward. The 3.12 job writes per-distribution
+percentages to the job summary and uploads `coverage.xml` to Codecov, which
+reports a 90% project target with a 1% dip (the same 89% minimum) and never
+fails the build. Patch coverage is advisory.
+
+The Studio is gated by Vitest thresholds instead. `npm run test:coverage`
+enforces statements 74, branches 65, functions 75, and lines 74 in
+`apps/studio/vite.config.ts`; measured values are 74.18%, 65.38%, 75.49%, and
+74.33%. It writes `apps/studio/coverage/lcov.info`, uploaded to Codecov under
+the `studio` flag on a non-blocking basis. `scripts/coverage_map.py --check`
+keeps the generated map in `docs/development.md` in sync with the test tree.
+
+### Known coverage gaps
+
+Recorded from issue #88 so the holes the coverage map exposes are not hidden.
+None of these are fixed by the coverage work itself; they are the next tests to
+write.
+
+Python:
+
+- `apps/studio-api/.../studio/changelog.py` measures **27.9%**. The markdown
+  parser is only reached through `/api/changelog` with the real `CHANGELOG.md`;
+  category headers, commit-link stripping, scoped items, and the
+  unparseable-file fallback have no tests of their own.
+- `apps/studio-api/.../studio/chat.py` measures **93.0%**. Uncovered: the
+  on-device-model fallback branch, a forced remote tier degrading when the
+  backend is down, the model stopping mid-stream, and the catch-all turn
+  failure handler.
+- `packages/core/src/agentic_odi_core/events.py` (**58%**) leaves
+  `resolve_device_id` uncovered, including creating the device-id file.
+  `intent_store.py` (**68%**) leaves the remote-sync half of the store
+  (`insert_remote`, `mark_synced`) uncovered. The MCP server distribution is
+  the lowest overall at **81.92%**.
+
+Studio:
+
+- `src/state/StudioContext.tsx` now has a test file, but measures **69% lines
+  / 51% branches**. Uncovered SSE dispatcher branches: the `ui` event being
+  re-validated, `canvas_dirty` triggering `refreshCanvas()`, and the
+  mobile-sheet versus desktop-dock lens split — `useMediaQuery` always returns
+  `false` under jsdom, so only one branch runs.
+- The least exercised UI modules are `src/ui/catalog.ts` (38% lines / 10%
+  branches), `src/ui/primitives.tsx` (23%), `src/components/chat/Markdown.tsx`
+  (59%), `src/components/setup/SetupConversation.tsx` (66%), and
+  `src/ui/cards.tsx` (70%).
+- `src/components/chat/OfflineNotice.tsx` and `src/components/Toasts.tsx` have
+  no test of their own. `src/api/schema.d.ts` is generated and imported by
+  nothing.
+- Issue #88 also listed `StudioContext.tsx`, `StudioBar.tsx`,
+  `DirectCapture.tsx`, `EvidenceStream.tsx`, and `OutcomeCard.tsx` as
+  untested; each has gained a dedicated test upstream since.
 
 ## Frontend
 
@@ -135,6 +190,7 @@ CI runs the root suite on Python 3.10, 3.11, and 3.12, collects coverage for eve
 npm --prefix apps/studio run lint
 npm --prefix apps/studio run typecheck
 npm --prefix apps/studio test -- --run
+npm --prefix apps/studio run test:coverage
 npm --prefix apps/studio run build
 cd apps/studio/src-tauri && cargo fmt --check && cargo clippy -- -D warnings && cargo check
 ```
