@@ -51,6 +51,8 @@ class ToolName(str, Enum):
     DELETE_CANDIDATE = "delete_candidate"
     ACCEPT_CANDIDATE = "accept_candidate"
     REJECT_CANDIDATE = "reject_candidate"
+    SUGGEST_DUPLICATE_CANDIDATES = "suggest_duplicate_candidates"
+    MERGE_CANDIDATES = "merge_candidates"
     PROMOTE_EVIDENCE = "promote_evidence"
     EVALUATE_OUTCOME = "evaluate_outcome"
     GET_ODI_SCHEMA = "get_odi_schema"
@@ -93,9 +95,12 @@ class ToolSpec:
 def _derive_effect(name: str) -> ToolEffect:
     """Derive a tool's effect from its name.
 
-    get_*/list_* → READ, delete_* → DESTRUCTIVE, everything else → WRITE.
+    get_*/list_*/suggest_* → READ, delete_* → DESTRUCTIVE, everything else → WRITE.
+
+    ``suggest_*`` is READ because duplicate suggestions never write: a person
+    still chooses the merge target.
     """
-    if name.startswith(("get_", "list_")):
+    if name.startswith(("get_", "list_", "suggest_")):
         return ToolEffect.READ
     if name.startswith("delete_"):
         return ToolEffect.DESTRUCTIVE
@@ -465,6 +470,21 @@ TOOL_SPECS: dict[str, ToolSpec] = {
         arguments=("candidate_id", "reason"),
         required=("candidate_id", "reason"),
         returns="The rejected OutcomeCandidate.",
+    ),
+    ToolName.SUGGEST_DUPLICATE_CANDIDATES.value: ToolSpec(
+        name="suggest_duplicate_candidates",
+        summary="Suggest groups of proposed candidates that look like the same need. Read-only.",
+        effect=_derive_effect("suggest_duplicate_candidates"),
+        arguments=("interview_id", "threshold"),
+        returns="A JSON object with duplicate candidate id groups.",
+    ),
+    ToolName.MERGE_CANDIDATES.value: ToolSpec(
+        name="merge_candidates",
+        summary="Absorb proposed candidates' quotes as evidence on one accepted outcome.",
+        effect=_derive_effect("merge_candidates"),
+        arguments=("target_id", "merged_ids"),
+        required=("target_id", "merged_ids"),
+        returns="The outcome, the new Evidence rows, and the merged candidates.",
     ),
     ToolName.PROMOTE_EVIDENCE.value: ToolSpec(
         name="promote_evidence",

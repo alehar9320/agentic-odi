@@ -11,6 +11,7 @@ from contextlib import asynccontextmanager
 from typing import Any
 
 from agentic_odi_core import (
+    DUPLICATE_THRESHOLD,
     ODI_ASSISTANT_PROMPT,
     ODI_FRAMEWORK_GUIDELINES,
     TOOL_SPECS,
@@ -800,6 +801,49 @@ def reject_candidate(candidate_id: str, reason: str) -> str:
     except (OdiError, ValueError) as exc:
         return f"Error: {exc}"
     return candidate.model_dump_json()
+
+
+@mcp.tool
+def suggest_duplicate_candidates(
+    interview_id: str | None = None,
+    threshold: float | None = None,
+) -> str:
+    """Suggest groups of proposed candidates that look like the same need.
+
+    Read-only: nothing is written. Each group is a list of candidate ids whose
+    statements score at or above ``threshold`` (default 0.82). A match is only a
+    suggestion — a person chooses which candidate becomes the outcome target.
+    """
+    groups = service.suggest_duplicate_groups(
+        interview_id,
+        DUPLICATE_THRESHOLD if threshold is None else threshold,
+    )
+    return json.dumps({"groups": groups})
+
+
+@mcp.tool
+def merge_candidates(target_id: str, merged_ids: list[str]) -> str:
+    """Merge proposed candidates' evidence into one accepted outcome.
+
+    ``target_id`` is an **outcome** id. Each id in ``merged_ids`` is a proposed
+    candidate whose verbatim quote is added as evidence on that outcome and then
+    marked ``merged`` with ``merged_into=target_id``. No second outcome is
+    created and the source candidates and quotes are retained. Repeating the
+    same merge changes nothing.
+    """
+    try:
+        outcome, evidence, merged = service.merge_candidates(target_id, merged_ids)
+    except CandidateNotFoundError as exc:
+        return _candidate_not_found(exc.resource_id)
+    except (OdiError, ValueError) as exc:
+        return f"Error: {exc}"
+    return json.dumps(
+        {
+            "outcome": outcome.model_dump(mode="json"),
+            "evidence": [item.model_dump(mode="json") for item in evidence],
+            "merged": [item.model_dump(mode="json") for item in merged],
+        }
+    )
 
 
 @mcp.tool
