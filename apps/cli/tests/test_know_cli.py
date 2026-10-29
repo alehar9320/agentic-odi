@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from datetime import date
 
 from agentic_odi_cli.cli import app
@@ -15,6 +16,18 @@ def _invoke(runner: CliRunner, db: str, *args: str):
     result = runner.invoke(app, ["--db", db, *args])
     assert result.exit_code == 0, result.output
     return result
+
+
+def _flat(text: str) -> str:
+    """Collapse wrapped output so assertions do not depend on terminal width.
+
+    Rich wraps long error text across panel borders, which would otherwise split
+    a phrase like ``at least one --outcome`` mid-sentence. Strip the box drawing
+    and ANSI, then collapse whitespace.
+    """
+    plain = re.sub(r"\x1b\[[0-9;]*m", "", text)
+    plain = re.sub(r"[\u2500-\u257f]", " ", plain)
+    return " ".join(plain.split())
 
 
 def _job(runner: CliRunner, db: str) -> str:
@@ -154,7 +167,7 @@ def test_illegal_transition_is_refused(tmp_path):
 
     result = runner.invoke(app, ["--db", db, "bets", "status", bet["id"], "measured"])
     assert result.exit_code != 0
-    assert "legal next states" in result.output
+    assert "legal next states" in _flat(result.output)
 
 
 def test_know_list_and_digest(tmp_path):
@@ -270,7 +283,7 @@ def test_bet_add_rejects_a_malformed_date(tmp_path):
         ],
     )
     assert result.exit_code != 0
-    assert "ISO date" in result.output
+    assert "ISO date" in _flat(result.output)
 
 
 def test_decision_record_requires_an_outcome(tmp_path):
@@ -283,7 +296,7 @@ def test_decision_record_requires_an_outcome(tmp_path):
         ["--db", db, "decisions", "record", "--job-id", job_id, "--rationale", "x", "--by", "alex"],
     )
     assert result.exit_code != 0
-    assert "at least one --outcome" in result.output
+    assert "at least one --outcome" in _flat(result.output)
 
 
 def test_decision_record_rejects_a_malformed_rejection(tmp_path):
@@ -312,7 +325,7 @@ def test_decision_record_rejects_a_malformed_rejection(tmp_path):
         ],
     )
     assert result.exit_code != 0
-    assert "id:reason" in result.output
+    assert "id:reason" in _flat(result.output)
 
 
 def test_decision_record_keeps_a_rejection_reason(tmp_path):
