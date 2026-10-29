@@ -71,7 +71,7 @@ This plan executes those two now (Wave 1) and lays out the remaining waves with 
 | 6 | ALH-121 | M5-01 · dark mode + system theme | — (Studio only) | independent; not verifiable here |
 | 6 | ALH-122 | M5-02 · locale groundwork + translated shell | — (Studio + Python) | independent; not verifiable here |
 | 6 | ALH-127 | M5-07 · the 90-second tour | ALH-58 (demo), spine UI | blocked |
-| 6 | ALH-129 | M5-09 · integration guide for external agents | ALH-61, ALH-53 (versions), ALH-130 | deps delivered; next candidate |
+| 6 | ALH-129 | M5-09 · integration guide for external agents | ALH-61, ALH-53 (versions), ALH-130 | blocked: no contract-version or actor/consent surface yet |
 | 6 | ALH-132 | M5-12 · social card per docs page | site generator (exists) | **delivered** |
 | 6 | ALH-134 | M5-14 · starter kit for a new team | ALH-202/217 (template engine) | blocked |
 
