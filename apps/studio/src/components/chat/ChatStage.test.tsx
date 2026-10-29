@@ -41,6 +41,12 @@ vi.mock("../../state/StudioContext", () => ({
   useStudio: () => harness.state,
 }));
 
+// The stage is rendered without the shell here, so the tour stays off; the
+// onboarding flow itself has its own suite.
+vi.mock("../../onboarding/context", () => ({
+  useOnboarding: () => ({ enabled: false, openTour: vi.fn() }),
+}));
+
 const FAILED_TURN: ChatMessage[] = [
   { id: "m-1", parentId: null, role: "user", content: "list the jobs" },
   {

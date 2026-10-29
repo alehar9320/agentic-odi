@@ -24,7 +24,7 @@ export interface FeatureFlagDefinition {
 export const FEATURE_FLAGS: Record<FeatureFlagName, FeatureFlagDefinition> = {
   firstRunWizard: {
     name: "firstRunWizard",
-    description: "Four-step welcome tour for first-time Living Studio users.",
+    description: "The optional four-step product tour, opened from the home stage or Settings.",
     envVar: "VITE_STUDIO_FIRST_RUN_WIZARD",
     defaultEnabled: true,
   },

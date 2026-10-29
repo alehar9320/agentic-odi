@@ -12,6 +12,7 @@ import { useStudio } from "../../state/StudioContext";
 import type { WorkspacePanelId } from "../../types";
 import { SetupConversation } from "../setup/SetupConversation";
 import { Conversation } from "./Conversation";
+import { GuidanceHint } from "./GuidanceHint";
 import { Hero } from "./Hero";
 import { ThreadComposer } from "./ThreadComposer";
 
@@ -177,6 +178,7 @@ export function ChatStage() {
         <LatestMessageButton />
       </div>
       <div className="chat__dock">
+        <GuidanceHint />
         <ThreadComposer
           onCommand={(command) => runCommand(command)}
           onSlashCommand={submitCommand}
