@@ -80,5 +80,9 @@ Pass `--dry-run` to fetch and normalize without writing anything: it prints the
 record count, the first normalized record, and — when `--job-id`, `--step-id`,
 or `--outcome-id` is given — how many evidence drafts the ingest would create.
 
+Evidence drafts are checked against the `EvidenceDraft` contract with
+`validate_evidence_draft()` before they can be handed to the ODI store, so a
+record that crossed a process boundary cannot enter with a missing field.
+
 Additional kinds (REST, webhooks, and so on) can register against the same
 `Connector` protocol later.

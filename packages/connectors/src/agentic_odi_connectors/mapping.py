@@ -9,13 +9,15 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from agentic_odi_connectors.models import EvidenceItemType, IngestBatch, IngestRecord
 
 
 class EvidenceDraft(BaseModel):
     """An ingest record ready to become ODI evidence."""
+
+    model_config = ConfigDict(validate_assignment=True)
 
     source_name: str
     source_kind: str
@@ -27,6 +29,16 @@ class EvidenceDraft(BaseModel):
     job_id: str | None = None
     step_id: str | None = None
     outcome_id: str | None = None
+
+
+def validate_evidence_draft(draft: EvidenceDraft | dict[str, Any]) -> EvidenceDraft:
+    """Validate a draft against the evidence contract before it is stored.
+
+    Accepts a draft or its JSON-ready dict so callers can check records that
+    crossed a process boundary; raises ``ValidationError`` on a malformed one.
+    """
+    payload = draft if isinstance(draft, dict) else draft.model_dump()
+    return EvidenceDraft.model_validate(payload)
 
 
 def drafts_from_batch(
