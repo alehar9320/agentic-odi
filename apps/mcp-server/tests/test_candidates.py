@@ -198,6 +198,150 @@ async def test_reject_candidate_requires_a_reason_and_keeps_the_candidate() -> N
     assert kept["quote_id"] == candidates[0]["quote_id"]
 
 
+# Five paraphrases of one need, each phrased so the deterministic fixture
+# extractor turns it into a valid statement that scores above the threshold.
+PARAPHRASE_QUOTES = [
+    "Onboarding takes too long when a new hire starts.",
+    "Onboarding takes too long when a new hire joins.",
+    "Onboarding takes too long when a new hire arrives.",
+    "Onboarding takes too long when a new hire begins.",
+    "Onboarding takes too long when a new hire is hired.",
+]
+
+
+async def _paraphrase_candidates(client: Client) -> tuple[str, list[dict]]:
+    """One interview with five paraphrased quotes, one candidate each."""
+    await client.call_tool("add_job", {"name": "Onboard"})
+    jobs = json.loads(_text(await client.call_tool("get_jobs", {})))
+    interview = _json_after_prefix(
+        _text(
+            await client.call_tool(
+                "add_interview",
+                {"title": "T", "participant_label": "Ana", "job_id": jobs[0]["id"]},
+            )
+        )
+    )
+    candidates: list[dict] = []
+    for text in PARAPHRASE_QUOTES:
+        quote = _json_after_prefix(
+            _text(
+                await client.call_tool("add_quote", {"interview_id": interview["id"], "text": text})
+            )
+        )
+        candidates.extend(
+            json.loads(
+                _text(await client.call_tool("extract_candidates", {"quote_id": quote["id"]}))
+            )
+        )
+    return interview["id"], candidates
+
+
+@pytest.mark.asyncio
+async def test_suggest_duplicate_candidates_is_read_only_and_groups_paraphrases() -> None:
+    async with Client(mcp) as client:
+        interview_id, candidates = await _paraphrase_candidates(client)
+        before = json.loads(
+            _text(await client.call_tool("list_candidates", {"interview_id": interview_id}))
+        )
+
+        result = json.loads(
+            _text(
+                await client.call_tool(
+                    "suggest_duplicate_candidates", {"interview_id": interview_id}
+                )
+            )
+        )
+        after = json.loads(
+            _text(await client.call_tool("list_candidates", {"interview_id": interview_id}))
+        )
+
+    assert len(result["groups"]) == 1
+    assert sorted(result["groups"][0]) == sorted(c["id"] for c in candidates)
+    # Detection wrote nothing: every candidate is unchanged.
+    assert [c["status"] for c in after] == [c["status"] for c in before]
+
+
+@pytest.mark.asyncio
+async def test_merge_candidates_absorbs_evidence_into_one_outcome() -> None:
+    async with Client(mcp) as client:
+        _, candidates = await _paraphrase_candidates(client)
+        target = json.loads(
+            _text(
+                await client.call_tool(
+                    "accept_candidate",
+                    {
+                        "candidate_id": candidates[0]["id"],
+                        "importance": 8.0,
+                        "satisfaction": 3.0,
+                    },
+                )
+            )
+        )
+        merged_ids = [c["id"] for c in candidates[1:]]
+
+        result = json.loads(
+            _text(
+                await client.call_tool(
+                    "merge_candidates",
+                    {"target_id": target["outcome"]["id"], "merged_ids": merged_ids},
+                )
+            )
+        )
+        evidence = json.loads(
+            _text(await client.call_tool("list_evidence", {"outcome_id": target["outcome"]["id"]}))
+        )
+        outcomes = json.loads(
+            _text(await client.call_tool("get_outcomes", {"job_id": target["outcome"]["job_id"]}))
+        )
+
+    assert [c["status"] for c in result["merged"]] == ["merged"] * len(merged_ids)
+    assert len(evidence) == 5  # the acceptance write plus one per paraphrase
+    assert len(outcomes) == 1  # no second outcome
+
+
+@pytest.mark.asyncio
+async def test_merge_candidates_twice_changes_nothing() -> None:
+    async with Client(mcp) as client:
+        _, candidates = await _paraphrase_candidates(client)
+        target = json.loads(
+            _text(
+                await client.call_tool(
+                    "accept_candidate",
+                    {
+                        "candidate_id": candidates[0]["id"],
+                        "importance": 8.0,
+                        "satisfaction": 3.0,
+                    },
+                )
+            )
+        )
+        args = {
+            "target_id": target["outcome"]["id"],
+            "merged_ids": [c["id"] for c in candidates[1:]],
+        }
+
+        await client.call_tool("merge_candidates", args)
+        second = json.loads(_text(await client.call_tool("merge_candidates", args)))
+        evidence = json.loads(
+            _text(await client.call_tool("list_evidence", {"outcome_id": target["outcome"]["id"]}))
+        )
+
+    assert second["evidence"] == []
+    assert second["merged"] == []
+    assert len(evidence) == 5
+
+
+@pytest.mark.asyncio
+async def test_merge_candidates_into_unknown_outcome_reports_an_error() -> None:
+    async with Client(mcp) as client:
+        _, candidates = await _paraphrase_candidates(client)
+        result = await client.call_tool(
+            "merge_candidates",
+            {"target_id": "no-such-outcome", "merged_ids": [candidates[0]["id"]]},
+        )
+    assert _text(result).startswith("Error:")
+
+
 @pytest.mark.asyncio
 async def test_accept_candidate_reports_a_missing_candidate() -> None:
     async with Client(mcp) as client:

@@ -526,3 +526,37 @@ def render_candidate_acceptance(result: Any, *, as_json: bool) -> str:
             ("quote", evidence.get("content", "")),
         ]
     )
+
+
+def render_duplicate_groups(result: Any, *, as_json: bool) -> str:
+    """Render suggested duplicate groups as one line of candidate ids per group."""
+    if not isinstance(result, dict):
+        return _json(result) if as_json else str(result)
+    if as_json:
+        return _json(result)
+    groups = result.get("groups", [])
+    if not groups:
+        return "No near-duplicate candidates found."
+    return _table(
+        ("group", "candidate_ids"),
+        [(str(index), ", ".join(group)) for index, group in enumerate(groups, start=1)],
+        empty="No near-duplicate candidates found.",
+    )
+
+
+def render_candidate_merge(result: Any, *, as_json: bool) -> str:
+    """Render a merge: the target outcome and the candidate ids absorbed into it."""
+    if not isinstance(result, dict):
+        return _json(result) if as_json else str(result)
+    if as_json:
+        return _json(result)
+    outcome = result.get("outcome", {})
+    merged = result.get("merged", [])
+    return _block(
+        [
+            ("outcome_id", outcome.get("id", "")),
+            ("statement", outcome.get("statement", "")),
+            ("evidence_count", len(result.get("evidence", []))),
+            ("merged_ids", ", ".join(item.get("id", "") for item in merged)),
+        ]
+    )
