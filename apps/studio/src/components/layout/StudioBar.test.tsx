@@ -22,8 +22,7 @@ const stubContext = (overrides: Record<string, unknown> = {}) => ({
   openConversation: vi.fn(),
   deleteConversation: vi.fn(),
   refreshConversations: vi.fn(),
-  unreadNotificationCount: 0,
-  markAllNotificationsAsRead: vi.fn(),
+  unreadSignalCount: 0,
   openPanel: vi.fn(),
   pushToast: vi.fn(),
   saveSettings: vi.fn(),
@@ -127,26 +126,29 @@ describe("StudioBar", () => {
     click.mockRestore();
   });
 
-  it("shows the unread count and clears it when catch-up opens", () => {
+  it("puts the unread count in the bell's accessible name and opens the inbox", () => {
     const openPanel = vi.fn();
-    const markAllNotificationsAsRead = vi.fn();
     vi.mocked(useStudio).mockReturnValue(
-      stubContext({
-        unreadNotificationCount: 3,
-        openPanel,
-        markAllNotificationsAsRead,
-      }) as never,
+      stubContext({ unreadSignalCount: 3, openPanel }) as never,
     );
     const { getByRole } = render(
       <StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />
     );
 
-    const bell = getByRole("button", { name: "Catch up notifications" });
+    const bell = getByRole("button", { name: "Signal inbox: 3 unread" });
     expect(bell.textContent).toContain("3");
+    expect(bell.querySelector(".bell-badge")?.getAttribute("aria-hidden")).toBeNull();
     fireEvent.click(bell);
 
-    expect(markAllNotificationsAsRead).toHaveBeenCalled();
     expect(openPanel).toHaveBeenCalledWith("catchup");
+  });
+
+  it("says the inbox is empty instead of showing a zero badge", () => {
+    vi.mocked(useStudio).mockReturnValue(stubContext({ unreadSignalCount: 0 }) as never);
+    render(<StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />);
+
+    const bell = screen.getByRole("button", { name: "Signal inbox: no unread signals" });
+    expect(bell.querySelector(".bell-badge")).toBeNull();
   });
 
   it("shows the running version and opens update settings", () => {

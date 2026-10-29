@@ -50,6 +50,7 @@ let chatAborts = false;
 let chatFailure: Error | null = null;
 let connectorFetches = 0;
 let llmHealthFetches = 0;
+let signalFetches = 0;
 let approvalCalls: Record<string, unknown>[] = [];
 let settingsPosts: Record<string, unknown>[] = [];
 let deletedConversations: string[] = [];
@@ -206,6 +207,13 @@ function route(
   if (url === "/api/health/llm") {
     llmHealthFetches += 1;
     return json({ healthy: true, message: "ok" });
+  }
+  if (url.startsWith("/api/signals/unread-count")) {
+    return json({ count: 0 });
+  }
+  if (url.startsWith("/api/signals")) {
+    signalFetches += 1;
+    return json([]);
   }
   return json({});
 }
@@ -571,6 +579,45 @@ describe("StudioContext health polling", () => {
   });
 });
 
+describe("StudioContext signal inbox", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    signalFetches = 0;
+    vi.useFakeTimers();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)),
+    );
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it("loads the inbox on boot and keeps polling while the window is visible", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(signalFetches).toBeGreaterThan(0);
+    expect(result.current.signals).toEqual([]);
+    expect(result.current.signalsError).toBeNull();
+
+    const afterBoot = signalFetches;
+    await act(async () => {
+      vi.advanceTimersByTime(60_000);
+    });
+    expect(signalFetches).toBeGreaterThan(afterBoot);
+
+    const afterInterval = signalFetches;
+    await act(async () => {
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+    expect(signalFetches).toBeGreaterThan(afterInterval);
+  });
+});
+
 describe("StudioContext theme", () => {
   beforeEach(() => {
     resetScene();
@@ -924,15 +971,9 @@ describe("StudioContext persistence the person can rely on", () => {
     });
 
     expect(result.current.toasts).toContainEqual(
-      expect.objectContaining({ kind: "info", message: "Noted: Prefers short updates." }),
-    );
-    expect(result.current.notifications).toContainEqual(
       expect.objectContaining({
-        category: "memory",
-        title: "New thing I learned",
-        message: "Prefers short updates.",
-        targetPanel: "memory",
-        targetId: "o-2",
+        kind: "info",
+        message: "Noted: Prefers short updates. — confirm it in Memory",
       }),
     );
     expect(result.current.memory.find((item) => item.id === "o-2")?.status).toBe("proposed");

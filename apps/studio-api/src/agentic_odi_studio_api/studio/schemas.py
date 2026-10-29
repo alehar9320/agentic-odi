@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Literal
 
 from agentic_odi_core import BusinessValue, CustomerValue
-from agentic_odi_core.models import JobStage, V2MOM
+from agentic_odi_core.models import V2MOM, JobStage
 from pydantic import BaseModel, Field
 
 if TYPE_CHECKING:
@@ -80,6 +80,12 @@ class UpdateOutcomeRequest(BaseModel):
     statement: str | None = None
     importance: float | None = None
     satisfaction: float | None = None
+    mcp_url: str = ""
+
+
+class SignalActionRequest(BaseModel):
+    """Body for the read/dismiss signal routes; only the MCP backend needs it."""
+
     mcp_url: str = ""
 
 

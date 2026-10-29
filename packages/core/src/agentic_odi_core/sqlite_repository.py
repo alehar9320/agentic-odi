@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import threading
+from datetime import datetime, timezone
 from typing import Any
 
 from pydantic import BaseModel, ValidationError
@@ -20,6 +21,7 @@ from agentic_odi_core.models import (
     Observation,
     Outcome,
     ScheduledWork,
+    Signal,
     Step,
     compute_opportunity_score,
 )
@@ -27,8 +29,10 @@ from agentic_odi_core.repository import (
     Repository,
     epoch_seconds,
     page,
+    rank_signals,
     sort_outcomes,
     thread_window,
+    unread_signals,
 )
 
 
@@ -65,6 +69,7 @@ class SQLiteRepository(Repository):
         self.messages: dict[str, Message] = {}
         self.observations: dict[str, Observation] = {}
         self.brief: Brief | None = None
+        self.signals: dict[str, Signal] = {}
         self.scheduled_work: dict[str, ScheduledWork] = {}
         self._last_event_id = 0
         for ev in self.store.get_stream(workspace_id=self._workspace_id, replay_order=True):
@@ -204,6 +209,12 @@ class SQLiteRepository(Repository):
             self.observations.pop(p["id"], None)
         elif et == "BRIEF_SAVED":
             self.brief = Brief.model_validate(p)
+        elif et == "SIGNAL_CREATED":
+            self.signals[p["id"]] = Signal.model_validate(p)
+        elif et == "SIGNAL_READ":
+            self._merge_updates(self.signals, p, Signal)
+        elif et == "SIGNAL_DISMISSED":
+            self._merge_updates(self.signals, p, Signal)
         self._last_event_id = max(self._last_event_id, ev["id"])
 
     @staticmethod
@@ -634,6 +645,60 @@ class SQLiteRepository(Repository):
         with self._lock:
             self._sync()
             return self.brief
+
+    def add_signal(self, signal: Signal) -> Signal:
+        with self._lock:
+            self.store.append(
+                "SIGNAL_CREATED",
+                signal.model_dump(mode="json"),
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return signal
+
+    def get_signal(self, signal_id: str) -> Signal | None:
+        with self._lock:
+            self._sync()
+            return self.signals.get(signal_id)
+
+    def list_signals(self, unread_only: bool = False, limit: int = 50) -> list[Signal]:
+        with self._lock:
+            self._sync()
+            items = (
+                unread_signals(list(self.signals.values()))
+                if unread_only
+                else rank_signals(list(self.signals.values()))
+            )
+            return page(items, limit)
+
+    def mark_signal_read(self, signal_id: str) -> Signal | None:
+        return self._stamp_signal(signal_id, "SIGNAL_READ", "read_at")
+
+    def dismiss_signal(self, signal_id: str) -> Signal | None:
+        return self._stamp_signal(signal_id, "SIGNAL_DISMISSED", "dismissed_at")
+
+    def _stamp_signal(self, signal_id: str, event_type: str, field: str) -> Signal | None:
+        with self._lock:
+            self._sync()
+            signal = self.signals.get(signal_id)
+            if signal is None:
+                return None
+            if getattr(signal, field) is None:
+                self.store.append(
+                    event_type,
+                    {"id": signal_id, "updates": {field: datetime.now(timezone.utc).isoformat()}},
+                    workspace_id=self._workspace_id,
+                    device_id=self._device_id,
+                )
+                self._sync()
+                signal = self.signals[signal_id]
+            return signal
+
+    def count_unread_signals(self) -> int:
+        with self._lock:
+            self._sync()
+            return len(unread_signals(list(self.signals.values())))
 
     def add_scheduled_work(self, work: ScheduledWork) -> ScheduledWork:
         with self._lock:

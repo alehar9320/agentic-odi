@@ -26,6 +26,7 @@ import type {
   ObservationStatus,
   Outcome,
   SettingsSummary,
+  Signal,
   Step,
   StudioBrief,
   StudioConfig,
@@ -471,6 +472,44 @@ export async function streamChat(
     await bff.chat.stream(request, onEvent, signal);
   }
 }
+/**
+ * The signal inbox. Signals live in the shared store, so the CLI and the Studio
+ * read the same feed; there is no browser-side copy to diverge into.
+ */
+export async function fetchSignals(
+  mcpUrl: string,
+  options: { unreadOnly?: boolean; limit?: number } = {},
+): Promise<Signal[]> {
+  const params = new URLSearchParams({ mcp_url: mcpUrl });
+  if (options.unreadOnly) {
+    params.set("unread_only", "true");
+  }
+  if (options.limit !== undefined) {
+    params.set("limit", String(options.limit));
+  }
+  return getJson<Signal[]>(`/api/signals?${params.toString()}`);
+}
+
+export async function fetchUnreadSignalCount(mcpUrl: string): Promise<number> {
+  const body = await getJson<{ count: number }>(
+    `/api/signals/unread-count?mcp_url=${encodeURIComponent(mcpUrl)}`,
+  );
+  return body.count;
+}
+
+export async function markSignalRead(signalId: string, mcpUrl: string): Promise<Signal> {
+  return sendJson<Signal>("POST", `/api/signals/${encodeURIComponent(signalId)}/read`, {
+    mcp_url: mcpUrl,
+  });
+}
+
+export async function dismissSignal(signalId: string, mcpUrl: string): Promise<Signal> {
+  return sendJson<Signal>("POST", `/api/signals/${encodeURIComponent(signalId)}/dismiss`, {
+    mcp_url: mcpUrl,
+  });
+}
+
+
 export async function fetchMemory(status?: ObservationStatus): Promise<Observation[]> {
   return withLocal(
     () =>

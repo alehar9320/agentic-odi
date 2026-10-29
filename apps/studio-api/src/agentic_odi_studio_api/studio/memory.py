@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Any, cast, get_args
 
 from agentic_odi_core import (
+    V2MOM,
     Brief,
     Conversation,
     ConversationNotFoundError,
@@ -30,7 +31,6 @@ from agentic_odi_core import (
     ObservationNotFoundError,
     ODIService,
     Repository,
-    V2MOM,
 )
 from agentic_odi_core.errors import ValidationError
 from agentic_odi_core.models import MessageRole, ObservationCategory, ObservationStatus

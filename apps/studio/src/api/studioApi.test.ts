@@ -19,8 +19,12 @@ import {
   saveSettings,
   setConversationArchived,
   deleteObservation,
+  dismissSignal,
   fetchLatestConversation,
   fetchMemory,
+  fetchSignals,
+  fetchUnreadSignalCount,
+  markSignalRead,
   updateObservation,
   fetchCanvas,
   fetchChangelog,
@@ -662,5 +666,63 @@ describe("settings, brief, and threads", () => {
         }),
       }),
     );
+  });
+});
+
+describe("signal inbox", () => {
+  function mockStore(body: unknown): { url: string; method: string; body: string }[] {
+    const calls: { url: string; method: string; body: string }[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        calls.push({
+          url: String(input),
+          method: init?.method ?? "GET",
+          body: String(init?.body ?? ""),
+        });
+        return new Response(JSON.stringify(body), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }),
+    );
+    return calls;
+  }
+
+  it("asks for the feed by store, unread only, and budgeted to a limit", async () => {
+    const calls = mockStore([]);
+
+    await expect(fetchSignals("http://mcp", { unreadOnly: true, limit: 20 })).resolves.toEqual([]);
+
+    expect(calls[0]?.url).toBe(
+      "/api/signals?mcp_url=http%3A%2F%2Fmcp&unread_only=true&limit=20",
+    );
+  });
+
+  it("reads the badge count from the unread-count route", async () => {
+    const calls = mockStore({ count: 3 });
+
+    await expect(fetchUnreadSignalCount("http://mcp")).resolves.toBe(3);
+
+    expect(calls[0]?.url).toBe("/api/signals/unread-count?mcp_url=http%3A%2F%2Fmcp");
+  });
+
+  it("posts the store url when marking a signal read", async () => {
+    const calls = mockStore({ id: "sig 1" });
+
+    await markSignalRead("sig 1", "http://mcp");
+
+    expect(calls[0]?.url).toBe("/api/signals/sig%201/read");
+    expect(calls[0]?.method).toBe("POST");
+    expect(JSON.parse(calls[0]!.body)).toEqual({ mcp_url: "http://mcp" });
+  });
+
+  it("posts the store url when dismissing a signal", async () => {
+    const calls = mockStore({ id: "sig-1" });
+
+    await dismissSignal("sig-1", "http://mcp");
+
+    expect(calls[0]?.url).toBe("/api/signals/sig-1/dismiss");
+    expect(JSON.parse(calls[0]!.body)).toEqual({ mcp_url: "http://mcp" });
   });
 });

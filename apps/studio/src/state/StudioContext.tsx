@@ -26,6 +26,7 @@ import {
   deleteEvidence as apiDeleteEvidence,
   deleteOutcome as apiDeleteOutcome,
   deleteStep as apiDeleteStep,
+  dismissSignal as apiDismissSignal,
   fetchBrief as apiFetchBrief,
   fetchCanvas,
   fetchConfig,
@@ -38,8 +39,11 @@ import {
   fetchMarketplace,
   fetchMemory,
   fetchSettings as apiFetchSettings,
+  fetchSignals,
+  fetchUnreadSignalCount,
   healthLlm,
   healthMcp,
+  markSignalRead as apiMarkSignalRead,
   promoteEvidence as apiPromoteEvidence,
   resolveApproval as apiResolveApproval,
   saveBrief as apiSaveBrief,
@@ -74,10 +78,11 @@ import type {
   MarketplaceSearch,
   Observation,
   SettingsSummary,
+  Signal,
+  SignalSubjectKind,
   StudioBrief,
   StudioConfig,
   StudioError,
-  StudioNotification,
   StudioTheme,
   Thesis,
   ToolStatus,
@@ -237,11 +242,24 @@ const CANVAS_KEY = "studio.canvas";
 const DISPLAY_NAME_KEY = "studio.displayName";
 const BRIEF_KEY = "studio.brief";
 const SIDECAR_NOTICE_DISMISSED_KEY = "studio.sidecarNoticeDismissed";
-const NOTIFICATIONS_KEY = "studio.notifications";
 const THESES_KEY = "studio.theses";
 
 /** How often the studio re-probes the model and the MCP server. */
 const HEALTH_POLL_INTERVAL_MS = 30_000;
+
+/** How often a focused window re-reads the signal inbox from the store. */
+const SIGNAL_POLL_INTERVAL_MS = 60_000;
+
+/** The lens that can show a signal's subject. Unwired kinds navigate nowhere. */
+const PANEL_FOR_SUBJECT: Partial<Record<SignalSubjectKind, WorkspacePanelId>> = {
+  job: "jobmap",
+  step: "jobmap",
+  outcome: "landscape",
+  evidence: "evidence",
+};
+
+/** The developer simulator's events never reach the store, so they carry this id prefix. */
+const SIMULATED_SIGNAL_PREFIX = "sim-";
 
 export const EMPTY_CONFIG: StudioConfig = {
   base_url: "http://localhost:8001/v1",
@@ -404,12 +422,19 @@ export interface StudioContextValue {
   theses: Thesis[];
   saveThesis: (thesis: Omit<Thesis, "id" | "created_at">) => void;
   deleteThesis: (thesisId: string) => void;
-  notifications: StudioNotification[];
-  unreadNotificationCount: number;
-  markNotificationAsRead: (id: string) => void;
-  markAllNotificationsAsRead: () => void;
-  dismissNotification: (id: string) => void;
-  addNotification: (notification: Omit<StudioNotification, "id" | "timestamp" | "read">) => void;
+  /** The inbox the store holds — not a browser copy of one. */
+  signals: Signal[];
+  unreadSignalCount: number;
+  /** A failed inbox read must never read as "nothing happened". */
+  signalsError: StudioError | null;
+  refreshSignals: () => Promise<void>;
+  markSignalAsRead: (id: string) => void;
+  dismissSignal: (id: string) => void;
+  /** Mark read, then open the lens on whatever the signal is about. */
+  focusSignalSubject: (signal: Signal) => void;
+  focusedSubject: { kind: SignalSubjectKind; id: string } | null;
+  /** The job that owns the focused subject, so canvas panels can select it. */
+  focusedJobId: string | null;
   simulateBackgroundEvent: () => void;
 }
 
@@ -528,20 +553,6 @@ function loadTheses(): Thesis[] {
   return [];
 }
 
-function loadNotifications(): StudioNotification[] {
-  try {
-    const raw = localStorage.getItem(NOTIFICATIONS_KEY);
-    if (raw) {
-      return JSON.parse(raw) as StudioNotification[];
-    }
-  } catch {
-    /* ignore malformed cache */
-  }
-  // First run has no activity yet. Showing fabricated updates here would make
-  // the feed lie about work the studio never did.
-  return [];
-}
-
 export function StudioProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<StudioConfig>(loadSettings);
   const theme: StudioTheme = settings.theme === "light" ? "light" : "dark";
@@ -580,6 +591,14 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [connectorsError, setConnectorsError] = useState<StudioError | null>(null);
   const [capabilities, setCapabilities] = useState<Capability[]>([]);
   const [connectorSuggestions, setConnectorSuggestions] = useState<string[]>([]);
+  const [serverSignals, setServerSignals] = useState<Signal[]>([]);
+  const [simulatedSignals, setSimulatedSignals] = useState<Signal[]>([]);
+  const [unreadSignalCount, setUnreadSignalCount] = useState(0);
+  const [signalsError, setSignalsError] = useState<StudioError | null>(null);
+  const [focusedSubject, setFocusedSubject] = useState<{
+    kind: SignalSubjectKind;
+    id: string;
+  } | null>(null);
   const [customizeOpen, setCustomizeOpen] = useState(false);
   const [customizeTarget, setCustomizeTarget] = useState<CustomizeTarget | null>(null);
   const [marketplace, setMarketplace] = useState<MarketplaceSearch | null>(null);
@@ -589,27 +608,33 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [featured, setFeatured] = useState<MarketplaceListing[]>([]);
   const [featuredError, setFeaturedError] = useState<StudioError | null>(null);
   const [connectorModalDismissed, setConnectorModalDismissed] = useState(false);
-  const [notifications, setNotifications] = useState<StudioNotification[]>(loadNotifications);
   const [theses, setTheses] = useState<Thesis[]>(loadTheses);
   const toastId = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
   /** Observations this tab already announced, so a notice fires once. */
   const seenMemoryIds = useRef(new Set<string>());
 
-  // Every writer below updates the list from the previous one, so two notices
-  // raised in the same instant both survive; the cache follows the state.
-  useEffect(() => {
-    try {
-      localStorage.setItem(NOTIFICATIONS_KEY, JSON.stringify(notifications));
-    } catch {
-      /* storage unavailable */
-    }
-  }, [notifications]);
-
-  const unreadNotificationCount = useMemo(
-    () => notifications.filter((n) => !n.read && !n.simulated).length,
-    [notifications],
+  /** Simulated events sit on top; they are labelled and never counted as unread. */
+  const signals = useMemo(
+    () =>
+      [...simulatedSignals, ...serverSignals].sort((a, b) => (a.created_at < b.created_at ? 1 : -1)),
+    [simulatedSignals, serverSignals],
   );
+
+  const refreshSignals = useCallback(async () => {
+    try {
+      const [feed, unread] = await Promise.all([
+        fetchSignals(settings.mcp_url, { limit: 50 }),
+        fetchUnreadSignalCount(settings.mcp_url),
+      ]);
+      setServerSignals(feed);
+      setUnreadSignalCount(unread);
+      setSignalsError(null);
+    } catch (error) {
+      // Keep the last feed on screen: a failed read is not an empty inbox.
+      setSignalsError(asStudioError(error));
+    }
+  }, [settings.mcp_url]);
 
   /**
    * The one connector the studio offers next. An agent suggestion wins, since
@@ -634,30 +659,36 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     return null;
   }, [connectorModalDismissed, connectorSuggestions, connectors, customizeOpen, featured]);
 
-  const markNotificationAsRead = useCallback((id: string) => {
-    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
-  }, []);
-
-  const markAllNotificationsAsRead = useCallback(() => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
-  }, []);
-
-  const dismissNotification = useCallback((id: string) => {
-    setNotifications((prev) => prev.filter((n) => n.id !== id));
-  }, []);
-
-  const addNotification = useCallback(
-    (item: Omit<StudioNotification, "id" | "timestamp" | "read">) => {
-      const newNotif: StudioNotification = {
-        ...item,
-        id: `NOTIF-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-        timestamp: new Date().toISOString(),
-        read: false,
-      };
-      setNotifications((prev) => [newNotif, ...prev]);
+  const markSignalAsRead = useCallback(
+    (id: string) => {
+      if (id.startsWith(SIMULATED_SIGNAL_PREFIX)) {
+        setSimulatedSignals((prev) =>
+          prev.map((item) =>
+            item.id === id ? { ...item, read_at: new Date().toISOString() } : item,
+          ),
+        );
+        return;
+      }
+      apiMarkSignalRead(id, settings.mcp_url)
+        .then(refreshSignals)
+        .catch((error) => setSignalsError(asStudioError(error)));
     },
-    [],
+    [refreshSignals, settings.mcp_url],
   );
+
+  const dismissSignal = useCallback(
+    (id: string) => {
+      if (id.startsWith(SIMULATED_SIGNAL_PREFIX)) {
+        setSimulatedSignals((prev) => prev.filter((item) => item.id !== id));
+        return;
+      }
+      apiDismissSignal(id, settings.mcp_url)
+        .then(refreshSignals)
+        .catch((error) => setSignalsError(asStudioError(error)));
+    },
+    [refreshSignals, settings.mcp_url],
+  );
+
 
   const pushToast = useCallback((kind: ToastKind, message: string) => {
     const id = (toastId.current += 1);
@@ -824,41 +855,47 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  /**
+   * The developer affordance #78 kept, re-shaped as a Signal. It demonstrates
+   * what a full inbox looks like; nothing it produces reaches the store, and
+   * the feed labels it so nobody mistakes it for something that happened.
+   */
   const simulateBackgroundEvent = useCallback(() => {
-    const events: Array<Omit<StudioNotification, "id" | "timestamp" | "read">> = [
+    const drafts: Array<Pick<Signal, "kind" | "title" | "severity" | "detail">> = [
       {
-        simulated: false,
-        title: "Telemetry Ingestion Complete",
-        message: "Analyzed workflow traces: 82% of users report friction during cluster config.",
-        category: "evidence",
-        targetPanel: "evidence",
-        actionText: "Review Evidence",
-        chatPrompt: "What friction was reported during cluster config?",
+        kind: "evidence_ingested",
+        title: 'Evidence from "telemetry": cluster config friction',
+        detail: "Analyzed workflow traces: 82% of users report friction during cluster config.",
+        severity: "info",
       },
       {
-        simulated: false,
-        title: "New Opportunity Uncovered",
-        message: "Automating validation rules elevated satisfaction target by +2.4 points.",
-        category: "outcome",
-        targetPanel: "landscape",
-        actionText: "Explore Landscape",
-        chatPrompt: "Show me details on the validation rules opportunity.",
+        kind: "opportunity_crossed",
+        title: "Opportunity score crossed 10 (up): validation rules",
+        detail: "Satisfaction fell to 3 while importance held at 9.",
+        severity: "urgent",
       },
       {
-        simulated: false,
-        title: "AI Job Step Insight",
-        message: "Suggested adding 'Verify secret parity across clusters' to Phase 4 of Job Map.",
-        category: "job",
-        targetPanel: "jobmap",
-        actionText: "Open Job Map",
-        chatPrompt: "Why is verifying secret parity across clusters recommended?",
+        kind: "job_map_completed",
+        title: "Job map complete: Deploy a release covers all 8 stages",
+        severity: "notice",
       },
     ];
 
-    const chosen = events[Math.floor(Math.random() * events.length)];
-    addNotification({ ...chosen, simulated: true });
-    pushToast("info", `Background Activity: ${chosen.title}`);
-  }, [addNotification, pushToast]);
+    const chosen = drafts[Math.floor(Math.random() * drafts.length)];
+    const stamp = new Date().toISOString();
+    setSimulatedSignals((prev) => [
+      {
+        ...chosen,
+        id: `${SIMULATED_SIGNAL_PREFIX}${Date.now()}`,
+        created_at: stamp,
+        suppressed: false,
+        fingerprint: `simulated-${stamp}`,
+        simulated: true,
+      },
+      ...prev,
+    ]);
+    pushToast("info", `Simulated: ${chosen.title}`);
+  }, [pushToast]);
 
   // The theme lives on <html> so every surface, portal, and native control
   // follows one class instead of each component tracking its own copy.
@@ -1013,6 +1050,10 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const refreshCanvas = useCallback(async () => {
+    // The inbox is re-read alongside the board: every path that reaches this
+    // function either just changed the store or is checking what changed, and
+    // a canvas that fails to load must not leave the bell showing stale counts.
+    void refreshSignals();
     setCanvasState((prev) => ({ kind: "loading", data: prev.data }));
     try {
       const data = await fetchCanvas(settings.mcp_url);
@@ -1030,7 +1071,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       const problem = asStudioError(error);
       setCanvasState((prev) => ({ kind: "error", error: problem, data: prev.data }));
     }
-  }, [settings.mcp_url]);
+  }, [settings.mcp_url, refreshSignals]);
 
   const addStep = useCallback(
     async (payload: Omit<AddStepPayload, "mcp_url">) => {
@@ -1190,6 +1231,54 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     },
     [setupOpen, closeSetup],
   );
+
+  /**
+   * What a card does when activated: read the signal, then take the person to
+   * the record it names. This is the job `targetId` never did.
+   */
+  const focusSignalSubject = useCallback(
+    (signal: Signal) => {
+      if (!signal.simulated && !signal.read_at) {
+        markSignalAsRead(signal.id);
+      }
+      const kind = signal.subject_kind;
+      const id = signal.subject_id;
+      if (!kind || !id) {
+        return;
+      }
+      setFocusedSubject({ kind, id });
+      const panel = PANEL_FOR_SUBJECT[kind];
+      if (panel) {
+        openPanel(panel);
+      }
+    },
+    [markSignalAsRead, openPanel],
+  );
+
+  /** The job owning the focused subject, so canvas panels can select it. */
+  const focusedJobId = useMemo(() => {
+    if (!focusedSubject) {
+      return null;
+    }
+    const data = canvasState.data;
+    if (!data) {
+      return null;
+    }
+    const { kind, id } = focusedSubject;
+    if (kind === "job") {
+      return data.jobs.some((job) => job.id === id) ? id : null;
+    }
+    if (kind === "step") {
+      return data.steps.find((step) => step.id === id)?.job_id ?? null;
+    }
+    if (kind === "outcome") {
+      return data.outcomes.find((outcome) => outcome.id === id)?.job_id ?? null;
+    }
+    if (kind === "evidence") {
+      return (data.evidence ?? []).find((item) => item.id === id)?.job_id ?? null;
+    }
+    return null;
+  }, [focusedSubject, canvasState.data]);
 
   const stopStreaming = useCallback(() => {
     abortRef.current?.abort();
@@ -1463,17 +1552,10 @@ export function StudioProvider({ children }: { children: ReactNode }) {
               );
               if (observation.status === "proposed" && isNew) {
                 // The agent wrote something down; only the person can make it
-                // fact. The notice points at the panel where that happens.
-                pushToast("info", `Noted: ${observation.text}`);
-                addNotification({
-                  category: "memory",
-                  title: "New thing I learned",
-                  message: observation.text,
-                  simulated: false,
-                  targetPanel: "memory",
-                  targetId: observation.id,
-                  actionText: "Confirm or dismiss",
-                });
+                // fact, so the toast points at the panel where that happens.
+                // The Catch Up inbox stays what #79 made it: facts the store
+                // recorded, not ones the client merely observed.
+                pushToast("info", `Noted: ${observation.text} — confirm it in Memory`);
               }
             }
             break;
@@ -1575,7 +1657,6 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       sidecarReachable,
       pushNotice,
       pushToast,
-      addNotification,
     ],
   );
 
@@ -1954,6 +2035,24 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     };
   }, [checkConnections]);
 
+  // The inbox is server state, so it is re-read rather than remembered: every
+  // minute the window is up, and the moment it comes back into focus.
+  useEffect(() => {
+    const poll = () => {
+      if (document.visibilityState === "visible") {
+        void refreshSignals();
+      }
+    };
+
+    const timer = window.setInterval(poll, SIGNAL_POLL_INTERVAL_MS);
+    document.addEventListener("visibilitychange", poll);
+
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", poll);
+    };
+  }, [refreshSignals]);
+
   // The canvas is one state, not four booleans: an empty board and a failed
   // board must never look the same.
   const canvas = canvasState.data;
@@ -2057,12 +2156,15 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       theses,
       saveThesis,
       deleteThesis,
-      notifications,
-      unreadNotificationCount,
-      markNotificationAsRead,
-      markAllNotificationsAsRead,
-      dismissNotification,
-      addNotification,
+      signals,
+      unreadSignalCount,
+      signalsError,
+      refreshSignals,
+      markSignalAsRead,
+      dismissSignal,
+      focusSignalSubject,
+      focusedSubject,
+      focusedJobId,
       simulateBackgroundEvent,
     }),
     [
@@ -2161,12 +2263,15 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       theses,
       saveThesis,
       deleteThesis,
-      notifications,
-      unreadNotificationCount,
-      markNotificationAsRead,
-      markAllNotificationsAsRead,
-      dismissNotification,
-      addNotification,
+      signals,
+      unreadSignalCount,
+      signalsError,
+      refreshSignals,
+      markSignalAsRead,
+      dismissSignal,
+      focusSignalSubject,
+      focusedSubject,
+      focusedJobId,
       simulateBackgroundEvent,
     ],
   );

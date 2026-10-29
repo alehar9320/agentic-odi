@@ -49,6 +49,9 @@ class ToolName(str, Enum):
     LIST_OBSERVATIONS = "list_observations"
     CONFIRM_OBSERVATION = "confirm_observation"
     DISMISS_OBSERVATION = "dismiss_observation"
+    LIST_SIGNALS = "list_signals"
+    MARK_SIGNAL_READ = "mark_signal_read"
+    DISMISS_SIGNAL = "dismiss_signal"
     SCHEDULE_WORK = "schedule_work"
     GET_SCHEDULED_WORK = "get_scheduled_work"
     LIST_SCHEDULED_WORK = "list_scheduled_work"
@@ -425,6 +428,29 @@ TOOL_SPECS: dict[str, ToolSpec] = {
         arguments=("observation_id",),
         required=("observation_id",),
         returns="The dismissed Observation.",
+    ),
+    ToolName.LIST_SIGNALS.value: ToolSpec(
+        name="list_signals",
+        summary="List signals the store recorded — real changes worth attention.",
+        effect=_derive_effect("list_signals"),
+        arguments=("unread_only", "limit"),
+        returns="A list of Signals, newest first.",
+    ),
+    ToolName.MARK_SIGNAL_READ.value: ToolSpec(
+        name="mark_signal_read",
+        summary="Mark a signal as read so it stops counting toward the unread badge.",
+        effect=_derive_effect("mark_signal_read"),
+        arguments=("signal_id",),
+        required=("signal_id",),
+        returns="The updated Signal.",
+    ),
+    ToolName.DISMISS_SIGNAL.value: ToolSpec(
+        name="dismiss_signal",
+        summary="Dismiss a signal; it stays recorded but leaves the feed.",
+        effect=_derive_effect("dismiss_signal"),
+        arguments=("signal_id",),
+        required=("signal_id",),
+        returns="The updated Signal.",
     ),
     ToolName.SCHEDULE_WORK.value: ToolSpec(
         name="schedule_work",

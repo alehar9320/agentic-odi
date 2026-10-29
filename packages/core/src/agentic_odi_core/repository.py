@@ -17,6 +17,7 @@ from agentic_odi_core.models import (
     Observation,
     Outcome,
     ScheduledWork,
+    Signal,
     Step,
 )
 
@@ -89,6 +90,25 @@ def apply_updates(entity: _Model, updates: dict[str, Any]) -> _Model:
     return type(entity).model_validate(current)
 
 
+def rank_signals(signals: list[Signal]) -> list[Signal]:
+    """Surfaced signals, newest first.
+
+    Dismissed signals left the feed; budget-suppressed ones were recorded but
+    are not surfaced, so neither kind appears. Urgent signals bypass the
+    budget, so they were never suppressed in the first place.
+    """
+    return sorted(
+        (signal for signal in signals if signal.dismissed_at is None and not signal.suppressed),
+        key=lambda signal: signal.created_at,
+        reverse=True,
+    )
+
+
+def unread_signals(signals: list[Signal]) -> list[Signal]:
+    """Unread means unseen: surfaced and not yet read."""
+    return [signal for signal in rank_signals(signals) if signal.read_at is None]
+
+
 OUTCOME_SORTS = ("opportunity_score", "insertion")
 
 
@@ -116,6 +136,7 @@ class Repository(Protocol):
     messages: dict[str, Message]
     observations: dict[str, Observation]
     brief: Brief | None
+    signals: dict[str, Signal]
     scheduled_work: dict[str, ScheduledWork]
 
     def add_job(self, job: Job) -> Job: ...
@@ -184,6 +205,12 @@ class Repository(Protocol):
     def delete_observation(self, observation_id: str) -> bool: ...
     def save_brief(self, brief: Brief) -> Brief: ...
     def get_brief(self) -> Brief | None: ...
+    def add_signal(self, signal: Signal) -> Signal: ...
+    def get_signal(self, signal_id: str) -> Signal | None: ...
+    def list_signals(self, unread_only: bool = False, limit: int = 50) -> list[Signal]: ...
+    def mark_signal_read(self, signal_id: str) -> Signal | None: ...
+    def dismiss_signal(self, signal_id: str) -> Signal | None: ...
+    def count_unread_signals(self) -> int: ...
     def add_scheduled_work(self, work: ScheduledWork) -> ScheduledWork: ...
     def get_scheduled_work(self, work_id: str) -> ScheduledWork | None: ...
     def list_scheduled_work(
@@ -209,6 +236,7 @@ class InMemoryRepository:
         self.messages: dict[str, Message] = {}
         self.observations: dict[str, Observation] = {}
         self.brief: Brief | None = None
+        self.signals: dict[str, Signal] = {}
         self.scheduled_work: dict[str, ScheduledWork] = {}
 
     def add_job(self, job: Job) -> Job:
@@ -475,6 +503,40 @@ class InMemoryRepository:
     def get_brief(self) -> Brief | None:
         return self.brief
 
+    def add_signal(self, signal: Signal) -> Signal:
+        self.signals[signal.id] = signal
+        return signal
+
+    def get_signal(self, signal_id: str) -> Signal | None:
+        return self.signals.get(signal_id)
+
+    def list_signals(self, unread_only: bool = False, limit: int = 50) -> list[Signal]:
+        items = (
+            unread_signals(list(self.signals.values()))
+            if unread_only
+            else rank_signals(list(self.signals.values()))
+        )
+        return page(items, limit)
+
+    def mark_signal_read(self, signal_id: str) -> Signal | None:
+        signal = self.signals.get(signal_id)
+        if signal is None:
+            return None
+        if signal.read_at is None:
+            signal.read_at = datetime.now(timezone.utc)
+        return signal
+
+    def dismiss_signal(self, signal_id: str) -> Signal | None:
+        signal = self.signals.get(signal_id)
+        if signal is None:
+            return None
+        if signal.dismissed_at is None:
+            signal.dismissed_at = datetime.now(timezone.utc)
+        return signal
+
+    def count_unread_signals(self) -> int:
+        return len(unread_signals(list(self.signals.values())))
+
     def add_scheduled_work(self, work: ScheduledWork) -> ScheduledWork:
         self.scheduled_work[work.id] = work
         return work
@@ -519,6 +581,7 @@ class InMemoryRepository:
         self.messages.clear()
         self.observations.clear()
         self.brief = None
+        self.signals.clear()
 
     def reload(self) -> None:
         """Reset in-memory state; there is no external store to re-read."""

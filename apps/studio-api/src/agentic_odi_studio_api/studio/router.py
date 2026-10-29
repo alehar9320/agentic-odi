@@ -94,6 +94,7 @@ from agentic_odi_studio_api.studio.schemas import (
     ScheduleWorkRequest,
     SettingsResponse,
     SettingsUpdateRequest,
+    SignalActionRequest,
     TurnModel,
     TurnNode,
     UpdateConversationRequest,
@@ -652,6 +653,80 @@ async def delete_outcome(
     except Exception as exc:  # noqa: BLE001
         raise _as_http_error(exc) from exc
     return {"deleted": outcome_id}
+
+
+@router.get("/signals", response_model=list[dict[str, Any]])
+async def get_signals(
+    request: Request,
+    unread_only: bool = Query(False),
+    limit: int = Query(50, ge=1, le=1000),
+    mcp_url: str | None = Query(None),
+) -> list[dict[str, Any]]:
+    """The signal feed, newest first. Same facts under both backends."""
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(mcp_url or ""),
+            ToolName.LIST_SIGNALS.value,
+            {"unread_only": unread_only, "limit": limit},
+        )
+        parsed = _json_or_raw(result)
+        return parsed if isinstance(parsed, list) else []
+    return [
+        signal.model_dump(mode="json")
+        for signal in _service(request).list_signals(unread_only=unread_only, limit=limit)
+    ]
+
+
+@router.get("/signals/unread-count")
+async def get_signal_unread_count(
+    request: Request, mcp_url: str | None = Query(None)
+) -> dict[str, int]:
+    """What the bell badge shows. Suppressed and dismissed signals never count."""
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(mcp_url or ""),
+            ToolName.LIST_SIGNALS.value,
+            {"unread_only": True, "limit": 1000},
+        )
+        parsed = _json_or_raw(result)
+        return {"count": len(parsed) if isinstance(parsed, list) else 0}
+    return {"count": _service(request).count_unread_signals()}
+
+
+@router.post("/signals/{signal_id}/read")
+async def post_signal_read(
+    signal_id: str, body: SignalActionRequest, request: Request
+) -> dict[str, Any]:
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(body.mcp_url),
+            ToolName.MARK_SIGNAL_READ.value,
+            {"signal_id": signal_id},
+        )
+        return _payload_from_text(result)
+    try:
+        signal = _service(request).mark_signal_read(signal_id)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return signal.model_dump(mode="json")
+
+
+@router.post("/signals/{signal_id}/dismiss")
+async def post_signal_dismiss(
+    signal_id: str, body: SignalActionRequest, request: Request
+) -> dict[str, Any]:
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(body.mcp_url),
+            ToolName.DISMISS_SIGNAL.value,
+            {"signal_id": signal_id},
+        )
+        return _payload_from_text(result)
+    try:
+        signal = _service(request).dismiss_signal(signal_id)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return signal.model_dump(mode="json")
 
 
 def _customer_outcome_args(body: AddCustomerOutcomeRequest) -> dict[str, Any]:

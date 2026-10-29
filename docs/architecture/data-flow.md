@@ -4,7 +4,7 @@
 
 | Layer | Owns | Persists |
 |---|---|---|
-| `packages/core` | `Job`, `Step`, `Outcome`, `CustomerOutcome`, `Conversation`, `Message`, `Observation`, `Brief`, `ODIService`, repository protocol | SQLite event log + snapshots |
+| `packages/core` | `Job`, `Step`, `Outcome`, `CustomerOutcome`, `Signal`, `Conversation`, `Message`, `Observation`, `Brief`, `ODIService`, repository protocol | SQLite event log + snapshots |
 | `apps/mcp-server` | MCP tool adapters over `ODIService` | `build_repository()` selects SQLite in production and in-memory for `AGENTIC_ODI_DB=:memory:` |
 | `apps/studio-api` | Studio API, canvas projection, chat tool loop, conversation history, PM memory | The same repository: jobs, the thread, and what the agent learned are appended to one event log; the provider key lives in `~/.agentic-odi/studio.json` (`0600`) |
 | `packages/connectors` | Connector protocol, presets, record mapping | Shared `connectors.json` registry; ingested batches land in an in-process sink |

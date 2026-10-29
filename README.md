@@ -77,6 +77,11 @@ per-platform archives with SHA-256 checksums for a manual download. See
   tools any agent can call.
 - **Local-first by default.** The CLI and server work with no network and no
   account. Point them at a remote MCP server with one flag.
+- **A catch-up that means something.** Writes emit signals — an outcome
+  re-scored, evidence promoted, a job map completed — stored in the same
+  event log and read by the CLI, any MCP client, and the Studio's bell.
+  Nothing is invented, and the feed is deduped and budgeted so it stays
+  worth opening.
 
 ## How it works
 
@@ -123,6 +128,7 @@ or `AGENTIC_ODI_MCP_PORT=8010`. The flag wins over the environment variable.
 ```bash
 odi jobs list
 odi desired-outcomes list --job-id <id>
+odi signals unread                    # what changed while you were away
 odi score 8 2                        # → 14.00
 odi                                  # interactive chat in a terminal
 ```

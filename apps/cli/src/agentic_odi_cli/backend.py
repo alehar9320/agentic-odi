@@ -648,6 +648,33 @@ class LocalBackend(Backend):
             raise BackendError(observation_not_found(observation_id)) from None
         return observation.model_dump()
 
+    def _list_signals(self, args: dict[str, Any]) -> list[dict[str, Any]]:
+        signals = self.service.list_signals(
+            unread_only=bool(args.get("unread_only", False)),
+            limit=int(args.get("limit", 50)),
+        )
+        return [signal.model_dump(mode="json") for signal in signals]
+
+    def _mark_signal_read(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import SignalNotFoundError
+
+        signal_id = args["signal_id"]
+        try:
+            signal = self.service.mark_signal_read(signal_id)
+        except SignalNotFoundError:
+            raise BackendError(f"signal not found: {signal_id}") from None
+        return signal.model_dump(mode="json")
+
+    def _dismiss_signal(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import SignalNotFoundError
+
+        signal_id = args["signal_id"]
+        try:
+            signal = self.service.dismiss_signal(signal_id)
+        except SignalNotFoundError:
+            raise BackendError(f"signal not found: {signal_id}") from None
+        return signal.model_dump(mode="json")
+
 
 _LOCAL_HANDLERS = {
     "add_job": LocalBackend._add_job,
@@ -691,6 +718,9 @@ _LOCAL_HANDLERS = {
     "list_observations": LocalBackend._list_observations,
     "confirm_observation": LocalBackend._confirm_observation,
     "dismiss_observation": LocalBackend._dismiss_observation,
+    "list_signals": LocalBackend._list_signals,
+    "mark_signal_read": LocalBackend._mark_signal_read,
+    "dismiss_signal": LocalBackend._dismiss_signal,
 }
 
 
@@ -757,6 +787,7 @@ _LIST_TOOLS = frozenset(
         "list_evidence",
         "list_conversations",
         "list_observations",
+        "list_signals",
         "list_scheduled_work",
     }
 )
