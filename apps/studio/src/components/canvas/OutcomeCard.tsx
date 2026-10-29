@@ -12,7 +12,15 @@ import { useStudio } from "../../state/StudioContext";
 import type { Outcome } from "../../types";
 import { CopyIcon } from "../icons";
 
-export function OutcomeCard({ outcome, sample = false }: { outcome: Outcome; sample?: boolean }) {
+export function OutcomeCard({
+  outcome,
+  sample = false,
+  detail = false,
+}: {
+  outcome: Outcome;
+  sample?: boolean;
+  detail?: boolean;
+}) {
   const { ask, canvasState, deleteOutcome, pushToast, saveThesis, settings, updateOutcome } =
     useStudio();
   // Records captured against this outcome, with their way back to the source.
@@ -35,7 +43,9 @@ export function OutcomeCard({ outcome, sample = false }: { outcome: Outcome; sam
   const outcomeId = outcome.id ?? "O";
   useEffect(() => {
     const id = outcome.id;
-    if (!id || sample) return;
+    // Only the detail card reads history: the list renders one card per
+    // outcome, and a note there would be one request per row.
+    if (!detail || !id || sample) return;
     let cancelled = false;
     void fetchOutcomeHistory(id, settings.mcp_url)
       .then((snapshots) => {
@@ -51,9 +61,9 @@ export function OutcomeCard({ outcome, sample = false }: { outcome: Outcome; sam
     return () => {
       cancelled = true;
     };
-  }, [outcome.id, sample, settings.mcp_url]);
+  }, [detail, outcome.id, sample, settings.mcp_url]);
 
-  const latestNote = !sample && noteFor?.id === outcome.id ? noteFor.note : null;
+  const latestNote = detail && !sample && noteFor?.id === outcome.id ? noteFor.note : null;
 
   const opp = outcome.opportunity_score;
   const statement = outcome.statement ?? "Untitled outcome";

@@ -593,7 +593,7 @@ function OpportunityMatrixView({
       <div>
         {activeOutcome ? (
           <div style={{ position: "sticky", top: 16 }}>
-            <OutcomeCard outcome={activeOutcome} sample={sample} />
+            <OutcomeCard outcome={activeOutcome} sample={sample} detail />
           </div>
         ) : (
           <div

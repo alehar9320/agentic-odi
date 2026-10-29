@@ -52,7 +52,7 @@ describe("OutcomeCard note", () => {
       },
     ]);
 
-    render(<OutcomeCard outcome={outcome} />);
+    render(<OutcomeCard outcome={outcome} detail />);
 
     await waitFor(() =>
       expect(screen.getByTestId("outcome-note")).toHaveTextContent("after the review"),
@@ -65,7 +65,7 @@ describe("OutcomeCard note", () => {
       { id: "S-1", outcome_id: "O-101", at: "2026-01-01T00:00:00+00:00", satisfaction: 2 },
     ]);
 
-    render(<OutcomeCard outcome={outcome} />);
+    render(<OutcomeCard outcome={outcome} detail />);
 
     await waitFor(() => expect(history).toHaveBeenCalled());
     expect(screen.queryByTestId("outcome-note")).toBeNull();
@@ -74,9 +74,27 @@ describe("OutcomeCard note", () => {
   it("stays quiet when history cannot be read", async () => {
     history.mockRejectedValue(new Error("unreachable"));
 
-    render(<OutcomeCard outcome={outcome} />);
+    render(<OutcomeCard outcome={outcome} detail />);
 
     await waitFor(() => expect(history).toHaveBeenCalled());
+    expect(screen.queryByTestId("outcome-note")).toBeNull();
+  });
+
+  it("does not read history for a list card", async () => {
+    history.mockResolvedValue([
+      {
+        id: "S-1",
+        outcome_id: "O-101",
+        at: "2026-01-01T00:00:00+00:00",
+        satisfaction: 2,
+        note: "should not load",
+      },
+    ]);
+
+    render(<OutcomeCard outcome={outcome} />);
+
+    await Promise.resolve();
+    expect(history).not.toHaveBeenCalled();
     expect(screen.queryByTestId("outcome-note")).toBeNull();
   });
 });
