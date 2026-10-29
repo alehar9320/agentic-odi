@@ -700,6 +700,34 @@ class LocalBackend(Backend):
             raise BackendError(candidate_not_found(args["candidate_id"])) from None
         return args["candidate_id"]
 
+    def _accept_candidate(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import CandidateNotFoundError, candidate_not_found
+
+        try:
+            candidate, outcome, evidence = self.service.accept_candidate(
+                args["candidate_id"],
+                importance=args["importance"],
+                satisfaction=args["satisfaction"],
+                statement=args.get("statement"),
+                step_id=args.get("step_id"),
+            )
+        except CandidateNotFoundError:
+            raise BackendError(candidate_not_found(args["candidate_id"])) from None
+        return {
+            "candidate": candidate.model_dump(mode="json"),
+            "outcome": outcome.model_dump(mode="json"),
+            "evidence": evidence.model_dump(mode="json"),
+        }
+
+    def _reject_candidate(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import CandidateNotFoundError, candidate_not_found
+
+        try:
+            candidate = self.service.reject_candidate(args["candidate_id"], reason=args["reason"])
+        except CandidateNotFoundError:
+            raise BackendError(candidate_not_found(args["candidate_id"])) from None
+        return candidate.model_dump(mode="json")
+
     def _evaluate_outcome(self, args: dict[str, Any]) -> str:
         from agentic_odi_core import job_not_found
         from agentic_odi_core.evaluation import (
@@ -817,6 +845,8 @@ _LOCAL_HANDLERS = {
     "list_candidates": LocalBackend._list_candidates,
     "update_candidate": LocalBackend._update_candidate,
     "delete_candidate": LocalBackend._delete_candidate,
+    "accept_candidate": LocalBackend._accept_candidate,
+    "reject_candidate": LocalBackend._reject_candidate,
     "promote_evidence": LocalBackend._promote_evidence,
     "schedule_work": LocalBackend._schedule_work,
     "get_scheduled_work": LocalBackend._get_scheduled_work,

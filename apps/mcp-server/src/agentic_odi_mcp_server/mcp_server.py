@@ -754,6 +754,55 @@ def delete_candidate(candidate_id: str) -> str:
 
 
 @mcp.tool
+def accept_candidate(
+    candidate_id: str,
+    importance: float,
+    satisfaction: float,
+    statement: str | None = None,
+    step_id: str | None = None,
+) -> str:
+    """Accept a candidate into exactly one outcome, with its quote as evidence.
+
+    The edited ``statement`` (or the proposed one) is validated before any
+    write; then one Outcome is created, the verbatim quote is written as an
+    Evidence row, and the candidate is marked ``accepted``. Accepting twice
+    returns what the first acceptance produced, so a retry never duplicates the
+    outcome or its evidence.
+    """
+    try:
+        candidate, outcome, evidence = service.accept_candidate(
+            candidate_id,
+            importance=importance,
+            satisfaction=satisfaction,
+            statement=statement,
+            step_id=step_id,
+        )
+    except CandidateNotFoundError:
+        return _candidate_not_found(candidate_id)
+    except (OdiError, ValueError) as exc:
+        return f"Error: {exc}"
+    return json.dumps(
+        {
+            "candidate": candidate.model_dump(mode="json"),
+            "outcome": outcome.model_dump(mode="json"),
+            "evidence": evidence.model_dump(mode="json"),
+        }
+    )
+
+
+@mcp.tool
+def reject_candidate(candidate_id: str, reason: str) -> str:
+    """Reject a candidate with a nonblank reason, keeping it and its quote."""
+    try:
+        candidate = service.reject_candidate(candidate_id, reason=reason)
+    except CandidateNotFoundError:
+        return _candidate_not_found(candidate_id)
+    except (OdiError, ValueError) as exc:
+        return f"Error: {exc}"
+    return candidate.model_dump_json()
+
+
+@mcp.tool
 def promote_evidence(
     evidence_id: str,
     target: str,
