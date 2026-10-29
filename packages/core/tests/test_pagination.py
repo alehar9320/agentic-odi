@@ -55,7 +55,7 @@ def test_page_rejects_negative_values() -> None:
 def _seed(repo) -> tuple[Job, list[Step]]:
     job = repo.add_job(Job(name="Deploy", description="Ship a service"))
     steps = [
-        repo.add_step(Step(id=f"STEP-{i}", job_id=job.id, name=f"step {i}", order=i + 1))
+        repo.add_step(Step(id=f"STEP-{i}", job_id=job.id, name=f"step {i}", order=i))
         for i in range(5)
     ]
     for i, step in enumerate(steps):
@@ -136,13 +136,13 @@ def test_service_pages_job_map_in_step_order() -> None:
     job = service.add_job(name="Deploy")
 
     # Insert out of order: pagination must still return ascending order.
-    for order in (4, 1, 5, 2, 3):
+    for order in (3, 0, 4, 1, 2):
         service.add_step(job_id=job.id, name=f"step {order}", order=order)
 
     full = service.get_job_map(job.id)
-    assert [s.order for s in full] == [1, 2, 3, 4, 5]
-    assert [s.order for s in service.get_job_map(job.id, limit=2)] == [1, 2]
-    assert [s.order for s in service.get_job_map(job.id, limit=2, offset=3)] == [4, 5]
+    assert [s.order for s in full] == [0, 1, 2, 3, 4]
+    assert [s.order for s in service.get_job_map(job.id, limit=2)] == [0, 1]
+    assert [s.order for s in service.get_job_map(job.id, limit=2, offset=3)] == [3, 4]
 
 
 def test_service_passes_pagination_through() -> None:
@@ -150,7 +150,7 @@ def test_service_passes_pagination_through() -> None:
     service = ODIService(repo)
     job = service.add_job(name="Deploy")
     for i in range(3):
-        step = service.add_step(job_id=job.id, name=f"step {i}", order=i + 1)
+        step = service.add_step(job_id=job.id, name=f"step {i}", order=i)
         service.add_customer_outcome(
             job_id=job.id,
             customer_value=_customer_value(i),

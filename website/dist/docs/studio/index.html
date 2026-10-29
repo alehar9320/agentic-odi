@@ -1,0 +1,865 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Running The Living Studio</title>
+  <meta name="description" content="The chat-first interface, its first run, and the desktop app.">
+  <meta name="color-scheme" content="dark light">
+  <meta name="theme-color" content="#0a0b0e">
+
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Agentic ODI">
+  <meta property="og:title" content="Running The Living Studio">
+  <meta property="og:description" content="The chat-first interface, its first run, and the desktop app.">
+  <meta property="og:url" content="https://alehar9320.github.io/agentic-odi/docs/studio/index.html">
+  <meta property="og:image" content="https://alehar9320.github.io/agentic-odi/assets/og.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Running The Living Studio">
+  <meta name="twitter:description" content="The chat-first interface, its first run, and the desktop app.">
+  <meta name="twitter:image" content="https://alehar9320.github.io/agentic-odi/assets/og.png">
+
+  <link rel="canonical" href="https://alehar9320.github.io/agentic-odi/docs/studio/index.html">
+  <script src="../../assets/theme.js"></script>
+  <link rel="stylesheet" href="../../assets/tokens.css">
+  <link rel="stylesheet" href="../../assets/style.css">
+  <link rel="icon" type="image/svg+xml" href="../../assets/favicon.svg">
+  <link rel="icon" type="image/png" href="../../assets/favicon.png" sizes="32x32">
+  <link rel="sitemap" type="application/xml" href="https://alehar9320.github.io/agentic-odi/sitemap.xml">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <header class="site-header">
+    <div class="site-header__inner">
+      <a class="brand" href="https://alehar9320.github.io/agentic-odi/">
+        <img src="../../assets/mark.svg" alt="" width="24" height="24" aria-hidden="true">
+        <span class="brand__name">Agentic&nbsp;ODI</span>
+      </a>
+      <nav class="site-nav" aria-label="Primary">
+        <a href="https://alehar9320.github.io/agentic-odi/#studio">The&nbsp;Studio</a>
+        <a href="https://alehar9320.github.io/agentic-odi/#how">How&nbsp;it&nbsp;works</a>
+        <a href="https://alehar9320.github.io/agentic-odi/docs/">Docs</a>
+      </nav>
+      <div class="site-header__actions">
+      <button
+        class="theme-toggle"
+        type="button"
+        aria-label="Switch to the light theme"
+        title="Switch theme"
+      >
+        <svg class="theme-toggle__sun" viewBox="0 0 24 24" width="17" height="17" aria-hidden="true" focusable="false">
+          <circle cx="12" cy="12" r="4.2" fill="none" stroke="currentColor" stroke-width="1.8"></circle>
+          <path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
+        </svg>
+        <svg class="theme-toggle__moon" viewBox="0 0 24 24" width="17" height="17" aria-hidden="true" focusable="false">
+          <path d="M20 14.2A8.4 8.4 0 0 1 9.8 4a8.5 8.5 0 1 0 10.2 10.2Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"></path>
+        </svg>
+      </button>
+      <a class="btn btn--primary btn--sm" href="https://alehar9320.github.io/agentic-odi/#run">Run it in 60 seconds</a>
+      </div>
+    </div>
+  </header>
+
+  <main id="main">
+<div class="doc">
+  <aside class="doc__nav" aria-label="Documentation">
+    <a class="doc__back" href="https://alehar9320.github.io/agentic-odi/">← Agentic ODI</a>
+    <div class="doc__group">
+      <p class="doc__group-title">Get started</p>
+      <ul class="doc__list">
+        <li>
+          <a class="doc__link"
+             href="https://alehar9320.github.io/agentic-odi/docs/quick-start/">Quick start</a>
+        </li>
+        <li>
+          <a class="doc__link"
+             href="https://alehar9320.github.io/agentic-odi/docs/installation/">Installation</a>
+        </li>
+        <li>
+          <a class="doc__link is-current"
+             href="https://alehar9320.github.io/agentic-odi/docs/studio/">The Living Studio</a>
+        </li>
+        <li>
+          <a class="doc__link"
+             href="https://alehar9320.github.io/agentic-odi/docs/local-llm/">Local LLM backend</a>
+        </li>
+      </ul>
+    </div>
+    <div class="doc__group">
+      <p class="doc__group-title">Build</p>
+      <ul class="doc__list">
+        <li>
+          <a class="doc__link"
+             href="https://alehar9320.github.io/agentic-odi/docs/cli/">CLI reference</a>
+        </li>
+        <li>
+          <a class="doc__link"
+             href="https://alehar9320.github.io/agentic-odi/docs/connectors/">Connectors</a>
+        </li>
+        <li>
+          <a class="doc__link"
+             href="https://alehar9320.github.io/agentic-odi/docs/mcp/">MCP tool reference</a>
+        </li>
+        <li>
+          <a class="doc__link"
+             href="https://alehar9320.github.io/agentic-odi/docs/architecture/">Architecture</a>
+        </li>
+      </ul>
+    </div>
+    <div class="doc__group">
+      <p class="doc__group-title">Operate</p>
+      <ul class="doc__list">
+        <li>
+          <a class="doc__link"
+             href="https://alehar9320.github.io/agentic-odi/docs/deployment/">Deployment</a>
+        </li>
+        <li>
+          <a class="doc__link"
+             href="https://alehar9320.github.io/agentic-odi/docs/development/">Development</a>
+        </li>
+        <li>
+          <a class="doc__link"
+             href="https://alehar9320.github.io/agentic-odi/docs/roadmap/">Roadmap</a>
+        </li>
+      </ul>
+    </div>
+  </aside>
+
+  <article class="doc__body">
+    <header class="doc__head">
+      <p class="eyebrow">Get started</p>
+      <h1 class="doc__title">Running The Living Studio</h1>
+<p class="lead">The chat-first interface, its first run, and the desktop app.</p>    </header>
+
+    <div class="prose">
+      <p><strong>The Living Studio</strong> is the conversational GUI for Outcome-Driven Innovation:
+an interactive Opportunity Landscape, Universal Job Map, WYSIWYG Impact
+Simulation, and Causal Lineage inspection, paired with an autonomous agent
+connected to the MCP server.</p>
+<p>The Studio runs three ways locally, plus a hosted deployment. All of them serve
+the same SPA, which talks only to the sidecar on <code>http://127.0.0.1:8100</code> — the
+SPA never contacts MCP or the LLM directly.</p>
+<h2 id="architecture">Architecture<a class="heading-anchor" href="#architecture" aria-label="Copy link to this section" title="Copy link">#</a></h2><pre class="highlight"><code class="language-text">┌────────────────────────────┐  /api (JSON)  ┌───────────────────────────────┐
+│  Living Studio SPA         │ ────────────▶ │  apps/studio-api (sidecar)    │
+│  React + TS + Vite         │  /api/chat    │  FastAPI on 127.0.0.1:8100    │
+│  (browser or Tauri webview)│ ◀──────────── │  - config / health / canvas   │
+└────────────────────────────┘  SSE stream   │  - steps / outcomes (via MCP) │
+                                             │  - /api/chat (LLM tool-loop)  │
+                                             │  - conversations + PM memory  │
+                                             └───────────────┬───────────────┘
+                                                             │ MCP (HTTP)
+                                                             ▼
+                                             ┌───────────────────────────────┐
+                                             │  apps/mcp-server :8000/mcp    │
+                                             └───────────────────────────────┘
+                                                             ▲
+                                                             │ OpenAI-compatible
+                                             ┌───────────────┴───────────────┐
+                                             │  Your local LLM backend       │
+                                             └───────────────────────────────┘
+</code></pre><h2 id="interface">Interface<a class="heading-anchor" href="#interface" aria-label="Copy link to this section" title="Copy link">#</a></h2><p>The Studio opens as a conversation, not a dashboard.</p>
+<table>
+<thead>
+<tr>
+<th>Surface</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>First-run tour</strong></td>
+<td>A four-step, skippable welcome on the very first visit: what the studio is, which ambition brought you here, the live state of your sidecar/MCP/model (with inline repair when the model is down), and the first move. The four doors are <strong>I have one in mind</strong>, <strong>My boss handed me a priority</strong>, <strong>Help me find the next one</strong>, and <strong>Pressure-test a bet</strong>; each starts the matching conversation. Replay it from <strong>Settings → Replay the welcome tour</strong>.</td>
+</tr>
+<tr>
+<td><strong>First run</strong></td>
+<td>A short conversation in the chat, not a form: what you are building, who feels the problem, the job they are trying to get done, then where it hurts. One question at a time, with a reflection before the next ask, quick replies, and <strong>Explore on my own</strong> always visible. Skipping is allowed; answers and progress are kept as a draft. Re-open it any time with <code>/start</code>, the home stage's context pill, or Settings.</td>
+</tr>
+<tr>
+<td><strong>Hero</strong></td>
+<td>One rotating headline above the composer: a greeting (time of day, plus your name if you set one in Settings), the product/job you set up, what is already on the canvas, or an intent-first prompt such as <em>What are you trying to win this quarter?</em> It cycles every few seconds and stays still under <code>prefers-reduced-motion</code>.</td>
+</tr>
+<tr>
+<td><strong>Suggestion pills</strong></td>
+<td>Below the headline. <strong>Sharpen an opportunity</strong> always starts a conversation; the next pill becomes <strong>Pressure-test a bet</strong> once outcomes exist, or <strong>Find the next opportunity</strong> before that. <strong>Capture what you heard</strong> replaces the landscape pill once a job exists. They change as the canvas fills up.</td>
+</tr>
+<tr>
+<td><strong>Composer</strong></td>
+<td>Docked at the bottom of the transcript. <code>Enter</code> sends, <code>Shift</code>+<code>Enter</code> adds a line, <code>Cmd/Ctrl</code>+<code>K</code> focuses it, <code>/</code> opens the command palette, and the paperclip attaches a text file or an image. The send button becomes a stop button while a reply streams.</td>
+</tr>
+<tr>
+<td><strong>Bar</strong></td>
+<td>The only persistent chrome: home, new conversation, catch-up, live model status, and settings. There is no navigation drawer to compete with the thread.</td>
+</tr>
+<tr>
+<td><strong>Rail</strong></td>
+<td>Above the conversation, and only once the thread has produced something: <code>Landscape · N</code>, <code>Job map · N</code>, <code>Evidence · N</code>, <code>What I know · N</code>. Every item is derived from the canvas and the memory, so the strip is a record of the work rather than a fixed menu.</td>
+</tr>
+<tr>
+<td><strong>Lens</strong></td>
+<td>A view docks to the right of the thread on wide screens and becomes a full-height sheet on narrow ones. The transcript and the composer stay on screen and stay usable; <code>Esc</code>, <strong>Close</strong>, or the rail chip closes it. Every lens ends in one sentence that re-enters the conversation — <em>Ask which to chase</em>, <em>Walk me through the job</em>, <em>Weigh the evidence</em> — so leaving a view is never a return to a menu. Settings and catch-up use the same lens.</td>
+</tr>
+</tbody>
+</table>
+<p>Replies render Markdown (headings, lists, emphasis, inline and fenced code).
+Reasoning sits in a collapsed disclosure above the answer, and every tool call is
+a trace chip with the source the turn actually read.</p>
+<h3 id="slash-commands">Slash commands<a class="heading-anchor" href="#slash-commands" aria-label="Copy link to this section" title="Copy link">#</a></h3><p>Type <code>/</code> to open the palette. <code>Up</code>/<code>Down</code> move, <code>Enter</code> or <code>Tab</code> runs the
+selected command, <code>Esc</code> closes it. Commands are handled in the SPA and never call
+the model, so they work when it is offline.</p>
+<table>
+<thead>
+<tr>
+<th>Command</th>
+<th>Effect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/help</code></td>
+<td>Every command, as a notice in the transcript</td>
+</tr>
+<tr>
+<td><code>/start</code></td>
+<td>Resume the context conversation</td>
+</tr>
+<tr>
+<td><code>/new</code></td>
+<td>New conversation</td>
+</tr>
+<tr>
+<td><code>/home</code></td>
+<td>Return to the empty stage</td>
+</tr>
+<tr>
+<td><code>/jobs</code></td>
+<td>Job summary, then the job map</td>
+</tr>
+<tr>
+<td><code>/landscape</code>, <code>/jobmap</code>, <code>/evidence</code>, <code>/settings</code></td>
+<td>Open that lens beside the conversation</td>
+</tr>
+<tr>
+<td><code>/impact</code>, <code>/capture</code></td>
+<td>Start the conversation that produces the card. <code>/capture</code> falls back to the offline form when no model answers.</td>
+</tr>
+<tr>
+<td><code>/status</code></td>
+<td>Model, MCP, context, and canvas status</td>
+</tr>
+</tbody>
+</table>
+<p>Unknown commands produce a transcript notice pointing at <code>/help</code>.</p>
+<h3 id="the-welcome-tour">The welcome tour<a class="heading-anchor" href="#the-welcome-tour" aria-label="Copy link to this section" title="Copy link">#</a></h3><p>The tour is the front door, the context conversation is the first room. It is
+skippable at every step (<code>Skip the tour</code> or <code>Escape</code>), resumable (progress is
+stored after every transition in <code>localStorage[&quot;studio.onboarding&quot;]</code>), and
+replayable from Settings.</p>
+<p>Everything lives in <code>apps/studio/src/onboarding/</code>:</p>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Role</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>content.ts</code></td>
+<td>Steps and goal copy as typed data — the only place the words live</td>
+</tr>
+<tr>
+<td><code>machine.ts</code></td>
+<td>Pure state transitions, no React or storage</td>
+</tr>
+<tr>
+<td><code>storage.ts</code></td>
+<td>Versioned, defensive <code>localStorage</code> persistence</td>
+</tr>
+<tr>
+<td><code>OnboardingProvider.tsx</code></td>
+<td>Auto-open, persistence, replay</td>
+</tr>
+<tr>
+<td><code>FirstRunWizard.tsx</code>, <code>steps.tsx</code>, <code>onboarding.css</code></td>
+<td>The dialog</td>
+</tr>
+<tr>
+<td><code>../features/flags.ts</code></td>
+<td>The <code>firstRunWizard</code> toggle</td>
+</tr>
+</tbody>
+</table>
+<p><code>App.tsx</code> only wires the provider and the wizard around the existing shell;
+the chat, canvas, and sidecar code are untouched.</p>
+<h4 id="toggling-the-tour">Toggling the tour<a class="heading-anchor" href="#toggling-the-tour" aria-label="Copy link to this section" title="Copy link">#</a></h4><p><code>firstRunWizard</code> defaults to on. Resolution order, highest first:</p>
+<table>
+<thead>
+<tr>
+<th>Source</th>
+<th>Example</th>
+<th>Use</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Query parameter</td>
+<td><code>?flags=firstRunWizard:off</code></td>
+<td>QA a build without rebuilding</td>
+</tr>
+<tr>
+<td>Local override</td>
+<td><code>localStorage[&quot;studio.flags.firstRunWizard&quot;] = &quot;off&quot;</code></td>
+<td>Per-browser opt-out</td>
+</tr>
+<tr>
+<td>Build environment</td>
+<td><code>VITE_STUDIO_FIRST_RUN_WIZARD=off npm --prefix apps/studio run build</code></td>
+<td>Ship it dark</td>
+</tr>
+<tr>
+<td>Default</td>
+<td>on</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p>Accepted values are <code>1</code>/<code>0</code>, <code>true</code>/<code>false</code>, <code>on</code>/<code>off</code>, <code>yes</code>/<code>no</code>, and
+<code>enabled</code>/<code>disabled</code>. With the flag off, no dialog renders, no onboarding state
+is written, and Settings hides the replay action.</p>
+<h3 id="guidance-not-gates">Guidance, not gates<a class="heading-anchor" href="#guidance-not-gates" aria-label="Copy link to this section" title="Copy link">#</a></h3><p>The setup conversation is a nudge, never a prerequisite. If you skip it, the
+home stage keeps a dashed <strong>Tell me what you're building</strong> pill; it reopens the
+conversation exactly where you left off. <code>/start</code> and Settings do the same. The conversation also understands a
+natural reply: say &quot;skip&quot;, &quot;not now&quot;, or &quot;show me the landscape&quot; and it reacts
+instead of recording it as an answer. When a brief exists, it opens on a review
+and asks what changed rather than asking everything again.</p>
+<h3 id="without-a-model">Without a model<a class="heading-anchor" href="#without-a-model" aria-label="Copy link to this section" title="Copy link">#</a></h3><p>When the LLM is unreachable the Studio keeps working:</p>
+<ul>
+<li>A <strong>Working by hand</strong> strip explains the state and offers capture, job map,
+and context.</li>
+<li>Messages still return deterministic ODI guidance from the sidecar, labelled
+<strong>Local guidance</strong>.</li>
+<li>Jobs can be created, renamed, and deleted; steps added, edited, and removed;
+outcomes recorded, re-scored, and removed. All of it goes through the same
+local repository the model uses.</li>
+<li>Settings → Base URL and Model reconnect the assistant whenever you are ready.</li>
+</ul>
+<p>The user's context is sent with every chat request, so the assistant starts from
+the product, audience, job, and problem rather than asking for them again.</p>
+<h3 id="the-thread-is-the-room">The thread is the room<a class="heading-anchor" href="#the-thread-is-the-room" aria-label="Copy link to this section" title="Copy link">#</a></h3><p>Capture, scoring, simulation, and decisions are conversations. The storefront
+never asks the PM to leave the thread to do work: the agent asks for the
+customer's words or the bet in plain language, then renders the surface that
+carries it. A lens exists for reading and for people who prefer a click, not for
+doing the work.</p>
+<p>That is also enforced in the agent's system prompt: it is told to keep every
+artifact in the conversation, never to send the PM to a panel, and to end each
+reply with the next move as an action on the surface.</p>
+<h3 id="the-conversation-runtime">The conversation runtime<a class="heading-anchor" href="#the-conversation-runtime" aria-label="Copy link to this section" title="Copy link">#</a></h3><p>The transcript is not a hand-rolled message list. It runs on <strong>assistant-ui</strong>,
+a React runtime for streaming assistants, bound to the Studio's own store with
+<code>useExternalStoreRuntime</code>, so the thread gains real conversation capabilities
+without giving up the message model the sidecar already understands.</p>
+<table>
+<thead>
+<tr>
+<th>Capability</th>
+<th>What it means here</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Streaming</strong></td>
+<td><code>delta</code> frames append to the open prose part; the send button becomes stop.</td>
+</tr>
+<tr>
+<td><strong>Reasoning</strong></td>
+<td><code>reasoning</code> frames render in a collapsed <em>Thought for a moment</em> disclosure. Never persisted, never counted as the answer.</td>
+</tr>
+<tr>
+<td><strong>Tools</strong></td>
+<td>Each MCP call is a trace chip with its status and a short preview of what came back.</td>
+</tr>
+<tr>
+<td><strong>Approval</strong></td>
+<td>A writing tool (<code>add_</code>, <code>create_</code>, <code>update_</code>, <code>delete_</code>, <code>ingest_</code>, <code>remove_</code>) pauses the turn until you answer <strong>Allow</strong> or <strong>Decline</strong>. A decline is a tool result, not an error: the model is told no and may propose something else.</td>
+</tr>
+<tr>
+<td><strong>Sources</strong></td>
+<td>Every tool call that returned data emits a <code>source</code>, titled with the tool and a preview. Provenance is what the turn actually read; a citation is never invented.</td>
+</tr>
+<tr>
+<td><strong>Attachments</strong></td>
+<td>Text-like files (<code>.md</code>, <code>.mdx</code>, <code>.json</code>, <code>.csv</code>, <code>.yaml</code>, <code>.log</code>, <code>text/*</code>) and images (PNG/JPEG/WebP/GIF, at most 5 MB). Text is extracted in the browser, capped at 20k characters, and sent with the turn. Nothing is stored server-side.</td>
+</tr>
+<tr>
+<td><strong>Branching</strong></td>
+<td><strong>Edit</strong> a user turn or <strong>Regenerate</strong> a reply and both versions are kept as siblings. <code>‹ 2 of 3 ›</code> steps between them, and the visible branch is saved as the conversation's <code>head_id</code>, so a reload reopens the branch you were reading.</td>
+</tr>
+<tr>
+<td><strong>Suggestions</strong></td>
+<td>The empty-stage pills are chosen from the canvas and handed to the runtime as suggestion prompts.</td>
+</tr>
+<tr>
+<td><strong>Generative UI</strong></td>
+<td>A validated <code>UiNode</code> travels as an assistant-ui <strong>data part</strong> (<code>data-odi-surface</code>) and renders through the same <code>UiRenderer</code>. The catalog stays ours and server-validated.</td>
+</tr>
+<tr>
+<td><strong>Voice</strong></td>
+<td>Deliberately not wired yet. The seam is <code>adapters.dictation</code> plus <code>ComposerPrimitive.Dictate</code>: no backend change and no message-model change. It waits because Tauri's WebKit webview support for the Web Speech API is uneven, and a microphone button that works in only one shell is worse than none.</td>
+</tr>
+</tbody>
+</table>
+<h4 id="where-the-bridge-lives">Where the bridge lives<a class="heading-anchor" href="#where-the-bridge-lives" aria-label="Copy link to this section" title="Copy link">#</a></h4><table>
+<thead>
+<tr>
+<th>File</th>
+<th>Role</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>apps/studio/src/assistant/convert.ts</code></td>
+<td>The only mapping between <code>ChatMessage</code>/<code>ChatPart</code> and assistant-ui parts, in both directions. Pure, and tested without a runtime.</td>
+</tr>
+<tr>
+<td><code>apps/studio/src/assistant/StudioRuntime.tsx</code></td>
+<td><code>useExternalStoreRuntime</code>: <code>onNew</code>, <code>onEdit</code>, <code>onReload</code>, <code>onCancel</code>, <code>setMessages</code>, <code>onRespondToToolApproval</code>, suggestions, attachments.</td>
+</tr>
+<tr>
+<td><code>apps/studio/src/assistant/attachments.ts</code></td>
+<td>The attachment adapter and the browser-side text/image extraction.</td>
+</tr>
+<tr>
+<td><code>apps/studio/src/assistant/parts.tsx</code></td>
+<td>One renderer per part: text, reasoning, tool (with its approval), source, file, generated surface.</td>
+</tr>
+<tr>
+<td><code>apps/studio/src/components/chat/Conversation.tsx</code></td>
+<td><code>MessagePrimitive.Parts</code>, the branch picker, the action bar, and the in-place edit composer.</td>
+</tr>
+<tr>
+<td><code>apps/studio/src/components/chat/ThreadComposer.tsx</code></td>
+<td><code>ComposerPrimitive</code> plus the slash palette and connector chips.</td>
+</tr>
+</tbody>
+</table>
+<p>The sidecar remains the source of truth for what happened. Its additions are
+opt-in and additive: <code>reasoning</code>, <code>source</code>, and <code>approval</code> stream events;
+<code>attachments</code> and <code>approvals</code> on <code>/api/chat</code>; <code>GET /api/conversations/{id}/tree</code>; and <code>PATCH /api/conversations/{id}</code>. A client that
+sends neither flag sees exactly the stream it saw before, which is what the CLI
+and older clients do.</p>
+<p>The approval gate is per-process and single-user by design. <code>ApprovalRegistry</code>
+waits on an <code>asyncio</code> future, <code>POST /api/approvals/{id}</code> answers it, and a
+timeout (300 s) or a cancelled turn resolves as a declined write, so a turn can
+never hang and a double click can never run a tool twice. That is the right size
+for a loopback sidecar with one person at the keyboard; it is not a durable job
+queue, and it is not pretending to be one.</p>
+<h4 id="extending-the-conversation">Extending the conversation<a class="heading-anchor" href="#extending-the-conversation" aria-label="Copy link to this section" title="Copy link">#</a></h4><p>A new kind of part is added in exactly two places — the mapping in <code>convert.ts</code>
+and the component in <code>parts.tsx</code> — and then registered in the <code>components</code> map
+in <code>Conversation.tsx</code>. Do not add a second message list, and never let an unknown
+part reach the screen as JSON: the converter drops what it does not understand on
+purpose, and <code>convert.test.ts</code> holds that line.</p>
+<h3 id="what-it-remembers">What it remembers<a class="heading-anchor" href="#what-it-remembers" aria-label="Copy link to this section" title="Copy link">#</a></h3><p>The studio keeps a small, local, editable model of the person it is helping. It
+is not a profile and not a transcript index; it is the handful of things that
+change the next answer.</p>
+<table>
+<thead>
+<tr>
+<th>Kind</th>
+<th>What it captures</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>career</code></td>
+<td>The PM's role, remit, and what success looks like for them</td>
+</tr>
+<tr>
+<td><code>opportunity</code></td>
+<td>The opportunity or bet currently in play</td>
+</tr>
+<tr>
+<td><code>business</code></td>
+<td>Goals, metrics, and commercial constraints</td>
+</tr>
+<tr>
+<td><code>stakeholder</code></td>
+<td>Who else matters and what they care about</td>
+</tr>
+<tr>
+<td><code>constraint</code></td>
+<td>Time, budget, policy, or technical limits</td>
+</tr>
+<tr>
+<td><code>evidence</code></td>
+<td>What has actually been heard or measured</td>
+</tr>
+<tr>
+<td><code>preference</code></td>
+<td>How the PM likes to work and be spoken to</td>
+</tr>
+</tbody>
+</table>
+<p>Each note is <code>suggested</code> or <code>confirmed</code>. Suggested notes appear first under
+<strong>What I know</strong> with <strong>Yes, that's right</strong>, <strong>That's not it</strong>, and <strong>Edit</strong>;
+confirmed notes can be edited or forgotten. The PM can also add a note by hand.
+Nothing is silently promoted: the agent may propose, but the person decides.</p>
+<p>The agent writes notes through a <code>remember</code> tool during a normal reply. The
+sidecar applies it, emits a <code>memory</code> SSE event, and the panel updates without a
+refresh. Memory writes are best-effort — a database failure never turns a good
+answer into an error.</p>
+<p>Storage is a separate SQLite file from the ODI repository:
+<code>~/.agentic-odi/studio.db</code>, overridable with <code>AGENTIC_ODI_STUDIO_DB</code>
+(<code>:memory:</code> is supported and is what the tests use). The API is small:</p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Path</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>GET</code></td>
+<td><code>/api/memory/observations</code></td>
+<td>Everything the agent believes</td>
+</tr>
+<tr>
+<td><code>POST</code></td>
+<td><code>/api/memory/observations</code></td>
+<td>Add a note by hand</td>
+</tr>
+<tr>
+<td><code>PATCH</code></td>
+<td><code>/api/memory/observations/{id}</code></td>
+<td>Edit text, confidence, or status</td>
+</tr>
+<tr>
+<td><code>DELETE</code></td>
+<td><code>/api/memory/observations/{id}</code></td>
+<td>Forget one note</td>
+</tr>
+<tr>
+<td><code>DELETE</code></td>
+<td><code>/api/memory</code></td>
+<td>Forget all notes and conversations</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Forget everything</strong> is a two-step confirmation and also clears the visible
+thread, because the server deletes the conversations behind it.</p>
+<h3 id="the-thread-comes-back">The thread comes back<a class="heading-anchor" href="#the-thread-comes-back" aria-label="Copy link to this section" title="Copy link">#</a></h3><p>Conversations are stored beside the memory. On launch the SPA asks
+<code>GET /api/conversations/latest</code>, restores that thread's user and assistant
+turns, and continues with the same <code>conversation_id</code> on the next message. <strong>New
+conversation</strong> starts a fresh one without touching the memory; <strong>Forget
+everything</strong> removes both. The composer stays usable while the restore is in
+flight, and a restore failure simply leaves the room empty.</p>
+<h2 id="rich-responses">Rich responses<a class="heading-anchor" href="#rich-responses" aria-label="Copy link to this section" title="Copy link">#</a></h2><p>The copilot does not only talk. When a surface carries the evidence better than a
+paragraph, the agent renders one <strong>inline in the conversation</strong>: a scored
+outcome, a ranked opportunity board, a before/after simulation of a bet, a
+customer quote with its lineage, the eight-stage job map, an opportunity thesis, or a decision record.
+Three properties keep this safe and cheap to extend:</p>
+<ul>
+<li><strong>The catalog is closed and owned by the SPA.</strong>
+<code>apps/studio/src/ui/catalog.ts</code> declares nine primitives and seven cards, their
+JSON Schema props, and the description the model reads. There is no HTML, no
+eval, and no third-party component in the path. Prose is rendered by the same
+<code>Markdown</code> component the transcript already used.</li>
+<li><strong>The sidecar is catalog-agnostic.</strong> The SPA sends the catalog with each turn;
+the sidecar derives the <code>render_ui</code> tool schema from it, validates what comes
+back, and streams a <code>ui</code> SSE event. Invalid props return to the model as a tool
+result naming the exact violation, and the loop offers the tool again, so a
+fumbled prop is corrected in the same reply. A client that sends no catalog
+never sees the tool.</li>
+<li><strong>Cards are views, never actors.</strong> Every button is an <code>intent</code> string that the
+agent receives as the user's next message — one authority, one audit trail.</li>
+</ul>
+<p>A surface is one node tree, streamed as one event:</p>
+<pre class="highlight"><code class="language-json"><span class="p">{</span>
+<span class="w">  </span><span class="nt">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"outcome-card"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"props"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">"id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"O-1"</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"statement"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Minimize the time it takes to propagate secrets across environments"</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"importance"</span><span class="p">:</span><span class="w"> </span><span class="mi">9</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"satisfaction"</span><span class="p">:</span><span class="w"> </span><span class="mi">3</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">}</span>
+</code></pre><p>The opportunity thesis is the intent-first card: one opportunity with its
+importance, satisfaction, the gap in plain words, the thesis itself, and the
+smallest next move. It is the shape the agent reaches for when the PM is deciding
+what to chase, rather than when they are inspecting a single score.</p>
+<p>The conversation keeps the order the agent produced: a <code>delta</code> appends to the
+open prose part, a <code>ui</code> event opens a card, and the next <code>delta</code> opens a new
+paragraph after it. The opportunity score is computed from importance and
+satisfaction when the agent omits it, so the ODI formula has exactly one home
+(<code>src/lib/odi.ts</code>). Unknown component types degrade to a quiet fallback; a tree
+that fails validation is dropped whole, and the surrounding prose still reads.</p>
+<h3 id="adding-a-surface">Adding a surface<a class="heading-anchor" href="#adding-a-surface" aria-label="Copy link to this section" title="Copy link">#</a></h3><ol>
+<li>Add an entry to <code>CATALOG</code> in <code>apps/studio/src/ui/catalog.ts</code> — props as a
+JSON Schema subset, plus the description the model will read.</li>
+<li>Register the component in <code>apps/studio/src/ui/registry.ts</code>.</li>
+<li>Implement it in <code>apps/studio/src/ui/cards.tsx</code> (domain shape) or
+<code>apps/studio/src/ui/primitives.tsx</code> (composition).</li>
+<li>Run <code>npm --prefix apps/studio test</code>. The <code>registry parity</code> test fails if the
+catalog and the registry drift apart.</li>
+</ol>
+<p>No server change is needed, and no new dependency.</p>
+<h2 id="hosted-experimental">Hosted (experimental)<a class="heading-anchor" href="#hosted-experimental" aria-label="Copy link to this section" title="Copy link">#</a></h2><p>The built SPA is also served from Cloudflare Workers at
+<strong><a href="https://agentic-odi.alehar.workers.dev/">https://agentic-odi.alehar.workers.dev/</a></strong>.
+The UI loads without a backend; canvas data, chat, and mutations need the local
+sidecar and MCP server. Pull requests get preview URLs from Cloudflare Workers
+Builds. See <a href="../deployment/">Deployment</a> for the Worker setup.</p>
+<h2 id="1-web-production-build-recommended-for-a-quick-look">1. Web — production build (recommended for a quick look)<a class="heading-anchor" href="#1-web-production-build-recommended-for-a-quick-look" aria-label="Copy link to this section" title="Copy link">#</a></h2><pre class="highlight"><code class="language-bash">npm<span class="w"> </span>--prefix<span class="w"> </span>apps/studio<span class="w"> </span>run<span class="w"> </span>build<span class="w">   </span><span class="c1"># build the SPA into apps/studio/dist</span>
+python<span class="w"> </span>scripts/dev.py<span class="w">            </span><span class="c1"># starts MCP :8000 + sidecar :8100</span>
+</code></pre><table>
+<thead>
+<tr>
+<th>Service</th>
+<th>URL</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>MCP Server</td>
+<td>http://localhost:8000/mcp</td>
+</tr>
+<tr>
+<td>Living Studio</td>
+<td>http://127.0.0.1:8100</td>
+</tr>
+</tbody>
+</table>
+<p><code>python scripts/dev.py</code> starts both processes concurrently; press <strong>Ctrl+C</strong> to
+stop both.</p>
+<h2 id="2-web-dev-with-hot-reload">2. Web — dev with hot reload<a class="heading-anchor" href="#2-web-dev-with-hot-reload" aria-label="Copy link to this section" title="Copy link">#</a></h2><p>Vite proxies <code>/api</code> to the sidecar:</p>
+<pre class="highlight"><code class="language-bash">npm<span class="w"> </span>--prefix<span class="w"> </span>apps/studio<span class="w"> </span>run<span class="w"> </span>dev:full<span class="w">   </span><span class="c1"># MCP + sidecar + Vite together</span>
+<span class="c1"># open http://localhost:5173</span>
+</code></pre><h2 id="3-desktop-tauri-2">3. Desktop — Tauri 2<a class="heading-anchor" href="#3-desktop-tauri-2" aria-label="Copy link to this section" title="Copy link">#</a></h2><p>The app spawns the MCP server and sidecar itself:</p>
+<pre class="highlight"><code class="language-bash">npm<span class="w"> </span>--prefix<span class="w"> </span>apps/studio<span class="w"> </span>run<span class="w"> </span>tauri<span class="w"> </span>dev<span class="w">     </span><span class="c1"># dev window</span>
+npm<span class="w"> </span>--prefix<span class="w"> </span>apps/studio<span class="w"> </span>run<span class="w"> </span>tauri<span class="w"> </span>build<span class="w">   </span><span class="c1"># bundles: .deb / .AppImage (Linux), .app / .dmg (macOS), .msi / .exe (Windows)</span>
+</code></pre><blockquote>
+<p>[!NOTE]
+<strong>Tauri prerequisites.</strong> The desktop build needs the WebKitGTK toolchain and
+Rust 1.90+. On Debian/Ubuntu:</p>
+<pre class="highlight"><code class="language-bash">sudo<span class="w"> </span>apt-get<span class="w"> </span>install<span class="w"> </span>-y<span class="w"> </span>libwebkit2gtk-4.1-dev<span class="w"> </span>build-essential<span class="w"> </span>pkg-config<span class="w"> </span>curl<span class="w"> </span>wget<span class="w"> </span>file<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>libxdo-dev<span class="w"> </span>libssl-dev<span class="w"> </span>libayatana-appindicator3-dev<span class="w"> </span>librsvg2-dev<span class="w"> </span>patchelf<span class="w"> </span>xdg-utils<span class="w"> </span>libfuse2t64
+</code></pre><p>The Tauri CLI ships as the <code>@tauri-apps/cli</code> npm dev dependency
+(<code>npm --prefix apps/studio run tauri</code>). The sidecar is launched with
+<code>uv run python -m …</code> from the repository root; if the app cannot locate the
+repo root, set <code>AGENTIC_ODI_REPO_ROOT</code>.</p>
+</blockquote>
+<h2 id="desktop-signing-updater-secrets">Desktop signing &amp; updater secrets<a class="heading-anchor" href="#desktop-signing-updater-secrets" aria-label="Copy link to this section" title="Copy link">#</a></h2><p>Self-updating and code signing are <strong>env-driven</strong>: if a secret is absent, an
+unsigned artifact is produced instead of failing. CI reads these from GitHub
+Actions secrets.</p>
+<table>
+<thead>
+<tr>
+<th>Secret</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>TAURI_SIGNING_PRIVATE_KEY</code></td>
+<td>Signs updater artifacts (<code>.sig</code>) and the <code>latest.json</code> manifest. A tagged release fails loudly without it. Generate with <code>npm --prefix apps/studio run tauri signer generate</code>.</td>
+</tr>
+<tr>
+<td><code>TAURI_SIGNING_PRIVATE_KEY_PASSWORD</code></td>
+<td>Password for the private key (optional when the key has none).</td>
+</tr>
+<tr>
+<td><code>APPLE_CERTIFICATE</code> / <code>APPLE_CERTIFICATE_PASSWORD</code></td>
+<td>macOS Developer ID certificate (base64 <code>.p12</code>) and its password.</td>
+</tr>
+<tr>
+<td><code>APPLE_SIGNING_IDENTITY</code></td>
+<td>macOS signing identity.</td>
+</tr>
+<tr>
+<td><code>APPLE_ID</code> / <code>APPLE_PASSWORD</code> / <code>APPLE_TEAM_ID</code></td>
+<td>macOS notarization credentials.</td>
+</tr>
+<tr>
+<td><code>WINDOWS_CERTIFICATE</code> / <code>WINDOWS_CERTIFICATE_PASSWORD</code></td>
+<td>Windows Authenticode PFX (base64) and its password; imported by CI and injected into the bundle config.</td>
+</tr>
+</tbody>
+</table>
+<p>Releases are published by <code>.github/workflows/tauri-release.yml</code> when a <code>v*</code> tag
+is pushed. The desktop app checks for updates on startup and via
+<strong>Settings → Check for updates</strong>.</p>
+<h3 id="managing-the-updater-signing-key">Managing the updater signing key<a class="heading-anchor" href="#managing-the-updater-signing-key" aria-label="Copy link to this section" title="Copy link">#</a></h3><p>The updater key pair authenticates release artifacts so an installed app can
+verify that an auto-update genuinely came from you. The <strong>public</strong> key is
+embedded in <code>apps/studio/src-tauri/tauri.conf.json</code> (<code>plugins.updater.pubkey</code>) and is
+safe to commit. The <strong>private</strong> key must never be committed, logged, printed in
+CI, or attached to a build artifact.</p>
+<ol>
+<li>
+<p><strong>Generate a key pair</strong> (only if you need a new one). Leave <code>-p &quot;&quot;</code> for a
+passwordless key, or pass a password and remember it:</p>
+<pre class="highlight"><code class="language-bash">npm<span class="w"> </span>--prefix<span class="w"> </span>apps/studio<span class="w"> </span>run<span class="w"> </span>tauri<span class="w"> </span>signer<span class="w"> </span>generate<span class="w"> </span>--<span class="w"> </span>-w<span class="w"> </span>./living-studio.key<span class="w"> </span>-p<span class="w"> </span><span class="s2">""</span><span class="w"> </span>-f
+</code></pre><p>This writes <code>living-studio.key</code> (private, <code>0600</code>) and <code>living-studio.key.pub</code>
+(public).</p>
+</li>
+<li>
+<p><strong>Paste the public key</strong> into <code>apps/studio/src-tauri/tauri.conf.json</code>:</p>
+<pre class="highlight"><code class="language-jsonc"><span class="p">{</span>
+<span class="w">  </span><span class="s2">"plugins"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="s2">"updater"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="s2">"endpoints"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"https://github.com/alehar9320/agentic-odi/releases/latest/download/latest.json"</span><span class="p">],</span>
+<span class="w">      </span><span class="s2">"pubkey"</span><span class="p">:</span><span class="w"> </span><span class="s2">"&lt;contents of living-studio.key.pub&gt;"</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">}</span>
+</code></pre></li>
+<li>
+<p><strong>Store the private key outside the repository</strong> (the repo root is
+git-tracked; a sibling directory is not), with restricted permissions:</p>
+<pre class="highlight"><code class="language-bash">mkdir<span class="w"> </span>-p<span class="w"> </span>~/repos/agentic-odi-keys<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>chmod<span class="w"> </span><span class="m">700</span><span class="w"> </span>~/repos/agentic-odi-keys
+mv<span class="w"> </span>living-studio.key<span class="w"> </span>~/repos/agentic-odi-keys/
+chmod<span class="w"> </span><span class="m">600</span><span class="w"> </span>~/repos/agentic-odi-keys/living-studio.key
+</code></pre><p>Move it to a long-term secret store (password manager, 1Password/Bitwarden/
+Vault, or a private encrypted backup) when you decide where that lives.
+Losing it means future releases can no longer be signed for existing
+installs.</p>
+</li>
+<li>
+<p><strong>Add the private key as a GitHub Actions secret</strong> (Settings → Secrets and
+variables → Actions → New repository secret), or via the CLI:</p>
+<pre class="highlight"><code class="language-bash">gh<span class="w"> </span>secret<span class="w"> </span><span class="nb">set</span><span class="w"> </span>TAURI_SIGNING_PRIVATE_KEY<span class="w"> </span>&lt;<span class="w"> </span>~/repos/agentic-odi-keys/living-studio.key
+gh<span class="w"> </span>secret<span class="w"> </span><span class="nb">set</span><span class="w"> </span>TAURI_SIGNING_PRIVATE_KEY_PASSWORD<span class="w"> </span>--body<span class="w"> </span><span class="s2">""</span><span class="w">   </span><span class="c1"># only if you set a password</span>
+</code></pre></li>
+<li>
+<p><strong>Verify</strong> the secrets exist (values are never displayed):</p>
+<pre class="highlight"><code class="language-bash">gh<span class="w"> </span>secret<span class="w"> </span>list
+</code></pre></li>
+<li>
+<p><strong>Rotate</strong> by repeating steps 1–4, then publishing a release signed with the
+new key. Existing installs still verify against the public key compiled into
+their binary, so keep the old private key usable and publish the new public
+key ahead of the cut-over.</p>
+</li>
+</ol>
+<blockquote>
+<p>[!CAUTION]
+If the private key leaks, treat auto-updates as compromised: generate a new
+pair, rotate the Actions secret, and publish a freshly signed release.</p>
+</blockquote>
+<h2 id="connecting-an-llm">Connecting an LLM<a class="heading-anchor" href="#connecting-an-llm" aria-label="Copy link to this section" title="Copy link">#</a></h2><p>The Studio needs an OpenAI-compatible LLM backend with tool-calling support to
+drive the agent. For a fully local setup, see
+<a href="../local-llm/">Local LLM Backend</a>.</p>
+<h2 id="agent-driven-testing">Agent-Driven Testing<a class="heading-anchor" href="#agent-driven-testing" aria-label="Copy link to this section" title="Copy link">#</a></h2><p>Type <code>/dev</code> in the AI assistant to trigger the full automated workflow: it starts
+both processes, opens the browser, sends a test message, and reports the results.</p>
+<p>Type <code>/test</code> to have the agent run all tests and report the results
+automatically.</p>
+
+<p class="prose__source">Source of truth: <code>docs/living-studio.md</code> &mdash; <a href="https://github.com/alehar9320/agentic-odi/blob/main/docs/living-studio.md">view on GitHub</a></p>
+    </div>
+
+    <nav class="doc__toc" aria-label="On this page">
+      <p class="doc__toc-title">On this page</p>
+      <ul>
+        <li class="doc__toc-item doc__toc-item--2">
+          <a href="#architecture">Architecture</a>
+        </li>
+        <li class="doc__toc-item doc__toc-item--2">
+          <a href="#interface">Interface</a>
+        </li>
+        <li class="doc__toc-item doc__toc-item--3">
+          <a href="#slash-commands">Slash commands</a>
+        </li>
+        <li class="doc__toc-item doc__toc-item--3">
+          <a href="#the-welcome-tour">The welcome tour</a>
+        </li>
+        <li class="doc__toc-item doc__toc-item--3">
+          <a href="#guidance-not-gates">Guidance, not gates</a>
+        </li>
+        <li class="doc__toc-item doc__toc-item--3">
+          <a href="#without-a-model">Without a model</a>
+        </li>
+        <li class="doc__toc-item doc__toc-item--3">
+          <a href="#the-thread-is-the-room">The thread is the room</a>
+        </li>
+        <li class="doc__toc-item doc__toc-item--3">
+          <a href="#the-conversation-runtime">The conversation runtime</a>
+        </li>
+        <li class="doc__toc-item doc__toc-item--3">
+          <a href="#what-it-remembers">What it remembers</a>
+        </li>
+        <li class="doc__toc-item doc__toc-item--3">
+          <a href="#the-thread-comes-back">The thread comes back</a>
+        </li>
+        <li class="doc__toc-item doc__toc-item--2">
+          <a href="#rich-responses">Rich responses</a>
+        </li>
+        <li class="doc__toc-item doc__toc-item--3">
+          <a href="#adding-a-surface">Adding a surface</a>
+        </li>
+        <li class="doc__toc-item doc__toc-item--2">
+          <a href="#hosted-experimental">Hosted (experimental)</a>
+        </li>
+        <li class="doc__toc-item doc__toc-item--2">
+          <a href="#1-web-production-build-recommended-for-a-quick-look">1. Web — production build (recommended for a quick look)</a>
+        </li>
+        <li class="doc__toc-item doc__toc-item--2">
+          <a href="#2-web-dev-with-hot-reload">2. Web — dev with hot reload</a>
+        </li>
+        <li class="doc__toc-item doc__toc-item--2">
+          <a href="#3-desktop-tauri-2">3. Desktop — Tauri 2</a>
+        </li>
+        <li class="doc__toc-item doc__toc-item--2">
+          <a href="#desktop-signing-updater-secrets">Desktop signing &amp;amp; updater secrets</a>
+        </li>
+        <li class="doc__toc-item doc__toc-item--3">
+          <a href="#managing-the-updater-signing-key">Managing the updater signing key</a>
+        </li>
+        <li class="doc__toc-item doc__toc-item--2">
+          <a href="#connecting-an-llm">Connecting an LLM</a>
+        </li>
+        <li class="doc__toc-item doc__toc-item--2">
+          <a href="#agent-driven-testing">Agent-Driven Testing</a>
+        </li>
+      </ul>
+    </nav>
+
+    <nav class="doc__pager" aria-label="Documentation">
+      <a class="doc__pager-link doc__pager-link--prev" href="https://alehar9320.github.io/agentic-odi/docs/installation/">
+        <span class="doc__pager-label">Previous</span>
+        <span class="doc__pager-title">Installation</span>
+      </a>
+      <a class="doc__pager-link doc__pager-link--next" href="https://alehar9320.github.io/agentic-odi/docs/local-llm/">
+        <span class="doc__pager-label">Next</span>
+        <span class="doc__pager-title">Local LLM backend</span>
+      </a>
+    </nav>
+  </article>
+</div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="shell">
+      <div class="site-footer__top">
+        <div class="site-footer__brand">
+          <img src="../../assets/mark.svg" alt="" width="24" height="24" aria-hidden="true">
+          <span class="brand__name">Agentic&nbsp;ODI</span>
+        </div>
+        <p class="site-footer__tagline">Built with outcomes, not guesses.</p>
+      </div>
+      <nav class="site-footer__nav" aria-label="Footer">
+        <a href="https://github.com/alehar9320/agentic-odi">GitHub</a>
+        <a href="https://github.com/alehar9320/agentic-odi/issues">Issues</a>
+        <a href="https://alehar9320.github.io/agentic-odi/docs/">Docs</a>
+        <a href="https://agentic-odi.alehar.workers.dev/">Hosted Studio</a>
+        <a href="https://horizon.prefect.io/alhase/servers/agentic-odi/chat">Test chat</a>
+      </nav>
+      <p class="site-footer__legal">
+        &copy; 2026 Agentic ODI maintainers &middot; All rights reserved
+      </p>
+      <p class="site-footer__note">
+        Experimental. We don't publish dates &mdash; this page changes when the code does.
+      </p>
+    </div>
+  </footer>
+
+  <script defer src="../../assets/main.js"></script>
+</body>
+</html>

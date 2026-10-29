@@ -1,6 +1,6 @@
 [package]
 name = "agentic-odi-studio"
-version = "0.12.0"
+version = "0.1.0"
 description = "Agentic ODI Living Studio desktop shell"
 authors = ["Agentic ODI"]
 edition = "2021"

@@ -50,7 +50,6 @@ ALLOWED_EXTERNAL_PREFIXES = (
     "https://codecov.io",
     "https://developers.cloudflare.com",
     "https://docs.entire.io",
-    "https://www.chromatic.com",
     "https://freebuff.com",
     "https://pi.dev",
     # A placeholder in the connector documentation. It is not routable, and
@@ -63,7 +62,6 @@ ALLOWED_EXTERNAL_PREFIXES = (
     "http://localhost:5173",
     "http://127.0.0.1:8100",
     "http://127.0.0.1:8001",
-    "http://127.0.0.1:11434",
 )
 
 # The strings the site must carry. These are promises, not decoration.

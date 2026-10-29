@@ -55,8 +55,6 @@ const stubContext = (overrides: Record<string, unknown> = {}) =>
     deleteConnector: vi.fn().mockResolvedValue({ ok: true, name: "notion" }),
     refreshConnectors: vi.fn().mockResolvedValue(undefined),
     refreshPresets: vi.fn().mockResolvedValue(undefined),
-    refreshCapabilities: vi.fn().mockResolvedValue(undefined),
-    capabilities: [],
     ...overrides,
   }) as unknown as StudioContextValue;
 
@@ -111,32 +109,6 @@ describe("SettingsPanel connectors", () => {
     fireEvent.click(screen.getByRole("button", { name: /check for updates/i }));
 
     expect(pushToast).not.toHaveBeenCalled();
-  });
-
-  it("does not pretend unconnectable sources are connection rows", () => {
-    vi.mocked(useStudio).mockReturnValue(stubContext());
-
-    renderPanel();
-
-    expect(screen.queryByText(/gong transcripts/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/slack friction stream/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/product telemetry/i)).not.toBeInTheDocument();
-    expect(screen.getByText(/no data source is connected yet/i)).toBeInTheDocument();
-  });
-
-  it("toggles API key visibility", () => {
-    vi.mocked(useStudio).mockReturnValue(stubContext());
-
-    renderPanel();
-
-    const input = screen.getByLabelText("API key") as HTMLInputElement;
-    expect(input.type).toBe("password");
-
-    fireEvent.click(screen.getByRole("button", { name: /show api key/i }));
-    expect(input.type).toBe("text");
-
-    fireEvent.click(screen.getByRole("button", { name: /hide api key/i }));
-    expect(input.type).toBe("password");
   });
 
   it("shows an empty state when no connectors are registered", () => {
@@ -210,39 +182,5 @@ describe("SettingsPanel connector list failures", () => {
 
     expect(screen.getByRole("alert").textContent).toContain("The connector list is unreachable.");
     expect(screen.queryByText(/no connectors registered/i)).toBeNull();
-  });
-});
-
-describe("SettingsPanel capabilities", () => {
-  it("renders each capability with its status", () => {
-    vi.mocked(useStudio).mockReturnValue(
-      stubContext({
-        capabilities: [
-          {
-            id: "local-data",
-            label: "Local canvas data",
-            description: "Jobs, steps, and outcomes stored in your browser.",
-            status: "available",
-          },
-          {
-            id: "sidecar-llm",
-            label: "Sidecar model proxy",
-            description: "Streams model responses through the local Python sidecar.",
-            status: "unavailable",
-            reason: "Sidecar unreachable.",
-          },
-        ],
-      }),
-    );
-
-    renderPanel();
-
-    const dataRow = screen.getByText(/local canvas data/i).closest("li");
-    expect(dataRow).toBeInTheDocument();
-    expect(dataRow).toHaveTextContent("available");
-
-    const llmRow = screen.getByText(/sidecar model proxy/i).closest("li");
-    expect(llmRow).toBeInTheDocument();
-    expect(llmRow).toHaveTextContent(/unavailable/);
   });
 });

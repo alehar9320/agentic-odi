@@ -74,9 +74,7 @@ def main(
         help="Show verbose version information (with --version)",
     ),
     backend: str | None = typer.Option(
-        None,
-        "--backend",
-        help="Backend to use: auto (local, then MCP) | local (SQLite) | mcp (remote server).",
+        None, "--backend", help="Backend to use: local (SQLite) | mcp (remote server)."
     ),
     db: str | None = typer.Option(
         None, "--db", help="Path to the local SQLite database (local backend)."

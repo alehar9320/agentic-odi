@@ -1,8 +1,5 @@
-import { useEffect, useRef, useState } from "react";
-
-import { conversationToMarkdown, downloadMarkdown, exportFilename } from "../../lib/export";
 import { useStudio } from "../../state/StudioContext";
-import { BellIcon, MenuIcon, MoonIcon, PlusIcon, SettingsIcon, SunIcon } from "../icons";
+import { BellIcon, MoonIcon, PlusIcon, SettingsIcon, SunIcon } from "../icons";
 import { OdiMascot } from "../OdiMascot";
 
 /**
@@ -19,49 +16,9 @@ export function StudioBar({
   onNew: () => void;
   onChangelog: () => void;
 }) {
-  const {
-    llmHealth,
-    messages,
-    unreadNotificationCount,
-    markAllNotificationsAsRead,
-    openPanel,
-    pushToast,
-    saveSettings,
-    settings,
-  } = useStudio();
+  const { llmHealth, unreadNotificationCount, openPanel, saveSettings, settings } = useStudio();
   const theme = settings.theme === "light" ? "light" : "dark";
   const nextTheme = theme === "dark" ? "light" : "dark";
-  const [menuOpen, setMenuOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!menuOpen) {
-      return;
-    }
-    function onPointerDown(event: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        setMenuOpen(false);
-      }
-    }
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        setMenuOpen(false);
-      }
-    }
-    window.addEventListener("mousedown", onPointerDown);
-    window.addEventListener("keydown", onKeyDown);
-    return () => {
-      window.removeEventListener("mousedown", onPointerDown);
-      window.removeEventListener("keydown", onKeyDown);
-    };
-  }, [menuOpen]);
-
-  function exportConversation() {
-    const exportedAt = new Date();
-    downloadMarkdown(conversationToMarkdown(messages, exportedAt), exportFilename(exportedAt));
-    setMenuOpen(false);
-    pushToast("success", "Conversation exported as Markdown.");
-  }
 
   const status =
     llmHealth.healthy === null ? "Connecting" : llmHealth.healthy ? "Live" : "Local mode";
@@ -118,10 +75,7 @@ export function StudioBar({
           className="icon-button bar__bell"
           aria-label="Catch up notifications"
           title="Activity & Catch Up"
-          onClick={() => {
-            markAllNotificationsAsRead();
-            openPanel("catchup");
-          }}
+          onClick={() => openPanel("catchup")}
         >
           <BellIcon size={17} />
           {unreadNotificationCount > 0 && (
@@ -135,7 +89,6 @@ export function StudioBar({
           type="button"
           className="bar__health"
           onClick={() => openPanel("settings")}
-          aria-label={`Model status: ${status}. ${llmHealth.message}`}
           title={llmHealth.message}
         >
           <span
@@ -155,33 +108,6 @@ export function StudioBar({
         >
           <SettingsIcon size={17} />
         </button>
-
-        <div className="bar__menu" ref={menuRef}>
-          <button
-            type="button"
-            className="icon-button"
-            aria-label="More actions"
-            title="More actions"
-            aria-haspopup="menu"
-            aria-expanded={menuOpen}
-            onClick={() => setMenuOpen((open) => !open)}
-          >
-            <MenuIcon size={17} />
-          </button>
-          {menuOpen && (
-            <div className="bar__menu-list" role="menu" aria-label="More actions">
-              <button
-                type="button"
-                role="menuitem"
-                className="bar__menu-item"
-                onClick={exportConversation}
-                disabled={messages.length === 0}
-              >
-                Export → Markdown
-              </button>
-            </div>
-          )}
-        </div>
       </div>
     </header>
   );

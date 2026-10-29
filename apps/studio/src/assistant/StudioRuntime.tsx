@@ -103,10 +103,10 @@ export function StudioRuntimeProvider({ children }: { children: ReactNode }) {
       await sendMessage(textOf(message), preparedAttachments(message.attachments));
     },
     onEdit: async (message) => {
-      await editFrom(message.sourceId, textOf(message), preparedAttachments(message.attachments));
+      await editFrom(message.parentId, textOf(message), preparedAttachments(message.attachments));
     },
-    onReload: async (parentId, config) => {
-      await regenerateFrom(config.sourceId ?? parentId);
+    onReload: async (parentId) => {
+      await regenerateFrom(parentId);
     },
     onCancel: async () => {
       stopStreaming();
