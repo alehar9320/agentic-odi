@@ -83,6 +83,11 @@ test.describe("capturing an outcome", () => {
     await offlineNotice(page).getByRole("button", { name: "Capture an outcome" }).click();
 
     const panel = page.getByRole("complementary", { name: "Capture by hand" });
+    // An outcome always belongs to a job, so the repository starts empty here.
+    await panel.getByLabel("Job name").fill("Ship a service to production");
+    await panel.getByRole("button", { name: "Add job" }).click();
+    await expect(page.locator(".banner").filter({ hasText: "Job created" })).toBeVisible();
+
     await expect(panel.getByRole("button", { name: "Record outcome" })).toBeDisabled();
 
     await panel.getByLabel("Desired outcome").fill("Minimize the wait");
