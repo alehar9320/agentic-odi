@@ -8,10 +8,17 @@ ROOT = Path(__file__).resolve().parents[2]
 TEMPLATE = ROOT / ".github" / "pull_request_template.md"
 WORKFLOW = ROOT / ".github" / "workflows" / "ci.yml"
 
-REQUIRED_SECTIONS = ("## Summary", "## What changed", "## Verification", "## Related issue")
+REQUIRED_SECTIONS = (
+    "## Summary",
+    "## What a person experiences",
+    "## What changed",
+    "## How this was verified",
+    "## What this does NOT do",
+    "## Related issue",
+)
 
 
-def test_the_template_asks_for_the_four_sections() -> None:
+def test_the_template_asks_for_the_required_sections() -> None:
     template = TEMPLATE.read_text(encoding="utf-8")
 
     for section in REQUIRED_SECTIONS:
