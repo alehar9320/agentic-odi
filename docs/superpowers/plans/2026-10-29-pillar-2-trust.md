@@ -715,5 +715,17 @@ with the approved implementation and drop the corresponding seam test.
 The B6.1 read surface is partly present: `desired-outcomes history` and
 `get_outcome_history` replay the recorded snapshots, `--why` records the reason
 on the snapshot, and `desired-outcomes get` shows the latest accepted reason as a
-`note` line. `outcome_delta` and the delta-driven rendering stay behind the seam
-until the baseline/direction decision is approved.
+`note` line. The Studio outcome detail card reads the same history and shows the
+same note line for the selected outcome. `outcome_delta` and the delta-driven
+rendering stay behind the seam until the baseline/direction decision is approved.
+
+ALH-203 acceptance status (non-gated slice):
+
+- Hand-computed signed deltas: blocked — `outcome_delta` is the delta-semantics gate.
+- Stable ordering across equal timestamps: done; `test_score_history.py` pins a
+  tie replaying in append order after reload.
+- Reasons reach the same snapshot and render as text; 501 characters fail before
+  any write; empty notes add no placeholder: done across CLI and Studio.
+- Unknown outcome / invalid `since` / unavailable comparisons produce explicit
+  errors without writes: unknown outcome done; the rest ride the `outcome_delta` gate.
+- Blind-reader protection: blocked on ALH-83 (M2-19).

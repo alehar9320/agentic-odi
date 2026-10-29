@@ -373,7 +373,10 @@ exposes it at `GET /api/outcomes/{outcome_id}/history`; `ScoreSnapshot` is
 exported from `types.ts` and read through `fetchOutcomeHistory`. A snapshot
 carries the score and its sample/method companions plus an optional `note`
 (max 500 chars) recording why the number was given. A rejected mutation writes
-no snapshot, so the history never shows a change that did not happen.
+no snapshot, so the history never shows a change that did not happen. The
+selected outcome's detail card reads this history and shows the most recent
+reason as a `note` line; the list cards do not, so a board does not issue one
+request per outcome.
 
 The conversation keeps the order the agent produced: a `delta` appends to the
 open prose part, a `ui` event opens a card, and the next `delta` opens a new
