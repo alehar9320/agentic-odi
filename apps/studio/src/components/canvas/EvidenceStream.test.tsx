@@ -146,6 +146,7 @@ describe("EvidenceStream", () => {
 
     await waitFor(() =>
       expect(promoteEvidence).toHaveBeenCalledWith("e1", {
+        target: "outcome",
         job_id: "j1",
         statement: "Minimize the time it takes to rotate deployment secrets.",
         importance: 9,

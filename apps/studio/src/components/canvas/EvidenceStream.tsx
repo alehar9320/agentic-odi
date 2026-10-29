@@ -114,6 +114,7 @@ export function EvidenceStream() {
     setFailure(null);
     try {
       await promoteEvidence(promotingId, {
+        target: "outcome",
         job_id: jobId,
         statement: statement.trim(),
         importance,

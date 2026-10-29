@@ -240,10 +240,6 @@ export interface StudioContextValue {
   offlineReply: boolean;
   addStep: (payload: Omit<AddStepPayload, "mcp_url">) => Promise<void>;
   addOutcome: (payload: Omit<AddOutcomePayload, "mcp_url">) => Promise<void>;
-  promoteEvidence: (
-    evidenceId: string,
-    payload: { job_id: string; statement: string; importance: number; satisfaction: number },
-  ) => Promise<void>;
   createJob: (payload: { name: string; description?: string }) => Promise<string | null>;
   updateJob: (jobId: string, payload: { name?: string; description?: string }) => Promise<void>;
   deleteJob: (jobId: string) => Promise<void>;
@@ -255,6 +251,17 @@ export interface StudioContextValue {
   ) => Promise<void>;
   deleteOutcome: (outcomeId: string) => Promise<void>;
   deleteEvidence: (evidenceId: string) => Promise<void>;
+  promoteEvidence: (
+    evidenceId: string,
+    payload: {
+      target: "job" | "outcome";
+      job_id?: string;
+      statement?: string;
+      name?: string;
+      importance?: number;
+      satisfaction?: number;
+    },
+  ) => Promise<void>;
   activePanel: WorkspacePanelId | null;
   openPanel: (panel: WorkspacePanelId) => void;
   closePanel: () => void;
@@ -870,23 +877,6 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     [settings.mcp_url, pushToast, refreshCanvas],
   );
 
-  const promoteEvidence = useCallback(
-    async (
-      evidenceId: string,
-      payload: { job_id: string; statement: string; importance: number; satisfaction: number },
-    ) => {
-      // The form keeps the error beside the quote it came from.
-      await apiPromoteEvidence(evidenceId, {
-        ...payload,
-        target: "outcome",
-        mcp_url: settings.mcp_url,
-      });
-      pushToast("success", "Evidence turned into a scored outcome.");
-      await refreshCanvas();
-    },
-    [settings.mcp_url, pushToast, refreshCanvas],
-  );
-
   const createJob = useCallback(
     async (payload: { name: string; description?: string }): Promise<string | null> => {
       const job = await apiCreateJob({ ...payload, mcp_url: settings.mcp_url });
@@ -991,6 +981,25 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     [settings.mcp_url, pushToast, refreshCanvas],
   );
 
+  const promoteEvidence = useCallback(
+    async (
+      evidenceId: string,
+      payload: {
+        target: "job" | "outcome";
+        job_id?: string;
+        statement?: string;
+        name?: string;
+        importance?: number;
+        satisfaction?: number;
+      },
+    ) => {
+      // The form keeps the error beside the quote it came from.
+      await apiPromoteEvidence(evidenceId, { ...payload, mcp_url: settings.mcp_url });
+      pushToast("success", `Promoted the evidence to a ${payload.target}.`);
+      await refreshCanvas();
+    },
+    [settings.mcp_url, pushToast, refreshCanvas],
+  );
   const closePanel = useCallback(() => setActivePanel(null), []);
 
   const openPanel = useCallback(
