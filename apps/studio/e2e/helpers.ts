@@ -24,6 +24,9 @@ export const CONVERSATION = "Conversation";
  * under test, so they are switched off the way a QA engineer would: the
  * wizard through its documented query flag, the setup conversation through the
  * same `localStorage` key `closeSetup()` writes.
+ *
+ * A fresh studio with no connectors also offers one in a modal. That is real
+ * product behavior, so it is dismissed the way a user would.
  */
 export async function openStudio(page: Page): Promise<void> {
   await page.addInitScript(() => {
@@ -33,6 +36,12 @@ export async function openStudio(page: Page): Promise<void> {
   // The composer is present in both the empty and the active conversation
   // states, so it is the one landmark that means the Studio is ready.
   await expect(page.getByRole("textbox", { name: COMPOSER })).toBeVisible();
+  const suggestion = page.getByRole("dialog", { name: "Connector suggestion" });
+  await suggestion.waitFor({ state: "visible", timeout: 2_000 }).catch(() => {});
+  if (await suggestion.isVisible()) {
+    await suggestion.getByRole("button", { name: "Not now" }).click();
+    await expect(suggestion).toBeHidden();
+  }
 }
 
 /** The workbench rail — the list of views the user can open. */
@@ -42,7 +51,9 @@ export function rail(page: Page) {
 
 /** The docked view (the "lens") that a rail item opens. */
 export function lens(page: Page) {
-  return page.getByRole("complementary");
+  // The guidance line is also an `aside` with an accessible name, so it is
+  // complementary too; scope to the docked lens itself.
+  return page.getByRole("complementary").and(page.locator(".lens"));
 }
 
 /**
