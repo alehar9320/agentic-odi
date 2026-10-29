@@ -21,7 +21,8 @@ python -m agentic_odi_cli --help               # show available options and comm
 python -m agentic_odi_cli                      # start interactive chat in a terminal (help when piped)
 ```
 
-A console script is also installed, so `agentic-odi --version` and `agentic-odi version --verbose` work the same way.
+A console script is also installed, so `agentic-odi --version` and
+`agentic-odi version --verbose` work the same way.
 
 ## Global options
 
