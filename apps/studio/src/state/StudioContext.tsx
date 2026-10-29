@@ -22,6 +22,7 @@ import {
   deleteConnector as apiDeleteConnector,
   deleteJob as apiDeleteJob,
   deleteObservation as apiDeleteObservation,
+  deleteEvidence as apiDeleteEvidence,
   deleteOutcome as apiDeleteOutcome,
   deleteStep as apiDeleteStep,
   fetchCanvas,
@@ -35,6 +36,7 @@ import {
   fetchMemory,
   healthLlm,
   healthMcp,
+  promoteEvidence as apiPromoteEvidence,
   resolveApproval as apiResolveApproval,
   setConversationHead as apiSetConversationHead,
   streamChat,
@@ -248,6 +250,11 @@ export interface StudioContextValue {
     payload: { statement?: string; importance?: number; satisfaction?: number },
   ) => Promise<void>;
   deleteOutcome: (outcomeId: string) => Promise<void>;
+  deleteEvidence: (evidenceId: string) => Promise<void>;
+  promoteEvidence: (
+    evidenceId: string,
+    payload: { target: "job" | "outcome"; job_id?: string; statement?: string; name?: string },
+  ) => Promise<void>;
   activePanel: WorkspacePanelId | null;
   openPanel: (panel: WorkspacePanelId) => void;
   closePanel: () => void;
@@ -949,6 +956,35 @@ export function StudioProvider({ children }: { children: ReactNode }) {
         await refreshCanvas();
       } catch (error) {
         pushToast("error", `Could not remove the outcome: ${(error as Error).message}`);
+      }
+    },
+    [settings.mcp_url, pushToast, refreshCanvas],
+  );
+
+  const deleteEvidence = useCallback(
+    async (evidenceId: string) => {
+      try {
+        await apiDeleteEvidence(evidenceId, settings.mcp_url);
+        pushToast("success", "Evidence removed.");
+        await refreshCanvas();
+      } catch (error) {
+        pushToast("error", `Could not remove the evidence: ${(error as Error).message}`);
+      }
+    },
+    [settings.mcp_url, pushToast, refreshCanvas],
+  );
+
+  const promoteEvidence = useCallback(
+    async (
+      evidenceId: string,
+      payload: { target: "job" | "outcome"; job_id?: string; statement?: string; name?: string },
+    ) => {
+      try {
+        await apiPromoteEvidence(evidenceId, { ...payload, mcp_url: settings.mcp_url });
+        pushToast("success", `Promoted the evidence to a ${payload.target}.`);
+        await refreshCanvas();
+      } catch (error) {
+        pushToast("error", `Could not promote the evidence: ${(error as Error).message}`);
       }
     },
     [settings.mcp_url, pushToast, refreshCanvas],
@@ -1673,6 +1709,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       deleteStep,
       updateOutcome,
       deleteOutcome,
+      deleteEvidence,
+      promoteEvidence,
       activePanel,
       openPanel,
       closePanel,
@@ -1770,6 +1808,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       deleteStep,
       updateOutcome,
       deleteOutcome,
+      deleteEvidence,
+      promoteEvidence,
       activePanel,
       openPanel,
       closePanel,
