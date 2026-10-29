@@ -64,9 +64,12 @@ per-platform archives with SHA-256 checksums for a manual download. See
 
 - **A brain for customer needs.** Jobs, desired outcomes, evidence, and
   opportunity scores in one store — queryable by any MCP client.
-- **A conversation, not a form.** The Living Studio turns "a customer still
-  reconciles invoices by hand" into a scored outcome, a job map, and a ranked
-  opportunity board — inline in the thread.
+- **A conversation, not a form.** The Living Studio opens on one question —
+  **What do you want to win?** — with the composer focused. Its optional
+  four-step tour stays out of the way, and in-place guidance appears only after
+  the first exchange. It turns "a customer still reconciles invoices by hand"
+  into a scored outcome, a job map, and a ranked opportunity board — inline in
+  the thread.
 - **Local-first by default.** The CLI and server work with no network and no
   account. Point them at a remote MCP server with one flag.
 
