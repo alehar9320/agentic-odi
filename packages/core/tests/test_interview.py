@@ -145,3 +145,33 @@ def test_quote_model_requires_ordinal() -> None:
 
 def test_interview_model_defaults_source_kind_to_manual() -> None:
     assert Interview(title="T", participant_label="P").source_kind == "manual"
+
+
+def test_import_transcript_is_atomic_on_parse_failure() -> None:
+    from agentic_odi_core import InMemoryRepository, ODIService
+    from agentic_odi_core.transcript import TranscriptFormatError
+
+    service = ODIService(InMemoryRepository())
+    with pytest.raises(TranscriptFormatError):
+        service.import_transcript(
+            "WEBVTT\n\n00:00:1.0 --> nope\nhello\n",
+            title="T",
+            participant_label="P",
+        )
+    # Nothing was written: the parse happens before the first write.
+    assert service.list_interviews() == []
+
+
+def test_import_transcript_persists_turns_as_ordered_quotes() -> None:
+    from agentic_odi_core import InMemoryRepository, ODIService
+
+    service = ODIService(InMemoryRepository())
+    interview, quotes = service.import_transcript(
+        "**Ana:** one\n\n**Bo:** two\n",
+        title="T",
+        participant_label="Ana",
+    )
+    assert [q.text for q in quotes] == ["one", "two"]
+    assert [q.ordinal for q in quotes] == [0, 1]
+    assert [q.interview_id for q in quotes] == [interview.id, interview.id]
+    assert service.list_quotes(interview.id) == quotes
