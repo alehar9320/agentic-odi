@@ -47,6 +47,8 @@ _1 outcome(s) had no score and were excluded — an unscored outcome is unknown,
 
 - Build toward `out-3` (lowest score 8) — Minimize the cost of supporting a new plugin when it ships
 
+_No value estimate recorded for the selected outcomes yet — worth is unknown, not zero._
+
 ## Risks and unknowns
 
 - No interviews with enterprise admins yet

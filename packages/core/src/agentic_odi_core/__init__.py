@@ -43,6 +43,8 @@ from agentic_odi_core.errors import (
 )
 from agentic_odi_core.evaluation import (
     OutcomeStatementError,
+    ValueSize,
+    classify_value,
     evaluate_outcome_statement,
     statement_to_dict,
 )
@@ -87,7 +89,9 @@ from agentic_odi_core.models import (
     ScoreMethod,
     ScoreSnapshot,
     Step,
+    ValueBasis,
     ValueMetric,
+    ValueUnit,
     compute_opportunity_score,
 )
 from agentic_odi_core.remote import (
@@ -207,7 +211,11 @@ __all__ = [
     "StoreError",
     "StudioError",
     "StudioErrorCode",
+    "ValueBasis",
     "ValueMetric",
+    "ValueSize",
+    "ValueUnit",
+    "classify_value",
     "ValueOutOfRangeError",
     "InMemoryRepository",
     "InvalidOutcomeStatementError",

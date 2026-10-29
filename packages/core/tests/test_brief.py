@@ -226,3 +226,153 @@ def test_argument_sections_keep_the_numeral_guarantee():
 
 def test_argument_sections_are_byte_identical_for_the_same_input():
     assert render_brief(_FIXTURE) == render_brief(_FIXTURE)
+
+
+# ---------------------------------------------------------------- W1 worth (ALH-64)
+
+
+def test_no_value_estimate_omits_the_section_and_says_why():
+    output = render_brief(_FIXTURE)
+    # The fixture records no value estimates, so the section is absent and the
+    # gap is named in one line — never a zero.
+    assert "## What it is worth" not in output
+    assert "worth is unknown, not zero" in output
+
+
+def test_a_sized_value_renders_with_unit_and_basis():
+    sized = BriefInput(
+        job_id="j",
+        job_name="J",
+        generated_at="2026-10-29T00:00:00Z",
+        outcomes=(
+            BriefOutcome(
+                outcome_id="out-1",
+                statement="Minimize the time it takes to publish a plugin when a release is ready",
+                score=15.0,
+                value_estimate=250_000.0,
+                value_unit="currency",
+                value_basis="market",
+                value_source="Gartner 2025 plugin market report",
+            ),
+        ),
+    )
+    output = render_brief(sized)
+    assert "## What it is worth" in output
+    assert "250000 currency (market, sized)" in output
+    assert "Gartner 2025 plugin market report" in output
+
+
+def test_a_thin_value_is_labelled_thin_not_sized():
+    thin = BriefInput(
+        job_id="j",
+        job_name="J",
+        generated_at="2026-10-29T00:00:00Z",
+        outcomes=(
+            BriefOutcome(
+                outcome_id="out-1",
+                statement="Minimize the time it takes to publish a plugin when a release is ready",
+                score=15.0,
+                value_estimate=100.0,
+                value_unit="users",
+                value_n=1,
+            ),
+        ),
+    )
+    output = render_brief(thin)
+    assert "(estimate, thin)" in output
+
+
+def test_a_real_zero_value_is_shown_as_zero_not_omitted():
+    zero = BriefInput(
+        job_id="j",
+        job_name="J",
+        generated_at="2026-10-29T00:00:00Z",
+        outcomes=(
+            BriefOutcome(
+                outcome_id="out-1",
+                statement="Minimize the time it takes to publish a plugin when a release is ready",
+                score=15.0,
+                value_estimate=0.0,
+                value_unit="currency",
+                value_basis="market",
+                value_source="No buyers in the segment",
+            ),
+        ),
+    )
+    output = render_brief(zero)
+    assert "0 currency (market, sized)" in output
+
+
+def test_the_value_section_introduces_no_numeral_outside_the_input():
+    sized = BriefInput(
+        job_id="j",
+        job_name="J",
+        generated_at="2026-10-29T00:00:00Z",
+        outcomes=(
+            BriefOutcome(
+                outcome_id="out-1",
+                statement="Minimize the time it takes to publish a plugin when a release is ready",
+                score=15.0,
+                value_estimate=250_000.0,
+                value_unit="currency",
+                value_basis="pilot",
+                value_source="beta with 6 admins",
+                value_n=6,
+            ),
+        ),
+    )
+    output = render_brief(sized)
+    section = output.split("## What it is worth")[1].split("## Risks and unknowns")[0]
+    # "1" is the outcome id numeral, not a measurement.
+    allowed = {"15", "250000", "6", "1"}
+    for numeral in _all_numerals(section):
+        assert numeral in allowed, f"fabricated numeral {numeral!r} in value section"
+
+
+def test_unsized_selected_outcomes_are_counted_when_some_are_sized():
+    mixed = BriefInput(
+        job_id="j",
+        job_name="J",
+        generated_at="2026-10-29T00:00:00Z",
+        outcomes=(
+            BriefOutcome(
+                outcome_id="out-1",
+                statement="Minimize the time it takes to publish a plugin when a release is ready",
+                score=15.0,
+                value_estimate=100.0,
+                value_unit="users",
+                value_n=3,
+            ),
+            BriefOutcome(
+                outcome_id="out-2",
+                statement="Minimize the cost of supporting a plugin when it ships",
+                score=12.0,
+            ),
+        ),
+    )
+    output = render_brief(mixed)
+    assert "## What it is worth" in output
+    assert "have no value estimate and were omitted" in output
+    assert "unsized outcome is unknown, not zero" in output
+
+
+def test_a_hostile_value_source_is_escaped():
+    hostile = BriefInput(
+        job_id="j",
+        job_name="J",
+        generated_at="2026-10-29T00:00:00Z",
+        outcomes=(
+            BriefOutcome(
+                outcome_id="out-1",
+                statement="Minimize the time it takes to publish a plugin when a release is ready",
+                score=15.0,
+                value_estimate=1.0,
+                value_unit="currency",
+                value_basis="market",
+                value_source="<script>alert(1)</script>",
+            ),
+        ),
+    )
+    output = render_brief(hostile)
+    assert "<script>" not in output
+    assert "&lt;script&gt;" in output

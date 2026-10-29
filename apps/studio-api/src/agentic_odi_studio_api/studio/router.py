@@ -87,6 +87,7 @@ from agentic_odi_studio_api.studio.schemas import (
     RecordBetRequest,
     RecordDecisionRequest,
     ReviewDecisionRequest,
+    SetOutcomeValueRequest,
     TurnNode,
     UpdateConversationRequest,
     UpdateJobRequest,
@@ -851,6 +852,31 @@ async def patch_outcome(outcome_id: str, body: UpdateOutcomeRequest, request: Re
         return _payload_from_text(result)
     try:
         outcome = _service(request).update_outcome(outcome_id, updates, at=body.at, note=body.note)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return outcome.model_dump(mode="json")
+
+
+@router.put("/outcomes/{outcome_id}/value")
+async def set_outcome_value(
+    outcome_id: str, body: SetOutcomeValueRequest, request: Request
+) -> dict:
+    """Record what an opportunity is worth, with its unit and its basis (W1).
+
+    A separate route, not a patch field, because setting a value is a distinct
+    act from editing a statement and the basis rules differ. A market or pilot
+    basis without a source is refused by the service, so the API and CLI agree.
+    """
+    payload = body.model_dump(exclude={"mcp_url"})
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(body.mcp_url),
+            ToolName.SET_OUTCOME_VALUE.value,
+            {"outcome_id": outcome_id, **payload},
+        )
+        return _payload_from_text(result)
+    try:
+        outcome = _service(request).set_outcome_value(outcome_id, **payload)
     except Exception as exc:  # noqa: BLE001
         raise _as_http_error(exc) from exc
     return outcome.model_dump(mode="json")

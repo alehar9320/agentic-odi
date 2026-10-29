@@ -39,6 +39,7 @@ class ToolName(str, Enum):
     DELETE_EVIDENCE = "delete_evidence"
     PROMOTE_EVIDENCE = "promote_evidence"
     COMPARE_OUTCOMES = "compare_outcomes"
+    SET_OUTCOME_VALUE = "set_outcome_value"
     GET_ROADMAP = "get_roadmap"
     RECORD_DECISION = "record_decision"
     GET_DECISION = "get_decision"
@@ -384,6 +385,22 @@ TOOL_SPECS: dict[str, ToolSpec] = {
         returns=(
             "Aligned rows over the given column order. A metric nobody measured "
             "renders 'not measured'; a real 0 stays 0."
+        ),
+        stage="6",
+    ),
+    ToolName.SET_OUTCOME_VALUE.value: ToolSpec(
+        name="set_outcome_value",
+        summary=(
+            "Record what an outcome is worth, with its unit and its basis. A "
+            "market or pilot estimate requires a source; a cleared estimate "
+            "clears its companions."
+        ),
+        effect=_derive_effect("set_outcome_value"),
+        arguments=("outcome_id", "estimate", "unit", "basis", "n", "source"),
+        required=("outcome_id", "estimate"),
+        returns=(
+            "The updated Outcome. An outcome with no estimate is 'unsized'; "
+            "value is never derived from the opportunity score."
         ),
         stage="6",
     ),

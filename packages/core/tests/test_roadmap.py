@@ -23,6 +23,7 @@ import re
 from datetime import date
 from pathlib import Path
 
+import pytest
 from agentic_odi_core.models import Decision, Outcome
 from agentic_odi_core.roadmap import (
     NOT_MEASURED,
@@ -285,3 +286,70 @@ def test_roadmap_entry_is_frozen_and_carries_the_decision_id():
         assert isinstance(exc, Exception)
     else:
         raise AssertionError("RoadmapEntry must be frozen")
+
+
+# --------------------------------------------------- W1 value ordering (ALH-64)
+
+
+def test_value_order_is_opt_in_and_the_default_is_unchanged():
+    decisions, outcomes = _fixture()
+    default = build_roadmap("job-1", decisions, outcomes, today=TODAY)
+    explicit = build_roadmap("job-1", decisions, outcomes, today=TODAY, order_by="quarter")
+    assert [e.outcome_id for e in default.entries] == [e.outcome_id for e in explicit.entries]
+    assert [e.outcome_id for e in default.entries] == ["out-1", "out-2", "out-3"]
+
+
+def test_value_order_ranks_within_a_quarter_and_keeps_the_grouping():
+    decisions, outcomes = _fixture()
+    # All three decisions are in 2026-Q4, so value ordering reorders within it.
+    roadmap = build_roadmap(
+        "job-1",
+        decisions,
+        outcomes,
+        today=TODAY,
+        values={"out-1": 100.0, "out-2": 900.0, "out-3": 400.0},
+        order_by="value",
+    )
+    assert [e.outcome_id for e in roadmap.entries] == ["out-2", "out-3", "out-1"]
+    # The quarter grouping is intact: one period for the whole view.
+    assert {e.period for e in roadmap.entries} == {"2026-Q4"}
+
+
+def test_an_unsized_outcome_sorts_last_never_as_zero():
+    decisions, outcomes = _fixture()
+    roadmap = build_roadmap(
+        "job-1",
+        decisions,
+        outcomes,
+        today=TODAY,
+        # out-2 has no value; a zero would put it last anyway, so give out-1 and
+        # out-3 values below and above the implicit zero to prove the ordering.
+        values={"out-1": -0.0, "out-3": 0.0},
+        order_by="value",
+    )
+    assert [e.outcome_id for e in roadmap.entries] == ["out-1", "out-3", "out-2"]
+    assert roadmap.entries[-1].value is None
+
+
+def test_value_ordering_does_not_cross_quarter_boundaries():
+    outcomes = [_outcome("out-1", "Minimize the time it takes to publish a plugin")]
+    decisions = [
+        _decision("dec-1", ["out-1"], "2026-10-01T00:00:00Z"),
+        _decision("dec-2", ["out-1"], "2026-11-01T00:00:00Z"),
+    ]
+    roadmap = build_roadmap(
+        "job-1",
+        decisions,
+        outcomes,
+        today=TODAY,
+        values={"out-1": 5.0},
+        order_by="value",
+    )
+    # Both rows are the same outcome; the period never regresses.
+    assert [e.period for e in roadmap.entries] == ["2026-Q4", "2026-Q4"]
+
+
+def test_an_unknown_order_by_is_refused():
+    decisions, outcomes = _fixture()
+    with pytest.raises(ValueError, match="order_by must be"):
+        build_roadmap("job-1", decisions, outcomes, today=TODAY, order_by="worth")

@@ -134,6 +134,8 @@ agentic-odi desired-outcomes delete <outcome-id> --yes
 agentic-odi desired-outcomes export --job-id <job-id> --format csv > outcomes.csv
 agentic-odi desired-outcomes export --job-id <job-id> --format json | jq '.[].opportunity_score'
 agentic-odi desired-outcomes evaluate "Minimize the time to ship when onboarding"
+agentic-odi desired-outcomes value <outcome-id> --estimate 250000 --unit currency --basis market --source "Gartner 2025 plugin market report"
+agentic-odi desired-outcomes value <outcome-id>            # omit --estimate to clear the value
 
 # One-screen report: job header, phase coverage, biggest opportunities
 agentic-odi summary <job-id>

@@ -80,6 +80,18 @@ class Step(BaseModel):
 
 ScoreMethod = Literal["estimate", "survey", "import"]
 
+#: What a value estimate counts. The unit is not decoration: ``250000`` currency
+#: and ``250000`` hours are different claims, and a reader who cannot see the
+#: unit cannot tell which was made.
+ValueUnit = Literal["currency", "users", "accounts", "hours"]
+
+#: Where a value estimate came from. ``estimate`` is a judgement; ``market`` and
+#: ``pilot`` are the two bases that require a named source (W1/ALH-64), because a
+#: number attributed to a market or a pilot has to say which one.
+ValueBasis = Literal["estimate", "market", "pilot"]
+
+MAX_VALUE_SOURCE = 200
+
 
 class Outcome(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -107,6 +119,23 @@ class Outcome(BaseModel):
     score_method: ScoreMethod = Field(
         "estimate", description="How the scores were obtained: estimate, survey, or import"
     )
+    # A recorded judgement with its basis (W1/ALH-64). ``None`` means nobody
+    # estimated a value — rendered as ``unsized``, never as a zero. The estimate
+    # never derives from the opportunity score and is never summed across
+    # outcomes: overlapping estimates would double-count and nobody would notice.
+    value_estimate: float | None = Field(
+        None, ge=0.0, description="A defensible value estimate, never derived from the score"
+    )
+    value_unit: ValueUnit | None = Field(
+        None, description="What the estimate counts: currency, users, accounts, or hours"
+    )
+    value_basis: ValueBasis = Field(
+        "estimate", description="Where the estimate came from: estimate, market, or pilot"
+    )
+    value_n: int | None = Field(None, ge=1, description="People behind the value estimate")
+    value_source: str | None = Field(
+        None, max_length=MAX_VALUE_SOURCE, description="Where a market/pilot estimate came from"
+    )
 
     @model_validator(mode="after")
     def _sample_requires_a_method(self) -> Outcome:
@@ -116,6 +145,23 @@ class Outcome(BaseModel):
                 "A sample size above one requires a non-estimate score_method "
                 "(survey or import); an estimate cannot have asked anyone."
             )
+        return self
+
+    @model_validator(mode="after")
+    def _sourced_basis_requires_a_source(self) -> Outcome:
+        """A market or pilot estimate must name its source.
+
+        An estimate with no basis is the most common way an ODI readout gets
+        discredited in a room; a *sourced* basis with no source is worse, because
+        the number looks attributable when it is not.
+        """
+        if self.value_basis in ("market", "pilot"):
+            source = (self.value_source or "").strip()
+            if not source:
+                raise ValueError(
+                    f"A value_basis of {self.value_basis!r} requires a value_source "
+                    "naming where the estimate came from."
+                )
         return self
 
 

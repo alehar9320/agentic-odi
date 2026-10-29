@@ -4,7 +4,15 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Literal
 
-from agentic_odi_core.models import BetStatus, DecisionConfidence, JobStage, ScoreMethod
+from agentic_odi_core.models import (
+    MAX_VALUE_SOURCE,
+    BetStatus,
+    DecisionConfidence,
+    JobStage,
+    ScoreMethod,
+    ValueBasis,
+    ValueUnit,
+)
 from pydantic import BaseModel, Field
 
 if TYPE_CHECKING:
@@ -108,6 +116,21 @@ class UpdateOutcomeRequest(BaseModel):
     score_method: ScoreMethod | None = None
     at: str | None = None
     note: str | None = None
+    mcp_url: str = ""
+
+
+class SetOutcomeValueRequest(BaseModel):
+    """Record what an opportunity is worth, with its unit and its basis.
+
+    ``estimate=None`` clears the value and its companions. A ``market`` or
+    ``pilot`` basis requires a ``source`` — enforced by the model, mirrored here.
+    """
+
+    estimate: float | None = Field(None, ge=0.0)
+    unit: ValueUnit | None = None
+    basis: ValueBasis = "estimate"
+    n: int | None = Field(None, ge=1)
+    source: str | None = Field(None, max_length=MAX_VALUE_SOURCE)
     mcp_url: str = ""
 
 

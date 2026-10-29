@@ -67,6 +67,10 @@ class RoadmapEntry:
     decision_id: str
     baseline: float | None = None
     target: float | None = None
+    #: The recorded value estimate, supplied by the caller (W1/ALH-64). ``None``
+    #: is unknown, never zero. It is carried so ``order_by="value"`` can sort on
+    #: it without the renderer recomputing anything.
+    value: float | None = None
 
 
 @dataclass(frozen=True)
@@ -149,6 +153,8 @@ def build_roadmap(
     today: date | None = None,
     baselines: Mapping[tuple[str, str], float | None] | None = None,
     targets: Mapping[tuple[str, str], float | None] | None = None,
+    values: Mapping[str, float | None] | None = None,
+    order_by: str = "quarter",
 ) -> Roadmap:
     """Group the outcomes a live decision chose into quarterly roadmap rows.
 
@@ -156,9 +162,16 @@ def build_roadmap(
     attributes named below), so the derivation stays a pure function and the
     caller owns the fetch. ``today`` is explicit so a test never depends on when
     it runs.
+
+    ``order_by="value"`` is **opt-in** and never the default: ordering by worth
+    changes the byte output, and existing callers must not see their roadmap
+    silently reorder. An outcome with no estimate sorts last under ``value``
+    (unknown, not zero) while keeping its quarter grouping.
     """
     if horizon < 1:
         raise ValueError("horizon must be at least 1 quarter")
+    if order_by not in ("quarter", "value"):
+        raise ValueError("order_by must be 'quarter' or 'value'")
     if today is None:
         today = datetime.now(timezone.utc).date()  # noqa: DTZ005 — explicit UTC
 
@@ -205,11 +218,24 @@ def build_roadmap(
                         decision_id=decision.id,
                         baseline=(baselines or {}).get((decision.id, outcome_id)),
                         target=(targets or {}).get((decision.id, outcome_id)),
+                        value=(values or {}).get(outcome_id),
                     ),
                 )
             )
 
-    rows.sort(key=lambda row: (row[0], row[1], row[2]))
+    if order_by == "value":
+        # Grouping by quarter is preserved: reordering across quarters would
+        # emit a period header twice and break the renderer's grouping. Within a
+        # quarter, a sized outcome comes before an unsized one (unknown sorts
+        # last, never as zero), then highest value first.
+        def value_key(row: tuple[int, str, str, RoadmapEntry]) -> tuple[int, int, float, str, str]:
+            value = row[3].value
+            unsized = 1 if value is None else 0
+            return (row[0], unsized, -(value or 0.0), row[1], row[2])
+
+        rows.sort(key=value_key)
+    else:
+        rows.sort(key=lambda row: (row[0], row[1], row[2]))
     return Roadmap(
         entries=tuple(row[3] for row in rows),
         undecided_count=undecided_count,

@@ -26,6 +26,7 @@ from agentic_odi_core.evaluation import (
 from agentic_odi_core.models import (
     JOB_STAGE_INDEX,
     MAX_SNAPSHOT_NOTE,
+    MAX_VALUE_SOURCE,
     Bet,
     BetStatus,
     BusinessValue,
@@ -42,6 +43,8 @@ from agentic_odi_core.models import (
     ScoreMethod,
     ScoreSnapshot,
     Step,
+    ValueBasis,
+    ValueUnit,
     compute_opportunity_score,
 )
 from agentic_odi_core.repository import Repository, page
@@ -118,6 +121,20 @@ def _first_line(text: str) -> str:
         if stripped:
             return stripped
     return ""
+
+
+def _pydantic_message(exc: PydanticValidationError) -> str:
+    """The validator's own sentence, not pydantic's ``N validation errors`` header.
+
+    ``str(exc)`` begins with a count line, so taking its first line drops the
+    reason a user needs. The first error's ``msg`` keeps the sentence the model
+    wrote (``A value_basis of 'market' requires a value_source ...``).
+    """
+    errors = exc.errors()
+    if not errors:
+        return _first_line(str(exc))
+    message = str(errors[0].get("msg", "")).strip()
+    return message.removeprefix("Value error, ") or _first_line(str(exc))
 
 
 def _now_iso() -> str:
@@ -249,6 +266,75 @@ class ODIService:
         if not res:
             raise OutcomeNotFoundError(outcome_id)
         self._capture_snapshot(res, at=at or _now_iso(), note=note)
+        return res
+
+    def set_outcome_value(
+        self,
+        outcome_id: str,
+        estimate: float | None,
+        *,
+        unit: ValueUnit | None = None,
+        basis: ValueBasis = "estimate",
+        n: int | None = None,
+        source: str | None = None,
+    ) -> Outcome:
+        """Record what an opportunity is worth, with its basis (W1/ALH-64).
+
+        The estimate is a judgement the caller supplies — it is never derived
+        from the opportunity score, and never summed across outcomes. A
+        ``market`` or ``pilot`` basis requires a named source; the model enforces
+        that, and this raises the same refusal as a validation error so the CLI
+        and the API fail identically.
+        """
+        existing = self.repo.get_outcome(outcome_id)
+        if existing is None:
+            raise OutcomeNotFoundError(outcome_id)
+        if estimate is not None:
+            _require_finite(estimate, "value_estimate")
+            if estimate < 0:
+                raise ValueOutOfRangeError("value_estimate must not be negative")
+        if n is not None and n < 1:
+            raise ValueOutOfRangeError("value_n must be at least 1")
+        if source is not None:
+            source = source.strip()
+            if not source:
+                raise ValidationError("value_source must not be blank.")
+            if len(source) > MAX_VALUE_SOURCE:
+                raise ValidationError(
+                    f"value_source must be at most {MAX_VALUE_SOURCE} characters."
+                )
+        if estimate is None:
+            # Clearing the estimate clears its companions: a unit, basis or
+            # source with no number describes nothing and would render as a
+            # sized value with nothing to show.
+            updates: dict[str, Any] = {
+                "value_estimate": None,
+                "value_unit": None,
+                "value_basis": "estimate",
+                "value_n": None,
+                "value_source": None,
+            }
+        else:
+            if unit is None:
+                raise ValidationError(
+                    "A value estimate needs a unit (currency, users, accounts, hours)."
+                )
+            updates = {
+                "value_estimate": estimate,
+                "value_unit": unit,
+                "value_basis": basis,
+                "value_n": n,
+                "value_source": source,
+            }
+        current = existing.model_dump(exclude_unset=True)
+        current.update(updates)
+        try:
+            Outcome.model_validate(current)
+        except PydanticValidationError as exc:
+            raise ValidationError(_pydantic_message(exc)) from exc
+        res = self.repo.update_outcome(outcome_id, updates)
+        if not res:
+            raise OutcomeNotFoundError(outcome_id)
         return res
 
     def delete_outcome(self, outcome_id: str) -> None:
@@ -569,6 +655,7 @@ class ODIService:
         *,
         horizon: int = 4,
         today: date | None = None,
+        order_by: str = "quarter",
     ) -> Roadmap:
         """Derive a job's outcome roadmap from its recorded decisions.
 
@@ -577,17 +664,23 @@ class ODIService:
         outcome score is never read as a baseline — no measurement source
         exists yet (``ALH-46``/``ALH-29``), so baselines and targets stay
         ``None`` and render as ``not measured`` rather than a zero.
+
+        ``order_by="value"`` is opt-in (W1/ALH-64): the recorded value estimates
+        are supplied to the derivation, and the default ordering is untouched.
         """
         if self.repo.get_job(job_id) is None:
             raise JobNotFoundError(job_id)
         decisions = self.repo.list_decisions(job_id, limit=None)
         outcomes = self.repo.get_outcomes(job_id, limit=None)
+        values = {outcome.id: outcome.value_estimate for outcome in outcomes}
         return build_roadmap(
             job_id,
             decisions,
             outcomes,
             horizon=horizon,
             today=today,
+            values=values,
+            order_by=order_by,
         )
 
     def record_decision(
@@ -819,6 +912,11 @@ class ODIService:
                     method=None,
                     quote=None,
                     sources=tuple(record.name for record in evidence),
+                    value_estimate=outcome.value_estimate,
+                    value_unit=outcome.value_unit,
+                    value_basis=outcome.value_basis,
+                    value_n=outcome.value_n,
+                    value_source=outcome.value_source,
                 )
             )
         decision = self.latest_decision(job_id)

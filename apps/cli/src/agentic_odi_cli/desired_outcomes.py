@@ -166,6 +166,35 @@ def evaluate(
             typer.echo(f"  Suggestion: {suggestion}")
 
 
+@desired_outcomes_app.command("value")
+def value(
+    outcome_id: str = typer.Argument(..., help="Outcome ID"),
+    estimate: float | None = typer.Option(
+        None, "--estimate", help="What the outcome is worth. Omit to clear the value."
+    ),
+    unit: str | None = typer.Option(None, "--unit", help="currency, users, accounts, or hours"),
+    basis: str = typer.Option("estimate", "--basis", help="estimate, market, or pilot"),
+    n: int | None = typer.Option(None, "--n", help="People behind the estimate"),
+    source: str | None = typer.Option(
+        None, "--source", help="Where a market/pilot estimate came from"
+    ),
+    json_output: bool = JSON_OPTION,
+) -> None:
+    """Record what an opportunity is worth, with its unit and its basis."""
+    args: dict[str, Any] = {"outcome_id": outcome_id, "estimate": estimate, "basis": basis}
+    if unit is not None:
+        args["unit"] = unit
+    if n is not None:
+        args["n"] = n
+    if source is not None:
+        args["source"] = source
+    typer.echo(
+        render_saved(
+            "valued", run_tool("set_outcome_value", args), as_json=json_output, noun="Outcome"
+        )
+    )
+
+
 @desired_outcomes_app.command("delete")
 def delete(
     outcome_id: str = typer.Argument(..., help="Outcome ID"),

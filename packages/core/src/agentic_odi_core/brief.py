@@ -14,7 +14,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 
-from agentic_odi_core.evaluation import classify_opportunity
+from agentic_odi_core.evaluation import classify_opportunity, classify_value
 
 #: A section with nothing to show is omitted and explained in one line. It is
 #: never filled with placeholder prose and never rendered as a zero.
@@ -37,11 +37,23 @@ class BriefOutcome:
     method: str | None = None
     quote: str | None = None
     sources: tuple[str, ...] = ()
+    #: The recorded value judgement and its basis (W1/ALH-64). ``None`` is an
+    #: ``unsized`` outcome: the brief omits the section rather than print a zero.
+    value_estimate: float | None = None
+    value_unit: str | None = None
+    value_basis: str = "estimate"
+    value_n: int | None = None
+    value_source: str | None = None
 
     @property
     def band(self) -> str | None:
         """The served/underserved bucket, or ``None`` when unscored."""
         return classify_opportunity(self.score)
+
+    @property
+    def value_size(self) -> str:
+        """How defensible the value estimate is: ``sized``, ``thin``, ``unsized``."""
+        return classify_value(self)
 
 
 @dataclass(frozen=True)
@@ -174,6 +186,50 @@ def _render_risks(holes: Sequence[str]) -> list[str]:
     return lines
 
 
+def _render_value(selected: list[BriefOutcome]) -> list[str]:
+    """*What it is worth* — the value estimate with its unit and its basis.
+
+    Only the selected outcomes that have an estimate appear. An outcome with no
+    estimate is ``unsized`` and contributes nothing: no zero, no placeholder. When
+    no selected outcome is sized the section is **omitted** and replaced by the
+    one-line note C1 uses elsewhere, so the brief never implies a worth it cannot
+    source.
+    """
+    sized = [outcome for outcome in selected if outcome.value_estimate is not None]
+    if not sized:
+        return [
+            "_No value estimate recorded for the selected outcomes yet — "
+            "worth is unknown, not zero._",
+            "",
+        ]
+    lines = ["## What it is worth", ""]
+    for outcome in sized:
+        unit = outcome.value_unit or NOT_MEASURED
+        basis = outcome.value_basis
+        size = outcome.value_size
+        detail = f"- `{outcome.outcome_id}`: {_fmt_value(outcome.value_estimate)} {unit} "
+        detail += f"({basis}, {size})"
+        if outcome.value_source:
+            detail += f" — source: {_escape(outcome.value_source)}"
+        if outcome.value_n is not None:
+            detail += f" — n={outcome.value_n}"
+        lines.append(detail)
+    unsized = len(selected) - len(sized)
+    if unsized:
+        lines.append(
+            f"_{unsized} selected outcome(s) have no value estimate and were omitted — "
+            "an unsized outcome is unknown, not zero._"
+        )
+    lines.append("")
+    return lines
+
+
+def _fmt_value(value: float | None) -> str:
+    if value is None:
+        return NOT_MEASURED
+    return f"{value:g}"
+
+
 def render_brief(brief: BriefInput) -> str:
     """Render the factual review case as markdown.
 
@@ -215,6 +271,7 @@ def render_brief(brief: BriefInput) -> str:
 
     lines.extend(_render_supported(selected))
     lines.extend(_render_build(selected))
+    lines.extend(_render_value(selected))
     lines.extend(_render_risks(brief.holes))
 
     lines.append("## Sources")

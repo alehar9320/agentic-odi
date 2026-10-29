@@ -293,6 +293,30 @@ class LocalBackend(Backend):
             raise BackendError(str(exc)) from None
         return outcome.model_dump()
 
+    def _set_outcome_value(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import (
+            OutcomeNotFoundError,
+            ValueOutOfRangeError,
+            outcome_not_found,
+        )
+
+        try:
+            outcome = self.service.set_outcome_value(
+                args["outcome_id"],
+                args.get("estimate"),
+                unit=args.get("unit"),
+                basis=args.get("basis", "estimate"),
+                n=args.get("n"),
+                source=args.get("source"),
+            )
+        except OutcomeNotFoundError:
+            raise BackendError(outcome_not_found(args["outcome_id"])) from None
+        except ValueOutOfRangeError as exc:
+            raise BackendError(_VALUE_RANGE_ERROR) from exc
+        except ValueError as exc:
+            raise BackendError(str(exc)) from None
+        return outcome.model_dump()
+
     def _delete_outcome(self, args: dict[str, Any]) -> str:
         from agentic_odi_core import OutcomeNotFoundError, outcome_not_found
 
@@ -782,6 +806,7 @@ _LOCAL_HANDLERS = {
     "compute_opportunity": LocalBackend._compute_opportunity,
     "evaluate_outcome": LocalBackend._evaluate_outcome,
     "compare_outcomes": LocalBackend._compare_outcomes,
+    "set_outcome_value": LocalBackend._set_outcome_value,
     "get_roadmap": LocalBackend._get_roadmap,
     "record_decision": LocalBackend._record_decision,
     "get_decision": LocalBackend._get_decision,

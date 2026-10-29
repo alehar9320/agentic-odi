@@ -460,6 +460,37 @@ def update_outcome(
 
 
 @mcp.tool
+def set_outcome_value(
+    outcome_id: str,
+    estimate: float | None,
+    unit: str | None = None,
+    basis: str = "estimate",
+    n: int | None = None,
+    source: str | None = None,
+) -> str:
+    """Record what an opportunity is worth, with its basis (W1/ALH-64).
+
+    Pass ``estimate=None`` to clear a value. A ``market`` or ``pilot`` basis
+    requires a ``source``. The estimate is a judgement the caller supplies; it is
+    never derived from the opportunity score.
+    """
+    try:
+        updated = service.set_outcome_value(
+            outcome_id,
+            estimate,
+            unit=unit,  # type: ignore[arg-type]
+            basis=basis,  # type: ignore[arg-type]
+            n=n,
+            source=source,
+        )
+    except OutcomeNotFoundError:
+        return _outcome_not_found(outcome_id)
+    except (OdiError, ValueError) as exc:
+        return f"Error: {_first_line(str(exc))}"
+    return f"Outcome value updated successfully: {updated.model_dump_json()}"
+
+
+@mcp.tool
 def delete_outcome(outcome_id: str) -> str:
     try:
         service.delete_outcome(outcome_id)
