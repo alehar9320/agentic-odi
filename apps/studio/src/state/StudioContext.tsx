@@ -416,6 +416,13 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const toastId = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
 
+  useEffect(() => {
+    const root = document.documentElement;
+    const light = settings.theme === "light";
+    root.classList.toggle("theme-light", light);
+    root.classList.toggle("theme-dark", !light);
+  }, [settings.theme]);
+
   const saveNotifications = useCallback((items: StudioNotification[]) => {
     setNotifications(items);
     try {
@@ -891,6 +898,18 @@ const pushNotice = useCallback((text: string) => {
       }
 
       const history: ChatMessage[] = userTurn ? [...base, userTurn] : base;
+      if (sidecarReachable === false) {
+        setMessages([
+          ...history,
+          {
+            role: "notice",
+            id: crypto.randomUUID(),
+            parentId: null,
+            content: "The Studio sidecar is offline. Start it to continue this conversation.",
+          },
+        ]);
+        return;
+      }
 
       const assistantId = crypto.randomUUID();
       const assistantIndex = history.length;
@@ -1076,6 +1095,7 @@ const pushNotice = useCallback((text: string) => {
             brief,
             ui_catalog: catalogManifest(),
             conversation_id: conversationId,
+            attachments: (userTurn ?? history.at(-1))?.attachments,
           },
           handleEvent,
           controller.signal,
@@ -1116,7 +1136,15 @@ const pushNotice = useCallback((text: string) => {
         abortRef.current = null;
       }
     },
-    [streaming, settings, brief, conversationId, refreshCanvas, refreshConnectors],
+    [
+      streaming,
+      settings,
+      brief,
+      conversationId,
+      refreshCanvas,
+      refreshConnectors,
+      sidecarReachable,
+    ],
   );
 
   const sendMessage = useCallback(
@@ -1156,7 +1184,7 @@ const pushNotice = useCallback((text: string) => {
         parentId: history.length ? history[history.length - 1].id : null,
         role: "user",
         content: trimmed,
-        ...(attachments.length ? { attachments: attachments as unknown as ChatAttachment[] } : {}),
+        ...(attachments.length ? { attachments } : {}),
       };
       await runTurn(history, userMessage, userMessage.id);
     },
@@ -1630,6 +1658,13 @@ const pushNotice = useCallback((text: string) => {
       dismissNotification,
       addNotification,
       simulateBackgroundEvent,
+      capabilities,
+      theses,
+      saveThesis,
+      deleteThesis,
+      dismissedSidecarNotice,
+      dismissSidecarNotice,
+      recheckConnections,
     ],
   );
 
