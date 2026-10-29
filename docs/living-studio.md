@@ -1,9 +1,8 @@
 # Running The Living Studio
 
 **The Living Studio** is the conversational GUI for Outcome-Driven Innovation:
-an interactive Opportunity Landscape, Universal Job Map, WYSIWYG Impact
-Simulation, and Causal Lineage inspection, paired with an autonomous agent
-connected to the MCP server.
+an interactive Opportunity Landscape, Universal Job Map, and WYSIWYG Impact
+Simulation, paired with an autonomous agent connected to the MCP server.
 
 The Studio runs three ways locally, plus a hosted deployment. All of them serve
 the same SPA, which talks only to the sidecar on `http://127.0.0.1:8100` — the
@@ -157,6 +156,25 @@ agentic_odi_mcp_server)…`. When the Studio is reached through the free
 Cloudflare Worker proxy, a missing `SIDECAR_URL` is reported to the browser as
 `{"error": {"code": "mcp_unreachable", "suggestion": "Start the studio sidecar
 …"}}` with `X-Request-ID` echoed for support.
+
+### What the canvas is made of
+
+Every canvas response carries its provenance: `live` when the sidecar read your
+store, `empty` when it read your store and found nothing, and `seed` when it is
+showing the built-in demonstration because the MCP server could not be reached.
+The sidecar says this in the payload (`provenance.kind`, `provenance.reason`,
+and record counts); it never dresses the prototype up as your data.
+
+The studio repeats that label where a person can see it: the rail shows a
+**DEMO** or **OFFLINE** chip, the Opportunity Landscape shows a sample-data
+notice, and an impact simulation must carry `provenance: live | simulated` before
+it renders. The catch-up feed starts empty rather than inventing activity, and
+every event produced by **Simulate update** is marked **Simulated** and excluded
+from the unread count. The catch-up feed has no server-side event source yet:
+its only content is the local simulator, which
+[#79](https://github.com/alehar9320/agentic-odi/issues/79) replaces. Connector rows in Settings come from the real connector
+store, grouped by capability area; nothing is pre-listed as though it were
+already connected.
 
 ### The thread is the room
 
