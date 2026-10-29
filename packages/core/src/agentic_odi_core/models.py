@@ -174,6 +174,30 @@ class CustomerOutcome(BaseModel):
         return self.customer_value.opportunity_score
 
 
+class V2MOM(BaseModel):
+    """The domain's V2MOM artifact: Vision, Values, Methods, Obstacles, Measures.
+
+    Only ``vision`` has an input path today, in the Studio's context
+    conversation. Nothing extracts the other four from a conversation and no
+    surface captures them, so a V2MOM in practice is its vision and four empty
+    lists.
+    """
+
+    vision: str = Field("", description="What you want to achieve or create")
+    values: list[str] = Field(
+        default_factory=list, description="Principles and beliefs that guide decisions"
+    )
+    methods: list[str] = Field(
+        default_factory=list, description="Actions and strategies to achieve the vision"
+    )
+    obstacles: list[str] = Field(
+        default_factory=list, description="Challenges and risks that stand in the way"
+    )
+    measures: list[str] = Field(
+        default_factory=list, description="Metrics and key results that measure success"
+    )
+
+
 class ScheduledWorkStatus(str, Enum):
     PENDING = "pending"
     SCHEDULED = "scheduled"

@@ -46,6 +46,7 @@ from agentic_odi_core.messages import (
 from agentic_odi_core.models import (
     JOB_STAGE_INDEX,
     JOB_STAGE_ORDER,
+    V2MOM,
     BusinessImpactCategory,
     BusinessValue,
     CustomerOutcome,
@@ -138,6 +139,7 @@ __all__ = [
     "ToolName",
     "ToolSpec",
     "ToolEffect",
+    "V2MOM",
     "capability_manifest",
     "capability_summary",
     "Repository",

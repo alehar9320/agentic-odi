@@ -4030,6 +4030,16 @@
             "type": "string",
             "title": "Core Problem",
             "default": ""
+          },
+          "v2mom": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/V2MOM"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -4332,6 +4342,46 @@
         },
         "type": "object",
         "title": "UpdateStepRequest"
+      },
+      "V2MOM": {
+        "properties": {
+          "vision": {
+            "type": "string",
+            "title": "Vision",
+            "default": ""
+          },
+          "values": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Values"
+          },
+          "methods": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Methods"
+          },
+          "obstacles": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Obstacles"
+          },
+          "measures": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Measures"
+          }
+        },
+        "type": "object",
+        "title": "V2MOM",
+        "description": "The domain's V2MOM artifact: Vision, Values, Methods, Obstacles, Measures.\n\nOnly ``vision`` is captured today, by the context conversation; the other\nfour fields have no input path yet and arrive empty."
       },
       "ValidationError": {
         "properties": {
