@@ -331,9 +331,11 @@ export function SettingsPanel() {
       {tourEnabled ? (
         <div className="settings__tour">
           <h3 className="settings__title">Getting started</h3>
-          <p className="muted">A four-step tour of what the studio can do, and where to begin.</p>
+          <p className="muted">
+            A four-step product tour, when you want one. It never opens by itself.
+          </p>
           <button type="button" className="button button--ghost" onClick={restartTour}>
-            Replay the welcome tour
+            Replay the tour
           </button>
         </div>
       ) : null}

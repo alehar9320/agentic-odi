@@ -358,6 +358,91 @@ a {
   margin-top: 2px;
 }
 
+/* The quiet second row: context and the optional tour, never competing with
+   the three starters. */
+.hero__aside {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 4px 2px;
+  margin-top: 2px;
+  color: var(--faint);
+}
+
+/* A quiet meta line, not a second row of buttons. */
+.hero__aside-divider {
+  padding: 0 6px;
+  color: var(--line-strong);
+}
+
+.hero__tour {
+  padding: 4px 2px;
+  border: 0;
+  background: transparent;
+  color: var(--faint);
+  font-size: 0.775rem;
+  text-decoration: underline;
+  text-decoration-color: var(--line-strong);
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.hero__tour:hover {
+  color: var(--text);
+  text-decoration-color: currentColor;
+}
+
+/* One next thing, under the thread and above the composer. */
+.guidance {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 0 2px 8px;
+  font-size: 0.78rem;
+}
+
+.guidance__line {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  color: var(--faint);
+  line-height: 1.5;
+}
+
+.guidance__action {
+  flex: none;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: inherit;
+  text-decoration: underline;
+  text-decoration-color: var(--line-strong);
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.guidance__action:hover {
+  color: var(--text);
+}
+
+.guidance__dismiss {
+  flex: none;
+  padding: 0 2px;
+  border: 0;
+  background: transparent;
+  color: var(--faint);
+  font-size: 0.7rem;
+  cursor: pointer;
+  opacity: 0.7;
+}
+
+.guidance__dismiss:hover {
+  color: var(--muted);
+  opacity: 1;
+}
+
 .suggestion {
   display: inline-flex;
   align-items: center;
@@ -2111,6 +2196,19 @@ input[type="range"] {
 
   .chat__dock {
     padding-inline: 12px;
+  }
+
+  .guidance {
+    flex-wrap: wrap;
+    gap: 4px 10px;
+  }
+
+  .guidance__line {
+    flex: 1 1 100%;
+  }
+
+  .hero__aside {
+    gap: 4px 2px;
   }
 
   .composer__hint span:first-child {
