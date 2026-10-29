@@ -4,6 +4,11 @@ import react from "@vitejs/plugin-react";
 export default defineConfig({
   plugins: [react()],
   clearScreen: false,
+  // Settings → About reports which build is running; the release workflow's
+  // date is baked in at build time. Applies to vitest transforms too.
+  define: {
+    __STUDIO_BUILD_DATE__: JSON.stringify(new Date().toISOString().slice(0, 10)),
+  },
   server: {
     port: 5173,
     strictPort: true,
@@ -25,5 +30,9 @@ export default defineConfig({
     // Visual tests need Chromium, so they run from vitest.visual.config.ts and
     // never from this jsdom suite (see docs/development.md).
     exclude: [...configDefaults.exclude, "**/*.visual.test.tsx"],
+    // Vitest's default include is `**/*.{test,spec}.?(c|m)[jt]s?(x)`, which
+    // would also collect the Playwright specs in `e2e/`. Scope it to the unit
+    // tests so the two runners never overlap.
+    include: ["src/**/*.test.{ts,tsx}"],
   },
 });

@@ -19,6 +19,7 @@ export function OpportunityLandscape() {
   const [hoveredOutcome, setHoveredOutcome] = useState<Outcome | null>(null);
 
   const canvas = canvasState.data;
+  const sample = canvas?.source === "seed";
   const jobs = useMemo(() => canvas?.jobs ?? [], [canvas]);
   const outcomes = useMemo(() => canvas?.outcomes ?? [], [canvas]);
   const isLoading = canvasState.kind === "loading";
@@ -71,7 +72,7 @@ export function OpportunityLandscape() {
             Opportunity Landscape
           </p>
           <p className="caption" style={{ marginTop: 4, margin: 0, color: "var(--studio-muted)" }}>
-            Interactive 2D Opportunity Matrix mapping Importance vs. Satisfaction. High Opportunity (&gt;10) targets pulse as primary innovation levers.
+            Interactive 2D Opportunity Matrix mapping Importance vs. Satisfaction. Scores above 10 mark underserved market needs and pulse as primary innovation levers.
           </p>
         </div>
 
@@ -214,6 +215,7 @@ export function OpportunityLandscape() {
           onSelectOutcome={(id) => setSelectedOutcomeId(selectedOutcomeId === id ? null : id)}
           onHoverOutcome={setHoveredOutcome}
           activeOutcome={activeOutcome}
+          sample={sample}
         />
       ) : viewMode === "table" ? (
         <OpportunityTableView
@@ -224,7 +226,7 @@ export function OpportunityLandscape() {
       ) : sortedOutcomes.length ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           {sortedOutcomes.map((outcome, index) => (
-            <OutcomeCard outcome={outcome} key={outcome.id ?? index} />
+            <OutcomeCard outcome={outcome} sample={sample} key={outcome.id ?? index} />
           ))}
         </div>
       ) : (
@@ -279,6 +281,7 @@ interface MatrixViewProps {
   onSelectOutcome: (id: string) => void;
   onHoverOutcome: (outcome: Outcome | null) => void;
   activeOutcome: Outcome | null;
+  sample: boolean;
 }
 
 function OpportunityMatrixView({
@@ -287,6 +290,7 @@ function OpportunityMatrixView({
   onSelectOutcome,
   onHoverOutcome,
   activeOutcome,
+  sample,
 }: MatrixViewProps) {
   return (
     <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: 16 }}>
@@ -444,7 +448,7 @@ function OpportunityMatrixView({
       <div>
         {activeOutcome ? (
           <div style={{ position: "sticky", top: 16 }}>
-            <OutcomeCard outcome={activeOutcome} />
+            <OutcomeCard outcome={activeOutcome} sample={sample} />
           </div>
         ) : (
           <div
@@ -496,7 +500,16 @@ function OpportunityTableView({
             return (
               <tr
                 key={outcome.id ?? idx}
+                role="row"
+                tabIndex={0}
+                aria-selected={isSelected}
                 onClick={() => outcome.id && onSelectOutcome(outcome.id)}
+                onKeyDown={(event) => {
+                  if ((event.key === "Enter" || event.key === " ") && outcome.id) {
+                    event.preventDefault();
+                    onSelectOutcome(outcome.id);
+                  }
+                }}
                 style={{
                   borderBottom: "1px solid var(--studio-border)",
                   cursor: "pointer",

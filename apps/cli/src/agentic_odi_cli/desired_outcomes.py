@@ -7,6 +7,8 @@ owns the former; ``customer-outcomes`` owns the latter.
 
 from __future__ import annotations
 
+import csv
+import io
 import json
 from typing import Any
 
@@ -19,6 +21,16 @@ from agentic_odi_cli.render import render_deleted, render_outcome, render_outcom
 desired_outcomes_app = typer.Typer(help="Manage desired Outcomes.")
 
 JSON_OPTION = typer.Option(False, "--json", help="Emit machine-readable JSON.")
+
+EXPORT_FIELDS = (
+    "id",
+    "job_id",
+    "step_id",
+    "statement",
+    "importance",
+    "satisfaction",
+    "opportunity_score",
+)
 
 
 @desired_outcomes_app.command("add")
@@ -55,6 +67,35 @@ def list_outcomes(
     if step_id is not None:
         args["step_id"] = step_id
     typer.echo(render_outcome_list(run_tool("get_outcomes", args), as_json=json_output))
+
+
+@desired_outcomes_app.command("export")
+def export(
+    job_id: str = typer.Option(..., help="Job ID to export outcomes for"),
+    step_id: str | None = typer.Option(default=None, help="Filter by Step ID"),
+    output_format: str = typer.Option("csv", "--format", help="Output format: csv or json."),
+) -> None:
+    """Export desired Outcomes to stdout, ready to pipe into another tool."""
+    fmt = output_format.lower()
+    if fmt not in {"csv", "json"}:
+        typer.echo(f"Error: unknown format '{output_format}', expected csv or json", err=True)
+        raise typer.Exit(code=1)
+    args: dict[str, Any] = {"job_id": job_id}
+    if step_id is not None:
+        args["step_id"] = step_id
+    outcomes = run_tool("get_outcomes", args)
+    if not isinstance(outcomes, list):
+        typer.echo(str(outcomes))
+        return
+    if fmt == "json":
+        typer.echo(json.dumps(outcomes, indent=2))
+        return
+    buffer = io.StringIO()
+    writer = csv.DictWriter(buffer, fieldnames=EXPORT_FIELDS, extrasaction="ignore")
+    writer.writeheader()
+    for item in outcomes:
+        writer.writerow({field: item.get(field, "") for field in EXPORT_FIELDS})
+    typer.echo(buffer.getvalue(), nl=False)
 
 
 @desired_outcomes_app.command("get")
