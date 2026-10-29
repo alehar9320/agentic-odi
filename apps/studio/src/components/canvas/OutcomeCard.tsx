@@ -63,7 +63,8 @@ export function OutcomeCard({
     };
   }, [detail, outcome.id, sample, settings.mcp_url]);
 
-  const latestNote = detail && !sample && noteFor?.id === outcome.id ? noteFor.note : null;
+  const latestNote =
+    detail && !sample && noteFor && noteFor.id === outcome.id ? noteFor.note : null;
 
   const opp = outcome.opportunity_score;
   const statement = outcome.statement ?? "Untitled outcome";
