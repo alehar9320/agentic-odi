@@ -1,6 +1,6 @@
 [project]
 name = "agentic-odi"
-version = "0.12.0"
+version = "0.13.0"
 description = "Outcome-Driven Innovation (ODI): an MCP server, chat client, CLI, and external connectors."
 requires-python = ">=3.10"
 
