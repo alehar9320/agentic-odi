@@ -8,6 +8,13 @@ Pydantic's identically named class. Import it from
 ``agentic_odi_core.errors`` instead.
 """
 
+from agentic_odi_core.brief import (
+    NOT_MEASURED,
+    BriefInput,
+    BriefOutcome,
+    render_brief,
+    select_underserved,
+)
 from agentic_odi_core.contract import (
     TOOL_NAMES,
     TOOL_SPECS,
@@ -86,6 +93,11 @@ from agentic_odi_core.steve_jobs import (
 __all__ = [
     "BusinessImpactCategory",
     "BusinessValue",
+    "BriefInput",
+    "BriefOutcome",
+    "NOT_MEASURED",
+    "render_brief",
+    "select_underserved",
     "CAPABILITIES",
     "ConflictError",
     "CustomerOutcome",
