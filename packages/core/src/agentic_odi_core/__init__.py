@@ -26,7 +26,11 @@ from agentic_odi_core.errors import (
     StoreError,
     error_status,
 )
-from agentic_odi_core.evaluation import evaluate_outcome_statement
+from agentic_odi_core.evaluation import (
+    OutcomeStatementError,
+    evaluate_outcome_statement,
+    statement_to_dict,
+)
 from agentic_odi_core.factory import build_repository
 from agentic_odi_core.messages import (
     CAPABILITIES,
@@ -34,12 +38,13 @@ from agentic_odi_core.messages import (
     ODI_FRAMEWORK_GUIDELINES,
     customer_outcome_not_found,
     evidence_not_found,
-    get_odi_framework_guidelines,
     job_not_found,
     outcome_not_found,
     step_not_found,
 )
 from agentic_odi_core.models import (
+    JOB_STAGE_INDEX,
+    JOB_STAGE_ORDER,
     BusinessImpactCategory,
     BusinessValue,
     CustomerOutcome,
@@ -48,6 +53,7 @@ from agentic_odi_core.models import (
     Evidence,
     EvidenceItemType,
     Job,
+    JobStage,
     Outcome,
     Step,
     ValueMetric,
@@ -86,6 +92,9 @@ __all__ = [
     "EvidenceNotFoundError",
     "Job",
     "JobNotFoundError",
+    "JobStage",
+    "JOB_STAGE_INDEX",
+    "JOB_STAGE_ORDER",
     "NotFoundError",
     "ODIService",
     "ODI_ASSISTANT_PROMPT",
@@ -93,6 +102,7 @@ __all__ = [
     "OdiError",
     "Outcome",
     "OutcomeNotFoundError",
+    "OutcomeStatementError",
     "RateLimitError",
     "SerializationError",
     "Step",
@@ -106,15 +116,14 @@ __all__ = [
     "InvalidOutcomeStatementError",
     "TOOL_NAMES",
     "TOOL_SPECS",
-    "ToolEffect",
     "ToolName",
     "ToolSpec",
+    "ToolEffect",
     "capability_manifest",
     "capability_summary",
     "Repository",
     "build_repository",
     "compute_opportunity_score",
-    "get_odi_framework_guidelines",
     "customer_outcome_not_found",
     "error_status",
     "evaluate_outcome_statement",
@@ -123,6 +132,7 @@ __all__ = [
     "odi_schema",
     "outcome_not_found",
     "parse_tool_result",
+    "statement_to_dict",
     "step_not_found",
     "tool_result_text",
 ]

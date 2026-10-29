@@ -1,15 +1,46 @@
 name: release
 
+# release-please publishes the GitHub release via the API; that emits a
+# `release` event, not a tag push. Both paths are kept so hand-cut tags still
+# publish the CLI archives.
+
 on:
   push:
     tags:
       - "v*"
+  release:
+    types: [published]
 
 permissions:
   contents: write
 
 jobs:
+  # A release that ships a binary reporting a different version than its tag is
+  # a trust failure, so the tag is checked against the source before any build.
+  version:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - name: Setup uv
+        uses: ./.github/actions/setup
+        with:
+          python-version: "3.11"
+      - name: The tag matches the version the CLI reports
+        run: |
+          set -euo pipefail
+          tag_version="${GITHUB_REF_NAME#v}"
+          reported="$(uv run python -m agentic_odi_cli --version)"
+          # `--version` prints "<version> (<date>)" when a build date is set.
+          cli_version="${reported%% *}"
+          if [ "$cli_version" != "$tag_version" ]; then
+            echo "::error::Tag v${tag_version} does not match the CLI version ${cli_version}. Bump the declared version before tagging."
+            exit 1
+          fi
+          echo "OK: version ${cli_version} matches tag v${tag_version}"
+
   build:
+    needs: [version]
     strategy:
       fail-fast: false
       matrix:

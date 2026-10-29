@@ -17,32 +17,50 @@ Follow this sequence when guiding a user through the ODI process:
 ### Stage 2: Capture Desired Outcomes
 - **When**: After a Job is defined. Outcomes come BEFORE steps or solutions.
 - **Ask the user**: 'What does success look like? What should happen faster, more reliably, or more consistently?'
-- **Outcome statement format**: 'Minimize/Maximize the [metric] when [context].'
+- **Outcome statement format**: `[Direction] + [Unit of Measure] + [Object of Control] + [Contextual Clarifier]`, e.g. 'Minimize the time it takes to onboard a new engineer.'
+- **Direction**: Must start with 'Minimize' or 'Maximize'.
+- **Unit of measure**: A measurable unit (time, cost, number, frequency, rate, percentage, steps, attempts).
+- **Object of control**: The thing being acted on (named after 'the').
+- **Contextual clarifier**: When it happens (when, while, before, after, during, if, as).
+- **Scores**: Both `importance` and `satisfaction` are required (1–10). An outcome without them cannot be compared to anything.
+- **Expectation**: Qualitative interviews typically uncover 50–150 desired outcome statements.
 - **Tools to use**:
   - `add_outcome(job_id, statement, importance, satisfaction)` — Capture each desired outcome with scores.
   - `get_outcomes(job_id)` — Review all outcomes captured for a Job.
-  - `evaluate_outcome(statement, job_id?)` — Check that a statement starts with Minimize/Maximize, names a metric, and states its context before saving it.
+  - `evaluate_outcome(statement, job_id?)` — **Pre-write check**: run this before `add_outcome` to confirm the statement matches the ODI format. It returns coded issues and suggestions for any failure.
+  - `update_outcome(outcome_id, ...)` — Correct a statement or scores; the same validation applies.
 
-### Stage 3: Calculate Opportunity Scores
+### Stage 3: Build the Job Map
+- **When**: After key outcomes are captured. Never build a map on a job with zero outcomes — outcomes are what give the steps their meaning.
+- **Ask the user**: 'What are the key phases or steps the customer takes when doing this job?'
+- **Eight Universal Job Map stages** (in order): Define, Locate, Prepare, Confirm, Execute, Monitor, Modify, Conclude.
+- **Tools to use**:
+  - `add_step(job_id, name, order, stage?)` — Add each chronological step; `stage` must be one of the eight stages above, and `stage_index` is derived from it.
+  - `get_job_map(job_id)` — View the complete ordered job map, ordered by stage.
+
+### Stage 4: Calculate Opportunity Scores
 - **When**: After outcomes have importance and satisfaction scores.
 - **Formula**: Opportunity Score = importance + max(importance - satisfaction, 0)
 - **Scores > 10** indicate high innovation opportunity. Guide the user to focus efforts there.
-- **Tools to use**: `get_outcomes(job_id)` — Review opportunity_score field on each outcome.
+- **Scores ≤ 10** indicate appropriately served or overserved outcomes.
+- **Tools to use**: `get_outcomes(job_id)` — Review opportunity_score field on each outcome. `compute_opportunity(importance, satisfaction)` — Calculate a score directly.
 
-### Stage 4: Build the Job Map
-- **When**: After key outcomes are captured. Use to organize the job execution context.
-- **Ask the user**: 'What are the key phases or steps the customer takes when doing this job?'
-- **Tools to use**:
-  - `add_step(job_id, name, order)` — Add each chronological step.
-  - `get_job_map(job_id)` — View the complete ordered job map.
+### Stage 5: Segment by Underserved Outcomes
+- **When**: After outcomes are scored.
+- **Never** segment by demographics. A segment is a group of people plus a functional job.
+- **Tools**: `get_segments(job_id?)`, `propose_strategy()`.
+- A segment is underserved when one of its outcomes scores above 10, and overserved when the customer already has the outcome (satisfaction at or above importance).
 
-### Supporting Tools
-- `add_evidence(...)` / `list_evidence(job_id?)` — Attach customer research records from connectors to a Job, Step, or Outcome without altering the ODI artifacts.
-- `promote_evidence(evidence_id, target, job_id?)` — Turn a captured record into a Job or desired Outcome when it is ready.
-- `get_odi_schema()` — Return the canonical JSON schema for every ODI entity.
+### Stage 6: Formulate the Innovation Strategy
+- **When**: After segments are clear.
+- **Differentiated**: improve an existing product for an underserved segment.
+- **Disruptive**: offer a lower-cost solution to an overserved segment.
+- **New-Market**: create for a job no one is being served on today.
+- **Tools**: `propose_strategy(job_id?)`.
+- Always state the strategies you rejected and why.
 
 ### General Rule
-Never skip stages. Always confirm the user has a Job defined (Stage 1) before capturing Outcomes (Stage 2), and always capture Outcomes (Stage 2) before building the Job Map (Stage 4)."""
+Never skip stages. Always confirm the user has a Job defined (Stage 1) before capturing Outcomes (Stage 2), always capture Outcomes (Stage 2) before building the Job Map (Stage 3), and always score outcomes (Stage 2) before computing opportunity (Stage 4). If a tool rejects a write, read the message, fix the statement or the numbers, and try once. Do not retry the same call unchanged."""
 
 
 def get_odi_framework_guidelines() -> str:

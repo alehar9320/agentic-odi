@@ -100,40 +100,6 @@ The wizard can be cancelled at any step with Ctrl-C.
 > Chat is the only CLI mode that needs an LLM endpoint. The `customer-outcomes`
 > and `connectors` commands keep working without one.
 
-## Capabilities
-
-Explore all tools and capabilities generated from the core contract:
-
-```bash
-agentic-odi capabilities         # print human-readable summary
-agentic-odi capabilities --json  # print capability manifest in JSON
-agentic-odi capabilities tools   # list all tool names
-```
-
-## Validate desired outcome statements
-
-```bash
-agentic-odi desired-outcomes evaluate "Minimize the time to setup"
-```
-
-## Settings and Feature Flags
-
-```bash
-agentic-odi settings flags list
-agentic-odi settings flags get developer_mode
-agentic-odi settings flags set developer_mode on
-agentic-odi settings flags reset developer_mode
-```
-
-## Profile and Setup
-
-```bash
-agentic-odi profile show
-agentic-odi profile set --product-name "My Product"
-agentic-odi profile path
-agentic-odi setup
-```
-
 ## Manage Jobs, Steps, and desired Outcomes
 
 Every ODI entity has the same create/read/update/delete surface in the CLI and
@@ -150,18 +116,26 @@ agentic-odi jobs delete <job-id> --yes
 
 # Steps (Job Map)
 agentic-odi steps add --job-id <job-id> --name "Prepare environment" --order 1
+agentic-odi steps add --job-id <job-id> --name "Execute" --order 5 --stage execute
 agentic-odi steps list --job-id <job-id>
 agentic-odi steps get <step-id>
 agentic-odi steps update <step-id> --order 2
 agentic-odi steps delete <step-id> --yes
 
+Capture a desired or customer outcome before adding a step. Use `--allow-empty-job-map`
+only when you intentionally need to stage a map before capturing outcomes.
+
 # Desired Outcomes
-agentic-odi desired-outcomes add --job-id <job-id>   --statement "Minimize the time it takes to get a working environment"   --importance 8 --satisfaction 4
+agentic-odi desired-outcomes add --job-id <job-id> --statement "Minimize the time it takes to get a working environment" --importance 8 --satisfaction 4
 agentic-odi desired-outcomes list --job-id <job-id>
 agentic-odi desired-outcomes get <outcome-id>
 agentic-odi desired-outcomes update <outcome-id> --satisfaction 6
 agentic-odi desired-outcomes delete <outcome-id> --yes
-agentic-odi desired-outcomes evaluate "Minimize the time to resolve setup errors"
+agentic-odi desired-outcomes evaluate "Minimize the time to ship when onboarding"
+```
+
+`--importance` and `--satisfaction` (1–10) are now required on `add`. `evaluate`
+checks a statement against the ODI format rules before saving.
 ```
 
 Add `--json` to any command for machine-readable output.
@@ -203,10 +177,45 @@ agentic-odi evaluate "Minimize the time to ship when onboarding"  # outcome-form
 agentic-odi evaluate --json "Minimize the time to ship when onboarding"
 agentic-odi guidelines        # the ODI stage-by-stage guide
 agentic-odi capabilities      # what the assistant can do
+agentic-odi capabilities --json   # machine-readable manifest
+agentic-odi capabilities tools  # tool names only
 ```
 
 `evaluate` returns the same verdict the `evaluate_outcome` MCP tool does, so the
 check works with or without a running server.
+
+`capabilities` groups every tool by effect (read/write/destructive) and by ODI
+stage. `capabilities --json` emits the full machine-readable manifest.
+`capabilities tools` lists tool names only.
+
+## Inspect settings and feature flags
+
+```bash
+agentic-odi settings flags list
+agentic-odi settings flags get experimental_connectors
+agentic-odi settings flags set experimental_connectors true
+agentic-odi settings flags reset
+```
+
+`experimental_connectors` gates the `connectors` group (`add`, `health`,
+`ingest`). `auto_update` gates startup auto-update checks. `advanced_metrics`
+gates detailed metrics output in `desired-outcomes evaluate`. `developer_mode`
+gates raw MCP trace debugging.
+
+## Manage your profile and run setup
+
+```bash
+agentic-odi profile show
+agentic-odi profile show --json
+agentic-odi profile set --product-name "My Product" --domain "acme.test"
+agentic-odi profile path
+agentic-odi setup       # interactive baseline wizard
+```
+
+`profile show` prints the baseline fields; add `--json` to emit the raw JSON.
+`profile set` updates any subset of baseline fields with explicit options.
+`profile path` prints the baseline file path. `setup` runs the interactive
+baseline wizard.
 
 ## Manage Customer Outcomes
 

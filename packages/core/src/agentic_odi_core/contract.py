@@ -7,15 +7,9 @@ matches :data:`TOOL_SPECS`.
 
 from __future__ import annotations
 
+from collections import defaultdict
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any
-
-
-class ToolEffect(str, Enum):
-    READ = "read"
-    WRITE = "write"
-    DESTRUCTIVE = "destructive"
 
 
 class ToolName(str, Enum):
@@ -52,9 +46,17 @@ class ToolName(str, Enum):
     GET_CAPABILITIES_MANIFEST = "get_capabilities_manifest"
 
 
+class ToolEffect(str, Enum):
+    READ = "read"
+    WRITE = "write"
+    DESTRUCTIVE = "destructive"
+
+
 @dataclass(frozen=True)
 class ToolSpec:
-    """Metadata describing a tool on the Agentic ODI tool surface."""
+    """Metadata for a single MCP tool: its name, human-readable summary,
+    effect (read/write/destructive), arguments, required subset, return
+    description, and ODI stage."""
 
     name: str
     summary: str
@@ -65,173 +67,185 @@ class ToolSpec:
     stage: str | None = None
 
 
+def _derive_effect(name: str) -> ToolEffect:
+    """Derive a tool's effect from its name.
+
+    get_*/list_* → READ, delete_* → DESTRUCTIVE, everything else → WRITE.
+    """
+    if name.startswith(("get_", "list_")):
+        return ToolEffect.READ
+    if name.startswith("delete_"):
+        return ToolEffect.DESTRUCTIVE
+    return ToolEffect.WRITE
+
+
 TOOL_SPECS: dict[str, ToolSpec] = {
     ToolName.ADD_JOB.value: ToolSpec(
-        name=ToolName.ADD_JOB.value,
-        summary="Create a new Job-to-be-Done",
-        effect=ToolEffect.WRITE,
+        name="add_job",
+        summary="Create a new Job-to-be-Done.",
+        effect=_derive_effect("add_job"),
         arguments=("name", "description"),
         required=("name",),
-        returns="Created Job entity in JSON format",
+        returns="The created Job.",
         stage="1",
     ),
     ToolName.GET_JOBS.value: ToolSpec(
-        name=ToolName.GET_JOBS.value,
-        summary="List all existing Jobs-to-be-Done",
-        effect=ToolEffect.READ,
+        name="get_jobs",
+        summary="List all Jobs.",
+        effect=_derive_effect("get_jobs"),
         arguments=("limit", "offset"),
-        required=(),
-        returns="Array of Job entities in JSON format",
+        returns="A list of Jobs.",
         stage="1",
     ),
     ToolName.GET_JOB.value: ToolSpec(
-        name=ToolName.GET_JOB.value,
-        summary="Retrieve a specific Job-to-be-Done by ID",
-        effect=ToolEffect.READ,
+        name="get_job",
+        summary="Get a single Job by ID.",
+        effect=_derive_effect("get_job"),
         arguments=("job_id",),
         required=("job_id",),
-        returns="Job entity in JSON format",
+        returns="The Job, or an error string if not found.",
         stage="1",
     ),
     ToolName.UPDATE_JOB.value: ToolSpec(
-        name=ToolName.UPDATE_JOB.value,
-        summary="Update an existing Job-to-be-Done",
-        effect=ToolEffect.WRITE,
+        name="update_job",
+        summary="Update a Job's name or description.",
+        effect=_derive_effect("update_job"),
         arguments=("job_id", "name", "description"),
         required=("job_id",),
-        returns="Updated Job entity in JSON format",
+        returns="The updated Job.",
         stage="1",
     ),
     ToolName.DELETE_JOB.value: ToolSpec(
-        name=ToolName.DELETE_JOB.value,
-        summary="Delete a Job-to-be-Done by ID",
-        effect=ToolEffect.DESTRUCTIVE,
+        name="delete_job",
+        summary="Delete a Job and its cascading dependents.",
+        effect=_derive_effect("delete_job"),
         arguments=("job_id",),
         required=("job_id",),
-        returns="Confirmation message with deleted Job ID",
+        returns="The deleted Job ID.",
         stage="1",
     ),
     ToolName.ADD_STEP.value: ToolSpec(
-        name=ToolName.ADD_STEP.value,
-        summary="Add a process step to a Job Map",
-        effect=ToolEffect.WRITE,
-        arguments=("job_id", "name", "order"),
+        name="add_step",
+        summary="Add a step to a Job's job map.",
+        effect=_derive_effect("add_step"),
+        arguments=("job_id", "name", "order", "stage", "allow_empty_job_map"),
         required=("job_id", "name", "order"),
-        returns="Created Step entity in JSON format",
-        stage="4",
+        returns="The created Step.",
+        stage="3",
     ),
     ToolName.GET_JOB_MAP.value: ToolSpec(
-        name=ToolName.GET_JOB_MAP.value,
-        summary="Get ordered process steps forming a Job Map",
-        effect=ToolEffect.READ,
+        name="get_job_map",
+        summary="Get the ordered job map for a Job.",
+        effect=_derive_effect("get_job_map"),
         arguments=("job_id", "limit", "offset"),
         required=("job_id",),
-        returns="Array of Step entities in JSON format",
-        stage="4",
+        returns="A list of Steps ordered by stage.",
+        stage="3",
     ),
     ToolName.GET_STEP.value: ToolSpec(
-        name=ToolName.GET_STEP.value,
-        summary="Retrieve a specific process step by ID",
-        effect=ToolEffect.READ,
+        name="get_step",
+        summary="Get a single Step by ID.",
+        effect=_derive_effect("get_step"),
         arguments=("step_id",),
         required=("step_id",),
-        returns="Step entity in JSON format",
-        stage="4",
+        returns="The Step, or an error string if not found.",
+        stage="3",
     ),
     ToolName.UPDATE_STEP.value: ToolSpec(
-        name=ToolName.UPDATE_STEP.value,
-        summary="Update a process step's name or order",
-        effect=ToolEffect.WRITE,
+        name="update_step",
+        summary="Update a Step's name or order.",
+        effect=_derive_effect("update_step"),
         arguments=("step_id", "name", "order"),
         required=("step_id",),
-        returns="Updated Step entity in JSON format",
-        stage="4",
+        returns="The updated Step.",
+        stage="3",
     ),
     ToolName.DELETE_STEP.value: ToolSpec(
-        name=ToolName.DELETE_STEP.value,
-        summary="Delete a process step by ID",
-        effect=ToolEffect.DESTRUCTIVE,
+        name="delete_step",
+        summary="Delete a Step and its cascading dependents.",
+        effect=_derive_effect("delete_step"),
         arguments=("step_id",),
         required=("step_id",),
-        returns="Confirmation message with deleted Step ID",
-        stage="4",
+        returns="The deleted Step ID.",
+        stage="3",
     ),
     ToolName.ADD_OUTCOME.value: ToolSpec(
-        name=ToolName.ADD_OUTCOME.value,
-        summary="Record a desired outcome statement with importance/satisfaction",
-        effect=ToolEffect.WRITE,
+        name="add_outcome",
+        summary="Add a desired Outcome to a Job.",
+        effect=_derive_effect("add_outcome"),
         arguments=("job_id", "statement", "importance", "satisfaction", "step_id"),
-        required=("job_id", "statement"),
-        returns="Created Outcome entity in JSON format",
+        required=("job_id", "statement", "importance", "satisfaction"),
+        returns="The created Outcome.",
         stage="2",
     ),
     ToolName.GET_OUTCOMES.value: ToolSpec(
-        name=ToolName.GET_OUTCOMES.value,
-        summary="List desired outcomes for a job with opportunity scores",
-        effect=ToolEffect.READ,
+        name="get_outcomes",
+        summary="List desired Outcomes for a Job.",
+        effect=_derive_effect("get_outcomes"),
         arguments=("job_id", "step_id", "limit", "offset"),
         required=("job_id",),
-        returns="Array of Outcome entities in JSON format",
+        returns="A list of Outcomes.",
         stage="2",
     ),
     ToolName.GET_OUTCOME.value: ToolSpec(
-        name=ToolName.GET_OUTCOME.value,
-        summary="Retrieve a specific desired outcome by ID",
-        effect=ToolEffect.READ,
+        name="get_outcome",
+        summary="Get a single Outcome by ID.",
+        effect=_derive_effect("get_outcome"),
         arguments=("outcome_id",),
         required=("outcome_id",),
-        returns="Outcome entity in JSON format",
+        returns="The Outcome, or an error string if not found.",
         stage="2",
     ),
     ToolName.UPDATE_OUTCOME.value: ToolSpec(
-        name=ToolName.UPDATE_OUTCOME.value,
-        summary="Update a desired outcome statement or scores",
-        effect=ToolEffect.WRITE,
+        name="update_outcome",
+        summary="Update an Outcome's statement or scores.",
+        effect=_derive_effect("update_outcome"),
         arguments=("outcome_id", "statement", "importance", "satisfaction", "step_id"),
         required=("outcome_id",),
-        returns="Updated Outcome entity in JSON format",
+        returns="The updated Outcome.",
         stage="2",
     ),
     ToolName.DELETE_OUTCOME.value: ToolSpec(
-        name=ToolName.DELETE_OUTCOME.value,
-        summary="Delete a desired outcome by ID",
-        effect=ToolEffect.DESTRUCTIVE,
+        name="delete_outcome",
+        summary="Delete a desired Outcome.",
+        effect=_derive_effect("delete_outcome"),
         arguments=("outcome_id",),
         required=("outcome_id",),
-        returns="Confirmation message with deleted Outcome ID",
+        returns="The deleted Outcome ID.",
         stage="2",
     ),
     ToolName.ADD_CUSTOMER_OUTCOME.value: ToolSpec(
-        name=ToolName.ADD_CUSTOMER_OUTCOME.value,
-        summary="Capture an ODI-aligned customer outcome linking customer and business value",
-        effect=ToolEffect.WRITE,
-        arguments=("job_id", "customer_value", "business_value", "step_id"),
+        name="add_customer_outcome",
+        summary="Add a Customer Outcome pairing customer and business value.",
+        effect=_derive_effect("add_customer_outcome"),
+        arguments=(
+            "job_id",
+            "customer_value",
+            "business_value",
+            "step_id",
+        ),
         required=("job_id", "customer_value", "business_value"),
-        returns="Created CustomerOutcome entity in JSON format",
-        stage="2",
+        returns="The created Customer Outcome.",
     ),
     ToolName.GET_CUSTOMER_OUTCOME.value: ToolSpec(
-        name=ToolName.GET_CUSTOMER_OUTCOME.value,
-        summary="Retrieve a specific customer outcome by ID",
-        effect=ToolEffect.READ,
+        name="get_customer_outcome",
+        summary="Get a single Customer Outcome by ID.",
+        effect=_derive_effect("get_customer_outcome"),
         arguments=("outcome_id",),
         required=("outcome_id",),
-        returns="CustomerOutcome entity in JSON format",
-        stage="2",
+        returns="The Customer Outcome, or an error string if not found.",
     ),
     ToolName.LIST_CUSTOMER_OUTCOMES.value: ToolSpec(
-        name=ToolName.LIST_CUSTOMER_OUTCOMES.value,
-        summary="List customer outcomes for a job",
-        effect=ToolEffect.READ,
+        name="list_customer_outcomes",
+        summary="List Customer Outcomes for a Job.",
+        effect=_derive_effect("list_customer_outcomes"),
         arguments=("job_id", "limit", "offset"),
-        required=(),
-        returns="Array of CustomerOutcome entities in JSON format",
-        stage="2",
+        returns="A list of Customer Outcomes.",
     ),
     ToolName.UPDATE_CUSTOMER_OUTCOME.value: ToolSpec(
-        name=ToolName.UPDATE_CUSTOMER_OUTCOME.value,
-        summary="Update fields on a customer outcome entity",
-        effect=ToolEffect.WRITE,
+        name="update_customer_outcome",
+        summary="Update a Customer Outcome's value metrics.",
+        effect=_derive_effect("update_customer_outcome"),
         arguments=(
             "outcome_id",
             "direction",
@@ -250,22 +264,20 @@ TOOL_SPECS: dict[str, ToolSpec] = {
             "value_metrics",
         ),
         required=("outcome_id",),
-        returns="Updated CustomerOutcome entity in JSON format",
-        stage="2",
+        returns="The updated Customer Outcome.",
     ),
     ToolName.DELETE_CUSTOMER_OUTCOME.value: ToolSpec(
-        name=ToolName.DELETE_CUSTOMER_OUTCOME.value,
-        summary="Delete a customer outcome by ID",
-        effect=ToolEffect.DESTRUCTIVE,
+        name="delete_customer_outcome",
+        summary="Delete a Customer Outcome.",
+        effect=_derive_effect("delete_customer_outcome"),
         arguments=("outcome_id",),
         required=("outcome_id",),
-        returns="Confirmation message with deleted CustomerOutcome ID",
-        stage="2",
+        returns="The deleted Customer Outcome ID.",
     ),
     ToolName.ADD_EVIDENCE.value: ToolSpec(
-        name=ToolName.ADD_EVIDENCE.value,
-        summary="Capture customer research or interview evidence",
-        effect=ToolEffect.WRITE,
+        name="add_evidence",
+        summary="Capture an evidence record from a connector.",
+        effect=_derive_effect("add_evidence"),
         arguments=(
             "source_name",
             "source_kind",
@@ -278,40 +290,35 @@ TOOL_SPECS: dict[str, ToolSpec] = {
             "outcome_id",
         ),
         required=("source_name", "source_kind", "name", "content"),
-        returns="Created Evidence entity in JSON format",
-        stage=None,
+        returns="The created Evidence record.",
     ),
     ToolName.GET_EVIDENCE.value: ToolSpec(
-        name=ToolName.GET_EVIDENCE.value,
-        summary="Retrieve a specific evidence record by ID",
-        effect=ToolEffect.READ,
+        name="get_evidence",
+        summary="Get a single evidence record by ID.",
+        effect=_derive_effect("get_evidence"),
         arguments=("evidence_id",),
         required=("evidence_id",),
-        returns="Evidence entity in JSON format",
-        stage=None,
+        returns="The Evidence record, or an error string if not found.",
     ),
     ToolName.LIST_EVIDENCE.value: ToolSpec(
-        name=ToolName.LIST_EVIDENCE.value,
-        summary="List evidence records filtered by job, step, or outcome",
-        effect=ToolEffect.READ,
+        name="list_evidence",
+        summary="List evidence records, optionally filtered by job/step/outcome.",
+        effect=_derive_effect("list_evidence"),
         arguments=("job_id", "step_id", "outcome_id", "limit", "offset"),
-        required=(),
-        returns="Array of Evidence entities in JSON format",
-        stage=None,
+        returns="A list of Evidence records.",
     ),
     ToolName.DELETE_EVIDENCE.value: ToolSpec(
-        name=ToolName.DELETE_EVIDENCE.value,
-        summary="Delete an evidence record by ID",
-        effect=ToolEffect.DESTRUCTIVE,
+        name="delete_evidence",
+        summary="Delete an evidence record.",
+        effect=_derive_effect("delete_evidence"),
         arguments=("evidence_id",),
         required=("evidence_id",),
-        returns="Confirmation message with deleted Evidence ID",
-        stage=None,
+        returns="The deleted Evidence ID.",
     ),
     ToolName.PROMOTE_EVIDENCE.value: ToolSpec(
-        name=ToolName.PROMOTE_EVIDENCE.value,
-        summary="Promote research evidence into a Job or desired Outcome",
-        effect=ToolEffect.WRITE,
+        name="promote_evidence",
+        summary="Promote evidence to a Job or an Outcome.",
+        effect=_derive_effect("promote_evidence"),
         arguments=(
             "evidence_id",
             "target",
@@ -322,122 +329,124 @@ TOOL_SPECS: dict[str, ToolSpec] = {
             "satisfaction",
         ),
         required=("evidence_id", "target"),
-        returns="Promoted Job or Outcome entity in JSON format",
-        stage=None,
+        returns="The created Job or Outcome.",
     ),
     ToolName.EVALUATE_OUTCOME.value: ToolSpec(
-        name=ToolName.EVALUATE_OUTCOME.value,
-        summary="Validate an outcome statement against canonical ODI formatting guidelines",
-        effect=ToolEffect.WRITE,
+        name="evaluate_outcome",
+        summary="Evaluate an outcome statement against ODI format rules.",
+        effect=_derive_effect("evaluate_outcome"),
         arguments=("statement", "job_id"),
         required=("statement",),
-        returns="Evaluation result with verdict, issues, and suggestions in JSON format",
+        returns="A verdict with coded issues and suggestions.",
         stage="2",
     ),
     ToolName.GET_ODI_SCHEMA.value: ToolSpec(
-        name=ToolName.GET_ODI_SCHEMA.value,
-        summary="Get canonical JSON schema definitions for all ODI entities",
-        effect=ToolEffect.READ,
+        name="get_odi_schema",
+        summary="Get the canonical JSON schema for all ODI entities.",
+        effect=_derive_effect("get_odi_schema"),
         arguments=(),
-        required=(),
-        returns="JSON schema dictionary",
-        stage=None,
+        returns="The full JSON schema object.",
     ),
     ToolName.COMPUTE_OPPORTUNITY.value: ToolSpec(
-        name=ToolName.COMPUTE_OPPORTUNITY.value,
-        summary="Calculate the ODI Opportunity Score from importance and satisfaction",
-        effect=ToolEffect.WRITE,
+        name="compute_opportunity",
+        summary="Compute an ODI opportunity score from importance and satisfaction.",
+        effect=_derive_effect("compute_opportunity"),
         arguments=("importance", "satisfaction"),
         required=("importance", "satisfaction"),
-        returns="Calculated opportunity score string",
-        stage="3",
+        returns="The opportunity score as a float.",
+        stage="4",
     ),
     ToolName.GET_FRAMEWORK_GUIDELINES.value: ToolSpec(
-        name=ToolName.GET_FRAMEWORK_GUIDELINES.value,
-        summary="Retrieve stage-by-stage ODI methodology guidelines",
-        effect=ToolEffect.READ,
+        name="get_odi_framework_guidelines",
+        summary="Get the stage-by-stage ODI framework guide.",
+        effect=_derive_effect("get_odi_framework_guidelines"),
         arguments=(),
-        required=(),
-        returns="Stage-by-stage framework guide text",
-        stage=None,
+        returns="The guidelines text.",
     ),
     ToolName.GET_CAPABILITIES.value: ToolSpec(
-        name=ToolName.GET_CAPABILITIES.value,
-        summary="Get human-readable capabilities summary of all available tools",
-        effect=ToolEffect.READ,
+        name="get_capabilities",
+        summary="Get a human-readable list of all available tools.",
+        effect=_derive_effect("get_capabilities"),
         arguments=(),
-        required=(),
-        returns="Human-readable summary of tools and capabilities",
-        stage=None,
+        returns="A grouped summary of every tool.",
     ),
     ToolName.GET_CAPABILITIES_MANIFEST.value: ToolSpec(
-        name=ToolName.GET_CAPABILITIES_MANIFEST.value,
-        summary="Get structured JSON manifest of all available tools",
-        effect=ToolEffect.READ,
+        name="get_capabilities_manifest",
+        summary="Get a machine-readable manifest of all tools.",
+        effect=_derive_effect("get_capabilities_manifest"),
         arguments=(),
-        required=(),
-        returns="Machine-readable capability manifest in JSON format",
-        stage=None,
+        returns="The full tool manifest JSON.",
     ),
 }
 
 TOOL_NAMES: tuple[str, ...] = tuple(TOOL_SPECS)
 
+_STAGE_NAMES: dict[str | None, str] = {
+    "1": "Stage 1: Define Intent (Job-to-be-Done)",
+    "2": "Stage 2: Capture Desired Outcomes",
+    "3": "Stage 3: Build the Job Map",
+    "4": "Stage 4: Calculate Opportunity Scores",
+    None: "Supporting Tools",
+}
 
-def capability_manifest() -> dict[str, Any]:
-    """A complete, generated description of the tool surface."""
+_EFFECT_ORDER: tuple[ToolEffect, ...] = (
+    ToolEffect.READ,
+    ToolEffect.WRITE,
+    ToolEffect.DESTRUCTIVE,
+)
+
+_STAGE_ORDER: tuple[str | None, ...] = ("1", "2", "3", "4", None)
+
+
+def capability_manifest() -> dict:
+    """A complete, generated description of the tool surface.
+
+    Every tool in :data:`TOOL_SPECS` appears exactly once.
+    """
     return {
-        "tools": {
-            spec.name: {
+        "tools": [
+            {
                 "name": spec.name,
                 "summary": spec.summary,
                 "effect": spec.effect.value,
-                "arguments": list(spec.arguments),
-                "required": list(spec.required),
+                "arguments": spec.arguments,
+                "required": spec.required,
                 "returns": spec.returns,
                 "stage": spec.stage,
             }
             for spec in TOOL_SPECS.values()
-        }
+        ]
     }
 
 
 def capability_summary() -> str:
-    """The human-readable rendering, used by get_capabilities."""
-    stage_titles: dict[str | None, str] = {
-        "1": "Stage 1: Define Intent (Jobs-to-be-Done)",
-        "2": "Stage 2: Capture & Evaluate Desired Outcomes",
-        "3": "Stage 3: Calculate Opportunity Scores",
-        "4": "Stage 4: Build Job Maps",
-        None: "General & Supporting Capabilities",
-    }
+    """The human-readable rendering, used by ``get_capabilities``.
 
-    lines = [
+    Groups tools by effect, then by ODI stage. Names every tool; generated,
+    not hand-written.
+    """
+    by_effect: dict[ToolEffect, dict[str | None, list[ToolSpec]]] = defaultdict(
+        lambda: defaultdict(list)
+    )
+    for spec in TOOL_SPECS.values():
+        by_effect[spec.effect][spec.stage].append(spec)
+
+    lines: list[str] = [
         "Here is what I can help you with as your Agentic ODI assistant:",
         "",
     ]
 
-    stages: list[str | None] = ["1", "2", "3", "4", None]
-
-    for stage in stages:
-        title = stage_titles[stage]
-        stage_tools = [spec for spec in TOOL_SPECS.values() if spec.stage == stage]
-        if not stage_tools:
-            continue
-        lines.append(f"### {title}")
-
-        for effect in (ToolEffect.READ, ToolEffect.WRITE, ToolEffect.DESTRUCTIVE):
-            effect_tools = [t for t in stage_tools if t.effect == effect]
-            if not effect_tools:
-                continue
-            effect_label = effect.value.upper()
-            lines.append(f"- **{effect_label}**:")
-            for tool in effect_tools:
-                args_str = f"({', '.join(tool.arguments)})" if tool.arguments else "()"
-                lines.append(f"  - `{tool.name}{args_str}`: {tool.summary}")
+    for effect in _EFFECT_ORDER:
+        lines.append(f"## {effect.value.capitalize()} Tools")
         lines.append("")
+        for stage in _STAGE_ORDER:
+            tools = sorted(by_effect[effect].get(stage, []), key=lambda s: s.name)
+            if not tools:
+                continue
+            lines.append(f"### {_STAGE_NAMES[stage]}")
+            lines.append("")
+            for spec in tools:
+                lines.append(f"- **`{spec.name}`**: {spec.summary}")
+            lines.append("")
 
-    lines.append(
-        "💡 **Tip**: Ask me to 'get started' and I will guide you step-by-step through the ODI process!"
-    )
-    return "\n".join(lines).strip()
+    return "\n".join(lines)

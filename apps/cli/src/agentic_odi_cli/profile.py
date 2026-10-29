@@ -27,7 +27,8 @@ class Baseline:
     business_model: str | None = None
     core_problem: str | None = None
     current_focus: str | None = None
-    confidence: str | None = None
+    confidence: float | None = None
+    inferred: bool = False
 
     def to_dict(self) -> dict:
         return {
@@ -312,7 +313,6 @@ def setup_wizard() -> None:
         business_model=b_model or None,
         core_problem=c_prob or None,
         current_focus=c_focus or None,
-        confidence="high",
     )
     p = save_baseline(b)
     typer.echo(f"Baseline configured successfully and saved to {p}")
