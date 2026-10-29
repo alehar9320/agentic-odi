@@ -353,6 +353,16 @@ class CapabilitiesResponse(BaseModel):
     capabilities: list[CapabilityItem]
 
 
+class ScheduleWorkRequest(BaseModel):
+    mcp_url: str = ""
+    name: str
+    schedule_expression: str
+    agent_id: str = "default-agent"
+    trigger_type: str = "oneshot"
+    payload: dict[str, Any] = Field(default_factory=dict)
+    job_id: str | None = None
+
+
 class AddEvidenceRequest(BaseModel):
     """A research record delegated from an external tool, or captured by hand."""
 

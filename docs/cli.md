@@ -273,6 +273,22 @@ agentic-odi outcomes score 8 2
 Set `AGENTIC_ODI_MCP_URL` (or `--mcp-url`) to point to a non-default server when
 using `--backend mcp` (default: `http://localhost:8000/mcp`).
 
+## Schedule Work
+
+Schedule, inspect, cancel, and trigger background cloud agent work tasks:
+
+```bash
+# Schedule a task
+agentic-odi schedule create --name "Nightly ODI Audit" --expression "0 0 * * *" --trigger-type cron
+
+# List, inspect, trigger, and cancel
+agentic-odi schedule list
+agentic-odi schedule list --json
+agentic-odi schedule show <work-id>
+agentic-odi schedule trigger <work-id>
+agentic-odi schedule cancel <work-id>
+```
+
 ## Connectors
 
 The `connectors` group manages external MCP integrations. See

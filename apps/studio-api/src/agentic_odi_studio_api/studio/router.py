@@ -83,6 +83,7 @@ from agentic_odi_studio_api.studio.schemas import (
     ObservationResponse,
     ObservationUpdateRequest,
     PromoteEvidenceRequest,
+    ScheduleWorkRequest,
     TurnNode,
     UpdateConversationRequest,
     UpdateCustomerOutcomeRequest,
@@ -1024,6 +1025,89 @@ async def proxy_llm_chat(body: LlmProxyRequest) -> StreamingResponse:
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+@router.get("/schedule")
+async def get_scheduled_work(
+    request: Request,
+    job_id: str | None = Query(None),
+    status: str | None = Query(None),
+    mcp_url: str | None = Query(None),
+) -> dict:
+    if _uses_mcp(request):
+        url = _require_mcp_url(mcp_url or "")
+        args: dict = {}
+        if job_id:
+            args["job_id"] = job_id
+        if status:
+            args["status"] = status
+        res = await call_mcp_tool(url, ToolName.LIST_SCHEDULED_WORK.value, args)
+        return {"ok": True, "result": json.loads(res) if isinstance(res, str) else res}
+    items = _service(request).list_scheduled_work(job_id=job_id, status=status)
+    return {"ok": True, "result": [item.model_dump(mode="json") for item in items]}
+
+
+@router.post("/schedule")
+async def post_scheduled_work(body: ScheduleWorkRequest, request: Request) -> dict:
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(body.mcp_url),
+            ToolName.SCHEDULE_WORK.value,
+            {
+                "name": body.name,
+                "schedule_expression": body.schedule_expression,
+                "agent_id": body.agent_id,
+                "trigger_type": body.trigger_type,
+                "payload": body.payload,
+                "job_id": body.job_id,
+            },
+        )
+        return {"ok": True, "result": result}
+    work = _service(request).schedule_work(
+        name=body.name,
+        schedule_expression=body.schedule_expression,
+        agent_id=body.agent_id,
+        trigger_type=body.trigger_type,
+        payload=body.payload,
+        job_id=body.job_id,
+    )
+    return {"ok": True, "result": work.model_dump(mode="json")}
+
+
+@router.post("/schedule/{work_id}/trigger")
+async def post_trigger_scheduled_work(
+    work_id: str, request: Request, mcp_url: str | None = Query(None)
+) -> dict:
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(mcp_url or ""),
+            ToolName.TRIGGER_SCHEDULED_WORK.value,
+            {"work_id": work_id},
+        )
+        return {"ok": True, "result": result}
+    try:
+        work = _service(request).trigger_scheduled_work(work_id)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return {"ok": True, "result": work.model_dump(mode="json")}
+
+
+@router.post("/schedule/{work_id}/cancel")
+async def post_cancel_scheduled_work(
+    work_id: str, request: Request, mcp_url: str | None = Query(None)
+) -> dict:
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(mcp_url or ""),
+            ToolName.CANCEL_SCHEDULED_WORK.value,
+            {"work_id": work_id},
+        )
+        return {"ok": True, "result": result}
+    try:
+        work = _service(request).cancel_scheduled_work(work_id)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return {"ok": True, "result": work.model_dump(mode="json")}
 
 
 @router.post("/evidence")

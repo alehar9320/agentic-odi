@@ -23,6 +23,7 @@ from agentic_odi_cli.onboard import maybe_run_first_launch
 from agentic_odi_cli.profile import app as profile_app
 from agentic_odi_cli.profile import setup_wizard
 from agentic_odi_cli.render import render_job_summary
+from agentic_odi_cli.schedule import schedule_app
 from agentic_odi_cli.settings import settings_app
 from agentic_odi_cli.steps import steps_app
 from agentic_odi_cli.version import __version__  # noqa: F401  (re-exported for tests)
@@ -34,6 +35,9 @@ app = typer.Typer(
 )
 app.add_typer(connectors_app, name="connectors")
 app.add_typer(jobs_app, name="jobs", help="Manage Jobs-to-be-Done.")
+app.add_typer(
+    schedule_app, name="schedule", help="Schedule and manage background cloud agent tasks."
+)
 app.add_typer(steps_app, name="steps", help="Manage Job-map Steps.")
 app.add_typer(desired_outcomes_app, name="desired-outcomes", help="Manage desired Outcomes.")
 app.add_typer(evidence_app, name="evidence", help="Manage evidence captured from connectors.")
