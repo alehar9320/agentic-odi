@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from agentic_odi_core.evaluation import classify_opportunity
+from agentic_odi_core.models import Outcome
 from agentic_odi_core.repository import InMemoryRepository
 from agentic_odi_core.services import ODIService
 
@@ -34,9 +35,18 @@ def test_outcomes_are_ranked_by_opportunity_score():
 
 
 def test_unscored_outcomes_sort_after_scored_ones():
-    service = ODIService(InMemoryRepository())
+    repository = InMemoryRepository()
+    service = ODIService(repository)
     job = service.add_job("Publish a plugin")
-    service.add_outcome(job.id, "Minimize the time to install when a customer starts.")
+    repository.add_outcome(
+        Outcome(
+            id="unscored",
+            job_id=job.id,
+            statement="Minimize the time to install when a customer starts.",
+            importance=None,
+            satisfaction=None,
+        )
+    )
     service.add_outcome(
         job.id,
         "Minimize the time to publish when a customer ships.",

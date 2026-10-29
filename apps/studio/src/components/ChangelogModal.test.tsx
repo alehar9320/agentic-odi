@@ -1,14 +1,34 @@
 import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ChangelogModal } from "./ChangelogModal";
 import * as studioApi from "../api/studioApi";
+import { CHANGELOG_READ_KEY } from "../lib/changelogRead";
 
 vi.mock("../api/studioApi", () => ({
   fetchChangelog: vi.fn(),
 }));
 
+const TWO_RELEASES = {
+  releases: [
+    {
+      version: "0.9.0",
+      date: "2026-10-22",
+      categories: [{ name: "Features", items: ["Newest feature"] }],
+    },
+    {
+      version: "0.8.0",
+      date: "2026-10-20",
+      categories: [{ name: "Fixes", items: ["Older fix"] }],
+    },
+  ],
+};
+
 describe("ChangelogModal", () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+    vi.mocked(studioApi.fetchChangelog).mockReset();
+  });
   it("does not render when isOpen is false", () => {
     const { container } = render(
       <ChangelogModal isOpen={false} onClose={vi.fn()} />
@@ -46,6 +66,38 @@ describe("ChangelogModal", () => {
     const closeBtn = screen.getByLabelText("Close changelog modal");
     fireEvent.click(closeBtn);
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("clears the unread badge and keeps it cleared after a remount", async () => {
+    vi.mocked(studioApi.fetchChangelog).mockResolvedValue(TWO_RELEASES);
+    const { unmount } = render(<ChangelogModal isOpen={true} onClose={vi.fn()} />);
+
+    expect(await screen.findByRole("status")).toHaveTextContent("2 new");
+    expect(screen.getAllByText("New")).toHaveLength(2);
+
+    fireEvent.click(screen.getByRole("button", { name: "Mark all read" }));
+
+    expect(screen.queryByRole("status")).toBeNull();
+    expect(screen.queryByText("New")).toBeNull();
+    expect(screen.getByRole("button", { name: "Mark all read" })).toBeDisabled();
+
+    unmount();
+    render(<ChangelogModal isOpen={true} onClose={vi.fn()} />);
+
+    await screen.findByText("v0.9.0");
+    expect(screen.queryByRole("status")).toBeNull();
+    expect(screen.queryByText("New")).toBeNull();
+    expect(screen.getByRole("button", { name: "Mark all read" })).toBeDisabled();
+  });
+
+  it("counts only the releases that were not acknowledged before", async () => {
+    window.localStorage.setItem(CHANGELOG_READ_KEY, JSON.stringify(["0.8.0"]));
+    vi.mocked(studioApi.fetchChangelog).mockResolvedValue(TWO_RELEASES);
+
+    render(<ChangelogModal isOpen={true} onClose={vi.fn()} />);
+
+    expect(await screen.findByRole("status")).toHaveTextContent("1 new");
+    expect(screen.getAllByText("New")).toHaveLength(1);
   });
 
   it("closes on Escape key press", async () => {

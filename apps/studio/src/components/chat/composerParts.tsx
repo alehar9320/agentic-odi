@@ -7,8 +7,9 @@
  * connector chips, and the hint row are the same in both, so they live here.
  */
 
-import { type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { useAuiState } from "@assistant-ui/react";
+
 import { isCommandDraft, type StudioCommand } from "../../lib/commands";
 import { useStudio } from "../../state/StudioContext";
 import { BoltIcon, CaptureIcon, CompassIcon, SparkIcon } from "../icons";
@@ -27,6 +28,11 @@ interface QuickPill {
   conversational?: boolean;
 }
 
+/**
+ * The runtime's suggestions, pinned to the composer so they stay reachable
+ * once the thread starts. What is offered here and what the thread knows are
+ * the same store, so they cannot drift apart.
+ */
 export function SuggestionPills() {
   const { canvas, llmHealth, openPanel, streaming, sendMessage } = useStudio();
   const suggestions = useAuiState((state) => state.thread.suggestions);
@@ -75,13 +81,45 @@ export function SuggestionPills() {
   );
 }
 
+function CommandOption({
+  command,
+  active,
+  onHover,
+  onChoose,
+}: {
+  command: StudioCommand;
+  active: boolean;
+  onHover: () => void;
+  onChoose: (command: StudioCommand) => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="option"
+      aria-selected={active}
+      className={`palette__item${active ? " is-active" : ""}`}
+      onMouseEnter={onHover}
+      onClick={() => onChoose(command)}
+    >
+      <code className="palette__name">{command.name}</code>
+      <span className="palette__text">
+        <span className="palette__label">{command.label}</span>
+        <span className="palette__description">{command.description}</span>
+      </span>
+    </button>
+  );
+}
+
 export function CommandPalette({
+  id,
   open,
   matches,
   activeIndex,
   onHover,
   onChoose,
 }: {
+  /** Unique per composer: two composers can be mounted at once. */
+  id: string;
   open: boolean;
   matches: StudioCommand[];
   activeIndex: number;
@@ -92,25 +130,31 @@ export function CommandPalette({
     return null;
   }
 
+  // Group the matches under their category, keeping the flat match index so
+  // arrow keys still walk one ordered list.
+  const groups = new Map<string, { command: StudioCommand; index: number }[]>();
+  matches.forEach((command, index) => {
+    const bucket = groups.get(command.category) ?? [];
+    bucket.push({ command, index });
+    groups.set(command.category, bucket);
+  });
+
   return (
-    <div className="palette" role="listbox" id="studio-command-palette" aria-label="Commands">
+    <div className="palette" role="listbox" id={id} aria-label="Commands">
       {matches.length ? (
-        matches.map((command, index) => (
-          <button
-            key={command.id}
-            type="button"
-            role="option"
-            aria-selected={index === activeIndex}
-            className={`palette__item${index === activeIndex ? " is-active" : ""}`}
-            onMouseEnter={() => onHover(index)}
-            onClick={() => onChoose(command)}
-          >
-            <code className="palette__name">{command.name}</code>
-            <span className="palette__text">
-              <span className="palette__label">{command.label}</span>
-              <span className="palette__description">{command.description}</span>
-            </span>
-          </button>
+        [...groups.entries()].map(([category, entries]) => (
+          <div key={category} className="palette__group" role="group" aria-label={category}>
+            <p className="palette__group-title">{category}</p>
+            {entries.map(({ command, index }) => (
+              <CommandOption
+                key={command.id}
+                command={command}
+                active={index === activeIndex}
+                onHover={() => onHover(index)}
+                onChoose={onChoose}
+              />
+            ))}
+          </div>
         ))
       ) : (
         <p className="palette__empty">
@@ -142,13 +186,13 @@ export function ConnectorChips() {
             key={id}
             type="button"
             className="composer__suggestion"
-            aria-label={`Added ${label}, dismiss`}
+            aria-label={`Dismiss suggestion: ${label}`}
             onClick={() => {
               dismissConnectorSuggestion(id);
               void refreshConnectors();
             }}
           >
-            <span>Added {label}</span>
+            <span>Suggested: {label}</span>
             <span aria-hidden>✕</span>
           </button>
         );
@@ -157,20 +201,22 @@ export function ConnectorChips() {
   );
 }
 
-export function ComposerHint() {
+export function ComposerHint({ trailing }: { trailing?: ReactNode } = {}) {
   const { settings, llmHealth, brief } = useStudio();
   const offline = llmHealth.healthy === false;
 
   return (
-    <p className="composer__hint">
+    <div className="composer__hint">
       <span>
         <kbd>Enter</kbd> to send · <kbd>/</kbd> for commands
         {brief ? ` · ${brief.product_name || "your job"}` : ""}
       </span>
-      <span className={`composer__status${offline ? " is-offline" : ""}`}>
-        {offline ? "Local guidance" : settings.model_name}
+      <span className="composer__hint-end">
+        {offline ? <span className="composer__status is-offline">Local guidance</span> : null}
+        {trailing ??
+          (offline ? null : <span className="composer__status">{settings.model_name}</span>)}
       </span>
-    </p>
+    </div>
   );
 }
 

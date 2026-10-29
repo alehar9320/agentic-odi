@@ -65,6 +65,26 @@
         }
       }
     },
+    "/api/changelog": {
+      "get": {
+        "summary": "Get Changelog Route",
+        "operationId": "get_changelog_route_api_changelog_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Get Changelog Route Api Changelog Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/health/mcp": {
       "post": {
         "summary": "Post Mcp Health",
@@ -145,6 +165,47 @@
         }
       }
     },
+    "/api/models": {
+      "post": {
+        "summary": "Post Models",
+        "description": "The model ids this backend serves, for the composer's model picker.",
+        "operationId": "post_models_api_models_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModelListRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Post Models Api Models Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/connectors/catalog": {
       "get": {
         "summary": "Get Connectors Catalog",
@@ -161,6 +222,120 @@
                   },
                   "type": "array",
                   "title": "Response Get Connectors Catalog Api Connectors Catalog Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/marketplace/servers": {
+      "get": {
+        "summary": "Search Marketplace",
+        "operationId": "search_marketplace_api_marketplace_servers_get",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Substring to match against name, title, or summary.",
+              "default": "",
+              "title": "Q"
+            },
+            "description": "Substring to match against name, title, or summary."
+          },
+          {
+            "name": "area",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Capability area filter.",
+              "title": "Area"
+            },
+            "description": "Capability area filter."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MarketplaceSearchResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/marketplace/featured": {
+      "get": {
+        "summary": "Featured Marketplace",
+        "operationId": "featured_marketplace_api_marketplace_featured_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 6,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MarketplaceSearchResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -791,6 +966,344 @@
         }
       }
     },
+    "/api/memory/observations": {
+      "get": {
+        "summary": "List Observations",
+        "operationId": "list_observations_api_memory_observations_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObservationListResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create Observation",
+        "operationId": "create_observation_api_memory_observations_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ObservationCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObservationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/memory/observations/{observation_id}": {
+      "patch": {
+        "summary": "Update Observation",
+        "operationId": "update_observation_api_memory_observations__observation_id__patch",
+        "parameters": [
+          {
+            "name": "observation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Observation Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ObservationUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObservationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete Observation",
+        "operationId": "delete_observation_api_memory_observations__observation_id__delete",
+        "parameters": [
+          {
+            "name": "observation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Observation Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Delete Observation Api Memory Observations  Observation Id  Delete"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/memory": {
+      "delete": {
+        "summary": "Clear Memory",
+        "operationId": "clear_memory_api_memory_delete",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Clear Memory Api Memory Delete"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/conversations/latest": {
+      "get": {
+        "summary": "Latest Conversation",
+        "operationId": "latest_conversation_api_conversations_latest_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LatestConversationResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/conversations": {
+      "post": {
+        "summary": "Create Conversation",
+        "operationId": "create_conversation_api_conversations_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/conversations/{conversation_id}/tree": {
+      "get": {
+        "summary": "Conversation Tree",
+        "description": "The whole branch tree, so a reload reopens the branch that was on screen.",
+        "operationId": "conversation_tree_api_conversations__conversation_id__tree_get",
+        "parameters": [
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Conversation Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationTreeResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/conversations/{conversation_id}": {
+      "patch": {
+        "summary": "Patch Conversation",
+        "description": "Record the visible branch, or rename the thread.",
+        "operationId": "patch_conversation_api_conversations__conversation_id__patch",
+        "parameters": [
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Conversation Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateConversationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/approvals/{approval_id}": {
+      "post": {
+        "summary": "Resolve Approval",
+        "description": "Answer a paused write. The paused turn resumes on its own stream.",
+        "operationId": "resolve_approval_api_approvals__approval_id__post",
+        "parameters": [
+          {
+            "name": "approval_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Approval Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApprovalDecisionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApprovalDecisionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/chat": {
       "post": {
         "summary": "Post Chat",
@@ -805,6 +1318,99 @@
           },
           "required": true
         },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/capabilities": {
+      "get": {
+        "summary": "Get Capabilities",
+        "description": "Manifest of what this sidecar can provide to a browser BFF.",
+        "operationId": "get_capabilities_api_capabilities_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CapabilitiesResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/llm/chat": {
+      "post": {
+        "summary": "Proxy Llm Chat",
+        "description": "Proxy a streaming model call so provider keys stay server-side.",
+        "operationId": "proxy_llm_chat_api_llm_chat_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LlmProxyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/{full_path}": {
+      "get": {
+        "summary": "Spa Fallback",
+        "operationId": "spa_fallback__full_path__get",
+        "parameters": [
+          {
+            "name": "full_path",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Full Path"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -864,6 +1470,17 @@
               }
             ],
             "title": "Url"
+          },
+          "marketplace_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Marketplace Id"
           }
         },
         "type": "object",
@@ -930,6 +1547,149 @@
         ],
         "title": "AddStepRequest"
       },
+      "ApprovalDecisionRequest": {
+        "properties": {
+          "approved": {
+            "type": "boolean",
+            "title": "Approved"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 500,
+            "title": "Reason",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "approved"
+        ],
+        "title": "ApprovalDecisionRequest"
+      },
+      "ApprovalDecisionResponse": {
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "title": "Ok"
+          },
+          "id": {
+            "type": "string",
+            "title": "Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ok",
+          "id"
+        ],
+        "title": "ApprovalDecisionResponse"
+      },
+      "AttachmentRef": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "content_type": {
+            "type": "string",
+            "title": "Content Type",
+            "default": "application/octet-stream"
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Size",
+            "default": 0
+          },
+          "text": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 80000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text"
+          },
+          "data_url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 8000000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data Url"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "AttachmentRef",
+        "description": "One file the user attached to a turn.\n\nNothing is stored server-side: an attachment is part of the message. Text is\nextracted by the client because only the client has the file; images arrive\nas data URLs for backends that accept them."
+      },
+      "CapabilitiesResponse": {
+        "properties": {
+          "capabilities": {
+            "items": {
+              "$ref": "#/components/schemas/CapabilityItem"
+            },
+            "type": "array",
+            "title": "Capabilities"
+          }
+        },
+        "type": "object",
+        "required": [
+          "capabilities"
+        ],
+        "title": "CapabilitiesResponse"
+      },
+      "CapabilityItem": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "available": {
+            "type": "boolean",
+            "title": "Available"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "label",
+          "description",
+          "available"
+        ],
+        "title": "CapabilityItem"
+      },
       "ChatMessage": {
         "properties": {
           "role": {
@@ -946,6 +1706,28 @@
             "type": "string",
             "title": "Content",
             "default": ""
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
           }
         },
         "type": "object",
@@ -973,6 +1755,11 @@
             "type": "string",
             "title": "Mcp Url"
           },
+          "routing_mode": {
+            "type": "string",
+            "title": "Routing Mode",
+            "default": "auto"
+          },
           "messages": {
             "items": {
               "$ref": "#/components/schemas/ChatMessage"
@@ -999,6 +1786,40 @@
                 "type": "null"
               }
             ]
+          },
+          "conversation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conversation Id"
+          },
+          "attachments": {
+            "items": {
+              "$ref": "#/components/schemas/AttachmentRef"
+            },
+            "type": "array",
+            "title": "Attachments"
+          },
+          "approvals": {
+            "type": "boolean",
+            "title": "Approvals",
+            "default": false
+          },
+          "assistant_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assistant Id"
           }
         },
         "type": "object",
@@ -1049,6 +1870,87 @@
           "name"
         ],
         "title": "ConnectorOperationResponse"
+      },
+      "ConversationModel": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "title": "Updated At"
+          },
+          "head_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Head Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "ConversationModel"
+      },
+      "ConversationResponse": {
+        "properties": {
+          "conversation": {
+            "$ref": "#/components/schemas/ConversationModel"
+          }
+        },
+        "type": "object",
+        "required": [
+          "conversation"
+        ],
+        "title": "ConversationResponse"
+      },
+      "ConversationTreeResponse": {
+        "properties": {
+          "conversation": {
+            "$ref": "#/components/schemas/ConversationModel"
+          },
+          "messages": {
+            "items": {
+              "$ref": "#/components/schemas/TurnNode"
+            },
+            "type": "array",
+            "title": "Messages"
+          },
+          "head_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Head Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "conversation"
+        ],
+        "title": "ConversationTreeResponse"
       },
       "CreateJobRequest": {
         "properties": {
@@ -1117,6 +2019,29 @@
         ],
         "title": "HealthStatus"
       },
+      "LatestConversationResponse": {
+        "properties": {
+          "conversation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ConversationModel"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "turns": {
+            "items": {
+              "$ref": "#/components/schemas/TurnModel"
+            },
+            "type": "array",
+            "title": "Turns"
+          }
+        },
+        "type": "object",
+        "title": "LatestConversationResponse"
+      },
       "LlmHealthRequest": {
         "properties": {
           "base_url": {
@@ -1140,6 +2065,256 @@
         ],
         "title": "LlmHealthRequest"
       },
+      "LlmProxyMessage": {
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "system",
+              "user",
+              "assistant",
+              "tool"
+            ],
+            "title": "Role"
+          },
+          "content": {
+            "type": "string",
+            "title": "Content",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "role"
+        ],
+        "title": "LlmProxyMessage"
+      },
+      "LlmProxyRequest": {
+        "properties": {
+          "base_url": {
+            "type": "string",
+            "title": "Base Url"
+          },
+          "api_key": {
+            "type": "string",
+            "title": "Api Key",
+            "default": ""
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "messages": {
+            "items": {
+              "$ref": "#/components/schemas/LlmProxyMessage"
+            },
+            "type": "array",
+            "title": "Messages"
+          },
+          "tools": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tools"
+          },
+          "stream": {
+            "type": "boolean",
+            "title": "Stream",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "base_url",
+          "model"
+        ],
+        "title": "LlmProxyRequest"
+      },
+      "MarketplaceListingOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary",
+            "default": ""
+          },
+          "version": {
+            "type": "string",
+            "title": "Version",
+            "default": ""
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "default": "official"
+          },
+          "area": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Area"
+          },
+          "repository": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Repository"
+          },
+          "docs": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Docs"
+          },
+          "env_vars": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Env Vars"
+          },
+          "headers": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Headers"
+          },
+          "auth": {
+            "type": "string",
+            "title": "Auth",
+            "default": "none"
+          },
+          "installable": {
+            "type": "boolean",
+            "title": "Installable",
+            "default": false
+          },
+          "verified": {
+            "type": "boolean",
+            "title": "Verified",
+            "default": false
+          },
+          "pull_count": {
+            "type": "integer",
+            "title": "Pull Count",
+            "default": 0
+          },
+          "is_recommended": {
+            "type": "boolean",
+            "title": "Is Recommended",
+            "default": false
+          },
+          "unavailable_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unavailable Reason"
+          },
+          "connector_name": {
+            "type": "string",
+            "title": "Connector Name",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "MarketplaceListingOut"
+      },
+      "MarketplaceSearchResponse": {
+        "properties": {
+          "listings": {
+            "items": {
+              "$ref": "#/components/schemas/MarketplaceListingOut"
+            },
+            "type": "array",
+            "title": "Listings"
+          },
+          "areas": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Areas"
+          },
+          "cached": {
+            "type": "boolean",
+            "title": "Cached",
+            "default": false
+          },
+          "types": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Types"
+          }
+        },
+        "type": "object",
+        "title": "MarketplaceSearchResponse"
+      },
       "McpHealthRequest": {
         "properties": {
           "mcp_url": {
@@ -1152,6 +2327,225 @@
           "mcp_url"
         ],
         "title": "McpHealthRequest"
+      },
+      "ModelListRequest": {
+        "properties": {
+          "base_url": {
+            "type": "string",
+            "title": "Base Url"
+          },
+          "api_key": {
+            "type": "string",
+            "title": "Api Key",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "base_url"
+        ],
+        "title": "ModelListRequest",
+        "description": "Which backend to ask for its model ids. The key travels in the body, not\nthe query string, so it never lands in a URL or an access log."
+      },
+      "ObservationCreateRequest": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "career",
+              "opportunity",
+              "business",
+              "stakeholder",
+              "constraint",
+              "evidence",
+              "preference"
+            ],
+            "title": "Kind"
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Text"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data"
+          },
+          "confidence": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Confidence",
+            "default": 0.6
+          },
+          "confirmed": {
+            "type": "boolean",
+            "title": "Confirmed",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "text"
+        ],
+        "title": "ObservationCreateRequest"
+      },
+      "ObservationListResponse": {
+        "properties": {
+          "observations": {
+            "items": {
+              "$ref": "#/components/schemas/ObservationModel"
+            },
+            "type": "array",
+            "title": "Observations"
+          }
+        },
+        "type": "object",
+        "required": [
+          "observations"
+        ],
+        "title": "ObservationListResponse"
+      },
+      "ObservationModel": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "data": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Data"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "confidence": {
+            "type": "number",
+            "title": "Confidence"
+          },
+          "source_turn": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Turn"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "text",
+          "status",
+          "confidence",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "ObservationModel"
+      },
+      "ObservationResponse": {
+        "properties": {
+          "observation": {
+            "$ref": "#/components/schemas/ObservationModel"
+          }
+        },
+        "type": "object",
+        "required": [
+          "observation"
+        ],
+        "title": "ObservationResponse"
+      },
+      "ObservationUpdateRequest": {
+        "properties": {
+          "text": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "suggested",
+                  "confirmed",
+                  "dismissed"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data"
+          },
+          "confidence": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confidence"
+          }
+        },
+        "type": "object",
+        "title": "ObservationUpdateRequest"
       },
       "StudioBrief": {
         "properties": {
@@ -1185,6 +2579,101 @@
         "title": "StudioBrief",
         "description": "The user's context, captured during first-run onboarding."
       },
+      "TurnModel": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "conversation_id": {
+            "type": "string",
+            "title": "Conversation Id"
+          },
+          "role": {
+            "type": "string",
+            "title": "Role"
+          },
+          "content": {
+            "type": "string",
+            "title": "Content"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          },
+          "message_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message Id"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "conversation_id",
+          "role",
+          "content",
+          "created_at"
+        ],
+        "title": "TurnModel"
+      },
+      "TurnNode": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
+          },
+          "role": {
+            "type": "string",
+            "title": "Role"
+          },
+          "content": {
+            "type": "string",
+            "title": "Content"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "role",
+          "content",
+          "created_at"
+        ],
+        "title": "TurnNode",
+        "description": "One turn in the branch tree, as the thread runtime needs it."
+      },
       "UiCatalogRequest": {
         "properties": {
           "version": {
@@ -1204,6 +2693,35 @@
         "type": "object",
         "title": "UiCatalogRequest",
         "description": "What the calling client can render. Omitted by non-visual clients."
+      },
+      "UpdateConversationRequest": {
+        "properties": {
+          "head_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Head Id"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "type": "object",
+        "title": "UpdateConversationRequest"
       },
       "UpdateJobRequest": {
         "properties": {

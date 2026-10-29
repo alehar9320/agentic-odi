@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type RefObject } from "react";
+import { useEffect, useId, useMemo, useState, type RefObject } from "react";
 
 import { isCommandDraft, matchCommands, type StudioCommand } from "../../lib/commands";
 import { useStudio } from "../../state/StudioContext";
@@ -39,6 +39,9 @@ export function Composer({
   placeholder,
 }: ComposerProps) {
   const { llmHealth } = useStudio();
+  // Two composers can be mounted at once (the thread's and the setup wizard's).
+  const inputId = useId();
+  const paletteId = useId();
   const [highlight, setHighlight] = useState(0);
   // Remember which draft was dismissed, so typing again re-opens the palette
   // without an effect that writes state on every keystroke.
@@ -122,6 +125,7 @@ export function Composer({
   return (
     <div className="composer">
       <CommandPalette
+        id={paletteId}
         open={paletteOpen}
         matches={matches}
         activeIndex={activeIndex}
@@ -129,7 +133,6 @@ export function Composer({
         onChoose={choose}
       />
       <ConnectorChips />
-
       <form
         className="composer__shell"
         onSubmit={(event) => {
@@ -139,11 +142,11 @@ export function Composer({
           }
         }}
       >
-        <label className="sr-only" htmlFor="studio-composer">
+        <label className="sr-only" htmlFor={inputId}>
           Message the studio
         </label>
         <textarea
-          id="studio-composer"
+          id={inputId}
           ref={inputRef}
           className="composer__input"
           rows={1}
@@ -152,10 +155,10 @@ export function Composer({
             placeholder ??
             (offline
               ? "Model offline — type / for commands, or capture what you know…"
-              : "What do you want to make happen?")
+              : "Start with what's on your mind…")
           }
           aria-expanded={paletteOpen}
-          aria-controls={paletteOpen ? "studio-command-palette" : undefined}
+          aria-controls={paletteOpen ? paletteId : undefined}
           aria-autocomplete="list"
           onChange={(event) => onChange(event.target.value)}
           onKeyDown={onTextareaKeyDown}

@@ -26,7 +26,7 @@ A console script is also installed, so `agentic-odi --version` works the same wa
 
 | Option | Environment variable | Default | Meaning |
 |---|---|---|---|
-| `--backend local\|mcp` | `AGENTIC_ODI_BACKEND` | `local` | Run in-process against SQLite, or call a remote MCP server. |
+| `--backend auto\|local\|mcp` | `AGENTIC_ODI_BACKEND` | `local` | Run in-process against SQLite, call a remote MCP server, or (`auto`) try local first and fall back to MCP. |
 | `--db PATH` | `AGENTIC_ODI_DB` | `~/.agentic-odi/odi.db` | Store path for the `local` backend. |
 | `--mcp-url URL` | `AGENTIC_ODI_MCP_URL` | `http://localhost:8000/mcp` | Server URL for the `mcp` backend. |
 
@@ -45,6 +45,14 @@ and free-text messages return a friendly nudge until you connect.
 agentic-odi chat
 agentic-odi chat --model local-tools-model --mcp-url http://localhost:8000/mcp
 ```
+
+Thinking does not need the Studio or its sidecar. While the first token is on
+its way, a dim `thinking…` sits on the prompt line and is erased when the reply
+starts, so a cold model reads as work rather than a hung session. When the
+model exposes its reasoning (`reasoning_content` or `reasoning`, as vLLM,
+Ollama, and DeepSeek do), it is printed dimmed on stderr as `thinking › …`:
+the answer on stdout stays clean, and the thinking is never replayed as
+conversation history.
 
 ### Connection settings
 
@@ -108,20 +116,40 @@ agentic-odi jobs delete <job-id> --yes
 
 # Steps (Job Map)
 agentic-odi steps add --job-id <job-id> --name "Prepare environment" --order 1
+agentic-odi steps add --job-id <job-id> --name "Execute" --order 5 --stage execute
 agentic-odi steps list --job-id <job-id>
 agentic-odi steps get <step-id>
 agentic-odi steps update <step-id> --order 2
 agentic-odi steps delete <step-id> --yes
 
+Capture a desired or customer outcome before adding a step. Use `--allow-empty-job-map`
+only when you intentionally need to stage a map before capturing outcomes.
+
 # Desired Outcomes
-agentic-odi desired-outcomes add --job-id <job-id>   --statement "Minimize the time it takes to get a working environment"   --importance 8 --satisfaction 4
+agentic-odi desired-outcomes add --job-id <job-id> --statement "Minimize the time it takes to get a working environment" --importance 8 --satisfaction 4
 agentic-odi desired-outcomes list --job-id <job-id>
 agentic-odi desired-outcomes get <outcome-id>
 agentic-odi desired-outcomes update <outcome-id> --satisfaction 6
 agentic-odi desired-outcomes delete <outcome-id> --yes
+agentic-odi desired-outcomes export --job-id <job-id> --format csv > outcomes.csv
+agentic-odi desired-outcomes export --job-id <job-id> --format json | jq '.[].opportunity_score'
+agentic-odi desired-outcomes evaluate "Minimize the time to ship when onboarding"
+
+# One-screen report: job header, phase coverage, biggest opportunities
+agentic-odi summary <job-id>
+agentic-odi summary <job-id> --top 3 --json
 ```
 
-Add `--json` to any command for machine-readable output.
+`--importance` and `--satisfaction` (1–10) are now required on `add`. `evaluate`
+checks a statement against the ODI format rules before saving.
+
+`summary` shows how many of the eight job-map phases the Job covers, which are
+still missing, and the underserved outcomes (score above 10) in descending
+order. `--top` caps that list; `--json` returns the same data for a script.
+
+Add `--json` to any command for machine-readable output. `export` writes to
+stdout only — CSV has one row per outcome with the same fields the table shows
+plus `job_id` and `step_id`, so it pipes straight into a spreadsheet or `jq`.
 
 ## Evidence
 
@@ -160,10 +188,43 @@ agentic-odi evaluate "Minimize the time to ship when onboarding"  # outcome-form
 agentic-odi evaluate --json "Minimize the time to ship when onboarding"
 agentic-odi guidelines        # the ODI stage-by-stage guide
 agentic-odi capabilities      # what the assistant can do
+agentic-odi capabilities --json   # machine-readable manifest
+agentic-odi capabilities tools  # tool names only
 ```
 
 `evaluate` returns the same verdict the `evaluate_outcome` MCP tool does, so the
 check works with or without a running server.
+
+`capabilities` groups every tool by effect (read/write/destructive) and by ODI
+stage. `capabilities --json` emits the full machine-readable manifest.
+`capabilities tools` lists tool names only.
+
+## Inspect settings and feature flags
+
+```bash
+agentic-odi settings flags list
+agentic-odi settings flags get experimental_connectors
+agentic-odi settings flags set experimental_connectors true
+agentic-odi settings flags reset
+```
+
+`experimental_connectors` gates the `connectors` group (`add`, `health`,
+`ingest`). `auto_update` gates startup auto-update checks. `advanced_metrics`
+gates detailed metrics output in `desired-outcomes evaluate`. `developer_mode`
+gates raw MCP trace debugging.
+
+## Manage your profile and run setup
+
+```bash
+agentic-odi profile show
+agentic-odi profile set domain "acme.test"
+agentic-odi profile path
+agentic-odi setup       # alias for profile; runs the first-run baseline wizard
+```
+
+`profile show` prints the baseline as JSON. `profile set` updates a baseline
+field. `profile path` prints the baseline file path. `setup` is an alias for
+`profile` that runs the interactive first-run baseline wizard on first launch.
 
 ## Manage Customer Outcomes
 
@@ -220,8 +281,10 @@ ingest behavior.
 python -m agentic_odi_cli connectors catalog
 python -m agentic_odi_cli connectors add mcp --preset github
 python -m agentic_odi_cli connectors list
+python -m agentic_odi_cli connectors list --json   # name, kind, url, enabled per connector
 python -m agentic_odi_cli connectors health --name github
 python -m agentic_odi_cli connectors ingest --name github
+python -m agentic_odi_cli connectors ingest --name github --dry-run   # preview only
 ```
 
 ## Updates
