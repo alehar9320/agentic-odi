@@ -15,11 +15,22 @@ desired outcomes, and opportunity scores that rank them.
 **Try it now — nothing to install.** The Studio opens in your browser; live data
 and chat need the local sidecar below.
 
-**Or install the CLI in one line** (Linux, macOS, Windows):
+**Or install the CLI in one line** (Linux, macOS):
 
 ```bash
 curl -fsSL https://github.com/alehar9320/agentic-odi/releases/latest/download/install.sh | sh
 ```
+
+On Windows (PowerShell):
+
+```powershell
+iex (Invoke-WebRequest -Uri https://github.com/alehar9320/agentic-odi/releases/latest/download/install.ps1 -UseBasicParsing)
+```
+
+Both installers verify the download against `checksums.txt`; every
+[release](https://github.com/alehar9320/agentic-odi/releases/latest) also carries
+per-platform archives with SHA-256 checksums for a manual download. See
+[Installation](docs/installation.md) for the install layout and updater.
 
 [![CI](https://github.com/alehar9320/agentic-odi/actions/workflows/ci.yml/badge.svg)](https://github.com/alehar9320/agentic-odi/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/alehar9320/agentic-odi/branch/main/graph/badge.svg)](https://codecov.io/gh/alehar9320/agentic-odi)
