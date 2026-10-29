@@ -21,6 +21,24 @@ uv run --directory website mypy .
 uv run bandit -c pyproject.toml -r apps packages website/
 ```
 
+## Documentation Checks
+
+`scripts/doc_check.py` keeps the living docs honest against the code. In a pull
+request it also refuses a new public capability with no roadmap entry:
+
+```bash
+uv run python scripts/doc_check.py
+uv run python scripts/doc_check.py --changed-files $(git diff --name-only main...HEAD)
+```
+
+It checks that documented CLI commands exist in the Typer tree, documented paths
+exist on disk, documented `/api` routes are served by the Studio router,
+documented `AGENTIC_ODI_*` variables are read somewhere, and the README's Code
+Overview paths exist. It is conservative on purpose: a code span is only a path
+when it starts with a known top-level directory, and a command only counts when
+it starts with a known entry point. `docs/superpowers/` is excluded — those
+plans and specs are a frozen record, not living documentation.
+
 ## Frontend & Desktop Checks (studio)
 
 The SPA and Tauri shell mirror their CI jobs locally:
@@ -308,7 +326,7 @@ uv run pytest \
 | `apps/cli/tests/` | Backend selection, local/remote CRUD, chat, wizard, onboarding, updates, rendering, connectors, and startup performance |
 | `packages/connectors/tests/` | Catalog presets, registry persistence, factory, MCP and REST connectors, evidence mapping, and sink |
 | `tests/contract/` | Live MCP tool surface and CLI local-handler parity |
-| `tests/scripts/` | `scripts/dev.py` startup, port checks, signals, and shutdown |
+| `tests/scripts/` | `scripts/dev.py` startup, port checks, signals, and shutdown; PR guardrails; documentation drift and roadmap gates |
 | `apps/studio/src/**/*.test.ts` | SPA units: ODI math, transport bridge, SSE parser, sidecar client |
 | `apps/studio/src/**/*.visual.test.tsx` | Component states captured for Chromatic visual review |
 | `apps/studio/e2e/` | Browser journeys against the real stack: the conversation, capturing an outcome, the opportunity landscape, the workspace views, and the MCP passthrough backend |

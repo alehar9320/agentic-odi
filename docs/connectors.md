@@ -72,9 +72,16 @@ python -m agentic_odi_cli connectors list
 ## Ingest behavior
 
 Ingested records are normalized (`catalog`, `resource`, `tool_result`) and
-appended to the in-process ingest sink. They are **not** written into the ODI
-jobs/outcomes store — mapping ingested evidence onto ODI artifacts is still on
-the [roadmap](roadmap.md).
+appended to the in-process ingest sink. When `--job-id`, `--step-id`, or
+`--outcome-id` is supplied, each normalized record is **also** mapped to an
+evidence draft and written to the ODI store as an `Evidence` record, carrying
+the source name, source kind, item type, content, URL when one is present, the
+raw payload, and the link.
+
+Without a target id nothing enters the ODI store: the batch lives only in the
+in-process sink and is lost when the process exits. The mapping is
+field-for-field — it does not summarize, score, infer confidence, or dedupe.
+See [Evidence mapping](architecture/evidence-mapping.md) for the contract.
 
 Pass `--dry-run` to fetch and normalize without writing anything: it prints the
 record count, the first normalized record, and — when `--job-id`, `--step-id`,

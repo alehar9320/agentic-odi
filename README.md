@@ -175,7 +175,9 @@ connector catalog, and client-side search over every page (`Ctrl`/`Cmd`+`K`).
 
 A [uv workspace](https://docs.astral.sh/uv/concepts/projects/workspaces/) with
 shared tooling at the root. Packages live in `packages/`, runnable services in
-`apps/`, and deployment assets in `infra/`:
+`apps/`, and deployment assets in `infra/`. The
+[architecture index](docs/architecture/README.md) explains how the pieces fit
+together and where each contract is enforced:
 
 | Path | Distribution | Description |
 |---|---|---|
@@ -197,6 +199,7 @@ request:
 ```bash
 uv run ruff check . && uv run ruff format --check .
 uv run mypy apps packages && uv run pytest
+uv run python scripts/doc_check.py   # documented commands, paths, routes, and env vars exist
 ```
 
 See [Development](docs/development.md) for the frontend checks, the coverage
