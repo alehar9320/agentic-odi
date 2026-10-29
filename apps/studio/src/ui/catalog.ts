@@ -405,6 +405,51 @@ export const CATALOG: readonly UiCatalogEntry[] = [
     },
     ["title", "job", "outcomes"],
   ),
+  entry(
+    "roadmap",
+    "leaf",
+    "The outcome roadmap derived from recorded decisions: one row per chosen outcome, grouped by the quarter of its decision date. Shows the excluded count and why. Render it once, then one sentence — never restate in prose what the card shows.",
+    {
+      title: { type: "string" },
+      entries: {
+        type: "array",
+        minItems: 0,
+        maxItems: 40,
+        items: {
+          type: "object",
+          properties: {
+            period: { type: "string", description: "The quarter, e.g. \"2026-Q4\"." },
+            outcome_id: { type: "string" },
+            statement: { type: "string", description: "The outcome statement, not a feature name." },
+            decision_id: { type: "string", description: "The decision this row traces back to." },
+            baseline: {
+              type: "number",
+              description:
+                "The measurement at decision time. Omit it when nobody measured one; the card shows \"not measured\".",
+            },
+            target: {
+              type: "number",
+              description:
+                "The number we intend to reach. Omit it when nobody set one; the card shows \"not measured\".",
+            },
+          },
+          required: ["period", "statement", "decision_id"],
+        },
+      },
+      undecided_count: {
+        type: "integer",
+        minimum: 0,
+        description: "Outcomes with no decision, excluded from the roadmap.",
+      },
+      horizon_excluded_count: { type: "integer", minimum: 0 },
+      superseded_excluded_count: { type: "integer", minimum: 0 },
+      exclusion_note: {
+        type: "string",
+        description: "One line naming what was left out and why. Always present.",
+      },
+    },
+    ["entries", "exclusion_note"],
+  ),
 ];
 
 const CATALOG_TYPES = new Set(CATALOG.map((component) => component.type));

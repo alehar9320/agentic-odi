@@ -39,6 +39,7 @@ class ToolName(str, Enum):
     DELETE_EVIDENCE = "delete_evidence"
     PROMOTE_EVIDENCE = "promote_evidence"
     COMPARE_OUTCOMES = "compare_outcomes"
+    GET_ROADMAP = "get_roadmap"
     RECORD_DECISION = "record_decision"
     GET_DECISION = "get_decision"
     LIST_DECISIONS = "list_decisions"
@@ -356,6 +357,22 @@ TOOL_SPECS: dict[str, ToolSpec] = {
         returns=(
             "Aligned rows over the given column order. A metric nobody measured "
             "renders 'not measured'; a real 0 stays 0."
+        ),
+        stage="6",
+    ),
+    ToolName.GET_ROADMAP.value: ToolSpec(
+        name="get_roadmap",
+        summary=(
+            "Derive a job's outcome roadmap from its recorded decisions: one "
+            "entry per chosen outcome, grouped by the quarter its decision was "
+            "made. Undecided outcomes are excluded and counted."
+        ),
+        effect=_derive_effect("get_roadmap"),
+        arguments=("job_id", "horizon", "today"),
+        required=("job_id",),
+        returns=(
+            "The roadmap entries in date order plus the excluded count and its "
+            "reason. A baseline nobody measured renders 'not measured'."
         ),
         stage="6",
     ),

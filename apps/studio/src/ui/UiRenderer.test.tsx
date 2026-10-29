@@ -361,3 +361,74 @@ describe("outcome compare", () => {
     expect(result.ok).toBe(false);
   });
 });
+
+describe("roadmap", () => {
+  const fullProps = {
+    title: "Outcome roadmap",
+    entries: [
+      {
+        period: "2026-Q4",
+        outcome_id: "out-1",
+        statement: "Minimize the time to publish a plugin",
+        decision_id: "dec-1",
+        baseline: 3,
+        target: 7.5,
+      },
+      {
+        period: "2026-Q4",
+        outcome_id: "out-2",
+        statement: "Minimize the likelihood of a failed install",
+        decision_id: "dec-2",
+      },
+    ],
+    undecided_count: 1,
+    exclusion_note: "1 outcome(s) have no decision and were excluded.",
+  };
+
+  it("renders the entries, periods and provenance from the same fixture", () => {
+    renderSpec({ type: "roadmap", props: fullProps });
+
+    expect(screen.getByLabelText("Outcome roadmap")).toBeInTheDocument();
+    expect(screen.getByText("Minimize the time to publish a plugin")).toBeInTheDocument();
+    expect(screen.getAllByText("2026-Q4").length).toBeGreaterThan(0);
+    expect(screen.getByText("Decision: dec-1")).toBeInTheDocument();
+    expect(screen.getByText("Baseline: 3.0")).toBeInTheDocument();
+    expect(screen.getByText("Target: 7.5")).toBeInTheDocument();
+  });
+
+  it("renders a missing baseline as not measured, never as zero", () => {
+    renderSpec({ type: "roadmap", props: fullProps });
+
+    // The second entry has no baseline/target: both read "not measured".
+    expect(screen.getAllByText(/not measured/).length).toBe(2);
+    expect(screen.queryByText("Baseline: 0.0")).not.toBeInTheDocument();
+  });
+
+  it("renders the excluded count and its reason", () => {
+    renderSpec({ type: "roadmap", props: fullProps });
+
+    expect(
+      screen.getByText(/1 outcome\(s\) have no decision and were excluded/),
+    ).toBeInTheDocument();
+  });
+
+  it("renders the one-line empty state", () => {
+    renderSpec({
+      type: "roadmap",
+      props: { entries: [], exclusion_note: "No outcomes were excluded." },
+    });
+
+    expect(screen.getByText("No decisions yet.")).toBeInTheDocument();
+  });
+
+  it("rejects a roadmap missing its required entries prop", () => {
+    const result = parseUiSpec(
+      { type: "roadmap", props: { title: "x" } },
+      catalogManifest(),
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.reason).toContain("roadmap");
+    }
+  });
+});

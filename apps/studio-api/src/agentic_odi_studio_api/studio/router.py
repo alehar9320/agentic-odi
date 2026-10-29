@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from datetime import date, datetime, timezone
 from typing import Any
 
 import httpx
@@ -14,18 +15,20 @@ from agentic_odi_connectors.registry import (
     DuplicateConnectorError,
 )
 from agentic_odi_core import (
+    DecisionNotFoundError,
     JobNotFoundError,
     OdiError,
     ODIService,
     OutcomeNotFoundError,
     OutcomeStatementError,
+    Rejection,
     StepNotFoundError,
     ToolName,
     ValueOutOfRangeError,
     error_status,
 )
 from agentic_odi_core.remote import StudioError, StudioErrorCode
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 
 from agentic_odi_studio_api.studio.approvals import (
@@ -79,6 +82,7 @@ from agentic_odi_studio_api.studio.schemas import (
     ObservationListResponse,
     ObservationResponse,
     ObservationUpdateRequest,
+    RecordDecisionRequest,
     TurnNode,
     UpdateConversationRequest,
     UpdateJobRequest,
@@ -125,7 +129,9 @@ def _as_http_error(exc: Exception) -> StudioHTTPError:
             StudioError(code=StudioErrorCode.VALIDATION, message=str(exc)),
             status_code=422,
         )
-    if isinstance(exc, (JobNotFoundError, StepNotFoundError, OutcomeNotFoundError)):
+    if isinstance(
+        exc, (JobNotFoundError, StepNotFoundError, OutcomeNotFoundError, DecisionNotFoundError)
+    ):
         return StudioHTTPError(StudioError(code=StudioErrorCode.NOT_FOUND, message=str(exc)))
     if isinstance(exc, ValueOutOfRangeError):
         return StudioHTTPError(StudioError(code=StudioErrorCode.OUT_OF_RANGE, message=str(exc)))
@@ -440,6 +446,108 @@ async def get_compare(
             {"metric": row.metric, "label": row.label, "cells": list(row.cells)}
             for row in comparison.rows
         ],
+    }
+
+
+@router.post("/decisions")
+async def post_decision(body: RecordDecisionRequest, request: Request) -> dict:
+    """Record a decision, optionally superseding an earlier one.
+
+    The transport is all this adds: the service validates the rationale, the
+    chosen and rejected ids, and the supersession, so the CLI and this route
+    cannot disagree about what a valid decision is.
+    """
+    decided_at = body.decided_at or datetime.now(timezone.utc).isoformat()
+    rejected = [{"outcome_id": item.outcome_id, "reason": item.reason} for item in body.rejected]
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(body.mcp_url),
+            ToolName.RECORD_DECISION.value,
+            {
+                "job_id": body.job_id,
+                "chosen_outcome_ids": body.chosen_outcome_ids,
+                "rationale": body.rationale,
+                "decided_by": body.decided_by,
+                "decided_at": decided_at,
+                "rejected": rejected,
+                "confidence": body.confidence.value,
+                "supersedes": body.supersedes,
+            },
+        )
+        return _payload_from_text(result)
+    try:
+        decision = _service(request).record_decision(
+            job_id=body.job_id,
+            chosen_outcome_ids=body.chosen_outcome_ids,
+            rationale=body.rationale,
+            decided_by=body.decided_by,
+            decided_at=decided_at,
+            rejected=[Rejection(**item) for item in rejected],
+            confidence=body.confidence,
+            supersedes=body.supersedes,
+        )
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return decision.model_dump(mode="json")
+
+
+@router.get("/decisions")
+async def get_decisions(request: Request, job_id: str = Query(...)) -> list[dict]:
+    """The decision history for a job, oldest first, superseded entries kept."""
+    try:
+        decisions = _service(request).list_decisions(job_id)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return [decision.model_dump(mode="json") for decision in decisions]
+
+
+@router.get("/roadmap")
+async def get_roadmap(
+    request: Request,
+    job_id: str = Query(...),
+    horizon: int = Query(4),
+    today: str | None = Query(None),
+) -> dict:
+    """The derived outcome roadmap for a job, from its recorded decisions.
+
+    A view over the decision log, not a store: entries are grouped by the
+    quarter of the decision date in UTC. Undecided outcomes are excluded and
+    counted, and a baseline nobody measured renders ``not measured`` — never
+    ``0``. ``today`` pins the window so a caller's view is reproducible.
+    """
+    pinned: date | None = None
+    if today:
+        try:
+            pinned = date.fromisoformat(today)
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=422,
+                detail={
+                    "error": "validation_error",
+                    "message": "today must be an ISO-8601 date",
+                },
+            ) from exc
+    try:
+        roadmap = _service(request).build_roadmap(job_id, horizon=horizon, today=pinned)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return {
+        "entries": [
+            {
+                "period": entry.period,
+                "outcome_id": entry.outcome_id,
+                "statement": entry.statement,
+                "decision_id": entry.decision_id,
+                "baseline": entry.baseline,
+                "target": entry.target,
+            }
+            for entry in roadmap.entries
+        ],
+        "undecided_count": roadmap.undecided_count,
+        "horizon_excluded_count": roadmap.horizon_excluded_count,
+        "superseded_excluded_count": roadmap.superseded_excluded_count,
+        "horizon": roadmap.horizon,
+        "exclusion_note": roadmap.exclusion_note(),
     }
 
 

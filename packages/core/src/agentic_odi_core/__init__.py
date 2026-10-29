@@ -83,6 +83,12 @@ from agentic_odi_core.remote import (
     tool_result_text,
 )
 from agentic_odi_core.repository import InMemoryRepository, Repository
+from agentic_odi_core.roadmap import (
+    Roadmap,
+    RoadmapEntry,
+    build_roadmap,
+    render_roadmap,
+)
 from agentic_odi_core.router import ModelRouter, ModelTier, OnDeviceLLMEngine, RoutingMode
 from agentic_odi_core.schema import odi_schema
 from agentic_odi_core.services import (
@@ -116,6 +122,10 @@ __all__ = [
     "NOT_MEASURED",
     "render_brief",
     "select_underserved",
+    "Roadmap",
+    "RoadmapEntry",
+    "build_roadmap",
+    "render_roadmap",
     "CAPABILITIES",
     "ConflictError",
     "CustomerOutcome",

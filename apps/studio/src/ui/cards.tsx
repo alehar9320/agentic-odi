@@ -557,3 +557,66 @@ export function OpportunityBrief({ node }: NodeProps) {
     </article>
   );
 }
+
+/* ------------------------------------------------------------------ */
+/* roadmap                                                             */
+/* ------------------------------------------------------------------ */
+
+function RoadmapMeasurement({ label, value }: { label: string; value: unknown }) {
+  const measured = typeof value === "number" && Number.isFinite(value);
+  return (
+    <span className="ui-roadmap__measure">
+      {label}: {measured ? formatOpportunityScore(value) : NOT_MEASURED}
+    </span>
+  );
+}
+
+export function Roadmap({ node }: NodeProps) {
+  const title = str(node.props, "title");
+  const entries = recordList(node.props.entries);
+  const exclusionNote = str(node.props, "exclusion_note");
+  const undecidedCount =
+    typeof node.props.undecided_count === "number" ? node.props.undecided_count : null;
+
+  let currentPeriod: string | null = null;
+
+  return (
+    <article className="ui-card ui-card--roadmap" aria-label={title || "Outcome roadmap"}>
+      {title ? <h4 className="ui-card__title">{title}</h4> : null}
+
+      {entries.length > 0 ? (
+        <ol className="ui-roadmap" aria-label="Roadmap entries">
+          {entries.map((entry, index) => {
+            const period = str(entry, "period");
+            const statement = str(entry, "statement");
+            const decisionId = str(entry, "decision_id");
+            const showPeriod = period !== currentPeriod;
+            currentPeriod = period;
+            return (
+              <li className="ui-roadmap__entry" key={`${decisionId}-${statement}-${index}`}>
+                {showPeriod ? <span className="ui-roadmap__period">{period}</span> : null}
+                <p className="ui-roadmap__statement">{statement}</p>
+                <div className="ui-roadmap__meta">
+                  <RoadmapMeasurement label="Baseline" value={entry.baseline} />
+                  <RoadmapMeasurement label="Target" value={entry.target} />
+                  <span className="ui-roadmap__decision">Decision: {decisionId}</span>
+                </div>
+              </li>
+            );
+          })}
+        </ol>
+      ) : (
+        <p className="ui-brief__empty">No decisions yet.</p>
+      )}
+
+      {exclusionNote ? (
+        <p className="ui-roadmap__exclusions">
+          {undecidedCount != null ? `${undecidedCount} undecided · ` : ""}
+          {exclusionNote}
+        </p>
+      ) : null}
+
+      <ActionRow actions={readActions(node.props)} />
+    </article>
+  );
+}

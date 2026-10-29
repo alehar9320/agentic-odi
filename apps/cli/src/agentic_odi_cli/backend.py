@@ -537,6 +537,42 @@ class LocalBackend(Backend):
             ],
         }
 
+    def _get_roadmap(self, args: dict[str, Any]) -> dict[str, Any]:
+        from datetime import date as _date
+
+        from agentic_odi_core import JobNotFoundError, job_not_found
+
+        pinned: _date | None = None
+        if args.get("today"):
+            try:
+                pinned = _date.fromisoformat(str(args["today"]))
+            except ValueError as exc:
+                raise BackendError(f"today must be an ISO-8601 date: {args['today']}") from exc
+        try:
+            roadmap = self.service.build_roadmap(
+                args["job_id"], horizon=int(args.get("horizon", 4)), today=pinned
+            )
+        except JobNotFoundError as exc:
+            raise BackendError(job_not_found(exc.job_id)) from exc
+        return {
+            "entries": [
+                {
+                    "period": entry.period,
+                    "outcome_id": entry.outcome_id,
+                    "statement": entry.statement,
+                    "decision_id": entry.decision_id,
+                    "baseline": entry.baseline,
+                    "target": entry.target,
+                }
+                for entry in roadmap.entries
+            ],
+            "undecided_count": roadmap.undecided_count,
+            "horizon_excluded_count": roadmap.horizon_excluded_count,
+            "superseded_excluded_count": roadmap.superseded_excluded_count,
+            "horizon": roadmap.horizon,
+            "exclusion_note": roadmap.exclusion_note(),
+        }
+
     def _record_decision(self, args: dict[str, Any]) -> dict[str, Any]:
         from agentic_odi_core import (
             DecisionNotFoundError,
@@ -620,6 +656,7 @@ _LOCAL_HANDLERS = {
     "compute_opportunity": LocalBackend._compute_opportunity,
     "evaluate_outcome": LocalBackend._evaluate_outcome,
     "compare_outcomes": LocalBackend._compare_outcomes,
+    "get_roadmap": LocalBackend._get_roadmap,
     "record_decision": LocalBackend._record_decision,
     "get_decision": LocalBackend._get_decision,
     "list_decisions": LocalBackend._list_decisions,

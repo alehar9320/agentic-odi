@@ -215,6 +215,42 @@ measurement; a field nobody supplied renders `not measured`, never `0`. The
 with no app CSS and no network access. `--generated-at` stamps a fixed
 timestamp when you need byte-identical output.
 
+## Record a decision
+
+```bash
+agentic-odi decide record --job-id JOB-1 \
+  --choose OUT-1 --choose OUT-2 \
+  --reject OUT-3="Already served by the support team." \
+  --rationale "The publishing path blocks every release." \
+  --decided-by dana
+```
+
+`decide record` persists what was chosen, what was rejected, and why. Each
+rejection is a repeated `--reject OUTCOME_ID=REASON` flag, so an id or reason
+that contains punctuation cannot be mistaken for the other. `--decided-at`
+defaults to now in UTC; `--confidence` is `low`, `medium`, or `high`. Pass
+`--supersedes DEC-ID` to replace an earlier decision: the predecessor stays
+readable and records the successor that superseded it. The same validation
+runs behind `POST /api/decisions`, so the CLI and the Studio cannot disagree
+about what a valid decision is.
+
+## Render the outcome roadmap
+
+```bash
+agentic-odi roadmap show --job-id JOB-1                # markdown to stdout
+agentic-odi roadmap show --job-id JOB-1 --horizon 4    # four quarters back
+agentic-odi roadmap show --job-id JOB-1 --today 2026-11-15
+agentic-odi roadmap show --job-id JOB-1 --json
+```
+
+`roadmap show` derives the roadmap from the job's recorded decisions: one entry
+per chosen outcome, grouped by the quarter of its decision date in UTC. It is a
+view, not a store — nothing is written. An outcome with no decision is excluded
+and counted, and the footer says how many were left out and why; a superseded
+decision contributes no rows. `--today` pins the window so the output is
+reproducible; `--horizon` sets how many quarters it spans. A baseline or target
+nobody measured prints `not measured`, never `0`.
+
 ## Inspect settings and feature flags
 
 ```bash

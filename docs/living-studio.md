@@ -312,12 +312,13 @@ below the thread instead of being clipped off-screen.
 The copilot does not only talk. When a surface carries the evidence better than a
 paragraph, the agent renders one **inline in the conversation**: a scored
 outcome, a ranked opportunity board, the factual review case for a job, a
+two-outcome comparison, the outcome roadmap derived from recorded decisions, a
 before/after simulation of a bet, a customer quote with its lineage, the
 eight-stage job map, an opportunity thesis, or a decision record.
 Three properties keep this safe and cheap to extend:
 
 - **The catalog is closed and owned by the SPA.**
-  `apps/studio/src/ui/catalog.ts` declares nine primitives and nine cards, their
+  `apps/studio/src/ui/catalog.ts` declares nine primitives and ten cards, their
   JSON Schema props, and the description the model reads. There is no HTML, no
   eval, and no third-party component in the path. Prose is rendered by the same
   `Markdown` component the transcript already used.
@@ -343,6 +344,13 @@ A surface is one node tree, streamed as one event:
   }
 }
 ```
+
+The roadmap card is the decision artifact, drawn: one row per outcome a
+recorded decision chose, grouped by the quarter of its decision date, each row
+naming its statement, baseline, target, and decision id. It is the same
+derivation `odi roadmap show` renders, so the doc and the card cannot disagree
+about a period. It always shows how many outcomes it left out and why — a
+baseline nobody measured reads `not measured`, never `0`.
 
 The opportunity thesis is the intent-first card: one opportunity with its
 importance, satisfaction, the gap in plain words, the thesis itself, and the

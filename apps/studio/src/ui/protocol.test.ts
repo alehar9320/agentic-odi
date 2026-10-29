@@ -10,6 +10,7 @@ const DOMAIN_CARDS = [
   "opportunity-board",
   "opportunity-brief",
   "outcome-compare",
+  "roadmap",
   "impact-simulation",
   "evidence-quote",
   "job-map",

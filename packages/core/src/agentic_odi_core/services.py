@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import date
 from typing import Any
 
 from agentic_odi_core.brief import BriefInput, BriefOutcome
@@ -36,6 +37,7 @@ from agentic_odi_core.models import (
     compute_opportunity_score,
 )
 from agentic_odi_core.repository import Repository, page
+from agentic_odi_core.roadmap import Roadmap, build_roadmap
 
 
 class JobNotFoundError(NotFoundError):
@@ -466,6 +468,33 @@ class ODIService:
                 )
             )
         return align_outcomes(candidates)
+
+    def build_roadmap(
+        self,
+        job_id: str,
+        *,
+        horizon: int = 4,
+        today: date | None = None,
+    ) -> Roadmap:
+        """Derive a job's outcome roadmap from its recorded decisions.
+
+        This is the only place the fetch happens: the pure ``build_roadmap`` in
+        ``roadmap.py`` receives the records and owns the grouping. The live
+        outcome score is never read as a baseline — no measurement source
+        exists yet (``ALH-46``/``ALH-29``), so baselines and targets stay
+        ``None`` and render as ``not measured`` rather than a zero.
+        """
+        if self.repo.get_job(job_id) is None:
+            raise JobNotFoundError(job_id)
+        decisions = self.repo.list_decisions(job_id, limit=None)
+        outcomes = self.repo.get_outcomes(job_id, limit=None)
+        return build_roadmap(
+            job_id,
+            decisions,
+            outcomes,
+            horizon=horizon,
+            today=today,
+        )
 
     def record_decision(
         self,

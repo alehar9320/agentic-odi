@@ -98,7 +98,7 @@ def test_brief_to_html_escapes_hostile_markdown() -> None:
     from agentic_odi_cli.brief import brief_to_html
 
     document = brief_to_html(
-        "# Brief: <script>alert(1)</script>\n\n- Quote: \"<img src=x onerror=alert(1)>\"",
+        '# Brief: <script>alert(1)</script>\n\n- Quote: "<img src=x onerror=alert(1)>"',
         source="job <b>1</b>",
     )
 

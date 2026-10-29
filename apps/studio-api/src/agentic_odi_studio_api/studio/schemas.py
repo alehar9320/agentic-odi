@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Literal
 
-from agentic_odi_core.models import JobStage
+from agentic_odi_core.models import DecisionConfidence, JobStage
 from pydantic import BaseModel, Field
 
 if TYPE_CHECKING:
@@ -53,6 +53,27 @@ class AddOutcomeRequest(BaseModel):
     statement: str
     importance: float = Field(ge=1.0, le=10.0)
     satisfaction: float = Field(ge=1.0, le=10.0)
+
+
+class RejectedOptionRequest(BaseModel):
+    """One option a decision considered and turned down, with its reason."""
+
+    outcome_id: str = Field(min_length=1)
+    reason: str = ""
+
+
+class RecordDecisionRequest(BaseModel):
+    """Record a decision, optionally naming the one it supersedes."""
+
+    mcp_url: str = ""
+    job_id: str = Field(min_length=1)
+    chosen_outcome_ids: list[str] = Field(min_length=1)
+    rationale: str = Field(min_length=1)
+    decided_by: str = Field(min_length=1)
+    decided_at: str | None = None
+    rejected: list[RejectedOptionRequest] = Field(default_factory=list)
+    confidence: DecisionConfidence = DecisionConfidence.MEDIUM
+    supersedes: str | None = None
 
 
 class CreateJobRequest(BaseModel):

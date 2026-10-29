@@ -16,6 +16,8 @@ Readiness choices pinned here:
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 from agentic_odi_core.brief import NOT_MEASURED
 from agentic_odi_core.compare import CompareCandidate, align_outcomes
@@ -51,8 +53,8 @@ def three_outcomes(service: ODIService) -> tuple[ODIService, list[str]]:
     return service, ids
 
 
-def _candidate(**overrides) -> CompareCandidate:
-    base = dict(
+def _candidate(**overrides: Any) -> CompareCandidate:
+    base: dict[str, Any] = dict(
         outcome_id="o-1",
         statement="Minimize the time it takes to publish a plugin when a release is ready",
         score=13.0,

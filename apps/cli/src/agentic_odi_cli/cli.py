@@ -17,12 +17,14 @@ from agentic_odi_cli.backend import run_tool
 from agentic_odi_cli.brief import brief_app
 from agentic_odi_cli.connectors import connectors_app
 from agentic_odi_cli.customer_outcomes import customer_outcomes_app, score
+from agentic_odi_cli.decide import decide_app
 from agentic_odi_cli.desired_outcomes import desired_outcomes_app
 from agentic_odi_cli.evidence import evidence_app
 from agentic_odi_cli.jobs import jobs_app
 from agentic_odi_cli.onboard import maybe_run_first_launch
 from agentic_odi_cli.profile import app as profile_app
 from agentic_odi_cli.render import render_job_summary
+from agentic_odi_cli.roadmap import roadmap_app
 from agentic_odi_cli.settings import settings_app
 from agentic_odi_cli.steps import steps_app
 from agentic_odi_cli.version import __version__  # noqa: F401  (re-exported for tests)
@@ -38,6 +40,8 @@ app.add_typer(steps_app, name="steps", help="Manage Job-map Steps.")
 app.add_typer(desired_outcomes_app, name="desired-outcomes", help="Manage desired Outcomes.")
 app.add_typer(evidence_app, name="evidence", help="Manage evidence captured from connectors.")
 app.add_typer(brief_app, name="brief", help="Render the factual case for a job.")
+app.add_typer(decide_app, name="decide", help="Record a decision with its rejected options.")
+app.add_typer(roadmap_app, name="roadmap", help="Render a job's outcome roadmap.")
 app.add_typer(customer_outcomes_app, name="customer-outcomes", help="Manage Customer Outcomes")
 app.add_typer(
     customer_outcomes_app,

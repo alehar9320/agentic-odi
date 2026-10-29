@@ -4,6 +4,7 @@ import json
 import signal
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from datetime import date
 from typing import Any
 
 from agentic_odi_core import (
@@ -581,6 +582,50 @@ def compare_outcomes(outcome_ids: list[str]) -> str:
                 {"metric": row.metric, "label": row.label, "cells": list(row.cells)}
                 for row in comparison.rows
             ],
+        }
+    )
+
+
+@mcp.tool
+def get_roadmap(job_id: str, horizon: int = 4, today: str | None = None) -> str:
+    """Derive a job's outcome roadmap from its recorded decisions.
+
+    One entry per chosen outcome, grouped by the quarter its decision was made.
+    An outcome with no decision is excluded and counted, with its reason. A
+    baseline nobody measured renders "not measured", never 0. ``today`` is
+    optional so a caller can pin the window; when omitted the current UTC date
+    is used.
+    """
+    pinned: date | None = None
+    if today:
+        try:
+            pinned = date.fromisoformat(today)
+        except ValueError:
+            return f"Error: today must be an ISO-8601 date, got {today!r}"
+    try:
+        roadmap = service.build_roadmap(job_id, horizon=horizon, today=pinned)
+    except JobNotFoundError:
+        return job_not_found(job_id)
+    except (OdiError, ValueError) as exc:
+        return f"Error: {exc}"
+    return json.dumps(
+        {
+            "entries": [
+                {
+                    "period": entry.period,
+                    "outcome_id": entry.outcome_id,
+                    "statement": entry.statement,
+                    "decision_id": entry.decision_id,
+                    "baseline": entry.baseline,
+                    "target": entry.target,
+                }
+                for entry in roadmap.entries
+            ],
+            "undecided_count": roadmap.undecided_count,
+            "horizon_excluded_count": roadmap.horizon_excluded_count,
+            "superseded_excluded_count": roadmap.superseded_excluded_count,
+            "horizon": roadmap.horizon,
+            "exclusion_note": roadmap.exclusion_note(),
         }
     )
 

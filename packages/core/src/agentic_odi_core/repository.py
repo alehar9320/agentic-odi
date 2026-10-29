@@ -139,8 +139,11 @@ class InMemoryRepository:
         job = self.jobs.get(job_id)
         if not job:
             return None
+        # ``exclude_unset`` omits an id that was never passed explicitly, and
+        # ``model_validate`` would then mint a fresh one. Pin it from the key.
         current = job.model_dump(exclude_unset=True)
         current.update(updates)
+        current["id"] = job_id
         new_job = job.model_validate(current)
         self.jobs[job_id] = new_job
         return new_job
@@ -184,8 +187,11 @@ class InMemoryRepository:
         step = self.steps.get(step_id)
         if not step:
             return None
+        # ``exclude_unset`` omits an id that was never passed explicitly, and
+        # ``model_validate`` would then mint a fresh one. Pin it from the key.
         current = step.model_dump(exclude_unset=True)
         current.update(updates)
+        current["id"] = step_id
         new_step = step.model_validate(current)
         self.steps[step_id] = new_step
         return new_step
@@ -231,8 +237,11 @@ class InMemoryRepository:
         outcome = self.outcomes.get(outcome_id)
         if not outcome:
             return None
+        # ``exclude_unset`` omits an id that was never passed explicitly, and
+        # ``model_validate`` would then mint a fresh one. Pin it from the key.
         current = outcome.model_dump(exclude_unset=True)
         current.update(updates)
+        current["id"] = outcome_id
         new_outcome = outcome.model_validate(current)
         self.outcomes[outcome_id] = new_outcome
         return new_outcome
@@ -268,8 +277,11 @@ class InMemoryRepository:
         co = self.customer_outcomes.get(outcome_id)
         if not co:
             return None
+        # ``exclude_unset`` omits an id that was never passed explicitly, and
+        # ``model_validate`` would then mint a fresh one. Pin it from the key.
         current = co.model_dump(exclude_unset=True)
         current.update(updates)
+        current["id"] = outcome_id
         new_co = co.model_validate(current)
         self.customer_outcomes[outcome_id] = new_co
         return new_co
@@ -329,8 +341,11 @@ class InMemoryRepository:
         decision = self.decisions.get(decision_id)
         if not decision:
             return None
+        # ``exclude_unset`` omits an id that was never passed explicitly, and
+        # ``model_validate`` would then mint a fresh one. Pin it from the key.
         current = decision.model_dump(exclude_unset=True)
         current.update(updates)
+        current["id"] = decision_id
         new_decision = decision.model_validate(current)
         self.decisions[decision_id] = new_decision
         return new_decision
