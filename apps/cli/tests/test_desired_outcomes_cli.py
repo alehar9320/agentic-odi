@@ -363,3 +363,21 @@ def test_show_omits_the_note_line_when_no_reason_was_recorded(tmp_path) -> None:
 
     assert shown.exit_code == 0, shown.output
     assert "note" not in shown.output
+
+
+def test_a_multiline_note_renders_on_one_line(tmp_path) -> None:
+    """A newline in a note must not split the aligned block."""
+    runner = CliRunner()
+    db = str(tmp_path / "odi.db")
+    job_id = _job_id(runner, db)
+    added = _add(runner, db, job_id, "--why", "first pass\nsecond line")
+
+    shown = runner.invoke(app, ["--db", db, "desired-outcomes", "get", added["id"]])
+
+    assert shown.exit_code == 0, shown.output
+    note_lines = [line for line in shown.output.splitlines() if line.startswith("note")]
+    assert note_lines == ["note          first pass second line"]
+
+    history = runner.invoke(app, ["--db", db, "desired-outcomes", "history", added["id"]])
+    assert history.exit_code == 0, history.output
+    assert "first pass second line" in history.output

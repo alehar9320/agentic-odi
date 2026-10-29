@@ -40,6 +40,17 @@ def _block(rows: list[tuple[str, Any]]) -> str:
     return "\n".join(f"{label.ljust(width)}  {value}" for label, value in rows)
 
 
+def _note_cell(note: Any) -> str:
+    """Flatten a note to a single line so it cannot break an aligned block or row.
+
+    The note is free text; a newline in it would otherwise split a value across
+    lines and misalign the surrounding output.
+    """
+    if not note:
+        return ""
+    return " ".join(str(note).split())
+
+
 def _table(headers: tuple[str, ...], rows: list[tuple[str, ...]], *, empty: str) -> str:
     """Render rows under headers, or ``empty`` when there is nothing to show."""
     if not rows:
@@ -219,7 +230,9 @@ def render_outcome(outcome: Any, *, as_json: bool, latest_note: str | None = Non
         ("sample", _sample_label(outcome)),
     ]
     if latest_note:
-        rows.append(("note", latest_note))
+        note_line = _note_cell(latest_note)
+        if note_line:
+            rows.append(("note", note_line))
     return _block(rows)
 
 
@@ -456,7 +469,7 @@ def render_score_history(snapshots: Any, *, as_json: bool) -> str:
                 _num(snapshot.get("satisfaction", "")),
                 _num(snapshot.get("opportunity_score", "")),
                 _sample_label(snapshot),
-                snapshot.get("note") or "",
+                _note_cell(snapshot.get("note")),
             )
             for snapshot in snapshots
         ],
