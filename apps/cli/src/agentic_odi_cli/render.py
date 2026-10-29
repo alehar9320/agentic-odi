@@ -197,6 +197,80 @@ def render_outcome(outcome: Any, *, as_json: bool) -> str:
     )
 
 
+JOB_MAP_STAGES = 8
+
+
+def _stage_number(step: dict[str, Any]) -> int | None:
+    try:
+        order = int(step.get("order", 0))
+    except (TypeError, ValueError):
+        return None
+    return order if 1 <= order <= JOB_MAP_STAGES else None
+
+
+def render_job_summary(
+    job: dict[str, Any],
+    steps: list[dict[str, Any]],
+    outcomes: list[dict[str, Any]],
+    *,
+    top: int = 5,
+    as_json: bool = False,
+) -> str:
+    """Summarize a Job: its map coverage and the outcomes worth acting on."""
+    covered = sorted({stage for step in steps if (stage := _stage_number(step)) is not None})
+    missing = [stage for stage in range(1, JOB_MAP_STAGES + 1) if stage not in covered]
+    scored = [item for item in outcomes if isinstance(item.get("opportunity_score"), (int, float))]
+    ranked = sorted(scored, key=lambda item: item["opportunity_score"], reverse=True)
+    underserved = [item for item in ranked if item["opportunity_score"] > 10][:top]
+
+    if as_json:
+        return _json(
+            {
+                "job": job,
+                "step_count": len(steps),
+                "outcome_count": len(outcomes),
+                "underserved": underserved,
+                "phase_coverage": {"covered": covered, "missing": missing},
+            }
+        )
+
+    lines = [
+        _block(
+            [
+                ("job", f"{job.get('name', '')} ({job.get('id', '')})"),
+                ("description", job.get("description") or "—"),
+                (
+                    "job map",
+                    f"{len(covered)} of {JOB_MAP_STAGES} phases"
+                    + (
+                        f" (missing {', '.join(str(stage) for stage in missing)})"
+                        if missing
+                        else ""
+                    ),
+                ),
+                ("outcomes", f"{len(outcomes)} captured, {len(underserved)} underserved"),
+            ]
+        )
+    ]
+    if underserved:
+        lines.append("")
+        lines.append("Biggest opportunities:")
+        lines.append(
+            _table(
+                ("statement", "score"),
+                [
+                    (_truncate(str(item.get("statement", ""))), _num(item["opportunity_score"]))
+                    for item in underserved
+                ],
+                empty="No outcome scores above 10 yet.",
+            )
+        )
+    else:
+        lines.append("")
+        lines.append("No outcome scores above 10 yet.")
+    return "\n".join(lines)
+
+
 def render_outcome_list(outcomes: Any, *, as_json: bool) -> str:
     """Render desired Outcomes as an aligned table or JSON."""
     if not isinstance(outcomes, list):
@@ -232,6 +306,7 @@ def render_evidence(item: Any, *, as_json: bool) -> str:
             ("kind", item.get("source_kind", "")),
             ("item_type", item.get("item_type", "")),
             ("name", item.get("name", "")),
+            ("url", item.get("url") or ""),
             ("job_id", item.get("job_id") or ""),
             ("step_id", item.get("step_id") or ""),
             ("outcome_id", item.get("outcome_id") or ""),
@@ -247,13 +322,14 @@ def render_evidence_list(items: Any, *, as_json: bool) -> str:
     if as_json:
         return _json(items)
     return _table(
-        ("id", "source", "item_type", "name"),
+        ("id", "source", "item_type", "name", "url"),
         [
             (
                 str(item.get("id", "")),
                 _truncate(str(item.get("source_name", ""))),
                 _truncate(str(item.get("item_type", ""))),
                 _truncate(str(item.get("name", ""))),
+                _truncate(str(item.get("url") or "")),
             )
             for item in items
         ],
@@ -303,3 +379,31 @@ def render_score(importance: float, satisfaction: float, score: float, *, as_jso
             {"importance": importance, "satisfaction": satisfaction, "opportunity_score": score}
         )
     return f"Opportunity score: {score:.2f}"
+
+
+def _cell(item: Any, key: str) -> str:
+    """A table cell, unwrapping enums so it reads `oneshot`, not `Trigger.ONESHOT`."""
+    value = item.get(key, "")
+    return str(getattr(value, "value", value))
+
+
+def render_scheduled_work_list(items: Any, *, as_json: bool) -> str:
+    if not isinstance(items, list):
+        return _json(items) if as_json else str(items)
+    if as_json:
+        return _json(items)
+    return _table(
+        ("id", "name", "agent_id", "trigger_type", "expression", "status"),
+        [
+            (
+                _cell(item, "id"),
+                _truncate(_cell(item, "name")),
+                _cell(item, "agent_id"),
+                _cell(item, "trigger_type"),
+                _cell(item, "schedule_expression"),
+                _cell(item, "status"),
+            )
+            for item in items
+        ],
+        empty="No scheduled work found.",
+    )

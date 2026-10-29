@@ -154,8 +154,8 @@ export function JobMap() {
     <section className="fade-in">
       <p className="section-title">Universal Job Map (8 Process Phases)</p>
       <p className="caption">
-        Ulwick Universal Job Steps: Deconstruct human execution into 8 predictable phases to uncover
-        latent friction.
+        Ulwick Universal Job Steps: Define ➔ Locate ➔ Prepare ➔ Confirm ➔ Execute ➔ Monitor ➔ Modify
+        ➔ Conclude
       </p>
 
       {jobs.length > 1 && (

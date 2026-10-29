@@ -40,11 +40,13 @@ from agentic_odi_core.messages import (
     evidence_not_found,
     job_not_found,
     outcome_not_found,
+    scheduled_work_not_found,
     step_not_found,
 )
 from agentic_odi_core.models import (
     JOB_STAGE_INDEX,
     JOB_STAGE_ORDER,
+    V2MOM,
     BusinessImpactCategory,
     BusinessValue,
     CustomerOutcome,
@@ -55,6 +57,9 @@ from agentic_odi_core.models import (
     Job,
     JobStage,
     Outcome,
+    ScheduledWork,
+    ScheduledWorkStatus,
+    ScheduledWorkTriggerType,
     Signal,
     SignalKind,
     Step,
@@ -69,6 +74,7 @@ from agentic_odi_core.remote import (
     tool_result_text,
 )
 from agentic_odi_core.repository import InMemoryRepository, Repository
+from agentic_odi_core.router import ModelRouter, ModelTier, OnDeviceLLMEngine, RoutingMode
 from agentic_odi_core.schema import odi_schema
 from agentic_odi_core.services import (
     CustomerOutcomeNotFoundError,
@@ -77,13 +83,23 @@ from agentic_odi_core.services import (
     JobNotFoundError,
     ODIService,
     OutcomeNotFoundError,
+    ScheduledWorkNotFoundError,
     SignalBudget,
     SignalNotFoundError,
     StepNotFoundError,
     ValueOutOfRangeError,
 )
+from agentic_odi_core.steve_jobs import (
+    format_opportunity_score_insight,
+    generate_steve_jobs_response,
+)
 
 __all__ = [
+    "ScheduledWork",
+    "ScheduledWorkNotFoundError",
+    "ScheduledWorkStatus",
+    "ScheduledWorkTriggerType",
+    "scheduled_work_not_found",
     "BusinessImpactCategory",
     "BusinessValue",
     "CAPABILITIES",
@@ -100,6 +116,8 @@ __all__ = [
     "JobStage",
     "JOB_STAGE_INDEX",
     "JOB_STAGE_ORDER",
+    "ModelRouter",
+    "ModelTier",
     "NotFoundError",
     "ODIService",
     "ODI_ASSISTANT_PROMPT",
@@ -108,7 +126,9 @@ __all__ = [
     "Outcome",
     "OutcomeNotFoundError",
     "OutcomeStatementError",
+    "OnDeviceLLMEngine",
     "RateLimitError",
+    "RoutingMode",
     "SerializationError",
     "Step",
     "StepNotFoundError",
@@ -128,6 +148,7 @@ __all__ = [
     "ToolName",
     "ToolSpec",
     "ToolEffect",
+    "V2MOM",
     "capability_manifest",
     "capability_summary",
     "Repository",
@@ -137,6 +158,8 @@ __all__ = [
     "error_status",
     "evaluate_outcome_statement",
     "evidence_not_found",
+    "format_opportunity_score_insight",
+    "generate_steve_jobs_response",
     "job_not_found",
     "job_stage_catalog",
     "odi_schema",

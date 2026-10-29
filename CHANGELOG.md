@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.14.0](https://github.com/alehar9320/agentic-odi/compare/v0.13.0...v0.14.0) (2026-10-29)
+
+
+### Features
+
+* add on-device llm fallback and model router ([#65](https://github.com/alehar9320/agentic-odi/issues/65)) ([2962ea6](https://github.com/alehar9320/agentic-odi/commit/2962ea6a75fad1b83dfdd09555b322aa82d31faf))
+* **release:** close the verifiable-release gaps from [#89](https://github.com/alehar9320/agentic-odi/issues/89) ([#275](https://github.com/alehar9320/agentic-odi/issues/275)) ([ac8a3a6](https://github.com/alehar9320/agentic-odi/commit/ac8a3a671dd75c9816e491260a3937d244d05296))
+* **studio:** add a Customize page for managing connectors ([#262](https://github.com/alehar9320/agentic-odi/issues/262)) ([bde4ab3](https://github.com/alehar9320/agentic-odi/commit/bde4ab33406c00ee2f768e94a0133285b54ea575))
+
+
+### Bug Fixes
+
+* **release:** attach assets and publish stellar instructions on every release ([#257](https://github.com/alehar9320/agentic-odi/issues/257)) ([fd22a04](https://github.com/alehar9320/agentic-odi/commit/fd22a046e39987355f75d13c434bd4942cc2f580))
+
 ## [0.13.0](https://github.com/alehar9320/agentic-odi/compare/v0.12.0...v0.13.0) (2026-10-29)
 
 

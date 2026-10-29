@@ -16,6 +16,7 @@ from agentic_odi_core.models import (
     Evidence,
     Job,
     Outcome,
+    ScheduledWork,
     Signal,
     Step,
     compute_opportunity_score,
@@ -23,8 +24,8 @@ from agentic_odi_core.models import (
 from agentic_odi_core.repository import (
     Repository,
     page,
-    rank_outcomes,
     rank_signals,
+    sort_outcomes,
     unread_signals,
 )
 
@@ -57,6 +58,7 @@ class SQLiteRepository(Repository):
         self.customer_outcomes: dict[str, CustomerOutcome] = {}
         self.evidence: dict[str, Evidence] = {}
         self.signals: dict[str, Signal] = {}
+        self.scheduled_work: dict[str, ScheduledWork] = {}
         self._last_event_id = 0
         for ev in self.store.get_stream(workspace_id=self._workspace_id, replay_order=True):
             self._apply_event(ev)
@@ -163,6 +165,13 @@ class SQLiteRepository(Repository):
                 del self.evidence[key]
         elif et == "EVIDENCE_DELETED":
             self.evidence.pop(p["id"], None)
+        elif et == "SCHEDULED_WORK_CREATED":
+            self.scheduled_work[p["id"]] = ScheduledWork.model_validate(p)
+        elif et == "SCHEDULED_WORK_UPDATED":
+            self._merge_updates(self.scheduled_work, p, ScheduledWork)
+        elif et == "SCHEDULED_WORK_DELETED":
+            self.scheduled_work.pop(p["id"], None)
+
         elif et == "CUSTOMER_OUTCOME_DELETED":
             self.customer_outcomes.pop(p["id"], None)
         elif et == "SIGNAL_CREATED":
@@ -316,13 +325,14 @@ class SQLiteRepository(Repository):
         step_id: str | None = None,
         limit: int | None = None,
         offset: int = 0,
+        sort: str = "opportunity_score",
     ) -> list[Outcome]:
         with self._lock:
             self._sync()
             outs = [o for o in self.outcomes.values() if o.job_id == job_id]
             if step_id is not None:
                 outs = [o for o in outs if o.step_id == step_id]
-            return page(rank_outcomes(outs), limit, offset)
+            return page(sort_outcomes(outs, sort), limit, offset)
 
     def update_outcome(self, outcome_id: str, updates: dict) -> Outcome | None:
         with self._lock:
@@ -526,6 +536,69 @@ class SQLiteRepository(Repository):
             self._sync()
             return len(unread_signals(list(self.signals.values())))
 
+    def add_scheduled_work(self, work: ScheduledWork) -> ScheduledWork:
+        with self._lock:
+            self.store.append(
+                "SCHEDULED_WORK_CREATED",
+                work.model_dump(),
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return work
+
+    def get_scheduled_work(self, work_id: str) -> ScheduledWork | None:
+        with self._lock:
+            self._sync()
+            return self.scheduled_work.get(work_id)
+
+    def list_scheduled_work(
+        self, job_id: str | None = None, status: str | None = None
+    ) -> list[ScheduledWork]:
+        with self._lock:
+            self._sync()
+            items = list(self.scheduled_work.values())
+            if job_id is not None:
+                items = [item for item in items if item.job_id == job_id]
+            if status is not None:
+                items = [item for item in items if item.status == status]
+            return items
+
+    def update_scheduled_work(self, work_id: str, updates: dict[str, Any]) -> ScheduledWork | None:
+        with self._lock:
+            self._sync()
+            work = self.scheduled_work.get(work_id)
+            if not work:
+                return None
+            current = work.model_dump(exclude_unset=True)
+            current.update(updates)
+            try:
+                new_work = work.model_validate(current)
+            except ValidationError:
+                return None
+            self.store.append(
+                "SCHEDULED_WORK_UPDATED",
+                {"id": work_id, "updates": updates},
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return new_work
+
+    def delete_scheduled_work(self, work_id: str) -> bool:
+        with self._lock:
+            self._sync()
+            if work_id in self.scheduled_work:
+                self.store.append(
+                    "SCHEDULED_WORK_DELETED",
+                    {"id": work_id},
+                    workspace_id=self._workspace_id,
+                    device_id=self._device_id,
+                )
+                self._sync()
+                return True
+            return False
+
     def clear(self) -> None:
         with self._lock:
             self.store.clear()
@@ -534,6 +607,11 @@ class SQLiteRepository(Repository):
     def reload(self) -> None:
         """Re‑load the local snapshot from the event store."""
         self._load_snapshot()
+
+    def commit(self) -> None:
+        """Flush any open transaction in the event store to disk."""
+        with self._lock:
+            self.store.commit()
 
     def close(self) -> None:
         """Close the event store and let SQLite clean up its journal files."""

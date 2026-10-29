@@ -4,7 +4,44 @@ import { useOnboarding } from "../onboarding/context";
 import { useStudio } from "../state/StudioContext";
 import type { ConnectorPreset, StudioConfig } from "../types";
 import { FailurePanel } from "./FailurePanel";
-import { UpdateSettings } from "../updater";
+import { UpdateSettings, useUpdateService, useUpdateSnapshot } from "../updater";
+import { detectPlatform } from "../updater/platform";
+
+const PLATFORM_LABELS: Record<ReturnType<typeof detectPlatform>, string> = {
+  macos: "macOS",
+  windows: "Windows",
+  linux: "Linux",
+  unknown: "Desktop",
+};
+
+/**
+ * The honest facts about this build: which version, cut when, for which
+ * platform, and what the updater thinks. Read-only — the controls live in
+ * the Software update section above.
+ */
+function AboutSection() {
+  const service = useUpdateService();
+  const snapshot = useUpdateSnapshot();
+  const platform = detectPlatform();
+
+  return (
+    <section className="settings__about" aria-labelledby="settings-about-heading">
+      <h3 className="settings__title" id="settings-about-heading">
+        About
+      </h3>
+      <dl>
+        <dt>Version</dt>
+        <dd>{snapshot.currentVersion ? `v${snapshot.currentVersion}` : "—"}</dd>
+        <dt>Build</dt>
+        <dd>{__STUDIO_BUILD_DATE__}</dd>
+        <dt>Platform</dt>
+        <dd>{PLATFORM_LABELS[platform]}</dd>
+        <dt>Updates</dt>
+        <dd>{service.statusLine()}</dd>
+      </dl>
+    </section>
+  );
+}
 
 const PRESET_AREAS: ConnectorPreset["area"][] = [
   "voice-of-customer",
@@ -30,6 +67,7 @@ export function SettingsPanel() {
     setDisplayName,
     brief,
     openSetup,
+    closeSetup,
     clearChat,
     refreshCanvas,
     llmHealth,
@@ -42,6 +80,7 @@ export function SettingsPanel() {
     refreshConnectors,
     addConnector,
     deleteConnector,
+    openCustomize,
     sidecarReachable,
     capabilities,
   } = useStudio();
@@ -68,6 +107,11 @@ export function SettingsPanel() {
               ? `${brief.product_name || "Your product"} — ${brief.job_statement}`
               : "Not set yet. The studio starts every reply from this."}
           </p>
+          {brief?.v2mom?.vision && (
+            <p className="settings__context-value">
+              <strong>Vision:</strong> {brief.v2mom.vision}
+            </p>
+          )}
         </div>
         <button type="button" className="button button--ghost" onClick={openSetup}>
           {brief ? "Edit context" : "Set up context"}
@@ -201,6 +245,13 @@ export function SettingsPanel() {
       ) : (
         <>
           <h3 className="settings__title">Connectors</h3>
+          <button
+            type="button"
+            className="button settings__manage"
+            onClick={() => openCustomize()}
+          >
+            Manage connectors
+          </button>
           {connectorsError ? (
             <FailurePanel
               error={connectorsError}
@@ -275,7 +326,14 @@ export function SettingsPanel() {
       )}
 
       <div className="settings__actions">
-        <button type="button" className="button" onClick={clearChat}>
+        <button
+          type="button"
+          className="button"
+          onClick={() => {
+            closeSetup();
+            clearChat();
+          }}
+        >
           Start a new conversation
         </button>
         <button type="button" className="button button--ghost" onClick={() => void refreshCanvas()}>
@@ -286,14 +344,18 @@ export function SettingsPanel() {
       {tourEnabled ? (
         <div className="settings__tour">
           <h3 className="settings__title">Getting started</h3>
-          <p className="muted">A four-step tour of what the studio can do, and where to begin.</p>
+          <p className="muted">
+            A four-step product tour, when you want one. It never opens by itself.
+          </p>
           <button type="button" className="button button--ghost" onClick={restartTour}>
-            Replay the welcome tour
+            Replay the tour
           </button>
         </div>
       ) : null}
 
       <UpdateSettings />
+
+      <AboutSection />
 
       <details className="disclosure">
         <summary>How the studio works</summary>

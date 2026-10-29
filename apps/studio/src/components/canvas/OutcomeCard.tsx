@@ -10,8 +10,12 @@ import { useStudio } from "../../state/StudioContext";
 import type { Outcome } from "../../types";
 import { CopyIcon } from "../icons";
 
-export function OutcomeCard({ outcome }: { outcome: Outcome }) {
-  const { ask, deleteOutcome, pushToast, saveThesis, updateOutcome } = useStudio();
+export function OutcomeCard({ outcome, sample = false }: { outcome: Outcome; sample?: boolean }) {
+  const { ask, canvasState, deleteOutcome, pushToast, saveThesis, updateOutcome } = useStudio();
+  // Records captured against this outcome, with their way back to the source.
+  const linkedEvidence = (canvasState.data?.evidence ?? []).filter(
+    (item) => item.outcome_id === outcome.id,
+  );
   const [showEvidence, setShowEvidence] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -32,6 +36,14 @@ export function OutcomeCard({ outcome }: { outcome: Outcome }) {
       <header className="card__head">
         <span className="card__id">{outcomeId}</span>
         <span className={`badge badge--${pill.variant}`}>{pill.label}</span>
+        {sample ? (
+          <span
+            className="badge badge--amber"
+            title="This is bundled sample data, not yours."
+          >
+            Sample
+          </span>
+        ) : null}
       </header>
 
       <p className="card__statement">{statement}</p>
@@ -44,11 +56,31 @@ export function OutcomeCard({ outcome }: { outcome: Outcome }) {
         Opportunity <b>{formatOpportunityScore(opp)}</b>
       </p>
 
-      {showEvidence && (
-        <p className="card__evidence">
-          {outcome.evidence?.trim() || "No transcript is linked to this outcome yet."}
-        </p>
-      )}
+      {showEvidence &&
+        (linkedEvidence.length > 0 ? (
+          <div className="card__evidence">
+            {linkedEvidence.map((item) => (
+              <p key={item.id}>
+                {item.content ? `“${item.content}” ` : ""}
+                <span className="evidence__meta">
+                  {item.source_name ? `Via ${item.source_name}` : "Captured by hand"}
+                  {item.url && (
+                    <>
+                      {" · "}
+                      <a href={item.url} target="_blank" rel="noopener noreferrer">
+                        Source ↗
+                      </a>
+                    </>
+                  )}
+                </span>
+              </p>
+            ))}
+          </div>
+        ) : (
+          <p className="card__evidence">
+            {outcome.evidence?.trim() || "No transcript is linked to this outcome yet."}
+          </p>
+        ))}
 
       {editing && (
         <form
@@ -126,6 +158,7 @@ export function OutcomeCard({ outcome }: { outcome: Outcome }) {
           type="button"
           className="quiet-action"
           aria-expanded={showEvidence}
+          title="Inspect customer interview transcripts and evidence line"
           onClick={() => setShowEvidence((prev) => !prev)}
         >
           {showEvidence ? "Hide evidence" : "Evidence"}
@@ -133,6 +166,7 @@ export function OutcomeCard({ outcome }: { outcome: Outcome }) {
         <button
           type="button"
           className="quiet-action"
+          title="Ask the studio what a bet on this outcome would change"
           onClick={() =>
             ask(
               `Simulate the impact of a bet on ${outcomeId}: "${statement}". ` +
@@ -163,6 +197,7 @@ export function OutcomeCard({ outcome }: { outcome: Outcome }) {
         <button
           type="button"
           className="quiet-action"
+          title="Consult the studio on strategic solutions for this outcome"
           onClick={() => ask(`How should we solve outcome ${outcomeId}: "${statement}"?`)}
         >
           Ask
