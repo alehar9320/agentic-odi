@@ -549,6 +549,68 @@ class LocalBackend(Backend):
 
         return odi_schema()
 
+    def _add_interview(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import JobNotFoundError, job_not_found
+
+        try:
+            interview = self.service.add_interview(
+                title=args["title"],
+                participant_label=args["participant_label"],
+                job_id=args.get("job_id"),
+                participant_role=args.get("participant_role"),
+                conducted_at=args.get("conducted_at"),
+                source_kind=args.get("source_kind", "manual"),
+                notes=args.get("notes"),
+            )
+        except JobNotFoundError:
+            raise BackendError(job_not_found(args.get("job_id") or "")) from None
+        return interview.model_dump()
+
+    def _get_interview(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import interview_not_found
+
+        interview = self.service.get_interview(args["interview_id"])
+        if interview is None:
+            raise BackendError(interview_not_found(args["interview_id"]))
+        return interview.model_dump()
+
+    def _list_interviews(self, args: dict[str, Any]) -> list[dict[str, Any]]:
+        items = self.service.list_interviews(
+            job_id=args.get("job_id"),
+            limit=args.get("limit"),
+            offset=args.get("offset", 0),
+        )
+        return [item.model_dump() for item in items]
+
+    def _delete_interview(self, args: dict[str, Any]) -> str:
+        from agentic_odi_core import InterviewNotFoundError, interview_not_found
+
+        interview_id = args["interview_id"]
+        try:
+            self.service.delete_interview(interview_id)
+        except InterviewNotFoundError:
+            raise BackendError(interview_not_found(interview_id)) from None
+        return interview_id
+
+    def _add_quote(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import InterviewNotFoundError, interview_not_found
+
+        try:
+            quote = self.service.add_quote(
+                interview_id=args["interview_id"],
+                text=args["text"],
+                speaker=args.get("speaker"),
+                start_ms=args.get("start_ms"),
+                end_ms=args.get("end_ms"),
+            )
+        except InterviewNotFoundError:
+            raise BackendError(interview_not_found(args["interview_id"])) from None
+        return quote.model_dump()
+
+    def _list_quotes(self, args: dict[str, Any]) -> list[dict[str, Any]]:
+        items = self.service.list_quotes(args["interview_id"])
+        return [item.model_dump() for item in items]
+
     def _evaluate_outcome(self, args: dict[str, Any]) -> str:
         from agentic_odi_core import job_not_found
         from agentic_odi_core.evaluation import (
@@ -654,6 +716,12 @@ _LOCAL_HANDLERS = {
     "get_evidence": LocalBackend._get_evidence,
     "list_evidence": LocalBackend._list_evidence,
     "delete_evidence": LocalBackend._delete_evidence,
+    "add_interview": LocalBackend._add_interview,
+    "get_interview": LocalBackend._get_interview,
+    "list_interviews": LocalBackend._list_interviews,
+    "delete_interview": LocalBackend._delete_interview,
+    "add_quote": LocalBackend._add_quote,
+    "list_quotes": LocalBackend._list_quotes,
     "promote_evidence": LocalBackend._promote_evidence,
     "schedule_work": LocalBackend._schedule_work,
     "get_scheduled_work": LocalBackend._get_scheduled_work,
