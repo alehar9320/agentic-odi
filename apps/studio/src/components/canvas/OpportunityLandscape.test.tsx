@@ -183,6 +183,64 @@ describe("OpportunityLandscape accessibility", () => {
   });
 });
 
+describe("OpportunityLandscape sample and method", () => {
+  beforeEach(() => {
+    harness.state.canvasState = {
+      kind: "ready",
+      data: {
+        jobs: [{ id: "JOB-1", name: "Deploy Service" }],
+        steps: [],
+        outcomes: [
+          {
+            id: "O-201",
+            statement: "Minimize time spent syncing secrets",
+            importance: 9,
+            satisfaction: 2,
+            opportunity_score: 16,
+            score_method: "estimate",
+          },
+          {
+            id: "O-202",
+            statement: "Minimize risk of configuration drift",
+            importance: 8,
+            satisfaction: 4,
+            opportunity_score: 12,
+            score_method: "survey",
+            importance_n: 40,
+            satisfaction_n: 40,
+          },
+          {
+            id: "O-203",
+            statement: "Minimize the number of manual approvals",
+            importance: 7,
+            satisfaction: 3,
+            opportunity_score: 11,
+            score_method: "survey",
+            importance_n: 40,
+            satisfaction_n: 12,
+          },
+        ],
+        source: "seed" as const,
+      },
+    } as unknown as CanvasState;
+  });
+
+  it("shows est. for an estimate and n=40 (survey) for a survey", () => {
+    render(<OpportunityLandscape />);
+    fireEvent.click(screen.getByText("📋 Table View"));
+
+    expect(screen.getByText("est.")).toBeInTheDocument();
+    expect(screen.getByText("n=40 (survey)")).toBeInTheDocument();
+  });
+
+  it("shows both counts when the dimensions differ instead of a fabricated shared n", () => {
+    render(<OpportunityLandscape />);
+    fireEvent.click(screen.getByText("📋 Table View"));
+
+    expect(screen.getByText("n=40/12 (survey)")).toBeInTheDocument();
+  });
+});
+
 describe("OpportunityLandscape canvas states", () => {
   it("shows the failure and a retry instead of the metrics when the canvas failed", () => {
     harness.state.canvasState = {

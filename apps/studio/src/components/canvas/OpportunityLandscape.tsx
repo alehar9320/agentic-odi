@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from "react";
 
 import { canvasStatus } from "../../lib/canvasProvenance";
-import { formatOpportunityScore, isUnderserved } from "../../lib/odi";
+import { formatOpportunityScore, formatSample, isUnderserved } from "../../lib/odi";
 import { useStudio } from "../../state/StudioContext";
 import type { Outcome } from "../../types";
 import { FailurePanel } from "../FailurePanel";
@@ -520,7 +520,9 @@ function OpportunityMatrixView({
                     stroke="#0b0d13"
                     strokeWidth="2"
                     filter={plot.underserved || isSelected ? "url(#glowEffect)" : undefined}
-                  />
+                  >
+                    <title>{`${outcome.id} · ${formatSample(outcome)}`}</title>
+                  </circle>
 
                   {/* Node ID Label */}
                   <text
@@ -631,6 +633,7 @@ function OpportunityTableView({
             <th style={{ padding: "10px 14px", textAlign: "right" }}>Importance</th>
             <th style={{ padding: "10px 14px", textAlign: "right" }}>Satisfaction</th>
             <th style={{ padding: "10px 14px", textAlign: "right" }}>Opp. Score</th>
+            <th style={{ padding: "10px 14px" }}>Sample</th>
             <th style={{ padding: "10px 14px", textAlign: "center" }}>Status</th>
           </tr>
         </thead>
@@ -685,6 +688,16 @@ function OpportunityTableView({
                   }}
                 >
                   {opp.toFixed(1)}
+                </td>
+                <td
+                  style={{
+                    padding: "10px 14px",
+                    color: "var(--studio-muted)",
+                    whiteSpace: "nowrap",
+                  }}
+                  title="How many people stand behind each score, and how it was obtained"
+                >
+                  {formatSample(outcome)}
                 </td>
                 <td style={{ padding: "10px 14px", textAlign: "center" }}>
                   <span

@@ -27,3 +27,30 @@ export function opportunityPill(score: number | null | undefined): PillDescripto
   }
   return { label: `✓ Served (Opp: ${formatted})`, variant: "green" };
 }
+
+export interface SampleMetadata {
+  score_method?: "estimate" | "survey" | "import" | null;
+  importance_n?: number | null;
+  satisfaction_n?: number | null;
+}
+
+/**
+ * Describe how many people stand behind a score, and how it was obtained.
+ *
+ * An estimate, or a score with no recorded sample, reads as `est.` — never as a
+ * fabricated `n`. A recorded sample shows both counts when they differ, so a
+ * thin dimension is visible rather than averaged away. Mirrors the CLI's
+ * `_sample_label` so both surfaces say the same thing.
+ */
+export function formatSample(outcome: SampleMetadata): string {
+  const importanceN = outcome.importance_n ?? null;
+  const satisfactionN = outcome.satisfaction_n ?? null;
+  const method = outcome.score_method ?? "estimate";
+  if (method === "estimate" || (importanceN == null && satisfactionN == null)) {
+    return "est.";
+  }
+  if (importanceN === satisfactionN) {
+    return `n=${importanceN} (${method})`;
+  }
+  return `n=${importanceN ?? "?"}/${satisfactionN ?? "?"} (${method})`;
+}

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   formatOpportunityScore,
+  formatSample,
   isUnderserved,
   opportunityPill,
   opportunityScore,
@@ -56,5 +57,40 @@ describe("opportunityPill", () => {
       label: "✓ Served (Opp: N/A)",
       variant: "green",
     });
+  });
+});
+
+describe("formatSample", () => {
+  it("reads as est. when the counts are unknown", () => {
+    expect(formatSample({})).toBe("est.");
+    expect(formatSample({ score_method: "estimate" })).toBe("est.");
+  });
+
+  it("never fabricates an n for an estimate with no counts", () => {
+    expect(formatSample({ score_method: "estimate", importance_n: null, satisfaction_n: null })).toBe(
+      "est.",
+    );
+  });
+
+  it("shows one shared n and the method when the counts agree", () => {
+    expect(formatSample({ score_method: "survey", importance_n: 40, satisfaction_n: 40 })).toBe(
+      "n=40 (survey)",
+    );
+  });
+
+  it("shows both counts when the dimensions differ", () => {
+    expect(formatSample({ score_method: "survey", importance_n: 40, satisfaction_n: 12 })).toBe(
+      "n=40/12 (survey)",
+    );
+  });
+
+  it("marks a missing dimension with ? rather than inventing a count", () => {
+    expect(formatSample({ score_method: "import", importance_n: 40, satisfaction_n: null })).toBe(
+      "n=40/? (import)",
+    );
+  });
+
+  it("falls back to est. when the method is absent but no counts exist", () => {
+    expect(formatSample({ importance_n: null, satisfaction_n: null })).toBe("est.");
   });
 });

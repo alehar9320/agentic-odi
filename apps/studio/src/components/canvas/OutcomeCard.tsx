@@ -2,6 +2,7 @@ import { useState } from "react";
 
 import {
   formatOpportunityScore,
+  formatSample,
   isUnderserved,
   opportunityPill,
   opportunityScore,
@@ -54,6 +55,10 @@ export function OutcomeCard({ outcome, sample = false }: { outcome: Outcome; sam
         Satisfaction <b>{outcome.satisfaction ?? "—"}</b>
         <span aria-hidden="true"> · </span>
         Opportunity <b>{formatOpportunityScore(opp)}</b>
+        <span aria-hidden="true"> · </span>
+        <span title="How many people stand behind each score, and how it was obtained">
+          {formatSample(outcome)}
+        </span>
       </p>
 
       {showEvidence &&
