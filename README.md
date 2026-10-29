@@ -58,6 +58,11 @@ curl -fsSL https://github.com/alehar9320/agentic-odi/releases/latest/download/in
   opportunity board — inline in the thread.
 - **Local-first by default.** The CLI and server work with no network and no
   account. Point them at a remote MCP server with one flag.
+- **A catch-up that means something.** Writes emit signals — an outcome
+  re-scored, evidence promoted, a job map completed — stored in the same
+  event log and read by the CLI, any MCP client, and the Studio's bell.
+  Nothing is invented, and the feed is deduped and budgeted so it stays
+  worth opening.
 
 ## How it works
 
@@ -101,6 +106,7 @@ uv run python scripts/dev.py        # start the MCP server + Studio together
 ```bash
 odi jobs list
 odi desired-outcomes list --job-id <id>
+odi signals unread                    # what changed while you were away
 odi score 8 2                        # → 14.00
 odi                                  # interactive chat in a terminal
 ```

@@ -38,6 +38,22 @@ vi.mock("./api/studioApi", () => ({
   updateOutcome: vi.fn(async () => ({ ok: true })),
   deleteOutcome: vi.fn(async () => ({ ok: true })),
   fetchMemory: vi.fn(async () => []),
+  fetchSignals: vi.fn(async () => [
+    {
+      id: "sig-1",
+      kind: "job_added",
+      title: 'Job added: "Propagate secrets"',
+      subject_kind: "job",
+      subject_id: "JOB-402",
+      severity: "info",
+      created_at: "2026-10-22T10:00:00+00:00",
+      suppressed: false,
+      fingerprint: "fp-1",
+    },
+  ]),
+  fetchUnreadSignalCount: vi.fn(async () => 1),
+  markSignalRead: vi.fn(async () => ({ id: "sig-1" })),
+  dismissSignal: vi.fn(async () => ({ id: "sig-1" })),
   fetchConnectorCatalog: vi.fn(async () => []),
   fetchConnectors: vi.fn(async () => []),
   asStudioError: (error: unknown) => ({

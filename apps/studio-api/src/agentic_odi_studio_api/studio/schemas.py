@@ -79,6 +79,12 @@ class UpdateOutcomeRequest(BaseModel):
     mcp_url: str = ""
 
 
+class SignalActionRequest(BaseModel):
+    """Body for the read/dismiss signal routes; only the MCP backend needs it."""
+
+    mcp_url: str = ""
+
+
 class StudioBrief(BaseModel):
     """The user's context, captured during first-run onboarding."""
 

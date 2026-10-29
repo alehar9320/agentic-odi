@@ -20,16 +20,8 @@ export function StudioBar({
   onNew: () => void;
   onChangelog: () => void;
 }) {
-  const {
-    llmHealth,
-    messages,
-    unreadNotificationCount,
-    markAllNotificationsAsRead,
-    openPanel,
-    pushToast,
-    saveSettings,
-    settings,
-  }    = useStudio();
+  const { llmHealth, messages, unreadSignalCount, openPanel, pushToast, saveSettings, settings } =
+    useStudio();
   const update = useUpdateSnapshot();
   const theme = settings.theme === "light" ? "light" : "dark";
   const nextTheme = theme === "dark" ? "light" : "dark";
@@ -124,19 +116,16 @@ export function StudioBar({
         <button
           type="button"
           className="icon-button bar__bell"
-          aria-label="Catch up notifications"
-          title="Activity & Catch Up"
-          onClick={() => {
-            markAllNotificationsAsRead();
-            openPanel("catchup");
-          }}
+          aria-label={
+            unreadSignalCount > 0
+              ? `Signal inbox: ${unreadSignalCount} unread`
+              : "Signal inbox: no unread signals"
+          }
+          title="Signals from the store"
+          onClick={() => openPanel("catchup")}
         >
           <BellIcon size={17} />
-          {unreadNotificationCount > 0 && (
-            <span className="bell-badge" aria-hidden="true">
-              {unreadNotificationCount}
-            </span>
-          )}
+          {unreadSignalCount > 0 && <span className="bell-badge">{unreadSignalCount}</span>}
         </button>
 
         <button

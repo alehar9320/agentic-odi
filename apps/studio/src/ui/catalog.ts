@@ -10,6 +10,7 @@
  * to the sidecar; `catalogPrompt()` is what the model reads.
  */
 
+import { JOB_STAGES } from "../domain/jobStages";
 import { UI_LIMITS, toManifest, type UiCatalogEntry, type UiPropSchema } from "./protocol";
 
 const actionList: UiPropSchema = {
@@ -279,23 +280,12 @@ export const CATALOG: readonly UiCatalogEntry[] = [
       steps: {
         type: "array",
         minItems: 1,
-        maxItems: 8,
+        maxItems: JOB_STAGES.length,
         items: {
           type: "object",
           properties: {
             name: { type: "string" },
-            stage: {
-              enum: [
-                "define",
-                "locate",
-                "prepare",
-                "confirm",
-                "execute",
-                "monitor",
-                "modify",
-                "conclude",
-              ],
-            },
+            stage: { enum: JOB_STAGES.map((stage) => stage.id) },
             note: { type: "string" },
           },
           required: ["name"],

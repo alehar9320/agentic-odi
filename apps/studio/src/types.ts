@@ -227,21 +227,44 @@ export type WorkspacePanelId =
   | "catchup"
   | "settings";
 
-export type NotificationCategory = "outcome" | "simulation" | "evidence" | "job" | "insight";
+/**
+ * One recorded fact from the shared store. Kinds are exactly the ones a real
+ * mutation can emit; nothing here is invented by the client.
+ */
+export type SignalKind =
+  | "job_added"
+  | "outcome_scored"
+  | "opportunity_crossed"
+  | "evidence_ingested"
+  | "evidence_promoted"
+  | "job_map_completed";
 
-export interface StudioNotification {
+export type SignalSeverity = "info" | "notice" | "urgent";
+
+export type SignalSubjectKind =
+  | "job"
+  | "step"
+  | "outcome"
+  | "evidence"
+  | "connector"
+  | "agent_work";
+
+export interface Signal {
   id: string;
+  kind: SignalKind;
   title: string;
-  message: string;
-  category: NotificationCategory;
-  timestamp: string;
-  read: boolean;
-  /** True for a demonstration event. Simulated events never count as unread. */
-  simulated: boolean;
-  targetPanel?: WorkspacePanelId;
-  targetId?: string;
-  actionText?: string;
-  chatPrompt?: string;
+  detail?: string | null;
+  subject_kind?: SignalSubjectKind | null;
+  subject_id?: string | null;
+  severity: SignalSeverity;
+  created_at: string;
+  read_at?: string | null;
+  dismissed_at?: string | null;
+  /** Past the daily attention budget: recorded, but never surfaced or counted. */
+  suppressed: boolean;
+  fingerprint: string;
+  /** Only the developer simulator (#78) sets this. Simulated entries never count. */
+  simulated?: boolean;
 }
 
 export interface ChatStreamRequest {
