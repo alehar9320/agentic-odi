@@ -716,3 +716,14 @@ def test_connectors_health_without_connectors_says_so(tmp_path: Path) -> None:
 
     assert result.exit_code == 0
     assert "No connectors configured." in _strip(result.output)
+
+
+def test_connectors_list_presets_prints_a_markdown_table() -> None:
+    result = runner.invoke(app, ["connectors", "list-presets"])
+
+    output = _strip(result.output)
+    assert result.exit_code == 0
+    assert "| Preset | Area | Kind | Auth | URL |" in output
+    assert "| notion |" in output
+    assert "| github |" in output
+    assert "| linear |" in output
