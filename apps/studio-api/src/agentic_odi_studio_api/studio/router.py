@@ -564,6 +564,7 @@ async def post_outcome(body: AddOutcomeRequest, request: Request) -> dict:
                 "importance_n": body.importance_n,
                 "satisfaction_n": body.satisfaction_n,
                 "score_method": body.score_method,
+                "note": body.note,
             },
         )
         return _payload_from_text(result)
@@ -576,6 +577,7 @@ async def post_outcome(body: AddOutcomeRequest, request: Request) -> dict:
             importance_n=body.importance_n,
             satisfaction_n=body.satisfaction_n,
             score_method=body.score_method,
+            note=body.note,
         )
     except Exception as exc:  # noqa: BLE001
         raise _as_http_error(exc) from exc
@@ -585,18 +587,44 @@ async def post_outcome(body: AddOutcomeRequest, request: Request) -> dict:
 @router.patch("/outcomes/{outcome_id}")
 async def patch_outcome(outcome_id: str, body: UpdateOutcomeRequest, request: Request) -> dict:
     updates = body.model_dump(exclude_none=True, exclude={"mcp_url"})
+    # ``note`` is snapshot metadata, not an Outcome field: it is recorded with
+    # the new score rather than written onto the record.
+    note = updates.pop("note", None)
     if _uses_mcp(request):
         result = await call_mcp_tool(
             _require_mcp_url(body.mcp_url),
             ToolName.UPDATE_OUTCOME.value,
-            {"outcome_id": outcome_id, **updates},
+            {"outcome_id": outcome_id, "note": note, **updates},
         )
         return _payload_from_text(result)
     try:
-        outcome = _service(request).update_outcome(outcome_id, updates)
+        outcome = _service(request).update_outcome(outcome_id, updates, note=note)
     except Exception as exc:  # noqa: BLE001
         raise _as_http_error(exc) from exc
     return outcome.model_dump(mode="json")
+
+
+@router.get("/outcomes/{outcome_id}/history")
+async def get_outcome_history(
+    outcome_id: str, request: Request, mcp_url: str | None = Query(None)
+) -> dict:
+    """Return an outcome's accepted score snapshots, oldest first.
+
+    Snapshots carry the score and its sample/method companions. Signed deltas
+    are not computed here: the baseline/sign policy is a pending decision.
+    """
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(mcp_url or ""),
+            ToolName.GET_OUTCOME_HISTORY.value,
+            {"outcome_id": outcome_id},
+        )
+        return {"ok": True, "result": _json_or_raw(result)}
+    try:
+        snapshots = _service(request).get_score_history(outcome_id)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return {"ok": True, "result": [snapshot.model_dump(mode="json") for snapshot in snapshots]}
 
 
 @router.delete("/outcomes/{outcome_id}")

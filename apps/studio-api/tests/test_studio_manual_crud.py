@@ -153,3 +153,55 @@ def test_out_of_range_scores_are_rejected() -> None:
     response = client.patch(f"/api/outcomes/{outcome_id}", json={"importance": 42})
     assert response.status_code == 422
     assert response.json()["error"]["code"] == "out_of_range"
+
+
+def test_outcome_history_records_each_accepted_change() -> None:
+    client = _client()
+    job = client.post("/api/jobs", json={"name": "Ship a service"}).json()
+    outcome = client.post(
+        "/api/outcomes",
+        json={
+            "mcp_url": "",
+            "job_id": job["id"],
+            "statement": "Minimize the time to ship a release when the build is green",
+            "importance": 8.0,
+            "satisfaction": 4.0,
+            "note": "first pass",
+        },
+    ).json()
+
+    client.patch(
+        f"/api/outcomes/{outcome['id']}",
+        json={"satisfaction": 6.0, "note": "after the review"},
+    )
+
+    history = client.get(f"/api/outcomes/{outcome['id']}/history").json()["result"]
+
+    assert [row["satisfaction"] for row in history] == [4.0, 6.0]
+    assert [row["note"] for row in history] == ["first pass", "after the review"]
+    assert all(row["outcome_id"] == outcome["id"] for row in history)
+
+
+def test_outcome_history_for_a_missing_outcome_is_404() -> None:
+    response = _client().get("/api/outcomes/does-not-exist/history")
+    assert response.status_code == 404
+
+
+def test_outcome_note_is_snapshot_metadata_not_a_record_field() -> None:
+    client = _client()
+    job = client.post("/api/jobs", json={"name": "Ship a service"}).json()
+    outcome = client.post(
+        "/api/outcomes",
+        json={
+            "mcp_url": "",
+            "job_id": job["id"],
+            "statement": "Minimize the time to ship a release when the build is green",
+            "importance": 8.0,
+            "satisfaction": 4.0,
+        },
+    ).json()
+
+    edited = client.patch(f"/api/outcomes/{outcome['id']}", json={"note": "why not"})
+
+    assert edited.status_code == 200
+    assert "note" not in edited.json()

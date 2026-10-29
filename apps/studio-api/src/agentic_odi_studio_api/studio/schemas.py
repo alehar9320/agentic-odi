@@ -57,6 +57,7 @@ class AddOutcomeRequest(BaseModel):
     importance_n: int | None = Field(default=None, ge=1)
     satisfaction_n: int | None = Field(default=None, ge=1)
     score_method: Literal["estimate", "survey", "import"] = "estimate"
+    note: str | None = Field(default=None, max_length=500)
 
 
 class CreateJobRequest(BaseModel):
@@ -86,6 +87,7 @@ class UpdateOutcomeRequest(BaseModel):
     importance_n: int | None = Field(default=None, ge=1)
     satisfaction_n: int | None = Field(default=None, ge=1)
     score_method: Literal["estimate", "survey", "import"] | None = None
+    note: str | None = Field(default=None, max_length=500)
     mcp_url: str = ""
 
 

@@ -392,6 +392,20 @@ export interface AddOutcomePayload {
   importance_n?: number | null;
   satisfaction_n?: number | null;
   score_method?: "estimate" | "survey" | "import";
+  note?: string | null;
+}
+
+export interface ScoreSnapshot {
+  id: string;
+  outcome_id: string;
+  at: string;
+  importance?: number | null;
+  satisfaction?: number | null;
+  opportunity_score?: number | null;
+  importance_n?: number | null;
+  satisfaction_n?: number | null;
+  method?: "estimate" | "survey" | "import";
+  note?: string | null;
 }
 
 export interface ConnectorPreset {

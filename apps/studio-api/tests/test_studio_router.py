@@ -69,6 +69,7 @@ def test_post_outcome_returns_the_normalized_result(monkeypatch) -> None:
                 "importance_n": None,
                 "satisfaction_n": None,
                 "score_method": "estimate",
+                "note": None,
             },
         )
     ]

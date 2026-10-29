@@ -25,6 +25,7 @@ import type {
   ObservationStatus,
   Outcome,
   Signal,
+  ScoreSnapshot,
   Step,
   StudioConfig,
   StudioError,
@@ -317,13 +318,31 @@ export function deleteStep(stepId: string, mcpUrl: string): Promise<{ deleted: s
 
 export function updateOutcome(
   outcomeId: string,
-  payload: { statement?: string; importance?: number; satisfaction?: number; mcp_url: string },
+  payload: {
+    statement?: string;
+    importance?: number;
+    satisfaction?: number;
+    importance_n?: number | null;
+    satisfaction_n?: number | null;
+    score_method?: "estimate" | "survey" | "import";
+    note?: string | null;
+    mcp_url: string;
+  },
 ): Promise<Outcome> {
   return sendJson<Outcome>(
     "PATCH",
     `/api/outcomes/${encodeURIComponent(outcomeId)}`,
     payload,
   );
+}
+
+export function fetchOutcomeHistory(
+  outcomeId: string,
+  mcpUrl: string,
+): Promise<ScoreSnapshot[]> {
+  return getJson<{ result: ScoreSnapshot[] }>(
+    `/api/outcomes/${encodeURIComponent(outcomeId)}/history?mcp_url=${encodeURIComponent(mcpUrl)}`,
+  ).then((body) => body.result);
 }
 
 export function deleteOutcome(outcomeId: string, mcpUrl: string): Promise<{ deleted: string }> {
