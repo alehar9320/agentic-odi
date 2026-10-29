@@ -165,7 +165,18 @@ def add_outcome(
     importance: float,
     satisfaction: float,
     step_id: str | None = None,
+    importance_n: int | None = None,
+    satisfaction_n: int | None = None,
+    score_method: str = "estimate",
 ) -> str:
+    """Add a desired Outcome to a Job.
+
+    ``importance_n``/``satisfaction_n`` are how many people stand behind each
+    score, when known; omit them for a single-person estimate.
+    ``score_method`` is ``estimate`` (one person's judgment), ``survey`` or
+    ``import``. A count above one with ``estimate`` is refused, because an
+    estimate cannot have asked people.
+    """
     try:
         outcome = service.add_outcome(
             job_id=job_id,
@@ -173,6 +184,9 @@ def add_outcome(
             importance=importance,
             satisfaction=satisfaction,
             step_id=step_id,
+            importance_n=importance_n,
+            satisfaction_n=satisfaction_n,
+            score_method=score_method,
         )
     except JobNotFoundError:
         return f"Error: Job with ID {job_id} not found."
@@ -182,6 +196,8 @@ def add_outcome(
         return "Error: importance and satisfaction must be between 1.0 and 10.0"
     except OutcomeStatementError as exc:
         return f"Error: {exc}"
+    except ValidationError:
+        return "Error: score_method 'estimate' cannot carry a sample count above 1"
     return f"Outcome created successfully: {outcome.model_dump_json()}"
 
 
@@ -416,7 +432,15 @@ def update_outcome(
     importance: float | None = None,
     satisfaction: float | None = None,
     step_id: str | None = None,
+    importance_n: int | None = None,
+    satisfaction_n: int | None = None,
+    score_method: str | None = None,
 ) -> str:
+    """Update an Outcome's statement, scores, or sample metadata.
+
+    The resulting whole record is validated, so switching a survey to
+    ``estimate`` while a count above one remains is refused.
+    """
     updates: dict = {}
     if statement is not None:
         updates["statement"] = statement
@@ -426,6 +450,12 @@ def update_outcome(
         updates["satisfaction"] = satisfaction
     if step_id is not None:
         updates["step_id"] = step_id
+    if importance_n is not None:
+        updates["importance_n"] = importance_n
+    if satisfaction_n is not None:
+        updates["satisfaction_n"] = satisfaction_n
+    if score_method is not None:
+        updates["score_method"] = score_method
     try:
         updated = service.update_outcome(outcome_id, updates)
     except OutcomeNotFoundError:
@@ -434,6 +464,8 @@ def update_outcome(
         return f"Error: {exc}"
     except ValueOutOfRangeError:
         return "Error: importance and satisfaction must be between 1.0 and 10.0"
+    except ValidationError:
+        return "Error: score_method 'estimate' cannot carry a sample count above 1"
     return f"Outcome updated successfully: {updated.model_dump_json()}"
 
 

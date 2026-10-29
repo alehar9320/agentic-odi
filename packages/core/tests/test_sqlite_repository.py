@@ -538,3 +538,86 @@ def test_signals_survive_a_reload_from_the_event_log(tmp_path) -> None:
 
     assert reopened.mark_signal_read("missing") is None
     assert reopened.dismiss_signal("missing") is None
+
+
+def _write_legacy_outcome(db_path: str, outcome_id: str = "legacy-1") -> None:
+    """Append an OUTCOME_CREATED payload shaped before the method field existed."""
+    repo = SQLiteRepository(db_path)
+    repo.add_job(Job(id="job-1", name="Onboard customers"))
+    repo.store.append(
+        "OUTCOME_CREATED",
+        {
+            "id": outcome_id,
+            "job_id": "job-1",
+            "step_id": None,
+            "statement": "Minimize time",
+            "importance": 8.0,
+            "satisfaction": 6.0,
+            "opportunity_score": 10.0,
+        },
+    )
+    repo.close()
+
+
+def _method_backfill_events(db_path: str) -> list[dict]:
+    repo = SQLiteRepository(db_path)
+    events = [e for e in repo.store.get_stream() if e["type"] == "OUTCOME_METHOD_BACKFILLED"]
+    repo.close()
+    return events
+
+
+def test_legacy_outcome_reads_back_as_an_estimate(tmp_path) -> None:
+    db_path = str(tmp_path / "odi.db")
+    _write_legacy_outcome(db_path)
+
+    repo = SQLiteRepository(db_path)
+    outcome = repo.get_outcome("legacy-1")
+    assert outcome is not None
+    assert outcome.score_method == "estimate"
+    assert outcome.importance_n is None
+    assert outcome.satisfaction_n is None
+    repo.close()
+
+
+def test_method_backfill_is_idempotent_across_restarts(tmp_path) -> None:
+    db_path = str(tmp_path / "odi.db")
+    _write_legacy_outcome(db_path)
+
+    # Constructing twice must not append a second backfill event.
+    assert len(_method_backfill_events(db_path)) == 1
+    assert len(_method_backfill_events(db_path)) == 1
+
+
+def test_method_backfill_does_not_touch_a_new_row(tmp_path) -> None:
+    db_path = str(tmp_path / "odi.db")
+    repo = SQLiteRepository(db_path)
+    repo.add_job(Job(id="job-1", name="Onboard customers"))
+    repo.add_outcome(
+        Outcome(
+            id="new-1",
+            job_id="job-1",
+            statement="Minimize time",
+            importance=8.0,
+            satisfaction=6.0,
+            score_method="survey",
+            importance_n=40,
+            satisfaction_n=40,
+        )
+    )
+    repo.close()
+
+    assert _method_backfill_events(db_path) == []
+    reopened = SQLiteRepository(db_path)
+    assert reopened.get_outcome("new-1").score_method == "survey"
+    reopened.close()
+
+
+def test_method_backfill_preserves_the_original_score(tmp_path) -> None:
+    db_path = str(tmp_path / "odi.db")
+    _write_legacy_outcome(db_path)
+
+    repo = SQLiteRepository(db_path)
+    reloaded = repo.get_outcome("legacy-1")
+    assert (reloaded.importance, reloaded.satisfaction) == (8.0, 6.0)
+    assert reloaded.opportunity_score == 10.0
+    repo.close()

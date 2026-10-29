@@ -29,6 +29,7 @@ from agentic_odi_core.models import (
     ScheduledWork,
     ScheduledWorkStatus,
     ScheduledWorkTriggerType,
+    ScoreMethod,
     Signal,
     SignalKind,
     Step,
@@ -163,6 +164,22 @@ def _opportunity_crossing(before: float | None, after: float | None) -> tuple[st
     return None
 
 
+def _reject_estimate_with_a_sample(
+    method: str, importance_n: int | None, satisfaction_n: int | None
+) -> None:
+    """Refuse a sample count on an estimate.
+
+    A count above one means people were asked; an estimate cannot have asked
+    them. Mirrors the model validator so the service fails with the same message
+    the model would, on both the create and partial-update paths.
+    """
+    if method == "estimate" and ((importance_n or 0) > 1 or (satisfaction_n or 0) > 1):
+        raise ValueOutOfRangeError(
+            "score_method 'estimate' cannot carry a sample count above 1; "
+            "use 'survey' or 'import' when people were asked"
+        )
+
+
 class ODIService:
     def __init__(self, repo: Repository, budget: SignalBudget | None = None) -> None:
         self.repo = repo
@@ -293,6 +310,13 @@ class ODIService:
             raise ValueOutOfRangeError("importance must be between 1.0 and 10.0")
         if satisfaction is not None and not (1.0 <= satisfaction <= 10.0):
             raise ValueOutOfRangeError("satisfaction must be between 1.0 and 10.0")
+        # Validate the whole resulting record, not just the patched fields: a
+        # partial update that switches a survey to an estimate must still be
+        # rejected when the untouched count would then be invalid.
+        method = updates.get("score_method", existing.score_method)
+        importance_n = updates.get("importance_n", existing.importance_n)
+        satisfaction_n = updates.get("satisfaction_n", existing.satisfaction_n)
+        _reject_estimate_with_a_sample(method, importance_n, satisfaction_n)
         require_outcome_statement(statement)
         if importance is not None and satisfaction is not None:
             updates = dict(updates)
@@ -403,6 +427,9 @@ class ODIService:
         satisfaction: float,
         step_id: str | None = None,
         validate_statement: bool = True,
+        importance_n: int | None = None,
+        satisfaction_n: int | None = None,
+        score_method: ScoreMethod = "estimate",
     ) -> Outcome:
         if self.repo.get_job(job_id) is None:
             raise JobNotFoundError(job_id)
@@ -412,6 +439,7 @@ class ODIService:
             raise ValueOutOfRangeError("importance must be between 1.0 and 10.0")
         if not (1.0 <= satisfaction <= 10.0):
             raise ValueOutOfRangeError("satisfaction must be between 1.0 and 10.0")
+        _reject_estimate_with_a_sample(score_method, importance_n, satisfaction_n)
         if validate_statement:
             verdict = evaluate_outcome_statement(statement)
             if not verdict["valid"]:
@@ -425,6 +453,9 @@ class ODIService:
             importance=importance,
             satisfaction=satisfaction,
             opportunity_score=opportunity_score,
+            importance_n=importance_n,
+            satisfaction_n=satisfaction_n,
+            score_method=score_method,
         )
         return self.repo.add_outcome(outcome)
 

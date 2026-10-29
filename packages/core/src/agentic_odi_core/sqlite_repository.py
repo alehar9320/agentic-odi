@@ -49,7 +49,10 @@ class SQLiteRepository(Repository):
         self.store = IntentStore(db_path, check_same_thread=False)
         self._last_event_id = 0
         self._backfilled = False
+        self._legacy_method_ids: set[str] = set()
+        self._method_backfilled_ids: set[str] = set()
         self._load_snapshot()
+        self._backfill_outcome_method()
         self._backfill_legacy_outcomes()
 
     def _load_snapshot(self) -> None:
@@ -61,8 +64,32 @@ class SQLiteRepository(Repository):
         self.signals: dict[str, Signal] = {}
         self.scheduled_work: dict[str, ScheduledWork] = {}
         self._last_event_id = 0
+        self._legacy_method_ids = set()
+        self._method_backfilled_ids = set()
         for ev in self.store.get_stream(workspace_id=self._workspace_id, replay_order=True):
             self._apply_event(ev)
+
+    def _backfill_outcome_method(self) -> None:
+        """One-time migration: label legacy outcomes with their score method.
+
+        Rows written before the method field existed are estimates by
+        definition, so each gets an ``OUTCOME_METHOD_BACKFILLED`` event carrying
+        ``score_method='estimate'``. The event is a no-op state-wise (the model
+        default already produces it) but it is the auditable record that the
+        label was applied rather than inferred. The pending set is derived from
+        the replayed stream, so re-running adds no duplicate events.
+        """
+        pending = self._legacy_method_ids - self._method_backfilled_ids
+        if not pending:
+            return
+        for outcome_id in sorted(pending):
+            self.store.append(
+                "OUTCOME_METHOD_BACKFILLED",
+                {"id": outcome_id, "updates": {"score_method": "estimate"}},
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+        self._sync()
 
     def _backfill_legacy_outcomes(self) -> None:
         """One-time migration: backfill null scores on legacy outcomes.
@@ -115,7 +142,14 @@ class SQLiteRepository(Repository):
         elif et == "STEP_CREATED":
             self.steps[p["id"]] = Step.model_validate(p)
         elif et == "OUTCOME_CREATED":
+            if "score_method" not in p:
+                # A payload written before the method field existed: an estimate
+                # by definition, labelled once by the method backfill.
+                self._legacy_method_ids.add(p["id"])
             self.outcomes[p["id"]] = Outcome.model_validate(p)
+        elif et == "OUTCOME_METHOD_BACKFILLED":
+            self._method_backfilled_ids.add(p["id"])
+            self._merge_updates(self.outcomes, p, Outcome)
         elif et == "CUSTOMER_OUTCOME_CREATED":
             self.customer_outcomes[p["id"]] = CustomerOutcome.model_validate(p)
         elif et == "EVIDENCE_CREATED":
