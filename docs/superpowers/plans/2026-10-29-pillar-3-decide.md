@@ -141,11 +141,12 @@ bite first:
       outcome_id: str
       statement: str
       score: float | None
-      band: str | None          # evaluation.classify_opportunity(score)
-      n: int | None             # sample size, supplied
+      band: str | None  # evaluation.classify_opportunity(score)
+      n: int | None  # sample size, supplied
       method: str | None
       quote: str | None
       sources: tuple[str, ...]  # evidence ids/names, supplied
+
 
   @dataclass(frozen=True)
   class BriefInput:
@@ -154,7 +155,8 @@ bite first:
       decision_consideration: str | None
       outcomes: tuple[BriefOutcome, ...]
       evidence_count: int
-      generated_at: str         # supplied clock, never read inside
+      generated_at: str  # supplied clock, never read inside
+
 
   def render_brief(brief: BriefInput) -> str: ...
   def select_underserved(outcomes: Sequence[BriefOutcome], limit: int = 3) -> list[BriefOutcome]: ...
@@ -279,14 +281,17 @@ outcome ids it rests on; the build section names the lowest-score outcome; risks
 ```python
 @dataclass(frozen=True)
 class RoadmapEntry:
-    period: str          # e.g. "2026-Q4", computed from decision date in UTC
+    period: str  # e.g. "2026-Q4", computed from decision date in UTC
     outcome_id: str
     statement: str
     baseline: float | None
     target: float | None
     decision_id: str
 
-def build_roadmap(job_id, decisions, outcomes, *, horizon: int = 4, today: date) -> tuple[list[RoadmapEntry], int]:
+
+def build_roadmap(
+    job_id, decisions, outcomes, *, horizon: int = 4, today: date
+) -> tuple[list[RoadmapEntry], int]:
     """Return (entries in date order, count of undecided outcomes excluded)."""
 ```
 
@@ -386,3 +391,63 @@ What is pinned, so the blocked work does not invent a contract later:
 
 Completed in this pillar: `C1`, `C1.2`, `C2`, `C3`, `C4`, `C6`, `C6.2`, `C7`,
 `C7.2`, `C8`, `E1`.
+
+## Execution ledger — SDD, run inline
+
+The plan asked for `superpowers:subagent-driven-development`; no subagent-dispatch
+tool is available in this environment, so it ran inline via
+`superpowers:executing-plans`, preserving the review rigor (tests, ruff, mypy,
+studio suite, whole-branch self-review).
+
+**Status: M1 complete on branch. W1 complete.**
+
+Commits on `alexanderharenstam/alh-8-pillar-3-decide-this-not-that-and-here-is-why`:
+
+| Commit | Increments |
+|---|---|
+| `6356b57` | C1 |
+| `3305a99` | C6 |
+| `b6daf90` | C2 |
+| `460cad0` | C3 |
+| `8d1d0e2` | C4 |
+| `422e06f` | C6.2, C7, C7.2 |
+| `439e6a1` | B6 blocker record |
+| `a38bef7` | C8, E1 |
+| `5b4bd74` | pillar end-to-end acceptance test + `PATCH` alignment |
+
+On `alexanderharenstam/alh-64-w1-what-is-this-opportunity-worth`:
+
+| Commit | Increments |
+|---|---|
+| `752ae14` | W1 (ALH-64) |
+
+**Verification at completion**
+
+- `uv run pytest` → **1566 passed** (includes the new
+  `packages/core/tests/test_pillar_three_end_to_end.py`, which chains all five
+  deliverables from one recorded fixture).
+- `uv run ruff check .` clean; `uv run ruff format --check .` clean.
+- `uv run mypy apps packages` → no issues in 199 source files.
+- `npm --prefix apps/studio test -- --run` → 540 passed (56 files).
+- Coverage 89.32% ≥ the 89% floor.
+
+**Readiness gates pinned (recorded, not inferred)**
+
+- C1: input fixture/schema, "three most underserved" (highest score, ties keep
+  input order, unscored excluded), decision-consideration supplied by caller —
+  in the `test_brief.py` module docstring.
+- C1.2: `What we would build` names the lowest-score measured outcome; evidence
+  section names the outcome ids it rests on; risks names the supplied holes.
+- C6: `superseded_at`/`superseded_by` on the predecessor; `rejected` is a list
+  of `{outcome_id, reason}` with a non-empty reason; referenced outcomes must
+  resolve within the decision's job.
+- C7/C8: baseline/target are supplied, never derived; a missing measurement is
+  not zero progress; direction is per metric; the review keeps `no change`,
+  `no evidence` and `orphaned` distinct.
+- W1: the estimate is a caller judgement, never score-derived, never summed;
+  `market`/`pilot` requires a named source; unsized ≠ 0.
+
+**Deferred (own specs, sequenced after M1)** — not implemented here: D1–D4
+segments/strategy, M3 narrative/memo/challenge/portfolio, M4 collaboration and
+role-policy rollout, and W1's split capture/display/ordering children
+(ALH-186/188/189).
