@@ -123,7 +123,13 @@ def test_export_csv_writes_a_header_and_one_row_per_outcome(tmp_path) -> None:
     db = str(tmp_path / "odi.db")
     job_id = _job_id(runner, db)
     _add(runner, db, job_id)
-    _add(runner, db, job_id, "--statement", "Max adopted accounts")
+    _add(
+        runner,
+        db,
+        job_id,
+        "--statement",
+        "Maximize the number of adopted accounts when a team rolls out the product",
+    )
 
     result = runner.invoke(
         app, ["--db", db, "desired-outcomes", "export", "--job-id", job_id, "--format", "csv"]
@@ -133,7 +139,10 @@ def test_export_csv_writes_a_header_and_one_row_per_outcome(tmp_path) -> None:
     rows = list(csv.DictReader(io.StringIO(result.output)))
     assert rows and len(rows) == 2
     assert list(rows[0]) == list(desired_outcomes.EXPORT_FIELDS)
-    assert {row["statement"] for row in rows} == {"Min onboarding", "Max adopted accounts"}
+    assert {row["statement"] for row in rows} == {
+        "Minimize the onboarding time when a customer signs up",
+        "Maximize the number of adopted accounts when a team rolls out the product",
+    }
     assert all(row["job_id"] == job_id for row in rows)
     assert all(row["opportunity_score"] == "12.0" for row in rows)
 
@@ -151,7 +160,7 @@ def test_export_json_is_a_parseable_array(tmp_path) -> None:
     assert result.exit_code == 0, result.output
     payload = json.loads(result.output)
     assert len(payload) == 1
-    assert payload[0]["statement"] == "Min onboarding"
+    assert payload[0]["statement"] == "Minimize the onboarding time when a customer signs up"
     assert payload[0]["opportunity_score"] == 12.0
 
 
