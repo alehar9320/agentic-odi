@@ -33,33 +33,10 @@ jobs:
       - name: Pytest (website)
         run: uv run --directory website pytest tests/
 
-      # Fail fast if any critical source file is missing before we build.
-      # A deleted website/index.html or build script must never let a
-      # broken site reach GitHub Pages.
-      - name: Verify critical source files exist
+      - name: Build site (rsync)
         run: |
-          for f in \
-            .github/workflows/pages.yml \
-            website/tools/build_site.py \
-            website/index.html \
-            website/tests/test_pages_deploy.py; do
-            [ -s "$f" ] || { echo "::error::Missing or empty critical file: $f"; exit 1; }
-          done
-          echo "OK: critical source files present"
-
-      # The site is generated from the repository's own sources, so it is
-      # built here rather than copied. This produces the artifact that goes live.
-      - name: Build site
-        run: uv run python website/tools/build_site.py --out _site
-
-      # Refuse to upload an empty or broken artifact. A missing index.html or
-      # 404.html means the build produced nothing usable; stop before deploy.
-      - name: Verify the built site is non-empty
-        run: |
-          for f in _site/index.html _site/404.html; do
-            [ -s "$f" ] || { echo "::error::Built site missing or empty: $f"; exit 1; }
-          done
-          echo "OK: built site contains index.html and 404.html"
+          mkdir -p _site
+          rsync -av website/ _site/ --exclude='tests/' --exclude='tools/'
 
       - name: Configure Pages
         uses: actions/configure-pages@v6

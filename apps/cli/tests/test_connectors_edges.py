@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 from agentic_odi_cli import connectors
 from agentic_odi_cli.cli import app
@@ -25,28 +26,17 @@ def test_lazy_wrappers_call_the_connectors_package() -> None:
 
 
 def test_config_path_prefers_the_environment(monkeypatch, tmp_path) -> None:
-    monkeypatch.setenv("AGENTIC_ODI_CONNECTORS_CONFIG", str(tmp_path / "env.json"))
+    monkeypatch.setenv("AGENTIC_ODI_CONNECTORS_FILE", str(tmp_path / "env.json"))
 
     assert connectors._config_path(None) == tmp_path / "env.json"
     assert connectors._config_path(tmp_path / "explicit.json") == tmp_path / "explicit.json"
 
 
-def test_config_path_matches_the_connectors_package(monkeypatch, tmp_path) -> None:
-    from agentic_odi_connectors.paths import config_path
+def test_config_path_defaults_to_the_working_directory(monkeypatch, tmp_path) -> None:
+    monkeypatch.delenv("AGENTIC_ODI_CONNECTORS_FILE", raising=False)
+    monkeypatch.chdir(tmp_path)
 
-    monkeypatch.delenv("AGENTIC_ODI_CONNECTORS_CONFIG", raising=False)
-    monkeypatch.setenv("HOME", str(tmp_path / "home"))
-
-    assert connectors._config_path(None) == config_path()
-    assert config_path() == tmp_path / "home" / ".config" / "agentic-odi" / "connectors.json"
-
-
-def test_config_path_defaults_to_the_config_directory(monkeypatch, tmp_path) -> None:
-    monkeypatch.delenv("AGENTIC_ODI_CONNECTORS_CONFIG", raising=False)
-    monkeypatch.setenv("HOME", str(tmp_path / "home"))
-
-    expected = tmp_path / "home" / ".config" / "agentic-odi" / "connectors.json"
-    assert connectors._config_path(None) == expected
+    assert connectors._config_path(None) == Path.cwd() / ".agentic-odi" / "connectors.json"
 
 
 def test_connector_timeout_reads_and_validates_the_environment(monkeypatch) -> None:

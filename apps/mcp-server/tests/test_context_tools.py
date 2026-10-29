@@ -70,12 +70,7 @@ async def test_evaluate_outcome_includes_existing_job_outcomes():
         job_id = await _new_job(client)
         await client.call_tool(
             "add_outcome",
-            {
-                "job_id": job_id,
-                "statement": "Minimize the time to first value when releasing",
-                "importance": 8,
-                "satisfaction": 4,
-            },
+            {"job_id": job_id, "statement": "Minimize time to first value"},
         )
 
         res = await client.call_tool(
@@ -88,10 +83,7 @@ async def test_evaluate_outcome_includes_existing_job_outcomes():
         result = _json(res.content[0].text)  # type: ignore[index]
 
     assert result["job_id"] == job_id
-    assert (
-        result["existing_outcomes"][0]["statement"]
-        == "Minimize the time to first value when releasing"
-    )
+    assert result["existing_outcomes"][0]["statement"] == "Minimize time to first value"
 
 
 @pytest.mark.asyncio

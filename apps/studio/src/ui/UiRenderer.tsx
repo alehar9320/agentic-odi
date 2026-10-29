@@ -1,6 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
 
-import { useStudio } from "../state/StudioContext";
 import type { UiNode } from "./protocol";
 import { NODE_COMPONENTS } from "./registry";
 
@@ -35,28 +34,14 @@ export class NodeBoundary extends Component<
   }
 }
 
-function UnknownNode({ node }: { node: UiNode }) {
-  const { pushToast } = useStudio();
-
-  async function copySpec() {
-    try {
-      await navigator.clipboard.writeText(JSON.stringify(node, null, 2));
-      pushToast("success", "Raw surface spec copied.");
-    } catch {
-      pushToast("error", "Could not copy the raw surface spec.");
-    }
-  }
-
+function UnknownNode({ type }: { type: string }) {
   return (
     <div className="ui-card ui-card--unknown" role="status">
       <p className="ui-caption">Unavailable surface</p>
       <p className="ui-card__statement">
-        This reply referenced <code className="ui-code">{node.type}</code>, which this version of
-        Studio cannot render.
+        This reply referenced <code className="ui-code">{type}</code>, which this version of Studio
+        cannot render.
       </p>
-      <button type="button" className="quiet-action" onClick={() => void copySpec()}>
-        Copy raw spec
-      </button>
     </div>
   );
 }
@@ -68,7 +53,7 @@ function renderChildren(children: UiNode[]): ReactNode {
 function renderNode(node: UiNode, key?: string | number): ReactNode {
   const Component = NODE_COMPONENTS[node.type];
   if (node.unsupported || !Component) {
-    return <UnknownNode key={key} node={node} />;
+    return <UnknownNode key={key} type={node.type} />;
   }
 
   return (

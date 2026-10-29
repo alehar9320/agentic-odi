@@ -180,6 +180,3 @@ _site/
 .freebuff/
 .qodo/
 node_modules/
-
-# Generated site output is built in CI and never committed.
-_site/

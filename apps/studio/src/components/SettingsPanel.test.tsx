@@ -2,29 +2,24 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { OnboardingProvider } from "../onboarding/OnboardingProvider";
-import { UpdateProvider, createUpdateService } from "../updater";
-import type { UpdateTransport } from "../updater/types";
 import { SettingsPanel } from "./SettingsPanel";
 
 vi.mock("../state/StudioContext", () => ({
   useStudio: vi.fn(),
 }));
+vi.mock("./updater/useUpdater", () => ({
+  useUpdater: () => ({
+    checking: false,
+    available: false,
+    version: null,
+    progress: null,
+    error: null,
+    check: vi.fn(),
+  }),
+}));
 
 import { useStudio } from "../state/StudioContext";
 import type { StudioContextValue } from "../state/StudioContext";
-
-const transport: UpdateTransport = {
-  supported: () => false,
-  currentVersion: async () => "0.11.0",
-  check: async () => null,
-  relaunch: async () => undefined,
-};
-
-const service = createUpdateService({
-  transport,
-  storage: null,
-  document: null,
-});
 
 const stubContext = (overrides: Record<string, unknown> = {}) =>
   ({
@@ -59,18 +54,14 @@ const stubContext = (overrides: Record<string, unknown> = {}) =>
     deleteConnector: vi.fn().mockResolvedValue({ ok: true, name: "notion" }),
     refreshConnectors: vi.fn().mockResolvedValue(undefined),
     refreshPresets: vi.fn().mockResolvedValue(undefined),
-    refreshCapabilities: vi.fn().mockResolvedValue(undefined),
-    capabilities: [],
     ...overrides,
   }) as unknown as StudioContextValue;
 
 function renderPanel() {
   return render(
-    <UpdateProvider service={service}>
-      <OnboardingProvider enabled={false}>
-        <SettingsPanel />
-      </OnboardingProvider>
-    </UpdateProvider>,
+    <OnboardingProvider enabled={false}>
+      <SettingsPanel />
+    </OnboardingProvider>,
   );
 }
 
@@ -81,25 +72,12 @@ describe("SettingsPanel connectors", () => {
 
     renderPanel();
 
-    expect(screen.getAllByText(/notion/).length).toBeGreaterThan(0);
+    expect(screen.getByText(/notion/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /remove notion/i }));
     expect(del).toHaveBeenCalledWith("notion");
   });
 
-  it("groups presets by capability area with id, auth, and a connect control", () => {
-    vi.mocked(useStudio).mockReturnValue(stubContext({ connectors: [] }));
-
-    renderPanel();
-
-    expect(
-      screen.getByRole("region", { name: /voice of customer/i }),
-    ).toBeInTheDocument();
-    expect(screen.getByText("notion")).toBeInTheDocument();
-    expect(screen.getByText(/OAuth/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /connect notion/i })).toBeInTheDocument();
-  });
-
-  it("adds a connector from its row", () => {
+  it("adds a connector from a selected preset", () => {
     const add = vi.fn().mockResolvedValue({ ok: true, name: "notion" });
     vi.mocked(useStudio).mockReturnValue(
       stubContext({ addConnector: add, connectors: [] }),
@@ -107,34 +85,11 @@ describe("SettingsPanel connectors", () => {
 
     renderPanel();
 
-    fireEvent.click(screen.getByRole("button", { name: /connect notion/i }));
+    fireEvent.change(screen.getByRole("combobox", { name: /add preset/i }), {
+      target: { value: "notion" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /add preset/i }));
     expect(add).toHaveBeenCalledWith({ preset: "notion" });
-  });
-
-  it("does not pretend unconnectable sources are connection rows", () => {
-    vi.mocked(useStudio).mockReturnValue(stubContext());
-
-    renderPanel();
-
-    expect(screen.queryByText(/gong transcripts/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/slack friction stream/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/product telemetry/i)).not.toBeInTheDocument();
-    expect(screen.getByText(/no data source is connected yet/i)).toBeInTheDocument();
-  });
-
-  it("toggles API key visibility", () => {
-    vi.mocked(useStudio).mockReturnValue(stubContext());
-
-    renderPanel();
-
-    const input = screen.getByLabelText("API key") as HTMLInputElement;
-    expect(input.type).toBe("password");
-
-    fireEvent.click(screen.getByRole("button", { name: /show api key/i }));
-    expect(input.type).toBe("text");
-
-    fireEvent.click(screen.getByRole("button", { name: /hide api key/i }));
-    expect(input.type).toBe("password");
   });
 
   it("shows an empty state when no connectors are registered", () => {
@@ -143,104 +98,5 @@ describe("SettingsPanel connectors", () => {
     renderPanel();
 
     expect(screen.getByText(/no connectors registered/i)).toBeInTheDocument();
-  });
-});
-
-describe("SettingsPanel connector catalog failures", () => {
-  it("shows the catalog failure with a retry instead of an empty select", () => {
-    const refresh = vi.fn().mockResolvedValue(undefined);
-    vi.mocked(useStudio).mockReturnValue(
-      stubContext({
-        presets: [],
-        presetError: {
-          code: "mcp_unreachable",
-          message: "The connector catalog is unreachable.",
-          suggestion: "Check that the sidecar is running, then try again.",
-          retryable: true,
-        },
-        refreshPresets: refresh,
-      }),
-    );
-
-    renderPanel();
-
-    expect(screen.getByRole("alert").textContent).toContain(
-      "The connector catalog is unreachable.",
-    );
-
-    fireEvent.click(screen.getByRole("button", { name: /retry/i }));
-    expect(refresh).toHaveBeenCalled();
-  });
-
-  it("offers no connect control while the catalog is in error", () => {
-    vi.mocked(useStudio).mockReturnValue(
-      stubContext({
-        presets: [],
-        presetError: {
-          code: "mcp_unreachable",
-          message: "The connector catalog is unreachable.",
-          retryable: true,
-        },
-      }),
-    );
-
-    renderPanel();
-
-    expect(screen.queryByRole("button", { name: /^connect /i })).toBeNull();
-  });
-});
-
-describe("SettingsPanel connector list failures", () => {
-  it("shows the failure instead of claiming there are no connectors", () => {
-    vi.mocked(useStudio).mockReturnValue(
-      stubContext({
-        connectors: [],
-        connectorsError: {
-          code: "mcp_unreachable",
-          message: "The connector list is unreachable.",
-          suggestion: "Check that the sidecar is running, then try again.",
-          retryable: true,
-        },
-      }),
-    );
-
-    renderPanel();
-
-    expect(screen.getByRole("alert").textContent).toContain("The connector list is unreachable.");
-    expect(screen.queryByText(/no connectors registered/i)).toBeNull();
-  });
-});
-
-describe("SettingsPanel capabilities", () => {
-  it("renders each capability with its status", () => {
-    vi.mocked(useStudio).mockReturnValue(
-      stubContext({
-        capabilities: [
-          {
-            id: "local-data",
-            label: "Local canvas data",
-            description: "Jobs, steps, and outcomes stored in your browser.",
-            status: "available",
-          },
-          {
-            id: "sidecar-llm",
-            label: "Sidecar model proxy",
-            description: "Streams model responses through the local Python sidecar.",
-            status: "unavailable",
-            reason: "Sidecar unreachable.",
-          },
-        ],
-      }),
-    );
-
-    renderPanel();
-
-    const dataRow = screen.getByText(/local canvas data/i).closest("li");
-    expect(dataRow).toBeInTheDocument();
-    expect(dataRow).toHaveTextContent("available");
-
-    const llmRow = screen.getByText(/sidecar model proxy/i).closest("li");
-    expect(llmRow).toBeInTheDocument();
-    expect(llmRow).toHaveTextContent(/unavailable/);
   });
 });

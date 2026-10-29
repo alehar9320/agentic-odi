@@ -26,7 +26,7 @@ def test_page_signals_repr_summarises_the_fetch() -> None:
         business_model=None,
         core_problem=None,
         current_focus=None,
-        confidence=0.9,
+        confidence="high",
     )
 
     assert signals.title == "Acme"
@@ -39,14 +39,19 @@ def test_infer_baseline_marks_keyword_rich_pages_high_confidence() -> None:
         title="DevTools error tracking and monitoring",
         meta_description="performance analytics",
         domain="acme.test",
+        primary_user="engineers",
+        business_model="saas",
+        core_problem="debugging",
+        current_focus="launch",
+        confidence=None,
     )
 
     baseline, scores = onboard.infer_baseline(signals)
 
     assert baseline.source == "url"
     assert baseline.domain == "acme.test"
-    assert baseline.inferred is True
-    assert baseline.confidence is not None and baseline.confidence > 0.5
+    assert baseline.primary_user == "engineers"
+    assert baseline.confidence == "high"
     assert scores["devtools"] == 3
     assert scores["error"] == 2
 
@@ -56,12 +61,17 @@ def test_infer_baseline_marks_keyword_poor_pages_low_confidence() -> None:
         title="Acme",
         meta_description="A friendly product",
         domain=None,
+        primary_user=None,
+        business_model=None,
+        core_problem=None,
+        current_focus=None,
+        confidence=None,
     )
 
     baseline, scores = onboard.infer_baseline(signals)
 
     assert baseline.domain == ""
-    assert baseline.confidence is not None and baseline.confidence < 0.5
+    assert baseline.confidence == "low"
     assert scores == {}
 
 
@@ -77,7 +87,7 @@ def test_extract_signals_reads_title_meta_and_domain() -> None:
     assert signals.title == "Acme DevTools"
     assert signals.meta_description == "Error tracking for teams"
     assert signals.domain == "acme.test"
-    assert signals.confidence == 0.0
+    assert signals.confidence == "high"
 
 
 def test_extract_signals_defaults_missing_metadata_to_empty() -> None:
@@ -85,7 +95,7 @@ def test_extract_signals_defaults_missing_metadata_to_empty() -> None:
 
     assert signals.title == ""
     assert signals.meta_description == ""
-    assert signals.confidence == 0.0
+    assert signals.confidence == "low"
 
 
 def test_fetch_signals_returns_a_baseline_for_reachable_pages(monkeypatch) -> None:
@@ -95,7 +105,7 @@ def test_fetch_signals_returns_a_baseline_for_reachable_pages(monkeypatch) -> No
     baseline, low_confidence = onboard.fetch_signals("https://acme.test")
 
     assert baseline.domain == "acme.test"
-    assert baseline.confidence is not None and baseline.confidence > 0.5
+    assert baseline.confidence == "high"
     assert low_confidence is False
 
 
@@ -109,7 +119,7 @@ def test_fetch_signals_falls_back_to_typed_path_on_fetch_errors(monkeypatch) -> 
 
     assert isinstance(signals, onboard.PageSignals)
     assert signals.title == ""
-    assert signals.confidence is not None and signals.confidence < 0.5
+    assert signals.confidence == "low"
     assert low_confidence is True
 
 

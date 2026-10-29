@@ -6,13 +6,7 @@ const studio = vi.hoisted(() => ({
     jobs: { id: string }[];
     steps: { id: string }[];
     outcomes: { id: string; evidence?: string }[];
-    source: "seed" | "mcp" | "local";
-    provenance?: {
-      kind: "live" | "seed" | "empty";
-      reason: string;
-      generated_at: string;
-      record_counts: { jobs: number; steps: number; outcomes: number; evidence: number };
-    };
+    source: "seed";
   },
   memory: [] as { id: string; text: string }[],
   activePanel: null as string | null,
@@ -84,57 +78,6 @@ describe("WorkbenchRail", () => {
 
     expect(screen.queryByRole("button", { name: /job map/i })).toBeNull();
     expect(screen.queryByRole("button", { name: /evidence/i })).toBeNull();
-  });
-
-  it("labels a seed canvas as sample data", () => {
-    studio.canvas = canvas({
-      outcomes: [{ id: "O-1" }],
-      provenance: {
-        kind: "seed",
-        reason: "mcp_unreachable",
-        generated_at: "2026-10-29T10:00:00+00:00",
-        record_counts: { jobs: 1, steps: 8, outcomes: 5, evidence: 0 },
-      },
-    });
-
-    render(<WorkbenchRail />);
-
-    expect(screen.getByText("OFFLINE")).toBeInTheDocument();
-  });
-
-  it("labels a demo seed differently from an unreachable server", () => {
-    studio.canvas = canvas({
-      outcomes: [{ id: "O-1" }],
-      provenance: {
-        kind: "seed",
-        reason: "demo",
-        generated_at: "2026-10-29T10:00:00+00:00",
-        record_counts: { jobs: 1, steps: 8, outcomes: 5, evidence: 0 },
-      },
-    });
-
-    render(<WorkbenchRail />);
-
-    expect(screen.getByText("DEMO")).toBeInTheDocument();
-    expect(screen.queryByText("OFFLINE")).toBeNull();
-  });
-
-  it("shows no provenance chip for a live canvas", () => {
-    studio.canvas = canvas({
-      source: "mcp",
-      outcomes: [{ id: "O-1" }],
-      provenance: {
-        kind: "live",
-        reason: "mcp_live",
-        generated_at: "2026-10-29T10:00:00+00:00",
-        record_counts: { jobs: 1, steps: 1, outcomes: 1, evidence: 0 },
-      },
-    });
-
-    render(<WorkbenchRail />);
-
-    expect(screen.queryByText("DEMO")).toBeNull();
-    expect(screen.queryByText("OFFLINE")).toBeNull();
   });
 
   it("opens a view and closes it again from the same chip", () => {

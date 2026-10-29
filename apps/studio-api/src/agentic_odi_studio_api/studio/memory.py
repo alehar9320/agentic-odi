@@ -70,8 +70,6 @@ class Conversation:
     title: str
     created_at: str
     updated_at: str
-    #: The visible leaf of the branch tree. ``None`` until a turn is persisted.
-    head_id: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -79,7 +77,6 @@ class Conversation:
             "title": self.title,
             "created_at": self.created_at,
             "updated_at": self.updated_at,
-            "head_id": self.head_id,
         }
 
 
@@ -90,9 +87,6 @@ class Turn:
     role: str
     content: str
     created_at: str
-    #: Stable client-facing id, so a branch can be rebuilt without guessing.
-    message_id: str | None = None
-    parent_id: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -101,8 +95,6 @@ class Turn:
             "role": self.role,
             "content": self.content,
             "created_at": self.created_at,
-            "message_id": self.message_id,
-            "parent_id": self.parent_id,
         }
 
 
@@ -137,8 +129,7 @@ CREATE TABLE IF NOT EXISTS conversations (
     id TEXT PRIMARY KEY,
     title TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL,
-    head_id TEXT
+    updated_at TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS turns (
@@ -146,9 +137,7 @@ CREATE TABLE IF NOT EXISTS turns (
     conversation_id TEXT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
     role TEXT NOT NULL,
     content TEXT NOT NULL,
-    created_at TEXT NOT NULL,
-    message_id TEXT,
-    parent_id TEXT
+    created_at TEXT NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS turns_by_conversation ON turns(conversation_id);
@@ -167,27 +156,6 @@ CREATE TABLE IF NOT EXISTS observations (
 
 CREATE INDEX IF NOT EXISTS observations_by_status ON observations(status);
 """
-
-
-#: Columns added after the first release. A database created by an older build
-#: is upgraded in place: nothing is dropped and no data is rewritten.
-_MIGRATIONS: tuple[tuple[str, str, str], ...] = (
-    ("conversations", "head_id", "TEXT"),
-    ("turns", "message_id", "TEXT"),
-    ("turns", "parent_id", "TEXT"),
-)
-
-
-def _migrate(connection: sqlite3.Connection) -> None:
-    for table, column, kind in _MIGRATIONS:
-        columns = {
-            row["name"] for row in connection.execute(f"PRAGMA table_info({table})").fetchall()
-        }
-        if column not in columns:
-            connection.execute(f"ALTER TABLE {table} ADD COLUMN {column} {kind}")
-    connection.execute(
-        "CREATE INDEX IF NOT EXISTS turns_by_message ON turns(conversation_id, message_id)"
-    )
 
 
 def _validate_text(text: str) -> str:
@@ -245,12 +213,8 @@ class StudioMemory:
         self._connection.execute("PRAGMA foreign_keys = ON")
         if not self._memory:
             self._connection.execute("PRAGMA journal_mode = WAL")
-            # Another process may be mid-write; wait for it briefly rather
-            # than failing the turn with "database is locked".
-            self._connection.execute("PRAGMA busy_timeout = 5000")
         with self._connection:
             self._connection.executescript(_SCHEMA)
-            _migrate(self._connection)
 
     def close(self) -> None:
         with self._lock:
@@ -291,14 +255,7 @@ class StudioMemory:
             ).fetchone()
         return None if row is None else self._conversation_from_row(row)
 
-    def append_turn(
-        self,
-        conversation_id: str,
-        role: str,
-        content: str,
-        message_id: str | None = None,
-        parent_id: str | None = None,
-    ) -> None:
+    def append_turn(self, conversation_id: str, role: str, content: str) -> None:
         if role not in TURN_ROLES:
             raise MemoryError(f"unknown turn role: {role}")
 
@@ -311,16 +268,10 @@ class StudioMemory:
                 raise ConversationNotFoundError(conversation_id)
 
             self._connection.execute(
-                "INSERT INTO turns "
-                "(conversation_id, role, content, created_at, message_id, parent_id) "
-                "VALUES (?, ?, ?, ?, ?, ?)",
-                (conversation_id, role, content, now, message_id, parent_id),
+                "INSERT INTO turns (conversation_id, role, content, created_at) "
+                "VALUES (?, ?, ?, ?)",
+                (conversation_id, role, content, now),
             )
-            if message_id:
-                self._connection.execute(
-                    "UPDATE conversations SET head_id = ? WHERE id = ?",
-                    (message_id, conversation_id),
-                )
 
             title = ""
             if role == "user" and content.strip():
@@ -348,62 +299,6 @@ class StudioMemory:
                 (conversation_id,),
             ).fetchall()
         return [self._turn_from_row(row) for row in rows]
-
-    def set_head(self, conversation_id: str, head_id: str | None) -> Conversation:
-        """Record which branch is visible, so a reload opens the same one."""
-        now = _now()
-        with self._lock, self._connection:
-            exists = self._connection.execute(
-                "SELECT 1 FROM conversations WHERE id = ?", (conversation_id,)
-            ).fetchone()
-            if exists is None:
-                raise ConversationNotFoundError(conversation_id)
-            self._connection.execute(
-                "UPDATE conversations SET head_id = ?, updated_at = ? WHERE id = ?",
-                (head_id, now, conversation_id),
-            )
-        return self._updated_conversation(conversation_id)
-
-    def update_title(self, conversation_id: str, title: str) -> Conversation:
-        now = _now()
-        with self._lock, self._connection:
-            exists = self._connection.execute(
-                "SELECT 1 FROM conversations WHERE id = ?", (conversation_id,)
-            ).fetchone()
-            if exists is None:
-                raise ConversationNotFoundError(conversation_id)
-            self._connection.execute(
-                "UPDATE conversations SET title = ?, updated_at = ? WHERE id = ?",
-                (title.strip()[:200], now, conversation_id),
-            )
-        return self._updated_conversation(conversation_id)
-
-    def _updated_conversation(self, conversation_id: str) -> Conversation:
-        """Read back a row this instance just wrote.
-
-        A missing row here means the store was mutated underneath us after the
-        existence check, which is a not-found, not an assertion.
-        """
-        conversation = self.get_conversation(conversation_id)
-        if conversation is None:
-            raise ConversationNotFoundError(conversation_id)
-        return conversation
-
-    def conversation_tree(self, conversation_id: str) -> list[Turn]:
-        """Turns in insertion order, with a linear chain synthesized for old rows.
-
-        Rows written before message ids existed have no ``message_id``; they are
-        given a stable one derived from their row id and chained to the previous
-        row, so an old conversation opens exactly as it did.
-        """
-        turns = self.list_turns(conversation_id)
-        previous: str | None = None
-        for turn in turns:
-            if turn.message_id is None:
-                turn.message_id = f"turn-{turn.id}"
-                turn.parent_id = previous
-            previous = turn.message_id
-        return turns
 
     # -- observations ------------------------------------------------------
 
@@ -541,26 +436,21 @@ class StudioMemory:
 
     @staticmethod
     def _conversation_from_row(row: sqlite3.Row) -> Conversation:
-        keys = row.keys()
         return Conversation(
             id=row["id"],
             title=row["title"],
             created_at=row["created_at"],
             updated_at=row["updated_at"],
-            head_id=row["head_id"] if "head_id" in keys else None,
         )
 
     @staticmethod
     def _turn_from_row(row: sqlite3.Row) -> Turn:
-        keys = row.keys()
         return Turn(
             id=row["id"],
             conversation_id=row["conversation_id"],
             role=row["role"],
             content=row["content"],
             created_at=row["created_at"],
-            message_id=row["message_id"] if "message_id" in keys else None,
-            parent_id=row["parent_id"] if "parent_id" in keys else None,
         )
 
     @staticmethod

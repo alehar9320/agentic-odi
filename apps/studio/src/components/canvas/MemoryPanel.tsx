@@ -1,7 +1,6 @@
 import { useMemo, useState, type FormEvent } from "react";
 
 import { useStudio } from "../../state/StudioContext";
-import { GhostMemory } from "../Skeletons";
 import type { Observation, ObservationKind, ObservationStatus } from "../../types";
 
 const KIND_LABELS: Record<ObservationKind, string> = {
@@ -116,7 +115,9 @@ export function MemoryPanel() {
 
   return (
     <div className="stack memory-panel">
-      {memoryLoading && items.length === 0 && <GhostMemory />}
+      {memoryLoading && items.length === 0 && (
+        <p className="memory-empty">Reading back what I've learned…</p>
+      )}
 
       {!memoryLoading && items.length === 0 && (
         <div className="memory-empty">
