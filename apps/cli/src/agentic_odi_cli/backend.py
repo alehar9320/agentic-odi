@@ -169,7 +169,11 @@ class LocalBackend(Backend):
 
         try:
             step = self.service.add_step(
-                job_id=args["job_id"], name=args["name"], order=args["order"]
+                job_id=args["job_id"],
+                name=args["name"],
+                order=args["order"],
+                stage=args.get("stage"),
+                allow_empty_job_map=args.get("allow_empty_job_map", False),
             )
         except JobNotFoundError:
             raise BackendError(job_not_found(args["job_id"])) from None
@@ -498,9 +502,14 @@ class LocalBackend(Backend):
         return ODI_FRAMEWORK_GUIDELINES
 
     def _get_capabilities(self, args: dict[str, Any]) -> str:
-        from agentic_odi_core import CAPABILITIES
+        from agentic_odi_core import capability_summary
 
-        return CAPABILITIES
+        return capability_summary()
+
+    def _get_capabilities_manifest(self, args: dict[str, Any]) -> dict:
+        from agentic_odi_core import capability_manifest
+
+        return capability_manifest()
 
     def _compute_opportunity(self, args: dict[str, Any]) -> float:
         from agentic_odi_core import compute_opportunity_score
@@ -543,6 +552,7 @@ _LOCAL_HANDLERS = {
     "evaluate_outcome": LocalBackend._evaluate_outcome,
     "get_odi_framework_guidelines": LocalBackend._get_odi_framework_guidelines,
     "get_capabilities": LocalBackend._get_capabilities,
+    "get_capabilities_manifest": LocalBackend._get_capabilities_manifest,
 }
 
 
@@ -560,6 +570,11 @@ class MCPBackend(Backend):
 
 def _call_mcp(tool: str, args: dict[str, Any], mcp_url: str, timeout: float) -> str:
     from fastmcp import Client
+
+    from agentic_odi_cli import flags
+
+    if flags.is_enabled("developer_mode"):
+        typer.echo(f"[debug] MCP call: {tool} args={args}", err=True)
 
     async def _run() -> str:
         async with Client(mcp_url) as client:

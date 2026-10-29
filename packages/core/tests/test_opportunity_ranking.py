@@ -40,11 +40,11 @@ def test_unscored_outcomes_sort_after_scored_ones():
     job = service.add_job("Publish a plugin")
     repository.add_outcome(
         Outcome(
+            id="unscored",
             job_id=job.id,
             statement="Minimize the time to install when a customer starts.",
-            importance=5,
-            satisfaction=5,
-            opportunity_score=None,
+            importance=None,
+            satisfaction=None,
         )
     )
     service.add_outcome(

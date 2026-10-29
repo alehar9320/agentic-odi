@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
+from agentic_odi_core.models import JobStage
 from pydantic import BaseModel, Field
 
 
@@ -39,6 +40,8 @@ class AddStepRequest(BaseModel):
     job_id: str
     name: str
     order: int
+    stage: JobStage | None = None
+    allow_empty_job_map: bool = False
 
 
 class AddOutcomeRequest(BaseModel):

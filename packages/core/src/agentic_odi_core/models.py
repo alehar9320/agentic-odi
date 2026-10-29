@@ -85,8 +85,12 @@ class Outcome(BaseModel):
     statement: str = Field(
         ..., description="The desired outcome statement (e.g., 'Minimize the time it takes to...')"
     )
-    importance: float = Field(ge=1.0, le=10.0, description="Importance score (1-10)")
-    satisfaction: float = Field(ge=1.0, le=10.0, description="Current satisfaction score (1-10)")
+    importance: float | None = Field(
+        default=None, ge=1.0, le=10.0, description="Importance score (1-10)"
+    )
+    satisfaction: float | None = Field(
+        default=None, ge=1.0, le=10.0, description="Current satisfaction score (1-10)"
+    )
     opportunity_score: float | None = Field(
         None, description="Opportunity score (Importance + max(Importance - Satisfaction, 0))"
     )

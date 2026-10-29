@@ -451,3 +451,16 @@ def test_reload_keeps_the_snapshot_on_disk(tmp_path) -> None:
     repo.reload()
 
     assert [job.id for job in repo.list_jobs()] == ["job-1"]
+
+
+def test_close_leaves_no_wal_or_shm_sidecars(tmp_path) -> None:
+    db_path = tmp_path / "odi.db"
+    repo = SQLiteRepository(str(db_path))
+    repo.add_job(Job(id="job-1", name="Onboard customers"))
+    assert (tmp_path / "odi.db-wal").exists()
+
+    repo.close()
+
+    assert db_path.exists()
+    assert list(tmp_path.glob("odi.db-wal")) == []
+    assert list(tmp_path.glob("odi.db-shm")) == []

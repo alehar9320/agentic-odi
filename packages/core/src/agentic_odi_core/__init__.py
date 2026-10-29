@@ -8,7 +8,15 @@ Pydantic's identically named class. Import it from
 ``agentic_odi_core.errors`` instead.
 """
 
-from agentic_odi_core.contract import TOOL_NAMES, TOOL_SPECS, ToolName, ToolSpec
+from agentic_odi_core.contract import (
+    TOOL_NAMES,
+    TOOL_SPECS,
+    ToolEffect,
+    ToolName,
+    ToolSpec,
+    capability_manifest,
+    capability_summary,
+)
 from agentic_odi_core.errors import (
     ConflictError,
     NotFoundError,
@@ -110,6 +118,9 @@ __all__ = [
     "TOOL_SPECS",
     "ToolName",
     "ToolSpec",
+    "ToolEffect",
+    "capability_manifest",
+    "capability_summary",
     "Repository",
     "build_repository",
     "compute_opportunity_score",

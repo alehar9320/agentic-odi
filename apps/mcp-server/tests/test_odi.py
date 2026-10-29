@@ -71,14 +71,48 @@ async def test_odi_workflow():
 
 
 @pytest.mark.asyncio
+@pytest.mark.asyncio
 async def test_get_capabilities():
-    """Test that the get_capabilities tool returns the expected human-readable markdown string."""
+    """Test that the get_capabilities tool returns the generated human-readable summary."""
     async with Client(mcp) as client:
         result = await client.call_tool("get_capabilities", {})
         result_text = result.content[0].text if hasattr(result, "content") else str(result)
 
-        # Check that it returns a string with the expected categories
+        # Check that it returns the generated summary
         assert "Here is what I can help you with" in result_text
-        assert "Manage Jobs-to-be-Done (JTBD)" in result_text
-        assert "Build Job Maps" in result_text
-        assert "Track Desired Outcomes" in result_text
+        assert "## Read Tools" in result_text
+        assert "## Write Tools" in result_text
+        assert "## Destructive Tools" in result_text
+        # Names every tool including update/delete/compute_opportunity/get_evidence/delete_evidence
+        assert "`update_job`" in result_text
+        assert "`delete_job`" in result_text
+        assert "`compute_opportunity`" in result_text
+        assert "`get_evidence`" in result_text
+        assert "`delete_evidence`" in result_text
+        # Names itself
+        assert "`get_capabilities`" in result_text
+        assert "`get_capabilities_manifest`" in result_text
+
+
+@pytest.mark.asyncio
+async def test_get_capabilities_manifest_returns_json():
+    """Test that get_capabilities_manifest returns the tool manifest as JSON."""
+    import json
+
+    async with Client(mcp) as client:
+        result = await client.call_tool("get_capabilities_manifest", {})
+        result_text = result.content[0].text if hasattr(result, "content") else str(result)
+
+    manifest = json.loads(result_text)
+    assert "tools" in manifest
+    tool_names = {tool["name"] for tool in manifest["tools"]}
+    assert "get_capabilities" in tool_names
+    assert "get_capabilities_manifest" in tool_names
+    assert "add_job" in tool_names
+    assert "delete_job" in tool_names
+    # Every tool has required fields
+    for tool in manifest["tools"]:
+        assert "name" in tool
+        assert "summary" in tool
+        assert "effect" in tool
+        assert "returns" in tool
