@@ -1079,10 +1079,20 @@ def require_backend() -> Backend:
     return resolve_backend(context.config())
 
 
+def call_tool(tool_name: str, args: dict[str, Any]) -> Any:
+    """Call ``tool_name`` on the resolved backend, letting failures propagate.
+
+    Unlike :func:`run_tool`, a :class:`BackendError` is raised rather than
+    printed and turned into ``typer.Exit``. Interactive callers use this to show
+    the server's reason and let the person correct the input.
+    """
+    return require_backend().call(tool_name, args)
+
+
 def run_tool(tool_name: str, args: dict[str, Any]) -> Any:
     """Call ``tool_name`` on the resolved backend, reporting failures cleanly."""
     try:
-        return require_backend().call(tool_name, args)
+        return call_tool(tool_name, args)
     except BackendError as exc:
         message = str(exc)
         if message.startswith("Error: "):

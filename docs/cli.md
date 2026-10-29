@@ -284,6 +284,41 @@ agentic-odi candidates delete <candidate-id> --yes
 
 Deleting an interview removes its candidates along with its quotes.
 
+### Work the review queue at the keyboard
+
+`interviews review` turns a queue of proposed candidates into a two-minute
+pass. Each prompt shows the candidate statement beside the quote it came from,
+with a `3/17` progress line, and six keys:
+
+| Key | Action |
+| --- | --- |
+| `a` | accept — writes one outcome with the quote as evidence |
+| `e` | edit the statement, then accept |
+| `m` | merge the candidate into an accepted outcome you name |
+| `r` | reject with a reason (a blank reason is refused) |
+| `s` | skip — nothing changes |
+| `q` | quit — every remaining candidate is preserved |
+
+Every key drives the same service the API uses, so a keypress and a click cannot
+diverge. `s`, `q`, and end-of-input all preserve the remaining candidates, and
+`q` never accepts anything. A refusal (a blank reject reason, an invalid edited
+statement, an unknown merge target) is shown inline and re-prompts, so the
+candidate stays for correction rather than silently dropping out of the queue.
+
+```bash
+agentic-odi interviews review <interview-id>
+agentic-odi interviews review <interview-id> --json
+```
+
+`--yes` is the only non-interactive path: it accepts every candidate still
+`proposed`, needs `--importance` and `--satisfaction` (scores are never
+invented), and reports the success and failure counts. It is explicit
+human-issued batch consent for scripts, not a confidence-based approval rule.
+
+```bash
+agentic-odi interviews review <interview-id> --yes --importance 8 --satisfaction 3
+```
+
 ### Accept or reject a candidate
 
 `candidates accept` turns one proposed candidate into exactly one Outcome. The
