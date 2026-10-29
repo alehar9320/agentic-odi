@@ -13,6 +13,8 @@ from pydantic import BaseModel, ValidationError
 from agentic_odi_core.events import DEFAULT_DEVICE, DEFAULT_WORKSPACE, Event
 from agentic_odi_core.intent_store import IntentStore
 from agentic_odi_core.models import (
+    JOB_STAGE_INDEX,
+    JOB_STAGE_ORDER,
     CandidateStatus,
     CustomerOutcome,
     Evidence,
@@ -53,8 +55,10 @@ class SQLiteRepository(Repository):
         self.store = IntentStore(db_path, check_same_thread=False)
         self._last_event_id = 0
         self._backfilled = False
+        self._stages_backfilled = False
         self._load_snapshot()
         self._backfill_legacy_outcomes()
+        self._backfill_legacy_stages()
 
     def _load_snapshot(self) -> None:
         self.jobs: dict[str, Job] = {}
@@ -109,6 +113,40 @@ class SQLiteRepository(Repository):
         self._sync()
         self._backfilled = True
 
+    def _backfill_legacy_stages(self) -> None:
+        """One-time migration: give legacy steps the stage their order names.
+
+        A step written before ``stage`` existed has ``order`` but no stage. On
+        open, each such step whose order is a real job-map position (1–8) is
+        assigned the stage that order stands for, recorded as a
+        ``STEP_STAGE_BACKFILLED`` event per step so the migration is visible in
+        the log rather than an invisible in-place edit.
+
+        A step whose order is outside 1–8 acquires **no** stage and emits no
+        event: there is no honest stage to invent for it, and leaving it unset
+        is the truthful representation. Because the backfilled steps already
+        carry their stage, a second open finds nothing to do and emits nothing.
+        """
+        if self._stages_backfilled:
+            return
+        needs_backfill = [s for s in self.steps.values() if s.stage is None and 1 <= s.order <= 8]
+        if not needs_backfill:
+            self._stages_backfilled = True
+            return
+        for step in needs_backfill:
+            stage = JOB_STAGE_ORDER[step.order - 1]
+            self.store.append(
+                "STEP_STAGE_BACKFILLED",
+                {
+                    "id": step.id,
+                    "updates": {"stage": stage.value, "stage_index": JOB_STAGE_INDEX[stage]},
+                },
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+        self._sync()
+        self._stages_backfilled = True
+
     def _sync(self) -> None:
         for ev in self.store.get_stream(workspace_id=self._workspace_id):
             if ev["id"] > self._last_event_id:
@@ -136,6 +174,8 @@ class SQLiteRepository(Repository):
         elif et == "JOB_UPDATED":
             self._merge_updates(self.jobs, p, Job)
         elif et == "STEP_UPDATED":
+            self._merge_updates(self.steps, p, Step)
+        elif et == "STEP_STAGE_BACKFILLED":
             self._merge_updates(self.steps, p, Step)
         elif et == "OUTCOME_UPDATED":
             self._merge_updates(self.outcomes, p, Outcome)

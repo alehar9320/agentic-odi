@@ -37,6 +37,7 @@ Uncovered inputs/conditions most likely to bite, each with a test in the owning 
 
 - **Task 0 (parity harness)** — done in this branch: `packages/core/tests/test_persistence_parity.py` drives both repositories and fails on a missed link.
 - **Task 1 (A1 — interviews and quotes)** — done in this branch: models, repository (Protocol + in-memory + SQLite), schema, service, contract, MCP tools, CLI group + renderers, docs, and tests.
+- **Task 9 (A7 — stages become data)** — done in this branch: `order`↔`stage` agreement on the model and service, `STEP_STAGE_BACKFILLED` on open, schema enum, CLI/MCP/API stage updates, docs, and `packages/core/tests/test_stages.py`.
 - **Tasks 2–14 and Phases 2–4** — not started; each is its own issue and PR.
 
 ---
@@ -175,9 +176,9 @@ The **Persistence checklist** in every child points at `packages/core/tests/test
 
 **Files:** `models.py` (`JobStage` enum + `Step.stage` derived from `order`), `services.py`, `sqlite_repository.py` (`STEP_STAGE_BACKFILLED` on open), `schema.py`; tests `packages/core/tests/test_stages.py`.
 
-- [ ] **Step 1:** `order`↔`stage` agree (1↔define … 8↔conclude); a disagreeing pair is rejected naming both.
-- [ ] **Step 2:** Backfill on open emits `STEP_STAGE_BACKFILLED` per changed step (auditable, not an in-place edit); opening the same legacy store twice emits backfill events only the first time; replay reproduces the same stage values.
-- [ ] **Step 3:** Explicitly unset/invalid legacy order acquires no invented stage; `get_odi_schema` exposes the enum.
+- [x] **Step 1:** `order`↔`stage` agree (1↔define … 8↔conclude); a disagreeing pair is rejected naming both.
+- [x] **Step 2:** Backfill on open emits `STEP_STAGE_BACKFILLED` per changed step (auditable, not an in-place edit); opening the same legacy store twice emits backfill events only the first time; replay reproduces the same stage values.
+- [x] **Step 3:** Explicitly unset/invalid legacy order acquires no invented stage; `get_odi_schema` exposes the enum.
 
 **Readiness blocker:** resolve one persistence/serialization contract with GH-83 (stage stored vs derived vs backfilled) and the behavior for existing steps outside 1–8 before implementing; do not store contradictory truths or silently remap history.
 

@@ -112,3 +112,118 @@ def test_steps_add_unknown_job_errors(tmp_path):
 
     assert result.exit_code == 1
     assert "Job not found: nope" in result.output
+
+
+def test_steps_update_moves_stage_with_order(tmp_path):
+    db = str(tmp_path / "odi.db")
+    runner = CliRunner()
+    job_id = _job_id(runner, db)
+    runner.invoke(
+        app,
+        [
+            "--db",
+            db,
+            "desired-outcomes",
+            "add",
+            "--job-id",
+            job_id,
+            "--statement",
+            "Minimize the time it takes to deploy when releasing",
+            "--importance",
+            "8",
+            "--satisfaction",
+            "4",
+            "--json",
+        ],
+    )
+    added = runner.invoke(
+        app,
+        [
+            "--db",
+            db,
+            "steps",
+            "add",
+            "--job-id",
+            job_id,
+            "--name",
+            "Prepare",
+            "--order",
+            "3",
+            "--stage",
+            "prepare",
+            "--json",
+        ],
+    )
+    assert added.exit_code == 0, added.output
+    step_id = json.loads(added.output)["id"]
+    assert json.loads(added.output)["stage"] == "prepare"
+
+    moved = runner.invoke(
+        app,
+        [
+            "--db",
+            db,
+            "steps",
+            "update",
+            step_id,
+            "--order",
+            "5",
+            "--stage",
+            "execute",
+            "--json",
+        ],
+    )
+
+    assert moved.exit_code == 0, moved.output
+    payload = json.loads(moved.output)
+    assert payload["stage"] == "execute"
+    assert payload["stage_index"] == 5
+
+
+def test_steps_update_rejects_stage_order_disagreement(tmp_path):
+    db = str(tmp_path / "odi.db")
+    runner = CliRunner()
+    job_id = _job_id(runner, db)
+    runner.invoke(
+        app,
+        [
+            "--db",
+            db,
+            "desired-outcomes",
+            "add",
+            "--job-id",
+            job_id,
+            "--statement",
+            "Minimize the time it takes to deploy when releasing",
+            "--importance",
+            "8",
+            "--satisfaction",
+            "4",
+            "--json",
+        ],
+    )
+    added = runner.invoke(
+        app,
+        [
+            "--db",
+            db,
+            "steps",
+            "add",
+            "--job-id",
+            job_id,
+            "--name",
+            "Prepare",
+            "--order",
+            "3",
+            "--json",
+        ],
+    )
+    step_id = json.loads(added.output)["id"]
+
+    moved = runner.invoke(
+        app,
+        ["--db", db, "steps", "update", step_id, "--order", "5", "--json"],
+    )
+
+    assert moved.exit_code != 0
+    assert "order=5" in moved.output and "prepare" in moved.output

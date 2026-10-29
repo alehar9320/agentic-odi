@@ -108,3 +108,69 @@ def test_out_of_range_scores_are_rejected() -> None:
     response = client.patch(f"/api/outcomes/{outcome_id}", json={"importance": 42})
     assert response.status_code == 422
     assert response.json()["error"]["code"] == "out_of_range"
+
+
+def test_step_stage_round_trips_and_is_reported_by_the_map() -> None:
+    client = _client()
+    job = client.post("/api/jobs", json={"name": "Ship a service"}).json()
+    client.post(
+        "/api/outcomes",
+        json={
+            "mcp_url": "",
+            "job_id": job["id"],
+            "statement": "Minimize the time it takes to deploy when releasing",
+            "importance": 8.0,
+            "satisfaction": 4.0,
+        },
+    )
+
+    created = client.post(
+        "/api/steps",
+        json={
+            "mcp_url": "",
+            "job_id": job["id"],
+            "name": "Prepare",
+            "order": 3,
+            "stage": "prepare",
+        },
+    )
+    assert created.status_code == 200, created.text
+    assert created.json()["stage"] == "prepare"
+    assert created.json()["stage_index"] == 3
+
+    mapped = client.get("/api/steps", params={"job_id": job["id"]}).json()
+    step = next(s for s in mapped["result"] if s["id"] == created.json()["id"])
+    assert step["stage"] == "prepare"
+
+
+def test_step_order_that_disagrees_with_stage_is_rejected() -> None:
+    client = _client()
+    job = client.post("/api/jobs", json={"name": "Ship a service"}).json()
+    client.post(
+        "/api/outcomes",
+        json={
+            "mcp_url": "",
+            "job_id": job["id"],
+            "statement": "Minimize the time it takes to deploy when releasing",
+            "importance": 8.0,
+            "satisfaction": 4.0,
+        },
+    )
+
+    created = client.post(
+        "/api/steps",
+        json={
+            "mcp_url": "",
+            "job_id": job["id"],
+            "name": "Prepare",
+            "order": 3,
+            "stage": "prepare",
+        },
+    )
+    step_id = created.json()["id"]
+
+    # Moving the order without moving the stage is a contradiction.
+    moved = client.patch(f"/api/steps/{step_id}", json={"order": 5})
+
+    assert moved.status_code == 400, moved.text
+    assert "order=5" in moved.json()["error"]["message"]

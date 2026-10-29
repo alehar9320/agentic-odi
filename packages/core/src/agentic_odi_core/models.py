@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, computed_field
+from pydantic import BaseModel, Field, computed_field, model_validator
 
 
 class Direction(str, Enum):
@@ -104,6 +104,27 @@ class Step(BaseModel):
     stage_index: int | None = Field(
         None, ge=1, le=8, description="Position (1-8) in the canonical stage order"
     )
+
+    @model_validator(mode="after")
+    def _stage_agrees_with_order(self) -> Step:
+        """Reject a step whose ``stage`` disagrees with its ``order``.
+
+        The eight stages are a fixed sequence (1↔define … 8↔conclude), so a
+        step that says ``order=3`` and ``stage=conclude`` is asking for two
+        contradictory truths. The message names both so the caller can see
+        which one to fix. A step with no stage is left alone: an unset stage
+        is not a claim about which stage the step belongs to.
+        """
+        if self.stage is None:
+            return self
+        expected = JOB_STAGE_ORDER[self.order - 1] if 1 <= self.order <= 8 else None
+        if expected is None or expected != self.stage:
+            raise ValueError(
+                f"Step order={self.order} disagrees with stage='{self.stage.value}': "
+                f"order {self.order} is stage '{expected.value if expected else 'none'}'. "
+                "They must agree (1=define … 8=conclude)."
+            )
+        return self
 
 
 class Outcome(BaseModel):
