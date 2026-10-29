@@ -84,7 +84,12 @@ branch is still visible:
   branch unless it is listed in `.github/pr-guardrails/deletion-allowlist.yml`;
   refuses a diff that deletes more than `max_deletions` lines or changes more
   than `max_changed_files` files, excluding regenerated files. Thresholds live
-  in `.github/pr-guardrails/config.yml`.
+  in `.github/pr-guardrails/config.yml`. A replacement the issue itself calls
+  for - code that must go, rather than a revert - is approved by name in
+  `.github/pr-guardrails/diff-budget-exceptions.yml`: an entry binds one head
+  branch to a larger ceiling and names the issue and the reason, so the default
+  stays deny for every other pull request and the raised budget is visible in
+  the check annotations.
 - **body-truth** (warns; the fenced JSON diff summary blocks): compares
   natural-language file/test claims and the machine-readable block against the
   real diff.

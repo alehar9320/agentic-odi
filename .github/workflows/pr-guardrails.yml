@@ -39,12 +39,17 @@ jobs:
 
       # The diff-shape gate is the only gate that blocks, and it runs on the
       # cumulative diff: a tree-replacement commit in the middle of a branch
-      # stays visible here.
+      # stays visible here. The head branch is passed explicitly because CI
+      # checks out a detached HEAD, and a per-issue budget exception only
+      # applies to the branch it names.
       - name: Diff-shape gate
         if: always()
+        env:
+          HEAD_BRANCH: ${{ github.head_ref }}
         run: |
           uv run python scripts/pr_guards.py diff-shape \
-            --base-ref "origin/${{ github.base_ref }}"
+            --base-ref "origin/${{ github.base_ref }}" \
+            --branch "$HEAD_BRANCH"
 
       - name: Body-truth gate
         if: always()
