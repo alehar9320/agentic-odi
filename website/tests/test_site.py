@@ -486,5 +486,6 @@ def test_page_weights_are_within_budget(page: str):
     # whole ODI schema live on that one page, so it grows with each paginated
     # list tool and each entity we add. The V2MOM entity, the five scheduled-work
     # tools, the three signal tools, the interview/quote tools with their two
-    # schema entities, and the evidence-claim markers bring the page to ~83 KB.
+    # schema entities, the evidence-claim markers, and the candidate review tools
+    # bring the page to ~83 KB.
     assert size <= 88 * 1024, f"{page}: {size} bytes"
