@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { OnboardingProvider } from "../onboarding/OnboardingProvider";
@@ -34,6 +34,7 @@ const stubContext = (overrides: Record<string, unknown> = {}) =>
     setDisplayName: vi.fn(),
     brief: null,
     openSetup: vi.fn(),
+    closeSetup: vi.fn(),
     clearChat: vi.fn(),
     refreshCanvas: vi.fn().mockResolvedValue(undefined),
     llmHealth: { healthy: null, message: "" },
@@ -276,5 +277,42 @@ describe("SettingsPanel capabilities", () => {
     const llmRow = screen.getByText(/sidecar model proxy/i).closest("li");
     expect(llmRow).toBeInTheDocument();
     expect(llmRow).toHaveTextContent(/unavailable/);
+  });
+});
+
+describe("SettingsPanel about section", () => {
+  it("reports the running version, build date, platform, and update status", async () => {
+    vi.mocked(useStudio).mockReturnValue(stubContext());
+
+    // A supported transport: the unsupported file-level stub never syncs
+    // currentVersion, and About must show real facts, not placeholders.
+    const aboutService = createUpdateService({
+      transport: {
+        supported: () => true,
+        currentVersion: async () => "0.11.0",
+        check: async () => null,
+        relaunch: async () => undefined,
+      },
+      storage: null,
+      document: null,
+    });
+    render(
+      <UpdateProvider service={aboutService}>
+        <OnboardingProvider enabled={false}>
+          <SettingsPanel />
+        </OnboardingProvider>
+      </UpdateProvider>,
+    );
+
+    const about = screen.getByRole("region", { name: "About" });
+    await waitFor(() =>
+      expect(aboutService.getSnapshot().currentVersion).toBe("0.11.0"),
+    );
+    await waitFor(() => expect(aboutService.getSnapshot().phase).not.toBe("checking"));
+
+    expect(within(about).getByText("v0.11.0")).toBeInTheDocument();
+    expect(within(about).getByText(__STUDIO_BUILD_DATE__)).toBeInTheDocument();
+    expect(within(about).getByText(/macOS|Windows|Linux|Desktop/)).toBeInTheDocument();
+    expect(within(about).getByText(aboutService.statusLine())).toBeInTheDocument();
   });
 });

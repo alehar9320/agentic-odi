@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { conversationToMarkdown, downloadMarkdown, exportFilename } from "../../lib/export";
 import { useStudio } from "../../state/StudioContext";
 import { useUpdateSnapshot } from "../../updater";
-import { BellIcon, MenuIcon, MoonIcon, PlusIcon, SettingsIcon, SunIcon } from "../icons";
+import { BellIcon, MenuIcon, MoonIcon, PlugIcon, PlusIcon, SettingsIcon, SunIcon } from "../icons";
 import { OdiMascot } from "../OdiMascot";
 
 /**
@@ -23,13 +23,13 @@ export function StudioBar({
   const {
     llmHealth,
     messages,
-    unreadNotificationCount,
-    markAllNotificationsAsRead,
+    unreadSignalCount,
     openPanel,
+    openCustomize,
     pushToast,
     saveSettings,
     settings,
-  }    = useStudio();
+  } = useStudio();
   const update = useUpdateSnapshot();
   const theme = settings.theme === "light" ? "light" : "dark";
   const nextTheme = theme === "dark" ? "light" : "dark";
@@ -94,6 +94,17 @@ export function StudioBar({
       <div className="bar__right">
         <button
           type="button"
+          className="studio-pill pill-customize"
+          onClick={() => openCustomize()}
+          aria-label="Customize connectors"
+          title="Customize connectors"
+        >
+          <PlugIcon size={15} />
+          Customize
+        </button>
+
+        <button
+          type="button"
           className="studio-pill pill-changelog"
           onClick={onChangelog}
           aria-label="Open What's New changelog"
@@ -124,19 +135,16 @@ export function StudioBar({
         <button
           type="button"
           className="icon-button bar__bell"
-          aria-label="Catch up notifications"
-          title="Activity & Catch Up"
-          onClick={() => {
-            markAllNotificationsAsRead();
-            openPanel("catchup");
-          }}
+          aria-label={
+            unreadSignalCount > 0
+              ? `Signal inbox: ${unreadSignalCount} unread`
+              : "Signal inbox: no unread signals"
+          }
+          title="Signals from the store"
+          onClick={() => openPanel("catchup")}
         >
           <BellIcon size={17} />
-          {unreadNotificationCount > 0 && (
-            <span className="bell-badge" aria-hidden="true">
-              {unreadNotificationCount}
-            </span>
-          )}
+          {unreadSignalCount > 0 && <span className="bell-badge">{unreadSignalCount}</span>}
         </button>
 
         <button

@@ -51,6 +51,25 @@ export function CompassIcon(props: IconProps) {
   );
 }
 
+export function SearchIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <circle cx="11" cy="11" r="6.5" />
+      <path d="m20 20-4.2-4.2" />
+    </Icon>
+  );
+}
+
+export function PlugIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M9 3v5M15 3v5" />
+      <path d="M6 8h12v2a6 6 0 0 1-6 6 6 6 0 0 1-6-6z" />
+      <path d="M12 16v5" />
+    </Icon>
+  );
+}
+
 export function RouteIcon(props: IconProps) {
   return (
     <Icon {...props}>

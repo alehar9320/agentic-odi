@@ -17,12 +17,14 @@ import type {
   Job,
   LatestConversation,
   LlmHealth,
+  MarketplaceSearch,
   McpHealth,
   ModelList,
   Observation,
   ObservationKind,
   ObservationStatus,
   Outcome,
+  Signal,
   Step,
   StudioConfig,
   StudioError,
@@ -237,7 +239,10 @@ export async function fetchConfig(): Promise<StudioConfig> {
 }
 
 export function fetchChangelog(): Promise<ChangelogData> {
-  return getJson<ChangelogData>("/api/changelog");
+  return withLocal(
+    () => getJson<ChangelogData>("/api/changelog"),
+    (bff) => bff.fetchChangelog(),
+  );
 }
 
 export async function fetchCanvas(mcpUrl: string): Promise<CanvasData> {
@@ -335,6 +340,48 @@ export function fetchConnectors(): Promise<ConnectorListItem[]> {
   return getJson<ConnectorListItem[]>("/api/connectors");
 }
 
+/**
+ * Search the marketplace. `area` and `q` are server-side filters so a narrow
+ * query does not depend on the page having fetched everything first.
+ */
+export async function fetchMarketplace(params: {
+  q?: string;
+  area?: string;
+  limit?: number;
+} = {}): Promise<MarketplaceSearch> {
+  const search = new URLSearchParams();
+  if (params.q) search.set("q", params.q);
+  if (params.area) search.set("area", params.area);
+  if (params.limit) search.set("limit", String(params.limit));
+  const suffix = search.toString();
+  return normalizeMarketplace(
+    await getJson<Partial<MarketplaceSearch>>(
+      `/api/marketplace/servers${suffix ? `?${suffix}` : ""}`,
+    ),
+  );
+}
+
+/** Editor's picks: the curated presets, recommended first. */
+export async function fetchFeatured(limit = 6): Promise<MarketplaceSearch> {
+  return normalizeMarketplace(
+    await getJson<Partial<MarketplaceSearch>>(`/api/marketplace/featured?limit=${limit}`),
+  );
+}
+
+/**
+ * The local BFF fallback may answer with a subset of the search shape, so a
+ * missing list becomes an empty one here rather than an undefined that callers
+ * would have to guard at every read.
+ */
+function normalizeMarketplace(body: Partial<MarketplaceSearch>): MarketplaceSearch {
+  return {
+    listings: body.listings ?? [],
+    areas: body.areas ?? {},
+    cached: body.cached ?? false,
+    types: body.types ?? [],
+  };
+}
+
 export function addConnector(payload: AddConnectorPayload): Promise<ConnectorOperationResponse> {
   return postJson<ConnectorOperationResponse>("/api/connectors", payload);
 }
@@ -420,6 +467,44 @@ export async function streamChat(
     const bff = await getStudioBff();
     await bff.chat.stream(request, onEvent, signal);
   }
+}
+
+
+/**
+ * The signal inbox. Signals live in the shared store, so the CLI and the Studio
+ * read the same feed; there is no browser-side copy to diverge into.
+ */
+export async function fetchSignals(
+  mcpUrl: string,
+  options: { unreadOnly?: boolean; limit?: number } = {},
+): Promise<Signal[]> {
+  const params = new URLSearchParams({ mcp_url: mcpUrl });
+  if (options.unreadOnly) {
+    params.set("unread_only", "true");
+  }
+  if (options.limit !== undefined) {
+    params.set("limit", String(options.limit));
+  }
+  return getJson<Signal[]>(`/api/signals?${params.toString()}`);
+}
+
+export async function fetchUnreadSignalCount(mcpUrl: string): Promise<number> {
+  const body = await getJson<{ count: number }>(
+    `/api/signals/unread-count?mcp_url=${encodeURIComponent(mcpUrl)}`,
+  );
+  return body.count;
+}
+
+export async function markSignalRead(signalId: string, mcpUrl: string): Promise<Signal> {
+  return sendJson<Signal>("POST", `/api/signals/${encodeURIComponent(signalId)}/read`, {
+    mcp_url: mcpUrl,
+  });
+}
+
+export async function dismissSignal(signalId: string, mcpUrl: string): Promise<Signal> {
+  return sendJson<Signal>("POST", `/api/signals/${encodeURIComponent(signalId)}/dismiss`, {
+    mcp_url: mcpUrl,
+  });
 }
 
 
@@ -560,5 +645,70 @@ export async function createConversation(): Promise<Conversation> {
         (body) => body.conversation,
       ),
     async (bff) => bff.memory.createConversation(),
+  );
+}
+
+export function scheduleWork(payload: {
+  name: string;
+  schedule_expression: string;
+  agent_id?: string;
+  trigger_type?: string;
+  payload?: Record<string, unknown>;
+  job_id?: string;
+  mcp_url: string;
+}): Promise<{ ok: boolean; result: unknown }> {
+  return postJson("/api/schedule", payload);
+}
+
+export function triggerScheduledWork(
+  workId: string,
+  mcpUrl: string,
+): Promise<{ ok: boolean; result: unknown }> {
+  return postJson(`/api/schedule/${encodeURIComponent(workId)}/trigger?mcp_url=${encodeURIComponent(mcpUrl)}`, {});
+}
+
+export function cancelScheduledWork(
+  workId: string,
+  mcpUrl: string,
+): Promise<{ ok: boolean; result: unknown }> {
+  return postJson(`/api/schedule/${encodeURIComponent(workId)}/cancel?mcp_url=${encodeURIComponent(mcpUrl)}`, {});
+}
+
+export function addEvidence(payload: {
+  source_name: string;
+  source_kind?: string;
+  name: string;
+  content: string;
+  url?: string;
+  item_type?: string;
+  job_id?: string;
+  step_id?: string;
+  outcome_id?: string;
+  mcp_url: string;
+}): Promise<{ ok: boolean }> {
+  return postJson<{ ok: boolean }>("/api/evidence", payload);
+}
+
+export function deleteEvidence(evidenceId: string, mcpUrl: string): Promise<{ ok: boolean }> {
+  return deleteJson<{ ok: boolean }>(
+    `/api/evidence/${encodeURIComponent(evidenceId)}?mcp_url=${encodeURIComponent(mcpUrl)}`,
+  );
+}
+
+export function promoteEvidence(
+  evidenceId: string,
+  payload: {
+    target: "job" | "outcome";
+    job_id?: string;
+    statement?: string;
+    name?: string;
+    importance?: number;
+    satisfaction?: number;
+    mcp_url: string;
+  },
+): Promise<{ ok: boolean }> {
+  return postJson<{ ok: boolean }>(
+    `/api/evidence/${encodeURIComponent(evidenceId)}/promote`,
+    payload,
   );
 }

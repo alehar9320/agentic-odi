@@ -31,6 +31,8 @@ export interface Evidence {
   item_type?: string;
   name?: string;
   content?: string;
+  /** Deep link back to the record in the tool that holds it, when it has one. */
+  url?: string | null;
   job_id?: string | null;
   step_id?: string | null;
   outcome_id?: string | null;
@@ -73,6 +75,7 @@ export interface CanvasData {
   outcomes: Outcome[];
   /** Captured research records, in capture order until the user reorders them. */
   evidence?: Evidence[];
+  scheduled_work?: ScheduledWork[];
   source: "mcp" | "seed" | "local";
   /** Why the board is not what the server actually holds, when the sidecar knows. */
   warnings?: string[];
@@ -204,6 +207,18 @@ export interface ChatMessage {
  * The user's context, captured on first run. Kept in local storage and sent to
  * the sidecar so every reply starts from the user's actual product and job.
  */
+/**
+ * The domain's V2MOM artifact. Only `vision` is captured today, by the setup
+ * conversation; the other four fields have no input path yet.
+ */
+export interface V2Mom {
+  vision?: string;
+  values?: string[];
+  methods?: string[];
+  obstacles?: string[];
+  measures?: string[];
+}
+
 export interface StudioBrief {
   product_name: string;
   product_url?: string;
@@ -211,6 +226,7 @@ export interface StudioBrief {
   job_statement: string;
   core_problem: string;
   job_id?: string;
+  v2mom?: V2Mom;
 }
 
 /**
@@ -224,23 +240,47 @@ export type WorkspacePanelId =
   | "capture"
   | "memory"
   | "catchup"
+  | "schedule"
   | "settings";
 
-export type NotificationCategory = "outcome" | "simulation" | "evidence" | "job" | "insight";
+/**
+ * One recorded fact from the shared store. Kinds are exactly the ones a real
+ * mutation can emit; nothing here is invented by the client.
+ */
+export type SignalKind =
+  | "job_added"
+  | "outcome_scored"
+  | "opportunity_crossed"
+  | "evidence_ingested"
+  | "evidence_promoted"
+  | "job_map_completed";
 
-export interface StudioNotification {
+export type SignalSeverity = "info" | "notice" | "urgent";
+
+export type SignalSubjectKind =
+  | "job"
+  | "step"
+  | "outcome"
+  | "evidence"
+  | "connector"
+  | "agent_work";
+
+export interface Signal {
   id: string;
+  kind: SignalKind;
   title: string;
-  message: string;
-  category: NotificationCategory;
-  timestamp: string;
-  read: boolean;
-  /** True for a demonstration event. Simulated events never count as unread. */
-  simulated: boolean;
-  targetPanel?: WorkspacePanelId;
-  targetId?: string;
-  actionText?: string;
-  chatPrompt?: string;
+  detail?: string | null;
+  subject_kind?: SignalSubjectKind | null;
+  subject_id?: string | null;
+  severity: SignalSeverity;
+  created_at: string;
+  read_at?: string | null;
+  dismissed_at?: string | null;
+  /** Past the daily attention budget: recorded, but never surfaced or counted. */
+  suppressed: boolean;
+  fingerprint: string;
+  /** Only the developer simulator (#78) sets this. Simulated entries never count. */
+  simulated?: boolean;
 }
 
 export interface ChatStreamRequest {
@@ -383,6 +423,66 @@ export interface AddConnectorPayload {
   name?: string;
   preset?: string;
   url?: string;
+  marketplace_id?: string;
+}
+
+/**
+ * One discoverable connector on the Customize page. Mirrors the sidecar's
+ * `MarketplaceListingOut`; `installable` is false for entries we can see but
+ * cannot reach, and `unavailable_reason` explains why.
+ */
+export interface MarketplaceListing {
+  id: string;
+  name: string;
+  title: string | null;
+  summary: string;
+  version: string;
+  url: string | null;
+  source: "official" | "preset";
+  area: string | null;
+  repository: string | null;
+  docs: string | null;
+  env_vars: string[];
+  headers: Record<string, string>;
+  auth: "none" | "oauth";
+  installable: boolean;
+  verified: boolean;
+  pull_count: number;
+  is_recommended: boolean;
+  unavailable_reason: string | null;
+  /** The registry name an install produces; matches the installed connector list. */
+  connector_name: string;
+}
+
+/** A connection type the page can offer. A2A ships as an unavailable placeholder. */
+export interface ConnectionType {
+  id: string;
+  label: string;
+  available: boolean;
+  note?: string;
+}
+
+export interface MarketplaceSearch {
+  listings: MarketplaceListing[];
+  areas: Record<string, string>;
+  cached: boolean;
+  types: ConnectionType[];
+}
+
+/** What the user asked Customize to open on, when a chat suggestion sent them. */
+export interface CustomizeTarget {
+  query?: string;
+  listingId?: string;
+}
+
+/**
+ * The connector the studio offers to install next, with why it is offering it.
+ * `empty` is the discovery nudge: the studio noticed it has nothing to read.
+ */
+export interface ConnectorSuggestion {
+  id: string;
+  listing: MarketplaceListing | null;
+  reason: "agent" | "empty";
 }
 
 export interface ChangelogCategory {
@@ -398,4 +498,18 @@ export interface ChangelogRelease {
 
 export interface ChangelogData {
   releases: ChangelogRelease[];
+}
+
+export interface ScheduledWork {
+  id: string;
+  name: string;
+  agent_id: string;
+  trigger_type: "oneshot" | "cron" | "interval";
+  schedule_expression: string;
+  payload?: Record<string, unknown>;
+  status: "pending" | "scheduled" | "running" | "completed" | "failed" | "cancelled";
+  job_id?: string | null;
+  created_at: string;
+  last_run_at?: string | null;
+  result_summary?: string | null;
 }

@@ -80,3 +80,13 @@ You can either set these in your shell or adjust them in the Living Studio's
   banner indicating the configured **Base URL** could not be reached, along with
   details from the underlying error. Use that message together with the steps
   above to fix your local LLM setup.
+
+## 6. On-Device LLM & Fallback Routing
+
+Agentic ODI includes a built-in multi-tier **Model Router** (`agentic_odi_core.router`) that ensures an instant, delightful on-device fallback experience:
+
+- **Tier 0 (`rule_based`)**: Instant zero-latency rule-based engine formatted with Steve Jobs clarity for stage guidelines, opportunity score calculations, and impact simulations.
+- **Tier 1 (`on_device_llm`)**: Local on-device LLM runner for standalone offline experience.
+- **Tier 2 (`remote_llm`)**: Smartest remote or local OpenAI-compatible LLM endpoint.
+
+In default **`auto`** mode, the system automatically routes requests to the smartest available tier, falling back silently and instantly when remote models are unreachable. The mode is a field on the chat request (`routing_mode` in the `/api/chat` payload) and accepts `auto`, `rule_based`, `on_device` or `remote`; the studio sends `auto` unless a caller overrides it.
