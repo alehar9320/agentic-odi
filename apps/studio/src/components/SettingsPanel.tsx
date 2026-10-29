@@ -4,7 +4,7 @@ import { useOnboarding } from "../onboarding/context";
 import { useStudio } from "../state/StudioContext";
 import type { StudioConfig } from "../types";
 import { FailurePanel } from "./FailurePanel";
-import { useUpdater } from "./updater/useUpdater";
+import { UpdateSettings } from "../updater";
 
 export function SettingsPanel() {
   const {
@@ -31,7 +31,7 @@ export function SettingsPanel() {
   } = useStudio();
   const { enabled: tourEnabled, restart: restartTour } = useOnboarding();
   const [selectedPreset, setSelectedPreset] = useState("");
-  const updater = useUpdater();
+  const [showApiKey, setShowApiKey] = useState(false);
 
   function update<K extends keyof StudioConfig>(key: K, value: StudioConfig[K]): void {
     saveSettings({ ...settings, [key]: value });
@@ -88,14 +88,24 @@ export function SettingsPanel() {
       </div>
       <div className="field">
         <label htmlFor="api-key">API key</label>
-        <input
-          id="api-key"
-          className="input"
-          type="password"
-          autoComplete="off"
-          value={settings.api_key}
-          onChange={(event) => update("api_key", event.target.value)}
-        />
+        <div className="field__row">
+          <input
+            id="api-key"
+            className="input"
+            type={showApiKey ? "text" : "password"}
+            autoComplete="off"
+            value={settings.api_key}
+            onChange={(event) => update("api_key", event.target.value)}
+          />
+          <button
+            type="button"
+            className="quiet-action"
+            aria-label={showApiKey ? "Hide API key" : "Show API key"}
+            onClick={() => setShowApiKey((visible) => !visible)}
+          >
+            {showApiKey ? "Hide" : "Show"}
+          </button>
+        </div>
       </div>
       <div className="field">
         <label htmlFor="model-name">Model</label>
@@ -146,22 +156,11 @@ export function SettingsPanel() {
           <span>Local FastMCP server</span>
           <span className="connection-list__value">{mcpReachable ? "connected" : "offline"}</span>
         </li>
-        <li>
-          <span className="status-dot is-unknown" />
-          <span>Gong transcripts</span>
-          <span className="connection-list__value">not connected</span>
-        </li>
-        <li>
-          <span className="status-dot is-unknown" />
-          <span>Slack friction stream</span>
-          <span className="connection-list__value">not connected</span>
-        </li>
-        <li>
-          <span className="status-dot is-unknown" />
-          <span>Product telemetry</span>
-          <span className="connection-list__value">not connected</span>
-        </li>
       </ul>
+      <p className="muted">
+        Only the model and MCP server above are live. No data source is connected yet — add one
+        from the presets below.
+      </p>
 
       <h3 className="settings__title">Capabilities</h3>
       <ul className="connection-list">
@@ -274,6 +273,8 @@ export function SettingsPanel() {
         </div>
       ) : null}
 
+      <UpdateSettings />
+
       <details className="disclosure">
         <summary>How the studio works</summary>
         <p>
@@ -281,21 +282,6 @@ export function SettingsPanel() {
           Point at an outcome, then talk about it: every bet traces back to evidence, and impact is
           simulated before code gets written.
         </p>
-        <button
-          type="button"
-          className="button button--ghost"
-          disabled={updater.checking}
-          onClick={() => void updater.check()}
-        >
-          {updater.checking ? "Checking for updates…" : "Check for updates"}
-        </button>
-        {updater.available && updater.version && (
-          <span className="muted">v{updater.version}</span>
-        )}
-        {updater.progress !== null && (
-          <span className="muted">{Math.round((updater.progress ?? 0) * 100)}%</span>
-        )}
-        {updater.error && <span className="muted">{updater.error}</span>}
       </details>
     </div>
   );
