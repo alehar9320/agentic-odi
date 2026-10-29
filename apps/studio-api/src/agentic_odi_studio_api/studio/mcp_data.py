@@ -5,7 +5,8 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from typing import Any
+from datetime import datetime, timezone
+from typing import Any, Literal
 
 from agentic_odi_core import ODIService, ToolName
 from agentic_odi_core.remote import (
@@ -25,6 +26,52 @@ log = logging.getLogger(__name__)
 
 MCP_CALL_TIMEOUT = 3.0
 
+CanvasKind = Literal["live", "seed", "empty"]
+
+
+def _provenance(
+    kind: CanvasKind,
+    reason: str,
+    *,
+    jobs: list[dict[str, Any]],
+    steps: list[dict[str, Any]],
+    outcomes: list[dict[str, Any]],
+    evidence: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Say where the canvas came from instead of letting the UI guess."""
+    return {
+        "kind": kind,
+        "reason": reason,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "record_counts": {
+            "jobs": len(jobs),
+            "steps": len(steps),
+            "outcomes": len(outcomes),
+            "evidence": len(evidence),
+        },
+    }
+
+
+def _seed_canvas(reason: str) -> dict[str, Any]:
+    seed = seed_payload()
+    jobs = seed["jobs"]
+    steps = seed["steps"]
+    outcomes = seed["outcomes"]
+    evidence: list[dict[str, Any]] = []
+    return {
+        **seed,
+        "evidence": evidence,
+        "source": "seed",
+        "provenance": _provenance(
+            "seed",
+            reason,
+            jobs=jobs,
+            steps=steps,
+            outcomes=outcomes,
+            evidence=evidence,
+        ),
+    }
+
 
 async def fetch_canvas(mcp_url: str) -> dict[str, Any]:
     """Fetch live canvas data from FastMCP, falling back to the seed prototype."""
@@ -37,7 +84,7 @@ async def fetch_canvas(mcp_url: str) -> dict[str, Any]:
 
     if not is_endpoint_reachable(mcp_url, timeout=0.3):
         log.warning("MCP endpoint unreachable at %s — falling back to seed data", mcp_url)
-        return {**seed_payload(), "source": "seed", "warnings": ["MCP endpoint unreachable"]}
+        return {**_seed_canvas("mcp_unreachable"), "warnings": ["MCP endpoint unreachable"]}
 
     try:
         mcp_client = McpClient(mcp_url)
@@ -111,7 +158,24 @@ async def fetch_canvas(mcp_url: str) -> dict[str, Any]:
         warnings.append(f"MCP hydration error: {exc}")
 
     if not jobs:
-        return {**seed_payload(), "source": "seed", "warnings": ["No jobs returned from MCP"]}
+        # The server answered: either it has no work, or nothing it sent was
+        # usable. Both are empty, not the prototype dressed up as the user's.
+        return {
+            "jobs": [],
+            "steps": [],
+            "outcomes": [],
+            "evidence": [],
+            "source": "mcp",
+            "warnings": warnings,
+            "provenance": _provenance(
+                "empty",
+                "mcp_unreadable" if warnings else "no_jobs",
+                jobs=[],
+                steps=[],
+                outcomes=[],
+                evidence=[],
+            ),
+        }
 
     return {
         "jobs": jobs,
@@ -121,6 +185,14 @@ async def fetch_canvas(mcp_url: str) -> dict[str, Any]:
         "scheduled_work": scheduled_work,
         "source": "mcp",
         "warnings": warnings,
+        "provenance": _provenance(
+            "live",
+            "partial_hydration" if warnings else "mcp_live",
+            jobs=jobs,
+            steps=steps,
+            outcomes=outcomes,
+            evidence=evidence,
+        ),
     }
 
 
@@ -135,6 +207,7 @@ def fetch_local_canvas(service: ODIService) -> dict[str, Any]:
         outcomes.extend(outcome.model_dump() for outcome in service.get_outcomes(job_id))
     evidence = [item.model_dump() for item in service.list_evidence()]
     scheduled_work = [item.model_dump() for item in service.list_scheduled_work()]
+    empty = not jobs and not steps and not outcomes and not evidence and not scheduled_work
     return {
         "jobs": jobs,
         "steps": steps,
@@ -142,6 +215,14 @@ def fetch_local_canvas(service: ODIService) -> dict[str, Any]:
         "evidence": evidence,
         "scheduled_work": scheduled_work,
         "source": "local",
+        "provenance": _provenance(
+            "empty" if empty else "live",
+            "local_store_empty" if empty else "local_store",
+            jobs=jobs,
+            steps=steps,
+            outcomes=outcomes,
+            evidence=evidence,
+        ),
     }
 
 

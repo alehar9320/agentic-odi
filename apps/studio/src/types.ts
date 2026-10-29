@@ -48,6 +48,25 @@ export interface Thesis {
   created_at: string;
 }
 
+export type CanvasProvenanceKind = "live" | "seed" | "empty";
+
+/**
+ * Where the canvas came from. The sidecar labels every response so the studio
+ * can say "sample data" instead of presenting the prototype as the user's work.
+ * Optional because a canvas cached by an older build has no provenance.
+ */
+export interface CanvasProvenance {
+  kind: CanvasProvenanceKind;
+  reason: string;
+  generated_at: string;
+  record_counts: {
+    jobs: number;
+    steps: number;
+    outcomes: number;
+    evidence: number;
+  };
+}
+
 export interface CanvasData {
   jobs: Job[];
   steps: Step[];
@@ -58,6 +77,7 @@ export interface CanvasData {
   source: "mcp" | "seed" | "local";
   /** Why the board is not what the server actually holds, when the sidecar knows. */
   warnings?: string[];
+  provenance?: CanvasProvenance;
 }
 
 /**
@@ -218,6 +238,8 @@ export interface StudioNotification {
   category: NotificationCategory;
   timestamp: string;
   read: boolean;
+  /** True for a demonstration event. Simulated events never count as unread. */
+  simulated: boolean;
   targetPanel?: WorkspacePanelId;
   targetId?: string;
   actionText?: string;
