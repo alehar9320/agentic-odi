@@ -349,6 +349,8 @@ def test_call_mcp_tool_raises_when_a_real_tool_result_reports_an_error(monkeypat
     assert exc_info.value.status_code == 404
     assert exc_info.value.error.code.value == "not_found"
     assert "JOB-402" in exc_info.value.error.message
+
+
 class _Record:
     def __init__(self, **data: Any) -> None:
         self._data = data

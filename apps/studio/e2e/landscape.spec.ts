@@ -16,7 +16,7 @@ const UNDERSERVED = {
   satisfaction: 3.1,
 };
 const SERVED = {
-  statement: "Minimize the effort to rotate expired tokens when credentials leak",
+  statement: "Minimize the time to rotate expired tokens when credentials leak",
   importance: 8.0,
   satisfaction: 7.2,
 };

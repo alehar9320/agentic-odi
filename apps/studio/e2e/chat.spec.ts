@@ -33,7 +33,7 @@ test.describe("the conversation", () => {
     );
   });
 
-  test("explains that the studio still works by hand when asked something else", async ({
+  test("offers local guidance when the offline assistant cannot answer the request", async ({
     page,
   }) => {
     await openStudio(page);
@@ -41,8 +41,8 @@ test.describe("the conversation", () => {
     await sendMessage(page, "What is the weather tomorrow?");
 
     const reply = await lastReply(page);
-    expect(reply).toContain("no model is reachable");
-    expect(reply).toContain("/capture");
+    expect(reply).toContain("LOCAL GUIDANCE");
+    expect(reply).toContain("/capture — record an outcome");
   });
 
   test("offers a copy button on the reply", async ({ page }) => {
