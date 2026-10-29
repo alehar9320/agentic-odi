@@ -52,3 +52,61 @@ def test_mapping_attaches_odi_links() -> None:
     assert all(draft.job_id == "j1" for draft in drafts)
     assert all(draft.step_id == "s1" for draft in drafts)
     assert all(draft.outcome_id == "o1" for draft in drafts)
+
+
+def test_a_draft_has_exactly_the_evidence_contract_fields() -> None:
+    drafts = drafts_from_batch(_batch())
+    draft = drafts[0]
+
+    assert draft.model_dump() == {
+        "source_name": "gong",
+        "source_kind": "mcp",
+        "item_type": "resource",
+        "name": "feedback",
+        "content": "Onboarding is slow",
+        "raw": {"uri": "resource://feedback"},
+        "job_id": None,
+        "step_id": None,
+        "outcome_id": None,
+    }
+    # The ODI store owns ids; a draft must not invent one.
+    assert "id" not in draft.model_dump()
+
+
+def test_unknown_payload_keys_stay_inside_raw() -> None:
+    batch = IngestBatch(
+        connector_name="gong",
+        records=[
+            IngestRecord(
+                source_name="gong",
+                source_kind="rest",
+                item_type="resource",
+                name="feedback",
+                content="Onboarding is slow",
+                raw={"vendor_field": "x", "nested": {"score": 3}},
+            )
+        ],
+    )
+
+    draft = drafts_from_batch(batch)[0]
+
+    assert draft.raw == {"vendor_field": "x", "nested": {"score": 3}}
+    assert not hasattr(draft, "vendor_field")
+    assert set(draft.model_dump()) == {
+        "source_name",
+        "source_kind",
+        "item_type",
+        "name",
+        "content",
+        "raw",
+        "job_id",
+        "step_id",
+        "outcome_id",
+    }
+
+
+def test_mapping_preserves_record_order_and_count() -> None:
+    drafts = drafts_from_batch(_batch(), include_catalog=True)
+
+    assert len(drafts) == len(_batch().records)
+    assert [draft.item_type for draft in drafts] == ["catalog", "resource", "tool_result"]

@@ -8,3 +8,5 @@ chromatic-diagnostics.json
 chromatic.log
 src-tauri/target
 src-tauri/gen
+playwright-report
+test-results

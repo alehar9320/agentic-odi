@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 
@@ -130,3 +131,15 @@ def test_list_presets_recommended_filter_returns_subset() -> None:
 
 def test_list_presets_recommended_false_returns_all() -> None:
     assert len(list_presets(recommended=False)) == len(list_presets())
+
+
+def test_committed_catalog_snapshot_matches_the_code() -> None:
+    """The published catalog is generated from this module; keep them in step."""
+    snapshot = Path(__file__).resolve().parents[3] / "docs" / "connectors-catalog.json"
+    committed = json.loads(snapshot.read_text(encoding="utf-8"))
+    from_code = [preset.model_dump() for preset in list_presets()]
+
+    assert committed == from_code, (
+        "docs/connectors-catalog.json does not match the connector catalog. Regenerate it: "
+        "uv run python -m agentic_odi_cli connectors catalog --json > docs/connectors-catalog.json"
+    )

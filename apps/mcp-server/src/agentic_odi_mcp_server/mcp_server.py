@@ -1,6 +1,9 @@
 """Agentic ODI MCP Server (FastMCP)."""
 
 import json
+import signal
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from typing import Any
 
 from agentic_odi_core import (
@@ -31,10 +34,33 @@ from agentic_odi_core import (
 from fastmcp import Context, FastMCP
 from pydantic import ValidationError
 
-mcp = FastMCP("Agentic ODI")
-
 _repo = build_repository()
 service = ODIService(_repo)
+
+_shutdown_complete = False
+
+
+def shutdown_store() -> None:
+    """Flush and close the event store. Safe to call more than once."""
+    global _shutdown_complete
+    if _shutdown_complete:
+        return
+    _shutdown_complete = True
+    try:
+        _repo.commit()
+    finally:
+        _repo.close()
+
+
+@asynccontextmanager
+async def _lifespan(_server: FastMCP) -> AsyncIterator[None]:
+    try:
+        yield
+    finally:
+        shutdown_store()
+
+
+mcp = FastMCP("Agentic ODI", lifespan=_lifespan)
 
 jobs_db = _repo.jobs
 steps_db = _repo.steps
@@ -151,12 +177,18 @@ def add_outcome(
 
 @mcp.tool
 def get_outcomes(
-    job_id: str, step_id: str | None = None, limit: int | None = None, offset: int = 0
+    job_id: str,
+    step_id: str | None = None,
+    limit: int | None = None,
+    offset: int = 0,
+    sort: str = "opportunity_score",
 ) -> str:
     job = service.get_job(job_id)
     if job is None:
         return f"Error: Job with ID {job_id} not found."
-    outcomes = service.get_outcomes(job_id=job_id, step_id=step_id, limit=limit, offset=offset)
+    outcomes = service.get_outcomes(
+        job_id=job_id, step_id=step_id, limit=limit, offset=offset, sort=sort
+    )
     return json.dumps([outcome.model_dump() for outcome in outcomes])
 
 
@@ -530,7 +562,28 @@ def get_odi_schema() -> str:
     return json.dumps(odi_schema())
 
 
+def setup_graceful_shutdown() -> None:
+    """Flush the event store when the process is asked to stop.
+
+    The handler chains to whatever was installed before it, so the server's own
+    graceful-shutdown behaviour (drain in-flight requests, then exit) is
+    preserved. The store is flushed on the way out either way.
+    """
+
+    def _chain(previous: Any) -> Any:
+        def _handle(signum: int, frame: Any) -> None:
+            shutdown_store()
+            if callable(previous):
+                previous(signum, frame)
+
+        return _handle
+
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        signal.signal(sig, _chain(signal.getsignal(sig)))
+
+
 def main() -> None:
+    setup_graceful_shutdown()
     mcp.run(transport="http", port=8000)
 
 

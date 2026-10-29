@@ -15,11 +15,22 @@ desired outcomes, and opportunity scores that rank them.
 **Try it now — nothing to install.** The Studio opens in your browser; live data
 and chat need the local sidecar below.
 
-**Or install the CLI in one line** (Linux, macOS, Windows):
+**Or install the CLI in one line** (Linux, macOS):
 
 ```bash
 curl -fsSL https://github.com/alehar9320/agentic-odi/releases/latest/download/install.sh | sh
 ```
+
+On Windows (PowerShell):
+
+```powershell
+iex (Invoke-WebRequest -Uri https://github.com/alehar9320/agentic-odi/releases/latest/download/install.ps1 -UseBasicParsing)
+```
+
+Both installers verify the download against `checksums.txt`; every
+[release](https://github.com/alehar9320/agentic-odi/releases/latest) also carries
+per-platform archives with SHA-256 checksums for a manual download. See
+[Installation](docs/installation.md) for the install layout and updater.
 
 [![CI](https://github.com/alehar9320/agentic-odi/actions/workflows/ci.yml/badge.svg)](https://github.com/alehar9320/agentic-odi/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/alehar9320/agentic-odi/branch/main/graph/badge.svg)](https://codecov.io/gh/alehar9320/agentic-odi)
@@ -117,10 +128,12 @@ The server speaks the Model Context Protocol. Any MCP client can reach it:
 }
 ```
 
-Register MCP or REST connectors (Notion, PostHog, Exa, Linear, GitHub) in the
-Studio's **Settings → Connectors**, conversationally, or via
-`agentic-odi connectors add <preset>`. See
-[External Connectors](docs/connectors.md).
+Register MCP or REST connectors (Notion, PostHog, Exa, Linear, GitHub) on the
+Studio's **Customize** page — installed connectors first, then a trusted vendor
+marketplace, then conversationally, or via `agentic-odi connectors add <preset>`.
+A listing that needs a token names the environment variable to set; no credential
+is stored in the app. MCP servers install today; A2A agents are marked "coming
+soon". See [External Connectors](docs/connectors.md).
 
 ## Documentation
 
@@ -156,7 +169,7 @@ shared tooling at the root. Packages live in `packages/`, runnable services in
 | **`apps/mcp-server/`** | `agentic-odi-mcp-server` | FastMCP server exposing Jobs, Steps, Desired Outcomes, Customer Outcomes, Evidence, and context tools over HTTP. SQLite by default. |
 | **`apps/studio-api/`** | `agentic-odi-studio-api` | FastAPI **Living Studio sidecar**: config, health, canvas, local mutations, MCP passthrough, SSE chat, conversations, and PM memory. |
 | **`apps/cli/`** | `agentic-odi-cli` | Typer CLI with interactive chat, full entity CRUD, `schema`, `connectors`, and local or remote data access. |
-| **`apps/studio/`** | React + TypeScript + Vite | **The Living Studio** SPA and Tauri 2 desktop shell, built on [assistant-ui](https://www.assistant-ui.com). Installed desktop builds **update themselves** in the background and apply on restart. |
+| **`apps/studio/`** | React + TypeScript + Vite | **The Living Studio** SPA and Tauri 2 desktop shell, built on [assistant-ui](https://www.assistant-ui.com). Its browser-level suite lives in `apps/studio/e2e/`. Installed desktop builds **update themselves** in the background and apply on restart. |
 | **`infra/cloudflare/`** | Worker | Free-plan Workers Static Assets deployment and sidecar tunnel. |
 | **`scripts/`** | — | Dev launcher, binary build, installer tests. |
 | **`tests/contract/`** | — | Cross-package MCP contract tests. |
@@ -173,6 +186,8 @@ uv run mypy apps packages && uv run pytest
 
 See [Development](docs/development.md) for the frontend checks, the coverage
 map, and how every pull request is automatically risk-classified.
+The browser-level Studio suite runs in its own non-blocking CI job; set the
+repository variable `AGENTIC_ODI_E2E` to `false` to skip it.
 
 ## Brand
 

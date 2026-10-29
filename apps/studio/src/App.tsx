@@ -7,6 +7,8 @@ import { BannerStack } from "./banners/BannerStack";
 import { BannerToasts } from "./banners/BannerToasts";
 import { ChangelogModal } from "./components/ChangelogModal";
 import { ChatStage } from "./components/chat/ChatStage";
+import { ConnectorSuggestionModal } from "./components/customize/ConnectorSuggestionModal";
+import { CustomizePage } from "./components/customize/CustomizePage";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { StudioBar } from "./components/layout/StudioBar";
 import { WorkbenchRail } from "./components/workspace/WorkbenchRail";
@@ -24,7 +26,7 @@ import { UpdateBanner, UpdateProvider } from "./updater";
  * composer never leaves the screen.
  */
 function StudioShell() {
-  const { closePanel, clearChat, closeSetup } = useStudio();
+  const { closePanel, clearChat, closeSetup, customizeOpen, closeCustomize } = useStudio();
   const { view } = useBanner();
   const { onIntent, onAction, onDismiss } = useBannerActionDispatcher();
   const [showChangelog, setShowChangelog] = useState(false);
@@ -33,11 +35,13 @@ function StudioShell() {
     clearChat();
     closePanel();
     closeSetup();
+    closeCustomize();
   }
 
   function newConversation() {
     clearChat();
     closePanel();
+    closeCustomize();
   }
 
   useEffect(() => {
@@ -68,15 +72,20 @@ function StudioShell() {
           onChangelog={() => setShowChangelog(true)}
         />
         <UpdateBanner />
-        <div className="stage__split">
-          <div className="stage__thread">
-            <WorkbenchRail />
-            <ChatStage />
+        {customizeOpen ? (
+          <CustomizePage />
+        ) : (
+          <div className="stage__split">
+            <div className="stage__thread">
+              <WorkbenchRail />
+              <ChatStage />
+            </div>
+            <WorkspacePanel />
           </div>
-          <WorkspacePanel />
-        </div>
+        )}
       </main>
       <ChangelogModal isOpen={showChangelog} onClose={() => setShowChangelog(false)} />
+      <ConnectorSuggestionModal />
     </div>
   );
 }
