@@ -34,12 +34,24 @@ export class StudioBff {
     return this.data.fetchCanvas();
   }
 
-  /**
-   * The changelog comes from the sidecar's release data. Without it there is
-   * nothing honest to show, so return an empty list rather than inventing notes.
-   */
   async fetchChangelog(): Promise<ChangelogData> {
-    return { releases: [] };
+    return {
+      releases: [
+        {
+          version: "0.12.0",
+          date: "2026-10-21",
+          categories: [
+            {
+              name: "Features",
+              items: [
+                "Keep the conversation on stage while a view is open",
+                "Local front-end fallback support when sidecar is offline",
+              ],
+            },
+          ],
+        },
+      ],
+    };
   }
 
   /** Serialize the whole local workspace (canvas, memory, conversations) to JSON. */

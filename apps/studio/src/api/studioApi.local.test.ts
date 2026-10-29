@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { StudioApiError, fetchCanvas, fetchMemory, isTransportFailure, streamChat } from "./studioApi";
+import { StudioApiError, fetchCanvas, fetchChangelog, fetchMemory, isTransportFailure, streamChat } from "./studioApi";
 
 const bff = {
+  fetchChangelog: vi.fn(),
   data: { fetchCanvas: vi.fn() },
   memory: { listObservations: vi.fn() },
   chat: { stream: vi.fn() },
@@ -21,6 +22,7 @@ function jsonResponse(body: unknown, status = 200): Response {
 
 beforeEach(() => {
   vi.stubGlobal("fetch", vi.fn(async () => jsonResponse({})));
+  vi.mocked(bff.fetchChangelog).mockReset();
   vi.mocked(bff.data.fetchCanvas).mockReset();
   vi.mocked(bff.memory.listObservations).mockReset();
   vi.mocked(bff.chat.stream).mockReset();
@@ -99,5 +101,16 @@ describe("streamChat fallback", () => {
       streamChat({ base_url: "", api_key: "", model: "", mcp_url: "", messages: [] }, () => {}),
     ).rejects.toThrow();
     expect(bff.chat.stream).not.toHaveBeenCalled();
+  });
+});
+
+describe("fetchChangelog fallback", () => {
+  it("falls back to the local BFF when the sidecar returns 502", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ detail: "Sidecar unreachable" }, 502));
+    vi.mocked(bff.fetchChangelog).mockResolvedValueOnce({ releases: [] });
+
+    const changelog = await fetchChangelog();
+    expect(changelog.releases).toEqual([]);
+    expect(bff.fetchChangelog).toHaveBeenCalled();
   });
 });
