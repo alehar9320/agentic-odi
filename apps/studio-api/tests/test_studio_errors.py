@@ -85,6 +85,21 @@ def test_unhandled_exception_returns_the_error_shape(monkeypatch) -> None:
     assert "secret internal detail" not in response.text
 
 
+def test_unhandled_exception_surfaces_the_request_id_in_the_message(monkeypatch) -> None:
+    monkeypatch.setenv("AGENTIC_ODI_DISABLE_SPA", "1")
+    app = create_app(InMemoryRepository())
+
+    @app.get("/api/kaput")
+    def kaput():
+        raise RuntimeError("secret internal detail")
+
+    response = _client(app).get("/api/kaput", headers={"X-Request-ID": "req-9"})
+
+    body = response.json()
+    assert "req-9" in body["error"]["message"]
+    assert body["error"]["message"].startswith("Something went wrong")
+
+
 def test_unknown_api_route_is_not_swallowed_by_the_spa(monkeypatch, tmp_path) -> None:
     from agentic_odi_studio_api import app as app_module
 

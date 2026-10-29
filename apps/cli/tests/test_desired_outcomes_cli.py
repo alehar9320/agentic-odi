@@ -28,7 +28,7 @@ def _add(runner: CliRunner, db: str, job_id: str, *extra: str) -> dict:
             "--job-id",
             job_id,
             "--statement",
-            "Min onboarding",
+            "Minimize the onboarding time when a customer signs up",
             "--importance",
             "8",
             "--satisfaction",
@@ -51,7 +51,10 @@ def test_outcomes_add_computes_score(tmp_path):
     assert added["opportunity_score"] == 12.0
 
     listed = runner.invoke(app, ["--db", db, "desired-outcomes", "list", "--job-id", job_id])
-    assert listed.exit_code == 0 and "Min onboarding" in listed.output
+    assert (
+        listed.exit_code == 0
+        and "Minimize the onboarding time when a customer signs up" in listed.output
+    )
 
 
 def test_outcomes_full_lifecycle(tmp_path):
@@ -61,7 +64,10 @@ def test_outcomes_full_lifecycle(tmp_path):
     outcome_id = _add(runner, db, job_id)["id"]
 
     fetched = runner.invoke(app, ["--db", db, "desired-outcomes", "get", outcome_id, "--json"])
-    assert json.loads(fetched.output)["statement"] == "Min onboarding"
+    assert (
+        json.loads(fetched.output)["statement"]
+        == "Minimize the onboarding time when a customer signs up"
+    )
 
     updated = runner.invoke(
         app,
@@ -90,7 +96,11 @@ def test_outcomes_add_unknown_job_reports_error(tmp_path):
             "--job-id",
             "nope",
             "--statement",
-            "Min x",
+            "Minimize the time to ship a release when the build is green",
+            "--importance",
+            "8",
+            "--satisfaction",
+            "4",
         ],
     )
 

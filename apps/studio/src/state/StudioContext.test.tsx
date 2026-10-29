@@ -37,6 +37,7 @@ function sse(body: string): Response {
 }
 
 let chatBody: Record<string, unknown> | null = null;
+let chatAttempts = 0;
 
 const DEFAULT_CHAT_STREAM =
   'event: conversation\ndata: {"id":"c-2","title":"hello"}\n\n' +
@@ -53,11 +54,16 @@ let llmHealthFetches = 0;
 let approvalCalls: Record<string, unknown>[] = [];
 let headPatches: Record<string, unknown>[] = [];
 
-function route(input: RequestInfo | URL, init?: RequestInit): Response {
+function route(
+  input: RequestInfo | URL,
+  init?: RequestInit,
+  configFails = false,
+): Response {
   const url = String(input);
 
   if (url === "/api/chat") {
     chatBody = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
+    chatAttempts += 1;
     if (chatAborts) {
       const error = new Error("The user aborted a request.");
       error.name = "AbortError";
@@ -69,6 +75,9 @@ function route(input: RequestInfo | URL, init?: RequestInit): Response {
     return sse(chatStream ?? DEFAULT_CHAT_STREAM);
   }
   if (url === "/api/config") {
+    if (configFails) {
+      throw new TypeError("fetch failed");
+    }
     return json({
       defaults: { base_url: "http://llm", api_key: "k", model_name: "m", mcp_url: "http://mcp" },
     });
@@ -172,6 +181,7 @@ describe("StudioContext memory and resume", () => {
     chatBody = null;
     chatStream = null;
     chatFailure = null;
+    chatAttempts = 0;
     chatAborts = false;
     canvasFails = false;
     connectorFetches = 0;
@@ -316,6 +326,30 @@ describe("StudioContext memory and resume", () => {
     );
   });
 
+  it("persists a saved opportunity thesis", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
+
+    act(() => {
+      result.current.saveThesis({
+        outcome_id: "O-1",
+        job_id: "JOB-1",
+        statement: "Minimize the time to ship when the build is green.",
+        importance: 9,
+        satisfaction: 3,
+        opportunity_score: 15,
+        rationale: "Shipping fast is the bet.",
+      });
+    });
+
+    expect(result.current.theses).toHaveLength(1);
+    const stored = JSON.parse(localStorage.getItem("studio.theses") ?? "[]");
+    expect(stored[0]).toMatchObject({
+      outcome_id: "O-1",
+      rationale: "Shipping fast is the bet.",
+    });
+  });
+
   it("sends the conversation id and applies memory events", async () => {
     const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
     await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
@@ -347,6 +381,7 @@ describe("StudioContext failures", () => {
     chatBody = null;
     chatStream = null;
     chatFailure = null;
+    chatAttempts = 0;
     chatAborts = false;
     canvasFails = false;
     connectorFetches = 0;
@@ -418,6 +453,45 @@ describe("StudioContext failures", () => {
 
     expect(result.current.messages.some((message) => message.role === "notice")).toBe(true);
     expect(connectorFetches).toBeGreaterThan(before);
+  });
+});
+
+describe("StudioContext sidecar down", () => {
+  let configFails: boolean;
+
+  beforeEach(() => {
+    configFails = true;
+    localStorage.clear();
+    chatBody = null;
+    chatStream = null;
+    chatFailure = null;
+    chatAttempts = 0;
+    chatAborts = false;
+    canvasFails = false;
+    connectorFetches = 0;
+    llmHealthFetches = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init, configFails)),
+    );
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("does not hit /api/chat when the sidecar is known to be down", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+
+    await waitFor(() => expect(result.current.sidecarReachable).toBe(false));
+
+    await act(async () => {
+      await result.current.sendMessage("list the jobs");
+    });
+
+    expect(chatAttempts).toBe(0);
+    expect(result.current.streaming).toBe(false);
+    expect(result.current.messages.some((message) => message.role === "notice")).toBe(true);
   });
 });
 

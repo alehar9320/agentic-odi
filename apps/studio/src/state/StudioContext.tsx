@@ -62,6 +62,7 @@ import type {
   StudioError,
   StudioNotification,
   StudioTheme,
+  Thesis,
   ToolStatus,
   TurnNode,
   WorkspacePanelId,
@@ -139,7 +140,9 @@ const CANVAS_KEY = "studio.canvas";
 const DISPLAY_NAME_KEY = "studio.displayName";
 const BRIEF_KEY = "studio.brief";
 const SETUP_DISMISSED_KEY = "studio.setupDismissed";
+const SIDECAR_NOTICE_DISMISSED_KEY = "studio.sidecarNoticeDismissed";
 const NOTIFICATIONS_KEY = "studio.notifications";
+const THESES_KEY = "studio.theses";
 
 /** How often the studio re-probes the model and the MCP server. */
 const HEALTH_POLL_INTERVAL_MS = 30_000;
@@ -165,42 +168,6 @@ export interface ToolActivity {
   status: string;
   preview?: string;
 }
-
-const SEED_NOTIFICATIONS: StudioNotification[] = [
-  {
-    id: "NOTIF-101",
-    title: "Opportunity Score Shift Identified",
-    message: "Minimize time to propagate secrets (O-1) opportunity score reached 15.3 (High Priority).",
-    category: "outcome",
-    timestamp: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
-    read: false,
-    targetPanel: "landscape",
-    targetId: "O-1",
-    actionText: "View Landscape",
-    chatPrompt: "How can we address the high opportunity score for secret propagation?",
-  },
-  {
-    id: "NOTIF-102",
-    title: "Friction Collapse Simulation Complete",
-    message: "Background simulation calculated a 68% deployment velocity increase upon automation.",
-    category: "simulation",
-    timestamp: new Date(Date.now() - 45 * 60 * 1000).toISOString(),
-    read: false,
-    actionText: "Talk it through",
-    chatPrompt: "Summarize the friction collapse simulation results.",
-  },
-  {
-    id: "NOTIF-103",
-    title: "New Customer Telemetry Signal",
-    message: "Evidence ingested: 'Config key mismatches account for 40% of deployment rollbacks'.",
-    category: "evidence",
-    timestamp: new Date(Date.now() - 120 * 60 * 1000).toISOString(),
-    read: true,
-    targetPanel: "evidence",
-    actionText: "View Evidence",
-    chatPrompt: "What evidence do we have regarding deployment config errors?",
-  },
-];
 
 export interface ConnectionReport {
   sidecarReachable: boolean;
@@ -230,6 +197,11 @@ export interface StudioContextValue {
   llmHealth: { healthy: boolean | null; message: string };
   mcpReachable: boolean;
   sidecarReachable: boolean | null;
+  /** Whether the user has dismissed this session's sidecar-down notice. */
+  dismissedSidecarNotice: boolean;
+  /** Probe again now, e.g. after the user started the sidecar. */
+  recheckConnections: () => Promise<void>;
+  dismissSidecarNotice: () => void;
   /** Probe the sidecar, MCP server, and model. Optionally against unsaved config. */
   checkConnections: (override?: Partial<StudioConfig>) => Promise<ConnectionReport>;
   messages: ChatMessage[];
@@ -294,6 +266,10 @@ export interface StudioContextValue {
   deleteConnector: (name: string) => Promise<void>;
   connectorSuggestions: string[];
   dismissConnectorSuggestion: (preset: string) => void;
+  /** Scored outcomes saved as shareable opportunity theses. */
+  theses: Thesis[];
+  saveThesis: (thesis: Omit<Thesis, "id" | "created_at">) => void;
+  deleteThesis: (thesisId: string) => void;
   notifications: StudioNotification[];
   unreadNotificationCount: number;
   markNotificationAsRead: (id: string) => void;
@@ -331,7 +307,15 @@ function loadCanvasCache(): CanvasData | null {
 
 function loadSetupDismissed(): boolean {
   try {
-    return localStorage.getItem(SETUP_DISMISSED_KEY) === "1";
+      return localStorage.getItem(SETUP_DISMISSED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function loadSidecarNoticeDismissed(): boolean {
+  try {
+    return localStorage.getItem(SIDECAR_NOTICE_DISMISSED_KEY) === "1";
   } catch {
     return false;
   }
@@ -366,6 +350,18 @@ function loadBrief(): StudioBrief | null {
   }
 }
 
+function loadTheses(): Thesis[] {
+  try {
+    const raw = localStorage.getItem(THESES_KEY);
+    if (raw) {
+      return JSON.parse(raw) as Thesis[];
+    }
+  } catch {
+    /* ignore malformed cache */
+  }
+  return [];
+}
+
 function loadNotifications(): StudioNotification[] {
   try {
     const raw = localStorage.getItem(NOTIFICATIONS_KEY);
@@ -375,7 +371,9 @@ function loadNotifications(): StudioNotification[] {
   } catch {
     /* ignore malformed cache */
   }
-  return SEED_NOTIFICATIONS;
+  // First run has no activity yet. Showing fabricated updates here would make
+  // the feed lie about work the studio never did.
+  return [];
 }
 
 export function StudioProvider({ children }: { children: ReactNode }) {
@@ -398,6 +396,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   });
   const [mcpReachable, setMcpReachable] = useState(false);
   const [sidecarReachable, setSidecarReachable] = useState<boolean | null>(null);
+  const [dismissedSidecarNotice, setDismissedSidecarNotice] = useState<boolean>(loadSidecarNoticeDismissed);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [memory, setMemory] = useState<Observation[]>([]);
@@ -414,6 +413,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [capabilities, setCapabilities] = useState<Capability[]>([]);
   const [connectorSuggestions, setConnectorSuggestions] = useState<string[]>([]);
   const [notifications, setNotifications] = useState<StudioNotification[]>(loadNotifications);
+  const [theses, setTheses] = useState<Thesis[]>(loadTheses);
   const toastId = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -427,7 +427,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const unreadNotificationCount = useMemo(
-    () => notifications.filter((n) => !n.read).length,
+    () => notifications.filter((n) => !n.read && !n.simulated).length,
     [notifications],
   );
 
@@ -543,9 +543,39 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     [pushToast, refreshConnectors],
   );
 
+  const saveThesis = useCallback((thesis: Omit<Thesis, "id" | "created_at">) => {
+    const saved: Thesis = {
+      ...thesis,
+      id: `THESIS-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      created_at: new Date().toISOString(),
+    };
+    setTheses((prev) => {
+      const next = [saved, ...prev];
+      try {
+        localStorage.setItem(THESES_KEY, JSON.stringify(next));
+      } catch {
+        /* storage unavailable */
+      }
+      return next;
+    });
+  }, []);
+
+  const deleteThesis = useCallback((thesisId: string) => {
+    setTheses((prev) => {
+      const next = prev.filter((thesis) => thesis.id !== thesisId);
+      try {
+        localStorage.setItem(THESES_KEY, JSON.stringify(next));
+      } catch {
+        /* storage unavailable */
+      }
+      return next;
+    });
+  }, []);
+
   const simulateBackgroundEvent = useCallback(() => {
     const events: Array<Omit<StudioNotification, "id" | "timestamp" | "read">> = [
       {
+        simulated: false,
         title: "Telemetry Ingestion Complete",
         message: "Analyzed workflow traces: 82% of users report friction during cluster config.",
         category: "evidence",
@@ -554,6 +584,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
         chatPrompt: "What friction was reported during cluster config?",
       },
       {
+        simulated: false,
         title: "New Opportunity Uncovered",
         message: "Automating validation rules elevated satisfaction target by +2.4 points.",
         category: "outcome",
@@ -562,6 +593,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
         chatPrompt: "Show me details on the validation rules opportunity.",
       },
       {
+        simulated: false,
         title: "AI Job Step Insight",
         message: "Suggested adding 'Verify secret parity across clusters' to Phase 4 of Job Map.",
         category: "job",
@@ -572,7 +604,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     ];
 
     const chosen = events[Math.floor(Math.random() * events.length)];
-    addNotification(chosen);
+    addNotification({ ...chosen, simulated: true });
     pushToast("info", `Background Activity: ${chosen.title}`);
   }, [addNotification, pushToast]);
 
@@ -669,10 +701,28 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       setMcpReachable(mcp);
       setLlmHealth(llm);
       void refreshCapabilities();
+      if (sidecar) {
+        setDismissedSidecarNotice(false);
+      }
       return { sidecarReachable: sidecar, mcpReachable: mcp, llmHealthy: llm.healthy };
     },
     [settings, refreshCapabilities],
   );
+
+  // Re-probe after the user acted on the sidecar notice (e.g. started the
+  // sidecar). Resolves once the report is in so the UI can stop showing "busy".
+  const recheckConnections = useCallback(async () => {
+    await checkConnections();
+  }, [checkConnections]);
+
+  const dismissSidecarNotice = useCallback(() => {
+    setDismissedSidecarNotice(true);
+    try {
+      localStorage.setItem(SIDECAR_NOTICE_DISMISSED_KEY, "1");
+    } catch {
+      /* storage unavailable */
+    }
+  }, []);
 
   const refreshCanvas = useCallback(async () => {
     setCanvasState((prev) => ({ kind: "loading", data: prev.data }));
@@ -842,6 +892,14 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     ) => {
       const trimmed = text.trim();
       if ((!trimmed && attachments.length === 0) || streaming) {
+        return;
+      }
+
+      // The sidecar is confirmed down: don't start a doomed stream. The notice
+      // above the composer already explains what's wrong; just surface a quiet
+      // heads-up in-thread and stop.
+      if (sidecarReachable === false) {
+        pushNotice("The studio sidecar isn't running — live replies are paused. Start it from Settings.");
         return;
       }
 
@@ -1178,6 +1236,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       conversationId,
       refreshCanvas,
       refreshConnectors,
+      sidecarReachable,
+      pushNotice,
     ],
   );
 
@@ -1483,6 +1543,9 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       llmHealth,
       mcpReachable,
       sidecarReachable,
+      dismissedSidecarNotice,
+      dismissSidecarNotice,
+      recheckConnections,
       checkConnections,
       messages,
       streaming,
@@ -1533,6 +1596,9 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       deleteConnector,
       connectorSuggestions,
       dismissConnectorSuggestion,
+      theses,
+      saveThesis,
+      deleteThesis,
       notifications,
       unreadNotificationCount,
       markNotificationAsRead,
@@ -1560,6 +1626,9 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       llmHealth,
       mcpReachable,
       sidecarReachable,
+      dismissedSidecarNotice,
+      dismissSidecarNotice,
+      recheckConnections,
       checkConnections,
       messages,
       streaming,
@@ -1610,6 +1679,9 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       deleteConnector,
       connectorSuggestions,
       dismissConnectorSuggestion,
+      theses,
+      saveThesis,
+      deleteThesis,
       notifications,
       unreadNotificationCount,
       markNotificationAsRead,
