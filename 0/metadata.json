@@ -1,0 +1,54 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "01M62K4BM5T5DSH0GQWK760XXN",
+  "session_id": "ses_e82b2729bffekS2KbXafYAauS3",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-29T01:07:17.180316707Z",
+  "branch": "issue/78-no-surface-lies",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "apps/studio-api/src/agentic_odi_studio_api/studio/mcp_data.py",
+    "apps/studio-api/src/agentic_odi_studio_api/studio/ui_spec.py",
+    "apps/studio-api/tests/test_studio_mcp_data.py",
+    "apps/studio/src/components/notifications/CatchUpFeed.test.tsx",
+    "apps/studio/src/lib/canvasProvenance.test.ts",
+    "apps/studio/src/lib/canvasProvenance.ts"
+  ],
+  "agent": "OpenCode",
+  "model": "deepseek-v4.1-flash-free",
+  "turn_id": "6461344f5f8c",
+  "checkpoint_transcript_start": 454,
+  "transcript_lines_at_start": 454,
+  "compact_transcript_start": 454,
+  "token_usage": {
+    "input_tokens": 538036,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 13787392,
+    "output_tokens": 40854,
+    "api_call_count": 136
+  },
+  "session_metrics": {
+    "turn_count": 7
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-10-29T01:07:16.875451854Z",
+    "agent_lines": 374,
+    "agent_removed": 31,
+    "human_added": 432,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 806,
+    "total_lines_changed": 946,
+    "agent_percentage": 42.81183932346723,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0
+    }
+  ]
+}
