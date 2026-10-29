@@ -52,7 +52,7 @@ def test_the_template_documents_every_supported_metadata_key():
     assert "agent_confidence" in body
 
 
-def test_the_readme_documents_the_labeler():
-    readme = (ROOT / "README.md").read_text(encoding="utf-8")
-    assert "agent-pr" in readme or "Label" in readme
-    assert "AGENT_METADATA" in readme
+def test_the_development_guide_documents_the_labeler():
+    guide = (ROOT / "docs" / "development.md").read_text(encoding="utf-8")
+    assert "PR labels" in guide
+    assert "AGENT_METADATA" in guide

@@ -116,17 +116,26 @@ agentic-odi jobs delete <job-id> --yes
 
 # Steps (Job Map)
 agentic-odi steps add --job-id <job-id> --name "Prepare environment" --order 1
+agentic-odi steps add --job-id <job-id> --name "Execute" --order 5 --stage execute
 agentic-odi steps list --job-id <job-id>
 agentic-odi steps get <step-id>
 agentic-odi steps update <step-id> --order 2
 agentic-odi steps delete <step-id> --yes
 
+Capture a desired or customer outcome before adding a step. Use `--allow-empty-job-map`
+only when you intentionally need to stage a map before capturing outcomes.
+
 # Desired Outcomes
-agentic-odi desired-outcomes add --job-id <job-id>   --statement "Minimize the time it takes to get a working environment"   --importance 8 --satisfaction 4
+agentic-odi desired-outcomes add --job-id <job-id> --statement "Minimize the time it takes to get a working environment" --importance 8 --satisfaction 4
 agentic-odi desired-outcomes list --job-id <job-id>
 agentic-odi desired-outcomes get <outcome-id>
 agentic-odi desired-outcomes update <outcome-id> --satisfaction 6
 agentic-odi desired-outcomes delete <outcome-id> --yes
+agentic-odi desired-outcomes evaluate "Minimize the time to ship when onboarding"
+```
+
+`--importance` and `--satisfaction` (1–10) are now required on `add`. `evaluate`
+checks a statement against the ODI format rules before saving.
 ```
 
 Add `--json` to any command for machine-readable output.
@@ -168,10 +177,43 @@ agentic-odi evaluate "Minimize the time to ship when onboarding"  # outcome-form
 agentic-odi evaluate --json "Minimize the time to ship when onboarding"
 agentic-odi guidelines        # the ODI stage-by-stage guide
 agentic-odi capabilities      # what the assistant can do
+agentic-odi capabilities --json   # machine-readable manifest
+agentic-odi capabilities tools  # tool names only
 ```
 
 `evaluate` returns the same verdict the `evaluate_outcome` MCP tool does, so the
 check works with or without a running server.
+
+`capabilities` groups every tool by effect (read/write/destructive) and by ODI
+stage. `capabilities --json` emits the full machine-readable manifest.
+`capabilities tools` lists tool names only.
+
+## Inspect settings and feature flags
+
+```bash
+agentic-odi settings flags list
+agentic-odi settings flags get experimental_connectors
+agentic-odi settings flags set experimental_connectors true
+agentic-odi settings flags reset
+```
+
+`experimental_connectors` gates the `connectors` group (`add`, `health`,
+`ingest`). `auto_update` gates startup auto-update checks. `advanced_metrics`
+gates detailed metrics output in `desired-outcomes evaluate`. `developer_mode`
+gates raw MCP trace debugging.
+
+## Manage your profile and run setup
+
+```bash
+agentic-odi profile show
+agentic-odi profile set domain "acme.test"
+agentic-odi profile path
+agentic-odi setup       # alias for profile; runs the first-run baseline wizard
+```
+
+`profile show` prints the baseline as JSON. `profile set` updates a baseline
+field. `profile path` prints the baseline file path. `setup` is an alias for
+`profile` that runs the interactive first-run baseline wizard on first launch.
 
 ## Manage Customer Outcomes
 
@@ -228,6 +270,7 @@ ingest behavior.
 python -m agentic_odi_cli connectors catalog
 python -m agentic_odi_cli connectors add mcp --preset github
 python -m agentic_odi_cli connectors list
+python -m agentic_odi_cli connectors list --json   # name, kind, url, enabled per connector
 python -m agentic_odi_cli connectors health --name github
 python -m agentic_odi_cli connectors ingest --name github
 ```

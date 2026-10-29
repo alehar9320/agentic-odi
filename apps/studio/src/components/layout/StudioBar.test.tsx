@@ -1,11 +1,17 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi, beforeEach } from "vitest";
+
+vi.mock("../../updater", () => ({
+  useUpdateSnapshot: vi.fn(),
+}));
 
 vi.mock("../../state/StudioContext", () => ({
   useStudio: vi.fn(),
 }));
 
 import { useStudio } from "../../state/StudioContext";
+import { useUpdateSnapshot } from "../../updater";
+import type { UpdateSnapshot } from "../../updater/types";
 import { StudioBar } from "./StudioBar";
 
 const stubContext = (overrides: Record<string, unknown> = {}) => ({
@@ -20,7 +26,25 @@ const stubContext = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 });
 
+const stubSnapshot = (overrides: Partial<UpdateSnapshot> = {}): UpdateSnapshot => ({
+  phase: "up-to-date",
+  currentVersion: "0.12.0",
+  available: null,
+  progress: null,
+  lastCheckedAt: null,
+  installed: false,
+  pendingInstall: false,
+  error: null,
+  autoCheck: true,
+  skippedVersion: null,
+  dismissedVersion: null,
+  ...overrides,
+});
+
 describe("StudioBar", () => {
+  beforeEach(() => {
+    vi.mocked(useUpdateSnapshot).mockReturnValue(stubSnapshot() as never);
+  });
   it("shows the Odi mark at 32 pixels so the pixel art stays crisp", () => {
     vi.mocked(useStudio).mockReturnValue(stubContext() as never);
     const { container } = render(
@@ -29,6 +53,20 @@ describe("StudioBar", () => {
     const svg = container.querySelector(".brand__mark svg");
     expect(svg?.getAttribute("width")).toBe("32");
     expect(svg?.getAttribute("height")).toBe("32");
+  });
+
+  it("labels the model health control with its state and message", () => {
+    vi.mocked(useStudio).mockReturnValue(
+      stubContext({
+        llmHealth: { healthy: false, message: "No model is reachable." },
+        openPanel: vi.fn(),
+      }) as never,
+    );
+    render(<StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />);
+
+    expect(
+      screen.getByRole("button", { name: /model status: local mode\. no model is reachable\./i }),
+    ).toBeInTheDocument();
   });
 
   it("keeps the brand mark decorative and labels the home control in text", () => {
@@ -104,5 +142,25 @@ describe("StudioBar", () => {
 
     expect(markAllNotificationsAsRead).toHaveBeenCalled();
     expect(openPanel).toHaveBeenCalledWith("catchup");
+  });
+
+  it("shows the running version and opens update settings", () => {
+    const openPanel = vi.fn();
+    vi.mocked(useStudio).mockReturnValue(stubContext({ openPanel }) as never);
+    render(<StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />);
+
+    const version = screen.getByRole("button", { name: "v0.12.0" });
+    fireEvent.click(version);
+
+    expect(openPanel).toHaveBeenCalledWith("settings");
+  });
+
+  it("says update ready when a restart will finish the job", () => {
+    vi.mocked(useStudio).mockReturnValue(stubContext() as never);
+    vi.mocked(useUpdateSnapshot).mockReturnValue(stubSnapshot({ phase: "ready" }) as never);
+
+    render(<StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />);
+
+    expect(screen.getByRole("button", { name: "Update ready" })).toBeInTheDocument();
   });
 });

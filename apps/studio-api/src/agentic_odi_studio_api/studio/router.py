@@ -17,6 +17,7 @@ from agentic_odi_core import (
     OdiError,
     ODIService,
     OutcomeNotFoundError,
+    OutcomeStatementError,
     StepNotFoundError,
     ToolName,
     ValueOutOfRangeError,
@@ -115,6 +116,11 @@ def _json_or_raw(value: str) -> Any:
 
 def _as_http_error(exc: Exception) -> StudioHTTPError:
     """Translate domain errors into typed HTTP responses without leaking 500s."""
+    if isinstance(exc, OutcomeStatementError):
+        return StudioHTTPError(
+            StudioError(code=StudioErrorCode.VALIDATION, message=str(exc)),
+            status_code=422,
+        )
     if isinstance(exc, (JobNotFoundError, StepNotFoundError, OutcomeNotFoundError)):
         return StudioHTTPError(StudioError(code=StudioErrorCode.NOT_FOUND, message=str(exc)))
     if isinstance(exc, ValueOutOfRangeError):
@@ -335,7 +341,14 @@ async def get_outcomes(
     if _uses_mcp(request):
         target = _require_mcp_url(mcp_url or "")
         if not job_id:
-            raise HTTPException(status_code=400, detail="job_id is required for the mcp backend")
+            raise StudioHTTPError(
+                StudioError(
+                    code=StudioErrorCode.VALIDATION,
+                    message="job_id is required for the mcp backend",
+                    suggestion="Pass job_id, or use the local backend to list every outcome.",
+                ),
+                status_code=400,
+            )
         arguments: dict[str, Any] = {"job_id": job_id}
         if step_id:
             arguments["step_id"] = step_id
@@ -404,14 +417,25 @@ async def delete_job(job_id: str, request: Request, mcp_url: str | None = Query(
 @router.post("/steps")
 async def post_step(body: AddStepRequest, request: Request) -> dict:
     if _uses_mcp(request):
+        args = {"job_id": body.job_id, "name": body.name, "order": body.order}
+        if body.stage is not None:
+            args["stage"] = body.stage.value
+        if body.allow_empty_job_map:
+            args["allow_empty_job_map"] = True
         result = await call_mcp_tool(
             _require_mcp_url(body.mcp_url),
             ToolName.ADD_STEP.value,
-            {"job_id": body.job_id, "name": body.name, "order": body.order},
+            args,
         )
         return _payload_from_text(result)
     try:
-        step = _service(request).add_step(job_id=body.job_id, name=body.name, order=body.order)
+        step = _service(request).add_step(
+            job_id=body.job_id,
+            name=body.name,
+            order=body.order,
+            stage=body.stage,
+            allow_empty_job_map=body.allow_empty_job_map,
+        )
     except Exception as exc:  # noqa: BLE001
         raise _as_http_error(exc) from exc
     return step.model_dump(mode="json")

@@ -122,6 +122,74 @@ You can also trigger them manually:
 pre-commit run --all-files
 ```
 
+## PR Risk Classification
+
+Every pull request is automatically classified by the
+[PR Risk Classification](../.github/workflows/pr-risk.yml) workflow, which runs
+on `ubuntu-latest` at $0 cost with zero external dependencies. It scores the diff
+(0–100) across three factors and applies a single, mutually exclusive label:
+
+| Label | Meaning | Score |
+|---|---|---|
+| `safe to merge` | Low risk — small diff, docs-only, or tested source code | ≤ 20 |
+| `needs a look` | Medium risk — standard feature work or missing test updates | 21–50 |
+| `danger zone` | High risk — critical path (auth, migrations, billing, infra, workflows) or protected-file deletion | ≥ 51 |
+
+Scoring factors:
+
+- **File & line churn** — files changed and lines added/deleted (0–30 points).
+- **Critical path override** — touching `auth/`, `migrations/`, `billing/`,
+  `infra/`, `.github/workflows/`, or deleting a file in
+  `.ci/protected-files.txt` forces the danger zone.
+- **Test delta** — source code changed without a corresponding
+  `*.test.*`/`*.spec.*`/`tests/**` file adds 20 points.
+
+### PR labels
+
+The same workflow also labels every pull request so a reviewer can read its
+shape at a glance, without opening the diff. Labelling is deterministic — no
+LLM calls, no network beyond the GitHub API — so it cannot invent a label.
+
+| Axis | Labels | What it tells a reviewer |
+|---|---|---|
+| Provenance | `🤖 agent`, `👤 human` | Whether a coding agent or a human wrote it. Detected from the PR author, the branch prefix, and the commit identities, because agents in this repository push on the owner's account. |
+| Size | `size/XS` … `size/XL` | How much there is to read: <50, 50–249, 250–799, 800–1999, 2000+ lines changed. |
+| Domain | `area/studio`, `area/cli`, `area/core`, `area/infra`, `area/docs`, … | Which components the diff touches. A PR can carry several. |
+| Supply chain | `dependencies` | A manifest or lockfile changed (`package-lock.json`, `pyproject.toml`, `Cargo.lock`, `go.sum`, …). Worth a careful read even when the diff is one line. |
+| Agent telemetry | `breaking change`, `needs deep dive`, `telemetry invalid` | What the agent declared about its own work. |
+
+#### Agent telemetry
+
+Coding agents declare what they know in the pull request body. Add this block to
+the description; the [pull request
+template](../.github/pull_request_template.md) already includes it:
+
+```html
+<!-- AGENT_METADATA {"has_breaking_changes": true, "agent_confidence": "low"} -->
+```
+
+- `has_breaking_changes: true` applies `breaking change`.
+- `agent_confidence: "low"` applies `needs deep dive`.
+- A block that cannot be parsed applies `telemetry invalid`. The workflow keeps
+  going either way and never fails the check suite on a malformed block.
+
+Human authors can leave the block alone: the shipped defaults claim nothing.
+
+Labels are managed idempotently. Each run adds the labels it computed and
+removes the ones it previously added that no longer apply, so re-pushing a
+branch corrects the size label instead of stacking a second one. The set of
+labels this system owns is defined once, in `scripts/pr_labels.py`:
+
+```bash
+python3 scripts/pr_labels.py --managed          # list every managed label
+echo '{"author":{"login":"x","type":"User"},"files":[]}' | python3 scripts/pr_labels.py
+```
+
+The risk tier labels (`safe to merge`, `needs a look`, `danger zone`) and the
+merge-state labels (`ready-for-merge`, `merge-conflict`) are owned by other
+workflows and are deliberately left alone. The workflow is silent: it updates
+labels only and never posts PR comments.
+
 ## Testing
 
 Tests use **pytest** with **pytest-asyncio** (strict mode) and run entirely

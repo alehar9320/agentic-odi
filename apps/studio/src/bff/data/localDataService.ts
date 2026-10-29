@@ -65,11 +65,23 @@ export class LocalDataService {
       this.store.listSteps(),
       this.store.listOutcomes(),
     ]);
+    const empty = jobs.length === 0 && steps.length === 0 && outcomes.length === 0;
     return {
       jobs: jobs.map(stripJob),
       steps: steps.map(stripStep),
       outcomes: outcomes.map(stripOutcome),
       source: "local",
+      provenance: {
+        kind: empty ? "empty" : "live",
+        reason: empty ? "local_store_empty" : "local_store",
+        generated_at: new Date().toISOString(),
+        record_counts: {
+          jobs: jobs.length,
+          steps: steps.length,
+          outcomes: outcomes.length,
+          evidence: 0,
+        },
+      },
     };
   }
 
