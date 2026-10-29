@@ -25,6 +25,8 @@ describe("LocalDataService canvas", () => {
     expect(canvas.jobs).toEqual([]);
     expect(canvas.steps).toEqual([]);
     expect(canvas.outcomes).toEqual([]);
+    expect(canvas.provenance?.kind).toBe("empty");
+    expect(canvas.provenance?.reason).toBe("local_store_empty");
   });
 
   it("creates jobs and steps in insertion order", async () => {

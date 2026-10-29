@@ -102,6 +102,7 @@ def test_wizard_full_flow_success(tmp_path):
     assert outcomes[0]["customer_value"]["importance"] == 8.0
     assert outcomes[0]["customer_value"]["satisfaction"] == 2.0
     assert outcomes[0]["opportunity_score"] == 14.0
+    assert outcomes[0]["step_id"] == steps[0]["id"]
 
 
 def test_wizard_decline_commit(tmp_path):

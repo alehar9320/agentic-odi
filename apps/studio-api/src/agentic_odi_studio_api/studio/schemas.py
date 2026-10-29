@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any, Literal
 
 from agentic_odi_core import BusinessValue, CustomerValue, EvidenceItemType
+from agentic_odi_core.models import JobStage
 from pydantic import BaseModel, Field
 
 
@@ -40,14 +41,16 @@ class AddStepRequest(BaseModel):
     job_id: str
     name: str
     order: int
+    stage: JobStage | None = None
+    allow_empty_job_map: bool = False
 
 
 class AddOutcomeRequest(BaseModel):
     mcp_url: str
     job_id: str
     statement: str
-    importance: float
-    satisfaction: float
+    importance: float = Field(ge=1.0, le=10.0)
+    satisfaction: float = Field(ge=1.0, le=10.0)
 
 
 class CreateJobRequest(BaseModel):
