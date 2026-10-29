@@ -708,3 +708,8 @@ Each callable raises `TrustContractPendingError` naming the blocking decision
 instead of returning a fabricated band, class or direction; `test_trust_seams.py`
 pins the refusal. When a gate clears, replace the raise with the approved
 implementation and drop the corresponding seam test.
+
+The B6.1 read surface is partly present: `desired-outcomes history` and
+`get_outcome_history` replay the recorded snapshots, and `--why` records the
+reason on the snapshot. `outcome_delta` and the delta-driven rendering stay
+behind the seam until the baseline/direction decision is approved.

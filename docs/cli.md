@@ -146,7 +146,7 @@ agentic-odi desired-outcomes add --job-id <job-id> --statement "Minimize the tim
 agentic-odi desired-outcomes list --job-id <job-id>
 agentic-odi desired-outcomes get <outcome-id>
 agentic-odi desired-outcomes update <outcome-id> --satisfaction 6
-agentic-odi desired-outcomes update <outcome-id> --satisfaction 6 --note "after the review"
+agentic-odi desired-outcomes update <outcome-id> --satisfaction 6 --why "after the review"
 agentic-odi desired-outcomes history <outcome-id>
 agentic-odi desired-outcomes delete <outcome-id> --yes
 agentic-odi desired-outcomes export --job-id <job-id> --format csv > outcomes.csv
@@ -161,12 +161,12 @@ rendered `sample` line reads `est.`. A count above one with `method=estimate` is
 refused, because an estimate cannot have asked people. When the two counts
 differ, `get` shows both (`n=40/12 (survey)`) so a thin dimension stays visible.
 
-Every accepted score change is written to an append-only history. Add `--note`
+Every accepted score change is written to an append-only history. Add `--why`
 to `add` or `update` to record *why* the number was given, then read the trail
 with `history`: one row per accepted change, oldest first, each row carrying the
 score and its sample/method companions. A change that fails validation writes
 neither a score change nor a row, so the history never records a rejected edit.
-The note is history metadata, not part of the outcome record.
+The reason is history metadata, not part of the outcome record.
 
 # One-screen report: job header, phase coverage, biggest opportunities
 agentic-odi summary <job-id>

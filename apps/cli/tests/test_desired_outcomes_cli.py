@@ -277,7 +277,7 @@ def test_history_shows_one_row_per_accepted_change(tmp_path) -> None:
     runner = CliRunner()
     db = str(tmp_path / "odi.db")
     job_id = _job_id(runner, db)
-    added = _add(runner, db, job_id, "--note", "first pass")
+    added = _add(runner, db, job_id, "--why", "first pass")
 
     runner.invoke(
         app,
@@ -289,7 +289,7 @@ def test_history_shows_one_row_per_accepted_change(tmp_path) -> None:
             added["id"],
             "--satisfaction",
             "6",
-            "--note",
+            "--why",
             "after the review",
         ],
     )
