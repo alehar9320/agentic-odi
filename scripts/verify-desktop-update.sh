@@ -7,14 +7,22 @@
 #   4. runs the result again and asserts it checks, finds nothing, and downloads
 #      nothing
 #
-# This is a manual proof, not part of CI: it builds the desktop shell twice and
-# needs a Linux display plus AppImage/FUSE support. Run it from a workstation:
+# This runs weekly in CI: the `updater-e2e` job in .github/workflows/ci.yml
+# (schedule + workflow_dispatch only, outside the `ci-green` gate) executes it
+# headless under xvfb with APPIMAGE_EXTRACT_AND_RUN=1. It needs no repository
+# secret — the key is generated per run below and the committed updater public
+# key is untouched. It also stays runnable from a workstation:
 #
 #   bash scripts/verify-desktop-update.sh
 #
-# The throwaway key means the built AppImages only trust this test feed; the
-# committed public key is untouched.
+# A Linux display (or xvfb) and AppImage/FUSE or extract-and-run support are
+# required, because the script builds the desktop shell twice.
 set -euo pipefail
+
+# GitHub runners have no FUSE daemon; extracting the AppImage to a temp dir
+# still leaves the on-disk .AppImage as current_exe(), which is what the
+# updater renames and replaces, so the assertions below hold either way.
+export APPIMAGE_EXTRACT_AND_RUN="${APPIMAGE_EXTRACT_AND_RUN:-1}"
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 STUDIO="$REPO_ROOT/apps/studio"

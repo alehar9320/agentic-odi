@@ -177,10 +177,15 @@ fi
 # ---------------------------------------------------------------------------
 # Label hygiene: remove all stale risk labels, then apply the current tier.
 # No PR comments are posted (silent execution).
+#
+# Removing a label that is already absent is a harmless no-op, so those calls
+# stay tolerant. Applying the tier must NOT be swallowed: this script once
+# reported success on every pull request while writing no label at all, because
+# an uncreated label and an empty diff both failed quietly here.
 # ---------------------------------------------------------------------------
 for label in "${RISK_LABELS[@]}"; do
   gh pr edit "${PR_NUMBER}" --repo "${REPO}" --remove-label "${label}" >/dev/null 2>&1 || true
 done
-gh pr edit "${PR_NUMBER}" --repo "${REPO}" --add-label "${tier}" >/dev/null 2>&1 || true
+gh pr edit "${PR_NUMBER}" --repo "${REPO}" --add-label "${tier}"
 
 echo "PR risk score: ${score}/100 -> ${tier}"
