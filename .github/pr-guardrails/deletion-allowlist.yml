@@ -1,0 +1,21 @@
+# Deletions are denied by default. Add one entry per approved deletion, with the
+# issue that tracks it. Glob patterns are supported.
+#
+# - path: "apps/old/thing.tsx"
+#   issue: "<issue-number>"
+#   reason: "Replaced by apps/new/thing.tsx in <issue-number>"
+- path: "apps/studio/src/components/Toasts.test.tsx"
+  issue: 264
+  reason: "Replaced by banner-system tests in PR #264."
+- path: "apps/studio/src/components/Toasts.tsx"
+  issue: 264
+  reason: "Replaced by the unified banner stack in PR #264."
+- path: "apps/studio/src/components/chat/OfflineNotice.tsx"
+  issue: 264
+  reason: "Replaced by the unified banner system in PR #264."
+- path: "apps/studio/src/components/notices/SidecarNotice.test.tsx"
+  issue: 264
+  reason: "Replaced by banner bridge tests in PR #264."
+- path: "apps/studio/src/components/notices/SidecarNotice.tsx"
+  issue: 264
+  reason: "Replaced by the unified banner bridge in PR #264."

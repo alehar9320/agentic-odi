@@ -65,8 +65,35 @@ apps/cli ──────────────▶ packages/connectors
 | `agentic-odi-studio-api` | `agentic_odi_studio_api.main:main` |
 | `uv run python scripts/dev.py` | Dev launcher (MCP + Studio API) |
 
+## Pull Request Guardrails
+
+`.github/workflows/pr-guardrails.yml` runs three gates on the cumulative
+`base...HEAD` diff, so a tree-replacement commit buried in the middle of a
+branch is still visible:
+
+- **diff-shape** (blocking): refuses to delete a file that exists on the base
+  branch unless it is listed in `.github/pr-guardrails/deletion-allowlist.yml`;
+  refuses a diff that deletes more than `max_deletions` lines or changes more
+  than `max_changed_files` files, excluding regenerated files. Thresholds live
+  in `.github/pr-guardrails/config.yml`.
+- **body-truth** (warns; the fenced JSON diff summary blocks): compares
+  natural-language file/test claims and the machine-readable block against the
+  real diff.
+- **fabrication** (warns): flags new `TODO`/`FIXME`/`NotImplementedError`/stubs,
+  unconditional `is_available`, hardcoded measurements, and "mock" returns.
+
+The logic lives in `scripts/pr_guards.py`; the YAML only gathers the diff.
+Unit tests are in `tests/scripts/test_pr_guards.py`.
+
+Repository ruleset `main-requires-ci-green` (id `25356329`) requires both
+`CI green` and `PR guardrails`, sets
+`strict_required_status_checks_policy: true`, and keeps the admin bypass only
+for pull requests (`bypass_mode: pull_request`). Rulesets are repository
+settings, not files; change them with `gh api` and record it here.
+
 ## Related
 
 - [Data flow](data-flow.md)
 - [Studio banners](banners.md)
 - [Testing](testing.md)
+- [Decisions (ADRs)](adr/README.md) — why the architecture looks the way it does
