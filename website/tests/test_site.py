@@ -489,5 +489,11 @@ def test_page_weights_are_within_budget(page: str):
     # page, so it grows with each paginated list tool we add. The ceiling leaves
     # room for the per-page social metadata every page now carries (its own
     # og:image, twitter:image, and their alt text); before that metadata the
-    # studio page already sat within ~120 bytes of the old 64 KiB limit.
-    assert size <= 68 * 1024, f"{page}: {size} bytes"
+    # studio page already sat within ~120 bytes of the old 64 KiB limit. It moved
+    # to 76 KiB when the candidate-review tools (extract/list/get/accept/reject/
+    # merge) joined the reference — six argument tables on the one page. It moved
+    # again to 80 KiB when the decision, bet and measurement entities joined the
+    # schema reference — three more entity schema blocks on the same page. It moved
+    # to 88 KiB when the score, brief, decision, bet and measure tools joined the
+    # tool reference — five more argument tables on that same page.
+    assert size <= 88 * 1024, f"{page}: {size} bytes"

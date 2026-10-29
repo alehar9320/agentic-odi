@@ -14,8 +14,10 @@ import typer
 
 from agentic_odi_cli import context, paths, update, version
 from agentic_odi_cli.backend import run_tool
+from agentic_odi_cli.candidates import candidates_app
 from agentic_odi_cli.connectors import connectors_app
 from agentic_odi_cli.customer_outcomes import customer_outcomes_app, score
+from agentic_odi_cli.demo import demo_app
 from agentic_odi_cli.desired_outcomes import desired_outcomes_app
 from agentic_odi_cli.evidence import evidence_app
 from agentic_odi_cli.jobs import jobs_app
@@ -37,6 +39,12 @@ app.add_typer(steps_app, name="steps", help="Manage Job-map Steps.")
 app.add_typer(desired_outcomes_app, name="desired-outcomes", help="Manage desired Outcomes.")
 app.add_typer(evidence_app, name="evidence", help="Manage evidence captured from connectors.")
 app.add_typer(customer_outcomes_app, name="customer-outcomes", help="Manage Customer Outcomes")
+app.add_typer(
+    candidates_app,
+    name="candidates",
+    help="Review proposed outcomes extracted from quotes.",
+)
+app.add_typer(demo_app, name="demo", help="Load a labelled sample workspace on purpose.")
 app.add_typer(
     customer_outcomes_app,
     name="outcomes",
@@ -231,13 +239,25 @@ def spine_cmd(
 ) -> None:
     """Report which stages of the quote-to-measurement spine are implemented.
 
-    Until the spine stages land, this prints the honest gap — each stage with the
-    issue that implements it — rather than a fabricated number.
+    Reports the build's actual capability: every stage wired to the local store
+    shows as available, and any seam without an implementation still names the
+    issue that owns it rather than a fabricated number.
     """
-    from agentic_odi_core import seam_inventory, spine_summary
+    from agentic_odi_core import build_spine, seam_inventory, spine_summary
+    from agentic_odi_core.demo import StoreDemoLoader
+    from agentic_odi_core.sqlite_repository import SQLiteRepository
+
+    repo = SQLiteRepository(db_path=context.config().db_path)
+    try:
+        spine = build_spine(repo)
+        demo = StoreDemoLoader(repo)
+        inventory = seam_inventory(spine, demo=demo)
+        rendered = spine_summary(spine, demo=demo)
+    finally:
+        repo.close()
 
     if json_output:
-        inventory = [
+        payload = [
             {
                 "id": status.id,
                 "available": status.available,
@@ -248,11 +268,49 @@ def spine_cmd(
                     "module": status.owner.module,
                 },
             }
-            for status in seam_inventory()
+            for status in inventory
         ]
-        typer.echo(json.dumps({"seams": inventory}, indent=2))
+        typer.echo(json.dumps({"seams": payload}, indent=2))
     else:
-        typer.echo(spine_summary())
+        typer.echo(rendered)
+
+
+@app.command(name="store")
+def store_cmd(
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
+) -> None:
+    """Report the local store's schema version and whether it is openable.
+
+    Opens the store through the same path every command uses, so a refusal here
+    is the refusal a user would hit elsewhere — not a second, softer check.
+    """
+    from agentic_odi_core.intent_store import CURRENT_SCHEMA_VERSION
+    from agentic_odi_core.sqlite_repository import SQLiteRepository
+
+    db_path = context.config().db_path
+    try:
+        repo = SQLiteRepository(db_path=db_path)
+    except Exception as exc:  # noqa: BLE001 - surfaced verbatim, it is the point
+        typer.secho(f"Error: {exc}", fg="red", err=True)
+        raise typer.Exit(code=1) from exc
+    try:
+        version = repo.store.schema_version()
+    finally:
+        repo.close()
+    if json_output:
+        typer.echo(
+            json.dumps(
+                {
+                    "db_path": db_path,
+                    "schema_version": version,
+                    "supported_version": CURRENT_SCHEMA_VERSION,
+                },
+                indent=2,
+            )
+        )
+    else:
+        typer.echo(f"store: {db_path or '(default)'}")
+        typer.echo(f"schema version: {version} (this build supports {CURRENT_SCHEMA_VERSION})")
 
 
 app.add_typer(settings_app, name="settings")

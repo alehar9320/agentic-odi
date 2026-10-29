@@ -122,6 +122,15 @@ class IntentStore:
             )
         self.ensure_version()
 
+    def schema_version(self) -> int:
+        """The store's own file-format version, for a surface to report.
+
+        Reads the stamped version without writing: a caller that only wants to
+        report the version must not trigger a migration or a version stamp.
+        """
+        version = self._read_version()
+        return CURRENT_SCHEMA_VERSION if version is None else version
+
     def _read_version(self) -> int | None:
         """Return the stamped version, or ``None`` when no version is stamped.
 

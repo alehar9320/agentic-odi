@@ -112,12 +112,12 @@ _STUB_TYPES_BY_STAGE: dict[SpineStage, type] = {
 @pytest.mark.parametrize(
     ("call", "seam_id"),
     [
-        (lambda s: s.extractor.extract("a quote"), "candidate"),
         (
-            lambda s: s.acceptor.accept(
-                CandidateOutcome(quote_id="q", statement="x", source_quote="a quote"),
-                job_id="j",
-            ),
+            lambda s: s.extractor.extract("a quote", quote_id="q", job_id="j"),
+            "candidate",
+        ),
+        (
+            lambda s: s.acceptor.accept("candidate-1", importance=5.0, satisfaction=5.0),
             "outcome",
         ),
         (lambda s: s.sampler.sample("o"), "score"),
@@ -135,7 +135,7 @@ def test_each_stub_raises_stage_not_implemented(call, seam_id: str) -> None:
 
 def test_the_refusal_names_the_owning_issue() -> None:
     with pytest.raises(StageNotImplemented) as caught:
-        default_spine().extractor.extract("a quote")
+        default_spine().extractor.extract("a quote", quote_id="q", job_id="j")
     message = str(caught.value)
     assert "ALH-17" in message
     assert "not implemented" in message
@@ -186,7 +186,9 @@ def test_missing_stages_lists_every_gap_in_order() -> None:
 
 def test_wiring_a_real_stage_marks_only_that_stage_available() -> None:
     class RealExtractor:
-        def extract(self, quote: str) -> list[CandidateOutcome]:
+        def extract(
+            self, quote: str, *, quote_id: str, job_id: str, **kwargs: object
+        ) -> list[CandidateOutcome]:
             return []
 
     spine = Spine(extractor=RealExtractor())
@@ -320,12 +322,29 @@ def test_the_seam_composes_across_all_seven_stages() -> None:
     """
 
     class FakeExtractor:
-        def extract(self, quote: str) -> list[CandidateOutcome]:
-            return [CandidateOutcome(quote_id="q1", statement="Minimize time", source_quote=quote)]
+        def extract(
+            self, quote: str, *, quote_id: str, job_id: str, **kwargs: object
+        ) -> list[CandidateOutcome]:
+            return [
+                CandidateOutcome(
+                    quote_id=quote_id,
+                    statement="Minimize time",
+                    source_quote=quote,
+                    candidate_id="c1",
+                )
+            ]
 
     class FakeAcceptor:
-        def accept(self, candidate: CandidateOutcome, *, job_id: str) -> Outcome:
-            return Outcome(id="o1", job_id=job_id, statement=candidate.statement)
+        def accept(
+            self, candidate_id: str, *, importance: float, satisfaction: float, **kwargs: object
+        ) -> Outcome:
+            return Outcome(
+                id="o1",
+                job_id="job1",
+                statement="Minimize time",
+                importance=importance,
+                satisfaction=satisfaction,
+            )
 
     class FakeSampler:
         def sample(self, outcome_id: str) -> ScoreSample:
@@ -371,8 +390,11 @@ def test_the_seam_composes_across_all_seven_stages() -> None:
         measurements=FakeMeasurements(),
     )
 
-    candidate = spine.extractor.extract("Customers say onboarding takes too long.")[0]
-    outcome = spine.acceptor.accept(candidate, job_id="job1")
+    candidate = spine.extractor.extract(
+        "Customers say onboarding takes too long.", quote_id="q1", job_id="job1"
+    )[0]
+    assert candidate.candidate_id is not None
+    outcome = spine.acceptor.accept(candidate.candidate_id, importance=9.0, satisfaction=3.0)
     score = spine.sampler.sample(outcome.id)
     brief = spine.brief.render(outcome.id)
     decision = spine.decisions.record(

@@ -64,6 +64,18 @@ async def live_tool_surface() -> dict[str, Any]:
 async def test_live_registry_snapshot() -> None:
     assert await live_tool_surface() == snapshot(
         {
+            "accept_candidate": {
+                "additionalProperties": False,
+                "properties": {
+                    "candidate_id": {"type": "string"},
+                    "importance": {"type": "number"},
+                    "satisfaction": {"type": "number"},
+                    "statement": {"anyOf": [{"type": "null"}, {"type": "string"}], "default": None},
+                    "step_id": {"anyOf": [{"type": "null"}, {"type": "string"}], "default": None},
+                },
+                "required": ["candidate_id", "importance", "satisfaction"],
+                "type": "object",
+            },
             "add_customer_outcome": {
                 "additionalProperties": False,
                 "properties": {
@@ -207,6 +219,33 @@ async def test_live_registry_snapshot() -> None:
                 "required": ["statement"],
                 "type": "object",
             },
+            "extract_candidates": {
+                "additionalProperties": False,
+                "properties": {
+                    "job_id": {"type": "string"},
+                    "job_name": {"anyOf": [{"type": "null"}, {"type": "string"}], "default": None},
+                    "quote": {"type": "string"},
+                    "quote_id": {"type": "string"},
+                    "stage_hint": {
+                        "anyOf": [{"type": "null"}, {"type": "string"}],
+                        "default": None,
+                    },
+                },
+                "required": ["job_id", "quote", "quote_id"],
+                "type": "object",
+            },
+            "get_brief": {
+                "additionalProperties": False,
+                "properties": {"subject_id": {"type": "string"}},
+                "required": ["subject_id"],
+                "type": "object",
+            },
+            "get_candidate": {
+                "additionalProperties": False,
+                "properties": {"candidate_id": {"type": "string"}},
+                "required": ["candidate_id"],
+                "type": "object",
+            },
             "get_capabilities": {"additionalProperties": False, "properties": {}, "type": "object"},
             "get_capabilities_manifest": {
                 "additionalProperties": False,
@@ -249,6 +288,12 @@ async def test_live_registry_snapshot() -> None:
                 },
                 "type": "object",
             },
+            "get_measurement": {
+                "additionalProperties": False,
+                "properties": {"bet_id": {"type": "string"}},
+                "required": ["bet_id"],
+                "type": "object",
+            },
             "get_odi_framework_guidelines": {
                 "additionalProperties": False,
                 "properties": {},
@@ -256,6 +301,12 @@ async def test_live_registry_snapshot() -> None:
             },
             "get_odi_schema": {"additionalProperties": False, "properties": {}, "type": "object"},
             "get_outcome": {
+                "additionalProperties": False,
+                "properties": {"outcome_id": {"type": "string"}},
+                "required": ["outcome_id"],
+                "type": "object",
+            },
+            "get_outcome_score": {
                 "additionalProperties": False,
                 "properties": {"outcome_id": {"type": "string"}},
                 "required": ["outcome_id"],
@@ -277,6 +328,17 @@ async def test_live_registry_snapshot() -> None:
                 "additionalProperties": False,
                 "properties": {"step_id": {"type": "string"}},
                 "required": ["step_id"],
+                "type": "object",
+            },
+            "list_candidates": {
+                "additionalProperties": False,
+                "properties": {
+                    "job_id": {"anyOf": [{"type": "null"}, {"type": "string"}], "default": None},
+                    "limit": {"anyOf": [{"type": "integer"}, {"type": "null"}], "default": None},
+                    "offset": {"default": 0, "type": "integer"},
+                    "quote_id": {"anyOf": [{"type": "null"}, {"type": "string"}], "default": None},
+                    "status": {"anyOf": [{"type": "null"}, {"type": "string"}], "default": None},
+                },
                 "type": "object",
             },
             "list_customer_outcomes": {
@@ -302,6 +364,15 @@ async def test_live_registry_snapshot() -> None:
                 },
                 "type": "object",
             },
+            "merge_candidate": {
+                "additionalProperties": False,
+                "properties": {
+                    "candidate_id": {"type": "string"},
+                    "merged_into": {"type": "string"},
+                },
+                "required": ["candidate_id", "merged_into"],
+                "type": "object",
+            },
             "promote_evidence": {
                 "additionalProperties": False,
                 "properties": {
@@ -320,6 +391,32 @@ async def test_live_registry_snapshot() -> None:
                     "target": {"type": "string"},
                 },
                 "required": ["evidence_id", "target"],
+                "type": "object",
+            },
+            "record_decision": {
+                "additionalProperties": False,
+                "properties": {
+                    "choice": {"type": "string"},
+                    "rationale": {"type": "string"},
+                    "subject_id": {"type": "string"},
+                },
+                "required": ["choice", "rationale", "subject_id"],
+                "type": "object",
+            },
+            "reject_candidate": {
+                "additionalProperties": False,
+                "properties": {"candidate_id": {"type": "string"}, "reason": {"type": "string"}},
+                "required": ["candidate_id", "reason"],
+                "type": "object",
+            },
+            "track_bet": {
+                "additionalProperties": False,
+                "properties": {
+                    "decision_id": {"type": "string"},
+                    "metric": {"type": "string"},
+                    "statement": {"type": "string"},
+                },
+                "required": ["decision_id", "metric", "statement"],
                 "type": "object",
             },
             "update_customer_outcome": {
@@ -437,6 +534,14 @@ async def test_live_registry_agrees_with_the_declared_contract() -> None:
 def test_declared_tool_surface_snapshot() -> None:
     assert declared_tool_surface() == snapshot(
         {
+            "accept_candidate": {
+                "arguments": ["candidate_id", "importance", "satisfaction", "statement", "step_id"],
+                "effect": "write",
+                "required": ["candidate_id", "importance", "satisfaction"],
+                "returns": "The created Outcome.",
+                "stage": "2",
+                "summary": "Accept a proposed outcome, creating exactly one Outcome.",
+            },
             "add_customer_outcome": {
                 "arguments": ["business_value", "customer_value", "job_id", "step_id"],
                 "effect": "write",
@@ -543,6 +648,30 @@ def test_declared_tool_surface_snapshot() -> None:
                 "stage": "2",
                 "summary": "Evaluate an outcome statement against ODI format rules.",
             },
+            "extract_candidates": {
+                "arguments": ["job_id", "job_name", "quote", "quote_id", "stage_hint"],
+                "effect": "write",
+                "required": ["job_id", "quote", "quote_id"],
+                "returns": "The candidates for the quote, valid ones proposed and invalid ones rejected.",
+                "stage": "2",
+                "summary": "Extract proposed outcomes from one quote; proposes, never accepts.",
+            },
+            "get_brief": {
+                "arguments": ["subject_id"],
+                "effect": "read",
+                "required": ["subject_id"],
+                "returns": "The brief document for the subject.",
+                "stage": None,
+                "summary": "Render the brief for a subject, each figure carrying its basis.",
+            },
+            "get_candidate": {
+                "arguments": ["candidate_id"],
+                "effect": "read",
+                "required": ["candidate_id"],
+                "returns": "The candidate, or an error string if not found.",
+                "stage": "2",
+                "summary": "Get a single proposed outcome by ID.",
+            },
             "get_capabilities": {
                 "arguments": [],
                 "effect": "read",
@@ -599,6 +728,14 @@ def test_declared_tool_surface_snapshot() -> None:
                 "stage": "1",
                 "summary": "List all Jobs.",
             },
+            "get_measurement": {
+                "arguments": ["bet_id"],
+                "effect": "read",
+                "required": ["bet_id"],
+                "returns": "The measurement for the bet.",
+                "stage": None,
+                "summary": "Read what a bet measured; an unmeasured bet reports nothing yet.",
+            },
             "get_odi_framework_guidelines": {
                 "arguments": [],
                 "effect": "read",
@@ -623,6 +760,14 @@ def test_declared_tool_surface_snapshot() -> None:
                 "stage": "2",
                 "summary": "Get a single Outcome by ID.",
             },
+            "get_outcome_score": {
+                "arguments": ["outcome_id"],
+                "effect": "read",
+                "required": ["outcome_id"],
+                "returns": "The score sample for the outcome.",
+                "stage": "4",
+                "summary": "Read an outcome's scores as a sample, with its sample size.",
+            },
             "get_outcomes": {
                 "arguments": ["job_id", "limit", "offset", "sort", "step_id"],
                 "effect": "read",
@@ -638,6 +783,14 @@ def test_declared_tool_surface_snapshot() -> None:
                 "returns": "The Step, or an error string if not found.",
                 "stage": "3",
                 "summary": "Get a single Step by ID.",
+            },
+            "list_candidates": {
+                "arguments": ["job_id", "limit", "offset", "quote_id", "status"],
+                "effect": "read",
+                "required": [],
+                "returns": "A list of outcome candidates.",
+                "stage": "2",
+                "summary": "List proposed outcomes, optionally for one quote, job or status.",
             },
             "list_customer_outcomes": {
                 "arguments": ["job_id", "limit", "offset"],
@@ -655,6 +808,14 @@ def test_declared_tool_surface_snapshot() -> None:
                 "stage": None,
                 "summary": "List evidence records, optionally filtered by job/step/outcome.",
             },
+            "merge_candidate": {
+                "arguments": ["candidate_id", "merged_into"],
+                "effect": "write",
+                "required": ["candidate_id", "merged_into"],
+                "returns": "The merged candidate.",
+                "stage": "2",
+                "summary": "Fold a proposed outcome into an existing Outcome; creates none.",
+            },
             "promote_evidence": {
                 "arguments": [
                     "evidence_id",
@@ -670,6 +831,30 @@ def test_declared_tool_surface_snapshot() -> None:
                 "returns": "The created Job or Outcome.",
                 "stage": None,
                 "summary": "Promote evidence to a Job or an Outcome.",
+            },
+            "record_decision": {
+                "arguments": ["choice", "rationale", "subject_id"],
+                "effect": "write",
+                "required": ["choice", "rationale", "subject_id"],
+                "returns": "The recorded decision.",
+                "stage": None,
+                "summary": "Record a decision about a subject, with its rationale.",
+            },
+            "reject_candidate": {
+                "arguments": ["candidate_id", "reason"],
+                "effect": "write",
+                "required": ["candidate_id", "reason"],
+                "returns": "The rejected candidate.",
+                "stage": "2",
+                "summary": "Reject a proposed outcome; a non-empty reason is required and kept.",
+            },
+            "track_bet": {
+                "arguments": ["decision_id", "metric", "statement"],
+                "effect": "write",
+                "required": ["decision_id", "metric", "statement"],
+                "returns": "The tracked bet.",
+                "stage": None,
+                "summary": "Track a bet under a decision, with the metric that would move.",
             },
             "update_customer_outcome": {
                 "arguments": [
@@ -726,6 +911,41 @@ def test_declared_tool_surface_snapshot() -> None:
 def test_entity_schema_snapshot() -> None:
     assert _normalize(odi_schema()) == snapshot(
         {
+            "BetRecord": {
+                "description": """\
+A bet: a decision's claim, plus the metric that would move if it is right.
+
+``baseline`` is ``None`` when the metric has not been measured yet — an
+unknown baseline, not a measured zero.\
+""",
+                "properties": {
+                    "baseline": {
+                        "anyOf": [{"type": "null"}, {"type": "number"}],
+                        "default": None,
+                        "description": "The metric's value before the bet, if known",
+                        "title": "Baseline",
+                    },
+                    "decision_id": {
+                        "description": "The Decision this bet tests",
+                        "title": "Decision Id",
+                        "type": "string",
+                    },
+                    "id": {"title": "Id", "type": "string"},
+                    "metric": {
+                        "description": "The metric that would move",
+                        "title": "Metric",
+                        "type": "string",
+                    },
+                    "statement": {
+                        "description": "The claim being bet on",
+                        "title": "Statement",
+                        "type": "string",
+                    },
+                },
+                "required": ["decision_id", "metric", "statement"],
+                "title": "BetRecord",
+                "type": "object",
+            },
             "BusinessValue": {
                 "$defs": {
                     "BusinessImpactCategory": {
@@ -981,6 +1201,40 @@ def test_entity_schema_snapshot() -> None:
                 "title": "CustomerValue",
                 "type": "object",
             },
+            "DecisionRecord": {
+                "description": """\
+A recorded decision about a subject (typically an accepted outcome).
+
+Persisted so the loop can be replayed: a decision names what was chosen and
+why, and is the parent of the :class:`BetRecord` that tests it.\
+""",
+                "properties": {
+                    "choice": {
+                        "description": "What was chosen",
+                        "title": "Choice",
+                        "type": "string",
+                    },
+                    "decided_at": {
+                        "description": "ISO-8601 timestamp of the decision",
+                        "title": "Decided At",
+                        "type": "string",
+                    },
+                    "id": {"title": "Id", "type": "string"},
+                    "rationale": {
+                        "description": "Why it was chosen",
+                        "title": "Rationale",
+                        "type": "string",
+                    },
+                    "subject_id": {
+                        "description": "The Outcome this decision is about",
+                        "title": "Subject Id",
+                        "type": "string",
+                    },
+                },
+                "required": ["choice", "decided_at", "rationale", "subject_id"],
+                "title": "DecisionRecord",
+                "type": "object",
+            },
             "Evidence": {
                 "description": "A captured research record linked (optionally) to ODI artifacts.",
                 "properties": {
@@ -1006,6 +1260,13 @@ def test_entity_schema_snapshot() -> None:
                     "name": {
                         "description": "Short human-readable label for the record",
                         "title": "Name",
+                        "type": "string",
+                    },
+                    "origin": {
+                        "default": "user",
+                        "description": "Where this row came from",
+                        "enum": ["demo", "imported", "sample", "user"],
+                        "title": "Origin",
                         "type": "string",
                     },
                     "outcome_id": {
@@ -1055,9 +1316,51 @@ def test_entity_schema_snapshot() -> None:
                         "title": "Name",
                         "type": "string",
                     },
+                    "origin": {
+                        "default": "user",
+                        "description": "Where this row came from",
+                        "enum": ["demo", "imported", "sample", "user"],
+                        "title": "Origin",
+                        "type": "string",
+                    },
                 },
                 "required": ["name"],
                 "title": "Job",
+                "type": "object",
+            },
+            "MeasurementRecord": {
+                "description": """\
+What a bet measured, against its baseline.
+
+``value`` may be ``None``: a measurement that has not been taken is
+representable without inventing a number.\
+""",
+                "properties": {
+                    "bet_id": {
+                        "description": "The Bet this measurement belongs to",
+                        "title": "Bet Id",
+                        "type": "string",
+                    },
+                    "id": {"title": "Id", "type": "string"},
+                    "metric": {
+                        "description": "The metric that was measured",
+                        "title": "Metric",
+                        "type": "string",
+                    },
+                    "observed_at": {
+                        "description": "ISO-8601 timestamp of the observation",
+                        "title": "Observed At",
+                        "type": "string",
+                    },
+                    "value": {
+                        "anyOf": [{"type": "null"}, {"type": "number"}],
+                        "default": None,
+                        "description": "The measured value, if taken",
+                        "title": "Value",
+                    },
+                },
+                "required": ["bet_id", "metric", "observed_at"],
+                "title": "MeasurementRecord",
                 "type": "object",
             },
             "Outcome": {
@@ -1083,6 +1386,13 @@ def test_entity_schema_snapshot() -> None:
                         "description": "Opportunity score (Importance + max(Importance - Satisfaction, 0))",
                         "title": "Opportunity Score",
                     },
+                    "origin": {
+                        "default": "user",
+                        "description": "Where this row came from",
+                        "enum": ["demo", "imported", "sample", "user"],
+                        "title": "Origin",
+                        "type": "string",
+                    },
                     "satisfaction": {
                         "anyOf": [
                             {"maximum": 10.0, "minimum": 1.0, "type": "number"},
@@ -1106,6 +1416,107 @@ def test_entity_schema_snapshot() -> None:
                 },
                 "required": ["job_id", "statement"],
                 "title": "Outcome",
+                "type": "object",
+            },
+            "OutcomeCandidate": {
+                "$defs": {
+                    "CandidateStatus": {
+                        "description": """\
+Where a proposed outcome sits in the review state machine.
+
+``PROPOSED`` awaits a person; ``ACCEPTED`` became a real :class:`Outcome`;
+``REJECTED`` was declined (with a reason); ``MERGED`` folded into an existing
+outcome. Rejection and merge are kept, never deleted — they are information
+about the extractor.\
+""",
+                        "enum": ["accepted", "merged", "proposed", "rejected"],
+                        "title": "CandidateStatus",
+                        "type": "string",
+                    }
+                },
+                "description": """\
+A proposed outcome extracted from a quote — a proposal, never an Outcome.
+
+A candidate is what the machine suggests; a person accepts, edits, merges or
+rejects it. Extraction never writes to ``outcomes``. ``status`` records the
+human's decision, and ``outcome_id`` links the outcome an acceptance created
+(``merged_into`` links the outcome a merge folded into).
+
+``interview_id``/``quote_id`` reference the interview record owned by ``A1``
+(``ALH-14``) by id, the same way :class:`Evidence` references a job by id
+rather than owning it.\
+""",
+                "properties": {
+                    "confidence": {
+                        "anyOf": [
+                            {"maximum": 1.0, "minimum": 0.0, "type": "number"},
+                            {"type": "null"},
+                        ],
+                        "default": None,
+                        "description": "Extractor confidence, displayed not thresholded",
+                        "title": "Confidence",
+                    },
+                    "id": {"title": "Id", "type": "string"},
+                    "interview_id": {
+                        "anyOf": [{"type": "null"}, {"type": "string"}],
+                        "default": None,
+                        "description": "The interview record, if known",
+                        "title": "Interview Id",
+                    },
+                    "job_id": {
+                        "anyOf": [{"type": "null"}, {"type": "string"}],
+                        "default": None,
+                        "description": "The Job this candidate would become an outcome of",
+                        "title": "Job Id",
+                    },
+                    "merged_into": {
+                        "anyOf": [{"type": "null"}, {"type": "string"}],
+                        "default": None,
+                        "description": "The existing Outcome a merge folded this candidate into",
+                        "title": "Merged Into",
+                    },
+                    "outcome_id": {
+                        "anyOf": [{"type": "null"}, {"type": "string"}],
+                        "default": None,
+                        "description": "The Outcome an acceptance created, or a merge folded into",
+                        "title": "Outcome Id",
+                    },
+                    "quote_id": {
+                        "description": "The source quote this candidate came from",
+                        "title": "Quote Id",
+                        "type": "string",
+                    },
+                    "rationale": {
+                        "default": "",
+                        "description": "Why the extractor proposed it, or the validator's reason when rejected",
+                        "title": "Rationale",
+                        "type": "string",
+                    },
+                    "rejection_reason": {
+                        "anyOf": [{"type": "null"}, {"type": "string"}],
+                        "default": None,
+                        "description": "Why a person rejected this candidate; required to reject",
+                        "title": "Rejection Reason",
+                    },
+                    "statement": {
+                        "description": "The proposed ODI desired-outcome statement",
+                        "title": "Statement",
+                        "type": "string",
+                    },
+                    "status": {
+                        "$ref": "#/$defs/CandidateStatus",
+                        "default": "proposed",
+                        "description": "Where this candidate sits in review",
+                    },
+                    "step_id": {
+                        "anyOf": [{"type": "null"}, {"type": "string"}],
+                        "default": None,
+                        "description": "The Step this candidate would attach to",
+                        "title": "Step Id",
+                    },
+                },
+                "required": ["quote_id", "statement"],
+                "title": "OutcomeCandidate",
                 "type": "object",
             },
             "Step": {
@@ -1142,6 +1553,13 @@ def test_entity_schema_snapshot() -> None:
                         "description": "The chronological order of this step in the job map",
                         "title": "Order",
                         "type": "integer",
+                    },
+                    "origin": {
+                        "default": "user",
+                        "description": "Where this row came from",
+                        "enum": ["demo", "imported", "sample", "user"],
+                        "title": "Origin",
+                        "type": "string",
                     },
                     "stage": {
                         "anyOf": [{"$ref": "#/$defs/JobStage"}, {"type": "null"}],

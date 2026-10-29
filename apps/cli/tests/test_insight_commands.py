@@ -51,16 +51,15 @@ def test_capabilities_and_guidelines_print_core_copy(tmp_path, monkeypatch):
     assert "Outcome-Driven Innovation" in guidelines.stdout
 
 
-def test_spine_reports_the_honest_gap(tmp_path, monkeypatch):
+def test_spine_reports_what_this_build_implements(tmp_path, monkeypatch):
     monkeypatch.setenv("AGENTIC_ODI_DB", str(tmp_path / "odi.db"))
 
     result = CliRunner().invoke(app, ["spine"])
 
     assert result.exit_code == 0
-    assert "0 of 7 are implemented" in result.stdout
-    # Each gap is reported by the issue that implements it, not hidden.
-    assert "ALH-17" in result.stdout
-    assert "ALH-47" in result.stdout
+    # Every quote-to-measure stage is wired to the local store in this build.
+    assert "7 of 7 are implemented" in result.stdout
+    assert "Nothing has been fabricated" in result.stdout
 
 
 def test_spine_json_lists_every_seam_with_its_owner(tmp_path, monkeypatch):
@@ -83,4 +82,8 @@ def test_spine_json_lists_every_seam_with_its_owner(tmp_path, monkeypatch):
         "template",
     }
     assert seams["brief"]["owner"]["module"] == "brief.py"
-    assert all(seam["available"] is False for seam in seams.values())
+    # The seven quote-to-measure stages are implemented; demo and template are not.
+    for stage in ("candidate", "outcome", "score", "brief", "decision", "bet", "measure"):
+        assert seams[stage]["available"] is True, stage
+    assert seams["demo"]["available"] is True  # the loader now exists
+    assert seams["template"]["available"] is False

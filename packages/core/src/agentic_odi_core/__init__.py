@@ -17,6 +17,16 @@ from agentic_odi_core.contract import (
     capability_manifest,
     capability_summary,
 )
+from agentic_odi_core.demo import (
+    DEMO_JOB_ID,
+    DemoLoadResult,
+    StoreDemoLoader,
+    demo_evidence,
+    demo_job,
+    demo_outcomes,
+    demo_steps,
+    load_demo,
+)
 from agentic_odi_core.errors import (
     ConflictError,
     NotFoundError,
@@ -30,6 +40,14 @@ from agentic_odi_core.evaluation import (
     OutcomeStatementError,
     evaluate_outcome_statement,
     statement_to_dict,
+)
+from agentic_odi_core.extraction import (
+    EXTRACTION_PROMPT,
+    ExtractionError,
+    FixtureStatementExtractor,
+    Proposal,
+    StatementExtractor,
+    extract_candidates,
 )
 from agentic_odi_core.factory import build_repository
 from agentic_odi_core.messages import (
@@ -45,16 +63,21 @@ from agentic_odi_core.messages import (
 from agentic_odi_core.models import (
     JOB_STAGE_INDEX,
     JOB_STAGE_ORDER,
+    BetRecord,
     BusinessImpactCategory,
     BusinessValue,
+    CandidateStatus,
     CustomerOutcome,
     CustomerValue,
+    DecisionRecord,
     Direction,
     Evidence,
     EvidenceItemType,
     Job,
     JobStage,
+    MeasurementRecord,
     Outcome,
+    OutcomeCandidate,
     Step,
     ValueMetric,
     compute_opportunity_score,
@@ -66,6 +89,13 @@ from agentic_odi_core.remote import (
     tool_result_text,
 )
 from agentic_odi_core.repository import InMemoryRepository, Repository
+from agentic_odi_core.review import (
+    CandidateAlreadyDecidedError,
+    CandidateNotFoundError,
+    accept_candidate,
+    merge_candidate,
+    reject_candidate,
+)
 from agentic_odi_core.router import ModelRouter, ModelTier, OnDeviceLLMEngine, RoutingMode
 from agentic_odi_core.schema import odi_schema
 from agentic_odi_core.services import (
@@ -77,6 +107,11 @@ from agentic_odi_core.services import (
     OutcomeNotFoundError,
     StepNotFoundError,
     ValueOutOfRangeError,
+)
+from agentic_odi_core.similarity import (
+    is_same_statement,
+    normalisation_key,
+    normalise,
 )
 from agentic_odi_core.spine import (
     DEMO_SEAM,
@@ -110,6 +145,17 @@ from agentic_odi_core.spine import (
     seam_status,
     spine_summary,
 )
+from agentic_odi_core.spine_stages import (
+    SpineStageError,
+    StoreBetTracker,
+    StoreBriefRenderer,
+    StoreCandidateExtractor,
+    StoreDecisionRecorder,
+    StoreMeasurementReader,
+    StoreOutcomeAcceptor,
+    StoreScoreSampler,
+    build_spine,
+)
 from agentic_odi_core.steve_jobs import (
     format_opportunity_score_insight,
     generate_steve_jobs_response,
@@ -117,6 +163,7 @@ from agentic_odi_core.steve_jobs import (
 
 __all__ = [
     "Bet",
+    "BetRecord",
     "BetTracker",
     "BriefDocument",
     "BriefFigure",
@@ -126,6 +173,9 @@ __all__ = [
     "CAPABILITIES",
     "CandidateExtractor",
     "CandidateOutcome",
+    "CandidateStatus",
+    "CandidateAlreadyDecidedError",
+    "CandidateNotFoundError",
     "ConflictError",
     "CustomerOutcome",
     "CustomerOutcomeNotFoundError",
@@ -134,11 +184,42 @@ __all__ = [
     "DEMO_SEAM",
     "DemoLoader",
     "DemoWorkspace",
+    "DEMO_JOB_ID",
     "Decision",
+    "DecisionRecord",
     "DecisionRecorder",
+    "DemoLoadResult",
+    "StoreDemoLoader",
+    "demo_evidence",
+    "demo_job",
+    "demo_outcomes",
+    "demo_steps",
+    "load_demo",
     "Evidence",
     "EvidenceItemType",
     "EvidenceNotFoundError",
+    "EXTRACTION_PROMPT",
+    "ExtractionError",
+    "FixtureStatementExtractor",
+    "Proposal",
+    "StatementExtractor",
+    "extract_candidates",
+    "is_same_statement",
+    "normalise",
+    "normalisation_key",
+    "OutcomeCandidate",
+    "accept_candidate",
+    "merge_candidate",
+    "reject_candidate",
+    "StoreBetTracker",
+    "StoreBriefRenderer",
+    "StoreCandidateExtractor",
+    "StoreDecisionRecorder",
+    "StoreMeasurementReader",
+    "StoreOutcomeAcceptor",
+    "StoreScoreSampler",
+    "SpineStageError",
+    "build_spine",
     "Job",
     "JobNotFoundError",
     "JobStage",
@@ -146,6 +227,7 @@ __all__ = [
     "JOB_STAGE_ORDER",
     "Measurement",
     "MeasurementReader",
+    "MeasurementRecord",
     "ModelRouter",
     "ModelTier",
     "NotFoundError",

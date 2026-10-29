@@ -179,6 +179,9 @@ class CandidateOutcome:
     statement: str
     source_quote: str
     confidence: float | None = None
+    candidate_id: str | None = None
+    status: str = "proposed"
+    outcome_id: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -266,11 +269,29 @@ class DemoWorkspace:
 
 
 class CandidateExtractor(Protocol):
-    def extract(self, quote: str) -> list[CandidateOutcome]: ...
+    def extract(
+        self,
+        quote: str,
+        *,
+        quote_id: str,
+        job_id: str,
+        job_name: str | None = None,
+        stage_hint: str | None = None,
+        interview_id: str | None = None,
+        step_id: str | None = None,
+    ) -> list[CandidateOutcome]: ...
 
 
 class OutcomeAcceptor(Protocol):
-    def accept(self, candidate: CandidateOutcome, *, job_id: str) -> Outcome: ...
+    def accept(
+        self,
+        candidate_id: str,
+        *,
+        importance: float,
+        satisfaction: float,
+        statement: str | None = None,
+        step_id: str | None = None,
+    ) -> Outcome: ...
 
 
 class ScoreSampler(Protocol):
@@ -324,14 +345,32 @@ class _Stub:
 class UnavailableCandidateExtractor(_Stub):
     _seam = SpineStage.CANDIDATE.value
 
-    def extract(self, quote: str) -> list[CandidateOutcome]:
+    def extract(
+        self,
+        quote: str,
+        *,
+        quote_id: str,
+        job_id: str,
+        job_name: str | None = None,
+        stage_hint: str | None = None,
+        interview_id: str | None = None,
+        step_id: str | None = None,
+    ) -> list[CandidateOutcome]:
         self._refuse()
 
 
 class UnavailableOutcomeAcceptor(_Stub):
     _seam = SpineStage.OUTCOME.value
 
-    def accept(self, candidate: CandidateOutcome, *, job_id: str) -> Outcome:
+    def accept(
+        self,
+        candidate_id: str,
+        *,
+        importance: float,
+        satisfaction: float,
+        statement: str | None = None,
+        step_id: str | None = None,
+    ) -> Outcome:
         self._refuse()
 
 
