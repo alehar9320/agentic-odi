@@ -1,0 +1,11 @@
+# Critical paths that must never be deleted on main.
+# A deletion here breaks GitHub Pages deployment or the site contract;
+# CI must fail red instead of staying green.
+# One path per line. Blank lines and lines starting with # are ignored.
+
+.github/workflows/pages.yml
+.github/workflows/ci.yml
+.github/actions/setup/action.yml
+website/tools/build_site.py
+website/tests/test_pages_deploy.py
+tests/contract/test_protected_files.py

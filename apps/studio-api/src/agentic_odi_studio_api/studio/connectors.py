@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import asyncio
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from agentic_odi_connectors.catalog import (
     connector_config_from_preset,
@@ -22,13 +22,22 @@ from agentic_odi_connectors.models import ConnectorConfig, HealthStatus
 from agentic_odi_connectors.paths import config_path
 from agentic_odi_connectors.registry import ConnectorRegistry
 
+if TYPE_CHECKING:
+    from agentic_odi_studio_api.studio.marketplace import StudioMarketplace
+
 
 class ConnectorService:
     """In-process management of the shared connector registry."""
 
-    def __init__(self, path: Path | None = None, timeout: float = 15.0) -> None:
+    def __init__(
+        self,
+        path: Path | None = None,
+        timeout: float = 15.0,
+        marketplace: StudioMarketplace | None = None,
+    ) -> None:
         self._path = path or config_path()
         self._timeout = timeout
+        self._marketplace = marketplace
 
     def _registry(self) -> ConnectorRegistry:
         return ConnectorRegistry(self._path)
@@ -42,9 +51,16 @@ class ConnectorService:
         name: str | None = None,
         preset_id: str | None = None,
         url: str | None = None,
+        marketplace_id: str | None = None,
     ) -> ConnectorConfig:
-        """Register a connector from a preset or a custom URL."""
-        if preset_id is not None:
+        """Register a connector from a preset, a marketplace listing, or a custom URL."""
+        if marketplace_id is not None:
+            if self._marketplace is None:
+                raise ValueError("marketplace is not available in this sidecar")
+            config = self._marketplace.config_for(marketplace_id)
+            if name:
+                config = config.model_copy(update={"name": name})
+        elif preset_id is not None:
             preset = get_preset(preset_id)
             config = connector_config_from_preset(preset, name=name, url=url)
         elif url is not None:
@@ -52,7 +68,7 @@ class ConnectorService:
                 raise ValueError("name is required when registering a custom URL")
             config = ConnectorConfig(name=name, kind="mcp", settings={"url": url})
         else:
-            raise ValueError("must provide preset_id or url")
+            raise ValueError("must provide preset_id, marketplace_id, or url")
         self._registry().add(config)
         return config
 

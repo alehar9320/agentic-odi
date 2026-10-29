@@ -12,11 +12,12 @@ const mocks = vi.hoisted(() => ({
 }));
 
 let mockMemory: Observation[] = [];
+let mockMemoryLoading = false;
 
 vi.mock("../../state/StudioContext", () => ({
   useStudio: () => ({
     memory: mockMemory,
-    memoryLoading: false,
+    memoryLoading: mockMemoryLoading,
     ...mocks,
   }),
 }));
@@ -39,7 +40,16 @@ function observation(overrides: Partial<Observation>): Observation {
 describe("MemoryPanel", () => {
   beforeEach(() => {
     mockMemory = [];
+    mockMemoryLoading = false;
     vi.clearAllMocks();
+  });
+
+  it("shows skeleton lines while memory loads", () => {
+    mockMemoryLoading = true;
+    const { container } = render(<MemoryPanel />);
+
+    expect(screen.queryByText(/Reading back what I've learned/)).toBeNull();
+    expect(container.querySelectorAll(".skeleton").length).toBeGreaterThanOrEqual(3);
   });
 
   it("explains the empty state", () => {

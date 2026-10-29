@@ -1,21 +1,28 @@
 """Agentic ODI MCP Server (FastMCP)."""
 
 import json
+import signal
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from typing import Any
 
 from agentic_odi_core import (
-    CAPABILITIES,
     ODI_ASSISTANT_PROMPT,
     ODI_FRAMEWORK_GUIDELINES,
     CustomerOutcomeNotFoundError,
     EvidenceItemType,
     EvidenceNotFoundError,
     JobNotFoundError,
+    JobStage,
+    OdiError,
     ODIService,
     OutcomeNotFoundError,
+    OutcomeStatementError,
     StepNotFoundError,
     ValueOutOfRangeError,
     build_repository,
+    capability_manifest,
+    capability_summary,
     compute_opportunity_score,
     evaluate_outcome_statement,
     job_not_found,
@@ -24,13 +31,36 @@ from agentic_odi_core import (
 from agentic_odi_core import (
     customer_outcome_not_found as _cust_not_found,
 )
-from fastmcp import FastMCP
+from fastmcp import Context, FastMCP
 from pydantic import ValidationError
-
-mcp = FastMCP("Agentic ODI")
 
 _repo = build_repository()
 service = ODIService(_repo)
+
+_shutdown_complete = False
+
+
+def shutdown_store() -> None:
+    """Flush and close the event store. Safe to call more than once."""
+    global _shutdown_complete
+    if _shutdown_complete:
+        return
+    _shutdown_complete = True
+    try:
+        _repo.commit()
+    finally:
+        _repo.close()
+
+
+@asynccontextmanager
+async def _lifespan(_server: FastMCP) -> AsyncIterator[None]:
+    try:
+        yield
+    finally:
+        shutdown_store()
+
+
+mcp = FastMCP("Agentic ODI", lifespan=_lifespan)
 
 jobs_db = _repo.jobs
 steps_db = _repo.steps
@@ -47,8 +77,11 @@ def _outcome_not_found(outcome_id: str | None) -> str:
     return f"Error: Outcome with ID {outcome_id} not found."
 
 
-def _evidence_not_found(evidence_id: str) -> str:
-    return f"Error: Evidence with ID {evidence_id} not found."
+def _evidence_not_found(evidence_id: str, hint: str | None = None) -> str:
+    message = f"Error: Evidence with ID {evidence_id} not found."
+    if hint:
+        message = f"{message} {hint}"
+    return message
 
 
 @mcp.prompt
@@ -63,8 +96,13 @@ def add_job(name: str, description: str | None = None) -> str:
 
 
 @mcp.tool
-def get_jobs() -> str:
-    jobs = service.get_jobs()
+def get_jobs(limit: int | None = None, offset: int = 0) -> str:
+    """List jobs.
+
+    ``limit`` caps how many jobs are returned and ``offset`` skips that many
+    first, so a client can walk a long list without re-reading all of it.
+    """
+    jobs = service.get_jobs(limit=limit, offset=offset)
     return json.dumps([job.model_dump() for job in jobs])
 
 
@@ -77,20 +115,36 @@ def get_job(job_id: str) -> str:
 
 
 @mcp.tool
-def add_step(job_id: str, name: str, order: int) -> str:
+def add_step(
+    job_id: str,
+    name: str,
+    order: int,
+    stage: JobStage | None = None,
+    allow_empty_job_map: bool = False,
+) -> str:
     try:
-        step = service.add_step(job_id=job_id, name=name, order=order)
+        step = service.add_step(
+            job_id=job_id,
+            name=name,
+            order=order,
+            stage=stage,
+            allow_empty_job_map=allow_empty_job_map,
+        )
     except JobNotFoundError:
         return job_not_found(job_id)
+    except ValueOutOfRangeError as exc:
+        return f"Error: {exc}"
+    except OdiError as exc:
+        return f"Error: {exc}"
     return f"Step created successfully: {step.model_dump_json()}"
 
 
 @mcp.tool
-def get_job_map(job_id: str) -> str:
+def get_job_map(job_id: str, limit: int | None = None, offset: int = 0) -> str:
     job = service.get_job(job_id)
     if job is None:
         return f"Error: Job with ID {job_id} not found."
-    steps = service.get_job_map(job_id)
+    steps = service.get_job_map(job_id, limit=limit, offset=offset)
     return json.dumps([step.model_dump() for step in steps])
 
 
@@ -98,8 +152,8 @@ def get_job_map(job_id: str) -> str:
 def add_outcome(
     job_id: str,
     statement: str,
-    importance: float | None = None,
-    satisfaction: float | None = None,
+    importance: float,
+    satisfaction: float,
     step_id: str | None = None,
 ) -> str:
     try:
@@ -116,15 +170,25 @@ def add_outcome(
         return _step_not_found(step_id)
     except ValueOutOfRangeError:
         return "Error: importance and satisfaction must be between 1.0 and 10.0"
+    except OutcomeStatementError as exc:
+        return f"Error: {exc}"
     return f"Outcome created successfully: {outcome.model_dump_json()}"
 
 
 @mcp.tool
-def get_outcomes(job_id: str, step_id: str | None = None) -> str:
+def get_outcomes(
+    job_id: str,
+    step_id: str | None = None,
+    limit: int | None = None,
+    offset: int = 0,
+    sort: str = "opportunity_score",
+) -> str:
     job = service.get_job(job_id)
     if job is None:
         return f"Error: Job with ID {job_id} not found."
-    outcomes = service.get_outcomes(job_id=job_id, step_id=step_id)
+    outcomes = service.get_outcomes(
+        job_id=job_id, step_id=step_id, limit=limit, offset=offset, sort=sort
+    )
     return json.dumps([outcome.model_dump() for outcome in outcomes])
 
 
@@ -161,8 +225,11 @@ def get_customer_outcome(outcome_id: str) -> str:
 
 
 @mcp.tool
-def list_customer_outcomes(job_id: str | None = None) -> str:
-    outcomes = service.list_customer_outcomes(job_id=job_id)
+def list_customer_outcomes(
+    job_id: str | None = None, limit: int | None = None, offset: int = 0
+) -> str:
+    """List customer outcomes, optionally for one job and one page at a time."""
+    outcomes = service.list_customer_outcomes(job_id=job_id, limit=limit, offset=offset)
     return json.dumps([o.model_dump() for o in outcomes])
 
 
@@ -254,7 +321,12 @@ def get_odi_framework_guidelines() -> str:
 
 @mcp.tool
 def get_capabilities() -> str:
-    return CAPABILITIES
+    return capability_summary()
+
+
+@mcp.tool
+def get_capabilities_manifest() -> str:
+    return json.dumps(capability_manifest())
 
 
 @mcp.tool
@@ -340,6 +412,8 @@ def update_outcome(
         updated = service.update_outcome(outcome_id, updates)
     except OutcomeNotFoundError:
         return _outcome_not_found(outcome_id)
+    except OutcomeStatementError as exc:
+        return f"Error: {exc}"
     except ValueOutOfRangeError:
         return "Error: importance and satisfaction must be between 1.0 and 10.0"
     return f"Outcome updated successfully: {updated.model_dump_json()}"
@@ -355,7 +429,8 @@ def delete_outcome(outcome_id: str) -> str:
 
 
 @mcp.tool
-def add_evidence(
+async def add_evidence(
+    ctx: Context,
     source_name: str,
     source_kind: str,
     name: str,
@@ -366,6 +441,7 @@ def add_evidence(
     step_id: str | None = None,
     outcome_id: str | None = None,
 ) -> str:
+    await ctx.report_progress(0, 2, "Validating the evidence links")
     try:
         evidence = service.add_evidence(
             source_name=source_name,
@@ -384,8 +460,9 @@ def add_evidence(
         return _step_not_found(step_id)
     except OutcomeNotFoundError:
         return _outcome_not_found(outcome_id)
-    except ValueError as exc:
+    except (OdiError, ValueError) as exc:
         return f"Error: {exc}"
+    await ctx.report_progress(2, 2, "Evidence stored")
     return f"Evidence created successfully: {evidence.model_dump_json()}"
 
 
@@ -393,7 +470,10 @@ def add_evidence(
 def get_evidence(evidence_id: str) -> str:
     evidence = service.get_evidence(evidence_id)
     if evidence is None:
-        return _evidence_not_found(evidence_id)
+        return _evidence_not_found(
+            evidence_id,
+            "List the stored records with list_evidence() to find a valid id.",
+        )
     return evidence.model_dump_json()
 
 
@@ -402,8 +482,13 @@ def list_evidence(
     job_id: str | None = None,
     step_id: str | None = None,
     outcome_id: str | None = None,
+    limit: int | None = None,
+    offset: int = 0,
 ) -> str:
-    items = service.list_evidence(job_id=job_id, step_id=step_id, outcome_id=outcome_id)
+    """List evidence for a job, step or outcome, one page at a time."""
+    items = service.list_evidence(
+        job_id=job_id, step_id=step_id, outcome_id=outcome_id, limit=limit, offset=offset
+    )
     return json.dumps([item.model_dump() for item in items])
 
 
@@ -411,8 +496,8 @@ def list_evidence(
 def delete_evidence(evidence_id: str) -> str:
     try:
         service.delete_evidence(evidence_id)
-    except EvidenceNotFoundError:
-        return _evidence_not_found(evidence_id)
+    except EvidenceNotFoundError as exc:
+        return _evidence_not_found(evidence_id, exc.hint)
     return f"Evidence deleted successfully: {evidence_id}"
 
 
@@ -436,8 +521,8 @@ def promote_evidence(
             importance=importance,
             satisfaction=satisfaction,
         )
-    except EvidenceNotFoundError:
-        return _evidence_not_found(evidence_id)
+    except EvidenceNotFoundError as exc:
+        return _evidence_not_found(evidence_id, exc.hint)
     except JobNotFoundError:
         return job_not_found(job_id or "")
     except StepNotFoundError:
@@ -446,18 +531,19 @@ def promote_evidence(
         return _outcome_not_found(None)
     except ValueOutOfRangeError:
         return "Error: importance and satisfaction must be between 1.0 and 10.0"
-    except ValueError as exc:
+    except (OdiError, ValueError) as exc:
         return f"Error: {exc}"
     label = "Job" if target == "job" else "Outcome"
     return f"{label} created successfully: {artifact.model_dump_json()}"
 
 
 @mcp.tool
-def evaluate_outcome(statement: str, job_id: str | None = None) -> str:
+async def evaluate_outcome(ctx: Context, statement: str, job_id: str | None = None) -> str:
+    await ctx.report_progress(0, 2, "Evaluating the statement")
     result = evaluate_outcome_statement(statement)
     if job_id is not None:
         if service.get_job(job_id) is None:
-            return json.dumps({**result, "job_id": job_id, "error": job_not_found(job_id)})
+            return job_not_found(job_id)
         result["job_id"] = job_id
         result["existing_outcomes"] = [
             {
@@ -467,6 +553,7 @@ def evaluate_outcome(statement: str, job_id: str | None = None) -> str:
             }
             for outcome in service.get_outcomes(job_id)
         ]
+    await ctx.report_progress(2, 2, "Evaluation complete")
     return json.dumps(result)
 
 
@@ -475,7 +562,28 @@ def get_odi_schema() -> str:
     return json.dumps(odi_schema())
 
 
+def setup_graceful_shutdown() -> None:
+    """Flush the event store when the process is asked to stop.
+
+    The handler chains to whatever was installed before it, so the server's own
+    graceful-shutdown behaviour (drain in-flight requests, then exit) is
+    preserved. The store is flushed on the way out either way.
+    """
+
+    def _chain(previous: Any) -> Any:
+        def _handle(signum: int, frame: Any) -> None:
+            shutdown_store()
+            if callable(previous):
+                previous(signum, frame)
+
+        return _handle
+
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        signal.signal(sig, _chain(signal.getsignal(sig)))
+
+
 def main() -> None:
+    setup_graceful_shutdown()
     mcp.run(transport="http", port=8000)
 
 

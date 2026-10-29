@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useAuiState } from "@assistant-ui/react";
 
 import {
   GREETING_ROTATION_MS,
@@ -6,6 +7,7 @@ import {
   nextGreeting,
 } from "../../lib/greeting";
 import { isUnderserved } from "../../lib/odi";
+import { useOnboarding } from "../../onboarding/context";
 import { useStudio } from "../../state/StudioContext";
 import { BoltIcon, CaptureIcon, CompassIcon, SparkIcon } from "../icons";
 
@@ -17,26 +19,33 @@ function prefersReducedMotion(): boolean {
   );
 }
 
-const OPPORTUNITY_PROMPT =
-  "I have an opportunity in mind. Ask me what it is, then help me sharpen it into something I can defend.";
-const FIND_PROMPT =
-  "I need to find the next opportunity worth chasing. Help me look across what I know about my customers and find the gap that matters most.";
-const PRESSURE_TEST_PROMPT =
-  "I have a bet I'm about to make. Pressure-test it with me: ask what it is, then tell me what would have to be true and what evidence I'm missing.";
-const CAPTURE_PROMPT =
-  "I heard something from a customer that I want to make sense of. Ask me what they said, then help me turn it into something we can act on.";
+const PILL_ICONS: ReactNode[] = [
+  <SparkIcon size={15} key="spark" />,
+  <BoltIcon size={15} key="bolt" />,
+  <CaptureIcon size={15} key="capture" />,
+];
 
 interface HeroPill {
   id: string;
   label: string;
+  description?: string;
   icon: ReactNode;
   run: () => void;
   conversational?: boolean;
 }
 
-export function Hero({ onSubmit }: { onSubmit: (text: string) => void }) {
-  const { displayName, canvas, llmHealth, openPanel, streaming, brief, openSetup } =
+/**
+ * The empty state.
+ *
+ * The starter prompts are the runtime's: `suggestions` on the external store is
+ * the one place they are decided, so what the hero offers and what the thread
+ * knows cannot drift apart.
+ */
+export function Hero() {
+  const { displayName, canvas, llmHealth, openPanel, streaming, brief, openSetup, sendMessage } =
     useStudio();
+  const suggestions = useAuiState((state) => state.thread.suggestions);
+  const { enabled: tourEnabled, openTour } = useOnboarding();
   const [now, setNow] = useState(() => new Date());
   const [currentId, setCurrentId] = useState<string | null>(null);
 
@@ -70,10 +79,14 @@ export function Hero({ onSubmit }: { onSubmit: (text: string) => void }) {
     ],
   );
 
+  // The first frame is always the invitation; rotation starts from it.
   const current = candidates.find((candidate) => candidate.id === currentId) ?? candidates[0];
+  // A first run gets one still sentence. Changing the headline while someone is
+  // deciding what to say is the opposite of focus.
+  const firstRun = !brief && jobs === 0 && outcomes === 0;
 
   useEffect(() => {
-    if (prefersReducedMotion()) {
+    if (firstRun || prefersReducedMotion()) {
       return;
     }
     const timer = window.setInterval(() => {
@@ -84,41 +97,24 @@ export function Hero({ onSubmit }: { onSubmit: (text: string) => void }) {
       setCurrentId((id) => nextGreeting(candidates, id ?? current?.id)?.id ?? null);
     }, GREETING_ROTATION_MS);
     return () => window.clearInterval(timer);
-  }, [candidates, current?.id]);
+  }, [candidates, current?.id, firstRun]);
 
-  const pills: HeroPill[] = [
-    {
-      id: "sharpen",
-      label: "Sharpen an opportunity",
-      icon: <SparkIcon size={15} />,
-      run: () => onSubmit(OPPORTUNITY_PROMPT),
-      conversational: true,
-    },
-    outcomes > 0
-      ? {
-          id: "pressure-test",
-          label: "Pressure-test a bet",
-          icon: <BoltIcon size={15} />,
-          run: () => onSubmit(PRESSURE_TEST_PROMPT),
-          conversational: true,
-        }
-      : {
-          id: "find",
-          label: "Find the next opportunity",
-          icon: <CompassIcon size={15} />,
-          run: () => onSubmit(FIND_PROMPT),
-          conversational: true,
-        },
-    jobs > 0
+  const pills: HeroPill[] = suggestions.map((suggestion, index) => ({
+    id: `suggestion-${index}`,
+    label: suggestion.title ?? suggestion.prompt,
+    description: suggestion.label,
+    icon: PILL_ICONS[index % PILL_ICONS.length],
+    run: () => void sendMessage(suggestion.prompt),
+    conversational: true,
+  }));
+
+  pills.push(
+    jobs > 0 && llmHealth.healthy === false
       ? {
           id: "capture",
           label: "Capture what you heard",
           icon: <CaptureIcon size={15} />,
-          run: () =>
-            llmHealth.healthy === false
-              ? openPanel("capture")
-              : onSubmit(CAPTURE_PROMPT),
-          conversational: true,
+          run: () => openPanel("capture"),
         }
       : {
           id: "landscape",
@@ -126,7 +122,7 @@ export function Hero({ onSubmit }: { onSubmit: (text: string) => void }) {
           icon: <CompassIcon size={15} />,
           run: () => openPanel("landscape"),
         },
-  ];
+  );
 
   return (
     <div className="hero">
@@ -134,34 +130,55 @@ export function Hero({ onSubmit }: { onSubmit: (text: string) => void }) {
         {brief?.product_name ? `Living Studio · ${brief.product_name}` : "Living Studio"}
       </p>
       <h1 className="hero__line" key={current?.id ?? "greeting"}>
-        {current?.text ?? "Good morning"}
+        {current?.text ?? "What do you want to win?"}
       </h1>
       <p className="hero__sub">
         {brief?.target_user
-          ? `For ${brief.target_user}. Tell me where they get stuck, and we'll turn it into something you can defend.`
-          : "Name what you're trying to win. I'll help you test whether it's worth it — and what to do next."}
+          ? `For ${brief.target_user}. Tell me where they get stuck.`
+          : "One sentence is enough. I'll help you test whether it's worth chasing."}
       </p>
       <div className="hero__pills" aria-label="Suggested next steps">
         {pills.map((pill) => (
           <button
             key={pill.id}
             type="button"
-            className="suggestion"
+            className={`suggestion${pill.conversational ? " suggestion--card" : ""}`}
             disabled={Boolean(pill.conversational && streaming)}
             onClick={pill.run}
           >
             {pill.icon}
-            {pill.label}
+            {pill.conversational ? (
+              <span className="suggestion__copy">
+                <span className="suggestion__title">{pill.label}</span>
+                {pill.description ? (
+                  <span className="suggestion__description">{pill.description}</span>
+                ) : null}
+              </span>
+            ) : (
+              pill.label
+            )}
           </button>
         ))}
+      </div>
+      <div className="hero__aside">
         <button
           type="button"
-          className="suggestion suggestion--quiet"
+          className="hero__tour"
           onClick={openSetup}
           title="Tell me about your product, audience, and job"
         >
           {brief ? "Edit context" : "Tell me what you're building"}
         </button>
+        {tourEnabled ? (
+          <>
+            <span className="hero__aside-divider" aria-hidden="true">
+              ·
+            </span>
+            <button type="button" className="hero__tour" onClick={openTour}>
+              Show me around
+            </button>
+          </>
+        ) : null}
       </div>
     </div>
   );

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import io
 from types import SimpleNamespace
 from typing import Any
 
@@ -20,8 +21,19 @@ def _config() -> chat.ChatConfig:
     )
 
 
-def _chunk(content: str | None = None, tool_calls: list[Any] | None = None) -> Any:
-    delta = SimpleNamespace(content=content, tool_calls=tool_calls)
+def _chunk(
+    content: str | None = None,
+    tool_calls: list[Any] | None = None,
+    *,
+    reasoning_content: str | None = None,
+    reasoning: str | None = None,
+) -> Any:
+    delta = SimpleNamespace(
+        content=content,
+        tool_calls=tool_calls,
+        reasoning_content=reasoning_content,
+        reasoning=reasoning,
+    )
     return SimpleNamespace(choices=[SimpleNamespace(delta=delta)])
 
 
@@ -334,6 +346,112 @@ def test_repl_starts_with_mcp_failure(monkeypatch, capsys) -> None:
     output = capsys.readouterr().out
     # Should contain a warning about MCP being unavailable
     assert "mcp" in output.lower() or "unavailable" in output.lower() or "offline" in output.lower()
+
+
+class _FakeOut(io.StringIO):
+    """A stream that can claim to be a terminal, so the hint can be tested."""
+
+    encoding = "utf-8"
+
+    def __init__(self, *, tty: bool) -> None:
+        super().__init__()
+        self._tty = tty
+
+    def isatty(self) -> bool:
+        return self._tty
+
+
+def test_stream_completion_reports_reasoning_without_mixing_it_into_the_answer() -> None:
+    session = chat.ChatSession(_config(), SimpleNamespace(), _FakeMCP())
+    session.openai_client = SimpleNamespace(
+        chat=SimpleNamespace(
+            completions=_Completions(
+                [
+                    _FakeStream(
+                        [
+                            _chunk(reasoning_content="weighing "),
+                            _chunk(reasoning="the options"),
+                            _chunk("Done."),
+                        ]
+                    )
+                ]
+            )
+        )
+    )
+    seen: list[str] = []
+
+    content, tool_calls = asyncio.run(session._stream_completion(None, seen.append))
+
+    assert content == "Done."
+    assert tool_calls == {}
+    assert "".join(seen) == "weighing the options"
+
+
+def test_ask_shows_thinking_but_stores_only_the_answer() -> None:
+    session = chat.ChatSession(
+        _config(), SimpleNamespace(), _FakeMCP(), connection_state=chat.ConnectionState(llm_ok=True)
+    )
+    session.openai_client = SimpleNamespace(
+        chat=SimpleNamespace(
+            completions=_Completions(
+                [_FakeStream([_chunk(reasoning_content="checking the canvas"), _chunk("Done.")])]
+            )
+        )
+    )
+    seen: list[str] = []
+
+    reply = asyncio.run(session.ask("hi", on_reasoning=seen.append))
+
+    assert reply == "Done."
+    assert seen == ["checking the canvas"]
+    # The thinking is not part of the answer, and never replayed as history.
+    assert session.messages[-1] == {"role": "assistant", "content": "Done."}
+
+
+def test_run_chat_prints_the_models_thinking_separately_from_the_answer(
+    monkeypatch, capsys
+) -> None:
+    _install(
+        monkeypatch,
+        inputs=["hello", "/exit"],
+        streams=[
+            _FakeStream(
+                [
+                    _chunk(reasoning_content="weighing the options"),
+                    _chunk("Done."),
+                ]
+            )
+        ],
+    )
+
+    assert asyncio.run(chat._run_chat(_config())) == 0
+
+    captured = capsys.readouterr()
+    assert "thinking" in captured.err
+    assert "weighing the options" in captured.err
+    assert "weighing the options" not in captured.out
+    assert "Done." in captured.out
+
+
+def test_the_thinking_hint_is_only_written_to_a_terminal() -> None:
+    terminal = _FakeOut(tty=True)
+    assert chat._show_thinking_hint(terminal) is True
+    assert "thinking" in terminal.getvalue()
+
+    piped = _FakeOut(tty=False)
+    assert chat._show_thinking_hint(piped) is False
+    assert piped.getvalue() == ""
+
+
+def test_the_thinking_hint_is_erased_before_the_answer() -> None:
+    terminal = _FakeOut(tty=True)
+
+    chat._show_thinking_hint(terminal)
+    chat._clear_thinking_hint(terminal)
+
+    # The hint sits on the prompt line; clearing rewrites that line in place
+    # rather than leaving "thinking…" above the reply forever.
+    assert terminal.getvalue().count("\x1b[2K") == 2
 
 
 def test_repl_sends_nudge_when_llm_not_connected() -> None:

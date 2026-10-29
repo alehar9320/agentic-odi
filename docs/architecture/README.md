@@ -10,10 +10,11 @@ apps/
   mcp-server/     agentic_odi_mcp_server  FastMCP server over HTTP
   studio-api/     agentic_odi_studio_api  FastAPI sidecar for the Studio SPA
   studio/         React + TypeScript + Vite SPA and Tauri 2 shell
+                   e2e/         Browser-level Playwright suite
 packages/
   core/           agentic_odi_core        Domain, services, repositories, contract
   connectors/     agentic_odi_connectors  MCP client connectors and catalog
-infra/cloudflare/ Worker + Wrangler config for the free-plan deployment
+infra/cloudflare/ Worker script; wrangler.jsonc lives at the repo root
 scripts/          Dev launcher, binary build, installer checks
 tests/            Cross-package contract and launcher tests only
 docs/             Architecture, reference material, Superpowers artifacts
@@ -34,6 +35,12 @@ apps/cli ──────────────▶ packages/connectors
 - `packages/connectors` depends on `core` only where it needs shared models.
 - Every runnable app may depend on `core`; none of them imports another app.
 - The React SPA only talks to `apps/studio-api` over `/api`; it never calls MCP or the LLM directly.
+- The SPA's conversation runtime is assistant-ui, bound to the Studio's own
+  store in `apps/studio/src/assistant/`. That directory
+  is the whole bridge: `convert.ts` maps the two message models in both
+  directions, `StudioRuntime.tsx` wires the runtime callbacks, and
+  `attachments.ts` extracts files in the browser. The library is presentation
+  only — it holds no product state and makes no network calls of its own.
 
 ## Persistence
 
@@ -59,7 +66,34 @@ apps/cli ──────────────▶ packages/connectors
 | `agentic-odi-studio-api` | `agentic_odi_studio_api.main:main` |
 | `uv run python scripts/dev.py` | Dev launcher (MCP + Studio API) |
 
+## Pull Request Guardrails
+
+`.github/workflows/pr-guardrails.yml` runs three gates on the cumulative
+`base...HEAD` diff, so a tree-replacement commit buried in the middle of a
+branch is still visible:
+
+- **diff-shape** (blocking): refuses to delete a file that exists on the base
+  branch unless it is listed in `.github/pr-guardrails/deletion-allowlist.yml`;
+  refuses a diff that deletes more than `max_deletions` lines or changes more
+  than `max_changed_files` files, excluding regenerated files. Thresholds live
+  in `.github/pr-guardrails/config.yml`.
+- **body-truth** (warns; the fenced JSON diff summary blocks): compares
+  natural-language file/test claims and the machine-readable block against the
+  real diff.
+- **fabrication** (warns): flags new `TODO`/`FIXME`/`NotImplementedError`/stubs,
+  unconditional `is_available`, hardcoded measurements, and "mock" returns.
+
+The logic lives in `scripts/pr_guards.py`; the YAML only gathers the diff.
+Unit tests are in `tests/scripts/test_pr_guards.py`.
+
+Repository ruleset `main-requires-ci-green` (id `25356329`) requires both
+`CI green` and `PR guardrails`, sets
+`strict_required_status_checks_policy: true`, and keeps the admin bypass only
+for pull requests (`bypass_mode: pull_request`). Rulesets are repository
+settings, not files; change them with `gh api` and record it here.
+
 ## Related
 
 - [Data flow](data-flow.md)
 - [Testing](testing.md)
+- [Decisions (ADRs)](adr/README.md) — why the architecture looks the way it does

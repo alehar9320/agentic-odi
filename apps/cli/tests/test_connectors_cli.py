@@ -7,7 +7,13 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 from agentic_odi_cli.cli import app
-from agentic_odi_connectors.models import HealthStatus, IngestBatch, IngestRecord
+from agentic_odi_connectors.models import (
+    HealthStatus,
+    IngestBatch,
+    IngestRecord,
+    RestConnectorSettings,
+)
+from agentic_odi_connectors.rest.connector import RestConnector
 from typer.testing import CliRunner
 
 ANSI_ESCAPE = re.compile(r"\x1b\[[0-9;]*m")
@@ -317,6 +323,47 @@ def test_connectors_health_uses_built_connector(tmp_path: Path, monkeypatch) -> 
     assert "reachable" in _strip(result.output)
 
 
+def test_connectors_health_no_cache_forces_a_fresh_check(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("AGENTIC_ODI_CONNECTORS_CACHE", str(tmp_path / "connector-health.json"))
+    config = tmp_path / "connectors.json"
+    runner.invoke(
+        app,
+        [
+            "connectors",
+            "add",
+            "rest",
+            "--name",
+            "jira",
+            "--url",
+            "https://api.example/records",
+            "--config",
+            str(config),
+        ],
+    )
+    calls: list[str] = []
+
+    def fetch(method, url, headers, body, timeout):
+        calls.append(url)
+        return 200, b"{}"
+
+    connector = RestConnector(
+        name="jira",
+        settings=RestConnectorSettings(url="https://api.example/records"),
+        fetcher=fetch,
+    )
+    monkeypatch.setattr("agentic_odi_cli.connectors.build_connector", lambda _config: connector)
+
+    first = runner.invoke(app, ["connectors", "health", "--name", "jira", "--config", str(config)])
+    cached = runner.invoke(app, ["connectors", "health", "--name", "jira", "--config", str(config)])
+    fresh = runner.invoke(
+        app,
+        ["connectors", "health", "--name", "jira", "--no-cache", "--config", str(config)],
+    )
+
+    assert first.exit_code == cached.exit_code == fresh.exit_code == 0
+    assert len(calls) == 2
+
+
 def test_connectors_ingest_appends_to_sink(tmp_path: Path, monkeypatch) -> None:
     config = tmp_path / "connectors.json"
     runner.invoke(
@@ -339,9 +386,9 @@ def test_connectors_ingest_appends_to_sink(tmp_path: Path, monkeypatch) -> None:
             IngestRecord(
                 source_name="gong",
                 source_kind="mcp",
-                item_type="catalog",
-                name="mcp-catalog",
-                content="{}",
+                item_type="resource",
+                name="Call notes",
+                content="Onboarding is slow",
             )
         ],
     )
@@ -455,3 +502,161 @@ def test_connectors_ingest_maps_records_to_evidence(tmp_path: Path, monkeypatch)
     payload = json.loads(listed.output)
     assert [item["content"] for item in payload] == ["Onboarding is slow"]
     assert all(item["name"] != "mcp-catalog" for item in payload)
+
+
+def test_connectors_ingest_dry_run_writes_nothing(tmp_path: Path, monkeypatch) -> None:
+    config = tmp_path / "connectors.json"
+    runner.invoke(
+        app,
+        [
+            "connectors",
+            "add",
+            "mcp",
+            "--name",
+            "gong",
+            "--url",
+            "http://localhost:9000/mcp",
+            "--config",
+            str(config),
+        ],
+    )
+    batch = IngestBatch(
+        connector_name="gong",
+        records=[
+            IngestRecord(
+                source_name="gong",
+                source_kind="mcp",
+                item_type="catalog",
+                name="mcp-catalog",
+                content="{/}",
+            ),
+            IngestRecord(
+                source_name="gong",
+                source_kind="mcp",
+                item_type="catalog",
+                name="second",
+                content="{}",
+            ),
+        ],
+    )
+    sink = MagicMock()
+    monkeypatch.setattr(
+        "agentic_odi_cli.connectors.build_connector", lambda _config: _FakeConnector(batch)
+    )
+    monkeypatch.setattr("agentic_odi_cli.connectors.get_default_sink", lambda: sink)
+
+    result = runner.invoke(
+        app,
+        ["connectors", "ingest", "--name", "gong", "--dry-run", "--config", str(config)],
+    )
+
+    assert result.exit_code == 0
+    sink.append.assert_not_called()
+    preview = json.loads(_strip(result.output))
+    assert preview["dry_run"] is True
+    assert preview["connector"] == "gong"
+    assert preview["records"] == 2
+    assert preview["sample"]["name"] == "mcp-catalog"
+    assert "evidence_drafts" not in preview
+
+
+def test_connectors_ingest_dry_run_counts_evidence_drafts(tmp_path: Path, monkeypatch) -> None:
+    config = tmp_path / "connectors.json"
+    db = str(tmp_path / "odi.db")
+    runner.invoke(
+        app,
+        [
+            "--db",
+            db,
+            "connectors",
+            "add",
+            "mcp",
+            "--name",
+            "gong",
+            "--url",
+            "http://localhost:9000/mcp",
+            "--config",
+            str(config),
+        ],
+    )
+    batch = IngestBatch(
+        connector_name="gong",
+        records=[
+            IngestRecord(
+                source_name="gong",
+                source_kind="mcp",
+                item_type="resource",
+                name="Call notes",
+                content="Onboarding is slow",
+            )
+        ],
+    )
+    sink = MagicMock()
+    monkeypatch.setattr(
+        "agentic_odi_cli.connectors.build_connector", lambda _config: _FakeConnector(batch)
+    )
+    monkeypatch.setattr("agentic_odi_cli.connectors.get_default_sink", lambda: sink)
+
+    result = runner.invoke(
+        app,
+        [
+            "--db",
+            db,
+            "connectors",
+            "ingest",
+            "--name",
+            "gong",
+            "--job-id",
+            "JOB-1",
+            "--dry-run",
+            "--config",
+            str(config),
+        ],
+    )
+
+    assert result.exit_code == 0
+    sink.append.assert_not_called()
+    preview = json.loads(_strip(result.output))
+    assert preview["records"] == 1
+    assert preview["evidence_drafts"] == 1
+
+
+def test_connectors_list_json_prints_expected_fields(tmp_path: Path) -> None:
+    config = tmp_path / "connectors.json"
+    runner.invoke(
+        app,
+        [
+            "connectors",
+            "add",
+            "mcp",
+            "--name",
+            "gong",
+            "--url",
+            "http://localhost:9000/mcp",
+            "--config",
+            str(config),
+        ],
+    )
+
+    result = runner.invoke(app, ["connectors", "list", "--config", str(config), "--json"])
+
+    assert result.exit_code == 0
+    payload = json.loads(_strip(result.output))
+    assert isinstance(payload, list)
+    assert payload == [
+        {
+            "name": "gong",
+            "kind": "mcp",
+            "url": "http://localhost:9000/mcp",
+            "enabled": True,
+        }
+    ]
+
+
+def test_connectors_list_json_is_an_empty_array(tmp_path: Path) -> None:
+    config = tmp_path / "connectors.json"
+
+    result = runner.invoke(app, ["connectors", "list", "--config", str(config), "--json"])
+
+    assert result.exit_code == 0
+    assert json.loads(_strip(result.output)) == []

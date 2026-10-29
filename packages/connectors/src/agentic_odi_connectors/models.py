@@ -7,6 +7,21 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
+
+class ConfigurationError(ValueError):
+    """Raised when a connector configuration fails validation.
+
+    Attributes:
+        keys: The missing or invalid config keys, used to surface which
+            fields need correction at startup.
+    """
+
+    def __init__(self, keys: list[str]) -> None:
+        self.keys = keys
+        joined = ", ".join(keys)
+        super().__init__(f"Invalid connector config: {joined}")
+
+
 ItemType = Literal["resource", "tool_result", "catalog"]
 McpAuthMode = Literal["none", "oauth"]
 EvidenceItemType = Literal["catalog", "resource", "tool_result", "manual", "note"]
@@ -49,6 +64,14 @@ class McpConnectorSettings(BaseModel):
     env_vars: list[str] = Field(default_factory=list)
 
 
+class PaginationSettings(BaseModel):
+    """Opt-in paging: where to find the next page, relative to the response."""
+
+    next_path: str = Field(
+        ..., description="Dotted path to the next page URL or cursor in the response."
+    )
+
+
 class RestConnectorSettings(BaseModel):
     url: str
     method: Literal["GET", "POST"] = "GET"
@@ -57,6 +80,7 @@ class RestConnectorSettings(BaseModel):
     records_key: str | None = None
     timeout: float = 10.0
     item_type: ItemType = "resource"
+    pagination: PaginationSettings | None = None
 
 
 class ConnectorConfig(BaseModel):
