@@ -414,3 +414,15 @@ class PromoteEvidenceRequest(BaseModel):
     importance: float | None = None
     satisfaction: float | None = None
     mcp_url: str = ""
+
+
+class NotificationRuleModel(BaseModel):
+    kind: str
+    threshold: float = 0.0
+    enabled: bool = True
+
+
+class NotificationRuleRequest(BaseModel):
+    kind: str
+    threshold: float = Field(default=0.0, ge=0.0)
+    enabled: bool = True

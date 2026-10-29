@@ -21,6 +21,10 @@ const KIND_LABEL: Record<SignalKind, string> = {
   evidence_ingested: "Evidence",
   evidence_promoted: "Evidence",
   job_map_completed: "Job map",
+  bet_due: "Bet due",
+  score_moved: "Score moved",
+  decision_superseded: "Decision superseded",
+  coverage_gap: "Coverage gap",
 };
 
 const SEVERITY_BADGE: Record<SignalSeverity, string> = {

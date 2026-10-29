@@ -45,6 +45,7 @@ class ToolName(str, Enum):
     GET_CAPABILITIES = "get_capabilities"
     GET_CAPABILITIES_MANIFEST = "get_capabilities_manifest"
     LIST_SIGNALS = "list_signals"
+    EMIT_KNOW_SIGNALS = "emit_know_signals"
     MARK_SIGNAL_READ = "mark_signal_read"
     DISMISS_SIGNAL = "dismiss_signal"
     GET_HEALTH = "get_health"
@@ -53,6 +54,18 @@ class ToolName(str, Enum):
     LIST_SCHEDULED_WORK = "list_scheduled_work"
     CANCEL_SCHEDULED_WORK = "cancel_scheduled_work"
     TRIGGER_SCHEDULED_WORK = "trigger_scheduled_work"
+    # Pillar 4 — Know: did it work
+    RECORD_DECISION = "record_decision"
+    LIST_DECISIONS = "list_decisions"
+    RECORD_SCORE_SNAPSHOT = "record_score_snapshot"
+    OUTCOME_DELTA = "outcome_delta"
+    CREATE_BET = "create_bet"
+    GET_BET = "get_bet"
+    LIST_BETS = "list_bets"
+    UPDATE_BET_STATUS = "update_bet_status"
+    MEASURE_BET = "measure_bet"
+    SET_NOTIFICATION_RULE = "set_notification_rule"
+    LIST_NOTIFICATION_RULES = "list_notification_rules"
 
 
 class ToolEffect(str, Enum):
@@ -401,6 +414,17 @@ TOOL_SPECS: dict[str, ToolSpec] = {
         arguments=("unread_only", "limit"),
         returns="A list of Signals, newest first.",
     ),
+    ToolName.EMIT_KNOW_SIGNALS.value: ToolSpec(
+        name="emit_know_signals",
+        summary=(
+            "Record the know signals the store can prove: bets now due, superseded "
+            "decisions, and stages with no outcomes. Idempotent."
+        ),
+        effect=_derive_effect("emit_know_signals"),
+        arguments=("job_id",),
+        returns="The current know Signals, newest first; an empty store records none.",
+        stage="6",
+    ),
     ToolName.MARK_SIGNAL_READ.value: ToolSpec(
         name="mark_signal_read",
         summary="Mark a signal as read so it stops counting toward the unread badge.",
@@ -456,6 +480,117 @@ TOOL_SPECS: dict[str, ToolSpec] = {
         required=("work_id",),
         returns="The dispatched scheduled work item.",
     ),
+    ToolName.RECORD_DECISION.value: ToolSpec(
+        name="record_decision",
+        summary="Record a decision: what was chosen, what was rejected, and why.",
+        effect=_derive_effect("record_decision"),
+        arguments=(
+            "job_id",
+            "chosen_outcome_ids",
+            "rationale",
+            "decided_by",
+            "rejected",
+            "confidence",
+        ),
+        required=("job_id", "chosen_outcome_ids", "rationale", "decided_by"),
+        returns="The created Decision.",
+        stage="6",
+    ),
+    ToolName.LIST_DECISIONS.value: ToolSpec(
+        name="list_decisions",
+        summary="List a Job's decisions, oldest first; a superseded one stays readable.",
+        effect=_derive_effect("list_decisions"),
+        arguments=("job_id",),
+        required=("job_id",),
+        returns="A list of Decisions.",
+        stage="6",
+    ),
+    ToolName.RECORD_SCORE_SNAPSHOT.value: ToolSpec(
+        name="record_score_snapshot",
+        summary="Capture an outcome's current score as an append-only history entry.",
+        effect=_derive_effect("record_score_snapshot"),
+        arguments=("outcome_id", "method", "note", "importance_n", "satisfaction_n"),
+        required=("outcome_id",),
+        returns="The created ScoreSnapshot.",
+        stage="6",
+    ),
+    ToolName.OUTCOME_DELTA.value: ToolSpec(
+        name="outcome_delta",
+        summary="Signed change between an outcome's earlier and latest score snapshots.",
+        effect=_derive_effect("outcome_delta"),
+        arguments=("outcome_id",),
+        required=("outcome_id",),
+        returns="A descriptive delta, or an explicit unavailable result.",
+        stage="6",
+    ),
+    ToolName.CREATE_BET.value: ToolSpec(
+        name="create_bet",
+        summary="Create a bet with a baseline frozen from the outcome's score now.",
+        effect=_derive_effect("create_bet"),
+        arguments=(
+            "decision_id",
+            "outcome_id",
+            "hypothesis",
+            "target",
+            "measure_by",
+            "direction",
+        ),
+        required=("decision_id", "outcome_id", "hypothesis", "target", "measure_by"),
+        returns="The created Bet.",
+        stage="6",
+    ),
+    ToolName.GET_BET.value: ToolSpec(
+        name="get_bet",
+        summary="Get a single Bet by ID, including its frozen baseline.",
+        effect=_derive_effect("get_bet"),
+        arguments=("bet_id",),
+        required=("bet_id",),
+        returns="The Bet, or an error string if not found.",
+        stage="6",
+    ),
+    ToolName.LIST_BETS.value: ToolSpec(
+        name="list_bets",
+        summary="List bets ordered by the date you will look, optionally for one Job.",
+        effect=_derive_effect("list_bets"),
+        arguments=("job_id",),
+        returns="A list of Bets.",
+        stage="6",
+    ),
+    ToolName.UPDATE_BET_STATUS.value: ToolSpec(
+        name="update_bet_status",
+        summary="Move a bet through a legal status transition, naming the legal ones on refusal.",
+        effect=_derive_effect("update_bet_status"),
+        arguments=("bet_id", "status"),
+        required=("bet_id", "status"),
+        returns="The updated Bet.",
+        stage="6",
+    ),
+    ToolName.MEASURE_BET.value: ToolSpec(
+        name="measure_bet",
+        summary="Report met, missed or no_data against the bet's stored baseline.",
+        effect=_derive_effect("measure_bet"),
+        arguments=("bet_id",),
+        required=("bet_id",),
+        returns="A result with the date it looked; no_data invents no numbers.",
+        stage="6",
+    ),
+    ToolName.SET_NOTIFICATION_RULE.value: ToolSpec(
+        name="set_notification_rule",
+        summary="Store one interruption rule for a signal kind.",
+        effect=_derive_effect("set_notification_rule"),
+        arguments=("kind", "threshold", "enabled"),
+        required=("kind",),
+        returns="The stored NotificationRule.",
+        stage="6",
+    ),
+    ToolName.LIST_NOTIFICATION_RULES.value: ToolSpec(
+        name="list_notification_rules",
+        summary="List the effective notification rules, including documented defaults.",
+        effect=_derive_effect("list_notification_rules"),
+        arguments=(),
+        returns="A list of NotificationRules.",
+        stage="6",
+    ),
 }
 
 TOOL_NAMES: tuple[str, ...] = tuple(TOOL_SPECS)
@@ -465,6 +600,7 @@ _STAGE_NAMES: dict[str | None, str] = {
     "2": "Stage 2: Capture Desired Outcomes",
     "3": "Stage 3: Build the Job Map",
     "4": "Stage 4: Calculate Opportunity Scores",
+    "6": "Stage 6: Know — did it work",
     None: "Supporting Tools",
 }
 
@@ -474,7 +610,7 @@ _EFFECT_ORDER: tuple[ToolEffect, ...] = (
     ToolEffect.DESTRUCTIVE,
 )
 
-_STAGE_ORDER: tuple[str | None, ...] = ("1", "2", "3", "4", None)
+_STAGE_ORDER: tuple[str | None, ...] = ("1", "2", "3", "4", "6", None)
 
 
 def capability_manifest() -> dict:

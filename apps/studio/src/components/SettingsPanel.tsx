@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { fetchDiagnostics } from "../api/studioApi";
 import type { SidecarDiagnostics } from "../api/studioApi";
+import { fetchNotificationRules, saveNotificationRule } from "../api/studioApi";
 import {
   createDiagnosticsBundle,
   diagnosticsEntryCount,
@@ -10,7 +11,7 @@ import {
 import { DiagnosticsModal } from "../diagnostics/DiagnosticsModal";
 import { useOnboarding } from "../onboarding/context";
 import { useStudio } from "../state/StudioContext";
-import type { ConnectorPreset, StudioConfig } from "../types";
+import type { ConnectorPreset, NotificationRule, SignalKind, StudioConfig } from "../types";
 import { FailurePanel } from "./FailurePanel";
 import { UpdateSettings, useUpdateService, useUpdateSnapshot } from "../updater";
 import { detectPlatform } from "../updater/platform";
@@ -22,6 +23,19 @@ const PLATFORM_LABELS: Record<ReturnType<typeof detectPlatform>, string> = {
   windows: "Windows",
   linux: "Linux",
   unknown: "Desktop",
+};
+
+const SIGNAL_KIND_LABELS: Record<SignalKind, string> = {
+  job_added: "A job is added",
+  outcome_scored: "An outcome's score changes",
+  opportunity_crossed: "An opportunity crosses the ODI threshold",
+  evidence_ingested: "Evidence is captured",
+  evidence_promoted: "Evidence becomes an outcome",
+  job_map_completed: "A job map is complete",
+  bet_due: "A bet's measure-by date arrives",
+  score_moved: "An outcome's score moves",
+  decision_superseded: "A decision is superseded",
+  coverage_gap: "A job-map stage has no outcomes",
 };
 
 /**
@@ -128,6 +142,86 @@ const AREA_LABELS: Record<ConnectorPreset["area"], string> = {
   "strategy-alignment": "Product strategy & backlog alignment",
   "knowledge-output": "Strategy & knowledge management output",
 };
+
+/**
+ * The shared interruption policy. It is stored on the sidecar, not in this
+ * browser, so the bell, the digest and every other reader agree. A rule only
+ * quiets the feed — it never changes which signals are real.
+ */
+function NotificationPolicySection() {
+  const [rules, setRules] = useState<NotificationRule[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    fetchNotificationRules()
+      .then((loaded) => {
+        if (active) setRules(loaded);
+      })
+      .catch((cause: unknown) => {
+        if (active) setError(cause instanceof Error ? cause.message : "Policy unavailable.");
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  async function update(rule: NotificationRule, patch: Partial<NotificationRule>) {
+    const next = { ...rule, ...patch };
+    try {
+      setRules(await saveNotificationRule(next));
+      setError(null);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not save the rule.");
+    }
+  }
+
+  return (
+    <section aria-labelledby="settings-notifications-heading">
+      <h3 className="settings__title" id="settings-notifications-heading">
+        Notifications
+      </h3>
+      <p className="muted">
+        Which signals interrupt you. Suppressed signals stay in the feed — this only decides what
+        asks for attention.
+      </p>
+      {error ? <p className="muted">{error}</p> : null}
+      {rules === null && !error ? (
+        <p className="muted">Loading the shared policy…</p>
+      ) : (
+        <ul className="connection-list">
+          {(rules ?? []).map((rule) => (
+            <li key={rule.kind}>
+              <label className="checkbox">
+                <input
+                  type="checkbox"
+                  checked={rule.enabled}
+                  onChange={(event) => void update(rule, { enabled: event.target.checked })}
+                />
+                <span>{SIGNAL_KIND_LABELS[rule.kind]}</span>
+              </label>
+              {rule.kind === "score_moved" ? (
+                <label className="connection-list__value">
+                  threshold{" "}
+                  <input
+                    className="input"
+                    type="number"
+                    min="0"
+                    step="0.1"
+                    value={rule.threshold}
+                    onChange={(event) =>
+                      void update(rule, { threshold: Number(event.target.value) })
+                    }
+                  />
+                </label>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
 
 export function SettingsPanel() {
   const {
@@ -454,6 +548,8 @@ export function SettingsPanel() {
           </button>
         </div>
       ) : null}
+
+      <NotificationPolicySection />
 
       <UpdateSettings />
 

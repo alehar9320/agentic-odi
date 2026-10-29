@@ -94,6 +94,10 @@ control while following a streamed turn and returning to the live end:
 | `apps/studio/src/assistant/claims.test.ts` | Marker hiding while a reply streams (including a split marker and literal code), block splitting, claim-to-sentence mapping, seeded counts |
 | `apps/studio/src/assistant/parts.test.tsx` | Claim chips open the record, hypothesis tag, uncited underline, missing record, sample chips, the no-citation banner, Escape |
 | `apps/studio-api/tests/test_studio_approvals.py` | Gate lifecycle: resolve, timeout, double resolve, unknown id |
+| `packages/core/tests/test_bets_and_signals.py` | Decision supersede-not-overwrite, a bet's frozen baseline, `met`/`missed`/`no_data` measurement, derived-signal kinds and stable ids |
+| `packages/core/tests/test_persistence_parity.py` | The SQLite repository returns the same decisions, bets, and signals as the in-memory one across a reload |
+| `apps/cli/tests/test_know_cli.py` | `bets`, `decisions`, and `know` commands: frozen baseline, overdue marking, honest empty feed, illegal-transition refusal, digest determinism |
+| `apps/studio-api/tests/test_studio_signals.py` | Derived `/api/signals`, persisted read/dismiss state, dismissal not resurrecting on re-derive, notification-rule defaults and updates |
 | `apps/studio/src/features/flags.test.ts` | Flag precedence (query → storage → env → default), value parsing, local overrides |
 | `apps/studio/src/onboarding/machine.test.ts` | Tour transitions, no forward motion without a goal, versioned storage, malformed records |
 | `apps/studio/src/onboarding/FirstRunWizard.test.tsx` | Never auto-opens, explicit open, full flow to a destination, skip/Escape, focus trap, resume, replay, inline model repair, flag off |

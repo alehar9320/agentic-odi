@@ -308,6 +308,45 @@ Storage is a separate SQLite file from the ODI repository:
 **Forget everything** is a two-step confirmation and also clears the visible
 thread, because the server deletes the conversations behind it.
 
+### Signals: what actually changed
+
+The **Catch up** feed shows what moved since you last looked, and every row is
+derived on read from your own store — bets, score snapshots, decisions, and
+job-map coverage. Nothing is simulated or invented: an empty store shows an
+empty feed, and a measurement that cannot be made says so instead of guessing.
+
+| Kind | What it means |
+|---|---|
+| `bet_due` | A bet's measure-by date has arrived and it is not yet measured |
+| `score_moved` | An outcome's opportunity score moved by at least the threshold |
+| `decision_superseded` | A newer decision replaced an older one |
+| `coverage_gap` | A universal job-map stage has no outcomes captured |
+
+Signals have stable ids, so **Read** and **Dismiss** are remembered: the state
+lives in the sidecar's own SQLite store and survives a reload. Dismissing hides
+a row from the feed without deleting anything — the signal is still real, it
+just stops asking for attention. The shared notification policy, editable
+through the API, decides which signals interrupt you (a score move needs a
+minimum threshold; coverage gaps are quiet by default). Everything else stays
+in the feed.
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/api/signals` | Derived signals plus read/dismiss state |
+| `POST` | `/api/signals/{id}/read` | Mark one read |
+| `POST` | `/api/signals/{id}/dismiss` | Dismiss one |
+| `GET` | `/api/notification-rules` | The effective interruption policy |
+| `PUT` | `/api/notification-rules` | Store one rule for a signal kind |
+
+The `+ Simulate update` button in the feed is a development-only affordance; it
+is hidden in production builds so a demonstration can never be mistaken for
+recorded activity.
+
+The **Notifications** section in Settings edits that shared policy. It reads and
+writes the same `/api/notification-rules` the digest and the bell consult, so a
+kind toggled off there stops interrupting everywhere — the signal stays in the
+feed.
+
 ### The thread comes back
 
 Conversations are stored beside the memory. On launch the SPA asks

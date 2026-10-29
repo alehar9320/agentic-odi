@@ -407,3 +407,101 @@ def render_scheduled_work_list(items: Any, *, as_json: bool) -> str:
         ],
         empty="No scheduled work found.",
     )
+
+
+def render_bet(bet: Any, *, as_json: bool) -> str:
+    """Render one Bet as a labelled block, showing the stored baseline."""
+    if not isinstance(bet, dict):
+        return _json(bet) if as_json else str(bet)
+    if as_json:
+        return _json(bet)
+    return _block(
+        [
+            ("id", bet.get("id", "")),
+            ("hypothesis", bet.get("hypothesis", "")),
+            ("status", bet.get("status", "")),
+            ("baseline", _num(bet.get("baseline", ""))),
+            ("target", _num(bet.get("target", ""))),
+            ("direction", bet.get("direction", "")),
+            ("measure_by", bet.get("measure_by", "")),
+            ("decision_id", bet.get("decision_id", "")),
+            ("outcome_id", bet.get("outcome_id", "")),
+            ("baseline_snapshot", bet.get("baseline_snapshot_id") or "—"),
+        ]
+    )
+
+
+def render_bet_list(bets: Any, *, today: str | None = None, as_json: bool) -> str:
+    """Render bets ordered as given; mark overdue ones when a date is supplied."""
+    if not isinstance(bets, list):
+        return _json(bets) if as_json else str(bets)
+    if as_json:
+        return _json(bets)
+    rows: list[tuple[str, ...]] = []
+    for bet in bets:
+        measure_by = str(bet.get("measure_by", ""))
+        status = str(bet.get("status", ""))
+        overdue = ""
+        if today and measure_by and measure_by < today and status in ("planned", "running"):
+            overdue = " (overdue)"
+        rows.append(
+            (
+                str(bet.get("id", "")),
+                _truncate(str(bet.get("hypothesis", ""))),
+                status,
+                measure_by + overdue,
+                _num(bet.get("baseline", "")),
+                _num(bet.get("target", "")),
+            )
+        )
+    return _table(
+        ("id", "hypothesis", "status", "measure_by", "baseline", "target"),
+        rows,
+        empty="No bets found.",
+    )
+
+
+def render_measurement(result: Any, *, as_json: bool) -> str:
+    """Render a bet measurement, keeping no_data visibly different from a value."""
+    if not isinstance(result, dict):
+        return _json(result) if as_json else str(result)
+    if as_json:
+        return _json(result)
+    outcome = str(result.get("result", ""))
+    if outcome == "no_data":
+        return (
+            f"No data yet: no score at or after {result.get('measure_by', '')} "
+            f"(looked {result.get('looked_at', '')})."
+        )
+    return (
+        f"{outcome.upper()}: observed {_num(result.get('observed', ''))} "
+        f"vs target {_num(result.get('target', ''))} "
+        f"(baseline {_num(result.get('baseline', ''))}, "
+        f"delta {_num(result.get('delta', ''))})"
+    )
+
+
+def render_decision_list(decisions: Any, *, as_json: bool) -> str:
+    """Render decisions as an aligned table, marking superseded ones."""
+    if not isinstance(decisions, list):
+        return _json(decisions) if as_json else str(decisions)
+    if as_json:
+        return _json(decisions)
+    rows: list[tuple[str, ...]] = []
+    for decision in decisions:
+        chosen = ", ".join(decision.get("chosen_outcome_ids", []))
+        superseded = "superseded" if decision.get("superseded_by") else "live"
+        rows.append(
+            (
+                str(decision.get("id", "")),
+                str(decision.get("decided_at", ""))[:10],
+                superseded,
+                _truncate(chosen),
+                _truncate(str(decision.get("rationale", ""))),
+            )
+        )
+    return _table(
+        ("id", "decided_at", "state", "chosen", "rationale"),
+        rows,
+        empty="No decisions found.",
+    )

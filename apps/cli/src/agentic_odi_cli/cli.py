@@ -15,11 +15,13 @@ import typer
 
 from agentic_odi_cli import context, paths, update, version
 from agentic_odi_cli.backend import run_tool
+from agentic_odi_cli.bets import bets_app, decisions_app
 from agentic_odi_cli.connectors import connectors_app
 from agentic_odi_cli.customer_outcomes import customer_outcomes_app, score
 from agentic_odi_cli.desired_outcomes import desired_outcomes_app
 from agentic_odi_cli.evidence import evidence_app
 from agentic_odi_cli.jobs import jobs_app
+from agentic_odi_cli.know import know_app
 from agentic_odi_cli.onboard import maybe_run_first_launch
 from agentic_odi_cli.profile import app as profile_app
 from agentic_odi_cli.profile import setup_wizard
@@ -44,6 +46,9 @@ app.add_typer(steps_app, name="steps", help="Manage Job-map Steps.")
 app.add_typer(desired_outcomes_app, name="desired-outcomes", help="Manage desired Outcomes.")
 app.add_typer(evidence_app, name="evidence", help="Manage evidence captured from connectors.")
 app.add_typer(customer_outcomes_app, name="customer-outcomes", help="Manage Customer Outcomes")
+app.add_typer(bets_app, name="bets", help="Track bets with a frozen baseline.")
+app.add_typer(decisions_app, name="decisions", help="Record and read decisions.")
+app.add_typer(know_app, name="know", help="The digest and the evidence spine.")
 app.add_typer(
     signals_app,
     name="signals",

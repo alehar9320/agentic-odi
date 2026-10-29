@@ -64,6 +64,9 @@ per-platform archives with SHA-256 checksums for a manual download. See
 
 - **A brain for customer needs.** Jobs, desired outcomes, evidence, and
   opportunity scores in one store — queryable by any MCP client.
+- **A loop that closes.** Record the decision, freeze a baseline as a bet, and
+  read back honest signals — `met`, `missed`, or an explicit `no_data` — never a
+  number the system invented.
 - **A conversation, not a form.** The Living Studio opens on one question —
   **What do you want to win?** — with the composer focused. Its optional
   four-step tour stays out of the way, and in-place guidance appears only after
@@ -131,6 +134,8 @@ odi jobs list
 odi desired-outcomes list --job-id <id>
 odi signals unread                    # what changed while you were away
 odi score 8 2                        # → 14.00
+odi bets list                        # dated expectations with a frozen baseline
+odi know spine --job <id>            # where the evidence chain stops
 odi                                  # interactive chat in a terminal
 ```
 
@@ -184,11 +189,11 @@ together and where each contract is enforced:
 
 | Path | Distribution | Description |
 |---|---|---|
-| **`packages/core/`** | `agentic-odi-core` | Domain models, the `ODIService` layer, in-memory and SQLite repositories, the shared MCP tool contract, and opportunity-score computation. |
+| **`packages/core/`** | `agentic-odi-core` | Domain models, the `ODIService` layer, in-memory and SQLite repositories, the shared MCP tool contract, opportunity-score computation, and the Pillar 4 spine: decisions, bets, derived signals, and the notification policy. |
 | **`packages/connectors/`** | `agentic-odi-connectors` | Pluggable MCP and REST connectors with presets and an ingest sink. |
-| **`apps/mcp-server/`** | `agentic-odi-mcp-server` | FastMCP server exposing Jobs, Steps, Desired Outcomes, Customer Outcomes, Evidence, and context tools over HTTP. SQLite by default. |
-| **`apps/studio-api/`** | `agentic-odi-studio-api` | FastAPI **Living Studio sidecar**: config, health, metadata-only diagnostics, canvas, local mutations, MCP passthrough, SSE chat, conversations, and PM memory. |
-| **`apps/cli/`** | `agentic-odi-cli` | Typer CLI with interactive chat, full entity CRUD, `schema`, `connectors`, and local or remote data access. |
+| **`apps/mcp-server/`** | `agentic-odi-mcp-server` | FastMCP server exposing Jobs, Steps, Desired Outcomes, Customer Outcomes, Evidence, decisions, bets, signals, and context tools over HTTP. SQLite by default. |
+| **`apps/studio-api/`** | `agentic-odi-studio-api` | FastAPI **Living Studio sidecar**: config, health, metadata-only diagnostics, canvas, local mutations, MCP passthrough, SSE chat, conversations, PM memory, and the derived signal feed with persisted read/dismiss state. |
+| **`apps/cli/`** | `agentic-odi-cli` | Typer CLI with interactive chat, full entity CRUD, `bets`, `decisions`, `know`, `schema`, `connectors`, and local or remote data access. |
 | **`apps/studio/`** | React + TypeScript + Vite | **The Living Studio** SPA and Tauri 2 desktop shell, built on [assistant-ui](https://www.assistant-ui.com). Keyboard- and screen-reader-operable, gated by an [axe-core](https://github.com/dequelabs/axe-core) WCAG 2.1 AA sweep in the frontend suite. Its browser-level suite lives in `apps/studio/e2e/`. Installed desktop builds **update themselves** in the background and apply on restart. |
 | **`infra/cloudflare/`** | Worker | Free-plan Workers Static Assets deployment and sidecar tunnel. |
 | **`scripts/`** | — | Dev launcher, binary build, installer tests. |

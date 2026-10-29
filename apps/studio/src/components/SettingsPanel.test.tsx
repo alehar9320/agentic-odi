@@ -10,6 +10,16 @@ vi.mock("../state/StudioContext", () => ({
   useStudio: vi.fn(),
 }));
 
+vi.mock("../api/studioApi", () => ({
+  fetchNotificationRules: vi.fn(async () => [
+    { kind: "bet_due", threshold: 0, enabled: true },
+    { kind: "score_moved", threshold: 0.5, enabled: true },
+    { kind: "decision_superseded", threshold: 0, enabled: true },
+    { kind: "coverage_gap", threshold: 0, enabled: false },
+  ]),
+  saveNotificationRule: vi.fn(async (rule: unknown) => [rule]),
+}));
+
 import { useStudio } from "../state/StudioContext";
 import type { StudioContextValue } from "../state/StudioContext";
 
@@ -314,5 +324,39 @@ describe("SettingsPanel about section", () => {
     expect(within(about).getByText(__STUDIO_BUILD_DATE__)).toBeInTheDocument();
     expect(within(about).getByText(/macOS|Windows|Linux|Desktop/)).toBeInTheDocument();
     expect(within(about).getByText(aboutService.statusLine())).toBeInTheDocument();
+  });
+});
+
+describe("SettingsPanel notification policy", () => {
+  it("shows the shared rules with their stored defaults", async () => {
+    vi.mocked(useStudio).mockReturnValue(stubContext());
+
+    renderPanel();
+
+    const policy = await screen.findByRole("region", { name: "Notifications" });
+    expect(within(policy).getByText(/a bet's measure-by date arrives/i)).toBeInTheDocument();
+    const coverage = within(policy).getByRole("checkbox", {
+      name: /a job-map stage has no outcomes/i,
+    }) as HTMLInputElement;
+    expect(coverage.checked).toBe(false);
+  });
+
+  it("saves a rule through the shared API when a kind is toggled", async () => {
+    const { saveNotificationRule } = await import("../api/studioApi");
+    vi.mocked(useStudio).mockReturnValue(stubContext());
+
+    renderPanel();
+
+    const policy = await screen.findByRole("region", { name: "Notifications" });
+    const coverage = within(policy).getByRole("checkbox", {
+      name: /a job-map stage has no outcomes/i,
+    });
+    fireEvent.click(coverage);
+
+    await waitFor(() =>
+      expect(saveNotificationRule).toHaveBeenCalledWith(
+        expect.objectContaining({ kind: "coverage_gap", enabled: true }),
+      ),
+    );
   });
 });

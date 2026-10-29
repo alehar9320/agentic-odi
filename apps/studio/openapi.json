@@ -2337,6 +2337,70 @@
         }
       }
     },
+    "/api/notification-rules": {
+      "get": {
+        "summary": "Get Notification Rules",
+        "description": "The effective interruption policy, including documented defaults.",
+        "operationId": "get_notification_rules_api_notification_rules_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/NotificationRuleModel"
+                  },
+                  "type": "array",
+                  "title": "Response Get Notification Rules Api Notification Rules Get"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Put Notification Rule",
+        "description": "Store one shared rule for a signal kind.",
+        "operationId": "put_notification_rule_api_notification_rules_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NotificationRuleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/NotificationRuleModel"
+                  },
+                  "type": "array",
+                  "title": "Response Put Notification Rule Api Notification Rules Put"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/llm/chat": {
       "post": {
         "summary": "Proxy Llm Chat",
@@ -2642,43 +2706,6 @@
                   "additionalProperties": true,
                   "title": "Response Promote Evidence Api Evidence  Evidence Id  Promote Post"
                 }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/{full_path}": {
-      "get": {
-        "summary": "Spa Fallback",
-        "operationId": "spa_fallback__full_path__get",
-        "parameters": [
-          {
-            "name": "full_path",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Full Path"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
               }
             }
           },
@@ -3903,6 +3930,53 @@
         ],
         "title": "ModelListRequest",
         "description": "Which backend to ask for its model ids. The key travels in the body, not\nthe query string, so it never lands in a URL or an access log."
+      },
+      "NotificationRuleModel": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "threshold": {
+            "type": "number",
+            "title": "Threshold",
+            "default": 0.0
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind"
+        ],
+        "title": "NotificationRuleModel"
+      },
+      "NotificationRuleRequest": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "threshold": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Threshold",
+            "default": 0.0
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind"
+        ],
+        "title": "NotificationRuleRequest"
       },
       "ObservationCreateRequest": {
         "properties": {

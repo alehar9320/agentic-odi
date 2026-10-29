@@ -177,7 +177,7 @@
       },
       {
         "title": "Ask",
-        "body": "Any agent calls the same MCP tools the studio uses: job maps, outcomes, evidence, opportunity scores. Thirty tools, at decision time, from your own machine or the hosted server."
+        "body": "Any agent calls the same MCP tools the studio uses: job maps, outcomes, evidence, opportunity scores, decisions, bets, and signals. One shared contract, at decision time, from your own machine or the hosted server."
       },
       {
         "title": "Steer",

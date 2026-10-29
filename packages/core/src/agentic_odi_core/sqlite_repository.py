@@ -13,11 +13,15 @@ from pydantic import BaseModel, ValidationError
 from agentic_odi_core.events import DEFAULT_DEVICE, DEFAULT_WORKSPACE, Event
 from agentic_odi_core.intent_store import IntentStore
 from agentic_odi_core.models import (
+    Bet,
     CustomerOutcome,
+    Decision,
     Evidence,
     Job,
+    NotificationRule,
     Outcome,
     ScheduledWork,
+    ScoreSnapshot,
     Signal,
     Step,
     compute_opportunity_score,
@@ -29,6 +33,32 @@ from agentic_odi_core.repository import (
     sort_outcomes,
     unread_signals,
 )
+
+
+def _jsonable_updates(updates: dict[str, Any]) -> dict[str, Any]:
+    """Coerce update values to JSON-safe forms for the append-only event log.
+
+    ``measured_at`` is a ``datetime`` and ``status`` is an enum; the event store
+    serializes payloads with ``json.dumps``, so they must be encoded here rather
+    than failing at append time.
+    """
+    from datetime import date as _date
+    from datetime import datetime as _datetime
+
+    from pydantic import BaseModel as _BaseModel
+
+    def encode(value: Any) -> Any:
+        if isinstance(value, _BaseModel):
+            return value.model_dump(mode="json")
+        if isinstance(value, _datetime):
+            return value.isoformat()
+        if isinstance(value, _date):
+            return value.isoformat()
+        if hasattr(value, "value"):  # Enum
+            return value.value
+        return value
+
+    return {key: encode(value) for key, value in updates.items()}
 
 
 class SQLiteRepository(Repository):
@@ -60,6 +90,10 @@ class SQLiteRepository(Repository):
         self.evidence: dict[str, Evidence] = {}
         self.signals: dict[str, Signal] = {}
         self.scheduled_work: dict[str, ScheduledWork] = {}
+        self.decisions: dict[str, Decision] = {}
+        self.score_snapshots: dict[str, ScoreSnapshot] = {}
+        self.bets: dict[str, Bet] = {}
+        self.notification_rules: dict[str, NotificationRule] = {}
         self._last_event_id = 0
         for ev in self.store.get_stream(workspace_id=self._workspace_id, replay_order=True):
             self._apply_event(ev)
@@ -181,6 +215,27 @@ class SQLiteRepository(Repository):
             self._merge_updates(self.signals, p, Signal)
         elif et == "SIGNAL_DISMISSED":
             self._merge_updates(self.signals, p, Signal)
+        elif et == "DECISION_RECORDED":
+            self.decisions[p["id"]] = Decision.model_validate(p)
+        elif et == "DECISION_SUPERSEDED":
+            decision = self.decisions.get(p["id"])
+            if decision is not None:
+                merged = decision.model_dump()
+                merged["superseded_by"] = p.get("superseded_by")
+                merged["superseded_at"] = p.get("superseded_at")
+                try:
+                    self.decisions[p["id"]] = Decision.model_validate(merged)
+                except ValidationError:
+                    pass
+        elif et == "SCORE_SNAPSHOT_RECORDED":
+            self.score_snapshots[p["id"]] = ScoreSnapshot.model_validate(p)
+        elif et == "BET_CREATED":
+            self.bets[p["id"]] = Bet.model_validate(p)
+        elif et == "BET_UPDATED":
+            self._merge_updates(self.bets, p, Bet)
+        elif et == "NOTIFICATION_RULE_SET":
+            rule = NotificationRule.model_validate(p)
+            self.notification_rules[rule.kind.value] = rule
         self._last_event_id = max(self._last_event_id, ev["id"])
 
     @staticmethod
@@ -604,6 +659,131 @@ class SQLiteRepository(Repository):
         with self._lock:
             self.store.clear()
             self._load_snapshot()
+
+    def add_decision(self, decision: Decision) -> Decision:
+        with self._lock:
+            self.store.append(
+                "DECISION_RECORDED",
+                decision.model_dump(mode="json"),
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return decision
+
+    def get_decision(self, decision_id: str) -> Decision | None:
+        with self._lock:
+            self._sync()
+            return self.decisions.get(decision_id)
+
+    def list_decisions(self, job_id: str) -> list[Decision]:
+        with self._lock:
+            self._sync()
+            items = [d for d in self.decisions.values() if d.job_id == job_id]
+            return sorted(items, key=lambda d: (d.decided_at, d.id))
+
+    def supersede_decision(
+        self, decision_id: str, *, superseded_by: str, superseded_at: datetime
+    ) -> Decision | None:
+        with self._lock:
+            self._sync()
+            if decision_id not in self.decisions:
+                return None
+            self.store.append(
+                "DECISION_SUPERSEDED",
+                {
+                    "id": decision_id,
+                    "superseded_by": superseded_by,
+                    "superseded_at": _jsonable_updates({"v": superseded_at})["v"],
+                },
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return self.decisions.get(decision_id)
+
+    def add_score_snapshot(self, snapshot: ScoreSnapshot) -> ScoreSnapshot:
+        with self._lock:
+            self.store.append(
+                "SCORE_SNAPSHOT_RECORDED",
+                snapshot.model_dump(mode="json"),
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return snapshot
+
+    def get_score_snapshot(self, snapshot_id: str) -> ScoreSnapshot | None:
+        with self._lock:
+            self._sync()
+            return self.score_snapshots.get(snapshot_id)
+
+    def list_score_snapshots(self, outcome_id: str) -> list[ScoreSnapshot]:
+        with self._lock:
+            self._sync()
+            items = [s for s in self.score_snapshots.values() if s.outcome_id == outcome_id]
+            return sorted(items, key=lambda s: (s.at, s.id))
+
+    def add_bet(self, bet: Bet) -> Bet:
+        with self._lock:
+            self.store.append(
+                "BET_CREATED",
+                bet.model_dump(mode="json"),
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return bet
+
+    def get_bet(self, bet_id: str) -> Bet | None:
+        with self._lock:
+            self._sync()
+            return self.bets.get(bet_id)
+
+    def list_bets(self, job_id: str | None = None) -> list[Bet]:
+        with self._lock:
+            self._sync()
+            items = list(self.bets.values())
+            if job_id is not None:
+                items = [b for b in items if b.job_id == job_id]
+            return sorted(items, key=lambda b: (b.measure_by, b.created_at, b.id))
+
+    def update_bet(self, bet_id: str, updates: dict) -> Bet | None:
+        with self._lock:
+            self._sync()
+            bet = self.bets.get(bet_id)
+            if not bet:
+                return None
+            current = bet.model_dump()
+            current.update(updates)
+            try:
+                new_bet = Bet.model_validate(current)
+            except ValidationError:
+                return None
+            self.store.append(
+                "BET_UPDATED",
+                {"id": bet_id, "updates": _jsonable_updates(updates)},
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return new_bet
+
+    def set_notification_rule(self, rule: NotificationRule) -> NotificationRule:
+        with self._lock:
+            self.store.append(
+                "NOTIFICATION_RULE_SET",
+                rule.model_dump(mode="json"),
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return rule
+
+    def list_notification_rules(self) -> list[NotificationRule]:
+        with self._lock:
+            self._sync()
+            return sorted(self.notification_rules.values(), key=lambda r: r.kind.value)
 
     def reload(self) -> None:
         """Re‑load the local snapshot from the event store."""

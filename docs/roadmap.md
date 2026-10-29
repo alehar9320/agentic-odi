@@ -44,6 +44,7 @@ counted as done.
 - [ ] **MCP `/health` store probe** — the server reports whether its SQLite store is reachable ([PR #286](https://github.com/alehar9320/agentic-odi/pull/286)).
 - [ ] **Durable sessions and a real memory** — the conversation survives a reload ([PR #285](https://github.com/alehar9320/agentic-odi/pull/285)).
 - [ ] **Accept or reject a candidate without losing evidence** — the review half of candidate extraction ([PR #284](https://github.com/alehar9320/agentic-odi/pull/284)).
+- [ ] **Know: did it work (Pillar 4)** — decisions, bets with a frozen baseline, real derived signals, the Monday digest and the evidence spine ([PR #295](https://github.com/alehar9320/agentic-odi/pull/295)).
 
 ## Next
 

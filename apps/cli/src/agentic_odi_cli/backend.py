@@ -617,6 +617,12 @@ class LocalBackend(Backend):
             raise BackendError(_VALUE_RANGE_ERROR)
         return compute_opportunity_score(importance, satisfaction)
 
+    def _emit_know_signals(self, args: dict[str, Any]) -> list[dict[str, Any]]:
+        return [
+            signal.model_dump(mode="json")
+            for signal in self.service.emit_know_signals(job_id=args.get("job_id"))
+        ]
+
     def _list_signals(self, args: dict[str, Any]) -> list[dict[str, Any]]:
         signals = self.service.list_signals(
             unread_only=bool(args.get("unread_only", False)),
@@ -643,6 +649,80 @@ class LocalBackend(Backend):
         except SignalNotFoundError:
             raise BackendError(f"signal not found: {signal_id}") from None
         return signal.model_dump(mode="json")
+
+    # -- Pillar 4 — Know: did it work -------------------------------------
+
+    def _record_decision(self, args: dict[str, Any]) -> dict[str, Any]:
+        decision = self.service.record_decision(
+            args["job_id"],
+            args["chosen_outcome_ids"],
+            args["rationale"],
+            args["decided_by"],
+            rejected=args.get("rejected"),
+            confidence=args.get("confidence", "medium"),
+        )
+        return decision.model_dump(mode="json")
+
+    def _list_decisions(self, args: dict[str, Any]) -> list[dict[str, Any]]:
+        return [
+            decision.model_dump(mode="json")
+            for decision in self.service.list_decisions(args["job_id"])
+        ]
+
+    def _record_score_snapshot(self, args: dict[str, Any]) -> dict[str, Any]:
+        snapshot = self.service.record_score_snapshot(
+            args["outcome_id"],
+            method=args.get("method"),
+            note=args.get("note"),
+            importance_n=args.get("importance_n"),
+            satisfaction_n=args.get("satisfaction_n"),
+        )
+        return snapshot.model_dump(mode="json")
+
+    def _outcome_delta(self, args: dict[str, Any]) -> dict[str, Any]:
+        return self.service.outcome_delta(args["outcome_id"])
+
+    def _create_bet(self, args: dict[str, Any]) -> dict[str, Any]:
+        from datetime import date
+
+        try:
+            measure_by = date.fromisoformat(args["measure_by"])
+        except ValueError as exc:
+            raise BackendError(
+                f"measure_by must be an ISO date (YYYY-MM-DD), got '{args['measure_by']}'"
+            ) from exc
+        bet = self.service.create_bet(
+            args["decision_id"],
+            args["outcome_id"],
+            args["hypothesis"],
+            args["target"],
+            measure_by,
+            direction=args.get("direction", "maximize"),
+        )
+        return bet.model_dump(mode="json")
+
+    def _get_bet(self, args: dict[str, Any]) -> dict[str, Any]:
+        return self.service.get_bet(args["bet_id"]).model_dump(mode="json")
+
+    def _list_bets(self, args: dict[str, Any]) -> list[dict[str, Any]]:
+        return [bet.model_dump(mode="json") for bet in self.service.list_bets(args.get("job_id"))]
+
+    def _update_bet_status(self, args: dict[str, Any]) -> dict[str, Any]:
+        return self.service.transition_bet(args["bet_id"], args["status"]).model_dump(mode="json")
+
+    def _measure_bet(self, args: dict[str, Any]) -> dict[str, Any]:
+        return self.service.measure_bet(args["bet_id"])
+
+    def _set_notification_rule(self, args: dict[str, Any]) -> dict[str, Any]:
+        rule = self.service.set_notification_rule(
+            args["kind"],
+            threshold=args.get("threshold", 0.0),
+            enabled=args.get("enabled", True),
+        )
+        return rule.model_dump(mode="json")
+
+    def _list_notification_rules(self, args: dict[str, Any]) -> list[dict[str, Any]]:
+        return [rule.model_dump(mode="json") for rule in self.service.list_notification_rules()]
 
 
 _LOCAL_HANDLERS = {
@@ -683,9 +763,21 @@ _LOCAL_HANDLERS = {
     "get_capabilities": LocalBackend._get_capabilities,
     "get_capabilities_manifest": LocalBackend._get_capabilities_manifest,
     "list_signals": LocalBackend._list_signals,
+    "emit_know_signals": LocalBackend._emit_know_signals,
     "mark_signal_read": LocalBackend._mark_signal_read,
     "dismiss_signal": LocalBackend._dismiss_signal,
     "get_health": LocalBackend._get_health,
+    "record_decision": LocalBackend._record_decision,
+    "list_decisions": LocalBackend._list_decisions,
+    "record_score_snapshot": LocalBackend._record_score_snapshot,
+    "outcome_delta": LocalBackend._outcome_delta,
+    "create_bet": LocalBackend._create_bet,
+    "get_bet": LocalBackend._get_bet,
+    "list_bets": LocalBackend._list_bets,
+    "update_bet_status": LocalBackend._update_bet_status,
+    "measure_bet": LocalBackend._measure_bet,
+    "set_notification_rule": LocalBackend._set_notification_rule,
+    "list_notification_rules": LocalBackend._list_notification_rules,
 }
 
 
@@ -751,7 +843,11 @@ _LIST_TOOLS = frozenset(
         "list_customer_outcomes",
         "list_evidence",
         "list_signals",
+        "emit_know_signals",
         "list_scheduled_work",
+        "list_decisions",
+        "list_bets",
+        "list_notification_rules",
     }
 )
 

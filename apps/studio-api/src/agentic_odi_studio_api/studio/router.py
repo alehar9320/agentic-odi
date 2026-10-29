@@ -84,6 +84,8 @@ from agentic_odi_studio_api.studio.schemas import (
     MarketplaceSearchResponse,
     McpHealthRequest,
     ModelListRequest,
+    NotificationRuleModel,
+    NotificationRuleRequest,
     ObservationCreateRequest,
     ObservationListResponse,
     ObservationResponse,
@@ -1146,6 +1148,29 @@ def get_capabilities(request: Request) -> CapabilitiesResponse:
             ),
         ]
     )
+
+
+@router.get("/notification-rules", response_model=list[NotificationRuleModel])
+def get_notification_rules(request: Request) -> list[NotificationRuleModel]:
+    """The effective interruption policy, including documented defaults."""
+    return [
+        NotificationRuleModel(kind=rule.kind.value, threshold=rule.threshold, enabled=rule.enabled)
+        for rule in _service(request).list_notification_rules()
+    ]
+
+
+@router.put("/notification-rules", response_model=list[NotificationRuleModel])
+def put_notification_rule(
+    body: NotificationRuleRequest, request: Request
+) -> list[NotificationRuleModel]:
+    """Store one shared rule for a signal kind."""
+    try:
+        _service(request).set_notification_rule(
+            body.kind, threshold=body.threshold, enabled=body.enabled
+        )
+    except (OdiError, ValueError) as exc:
+        raise _as_http_error(exc) from exc
+    return get_notification_rules(request)
 
 
 @router.post("/llm/chat")

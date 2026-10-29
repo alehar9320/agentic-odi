@@ -6,11 +6,15 @@ from datetime import datetime, timezone
 from typing import Protocol, TypeVar
 
 from agentic_odi_core.models import (
+    Bet,
     CustomerOutcome,
+    Decision,
     Evidence,
     Job,
+    NotificationRule,
     Outcome,
     ScheduledWork,
+    ScoreSnapshot,
     Signal,
     Step,
 )
@@ -87,6 +91,10 @@ class Repository(Protocol):
     evidence: dict[str, Evidence]
     signals: dict[str, Signal]
     scheduled_work: dict[str, ScheduledWork]
+    decisions: dict[str, Decision]
+    score_snapshots: dict[str, ScoreSnapshot]
+    bets: dict[str, Bet]
+    notification_rules: dict[str, NotificationRule]
 
     def add_job(self, job: Job) -> Job: ...
     def list_jobs(self, limit: int | None = None, offset: int = 0) -> list[Job]: ...
@@ -146,7 +154,25 @@ class Repository(Protocol):
     ) -> list[ScheduledWork]: ...
     def update_scheduled_work(self, work_id: str, updates: dict) -> ScheduledWork | None: ...
     def delete_scheduled_work(self, work_id: str) -> bool: ...
-
+    # -- decisions ---------------------------------------------------------
+    def add_decision(self, decision: Decision) -> Decision: ...
+    def get_decision(self, decision_id: str) -> Decision | None: ...
+    def list_decisions(self, job_id: str) -> list[Decision]: ...
+    def supersede_decision(
+        self, decision_id: str, *, superseded_by: str, superseded_at: datetime
+    ) -> Decision | None: ...
+    # -- score snapshots ---------------------------------------------------
+    def add_score_snapshot(self, snapshot: ScoreSnapshot) -> ScoreSnapshot: ...
+    def get_score_snapshot(self, snapshot_id: str) -> ScoreSnapshot | None: ...
+    def list_score_snapshots(self, outcome_id: str) -> list[ScoreSnapshot]: ...
+    # -- bets --------------------------------------------------------------
+    def add_bet(self, bet: Bet) -> Bet: ...
+    def get_bet(self, bet_id: str) -> Bet | None: ...
+    def list_bets(self, job_id: str | None = None) -> list[Bet]: ...
+    def update_bet(self, bet_id: str, updates: dict) -> Bet | None: ...
+    # -- notification rules ------------------------------------------------
+    def set_notification_rule(self, rule: NotificationRule) -> NotificationRule: ...
+    def list_notification_rules(self) -> list[NotificationRule]: ...
     def clear(self) -> None: ...
     def reload(self) -> None: ...
     def commit(self) -> None: ...
@@ -163,6 +189,10 @@ class InMemoryRepository:
         self.evidence: dict[str, Evidence] = {}
         self.signals: dict[str, Signal] = {}
         self.scheduled_work: dict[str, ScheduledWork] = {}
+        self.decisions: dict[str, Decision] = {}
+        self.score_snapshots: dict[str, ScoreSnapshot] = {}
+        self.bets: dict[str, Bet] = {}
+        self.notification_rules: dict[str, NotificationRule] = {}
 
     def add_job(self, job: Job) -> Job:
         self.jobs[job.id] = job
@@ -414,6 +444,70 @@ class InMemoryRepository:
             return True
         return False
 
+    def add_decision(self, decision: Decision) -> Decision:
+        self.decisions[decision.id] = decision
+        return decision
+
+    def get_decision(self, decision_id: str) -> Decision | None:
+        return self.decisions.get(decision_id)
+
+    def list_decisions(self, job_id: str) -> list[Decision]:
+        items = [d for d in self.decisions.values() if d.job_id == job_id]
+        return sorted(items, key=lambda d: (d.decided_at, d.id))
+
+    def supersede_decision(
+        self, decision_id: str, *, superseded_by: str, superseded_at: datetime
+    ) -> Decision | None:
+        decision = self.decisions.get(decision_id)
+        if decision is None:
+            return None
+        updated = decision.model_copy(
+            update={"superseded_by": superseded_by, "superseded_at": superseded_at}
+        )
+        self.decisions[decision_id] = updated
+        return updated
+
+    def add_score_snapshot(self, snapshot: ScoreSnapshot) -> ScoreSnapshot:
+        self.score_snapshots[snapshot.id] = snapshot
+        return snapshot
+
+    def get_score_snapshot(self, snapshot_id: str) -> ScoreSnapshot | None:
+        return self.score_snapshots.get(snapshot_id)
+
+    def list_score_snapshots(self, outcome_id: str) -> list[ScoreSnapshot]:
+        items = [s for s in self.score_snapshots.values() if s.outcome_id == outcome_id]
+        return sorted(items, key=lambda s: (s.at, s.id))
+
+    def add_bet(self, bet: Bet) -> Bet:
+        self.bets[bet.id] = bet
+        return bet
+
+    def get_bet(self, bet_id: str) -> Bet | None:
+        return self.bets.get(bet_id)
+
+    def list_bets(self, job_id: str | None = None) -> list[Bet]:
+        items = list(self.bets.values())
+        if job_id is not None:
+            items = [b for b in items if b.job_id == job_id]
+        return sorted(items, key=lambda b: (b.measure_by, b.created_at, b.id))
+
+    def update_bet(self, bet_id: str, updates: dict) -> Bet | None:
+        bet = self.bets.get(bet_id)
+        if bet is None:
+            return None
+        current = bet.model_dump()
+        current.update(updates)
+        new_bet = Bet.model_validate(current)
+        self.bets[bet_id] = new_bet
+        return new_bet
+
+    def set_notification_rule(self, rule: NotificationRule) -> NotificationRule:
+        self.notification_rules[rule.kind.value] = rule
+        return rule
+
+    def list_notification_rules(self) -> list[NotificationRule]:
+        return sorted(self.notification_rules.values(), key=lambda r: r.kind.value)
+
     def clear(self) -> None:
         self.jobs.clear()
         self.scheduled_work.clear()
@@ -422,6 +516,10 @@ class InMemoryRepository:
         self.customer_outcomes.clear()
         self.evidence.clear()
         self.signals.clear()
+        self.decisions.clear()
+        self.score_snapshots.clear()
+        self.bets.clear()
+        self.notification_rules.clear()
 
     def reload(self) -> None:
         """Reset in-memory state; there is no external store to re-read."""

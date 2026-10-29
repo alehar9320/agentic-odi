@@ -643,6 +643,153 @@ def get_odi_schema() -> str:
     return json.dumps(odi_schema())
 
 
+# --- Pillar 4 — Know: did it work -----------------------------------------
+
+
+@mcp.tool
+def record_decision(
+    job_id: str,
+    chosen_outcome_ids: list[str],
+    rationale: str,
+    decided_by: str,
+    rejected: list[dict[str, Any]] | None = None,
+    confidence: str = "medium",
+) -> str:
+    """Record a decision. A later decision supersedes the previous one."""
+    try:
+        decision = service.record_decision(
+            job_id,
+            chosen_outcome_ids,
+            rationale,
+            decided_by,
+            rejected=rejected,
+            confidence=confidence,
+        )
+    except (OdiError, ValueError) as exc:
+        return f"Error: {exc}"
+    return decision.model_dump_json()
+
+
+@mcp.tool
+def list_decisions(job_id: str) -> str:
+    """List a Job's decisions, oldest first. A superseded decision stays readable."""
+    try:
+        decisions = service.list_decisions(job_id)
+    except OdiError as exc:
+        return f"Error: {exc}"
+    return json.dumps([decision.model_dump(mode="json") for decision in decisions])
+
+
+@mcp.tool
+def record_score_snapshot(
+    outcome_id: str,
+    method: str | None = None,
+    note: str | None = None,
+    importance_n: int | None = None,
+    satisfaction_n: int | None = None,
+) -> str:
+    """Capture the outcome's current score as an append-only history entry."""
+    try:
+        snapshot = service.record_score_snapshot(
+            outcome_id,
+            method=method,
+            note=note,
+            importance_n=importance_n,
+            satisfaction_n=satisfaction_n,
+        )
+    except (OdiError, ValueError) as exc:
+        return f"Error: {exc}"
+    return snapshot.model_dump_json()
+
+
+@mcp.tool
+def outcome_delta(outcome_id: str) -> str:
+    """Signed change between an outcome's earlier and latest score snapshots."""
+    try:
+        return json.dumps(service.outcome_delta(outcome_id))
+    except OdiError as exc:
+        return f"Error: {exc}"
+
+
+@mcp.tool
+def create_bet(
+    decision_id: str,
+    outcome_id: str,
+    hypothesis: str,
+    target: float,
+    measure_by: str,
+    direction: str = "maximize",
+) -> str:
+    """Create a bet with a baseline frozen from the outcome's score now."""
+    from datetime import date
+
+    try:
+        parsed = date.fromisoformat(measure_by)
+    except ValueError:
+        return f"Error: measure_by must be an ISO date (YYYY-MM-DD), got '{measure_by}'"
+    try:
+        bet = service.create_bet(
+            decision_id,
+            outcome_id,
+            hypothesis,
+            target,
+            parsed,
+            direction=direction,
+        )
+    except (OdiError, ValueError) as exc:
+        return f"Error: {exc}"
+    return bet.model_dump_json()
+
+
+@mcp.tool
+def get_bet(bet_id: str) -> str:
+    """Get a single Bet by ID, including its frozen baseline."""
+    try:
+        bet = service.get_bet(bet_id)
+    except OdiError as exc:
+        return f"Error: {exc}"
+    return bet.model_dump_json()
+
+
+@mcp.tool
+def list_bets(job_id: str | None = None) -> str:
+    """List bets ordered by the date you will look."""
+    try:
+        bets = service.list_bets(job_id)
+    except OdiError as exc:
+        return f"Error: {exc}"
+    return json.dumps([bet.model_dump(mode="json") for bet in bets])
+
+
+@mcp.tool
+def update_bet_status(bet_id: str, status: str) -> str:
+    """Move a bet through a legal status transition; refusals name the legal ones."""
+    try:
+        bet = service.transition_bet(bet_id, status)
+    except (OdiError, ValueError) as exc:
+        return f"Error: {exc}"
+    return bet.model_dump_json()
+
+
+@mcp.tool
+def measure_bet(bet_id: str) -> str:
+    """Report met, missed or no_data against the bet's stored baseline."""
+    try:
+        return json.dumps(service.measure_bet(bet_id))
+    except OdiError as exc:
+        return f"Error: {exc}"
+
+
+@mcp.tool
+def emit_know_signals(job_id: str | None = None) -> str:
+    """Record the "know" signals the store can prove (bets due, superseded decisions, gaps)."""
+    try:
+        signals = service.emit_know_signals(job_id=job_id)
+    except OdiError as exc:
+        return f"Error: {exc}"
+    return json.dumps([signal.model_dump(mode="json") for signal in signals])
+
+
 @mcp.tool
 def list_signals(unread_only: bool = False, limit: int = 50) -> str:
     """List recorded signals, newest first; ``unread_only`` trims to the badge."""
@@ -757,6 +904,23 @@ def main(argv: list[str] | None = None) -> None:
     validate_at_startup()
     setup_graceful_shutdown()
     mcp.run(transport="http", port=resolve_port(args.port))
+
+
+@mcp.tool
+def set_notification_rule(kind: str, threshold: float = 0.0, enabled: bool = True) -> str:
+    """Store one interruption rule for a signal kind."""
+    try:
+        rule = service.set_notification_rule(kind, threshold=threshold, enabled=enabled)
+    except (OdiError, ValueError) as exc:
+        return f"Error: {exc}"
+    return rule.model_dump_json()
+
+
+@mcp.tool
+def list_notification_rules() -> str:
+    """List the effective notification rules, including documented defaults."""
+    rules = service.list_notification_rules()
+    return json.dumps([rule.model_dump(mode="json") for rule in rules])
 
 
 def setup_graceful_shutdown() -> None:

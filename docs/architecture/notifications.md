@@ -1,12 +1,10 @@
-# The Signal Inbox
-
 "Catch up" reads the store. A **Signal** is a record of something that actually
 changed in the ODI data, produced by `ODIService` at the moment it changed, and
 read back by every surface — CLI, MCP client, Studio.
 
 ## What emits a signal
 
-`SignalKind` in `packages/core/src/agentic_odi_core/models.py` has exactly six
+`SignalKind` in `packages/core/src/agentic_odi_core/models.py` has these
 emitters:
 
 | Kind | Emitted when | Severity |
@@ -17,10 +15,45 @@ emitters:
 | `evidence_ingested` | `add_evidence` | info |
 | `evidence_promoted` | `promote_evidence` turns evidence into an outcome | notice |
 | `job_map_completed` | a job map covers all 8 Universal Job Map stages | notice |
+| `score_moved` | a recorded snapshot moves the score past the policy threshold | urgent up, notice down |
+| `decision_superseded` | a new decision supersedes the live one for a job | notice |
+| `bet_due` | a planned or running bet reaches its measure-by date | notice |
+| `coverage_gap` | a job-map stage still has no outcomes | info |
+
+The first six are emitted by `ODIService` at the moment of the write.
+`score_moved` and `decision_superseded` are also written at write time (a
+snapshot, a superseding decision); `bet_due` and `coverage_gap` are the two
+kinds no write can see, so `emit_know_signals` records them by reading the
+store. All ten carry a deterministic discriminator, so a re-run writes nothing
+new.
 
 Deletions emit nothing: removing a record is not news worth interrupting for.
 Connector and agent-work kinds belong to
 [#95](https://github.com/alehar9320/agentic-odi/issues/95), not here.
+
+## The Monday digest and the spine
+
+`odi know digest [--since 7d] [--out FILE]` refreshes the inbox, then writes a
+deterministic markdown digest of the signals inside the window, grouped by the
+four know kinds. It is deterministic: the same store and the same window
+produce byte-identical output. An empty window prints `No changes in this
+period.` — never a fabricated row.
+
+`odi know spine [--job ID]` walks the evidence chain stage by stage —
+`captured → scored → decided → bet → measured` — and shows the first stage with
+no records and what would unblock it. Where the chain stops is stated, not
+guessed at.
+
+## The notification policy
+
+The interruption policy is one stored source of truth, not a client setting.
+Signal kinds and the score-move threshold live behind `GET`/`PUT
+/api/notification-rules`; the CLI digest reads the same policy and Settings
+edits it. A kind turned off stops interrupting everywhere while the signal
+stays visible in the feed. The defaults are documented in
+`agentic_odi_core.signals.default_rules`: bet-due and superseded decisions
+interrupt, score movement interrupts past ±0.5, and coverage gaps are shown but
+never interrupt.
 
 ## Identity and dedupe
 
