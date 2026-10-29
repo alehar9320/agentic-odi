@@ -350,16 +350,7 @@ a {
   line-height: 1.55;
 }
 
-.hero__pills {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 7px;
-  margin-top: 2px;
-}
-
-/* The quiet second row: context and the optional tour, never competing with
-   the three starters. */
+/* The quiet second row: context and the optional tour. */
 .hero__aside {
   display: flex;
   flex-wrap: wrap;
@@ -672,6 +663,14 @@ a {
 .composer__send--stop {
   background: rgba(255, 255, 255, 0.14);
   color: var(--text);
+}
+
+.composer__pills {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 2px;
 }
 
 .composer__hint {
