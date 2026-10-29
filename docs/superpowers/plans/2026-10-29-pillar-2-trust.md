@@ -701,15 +701,19 @@ its trusted-viewer authorization decision.
 increment must satisfy, without encoding an unapproved convention:
 
 - `OpportunityInterval` and `opportunity_interval` (B3 — bootstrap convention).
-- `classify_confidence` (B4.1 — confidence table).
+- `parse_survey` / `aggregate_survey` and `SurveyAggregate` (B2 — import policy).
+- `RetainedSurveyInput` and `retain_survey_inputs` (B3.1 — retention policy).
+- `IntervalProvenance` and `persisted_interval` (B3.2 — interval provenance).
+- `classify_confidence` and `rank_outcomes_honestly` (B4 / B4.1 — confidence table).
 - `OutcomeDelta` / `DeltaDirection` and `outcome_delta` (B6.1 — delta semantics).
 
 Each callable raises `TrustContractPendingError` naming the blocking decision
-instead of returning a fabricated band, class or direction; `test_trust_seams.py`
-pins the refusal. When a gate clears, replace the raise with the approved
-implementation and drop the corresponding seam test.
+instead of returning a fabricated band, class, aggregate or direction;
+`test_trust_seams.py` pins the refusal. When a gate clears, replace the raise
+with the approved implementation and drop the corresponding seam test.
 
 The B6.1 read surface is partly present: `desired-outcomes history` and
-`get_outcome_history` replay the recorded snapshots, and `--why` records the
-reason on the snapshot. `outcome_delta` and the delta-driven rendering stay
-behind the seam until the baseline/direction decision is approved.
+`get_outcome_history` replay the recorded snapshots, `--why` records the reason
+on the snapshot, and `desired-outcomes get` shows the latest accepted reason as a
+`note` line. `outcome_delta` and the delta-driven rendering stay behind the seam
+until the baseline/direction decision is approved.
