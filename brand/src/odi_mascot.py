@@ -26,6 +26,9 @@ PALETTE: Final[dict[str, str]] = {
     "cream": "#F6EAD8",
     "accent": "#8B8CF8",
     "tile": "#131722",
+    "suit": "#1F2536",
+    "shirt": "#FFFFFF",
+    "tie": "#6366F1",
 }
 
 HEAD_W_BUST: Final[int] = 20
@@ -150,7 +153,7 @@ class Raster:
 
 
 def head_raster(head_w: int, center_y: float | None = None) -> Raster:
-    """Draw Odi's head: skull, ears, eyes, muzzle, nose, mouth, and cheeks.
+    """Draw Odi's head: skull, ears, eyes, muzzle, nose, mouth, cheeks, and PM glasses.
 
     Every proportion is a power of the golden ratio applied to the head width.
     The head is a golden rectangle (width / height is phi), the eyes sit
@@ -203,6 +206,25 @@ def head_raster(head_w: int, center_y: float | None = None) -> Raster:
     mouth_y = nose_y + 4
     raster.fill_rect(round(cx - 1), mouth_y, 3, 1, "ink")
 
+    # Smart glasses: frame outline top rim, bottom rim, side outer edges & bridge
+    for sign in (-1, 1):
+        ex = round(cx + sign * eye_separation / 2 - eye_d / 2)
+        ey = round(eye_cy - eye_d / 2)
+        # Top frame rim
+        raster.fill_rect(ex - 1, ey - 1, eye_d + 2, 1, "ink")
+        # Outer side frame edge
+        if sign == -1:
+            raster.fill_rect(ex - 1, ey - 1, 1, eye_d, "ink")
+        else:
+            raster.fill_rect(ex + eye_d, ey - 1, 1, eye_d, "ink")
+        # Bottom rim
+        raster.fill_rect(ex, ey + eye_d - 1, eye_d, 1, "ink")
+
+    # Bridge between eyes
+    ex_left = round(cx - eye_separation / 2 + eye_d / 2)
+    ex_right = round(cx + eye_separation / 2 - eye_d / 2)
+    raster.fill_rect(ex_left, round(eye_cy - eye_d / 2) - 1, ex_right - ex_left, 1, "ink")
+
     raster.outline("ink")
     return raster
 
@@ -216,13 +238,27 @@ def mark_raster() -> Raster:
 
 
 def bust_raster() -> Raster:
-    """Draw the full Odi bust: head, shoulders, chest, and the outcome spark."""
+    """Draw the full Odi bust: head, PM business suit attire, and outcome spark."""
     body = Raster()
-    body.fill_ellipse(GRID / 2, 22, 8.5, 6, "fur")
-    body.fill_ellipse(GRID / 2, 29, 7, 7, "fur")
-    body.fill_round_rect(13, 24, 6, 7, 3, "cream")
-    body.outline("ink")
+    # Suit jacket body and shoulders
+    body.fill_ellipse(GRID / 2, 22, 8.5, 6, "suit")
+    body.fill_ellipse(GRID / 2, 29, 7, 7, "suit")
 
+    # White dress shirt collar / front
+    body.fill_round_rect(13, 23, 6, 8, 2, "shirt")
+
+    # PM Leader Tie
+    body.fill_rect(15, 24, 2, 7, "tie")
+    # Tie knot
+    body.fill_rect(15, 23, 2, 1, "ink")
+
+    # Suit lapels
+    body.set(12, 23, "suit")
+    body.set(19, 23, "suit")
+    body.set(13, 24, "suit")
+    body.set(18, 24, "suit")
+
+    body.outline("ink")
     body.composite(head_raster(HEAD_W_BUST, center_y=12))
 
     spark_x = round(GRID / 2)
@@ -248,7 +284,17 @@ def _png_bytes(rows: list[list[_RGBA]]) -> bytes:
     )
 
 
-_COLOR_PRIORITY: Final[tuple[str, ...]] = ("ink", "fur", "fur_light", "cream", "accent", "tile")
+_COLOR_PRIORITY: Final[tuple[str, ...]] = (
+    "ink",
+    "suit",
+    "tie",
+    "shirt",
+    "fur",
+    "fur_light",
+    "cream",
+    "accent",
+    "tile",
+)
 
 
 def _majority(pixels: list[_Color]) -> _Color:
