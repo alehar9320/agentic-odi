@@ -19,7 +19,7 @@ from agentic_odi_core.models import (
     Step,
     compute_opportunity_score,
 )
-from agentic_odi_core.repository import Repository, page, rank_outcomes
+from agentic_odi_core.repository import Repository, page, sort_outcomes
 
 
 class SQLiteRepository(Repository):
@@ -310,13 +310,14 @@ class SQLiteRepository(Repository):
         step_id: str | None = None,
         limit: int | None = None,
         offset: int = 0,
+        sort: str = "opportunity_score",
     ) -> list[Outcome]:
         with self._lock:
             self._sync()
             outs = [o for o in self.outcomes.values() if o.job_id == job_id]
             if step_id is not None:
                 outs = [o for o in outs if o.step_id == step_id]
-            return page(rank_outcomes(outs), limit, offset)
+            return page(sort_outcomes(outs, sort), limit, offset)
 
     def update_outcome(self, outcome_id: str, updates: dict) -> Outcome | None:
         with self._lock:
@@ -537,6 +538,11 @@ class SQLiteRepository(Repository):
     def reload(self) -> None:
         """Re‑load the local snapshot from the event store."""
         self._load_snapshot()
+
+    def commit(self) -> None:
+        """Flush any open transaction in the event store to disk."""
+        with self._lock:
+            self.store.commit()
 
     def close(self) -> None:
         """Close the event store and let SQLite clean up its journal files."""

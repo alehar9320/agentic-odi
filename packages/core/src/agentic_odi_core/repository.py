@@ -34,6 +34,23 @@ def page(items: list[_Item], limit: int | None = None, offset: int = 0) -> list[
     return sliced if limit is None else sliced[:limit]
 
 
+OUTCOME_SORTS = ("opportunity_score", "insertion")
+
+
+def sort_outcomes(items: list[Outcome], sort: str = "opportunity_score") -> list[Outcome]:
+    """Order outcomes for reading, best opportunity first by default.
+
+    ``opportunity_score`` puts the highest scores first and leaves unscored
+    outcomes last, since a missing score is not evidence of low opportunity.
+    ``insertion`` keeps whatever order the store produced.
+    """
+    if sort == "insertion":
+        return list(items)
+    if sort not in OUTCOME_SORTS:
+        raise ValueError(f"Unknown outcome sort: {sort}")
+    return rank_outcomes(items)
+
+
 class Repository(Protocol):
     jobs: dict[str, Job]
     steps: dict[str, Step]
@@ -62,6 +79,7 @@ class Repository(Protocol):
         step_id: str | None = None,
         limit: int | None = None,
         offset: int = 0,
+        sort: str = "opportunity_score",
     ) -> list[Outcome]: ...
     def update_outcome(self, outcome_id: str, updates: dict) -> Outcome | None: ...
     def delete_outcome(self, outcome_id: str) -> bool: ...
@@ -96,6 +114,8 @@ class Repository(Protocol):
 
     def clear(self) -> None: ...
     def reload(self) -> None: ...
+    def commit(self) -> None: ...
+    def close(self) -> None: ...
 
 
 class InMemoryRepository:
@@ -200,11 +220,12 @@ class InMemoryRepository:
         step_id: str | None = None,
         limit: int | None = None,
         offset: int = 0,
+        sort: str = "opportunity_score",
     ) -> list[Outcome]:
         outs = [o for o in self.outcomes.values() if o.job_id == job_id]
         if step_id is not None:
             outs = [o for o in outs if o.step_id == step_id]
-        return page(rank_outcomes(outs), limit, offset)
+        return page(sort_outcomes(outs, sort), limit, offset)
 
     def update_outcome(self, outcome_id: str, updates: dict) -> Outcome | None:
         outcome = self.outcomes.get(outcome_id)
@@ -333,3 +354,9 @@ class InMemoryRepository:
     def reload(self) -> None:
         """Reset in-memory state; there is no external store to re-read."""
         self.clear()
+
+    def commit(self) -> None:
+        """No-op: an in-memory store has nothing to flush."""
+
+    def close(self) -> None:
+        """No-op: an in-memory store holds no resources."""

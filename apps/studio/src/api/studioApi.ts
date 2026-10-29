@@ -17,6 +17,7 @@ import type {
   Job,
   LatestConversation,
   LlmHealth,
+  MarketplaceSearch,
   McpHealth,
   ModelList,
   Observation,
@@ -237,7 +238,10 @@ export async function fetchConfig(): Promise<StudioConfig> {
 }
 
 export function fetchChangelog(): Promise<ChangelogData> {
-  return getJson<ChangelogData>("/api/changelog");
+  return withLocal(
+    () => getJson<ChangelogData>("/api/changelog"),
+    (bff) => bff.fetchChangelog(),
+  );
 }
 
 export async function fetchCanvas(mcpUrl: string): Promise<CanvasData> {
@@ -333,6 +337,48 @@ export function fetchConnectorCatalog(): Promise<ConnectorPreset[]> {
 
 export function fetchConnectors(): Promise<ConnectorListItem[]> {
   return getJson<ConnectorListItem[]>("/api/connectors");
+}
+
+/**
+ * Search the marketplace. `area` and `q` are server-side filters so a narrow
+ * query does not depend on the page having fetched everything first.
+ */
+export async function fetchMarketplace(params: {
+  q?: string;
+  area?: string;
+  limit?: number;
+} = {}): Promise<MarketplaceSearch> {
+  const search = new URLSearchParams();
+  if (params.q) search.set("q", params.q);
+  if (params.area) search.set("area", params.area);
+  if (params.limit) search.set("limit", String(params.limit));
+  const suffix = search.toString();
+  return normalizeMarketplace(
+    await getJson<Partial<MarketplaceSearch>>(
+      `/api/marketplace/servers${suffix ? `?${suffix}` : ""}`,
+    ),
+  );
+}
+
+/** Editor's picks: the curated presets, recommended first. */
+export async function fetchFeatured(limit = 6): Promise<MarketplaceSearch> {
+  return normalizeMarketplace(
+    await getJson<Partial<MarketplaceSearch>>(`/api/marketplace/featured?limit=${limit}`),
+  );
+}
+
+/**
+ * The local BFF fallback may answer with a subset of the search shape, so a
+ * missing list becomes an empty one here rather than an undefined that callers
+ * would have to guard at every read.
+ */
+function normalizeMarketplace(body: Partial<MarketplaceSearch>): MarketplaceSearch {
+  return {
+    listings: body.listings ?? [],
+    areas: body.areas ?? {},
+    cached: body.cached ?? false,
+    types: body.types ?? [],
+  };
 }
 
 export function addConnector(payload: AddConnectorPayload): Promise<ConnectorOperationResponse> {
