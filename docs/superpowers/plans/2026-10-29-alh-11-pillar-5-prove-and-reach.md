@@ -51,10 +51,11 @@ This plan executes those two now (Wave 1) and lays out the remaining waves with 
 
 | Wave | Issue | Title | Depends on | Status |
 |------|-------|-------|-----------|--------|
-| 1 | ALH-53 | F1 · A schema version you can migrate | — | **execute now** |
-| 1 | ALH-61 | H1 · Pin the contract, fail on drift | — | **execute now** |
-| 2 | ALH-63 | H3 · One end-to-end test of the spine | A4, A5, B1, C1, C6, E1, E2 (M1 spine) | blocked |
-| 2 | ALH-59 | G2 · Document the spine | G1 = ALH-58 demo loader; spine commands | blocked |
+| 1 | ALH-53 | F1 · A schema version you can migrate | — | **delivered** |
+| 1 | ALH-61 | H1 · Pin the contract, fail on drift | — | **delivered** |
+| 1 | ALH-11 seam | The ODI spine seam (interfaces + honest stubs) | — | **delivered** |
+| 2 | ALH-63 | H3 · One end-to-end test of the spine | A4, A5, B1, C1, C6, E1, E2 (M1 spine) | blocked; seam in place |
+| 2 | ALH-59 | G2 · Document the spine | G1 = ALH-58 demo loader; spine commands | blocked; seam in place |
 | 3 | ALH-112 | M4-06 · Share · read-only link, revocable token | — (needs approval/disclosure policy) | blocked on policy |
 | 3 | ALH-173 | M4-06.2 · snapshot page a stranger can read | ALH-112 | blocked |
 | 3 | ALH-176 | M4-09.1 · persist publish identity + reconciliation | connector auth/destination identity decision | blocked on policy |
@@ -62,16 +63,16 @@ This plan executes those two now (Wave 1) and lays out the remaining waves with 
 | 4 | ALH-113 | M4-07 · post the brief to Slack | ALH-98 (stakeholder message), ALH-218/235 | blocked |
 | 4 | ALH-116 | M4-10 · push a decided outcome to Linear | ALH-176, approval + criterion contracts, ALH-112/173 | blocked |
 | 4 | ALH-174 | M4-10.2 · Jira and the approval gate | ALH-116 | blocked |
-| 5 | ALH-119 | M4-13 · workspace templates | — (needs guide/screener/view schemas) | partial |
+| 5 | ALH-119 | M4-13 · workspace templates | — (needs guide/screener/view schemas) | partial; seam in place |
 | 5 | ALH-120 | M4-14 · stakeholder one-pager, printed | ALH-97 (memo), ALH-98 | blocked |
 | 5 | ALH-130 | M5-10 · readable telemetry for shareable artifacts | — (needs renderer inventory) | partial |
 | 5 | ALH-131 | M5-11 · shared artifacts pass a screen reader | — (needs renderer inventory) | partial |
 | 5 | ALH-133 | M5-13 · branding on what you share | ALH-201 (contrast seam) | partial |
-| 6 | ALH-121 | M5-01 · dark mode + system theme | — (Studio only) | independent |
-| 6 | ALH-122 | M5-02 · locale groundwork + translated shell | — (Studio + Python) | independent |
+| 6 | ALH-121 | M5-01 · dark mode + system theme | — (Studio only) | independent; not verifiable here |
+| 6 | ALH-122 | M5-02 · locale groundwork + translated shell | — (Studio + Python) | independent; not verifiable here |
 | 6 | ALH-127 | M5-07 · the 90-second tour | ALH-58 (demo), spine UI | blocked |
-| 6 | ALH-129 | M5-09 · integration guide for external agents | ALH-61, ALH-53 (versions), ALH-130 | blocked on ALH-61/53 |
-| 6 | ALH-132 | M5-12 · social card per docs page | site generator (exists) | independent |
+| 6 | ALH-129 | M5-09 · integration guide for external agents | ALH-61, ALH-53 (versions), ALH-130 | deps delivered; next candidate |
+| 6 | ALH-132 | M5-12 · social card per docs page | site generator (exists) | **delivered** |
 | 6 | ALH-134 | M5-14 · starter kit for a new team | ALH-202/217 (template engine) | blocked |
 
 **Cross-cutting seams that must be agreed before their consumers start** (these are the "readiness blockers" in ALH-11 and must be *decided*, not invented):
