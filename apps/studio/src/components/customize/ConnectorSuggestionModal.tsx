@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
+import { useFocusTrap } from "../../lib/useFocusTrap";
 import { useStudio } from "../../state/StudioContext";
 import { CloseIcon, PlugIcon } from "../icons";
 
@@ -18,6 +19,8 @@ export function ConnectorSuggestionModal() {
     installFromMarketplace,
   } = useStudio();
   const [installing, setInstalling] = useState(false);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(dialogRef, connectorSuggestion !== null);
 
   useEffect(() => {
     if (!connectorSuggestion) {
@@ -62,7 +65,13 @@ export function ConnectorSuggestionModal() {
   }
 
   return (
-    <div className="suggestion-modal" role="dialog" aria-modal="true" aria-label="Connector suggestion">
+    <div
+      ref={dialogRef}
+      className="suggestion-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Connector suggestion"
+    >
       <div className="suggestion-modal__card">
         <button
           type="button"
