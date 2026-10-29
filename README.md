@@ -156,6 +156,7 @@ soon". See [External Connectors](docs/connectors.md).
 | [External Connectors](docs/connectors.md) | Presets, the registry, and the `Connector` protocol |
 | [Local LLM Backend](docs/local-llm.md) | Running a local OpenAI-compatible model with tool calling |
 | [Architecture](docs/architecture/README.md) | Workspace layout, dependency direction, data flow, and testing |
+| [Studio Banners](docs/architecture/banners.md) | The Studio's unified notice system |
 | [Development](docs/development.md) | Lint, types, frontend checks, tests, and PR risk labels |
 | [Installation](docs/installation.md) | Binary install, updater behavior, and release automation |
 | [Deployment](docs/deployment.md) | Project site, Hosted Studio, MCP endpoint, and the Cloudflare Worker |
