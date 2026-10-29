@@ -189,6 +189,36 @@ refresh, and polls once a minute while the window is visible. Connector rows in 
 store, grouped by capability area; nothing is pre-listed as though it were
 already connected.
 
+#### Provenance travels with the number
+
+An opportunity score nobody can trace is an opinion with a decimal point. Every
+outcome a person accepts from a candidate carries at least one `Evidence` row
+whose `content` is the quote **verbatim** — never paraphrased or summarised —
+with `source_kind: "interview"` and the interview title as `source_name`. The
+`raw` payload holds `{interview_id, quote_id}` so the row can point back at the
+sentence it came from.
+
+The outcome detail card and the landscape row show a **source count**, and that
+count is the length of `list_evidence(outcome_id=...)`, read live through
+`GET /api/outcomes/{id}/evidence`. It is never a stored counter: a
+denormalised count is a second truth that can drift from the records it claims
+to summarise. Opening the count lists each source with the quote beside it.
+
+Deleting an interview **keeps** the evidence. The quote text and the interview
+title stay readable, and only `raw["quote_id"]` is nulled, because the quote it
+named is gone; `raw["interview_id"]` stays as an unavailable historical id. The
+`INTERVIEW_DELETED` event records which evidence rows were changed
+(`cascaded_evidence_ids`), so a replay reproduces the nulled link rather than
+resurrecting it. A decision made from a quote must outlive the transcript, and
+the dangling link is the honest representation of that.
+
+The evidence row carries no speaker or date of its own. Once the interview is
+deleted those stay **visibly unknown**; the studio does not invent attribution
+from a record that is gone. The three states — no evidence, an unknown outcome,
+and a failed fetch — are distinct: an empty outcome says *nothing yet*, an
+unknown id is a not-found error, and a failed read says so without rendering as
+empty.
+
 ### The thread is the room
 
 Capture, scoring, simulation, and decisions are conversations. The storefront
