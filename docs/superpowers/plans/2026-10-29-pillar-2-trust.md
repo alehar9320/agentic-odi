@@ -97,7 +97,7 @@ planned in detail when their gate clears (see the spec's decision-blocker table)
 - Produces: `Outcome.importance_n: int | None`, `Outcome.satisfaction_n: int | None`,
   `Outcome.score_method: Literal["estimate","survey","import"]` (default `"estimate"`).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```python
 """Sample size and method travel with an outcome score."""
@@ -152,12 +152,12 @@ def test_an_estimate_with_unknown_counts_is_accepted():
     assert outcome.importance_n is None
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `uv run pytest packages/core/tests/test_outcome_method.py -q`
 Expected: FAIL — `Outcome` has no field `importance_n`.
 
-- [ ] **Step 3: Implement the fields and validator**
+- [x] **Step 3: Implement the fields and validator**
 
 In `models.py`, add a module-level literal alias and extend `Outcome`:
 
@@ -208,17 +208,17 @@ class Outcome(BaseModel):
 
 Add `model_validator` to the pydantic import at the top of `models.py`.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `uv run pytest packages/core/tests/test_outcome_method.py -q`
 Expected: PASS (7 passed).
 
-- [ ] **Step 5: Run the core suite for regressions**
+- [x] **Step 5: Run the core suite for regressions**
 
 Run: `uv run pytest packages/core -q`
 Expected: PASS. Existing `Outcome` construction is unaffected because all three fields are optional/defaulted.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add packages/core/src/agentic_odi_core/models.py packages/core/tests/test_outcome_method.py
@@ -238,7 +238,7 @@ git commit -m "feat(core): carry sample size and method on every outcome score"
 - Produces: `ODIService.add_outcome(..., importance_n=None, satisfaction_n=None, score_method="estimate")`
   and `ODIService.update_outcome(...)` that validates the resulting whole record.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```python
 def test_add_outcome_rejects_an_estimate_with_a_count(service, job_id):
@@ -282,12 +282,12 @@ def test_update_clearing_a_count_keeps_the_method(service, job_id):
 
 Add a `service`/`job_id` fixture if the module does not already provide one (it does — follow the existing pattern in `test_service.py`).
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `uv run pytest packages/core/tests/test_service.py -k "count or survey_to_estimate" -q`
 Expected: FAIL — `add_outcome` has no `importance_n` parameter.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Extend `add_outcome` with the three keyword arguments and pass them into `Outcome(...)`.
 Add a shared guard so the same rule holds on both paths. Raise `ValueOutOfRangeError`
@@ -308,12 +308,12 @@ after merging `updates` onto the existing outcome, validate the *whole* merged r
 with the merged method and counts) **before** writing, so a partial patch cannot
 produce an invalid stored record.
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `uv run pytest packages/core/tests/test_service.py -q`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add packages/core/src/agentic_odi_core/services.py packages/core/tests/test_service.py
@@ -334,7 +334,7 @@ git commit -m "feat(core): validate sample/method on the whole record, both writ
   legacy rows read back as `estimate`/`n=None`; re-running the backfill adds no
   duplicate events.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```python
 def test_legacy_outcome_reads_back_as_an_estimate(tmp_path):
@@ -364,12 +364,12 @@ def test_backfill_preserves_the_original_score(tmp_path):
     assert reloaded.opportunity_score == outcome.opportunity_score
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `uv run pytest packages/core/tests/test_sqlite_repository.py -k "method_backfill or legacy_outcome_reads" -q`
 Expected: FAIL — no `OUTCOME_METHOD_BACKFILLED` branch.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `_apply_event`, add:
 
@@ -386,12 +386,12 @@ carries `score_method` (i.e. was written after this change) must not be re-emitt
 the event is skipped when the model already has the field. Guard with the existing
 `self._backfilled` flag so a single process does not repeat it.
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `uv run pytest packages/core/tests/test_sqlite_repository.py -q`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add packages/core/src/agentic_odi_core/sqlite_repository.py packages/core/tests/test_sqlite_repository.py
@@ -412,7 +412,7 @@ git commit -m "feat(core): backfill legacy outcomes to estimate via an auditable
 - Produces: MCP tools accept `importance_n`, `satisfaction_n`, `score_method`; `TOOL_SPECS`
   argument tuples match; the `get_capabilities` summary still renders.
 
-- [ ] **Step 1: Write the failing contract assertion**
+- [x] **Step 1: Write the failing contract assertion**
 
 In `tests/contract/test_mcp_contract.py`, the existing test already asserts
 `set(schema["properties"]) == set(spec.arguments)` for every tool. Add an explicit
@@ -429,12 +429,12 @@ def test_update_outcome_exposes_sample_metadata():
     assert {"importance_n", "satisfaction_n", "score_method"} <= set(spec.arguments)
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `uv run pytest tests/contract/test_mcp_contract.py -q`
 Expected: FAIL — the argument tuples do not include the new names.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `contract.py`, extend the `add_outcome` `arguments` tuple to
 `("job_id", "statement", "importance", "satisfaction", "step_id", "importance_n", "satisfaction_n", "score_method")`
@@ -446,12 +446,12 @@ In `mcp_server.py`, add the three optional parameters to `add_outcome` and
 existing error string. `get_capabilities` is generated from `TOOL_SPECS`, so it needs
 no manual edit — but run the capability-manifest test to confirm.
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `uv run pytest tests/contract apps/mcp-server -q`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add packages/core/src/agentic_odi_core/contract.py apps/mcp-server/src/agentic_odi_mcp_server/mcp_server.py tests/contract/test_mcp_contract.py apps/mcp-server/tests/test_odi.py
@@ -473,7 +473,7 @@ git commit -m "feat(mcp): expose sample and method on the outcome tools"
 - Produces: `odi desired-outcomes add|update --importance-n --satisfaction-n --method`;
   the readable renderer shows `est.` or `n=40 (survey)`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```python
 def test_add_outcome_passes_sample_metadata(runner, ...):
@@ -508,12 +508,12 @@ def test_render_shows_both_counts_when_they_differ():
     assert "40" in line and "12" in line
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `uv run pytest apps/cli/tests/test_desired_outcomes_cli.py -k "sample or est or both_counts" -q`
 Expected: FAIL — the flags do not exist.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Add `importance_n: int | None`, `satisfaction_n: int | None`, `method: str | None`
 Typer options to `add` and `update`, forwarding them as `importance_n`,
@@ -522,12 +522,12 @@ printing `est.` when the method is `estimate` or the counts are unknown, and
 `n=<importance_n>/<satisfaction_n>` (or a single `n=` when equal) plus the method
 otherwise. Add the flags to `docs/cli.md`.
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `uv run pytest apps/cli -q`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/cli/src/agentic_odi_cli/desired_outcomes.py apps/cli/src/agentic_odi_cli/render.py apps/cli/tests/test_desired_outcomes_cli.py docs/cli.md
@@ -544,7 +544,7 @@ git commit -m "feat(cli): set and show an outcome's sample and method"
 **Interfaces:**
 - Consumes: Tasks 1–3.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```python
 """A field added on one persistence link must exist on all of them."""
@@ -573,13 +573,13 @@ def test_sample_metadata_survives_every_repository(factory, tmp_path):
     assert (loaded.importance_n, loaded.satisfaction_n, loaded.score_method) == (40, 40, "survey")
 ```
 
-- [ ] **Step 2: Run test to verify it fails or passes**
+- [x] **Step 2: Run test to verify it fails or passes**
 
 Run: `uv run pytest packages/core/tests/test_persistence_parity.py -q`
 Expected: PASS once Tasks 1–3 are in. If it fails on SQLite, the event payload is not
 carrying the fields — fix `add_outcome`/`_apply_event`, do not weaken the test.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add packages/core/tests/test_persistence_parity.py
@@ -599,7 +599,7 @@ git commit -m "test(core): pin in-memory/SQLite parity for outcome sample metada
 **Interfaces:**
 - Consumes: MCP tools (Task 4).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```python
 def test_manual_outcome_accepts_sample_metadata(client, ...):
@@ -609,12 +609,12 @@ def test_manual_outcome_accepts_sample_metadata(client, ...):
     assert response.status_code == 200
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `uv run pytest apps/studio-api/tests/test_studio_manual_crud.py -k sample -q`
 Expected: FAIL — the request model rejects/ignores the fields.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Add `importance_n: int | None = Field(default=None, ge=1)`,
 `satisfaction_n: int | None = Field(default=None, ge=1)`,
@@ -624,12 +624,12 @@ Add `importance_n: int | None = Field(default=None, ge=1)`,
 `apps/studio/src/types.ts`. Confirm `npm --prefix apps/studio test -- --run` and the
 TypeScript build still pass.
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `uv run pytest apps/studio-api -q && npm --prefix apps/studio test -- --run`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/studio-api/src/agentic_odi_studio_api/studio/schemas.py apps/studio-api/src/agentic_odi_studio_api/studio/router.py apps/studio-api/tests/test_studio_manual_crud.py apps/studio/src/types.ts
@@ -644,12 +644,12 @@ git commit -m "feat(studio): carry outcome sample metadata through the sidecar a
 - Modify: `README.md` (if a command/package changed), `docs/living-studio.md` (if a surface changed)
 - Test: the whole suite.
 
-- [ ] **Step 1: Update docs in the same change**
+- [x] **Step 1: Update docs in the same change**
 
 Tick the roadmap item if this completes one; note the new fields where outcomes are
 documented. Keep `README.md` short and push detail to `docs/`.
 
-- [ ] **Step 2: Full verification**
+- [x] **Step 2: Full verification**
 
 ```bash
 uv run pytest
@@ -660,7 +660,7 @@ npm --prefix apps/studio test -- --run
 
 Expected: all pass; coverage stays at or above the `fail_under = 89` floor.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add -A
@@ -671,15 +671,15 @@ git commit -m "docs: record outcome sample/method in the trust surfaces"
 
 ## Acceptance criteria (B1 / ALH-24)
 
-- [ ] `importance_n=0` is rejected.
-- [ ] An existing row reads back as `estimate`/`n=None` after migration.
-- [ ] The landscape shows `est.` or `n=40`.
-- [ ] The contract test sees the new optional arguments.
-- [ ] Both dimensions reject zero, negative and non-integer counts; omitted counts remain `None`, not 1 or 0.
-- [ ] Creating or partially updating an outcome with `method=estimate` and either count above 1 fails before mutation; switching an existing survey to estimate validates the resulting whole record.
-- [ ] A backfill can be rerun without duplicate events; replay and reload preserve the same fields and original scores.
-- [ ] CLI, MCP, API, remote/schema and Studio types round-trip omitted and provided metadata consistently; differing counts display both.
-- [ ] Legacy unknown counts render as unknown/estimated; no consumer describes them as a one-person survey.
+- [x] `importance_n=0` is rejected.
+- [x] An existing row reads back as `estimate`/`n=None` after migration.
+- [x] The landscape shows `est.` or `n=40`.
+- [x] The contract test sees the new optional arguments.
+- [x] Both dimensions reject zero, negative and non-integer counts; omitted counts remain `None`, not 1 or 0.
+- [x] Creating or partially updating an outcome with `method=estimate` and either count above 1 fails before mutation; switching an existing survey to estimate validates the resulting whole record.
+- [x] A backfill can be rerun without duplicate events; replay and reload preserve the same fields and original scores.
+- [x] CLI, MCP, API, remote/schema and Studio types round-trip omitted and provided metadata consistently; differing counts display both.
+- [x] Legacy unknown counts render as unknown/estimated; no consumer describes them as a one-person survey.
 
 ## Later increments (gate-first)
 
