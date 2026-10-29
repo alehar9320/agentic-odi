@@ -133,4 +133,19 @@ describe("EvidenceStream", () => {
 
     expect(labels()).toEqual(["Support ticket", "Slack thread", "Call with Ada"]);
   });
+
+  it("links a record back to the tool that owns it", () => {
+    renderWith([{ ...evidence[0], url: "https://app.gong.io/calls/104" }]);
+
+    const link = screen.getByRole("link", { name: /open in gong/i });
+    expect(link).toHaveAttribute("href", "https://app.gong.io/calls/104");
+    expect(link).toHaveAttribute("rel", "noopener noreferrer");
+    expect(link).toHaveAttribute("target", "_blank");
+  });
+
+  it("does not invent a link for a record captured by hand", () => {
+    renderWith([evidence[2]]);
+
+    expect(screen.queryByRole("link")).toBeNull();
+  });
 });

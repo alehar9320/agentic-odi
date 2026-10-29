@@ -136,7 +136,23 @@ export function EvidenceStream() {
               onDragEnd={() => setDraggingId(null)}
               data-dragging={draggingId === item.id ? "true" : undefined}
             >
-              <figcaption>{label}</figcaption>
+              <figcaption>
+                {label}
+                {/* The record itself stays in the tool that owns it; this is the way back. */}
+                {item.url && (
+                  <>
+                    {" "}
+                    <a
+                      href={item.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="quiet-action"
+                    >
+                      Open in {item.source_name || "source"} ↗
+                    </a>
+                  </>
+                )}
+              </figcaption>
               <blockquote>{item.content || "No text captured."}</blockquote>
               <span className="evidence__meta">
                 {linkedJob ? `Linked to ${linkedJob}` : "Not linked to a job"}

@@ -109,7 +109,8 @@ async def test_get_capabilities_mentions_customer_outcomes():
     async with Client(mcp) as client:
         res = await client.call_tool("get_capabilities", {})
         text = res.content[0].text  # type: ignore[index]
-        assert "Customer Outcomes" in text
+        assert "add_customer_outcome" in text
+        assert "list_customer_outcomes" in text
 
 
 @pytest.mark.asyncio

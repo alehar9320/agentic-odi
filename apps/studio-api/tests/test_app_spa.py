@@ -19,7 +19,7 @@ def test_capabilities_endpoint_returns_the_capability_list() -> None:
     assert response.status_code == 200
     assert response.json() == {"capabilities": CAPABILITIES}
     # The body must say what the assistant can do, not which backend is loaded.
-    assert "Job Maps" in response.json()["capabilities"]
+    assert "Job Map" in response.json()["capabilities"]
     assert response.json()["capabilities"] != "local"
 
 

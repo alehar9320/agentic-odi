@@ -467,8 +467,6 @@ export async function streamChat(
     await bff.chat.stream(request, onEvent, signal);
   }
 }
-
-
 export async function fetchMemory(): Promise<Observation[]> {
   return withLocal(
     () =>
@@ -633,4 +631,43 @@ export function cancelScheduledWork(
   mcpUrl: string,
 ): Promise<{ ok: boolean; result: unknown }> {
   return postJson(`/api/schedule/${encodeURIComponent(workId)}/cancel?mcp_url=${encodeURIComponent(mcpUrl)}`, {});
+}
+
+export function addEvidence(payload: {
+  source_name: string;
+  source_kind?: string;
+  name: string;
+  content: string;
+  url?: string;
+  item_type?: string;
+  job_id?: string;
+  step_id?: string;
+  outcome_id?: string;
+  mcp_url: string;
+}): Promise<{ ok: boolean }> {
+  return postJson<{ ok: boolean }>("/api/evidence", payload);
+}
+
+export function deleteEvidence(evidenceId: string, mcpUrl: string): Promise<{ ok: boolean }> {
+  return deleteJson<{ ok: boolean }>(
+    `/api/evidence/${encodeURIComponent(evidenceId)}?mcp_url=${encodeURIComponent(mcpUrl)}`,
+  );
+}
+
+export function promoteEvidence(
+  evidenceId: string,
+  payload: {
+    target: "job" | "outcome";
+    job_id?: string;
+    statement?: string;
+    name?: string;
+    importance?: number;
+    satisfaction?: number;
+    mcp_url: string;
+  },
+): Promise<{ ok: boolean }> {
+  return postJson<{ ok: boolean }>(
+    `/api/evidence/${encodeURIComponent(evidenceId)}/promote`,
+    payload,
+  );
 }

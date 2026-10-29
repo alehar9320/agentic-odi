@@ -82,6 +82,7 @@ from agentic_odi_studio_api.studio.schemas import (
     ObservationListResponse,
     ObservationResponse,
     ObservationUpdateRequest,
+    PromoteEvidenceRequest,
     ScheduleWorkRequest,
     TurnNode,
     UpdateConversationRequest,
@@ -733,50 +734,6 @@ async def get_evidence(
     return {"ok": True, "result": record.model_dump(mode="json")}
 
 
-@router.post("/evidence")
-async def post_evidence(body: AddEvidenceRequest, request: Request) -> dict:
-    if _uses_mcp(request):
-        result = await call_mcp_tool(
-            body.mcp_url,
-            ToolName.ADD_EVIDENCE.value,
-            body.model_dump(exclude_none=True, exclude={"mcp_url"}),
-        )
-        return {"ok": True, "result": _json_or_raw(result)}
-    try:
-        record = _service(request).add_evidence(
-            source_name=body.source_name,
-            source_kind=body.source_kind,
-            name=body.name,
-            content=body.content,
-            item_type=body.item_type,
-            raw=body.raw,
-            job_id=body.job_id,
-            step_id=body.step_id,
-            outcome_id=body.outcome_id,
-        )
-    except Exception as exc:  # noqa: BLE001
-        raise _as_http_error(exc) from exc
-    return {"ok": True, "result": record.model_dump(mode="json")}
-
-
-@router.delete("/evidence/{evidence_id}")
-async def delete_evidence(
-    evidence_id: str, request: Request, mcp_url: str | None = Query(None)
-) -> dict:
-    if _uses_mcp(request):
-        await call_mcp_tool(
-            _require_mcp_url(mcp_url or ""),
-            ToolName.DELETE_EVIDENCE.value,
-            {"evidence_id": evidence_id},
-        )
-        return {"ok": True}
-    try:
-        _service(request).delete_evidence(evidence_id)
-    except Exception as exc:  # noqa: BLE001
-        raise _as_http_error(exc) from exc
-    return {"ok": True}
-
-
 @router.get("/memory/observations", response_model=ObservationListResponse)
 def list_observations(request: Request) -> ObservationListResponse:
     observations = _memory(request).list_observations()
@@ -1151,3 +1108,96 @@ async def post_cancel_scheduled_work(
     except Exception as exc:  # noqa: BLE001
         raise _as_http_error(exc) from exc
     return {"ok": True, "result": work.model_dump(mode="json")}
+
+
+@router.post("/evidence")
+async def post_evidence(body: AddEvidenceRequest, request: Request) -> dict:
+    """Capture a research record, keeping the knowledge where it already lives."""
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(body.mcp_url),
+            ToolName.ADD_EVIDENCE.value,
+            {
+                "source_name": body.source_name,
+                "source_kind": body.source_kind,
+                "name": body.name,
+                "content": body.content,
+                "url": body.url,
+                "item_type": body.item_type,
+                "job_id": body.job_id,
+                "step_id": body.step_id,
+                "outcome_id": body.outcome_id,
+            },
+        )
+        return {"ok": True, "result": result}
+    try:
+        evidence = _service(request).add_evidence(
+            source_name=body.source_name,
+            source_kind=body.source_kind,
+            name=body.name,
+            content=body.content,
+            url=body.url,
+            item_type=body.item_type,
+            job_id=body.job_id,
+            step_id=body.step_id,
+            outcome_id=body.outcome_id,
+        )
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return {"ok": True, "result": evidence.model_dump(mode="json")}
+
+
+@router.delete("/evidence/{evidence_id}")
+async def delete_evidence(
+    evidence_id: str, request: Request, mcp_url: str | None = Query(None)
+) -> dict:
+    if _uses_mcp(request):
+        await call_mcp_tool(
+            _require_mcp_url(mcp_url or ""),
+            ToolName.DELETE_EVIDENCE.value,
+            {"evidence_id": evidence_id},
+        )
+        return {"ok": True}
+    try:
+        _service(request).delete_evidence(evidence_id)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return {"ok": True}
+
+
+@router.post("/evidence/{evidence_id}/promote")
+async def promote_evidence(
+    evidence_id: str, body: PromoteEvidenceRequest, request: Request
+) -> dict:
+    """Promote a record into a Job or a Desired Outcome."""
+    if _uses_mcp(request):
+        args: dict[str, Any] = {"evidence_id": evidence_id, "target": body.target}
+        if body.job_id:
+            args["job_id"] = body.job_id
+        if body.statement:
+            args["statement"] = body.statement
+        if body.name:
+            args["name"] = body.name
+        if body.importance is not None:
+            args["importance"] = body.importance
+        if body.satisfaction is not None:
+            args["satisfaction"] = body.satisfaction
+        result = await call_mcp_tool(
+            _require_mcp_url(body.mcp_url),
+            ToolName.PROMOTE_EVIDENCE.value,
+            args,
+        )
+        return {"ok": True, "result": result}
+    try:
+        artifact = _service(request).promote_evidence(
+            evidence_id=evidence_id,
+            target=body.target,
+            job_id=body.job_id,
+            statement=body.statement,
+            name=body.name,
+            importance=body.importance,
+            satisfaction=body.satisfaction,
+        )
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return {"ok": True, "result": artifact.model_dump(mode="json")}

@@ -34,6 +34,7 @@ const stubContext = (overrides: Record<string, unknown> = {}) =>
     setDisplayName: vi.fn(),
     brief: null,
     openSetup: vi.fn(),
+    closeSetup: vi.fn(),
     clearChat: vi.fn(),
     refreshCanvas: vi.fn().mockResolvedValue(undefined),
     llmHealth: { healthy: null, message: "" },

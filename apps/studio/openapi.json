@@ -1567,6 +1567,7 @@
       },
       "post": {
         "summary": "Post Evidence",
+        "description": "Capture a research record, keeping the knowledge where it already lives.",
         "operationId": "post_evidence_api_evidence_post",
         "requestBody": {
           "required": true,
@@ -2378,6 +2379,58 @@
         }
       }
     },
+    "/api/evidence/{evidence_id}/promote": {
+      "post": {
+        "summary": "Promote Evidence",
+        "description": "Promote a record into a Job or a Desired Outcome.",
+        "operationId": "promote_evidence_api_evidence__evidence_id__promote_post",
+        "parameters": [
+          {
+            "name": "evidence_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Evidence Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PromoteEvidenceRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Promote Evidence Api Evidence  Evidence Id  Promote Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/{full_path}": {
       "get": {
         "summary": "Spa Fallback",
@@ -2507,18 +2560,14 @@
       },
       "AddEvidenceRequest": {
         "properties": {
-          "mcp_url": {
-            "type": "string",
-            "title": "Mcp Url",
-            "default": ""
-          },
           "source_name": {
             "type": "string",
             "title": "Source Name"
           },
           "source_kind": {
             "type": "string",
-            "title": "Source Kind"
+            "title": "Source Kind",
+            "default": "manual"
           },
           "name": {
             "type": "string",
@@ -2527,6 +2576,17 @@
           "content": {
             "type": "string",
             "title": "Content"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
           },
           "item_type": {
             "type": "string",
@@ -2539,11 +2599,6 @@
             ],
             "title": "Item Type",
             "default": "manual"
-          },
-          "raw": {
-            "additionalProperties": true,
-            "type": "object",
-            "title": "Raw"
           },
           "job_id": {
             "anyOf": [
@@ -2577,16 +2632,21 @@
               }
             ],
             "title": "Outcome Id"
+          },
+          "mcp_url": {
+            "type": "string",
+            "title": "Mcp Url",
+            "default": ""
           }
         },
         "type": "object",
         "required": [
           "source_name",
-          "source_kind",
           "name",
           "content"
         ],
-        "title": "AddEvidenceRequest"
+        "title": "AddEvidenceRequest",
+        "description": "A research record delegated from an external tool, or captured by hand."
       },
       "AddOutcomeRequest": {
         "properties": {
@@ -3816,6 +3876,84 @@
         },
         "type": "object",
         "title": "ObservationUpdateRequest"
+      },
+      "PromoteEvidenceRequest": {
+        "properties": {
+          "target": {
+            "type": "string",
+            "enum": [
+              "job",
+              "outcome"
+            ],
+            "title": "Target"
+          },
+          "job_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Id"
+          },
+          "statement": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Statement"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "importance": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Importance"
+          },
+          "satisfaction": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Satisfaction"
+          },
+          "mcp_url": {
+            "type": "string",
+            "title": "Mcp Url",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "target"
+        ],
+        "title": "PromoteEvidenceRequest",
+        "description": "Turn a captured record into a Job or a Desired Outcome."
       },
       "ScheduleWorkRequest": {
         "properties": {

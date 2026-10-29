@@ -217,14 +217,16 @@ gates raw MCP trace debugging.
 
 ```bash
 agentic-odi profile show
-agentic-odi profile set domain "acme.test"
+agentic-odi profile show --json
+agentic-odi profile set --product-name "My Product" --domain "acme.test"
 agentic-odi profile path
-agentic-odi setup       # alias for profile; runs the first-run baseline wizard
+agentic-odi setup       # interactive baseline wizard
 ```
 
-`profile show` prints the baseline as JSON. `profile set` updates a baseline
-field. `profile path` prints the baseline file path. `setup` is an alias for
-`profile` that runs the interactive first-run baseline wizard on first launch.
+`profile show` prints the baseline fields; add `--json` to emit the raw JSON.
+`profile set` updates any subset of baseline fields with explicit options.
+`profile path` prints the baseline file path. `setup` runs the interactive
+baseline wizard.
 
 ## Manage Customer Outcomes
 

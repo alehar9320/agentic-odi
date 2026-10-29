@@ -133,7 +133,12 @@ class LocalBackend(Backend):
         return job.model_dump()
 
     def _get_jobs(self, args: dict[str, Any]) -> list[dict[str, Any]]:
-        return [job.model_dump() for job in self.service.get_jobs()]
+        kwargs: dict[str, Any] = {}
+        if "limit" in args:
+            kwargs["limit"] = args["limit"]
+        if "offset" in args:
+            kwargs["offset"] = args["offset"]
+        return [job.model_dump() for job in self.service.get_jobs(**kwargs)]
 
     def _get_job(self, args: dict[str, Any]) -> dict[str, Any]:
         from agentic_odi_core import job_not_found
@@ -185,7 +190,12 @@ class LocalBackend(Backend):
         job_id = args["job_id"]
         if self.service.get_job(job_id) is None:
             raise BackendError(job_not_found(job_id))
-        return [step.model_dump() for step in self.service.get_job_map(job_id)]
+        kwargs: dict[str, Any] = {"job_id": job_id}
+        if "limit" in args:
+            kwargs["limit"] = args["limit"]
+        if "offset" in args:
+            kwargs["offset"] = args["offset"]
+        return [step.model_dump() for step in self.service.get_job_map(**kwargs)]
 
     def _get_step(self, args: dict[str, Any]) -> dict[str, Any]:
         from agentic_odi_core import step_not_found
@@ -248,7 +258,12 @@ class LocalBackend(Backend):
         job_id = args["job_id"]
         if self.service.get_job(job_id) is None:
             raise BackendError(job_not_found(job_id))
-        outcomes = self.service.get_outcomes(job_id=job_id, step_id=args.get("step_id"))
+        kwargs: dict[str, Any] = {"job_id": job_id, "step_id": args.get("step_id")}
+        if "limit" in args:
+            kwargs["limit"] = args["limit"]
+        if "offset" in args:
+            kwargs["offset"] = args["offset"]
+        outcomes = self.service.get_outcomes(**kwargs)
         return [outcome.model_dump() for outcome in outcomes]
 
     def _get_outcome(self, args: dict[str, Any]) -> dict[str, Any]:
@@ -314,7 +329,12 @@ class LocalBackend(Backend):
         return outcome.model_dump()
 
     def _list_customer_outcomes(self, args: dict[str, Any]) -> list[dict[str, Any]]:
-        outcomes = self.service.list_customer_outcomes(args.get("job_id"))
+        kwargs: dict[str, Any] = {"job_id": args.get("job_id")}
+        if "limit" in args:
+            kwargs["limit"] = args["limit"]
+        if "offset" in args:
+            kwargs["offset"] = args["offset"]
+        outcomes = self.service.list_customer_outcomes(**kwargs)
         return [outcome.model_dump() for outcome in outcomes]
 
     def _update_customer_outcome(self, args: dict[str, Any]) -> dict[str, Any]:
@@ -383,6 +403,7 @@ class LocalBackend(Backend):
                 name=args["name"],
                 content=args["content"],
                 item_type=args.get("item_type", "manual"),
+                url=args.get("url"),
                 raw=args.get("raw"),
                 job_id=args.get("job_id"),
                 step_id=args.get("step_id"),
@@ -413,11 +434,16 @@ class LocalBackend(Backend):
         return evidence.model_dump()
 
     def _list_evidence(self, args: dict[str, Any]) -> list[dict[str, Any]]:
-        items = self.service.list_evidence(
-            job_id=args.get("job_id"),
-            step_id=args.get("step_id"),
-            outcome_id=args.get("outcome_id"),
-        )
+        kwargs: dict[str, Any] = {
+            "job_id": args.get("job_id"),
+            "step_id": args.get("step_id"),
+            "outcome_id": args.get("outcome_id"),
+        }
+        if "limit" in args:
+            kwargs["limit"] = args["limit"]
+        if "offset" in args:
+            kwargs["offset"] = args["offset"]
+        items = self.service.list_evidence(**kwargs)
         return [item.model_dump() for item in items]
 
     def _delete_evidence(self, args: dict[str, Any]) -> str:
@@ -561,7 +587,7 @@ class LocalBackend(Backend):
 
         return capability_summary()
 
-    def _get_capabilities_manifest(self, args: dict[str, Any]) -> dict:
+    def _get_capabilities_manifest(self, args: dict[str, Any]) -> dict[str, Any]:
         from agentic_odi_core import capability_manifest
 
         return capability_manifest()
