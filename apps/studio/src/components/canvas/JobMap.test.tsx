@@ -128,6 +128,19 @@ describe("JobMap Interactive Visualization", () => {
     expect(screen.getByText("Define payload parameters")).toBeInTheDocument();
   });
 
+  it("exposes each phase card as a labelled toggle button", () => {
+    render(<JobMap />);
+
+    const phase = screen.getByRole("button", { name: "Filter steps by 1. Define" });
+    expect(phase).toHaveAttribute("aria-pressed", "false");
+
+    fireEvent.click(phase);
+    expect(phase).toHaveAttribute("aria-pressed", "true");
+
+    fireEvent.click(phase);
+    expect(phase).toHaveAttribute("aria-pressed", "false");
+  });
+
   it("moves a focused step up with the arrow keys", async () => {
     mocks.updateStep.mockClear();
     render(<JobMap />);

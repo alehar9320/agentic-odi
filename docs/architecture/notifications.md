@@ -69,7 +69,8 @@ kept only in `localStorage`.
   count and every counter, and never contributes to the bell badge.
 - Cards are reachable and activatable by keyboard alone; activating one marks the
   signal read and opens the lens on the record it names. Filters are toggle
-  buttons with `aria-pressed`, not tabs.
+  buttons with `aria-pressed`, not tabs. The feed itself is a named `region`
+  landmark so screen-reader users can jump straight to it.
 
 ## The eight stages are one constant
 
@@ -82,3 +83,15 @@ stale. Regenerate after editing the Python constant:
 ```bash
 uv run python scripts/gen_job_stages.py
 ```
+
+## Keyboard model
+
+There is no mouse-only surface in the Catch Up feed or the job map:
+
+- Phase cards are real buttons with `aria-pressed`; Tab reaches them and
+  Enter/Space toggles the filter.
+- Step rows take focus, Arrow Up/Down swap them with their neighbour, and every
+  action (Edit, Remove, Move up, Move down) is a normal button.
+- The changelog and connector-suggestion dialogs use `useFocusTrap`
+  (`apps/studio/src/lib/useFocusTrap.ts`): focus moves into the dialog on open,
+  Tab/Shift+Tab wrap at the edges, and focus returns to the opener on close.
