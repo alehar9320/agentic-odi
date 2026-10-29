@@ -10,6 +10,7 @@ from agentic_odi_core import (
     ODI_ASSISTANT_PROMPT,
     ODI_FRAMEWORK_GUIDELINES,
     CustomerOutcomeNotFoundError,
+    DecisionNotFoundError,
     EvidenceItemType,
     EvidenceNotFoundError,
     JobNotFoundError,
@@ -18,6 +19,7 @@ from agentic_odi_core import (
     ODIService,
     OutcomeNotFoundError,
     OutcomeStatementError,
+    Rejection,
     StepNotFoundError,
     ValueOutOfRangeError,
     build_repository,
@@ -555,6 +557,65 @@ async def evaluate_outcome(ctx: Context, statement: str, job_id: str | None = No
         ]
     await ctx.report_progress(2, 2, "Evaluation complete")
     return json.dumps(result)
+
+
+@mcp.tool
+async def record_decision(
+    ctx: Context,
+    job_id: str,
+    chosen_outcome_ids: list[str],
+    rationale: str,
+    decided_by: str,
+    decided_at: str,
+    rejected: list[dict[str, Any]] | None = None,
+    confidence: str = "medium",
+    supersedes: str | None = None,
+) -> str:
+    await ctx.report_progress(0, 2, "Recording the decision")
+    rejections: list[Rejection] = []
+    for item in rejected or []:
+        if not isinstance(item, dict) or "outcome_id" not in item:
+            return "Error: each rejected option needs an outcome_id and a reason"
+        rejections.append(
+            Rejection(outcome_id=str(item["outcome_id"]), reason=str(item.get("reason", "")))
+        )
+    try:
+        decision = service.record_decision(
+            job_id=job_id,
+            chosen_outcome_ids=chosen_outcome_ids,
+            rationale=rationale,
+            decided_by=decided_by,
+            decided_at=decided_at,
+            rejected=rejections,
+            confidence=confidence,
+            supersedes=supersedes,
+        )
+    except JobNotFoundError:
+        return job_not_found(job_id)
+    except OutcomeNotFoundError as exc:
+        return _outcome_not_found(exc.outcome_id)
+    except DecisionNotFoundError:
+        return f"Error: decision not found: {supersedes}"
+    except (OdiError, ValueError) as exc:
+        return f"Error: {exc}"
+    await ctx.report_progress(2, 2, "Decision recorded")
+    return f"Decision recorded successfully: {decision.model_dump_json()}"
+
+
+@mcp.tool
+def get_decision(decision_id: str) -> str:
+    decision = service.get_decision(decision_id)
+    if decision is None:
+        return f"Error: decision not found: {decision_id}"
+    return decision.model_dump_json()
+
+
+@mcp.tool
+def list_decisions(job_id: str, limit: int | None = None, offset: int = 0) -> str:
+    if service.get_job(job_id) is None:
+        return job_not_found(job_id)
+    decisions = service.list_decisions(job_id, limit=limit, offset=offset)
+    return json.dumps([d.model_dump(mode="json") for d in decisions])
 
 
 @mcp.tool

@@ -12,6 +12,7 @@ from agentic_odi_core.events import DEFAULT_DEVICE, DEFAULT_WORKSPACE, Event
 from agentic_odi_core.intent_store import IntentStore
 from agentic_odi_core.models import (
     CustomerOutcome,
+    Decision,
     Evidence,
     Job,
     Outcome,
@@ -48,6 +49,7 @@ class SQLiteRepository(Repository):
         self.outcomes: dict[str, Outcome] = {}
         self.customer_outcomes: dict[str, CustomerOutcome] = {}
         self.evidence: dict[str, Evidence] = {}
+        self.decisions: dict[str, Decision] = {}
         self._last_event_id = 0
         for ev in self.store.get_stream(workspace_id=self._workspace_id, replay_order=True):
             self._apply_event(ev)
@@ -106,6 +108,10 @@ class SQLiteRepository(Repository):
             self.outcomes[p["id"]] = Outcome.model_validate(p)
         elif et == "CUSTOMER_OUTCOME_CREATED":
             self.customer_outcomes[p["id"]] = CustomerOutcome.model_validate(p)
+        elif et == "DECISION_RECORDED":
+            self.decisions[p["id"]] = Decision.model_validate(p)
+        elif et == "DECISION_UPDATED":
+            self._merge_updates(self.decisions, p, Decision)
         elif et == "EVIDENCE_CREATED":
             self.evidence[p["id"]] = Evidence.model_validate(p)
         elif et == "JOB_UPDATED":
@@ -125,6 +131,8 @@ class SQLiteRepository(Repository):
                 del self.outcomes[key]
             for key in [k for k, v in self.customer_outcomes.items() if v.job_id == job_id]:
                 del self.customer_outcomes[key]
+            for key in [k for k, v in self.decisions.items() if v.job_id == job_id]:
+                del self.decisions[key]
             for key in [
                 k
                 for k, v in self.evidence.items()
@@ -457,6 +465,46 @@ class SQLiteRepository(Repository):
                 self._sync()
                 return True
             return False
+
+    def add_decision(self, decision: Decision) -> Decision:
+        with self._lock:
+            self.store.append(
+                "DECISION_RECORDED",
+                decision.model_dump(mode="json"),
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return decision
+
+    def get_decision(self, decision_id: str) -> Decision | None:
+        with self._lock:
+            self._sync()
+            return self.decisions.get(decision_id)
+
+    def list_decisions(
+        self, job_id: str, limit: int | None = None, offset: int = 0
+    ) -> list[Decision]:
+        with self._lock:
+            self._sync()
+            items = [d for d in self.decisions.values() if d.job_id == job_id]
+            items.sort(key=lambda d: (d.decided_at, d.id))
+            return page(items, limit, offset)
+
+    def update_decision(self, decision_id: str, updates: dict) -> Decision | None:
+        with self._lock:
+            self._sync()
+            if decision_id not in self.decisions:
+                return None
+            payload = {"id": decision_id, "updates": updates}
+            self.store.append(
+                "DECISION_UPDATED",
+                payload,
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return self.decisions.get(decision_id)
 
     def clear(self) -> None:
         with self._lock:

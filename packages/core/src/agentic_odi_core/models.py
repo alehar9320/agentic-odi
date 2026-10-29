@@ -166,3 +166,46 @@ class CustomerOutcome(BaseModel):
     @property
     def opportunity_score(self) -> float:
         return self.customer_value.opportunity_score
+
+
+class DecisionConfidence(str, Enum):
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+
+
+class Rejection(BaseModel):
+    """An option a decision considered and rejected, with its reason.
+
+    The reason is required and non-empty: a rejection without a reason cannot be
+    steelmanned later, and keeping the rejected options is the point.
+    """
+
+    outcome_id: str = Field(..., description="The rejected Outcome's ID")
+    reason: str = Field(..., min_length=1, description="Why this option was not chosen")
+
+
+class Decision(BaseModel):
+    """A recorded choice: what was chosen, what was rejected, and why.
+
+    A newer decision supersedes an older one rather than overwriting it, so the
+    argument that was lost stays readable. ``superseded_at``/``superseded_by``
+    are set on the predecessor when a successor is recorded.
+    """
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    job_id: str = Field(..., description="The Job this decision belongs to")
+    chosen_outcome_ids: list[str] = Field(
+        ..., min_length=1, description="Outcome IDs the decision chose"
+    )
+    rejected: list[Rejection] = Field(default_factory=list)
+    rationale: str = Field(..., min_length=1, description="Why this choice was made")
+    decided_by: str = Field(
+        ..., min_length=1, description="Who recorded the decision (attribution, not authentication)"
+    )
+    decided_at: str = Field(..., description="ISO-8601 timestamp, supplied at write time")
+    confidence: DecisionConfidence = Field(DecisionConfidence.MEDIUM)
+    superseded_at: str | None = Field(None, description="When a later decision replaced this one")
+    superseded_by: str | None = Field(
+        None, description="The ID of the decision that replaced this one"
+    )

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Protocol, TypeVar
 
-from agentic_odi_core.models import CustomerOutcome, Evidence, Job, Outcome, Step
+from agentic_odi_core.models import CustomerOutcome, Decision, Evidence, Job, Outcome, Step
 
 _Item = TypeVar("_Item")
 
@@ -57,6 +57,7 @@ class Repository(Protocol):
     outcomes: dict[str, Outcome]
     customer_outcomes: dict[str, CustomerOutcome]
     evidence: dict[str, Evidence]
+    decisions: dict[str, Decision]
 
     def add_job(self, job: Job) -> Job: ...
     def list_jobs(self, limit: int | None = None, offset: int = 0) -> list[Job]: ...
@@ -103,6 +104,12 @@ class Repository(Protocol):
         offset: int = 0,
     ) -> list[Evidence]: ...
     def delete_evidence(self, evidence_id: str) -> bool: ...
+    def add_decision(self, decision: Decision) -> Decision: ...
+    def get_decision(self, decision_id: str) -> Decision | None: ...
+    def list_decisions(
+        self, job_id: str, limit: int | None = None, offset: int = 0
+    ) -> list[Decision]: ...
+    def update_decision(self, decision_id: str, updates: dict) -> Decision | None: ...
     def clear(self) -> None: ...
     def reload(self) -> None: ...
     def commit(self) -> None: ...
@@ -116,6 +123,7 @@ class InMemoryRepository:
         self.outcomes: dict[str, Outcome] = {}
         self.customer_outcomes: dict[str, CustomerOutcome] = {}
         self.evidence: dict[str, Evidence] = {}
+        self.decisions: dict[str, Decision] = {}
 
     def add_job(self, job: Job) -> Job:
         self.jobs[job.id] = job
@@ -147,6 +155,8 @@ class InMemoryRepository:
             del self.outcomes[key]
         for key in [k for k, v in self.customer_outcomes.items() if v.job_id == job_id]:
             del self.customer_outcomes[key]
+        for key in [k for k, v in self.decisions.items() if v.job_id == job_id]:
+            del self.decisions[key]
         for key in [
             k
             for k, v in self.evidence.items()
@@ -300,12 +310,38 @@ class InMemoryRepository:
             return True
         return False
 
+    def add_decision(self, decision: Decision) -> Decision:
+        self.decisions[decision.id] = decision
+        return decision
+
+    def get_decision(self, decision_id: str) -> Decision | None:
+        return self.decisions.get(decision_id)
+
+    def list_decisions(
+        self, job_id: str, limit: int | None = None, offset: int = 0
+    ) -> list[Decision]:
+        items = [d for d in self.decisions.values() if d.job_id == job_id]
+        # Ordered by decision time, then insertion id, so history is stable.
+        items.sort(key=lambda d: (d.decided_at, d.id))
+        return page(items, limit, offset)
+
+    def update_decision(self, decision_id: str, updates: dict) -> Decision | None:
+        decision = self.decisions.get(decision_id)
+        if not decision:
+            return None
+        current = decision.model_dump(exclude_unset=True)
+        current.update(updates)
+        new_decision = decision.model_validate(current)
+        self.decisions[decision_id] = new_decision
+        return new_decision
+
     def clear(self) -> None:
         self.jobs.clear()
         self.steps.clear()
         self.outcomes.clear()
         self.customer_outcomes.clear()
         self.evidence.clear()
+        self.decisions.clear()
 
     def reload(self) -> None:
         """Reset in-memory state; there is no external store to re-read."""

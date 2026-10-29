@@ -16,11 +16,14 @@ from agentic_odi_core.models import (
     BusinessValue,
     CustomerOutcome,
     CustomerValue,
+    Decision,
+    DecisionConfidence,
     Evidence,
     EvidenceItemType,
     Job,
     JobStage,
     Outcome,
+    Rejection,
     Step,
     compute_opportunity_score,
 )
@@ -49,6 +52,12 @@ class CustomerOutcomeNotFoundError(NotFoundError):
     def __init__(self, outcome_id: str) -> None:
         self.outcome_id = outcome_id
         super().__init__(outcome_id, "customer_outcome")
+
+
+class DecisionNotFoundError(NotFoundError):
+    def __init__(self, decision_id: str) -> None:
+        self.decision_id = decision_id
+        super().__init__(decision_id, "decision")
 
 
 class EvidenceNotFoundError(NotFoundError, ValueError):
@@ -406,3 +415,93 @@ class ODIService:
 
     def compute_opportunity(self, importance: float, satisfaction: float) -> float:
         return compute_opportunity_score(importance, satisfaction)
+
+    # ------------------------------------------------------------- decisions
+
+    def record_decision(
+        self,
+        job_id: str,
+        chosen_outcome_ids: list[str],
+        rationale: str,
+        decided_by: str,
+        decided_at: str,
+        rejected: list[Rejection] | None = None,
+        confidence: DecisionConfidence | str = DecisionConfidence.MEDIUM,
+        supersedes: str | None = None,
+    ) -> Decision:
+        """Record a decision, superseding a predecessor instead of overwriting it.
+
+        Every referenced outcome must belong to ``job_id``; a decision that
+        points at another job's outcome is refused before an event is appended.
+        """
+        job = self.repo.get_job(job_id)
+        if job is None:
+            raise JobNotFoundError(job_id)
+        if not chosen_outcome_ids:
+            raise ValidationError("A decision must choose at least one outcome.")
+        rationale = rationale.strip()
+        if not rationale:
+            raise ValidationError("A decision needs a rationale.")
+        decided_by = decided_by.strip()
+        if not decided_by:
+            raise ValidationError("A decision needs a decided_by attribution.")
+
+        try:
+            resolved_confidence = DecisionConfidence(confidence)
+        except ValueError as exc:
+            raise ValidationError(
+                f"Unknown confidence: {confidence!r}. "
+                f"Use one of {[c.value for c in DecisionConfidence]}."
+            ) from exc
+
+        job_outcome_ids = {o.id for o in self.repo.get_outcomes(job_id=job_id, limit=None)}
+        for outcome_id in chosen_outcome_ids:
+            if outcome_id not in job_outcome_ids:
+                raise OutcomeNotFoundError(outcome_id)
+
+        rejections: list[Rejection] = []
+        for rejection in rejected or []:
+            reason = rejection.reason.strip()
+            if not reason:
+                raise ValidationError("A rejected option needs a reason.")
+            if rejection.outcome_id not in job_outcome_ids:
+                raise OutcomeNotFoundError(rejection.outcome_id)
+            rejections.append(Rejection(outcome_id=rejection.outcome_id, reason=reason))
+
+        predecessor = None
+        if supersedes is not None:
+            predecessor = self.repo.get_decision(supersedes)
+            if predecessor is None:
+                raise DecisionNotFoundError(supersedes)
+            if predecessor.job_id != job_id:
+                raise ValidationError("A decision can only supersede one from the same job.")
+
+        decision = Decision(
+            job_id=job_id,
+            chosen_outcome_ids=list(chosen_outcome_ids),
+            rejected=rejections,
+            rationale=rationale,
+            decided_by=decided_by,
+            decided_at=decided_at,
+            confidence=resolved_confidence,
+        )
+        self.repo.add_decision(decision)
+
+        if predecessor is not None:
+            self.repo.update_decision(
+                predecessor.id,
+                {"superseded_at": decided_at, "superseded_by": decision.id},
+            )
+        return decision
+
+    def get_decision(self, decision_id: str) -> Decision | None:
+        return self.repo.get_decision(decision_id)
+
+    def list_decisions(
+        self, job_id: str, limit: int | None = None, offset: int = 0
+    ) -> list[Decision]:
+        return self.repo.list_decisions(job_id, limit=limit, offset=offset)
+
+    def latest_decision(self, job_id: str) -> Decision | None:
+        history = self.repo.list_decisions(job_id, limit=None)
+        return history[-1] if history else None

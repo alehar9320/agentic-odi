@@ -38,6 +38,9 @@ class ToolName(str, Enum):
     LIST_EVIDENCE = "list_evidence"
     DELETE_EVIDENCE = "delete_evidence"
     PROMOTE_EVIDENCE = "promote_evidence"
+    RECORD_DECISION = "record_decision"
+    GET_DECISION = "get_decision"
+    LIST_DECISIONS = "list_decisions"
     EVALUATE_OUTCOME = "evaluate_outcome"
     GET_ODI_SCHEMA = "get_odi_schema"
     COMPUTE_OPPORTUNITY = "compute_opportunity"
@@ -340,6 +343,48 @@ TOOL_SPECS: dict[str, ToolSpec] = {
         returns="A verdict with coded issues and suggestions.",
         stage="2",
     ),
+    ToolName.RECORD_DECISION.value: ToolSpec(
+        name="record_decision",
+        summary="Record a decision: what was chosen, what was rejected, and why.",
+        effect=_derive_effect("record_decision"),
+        arguments=(
+            "job_id",
+            "chosen_outcome_ids",
+            "rationale",
+            "decided_by",
+            "decided_at",
+            "rejected",
+            "confidence",
+            "supersedes",
+        ),
+        required=(
+            "job_id",
+            "chosen_outcome_ids",
+            "rationale",
+            "decided_by",
+            "decided_at",
+        ),
+        returns="The recorded Decision, with a superseded predecessor kept readable.",
+        stage="6",
+    ),
+    ToolName.GET_DECISION.value: ToolSpec(
+        name="get_decision",
+        summary="Get a single recorded decision by ID.",
+        effect=_derive_effect("get_decision"),
+        arguments=("decision_id",),
+        required=("decision_id",),
+        returns="The Decision, or an error string if not found.",
+        stage="6",
+    ),
+    ToolName.LIST_DECISIONS.value: ToolSpec(
+        name="list_decisions",
+        summary="List a job's decision history, oldest first.",
+        effect=_derive_effect("list_decisions"),
+        arguments=("job_id", "limit", "offset"),
+        required=("job_id",),
+        returns="An ordered list of Decisions, including superseded ones.",
+        stage="6",
+    ),
     ToolName.GET_ODI_SCHEMA.value: ToolSpec(
         name="get_odi_schema",
         summary="Get the canonical JSON schema for all ODI entities.",
@@ -386,6 +431,7 @@ _STAGE_NAMES: dict[str | None, str] = {
     "2": "Stage 2: Capture Desired Outcomes",
     "3": "Stage 3: Build the Job Map",
     "4": "Stage 4: Calculate Opportunity Scores",
+    "6": "Stage 6: Formulate the Innovation Strategy",
     None: "Supporting Tools",
 }
 
@@ -395,7 +441,7 @@ _EFFECT_ORDER: tuple[ToolEffect, ...] = (
     ToolEffect.DESTRUCTIVE,
 )
 
-_STAGE_ORDER: tuple[str | None, ...] = ("1", "2", "3", "4", None)
+_STAGE_ORDER: tuple[str | None, ...] = ("1", "2", "3", "4", "6", None)
 
 
 def capability_manifest() -> dict:

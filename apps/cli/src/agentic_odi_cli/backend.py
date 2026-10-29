@@ -520,6 +520,58 @@ class LocalBackend(Backend):
             raise BackendError(_VALUE_RANGE_ERROR)
         return compute_opportunity_score(importance, satisfaction)
 
+    def _record_decision(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import (
+            DecisionNotFoundError,
+            JobNotFoundError,
+            OutcomeNotFoundError,
+            Rejection,
+            job_not_found,
+            outcome_not_found,
+        )
+
+        rejections = [
+            Rejection(outcome_id=str(item["outcome_id"]), reason=str(item.get("reason", "")))
+            for item in args.get("rejected") or []
+        ]
+        try:
+            decision = self.service.record_decision(
+                job_id=args["job_id"],
+                chosen_outcome_ids=args["chosen_outcome_ids"],
+                rationale=args["rationale"],
+                decided_by=args["decided_by"],
+                decided_at=args["decided_at"],
+                rejected=rejections,
+                confidence=args.get("confidence", "medium"),
+                supersedes=args.get("supersedes"),
+            )
+        except JobNotFoundError:
+            raise BackendError(job_not_found(args["job_id"])) from None
+        except OutcomeNotFoundError as exc:
+            raise BackendError(outcome_not_found(exc.outcome_id)) from None
+        except DecisionNotFoundError:
+            raise BackendError(f"decision not found: {args.get('supersedes')}") from None
+        except ValueError as exc:
+            raise BackendError(str(exc)) from None
+        return decision.model_dump(mode="json")
+
+    def _get_decision(self, args: dict[str, Any]) -> dict[str, Any]:
+        decision = self.service.get_decision(args["decision_id"])
+        if decision is None:
+            raise BackendError(f"decision not found: {args['decision_id']}")
+        return decision.model_dump(mode="json")
+
+    def _list_decisions(self, args: dict[str, Any]) -> list[dict[str, Any]]:
+        from agentic_odi_core import job_not_found
+
+        job_id = args["job_id"]
+        if self.service.get_job(job_id) is None:
+            raise BackendError(job_not_found(job_id))
+        decisions = self.service.list_decisions(
+            job_id, limit=args.get("limit"), offset=args.get("offset", 0)
+        )
+        return [d.model_dump(mode="json") for d in decisions]
+
 
 _LOCAL_HANDLERS = {
     "add_job": LocalBackend._add_job,
@@ -550,6 +602,9 @@ _LOCAL_HANDLERS = {
     "get_odi_schema": LocalBackend._get_odi_schema,
     "compute_opportunity": LocalBackend._compute_opportunity,
     "evaluate_outcome": LocalBackend._evaluate_outcome,
+    "record_decision": LocalBackend._record_decision,
+    "get_decision": LocalBackend._get_decision,
+    "list_decisions": LocalBackend._list_decisions,
     "get_odi_framework_guidelines": LocalBackend._get_odi_framework_guidelines,
     "get_capabilities": LocalBackend._get_capabilities,
     "get_capabilities_manifest": LocalBackend._get_capabilities_manifest,
