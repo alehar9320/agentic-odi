@@ -7,16 +7,15 @@ import {
   opportunityScore,
 } from "../../lib/odi";
 import { useStudio } from "../../state/StudioContext";
-import type { Outcome } from "../../types";
+import type { Evidence, Outcome } from "../../types";
 import { CopyIcon } from "../icons";
 
 export function OutcomeCard({ outcome, sample = false }: { outcome: Outcome; sample?: boolean }) {
-  const { ask, canvasState, deleteOutcome, pushToast, saveThesis, updateOutcome } = useStudio();
-  // Records captured against this outcome, with their way back to the source.
-  const linkedEvidence = (canvasState.data?.evidence ?? []).filter(
-    (item) => item.outcome_id === outcome.id,
-  );
+  const { ask, deleteOutcome, fetchOutcomeEvidence, pushToast, saveThesis, updateOutcome } =
+    useStudio();
   const [showEvidence, setShowEvidence] = useState(false);
+  const [evidence, setEvidence] = useState<Evidence[] | null>(null);
+  const [evidenceError, setEvidenceError] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [editing, setEditing] = useState(false);
   const [thesisOpen, setThesisOpen] = useState(false);
@@ -30,6 +29,19 @@ export function OutcomeCard({ outcome, sample = false }: { outcome: Outcome; sam
   const outcomeId = outcome.id ?? "O";
   const underserved = isUnderserved(opp);
   const pill = opportunityPill(opp);
+
+  const toggleEvidence = () => {
+    const next = !showEvidence;
+    setShowEvidence(next);
+    if (!next || !outcome.id || evidence !== null) {
+      return;
+    }
+    // Read the count from the store on open, never from a stored counter, so
+    // it cannot drift from the records it claims to summarise.
+    void fetchOutcomeEvidence(outcome.id)
+      .then((items) => setEvidence(items))
+      .catch(() => setEvidenceError(true));
+  };
 
   return (
     <article className={`card${underserved ? " card--hot" : ""}`} aria-label={`Outcome ${outcomeId}`}>
@@ -56,31 +68,33 @@ export function OutcomeCard({ outcome, sample = false }: { outcome: Outcome; sam
         Opportunity <b>{formatOpportunityScore(opp)}</b>
       </p>
 
-      {showEvidence &&
-        (linkedEvidence.length > 0 ? (
-          <div className="card__evidence">
-            {linkedEvidence.map((item) => (
-              <p key={item.id}>
-                {item.content ? `“${item.content}” ` : ""}
-                <span className="evidence__meta">
-                  {item.source_name ? `Via ${item.source_name}` : "Captured by hand"}
-                  {item.url && (
-                    <>
-                      {" · "}
-                      <a href={item.url} target="_blank" rel="noopener noreferrer">
-                        Source ↗
-                      </a>
-                    </>
-                  )}
-                </span>
+      {showEvidence && (
+        <div className="card__evidence">
+          {evidenceError ? (
+            <p>Could not load the evidence behind this outcome.</p>
+          ) : evidence === null ? (
+            <p>Loading evidence…</p>
+          ) : evidence.length === 0 ? (
+            <p>No transcript is linked to this outcome yet.</p>
+          ) : (
+            <>
+              <p>
+                {evidence.length} source{evidence.length === 1 ? "" : "s"} behind this number
               </p>
-            ))}
-          </div>
-        ) : (
-          <p className="card__evidence">
-            {outcome.evidence?.trim() || "No transcript is linked to this outcome yet."}
-          </p>
-        ))}
+              <ul className="card__evidence-list">
+                {evidence.map((item) => (
+                  <li key={item.id}>
+                    <span className="card__evidence-source">
+                      {item.source_name ?? item.source_kind ?? "Source"}
+                    </span>
+                    <blockquote>{item.content ?? ""}</blockquote>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+        </div>
+      )}
 
       {editing && (
         <form
@@ -159,7 +173,7 @@ export function OutcomeCard({ outcome, sample = false }: { outcome: Outcome; sam
           className="quiet-action"
           aria-expanded={showEvidence}
           title="Inspect customer interview transcripts and evidence line"
-          onClick={() => setShowEvidence((prev) => !prev)}
+          onClick={toggleEvidence}
         >
           {showEvidence ? "Hide evidence" : "Evidence"}
         </button>
