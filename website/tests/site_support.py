@@ -62,7 +62,7 @@ def all_pages() -> list[str]:
     """Every built HTML page, as a path relative to the built site root."""
     assert _BUILT is not None, "the site was not built"
     return sorted(
-        str(p.relative_to(_BUILT)) for p in _BUILT.rglob("*.html") if p.name != "404.html"
+        p.relative_to(_BUILT).as_posix() for p in _BUILT.rglob("*.html") if p.name != "404.html"
     )
 
 

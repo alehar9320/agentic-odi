@@ -200,3 +200,38 @@ describe("registry parity", () => {
     }
   });
 });
+
+describe("impact simulation provenance", () => {
+  const simulation = {
+    outcome: { id: "O-1", statement: "Minimize propagation time" },
+    bet: "Automate secret sync",
+    before: ["Copy-paste into CI"],
+    after: ["One command"],
+  };
+
+  it("marks a simulated bet and says no model backs the number", () => {
+    renderSpec({ type: "impact-simulation", props: { ...simulation, provenance: "simulated" } });
+
+    expect(screen.getByText("Simulated")).toBeInTheDocument();
+    expect(screen.getByText(/no model behind this number/i)).toBeInTheDocument();
+  });
+
+  it("refuses a simulation that does not say where it came from", () => {
+    const result = parseUiSpec(
+      { type: "impact-simulation", props: simulation },
+      catalogManifest(),
+    );
+
+    expect(result.ok).toBe(false);
+  });
+
+  it("refuses a simulation that claims to be measured or live", () => {
+    for (const provenance of ["live", "measured"]) {
+      const result = parseUiSpec(
+        { type: "impact-simulation", props: { ...simulation, provenance } },
+        catalogManifest(),
+      );
+      expect(result.ok).toBe(false);
+    }
+  });
+});
