@@ -5,9 +5,10 @@ from __future__ import annotations
 import asyncio
 import json
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, cast
 
 import pytest
+from agentic_odi_core import ODIService
 from agentic_odi_studio_api.studio import mcp_data
 from agentic_odi_studio_api.studio.errors import StudioHTTPError
 
@@ -42,6 +43,56 @@ def test_fetch_canvas_falls_back_to_seed_when_unreachable(monkeypatch) -> None:
 
     assert payload["source"] == "seed"
     assert payload["jobs"][0]["id"] == "JOB-402"
+    provenance = payload["provenance"]
+    assert provenance["kind"] == "seed"
+    assert provenance["reason"] == "mcp_unreachable"
+    assert provenance["record_counts"] == {
+        "jobs": 1,
+        "steps": len(payload["steps"]),
+        "outcomes": len(payload["outcomes"]),
+        "evidence": len(payload["evidence"]),
+    }
+    assert provenance["generated_at"].endswith("+00:00")
+
+
+def test_fetch_canvas_marks_a_reachable_but_empty_server_as_empty(monkeypatch) -> None:
+    _FakeClient.calls = []
+    _FakeClient.error = None
+    _FakeClient.payloads = {"get_jobs": "[]"}
+    monkeypatch.setattr(mcp_data, "is_endpoint_reachable", lambda url, timeout: True)
+    monkeypatch.setattr(mcp_data, "McpClient", _FakeClient)
+
+    payload = asyncio.run(mcp_data.fetch_canvas("http://mcp"))
+
+    assert payload["source"] == "mcp"
+    assert payload["jobs"] == []
+    assert payload["provenance"]["kind"] == "empty"
+    assert payload["provenance"]["reason"] == "no_jobs"
+    assert payload["provenance"]["record_counts"] == {
+        "jobs": 0,
+        "steps": 0,
+        "outcomes": 0,
+        "evidence": 0,
+    }
+
+
+def test_fetch_canvas_labels_a_partial_hydration(monkeypatch) -> None:
+    class _PartiallyFailingClient(_FakeClient):
+        async def call_tool(self, name: str, arguments: dict[str, Any]) -> Any:
+            if name in ("get_job_map", "get_outcomes", "list_evidence"):
+                raise RuntimeError("read failed")
+            return await super().call_tool(name, arguments)
+
+    _FakeClient.payloads = {"get_jobs": json.dumps([{"id": "job-1"}])}
+    monkeypatch.setattr(mcp_data, "is_endpoint_reachable", lambda url, timeout: True)
+    monkeypatch.setattr(mcp_data, "McpClient", _PartiallyFailingClient)
+
+    payload = asyncio.run(mcp_data.fetch_canvas("http://mcp"))
+
+    assert payload["source"] == "mcp"
+    assert payload["warnings"]
+    assert payload["provenance"]["kind"] == "live"
+    assert payload["provenance"]["reason"] == "partial_hydration"
 
 
 def test_fetch_canvas_hydrates_jobs_steps_and_outcomes(monkeypatch) -> None:
@@ -58,13 +109,19 @@ def test_fetch_canvas_hydrates_jobs_steps_and_outcomes(monkeypatch) -> None:
 
     payload = asyncio.run(mcp_data.fetch_canvas("http://mcp"))
 
-    assert payload == {
-        "jobs": [{"id": "job-1"}],
-        "steps": [{"id": "step-1", "job_id": "job-1"}],
-        "outcomes": [{"id": "outcome-1", "job_id": "job-1"}],
-        "evidence": [{"id": "evidence-1", "job_id": "job-1"}],
-        "source": "mcp",
-        "warnings": [],
+    assert payload["jobs"] == [{"id": "job-1"}]
+    assert payload["steps"] == [{"id": "step-1", "job_id": "job-1"}]
+    assert payload["outcomes"] == [{"id": "outcome-1", "job_id": "job-1"}]
+    assert payload["evidence"] == [{"id": "evidence-1", "job_id": "job-1"}]
+    assert payload["source"] == "mcp"
+    assert payload["warnings"] == []
+    assert payload["provenance"]["kind"] == "live"
+    assert payload["provenance"]["reason"] == "mcp_live"
+    assert payload["provenance"]["record_counts"] == {
+        "jobs": 1,
+        "steps": 1,
+        "outcomes": 1,
+        "evidence": 1,
     }
     assert _FakeClient.calls == [
         ("get_jobs", {}),
@@ -83,7 +140,11 @@ def test_fetch_canvas_skips_invalid_json_and_jobs_without_ids(monkeypatch) -> No
 
     payload = asyncio.run(mcp_data.fetch_canvas("http://mcp"))
 
-    assert payload["source"] == "seed"
+    # A reachable server that returns no usable jobs is genuinely empty; the
+    # seed prototype is only a stand-in when the server cannot answer.
+    assert payload["source"] == "mcp"
+    assert payload["provenance"]["kind"] == "empty"
+    assert payload["jobs"] == []
 
     _FakeClient.payloads = {"get_jobs": json.dumps([{"name": "no id"}])}
     payload = asyncio.run(mcp_data.fetch_canvas("http://mcp"))
@@ -196,3 +257,50 @@ def test_call_mcp_tool_reports_a_tool_error_as_a_tool_failure(monkeypatch) -> No
 
     assert exc_info.value.status_code == 500
     assert exc_info.value.error.code.value == "mcp_tool_failed"
+
+
+class _Record:
+    def __init__(self, **data: Any) -> None:
+        self._data = data
+
+    def model_dump(self) -> dict[str, Any]:
+        return dict(self._data)
+
+
+class _FakeService:
+    def __init__(self, jobs: list[_Record]) -> None:
+        self._jobs = jobs
+
+    def get_jobs(self) -> list[_Record]:
+        return self._jobs
+
+    def get_job_map(self, job_id: str) -> list[_Record]:
+        return []
+
+    def get_outcomes(self, job_id: str) -> list[_Record]:
+        return []
+
+    def list_evidence(self) -> list[_Record]:
+        return []
+
+
+def test_fetch_local_canvas_is_labelled_live_with_counts() -> None:
+    payload = mcp_data.fetch_local_canvas(cast(ODIService, _FakeService([_Record(id="j-1")])))
+
+    assert payload["source"] == "local"
+    assert payload["provenance"]["kind"] == "live"
+    assert payload["provenance"]["reason"] == "local_store"
+    assert payload["provenance"]["record_counts"] == {
+        "jobs": 1,
+        "steps": 0,
+        "outcomes": 0,
+        "evidence": 0,
+    }
+
+
+def test_fetch_local_canvas_marks_an_empty_store_as_empty() -> None:
+    payload = mcp_data.fetch_local_canvas(cast(ODIService, _FakeService([])))
+
+    assert payload["source"] == "local"
+    assert payload["provenance"]["kind"] == "empty"
+    assert payload["provenance"]["reason"] == "local_store_empty"

@@ -1,9 +1,8 @@
 # Running The Living Studio
 
 **The Living Studio** is the conversational GUI for Outcome-Driven Innovation:
-an interactive Opportunity Landscape, Universal Job Map, WYSIWYG Impact
-Simulation, and Causal Lineage inspection, paired with an autonomous agent
-connected to the MCP server.
+an interactive Opportunity Landscape, Universal Job Map, and WYSIWYG Impact
+Simulation, paired with an autonomous agent connected to the MCP server.
 
 The Studio runs three ways locally, plus a hosted deployment. All of them serve
 the same SPA, which talks only to the sidecar on `http://127.0.0.1:8100` — the
@@ -157,6 +156,25 @@ agentic_odi_mcp_server)…`. When the Studio is reached through the free
 Cloudflare Worker proxy, a missing `SIDECAR_URL` is reported to the browser as
 `{"error": {"code": "mcp_unreachable", "suggestion": "Start the studio sidecar
 …"}}` with `X-Request-ID` echoed for support.
+
+### What the canvas is made of
+
+Every canvas response carries its provenance: `live` when the sidecar read your
+store, `empty` when it read your store and found nothing, and `seed` when it is
+showing the built-in demonstration because the MCP server could not be reached.
+The sidecar says this in the payload (`provenance.kind`, `provenance.reason`,
+and record counts); it never dresses the prototype up as your data.
+
+The studio repeats that label where a person can see it: the rail shows a
+**DEMO** or **OFFLINE** chip, the Opportunity Landscape shows a sample-data
+notice, and an impact simulation must carry `provenance: live | simulated` before
+it renders. The catch-up feed starts empty rather than inventing activity, and
+every event produced by **Simulate update** is marked **Simulated** and excluded
+from the unread count. The catch-up feed has no server-side event source yet:
+its only content is the local simulator, which
+[#79](https://github.com/alehar9320/agentic-odi/issues/79) replaces. Connector rows in Settings come from the real connector
+store, grouped by capability area; nothing is pre-listed as though it were
+already connected.
 
 ### The thread is the room
 
@@ -411,16 +429,44 @@ Actions secrets.
 
 | Secret | Purpose |
 |---|---|
-| `TAURI_SIGNING_PRIVATE_KEY` | Signs updater artifacts (`.sig`) and the `latest.json` manifest. A tagged release fails loudly without it. Generate with `npm --prefix apps/studio run tauri signer generate`. |
+| `TAURI_SIGNING_PRIVATE_KEY` | Signs updater artifacts (`.sig`) and the `latest.json` manifest. A release fails loudly without it. Generate with `npm --prefix apps/studio run tauri signer generate`. |
 | `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | Password for the private key (optional when the key has none). |
 | `APPLE_CERTIFICATE` / `APPLE_CERTIFICATE_PASSWORD` | macOS Developer ID certificate (base64 `.p12`) and its password. |
 | `APPLE_SIGNING_IDENTITY` | macOS signing identity. |
 | `APPLE_ID` / `APPLE_PASSWORD` / `APPLE_TEAM_ID` | macOS notarization credentials. |
 | `WINDOWS_CERTIFICATE` / `WINDOWS_CERTIFICATE_PASSWORD` | Windows Authenticode PFX (base64) and its password; imported by CI and injected into the bundle config. |
 
-Releases are published by `.github/workflows/tauri-release.yml` when a `v*` tag
-is pushed. The desktop app checks for updates on startup and via
-**Settings → Check for updates**.
+Releases are published by `.github/workflows/tauri-release.yml`. It starts when
+a GitHub release is **published**, and on a `v*` tag push for hand-cut tags.
+The published release is what matters: release-please creates releases through
+the API, which never emits a tag-push event, so a tag-only trigger would leave
+every release without binaries. A `verify` job fails the release unless
+`latest.json` advertises the release version and carries a signed artifact for
+Linux, Windows, and both macOS architectures.
+
+`release-please` bumps the desktop app version from `extra-files`
+(`apps/studio/package.json`, `apps/studio/src-tauri/tauri.conf.json`, and
+`apps/studio/src-tauri/Cargo.toml`), so the installed version moves with every
+release. Without that sync the updater can never see a newer manifest.
+
+The app checks four seconds after launch, every six hours, and when the window
+returns to the foreground after that interval. A found update downloads in the
+background; the shell shows one quiet bar above the conversation with progress
+and a single action. macOS and Linux stage the update as soon as its signature
+verifies, so it also applies on the next ordinary launch. **Restart now** in the
+bar, **Settings → Software update**, or the version line in the sidebar applies
+it immediately. Windows needs the app to exit before its installer runs, so it
+offers **Update & restart** instead. Dismissing the bar is safe: a staged update
+still applies on the next launch, and check failures are reported in Settings
+rather than interrupting the conversation.
+
+In-app updates are inactive in the browser build and in `tauri dev`; both say so
+in **Settings → Software update**.
+
+`scripts/verify-desktop-update.sh` proves the path locally: it builds signed
+0.1.0 and 0.2.0 AppImages against a throwaway key and a local `latest.json`,
+runs 0.1.0 until it replaces its own file with 0.2.0, then runs the result and
+asserts it checks without downloading anything.
 
 ### Managing the updater signing key
 

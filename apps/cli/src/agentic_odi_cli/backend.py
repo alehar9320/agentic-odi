@@ -169,7 +169,11 @@ class LocalBackend(Backend):
 
         try:
             step = self.service.add_step(
-                job_id=args["job_id"], name=args["name"], order=args["order"]
+                job_id=args["job_id"],
+                name=args["name"],
+                order=args["order"],
+                stage=args.get("stage"),
+                allow_empty_job_map=args.get("allow_empty_job_map", False),
             )
         except JobNotFoundError:
             raise BackendError(job_not_found(args["job_id"])) from None
@@ -226,8 +230,8 @@ class LocalBackend(Backend):
             outcome = self.service.add_outcome(
                 job_id=args["job_id"],
                 statement=args["statement"],
-                importance=args.get("importance"),
-                satisfaction=args.get("satisfaction"),
+                importance=float(args["importance"]),
+                satisfaction=float(args["satisfaction"]),
                 step_id=step_id,
             )
         except JobNotFoundError:
@@ -471,9 +475,12 @@ class LocalBackend(Backend):
 
     def _evaluate_outcome(self, args: dict[str, Any]) -> str:
         from agentic_odi_core import job_not_found
-        from agentic_odi_core.evaluation import evaluate_outcome_statement
+        from agentic_odi_core.evaluation import (
+            evaluate_outcome_statement,
+            statement_to_dict,
+        )
 
-        result = evaluate_outcome_statement(args["statement"])
+        result = statement_to_dict(evaluate_outcome_statement(args["statement"]))
         job_id = args.get("job_id")
         if job_id is not None:
             if self.service.get_job(job_id) is None:
@@ -495,9 +502,14 @@ class LocalBackend(Backend):
         return ODI_FRAMEWORK_GUIDELINES
 
     def _get_capabilities(self, args: dict[str, Any]) -> str:
-        from agentic_odi_core import CAPABILITIES
+        from agentic_odi_core import capability_summary
 
-        return CAPABILITIES
+        return capability_summary()
+
+    def _get_capabilities_manifest(self, args: dict[str, Any]) -> dict:
+        from agentic_odi_core import capability_manifest
+
+        return capability_manifest()
 
     def _compute_opportunity(self, args: dict[str, Any]) -> float:
         from agentic_odi_core import compute_opportunity_score
@@ -540,6 +552,7 @@ _LOCAL_HANDLERS = {
     "evaluate_outcome": LocalBackend._evaluate_outcome,
     "get_odi_framework_guidelines": LocalBackend._get_odi_framework_guidelines,
     "get_capabilities": LocalBackend._get_capabilities,
+    "get_capabilities_manifest": LocalBackend._get_capabilities_manifest,
 }
 
 
@@ -557,6 +570,11 @@ class MCPBackend(Backend):
 
 def _call_mcp(tool: str, args: dict[str, Any], mcp_url: str, timeout: float) -> str:
     from fastmcp import Client
+
+    from agentic_odi_cli import flags
+
+    if flags.is_enabled("developer_mode"):
+        typer.echo(f"[debug] MCP call: {tool} args={args}", err=True)
 
     async def _run() -> str:
         async with Client(mcp_url) as client:
@@ -652,6 +670,34 @@ def _extract_float(text: str) -> float:
 
 
 @dataclass
+class AutoBackend(Backend):
+    """Prefer the local store, and reach for the MCP server if it fails.
+
+    A locked or unreachable local store used to make every command fail even
+    when an MCP server was running. Auto keeps the local-first path but does
+    not let a local failure end the command.
+    """
+
+    def __init__(self, db_path: str | None = None, mcp_url: str | None = None) -> None:
+        self._local = LocalBackend(db_path=db_path)
+        self._mcp = MCPBackend(mcp_url=mcp_url)
+        self._announced = False
+
+    def call(self, tool_name: str, args: dict[str, Any]) -> Any:
+        try:
+            return self._local.call(tool_name, args)
+        except (BackendError, NotImplementedError) as local_error:
+            try:
+                result = self._mcp.call(tool_name, args)
+            except BackendError as mcp_error:
+                raise local_error from mcp_error
+            if not self._announced:
+                typer.echo("Local store unavailable; using the MCP server.", err=True)
+                self._announced = True
+            return result
+
+
+@dataclass
 class BackendConfig:
     backend: str | None = None
     db_path: str | None = None
@@ -666,6 +712,8 @@ def get_backend(
         return LocalBackend(db_path=db_path)
     if resolved in {"mcp", "remote"}:
         return MCPBackend(mcp_url=mcp_url)
+    if resolved == "auto":
+        return AutoBackend(db_path=db_path, mcp_url=mcp_url)
     raise BackendError(f"unknown backend: {resolved}")
 
 
