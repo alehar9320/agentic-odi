@@ -65,6 +65,14 @@ export function advanceTour(state: OnboardingState): OnboardingState {
   return { ...state, status: "active", step: clampStep(state.step + 1) };
 }
 
+/** Move past one step without leaving the tour; it never finishes the flow. */
+export function skipStepTour(state: OnboardingState): OnboardingState {
+  if (isFinished(state)) {
+    return state;
+  }
+  return { ...state, status: "active", step: clampStep(state.step + 1) };
+}
+
 export function retreatTour(state: OnboardingState): OnboardingState {
   if (isFinished(state)) {
     return state;

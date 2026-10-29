@@ -5,9 +5,15 @@ helper. `main()` is exercised with monkeypatched subprocess so no network
 or `gh` binary is required.
 """
 
+import shlex
 import subprocess
 
-from release_instructions import apply_instructions, build_instructions_section, main
+from release_instructions import (
+    _studio_install_command,
+    apply_instructions,
+    build_instructions_section,
+    main,
+)
 
 
 def test_build_instructions_section_contains_artifacts_and_installers():
@@ -150,3 +156,102 @@ def test_main_publishes_instructions(monkeypatch, capsys):
     assert "https://x/dl/odi_0.7.0_linux_x86_64.tar.gz" in out
     assert "install.sh | sh" in out
     assert "## 📦 Download & Run" in out
+
+
+def _fenced_block_after(section: str, heading: str) -> list[str]:
+    """Return the lines of the first ```bash block after ``heading``."""
+    rest = section.split(heading, 1)[1]
+    body = rest.split("```bash", 1)[1].split("```", 1)[0]
+    return [line for line in body.strip().splitlines() if line.strip()]
+
+
+def test_verify_block_is_one_copy_pasteable_curl_command():
+    import shlex
+
+    section = build_instructions_section("v0.7.0", "alehar9320/agentic-odi", [], "")
+
+    block = _fenced_block_after(section, "### Verify")
+    urls = [line for line in block if line.startswith("http")]
+    curl_lines = [line for line in block if line.startswith("curl")]
+
+    assert urls == []
+    assert len(curl_lines) == 1
+    # A URL on its own line would make the previous line a broken command.
+    assert shlex.split(curl_lines[0]) == [
+        "curl",
+        "-fsSL",
+        "-O",
+        "https://github.com/alehar9320/agentic-odi/releases/download/v0.7.0/checksums.txt",
+    ]
+
+
+STUDIO_ARTIFACTS = [
+    {
+        "name": "Agentic ODI Living Studio_0.12.0_amd64.deb",
+        "browser_download_url": "https://github.com/alehar9320/agentic-odi/releases/download/v0.12.0/Agentic%20ODI%20Living%20Studio_0.12.0_amd64.deb",
+        "size": 1,
+    },
+    {
+        "name": "Agentic ODI Living Studio_0.12.0_x86_64.AppImage",
+        "browser_download_url": "https://github.com/alehar9320/agentic-odi/releases/download/v0.12.0/Agentic%20ODI%20Living%20Studio_0.12.0_x86_64.AppImage",
+        "size": 1,
+    },
+    {
+        "name": "Agentic ODI Living Studio_0.12.0_x86_64.dmg",
+        "browser_download_url": "https://github.com/alehar9320/agentic-odi/releases/download/v0.12.0/Agentic%20ODI%20Living%20Studio_0.12.0_x86_64.dmg",
+        "size": 1,
+    },
+    {
+        "name": "Agentic ODI Living Studio_0.12.0_x64-setup.exe",
+        "browser_download_url": "https://github.com/alehar9320/agentic-odi/releases/download/v0.12.0/Agentic%20ODI%20Living%20Studio_0.12.0_x64-setup.exe",
+        "size": 1,
+    },
+]
+
+CLI_ARTIFACTS = [
+    {
+        "name": "odi_0.12.0_linux_x86_64.tar.gz",
+        "browser_download_url": "https://github.com/alehar9320/agentic-odi/releases/download/v0.12.0/odi_0.12.0_linux_x86_64.tar.gz",
+        "size": 12345,
+    },
+    {
+        "name": "odi_0.12.0_windows_x86_64.zip",
+        "browser_download_url": "https://github.com/alehar9320/agentic-odi/releases/download/v0.12.0/odi_0.12.0_windows_x86_64.zip",
+        "size": 6789,
+    },
+]
+
+
+def test_studio_section_lists_bundles_with_install_commands():
+    section = build_instructions_section("v0.12.0", "alehar9320/agentic-odi", STUDIO_ARTIFACTS, "")
+
+    assert "### Living Studio (desktop)" in section
+    assert "## 📦 Download & Run" in section
+    for a in STUDIO_ARTIFACTS:
+        assert a["browser_download_url"] in section
+    assert "Linux (.deb)" in section
+    assert "Linux (AppImage)" in section
+    assert "macOS (dmg)" in section
+    assert "Windows (exe)" in section
+    assert "sudo apt install" in section
+    assert "double-click" in section
+    assert "/S" in section
+
+
+def test_studio_and_cli_coexist_without_duplication():
+    section = build_instructions_section(
+        "v0.12.0", "alehar9320/agentic-odi", CLI_ARTIFACTS + STUDIO_ARTIFACTS, ""
+    )
+
+    assert "### Living Studio (desktop)" in section
+    # Every asset gets exactly one download link.
+    for a in CLI_ARTIFACTS + STUDIO_ARTIFACTS:
+        assert section.count(a["browser_download_url"]) == 1
+
+
+def test_studio_install_command_shell_escapes_spaced_names():
+    name = "Agentic ODI Living Studio_0.12.0_amd64.deb"
+    cmd = _studio_install_command(name)
+
+    assert shlex.quote(name) in cmd
+    assert name in shlex.split(cmd)

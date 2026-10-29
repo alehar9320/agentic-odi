@@ -139,3 +139,27 @@ def test_unknown_route_is_404(tmp_path) -> None:
     response = _app(tmp_path).get("/api/not-a-thing")
 
     assert response.status_code == 404
+
+
+def test_error_bodies_use_the_studio_shape(tmp_path) -> None:
+    client = _app(tmp_path)
+    client.post("/api/connectors", json={"preset": "notion"})
+
+    duplicate = client.post("/api/connectors", json={"preset": "notion"})
+    assert duplicate.status_code == 409
+    body = duplicate.json()
+    assert set(body) == {"error"}
+    assert body["error"]["code"] == "conflict"
+    assert body["error"]["suggestion"]
+
+    missing = client.delete("/api/connectors/missing")
+    assert missing.status_code == 404
+    body = missing.json()
+    assert body["error"]["code"] == "not_found"
+    assert body["error"]["suggestion"]
+
+    bad = client.post("/api/connectors", json={"preset": "nope"})
+    assert bad.status_code == 400
+    body = bad.json()
+    assert body["error"]["code"] == "validation"
+    assert body["error"]["suggestion"]

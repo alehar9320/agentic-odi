@@ -1,0 +1,404 @@
+{% extends "base.html" %}
+{% import "_cards.html" as cards %}
+
+{% block body %}
+
+<!-- ── Hero ─────────────────────────────────────────────────────── -->
+<section id="top" class="hero">
+  <div class="shell">
+    <div class="hero__inner">
+      <p class="eyebrow eyebrow--pill hero__eyebrow">{{ landing.hero.eyebrow }}</p>
+      <h1 class="hero__title">{{ landing.hero.title }}</h1>
+      <p class="hero__sub">{{ landing.hero.sub }}</p>
+      <div class="hero__actions">
+        <a class="btn btn--primary" href="{{ landing.hero.primary.href }}">{{ landing.hero.primary.label }}</a>
+        <a class="btn btn--ghost" href="{{ landing.hero.secondary.href }}">{{ landing.hero.secondary.label }}</a>
+      </div>
+      <a class="hero__cue" href="#problem"><span></span>Keep reading</a>
+    </div>
+  </div>
+</section>
+
+<!-- ── The Living Studio ────────────────────────────────────────── -->
+<section id="studio" class="section" aria-labelledby="studio-title">
+  <div class="shell">
+    <div class="section__head" data-reveal>
+      <p class="eyebrow">The Living Studio</p>
+      <h2 id="studio-title" class="section__title">One room. Ask it like a colleague.</h2>
+      <p class="lead">
+        The transcript and the composer never leave the screen. Describe a job, or what a
+        customer said, and the agent composes the surface that answers it — scored
+        outcomes, opportunity boards, job maps — inline, in the same room.
+      </p>
+    </div>
+
+    <div class="demo" data-demo data-reveal>
+      <div class="demo__notice">
+        <p class="demo__label">{{ demo.label }}</p>
+        <p class="demo__disclaimer">
+          {{ demo.disclaimer }}
+          <a href="{{ demo.live_url }}">Open the live Studio</a>
+        </p>
+      </div>
+
+      <div class="demo__frame glass">
+        <div class="demo__bar">
+          <span class="demo__brand">
+            <img src="{{ prefix }}assets/mark.svg" alt="" width="18" height="18" aria-hidden="true">
+            Agentic&nbsp;ODI
+          </span>
+          <span class="demo__health"><span class="demo__dot" aria-hidden="true"></span>Local sidecar</span>
+        </div>
+
+        {# The static transcript is the no-JavaScript fallback: complete and
+           readable without a script. The script replaces it with the live
+           thread when it takes over. #}
+        <div class="demo__transcript" data-demo-transcript>
+          {% for exchange in demo.exchanges %}
+          <div class="demo__exchange">
+            <div class="demo__msg demo__msg--user">
+              <p class="demo__bubble demo__bubble--user">{{ exchange.prompt }}</p>
+            </div>
+            <div class="demo__msg demo__msg--assistant">
+              <span class="demo__avatar" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/>
+                  <circle cx="12" cy="12" r="3"/>
+                </svg>
+              </span>
+              <div class="demo__msg-body">
+                <p class="demo__reply">{{ exchange.reply }}</p>
+                {{ cards.render_card(exchange.card) }}
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+
+        <div class="demo__live" data-demo-live hidden>
+          <div class="demo__thread" data-demo-thread aria-live="polite"></div>
+
+          <div class="demo__composer">
+            <label class="sr-only" for="demo-input">Describe a job or a customer frustration</label>
+            <textarea id="demo-input" class="demo__input" rows="1" placeholder="Describe a job, or a customer frustration…"></textarea>
+            <button class="demo__send" type="button" data-demo-send aria-label="Send">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M5 12h14M13 6l6 6-6 6"/>
+              </svg>
+            </button>
+          </div>
+
+          <div class="demo__chips" role="group" aria-label="Try one of these">
+            {% for chip in demo.chips %}
+            <button class="demo__chip" type="button" data-demo-chip data-exchange="{{ loop.index0 }}">{{ chip }}</button>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Problem ──────────────────────────────────────────────────── -->
+<section id="problem" class="section" aria-labelledby="problem-title">
+  <div class="shell">
+    <div class="section__head" data-reveal>
+      <p class="eyebrow">{{ landing.problem.eyebrow }}</p>
+      <h2 id="problem-title" class="section__title">{{ landing.problem.title }}</h2>
+    </div>
+
+    <div class="beats">
+      {% for beat in landing.problem.beats %}
+      <article class="beat" data-reveal>
+        <p class="beat__quote">{{ beat.quote }}</p>
+        <p class="beat__support">{{ beat.support }}</p>
+      </article>
+      {% endfor %}
+    </div>
+
+    <p class="closer" data-reveal>{{ landing.problem.closer }}</p>
+  </div>
+</section>
+
+<!-- ── Insight ──────────────────────────────────────────────────── -->
+<section id="insight" class="section" aria-labelledby="insight-title">
+  <div class="shell">
+    <div class="section__head" data-reveal>
+      <p class="eyebrow">{{ landing.insight.eyebrow }}</p>
+      <h2 id="insight-title" class="section__title">{{ landing.insight.title }}</h2>
+    </div>
+
+    <div class="insight">
+      <div class="stack" data-reveal>
+        {% for paragraph in landing.insight.paragraphs %}
+        <p class="lead">{{ paragraph }}</p>
+        {% endfor %}
+
+        <p class="formula">
+          <span class="formula__label">{{ landing.insight.formula_label }}</span>
+          <span class="formula__expr">{{ formula_base }} + <span class="formula__gap">{{ formula_gap }}</span></span>
+        </p>
+
+        <p class="statline">
+          <span class="statline__value">{{ landing.insight.stat }}</span>
+          <span class="statline__source">— {{ landing.insight.stat_source }}</span>
+        </p>
+      </div>
+
+      <figure class="gap" data-reveal>
+        <div class="gap__row">
+          <span>Importance</span>
+          <span class="gap__track"><span class="gap__fill" style="width: 80%"></span></span>
+          <span class="gap__value">8</span>
+        </div>
+        <div class="gap__row">
+          <span>Satisfaction</span>
+          <span class="gap__track"><span class="gap__fill gap__fill--satisfaction" style="width: 30%"></span></span>
+          <span class="gap__value">3</span>
+        </div>
+        <div class="gap__row">
+          <span>Opportunity</span>
+          <span class="gap__track"><span class="gap__fill" style="width: 100%"></span></span>
+          <span class="gap__value">13.0</span>
+        </div>
+        <figcaption class="gap__note">
+          Illustrative scores. The gap between importance and satisfaction is the
+          opportunity: 8 + max(8 &minus; 3, 0) = 13.0.
+        </figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<!-- ── Surfaces ─────────────────────────────────────────────────── -->
+<section id="surfaces" class="section" aria-labelledby="surfaces-title">
+  <div class="shell">
+    <div class="section__head" data-reveal>
+      <p class="eyebrow">{{ landing.surfaces.eyebrow }}</p>
+      <h2 id="surfaces-title" class="section__title section__title--wide">{{ landing.surfaces.title }}</h2>
+      <p class="lead">{{ landing.surfaces.blurb }}</p>
+    </div>
+
+    <div class="grid grid--3">
+      {% for card in landing.surfaces.cards %}
+      <article class="surface-card" data-reveal>
+        <div class="surface-card__head">
+          <h3 class="surface-card__title">{{ card.title }}</h3>
+          <code class="surface-card__type">{{ card.type }}</code>
+        </div>
+        {{ cards.render_card(card) }}
+        <p class="surface-card__blurb">{{ card.blurb }}</p>
+      </article>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<!-- ── How it works ─────────────────────────────────────────────── -->
+<section id="how" class="section" aria-labelledby="how-title">
+  <div class="shell">
+    <div class="section__head" data-reveal>
+      <p class="eyebrow">{{ landing.how.eyebrow }}</p>
+      <h2 id="how-title" class="section__title">{{ landing.how.title }}</h2>
+    </div>
+
+    <div class="steps">
+      {% for step in landing.how.steps %}
+      <article class="step" data-reveal>
+        <h3 class="step__title">{{ step.title }}</h3>
+        <p class="step__body">{{ step.body }}</p>
+      </article>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<!-- ── Connectors ────────────────────────────────────────────────── -->
+<section id="connectors" class="section" aria-labelledby="connectors-title">
+  <div class="shell">
+    <div class="section__head" data-reveal>
+      <p class="eyebrow">Connectors</p>
+      <h2 id="connectors-title" class="section__title section__title--wide">Bring your own tools.</h2>
+      <p class="lead">
+        The studio reads from where your customer evidence already lives. {{ connectors | length }}
+        presets ship today, and the registry takes your own MCP or REST server in the same
+        shape.
+      </p>
+    </div>
+
+    {% for area in connector_areas %}
+    <div class="connector-group" data-reveal>
+      <h3 class="connector-group__title">{{ area.label }}</h3>
+      <div class="connector-list">
+        {% for connector in area.connectors %}
+        <article class="connector" id="connector-{{ connector.id }}">
+          <div class="connector__head">
+            <span class="connector__name">{{ connector.label }}</span>
+            {% if connector.recommended %}
+            <span class="pill pill--accent">Recommended</span>
+            {% else %}
+            <span class="pill">{{ connector.auth }}</span>
+            {% endif %}
+          </div>
+          <p class="connector__summary">{{ connector.summary }}</p>
+          {% if connector.env_vars %}
+          <p class="connector__env">{{ connector.env_vars | join(", ") }}</p>
+          {% endif %}
+        </article>
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+
+<!-- ── Run it ────────────────────────────────────────────────────── -->
+<section id="run" class="section" aria-labelledby="run-title">
+  <div class="shell">
+    <div class="section__head" data-reveal>
+      <p class="eyebrow">{{ landing.run.eyebrow }}</p>
+      <h2 id="run-title" class="section__title">{{ landing.run.title }}</h2>
+      <p class="lead">{{ landing.run.lede }}</p>
+    </div>
+
+    <div class="run" data-reveal>
+      <div class="tabs" data-tabs>
+        <div class="tabs__list" role="tablist" aria-label="How to install">
+          {% for tab in landing.run.tabs %}
+          <button
+            class="tabs__tab"
+            type="button"
+            role="tab"
+            id="tab-{{ tab.id }}"
+            aria-controls="panel-{{ tab.id }}"
+            aria-selected="{{ 'true' if loop.first else 'false' }}"
+            tabindex="{{ '0' if loop.first else '-1' }}"
+          >{{ tab.label }}</button>
+          {% endfor %}
+        </div>
+
+        {% for tab in landing.run.tabs %}
+        <div
+          class="tabs__panel"
+          role="tabpanel"
+          id="panel-{{ tab.id }}"
+          aria-labelledby="tab-{{ tab.id }}"
+          {% if not loop.first %}hidden{% endif %}
+        >
+          <div class="codeblock">
+            <button class="copy-btn" type="button" data-copy>Copy</button>
+            <code>{{ tab.code }}</code>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+
+      <div class="run__grid">
+        <div>
+          <h3 class="run__label">Point an MCP client at it</h3>
+          <div class="codeblock">
+            <button class="copy-btn" type="button" data-copy>Copy</button>
+            <code>{{ landing.run.mcp_config }}</code>
+          </div>
+        </div>
+
+        <div>
+          <h3 class="run__label">Where it runs</h3>
+          <div class="endpoints">
+            {% for endpoint in landing.run.endpoints %}
+            <div class="endpoint">
+              <span class="endpoint__name">{{ endpoint.name }}</span>
+              <span class="endpoint__url">
+                <code>{{ endpoint.url }}</code>
+                <button class="copy-btn copy-btn--inline" type="button" data-copy>Copy</button>
+              </span>
+              <span class="endpoint__note">{{ endpoint.note }}</span>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+
+      <p class="run__note">
+        Hosted credentials come from the maintainers &mdash;
+        <a href="https://github.com/alehar9320/agentic-odi/issues">open an issue</a>.
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- ── The MCP surface ──────────────────────────────────────────── -->
+<section id="tools" class="section" aria-labelledby="tools-title">
+  <div class="shell">
+    <div class="section__head" data-reveal>
+      <p class="eyebrow">{{ landing.tools.eyebrow }}</p>
+      <h2 id="tools-title" class="section__title">{{ landing.tools.title }}</h2>
+      <p class="lead">{{ landing.tools.blurb }}</p>
+    </div>
+
+    <div class="grid grid--3">
+      {% for name in landing.tools.peek %}
+      <article class="tool" data-reveal>
+        <span class="tool__name">{{ name }}</span>
+        <p class="tool__purpose">{{ tool_by_name[name].purpose }}</p>
+        <code class="tool__sig">{{ tool_signatures[name] }}</code>
+      </article>
+      {% endfor %}
+    </div>
+
+    <p class="section__more" data-reveal>
+      <a class="btn btn--ghost" href="{{ pages_url }}docs/mcp/">See all {{ tools | length }} tools</a>
+    </p>
+  </div>
+</section>
+
+<!-- ── Status ───────────────────────────────────────────────────── -->
+<section id="status" class="section" aria-labelledby="status-title">
+  <div class="shell">
+    <div class="section__head" data-reveal>
+      <p class="eyebrow">{{ landing.status.eyebrow }}</p>
+      <h2 id="status-title" class="section__title">
+        {{ landing.status.title }}
+        <span class="pill pill--warning">{{ landing.status.title }}</span>
+      </h2>
+    </div>
+
+    <div class="status-grid">
+      <div class="card" data-reveal>
+        <h3 class="card__title">{{ landing.status.works_title }}</h3>
+        <ul class="status-list">
+          {% for item in works_today %}
+          <li>{{ item }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+
+      <div class="card" data-reveal>
+        <h3 class="card__title">{{ landing.status.next_title }}</h3>
+        {% if roadmap_pending %}
+        <ul class="status-list">
+          {% for item in roadmap_pending %}
+          <li>{{ item }}</li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <p class="card__body">
+          Nothing is queued. The roadmap is a list of what has already shipped, and it is
+          empty of promises &mdash; which is the point.
+        </p>
+        {% endif %}
+      </div>
+    </div>
+
+    <p class="status-note" data-reveal>{{ landing.status.note }}</p>
+    <p class="status-note status-note--muted" data-reveal>
+      {{ landing.status.questions }}
+      <a href="https://github.com/alehar9320/agentic-odi/issues">Open an issue</a>.
+    </p>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script defer src="{{ prefix }}assets/demo.js"></script>
+{% endblock %}

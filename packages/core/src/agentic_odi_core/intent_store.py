@@ -27,7 +27,12 @@ class IntentStore:
 
     def __init__(self, db_path: str = "intent_store.db", check_same_thread: bool = True) -> None:
         self.conn = sqlite3.connect(db_path, check_same_thread=check_same_thread)
+        # WAL lets readers and one writer work at once; the busy timeout makes
+        # a second writer wait for the lock (the CLI, the sidecar, and a test
+        # can all hold a connection to the same file) instead of raising
+        # "database is locked" the moment the lock is taken.
         self.conn.execute("PRAGMA journal_mode=WAL;")
+        self.conn.execute("PRAGMA busy_timeout=5000;")
         self._init_db()
 
     def _init_db(self) -> None:

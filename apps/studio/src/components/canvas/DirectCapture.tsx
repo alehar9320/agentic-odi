@@ -1,7 +1,13 @@
 import { useMemo, useState } from "react";
 
+import { asStudioError } from "../../api/studioApi";
 import { isUnderserved, opportunityScore } from "../../lib/odi";
 import { useStudio } from "../../state/StudioContext";
+import type { StudioError } from "../../types";
+import { FailurePanel } from "../FailurePanel";
+
+/** Which field the failure belongs to, so the message lands next to it. */
+type FailureField = "statement" | "range" | "form";
 
 export function DirectCapture() {
   const { canvas, addOutcome, createJob } = useStudio();
@@ -15,6 +21,7 @@ export function DirectCapture() {
   const [importance, setImportance] = useState(8.5);
   const [satisfaction, setSatisfaction] = useState(3.5);
   const [busy, setBusy] = useState(false);
+  const [failure, setFailure] = useState<{ error: StudioError; field: FailureField } | null>(null);
 
   const activeJobId = jobId ?? jobs[0]?.id ?? "";
 
@@ -29,6 +36,7 @@ export function DirectCapture() {
       return;
     }
     setCreatingJob(true);
+    setFailure(null);
     try {
       const id = await createJob({
         name: jobName.trim(),
@@ -39,6 +47,8 @@ export function DirectCapture() {
       }
       setJobName("");
       setJobDescription("");
+    } catch (error) {
+      setFailure({ error: asStudioError(error), field: "form" });
     } finally {
       setCreatingJob(false);
     }
@@ -50,6 +60,7 @@ export function DirectCapture() {
       return;
     }
     setBusy(true);
+    setFailure(null);
     try {
       await addOutcome({
         job_id: activeJobId,
@@ -58,6 +69,13 @@ export function DirectCapture() {
         satisfaction,
       });
       setStatement("");
+    } catch (error) {
+      const problem = asStudioError(error);
+      // A rejected score belongs to the score fields; anything else belongs to
+      // the statement the user wrote.
+      const field: FailureField =
+        problem.code === "out_of_range" || problem.code === "validation" ? "range" : "statement";
+      setFailure({ error: problem, field });
     } finally {
       setBusy(false);
     }
@@ -103,6 +121,9 @@ export function DirectCapture() {
           <p className="field__hint">
             Direction + unit of measure + object of control + contextual clarifier.
           </p>
+          {failure?.field === "statement" ? (
+            <FailurePanel error={failure.error} />
+          ) : null}
         </div>
 
         <div className="field">
@@ -129,6 +150,7 @@ export function DirectCapture() {
             value={satisfaction}
             onChange={(event) => setSatisfaction(Number(event.target.value))}
           />
+          {failure?.field === "range" ? <FailurePanel error={failure.error} /> : null}
         </div>
 
         <p className="score-preview">
@@ -177,6 +199,7 @@ export function DirectCapture() {
           >
             {creatingJob ? "Adding…" : "Add job"}
           </button>
+          {failure?.field === "form" ? <FailurePanel error={failure.error} /> : null}
         </form>
       </details>
     </div>

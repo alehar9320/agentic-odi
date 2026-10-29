@@ -15,6 +15,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shlex
 import subprocess
 import sys
 import tempfile
@@ -66,15 +67,84 @@ def _hash_for(checksums_text: str, name: str) -> str | None:
     return None
 
 
+_STUDIO_INSTALLERS = {
+    ".deb": "sudo apt install {file}  # or: sudo dpkg -i {file}",
+    ".AppImage": "chmod +x {file} && ./{file}",
+    ".dmg": "open {file}  # then drag to Applications",
+    ".exe": "{file}  # double-click to run (or append /S for silent install)",
+}
+_STUDIO_PLATFORM = {
+    ".deb": "Linux (.deb)",
+    ".AppImage": "Linux (AppImage)",
+    ".dmg": "macOS (dmg)",
+    ".exe": "Windows (exe)",
+}
+
+
+def _is_cli_archive(name: str) -> bool:
+    """A CLI PyInstaller bundle: ``odi_<version>_<platform>.(tar.gz|zip)``."""
+    return name.startswith("odi_") and name.endswith((".tar.gz", ".zip"))
+
+
+def _is_studio_bundle(name: str) -> bool:
+    """A Living Studio desktop bundle produced by the Tauri release."""
+    return any(name.endswith(ext) for ext in _STUDIO_INSTALLERS) or "Living Studio" in name
+
+
+def _studio_platform(name: str) -> str:
+    for ext, plat in _STUDIO_PLATFORM.items():
+        if name.endswith(ext):
+            return plat
+    return "Desktop bundle"
+
+
+def _studio_install_command(name: str) -> str:
+    template = next(
+        (t for ext, t in _STUDIO_INSTALLERS.items() if name.endswith(ext)),
+        "Open to install.",
+    )
+    return template.format(file=shlex.quote(name)) if "{file}" in template else template
+
+
+def _build_studio_section(tag: str, repo: str, studio_artifacts: list[dict]) -> list[str]:
+    dl_base = f"{GITHUB_RELEASES}/{repo}/releases/download/{tag}"
+    lines: list[str] = []
+    lines.append("### Living Studio (desktop)")
+    lines.append("")
+    lines.append(
+        "The **Living Studio** desktop app is attached for Linux, macOS, and "
+        "Windows. Download the bundle for your platform and install it:"
+    )
+    lines.append("")
+    lines.append("| Platform | Bundle | Install |")
+    lines.append("| --- | --- | --- |")
+    for a in sorted(studio_artifacts, key=lambda x: x["name"]):
+        name = a["name"]
+        url = a["browser_download_url"]
+        command = _studio_install_command(name)
+        lines.append(f"| {_studio_platform(name)} | [{name}]({url}) | `{command}` |")
+    lines.append("")
+    lines.append(
+        "> The desktop app self-updates in place via the Tauri updater configured in "
+        "`tauri.conf.json`. macOS may quarantine the app bundle "
+        "(`xattr -d -r com.apple.quarantine '/Applications/Agentic ODI Living Studio.app'` "
+        "if needed); Windows SmartScreen may warn for unsigned builds — choose "
+        '"More info → Run anyway" if you trust the release.'
+    )
+    lines.append("")
+    lines.append(f"<!-- studio updater stream: {dl_base} -->")
+    lines.append("")
+    return lines
+
+
 def build_instructions_section(
     tag: str, repo: str, artifacts: list[dict], checksums_text: str
 ) -> str:
     version = tag.lstrip("v")
     dl_base = f"{GITHUB_RELEASES}/{repo}/releases/download/{tag}"
 
-    release_artifacts = [
-        a for a in artifacts if a["name"] not in ("checksums.txt", "install.sh", "install.ps1")
-    ]
+    cli_artifacts = [a for a in artifacts if _is_cli_archive(a["name"])]
+    studio_artifacts = [a for a in artifacts if _is_studio_bundle(a["name"])]
 
     lines: list[str] = []
     lines.append("## 📦 Download & Run")
@@ -86,10 +156,10 @@ def build_instructions_section(
     )
     lines.append("")
 
-    if release_artifacts:
+    if cli_artifacts:
         lines.append("| Platform | Archive | Download | SHA-256 |")
         lines.append("| --- | --- | --- | --- |")
-        for a in sorted(release_artifacts, key=lambda x: x["name"]):
+        for a in sorted(cli_artifacts, key=lambda x: x["name"]):
             name = a["name"]
             target = _archive_target(name)
             url = a["browser_download_url"]
@@ -101,8 +171,7 @@ def build_instructions_section(
     lines.append("Download ``checksums.txt`` from this release and verify the archive you picked:")
     lines.append("")
     lines.append("```bash")
-    lines.append("curl -fsSL -O checksums.txt")
-    lines.append(f"{dl_base}/checksums.txt")
+    lines.append(f"curl -fsSL -O {dl_base}/checksums.txt")
     lines.append("sha256sum -c checksums.txt   # or: shasum -a 256 -c checksums.txt")
     lines.append("```")
     lines.append("")
@@ -137,6 +206,9 @@ def build_instructions_section(
     lines.append("odi jobs list")
     lines.append("```")
     lines.append("")
+
+    if studio_artifacts:
+        lines.extend(_build_studio_section(tag, repo, studio_artifacts))
 
     lines.append("### Related artifacts")
     for kind in ("checksums.txt", "install.sh", "install.ps1"):

@@ -25,3 +25,11 @@ runs:
       shell: bash
       env:
         UV_PYTHON: ${{ inputs.python-version }}
+
+    # Tag every job with the build it belongs to, so a failure can be traced
+    # back to the tag or commit that produced it.
+    - name: Export the release identity
+      run: uv run python scripts/ci_release.py >> "$GITHUB_ENV"
+      shell: bash
+      env:
+        UV_PYTHON: ${{ inputs.python-version }}

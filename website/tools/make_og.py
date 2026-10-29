@@ -21,17 +21,22 @@ OG_SIZE = (1200, 630)
 FAVICON_SIZE = (32, 32)
 
 DEFAULT_HEADLINE = "Your roadmap is a guess."
-DEFAULT_SUBHEAD = "Verified customer outcomes, jobs, and opportunity scores — served over MCP."
+# Pillow's built-in font has no em dash, so the card stays ASCII.
+DEFAULT_SUBHEAD = "Verified customer outcomes, jobs, and opportunity scores. Served over MCP."
 DEFAULT_URL = "alehar9320.github.io/agentic-odi"
 
-CANVAS = (11, 13, 19)  # #0b0d13
-SURFACE = (19, 23, 34)  # #131722
-TEXT = (241, 245, 249)  # #f1f5f9
-MUTED = (148, 163, 184)  # #94a3b8
-ACCENT = (64, 156, 255)  # #409cff
-BADGE_FG = (203, 213, 225)  # #cbd5e1
-BADGE_BG = (30, 41, 59)  # #1e293b
-HAIRLINE = (51, 65, 85)  # #334155
+# The site's palette, taken from the Living Studio's own theme so the social
+# card and the site are the same colour.
+CANVAS = (10, 11, 14)  # --bg
+SURFACE = (14, 16, 20)  # --bg-raised
+TEXT = (241, 242, 244)  # --text
+MUTED = (162, 167, 179)  # --muted
+FAINT = (113, 118, 127)  # --faint
+ACCENT = (139, 140, 248)  # --accent
+ACCENT_STRONG = (99, 102, 241)  # --accent-strong
+BADGE_FG = (162, 167, 179)  # --muted
+BADGE_BG = (24, 24, 32)  # a raised chip on the canvas
+HAIRLINE = (38, 42, 52)  # a visible hairline on the canvas
 
 MARGIN = 64
 PILL_LABEL = "Experimental"
@@ -99,6 +104,44 @@ def _draw_pill(draw: ImageDraw.ImageDraw, label: str, right: int, cy: int) -> No
     draw.text(((x0 + x1) / 2, cy), label, font=font, fill=BADGE_FG, anchor="mm")
 
 
+def _wash(
+    size: tuple[int, int],
+    color: tuple[int, int, int],
+    center: tuple[float, float],
+    radius: float,
+    strength: int,
+) -> tuple[Image.Image, Image.Image, tuple[int, int]]:
+    """A soft radial wash, drawn small and scaled up.
+
+    The site's canvas carries two of these. Reproducing them keeps the social
+    card looking like the page it links to.
+    """
+    small = 180
+    mask = Image.new("L", (small, small), 0)
+    painter = ImageDraw.Draw(mask)
+    steps = 48
+    for step in range(steps, 0, -1):
+        fraction = step / steps
+        extent = small * radius * fraction
+        value = int(strength * (1 - fraction))
+        painter.ellipse(
+            (
+                small / 2 - extent,
+                small / 2 - extent,
+                small / 2 + extent,
+                small / 2 + extent,
+            ),
+            fill=value,
+        )
+    mask = mask.resize(size, Image.Resampling.LANCZOS)
+    layer = Image.new("RGB", size, color)
+    offset = (
+        int(center[0] * size[0] - small * radius / 2),
+        int(center[1] * size[1] - small * radius / 2),
+    )
+    return layer, mask, offset
+
+
 def _to_png(image: Image.Image) -> bytes:
     buffer = io.BytesIO()
     image.save(buffer, format="PNG", compress_level=9, optimize=True)
@@ -113,6 +156,15 @@ def render(
     """Render the 1200x630 social card and return its PNG bytes."""
     width, height = OG_SIZE
     image = Image.new("RGB", OG_SIZE, CANVAS)
+
+    # The site's two canvas washes, in the same places.
+    for color, center, radius, strength in (
+        (ACCENT_STRONG, (0.50, 1.08), 0.62, 26),
+        (ACCENT_STRONG, (0.68, -0.12), 0.72, 22),
+    ):
+        layer, mask, offset = _wash(OG_SIZE, color, center, radius, strength)
+        image.paste(layer, offset, mask)
+
     draw = ImageDraw.Draw(image)
 
     draw.rounded_rectangle((24, 24, width - 25, height - 25), radius=28, outline=HAIRLINE, width=1)

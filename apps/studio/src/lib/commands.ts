@@ -23,6 +23,8 @@ export interface StudioCommand {
   name: string;
   label: string;
   description: string;
+  /** The palette groups commands under this heading. */
+  category: string;
   keywords?: string[];
 }
 
@@ -41,6 +43,7 @@ export const STUDIO_COMMANDS: StudioCommand[] = [
     name: "/help",
     label: "Help",
     description: "Every command, and what the studio can do by hand.",
+    category: "Start",
     keywords: ["commands", "?"],
   },
   {
@@ -48,6 +51,7 @@ export const STUDIO_COMMANDS: StudioCommand[] = [
     name: "/start",
     label: "Set your context",
     description: "Product, audience, job, and the problem you are chasing.",
+    category: "Start",
     keywords: ["onboarding", "context", "brief", "setup"],
   },
   {
@@ -55,6 +59,7 @@ export const STUDIO_COMMANDS: StudioCommand[] = [
     name: "/new",
     label: "New conversation",
     description: "Clear the transcript and start again.",
+    category: "Start",
     keywords: ["clear", "reset"],
   },
   {
@@ -62,6 +67,7 @@ export const STUDIO_COMMANDS: StudioCommand[] = [
     name: "/home",
     label: "Go home",
     description: "Return to the empty stage.",
+    category: "Start",
     keywords: ["welcome"],
   },
   {
@@ -69,6 +75,7 @@ export const STUDIO_COMMANDS: StudioCommand[] = [
     name: "/jobs",
     label: "Jobs",
     description: "What the studio knows about, then open the job map.",
+    category: "Explore",
     keywords: ["summary", "list"],
   },
   {
@@ -76,6 +83,7 @@ export const STUDIO_COMMANDS: StudioCommand[] = [
     name: "/landscape",
     label: "Opportunity landscape",
     description: "Every outcome scored; anything above 10 is underserved.",
+    category: "Explore",
     keywords: ["outcomes", "scores", "opportunity"],
   },
   {
@@ -83,6 +91,7 @@ export const STUDIO_COMMANDS: StudioCommand[] = [
     name: "/jobmap",
     label: "Job map",
     description: "The eight phases, and the steps already captured.",
+    category: "Explore",
     keywords: ["steps", "phases"],
   },
   {
@@ -90,6 +99,7 @@ export const STUDIO_COMMANDS: StudioCommand[] = [
     name: "/impact",
     label: "Simulate a bet",
     description: "Ask the studio to simulate what a bet would change.",
+    category: "Act",
     keywords: ["simulate", "bet"],
   },
   {
@@ -97,6 +107,7 @@ export const STUDIO_COMMANDS: StudioCommand[] = [
     name: "/evidence",
     label: "Evidence",
     description: "The customer signals behind each outcome.",
+    category: "Explore",
     keywords: ["signals", "quotes"],
   },
   {
@@ -104,6 +115,7 @@ export const STUDIO_COMMANDS: StudioCommand[] = [
     name: "/capture",
     label: "Capture an outcome",
     description: "Tell the studio what you heard. Falls back to the offline form.",
+    category: "Act",
     keywords: ["add", "outcome", "manual"],
   },
   {
@@ -111,6 +123,7 @@ export const STUDIO_COMMANDS: StudioCommand[] = [
     name: "/settings",
     label: "Settings",
     description: "Point the studio at a model and an MCP server.",
+    category: "Studio",
     keywords: ["model", "mcp", "connection"],
   },
   {
@@ -118,6 +131,7 @@ export const STUDIO_COMMANDS: StudioCommand[] = [
     name: "/status",
     label: "Status",
     description: "Model, MCP, context, and canvas at a glance.",
+    category: "Studio",
     keywords: ["connection", "health"],
   },
 ];

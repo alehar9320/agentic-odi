@@ -47,7 +47,7 @@ def test_version_subcommand_prints_build_summary(monkeypatch):
     result = runner.invoke(app, ["version"])
 
     assert result.exit_code == 0
-    assert "0.1.0 (2026-10-15)" in _strip_ansi(result.output)
+    assert f"{version.VERSION} (2026-10-15)" in _strip_ansi(result.output)
 
 
 def test_version_verbose_shows_build_details():
@@ -69,7 +69,7 @@ def test_version_verbose_includes_release_date_when_set(monkeypatch):
     result = runner.invoke(app, ["--version", "--verbose"])
 
     assert result.exit_code == 0
-    assert "0.1.0 (2026-10-15)" in _strip_ansi(result.output)
+    assert f"{version.VERSION} (2026-10-15)" in _strip_ansi(result.output)
 
 
 def test_help_lists_global_backend_options():

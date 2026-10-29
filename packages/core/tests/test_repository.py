@@ -38,8 +38,26 @@ def _customer_outcome(outcome_id: str, job_id: str = "job-1") -> CustomerOutcome
 
 def test_get_outcomes_filters_by_step() -> None:
     repo = InMemoryRepository()
-    repo.add_outcome(Outcome(id="o-1", job_id="job-1", step_id="step-1", statement="one"))
-    repo.add_outcome(Outcome(id="o-2", job_id="job-1", step_id="step-2", statement="two"))
+    repo.add_outcome(
+        Outcome(
+            id="o-1",
+            job_id="job-1",
+            step_id="step-1",
+            statement="one",
+            importance=5.0,
+            satisfaction=5.0,
+        )
+    )
+    repo.add_outcome(
+        Outcome(
+            id="o-2",
+            job_id="job-1",
+            step_id="step-2",
+            statement="two",
+            importance=5.0,
+            satisfaction=5.0,
+        )
+    )
 
     assert [o.id for o in repo.get_outcomes("job-1", step_id="step-1")] == ["o-1"]
     assert [o.id for o in repo.get_outcomes("job-1")] == ["o-1", "o-2"]
@@ -74,7 +92,11 @@ def test_clear_removes_all_entities() -> None:
     repo = InMemoryRepository()
     job = repo.add_job(Job(id="job-1", name="Onboard customers"))
     repo.add_step(Step(id="step-1", job_id=job.id, name="Prepare", order=1))
-    repo.add_outcome(Outcome(id="o-1", job_id=job.id, statement="Minimize time"))
+    repo.add_outcome(
+        Outcome(
+            id="o-1", job_id=job.id, statement="Minimize time", importance=5.0, satisfaction=5.0
+        )
+    )
     repo.add_customer_outcome(_customer_outcome("co-1", job.id))
 
     repo.clear()
@@ -89,7 +111,11 @@ def _repo_with_graph() -> InMemoryRepository:
     repo = InMemoryRepository()
     repo.add_job(Job(id="j1", name="Job"))
     repo.add_step(Step(id="s1", job_id="j1", name="Step", order=1))
-    repo.add_outcome(Outcome(id="o1", job_id="j1", step_id="s1", statement="Min x"))
+    repo.add_outcome(
+        Outcome(
+            id="o1", job_id="j1", step_id="s1", statement="Min x", importance=5.0, satisfaction=5.0
+        )
+    )
     return repo
 
 
@@ -138,7 +164,9 @@ def test_delete_job_cascades_dependents():
 
 def test_delete_step_cascades_its_outcomes():
     repo = _repo_with_graph()
-    repo.add_outcome(Outcome(id="o2", job_id="j1", statement="Unbound"))
+    repo.add_outcome(
+        Outcome(id="o2", job_id="j1", statement="Unbound", importance=5.0, satisfaction=5.0)
+    )
     assert repo.delete_step("s1") is True
     assert repo.get_step("s1") is None
     assert repo.get_outcome("o1") is None
@@ -225,3 +253,21 @@ def test_delete_outcome_cascades_evidence():
     repo.add_evidence(_evidence("e1", job_id="j1", outcome_id="o1"))
     assert repo.delete_outcome("o1") is True
     assert repo.get_evidence("e1") is None
+
+
+def test_reload_empties_in_memory_state() -> None:
+    repo = InMemoryRepository()
+    repo.add_job(Job(id="job-1", name="Job", description=""))
+    repo.add_customer_outcome(_customer_outcome("co-1"))
+
+    repo.reload()
+
+    assert repo.list_jobs() == []
+    assert repo.list_customer_outcomes() == []
+
+
+def test_reload_is_safe_on_an_empty_repository() -> None:
+    repo = InMemoryRepository()
+    repo.reload()
+    repo.reload()
+    assert repo.list_jobs() == []
