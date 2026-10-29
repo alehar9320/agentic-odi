@@ -263,6 +263,7 @@ class LocalBackend(Backend):
                 importance_n=args.get("importance_n"),
                 satisfaction_n=args.get("satisfaction_n"),
                 score_method=args.get("score_method", "estimate"),
+                note=args.get("note"),
             )
         except JobNotFoundError:
             raise BackendError(job_not_found(args["job_id"])) from None
@@ -301,6 +302,15 @@ class LocalBackend(Backend):
             raise BackendError(outcome_not_found(outcome_id))
         return outcome.model_dump()
 
+    def _get_outcome_history(self, args: dict[str, Any]) -> list[dict[str, Any]]:
+        from agentic_odi_core import OutcomeNotFoundError, outcome_not_found
+
+        try:
+            snapshots = self.service.get_score_history(args["outcome_id"])
+        except OutcomeNotFoundError:
+            raise BackendError(outcome_not_found(args["outcome_id"])) from None
+        return [snapshot.model_dump() for snapshot in snapshots]
+
     def _update_outcome(self, args: dict[str, Any]) -> dict[str, Any]:
         from agentic_odi_core import OutcomeNotFoundError, ValueOutOfRangeError, outcome_not_found
         from pydantic import ValidationError
@@ -319,7 +329,9 @@ class LocalBackend(Backend):
             if key in args
         }
         try:
-            outcome = self.service.update_outcome(args["outcome_id"], updates)
+            outcome = self.service.update_outcome(
+                args["outcome_id"], updates, note=args.get("note")
+            )
         except OutcomeNotFoundError:
             raise BackendError(outcome_not_found(args["outcome_id"])) from None
         except ValueOutOfRangeError as exc:
@@ -689,6 +701,7 @@ _LOCAL_HANDLERS = {
     "add_outcome": LocalBackend._add_outcome,
     "get_outcomes": LocalBackend._get_outcomes,
     "get_outcome": LocalBackend._get_outcome,
+    "get_outcome_history": LocalBackend._get_outcome_history,
     "update_outcome": LocalBackend._update_outcome,
     "delete_outcome": LocalBackend._delete_outcome,
     "add_customer_outcome": LocalBackend._add_customer_outcome,
@@ -778,6 +791,7 @@ _LIST_TOOLS = frozenset(
         "get_jobs",
         "get_job_map",
         "get_outcomes",
+        "get_outcome_history",
         "list_customer_outcomes",
         "list_evidence",
         "list_signals",

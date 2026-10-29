@@ -26,6 +26,7 @@ from agentic_odi_core import (
     ScheduledWorkNotFoundError,
     ScoreMethod,
     SignalNotFoundError,
+    SnapshotNoteError,
     StepNotFoundError,
     ToolName,
     ValueOutOfRangeError,
@@ -169,6 +170,7 @@ def add_outcome(
     importance_n: int | None = None,
     satisfaction_n: int | None = None,
     score_method: ScoreMethod = "estimate",
+    note: str | None = None,
 ) -> str:
     """Add a desired Outcome to a Job.
 
@@ -177,6 +179,8 @@ def add_outcome(
     ``score_method`` is ``estimate`` (one person's judgment), ``survey`` or
     ``import``. A count above one with ``estimate`` is refused, because an
     estimate cannot have asked people.
+    ``note`` (max 500 characters) records why the number was given; it is kept
+    with the score snapshot.
     """
     try:
         outcome = service.add_outcome(
@@ -188,11 +192,14 @@ def add_outcome(
             importance_n=importance_n,
             satisfaction_n=satisfaction_n,
             score_method=score_method,
+            note=note,
         )
     except JobNotFoundError:
         return f"Error: Job with ID {job_id} not found."
     except StepNotFoundError:
         return _step_not_found(step_id)
+    except SnapshotNoteError as exc:
+        return f"Error: {exc}"
     except ValueOutOfRangeError:
         return "Error: importance and satisfaction must be between 1.0 and 10.0"
     except OutcomeStatementError as exc:
@@ -436,11 +443,14 @@ def update_outcome(
     importance_n: int | None = None,
     satisfaction_n: int | None = None,
     score_method: ScoreMethod | None = None,
+    note: str | None = None,
 ) -> str:
     """Update an Outcome's statement, scores, or sample metadata.
 
     The resulting whole record is validated, so switching a survey to
-    ``estimate`` while a count above one remains is refused.
+    ``estimate`` while a count above one remains is refused. ``note`` (max 500
+    characters) records why the number was given; it is kept with the score
+    snapshot.
     """
     updates: dict = {}
     if statement is not None:
@@ -458,16 +468,33 @@ def update_outcome(
     if score_method is not None:
         updates["score_method"] = score_method
     try:
-        updated = service.update_outcome(outcome_id, updates)
+        updated = service.update_outcome(outcome_id, updates, note=note)
     except OutcomeNotFoundError:
         return _outcome_not_found(outcome_id)
     except OutcomeStatementError as exc:
+        return f"Error: {exc}"
+    except SnapshotNoteError as exc:
         return f"Error: {exc}"
     except ValueOutOfRangeError:
         return "Error: importance and satisfaction must be between 1.0 and 10.0"
     except ValidationError:
         return "Error: score_method 'estimate' cannot carry a sample count above 1"
     return f"Outcome updated successfully: {updated.model_dump_json()}"
+
+
+@mcp.tool
+def get_outcome_history(outcome_id: str) -> str:
+    """List the accepted score snapshots for an Outcome, oldest first.
+
+    A snapshot records the score and its sample/method companions, so "did it
+    move?" is a subtraction. Reads of history/deltas beyond the raw snapshots
+    are gated on the approved delta-semantics decision and are not exposed here.
+    """
+    try:
+        snapshots = service.get_score_history(outcome_id)
+    except OutcomeNotFoundError:
+        return _outcome_not_found(outcome_id)
+    return json.dumps([snapshot.model_dump() for snapshot in snapshots])
 
 
 @mcp.tool

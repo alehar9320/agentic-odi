@@ -195,3 +195,52 @@ def test_main_passes_an_explicit_port_through(monkeypatch) -> None:
     server.main(["--port", "8010"])
 
     assert calls == [{"transport": "http", "port": 8010}]
+
+
+async def _add_outcome(client: Client, **overrides: object) -> str:
+    await client.call_tool("add_job", {"name": "Onboard"})
+    jobs = json.loads(_text(await client.call_tool("get_jobs", {})))
+    arguments: dict[str, object] = {
+        "job_id": jobs[0]["id"],
+        "statement": "Minimize the time it takes to onboard a new engineer when they join",
+        "importance": 8.0,
+        "satisfaction": 6.0,
+    }
+    arguments.update(overrides)
+    result = await client.call_tool("add_outcome", arguments)
+    return _extract_id(_text(result))
+
+
+@pytest.mark.asyncio
+async def test_get_outcome_history_lists_a_snapshot_per_change() -> None:
+    async with Client(mcp) as client:
+        outcome_id = await _add_outcome(client, note="first pass")
+        await client.call_tool(
+            "update_outcome", {"outcome_id": outcome_id, "satisfaction": 4.0, "note": "after"}
+        )
+
+        result = await client.call_tool("get_outcome_history", {"outcome_id": outcome_id})
+
+    history = json.loads(_text(result))
+    assert [snapshot["satisfaction"] for snapshot in history] == [6.0, 4.0]
+    assert [snapshot["note"] for snapshot in history] == ["first pass", "after"]
+    assert all(snapshot["outcome_id"] == outcome_id for snapshot in history)
+
+
+@pytest.mark.asyncio
+async def test_get_outcome_history_reports_missing_ids() -> None:
+    async with Client(mcp) as client:
+        result = await client.call_tool("get_outcome_history", {"outcome_id": "missing"})
+
+    assert _text(result) == "Error: Outcome with ID missing not found."
+
+
+@pytest.mark.asyncio
+async def test_update_outcome_reports_an_over_long_note() -> None:
+    async with Client(mcp) as client:
+        outcome_id = await _add_outcome(client)
+        result = await client.call_tool(
+            "update_outcome", {"outcome_id": outcome_id, "note": "x" * 501}
+        )
+
+    assert _text(result) == "Error: note must be 500 characters or fewer"

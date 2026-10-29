@@ -187,7 +187,8 @@ def _sample_label(outcome: dict[str, Any]) -> str:
     """
     importance_n = outcome.get("importance_n")
     satisfaction_n = outcome.get("satisfaction_n")
-    method = outcome.get("score_method") or "estimate"
+    # Outcomes store the method as ``score_method``; snapshots as ``method``.
+    method = outcome.get("score_method") or outcome.get("method") or "estimate"
     if method == "estimate" or (importance_n is None and satisfaction_n is None):
         return "est."
     if importance_n == satisfaction_n:
@@ -424,4 +425,33 @@ def render_scheduled_work_list(items: Any, *, as_json: bool) -> str:
             for item in items
         ],
         empty="No scheduled work found.",
+    )
+
+
+def render_score_history(snapshots: Any, *, as_json: bool) -> str:
+    """Render an outcome's accepted score snapshots, oldest first.
+
+    Each row carries the score *and* its sample/method companions, because a
+    history of bare numbers cannot say whether the evidence changed or the
+    estimate did. Deltas are not computed here: the baseline/sign policy is a
+    pending decision, so this shows the recorded states only.
+    """
+    if not isinstance(snapshots, list):
+        return _json(snapshots) if as_json else str(snapshots)
+    if as_json:
+        return _json(snapshots)
+    return _table(
+        headers=("at", "importance", "satisfaction", "opportunity", "sample", "note"),
+        rows=[
+            (
+                str(snapshot.get("at", "")),
+                _num(snapshot.get("importance", "")),
+                _num(snapshot.get("satisfaction", "")),
+                _num(snapshot.get("opportunity_score", "")),
+                _sample_label(snapshot),
+                snapshot.get("note") or "",
+            )
+            for snapshot in snapshots
+        ],
+        empty="No score history recorded yet.",
     )

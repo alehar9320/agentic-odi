@@ -271,3 +271,54 @@ def test_show_renders_both_counts_when_they_differ(tmp_path) -> None:
 
     assert shown.exit_code == 0, shown.output
     assert "n=40/12 (survey)" in shown.output
+
+
+def test_history_shows_one_row_per_accepted_change(tmp_path) -> None:
+    runner = CliRunner()
+    db = str(tmp_path / "odi.db")
+    job_id = _job_id(runner, db)
+    added = _add(runner, db, job_id, "--note", "first pass")
+
+    runner.invoke(
+        app,
+        [
+            "--db",
+            db,
+            "desired-outcomes",
+            "update",
+            added["id"],
+            "--satisfaction",
+            "6",
+            "--note",
+            "after the review",
+        ],
+    )
+
+    history = runner.invoke(app, ["--db", db, "desired-outcomes", "history", added["id"], "--json"])
+
+    assert history.exit_code == 0, history.output
+    rows = json.loads(history.output)
+    assert [row["satisfaction"] for row in rows] == [4.0, 6.0]
+    assert [row["note"] for row in rows] == ["first pass", "after the review"]
+
+
+def test_history_shows_the_creation_snapshot_with_an_estimated_sample(tmp_path) -> None:
+    runner = CliRunner()
+    db = str(tmp_path / "odi.db")
+    job_id = _job_id(runner, db)
+    added = _add(runner, db, job_id)
+
+    history = runner.invoke(app, ["--db", db, "desired-outcomes", "history", added["id"]])
+
+    assert history.exit_code == 0, history.output
+    assert "4.0" in history.output
+    assert "est." in history.output
+
+
+def test_history_reports_an_unknown_outcome(tmp_path) -> None:
+    runner = CliRunner()
+    db = str(tmp_path / "odi.db")
+
+    history = runner.invoke(app, ["--db", db, "desired-outcomes", "history", "missing"])
+
+    assert history.exit_code != 0

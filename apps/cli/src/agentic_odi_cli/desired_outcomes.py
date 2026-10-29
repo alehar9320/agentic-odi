@@ -16,7 +16,13 @@ import typer
 
 from agentic_odi_cli import flags
 from agentic_odi_cli.backend import run_tool
-from agentic_odi_cli.render import render_deleted, render_outcome, render_outcome_list, render_saved
+from agentic_odi_cli.render import (
+    render_deleted,
+    render_outcome,
+    render_outcome_list,
+    render_saved,
+    render_score_history,
+)
 
 desired_outcomes_app = typer.Typer(help="Manage desired Outcomes.")
 
@@ -49,6 +55,9 @@ def add(
     method: str | None = typer.Option(
         default=None, help="How the score was obtained: estimate (default), survey or import"
     ),
+    note: str | None = typer.Option(
+        default=None, max=500, help="Why the number was given (max 500 characters)"
+    ),
     json_output: bool = JSON_OPTION,
 ) -> None:
     """Add a desired Outcome to a Job."""
@@ -66,6 +75,8 @@ def add(
         args["satisfaction_n"] = satisfaction_n
     if method is not None:
         args["score_method"] = method
+    if note is not None:
+        args["note"] = note
     typer.echo(
         render_saved("created", run_tool("add_outcome", args), as_json=json_output, noun="Outcome")
     )
@@ -137,6 +148,9 @@ def update(
     method: str | None = typer.Option(
         default=None, help="How the score was obtained: estimate, survey or import"
     ),
+    note: str | None = typer.Option(
+        default=None, max=500, help="Why the number was given (max 500 characters)"
+    ),
     json_output: bool = JSON_OPTION,
 ) -> None:
     """Update a desired Outcome."""
@@ -155,9 +169,24 @@ def update(
         args["satisfaction_n"] = satisfaction_n
     if method is not None:
         args["score_method"] = method
+    if note is not None:
+        args["note"] = note
     typer.echo(
         render_saved(
             "updated", run_tool("update_outcome", args), as_json=json_output, noun="Outcome"
+        )
+    )
+
+
+@desired_outcomes_app.command("history")
+def history(
+    outcome_id: str = typer.Argument(..., help="Outcome ID"),
+    json_output: bool = JSON_OPTION,
+) -> None:
+    """Show an Outcome's accepted score snapshots, oldest first."""
+    typer.echo(
+        render_score_history(
+            run_tool("get_outcome_history", {"outcome_id": outcome_id}), as_json=json_output
         )
     )
 
