@@ -8,6 +8,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from agentic_odi_core import ODIService
+from agentic_odi_core.messages import CAPABILITIES
 from agentic_odi_core.remote import StudioError, StudioErrorCode
 from agentic_odi_core.repository import Repository
 from agentic_odi_core.sqlite_repository import SQLiteRepository
@@ -24,6 +25,7 @@ from agentic_odi_studio_api.studio.errors import (
     register_error_handlers,
     request_id_for,
 )
+from agentic_odi_studio_api.studio.marketplace import StudioMarketplace
 from agentic_odi_studio_api.studio.memory import StudioMemory
 from agentic_odi_studio_api.studio.router import router as studio_router
 
@@ -55,6 +57,7 @@ def create_app(
     backend: str | None = None,
     connectors: ConnectorService | None = None,
     memory: StudioMemory | None = None,
+    marketplace: StudioMarketplace | None = None,
 ) -> FastAPI:
     if repo is None:
         repo = SQLiteRepository()
@@ -76,7 +79,9 @@ def create_app(
     )
     app.state.service = service
     app.state.backend = backend or os.environ.get("AGENTIC_ODI_BACKEND") or DEFAULT_BACKEND
-    app.state.connectors = connectors or ConnectorService()
+    resolved_marketplace = marketplace or StudioMarketplace()
+    app.state.marketplace = resolved_marketplace
+    app.state.connectors = connectors or ConnectorService(marketplace=resolved_marketplace)
     app.state.memory = memory or StudioMemory()
     app.state.approvals = approvals
 
@@ -96,7 +101,7 @@ def create_app(
 
     @app.get("/capabilities")
     def capabilities() -> dict:
-        return {"capabilities": app.state.backend}
+        return {"capabilities": CAPABILITIES}
 
     app.include_router(studio_router)
 

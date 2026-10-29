@@ -1,4 +1,4 @@
-import { ThreadPrimitive } from "@assistant-ui/react";
+import { ThreadPrimitive, useThreadViewport } from "@assistant-ui/react";
 
 import {
   HELP_TEXT,
@@ -7,15 +7,39 @@ import {
   isSlashCommand,
   type StudioCommand,
 } from "../../lib/commands";
+import { useMediaQuery } from "../../lib/useMediaQuery";
 import { useStudio } from "../../state/StudioContext";
 import type { WorkspacePanelId } from "../../types";
 import { SetupConversation } from "../setup/SetupConversation";
 import { Conversation } from "./Conversation";
+import { GuidanceHint } from "./GuidanceHint";
 import { Hero } from "./Hero";
 import { OfflineNotice } from "./OfflineNotice";
 import { ThreadComposer } from "./ThreadComposer";
 
 const VIEW_COMMANDS = new Set<string>(["landscape", "jobmap", "evidence", "settings"]);
+
+function LatestMessageButton() {
+  const isAtBottom = useThreadViewport((state) => state.isAtBottom);
+  const scrollToBottom = useThreadViewport((state) => state.scrollToBottom);
+  // A reader who asked for less motion should land on the newest reply, not
+  // watch the transcript animate past everything in between.
+  const reducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
+
+  if (isAtBottom) {
+    return null;
+  }
+
+  return (
+    <button
+      type="button"
+      className="chat__latest"
+      onClick={() => scrollToBottom({ behavior: reducedMotion ? "auto" : "smooth" })}
+    >
+      Latest message
+    </button>
+  );
+}
 
 export function ChatStage() {
   const {
@@ -148,12 +172,16 @@ export function ChatStage() {
   return (
     <ThreadPrimitive.Root className="chat" aria-label="Studio conversation">
       <OfflineNotice />
-      <ThreadPrimitive.Viewport className="chat__scroll" autoScroll>
-        <div className="chat__thread">
-          <Conversation />
-        </div>
-      </ThreadPrimitive.Viewport>
+      <div className="chat__transcript">
+        <ThreadPrimitive.Viewport className="chat__scroll" autoScroll>
+          <div className="chat__thread">
+            <Conversation />
+          </div>
+        </ThreadPrimitive.Viewport>
+        <LatestMessageButton />
+      </div>
       <div className="chat__dock">
+        <GuidanceHint />
         <ThreadComposer
           onCommand={(command) => runCommand(command)}
           onSlashCommand={submitCommand}

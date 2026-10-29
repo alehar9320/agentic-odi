@@ -7,8 +7,8 @@ it. When that workflow was removed, every check kept passing while
 https://alehar9320.github.io/agentic-odi/ returned 404. These assertions keep
 the publish path from disappearing again.
 
-The site is generated, so the workflow must build it and the CI must fail
-when the committed output drifts from a fresh build.
+The site is generated, so CI builds it and uploads the artifact for review;
+Pages builds and deploys it. There is no committed copy to drift.
 """
 
 from pathlib import Path
@@ -74,11 +74,20 @@ def test_the_workflow_verifies_the_site_before_it_publishes() -> None:
     assert verify < build, "a broken site must never be published"
 
 
-def test_ci_gates_on_drift() -> None:
+def test_ci_builds_the_site_from_source() -> None:
     text = _ci_workflow()
-    assert "build_site.py --check" in text, (
-        "CI must fail when the committed site differs from a fresh build"
-    )
+    assert "build_site.py --out _site" in text
+
+
+def test_ci_uploads_the_built_site_for_review() -> None:
+    text = _ci_workflow()
+    assert "actions/upload-artifact@" in text
+    assert "path: _site" in text
+
+
+def test_ci_does_not_gate_on_committed_output() -> None:
+    text = _ci_workflow()
+    assert "build_site.py --check" not in text
 
 
 def test_ci_never_publishes_the_site() -> None:
