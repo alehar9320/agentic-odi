@@ -217,14 +217,16 @@ gates raw MCP trace debugging.
 
 ```bash
 agentic-odi profile show
-agentic-odi profile set domain "acme.test"
+agentic-odi profile show --json
+agentic-odi profile set --product-name "My Product" --domain "acme.test"
 agentic-odi profile path
-agentic-odi setup       # alias for profile; runs the first-run baseline wizard
+agentic-odi setup       # interactive baseline wizard
 ```
 
-`profile show` prints the baseline as JSON. `profile set` updates a baseline
-field. `profile path` prints the baseline file path. `setup` is an alias for
-`profile` that runs the interactive first-run baseline wizard on first launch.
+`profile show` prints the baseline fields; add `--json` to emit the raw JSON.
+`profile set` updates any subset of baseline fields with explicit options.
+`profile path` prints the baseline file path. `setup` runs the interactive
+baseline wizard.
 
 ## Manage Customer Outcomes
 
@@ -270,6 +272,22 @@ agentic-odi outcomes score 8 2
 
 Set `AGENTIC_ODI_MCP_URL` (or `--mcp-url`) to point to a non-default server when
 using `--backend mcp` (default: `http://localhost:8000/mcp`).
+
+## Schedule Work
+
+Schedule, inspect, cancel, and trigger background cloud agent work tasks:
+
+```bash
+# Schedule a task
+agentic-odi schedule create --name "Nightly ODI Audit" --expression "0 0 * * *" --trigger-type cron
+
+# List, inspect, trigger, and cancel
+agentic-odi schedule list
+agentic-odi schedule list --json
+agentic-odi schedule show <work-id>
+agentic-odi schedule trigger <work-id>
+agentic-odi schedule cancel <work-id>
+```
 
 ## Connectors
 

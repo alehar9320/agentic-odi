@@ -306,6 +306,7 @@ def render_evidence(item: Any, *, as_json: bool) -> str:
             ("kind", item.get("source_kind", "")),
             ("item_type", item.get("item_type", "")),
             ("name", item.get("name", "")),
+            ("url", item.get("url") or ""),
             ("job_id", item.get("job_id") or ""),
             ("step_id", item.get("step_id") or ""),
             ("outcome_id", item.get("outcome_id") or ""),
@@ -321,13 +322,14 @@ def render_evidence_list(items: Any, *, as_json: bool) -> str:
     if as_json:
         return _json(items)
     return _table(
-        ("id", "source", "item_type", "name"),
+        ("id", "source", "item_type", "name", "url"),
         [
             (
                 str(item.get("id", "")),
                 _truncate(str(item.get("source_name", ""))),
                 _truncate(str(item.get("item_type", ""))),
                 _truncate(str(item.get("name", ""))),
+                _truncate(str(item.get("url") or "")),
             )
             for item in items
         ],
@@ -356,3 +358,31 @@ def render_score(importance: float, satisfaction: float, score: float, *, as_jso
             {"importance": importance, "satisfaction": satisfaction, "opportunity_score": score}
         )
     return f"Opportunity score: {score:.2f}"
+
+
+def _cell(item: Any, key: str) -> str:
+    """A table cell, unwrapping enums so it reads `oneshot`, not `Trigger.ONESHOT`."""
+    value = item.get(key, "")
+    return str(getattr(value, "value", value))
+
+
+def render_scheduled_work_list(items: Any, *, as_json: bool) -> str:
+    if not isinstance(items, list):
+        return _json(items) if as_json else str(items)
+    if as_json:
+        return _json(items)
+    return _table(
+        ("id", "name", "agent_id", "trigger_type", "expression", "status"),
+        [
+            (
+                _cell(item, "id"),
+                _truncate(_cell(item, "name")),
+                _cell(item, "agent_id"),
+                _cell(item, "trigger_type"),
+                _cell(item, "schedule_expression"),
+                _cell(item, "status"),
+            )
+            for item in items
+        ],
+        empty="No scheduled work found.",
+    )
