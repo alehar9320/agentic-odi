@@ -96,11 +96,21 @@ export function StudioBar({
           type="button"
           className="studio-pill pill-customize"
           onClick={() => openCustomize()}
-          aria-label="Customize connectors"
-          title="Customize connectors"
+          aria-label="Customize"
+          title="Customize"
         >
           <PlugIcon size={15} />
           Customize
+        </button>
+
+        <button
+          type="button"
+          className="icon-button"
+          aria-label={`Switch to ${nextTheme} theme`}
+          title={`Switch to ${nextTheme} theme`}
+          onClick={() => saveSettings({ ...settings, theme: nextTheme })}
+        >
+          {theme === "dark" ? <SunIcon size={17} /> : <MoonIcon size={17} />}
         </button>
 
         <button
@@ -120,16 +130,6 @@ export function StudioBar({
           onClick={onNew}
         >
           <PlusIcon size={17} />
-        </button>
-
-        <button
-          type="button"
-          className="icon-button"
-          aria-label={`Switch to ${nextTheme} theme`}
-          title={`Switch to ${nextTheme} theme`}
-          onClick={() => saveSettings({ ...settings, theme: nextTheme })}
-        >
-          {theme === "dark" ? <SunIcon size={17} /> : <MoonIcon size={17} />}
         </button>
 
         <button

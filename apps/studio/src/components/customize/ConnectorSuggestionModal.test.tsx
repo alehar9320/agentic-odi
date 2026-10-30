@@ -93,6 +93,25 @@ describe("ConnectorSuggestionModal", () => {
     expect(screen.getByText("GONG_TOKEN")).toBeInTheDocument();
   });
 
+  it("opens Customize on the Connectors tab and targets the suggested listing", () => {
+    const openCustomize = vi.fn();
+    vi.mocked(useStudio).mockReturnValue(
+      stubContext({
+        connectorSuggestion: { id: "gong", listing: LISTING, reason: "agent" },
+        openCustomize,
+      }),
+    );
+
+    render(<ConnectorSuggestionModal />);
+    fireEvent.click(screen.getByRole("button", { name: "Browse all" }));
+
+    expect(openCustomize).toHaveBeenCalledWith({
+      query: "gong",
+      listingId: LISTING.id,
+      tab: "connectors",
+    });
+  });
+
   it("browses all when the suggestion has no listing to install", () => {
     const openCustomize = vi.fn();
     vi.mocked(useStudio).mockReturnValue(
@@ -105,7 +124,7 @@ describe("ConnectorSuggestionModal", () => {
     render(<ConnectorSuggestionModal />);
     fireEvent.click(screen.getByRole("button", { name: "Browse all" }));
 
-    expect(openCustomize).toHaveBeenCalledWith({ query: "gong" });
+    expect(openCustomize).toHaveBeenCalledWith({ query: "gong", tab: "connectors" });
   });
 
   it("moves focus into the dialog and traps Tab at both ends", () => {

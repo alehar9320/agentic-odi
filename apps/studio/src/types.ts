@@ -470,9 +470,12 @@ export interface MarketplaceSearch {
 }
 
 /** What the user asked Customize to open on, when a chat suggestion sent them. */
+export type CustomizeTab = "model" | "appearance" | "data" | "connectors" | "shortcuts";
+
 export interface CustomizeTarget {
   query?: string;
   listingId?: string;
+  tab?: CustomizeTab;
 }
 
 /**

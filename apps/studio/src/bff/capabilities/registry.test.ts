@@ -78,6 +78,7 @@ describe("CapabilityRegistry", () => {
             JSON.stringify({
               capabilities: [
                 { id: "sidecar-llm", available: true },
+                { id: "sidecar-connectors", available: true },
                 { id: "sidecar-import", available: true },
               ],
             }),

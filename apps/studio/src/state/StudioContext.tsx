@@ -1708,9 +1708,6 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       }
       void refreshCapabilities();
       void refreshCanvas();
-      void refreshConnectors();
-      void refreshPresets();
-      void refreshFeatured();
       void refreshMemory();
       void fetchLatestConversation()
         .then(async ({ conversation }) => {
