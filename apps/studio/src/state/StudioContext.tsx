@@ -38,6 +38,7 @@ import {
   fetchModels,
   fetchOutcomeEvidence as apiFetchOutcomeEvidence,
   fetchSignals,
+  fetchStages,
   fetchUnreadSignalCount,
   healthLlm,
   healthMcp,
@@ -82,6 +83,7 @@ import type {
   ToolStatus,
   TurnNode,
   WorkspacePanelId,
+  StagesState,
 } from "../types";
 import { catalogManifest } from "../ui/catalog";
 import { parseUiSpec } from "../ui/protocol";
@@ -222,6 +224,9 @@ export interface StudioContextValue {
   /** The failure behind `canvasState.kind === "error"`, if any. */
   canvasError: StudioError | null;
   refreshCanvas: () => Promise<void>;
+  /** The canonical job-map stages the server names, and how that fetch went. */
+  stagesState: StagesState;
+  refreshStages: () => Promise<void>;
   llmHealth: { healthy: boolean | null; message: string };
   /** Model ids the configured endpoint publishes. Empty means "type one". */
   models: string[];
@@ -442,6 +447,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     return cached ? { kind: "loading", data: cached } : { kind: "loading", data: null };
   });
   const [canvasCached, setCanvasCached] = useState(() => loadCanvasCache() !== null);
+  const [stagesState, setStagesState] = useState<StagesState>({ kind: "loading", data: null });
   const [llmHealth, setLlmHealth] = useState<{ healthy: boolean | null; message: string }>({
     healthy: null,
     message: "Health not checked yet.",
@@ -921,6 +927,19 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       setCanvasState((prev) => ({ kind: "error", error: problem, data: prev.data }));
     }
   }, [settings.mcp_url, refreshSignals]);
+
+  const refreshStages = useCallback(async () => {
+    setStagesState((prev) => ({ kind: "loading", data: prev.data }));
+    try {
+      const stages = await fetchStages();
+      setStagesState({ kind: "ready", data: stages });
+    } catch (error) {
+      // A failed schema fetch is a failure, not an empty map: the Job Map shows
+      // what went wrong instead of eight blank phases.
+      const problem = asStudioError(error);
+      setStagesState((prev) => ({ kind: "error", error: problem, data: prev.data }));
+    }
+  }, []);
 
   const addStep = useCallback(
     async (payload: Omit<AddStepPayload, "mcp_url">) => {
@@ -1721,6 +1740,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       }
       void refreshCapabilities();
       void refreshCanvas();
+      void refreshStages();
       void refreshConnectors();
       void refreshPresets();
       void refreshFeatured();
@@ -1826,6 +1846,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       canvasState,
       canvasError,
       refreshCanvas,
+      stagesState,
+      refreshStages,
       llmHealth,
       models,
       modelsLoading,
@@ -1933,6 +1955,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       canvasState,
       canvasError,
       refreshCanvas,
+      stagesState,
+      refreshStages,
       llmHealth,
       models,
       modelsLoading,

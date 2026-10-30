@@ -31,7 +31,9 @@ const noop = () => {};
 const state = vi.hoisted(() => ({
   // Canvas surfaces
   canvasState: { kind: "ready", data: null } as unknown,
+  stagesState: { kind: "ready", data: null } as unknown,
   refreshCanvas: vi.fn(),
+  refreshStages: vi.fn(),
   addStep: vi.fn(),
   updateStep: vi.fn(),
   deleteStep: vi.fn(),
@@ -118,6 +120,18 @@ const transport: UpdateTransport = {
 
 const updateService = createUpdateService({ transport, storage: null, document: null });
 
+/** The eight stages exactly as `GET /api/schema` returns them. */
+const SERVER_STAGES = [
+  { id: "define", name: "1. Define", description: "Determine goals and criteria" },
+  { id: "locate", name: "2. Locate", description: "Gather inputs and resources" },
+  { id: "prepare", name: "3. Prepare", description: "Set up context and workspace" },
+  { id: "confirm", name: "4. Confirm", description: "Verify readiness to execute" },
+  { id: "execute", name: "5. Execute", description: "Carry out core job work" },
+  { id: "monitor", name: "6. Monitor", description: "Track performance and errors" },
+  { id: "modify", name: "7. Modify", description: "Adjust inputs or workflows" },
+  { id: "conclude", name: "8. Conclude", description: "Finish and store outputs" },
+];
+
 const canvasData = {
   jobs: [{ id: "JOB-1", name: "Deploy services" }],
   steps: [
@@ -186,6 +200,7 @@ function TourOpener() {
 beforeEach(() => {
   localStorage.clear();
   state.canvasState = { kind: "ready", data: canvasData };
+  state.stagesState = { kind: "ready", data: SERVER_STAGES };
   state.signals = [signal];
   state.unreadSignalCount = 1;
 });

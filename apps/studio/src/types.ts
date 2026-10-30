@@ -11,7 +11,24 @@ export interface Step {
   job_id?: string;
   name?: string;
   order?: number;
+  stage?: string | null;
 }
+
+/**
+ * One Universal Job Map stage as the server names it. The Studio renders this
+ * list verbatim, so a stage the server adds or reorders appears without a
+ * component change.
+ */
+export interface JobStageDef {
+  id: string;
+  name: string;
+  description: string;
+}
+
+export type StagesState =
+  | { kind: "loading"; data: JobStageDef[] | null }
+  | { kind: "ready"; data: JobStageDef[] }
+  | { kind: "error"; error: StudioError; data: JobStageDef[] | null };
 
 export interface Outcome {
   id?: string;

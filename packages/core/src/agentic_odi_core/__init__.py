@@ -84,7 +84,7 @@ from agentic_odi_core.remote import (
 )
 from agentic_odi_core.repository import InMemoryRepository, Repository
 from agentic_odi_core.router import ModelRouter, ModelTier, OnDeviceLLMEngine, RoutingMode
-from agentic_odi_core.schema import odi_schema
+from agentic_odi_core.schema import odi_schema, stage_catalog
 from agentic_odi_core.services import (
     CandidateNotFoundError,
     CustomerOutcomeNotFoundError,
@@ -201,6 +201,7 @@ __all__ = [
     "outcome_not_found",
     "parse_tool_result",
     "quote_not_found",
+    "stage_catalog",
     "statement_to_dict",
     "step_not_found",
     "tool_result_text",
