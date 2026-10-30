@@ -185,6 +185,63 @@ def test_a_snapshot_timestamp_is_iso_utc() -> None:
     assert snapshot.at.endswith("+00:00")
 
 
+def test_a_metadata_only_edit_records_a_new_snapshot(repo: Repository) -> None:
+    """A method/count-only edit is an accepted change, so it appends.
+
+    Documented behaviour: any accepted ``update_outcome`` appends one snapshot,
+    even when the numeric scores are untouched. A history that only recorded
+    number changes could not answer "did the evidence change or the estimate?".
+    """
+    service = _service(repo)
+    outcome = _add(service)
+
+    service.update_outcome(
+        outcome.id, {"score_method": "survey", "importance_n": 40, "satisfaction_n": 40}
+    )
+
+    history = repo.list_score_snapshots(outcome.id)
+    assert len(history) == 2
+    # The scores are unchanged; only the evidence state moved.
+    assert (history[1].importance, history[1].satisfaction) == (8.0, 6.0)
+    assert (history[1].method, history[1].importance_n) == ("survey", 40)
+
+
+def test_an_equal_value_submission_records_a_new_snapshot(repo: Repository) -> None:
+    """Re-submitting the same scores is still an accepted change, so it appends.
+
+    Documented behaviour, not an accident: the writer records every accepted
+    state rather than de-duplicating, so the trail shows the decision was
+    re-affirmed. The snapshots stay ordered and distinct.
+    """
+    service = _service(repo)
+    outcome = _add(service)
+
+    service.update_outcome(outcome.id, {"importance": 8.0, "satisfaction": 6.0})
+
+    history = repo.list_score_snapshots(outcome.id)
+    assert len(history) == 2
+    assert (history[0].importance, history[0].satisfaction) == (8.0, 6.0)
+    assert (history[1].importance, history[1].satisfaction) == (8.0, 6.0)
+    assert history[0].id != history[1].id
+
+
+def test_a_count_only_change_keeps_its_evidence_state(repo: Repository) -> None:
+    """A count/method-only change retains its evidence-state distinction.
+
+    The earlier snapshot stays ``estimate``/``n=None`` and the later one is the
+    survey, so a reader can tell an estimate from a measured sample rather than
+    seeing two identical numbers.
+    """
+    service = _service(repo)
+    outcome = _add(service)
+
+    service.update_outcome(outcome.id, {"score_method": "survey", "importance_n": 40})
+
+    before, after = repo.list_score_snapshots(outcome.id)
+    assert (before.method, before.importance_n) == ("estimate", None)
+    assert (after.method, after.importance_n) == ("survey", 40)
+
+
 def test_the_score_writing_service_methods_are_the_named_ones() -> None:
     """A new score-mutating path cannot skip the history.
 

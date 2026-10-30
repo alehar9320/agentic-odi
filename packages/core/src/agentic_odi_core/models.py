@@ -188,6 +188,12 @@ class ScoreSnapshot(BaseModel):
 
     A snapshot is only written for an *accepted* mutation; a validation failure
     creates neither a score change nor a snapshot.
+
+    The writer appends on every accepted ``update_outcome``, so a metadata-only
+    edit (method/count) and an equal-value re-submission each add a snapshot.
+    That is deliberate: the trail records that the decision was re-affirmed or
+    re-evidenced, and it keeps the count/method-only evidence state visible
+    rather than collapsing two unlike states into one identical number.
     """
 
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
