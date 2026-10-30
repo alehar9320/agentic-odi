@@ -63,6 +63,9 @@ import type {
   ChatAttachment,
   ChatMessage,
   ChatPart,
+  Claim,
+  ClaimCitation,
+  ClaimStatus,
   ConnectorListItem,
   ConnectorPreset,
   ConnectorSuggestion,
@@ -117,16 +120,67 @@ export function turnsToMessages(
       return [];
     }
     const content = node.content ?? "";
+    const claims = node.claims ?? [];
     return [
       {
         id: node.id,
         parentId: node.parent_id,
         role: node.role,
         content,
-        parts: content ? [{ kind: "text" as const, text: content }] : [],
+        parts: claims.length
+          ? [{ kind: "claims" as const, content, claims }]
+          : content
+            ? [{ kind: "text" as const, text: content }]
+            : [],
       },
     ];
   });
+}
+
+const CLAIM_STATUSES = new Set<ClaimStatus>(["cited", "hypothesis", "uncited"]);
+
+/** The claims a terminal frame carries, read defensively. */
+function readClaims(raw: unknown): Claim[] {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  const claims: Claim[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== "object") {
+      continue;
+    }
+    const candidate = item as Partial<Claim>;
+    if (typeof candidate.index !== "number" || typeof candidate.text !== "string") {
+      continue;
+    }
+    const evidence: ClaimCitation[] = [];
+    for (const rawCitation of Array.isArray(candidate.evidence) ? candidate.evidence : []) {
+      if (!rawCitation || typeof rawCitation !== "object") {
+        continue;
+      }
+      const citation = rawCitation as Partial<ClaimCitation>;
+      if (typeof citation.id !== "string" || !citation.id) {
+        continue;
+      }
+      evidence.push({
+        id: citation.id,
+        name: typeof citation.name === "string" ? citation.name : citation.id,
+        source_name: typeof citation.source_name === "string" ? citation.source_name : "",
+      });
+    }
+    const status =
+      typeof candidate.status === "string" && CLAIM_STATUSES.has(candidate.status as ClaimStatus)
+        ? (candidate.status as ClaimStatus)
+        : "uncited";
+    claims.push({
+      index: candidate.index,
+      text: candidate.text,
+      status,
+      evidence,
+      reason: typeof candidate.reason === "string" ? candidate.reason : null,
+    });
+  }
+  return claims;
 }
 
 /** Read the failure the sidecar reported on an SSE `error` event. */
@@ -346,6 +400,9 @@ export interface StudioContextValue {
   focusedSubject: { kind: SignalSubjectKind; id: string } | null;
   /** The job that owns the focused subject, so canvas panels can select it. */
   focusedJobId: string | null;
+  /** The evidence record a citation chip asked the Evidence lens to show. */
+  focusedEvidenceId: string | null;
+  focusEvidence: (evidenceId: string) => void;
   simulateBackgroundEvent: () => void;
 }
 
@@ -471,6 +528,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     kind: SignalSubjectKind;
     id: string;
   } | null>(null);
+  const [focusedEvidenceId, setFocusedEvidenceId] = useState<string | null>(null);
   const [customizeOpen, setCustomizeOpen] = useState(false);
   const [customizeTarget, setCustomizeTarget] = useState<CustomizeTarget | null>(null);
   const [marketplace, setMarketplace] = useState<MarketplaceSearch | null>(null);
@@ -1100,6 +1158,18 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     [markSignalAsRead, openPanel],
   );
 
+  /**
+   * A citation chip opens the record it names: the Evidence lens, focused on
+   * that row. The snapshot label stays even when the record is gone.
+   */
+  const focusEvidence = useCallback(
+    (evidenceId: string) => {
+      setFocusedEvidenceId(evidenceId);
+      openPanel("evidence");
+    },
+    [openPanel],
+  );
+
   /** The job owning the focused subject, so canvas panels can select it. */
   const focusedJobId = useMemo(() => {
     if (!focusedSubject) {
@@ -1372,7 +1442,24 @@ export function StudioProvider({ children }: { children: ReactNode }) {
             // never erase structured parts: thinking, tool calls, citations,
             // and surfaces sit between the paragraphs that frame them.
             content = String(event.data.content ?? content);
-            if (content && !parts.some((part) => part.kind === "text")) {
+            const claims = readClaims(event.data.claims);
+            if (claims.length > 0) {
+              // The finished list replaces the streamed prose in place, so each
+              // sentence keeps its own chip.
+              let preceding = 0;
+              for (const part of parts) {
+                if (part.kind === "text") {
+                  break;
+                }
+                preceding += 1;
+              }
+              const structured = parts.filter((part) => part.kind !== "text");
+              parts = [
+                ...structured.slice(0, preceding),
+                { kind: "claims", content, claims },
+                ...structured.slice(preceding),
+              ];
+            } else if (content && !parts.some((part) => part.kind === "text")) {
               parts = [...parts, { kind: "text", text: content }];
             }
             publish();
@@ -1901,6 +1988,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       focusSignalSubject,
       focusedSubject,
       focusedJobId,
+      focusedEvidenceId,
+      focusEvidence,
       simulateBackgroundEvent,
     }),
     [
@@ -2007,6 +2096,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       focusSignalSubject,
       focusedSubject,
       focusedJobId,
+      focusedEvidenceId,
+      focusEvidence,
       simulateBackgroundEvent,
     ],
   );

@@ -7,15 +7,24 @@
  * decided what each part means.
  */
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useAuiState, type ToolCallMessagePartProps } from "@assistant-ui/react";
 
 import { formatFileSize, preparedAttachmentById } from "./attachments";
 import { CheckIcon, ChevronDownIcon, SparkIcon } from "../components/icons";
 import { Markdown } from "../components/chat/Markdown";
+import { useStudio } from "../state/StudioContext";
+import type { Claim } from "../types";
 import type { UiNode } from "../ui/protocol";
 import { UiRenderer } from "../ui/UiRenderer";
-import { SURFACE_PART } from "./convert";
+import {
+  buildClaimBlocks,
+  citedCount,
+  hideMarkers,
+  rememberClaimChip,
+  type ClaimSegment,
+} from "./claims";
+import { CLAIMS_PART, SURFACE_PART } from "./convert";
 
 /** Prose. The existing renderer, so the transcript reads exactly as before. */
 export function TextPart() {
@@ -23,7 +32,160 @@ export function TextPart() {
   if (text === null) {
     return null;
   }
-  return <Markdown source={text} />;
+  // A marker is syntax, not prose: hide it even while the reply streams.
+  return <Markdown source={hideMarkers(text)} />;
+}
+
+/**
+ * One assistant reply with a chip, a tag, or an underline per sentence.
+ *
+ * The chip names the record — source and name — never the tool that ran. A
+ * sentence the agent could not ground keeps its place and says so.
+ */
+export function ClaimText({ content, claims }: { content: string; claims: Claim[] }) {
+  const { canvas, closePanel, focusEvidence } = useStudio();
+  const seeded = canvas?.source === "seed";
+  const blocks = useMemo(() => buildClaimBlocks(content, claims), [content, claims]);
+  const ordinals = useMemo(() => {
+    const order = new Map<number, number>();
+    let next = 0;
+    for (const block of blocks) {
+      for (const item of block.items) {
+        for (const segment of item) {
+          if (segment.claim?.status === "cited") {
+            next += 1;
+            order.set(segment.claim.index, next);
+          }
+        }
+      }
+    }
+    return order;
+  }, [blocks]);
+  const known = useMemo(() => {
+    const evidence = canvas?.evidence;
+    return evidence ? new Set(evidence.map((item) => item.id)) : null;
+  }, [canvas]);
+  const cited = citedCount(claims, seeded);
+
+  const renderSegments = (segments: ClaimSegment[]) =>
+    segments.map((segment, index) => {
+      const claim = segment.claim;
+      if (!claim) {
+        return <span key={index}>{segment.text}</span>;
+      }
+      if (claim.status === "hypothesis") {
+        return (
+          <span key={index} className="claim claim--hypothesis">
+            {claim.text} <span className="claim-tag">Hypothesis</span>
+          </span>
+        );
+      }
+      if (claim.status === "uncited") {
+        return (
+          <span
+            key={index}
+            className="claim claim--uncited"
+            title="No record supports this sentence."
+          >
+            {claim.text} <span className="sr-only">Uncited claim.</span>
+          </span>
+        );
+      }
+      return (
+        <span key={index} className="claim claim--cited">
+          {claim.text}
+          {claim.evidence.map((citation) => {
+            const label = citation.source_name
+              ? `${citation.source_name} · ${citation.name}`
+              : citation.name;
+            if (known !== null && !known.has(citation.id)) {
+              return (
+                <span
+                  key={citation.id}
+                  className="claim-chip claim-chip--missing"
+                  title={`${label} — this record is no longer in the studio.`}
+                >
+                  <span className="claim-chip__label">{label}</span>
+                  <span className="sr-only">This record is no longer in the studio.</span>
+                </span>
+              );
+            }
+            return (
+              <button
+                key={citation.id}
+                type="button"
+                className="claim-chip"
+                title={`${label} — open this record`}
+                onClick={(event) => {
+                  rememberClaimChip(event.currentTarget);
+                  focusEvidence(citation.id);
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === "Escape") {
+                    closePanel();
+                  }
+                }}
+              >
+                <span className="claim-chip__label">{label}</span>
+                <sup className="claim-chip__order" aria-hidden="true">
+                  {ordinals.get(claim.index) ?? 0}
+                </sup>
+                {seeded ? <span className="claim-chip__sample">Sample</span> : null}
+              </button>
+            );
+          })}
+        </span>
+      );
+    });
+
+  return (
+    <div className="claim-text">
+      {blocks.map((block, index) => {
+        if (block.kind === "code") {
+          return (
+            <pre key={index} className="claim-text__code">
+              <code>{block.items[0]?.[0]?.text ?? ""}</code>
+            </pre>
+          );
+        }
+        if (block.kind === "heading") {
+          return (
+            <p key={index} className="claim-text__heading">
+              {block.items[0]?.[0]?.text}
+            </p>
+          );
+        }
+        if (block.kind === "list") {
+          return (
+            <ul key={index} className="claim-text__list">
+              {block.items.map((item, itemIndex) => (
+                <li key={itemIndex}>{renderSegments(item)}</li>
+              ))}
+            </ul>
+          );
+        }
+        return <p key={index}>{renderSegments(block.items[0] ?? [])}</p>;
+      })}
+      {claims.length > 0 && cited === 0 && !seeded ? (
+        <p className="claim-banner" role="status">
+          This reply has no citations
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+/** The claim contract as it arrives: validated prose the server stood behind. */
+export function ClaimsPart() {
+  const data = useAuiState((state) =>
+    state.part.type === "data" && state.part.name === CLAIMS_PART
+      ? (state.part.data as { content?: string; claims?: Claim[] })
+      : null,
+  );
+  if (!data?.claims?.length) {
+    return null;
+  }
+  return <ClaimText content={data.content ?? ""} claims={data.claims} />;
 }
 
 /**

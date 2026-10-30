@@ -66,6 +66,7 @@ from agentic_odi_studio_api.studio.schemas import (
     CapabilitiesResponse,
     CapabilityItem,
     ChatRequest,
+    ClaimOut,
     ConnectorListItem,
     ConnectorOperationResponse,
     ConversationResponse,
@@ -891,9 +892,12 @@ def latest_conversation(request: Request) -> LatestConversationResponse:
     conversation = memory.latest_conversation()
     if conversation is None:
         return LatestConversationResponse(conversation=None, turns=[])
+    turns = memory.list_turns(conversation.id)
+    for turn in turns:
+        turn.claims = memory.claims_for_turn(turn)
     return LatestConversationResponse(
         conversation=conversation.to_dict(),
-        turns=[turn.to_dict() for turn in memory.list_turns(conversation.id)],
+        turns=[turn.to_dict() for turn in turns],
     )
 
 
@@ -924,6 +928,7 @@ def conversation_tree(conversation_id: str, request: Request) -> ConversationTre
                 role=turn.role,
                 content=turn.content,
                 created_at=turn.created_at,
+                claims=[ClaimOut(**claim.to_dict()) for claim in turn.claims],
             )
             for turn in turns
             if turn.role in {"user", "assistant"}
@@ -993,6 +998,7 @@ async def post_chat(request: Request, body: ChatRequest) -> StreamingResponse:
             memory=request.app.state.memory,
             request_id=request_id,
             approvals=request.app.state.approvals,
+            local_service=request.app.state.service,
         ),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},

@@ -18,9 +18,10 @@ import {
 } from "@assistant-ui/react";
 
 import { formatFileSize, preparedAttachmentById } from "../../assistant/attachments";
-import { SURFACE_PART } from "../../assistant/convert";
+import { CLAIMS_PART, SURFACE_PART } from "../../assistant/convert";
 import {
   AssistantAvatar,
+  ClaimsPart,
   FilePart,
   ReasoningPart,
   SourcePart,
@@ -77,7 +78,7 @@ function AssistantMessage() {
             Reasoning: ReasoningPart,
             Source: SourcePart,
             File: FilePart,
-            data: { by_name: { [SURFACE_PART]: SurfacePart } },
+            data: { by_name: { [SURFACE_PART]: SurfacePart, [CLAIMS_PART]: ClaimsPart } },
             tools: { Fallback: ToolPart },
           }}
         />
