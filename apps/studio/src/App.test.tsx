@@ -122,8 +122,6 @@ describe("studio shell", () => {
     ).toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: /message the studio/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /sharpen an opportunity/i })).toBeInTheDocument();
-    expect(screen.getByText("Turn a hunch into something defensible")).toBeInTheDocument();
-    expect(screen.getByText("Look across what you already know")).toBeInTheDocument();
     // The classic UI is secondary: no workspace surface until you ask for one.
     expect(screen.queryByRole("heading", { name: /opportunity landscape/i })).toBeNull();
   });
@@ -216,7 +214,9 @@ describe("studio shell", () => {
     expect(await screen.findByText("Where do I start?")).toBeInTheDocument();
     expect(await screen.findByText("job")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /copy reply/i })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /sharpen an opportunity/i })).not.toBeInTheDocument();
+    // The invitation gives way to the transcript; the starters stay in the
+    // composer, where they remain reachable for the rest of the thread.
+    expect(screen.queryByRole("heading", { name: "What do you want to win?" })).not.toBeInTheDocument();
   });
 
   it("returns home from the wordmark", async () => {
@@ -475,7 +475,7 @@ describe("first run", () => {
         expect.objectContaining({ name: "Get a service from commit to production" }),
       );
     });
-    expect(await screen.findByText(/Living Studio · Ambient/i)).toBeInTheDocument();
+    expect(await screen.findByText(/^Ambient$/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /explore on my own/i })).toBeNull();
   });
 

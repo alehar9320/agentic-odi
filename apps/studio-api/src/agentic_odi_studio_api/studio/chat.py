@@ -65,6 +65,9 @@ MUTATING_TOOL_PREFIXES: tuple[str, ...] = (
     "remove_",
 )
 
+#: Writes whose names do not follow the verb-prefix convention.
+MUTATING_TOOLS: frozenset[str] = frozenset({"promote_evidence"})
+
 #: Attachments are context, not a corpus: five files, and a bounded slice of each.
 MAX_ATTACHMENTS = 5
 MAX_ATTACHMENT_TEXT = 20_000
@@ -75,7 +78,7 @@ MAX_SOURCE_PREVIEW = 160
 
 def is_mutating_tool(name: str) -> bool:
     """Whether a tool call changes stored data and should be confirmed."""
-    return name.startswith(MUTATING_TOOL_PREFIXES)
+    return name in MUTATING_TOOLS or name.startswith(MUTATING_TOOL_PREFIXES)
 
 
 SYSTEM_PROMPT = """You are an elite product strategist working inside The Living Studio, a room built for product managers.
@@ -732,9 +735,17 @@ async def _turn_frames(
                     result_str = declined
                     yield frame("tool", {"name": name, "status": "declined", "preview": declined})
                 elif name == "add_connector":
+                    yield frame("tool", {"name": name, "status": "start"})
                     result_str, events = _apply_add_connector(arguments, connector_service)
                     for event in events:
                         yield frame(event["event"], event["data"])
+                    if result_str.startswith("Error:"):
+                        counters["tool_errors"] += 1
+                        yield frame(
+                            "tool", {"name": name, "status": "error", "preview": result_str}
+                        )
+                    else:
+                        yield frame("tool", {"name": name, "status": "ok"})
                 elif name == "remember":
                     yield frame("tool", {"name": name, "status": "start"})
                     result_str, memory_event = _apply_remember(arguments, memory)

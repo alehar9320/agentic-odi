@@ -142,6 +142,23 @@ def test_patching_an_unknown_conversation_is_a_404() -> None:
     assert response.status_code == 404
 
 
+def test_renaming_a_conversation_keeps_the_selected_branch() -> None:
+    memory = _memory()
+    conversation = memory.create_conversation()
+    memory.append_turn(conversation.id, "user", "list jobs", "m-1", None)
+    memory.append_turn(conversation.id, "assistant", "first", "m-2", "m-1")
+    memory.append_turn(conversation.id, "assistant", "second", "m-3", "m-1")
+    memory.set_head(conversation.id, "m-2")
+    app = create_app(repo=InMemoryRepository(), memory=memory)
+    client = TestClient(app)
+
+    response = client.patch(f"/api/conversations/{conversation.id}", json={"title": "Renamed"})
+
+    assert response.status_code == 200
+    assert response.json()["conversation"]["head_id"] == "m-2"
+    assert memory.get_conversation(conversation.id).head_id == "m-2"  # type: ignore[union-attr]
+
+
 def test_an_approval_can_be_answered_through_the_api() -> None:
     app = create_app(repo=InMemoryRepository(), memory=_memory())
     client = TestClient(app)

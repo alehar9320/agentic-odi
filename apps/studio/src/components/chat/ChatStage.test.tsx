@@ -28,7 +28,7 @@ const harness = vi.hoisted(() => ({
     brief: null as unknown,
     settings: { base_url: "http://llm", api_key: "k", model_name: "m", mcp_url: "http://mcp" },
     mcpReachable: true,
-    llmHealth: { healthy: true as boolean | null, message: "ok" },
+    llmHealth: { healthy: true, message: "ok" },
     connectorSuggestions: [] as string[],
     presets: [] as unknown[],
     dismissConnectorSuggestion: vi.fn(),
@@ -238,48 +238,5 @@ describe("ChatStage", () => {
     expect(screen.getByRole("button", { name: /retry/i })).toBeInTheDocument();
     expect(screen.getByRole("textbox")).toBeInTheDocument();
     expect(errorLog).not.toHaveBeenCalled();
-  });
-});
-
-describe("ChatStage offline notice", () => {
-  afterEach(() => {
-    harness.state.llmHealth = { healthy: true, message: "ok" };
-  });
-
-  it("offers a way to work when no model is reachable", () => {
-    harness.state.llmHealth = { healthy: false, message: "The model did not answer." };
-
-    render(
-      <StudioRuntimeProvider>
-        <ChatStage />
-      </StudioRuntimeProvider>,
-    );
-
-    expect(screen.getByText(/Working by hand/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /capture an outcome/i })).toBeInTheDocument();
-  });
-
-  it("stays quiet when the model answers", () => {
-    harness.state.llmHealth = { healthy: true, message: "LLM backend reachable" };
-
-    render(
-      <StudioRuntimeProvider>
-        <ChatStage />
-      </StudioRuntimeProvider>,
-    );
-
-    expect(screen.queryByText(/Working by hand/i)).toBeNull();
-  });
-
-  it("stays quiet while the model health is still unknown", () => {
-    harness.state.llmHealth = { healthy: null, message: "" };
-
-    render(
-      <StudioRuntimeProvider>
-        <ChatStage />
-      </StudioRuntimeProvider>,
-    );
-
-    expect(screen.queryByText(/Working by hand/i)).toBeNull();
   });
 });

@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { fetchChangelog } from "../api/studioApi";
 import { markReleasesRead, readReleaseVersions, unreadReleases } from "../lib/changelogRead";
+import { useFocusTrap } from "../lib/useFocusTrap";
 import type { ChangelogData } from "../types";
 
 interface ChangelogModalProps {
@@ -23,6 +24,9 @@ export function ChangelogModal({ isOpen, onClose }: ChangelogModalProps) {
     () => new Set(unread.map((release) => release.version)),
     [unread],
   );
+
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(dialogRef, isOpen);
 
   function markAllRead() {
     setReadVersions(markReleasesRead((changelog?.releases ?? []).map((r) => r.version)));
@@ -65,6 +69,7 @@ export function ChangelogModal({ isOpen, onClose }: ChangelogModalProps) {
 
   return (
     <div
+      ref={dialogRef}
       className="changelog-overlay fade-in"
       onClick={onClose}
       role="dialog"

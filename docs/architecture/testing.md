@@ -47,6 +47,7 @@ Tests live next to their package (`packages/*/tests`, `apps/*/tests`). `testpath
 - `test_customer_outcomes.py` — Customer Outcome and value entities.
 - `test_tool_branches.py` — branch coverage for prompts, errors, and full updates.
 - `test_server_tools.py` — server-level tool registration and transport wiring.
+- `test_tool_spec_validation.py` — startup refuses a contract/registry mismatch.
 - `conftest.py` — sets `AGENTIC_ODI_DB=:memory:` before the server imports.
 
 ### `apps/studio-api/tests/`

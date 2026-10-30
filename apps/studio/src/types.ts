@@ -132,20 +132,19 @@ export interface McpHealth {
   reachable: boolean;
 }
 
-/**
- * Everything one turn can contain, in the order the agent produced it.
- *
- * Text and surfaces are the Studio's own vocabulary. Reasoning, tool calls,
- * sources, approvals, and attachments are conversation primitives the runtime
- * renders — the bridge in `assistant/convert.ts` maps each one to its
- * assistant-ui message part.
- */
 export type ToolStatus = "running" | "ok" | "error" | "declined";
 
 /** A write the agent is asking permission for. */
 export interface ToolApproval {
   id: string;
   prompt: string;
+}
+
+/** What goes on the wire with a turn: the sidecar's snake-case shape. */
+export interface ChatAttachmentPayload {
+  name: string;
+  media_type: string;
+  data: string;
 }
 
 export interface ChatAttachment {

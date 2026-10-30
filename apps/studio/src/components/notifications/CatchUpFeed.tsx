@@ -126,7 +126,7 @@ export function CatchUpFeed() {
   ];
 
   return (
-    <div className="stack catchup-feed" aria-label="Signal inbox">
+    <div className="stack catchup-feed" role="region" aria-label="Signal inbox">
       <section className="catchup-summary card" aria-label="Summary while you were away">
         <div className="card__head">
           <div>
