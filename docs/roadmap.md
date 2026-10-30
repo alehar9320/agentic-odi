@@ -17,6 +17,10 @@ As we validate the feasibility of this architecture, our next milestones include
 - [x] **First minute**: The studio opens on a guided conversation, not a modal —
   one invitation, three starters, and a single dismissible hint that teaches the
   next thing in place.
+- [x] **First-run introduction**: The agent speaks first in five short turns —
+  you and your team, customer, win, friction, and evidence at hand — and returns
+  an editable brief. Behind the `firstRunIntro` flag, with the old five-field
+  panel kept for one release and old drafts migrated on first open.
 - [x] **Product tour**: An optional, skippable, resumable four-step tour with
   inline connection repair, ending in the chosen surface or a handoff to the
   context conversation — isolated in `apps/studio/src/onboarding/` behind the

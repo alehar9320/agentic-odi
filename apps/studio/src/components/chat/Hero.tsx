@@ -62,9 +62,9 @@ export function Hero() {
           type="button"
           className="hero__tour"
           onClick={openSetup}
-          title="Tell me about your product, audience, and job"
+          title="Tell me who you are and what you're working on"
         >
-          {brief ? "Edit context" : "Tell me what you're building"}
+          {brief ? "Edit context" : "Start with you and your team"}
         </button>
         {tourEnabled ? (
           <>
