@@ -729,3 +729,8 @@ ALH-203 acceptance status (non-gated slice):
 - Unknown outcome / invalid `since` / unavailable comparisons produce explicit
   errors without writes: unknown outcome done; the rest ride the `outcome_delta` gate.
 - Blind-reader protection: blocked on ALH-83 (M2-19).
+
+The criterion names "CLI/batch reasons"; the CLI half is done, but the A9 batch
+score-write surface does not exist in the repository yet (ALH-7 lists A9 as a
+cross-pillar prerequisite). The batch `why` reaches the same snapshot only once
+that endpoint exists and calls the same `_record_score_snapshot` helper.
