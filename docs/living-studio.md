@@ -158,7 +158,13 @@ otherwise.
 - Sending a message does not fire off a doomed request: it drops a quiet in-thread
   notice pointing to Settings, and the composer never spins.
 - The canvas keeps showing the last thing it drew instead of going blank; a failed
-  canvas is a failure panel with Retry, not an empty board.
+  canvas is a failure panel with Retry, not an empty board. **Settings → About →
+  Diagnostics** creates an opt-in, in-memory-only local bundle. It previews the
+  exact JSON and byte count before Copy or Save, recursively redacts secrets,
+  strips URL credentials and query strings, and contains machine metadata and
+  turn counts/timings only — never messages, observations, brief, theses,
+  attachments, or canvas entities. It works with the sidecar down. No report is
+  uploaded, and no diagnostic capture is retained across reloads.
 - **What's New** still opens in front-end-only mode; without the sidecar it
   explains that release notes are unavailable rather than showing invented notes.
 
@@ -294,6 +300,7 @@ Storage is a separate SQLite file from the ODI repository:
 | `PATCH` | `/api/memory/observations/{id}` | Edit text, confidence, or status |
 | `DELETE` | `/api/memory/observations/{id}` | Forget one note |
 | `DELETE` | `/api/memory` | Forget all notes and conversations |
+| `GET` | `/api/diagnostics` | App/runtime and database metadata/counts only; never config, database paths, or row contents |
 
 **Forget everything** is a two-step confirmation and also clears the visible
 thread, because the server deletes the conversations behind it.
@@ -313,6 +320,17 @@ The bar's overflow menu has **Export → Markdown**. The file labels every
 speaker, keeps the prose as Markdown, and writes each agent-composed surface as
 a fenced JSON block, so a thread can be pasted into a doc or a ticket without
 the reader needing the Studio.
+
+**Diagnostics are separate from conversation export.** Settings → About →
+Diagnostics builds a local, opt-in bundle, then shows the exact pretty-printed
+JSON, byte count, and Included / Never included lists before Copy or Save. Capture
+rings live only in memory after the person presses the button and are cleared on
+reload. The bundle contains app version/build/platform/theme, sanitized sidecar
+configuration and metadata, capabilities, redacted error/console entries, and
+turn frame counts/timing; it never includes messages, observations, brief,
+theses, attachments, or canvas entities. Secrets, email addresses, bearer tokens,
+URL credentials and query strings are redacted, and file paths become basenames.
+It still exports while the sidecar is stopped; nothing is uploaded.
 
 Printing (`Cmd`/`Ctrl`+`P`) lays the open conversation out for A4: the bar,
 rail, composer, and floating chrome are hidden, the palette switches to paper,

@@ -83,6 +83,7 @@ import type {
 } from "../types";
 import { catalogManifest } from "../ui/catalog";
 import { parseUiSpec } from "../ui/protocol";
+import { recordStream, recordStudioError } from "../diagnostics/bundle";
 
 /**
  * The visible path of a persisted conversation: from the head back to the root.
@@ -133,7 +134,7 @@ export function turnsToMessages(
 function readStudioError(raw: unknown): StudioError {
   if (raw && typeof raw === "object" && "code" in raw) {
     const error = raw as Partial<StudioError>;
-    return {
+    const parsed = {
       code: String(error.code ?? "internal"),
       message: String(error.message ?? "The assistant could not finish this turn."),
       detail: error.detail ?? null,
@@ -141,12 +142,16 @@ function readStudioError(raw: unknown): StudioError {
       retryable: Boolean(error.retryable),
       request_id: error.request_id ?? null,
     };
+    recordStudioError(parsed, "/api/chat");
+    return parsed;
   }
-  return {
+  const parsed: StudioError = {
     code: "internal",
     message: "The assistant could not finish this turn.",
     retryable: true,
   };
+  recordStudioError(parsed, "/api/chat");
+  return parsed;
 }
 
 const SETTINGS_KEY = "studio.settings";
@@ -1165,6 +1170,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
         ...(attachments.length ? { attachments } : {}),
       };
       const assistantId = crypto.randomUUID();
+      const turnStartedAt = Date.now();
+      let streamFrames = 0;
       const history: ChatMessage[] =
         existingUserMessage && base.at(-1)?.id === existingUserMessage.id
           ? base
@@ -1282,6 +1289,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       };
 
       const handleEvent = (event: RawSseEvent) => {
+        streamFrames += 1;
         switch (event.event) {
           case "status": {
             const phase = String(event.data.phase ?? "");
@@ -1464,6 +1472,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
         } else {
           terminal = true;
           failure = asStudioError(error);
+          recordStudioError(failure, "/api/chat");
           publish();
         }
       } finally {
@@ -1476,8 +1485,15 @@ export function StudioProvider({ children }: { children: ReactNode }) {
             suggestion: "Try again — your question is still here.",
             retryable: true,
           };
+          recordStudioError(failure, "/api/chat");
           publish();
         }
+        recordStream({
+          assistant_id: assistantId,
+          frames: streamFrames,
+          terminal: failure ? "failed" : stopped ? "stopped" : "completed",
+          duration_ms: Math.max(0, Date.now() - turnStartedAt),
+        });
         setStreaming(false);
         setThinkingPhase(null);
         abortRef.current = null;
@@ -1650,7 +1666,9 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       try {
         await apiDeleteObservation(observationId);
         setMemory((prev) => prev.filter((item) => item.id !== observationId));
-      } catch {
+      } catch (error) {
+        const problem = asStudioError(error);
+        recordStudioError(problem, "/api/memory/observations");
         pushToast("error", "I couldn't forget that.");
       }
     },
@@ -1664,7 +1682,9 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       setConversationId(null);
       setMessages([]);
       setToolActivity([]);
-    } catch {
+    } catch (error) {
+      const problem = asStudioError(error);
+      recordStudioError(problem, "/api/memory");
       pushToast("error", "I couldn't clear what I've learned.");
     }
   }, [pushToast]);
