@@ -207,3 +207,18 @@ For the full Kiro tool reference including subagent dispatch patterns and git wo
 - Architecture and data-flow details live in `docs/architecture/`; update them when the package graph or runtime boundaries change.
 - Superpowers artifacts belong under `docs/superpowers/`: designs in `docs/superpowers/specs/YYYY-MM-DD-<topic>-design.md`, plans in `docs/superpowers/plans/YYYY-MM-DD-<topic>.md`.
 - Run `uv run pytest` from the root; see `.agents/workflows/test.md` and `docs/architecture/testing.md` for focused commands.
+
+## Surface parity (learned the hard way)
+
+- Every user-facing surface is a **thin adapter over one `ODIService` call**. A new outcome
+  field must be threaded through *all* adapters in the same change — core renderer, MCP tool,
+  CLI, Studio API, Studio card. A field added to the core model but omitted by an adapter is a
+  silent defect (the CLI `brief export` once dropped the W1 value fields and always said "worth
+  is unknown").
+- After adding a field or section, exercise each surface end to end, not just the unit that owns
+  it. The real CLI entry point is `agentic-odi` (`agentic_odi_cli.cli:app`); the Studio sidecar
+  is `agentic-odi-studio-api` and reads `AGENTIC_ODI_DB` (default `~/.agentic-odi/odi.db`).
+- "No fabricated numeral" tests must derive their allow-list **deterministically** from recorded
+  inputs, computed scores, and structural positions. Pulling numerals out of a random UUID (as
+  one pillar test did) makes the assertion pass by luck.
+
