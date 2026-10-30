@@ -242,6 +242,7 @@ export type WorkspacePanelId =
   | "memory"
   | "catchup"
   | "schedule"
+  | "work"
   | "settings";
 
 /**
@@ -254,7 +255,10 @@ export type SignalKind =
   | "opportunity_crossed"
   | "evidence_ingested"
   | "evidence_promoted"
-  | "job_map_completed";
+  | "job_map_completed"
+  | "agent_work_completed"
+  | "agent_work_failed"
+  | "agent_work_blocked";
 
 export type SignalSeverity = "info" | "notice" | "urgent";
 
@@ -512,5 +516,104 @@ export interface ScheduledWork {
   job_id?: string | null;
   created_at: string;
   last_run_at?: string | null;
+  next_run_at?: string | null;
+  trigger_requested_at?: string | null;
   result_summary?: string | null;
+}
+
+export type WorkItemStatus =
+  | "queued"
+  | "dispatching"
+  | "running"
+  | "waiting_for_confirmation"
+  | "completed"
+  | "failed"
+  | "blocked"
+  | "cancelled";
+
+export interface AgentWorkItem {
+  id: string;
+  work_key: string;
+  source_kind: "manual" | "github" | "schedule" | "studio";
+  source_ref?: string | null;
+  title: string;
+  prompt: string;
+  target_alias: string;
+  repository?: string | null;
+  branch?: string | null;
+  priority: number;
+  status: WorkItemStatus;
+  attempts: number;
+  next_attempt_at?: string | null;
+  job_id?: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export type AgentRunStatus =
+  | "pending"
+  | "starting"
+  | "running"
+  | "waiting_for_confirmation"
+  | "completed"
+  | "failed"
+  | "blocked"
+  | "cancelled";
+
+export interface AgentRun {
+  id: string;
+  work_item_id: string;
+  attempt: number;
+  status: AgentRunStatus;
+  conversation_id?: string | null;
+  sandbox_id?: string | null;
+  conversation_url?: string | null;
+  policy_verified: boolean;
+  cost_usd: number;
+  tokens: number;
+  summary?: string | null;
+  pr_urls: string[];
+  error?: string | null;
+  blocked_reason?: string | null;
+  approvals: number;
+  rejections: number;
+  started_at?: string | null;
+  finished_at?: string | null;
+  last_polled_at?: string | null;
+}
+
+export interface AgentWorkEntry {
+  work_item: AgentWorkItem;
+  latest_run: AgentRun | null;
+}
+
+export interface AgentTarget {
+  alias: string;
+  base_url: string;
+  repository?: string | null;
+  branch?: string | null;
+  llm_model?: string | null;
+  max_concurrency: number;
+  max_cost_usd: number;
+  max_runtime_s: number;
+  enabled: boolean;
+  has_env_key: boolean;
+  has_literal_key: boolean;
+}
+
+export interface OrchestratorStatus {
+  daemon_running: boolean;
+  heartbeat_at?: string | null;
+  pid?: number | null;
+  queued: number;
+  running: number;
+  waiting_for_confirmation: number;
+  completed: number;
+  failed: number;
+  blocked: number;
+  cancelled: number;
+  targets: string[];
+  db_path?: string | null;
+  config_path?: string | null;
 }

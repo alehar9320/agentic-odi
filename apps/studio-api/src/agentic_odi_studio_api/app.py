@@ -28,6 +28,7 @@ from agentic_odi_studio_api.studio.errors import (
 from agentic_odi_studio_api.studio.marketplace import StudioMarketplace
 from agentic_odi_studio_api.studio.memory import StudioMemory
 from agentic_odi_studio_api.studio.router import router as studio_router
+from agentic_odi_studio_api.studio.work import router as work_router
 
 CORS_ORIGINS = [
     "tauri://localhost",
@@ -58,6 +59,7 @@ def create_app(
     connectors: ConnectorService | None = None,
     memory: StudioMemory | None = None,
     marketplace: StudioMarketplace | None = None,
+    orchestrator: object | None = None,
 ) -> FastAPI:
     if repo is None:
         repo = SQLiteRepository()
@@ -84,6 +86,8 @@ def create_app(
     app.state.connectors = connectors or ConnectorService(marketplace=resolved_marketplace)
     app.state.memory = memory or StudioMemory()
     app.state.approvals = approvals
+    # Constructed on first use so Studio starts without an orchestrator config.
+    app.state.orchestrator = orchestrator
 
     app.add_middleware(
         CORSMiddleware,
@@ -104,6 +108,7 @@ def create_app(
         return {"capabilities": CAPABILITIES}
 
     app.include_router(studio_router)
+    app.include_router(work_router)
 
     if SPA_DIST.is_dir() and not os.getenv("AGENTIC_ODI_DISABLE_SPA"):
         assets_dir = SPA_DIST / "assets"

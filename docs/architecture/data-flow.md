@@ -8,6 +8,8 @@
 | `apps/mcp-server` | MCP tool adapters over `ODIService` | `build_repository()` selects SQLite in production and in-memory for `AGENTIC_ODI_DB=:memory:` |
 | `apps/studio-api` | Studio API, canvas projection, chat tool loop, conversation history, PM memory | Via the same repository when the local backend is active; conversations and memory in `~/.agentic-odi/studio.db` |
 | `packages/connectors` | Connector protocol, presets, record mapping | Shared `connectors.json` registry; ingested batches land in an in-process sink |
+| `packages/openhands` | Cloud and Agent Server wire models, HTTP calls, status mapping | Nothing; it is a client |
+| `packages/orchestrator` | Work queue, run state machine, approval policy, GitHub intake, daemon | Its own event-sourced SQLite database, `~/.agentic-odi/orchestrator.db` |
 | `apps/studio` | Presentation state, the visible conversation path, optimistic canvas updates; the conversation runtime is assistant-ui | Browser cache only |
 | `apps/cli` | Terminal rendering, local/remote backend selection | SQLite directly for `local`, no local writes for `mcp` |
 
@@ -89,6 +91,35 @@ The sink is a hand-off buffer, not storage: nothing survives the process, and
 mapping is the only way connector data reaches the ODI repository, and it goes
 through the same `ODIService.add_evidence` path as a hand-entered record.
 
+### Orchestrator
+
+The orchestrator is a second writer with its own store, and it mirrors only
+terminal outcomes into the ODI signal inbox.
+
+```text
+manual add / schedule due / GitHub label / Studio chat tool
+  -> WorkItem (work_key is the idempotency key)
+  -> OrchestratorService.tick()
+  -> AgentRun persisted as DISPATCHING before the POST
+  -> OpenHands Cloud: start app-conversation, poll start task
+  -> Agent Server: install ConfirmRisky policy, poll events
+  -> policy.evaluate(ActionEvent) -> respond_to_confirmation
+  -> terminal run: summary, PR URLs, cost
+  -> one agent_work_* signal via ODIService.record_signal
+  -> schedule status sync, GitHub label + one comment
+```
+
+- The daemon refreshes the event projection at the start of every tick, so a
+  work item added by a separate `odi orchestrate add` process is visible.
+- The run row and dispatch token exist before the Cloud POST. On restart the
+  daemon adopts a run by conversation id or by an exact single title/tag match;
+  zero or multiple matches become `BLOCKED` with an urgent signal rather than a
+  blind retry.
+- The confirmation policy is installed immediately after the start task reaches
+  `READY`; if that fails the run is blocked, not run unsupervised.
+- A signal is emitted once per terminal run; queued, running, poll-only, and
+  cancelled states emit nothing.
+
 ## The Conversation
 
 One turn is one SSE stream, and the SPA renders it as typed parts rather than a
@@ -154,6 +185,10 @@ the demo seed only in `mcp` mode when MCP is unreachable or returns no jobs. `lo
 | `AGENTIC_ODI_BASE_URL` | CLI chat, Studio chat | `http://localhost:8001/v1` |
 | `AGENTIC_ODI_MODEL` | CLI chat, Studio chat | `local-tools-model` |
 | `AGENTIC_ODI_API_KEY` | CLI chat, Studio chat | `local` |
+| `AGENTIC_ODI_OPENHANDS_CONFIG` | Orchestrator | `~/.config/agentic-odi/openhands.json` |
+| `AGENTIC_ODI_ORCHESTRATOR_DB` | Orchestrator, CLI, Studio API | `~/.agentic-odi/orchestrator.db` |
+| `OPENHANDS_API_KEY` | Orchestrator target (`api_key_env`) | unset |
+| `GITHUB_TOKEN` | GitHub intake and terminal comments | unset |
 
 ## Trust Boundaries
 
@@ -161,6 +196,12 @@ the demo seed only in `mcp` mode when MCP is unreachable or returns no jobs. `lo
 - The sidecar may reach MCP and the LLM; CORS is restricted to known Studio origins.
 - MCP is an HTTP service with no authentication in local development. Do not expose it directly to the internet; the Cloudflare setup tunnels the sidecar, not MCP.
 - The Tauri desktop shell contacts the GitHub releases endpoint for `latest.json`, verifies the artifact signatures against the key pinned in `tauri.conf.json`, and only stages an update after verification. The updater cannot be reached from the browser build.
+- The orchestrator treats agent output as untrusted: every pending action is
+  checked against the deterministic allowlist and repository scope before it is
+  accepted. Session API keys live only in the orchestrator store, never in logs,
+  signals, GitHub comments, or Studio responses (`AgentRun.public_view`).
+- GitHub issue bodies and labels are untrusted input. Intake is limited to
+  allowlisted repositories and one opt-in label; a pull request is never intake.
 
 ## The Failure Path
 

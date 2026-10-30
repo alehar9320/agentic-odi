@@ -210,6 +210,9 @@ class SignalKind(str, Enum):
     EVIDENCE_PROMOTED = "evidence_promoted"
     JOB_ADDED = "job_added"
     JOB_MAP_COMPLETED = "job_map_completed"
+    AGENT_WORK_COMPLETED = "agent_work_completed"
+    AGENT_WORK_FAILED = "agent_work_failed"
+    AGENT_WORK_BLOCKED = "agent_work_blocked"
 
 
 SignalSeverity = Literal["info", "notice", "urgent"]
@@ -301,4 +304,7 @@ class ScheduledWork(BaseModel):
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     last_run_at: str | None = Field(None, description="ISO timestamp of last execution")
     next_run_at: str | None = Field(None, description="ISO timestamp of next scheduled execution")
+    trigger_requested_at: str | None = Field(
+        None, description="ISO timestamp of an explicit dispatch request for the orchestrator"
+    )
     result_summary: str | None = Field(None, description="Execution outcome or error summary")

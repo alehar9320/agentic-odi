@@ -17,7 +17,14 @@ import { Hero } from "./Hero";
 import { OfflineNotice } from "./OfflineNotice";
 import { ThreadComposer } from "./ThreadComposer";
 
-const VIEW_COMMANDS = new Set<string>(["landscape", "jobmap", "evidence", "settings"]);
+const VIEW_COMMANDS = new Set<string>([
+  "landscape",
+  "jobmap",
+  "evidence",
+  "work",
+  "schedule",
+  "settings",
+]);
 
 function LatestMessageButton() {
   const isAtBottom = useThreadViewport((state) => state.isAtBottom);

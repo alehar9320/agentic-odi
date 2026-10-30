@@ -14,6 +14,8 @@ apps/
 packages/
   core/           agentic_odi_core        Domain, services, repositories, contract
   connectors/     agentic_odi_connectors  MCP client connectors and catalog
+  openhands/      agentic_odi_openhands   OpenHands Cloud/Agent Server HTTP client
+  orchestrator/   agentic_odi_orchestrator Queue, daemon, policy, GitHub and schedule sources
 infra/cloudflare/ Worker script; wrangler.jsonc lives at the repo root
 scripts/          Dev launcher, binary build, installer checks
 tests/            Cross-package contract and launcher tests only
@@ -29,11 +31,20 @@ apps/mcp-server ───────┼──▶ packages/core
 apps/studio-api ───────┘         ▲
                                  │
 apps/cli ──────────────▶ packages/connectors
+apps/cli ──────────────▶ packages/orchestrator ──▶ packages/openhands
+apps/mcp-server ───────▶ packages/orchestrator
+apps/studio-api ───────▶ packages/orchestrator
 ```
 
 - `packages/core` depends on no other workspace package.
 - `packages/connectors` depends on `core` only where it needs shared models.
+- `packages/openhands` is a pure HTTP and wire-model package; it imports no ODI
+  domain code and makes no policy decisions.
+- `packages/orchestrator` depends on `core` for signals and schedules, and on
+  `openhands` for the client. It owns queueing, run state, the approval policy,
+  GitHub intake, and the daemon loop.
 - Every runnable app may depend on `core`; none of them imports another app.
+  The CLI imports the orchestrator lazily so ordinary startup is unaffected.
 - The React SPA only talks to `apps/studio-api` over `/api`; it never calls MCP or the LLM directly.
 - The SPA's conversation runtime is assistant-ui, bound to the Studio's own
   store in `apps/studio/src/assistant/`. That directory
@@ -49,6 +60,14 @@ apps/cli ──────────────▶ packages/connectors
 - Studio conversation history and PM memory use a separate SQLite database,
   `~/.agentic-odi/studio.db`, overridable with `AGENTIC_ODI_STUDIO_DB`. They are
   sidecar-local and never enter the ODI repository or the MCP contract.
+- The orchestrator has its own append-only SQLite database,
+  `~/.agentic-odi/orchestrator.db` (`AGENTIC_ODI_ORCHESTRATOR_DB`), with WAL and
+  a busy timeout. Work items, runs, and approval records are events; the daemon
+  refreshes the projection each tick so CLI and Studio reads see its writes.
+  Signals still land in the ODI database through `ODIService.record_signal`.
+- Agent targets live in `~/.config/agentic-odi/openhands.json`
+  (`AGENTIC_ODI_OPENHANDS_CONFIG`), mode `0600`. Prefer `api_key_env`; a literal
+  `api_key` is allowed but flagged by `odi orchestrate agents`.
 - `build_repository()` chooses SQLite by default and `InMemoryRepository` when `AGENTIC_ODI_DB=:memory:`, which is what tests use.
 - The CLI selects its backend with `--backend local|mcp` or `AGENTIC_ODI_BACKEND`.
 - The Studio API selects `local` (direct service calls) or `mcp` (passthrough) with `AGENTIC_ODI_BACKEND` or `create_app(backend=...)`.

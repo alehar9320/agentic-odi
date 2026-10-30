@@ -7,10 +7,12 @@ dependencies = [
     "fastmcp",
     "pydantic",
     "agentic-odi-core",
+    "agentic-odi-orchestrator",
 ]
 
 [tool.uv.sources]
 agentic-odi-core = { workspace = true }
+agentic-odi-orchestrator = { workspace = true }
 
 [project.scripts]
 agentic-odi-server = "agentic_odi_mcp_server.mcp_server:main"

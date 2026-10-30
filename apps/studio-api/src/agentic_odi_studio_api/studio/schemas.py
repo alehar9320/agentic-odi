@@ -369,6 +369,17 @@ class ScheduleWorkRequest(BaseModel):
     job_id: str | None = None
 
 
+class AddWorkItemRequest(BaseModel):
+    title: str
+    prompt: str
+    target: str | None = None
+    repository: str | None = None
+    branch: str | None = None
+    priority: int = 0
+    job_id: str | None = None
+    work_key: str | None = None
+
+
 class AddEvidenceRequest(BaseModel):
     """A research record delegated from an external tool, or captured by hand."""
 

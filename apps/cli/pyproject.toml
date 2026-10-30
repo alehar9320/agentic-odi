@@ -9,12 +9,14 @@ dependencies = [
     "fastmcp",
     "openai",
     "agentic-odi-core",
+    "agentic-odi-orchestrator",
     "httpx>=0.28.1",
 ]
 
 [tool.uv.sources]
 agentic-odi-connectors = { workspace = true }
 agentic-odi-core = { workspace = true }
+agentic-odi-orchestrator = { workspace = true }
 
 [project.scripts]
 agentic-odi = "agentic_odi_cli.cli:app"

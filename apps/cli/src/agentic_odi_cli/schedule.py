@@ -25,15 +25,18 @@ def create_cmd(
         "--expression",
         "-e",
         help=(
-            "Schedule expression, stored verbatim. It is not interpreted yet: "
-            "no parser reads an ISO timestamp, a relative delay, or cron."
+            "ISO-8601 timestamp, relative delay (+1h, +90m, +2d), or cron "
+            "(0 9 * * 1-5). The expression decides one-shot vs recurring."
         ),
     ),
     agent_id: str = typer.Option(
         "default-agent", "--agent-id", "-a", help="Agent ID assigned to run the work"
     ),
     trigger_type: str = typer.Option(
-        "oneshot", "--trigger-type", "-t", help="Trigger type: oneshot | cron | interval"
+        "oneshot",
+        "--trigger-type",
+        "-t",
+        help="Compatibility hint; the parsed expression decides the real trigger type.",
     ),
     job_id: str | None = typer.Option(None, "--job-id", "-j", help="Associated ODI Job ID"),
     payload: str | None = typer.Option(
@@ -110,8 +113,10 @@ def trigger_cmd(
         ..., help="The ID of the scheduled work task to trigger immediately"
     ),
 ) -> None:
-    """Record a dispatch of a scheduled task. No executor is installed yet."""
+    """Queue a scheduled task for the orchestrator to dispatch."""
     result = run_tool("trigger_scheduled_work", {"work_id": work_id})
     typer.secho(
-        f"Triggered task '{result.get('name')}': {result.get('result_summary')}", fg="green"
+        f"Queued task '{result.get('name')}' for the orchestrator: "
+        f"{result.get('result_summary')}",
+        fg="green",
     )

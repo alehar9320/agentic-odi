@@ -22,17 +22,22 @@ function statusTone(status: ScheduledWork["status"]): string {
   }
 }
 
+function formatTime(value: string): string {
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleString();
+}
+
 /**
- * The scheduling foundation: record work for an agent, dispatch it, or cancel
- * it. No executor is installed yet (#95), so Trigger records a dispatch and
- * says so; it never claims the work ran. The agent id arrives as data.
+ * Schedule work for an agent and let the daemon dispatch it. The expression is
+ * parsed when the schedule is created, so the panel shows the real next run
+ * instead of guessing. Trigger queues an occurrence immediately; it never
+ * claims the work ran.
  */
 export function SchedulePanel({ agentId: initialAgentId }: { agentId?: string }) {
   const { canvas, settings, pushToast, refreshCanvas } = useStudio();
   const [name, setName] = useState("");
   const [expression, setExpression] = useState("");
   const [agentId, setAgentId] = useState(initialAgentId ?? "");
-  const [triggerType, setTriggerType] = useState<"oneshot" | "cron" | "interval">("oneshot");
   const [selectedJobId, setSelectedJobId] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -50,11 +55,13 @@ export function SchedulePanel({ agentId: initialAgentId }: { agentId?: string })
         name: name.trim(),
         schedule_expression: expression.trim(),
         agent_id: agentId.trim() || "default-agent",
-        trigger_type: triggerType,
         job_id: selectedJobId || undefined,
         mcp_url: settings.mcp_url,
       });
-      pushToast("success", `Scheduled “${name.trim()}”.`);
+      pushToast(
+        "success",
+        `Scheduled “${name.trim()}”. It runs when the orchestrator daemon is running.`,
+      );
       setName("");
       setExpression("");
       await refreshCanvas();
@@ -68,10 +75,13 @@ export function SchedulePanel({ agentId: initialAgentId }: { agentId?: string })
   async function handleTrigger(work: ScheduledWork) {
     try {
       await apiTriggerScheduledWork(work.id, settings.mcp_url);
-      pushToast("success", `Dispatched “${work.name}” — no executor is installed yet.`);
+      pushToast(
+        "success",
+        `Queued “${work.name}” for the orchestrator; it has not run yet.`,
+      );
       await refreshCanvas();
     } catch (error) {
-      pushToast("error", `Could not trigger: ${(error as Error).message}`);
+      pushToast("error", `Could not queue: ${(error as Error).message}`);
     }
   }
 
@@ -100,9 +110,7 @@ export function SchedulePanel({ agentId: initialAgentId }: { agentId?: string })
         </div>
 
         <div className="field">
-          <label htmlFor="schedule-expression">
-            When <span className="field__hint">stored verbatim, not parsed yet</span>
-          </label>
+          <label htmlFor="schedule-expression">When</label>
           <input
             id="schedule-expression"
             className="input"
@@ -111,8 +119,8 @@ export function SchedulePanel({ agentId: initialAgentId }: { agentId?: string })
             onChange={(event) => setExpression(event.target.value)}
           />
           <p className="field__hint">
-            Nothing reads this expression yet — no scheduler exists (#95). It is kept so the
-            record is complete when one does.
+            An ISO timestamp, a relative delay (+90m, +2d), or a cron expression. The expression
+            is parsed when you schedule it and decides whether the work runs once or repeatedly.
           </p>
         </div>
 
@@ -127,22 +135,6 @@ export function SchedulePanel({ agentId: initialAgentId }: { agentId?: string })
             placeholder="default-agent"
             onChange={(event) => setAgentId(event.target.value)}
           />
-        </div>
-
-        <div className="field">
-          <label htmlFor="schedule-trigger">Trigger type</label>
-          <select
-            id="schedule-trigger"
-            className="select"
-            value={triggerType}
-            onChange={(event) =>
-              setTriggerType(event.target.value as "oneshot" | "cron" | "interval")
-            }
-          >
-            <option value="oneshot">oneshot</option>
-            <option value="cron">cron</option>
-            <option value="interval">interval</option>
-          </select>
         </div>
 
         <div className="field">
@@ -175,7 +167,9 @@ export function SchedulePanel({ agentId: initialAgentId }: { agentId?: string })
 
       <p className="section-title">Scheduled ({scheduledWork.length})</p>
       {scheduledWork.length === 0 ? (
-        <p className="empty-note">Nothing scheduled yet. There is no executor, so nothing runs.</p>
+        <p className="empty-note">
+          Nothing scheduled yet. The orchestrator daemon turns due schedules into agent work.
+        </p>
       ) : (
         <div className="stack">
           {scheduledWork.map((work) => (
@@ -187,6 +181,14 @@ export function SchedulePanel({ agentId: initialAgentId }: { agentId?: string })
               <p className="card__meta">
                 Agent {work.agent_id} · {work.trigger_type} · {work.schedule_expression || "—"}
               </p>
+              <p className="card__meta">
+                {work.trigger_requested_at
+                  ? `Queued for the orchestrator ${formatTime(work.trigger_requested_at)}`
+                  : work.next_run_at
+                    ? `Next run ${formatTime(work.next_run_at)}`
+                    : "No next run; one-shot work runs once when queued"}
+                {work.last_run_at ? ` · Last run ${formatTime(work.last_run_at)}` : ""}
+              </p>
               {work.result_summary ? <p className="card__evidence">{work.result_summary}</p> : null}
               {work.status !== "cancelled" && work.status !== "completed" ? (
                 <div className="card__actions">
@@ -195,7 +197,7 @@ export function SchedulePanel({ agentId: initialAgentId }: { agentId?: string })
                     className="quiet-action"
                     onClick={() => void handleTrigger(work)}
                   >
-                    Dispatch
+                    Queue now
                   </button>
                   <button
                     type="button"

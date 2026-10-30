@@ -167,6 +167,7 @@ const PANEL_FOR_SUBJECT: Partial<Record<SignalSubjectKind, WorkspacePanelId>> = 
   step: "jobmap",
   outcome: "landscape",
   evidence: "evidence",
+  agent_work: "work",
 };
 
 /** The developer simulator's events never reach the store, so they carry this id prefix. */

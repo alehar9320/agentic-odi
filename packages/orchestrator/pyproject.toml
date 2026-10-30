@@ -1,0 +1,21 @@
+[project]
+name = "agentic-odi-orchestrator"
+version = "0.14.0"
+description = "Queue, dispatch, supervise, and retry OpenHands Cloud agent work for Agentic ODI."
+requires-python = ">=3.10"
+dependencies = [
+    "agentic-odi-core",
+    "agentic-odi-openhands",
+    "pydantic",
+]
+
+[tool.uv.sources]
+agentic-odi-core = { workspace = true }
+agentic-odi-openhands = { workspace = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/agentic_odi_orchestrator"]
