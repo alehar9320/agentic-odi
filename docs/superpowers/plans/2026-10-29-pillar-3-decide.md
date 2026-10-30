@@ -421,15 +421,37 @@ On `alexanderharenstam/alh-64-w1-what-is-this-opportunity-worth`:
 |---|---|
 | `752ae14` | W1 (ALH-64) |
 
+**Post-completion surface check (follow-up commit `6e96d4f`)**
+
+An end-to-end walkthrough against a live `agentic-odi` binary and the Studio
+sidecar surfaced two gaps the unit suites had not pinned:
+
+- The CLI `brief export` adapter (`assemble_brief_inputs`) dropped the W1 value
+  fields, so the exported case always said "worth is unknown" even when a value
+  was recorded — contradicting ALH-64's first acceptance criterion and the
+  "thin adapter over one shared spine" rule. Fixed and pinned with valued and
+  unvalued CLI tests.
+- `test_pillar_three_end_to_end.py`'s numeral allow-list only admitted `0` when
+  a random UUID happened to contain it, so the evidence-count numeral passed by
+  luck. The allow-list is now derived deterministically (input numerals,
+  computed scores, structural count/positions).
+
+The Studio value *row* (ALH-188) and value-based roadmap *ordering* (ALH-189)
+remain deferred by the plan; this fix is confined to C4's exported-case parity.
+
 **Verification at completion**
 
-- `uv run pytest` → **1566 passed** (includes the new
+- `uv run pytest` → **1568 passed** (includes the new
   `packages/core/tests/test_pillar_three_end_to_end.py`, which chains all five
-  deliverables from one recorded fixture).
+  deliverables from one recorded fixture); run three times with no flake.
 - `uv run ruff check .` clean; `uv run ruff format --check .` clean.
 - `uv run mypy apps packages` → no issues in 199 source files.
 - `npm --prefix apps/studio test -- --run` → 540 passed (56 files).
-- Coverage 89.32% ≥ the 89% floor.
+- Coverage 89.45% ≥ the 89% floor.
+- Live CLI + Studio API walkthrough: brief (valued and unvalued), compare
+  (2- and 4-outcome), `decide record` (supersede), `roadmap show` (excluded
+  count), `POST /api/decisions/review` (`no_evidence`, not a zero), `PATCH
+  /api/outcomes/{id}/value` (market-without-source refused).
 
 **Readiness gates pinned (recorded, not inferred)**
 
