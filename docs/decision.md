@@ -31,32 +31,76 @@ async def main():
     async with Client(mcp_server.mcp) as client:
         job = _j((await client.call_tool("add_job", {"name": "Onboard customers"})).content[0].text)
 
-        candidates = _j((await client.call_tool("extract_candidates", {
-            "quote_id": "q-1",
-            "quote": "Minimize the time it takes to onboard when a customer signs up.",
-            "job_id": job["id"],
-        })).content[0].text)
+        candidates = _j(
+            (
+                await client.call_tool(
+                    "extract_candidates",
+                    {
+                        "quote_id": "q-1",
+                        "quote": "Minimize the time it takes to onboard when a customer signs up.",
+                        "job_id": job["id"],
+                    },
+                )
+            )
+            .content[0]
+            .text
+        )
 
-        outcome = _j((await client.call_tool("accept_candidate", {
-            "candidate_id": candidates[0]["id"], "importance": 9.0, "satisfaction": 4.0,
-        })).content[0].text)
-        print("outcome", outcome["id"], outcome["opportunity_score"])   # 14.0
+        outcome = _j(
+            (
+                await client.call_tool(
+                    "accept_candidate",
+                    {
+                        "candidate_id": candidates[0]["id"],
+                        "importance": 9.0,
+                        "satisfaction": 4.0,
+                    },
+                )
+            )
+            .content[0]
+            .text
+        )
+        print("outcome", outcome["id"], outcome["opportunity_score"])  # 14.0
 
-        brief = _j((await client.call_tool("get_brief", {"subject_id": outcome["id"]})).content[0].text)
+        brief = _j(
+            (await client.call_tool("get_brief", {"subject_id": outcome["id"]})).content[0].text
+        )
         print("brief", brief["headline"])
 
-        decision = _j((await client.call_tool("record_decision", {
-            "subject_id": outcome["id"], "choice": "build", "rationale": "underserved and frequent",
-        })).content[0].text)
+        decision = _j(
+            (
+                await client.call_tool(
+                    "record_decision",
+                    {
+                        "subject_id": outcome["id"],
+                        "choice": "build",
+                        "rationale": "underserved and frequent",
+                    },
+                )
+            )
+            .content[0]
+            .text
+        )
 
-        bet = _j((await client.call_tool("track_bet", {
-            "decision_id": decision["id"],
-            "statement": "activation within a day rises",
-            "metric": "time_to_first_value",
-        })).content[0].text)
+        bet = _j(
+            (
+                await client.call_tool(
+                    "track_bet",
+                    {
+                        "decision_id": decision["id"],
+                        "statement": "activation within a day rises",
+                        "metric": "time_to_first_value",
+                    },
+                )
+            )
+            .content[0]
+            .text
+        )
 
-        measurement = _j((await client.call_tool("get_measurement", {"bet_id": bet["id"]})).content[0].text)
-        print("measurement", measurement["value"])   # None — nothing measured yet
+        measurement = _j(
+            (await client.call_tool("get_measurement", {"bet_id": bet["id"]})).content[0].text
+        )
+        print("measurement", measurement["value"])  # None — nothing measured yet
 
 
 asyncio.run(main())
@@ -64,8 +108,22 @@ asyncio.run(main())
 
 ## 1. The brief
 
-`get_brief` renders the case for a subject from its numbers. Each figure carries
-its **basis** — the words that say where the number came from:
+The CLI renders it with `brief`; the MCP tool `get_brief` returns the same
+object. Each figure carries its **basis** — the words that say where the number
+came from.
+
+```bash
+agentic-odi brief <outcome-id>
+```
+
+```
+Minimize the time it takes to onboard when a customer signs up.
+
+opportunity_score  14.00
+                   importance 9.0 + max(importance - satisfaction, 0) at satisfaction 4.0
+decisions          0.00
+                   0 decisions recorded
+```
 
 ```json
 {

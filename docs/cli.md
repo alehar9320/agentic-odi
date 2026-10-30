@@ -182,6 +182,17 @@ already-decided candidate is refused rather than re-accepted, so a retry cannot
 double-write. `reject` requires a reason and keeps it. `merge` folds a
 near-duplicate into an existing Outcome and creates no outcome.
 
+Once an outcome exists, render its decision brief:
+
+```bash
+agentic-odi brief <outcome-id>          # the case for the outcome, with each basis
+agentic-odi brief <outcome-id> --json   # the same, machine-readable
+```
+
+Every figure in the brief carries the words that explain where its number came
+from, so a figure with no data reads `0 decisions recorded` rather than a
+placeholder.
+
 ## Load the sample workspace
 
 `demo` loads a labelled corpus so you can see a filled canvas before you have

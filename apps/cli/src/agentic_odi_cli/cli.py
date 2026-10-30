@@ -275,6 +275,35 @@ def spine_cmd(
         typer.echo(rendered)
 
 
+@app.command(name="brief")
+def brief_cmd(
+    subject_id: str = typer.Argument(..., help="Outcome ID to render the brief for."),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
+) -> None:
+    """Render the decision brief for one outcome, with each figure's basis.
+
+    Every numeral in the brief is interpolated from the stored outcome; the
+    ``basis`` line says where it came from, so a figure with no data reads
+    "0 decisions recorded" rather than a placeholder.
+    """
+    brief = run_tool("get_brief", {"subject_id": subject_id})
+    if json_output:
+        typer.echo(json.dumps(brief, indent=2))
+        return
+    if not isinstance(brief, dict):
+        typer.echo(str(brief))
+        return
+    typer.echo(brief.get("headline", ""))
+    typer.echo("")
+    rows = [(figure["name"], figure.get("value")) for figure in brief.get("figures", [])]
+    width = max((len(name) for name, _ in rows), default=0)
+    for figure in brief.get("figures", []):
+        value = figure.get("value")
+        shown = f"{value:.2f}" if isinstance(value, (int, float)) else "—"
+        typer.echo(f"{figure['name'].ljust(width)}  {shown}")
+        typer.echo(f"{' '.ljust(width)}  {figure.get('basis', '')}")
+
+
 @app.command(name="store")
 def store_cmd(
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
@@ -285,9 +314,9 @@ def store_cmd(
     is the refusal a user would hit elsewhere — not a second, softer check.
     """
     from agentic_odi_core.intent_store import CURRENT_SCHEMA_VERSION
-    from agentic_odi_core.sqlite_repository import SQLiteRepository
+    from agentic_odi_core.sqlite_repository import SQLiteRepository, resolve_db_path
 
-    db_path = context.config().db_path
+    db_path = resolve_db_path(context.config().db_path)
     try:
         repo = SQLiteRepository(db_path=db_path)
     except Exception as exc:  # noqa: BLE001 - surfaced verbatim, it is the point
@@ -309,7 +338,7 @@ def store_cmd(
             )
         )
     else:
-        typer.echo(f"store: {db_path or '(default)'}")
+        typer.echo(f"store: {db_path}")
         typer.echo(f"schema version: {version} (this build supports {CURRENT_SCHEMA_VERSION})")
 
 

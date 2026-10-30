@@ -25,6 +25,19 @@ from agentic_odi_core.models import (
 )
 from agentic_odi_core.repository import Repository, page, sort_outcomes
 
+DEFAULT_DB_PATH = os.path.expanduser("~/.agentic-odi/odi.db")
+
+
+def resolve_db_path(db_path: str | None = None) -> str:
+    """The store path a command will actually open.
+
+    One place resolves the default so every surface — a write, a read, and the
+    ``store`` report — names the same file rather than each guessing.
+    """
+    if db_path:
+        return db_path
+    return os.environ.get("AGENTIC_ODI_DB") or DEFAULT_DB_PATH
+
 
 class SQLiteRepository(Repository):
     def __init__(
@@ -33,8 +46,7 @@ class SQLiteRepository(Repository):
         workspace_id: str | None = None,
         device_id: str | None = None,
     ) -> None:
-        if db_path is None:
-            db_path = os.environ.get("AGENTIC_ODI_DB", os.path.expanduser("~/.agentic-odi/odi.db"))
+        db_path = resolve_db_path(db_path)
         os.makedirs(os.path.dirname(db_path) or ".", exist_ok=True)
         self._lock = threading.RLock()
         self._workspace_id = workspace_id or os.environ.get(

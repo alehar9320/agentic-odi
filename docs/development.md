@@ -318,6 +318,21 @@ CI never accepts a snapshot automatically; drift fails the build. A newly
 accepted snapshot is not proof of backward compatibility — an intentional
 breaking change needs its own compatibility decision.
 
+## The ninety-second tour
+
+`docs/tour/README.md` and `docs/tour/tour.cast` are generated, never hand-edited.
+Regenerate them in one command after a change that affects the walkthrough:
+
+```bash
+uv run python scripts/tour.py
+```
+
+`scripts/tour.py` executes every command in `docs/tour/script.md` against a
+disposable store, so a command that no longer runs fails the build rather than
+rotting in prose. `tests/test_tour.py` fails if the committed artifacts differ
+from a fresh run, if the walkthrough exceeds the ninety-second budget, or if a
+documented command cannot be executed.
+
 ## Agent Session Tracking
 
 Agent sessions are captured with the [Entire](https://docs.entire.io/overview)

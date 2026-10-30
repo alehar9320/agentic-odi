@@ -116,6 +116,16 @@ odi score 8 2                        # → 14.00
 odi                                  # interactive chat in a terminal
 ```
 
+**See the loop in ninety seconds.** The
+[ninety-second tour](docs/tour/README.md) walks quote → candidate → outcome →
+brief on a labelled sample workspace, with a generated transcript and a
+committed terminal cast:
+
+```bash
+odi demo load                        # a labelled sample you can explore
+odi summary demo-job-1 --top 3       # the landscape
+```
+
 ## Connect your agent
 
 The server speaks the Model Context Protocol. Any MCP client can reach it:
