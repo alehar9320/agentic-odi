@@ -313,7 +313,7 @@ class ConfirmationPolicy(BaseModel):
     """Base class; subclasses know their own OpenHands wire shape."""
 
     def to_wire(self) -> dict[str, Any]:  # pragma: no cover - overridden
-        raise NotImplementedError
+        raise TypeError(f"{type(self).__name__} does not implement to_wire")
 
 
 class AlwaysConfirm(ConfirmationPolicy):
