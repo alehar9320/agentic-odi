@@ -29,6 +29,7 @@ import type {
   Step,
   StudioConfig,
   StudioError,
+  JobStageDef,
 } from "../types";
 import { createSseParser, type RawSseEvent } from "./sse";
 import { recordStudioError } from "../diagnostics/bundle";
@@ -268,6 +269,15 @@ export function fetchChangelog(): Promise<ChangelogData> {
     () => getJson<ChangelogData>("/api/changelog"),
     (bff) => bff.fetchChangelog(),
   );
+}
+
+/**
+ * The canonical job-map stages, in server order. The Studio renders what this
+ * returns, so it holds no second copy of the eight names.
+ */
+export async function fetchStages(): Promise<JobStageDef[]> {
+  const body = await getJson<{ stages?: JobStageDef[] }>("/api/schema");
+  return body.stages ?? [];
 }
 
 export async function fetchCanvas(mcpUrl: string): Promise<CanvasData> {
