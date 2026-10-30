@@ -75,7 +75,10 @@ export function WorkPanel() {
   }, []);
 
   useEffect(() => {
-    void refresh();
+    // The first read happens after the async boundary, never during render.
+    void (async () => {
+      await refresh();
+    })();
   }, [refresh]);
 
   async function handleCancel(entry: AgentWorkEntry) {
