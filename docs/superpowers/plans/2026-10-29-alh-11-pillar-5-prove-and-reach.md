@@ -232,3 +232,44 @@ This is the seam ALH-63's end-to-end spine test and ALH-59's guides will extend:
 a consumer depends on `Spine` and a `Protocol`, wires the real implementation
 when it lands, and reads `spine_summary()` to render the gap meanwhile.
 
+
+## Wave 2 · ALH-63, ALH-59, ALH-127/219 (delivered)
+
+The M1 spine landed over the real store, which unblocked the three Wave-2
+children that named it.
+
+- **ALH-63 — one end-to-end test of the spine.**
+  `tests/e2e/test_spine.py::test_one_quote_travels_the_whole_spine_and_survives_a_reopen`
+  drives one quote through candidate → outcome → score → brief → decision →
+  bet → measure over the real store, reopens it, and asserts the numbers are
+  independently expected. It is the proof, not a mock.
+- **ALH-59 — document the spine.** `docs/interviews.md`, `docs/scoring.md`,
+  `docs/decision.md` each carry a runnable isolated-fixture sequence and one
+  honest empty path; `README.md`, `docs/cli.md` and `docs/roadmap.md` point at
+  them and the site nav publishes them.
+- **ALH-127 / ALH-219 — the ninety-second tour.** `docs/tour/script.md` is the
+  scripted walkthrough; `scripts/tour.py` executes every command against a
+  disposable store and generates `docs/tour/tour.cast` (asciinema v2) and
+  `docs/tour/README.md`. `tests/test_tour.py` fails if a documented command
+  cannot run, if the committed artifacts drift, or if the walkthrough exceeds
+  the ninety-second budget (measured ~4s). A new `agentic-odi brief` command
+  renders the decision brief with each figure's basis so the tour ends at a
+  real rendered brief; `store` now reports the resolved store path.
+
+### ALH-236 — deliberately not attempted
+
+ALH-236 (Studio screenshot capture) is unblocked by ALH-219 in the dependency
+graph but **not deliverable in this environment**: the Studio e2e harness needs
+a click-capable browser, and the sandbox's headless Chromium is blocked by an
+interstitial "Connector suggestion" modal that intercepts pointer events (and
+by the headless-shell's missing dbus). The child's own rule applies — report the
+missing capability by reference rather than commit a capture that was never
+verified. It stays open with this note as its blocker.
+
+### Still blocked (unchanged)
+
+Every remaining M4/M5 child names a policy or contract that does not exist yet
+(per-view disclosure/redaction, approval records and override actors, publish
+destination identity, contract-version and provenance-format sources). Per the
+epic and the children, these remain explicit blockers rather than invented
+constants.

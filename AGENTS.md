@@ -207,3 +207,25 @@ For the full Kiro tool reference including subagent dispatch patterns and git wo
 - Architecture and data-flow details live in `docs/architecture/`; update them when the package graph or runtime boundaries change.
 - Superpowers artifacts belong under `docs/superpowers/`: designs in `docs/superpowers/specs/YYYY-MM-DD-<topic>-design.md`, plans in `docs/superpowers/plans/YYYY-MM-DD-<topic>.md`.
 - Run `uv run pytest` from the root; see `.agents/workflows/test.md` and `docs/architecture/testing.md` for focused commands.
+
+## Pillar 5 (ALH-11) delivery notes
+
+- **The tour is generated, never hand-edited.** `docs/tour/script.md` is the
+  source; `uv run python scripts/tour.py` executes every command against a
+  disposable store and regenerates `docs/tour/tour.cast` and
+  `docs/tour/README.md`. `tests/test_tour.py` fails on drift, a command that
+  cannot run, or a walkthrough over the 90s budget. Never edit the cast or the
+  generated README by hand.
+- **One place resolves the store path.** `agentic_odi_core.sqlite_repository.resolve_db_path`
+  is the single default-resolution point (`--db` → `AGENTIC_ODI_DB` →
+  `~/.agentic-odi/odi.db`); the `store` command reports it, so the report can
+  never disagree with the file a write opens.
+- **`agentic-odi brief <outcome-id>`** renders the decision brief with each
+  figure's basis; the MCP tool `get_brief` returns the same object.
+- **Blocked children stay blocked.** M4/M5 children that name a missing policy
+  or contract (per-view disclosure/redaction, approval records and override
+  actors, publish destination identity, contract-version/provenance sources)
+  must report the gap by reference, never invent a constant. ALH-236 (Studio
+  screenshot capture) is unblocked in the graph but not deliverable in this
+  sandbox: the Studio e2e harness is blocked by an interstitial modal in
+  headless Chromium.
