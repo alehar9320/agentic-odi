@@ -139,6 +139,50 @@ download, and install), `transport.test.ts` (Tauri boundary), and the
 `UpdateBanner`/`UpdateSettings` component tests. `StudioBar.test.tsx` and
 `SettingsPanel.test.tsx` cover the UI integration points.
 
+## Accessibility
+
+Accessibility is tested, not asserted. Three kinds of checks run with the normal
+frontend suite (`npm --prefix apps/studio test`), so a regression turns the
+build red without a separate command:
+
+- **axe sweep** — `src/test/a11y.test.tsx` renders every shipping surface
+  (matrix, job map, catch-up feed, settings, first-run wizard, command palette,
+  chat stage, changelog dialog) inside a real `<main>` and runs
+  [axe-core](https://github.com/dequelabs/axe-core) through `vitest-axe`, with
+  zero WCAG 2.1 A/AA violations allowed. The helper lives in `src/test/axe.ts`.
+  `vitest-axe@0.1.0` ships an empty `extend-expect` module, so the helper
+  asserts on `results.violations` directly instead of the `toHaveNoViolations`
+  matcher; the output names the rule, its help text, and the offending
+  selector.
+  - `color-contrast` is disabled in this sweep: jsdom has no layout, so every
+    element computes as transparent-on-white and axe cannot measure real
+    colours. Contrast is covered by the next two bullets instead.
+- **theme contrast** — `src/styles/theme.test.ts` derives both palettes from
+  `theme.css` and asserts every text token (`--text`, `--muted`, `--faint`,
+  `--accent`, `--green`, `--amber`) clears 4.5:1 on `--bg` and `--bg-raised`,
+  and that the focus ring (`--accent`) clears the 3:1 non-text minimum. The
+  same file fails if the stylesheet references a custom property that nothing
+  defines, which is how the `--studio-*` aliases silently stopped resolving.
+  Measured today: dark text 17.6, muted 8.2, faint 5.1, accent 6.8; light text
+  16.6, muted 6.1, faint 4.6, accent 5.0.
+- **keyboard and structure** — `src/test/keyboard.test.tsx` asserts the shell
+  landmarks, skip link, and `<main>` target, then parses every non-test `.tsx`
+  with the TypeScript AST and fails on any intrinsic element that carries
+  `onClick` without being a native control or declaring
+  `role` + `tabIndex` + `onKeyDown`. Component-level suites cover the rest:
+  roving tabindex and arrow keys on the opportunity matrix, `aria-activedescendant`
+  in the command palette, focus trapping and focus restore in the mobile lens
+  and changelog dialog, and a single polite live region per transcript.
+
+Reduced motion is honoured globally in `theme.css` (`@media
+(prefers-reduced-motion: reduce)` collapses animations, transitions, and
+`scroll-behavior`), so new components inherit it without opting in.
+
+Contrast is never faked in jsdom: it is computed from the palette tokens above,
+and a real-browser axe pass over the matrix, palette, and mobile lens remains a
+candidate for the Playwright suite described below, which today covers the
+end-to-end seams rather than accessibility.
+
 ## End-to-end
 
 The browser-level suite lives in `apps/studio/e2e/` and runs with

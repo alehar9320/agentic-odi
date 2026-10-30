@@ -69,6 +69,9 @@ function StudioShell() {
 
   return (
     <div className="studio-app">
+      <a className="skip-link" href="#studio-stage">
+        Skip to conversation
+      </a>
       <BannerBridge />
       <BannerToasts />
       <BannerStack
@@ -78,13 +81,13 @@ function StudioShell() {
         onAction={onAction}
         onIntent={onIntent}
       />
-      <main className="stage">
-        <StudioBar
-          onHome={goHome}
-          onNew={newConversation}
-          onChangelog={() => setShowChangelog(true)}
-        />
-        <UpdateBanner />
+      <StudioBar
+        onHome={goHome}
+        onNew={newConversation}
+        onChangelog={() => setShowChangelog(true)}
+      />
+      <UpdateBanner />
+      <main id="studio-stage" className="stage" tabIndex={-1}>
         {customizeOpen ? (
           <CustomizePage />
         ) : (
@@ -102,6 +105,8 @@ function StudioShell() {
     </div>
   );
 }
+
+export { StudioShell };
 
 export default function App() {
   return (
