@@ -140,3 +140,50 @@ def test_brief_export_missing_measurement_is_not_zero(tmp_path) -> None:
     assert result.exit_code == 0, result.output
     assert "No measured outcomes yet" in result.output
     assert "- Score: 0" not in result.output
+
+
+def test_brief_export_renders_a_recorded_value_with_its_basis(tmp_path) -> None:
+    db = str(tmp_path / "studio.db")
+    job_id = _seed(db)
+    outcome_id = json.loads(
+        runner.invoke(
+            app, ["--db", db, "desired-outcomes", "list", "--job-id", job_id, "--json"]
+        ).output
+    )[0]["id"]
+    valued = runner.invoke(
+        app,
+        [
+            "--db",
+            db,
+            "desired-outcomes",
+            "value",
+            outcome_id,
+            "--estimate",
+            "250000",
+            "--unit",
+            "currency",
+            "--basis",
+            "market",
+            "--source",
+            "Gartner 2026",
+        ],
+    )
+    assert valued.exit_code == 0, valued.output
+
+    result = runner.invoke(app, ["--db", db, "brief", "export", "--job-id", job_id])
+
+    assert result.exit_code == 0, result.output
+    assert "## What it is worth" in result.output
+    assert "250000 currency (market, sized)" in result.output
+    assert "source: Gartner 2026" in result.output
+
+
+def test_brief_export_omits_worth_when_no_value_recorded(tmp_path) -> None:
+    db = str(tmp_path / "studio.db")
+    job_id = _seed(db)
+
+    result = runner.invoke(app, ["--db", db, "brief", "export", "--job-id", job_id])
+
+    assert result.exit_code == 0, result.output
+    assert "worth is unknown, not zero" in result.output
+    assert "(market, sized)" not in result.output

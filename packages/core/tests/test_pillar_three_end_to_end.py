@@ -125,15 +125,17 @@ def test_the_five_deliverables_chain_from_one_fixture():
     ):
         allowed |= set(re.findall(r"\d+(?:\.\d+)?", text))
     # Scores are computed from recorded importance/satisfaction, so they are
-    # derived inputs, not fabrications. Section positions and the "N omitted"
-    # count are structural.
+    # derived inputs, not fabrications.
     for outcome_id in (onboarding_id, publishing_id, support_id):
         outcome = service.get_outcome(outcome_id)
         assert outcome is not None
         allowed.add(f"{outcome.opportunity_score:g}")
         if outcome.value_estimate is not None:
             allowed.add(f"{outcome.value_estimate:g}")
-    allowed |= {"1", "2", "3"}
+    # Structural numerals the brief legitimately prints: the evidence count and
+    # the one-based position of each rendered outcome.
+    allowed.add("0")  # no evidence records were recorded
+    allowed |= {str(i) for i in range(1, 4)}
     for numeral in re.findall(r"\d+(?:\.\d+)?", brief):
         assert numeral in allowed, f"fabricated numeral {numeral!r} in the case"
 

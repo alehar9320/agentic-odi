@@ -126,6 +126,11 @@ def assemble_brief_inputs(
                 "method": None,
                 "quote": None,
                 "sources": sources.get(outcome_id, []) if isinstance(outcome_id, str) else [],
+                "value_estimate": outcome.get("value_estimate"),
+                "value_unit": outcome.get("value_unit"),
+                "value_basis": outcome.get("value_basis") or "estimate",
+                "value_n": outcome.get("value_n"),
+                "value_source": outcome.get("value_source"),
             }
         )
     consideration = None
@@ -155,6 +160,11 @@ def _render(brief_inputs: dict[str, Any]) -> str:
             method=item["method"],
             quote=item["quote"],
             sources=tuple(item["sources"]),
+            value_estimate=item.get("value_estimate"),
+            value_unit=item.get("value_unit"),
+            value_basis=item.get("value_basis") or "estimate",
+            value_n=item.get("value_n"),
+            value_source=item.get("value_source"),
         )
         for item in brief_inputs["outcomes"]
     )
