@@ -1889,6 +1889,35 @@ html[data-theme="light"] .theme-toggle__moon {
 }
 
 /* ---------------------------------------------------------------- */
+/* Candidate review queue                                           */
+/* ---------------------------------------------------------------- */
+
+.queue {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.queue__item {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: color-mix(in srgb, var(--surface) 60%, transparent);
+}
+
+.queue__item .evidence__quote {
+  margin: 0;
+}
+
+.queue__item .evidence__meta {
+  margin-top: 0;
+}
+
+/* ---------------------------------------------------------------- */
 /* Steps                                                            */
 /* ---------------------------------------------------------------- */
 
