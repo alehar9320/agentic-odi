@@ -375,6 +375,28 @@ async def get_job(job_id: str, request: Request, mcp_url: str | None = Query(Non
     return {"ok": True, "result": job.model_dump(mode="json")}
 
 
+@router.get("/jobs/{job_id}/coverage")
+async def get_job_coverage(
+    job_id: str, request: Request, mcp_url: str | None = Query(None)
+) -> dict:
+    """What a job's research covers, per stage, with the gaps named.
+
+    A read: nothing is written. Every stage is reported in canonical order,
+    including the empty ones, and outcomes with no stage fall into an explicit
+    ``unassigned`` bucket. An unknown job is a not-found error, distinct from an
+    existing job with no outcomes, which returns a zeroed report.
+    """
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(mcp_url or ""), ToolName.GET_COVERAGE.value, {"job_id": job_id}
+        )
+        return {"ok": True, "result": _json_or_raw(result)}
+    service = _service(request)
+    if service.get_job(job_id) is None:
+        raise _as_http_error(JobNotFoundError(job_id))
+    return {"ok": True, "result": service.coverage_report(job_id).model_dump(mode="json")}
+
+
 @router.get("/steps")
 async def get_steps(
     request: Request,

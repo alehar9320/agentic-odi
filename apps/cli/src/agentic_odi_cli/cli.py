@@ -231,6 +231,17 @@ def guidelines_cmd() -> None:
     typer.echo(run_tool("get_odi_framework_guidelines", {}))
 
 
+@app.command(name="coverage")
+def coverage_cmd(
+    job_id: str = typer.Argument(..., help="Job ID"),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
+) -> None:
+    """Show what a job's research covers: outcomes, measured counts, and gaps."""
+    from agentic_odi_cli.render import render_coverage
+
+    typer.echo(render_coverage(run_tool("get_coverage", {"job_id": job_id}), as_json=json_output))
+
+
 capabilities_app = typer.Typer(name="capabilities", help="Inspect the assistant's tool surface.")
 
 

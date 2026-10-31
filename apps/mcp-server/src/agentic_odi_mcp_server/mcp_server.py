@@ -176,6 +176,25 @@ def get_job_map(job_id: str, limit: int | None = None, offset: int = 0) -> str:
 
 
 @mcp.tool
+def get_coverage(job_id: str) -> str:
+    """Read a job's coverage: outcomes, measured counts, and quotes per stage.
+
+    Read-only: nothing is written. Every stage is reported in canonical order,
+    including the empty ones, and outcomes with no stage are counted in an
+    explicit ``unassigned`` bucket. A stage with zero outcomes appears in
+    ``gaps``. An unknown job is an error, distinct from an empty job, which
+    returns a zeroed report.
+    """
+    try:
+        report = service.coverage_report(job_id)
+    except JobNotFoundError:
+        return job_not_found(job_id)
+    except OdiError as exc:
+        return f"Error: {exc}"
+    return report.model_dump_json()
+
+
+@mcp.tool
 def add_outcome(
     job_id: str,
     statement: str,

@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
 
+from agentic_odi_core.coverage import CoverageReport, build_coverage_report
 from agentic_odi_core.errors import NotFoundError, ValidationError
 from agentic_odi_core.evaluation import (
     OutcomeStatementError,
@@ -1204,3 +1205,17 @@ class ODIService:
         if updated is None:
             raise ScheduledWorkNotFoundError(work_id)
         return updated
+
+    def coverage_report(self, job_id: str) -> CoverageReport:
+        """Read a job's coverage: outcomes, measured counts, and quotes per stage.
+
+        Read-only: nothing is written and no event is emitted. An unknown job
+        raises :class:`JobNotFoundError` (a not-found failure), distinct from an
+        existing job with no outcomes, which returns a zeroed report.
+        """
+        if self.repo.get_job(job_id) is None:
+            raise JobNotFoundError(job_id)
+        steps = list(self.repo.get_steps_for_job(job_id))
+        outcomes = list(self.repo.get_outcomes(job_id))
+        evidence = list(self.repo.list_evidence(job_id=job_id))
+        return build_coverage_report(job_id, steps, outcomes, evidence)

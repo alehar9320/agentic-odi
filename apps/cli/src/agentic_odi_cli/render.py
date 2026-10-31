@@ -599,3 +599,52 @@ def render_candidate_merge(result: Any, *, as_json: bool) -> str:
             ("merged_ids", ", ".join(item.get("id", "") for item in merged)),
         ]
     )
+
+
+_STAGE_LABELS = {
+    "define": "Define",
+    "locate": "Locate",
+    "prepare": "Prepare",
+    "confirm": "Confirm",
+    "execute": "Execute",
+    "monitor": "Monitor",
+    "modify": "Modify",
+    "conclude": "Conclude",
+}
+
+
+def render_coverage(report: Any, *, as_json: bool) -> str:
+    """Render a coverage report: one row per stage, then the totals and gaps.
+
+    An empty stage is shown as a row with zeros rather than omitted, so the
+    finding ("nothing here yet") is visible instead of implied.
+    """
+    if not isinstance(report, dict):
+        return _json(report) if as_json else str(report)
+    if as_json:
+        return _json(report)
+    per_stage = report.get("per_stage", [])
+    rows: list[tuple[str, ...]] = [
+        (
+            _STAGE_LABELS.get(row.get("stage", ""), row.get("stage", "")),
+            str(row.get("outcomes", 0)),
+            str(row.get("measured", 0)),
+            str(row.get("quotes", 0)),
+        )
+        for row in per_stage
+    ]
+    table = _table(("Stage", "Outcomes", "Measured", "Quotes"), rows, empty="No stages.")
+    totals = report.get("totals", {})
+    gaps = report.get("gaps", [])
+    gap_labels = ", ".join(_STAGE_LABELS.get(stage, stage) for stage in gaps) or "none"
+    return "\n".join(
+        [
+            table,
+            "",
+            f"Outcomes {totals.get('outcomes', 0)} · measured {totals.get('measured', 0)} "
+            f"· quotes {totals.get('quotes', 0)}",
+            f"Unassigned: {totals.get('unassigned_outcomes', 0)} outcomes, "
+            f"{totals.get('unassigned_quotes', 0)} quotes",
+            f"Gaps: {gap_labels}",
+        ]
+    )

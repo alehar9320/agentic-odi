@@ -3,7 +3,7 @@ import { useMemo, type ReactNode } from "react";
 import { canvasStatus } from "../../lib/canvasProvenance";
 import { useStudio } from "../../state/StudioContext";
 import type { WorkspacePanelId } from "../../types";
-import { CompassIcon, RouteIcon, SignalIcon, SparkIcon } from "../icons";
+import { CompassIcon, CoverageIcon, RouteIcon, SignalIcon, SparkIcon } from "../icons";
 
 interface RailItem {
   id: WorkspacePanelId;
@@ -29,6 +29,21 @@ export function WorkbenchRail() {
     const steps = canvas?.steps ?? [];
     const evidence = outcomes.filter((outcome) => outcome.evidence?.trim()).length;
 
+    // Coverage is a count of stages that hold at least one staged outcome, not
+    // a count of steps: a job can have eight steps and cover one stage. The
+    // chip is derived from the canvas, so it says roughly how much of the map
+    // is filled; the Coverage lens reads the server's report for the exact
+    // numbers and the gaps.
+    const stagedSteps = new Set(
+      steps.filter((step) => step.stage).map((step) => step.id).filter(Boolean),
+    );
+    const coveredStages = new Set(
+      outcomes
+        .map((outcome) => outcome.step_id)
+        .filter((stepId): stepId is string => Boolean(stepId && stagedSteps.has(stepId)))
+        .map((stepId) => steps.find((step) => step.id === stepId)?.stage),
+    );
+
     const rail: RailItem[] = [];
     if (outcomes.length > 0) {
       rail.push({
@@ -46,6 +61,15 @@ export function WorkbenchRail() {
         count: steps.length,
         noun: steps.length === 1 ? "step" : "steps",
         icon: <RouteIcon size={14} />,
+      });
+    }
+    if (coveredStages.size > 0) {
+      rail.push({
+        id: "coverage",
+        label: "Coverage",
+        count: coveredStages.size,
+        noun: coveredStages.size === 1 ? "stage" : "stages",
+        icon: <CoverageIcon size={14} />,
       });
     }
     if (evidence > 0) {

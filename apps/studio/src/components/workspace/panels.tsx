@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 
 import type { WorkspacePanelId } from "../../types";
+import { CoveragePanel } from "../canvas/CoveragePanel";
 import { DirectCapture } from "../canvas/DirectCapture";
 import { EvidenceStream } from "../canvas/EvidenceStream";
 import { JobMap } from "../canvas/JobMap";
@@ -14,6 +15,7 @@ import {
   BoltIcon,
   CaptureIcon,
   CompassIcon,
+  CoverageIcon,
   RouteIcon,
   SettingsIcon,
   SignalIcon,
@@ -78,6 +80,19 @@ export const WORKSPACE_PANELS: PanelDefinition[] = [
       label: "Walk me through the job",
       intent:
         "Walk me through the job step by step, and show me where the work breaks down today.",
+    },
+  },
+  {
+    id: "coverage",
+    label: "Coverage",
+    title: "Coverage",
+    blurb: "What the research covers, stage by stage, and the gaps it leaves.",
+    icon: <CoverageIcon />,
+    render: () => <CoveragePanel />,
+    talk: {
+      label: "Find the gaps",
+      intent:
+        "Looking at my coverage, which stages of the job have no outcomes yet, and what should I go research next?",
     },
   },
   {

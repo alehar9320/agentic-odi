@@ -192,6 +192,16 @@ class LocalBackend(Backend):
             kwargs["offset"] = args["offset"]
         return [step.model_dump() for step in self.service.get_job_map(**kwargs)]
 
+    def _get_coverage(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import JobNotFoundError, job_not_found
+
+        job_id = args["job_id"]
+        try:
+            report = self.service.coverage_report(job_id)
+        except JobNotFoundError:
+            raise BackendError(job_not_found(job_id)) from None
+        return report.model_dump(mode="json")
+
     def _get_step(self, args: dict[str, Any]) -> dict[str, Any]:
         from agentic_odi_core import step_not_found
 
@@ -837,6 +847,7 @@ _LOCAL_HANDLERS = {
     "delete_job": LocalBackend._delete_job,
     "add_step": LocalBackend._add_step,
     "get_job_map": LocalBackend._get_job_map,
+    "get_coverage": LocalBackend._get_coverage,
     "get_step": LocalBackend._get_step,
     "update_step": LocalBackend._update_step,
     "delete_step": LocalBackend._delete_step,
