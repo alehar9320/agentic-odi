@@ -223,6 +223,7 @@ class Repository(Protocol):
     def reload(self) -> None: ...
     def commit(self) -> None: ...
     def close(self) -> None: ...
+    def health(self) -> bool: ...
 
 
 class InMemoryRepository:
@@ -592,3 +593,7 @@ class InMemoryRepository:
 
     def close(self) -> None:
         """No-op: an in-memory store holds no resources."""
+
+    def health(self) -> bool:
+        """An in-memory store is always reachable while the process is alive."""
+        return True

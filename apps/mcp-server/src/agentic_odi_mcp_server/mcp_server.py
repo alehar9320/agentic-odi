@@ -350,6 +350,14 @@ def get_capabilities_manifest() -> str:
 
 
 @mcp.tool
+def get_health() -> str:
+    """Report whether the ODI store can be queried right now."""
+    if _repo.health():
+        return json.dumps({"status": "ok", "store": "accessible"})
+    return json.dumps({"status": "degraded", "store": "locked"})
+
+
+@mcp.tool
 def get_step(step_id: str) -> str:
     step = service.get_step(step_id)
     if step is None:

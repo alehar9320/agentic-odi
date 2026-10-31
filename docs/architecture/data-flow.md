@@ -199,8 +199,9 @@ the demo seed only in `mcp` mode when MCP is unreachable or returns no jobs. `lo
 | `AGENTIC_ODI_DEVICE_ID` | core SQLite repository — otherwise the id created once at `~/.agentic-odi/device_id` (`0600`) | that generated id |
 | `AGENTIC_ODI_BACKEND` | CLI, Studio API | `local` |
 | `AGENTIC_ODI_MCP_URL` | CLI, Studio defaults | `http://localhost:8000/mcp` |
-| `AGENTIC_ODI_STUDIO_DB` | Studio API — pre-core `studio.db`, imported once into the event log | `~/.agentic-odi/studio.db` |
-| `AGENTIC_ODI_STUDIO_SETTINGS` | Studio API — provider key, base URL, model, MCP URL | `~/.agentic-odi/studio.json` |
+| `AGENTIC_ODI_MCP_TIMEOUT` | CLI MCP client calls | `30` seconds |
+| `AGENTIC_ODI_MCP_KEEPALIVE` | MCP session keepalive interval | `15` seconds (`0` disables) |
+| `AGENTIC_ODI_STUDIO_DB` | Studio API memory | `~/.agentic-odi/studio.db` |
 | `AGENTIC_ODI_CONNECTORS_CONFIG` | connectors registry (CLI, Studio, MCP) | `~/.config/agentic-odi/connectors.json` |
 | `AGENTIC_ODI_CONNECTOR_TIMEOUT` | connector health/ingest calls | `30` seconds |
 | `AGENTIC_ODI_STUDIO_DIST` | Studio API, dev launcher | `apps/studio/dist` |
@@ -211,14 +212,12 @@ the demo seed only in `mcp` mode when MCP is unreachable or returns no jobs. `lo
 
 ## Trust Boundaries
 
-- The SPA runs in a browser or Tauri webview and only trusts the sidecar origin.
-- The provider key is the sidecar's: it is written to `~/.agentic-odi/studio.json`
-  (`0600`) and only ever read back as a mask, so `localStorage` never holds it and
-  no response hands the value to the page. The tab may hold one for itself in
-  `sessionStorage`, and an empty tab key means "use the stored one".
-- The sidecar may reach MCP and the LLM; CORS is restricted to known Studio origins.
-- MCP is an HTTP service with no authentication in local development. Do not expose it directly to the internet; the Cloudflare setup tunnels the sidecar, not MCP.
-- The Tauri desktop shell contacts the GitHub releases endpoint for `latest.json`, verifies the artifact signatures against the key pinned in `tauri.conf.json`, and only stages an update after verification. The updater cannot be reached from the browser build.
+Each process, the credentials it holds, and what crosses every wire are
+documented in [Trust boundaries](trust-boundaries.md). The short version: the
+SPA trusts only the sidecar; the sidecar reaches MCP and the LLM; MCP is an
+unauthenticated local HTTP service and must not be exposed; the hosted Worker
+tunnels the sidecar, not MCP; and the Tauri updater verifies signatures before
+staging an update.
 
 ## The Failure Path
 

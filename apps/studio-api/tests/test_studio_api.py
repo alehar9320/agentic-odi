@@ -467,6 +467,12 @@ def test_post_step_uses_local_service() -> None:
     assert ODIService(repo).get_job_map(job.id)[0].name == "Ship it"
 
 
+def test_post_job_rejects_an_invalid_name() -> None:
+    response = _client().post("/api/jobs", json={"mcp_url": "http://unused", "name": "Jo"})
+
+    assert response.status_code == 422
+
+
 def test_post_outcome_uses_local_service() -> None:
     repo = InMemoryRepository()
     job = ODIService(repo).add_job(name="Local job")

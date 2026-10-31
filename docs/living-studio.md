@@ -296,7 +296,7 @@ shapes:
 
 | Method | Path | Purpose |
 |---|---|---|
-| `GET` | `/api/observations?status=proposed` | Filtered by status; dismissed rows only when asked |
+| `GET` | `/api/observations` | Filter by `status`; dismissed rows only when asked |
 | `GET` | `/api/memory/observations` | Everything the agent believes |
 | `POST` | `/api/memory/observations` | Add a note by hand |
 | `PATCH` | `/api/memory/observations/{id}` | Edit text, confidence, or status |

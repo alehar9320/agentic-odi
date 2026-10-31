@@ -99,13 +99,6 @@ export function CatchUpFeed() {
     focusSignalSubject(signal);
   }
 
-  function handleCardKey(event: React.KeyboardEvent, signal: Signal) {
-    if (event.key === "Enter" || event.key === " ") {
-      event.preventDefault();
-      activate(signal);
-    }
-  }
-
   const chips: Array<{ id: FilterType; label: string; count: number }> = [
     { id: "all", label: "All", count: recorded.length },
     { id: "unread", label: "Unread", count: unreadSignalCount },
@@ -197,17 +190,22 @@ export function CatchUpFeed() {
             return (
               <article
                 key={item.id}
-                role="button"
-                tabIndex={0}
-                aria-label={`${item.title}. Activate to ${
-                  item.subject_id ? `open the ${item.subject_kind ?? "record"} it names` : "mark as read"
-                }`}
                 className={`card catchup-card${unreadCard ? " is-unread" : ""}${
                   item.simulated ? " is-simulated" : ""
                 }`}
-                onClick={() => activate(item)}
-                onKeyDown={(event) => handleCardKey(event, item)}
               >
+                {/* A real button stretched over the card: keyboard users get
+                    Enter/Space for free, and the controls below sit above it. */}
+                <button
+                  type="button"
+                  className="catchup-card__hit"
+                  aria-label={`${item.title}. Activate to ${
+                    item.subject_id
+                      ? `open the ${item.subject_kind ?? "record"} it names`
+                      : "mark as read"
+                  }`}
+                  onClick={() => activate(item)}
+                />
                 <div className="card__head">
                   <div className="catchup-card__meta">
                     {unreadCard && <span className="status-dot" title="Unread signal" />}

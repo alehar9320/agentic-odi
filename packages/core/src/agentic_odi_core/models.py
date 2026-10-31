@@ -93,10 +93,31 @@ def compute_opportunity_score(importance: float, satisfaction: float) -> float:
     return float(importance + max(importance - satisfaction, 0.0))
 
 
+JOB_NAME_PATTERN = r"^[A-Za-z0-9 _-]+$"
+JOB_NAME_MIN_LENGTH = 3
+JOB_NAME_MAX_LENGTH = 64
+JOB_DESCRIPTION_MAX_LENGTH = 500
+
+
 class Job(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    name: str = Field(..., description="The name of the Job-to-be-Done")
-    description: str | None = Field(None, description="Detailed description of the Job")
+    name: str = Field(
+        ...,
+        min_length=JOB_NAME_MIN_LENGTH,
+        max_length=JOB_NAME_MAX_LENGTH,
+        pattern=JOB_NAME_PATTERN,
+        description="The name of the Job-to-be-Done",
+    )
+    description: str | None = Field(
+        None,
+        max_length=JOB_DESCRIPTION_MAX_LENGTH,
+        description="Detailed description of the Job",
+    )
+
+
+def create_job(name: str, description: str | None = None) -> Job:
+    """Build a Job through model validation before it reaches a repository."""
+    return Job(name=name, description=description)
 
 
 class Step(BaseModel):

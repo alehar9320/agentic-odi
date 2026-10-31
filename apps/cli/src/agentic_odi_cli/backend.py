@@ -34,7 +34,6 @@ if TYPE_CHECKING:
 
 DEFAULT_BACKEND = "local"
 DEFAULT_MCP_URL = "http://localhost:8000/mcp"
-DEFAULT_MCP_TIMEOUT = 30.0
 
 _VALUE_RANGE_ERROR = "importance and satisfaction must be between 1.0 and 10.0"
 
@@ -76,13 +75,22 @@ class BackendError(Exception):
 
 def mcp_timeout() -> float:
     """Resolve the MCP call timeout in seconds (``AGENTIC_ODI_MCP_TIMEOUT``)."""
-    raw = os.environ.get("AGENTIC_ODI_MCP_TIMEOUT")
-    if not raw:
-        return DEFAULT_MCP_TIMEOUT
+    from agentic_odi_core import MCPConnectionConfig
+
+    return MCPConnectionConfig.from_env().timeout
+
+
+def _validation_summary(exc: Exception) -> str:
+    """One line naming the first field a model rejected."""
+    errors = getattr(exc, "errors", None)
+    if not callable(errors):
+        return str(exc)
     try:
-        return float(raw)
-    except ValueError:
-        return DEFAULT_MCP_TIMEOUT
+        first = errors()[0]
+    except (IndexError, TypeError):
+        return str(exc)
+    location = ".".join(str(part) for part in first.get("loc", ()))
+    return f"{location}: {first.get('msg', exc)}" if location else str(first.get("msg", exc))
 
 
 def _validation_message(exc: Exception) -> str:
@@ -120,12 +128,15 @@ class LocalBackend(Backend):
 
     def call(self, tool_name: str, args: dict[str, Any]) -> Any:
         from agentic_odi_core import OdiError
+        from pydantic import ValidationError
 
         handler = _LOCAL_HANDLERS.get(tool_name)
         if handler is None:
             raise NotImplementedError(f"Unknown tool: {tool_name}")
         try:
             return handler(self, args)
+        except ValidationError as exc:
+            raise BackendError(_validation_summary(exc)) from exc
         except OdiError as exc:
             raise BackendError(str(exc)) from exc
 
@@ -593,6 +604,11 @@ class LocalBackend(Backend):
 
         return capability_manifest()
 
+    def _get_health(self, args: dict[str, Any]) -> dict[str, Any]:
+        if self.service.repo.health():
+            return {"status": "ok", "store": "accessible"}
+        return {"status": "degraded", "store": "locked"}
+
     def _compute_opportunity(self, args: dict[str, Any]) -> float:
         from agentic_odi_core import compute_opportunity_score
 
@@ -721,6 +737,7 @@ _LOCAL_HANDLERS = {
     "list_signals": LocalBackend._list_signals,
     "mark_signal_read": LocalBackend._mark_signal_read,
     "dismiss_signal": LocalBackend._dismiss_signal,
+    "get_health": LocalBackend._get_health,
 }
 
 
@@ -745,7 +762,7 @@ def _call_mcp(tool: str, args: dict[str, Any], mcp_url: str, timeout: float) -> 
         typer.echo(f"[debug] MCP call: {tool} args={args}", err=True)
 
     async def _run() -> str:
-        async with Client(mcp_url) as client:
+        async with Client(mcp_url, timeout=timeout, init_timeout=timeout) as client:
             result = await client.call_tool(tool, args)
             return result.content[0].text  # type: ignore[index]
 

@@ -180,7 +180,9 @@ connector catalog, and client-side search over every page (`Ctrl`/`Cmd`+`K`).
 
 A [uv workspace](https://docs.astral.sh/uv/concepts/projects/workspaces/) with
 shared tooling at the root. Packages live in `packages/`, runnable services in
-`apps/`, and deployment assets in `infra/`:
+`apps/`, and deployment assets in `infra/`. The
+[architecture index](docs/architecture/README.md) explains how the pieces fit
+together and where each contract is enforced:
 
 | Path | Distribution | Description |
 |---|---|---|
@@ -189,7 +191,7 @@ shared tooling at the root. Packages live in `packages/`, runnable services in
 | **`apps/mcp-server/`** | `agentic-odi-mcp-server` | FastMCP server exposing Jobs, Steps, Desired Outcomes, Customer Outcomes, Evidence, conversations, observations, and context tools over HTTP. SQLite by default. |
 | **`apps/studio-api/`** | `agentic-odi-studio-api` | FastAPI **Living Studio sidecar**: config, health, canvas, local mutations, MCP passthrough, SSE chat, conversations, and PM memory. |
 | **`apps/cli/`** | `agentic-odi-cli` | Typer CLI with interactive chat, full entity CRUD, `schema`, `connectors`, and local or remote data access. |
-| **`apps/studio/`** | React + TypeScript + Vite | **The Living Studio** SPA and Tauri 2 desktop shell, built on [assistant-ui](https://www.assistant-ui.com). Its browser-level suite lives in `apps/studio/e2e/`. Installed desktop builds **update themselves** in the background and apply on restart. |
+| **`apps/studio/`** | React + TypeScript + Vite | **The Living Studio** SPA and Tauri 2 desktop shell, built on [assistant-ui](https://www.assistant-ui.com). Keyboard- and screen-reader-operable, gated by an [axe-core](https://github.com/dequelabs/axe-core) WCAG 2.1 AA sweep in the frontend suite. Its browser-level suite lives in `apps/studio/e2e/`. Installed desktop builds **update themselves** in the background and apply on restart. |
 | **`infra/cloudflare/`** | Worker | Free-plan Workers Static Assets deployment and sidecar tunnel. |
 | **`scripts/`** | — | Dev launcher, binary build, installer tests. |
 | **`tests/contract/`** | — | Cross-package MCP contract tests. |
@@ -202,6 +204,7 @@ request:
 ```bash
 uv run ruff check . && uv run ruff format --check .
 uv run mypy apps packages && uv run pytest
+uv run python scripts/doc_check.py   # documented commands, paths, routes, and env vars exist
 ```
 
 See [Development](docs/development.md) for the frontend checks, the coverage

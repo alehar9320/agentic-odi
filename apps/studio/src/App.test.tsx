@@ -296,14 +296,18 @@ describe("studio shell", () => {
 
     const first = render(<App />);
     expect(await screen.findByText("The approval step is what hurts.")).toBeInTheDocument();
-    expect(await screen.findByText("Then let us start with approvals.")).toBeInTheDocument();
+    expect(
+      await screen.findByText("Then let us start with approvals.", { selector: "p.md-paragraph" }),
+    ).toBeInTheDocument();
     first.unmount();
 
     // A reload is a fresh process with the same store: nothing may be invented
     // locally to fill the gap.
     render(<App />);
     expect(await screen.findByText("The approval step is what hurts.")).toBeInTheDocument();
-    expect(screen.getByText("Then let us start with approvals.")).toBeInTheDocument();
+    expect(
+      screen.getByText("Then let us start with approvals.", { selector: "p.md-paragraph" }),
+    ).toBeInTheDocument();
   });
 
   it("returns home from the wordmark", async () => {
