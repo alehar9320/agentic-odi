@@ -165,6 +165,27 @@
         }
       },
       {
+        "type": "batch-scoring",
+        "title": "Scoring pass",
+        "blurb": "Twenty outcomes in one pass: one at a time, with the customer's sentence in view, until the ranking is honest.",
+        "data": {
+          "outcomes": [
+            {
+              "id": "O-1",
+              "statement": "Minimize the time it takes to onboard",
+              "importance": 9,
+              "satisfaction": 3,
+              "quote": "Setup takes forever when a new hire starts."
+            },
+            {
+              "id": "O-2",
+              "statement": "Minimize the effort to reconcile invoices",
+              "quote": "I reconcile invoices by hand every Friday."
+            }
+          ]
+        }
+      },
+      {
         "type": "candidate-queue",
         "title": "Review queue",
         "blurb": "Proposed outcomes beside the sentences they came from, so a person accepts, edits, merges, or rejects with the evidence in view.",

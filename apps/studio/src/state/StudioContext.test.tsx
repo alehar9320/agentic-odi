@@ -53,6 +53,7 @@ let connectorFetches = 0;
 let llmHealthFetches = 0;
 let signalFetches = 0;
 let approvalCalls: Record<string, unknown>[] = [];
+let scoreCalls: unknown[] = [];
 let headPatches: Record<string, unknown>[] = [];
 
 function route(
@@ -91,6 +92,22 @@ function route(
       });
     }
     return json({ jobs: [], steps: [], outcomes: [], source: "local" });
+  }
+  if (url.startsWith("/api/outcomes/score-batch")) {
+    scoreCalls.push(JSON.parse(String(init?.body ?? "[]")));
+    const [item] = JSON.parse(String(init?.body ?? "[]")) as Record<string, unknown>[];
+    return json({
+      ok: true,
+      results: [
+        {
+          outcome_id: item.outcome_id,
+          importance: item.importance,
+          satisfaction: item.satisfaction,
+          ok: true,
+          outcome: { id: item.outcome_id },
+        },
+      ],
+    });
   }
   if (url === "/api/connectors/catalog") {
     return json([]);
@@ -773,5 +790,62 @@ describe("StudioContext write approval and branches", () => {
 
     expect(result.current.messages.map((message) => message.id)).toEqual(["b-1", "b-2"]);
     await waitFor(() => expect(headPatches).toEqual([{ head_id: "b-2" }]));
+  });
+});
+
+describe("StudioContext scoring", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    chatBody = null;
+    chatStream = null;
+    chatFailure = null;
+    chatAttempts = 0;
+    chatAborts = false;
+    canvasFails = false;
+    connectorFetches = 0;
+    llmHealthFetches = 0;
+    approvalCalls = [];
+    scoreCalls = [];
+    headPatches = [];
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("scores one outcome through the shared batch endpoint", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.canvas).not.toBeNull());
+
+    let item: Awaited<ReturnType<typeof result.current.scoreOutcome>> | undefined;
+    await act(async () => {
+      item = await result.current.scoreOutcome({
+        outcome_id: "O-101",
+        importance: 9,
+        satisfaction: 3,
+      });
+    });
+
+    expect(item?.ok).toBe(true);
+    // One item per call: the same endpoint the CLI's `odi score` writes through.
+    expect(scoreCalls).toEqual([
+      [{ outcome_id: "O-101", importance: 9, satisfaction: 3 }],
+    ]);
+  });
+
+  it("carries a null pair so an unscored outcome can be restored", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.canvas).not.toBeNull());
+
+    await act(async () => {
+      await result.current.scoreOutcome({
+        outcome_id: "O-101",
+        importance: null,
+        satisfaction: null,
+      });
+    });
+
+    expect(scoreCalls).toEqual([[{ outcome_id: "O-101", importance: null, satisfaction: null }]]);
   });
 });

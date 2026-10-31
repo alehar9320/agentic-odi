@@ -315,6 +315,7 @@ def test_surfaces_section_shows_every_catalog_card():
         "job-map",
         "opportunity-thesis",
         "decision-record",
+        "batch-scoring",
         "candidate-queue",
     ):
         assert card in html
@@ -487,5 +488,6 @@ def test_page_weights_are_within_budget(page: str):
     # that one page, so it grows with each tool we add. Raised 60→64 for the
     # paginated list tools, 64→80 for the interview/quote tools and their two
     # schema entities, 80→88 for the candidate review tools, 88→92 for the
-    # duplicate-suggestion and merge tools.
-    assert size <= 92 * 1024, f"{page}: {size} bytes"
+    # duplicate-suggestion and merge tools, 92→100 for the coverage and batch
+    # scoring tools.
+    assert size <= 100 * 1024, f"{page}: {size} bytes"

@@ -5854,3 +5854,25 @@ details[open] summary {
 .cov-gaps {
   color: var(--studio-text);
 }
+
+/* Batch scoring */
+.ui-card--scoring {
+  border-color: rgba(129, 140, 248, 0.24);
+}
+
+.ui-scoring__field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.82rem;
+  color: var(--studio-muted);
+}
+
+.ui-scoring__field input[type="range"] {
+  width: 100%;
+  accent-color: var(--studio-indigo, #818cf8);
+}
+
+.ui-scoring__field input[type="range"]:disabled {
+  opacity: 0.6;
+}
