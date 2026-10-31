@@ -131,6 +131,9 @@ class Outcome(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     job_id: str = Field(..., description="The ID of the Job this outcome relates to")
     step_id: str | None = Field(None, description="The ID of the specific Step, if applicable")
+    study_id: str | None = Field(
+        None, description="The study wave this measurement belongs to, when it is one"
+    )
     statement: str = Field(
         ..., description="The desired outcome statement (e.g., 'Minimize the time it takes to...')"
     )
@@ -394,3 +397,102 @@ class ScheduledWork(BaseModel):
     last_run_at: str | None = Field(None, description="ISO timestamp of last execution")
     next_run_at: str | None = Field(None, description="ISO timestamp of next scheduled execution")
     result_summary: str | None = Field(None, description="Execution outcome or error summary")
+
+
+class StudyStatus(str, Enum):
+    """Whether a wave is still taking measurements."""
+
+    OPEN = "open"
+    CLOSED = "closed"
+
+
+class StudyGuide(BaseModel):
+    """The interview guide a wave uses, held by value so the wave is reproducible.
+
+    A version string travels with the questions: two waves may deliberately use
+    different guides, and the comparison must be able to say so.
+    """
+
+    name: str = Field(..., description="The guide's label, e.g. 'Corn growers, core interview'")
+    version: str = Field("1", description="Version of this guide")
+    questions: list[str] = Field(default_factory=list, description="The questions, in order")
+
+
+class StudyFrame(BaseModel):
+    """What carries between waves: the guide, the outcome statements, the themes.
+
+    Stored by value on the wave, never as a pointer into a job-level record.
+    Editing a copied frame must not mutate its source, and a frame must survive
+    the source being changed or removed, so a wave can always be reproduced.
+    """
+
+    guide: StudyGuide | None = Field(None, description="The interview guide this wave used")
+    outcome_statements: list[str] = Field(
+        default_factory=list, description="The outcome statements this wave set out to measure"
+    )
+    themes: list[str] = Field(
+        default_factory=list, description="The themes the frame groups statements under"
+    )
+
+
+class Study(BaseModel):
+    """One wave of a study: a job, measured at one point in time.
+
+    A study is what makes "the market last quarter" and "the market this
+    quarter" comparable. The *frame* — the guide, the outcome statements, the
+    themes — carries between waves; the measurements do not, because a wave
+    starts unmeasured. ``lineage_id`` groups a wave with its siblings: wave 1
+    has ``lineage_id == id``, and ``next_wave`` stamps the same lineage on the
+    clone. Measurements live on :class:`Outcome`, linked back by ``study_id``.
+    """
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    lineage_id: str = Field(..., description="Groups the waves of one study; wave 1 is its own")
+    job_id: str = Field(..., description="The Job this study measures")
+    name: str = Field(..., description='Human label, e.g. "Corn growers, quarterly pulse"')
+    wave: int = Field(1, ge=1, description="1-based wave number inside this lineage")
+    status: StudyStatus = Field(StudyStatus.OPEN, description="Whether the wave is still measuring")
+    frame: StudyFrame = Field(default_factory=StudyFrame, description="The wave's carried frame")
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class OutcomeComparisonStatus(str, Enum):
+    """How one statement changed between two waves."""
+
+    MOVED = "moved"
+    STABLE = "stable"
+    ADDED = "added"
+    DROPPED = "dropped"
+    UNMEASURED = "unmeasured"
+
+
+class OutcomeComparison(BaseModel):
+    """One statement's two measurements, side by side.
+
+    A missing score stays ``None``: an absent measurement is not a zero, and
+    rendering it as one would make every added statement look like a collapse.
+    """
+
+    statement: str
+    score_a: float | None = Field(None, description="Mean score in wave A, or None if unmeasured")
+    score_b: float | None = Field(None, description="Mean score in wave B, or None if unmeasured")
+    delta: float | None = Field(None, description="score_b - score_a, only when both are scored")
+    n_a: int = Field(0, description="Measurements of this statement in wave A")
+    n_b: int = Field(0, description="Measurements of this statement in wave B")
+    status: OutcomeComparisonStatus
+
+
+class WaveComparison(BaseModel):
+    """Two waves compared statement by statement, never by outcome id.
+
+    Keyed by statement so an outcome re-created in the second wave still lines
+    up with its twin in the first.
+    """
+
+    study_a: str = Field(..., description="The earlier wave's id")
+    study_b: str = Field(..., description="The later wave's id")
+    job_id: str = Field(..., description="The job both waves measure")
+    per_outcome: list[OutcomeComparison] = Field(default_factory=list)
+    added: list[str] = Field(default_factory=list, description="Statements only in wave B")
+    dropped: list[str] = Field(default_factory=list, description="Statements only in wave A")
+    stable: list[str] = Field(default_factory=list, description="Statements unchanged in both")

@@ -228,6 +228,24 @@ refresh, and polls once a minute while the window is visible. Connector rows in 
 store, grouped by capability area; nothing is pre-listed as though it were
 already connected.
 
+### Studies and waves
+
+A study is a job measured in waves. The sidecar exposes the wave lifecycle so
+the SPA and the chat read the same records the CLI does: `POST /api/studies`
+opens wave 1 with its interview frame, `GET /api/studies` lists the waves,
+`POST /api/studies/{study_id}/next-wave` clones the frame into an unmeasured
+next wave, and `GET /api/studies/{study_a}/compare/{study_b}` reports what moved
+between two waves.
+
+The frame — the interview guide, the outcome statements, the themes — is copied
+onto a wave by value, and a measurement is an `Outcome` that carries `study_id`.
+Nothing is carried forward when a wave is cloned: scores, interviews and sample
+sizes stay in the wave they were measured in, because copying last quarter's
+scores would make every comparison look flat. A comparison matches by statement,
+so an outcome re-created in the second wave still lines up with its twin in the
+first, and a statement measured in only one wave is reported added or dropped
+with an absent score rather than a zero.
+
 ### The thread is the room
 
 Capture, scoring, simulation, and decisions are conversations. The storefront

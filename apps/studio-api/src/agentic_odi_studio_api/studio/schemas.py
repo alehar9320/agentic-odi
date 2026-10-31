@@ -54,6 +54,7 @@ class AddOutcomeRequest(BaseModel):
     statement: str
     importance: float = Field(ge=1.0, le=10.0)
     satisfaction: float = Field(ge=1.0, le=10.0)
+    study_id: str | None = None
 
 
 class CreateJobRequest(BaseModel):
@@ -97,6 +98,21 @@ class ProposeStrategyRequest(BaseModel):
     """
 
     job_id: str | None = None
+    mcp_url: str = ""
+
+
+class OpenStudyRequest(BaseModel):
+    """Body for ``POST /api/studies``.
+
+    ``guide``, ``outcome_statements`` and ``themes`` are the frame: copied by
+    value onto wave 1, so the wave is reproducible without the job-level record.
+    """
+
+    job_id: str
+    name: str
+    guide: dict[str, Any] | None = None
+    outcome_statements: list[str] = Field(default_factory=list)
+    themes: list[str] = Field(default_factory=list)
     mcp_url: str = ""
 
 

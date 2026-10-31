@@ -26,6 +26,8 @@ from agentic_odi_core.models import (
     Job,
     JobStage,
     Outcome,
+    OutcomeComparison,
+    OutcomeComparisonStatus,
     ScheduledWork,
     ScheduledWorkStatus,
     ScheduledWorkTriggerType,
@@ -35,6 +37,11 @@ from agentic_odi_core.models import (
     SignalKind,
     Step,
     Strategy,
+    Study,
+    StudyFrame,
+    StudyGuide,
+    StudyStatus,
+    WaveComparison,
     compute_opportunity_score,
 )
 from agentic_odi_core.repository import Repository, page
@@ -123,6 +130,34 @@ class StrategyNotFoundError(NotFoundError, ValueError):
     def __init__(self, strategy_id: str, hint: str | None = None) -> None:
         self.strategy_id = strategy_id
         super().__init__(strategy_id, "strategy", hint)
+
+
+class StudyNotFoundError(NotFoundError, ValueError):
+    """Raised when a study wave id does not resolve.
+
+    Also a :class:`ValueError`, because the caller supplied an id that does not
+    resolve — an invalid argument value.
+    """
+
+    def __init__(self, study_id: str, hint: str | None = None) -> None:
+        self.study_id = study_id
+        super().__init__(study_id, "study", hint)
+
+
+class StudyJobMismatchError(ValidationError):
+    """Two waves from different jobs cannot be compared.
+
+    Comparing across jobs would line up statements that measure different
+    functional jobs, so the difference would be meaningless rather than wrong.
+    """
+
+    def __init__(self, study_a: str, study_b: str, job_a: str, job_b: str) -> None:
+        self.study_a = study_a
+        self.study_b = study_b
+        super().__init__(
+            f"Study {study_a} measures job {job_a} but study {study_b} measures job {job_b}. "
+            "Compare two waves of the same job."
+        )
 
 
 class NoStrategyEvidenceError(ValidationError):
@@ -449,11 +484,14 @@ class ODIService:
         satisfaction: float,
         step_id: str | None = None,
         validate_statement: bool = True,
+        study_id: str | None = None,
     ) -> Outcome:
         if self.repo.get_job(job_id) is None:
             raise JobNotFoundError(job_id)
         if step_id is not None and self.repo.get_step(step_id) is None:
             raise StepNotFoundError(step_id)
+        if study_id is not None and self.repo.get_study(study_id) is None:
+            raise StudyNotFoundError(study_id)
         if not (1.0 <= importance <= 10.0):
             raise ValueOutOfRangeError("importance must be between 1.0 and 10.0")
         if not (1.0 <= satisfaction <= 10.0):
@@ -467,6 +505,7 @@ class ODIService:
             id=str(uuid.uuid4()),
             job_id=job_id,
             step_id=step_id,
+            study_id=study_id,
             statement=statement,
             importance=importance,
             satisfaction=satisfaction,
@@ -910,3 +949,167 @@ class ODIService:
             discriminator=f"kind={saved.kind.value},segment={saved.segment_id or ''}",
         )
         return saved
+
+    # -- M2-05: studies, and the waves inside them ---------------------------
+
+    def open_study(
+        self,
+        job_id: str,
+        name: str,
+        guide: dict[str, Any] | None = None,
+        outcome_statements: list[str] | None = None,
+        themes: list[str] | None = None,
+    ) -> Study:
+        """Open wave 1 of a study against a job.
+
+        The frame — guide, outcome statements, themes — is copied by value onto
+        the wave. No measurement is created here: a wave starts unmeasured, and
+        ``Outcome`` rows with ``study_id`` are added as the research happens.
+        """
+        if self.repo.get_job(job_id) is None:
+            raise JobNotFoundError(job_id)
+        study_id = str(uuid.uuid4())
+        study = Study(
+            id=study_id,
+            lineage_id=study_id,
+            job_id=job_id,
+            name=name,
+            wave=1,
+            frame=StudyFrame(
+                guide=StudyGuide.model_validate(guide) if guide is not None else None,
+                outcome_statements=list(outcome_statements or []),
+                themes=list(themes or []),
+            ),
+        )
+        return self.repo.add_study(study)
+
+    def list_studies(self, job_id: str | None = None) -> list[Study]:
+        """Every wave, grouped by lineage then wave number."""
+        return self.repo.list_studies(job_id=job_id)
+
+    def get_study(self, study_id: str) -> Study:
+        study = self.repo.get_study(study_id)
+        if study is None:
+            raise StudyNotFoundError(study_id, "run `odi studies open` to create wave 1")
+        return study
+
+    def next_wave(self, study_id: str) -> Study:
+        """Clone a study's frame into a new, unmeasured wave.
+
+        The frame — guide, outcome statements, themes — is copied *by value*,
+        so editing the new wave cannot mutate its source. Measurements are
+        deliberately not copied: interviews, scores and sample sizes stay in
+        the source wave, because carrying last quarter's scores forward is the
+        one mistake that would make every comparison look flat.
+        """
+        source = self.repo.get_study(study_id)
+        if source is None:
+            raise StudyNotFoundError(study_id, "run `odi studies open` to create wave 1")
+        siblings = [s for s in self.repo.list_studies() if s.lineage_id == source.lineage_id]
+        next_number = max((s.wave for s in siblings), default=source.wave) + 1
+        wave = Study(
+            lineage_id=source.lineage_id,
+            job_id=source.job_id,
+            name=source.name,
+            wave=next_number,
+            status=StudyStatus.OPEN,
+            frame=StudyFrame.model_validate(source.frame.model_dump(mode="json")),
+        )
+        return self.repo.add_study(wave)
+
+    def close_study(self, study_id: str) -> Study:
+        """Mark a wave closed so no further measurements are expected."""
+        study = self.repo.get_study(study_id)
+        if study is None:
+            raise StudyNotFoundError(study_id)
+        updated = self.repo.update_study(study_id, {"status": StudyStatus.CLOSED})
+        if updated is None:
+            raise StudyNotFoundError(study_id)
+        return updated
+
+    def compare_waves(self, study_a: str, study_b: str) -> WaveComparison:
+        """Compare two waves of one job, statement by statement.
+
+        Matching is by statement, never by outcome id or list position, so an
+        outcome re-created in the second wave still lines up with its twin in
+        the first. A statement present in only one wave is reported ``added``
+        or ``dropped``, and its absent score stays ``None`` — never ``0``.
+        """
+        first = self.repo.get_study(study_a)
+        if first is None:
+            raise StudyNotFoundError(study_a)
+        second = self.repo.get_study(study_b)
+        if second is None:
+            raise StudyNotFoundError(study_b)
+        if first.job_id != second.job_id:
+            raise StudyJobMismatchError(study_a, study_b, first.job_id, second.job_id)
+
+        scores_a, counts_a = self._measurements_by_statement(study_a)
+        scores_b, counts_b = self._measurements_by_statement(study_b)
+        statements = list(dict.fromkeys([*scores_a, *counts_a, *scores_b, *counts_b]))
+
+        per_outcome: list[OutcomeComparison] = []
+        added: list[str] = []
+        dropped: list[str] = []
+        stable: list[str] = []
+        for statement in statements:
+            in_a = statement in counts_a
+            in_b = statement in counts_b
+            score_a = scores_a.get(statement)
+            score_b = scores_b.get(statement)
+            delta = None if score_a is None or score_b is None else round(score_b - score_a, 6)
+            if not in_a:
+                status = OutcomeComparisonStatus.ADDED
+                added.append(statement)
+            elif not in_b:
+                status = OutcomeComparisonStatus.DROPPED
+                dropped.append(statement)
+            elif score_a is None or score_b is None:
+                status = OutcomeComparisonStatus.UNMEASURED
+            elif delta == 0:
+                status = OutcomeComparisonStatus.STABLE
+                stable.append(statement)
+            else:
+                status = OutcomeComparisonStatus.MOVED
+            per_outcome.append(
+                OutcomeComparison(
+                    statement=statement,
+                    score_a=score_a,
+                    score_b=score_b,
+                    delta=delta,
+                    n_a=counts_a.get(statement, 0),
+                    n_b=counts_b.get(statement, 0),
+                    status=status,
+                )
+            )
+        return WaveComparison(
+            study_a=study_a,
+            study_b=study_b,
+            job_id=first.job_id,
+            per_outcome=per_outcome,
+            added=added,
+            dropped=dropped,
+            stable=stable,
+        )
+
+    def _measurements_by_statement(self, study_id: str) -> tuple[dict[str, float], dict[str, int]]:
+        """Mean importance per statement for one wave, and the sample size.
+
+        An outcome with no importance recorded contributes to the count of
+        measurements but not to the mean, so the comparison can say "measured,
+        but unscored" instead of treating a missing score as a zero.
+        """
+        grouped: dict[str, list[float]] = {}
+        counts: dict[str, int] = {}
+        for outcome in self.repo.outcomes.values():
+            if outcome.study_id != study_id:
+                continue
+            counts[outcome.statement] = counts.get(outcome.statement, 0) + 1
+            if outcome.importance is not None:
+                grouped.setdefault(outcome.statement, []).append(outcome.importance)
+        means = {
+            statement: round(sum(values) / len(values), 6)
+            for statement, values in grouped.items()
+            if values
+        }
+        return means, counts

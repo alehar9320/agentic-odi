@@ -241,12 +241,14 @@ class LocalBackend(Backend):
         from agentic_odi_core import (
             JobNotFoundError,
             StepNotFoundError,
+            StudyNotFoundError,
             ValueOutOfRangeError,
             job_not_found,
             step_not_found,
         )
 
         step_id = args.get("step_id")
+        study_id = args.get("study_id")
         try:
             outcome = self.service.add_outcome(
                 job_id=args["job_id"],
@@ -254,11 +256,14 @@ class LocalBackend(Backend):
                 importance=float(args["importance"]),
                 satisfaction=float(args["satisfaction"]),
                 step_id=step_id,
+                study_id=study_id,
             )
         except JobNotFoundError:
             raise BackendError(job_not_found(args["job_id"])) from None
         except StepNotFoundError:
             raise BackendError(step_not_found(step_id)) from None
+        except StudyNotFoundError:
+            raise BackendError(f"study not found: {study_id}") from None
         except ValueOutOfRangeError as exc:
             raise BackendError(_VALUE_RANGE_ERROR) from exc
         return outcome.model_dump()
@@ -672,6 +677,50 @@ class LocalBackend(Backend):
             raise BackendError(job_not_found(job_id or "")) from None
         return strategy.model_dump(mode="json")
 
+    def _open_study(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import JobNotFoundError, job_not_found
+
+        job_id = args["job_id"]
+        try:
+            study = self.service.open_study(
+                job_id=job_id,
+                name=args["name"],
+                guide=args.get("guide"),
+                outcome_statements=args.get("outcome_statements"),
+                themes=args.get("themes"),
+            )
+        except JobNotFoundError:
+            raise BackendError(job_not_found(job_id)) from None
+        return study.model_dump(mode="json")
+
+    def _get_studies(self, args: dict[str, Any]) -> list[dict[str, Any]]:
+        job_id = args.get("job_id")
+        return [study.model_dump(mode="json") for study in self.service.list_studies(job_id=job_id)]
+
+    def _next_wave(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import StudyNotFoundError
+
+        study_id = args["study_id"]
+        try:
+            wave = self.service.next_wave(study_id)
+        except StudyNotFoundError:
+            raise BackendError(f"study not found: {study_id}") from None
+        return wave.model_dump(mode="json")
+
+    def _compare_waves(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import StudyNotFoundError
+        from agentic_odi_core.services import StudyJobMismatchError
+
+        study_a = args["study_a"]
+        study_b = args["study_b"]
+        try:
+            comparison = self.service.compare_waves(study_a, study_b)
+        except StudyNotFoundError as exc:
+            raise BackendError(f"study not found: {exc.study_id}") from None
+        except StudyJobMismatchError as exc:
+            raise BackendError(str(exc)) from None
+        return comparison.model_dump(mode="json")
+
 
 _LOCAL_HANDLERS = {
     "add_job": LocalBackend._add_job,
@@ -717,6 +766,10 @@ _LOCAL_HANDLERS = {
     "get_segments": LocalBackend._get_segments,
     "get_strategy": LocalBackend._get_strategy,
     "propose_strategy": LocalBackend._propose_strategy,
+    "open_study": LocalBackend._open_study,
+    "get_studies": LocalBackend._get_studies,
+    "next_wave": LocalBackend._next_wave,
+    "compare_waves": LocalBackend._compare_waves,
     "get_health": LocalBackend._get_health,
 }
 
@@ -786,6 +839,7 @@ _LIST_TOOLS = frozenset(
         "list_scheduled_work",
         "segment_market",
         "get_segments",
+        "get_studies",
     }
 )
 

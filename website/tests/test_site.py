@@ -505,5 +505,7 @@ def test_page_weights_are_within_budget(page: str):
     # list tool and each entity we add. The V2MOM entity, the five
     # scheduled-work tools, and the three signal tools bring the page to ~78 KB;
     # the four Stage 5 and 6 tools (segment_market, get_segments, get_strategy,
-    # propose_strategy) bring it to ~80 KB.
-    assert size <= 84 * 1024, f"{page}: {size} bytes"
+    # propose_strategy) bring it to ~80 KB; the four study tools (open_study,
+    # get_studies, next_wave, compare_waves) plus the Study, StudyGuide,
+    # StudyFrame and WaveComparison schemas bring it to ~98 KB.
+    assert size <= 100 * 1024, f"{page}: {size} bytes"

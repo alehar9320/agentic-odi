@@ -16,6 +16,8 @@ export interface Step {
 export interface Outcome {
   id?: string;
   job_id?: string;
+  /** The study wave this measurement belongs to, when it is one. */
+  study_id?: string | null;
   statement?: string;
   importance?: number | null;
   satisfaction?: number | null;
@@ -91,6 +93,72 @@ export interface Strategy {
   bets: string[];
   rejected: RejectedPath[];
   created_at: string;
+}
+
+export type StudyStatus = "open" | "closed";
+
+export interface StudyGuide {
+  name: string;
+  version: string;
+  questions: string[];
+}
+
+/**
+ * What carries between waves: the guide, the outcome statements, the themes.
+ * Held by value on the wave, so editing a copied frame cannot change its source.
+ */
+export interface StudyFrame {
+  guide?: StudyGuide | null;
+  outcome_statements: string[];
+  themes: string[];
+}
+
+/**
+ * One wave of a study: a job measured at one point in time. `wave` is 1-based
+ * inside `lineage_id`, and a wave starts unmeasured — scores arrive as Outcomes
+ * that carry `study_id`.
+ */
+export interface Study {
+  id: string;
+  lineage_id: string;
+  job_id: string;
+  name: string;
+  wave: number;
+  status: StudyStatus;
+  frame: StudyFrame;
+  created_at: string;
+}
+
+export type OutcomeComparisonStatus =
+  | "moved"
+  | "stable"
+  | "added"
+  | "dropped"
+  | "unmeasured";
+
+/**
+ * One statement's two measurements. `score_a` and `score_b` are null when the
+ * statement was not measured in that wave: an absent score is not a zero.
+ */
+export interface OutcomeComparison {
+  statement: string;
+  score_a?: number | null;
+  score_b?: number | null;
+  delta?: number | null;
+  n_a: number;
+  n_b: number;
+  status: OutcomeComparisonStatus;
+}
+
+/** Two waves compared statement by statement, never by outcome id. */
+export interface WaveComparison {
+  study_a: string;
+  study_b: string;
+  job_id: string;
+  per_outcome: OutcomeComparison[];
+  added: string[];
+  dropped: string[];
+  stable: string[];
 }
 
 export type CanvasProvenanceKind = "live" | "seed" | "empty";
@@ -470,6 +538,8 @@ export interface AddOutcomePayload {
   statement: string;
   importance: number;
   satisfaction: number;
+  /** Link the measurement to a study wave, when it is part of one. */
+  study_id?: string | null;
 }
 
 export interface ConnectorPreset {

@@ -30,6 +30,8 @@ import type {
   Strategy,
   StudioConfig,
   StudioError,
+  Study,
+  WaveComparison,
 } from "../types";
 import { createSseParser, type RawSseEvent } from "./sse";
 import { recordStudioError } from "../diagnostics/bundle";
@@ -556,6 +558,50 @@ export async function proposeStrategy(mcpUrl: string, jobId?: string): Promise<S
     mcp_url: mcpUrl,
     job_id: jobId ?? null,
   });
+}
+
+/** The study waves, grouped by lineage and wave number. Empty until one is opened. */
+export async function fetchStudies(mcpUrl: string, jobId?: string): Promise<Study[]> {
+  const params = new URLSearchParams({ mcp_url: mcpUrl });
+  if (jobId) {
+    params.set("job_id", jobId);
+  }
+  return getJson<Study[]>(`/api/studies?${params.toString()}`);
+}
+
+export async function openStudy(payload: {
+  mcp_url: string;
+  job_id: string;
+  name: string;
+  guide?: { name: string; version: string; questions: string[] } | null;
+  outcome_statements?: string[];
+  themes?: string[];
+}): Promise<Study> {
+  return postJson<Study>("/api/studies", payload);
+}
+
+/** Open the next wave: same frame by value, no measurements carried over. */
+export async function nextWave(studyId: string, mcpUrl: string): Promise<Study> {
+  const params = new URLSearchParams({ mcp_url: mcpUrl });
+  return postJson<Study>(
+    `/api/studies/${encodeURIComponent(studyId)}/next-wave?${params.toString()}`,
+    {},
+  );
+}
+
+/**
+ * Compare two waves statement by statement. A statement measured in only one
+ * wave comes back `added` or `dropped` with a null score, never a zero.
+ */
+export async function compareWaves(
+  studyA: string,
+  studyB: string,
+  mcpUrl: string,
+): Promise<WaveComparison> {
+  const params = new URLSearchParams({ mcp_url: mcpUrl });
+  return getJson<WaveComparison>(
+    `/api/studies/${encodeURIComponent(studyA)}/compare/${encodeURIComponent(studyB)}?${params.toString()}`,
+  );
 }
 
 

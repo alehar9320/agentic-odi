@@ -50,6 +50,7 @@ counted as done.
 - [ ] **A vendor tree that cannot rot into app code** — copied markup lives in `src/vendor`, with lint and a resolving test on its imports ([PR #417](https://github.com/alehar9320/agentic-odi/pull/417)).
 - [ ] **Tailwind scoped to the copied components** — v4 styles `src/vendor` alone, the product keeps its own stylesheet ([PR #422](https://github.com/alehar9320/agentic-odi/pull/422)).
 - [ ] **Evidence from a file at the terminal** — `evidence add --file` reads text (or stdin) on the Studio's attachment cap ([PR #415](https://github.com/alehar9320/agentic-odi/pull/415)).
+- [ ] **Studies and waves** — a job measured again: `open_study` opens wave 1 with its interview frame, `next_wave` clones that frame with no measurements carried over, and `compare_waves` reports what moved, was added, or dropped, keyed by statement.
 
 ## Next
 

@@ -23,7 +23,11 @@ from agentic_odi_core.models import (
     Segment,
     Step,
     Strategy,
+    Study,
+    StudyFrame,
+    StudyGuide,
     ValueMetric,
+    WaveComparison,
 )
 
 _SCHEMA_MODELS: dict[str, type[BaseModel]] = {
@@ -39,6 +43,10 @@ _SCHEMA_MODELS: dict[str, type[BaseModel]] = {
     "Strategy": Strategy,
     "V2MOM": V2MOM,
     "ScheduledWork": ScheduledWork,
+    "Study": Study,
+    "StudyGuide": StudyGuide,
+    "StudyFrame": StudyFrame,
+    "WaveComparison": WaveComparison,
 }
 
 

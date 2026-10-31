@@ -91,6 +91,7 @@ from agentic_odi_studio_api.studio.schemas import (
     ObservationListResponse,
     ObservationResponse,
     ObservationUpdateRequest,
+    OpenStudyRequest,
     PromoteEvidenceRequest,
     ProposeStrategyRequest,
     ScheduleWorkRequest,
@@ -631,15 +632,18 @@ async def delete_step(step_id: str, request: Request, mcp_url: str | None = Quer
 @router.post("/outcomes")
 async def post_outcome(body: AddOutcomeRequest, request: Request) -> dict:
     if _uses_mcp(request):
+        arguments: dict[str, Any] = {
+            "job_id": body.job_id,
+            "statement": body.statement,
+            "importance": body.importance,
+            "satisfaction": body.satisfaction,
+        }
+        if body.study_id is not None:
+            arguments["study_id"] = body.study_id
         result = await call_mcp_tool(
             _require_mcp_url(body.mcp_url),
             ToolName.ADD_OUTCOME.value,
-            {
-                "job_id": body.job_id,
-                "statement": body.statement,
-                "importance": body.importance,
-                "satisfaction": body.satisfaction,
-            },
+            arguments,
         )
         return _payload_from_text(result)
     try:
@@ -648,6 +652,7 @@ async def post_outcome(body: AddOutcomeRequest, request: Request) -> dict:
             statement=body.statement,
             importance=body.importance,
             satisfaction=body.satisfaction,
+            study_id=body.study_id,
         )
     except Exception as exc:  # noqa: BLE001
         raise _as_http_error(exc) from exc
@@ -828,6 +833,101 @@ async def post_strategy_propose(
     except Exception as exc:  # noqa: BLE001
         raise _as_http_error(exc) from exc
     return strategy.model_dump(mode="json")
+
+
+@router.get("/studies", response_model=list[dict[str, Any]])
+async def get_studies(
+    request: Request,
+    job_id: str | None = Query(None),
+    mcp_url: str | None = Query(None),
+) -> list[dict[str, Any]]:
+    """The study waves, grouped by lineage and wave number.
+
+    Empty until a study is opened: a wave is opened, never invented.
+    """
+    if _uses_mcp(request):
+        arguments: dict[str, Any] = {}
+        if job_id:
+            arguments["job_id"] = job_id
+        result = await call_mcp_tool(
+            _require_mcp_url(mcp_url or ""), ToolName.GET_STUDIES.value, arguments
+        )
+        parsed = _json_or_raw(result)
+        return parsed if isinstance(parsed, list) else []
+    return [
+        study.model_dump(mode="json") for study in _service(request).list_studies(job_id=job_id)
+    ]
+
+
+@router.post("/studies", response_model=dict[str, Any])
+async def post_study(body: OpenStudyRequest, request: Request) -> dict[str, Any]:
+    """Open wave 1 of a study, with the frame it will measure against."""
+    arguments = {
+        "job_id": body.job_id,
+        "name": body.name,
+        "guide": body.guide,
+        "outcome_statements": body.outcome_statements,
+        "themes": body.themes,
+    }
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(body.mcp_url), ToolName.OPEN_STUDY.value, arguments
+        )
+        return _payload_from_text(result)
+    try:
+        study = _service(request).open_study(
+            job_id=body.job_id,
+            name=body.name,
+            guide=body.guide,
+            outcome_statements=body.outcome_statements,
+            themes=body.themes,
+        )
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return study.model_dump(mode="json")
+
+
+@router.post("/studies/{study_id}/next-wave", response_model=dict[str, Any])
+async def post_next_wave(
+    study_id: str, request: Request, mcp_url: str | None = Query(None)
+) -> dict[str, Any]:
+    """Open the next wave: same frame by value, no measurements carried over."""
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(mcp_url or ""), ToolName.NEXT_WAVE.value, {"study_id": study_id}
+        )
+        return _payload_from_text(result)
+    try:
+        wave = _service(request).next_wave(study_id)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return wave.model_dump(mode="json")
+
+
+@router.get("/studies/{study_a}/compare/{study_b}", response_model=dict[str, Any])
+async def get_compare_waves(
+    study_a: str,
+    study_b: str,
+    request: Request,
+    mcp_url: str | None = Query(None),
+) -> dict[str, Any]:
+    """Compare two waves of one job, statement by statement.
+
+    A statement measured in only one wave is reported added or dropped, and its
+    absent score stays ``null`` — never ``0``.
+    """
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(mcp_url or ""),
+            ToolName.COMPARE_WAVES.value,
+            {"study_a": study_a, "study_b": study_b},
+        )
+        return _payload_from_text(result)
+    try:
+        comparison = _service(request).compare_waves(study_a, study_b)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return comparison.model_dump(mode="json")
 
 
 def _customer_outcome_args(body: AddCustomerOutcomeRequest) -> dict[str, Any]:

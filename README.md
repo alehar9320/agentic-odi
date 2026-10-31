@@ -71,6 +71,11 @@ per-platform archives with SHA-256 checksums for a manual download. See
   a group of people plus a functional job, never a demographic — and Stage 6
   recommends the one innovation path those segments support, with every path it
   rejected and why.
+- **Measurement over time.** A study measures one job in waves. The interview
+  frame — guide, outcome statements, themes — carries into the next wave by
+  value, while the measurements stay behind, so comparing two waves shows what
+  actually moved instead of a copied flat line. A statement measured in only one
+  wave is reported added or dropped, and its absent score is never a zero.
 - **A conversation, not a form.** The Living Studio opens on one question —
   **What do you want to win?** — with the composer focused. When you ask for
   context, the agent speaks first: who you are and your team, who feels the
@@ -148,6 +153,9 @@ odi jobs list
 odi desired-outcomes list --job-id <id>
 odi segments run --job <id>          # Stage 5: who the scored outcomes point at
 odi strategy propose                 # Stage 6: the bet, and the paths it beat
+odi studies open --job <id> --name "Autumn pulse"   # M2: measure a job again
+odi studies next <study-id>          # next wave: same frame, no measurements
+odi studies compare <a-id> <b-id>    # what moved between two waves
 odi signals unread                    # what changed while you were away
 odi score 8 2                        # → 14.00
 odi                                  # interactive chat in a terminal
@@ -203,9 +211,9 @@ together and where each contract is enforced:
 
 | Path | Distribution | Description |
 |---|---|---|
-| **`packages/core/`** | `agentic-odi-core` | Domain models, the `ODIService` layer, in-memory and SQLite repositories, the shared MCP tool contract, opportunity-score computation, outcome-based segmentation (Stage 5), and the innovation strategy (Stage 6). |
+| **`packages/core/`** | `agentic-odi-core` | Domain models, the `ODIService` layer, in-memory and SQLite repositories, the shared MCP tool contract, opportunity-score computation, outcome-based segmentation (Stage 5), the innovation strategy (Stage 6), and studies with their waves. |
 | **`packages/connectors/`** | `agentic-odi-connectors` | Pluggable MCP and REST connectors with presets and an ingest sink. |
-| **`apps/mcp-server/`** | `agentic-odi-mcp-server` | FastMCP server exposing Jobs, Steps, Desired Outcomes, Customer Outcomes, Evidence, Segments, Strategy, and context tools over HTTP. SQLite by default. |
+| **`apps/mcp-server/`** | `agentic-odi-mcp-server` | FastMCP server exposing Jobs, Steps, Desired Outcomes, Customer Outcomes, Evidence, Segments, Strategy, Studies, and context tools over HTTP. SQLite by default. |
 | **`apps/studio-api/`** | `agentic-odi-studio-api` | FastAPI **Living Studio sidecar**: config, health, metadata-only diagnostics, canvas, local mutations, MCP passthrough, SSE chat, conversations, and PM memory. |
 | **`apps/cli/`** | `agentic-odi-cli` | Typer CLI with interactive chat, full entity CRUD, `schema`, `connectors`, and local or remote data access. |
 | **`apps/studio/`** | React + TypeScript + Vite | **The Living Studio** SPA and Tauri 2 desktop shell, built on [assistant-ui](https://www.assistant-ui.com). Keyboard- and screen-reader-operable, gated by an [axe-core](https://github.com/dequelabs/axe-core) WCAG 2.1 AA sweep in the frontend suite. Its browser-level suite lives in `apps/studio/e2e/`. Copied UI components land under `src/vendor/`, which is the only place Tailwind styles. Installed desktop builds **update themselves** in the background and apply on restart. |

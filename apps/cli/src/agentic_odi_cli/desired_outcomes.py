@@ -40,6 +40,9 @@ def add(
     importance: float = typer.Option(..., min=1.0, max=10.0, help="Importance score (1-10)"),
     satisfaction: float = typer.Option(..., min=1.0, max=10.0, help="Satisfaction score (1-10)"),
     step_id: str | None = typer.Option(default=None, help="Optional Step ID"),
+    study_id: str | None = typer.Option(
+        default=None, help="Study wave this measurement belongs to"
+    ),
     json_output: bool = JSON_OPTION,
 ) -> None:
     """Add a desired Outcome to a Job."""
@@ -51,6 +54,8 @@ def add(
     }
     if step_id is not None:
         args["step_id"] = step_id
+    if study_id is not None:
+        args["study_id"] = study_id
     typer.echo(
         render_saved("created", run_tool("add_outcome", args), as_json=json_output, noun="Outcome")
     )
