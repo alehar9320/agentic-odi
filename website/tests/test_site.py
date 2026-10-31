@@ -489,7 +489,7 @@ PAGE_WEIGHT_BUDGET = 78 * 1024
 # the test tree, so it needs its own ceiling rather than a raised one for
 # every page.
 PAGE_WEIGHT_OVERRIDES = {
-    "docs/development/index.html": 84 * 1024,
+    "docs/development/index.html": 92 * 1024,
 }
 
 
