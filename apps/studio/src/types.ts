@@ -20,9 +20,101 @@ export interface Outcome {
   importance?: number | null;
   satisfaction?: number | null;
   opportunity_score?: number | null;
+  importance_n?: number | null;
+  satisfaction_n?: number | null;
+  score_method?: "estimate" | "survey" | "import";
+  opportunity_low?: number | null;
+  opportunity_high?: number | null;
+  interval_n?: number | null;
+  interval_seed?: number | null;
+  interval_confidence_level?: number | null;
+  interval_computed_at?: string | null;
   evidence?: string;
   telemetry?: string;
 }
+
+/**
+ * A stored band and the provenance it was recorded with (B3.2). `band` is null
+ * when the score carries no band at all — an estimate or an unscored outcome —
+ * which is a distinct state from a zero-width band. `stale` marks a band whose
+ * score a later snapshot moved, so a consumer never presents it as current.
+ */
+export interface OutcomeInterval {
+  outcome_id: string;
+  band: {
+    low: number;
+    high: number;
+    n: number;
+    confidence_level: number;
+    seed: number | null;
+    method: string;
+    computed_at: string;
+    stale: boolean;
+  } | null;
+}
+
+/**
+ * The paired survey inputs a stored band was reproduced from (B3.1). `inputs`
+ * is null when no input set is retained — a legacy or aggregate-only outcome —
+ * which is a distinct state from a retained set and never an empty list that
+ * would read as zero responses. Each entry carries only an opaque per-pair
+ * token and the two numbers, so the shape is de-identified.
+ */
+export interface OutcomeInputs {
+  outcome_id: string;
+  inputs: {
+    respondent_id: string;
+    importance: number;
+    satisfaction: number;
+  }[] | null;
+}
+
+/**
+ * What a customer uses today for one Job (M2-07). `kind` is one of product,
+ * service, workaround, manual, nothing — a `nothing` row is real evidence for a
+ * new-market bet, not an absent record.
+ */
+export interface Alternative {
+  id?: string;
+  job_id?: string;
+  name?: string;
+  kind?: "product" | "service" | "workaround" | "manual" | "nothing";
+  notes?: string | null;
+  source_kind?: string;
+}
+
+/** A customer's own adequacy rating of one alternative against one outcome (M2-07). */
+export interface AlternativeLink {
+  outcome_id: string;
+  alternative_id: string;
+  adequacy: number;
+  usage_n?: number | null;
+  note?: string | null;
+}
+
+/** An alternative paired with the adequacy link that rates it for one outcome. */
+export interface OutcomeAlternative {
+  alternative: Alternative;
+  link: AlternativeLink;
+}
+
+/**
+ * One recorded alternative with the outcome it rates (M2-07.2). The landscape
+ * facet reads a whole job in one call rather than one request per outcome.
+ */
+export interface OutcomeAlternativeLink {
+  outcome_id: string;
+  alternative: Alternative;
+  link: AlternativeLink;
+}
+
+/**
+ * Whether an existing solution is recorded for an outcome (M2-07). `yes` means
+ * a solution is recorded; `no_linked_nothing` means we asked and the customer
+ * uses nothing today; `no_link_at_all` means we have not asked. Only `yes`
+ * means a solution exists — an empty inventory is never evidence.
+ */
+export type ExistingSolution = "yes" | "no_linked_nothing" | "no_link_at_all";
 
 export interface Evidence {
   id: string;
@@ -464,6 +556,23 @@ export interface AddOutcomePayload {
   statement: string;
   importance: number;
   satisfaction: number;
+  importance_n?: number | null;
+  satisfaction_n?: number | null;
+  score_method?: "estimate" | "survey" | "import";
+  note?: string | null;
+}
+
+export interface ScoreSnapshot {
+  id: string;
+  outcome_id: string;
+  at: string;
+  importance?: number | null;
+  satisfaction?: number | null;
+  opportunity_score?: number | null;
+  importance_n?: number | null;
+  satisfaction_n?: number | null;
+  method?: "estimate" | "survey" | "import";
+  note?: string | null;
 }
 
 export interface ConnectorPreset {

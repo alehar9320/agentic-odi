@@ -10,18 +10,23 @@ from typing import Any
 
 from pydantic import BaseModel, ValidationError
 
+from agentic_odi_core.errors import ValidationError as OdiValidationError
 from agentic_odi_core.events import DEFAULT_DEVICE, DEFAULT_WORKSPACE, Event
 from agentic_odi_core.intent_store import IntentStore
 from agentic_odi_core.models import (
+    Alternative,
+    AlternativeLink,
     CustomerOutcome,
     Evidence,
     Job,
     Outcome,
     ScheduledWork,
+    ScoreSnapshot,
     Segment,
     Signal,
     Step,
     Strategy,
+    SurveyInputSet,
     compute_opportunity_score,
 )
 from agentic_odi_core.repository import (
@@ -52,7 +57,10 @@ class SQLiteRepository(Repository):
         self.store = IntentStore(db_path, check_same_thread=False)
         self._last_event_id = 0
         self._backfilled = False
+        self._legacy_method_ids: set[str] = set()
+        self._method_backfilled_ids: set[str] = set()
         self._load_snapshot()
+        self._backfill_outcome_method()
         self._backfill_legacy_outcomes()
 
     def _load_snapshot(self) -> None:
@@ -60,14 +68,42 @@ class SQLiteRepository(Repository):
         self.steps: dict[str, Step] = {}
         self.outcomes: dict[str, Outcome] = {}
         self.customer_outcomes: dict[str, CustomerOutcome] = {}
+        self.alternatives: dict[str, Alternative] = {}
+        self.alternative_links: dict[tuple[str, str], AlternativeLink] = {}
         self.evidence: dict[str, Evidence] = {}
         self.signals: dict[str, Signal] = {}
         self.scheduled_work: dict[str, ScheduledWork] = {}
+        self.score_snapshots: list[ScoreSnapshot] = []
+        self.survey_input_sets: dict[str, SurveyInputSet] = {}
         self.segments: dict[str, Segment] = {}
         self.strategies: dict[str, Strategy] = {}
         self._last_event_id = 0
+        self._legacy_method_ids = set()
+        self._method_backfilled_ids = set()
         for ev in self.store.get_stream(workspace_id=self._workspace_id, replay_order=True):
             self._apply_event(ev)
+
+    def _backfill_outcome_method(self) -> None:
+        """One-time migration: label legacy outcomes with their score method.
+
+        Rows written before the method field existed are estimates by
+        definition, so each gets an ``OUTCOME_METHOD_BACKFILLED`` event carrying
+        ``score_method='estimate'``. The event is a no-op state-wise (the model
+        default already produces it) but it is the auditable record that the
+        label was applied rather than inferred. The pending set is derived from
+        the replayed stream, so re-running adds no duplicate events.
+        """
+        pending = self._legacy_method_ids - self._method_backfilled_ids
+        if not pending:
+            return
+        for outcome_id in sorted(pending):
+            self.store.append(
+                "OUTCOME_METHOD_BACKFILLED",
+                {"id": outcome_id, "updates": {"score_method": "estimate"}},
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+        self._sync()
 
     def _backfill_legacy_outcomes(self) -> None:
         """One-time migration: backfill null scores on legacy outcomes.
@@ -120,11 +156,25 @@ class SQLiteRepository(Repository):
         elif et == "STEP_CREATED":
             self.steps[p["id"]] = Step.model_validate(p)
         elif et == "OUTCOME_CREATED":
+            if "score_method" not in p:
+                # A payload written before the method field existed: an estimate
+                # by definition, labelled once by the method backfill.
+                self._legacy_method_ids.add(p["id"])
             self.outcomes[p["id"]] = Outcome.model_validate(p)
+        elif et == "OUTCOME_METHOD_BACKFILLED":
+            self._method_backfilled_ids.add(p["id"])
+            self._merge_updates(self.outcomes, p, Outcome)
         elif et == "CUSTOMER_OUTCOME_CREATED":
             self.customer_outcomes[p["id"]] = CustomerOutcome.model_validate(p)
         elif et == "EVIDENCE_CREATED":
             self.evidence[p["id"]] = Evidence.model_validate(p)
+        elif et == "SCORE_SNAPSHOT_RECORDED":
+            self.score_snapshots.append(ScoreSnapshot.model_validate(p))
+        elif et == "SURVEY_INPUTS_RETAINED":
+            input_set = SurveyInputSet.model_validate(p)
+            self.survey_input_sets[input_set.outcome_id] = input_set
+        elif et == "SURVEY_INPUTS_DELETED":
+            self.survey_input_sets.pop(p["outcome_id"], None)
         elif et == "JOB_UPDATED":
             self._merge_updates(self.jobs, p, Job)
         elif et == "STEP_UPDATED":
@@ -133,6 +183,19 @@ class SQLiteRepository(Repository):
             self._merge_updates(self.outcomes, p, Outcome)
         elif et == "CUSTOMER_OUTCOME_UPDATED":
             self._merge_updates(self.customer_outcomes, p, CustomerOutcome)
+        elif et == "ALTERNATIVE_CREATED":
+            self.alternatives[p["id"]] = Alternative.model_validate(p)
+        elif et == "ALTERNATIVE_UPDATED":
+            self._merge_updates(self.alternatives, p, Alternative)
+        elif et == "ALTERNATIVE_DELETED":
+            self.alternatives.pop(p["id"], None)
+            for link_key in [k for k in self.alternative_links if k[1] == p["id"]]:
+                del self.alternative_links[link_key]
+        elif et == "ALTERNATIVE_LINKED":
+            link = AlternativeLink.model_validate(p)
+            self.alternative_links[(link.outcome_id, link.alternative_id)] = link
+        elif et == "ALTERNATIVE_UNLINKED":
+            self.alternative_links.pop((p["outcome_id"], p["alternative_id"]), None)
         elif et == "JOB_DELETED":
             job_id = p["id"]
             self.jobs.pop(job_id, None)
@@ -144,6 +207,9 @@ class SQLiteRepository(Repository):
                 del self.outcomes[key]
             for key in [k for k, v in self.customer_outcomes.items() if v.job_id == job_id]:
                 del self.customer_outcomes[key]
+            for key in [k for k, v in self.alternatives.items() if v.job_id == job_id]:
+                del self.alternatives[key]
+            self._drop_orphan_alternative_links()
             #: Do not destroy research evidence: unlink references to the removed
             #: job, its steps and its outcomes instead of deleting the rows.
             for key, record in list(self.evidence.items()):
@@ -158,6 +224,7 @@ class SQLiteRepository(Repository):
                     current = record.model_dump(exclude_unset=True)
                     current.update(updates)
                     self.evidence[key] = Evidence.model_validate(current)
+            self._drop_orphan_survey_input_sets()
         elif et == "STEP_DELETED":
             step_id = p["id"]
             self.steps.pop(step_id, None)
@@ -165,15 +232,20 @@ class SQLiteRepository(Repository):
                 del self.outcomes[key]
             for key in [k for k, v in self.customer_outcomes.items() if v.step_id == step_id]:
                 del self.customer_outcomes[key]
+            self._drop_orphan_alternative_links()
             #: Unlink evidence instead of destroying it.
             for key, record in list(self.evidence.items()):
                 if record.step_id == step_id:
                     current = record.model_dump(exclude_unset=True)
                     current["step_id"] = None
                     self.evidence[key] = Evidence.model_validate(current)
+            self._drop_orphan_survey_input_sets()
         elif et == "OUTCOME_DELETED":
             outcome_id = p["id"]
             self.outcomes.pop(outcome_id, None)
+            self.score_snapshots = [s for s in self.score_snapshots if s.outcome_id != outcome_id]
+            self.survey_input_sets.pop(outcome_id, None)
+            self._drop_orphan_alternative_links()
             #: Unlink evidence instead of destroying it: point outcome_id to NULL
             #: so the quote survives the outcome's removal.
             for key, record in list(self.evidence.items()):
@@ -209,6 +281,25 @@ class SQLiteRepository(Repository):
         elif et == "STRATEGY_UPDATED":
             self._merge_updates(self.strategies, p, Strategy)
         self._last_event_id = max(self._last_event_id, ev["id"])
+
+    def _drop_orphan_survey_input_sets(self) -> None:
+        """Drop retained inputs whose outcome no longer exists.
+
+        Deleting a job or step removes its outcomes; the paired inputs those
+        outcomes were bootstrapped from must go with them rather than outliving
+        their outcome as an orphan set.
+        """
+        for outcome_id in [k for k in self.survey_input_sets if k not in self.outcomes]:
+            del self.survey_input_sets[outcome_id]
+
+    def _drop_orphan_alternative_links(self) -> None:
+        """Drop links whose outcome or alternative no longer exists."""
+        for key in [
+            k
+            for k in self.alternative_links
+            if k[0] not in self.outcomes or k[1] not in self.alternatives
+        ]:
+            del self.alternative_links[key]
 
     @staticmethod
     def _merge_updates(entities: dict[str, Any], p: dict, model: type[BaseModel]) -> None:
@@ -546,6 +637,65 @@ class SQLiteRepository(Repository):
             self._sync()
             return new_evidence
 
+    def add_score_snapshot(self, snapshot: ScoreSnapshot) -> ScoreSnapshot:
+        with self._lock:
+            self.store.append(
+                "SCORE_SNAPSHOT_RECORDED",
+                snapshot.model_dump(),
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return snapshot
+
+    def list_score_snapshots(self, outcome_id: str | None = None) -> list[ScoreSnapshot]:
+        with self._lock:
+            self._sync()
+            if outcome_id is None:
+                return list(self.score_snapshots)
+            return [s for s in self.score_snapshots if s.outcome_id == outcome_id]
+
+    def add_survey_input_set(self, input_set: SurveyInputSet) -> SurveyInputSet:
+        with self._lock:
+            self._sync()
+            outcome = self.outcomes.get(input_set.outcome_id)
+            if outcome is None:
+                raise OdiValidationError(
+                    f"cannot retain inputs for unknown outcome {input_set.outcome_id!r}"
+                )
+            if outcome.job_id != input_set.job_id:
+                raise OdiValidationError(
+                    "a retained input set must belong to the outcome's own job; "
+                    f"outcome job {outcome.job_id!r} != input set job {input_set.job_id!r}"
+                )
+            self.store.append(
+                "SURVEY_INPUTS_RETAINED",
+                input_set.model_dump(),
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return input_set
+
+    def get_survey_input_set(self, outcome_id: str) -> SurveyInputSet | None:
+        with self._lock:
+            self._sync()
+            return self.survey_input_sets.get(outcome_id)
+
+    def delete_survey_input_set(self, outcome_id: str) -> bool:
+        with self._lock:
+            self._sync()
+            if outcome_id not in self.survey_input_sets:
+                return False
+            self.store.append(
+                "SURVEY_INPUTS_DELETED",
+                {"outcome_id": outcome_id},
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return True
+
     def delete_customer_outcome(self, outcome_id: str) -> bool:
         with self._lock:
             self._sync()
@@ -559,6 +709,99 @@ class SQLiteRepository(Repository):
                 self._sync()
                 return True
             return False
+
+    def add_alternative(self, alternative: Alternative) -> Alternative:
+        with self._lock:
+            self.store.append(
+                "ALTERNATIVE_CREATED",
+                alternative.model_dump(),
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return alternative
+
+    def get_alternative(self, alternative_id: str) -> Alternative | None:
+        with self._lock:
+            self._sync()
+            return self.alternatives.get(alternative_id)
+
+    def list_alternatives(
+        self, job_id: str | None = None, limit: int | None = None, offset: int = 0
+    ) -> list[Alternative]:
+        with self._lock:
+            self._sync()
+            if job_id is None:
+                items = list(self.alternatives.values())
+            else:
+                items = [a for a in self.alternatives.values() if a.job_id == job_id]
+            return page(items, limit, offset)
+
+    def delete_alternative(self, alternative_id: str) -> bool:
+        with self._lock:
+            self._sync()
+            if alternative_id not in self.alternatives:
+                return False
+            self.store.append(
+                "ALTERNATIVE_DELETED",
+                {"id": alternative_id},
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return True
+
+    def link_alternative(self, link: AlternativeLink) -> AlternativeLink:
+        with self._lock:
+            self.store.append(
+                "ALTERNATIVE_LINKED",
+                link.model_dump(),
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return link
+
+    def get_alternative_link(self, outcome_id: str, alternative_id: str) -> AlternativeLink | None:
+        with self._lock:
+            self._sync()
+            return self.alternative_links.get((outcome_id, alternative_id))
+
+    def list_alternative_links(
+        self,
+        outcome_id: str | None = None,
+        alternative_id: str | None = None,
+        job_id: str | None = None,
+    ) -> list[AlternativeLink]:
+        with self._lock:
+            self._sync()
+            items = list(self.alternative_links.values())
+            if outcome_id is not None:
+                items = [link for link in items if link.outcome_id == outcome_id]
+            if alternative_id is not None:
+                items = [link for link in items if link.alternative_id == alternative_id]
+            if job_id is not None:
+                items = [
+                    link
+                    for link in items
+                    if (alternative := self.alternatives.get(link.alternative_id)) is not None
+                    and alternative.job_id == job_id
+                ]
+            return items
+
+    def unlink_alternative(self, outcome_id: str, alternative_id: str) -> bool:
+        with self._lock:
+            self._sync()
+            if (outcome_id, alternative_id) not in self.alternative_links:
+                return False
+            self.store.append(
+                "ALTERNATIVE_UNLINKED",
+                {"outcome_id": outcome_id, "alternative_id": alternative_id},
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return True
 
     def add_signal(self, signal: Signal) -> Signal:
         with self._lock:

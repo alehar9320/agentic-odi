@@ -40,6 +40,17 @@ def _block(rows: list[tuple[str, Any]]) -> str:
     return "\n".join(f"{label.ljust(width)}  {value}" for label, value in rows)
 
 
+def _note_cell(note: Any) -> str:
+    """Flatten a note to a single line so it cannot break an aligned block or row.
+
+    The note is free text; a newline in it would otherwise split a value across
+    lines and misalign the surrounding output.
+    """
+    if not note:
+        return ""
+    return " ".join(str(note).split())
+
+
 def _table(headers: tuple[str, ...], rows: list[tuple[str, ...]], *, empty: str) -> str:
     """Render rows under headers, or ``empty`` when there is nothing to show."""
     if not rows:
@@ -178,23 +189,119 @@ def render_step_list(steps: Any, *, as_json: bool) -> str:
     )
 
 
-def render_outcome(outcome: Any, *, as_json: bool) -> str:
-    """Render one desired Outcome as a labelled block or JSON."""
+def _sample_label(outcome: dict[str, Any]) -> str:
+    """Describe how many people stand behind a score, and how it was obtained.
+
+    An estimate, or a score with no recorded sample, reads as ``est.`` — never
+    as a fabricated ``n``. A recorded sample shows both counts when they differ,
+    so a thin dimension is visible rather than averaged away.
+    """
+    importance_n = outcome.get("importance_n")
+    satisfaction_n = outcome.get("satisfaction_n")
+    # Outcomes store the method as ``score_method``; snapshots as ``method``.
+    method = outcome.get("score_method") or outcome.get("method") or "estimate"
+    if method == "estimate" or (importance_n is None and satisfaction_n is None):
+        return "est."
+    if importance_n == satisfaction_n:
+        return f"n={importance_n} ({method})"
+    return f"n={importance_n or '?'}/{satisfaction_n or '?'} ({method})"
+
+
+def _advisory_line(outcome: dict[str, Any]) -> str | None:
+    """The M2-14 below-threshold advisory for an outcome mapping, or ``None``.
+
+    Reads the same fields the sample label does and calls the core's single
+    advisory implementation, so the CLI, the landscape and the brief word the
+    warning identically. It never invents a count for an estimate or an unknown
+    sample; those produce no advisory.
+    """
+    from agentic_odi_core.evaluation import advisory_for
+
+    advisory = advisory_for(
+        method=outcome.get("score_method") or outcome.get("method") or "estimate",
+        importance_n=outcome.get("importance_n"),
+        satisfaction_n=outcome.get("satisfaction_n"),
+        opportunity_score=outcome.get("opportunity_score"),
+    )
+    return advisory.message if advisory else None
+
+
+def render_interval_provenance(interval: Any, *, as_json: bool = False) -> str:
+    """Render a stored band and its provenance, or the no-band reason (B3.2).
+
+    A ``None`` band is *no band* — an estimate or an unscored outcome — and is
+    said so explicitly rather than shown as a zero-width band. A stored band
+    names the sample, seed and confidence level it was computed with, and is
+    marked ``stale`` when a later snapshot moved the score it came from, so a
+    band is never presented as current when it is not.
+    """
+    if as_json:
+        return _json(interval)
+    if not isinstance(interval, dict):
+        return str(interval)
+    band = interval.get("band")
+    if not band:
+        return "band  none (no band recorded; an estimate or an unscored outcome)"
+    low = band.get("low")
+    high = band.get("high")
+    seed = band.get("seed")
+    seed_label = "unrecorded" if seed is None else str(seed)
+    confidence = band.get("confidence_level")
+    confidence_label = f"{confidence:.2f}" if isinstance(confidence, (int, float)) else "unrecorded"
+    return _block(
+        [
+            ("band", f"[{low}–{high}]" if low != high else f"±0 ({low})"),
+            ("band n", str(band.get("n"))),
+            ("band method", str(band.get("method") or "unrecorded")),
+            ("band confidence", confidence_label),
+            ("band seed", seed_label),
+            ("band computed", str(band.get("computed_at") or "unrecorded")),
+            ("band stale", "yes" if band.get("stale") else "no"),
+        ]
+    )
+
+
+def render_outcome(
+    outcome: Any,
+    *,
+    as_json: bool,
+    latest_note: str | None = None,
+    interval: Any = None,
+) -> str:
+    """Render one desired Outcome as a labelled block or JSON.
+
+    ``latest_note`` is the reason recorded with the most recent accepted score
+    change. It is snapshot metadata, not an Outcome field, so it is shown as a
+    separate line and omitted entirely when empty — an absent reason renders
+    nothing rather than a placeholder. ``interval`` is the stored band and its
+    provenance; a no-band outcome renders an explicit "no band" line so the
+    absence of a band is visible rather than left to inference.
+    """
     if not isinstance(outcome, dict):
         return _json(outcome) if as_json else str(outcome)
     if as_json:
         return _json(outcome)
-    return _block(
-        [
-            ("id", outcome.get("id", "")),
-            ("job_id", outcome.get("job_id", "")),
-            ("step_id", outcome.get("step_id") or ""),
-            ("statement", outcome.get("statement", "")),
-            ("importance", _num(outcome.get("importance", ""))),
-            ("satisfaction", _num(outcome.get("satisfaction", ""))),
-            ("opportunity", _num(outcome.get("opportunity_score", ""))),
-        ]
-    )
+    rows = [
+        ("id", outcome.get("id", "")),
+        ("job_id", outcome.get("job_id", "")),
+        ("step_id", outcome.get("step_id") or ""),
+        ("statement", outcome.get("statement", "")),
+        ("importance", _num(outcome.get("importance", ""))),
+        ("satisfaction", _num(outcome.get("satisfaction", ""))),
+        ("opportunity", _num(outcome.get("opportunity_score", ""))),
+        ("sample", _sample_label(outcome)),
+    ]
+    advisory = _advisory_line(outcome)
+    if advisory:
+        rows.append(("advisory", advisory))
+    if latest_note:
+        note_line = _note_cell(latest_note)
+        if note_line:
+            rows.append(("note", note_line))
+    block = _block(rows)
+    if interval is not None:
+        block = f"{block}\n{render_interval_provenance(interval)}"
+    return block
 
 
 JOB_MAP_STAGES = 8
@@ -358,6 +465,77 @@ def render_signal_list(signals: Any, *, as_json: bool) -> str:
     )
 
 
+def render_alternative(item: Any, *, as_json: bool) -> str:
+    """Render one alternative as a labelled block or JSON."""
+    if not isinstance(item, dict):
+        return _json(item) if as_json else str(item)
+    if as_json:
+        return _json(item)
+    return _block(
+        [
+            ("id", item.get("id", "")),
+            ("job_id", item.get("job_id", "")),
+            ("name", item.get("name", "")),
+            ("kind", item.get("kind", "")),
+            ("source_kind", item.get("source_kind", "")),
+            ("notes", _note_cell(item.get("notes"))),
+        ]
+    )
+
+
+def render_alternative_list(
+    items: Any, *, as_json: bool, empty: str = "No alternatives found."
+) -> str:
+    """Render alternatives as an aligned table or JSON.
+
+    ``get_outcome_alternatives`` returns ``{alternative, link}`` pairs; a plain
+    job-level list returns bare alternatives. Both render under the same table,
+    so a caller never sees two shapes for the same noun.
+    """
+    if not isinstance(items, list):
+        return _json(items) if as_json else str(items)
+    if as_json:
+        return _json(items)
+    rows: list[tuple[str, ...]] = []
+    for item in items:
+        if isinstance(item, dict) and "alternative" in item:
+            alternative = item.get("alternative") or {}
+            link = item.get("link") or {}
+        else:
+            alternative = item
+            link = {}
+        rows.append(
+            (
+                str(alternative.get("id", "")),
+                _truncate(str(alternative.get("name", ""))),
+                _cell(alternative, "kind"),
+                _num(link.get("adequacy", "")),
+                str(link.get("usage_n", "") or ""),
+            )
+        )
+    return _table(
+        ("id", "name", "kind", "adequacy", "usage_n"),
+        rows,
+        empty=empty,
+    )
+
+
+def render_existing_solution(verdict: Any, *, as_json: bool) -> str:
+    """Render the three-state existing-solution result.
+
+    ``yes`` means a solution is recorded; ``no_linked_nothing`` means we asked
+    and the customer uses nothing today; ``no_link_at_all`` means we have not
+    asked. Only ``yes`` means a solution exists. The wording comes from the one
+    core map so the CLI, the Studio and the brief cannot disagree.
+    """
+    if as_json:
+        return _json(verdict)
+    from agentic_odi_core import solution_label
+
+    state = verdict.get("existing_solution") if isinstance(verdict, dict) else verdict
+    return solution_label(str(state))
+
+
 def render_saved(verb: str, outcome: Any, *, as_json: bool, noun: str = "Customer outcome") -> str:
     """Confirm a create/update, showing the record by default."""
     if not isinstance(outcome, dict):
@@ -407,6 +585,60 @@ def render_scheduled_work_list(items: Any, *, as_json: bool) -> str:
         ],
         empty="No scheduled work found.",
     )
+
+
+def render_score_history(snapshots: Any, *, as_json: bool) -> str:
+    """Render an outcome's accepted score snapshots, oldest first.
+
+    Each row carries the score *and* its sample/method companions, because a
+    history of bare numbers cannot say whether the evidence changed or the
+    estimate did. Deltas are not computed here: the baseline/sign policy is a
+    pending decision, so this shows the recorded states only.
+    """
+    if not isinstance(snapshots, list):
+        return _json(snapshots) if as_json else str(snapshots)
+    if as_json:
+        return _json(snapshots)
+    return _table(
+        headers=("at", "importance", "satisfaction", "opportunity", "sample", "note"),
+        rows=[
+            (
+                str(snapshot.get("at", "")),
+                _num(snapshot.get("importance", "")),
+                _num(snapshot.get("satisfaction", "")),
+                _num(snapshot.get("opportunity_score", "")),
+                _sample_label(snapshot),
+                _note_cell(snapshot.get("note")),
+            )
+            for snapshot in snapshots
+        ],
+        empty="No score history recorded yet.",
+    )
+
+
+def render_outcome_delta(delta: Any, *, as_json: bool = False) -> str:
+    """Render the signed change across an outcome's snapshots (B6.1).
+
+    The sign is the product's direction rule, so it is rendered from the delta
+    the service computed, never recomputed here.
+    """
+    if not isinstance(delta, dict):
+        return _json(delta) if as_json else str(delta)
+    if as_json:
+        return _json(delta)
+    direction = str(delta.get("direction", "flat"))
+    arrow = {"up": "^", "down": "v", "flat": "="}.get(direction, "?")
+    return (
+        f"Change: importance {_signed(delta.get('importance'))}, "
+        f"satisfaction {_signed(delta.get('satisfaction'))}, "
+        f"opportunity {_signed(delta.get('opportunity'))} ({arrow} {direction})"
+    )
+
+
+def _signed(value: Any) -> str:
+    if value is None:
+        return "unknown"
+    return f"{float(value):+g}"
 
 
 def _verdict(segment: dict[str, Any]) -> str:

@@ -64,6 +64,7 @@ from agentic_odi_studio_api.studio.probes import (
     list_models,
 )
 from agentic_odi_studio_api.studio.schemas import (
+    AddAlternativeRequest,
     AddConnectorRequest,
     AddCustomerOutcomeRequest,
     AddEvidenceRequest,
@@ -81,6 +82,7 @@ from agentic_odi_studio_api.studio.schemas import (
     ConversationTreeResponse,
     CreateJobRequest,
     LatestConversationResponse,
+    LinkAlternativeRequest,
     LlmHealthRequest,
     LlmProxyRequest,
     MarketplaceListingOut,
@@ -639,6 +641,10 @@ async def post_outcome(body: AddOutcomeRequest, request: Request) -> dict:
                 "statement": body.statement,
                 "importance": body.importance,
                 "satisfaction": body.satisfaction,
+                "importance_n": body.importance_n,
+                "satisfaction_n": body.satisfaction_n,
+                "score_method": body.score_method,
+                "note": body.note,
             },
         )
         return _payload_from_text(result)
@@ -648,6 +654,10 @@ async def post_outcome(body: AddOutcomeRequest, request: Request) -> dict:
             statement=body.statement,
             importance=body.importance,
             satisfaction=body.satisfaction,
+            importance_n=body.importance_n,
+            satisfaction_n=body.satisfaction_n,
+            score_method=body.score_method,
+            note=body.note,
         )
     except Exception as exc:  # noqa: BLE001
         raise _as_http_error(exc) from exc
@@ -657,18 +667,164 @@ async def post_outcome(body: AddOutcomeRequest, request: Request) -> dict:
 @router.patch("/outcomes/{outcome_id}")
 async def patch_outcome(outcome_id: str, body: UpdateOutcomeRequest, request: Request) -> dict:
     updates = body.model_dump(exclude_none=True, exclude={"mcp_url"})
+    # ``note`` is snapshot metadata, not an Outcome field: it is recorded with
+    # the new score rather than written onto the record.
+    note = updates.pop("note", None)
     if _uses_mcp(request):
         result = await call_mcp_tool(
             _require_mcp_url(body.mcp_url),
             ToolName.UPDATE_OUTCOME.value,
-            {"outcome_id": outcome_id, **updates},
+            {"outcome_id": outcome_id, "note": note, **updates},
         )
         return _payload_from_text(result)
     try:
-        outcome = _service(request).update_outcome(outcome_id, updates)
+        outcome = _service(request).update_outcome(outcome_id, updates, note=note)
     except Exception as exc:  # noqa: BLE001
         raise _as_http_error(exc) from exc
     return outcome.model_dump(mode="json")
+
+
+@router.get("/outcomes/{outcome_id}/history")
+async def get_outcome_history(
+    outcome_id: str, request: Request, mcp_url: str | None = Query(None)
+) -> dict:
+    """Return an outcome's accepted score snapshots, oldest first.
+
+    Snapshots carry the score and its sample/method companions. The signed delta
+    is served separately at ``/outcomes/{id}/delta`` so this list shape stays
+    identical across the local and MCP backends.
+    """
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(mcp_url or ""),
+            ToolName.GET_OUTCOME_HISTORY.value,
+            {"outcome_id": outcome_id},
+        )
+        return {"ok": True, "result": _json_or_raw(result)}
+    try:
+        snapshots = _service(request).get_score_history(outcome_id)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return {"ok": True, "result": [snapshot.model_dump(mode="json") for snapshot in snapshots]}
+
+
+@router.get("/outcomes/{outcome_id}/delta")
+async def get_outcome_delta(
+    outcome_id: str,
+    request: Request,
+    since: str | None = Query(None),
+    mcp_url: str | None = Query(None),
+) -> dict:
+    """Return the signed change across an outcome's snapshots (B6.1).
+
+    ``since`` chooses the baseline (the last snapshot at or before it; the
+    earliest when omitted). ``direction`` is the product's sign rule, so a
+    consumer never invents an "improvement" from a bare number.
+    """
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(mcp_url or ""),
+            ToolName.GET_OUTCOME_DELTA.value,
+            {"outcome_id": outcome_id, **({"since": since} if since else {})},
+        )
+        return {"ok": True, "result": _json_or_raw(result)}
+    try:
+        delta = _service(request).get_outcome_delta(outcome_id, since)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return {
+        "ok": True,
+        "result": {
+            "outcome_id": delta.outcome_id,
+            "importance": delta.importance,
+            "satisfaction": delta.satisfaction,
+            "opportunity": delta.opportunity,
+            "direction": delta.direction,
+        },
+    }
+
+
+@router.get("/outcomes/{outcome_id}/interval")
+async def get_outcome_interval(
+    outcome_id: str, request: Request, mcp_url: str | None = Query(None)
+) -> dict:
+    """Return an outcome's stored band and its provenance (B3.2).
+
+    ``band: null`` means the score carries no band at all — an estimate or an
+    unscored outcome — which is a distinct state from a zero-width band. A
+    stored band reports the sample, seed, confidence level, method and
+    computed-at it was recorded with, plus whether a later snapshot moved the
+    score it came from, so a consumer never presents a stale band as current.
+    """
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(mcp_url or ""),
+            ToolName.GET_OUTCOME_INTERVAL.value,
+            {"outcome_id": outcome_id},
+        )
+        return {"ok": True, "result": _json_or_raw(result)}
+    try:
+        provenance = _service(request).get_outcome_interval(outcome_id)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    if provenance is None:
+        return {"ok": True, "result": {"outcome_id": outcome_id, "band": None}}
+    return {
+        "ok": True,
+        "result": {
+            "outcome_id": provenance.outcome_id,
+            "band": {
+                "low": provenance.low,
+                "high": provenance.high,
+                "n": provenance.n,
+                "confidence_level": provenance.confidence_level,
+                "seed": provenance.seed,
+                "method": provenance.method,
+                "computed_at": provenance.computed_at,
+                "stale": provenance.stale,
+            },
+        },
+    }
+
+
+@router.get("/outcomes/{outcome_id}/inputs")
+async def get_outcome_inputs(
+    outcome_id: str, request: Request, mcp_url: str | None = Query(None)
+) -> dict:
+    """Return the paired survey inputs a stored band was reproduced from (B3.1).
+
+    ``inputs: null`` means no input set is retained — a legacy or aggregate-only
+    outcome — which is a distinct state from a retained set and never an empty
+    list that would read as zero responses. Each input carries only an opaque
+    per-pair token and the two numbers, so the read shape is de-identified.
+    """
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(mcp_url or ""),
+            ToolName.GET_OUTCOME_INPUTS.value,
+            {"outcome_id": outcome_id},
+        )
+        return {"ok": True, "result": _json_or_raw(result)}
+    try:
+        inputs = _service(request).get_outcome_inputs(outcome_id)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    if inputs is None:
+        return {"ok": True, "result": {"outcome_id": outcome_id, "inputs": None}}
+    return {
+        "ok": True,
+        "result": {
+            "outcome_id": outcome_id,
+            "inputs": [
+                {
+                    "respondent_id": item.respondent_id,
+                    "importance": item.importance,
+                    "satisfaction": item.satisfaction,
+                }
+                for item in inputs
+            ],
+        },
+    }
 
 
 @router.delete("/outcomes/{outcome_id}")
@@ -929,6 +1085,201 @@ async def delete_customer_outcome(
     except Exception as exc:  # noqa: BLE001
         raise _as_http_error(exc) from exc
     return {"ok": True}
+
+
+@router.get("/alternatives")
+async def get_alternatives(
+    request: Request,
+    job_id: str | None = Query(None),
+    mcp_url: str | None = Query(None),
+) -> dict:
+    if _uses_mcp(request):
+        arguments: dict[str, Any] = {}
+        if job_id:
+            arguments["job_id"] = job_id
+        result = await call_mcp_tool(
+            _require_mcp_url(mcp_url or ""), ToolName.LIST_ALTERNATIVES.value, arguments
+        )
+        return {"ok": True, "result": _json_or_raw(result)}
+    alternatives = _service(request).list_alternatives(job_id)
+    return {"ok": True, "result": [item.model_dump(mode="json") for item in alternatives]}
+
+
+@router.get("/alternatives/{alternative_id}")
+async def get_alternative(
+    alternative_id: str, request: Request, mcp_url: str | None = Query(None)
+) -> dict:
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(mcp_url or ""),
+            ToolName.GET_ALTERNATIVE.value,
+            {"alternative_id": alternative_id},
+        )
+        return {"ok": True, "result": _json_or_raw(result)}
+    try:
+        alternative = _service(request).get_alternative(alternative_id)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return {"ok": True, "result": alternative.model_dump(mode="json")}
+
+
+@router.post("/alternatives")
+async def post_alternative(body: AddAlternativeRequest, request: Request) -> dict:
+    arguments = body.model_dump(exclude={"mcp_url"})
+    if _uses_mcp(request):
+        result = await call_mcp_tool(body.mcp_url, ToolName.ADD_ALTERNATIVE.value, arguments)
+        return {"ok": True, "result": _json_or_raw(result)}
+    try:
+        alternative = _service(request).add_alternative(
+            job_id=body.job_id,
+            name=body.name,
+            kind=body.kind,
+            notes=body.notes,
+            source_kind=body.source_kind,
+        )
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return {"ok": True, "result": alternative.model_dump(mode="json")}
+
+
+@router.delete("/alternatives/{alternative_id}")
+async def delete_alternative(
+    alternative_id: str, request: Request, mcp_url: str | None = Query(None)
+) -> dict:
+    if _uses_mcp(request):
+        await call_mcp_tool(
+            _require_mcp_url(mcp_url or ""),
+            ToolName.DELETE_ALTERNATIVE.value,
+            {"alternative_id": alternative_id},
+        )
+        return {"ok": True}
+    try:
+        _service(request).delete_alternative(alternative_id)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return {"ok": True}
+
+
+@router.post("/outcomes/{outcome_id}/alternatives")
+async def link_alternative(outcome_id: str, body: LinkAlternativeRequest, request: Request) -> dict:
+    arguments = {"outcome_id": outcome_id, **body.model_dump(exclude={"mcp_url"})}
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(body.mcp_url), ToolName.LINK_ALTERNATIVE.value, arguments
+        )
+        return {"ok": True, "result": _json_or_raw(result)}
+    try:
+        link = _service(request).link_alternative(
+            outcome_id=outcome_id,
+            alternative_id=body.alternative_id,
+            adequacy=body.adequacy,
+            usage_n=body.usage_n,
+            note=body.note,
+        )
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return {"ok": True, "result": link.model_dump(mode="json")}
+
+
+@router.delete("/outcomes/{outcome_id}/alternatives/{alternative_id}")
+async def unlink_alternative(
+    outcome_id: str,
+    alternative_id: str,
+    request: Request,
+    mcp_url: str | None = Query(None),
+) -> dict:
+    if _uses_mcp(request):
+        await call_mcp_tool(
+            _require_mcp_url(mcp_url or ""),
+            ToolName.UNLINK_ALTERNATIVE.value,
+            {"outcome_id": outcome_id, "alternative_id": alternative_id},
+        )
+        return {"ok": True}
+    try:
+        _service(request).unlink_alternative(outcome_id, alternative_id)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return {"ok": True}
+
+
+@router.get("/outcomes/{outcome_id}/alternatives")
+async def get_outcome_alternatives(
+    outcome_id: str, request: Request, mcp_url: str | None = Query(None)
+) -> dict:
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(mcp_url or ""),
+            ToolName.GET_OUTCOME_ALTERNATIVES.value,
+            {"outcome_id": outcome_id},
+        )
+        return {"ok": True, "result": _json_or_raw(result)}
+    try:
+        pairs = _service(request).outcome_alternatives(outcome_id)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return {
+        "ok": True,
+        "result": [
+            {
+                "alternative": alternative.model_dump(mode="json"),
+                "link": link.model_dump(mode="json"),
+            }
+            for alternative, link in pairs
+        ],
+    }
+
+
+@router.get("/outcomes/{outcome_id}/existing-solution")
+async def get_has_existing_solution(
+    outcome_id: str, request: Request, mcp_url: str | None = Query(None)
+) -> dict:
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(mcp_url or ""),
+            ToolName.GET_HAS_EXISTING_SOLUTION.value,
+            {"outcome_id": outcome_id},
+        )
+        return {"ok": True, "result": _json_or_raw(result)}
+    try:
+        verdict = _service(request).has_existing_solution(outcome_id)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return {"ok": True, "result": {"outcome_id": outcome_id, "existing_solution": verdict}}
+
+
+@router.get("/alternative-links")
+async def get_alternative_links(
+    request: Request,
+    job_id: str = Query(...),
+    mcp_url: str | None = Query(None),
+) -> dict:
+    """Every recorded alternative for one Job, with its outcome and link (M2-07.2).
+
+    One read for the whole Job so the landscape facet can compute a solution
+    state per outcome without a request per row.
+    """
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(mcp_url or ""),
+            ToolName.LIST_ALTERNATIVE_LINKS.value,
+            {"job_id": job_id},
+        )
+        return {"ok": True, "result": _json_or_raw(result)}
+    try:
+        triples = _service(request).job_outcome_alternatives(job_id)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return {
+        "ok": True,
+        "result": [
+            {
+                "outcome_id": outcome_id,
+                "alternative": alternative.model_dump(mode="json"),
+                "link": link.model_dump(mode="json"),
+            }
+            for outcome_id, alternative, link in triples
+        ],
+    }
 
 
 @router.get("/evidence")

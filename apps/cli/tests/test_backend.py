@@ -372,6 +372,42 @@ def test_local_backend_rejects_out_of_range_scores(tmp_path):
         )
 
 
+def test_local_backend_reports_an_over_long_note_as_a_note_error(tmp_path):
+    """A bad note is not a bad score: the message must name the note, not the range."""
+    backend = LocalBackend(db_path=str(tmp_path / "odi.db"))
+    job_id = backend.call("add_job", {"name": "Job"})["id"]
+    statement = "Minimize the time to ship a release when the build is green"
+
+    with pytest.raises(BackendError, match="note must be 500 characters or fewer") as added:
+        backend.call(
+            "add_outcome",
+            {
+                "job_id": job_id,
+                "statement": statement,
+                "importance": 8.0,
+                "satisfaction": 5.0,
+                "note": "x" * 501,
+            },
+        )
+    assert "between 1.0 and 10.0" not in added.value.args[0]
+
+    outcome_id = backend.call(
+        "add_outcome",
+        {"job_id": job_id, "statement": statement, "importance": 8.0, "satisfaction": 5.0},
+    )["id"]
+
+    with pytest.raises(BackendError, match="note must be 500 characters or fewer") as updated:
+        backend.call(
+            "update_outcome",
+            {"outcome_id": outcome_id, "satisfaction": 6.0, "note": "y" * 501},
+        )
+    assert "between 1.0 and 10.0" not in updated.value.args[0]
+
+    # Neither rejection may leave a trace in the history.
+    history = backend.call("get_outcome_history", {"outcome_id": outcome_id})
+    assert len(history) == 1
+
+
 def test_local_backend_update_customer_outcome_folds_value_metrics(tmp_path):
     backend = LocalBackend(db_path=str(tmp_path / "odi.db"))
     job_id = backend.call("add_job", {"name": "Job"})["id"]
@@ -465,3 +501,101 @@ def test_evaluate_outcome_job_error_surfaces_as_a_backend_error():
 
     with pytest.raises(BackendError, match="Job not found: missing"):
         _parse_remote("evaluate_outcome", "Job not found: missing")
+
+
+def test_local_backend_get_outcome_interval_reports_a_no_band(tmp_path):
+    backend = LocalBackend(db_path=str(tmp_path / "odi.db"))
+    job_id = backend.call("add_job", {"name": "Job J"})["id"]
+    outcome_id = backend.call(
+        "add_outcome",
+        {
+            "job_id": job_id,
+            "statement": "Minimize the time to publish when a plugin is ready.",
+            "importance": 8.0,
+            "satisfaction": 5.0,
+        },
+    )["id"]
+
+    result = backend.call("get_outcome_interval", {"outcome_id": outcome_id})
+
+    assert result == {"outcome_id": outcome_id, "band": None}
+
+
+def test_local_backend_get_outcome_interval_reports_a_stored_band(tmp_path):
+    backend = LocalBackend(db_path=str(tmp_path / "odi.db"))
+    job_id = backend.call("add_job", {"name": "Job J"})["id"]
+    outcome_id = backend.call(
+        "add_outcome",
+        {
+            "job_id": job_id,
+            "statement": "Minimize the time to publish when a plugin is ready.",
+            "importance": 8.0,
+            "satisfaction": 5.0,
+        },
+    )["id"]
+    rows = [
+        {
+            "outcome_id": outcome_id,
+            "importance": 8.0,
+            "satisfaction": 4.0,
+            "respondent_id": f"r{i}",
+        }
+        for i in range(40)
+    ]
+    backend.call("import_survey", {"rows": rows})
+
+    result = backend.call("get_outcome_interval", {"outcome_id": outcome_id})
+
+    band = result["band"]
+    assert band is not None
+    assert band["n"] == 40
+    assert band["stale"] is False
+
+
+def test_local_backend_get_outcome_inputs_reports_a_no_inputs(tmp_path):
+    backend = LocalBackend(db_path=str(tmp_path / "odi.db"))
+    job_id = backend.call("add_job", {"name": "Job J"})["id"]
+    outcome_id = backend.call(
+        "add_outcome",
+        {
+            "job_id": job_id,
+            "statement": "Minimize the time to publish when a plugin is ready.",
+            "importance": 8.0,
+            "satisfaction": 5.0,
+        },
+    )["id"]
+
+    result = backend.call("get_outcome_inputs", {"outcome_id": outcome_id})
+
+    assert result == {"outcome_id": outcome_id, "inputs": None}
+
+
+def test_local_backend_get_outcome_inputs_reports_the_retained_pairs(tmp_path):
+    backend = LocalBackend(db_path=str(tmp_path / "odi.db"))
+    job_id = backend.call("add_job", {"name": "Job J"})["id"]
+    outcome_id = backend.call(
+        "add_outcome",
+        {
+            "job_id": job_id,
+            "statement": "Minimize the time to publish when a plugin is ready.",
+            "importance": 8.0,
+            "satisfaction": 5.0,
+        },
+    )["id"]
+    rows = [
+        {
+            "outcome_id": outcome_id,
+            "importance": 8.0,
+            "satisfaction": 4.0,
+            "respondent_id": f"r{i}",
+        }
+        for i in range(3)
+    ]
+    backend.call("import_survey", {"rows": rows})
+
+    result = backend.call("get_outcome_inputs", {"outcome_id": outcome_id})
+
+    assert result["outcome_id"] == outcome_id
+    assert [i["importance"] for i in result["inputs"]] == [8.0, 8.0, 8.0]
+    assert [i["satisfaction"] for i in result["inputs"]] == [4.0, 4.0, 4.0]
+    assert [i["respondent_id"] for i in result["inputs"]] == ["r0", "r1", "r2"]

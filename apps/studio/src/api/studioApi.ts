@@ -4,6 +4,8 @@ import type {
   AddConnectorPayload,
   AddOutcomePayload,
   AddStepPayload,
+  Alternative,
+  AlternativeLink,
   CanvasData,
   ChangelogData,
   ChatStreamRequest,
@@ -14,6 +16,7 @@ import type {
   Conversation,
   ConversationTree,
   CreateJobPayload,
+  ExistingSolution,
   Job,
   LatestConversation,
   LlmHealth,
@@ -24,6 +27,11 @@ import type {
   ObservationKind,
   ObservationStatus,
   Outcome,
+  OutcomeAlternative,
+  OutcomeAlternativeLink,
+  OutcomeInterval,
+  OutcomeInputs,
+  ScoreSnapshot,
   Segment,
   Signal,
   Step,
@@ -343,13 +351,140 @@ export function deleteStep(stepId: string, mcpUrl: string): Promise<{ deleted: s
 
 export function updateOutcome(
   outcomeId: string,
-  payload: { statement?: string; importance?: number; satisfaction?: number; mcp_url: string },
+  payload: {
+    statement?: string;
+    importance?: number;
+    satisfaction?: number;
+    importance_n?: number | null;
+    satisfaction_n?: number | null;
+    score_method?: "estimate" | "survey" | "import";
+    note?: string | null;
+    mcp_url: string;
+  },
 ): Promise<Outcome> {
   return sendJson<Outcome>(
     "PATCH",
     `/api/outcomes/${encodeURIComponent(outcomeId)}`,
     payload,
   );
+}
+
+export function fetchOutcomeHistory(
+  outcomeId: string,
+  mcpUrl: string,
+): Promise<ScoreSnapshot[]> {
+  return getJson<{ result: ScoreSnapshot[] }>(
+    `/api/outcomes/${encodeURIComponent(outcomeId)}/history?mcp_url=${encodeURIComponent(mcpUrl)}`,
+  ).then((body) => body.result);
+}
+
+/**
+ * Fetch an outcome's stored band and its provenance. `band` is null when the
+ * score carries no band at all — an estimate or an unscored outcome — which is
+ * a distinct state from a zero-width band, so the caller must not treat null as
+ * a tight band.
+ */
+export function fetchOutcomeInterval(
+  outcomeId: string,
+  mcpUrl: string,
+): Promise<OutcomeInterval> {
+  return getJson<{ result: OutcomeInterval }>(
+    `/api/outcomes/${encodeURIComponent(outcomeId)}/interval?mcp_url=${encodeURIComponent(mcpUrl)}`,
+  ).then((body) => body.result);
+}
+
+/**
+ * Fetch the paired survey inputs a stored band was reproduced from (B3.1).
+ * `inputs` is null when no input set is retained — a legacy or aggregate-only
+ * outcome — which is a distinct state from a retained set, so the caller must
+ * not treat null as an empty response set.
+ */
+export function fetchOutcomeInputs(
+  outcomeId: string,
+  mcpUrl: string,
+): Promise<OutcomeInputs> {
+  return getJson<{ result: OutcomeInputs }>(
+    `/api/outcomes/${encodeURIComponent(outcomeId)}/inputs?mcp_url=${encodeURIComponent(mcpUrl)}`,
+  ).then((body) => body.result);
+}
+
+/** Fetch the alternatives recorded for a job (M2-07). */
+export function fetchAlternatives(jobId: string, mcpUrl: string): Promise<Alternative[]> {
+  return getJson<{ result: Alternative[] }>(
+    `/api/alternatives?job_id=${encodeURIComponent(jobId)}&mcp_url=${encodeURIComponent(mcpUrl)}`,
+  ).then((body) => body.result);
+}
+
+/** Record what a customer uses today for one job (M2-07). */
+export function addAlternative(
+  input: { job_id: string; name: string; kind: string; notes?: string; source_kind?: string },
+  mcpUrl: string,
+): Promise<Alternative> {
+  return postJson<{ result: Alternative }>("/api/alternatives", {
+    ...input,
+    mcp_url: mcpUrl,
+  }).then((body) => body.result);
+}
+
+export function deleteAlternative(
+  alternativeId: string,
+  mcpUrl: string,
+): Promise<{ ok: boolean }> {
+  return deleteJson<{ ok: boolean }>(
+    `/api/alternatives/${encodeURIComponent(alternativeId)}?mcp_url=${encodeURIComponent(mcpUrl)}`,
+  );
+}
+
+/** Rate one alternative against one outcome with the customer's adequacy (M2-07). */
+export function linkAlternative(
+  outcomeId: string,
+  input: { alternative_id: string; adequacy: number; usage_n?: number; note?: string },
+  mcpUrl: string,
+): Promise<AlternativeLink> {
+  return postJson<{ result: AlternativeLink }>(
+    `/api/outcomes/${encodeURIComponent(outcomeId)}/alternatives`,
+    { ...input, mcp_url: mcpUrl },
+  ).then((body) => body.result);
+}
+
+export function unlinkAlternative(
+  outcomeId: string,
+  alternativeId: string,
+  mcpUrl: string,
+): Promise<{ ok: boolean }> {
+  return deleteJson<{ ok: boolean }>(
+    `/api/outcomes/${encodeURIComponent(outcomeId)}/alternatives/${encodeURIComponent(alternativeId)}?mcp_url=${encodeURIComponent(mcpUrl)}`,
+  );
+}
+
+/** The alternatives recorded for one outcome, each with its adequacy link (M2-07). */
+export function fetchOutcomeAlternatives(
+  outcomeId: string,
+  mcpUrl: string,
+): Promise<OutcomeAlternative[]> {
+  return getJson<{ result: OutcomeAlternative[] }>(
+    `/api/outcomes/${encodeURIComponent(outcomeId)}/alternatives?mcp_url=${encodeURIComponent(mcpUrl)}`,
+  ).then((body) => body.result);
+}
+
+/** Whether an existing solution is recorded for an outcome (M2-07). */
+export function fetchExistingSolution(
+  outcomeId: string,
+  mcpUrl: string,
+): Promise<ExistingSolution> {
+  return getJson<{ result: { outcome_id: string; existing_solution: ExistingSolution } }>(
+    `/api/outcomes/${encodeURIComponent(outcomeId)}/existing-solution?mcp_url=${encodeURIComponent(mcpUrl)}`,
+  ).then((body) => body.result.existing_solution);
+}
+
+/** Every recorded alternative for one job, with its outcome and link (M2-07.2). */
+export function fetchAlternativeLinks(
+  jobId: string,
+  mcpUrl: string,
+): Promise<OutcomeAlternativeLink[]> {
+  return getJson<{ result: OutcomeAlternativeLink[] }>(
+    `/api/alternative-links?job_id=${encodeURIComponent(jobId)}&mcp_url=${encodeURIComponent(mcpUrl)}`,
+  ).then((body) => body.result);
 }
 
 export function deleteOutcome(outcomeId: string, mcpUrl: string): Promise<{ deleted: string }> {

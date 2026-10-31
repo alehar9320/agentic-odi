@@ -97,6 +97,56 @@ Score **> 10** → underserved, innovate. **= 10** → served, maintain.
 **< 10** → overserved, disrupt. ODI reports an **86% innovation success rate**
 (as reported in the [Strategyn](https://strategyn.com/outcome-driven-innovation/) literature).
 
+Every score also carries **who stands behind it**. `score_method` records whether
+the number is a one-person `estimate`, a `survey`, or an `import`, and
+`importance_n` / `satisfaction_n` record how many people answered. An unknown
+count stays unknown — the CLI renders it as `est.`, never `n=0` — and an
+`estimate` that claims a sample above one is refused before the write. See
+[CLI reference](docs/cli.md#desired-outcomes) for the flags.
+
+A score is a number with a **range**, not a point. Importing a survey with
+`odi survey import <csv>` lands each outcome's mean, its sample and a bootstrap
+band from the real paired responses; editing the score without a fresh band
+clears the stale one, so a new number never carries an old range. A stored band
+is readable with its provenance — sample, seed, confidence level, method and
+computed-at, plus whether a later snapshot moved the score — through
+`odi desired-outcomes get`, the `get_outcome_interval` tool and
+`GET /api/outcomes/{id}/interval`. A score with no band reads as `no band`, not
+as a zero-width range, and a stale band says so.
+
+A band is not just reproducible in principle: the accepted survey import keeps
+the exact paired responses behind it, de-identified (an opaque per-pair token and
+the two numbers), in the append-only log behind a named provisional retention
+convention. So a stored band names the input set it came from and can be
+reproduced bit for bit after a restart, and the inputs are dropped in the same
+write that clears a stale band — a later reader can never reproduce a band for a
+score that no longer exists. Read them with `get_outcome_inputs`,
+`GET /api/outcomes/{id}/inputs`, or the CLI local backend; `null` means nothing
+is retained, a distinct state from a retained set and never an empty list that
+would read as zero responses.
+
+A score says a need is unmet; it does not say whether a solution exists and is
+merely disliked. The **alternatives inventory** records what a customer uses
+today for each Job — a product, a service, a workaround, a manual process, or
+`nothing` — and rates each against an outcome with the customer's own `adequacy`
+(1–10). The explicit three-state query distinguishes "we asked and there is
+nothing" from "we have not asked", so an un-inventoried outcome is never rendered
+as "no solution". Record it with `odi alternatives add|list|link|show`, the
+`add_alternative` / `link_alternative` / `get_outcome_alternatives` tools, or the
+Studio API. Read a whole Job's inventory in one call with `odi alternatives
+links`, the `list_alternative_links` tool, or `GET /api/alternative-links`, and
+one outcome's solution state with `get_has_existing_solution` or `GET
+/api/outcomes/{id}/existing-solution`. The Studio shows the recorded
+alternatives on the outcome detail and offers an **Only workaround** facet on the
+landscape, so an outcome whose only recorded solution is a workaround can be
+pulled out of the ranking without turning an un-inventoried outcome into a
+workaround.
+
+`odi top` answers "what should we build next?" from the measured section only —
+highest low end of the band first — naming the thin and unscored outcomes it
+left out, and `odi coverage` reports that split. An estimate can no longer
+outrank a measured score.
+
 A score says *which outcome* to chase; the job map says *who* is underserved.
 Stage 5 clusters a job's scored outcomes by the step they attach to, and Stage 6
 recommends one of three paths — differentiated for an underserved segment,

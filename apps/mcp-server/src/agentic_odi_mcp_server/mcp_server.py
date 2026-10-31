@@ -14,6 +14,7 @@ from agentic_odi_core import (
     ODI_ASSISTANT_PROMPT,
     ODI_FRAMEWORK_GUIDELINES,
     TOOL_SPECS,
+    AlternativeNotFoundError,
     CustomerOutcomeNotFoundError,
     EvidenceItemType,
     EvidenceNotFoundError,
@@ -24,7 +25,9 @@ from agentic_odi_core import (
     OutcomeNotFoundError,
     OutcomeStatementError,
     ScheduledWorkNotFoundError,
+    ScoreMethod,
     SignalNotFoundError,
+    SnapshotNoteError,
     StepNotFoundError,
     ToolName,
     ValueOutOfRangeError,
@@ -168,7 +171,21 @@ def add_outcome(
     importance: float,
     satisfaction: float,
     step_id: str | None = None,
+    importance_n: int | None = None,
+    satisfaction_n: int | None = None,
+    score_method: ScoreMethod = "estimate",
+    note: str | None = None,
 ) -> str:
+    """Add a desired Outcome to a Job.
+
+    ``importance_n``/``satisfaction_n`` are how many people stand behind each
+    score, when known; omit them for a single-person estimate.
+    ``score_method`` is ``estimate`` (one person's judgment), ``survey`` or
+    ``import``. A count above one with ``estimate`` is refused, because an
+    estimate cannot have asked people.
+    ``note`` (max 500 characters) records why the number was given; it is kept
+    with the score snapshot.
+    """
     try:
         outcome = service.add_outcome(
             job_id=job_id,
@@ -176,15 +193,23 @@ def add_outcome(
             importance=importance,
             satisfaction=satisfaction,
             step_id=step_id,
+            importance_n=importance_n,
+            satisfaction_n=satisfaction_n,
+            score_method=score_method,
+            note=note,
         )
     except JobNotFoundError:
         return f"Error: Job with ID {job_id} not found."
     except StepNotFoundError:
         return _step_not_found(step_id)
+    except SnapshotNoteError as exc:
+        return f"Error: {exc}"
     except ValueOutOfRangeError:
         return "Error: importance and satisfaction must be between 1.0 and 10.0"
     except OutcomeStatementError as exc:
         return f"Error: {exc}"
+    except ValidationError:
+        return "Error: score_method 'estimate' cannot carry a sample count above 1"
     return f"Outcome created successfully: {outcome.model_dump_json()}"
 
 
@@ -320,6 +345,140 @@ def delete_customer_outcome(outcome_id: str) -> str:
 
 
 @mcp.tool
+def add_alternative(
+    job_id: str,
+    name: str,
+    kind: str,
+    notes: str | None = None,
+    source_kind: str = "manual",
+) -> str:
+    """Record what a customer uses today for one Job (M2-07).
+
+    ``kind`` is one of product, service, workaround, manual, nothing. A
+    ``nothing`` row is real evidence for a new-market bet, not an absent record.
+    ``source_kind`` is one of the provisional set ALTERNATIVE_SOURCE_KINDS.
+    """
+    try:
+        alternative = service.add_alternative(job_id, name, kind, notes, source_kind)
+    except JobNotFoundError:
+        return job_not_found(job_id)
+    except ValidationError as e:
+        return f"Error: {e}"
+    return json.dumps(alternative.model_dump())
+
+
+@mcp.tool
+def get_alternative(alternative_id: str) -> str:
+    """Get a single Alternative by ID."""
+    try:
+        alternative = service.get_alternative(alternative_id)
+    except AlternativeNotFoundError:
+        return f"Alternative not found: {alternative_id}"
+    return json.dumps(alternative.model_dump())
+
+
+@mcp.tool
+def list_alternatives(job_id: str | None = None, limit: int | None = None, offset: int = 0) -> str:
+    """List the Alternatives recorded for a Job."""
+    items = service.list_alternatives(job_id, limit=limit, offset=offset)
+    return json.dumps([item.model_dump() for item in items])
+
+
+@mcp.tool
+def delete_alternative(alternative_id: str) -> str:
+    """Delete an Alternative and its links; its outcomes stay intact."""
+    try:
+        service.delete_alternative(alternative_id)
+    except AlternativeNotFoundError:
+        return f"Alternative not found: {alternative_id}"
+    return f"Alternative deleted successfully: {alternative_id}"
+
+
+@mcp.tool
+def link_alternative(
+    outcome_id: str,
+    alternative_id: str,
+    adequacy: float,
+    usage_n: int | None = None,
+    note: str | None = None,
+) -> str:
+    """Rate one Alternative against one Outcome with the customer's adequacy (1-10)."""
+    try:
+        link = service.link_alternative(outcome_id, alternative_id, adequacy, usage_n, note)
+    except OutcomeNotFoundError:
+        return _outcome_not_found(outcome_id)
+    except AlternativeNotFoundError:
+        return f"Alternative not found: {alternative_id}"
+    except ValidationError as e:
+        return f"Error: {e}"
+    return json.dumps(link.model_dump())
+
+
+@mcp.tool
+def unlink_alternative(outcome_id: str, alternative_id: str) -> str:
+    """Remove one Alternative-to-Outcome link; both records stay."""
+    try:
+        service.unlink_alternative(outcome_id, alternative_id)
+    except ValidationError as e:
+        return f"Error: {e}"
+    return json.dumps({"outcome_id": outcome_id, "alternative_id": alternative_id})
+
+
+@mcp.tool
+def get_outcome_alternatives(outcome_id: str) -> str:
+    """The Alternatives recorded for one Outcome, with each adequacy rating."""
+    try:
+        pairs = service.outcome_alternatives(outcome_id)
+    except OutcomeNotFoundError:
+        return _outcome_not_found(outcome_id)
+    return json.dumps(
+        [
+            {"alternative": alternative.model_dump(), "link": link.model_dump()}
+            for alternative, link in pairs
+        ]
+    )
+
+
+@mcp.tool
+def get_has_existing_solution(outcome_id: str) -> str:
+    """Whether an existing solution is recorded for an outcome (M2-07).
+
+    One of ``yes`` (a solution is recorded), ``no_linked_nothing`` (we asked and
+    the customer uses nothing today), or ``no_link_at_all`` (we have not asked).
+    Only ``yes`` means a solution exists; an empty inventory is not evidence.
+    """
+    try:
+        verdict = service.has_existing_solution(outcome_id)
+    except OutcomeNotFoundError:
+        return _outcome_not_found(outcome_id)
+    return json.dumps({"outcome_id": outcome_id, "existing_solution": verdict})
+
+
+@mcp.tool
+def list_alternative_links(job_id: str) -> str:
+    """Every recorded alternative for one Job, each with its outcome and adequacy (M2-07.2).
+
+    One call reads the whole job's inventory so a facet can compute a solution
+    state per outcome without a request per row. An unknown job is refused
+    rather than reported as an empty inventory.
+    """
+    try:
+        triples = service.job_outcome_alternatives(job_id)
+    except JobNotFoundError:
+        return job_not_found(job_id)
+    return json.dumps(
+        [
+            {
+                "outcome_id": outcome_id,
+                "alternative": alternative.model_dump(),
+                "link": link.model_dump(),
+            }
+            for outcome_id, alternative, link in triples
+        ]
+    )
+
+
+@mcp.tool
 def compute_opportunity(importance: float, satisfaction: float) -> str:
     if not (1.0 <= importance <= 10.0) or not (1.0 <= satisfaction <= 10.0):
         return "Error: importance and satisfaction must be between 1.0 and 10.0"
@@ -419,7 +578,18 @@ def update_outcome(
     importance: float | None = None,
     satisfaction: float | None = None,
     step_id: str | None = None,
+    importance_n: int | None = None,
+    satisfaction_n: int | None = None,
+    score_method: ScoreMethod | None = None,
+    note: str | None = None,
 ) -> str:
+    """Update an Outcome's statement, scores, or sample metadata.
+
+    The resulting whole record is validated, so switching a survey to
+    ``estimate`` while a count above one remains is refused. ``note`` (max 500
+    characters) records why the number was given; it is kept with the score
+    snapshot.
+    """
     updates: dict = {}
     if statement is not None:
         updates["statement"] = statement
@@ -429,15 +599,206 @@ def update_outcome(
         updates["satisfaction"] = satisfaction
     if step_id is not None:
         updates["step_id"] = step_id
+    if importance_n is not None:
+        updates["importance_n"] = importance_n
+    if satisfaction_n is not None:
+        updates["satisfaction_n"] = satisfaction_n
+    if score_method is not None:
+        updates["score_method"] = score_method
     try:
-        updated = service.update_outcome(outcome_id, updates)
+        updated = service.update_outcome(outcome_id, updates, note=note)
     except OutcomeNotFoundError:
         return _outcome_not_found(outcome_id)
     except OutcomeStatementError as exc:
         return f"Error: {exc}"
+    except SnapshotNoteError as exc:
+        return f"Error: {exc}"
     except ValueOutOfRangeError:
         return "Error: importance and satisfaction must be between 1.0 and 10.0"
+    except ValidationError:
+        return "Error: score_method 'estimate' cannot carry a sample count above 1"
     return f"Outcome updated successfully: {updated.model_dump_json()}"
+
+
+@mcp.tool
+def get_outcome_history(outcome_id: str) -> str:
+    """List the accepted score snapshots for an Outcome, oldest first.
+
+    A snapshot records the score and its sample/method companions, so "did it
+    move?" is a subtraction.
+    """
+    try:
+        snapshots = service.get_score_history(outcome_id)
+    except OutcomeNotFoundError:
+        return _outcome_not_found(outcome_id)
+    return json.dumps([snapshot.model_dump() for snapshot in snapshots])
+
+
+@mcp.tool
+def get_outcome_delta(outcome_id: str, since: str | None = None) -> str:
+    """The signed score change across an Outcome's recorded snapshots.
+
+    ``since`` selects the baseline: the last snapshot at or before that ISO-8601
+    timestamp. A ``since`` before the first snapshot is an explicit error, not a
+    zero baseline. Without ``since`` the baseline is the earliest snapshot.
+    """
+    try:
+        delta = service.get_outcome_delta(outcome_id, since)
+    except OutcomeNotFoundError:
+        return _outcome_not_found(outcome_id)
+    except ValidationError as exc:
+        return f"Error: {exc}"
+    return json.dumps(
+        {
+            "outcome_id": delta.outcome_id,
+            "importance": delta.importance,
+            "satisfaction": delta.satisfaction,
+            "opportunity": delta.opportunity,
+            "direction": delta.direction,
+        }
+    )
+
+
+@mcp.tool
+def get_outcome_interval(outcome_id: str) -> str:
+    """The stored band and its provenance for an Outcome, or a no-band result.
+
+    Reports the persisted bounds with the sample, seed, confidence level,
+    method and computed-at they were recorded with, and whether a later
+    snapshot moved the score the band was computed from. ``band: null`` means
+    the score carries no band at all — an estimate or an unscored outcome —
+    which is never the same as a zero-width band.
+    """
+    try:
+        provenance = service.get_outcome_interval(outcome_id)
+    except OutcomeNotFoundError:
+        return _outcome_not_found(outcome_id)
+    if provenance is None:
+        return json.dumps({"outcome_id": outcome_id, "band": None})
+    return json.dumps(
+        {
+            "outcome_id": provenance.outcome_id,
+            "band": {
+                "low": provenance.low,
+                "high": provenance.high,
+                "n": provenance.n,
+                "confidence_level": provenance.confidence_level,
+                "seed": provenance.seed,
+                "method": provenance.method,
+                "computed_at": provenance.computed_at,
+                "stale": provenance.stale,
+            },
+        }
+    )
+
+
+@mcp.tool
+def get_outcome_inputs(outcome_id: str) -> str:
+    """The paired survey inputs a stored band was reproduced from (B3.1).
+
+    Returns the de-identified paired ``(importance, satisfaction)`` values and
+    the versioned input ref, so a stored band can be reproduced after a reload.
+    ``inputs: null`` means no input set is retained — a legacy or aggregate-only
+    outcome — which is never an empty list that would read as zero responses.
+    """
+    try:
+        inputs = service.get_outcome_inputs(outcome_id)
+    except OutcomeNotFoundError:
+        return _outcome_not_found(outcome_id)
+    if inputs is None:
+        return json.dumps({"outcome_id": outcome_id, "inputs": None})
+    return json.dumps(
+        {
+            "outcome_id": outcome_id,
+            "inputs": [
+                {
+                    "respondent_id": item.respondent_id,
+                    "importance": item.importance,
+                    "satisfaction": item.satisfaction,
+                }
+                for item in inputs
+            ],
+        }
+    )
+
+
+@mcp.tool
+def import_survey(rows: list[dict[str, Any]]) -> str:
+    """Land a survey's per-outcome means, sample and band on matching Outcomes.
+
+    References are exact: an ``outcome_id`` must exist and an
+    ``outcome_statement`` must match exactly one outcome. A malformed row or an
+    unresolved reference fails the whole import without a partial write.
+    """
+    try:
+        updated = service.import_survey(rows)
+    except OutcomeNotFoundError as exc:
+        return f"Error: {exc}"
+    except ValidationError as exc:
+        return f"Error: {exc}"
+    return json.dumps({outcome_id: outcome.model_dump() for outcome_id, outcome in updated.items()})
+
+
+@mcp.tool
+def get_survey_import_plan(
+    rows: list[dict[str, Any]], confirmed_matches: dict[str, str] | None = None
+) -> str:
+    """Plan a survey import without writing: every row's fate and line number.
+
+    Returns the per-row accepted/unmatched/ambiguous/invalid report with a
+    ``counts`` summary, so a dry run shows the report the real run would produce
+    and no row disappears without a report line.
+    """
+    plan = service.get_survey_import_plan(rows, confirmed_matches=confirmed_matches)
+    counts = {"accepted": 0, "unmatched": 0, "ambiguous": 0, "invalid": 0}
+    reports = []
+    for row in plan.rows:
+        counts[row.status] += 1
+        reports.append(
+            {
+                "line": row.line,
+                "status": row.status,
+                "reason": row.reason,
+                "outcome_ref": row.outcome_ref,
+                "suggestion": row.suggestion,
+            }
+        )
+    counts["total"] = len(plan.rows)
+    return json.dumps({"rows": reports, "counts": counts, "writable": plan.writable})
+
+
+@mcp.tool
+def commit_survey_import(
+    rows: list[dict[str, Any]], confirmed_matches: dict[str, str] | None = None
+) -> str:
+    """Write a survey import only when every row resolves; otherwise refuse.
+
+    A plan with any unmatched, ambiguous or invalid row is refused as a whole, so
+    a partial score write is impossible. Accepted rows land through the same
+    sample/band path as ``import_survey``.
+    """
+    try:
+        updated = service.commit_survey_import(rows, confirmed_matches=confirmed_matches)
+    except OutcomeNotFoundError as exc:
+        return f"Error: {exc}"
+    except (OdiError, ValueError) as exc:
+        return f"Error: {exc}"
+    return json.dumps({outcome_id: outcome.model_dump() for outcome_id, outcome in updated.items()})
+
+
+@mcp.tool
+def rank_outcomes(job_id: str) -> str:
+    """Rank a Job's Outcomes by evidence strength into measured/thin/none sections.
+
+    The same read the landscape uses, so the terminal and the SPA cannot
+    disagree. Unscored outcomes stay in the ``none`` section, never sorted as a
+    zero.
+    """
+    try:
+        ranking = service.rank_outcomes_for_job(job_id)
+    except JobNotFoundError:
+        return f"Error: job not found: {job_id}"
+    return json.dumps(ranking)
 
 
 @mcp.tool

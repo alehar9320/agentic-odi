@@ -40,6 +40,7 @@ hand-edited record cannot disagree about what a valid outcome is.
 | The eight Universal Job Map stages are one constant | `JOB_STAGE_ORDER` and `job_stage_catalog()` (`models.py`), generated to `apps/studio/src/domain/jobStages.ts` | `scripts/gen_job_stages.py` regenerates the file; `tests/scripts/test_gen_job_stages.py` fails if it is stale |
 | Steps occupy a stage | `Step.stage_index` (`ge=1, le=8`) and `Step.stage` (`JobStage`) | Position is optional but bounded when present |
 | Every adapter exposes the same tools | `ToolName` / `TOOL_SPECS` in `contract.py` | `tests/contract/test_mcp_contract.py` and `test_cli_contract.py` fail on drift |
+| "No solution" is never fabricated from an un-inventoried outcome | `_solution_state` (`services.py`), `EXISTING_SOLUTION_LABELS` (`models.py`), `render_alternative_lines` (`alternatives.py`) | One three-state rule: `yes`, `no_linked_nothing`, `no_link_at_all`; the last two word differently, so "we asked and there is nothing" is never rendered as "we have not asked" |
 
 The statement checker is deliberately mechanical: it requires a leading
 `Minimize`/`Maximize`, a known unit of measure (or a digit), an object after

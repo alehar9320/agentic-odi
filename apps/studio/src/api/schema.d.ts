@@ -55,6 +55,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/diagnostics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Diagnostics
+         * @description Return diagnostic metadata only; never return database paths or records.
+         */
+        get: operations["get_diagnostics_api_diagnostics_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/changelog": {
         parameters: {
             query?: never;
@@ -358,6 +378,105 @@ export interface paths {
         patch: operations["patch_outcome_api_outcomes__outcome_id__patch"];
         trace?: never;
     };
+    "/api/outcomes/{outcome_id}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Outcome History
+         * @description Return an outcome's accepted score snapshots, oldest first.
+         *
+         *     Snapshots carry the score and its sample/method companions. The signed delta
+         *     is served separately at ``/outcomes/{id}/delta`` so this list shape stays
+         *     identical across the local and MCP backends.
+         */
+        get: operations["get_outcome_history_api_outcomes__outcome_id__history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/outcomes/{outcome_id}/delta": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Outcome Delta
+         * @description Return the signed change across an outcome's snapshots (B6.1).
+         *
+         *     ``since`` chooses the baseline (the last snapshot at or before it; the
+         *     earliest when omitted). ``direction`` is the product's sign rule, so a
+         *     consumer never invents an "improvement" from a bare number.
+         */
+        get: operations["get_outcome_delta_api_outcomes__outcome_id__delta_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/outcomes/{outcome_id}/interval": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Outcome Interval
+         * @description Return an outcome's stored band and its provenance (B3.2).
+         *
+         *     ``band: null`` means the score carries no band at all — an estimate or an
+         *     unscored outcome — which is a distinct state from a zero-width band. A
+         *     stored band reports the sample, seed, confidence level, method and
+         *     computed-at it was recorded with, plus whether a later snapshot moved the
+         *     score it came from, so a consumer never presents a stale band as current.
+         */
+        get: operations["get_outcome_interval_api_outcomes__outcome_id__interval_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/outcomes/{outcome_id}/inputs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Outcome Inputs
+         * @description Return the paired survey inputs a stored band was reproduced from (B3.1).
+         *
+         *     ``inputs: null`` means no input set is retained — a legacy or aggregate-only
+         *     outcome — which is a distinct state from a retained set and never an empty
+         *     list that would read as zero responses. Each input carries only an opaque
+         *     per-pair token and the two numbers, so the read shape is de-identified.
+         */
+        get: operations["get_outcome_inputs_api_outcomes__outcome_id__inputs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/signals": {
         parameters: {
             query?: never;
@@ -533,6 +652,117 @@ export interface paths {
         head?: never;
         /** Patch Customer Outcome */
         patch: operations["patch_customer_outcome_api_customer_outcomes__outcome_id__patch"];
+        trace?: never;
+    };
+    "/api/alternatives": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Alternatives */
+        get: operations["get_alternatives_api_alternatives_get"];
+        put?: never;
+        /** Post Alternative */
+        post: operations["post_alternative_api_alternatives_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/alternatives/{alternative_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Alternative */
+        get: operations["get_alternative_api_alternatives__alternative_id__get"];
+        put?: never;
+        post?: never;
+        /** Delete Alternative */
+        delete: operations["delete_alternative_api_alternatives__alternative_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/outcomes/{outcome_id}/alternatives": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Outcome Alternatives */
+        get: operations["get_outcome_alternatives_api_outcomes__outcome_id__alternatives_get"];
+        put?: never;
+        /** Link Alternative */
+        post: operations["link_alternative_api_outcomes__outcome_id__alternatives_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/outcomes/{outcome_id}/alternatives/{alternative_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Unlink Alternative */
+        delete: operations["unlink_alternative_api_outcomes__outcome_id__alternatives__alternative_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/outcomes/{outcome_id}/existing-solution": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Has Existing Solution */
+        get: operations["get_has_existing_solution_api_outcomes__outcome_id__existing_solution_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/alternative-links": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Alternative Links
+         * @description Every recorded alternative for one Job, with its outcome and link (M2-07.2).
+         *
+         *     One read for the whole Job so the landscape facet can compute a solution
+         *     state per outcome without a request per row.
+         */
+        get: operations["get_alternative_links_api_alternative_links_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/evidence": {
@@ -871,6 +1101,27 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AddAlternativeRequest */
+        AddAlternativeRequest: {
+            /**
+             * Mcp Url
+             * @default
+             */
+            mcp_url: string;
+            /** Job Id */
+            job_id: string;
+            /** Name */
+            name: string;
+            /** Kind */
+            kind: string;
+            /** Notes */
+            notes?: string | null;
+            /**
+             * Source Kind
+             * @default manual
+             */
+            source_kind: string;
+        };
         /** AddConnectorRequest */
         AddConnectorRequest: {
             /** Name */
@@ -944,6 +1195,18 @@ export interface components {
             importance: number;
             /** Satisfaction */
             satisfaction: number;
+            /** Importance N */
+            importance_n?: number | null;
+            /** Satisfaction N */
+            satisfaction_n?: number | null;
+            /**
+             * Score Method
+             * @default estimate
+             * @enum {string}
+             */
+            score_method: "estimate" | "survey" | "import";
+            /** Note */
+            note?: string | null;
         };
         /** AddStepRequest */
         AddStepRequest: {
@@ -1091,6 +1354,40 @@ export interface components {
             /** Assistant Id */
             assistant_id?: string | null;
         };
+        /**
+         * ClaimCitationOut
+         * @description The record label a claim carries, snapshotted when the turn was stored.
+         */
+        ClaimCitationOut: {
+            /** Id */
+            id: string;
+            /**
+             * Name
+             * @default
+             */
+            name: string;
+            /**
+             * Source Name
+             * @default
+             */
+            source_name: string;
+        };
+        /**
+         * ClaimOut
+         * @description One declarative sentence and what stands behind it.
+         */
+        ClaimOut: {
+            /** Index */
+            index: number;
+            /** Text */
+            text: string;
+            /** Status */
+            status: string;
+            /** Evidence */
+            evidence?: components["schemas"]["ClaimCitationOut"][];
+            /** Reason */
+            reason?: string | null;
+        };
         /** ConnectorListItem */
         ConnectorListItem: {
             /** Name */
@@ -1200,6 +1497,22 @@ export interface components {
             conversation?: components["schemas"]["ConversationModel"] | null;
             /** Turns */
             turns?: components["schemas"]["TurnModel"][];
+        };
+        /** LinkAlternativeRequest */
+        LinkAlternativeRequest: {
+            /**
+             * Mcp Url
+             * @default
+             */
+            mcp_url: string;
+            /** Alternative Id */
+            alternative_id: string;
+            /** Adequacy */
+            adequacy: number;
+            /** Usage N */
+            usage_n?: number | null;
+            /** Note */
+            note?: string | null;
         };
         /** LlmHealthRequest */
         LlmHealthRequest: {
@@ -1557,6 +1870,8 @@ export interface components {
             message_id?: string | null;
             /** Parent Id */
             parent_id?: string | null;
+            /** Claims */
+            claims?: components["schemas"]["ClaimOut"][];
         };
         /**
          * TurnNode
@@ -1573,6 +1888,8 @@ export interface components {
             content: string;
             /** Created At */
             created_at: string;
+            /** Claims */
+            claims?: components["schemas"]["ClaimOut"][];
         };
         /**
          * UiCatalogRequest
@@ -1631,6 +1948,14 @@ export interface components {
             importance?: number | null;
             /** Satisfaction */
             satisfaction?: number | null;
+            /** Importance N */
+            importance_n?: number | null;
+            /** Satisfaction N */
+            satisfaction_n?: number | null;
+            /** Score Method */
+            score_method?: ("estimate" | "survey" | "import") | null;
+            /** Note */
+            note?: string | null;
             /**
              * Mcp Url
              * @default
@@ -1750,6 +2075,28 @@ export interface operations {
         };
     };
     get_config_api_config_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    get_diagnostics_api_diagnostics_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -2592,6 +2939,147 @@ export interface operations {
             };
         };
     };
+    get_outcome_history_api_outcomes__outcome_id__history_get: {
+        parameters: {
+            query?: {
+                mcp_url?: string | null;
+            };
+            header?: never;
+            path: {
+                outcome_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_outcome_delta_api_outcomes__outcome_id__delta_get: {
+        parameters: {
+            query?: {
+                since?: string | null;
+                mcp_url?: string | null;
+            };
+            header?: never;
+            path: {
+                outcome_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_outcome_interval_api_outcomes__outcome_id__interval_get: {
+        parameters: {
+            query?: {
+                mcp_url?: string | null;
+            };
+            header?: never;
+            path: {
+                outcome_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_outcome_inputs_api_outcomes__outcome_id__inputs_get: {
+        parameters: {
+            query?: {
+                mcp_url?: string | null;
+            };
+            header?: never;
+            path: {
+                outcome_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_signals_api_signals_get: {
         parameters: {
             query?: {
@@ -2989,6 +3477,322 @@ export interface operations {
                 "application/json": components["schemas"]["UpdateCustomerOutcomeRequest"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_alternatives_api_alternatives_get: {
+        parameters: {
+            query?: {
+                job_id?: string | null;
+                mcp_url?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_alternative_api_alternatives_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddAlternativeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_alternative_api_alternatives__alternative_id__get: {
+        parameters: {
+            query?: {
+                mcp_url?: string | null;
+            };
+            header?: never;
+            path: {
+                alternative_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_alternative_api_alternatives__alternative_id__delete: {
+        parameters: {
+            query?: {
+                mcp_url?: string | null;
+            };
+            header?: never;
+            path: {
+                alternative_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_outcome_alternatives_api_outcomes__outcome_id__alternatives_get: {
+        parameters: {
+            query?: {
+                mcp_url?: string | null;
+            };
+            header?: never;
+            path: {
+                outcome_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    link_alternative_api_outcomes__outcome_id__alternatives_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                outcome_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LinkAlternativeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unlink_alternative_api_outcomes__outcome_id__alternatives__alternative_id__delete: {
+        parameters: {
+            query?: {
+                mcp_url?: string | null;
+            };
+            header?: never;
+            path: {
+                outcome_id: string;
+                alternative_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_has_existing_solution_api_outcomes__outcome_id__existing_solution_get: {
+        parameters: {
+            query?: {
+                mcp_url?: string | null;
+            };
+            header?: never;
+            path: {
+                outcome_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_alternative_links_api_alternative_links_get: {
+        parameters: {
+            query: {
+                job_id: string;
+                mcp_url?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {

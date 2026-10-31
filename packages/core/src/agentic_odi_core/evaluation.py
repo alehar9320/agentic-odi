@@ -3,14 +3,22 @@
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 from typing import Any, Literal
 
 from agentic_odi_core.errors import ValidationError
+from agentic_odi_core.models import Outcome
 
 OpportunitySegment = Literal["underserved", "appropriate", "overserved", "unscored"]
 
 # Above 10 is underserved, exactly 10 is appropriately served, and below 10 is overserved.
 UNDERSERVED_SCORE = 10.0
+
+#: M2-14 advisory threshold. This is a *product* warning line, not a claim that a
+#: sample below it is statistically worthless or that one above it is reliable.
+#: It is one named constant so the advice and the number it cites cannot drift
+#: apart across the CLI, the landscape and the brief.
+MIN_MEANINGFUL_N = 20
 _CONTEXT_MARKERS = (" when ", " while ", " before ", " after ", " during ", " if ", " as ")
 _SOLUTION_NOUNS = (
     "notification",
@@ -51,6 +59,96 @@ def classify_opportunity(score: float | None) -> OpportunitySegment:
     if score == UNDERSERVED_SCORE:
         return "appropriate"
     return "overserved"
+
+
+#: Which dimension triggered an advisory when the two samples differ.
+AdvisoryDimension = Literal["importance", "satisfaction", "both"]
+
+
+@dataclass(frozen=True)
+class Advisory:
+    """A below-threshold warning about a score's sample (M2-14).
+
+    ``message`` is the one sentence every surface renders, so the CLI, the
+    landscape chip and the brief cannot word the same warning differently.
+    ``n``, ``threshold`` and ``method`` are the structured companions a test (and
+    a UI chip) can assert against instead of parsing the sentence.
+
+    The advisory is a statement about the data, never a verdict on the score: it
+    does not hide the outcome, change its ranking, or promise that a sample at or
+    above the threshold is statistically valid.
+    """
+
+    n: int
+    threshold: int
+    method: str
+    dimension: AdvisoryDimension
+    message: str
+
+
+def n_advisory(outcome: Outcome) -> Advisory | None:
+    """Warn when a score's recorded sample is below the advisory threshold (M2-14).
+
+    Returns ``None`` when no advisory applies, which is the case for an estimate,
+    an unknown count, a sample at or above :data:`MIN_MEANINGFUL_N`, or an
+    outcome with no score. The advisory uses the *smaller* of the two counts and
+    names the dimension that triggered it, because a single number would hide
+    which half of the pair is thin.
+
+    An estimate or an unknown count produces ``None`` rather than a fabricated
+    ``n=0``: the confidence classifier already reports those as ``none``, and
+    inventing a zero here would turn an unknown into a fact.
+    """
+    return advisory_for(
+        method=outcome.score_method,
+        importance_n=outcome.importance_n,
+        satisfaction_n=outcome.satisfaction_n,
+        opportunity_score=outcome.opportunity_score,
+    )
+
+
+def advisory_for(
+    *,
+    method: str,
+    importance_n: int | None,
+    satisfaction_n: int | None,
+    opportunity_score: float | None,
+) -> Advisory | None:
+    """The advisory over raw score fields, so a dict-based surface agrees (M2-14).
+
+    The CLI and the Studio read an outcome as a plain mapping, not an
+    :class:`~agentic_odi_core.models.Outcome`; this is the one implementation
+    they call so the wording and the triggering rule cannot drift from the model.
+    """
+    if opportunity_score is None or method == "estimate":
+        return None
+    known = {
+        dimension: n
+        for dimension, n in (("importance", importance_n), ("satisfaction", satisfaction_n))
+        if n is not None
+    }
+    if not known:
+        return None
+    smallest = min(known.values())
+    if smallest >= MIN_MEANINGFUL_N:
+        return None
+    below = [dimension for dimension, n in known.items() if n == smallest]
+    if len(below) == 2:
+        dimension: AdvisoryDimension = "both"
+    elif below[0] == "importance":
+        dimension = "importance"
+    else:
+        dimension = "satisfaction"
+    return Advisory(
+        n=smallest,
+        threshold=MIN_MEANINGFUL_N,
+        method=method,
+        dimension=dimension,
+        message=(
+            f"n={smallest} ({dimension}) is below the advisory threshold of "
+            f"{MIN_MEANINGFUL_N}; treat this score as a lead to confirm, not a finding."
+        ),
+    )
 
 
 def _find_unit_of_measure(text: str) -> str | None:

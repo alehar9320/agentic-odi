@@ -7,17 +7,22 @@ import os
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Literal
 
 from agentic_odi_core.errors import NotFoundError, ValidationError
 from agentic_odi_core.evaluation import (
     OutcomeStatementError,
     evaluate_outcome_statement,
+    n_advisory,
     require_outcome_statement,
 )
 from agentic_odi_core.models import (
+    ALTERNATIVE_SOURCE_KINDS,
     JOB_STAGE_INDEX,
     JOB_STAGE_ORDER,
+    SCORE_SNAPSHOT_NOTE_MAX,
+    Alternative,
+    AlternativeLink,
     BusinessValue,
     CustomerOutcome,
     CustomerValue,
@@ -29,6 +34,8 @@ from agentic_odi_core.models import (
     ScheduledWork,
     ScheduledWorkStatus,
     ScheduledWorkTriggerType,
+    ScoreMethod,
+    ScoreSnapshot,
     Segment,
     SegmentVerdict,
     Signal,
@@ -36,6 +43,7 @@ from agentic_odi_core.models import (
     Step,
     Strategy,
     compute_opportunity_score,
+    utc_now_iso,
 )
 from agentic_odi_core.repository import Repository, page
 from agentic_odi_core.segmentation import (
@@ -44,7 +52,19 @@ from agentic_odi_core.segmentation import (
     SegmentationStrategy,
     unclustered_outcomes,
 )
+from agentic_odi_core.stats import DEFAULT_SEED, opportunity_interval
 from agentic_odi_core.strategy import propose_strategy as build_strategy
+from agentic_odi_core.survey import SurveyPlan, aggregate_survey, parse_survey, plan_survey
+from agentic_odi_core.trust import (
+    IntervalProvenance,
+    OutcomeDelta,
+    build_survey_input_set,
+    classify_confidence,
+    outcome_delta,
+    persisted_interval,
+    rank_outcomes_honestly,
+    retained_survey_inputs,
+)
 
 
 class JobNotFoundError(NotFoundError):
@@ -69,6 +89,12 @@ class CustomerOutcomeNotFoundError(NotFoundError):
     def __init__(self, outcome_id: str) -> None:
         self.outcome_id = outcome_id
         super().__init__(outcome_id, "customer_outcome")
+
+
+class AlternativeNotFoundError(NotFoundError):
+    def __init__(self, alternative_id: str) -> None:
+        self.alternative_id = alternative_id
+        super().__init__(alternative_id, "alternative")
 
 
 class ScheduledWorkNotFoundError(NotFoundError, ValueError):
@@ -167,6 +193,60 @@ class SignalBudget:
         return surfaced_today < self.daily_cap
 
 
+class SnapshotNoteError(ValueOutOfRangeError):
+    """A score snapshot note is longer than the allowed limit.
+
+    A subclass of :class:`ValueOutOfRangeError` so callers that already handle
+    an out-of-range value keep working, while the note path can report the
+    limit by name.
+    """
+
+
+def _solution_state(
+    pairs: list[tuple[Alternative, AlternativeLink]],
+) -> Literal["yes", "no_linked_nothing", "no_link_at_all"]:
+    """The one solution-state rule every surface reads (M2-07 / M2-07.2).
+
+    Only ``yes`` records a solution: any linked alternative whose kind is not
+    ``nothing``. ``no_linked_nothing`` means we asked and the customer uses
+    nothing today; ``no_link_at_all`` means we have not asked. The rule lives in
+    one place so the brief, the CLI and the Studio facet cannot disagree, and so
+    an empty inventory is never read as evidence of no solution.
+    """
+    if not pairs:
+        return "no_link_at_all"
+    if any(alternative.kind != "nothing" for alternative, _ in pairs):
+        return "yes"
+    return "no_linked_nothing"
+
+
+def _validate_snapshot_note(note: str | None) -> str | None:
+    """Reject an over-long note before any score mutation is attempted."""
+    if note is not None and len(note) > SCORE_SNAPSHOT_NOTE_MAX:
+        raise SnapshotNoteError(f"note must be {SCORE_SNAPSHOT_NOTE_MAX} characters or fewer")
+    return note
+
+
+def _snapshot_from_outcome(outcome: Outcome, note: str | None = None) -> ScoreSnapshot:
+    """Capture an accepted outcome's score, sample and method as one snapshot.
+
+    The single place a snapshot is built, so every score-mutating path records
+    the same shape. A snapshot stores the companions of the score, because a
+    history of bare numbers cannot answer "did the evidence change or the
+    estimate?".
+    """
+    return ScoreSnapshot(
+        outcome_id=outcome.id,
+        importance=outcome.importance,
+        satisfaction=outcome.satisfaction,
+        opportunity_score=outcome.opportunity_score,
+        importance_n=outcome.importance_n,
+        satisfaction_n=outcome.satisfaction_n,
+        method=outcome.score_method,
+        note=note,
+    )
+
+
 class InvalidOutcomeStatementError(OutcomeStatementError):
     """A statement does not match the ODI desired-outcome format.
 
@@ -199,6 +279,22 @@ def _opportunity_crossing(before: float | None, after: float | None) -> tuple[st
     if before >= 10.0 > after:
         return ("down", "notice")
     return None
+
+
+def _reject_estimate_with_a_sample(
+    method: str, importance_n: int | None, satisfaction_n: int | None
+) -> None:
+    """Refuse a sample count on an estimate.
+
+    A count above one means people were asked; an estimate cannot have asked
+    them. Mirrors the model validator so the service fails with the same message
+    the model would, on both the create and partial-update paths.
+    """
+    if method == "estimate" and ((importance_n or 0) > 1 or (satisfaction_n or 0) > 1):
+        raise ValueOutOfRangeError(
+            "score_method 'estimate' cannot carry a sample count above 1; "
+            "use 'survey' or 'import' when people were asked"
+        )
 
 
 class ODIService:
@@ -328,7 +424,12 @@ class ODIService:
         if not ok:
             raise StepNotFoundError(step_id)
 
-    def update_outcome(self, outcome_id: str, updates: dict[str, Any]) -> Outcome:
+    def update_outcome(
+        self,
+        outcome_id: str,
+        updates: dict[str, Any],
+        note: str | None = None,
+    ) -> Outcome:
         existing = self.repo.get_outcome(outcome_id)
         if existing is None:
             raise OutcomeNotFoundError(outcome_id)
@@ -339,6 +440,14 @@ class ODIService:
             raise ValueOutOfRangeError("importance must be between 1.0 and 10.0")
         if satisfaction is not None and not (1.0 <= satisfaction <= 10.0):
             raise ValueOutOfRangeError("satisfaction must be between 1.0 and 10.0")
+        # Validate the whole resulting record, not just the patched fields: a
+        # partial update that switches a survey to an estimate must still be
+        # rejected when the untouched count would then be invalid.
+        method = updates.get("score_method", existing.score_method)
+        importance_n = updates.get("importance_n", existing.importance_n)
+        satisfaction_n = updates.get("satisfaction_n", existing.satisfaction_n)
+        _reject_estimate_with_a_sample(method, importance_n, satisfaction_n)
+        _validate_snapshot_note(note)
         require_outcome_statement(statement)
         if importance is not None and satisfaction is not None:
             updates = dict(updates)
@@ -346,11 +455,311 @@ class ODIService:
         else:
             updates = dict(updates)
             updates["opportunity_score"] = None
+        # A band describes one exact score and sample. When a caller changes the
+        # score without supplying a fresh band, the old band is stale: clear it in
+        # the same write rather than letting a new number carry an old range.
+        if "opportunity_low" not in updates and "opportunity_high" not in updates:
+            score_changed = (importance, satisfaction) != (
+                existing.importance,
+                existing.satisfaction,
+            )
+            method_changed = method != existing.score_method
+            if existing.opportunity_low is not None and (score_changed or method_changed):
+                updates["opportunity_low"] = None
+                updates["opportunity_high"] = None
+                updates["interval_n"] = None
+                # The retained paired inputs described the band that was just
+                # invalidated. Keeping them would let a later reader reproduce a
+                # band for a score that no longer exists, so they go with it.
+                self.repo.delete_survey_input_set(outcome_id)
         res = self.repo.update_outcome(outcome_id, updates)
         if not res:
             raise OutcomeNotFoundError(outcome_id)
         self._emit_outcome_updates(existing, res)
+        self._record_score_snapshot(res, note)
         return res
+
+    def get_outcome_delta(self, outcome_id: str, since: str | None = None) -> OutcomeDelta:
+        """The signed change across an outcome's recorded snapshots (B6.1).
+
+        Reads the recorded snapshots rather than regenerating a series, so the
+        delta is a subtraction over the same history a reviewer can see.
+        """
+        history = self.get_score_history(outcome_id)
+        return outcome_delta(history, since)
+
+    def get_outcome_interval(self, outcome_id: str) -> IntervalProvenance | None:
+        """The stored band and its provenance, or ``None`` for a no-band score (B3.2).
+
+        Reads the persisted ``opportunity_low``/``opportunity_high`` off the
+        outcome together with the recorded sample, seed, confidence level and
+        computed-at, and marks the band stale when a later accepted snapshot
+        moved the score it was computed from. ``None`` means the outcome carries
+        no band at all — an estimate or an unscored outcome — which is a
+        distinct state from a band, and never a zero-width one.
+        """
+        outcome = self.get_outcome(outcome_id)
+        if outcome is None:
+            raise OutcomeNotFoundError(outcome_id)
+        if outcome.opportunity_low is None or outcome.opportunity_high is None:
+            return None
+        history = self.repo.list_score_snapshots(outcome_id)
+        return persisted_interval(outcome, history)
+
+    def rank_outcomes_for_job(self, job_id: str) -> dict[str, Any]:
+        """Partition and rank a job's outcomes by evidence strength (B4/B4.1).
+
+        One shared read for the landscape, ``odi top`` and ``odi coverage``, so
+        the CLI, the API and the SPA cannot disagree. Returns measured, thin and
+        none sections whose union is the input set; within a section, outcomes
+        are ordered by the low end of the band (falling back to the point score)
+        descending. Unscored outcomes stay in the ``none`` section, never sorted
+        as a zero.
+        """
+        if self.repo.get_job(job_id) is None:
+            raise JobNotFoundError(job_id)
+        outcomes = self.repo.get_outcomes(job_id)
+        sections: dict[str, list[dict[str, Any]]] = {"measured": [], "thin": [], "none": []}
+        for outcome in rank_outcomes_honestly(outcomes):
+            sections[classify_confidence(outcome)].append(self._ranking_entry(outcome))
+        return {
+            "job_id": job_id,
+            "sections": sections,
+            "counts": {
+                "measured": len(sections["measured"]),
+                "thin": len(sections["thin"]),
+                "none": len(sections["none"]),
+                "total": len(outcomes),
+            },
+        }
+
+    def _ranking_entry(self, outcome: Outcome) -> dict[str, Any]:
+        """The shared ranking entry: score, band, sample, method and advisory (B4)."""
+        advisory = n_advisory(outcome)
+        return {
+            "id": outcome.id,
+            "statement": outcome.statement,
+            "opportunity_score": outcome.opportunity_score,
+            "opportunity_low": outcome.opportunity_low,
+            "opportunity_high": outcome.opportunity_high,
+            "importance_n": outcome.importance_n,
+            "satisfaction_n": outcome.satisfaction_n,
+            "score_method": outcome.score_method,
+            "confidence": classify_confidence(outcome),
+            "advisory": (
+                None
+                if advisory is None
+                else {
+                    "n": advisory.n,
+                    "threshold": advisory.threshold,
+                    "method": advisory.method,
+                    "dimension": advisory.dimension,
+                    "message": advisory.message,
+                }
+            ),
+        }
+
+    def _survey_reference_index(self) -> tuple[set[str], dict[str, str | None]]:
+        """The exact-match resolution tables for a survey import (B2).
+
+        ``known_ids`` is every outcome id in the store; ``id_by_statement`` maps
+        a statement to its single outcome id, or to ``None`` when the statement
+        is ambiguous. Both are job-agnostic because an import may reference any
+        outcome the store holds.
+        """
+        outcomes = [
+            outcome for job in self.repo.list_jobs() for outcome in self.repo.get_outcomes(job.id)
+        ]
+        known_ids = {outcome.id for outcome in outcomes}
+        id_by_statement: dict[str, str | None] = {}
+        for outcome in outcomes:
+            if outcome.statement in id_by_statement:
+                id_by_statement[outcome.statement] = None  # ambiguous
+            else:
+                id_by_statement[outcome.statement] = outcome.id
+        return known_ids, id_by_statement
+
+    def get_survey_import_plan(
+        self,
+        rows: list[dict[str, Any]],
+        *,
+        confirmed_matches: dict[str, str] | None = None,
+    ) -> SurveyPlan:
+        """Build a side-effect-free import plan that accounts for every row (B2.2).
+
+        Resolves references against the whole store exactly as :meth:`import_survey`
+        does, but writes nothing: the plan names each row's fate and line number,
+        so a dry run prints the report the real run would produce.
+        """
+        known_ids, id_by_statement = self._survey_reference_index()
+        return plan_survey(
+            rows,
+            id_by_statement=id_by_statement,
+            known_ids=known_ids,
+            confirmed_matches=confirmed_matches,
+        )
+
+    def commit_survey_import(
+        self,
+        rows: list[dict[str, Any]],
+        *,
+        confirmed_matches: dict[str, str] | None = None,
+    ) -> dict[str, Outcome]:
+        """Plan and write a survey import, refusing any unresolved row (B2.2).
+
+        Re-plans from the same rows and writes only when every row is accepted,
+        so a dry run and the real run agree and a partial write is impossible.
+        """
+        plan = self.get_survey_import_plan(rows, confirmed_matches=confirmed_matches)
+        return self.commit_survey_plan(plan)
+
+    def commit_survey_plan(self, plan: SurveyPlan) -> dict[str, Outcome]:
+        """Write an already-reviewed, fully-accepted plan (B2.2).
+
+        Refuses a plan with any rejected row, so a partial write is impossible:
+        the caller must resolve or explicitly confirm every row first. Accepted
+        rows land through the same band/sample path as :meth:`import_survey`.
+        """
+        if not plan.writable:
+            rejected = ", ".join(f"line {row.line} ({row.status})" for row in plan.rejected)
+            raise ValidationError(
+                f"import plan has {len(plan.rejected)} unresolved row(s): {rejected}; "
+                "resolve or confirm every row before writing"
+            )
+        observations: dict[str, list[tuple[float, float]]] = {}
+        respondent_refs: dict[str, list[str]] = {}
+        for response in plan.accepted:
+            observations.setdefault(response.outcome_ref, []).append(
+                (response.importance, response.satisfaction)
+            )
+            respondent_refs.setdefault(response.outcome_ref, []).append(response.respondent)
+        updated: dict[str, Outcome] = {}
+        for outcome_id, aggregate in plan.aggregates.items():
+            if self.get_outcome(outcome_id) is None:
+                raise OutcomeNotFoundError(outcome_id)
+            updates: dict[str, Any] = {
+                "importance": round(aggregate.importance_mean, 6),
+                "satisfaction": round(aggregate.satisfaction_mean, 6),
+                "importance_n": aggregate.n,
+                "satisfaction_n": aggregate.n,
+                "score_method": "survey",
+            }
+            updates.update(self._band_for(observations.get(outcome_id, [])))
+            updated[outcome_id] = self.update_outcome(outcome_id, updates)
+            self._retain_inputs(
+                updated[outcome_id],
+                observations.get(outcome_id, []),
+                respondent_refs.get(outcome_id, []),
+            )
+        return updated
+
+    def import_survey(
+        self,
+        rows: list[dict[str, Any]],
+    ) -> dict[str, Outcome]:
+        """Land a survey's per-outcome means on the matching outcomes (B2).
+
+        Parses and aggregates first, so a malformed file or an unresolved
+        reference fails before any outcome is written; then updates each outcome
+        through :meth:`update_outcome` so all score validation still applies and
+        the write records ``method='survey'`` with its per-dimension ``n`` and a
+        band bootstrapped from the real paired responses. Nothing is written for
+        a reference that does not resolve.
+        """
+        responses = parse_survey(rows)
+        known_ids, id_by_statement = self._survey_reference_index()
+        result = aggregate_survey(responses, id_by_statement=id_by_statement, known_ids=known_ids)
+
+        # The band is bootstrapped from the paired responses, not from the mean,
+        # so the correlation between the two dimensions survives.
+        observations: dict[str, list[tuple[float, float]]] = {}
+        respondent_refs: dict[str, list[str]] = {}
+        for response in responses:
+            outcome_id = (
+                response.outcome_ref
+                if response.outcome_ref_kind == "outcome_id"
+                else id_by_statement[response.outcome_ref]
+            )
+            if outcome_id is None:
+                continue
+            observations.setdefault(outcome_id, []).append(
+                (response.importance, response.satisfaction)
+            )
+            respondent_refs.setdefault(outcome_id, []).append(response.respondent)
+
+        updated: dict[str, Outcome] = {}
+        for outcome_id, aggregate in result.aggregates.items():
+            existing = self.get_outcome(outcome_id)
+            if existing is None:
+                raise OutcomeNotFoundError(outcome_id)
+            updates: dict[str, Any] = {
+                "importance": round(aggregate.importance_mean, 6),
+                "satisfaction": round(aggregate.satisfaction_mean, 6),
+                "importance_n": aggregate.n,
+                "satisfaction_n": aggregate.n,
+                "score_method": "survey",
+            }
+            updates.update(self._band_for(observations.get(outcome_id, [])))
+            updated[outcome_id] = self.update_outcome(outcome_id, updates)
+            self._retain_inputs(
+                updated[outcome_id],
+                observations.get(outcome_id, []),
+                respondent_refs.get(outcome_id, []),
+            )
+        return updated
+
+    def _retain_inputs(
+        self,
+        outcome: Outcome,
+        pairs: list[tuple[float, float]],
+        respondent_refs: list[str],
+    ) -> None:
+        """Persist the accepted paired inputs a band is reproduced from (B3.1).
+
+        Called only after the outcome write succeeded, so a refused or dry-run
+        import retains nothing. The set is de-identified (opaque per-pair tokens,
+        no names) and carries a versioned ref so the band can name its inputs.
+        """
+        if not pairs:
+            return
+        input_set = build_survey_input_set(outcome, pairs, respondent_refs=respondent_refs)
+        self.repo.add_survey_input_set(input_set)
+
+    def get_outcome_inputs(self, outcome_id: str) -> list[Any] | None:
+        """The paired inputs a stored band was reproduced from (B3.1), or ``None``.
+
+        Reads the persisted input set for the outcome. ``None`` means no input
+        set is retained — a legacy or aggregate-only outcome — which is a
+        distinct state from a retained set, and never an empty list that would
+        read as "zero responses".
+        """
+        outcome = self.get_outcome(outcome_id)
+        if outcome is None:
+            raise OutcomeNotFoundError(outcome_id)
+        input_set = self.repo.get_survey_input_set(outcome_id)
+        if input_set is None:
+            return None
+        return retained_survey_inputs(input_set)
+
+    def _band_for(self, observations: list[tuple[float, float]]) -> dict[str, Any]:
+        """Compute the stored band and provenance from paired responses (B3/B3.2).
+
+        Uses the real per-respondent pairs, not the aggregated mean: a bootstrap
+        over the means would report a zero-width band for a spread-out sample.
+        """
+        if not observations:
+            return {}
+        importance = [pair[0] for pair in observations]
+        satisfaction = [pair[1] for pair in observations]
+        interval = opportunity_interval(importance, satisfaction)
+        return {
+            "opportunity_low": interval.low,
+            "opportunity_high": interval.high,
+            "interval_n": interval.n,
+            "interval_seed": DEFAULT_SEED,
+            "interval_confidence_level": interval.confidence_level,
+            "interval_computed_at": utc_now_iso(),
+        }
 
     def _emit_outcome_updates(self, before: Outcome, after: Outcome) -> None:
         if before.importance != after.importance or before.satisfaction != after.satisfaction:
@@ -394,6 +803,21 @@ class ODIService:
             severity="notice",
             discriminator="all-stages",
         )
+
+    def _record_score_snapshot(self, outcome: Outcome, note: str | None = None) -> ScoreSnapshot:
+        """Write one snapshot for an accepted score state.
+
+        Called from every score-mutating path, so a future path cannot skip the
+        history. The snapshot records the *accepted* state, so it is written
+        after the mutation succeeds and never for a rejected one.
+        """
+        return self.repo.add_score_snapshot(_snapshot_from_outcome(outcome, note))
+
+    def get_score_history(self, outcome_id: str) -> list[ScoreSnapshot]:
+        """Return an outcome's snapshots in the order they were accepted."""
+        if self.repo.get_outcome(outcome_id) is None:
+            raise OutcomeNotFoundError(outcome_id)
+        return self.repo.list_score_snapshots(outcome_id)
 
     def delete_outcome(self, outcome_id: str) -> None:
         ok = self.repo.delete_outcome(outcome_id)
@@ -449,6 +873,10 @@ class ODIService:
         satisfaction: float,
         step_id: str | None = None,
         validate_statement: bool = True,
+        importance_n: int | None = None,
+        satisfaction_n: int | None = None,
+        score_method: ScoreMethod = "estimate",
+        note: str | None = None,
     ) -> Outcome:
         if self.repo.get_job(job_id) is None:
             raise JobNotFoundError(job_id)
@@ -458,6 +886,8 @@ class ODIService:
             raise ValueOutOfRangeError("importance must be between 1.0 and 10.0")
         if not (1.0 <= satisfaction <= 10.0):
             raise ValueOutOfRangeError("satisfaction must be between 1.0 and 10.0")
+        _reject_estimate_with_a_sample(score_method, importance_n, satisfaction_n)
+        _validate_snapshot_note(note)
         if validate_statement:
             verdict = evaluate_outcome_statement(statement)
             if not verdict["valid"]:
@@ -471,8 +901,13 @@ class ODIService:
             importance=importance,
             satisfaction=satisfaction,
             opportunity_score=opportunity_score,
+            importance_n=importance_n,
+            satisfaction_n=satisfaction_n,
+            score_method=score_method,
         )
-        return self.repo.add_outcome(outcome)
+        created = self.repo.add_outcome(outcome)
+        self._record_score_snapshot(created, note)
+        return created
 
     def get_outcomes(
         self,
@@ -538,6 +973,129 @@ class ODIService:
         ok = self.repo.delete_customer_outcome(outcome_id)
         if not ok:
             raise CustomerOutcomeNotFoundError(outcome_id)
+
+    def add_alternative(
+        self,
+        job_id: str,
+        name: str,
+        kind: str,
+        notes: str | None = None,
+        source_kind: str = "manual",
+    ) -> Alternative:
+        """Record what a customer uses today for one Job (M2-07).
+
+        Never inferred from a score or an import: the caller supplies the
+        customer's own inventory. An unknown job or an unapproved source_kind is
+        refused rather than silently accepted.
+        """
+        if self.repo.get_job(job_id) is None:
+            raise JobNotFoundError(job_id)
+        if source_kind not in ALTERNATIVE_SOURCE_KINDS:
+            raise ValidationError(
+                f"source_kind {source_kind!r} is not one of {', '.join(ALTERNATIVE_SOURCE_KINDS)}"
+            )
+        alternative = Alternative(
+            job_id=job_id, name=name, kind=kind, notes=notes, source_kind=source_kind
+        )
+        return self.repo.add_alternative(alternative)
+
+    def get_alternative(self, alternative_id: str) -> Alternative:
+        alternative = self.repo.get_alternative(alternative_id)
+        if alternative is None:
+            raise AlternativeNotFoundError(alternative_id)
+        return alternative
+
+    def list_alternatives(
+        self, job_id: str | None = None, limit: int | None = None, offset: int = 0
+    ) -> list[Alternative]:
+        return self.repo.list_alternatives(job_id, limit=limit, offset=offset)
+
+    def delete_alternative(self, alternative_id: str) -> None:
+        if not self.repo.delete_alternative(alternative_id):
+            raise AlternativeNotFoundError(alternative_id)
+
+    def link_alternative(
+        self,
+        outcome_id: str,
+        alternative_id: str,
+        adequacy: float,
+        usage_n: int | None = None,
+        note: str | None = None,
+    ) -> AlternativeLink:
+        """Rate one alternative against one outcome, from the customer (M2-07).
+
+        Refuses a cross-job link: the outcome and the alternative must belong to
+        the same Job, or the link would compare unrelated work.
+        """
+        outcome = self.repo.get_outcome(outcome_id)
+        if outcome is None:
+            raise OutcomeNotFoundError(outcome_id)
+        alternative = self.repo.get_alternative(alternative_id)
+        if alternative is None:
+            raise AlternativeNotFoundError(alternative_id)
+        if outcome.job_id != alternative.job_id:
+            raise ValidationError(
+                "an alternative link must join an outcome and an alternative in the "
+                f"same job; outcome job {outcome.job_id!r} != alternative job "
+                f"{alternative.job_id!r}"
+            )
+        link = AlternativeLink(
+            outcome_id=outcome_id,
+            alternative_id=alternative_id,
+            adequacy=adequacy,
+            usage_n=usage_n,
+            note=note,
+        )
+        return self.repo.link_alternative(link)
+
+    def unlink_alternative(self, outcome_id: str, alternative_id: str) -> None:
+        if not self.repo.unlink_alternative(outcome_id, alternative_id):
+            raise ValidationError(
+                f"no link between outcome {outcome_id!r} and alternative {alternative_id!r}"
+            )
+
+    def outcome_alternatives(self, outcome_id: str) -> list[tuple[Alternative, AlternativeLink]]:
+        """The alternatives recorded for one outcome, each with its adequacy link."""
+        if self.repo.get_outcome(outcome_id) is None:
+            raise OutcomeNotFoundError(outcome_id)
+        result: list[tuple[Alternative, AlternativeLink]] = []
+        for link in self.repo.list_alternative_links(outcome_id=outcome_id):
+            alternative = self.repo.get_alternative(link.alternative_id)
+            if alternative is not None:
+                result.append((alternative, link))
+        return result
+
+    def has_existing_solution(
+        self, outcome_id: str
+    ) -> Literal["yes", "no_linked_nothing", "no_link_at_all"]:
+        """Whether an existing solution is recorded for an outcome (M2-07).
+
+        A two-valued question with three honest answers, so a caller can tell
+        "we asked and there is nothing" (``no_linked_nothing``) from "we have not
+        asked" (``no_link_at_all``). Only ``yes`` means a solution is recorded;
+        an empty inventory is never evidence that no solution exists.
+        """
+        return _solution_state(self.outcome_alternatives(outcome_id))
+
+    def job_outcome_alternatives(
+        self, job_id: str
+    ) -> list[tuple[str, Alternative, AlternativeLink]]:
+        """Every recorded alternative for one Job, each with its outcome and link.
+
+        A bulk read of the inventory so the landscape facet can compute a
+        solution state and a kind filter per outcome without a request per row.
+        It reuses :func:`_solution_state`, so the facet, the detail row and the
+        brief cannot disagree. An unknown job is refused rather than reported as
+        an empty inventory.
+        """
+        if self.repo.get_job(job_id) is None:
+            raise JobNotFoundError(job_id)
+        result: list[tuple[str, Alternative, AlternativeLink]] = []
+        for link in self.repo.list_alternative_links(job_id=job_id):
+            alternative = self.repo.get_alternative(link.alternative_id)
+            if alternative is not None:
+                result.append((link.outcome_id, alternative, link))
+        return result
 
     def add_evidence(
         self,

@@ -1,9 +1,18 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
+import { fetchAlternativeLinks } from "../../api/studioApi";
 import { canvasStatus } from "../../lib/canvasProvenance";
-import { formatOpportunityScore, isUnderserved } from "../../lib/odi";
+import {
+  confidenceClass,
+  formatBand,
+  formatOpportunityScore,
+  formatSample,
+  isOnlyWorkaround,
+  isUnderserved,
+  nAdvisory,
+} from "../../lib/odi";
 import { useStudio } from "../../state/StudioContext";
-import type { Outcome } from "../../types";
+import type { Outcome, OutcomeAlternativeLink } from "../../types";
 import { FailurePanel } from "../FailurePanel";
 import { GhostMetrics, GhostOpportunityCards } from "../Skeletons";
 import { OutcomeCard } from "./OutcomeCard";
@@ -19,14 +28,25 @@ export function OpportunityLandscape() {
     theses,
     focusedSubject,
     focusSubject,
+    settings,
   } = useStudio();
   const [underservedOnly, setUnderservedOnly] = useState(false);
+  const [workaroundOnly, setWorkaroundOnly] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedOutcomeId, setSelectedOutcomeId] = useState<string | null>(
     focusedSubject?.kind === "outcome" ? focusedSubject.id : null,
   );
   const [viewMode, setViewMode] = useState<ViewMode>("matrix");
   const [hoveredOutcome, setHoveredOutcome] = useState<Outcome | null>(null);
+  // Every alternative recorded for the job(s) on screen, read once per job so
+  // the facet never issues a request per row. Both the links and the failure are
+  // keyed by the job set they were read for, so a stale page is ignored and a
+  // failed read is never confused with an empty inventory.
+  const [linksRead, setLinksRead] = useState<{
+    key: string;
+    links: OutcomeAlternativeLink[];
+  } | null>(null);
+  const [readFailureKey, setReadFailureKey] = useState<string | null>(null);
 
   const canvas = canvasState.data;
   const sample = canvas?.source === "seed";
@@ -36,6 +56,54 @@ export function OpportunityLandscape() {
   const isLoading = canvasState.kind === "loading";
   const isEmpty = canvasState.kind === "empty";
   const provenance = canvasStatus(canvas);
+
+  const jobIds = useMemo(
+    () =>
+      [
+        ...new Set(
+          outcomes
+            .map((outcome) => outcome.job_id)
+            .filter((jobId): jobId is string => Boolean(jobId)),
+        ),
+      ].sort(),
+    [outcomes],
+  );
+  const jobKey = jobIds.join(",");
+  const readyToRead = canvasState.kind === "ready" && jobIds.length > 0;
+  const links = useMemo(
+    () => (readyToRead && linksRead?.key === jobKey ? linksRead.links : []),
+    [readyToRead, linksRead, jobKey],
+  );
+  const alternativesReadFailed = readyToRead && readFailureKey === jobKey;
+
+  useEffect(() => {
+    if (!readyToRead) return;
+    let cancelled = false;
+    void Promise.all(jobIds.map((jobId) => fetchAlternativeLinks(jobId, settings.mcp_url)))
+      .then((pages) => {
+        if (cancelled) return;
+        setLinksRead({ key: jobKey, links: pages.flat() });
+        setReadFailureKey(null);
+      })
+      .catch(() => {
+        // The facet is supporting context: a failure disables it with a notice
+        // rather than filtering every outcome away as "not a workaround".
+        if (!cancelled) setReadFailureKey(jobKey);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [readyToRead, jobKey, jobIds, settings.mcp_url]);
+
+  const linksByOutcome = useMemo(() => {
+    const grouped = new Map<string, OutcomeAlternativeLink[]>();
+    for (const entry of links) {
+      const bucket = grouped.get(entry.outcome_id) ?? [];
+      bucket.push(entry);
+      grouped.set(entry.outcome_id, bucket);
+    }
+    return grouped;
+  }, [links]);
 
   const underservedCount = outcomes.filter((outcome) =>
     isUnderserved(outcome.opportunity_score),
@@ -65,6 +133,12 @@ export function OpportunityLandscape() {
       if (underservedOnly && !isUnderserved(outcome.opportunity_score)) {
         return false;
       }
+      if (
+        workaroundOnly &&
+        !isOnlyWorkaround(outcome.id ? (linksByOutcome.get(outcome.id) ?? []) : [])
+      ) {
+        return false;
+      }
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase();
         const stmt = outcome.statement?.toLowerCase() ?? "";
@@ -73,12 +147,25 @@ export function OpportunityLandscape() {
       }
       return true;
     });
-  }, [outcomes, underservedOnly, searchQuery]);
+  }, [outcomes, underservedOnly, workaroundOnly, linksByOutcome, searchQuery]);
 
   const sortedOutcomes = useMemo(() => {
-    return [...filteredOutcomes].sort(
-      (a, b) => (b.opportunity_score ?? -Infinity) - (a.opportunity_score ?? -Infinity),
-    );
+    // Group by confidence class (measured, then thin, then none) and order
+    // within a group by the low end of the band, matching the core's honest
+    // ranking. This keeps a thin high-variance guess below a measured need and
+    // never sorts an unscored outcome as a zero.
+    const order: Record<string, number> = { measured: 0, thin: 1, none: 2 };
+    return [...filteredOutcomes].sort((a, b) => {
+      const classA = order[confidenceClass(a)];
+      const classB = order[confidenceClass(b)];
+      if (classA !== classB) return classA - classB;
+      const lowA = a.opportunity_low ?? a.opportunity_score ?? null;
+      const lowB = b.opportunity_low ?? b.opportunity_score ?? null;
+      if (lowA === null && lowB === null) return 0;
+      if (lowA === null) return 1;
+      if (lowB === null) return -1;
+      return lowB - lowA;
+    });
   }, [filteredOutcomes]);
 
   function toggleOutcome(id: string) {
@@ -226,7 +313,25 @@ export function OpportunityLandscape() {
             />
             Show Underserved Only (&gt;10)
           </label>
-          {searchQuery || underservedOnly ? (
+          <label
+            style={{ fontSize: "0.85rem", color: "var(--studio-text)", display: "flex", alignItems: "center", gap: 6, cursor: "pointer", userSelect: "none" }}
+            title={
+              alternativesReadFailed
+                ? "The alternatives inventory could not be read; the facet is unavailable rather than treating every outcome as not a workaround."
+                : "Outcomes whose only recorded solution is a workaround."
+            }
+          >
+            <input
+              type="checkbox"
+              data-testid="facet-only-workaround"
+              checked={workaroundOnly}
+              disabled={isLoading || alternativesReadFailed}
+              onChange={(event) => setWorkaroundOnly(event.target.checked)}
+              style={{ accentColor: "var(--studio-indigo)" }}
+            />
+            Only Workaround
+          </label>
+          {searchQuery || underservedOnly || workaroundOnly ? (
             <button
               type="button"
               className="studio-button"
@@ -235,6 +340,7 @@ export function OpportunityLandscape() {
               onClick={() => {
                 setSearchQuery("");
                 setUnderservedOnly(false);
+                setWorkaroundOnly(false);
               }}
             >
               Clear Filters
@@ -557,7 +663,9 @@ function OpportunityMatrixView({
                     stroke="#0b0d13"
                     strokeWidth="2"
                     filter={plot.underserved || isSelected ? "url(#glowEffect)" : undefined}
-                  />
+                  >
+                    <title>{`${outcome.id} · ${formatSample(outcome)}`}</title>
+                  </circle>
 
                   {/* Node ID Label */}
                   <text
@@ -628,7 +736,7 @@ function OpportunityMatrixView({
       <div>
         {activeOutcome ? (
           <div style={{ position: "sticky", top: 16 }}>
-            <OutcomeCard outcome={activeOutcome} sample={sample} />
+            <OutcomeCard outcome={activeOutcome} sample={sample} detail />
           </div>
         ) : (
           <div
@@ -668,6 +776,8 @@ function OpportunityTableView({
             <th style={{ padding: "10px 14px", textAlign: "right" }}>Importance</th>
             <th style={{ padding: "10px 14px", textAlign: "right" }}>Satisfaction</th>
             <th style={{ padding: "10px 14px", textAlign: "right" }}>Opp. Score</th>
+            <th style={{ padding: "10px 14px" }}>Band</th>
+            <th style={{ padding: "10px 14px" }}>Sample</th>
             <th style={{ padding: "10px 14px", textAlign: "center" }}>Status</th>
           </tr>
         </thead>
@@ -722,6 +832,46 @@ function OpportunityTableView({
                   }}
                 >
                   {opp.toFixed(1)}
+                </td>
+                <td
+                  style={{
+                    padding: "10px 14px",
+                    color: "var(--studio-muted)",
+                    whiteSpace: "nowrap",
+                  }}
+                  title="The band around the score; an estimate has no band"
+                >
+                  {formatBand(outcome)}
+                </td>
+                <td
+                  style={{
+                    padding: "10px 14px",
+                    color: "var(--studio-muted)",
+                    whiteSpace: "nowrap",
+                  }}
+                  title="How many people stand behind each score, and how it was obtained"
+                >
+                  {formatSample(outcome)}
+                  {(() => {
+                    // The M2-14 chip marks exactly the outcomes the shared
+                    // advisory flags; it never hides or re-ranks a row.
+                    const advisory = nAdvisory(outcome);
+                    return advisory ? (
+                      <span
+                        className="studio-pill"
+                        data-testid={`advisory-${outcome.id}`}
+                        title={advisory.message}
+                        style={{
+                          marginLeft: 6,
+                          background: "rgba(251, 191, 36, 0.15)",
+                          color: "var(--studio-amber)",
+                          fontSize: "0.68rem",
+                        }}
+                      >
+                        n&lt;{advisory.threshold}
+                      </span>
+                    ) : null;
+                  })()}
                 </td>
                 <td style={{ padding: "10px 14px", textAlign: "center" }}>
                   <span

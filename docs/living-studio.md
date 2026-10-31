@@ -382,6 +382,54 @@ importance, satisfaction, the gap in plain words, the thesis itself, and the
 smallest next move. It is the shape the agent reaches for when the PM is deciding
 what to chase, rather than when they are inspecting a single score.
 
+An outcome score carries its sample and method: `score_method` is `estimate`,
+`survey`, or `import`, and `importance_n` / `satisfaction_n` hold how many people
+stand behind each dimension when known. Omitted counts stay unknown — the CLI and
+the opportunity landscape render them as `est.`, never `n=0`, and show both
+counts (`n=40/12 (survey)`) when the dimensions differ. An `estimate` claiming a
+count above one is rejected before the write.
+
+A recorded sample below the advisory threshold (`MIN_MEANINGFUL_N = 20`) is
+flagged, not hidden. One shared read decides it — `evaluation.n_advisory` in the
+core and `nAdvisory` in `lib/odi.ts` — so the CLI footer, the `desired-outcomes
+get` `advisory` line and the landscape's `n<20` chip word the warning
+identically: the count, the dimension that triggered it (the smaller of the two),
+and the threshold. The advisory is a statement about the data, never a verdict on
+the score, so the row still renders and still ranks; an estimate or an unknown
+count produces no advisory rather than a fabricated `n=0`.
+
+Each accepted score change is also recorded as a `ScoreSnapshot` in the same
+append-only event log, so a score's history replays with the store. The sidecar
+exposes it at `GET /api/outcomes/{outcome_id}/history`; `ScoreSnapshot` is
+exported from `types.ts` and read through `fetchOutcomeHistory`. A snapshot
+carries the score and its sample/method companions plus an optional `note`
+(max 500 chars) recording why the number was given. A rejected mutation writes
+no snapshot, so the history never shows a change that did not happen. The
+selected outcome's detail card reads this history and shows the most recent
+reason as a `note` line; the list cards do not, so a board does not issue one
+request per outcome.
+
+The signed change across that history is exposed separately at
+`GET /api/outcomes/{outcome_id}/delta` (`since` optional), so the history list
+keeps one shape across the local and MCP backends. The response carries the
+per-dimension and opportunity differences plus a `direction` (`up`/`down`/
+`flat`) taken from the opportunity sign — a consumer never infers an
+"improvement" from a bare number. A missing dimension stays `null`, not `0`.
+
+The alternatives inventory records what a customer uses today for each Job — a
+product, a service, a workaround, a manual process, or `nothing` — and rates each
+against an outcome with the customer's own `adequacy` (1–10). The sidecar exposes
+`GET /api/alternatives` (optionally `?job_id=`), `GET /api/alternatives/{id}`,
+`POST /api/alternatives`, `DELETE /api/alternatives/{id}`, plus the per-outcome
+link reads and writes at `GET /api/outcomes/{id}/alternatives`,
+`POST /api/outcomes/{id}/alternatives`, `DELETE /api/outcomes/{id}/alternatives/{alternative_id}`
+and `GET /api/outcomes/{id}/existing-solution`. `Alternative`, `AlternativeLink`,
+`ExistingSolution` and `OutcomeAlternative` are exported from `types.ts` and read
+through `fetchAlternatives` / `linkAlternative`. The `existing-solution` read
+returns the explicit three-state result `yes | no_linked_nothing | no_link_at_all`,
+so the outcome detail can distinguish "we asked and there is nothing" from "we
+have not asked" without inferring a solution from a score.
+
 The segment card is the answer to "who is this for?": the people, the job they
 are doing, the step their outcomes cluster on, and the verdict those outcomes
 support. A verdict is never shown apart from the confidence behind it, and

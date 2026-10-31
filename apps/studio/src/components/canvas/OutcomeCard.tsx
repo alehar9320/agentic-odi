@@ -1,17 +1,35 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import {
+  fetchExistingSolution,
+  fetchOutcomeAlternatives,
+  fetchOutcomeHistory,
+  fetchOutcomeInterval,
+} from "../../api/studioApi";
+import {
+  existingSolutionLabel,
+  formatBandProvenance,
   formatOpportunityScore,
+  formatSample,
   isUnderserved,
   opportunityPill,
   opportunityScore,
 } from "../../lib/odi";
 import { useStudio } from "../../state/StudioContext";
-import type { Outcome } from "../../types";
+import type { ExistingSolution, Outcome, OutcomeAlternative, OutcomeInterval } from "../../types";
 import { CopyIcon } from "../icons";
 
-export function OutcomeCard({ outcome, sample = false }: { outcome: Outcome; sample?: boolean }) {
-  const { ask, canvasState, deleteOutcome, pushToast, saveThesis, updateOutcome } = useStudio();
+export function OutcomeCard({
+  outcome,
+  sample = false,
+  detail = false,
+}: {
+  outcome: Outcome;
+  sample?: boolean;
+  detail?: boolean;
+}) {
+  const { ask, canvasState, deleteOutcome, pushToast, saveThesis, settings, updateOutcome } =
+    useStudio();
   // Records captured against this outcome, with their way back to the source.
   const linkedEvidence = (canvasState.data?.evidence ?? []).filter(
     (item) => item.outcome_id === outcome.id,
@@ -24,10 +42,100 @@ export function OutcomeCard({ outcome, sample = false }: { outcome: Outcome; sam
   const [importance, setImportance] = useState(outcome.importance ?? 5);
   const [satisfaction, setSatisfaction] = useState(outcome.satisfaction ?? 5);
   const [saving, setSaving] = useState(false);
+  // The reason recorded with the most recent accepted score change. It is
+  // snapshot metadata, not an Outcome field, so it is fetched from history and
+  // tagged with its outcome so a switch never shows the previous one's note.
+  const [noteFor, setNoteFor] = useState<{ id: string; note: string | null } | null>(null);
+  // The stored band and its provenance. Fetched only on the detail card, like
+  // the note, so the list does not issue one request per row. A failed fetch
+  // leaves the line absent rather than showing a fabricated band.
+  const [intervalFor, setIntervalFor] = useState<{
+    id: string;
+    interval: OutcomeInterval | null;
+  } | null>(null);
+  // The recorded alternatives and the solution state for the detail card
+  // (M2-07.2). A `null` read means it has not resolved, which is a distinct
+  // state from "asked and found nothing": a failed read leaves the row absent
+  // rather than claiming the outcome is un-inventoried.
+  const [alternativesFor, setAlternativesFor] = useState<{
+    id: string;
+    pairs: OutcomeAlternative[];
+    state: ExistingSolution;
+  } | null>(null);
+
+  const outcomeId = outcome.id ?? "O";
+  useEffect(() => {
+    const id = outcome.id;
+    // Only the detail card reads history: the list renders one card per
+    // outcome, and a note there would be one request per row.
+    if (!detail || !id || sample) return;
+    let cancelled = false;
+    void fetchOutcomeHistory(id, settings.mcp_url)
+      .then((snapshots) => {
+        if (cancelled) return;
+        const noted = [...snapshots].reverse().find((snapshot) => snapshot.note);
+        setNoteFor({ id, note: noted?.note ?? null });
+      })
+      .catch(() => {
+        // History is supporting context: a failure leaves the line absent
+        // rather than blocking the card.
+        if (!cancelled) setNoteFor({ id, note: null });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [detail, outcome.id, sample, settings.mcp_url]);
+
+  useEffect(() => {
+    const id = outcome.id;
+    if (!detail || !id || sample) return;
+    let cancelled = false;
+    void fetchOutcomeInterval(id, settings.mcp_url)
+      .then((interval) => {
+        if (!cancelled) setIntervalFor({ id, interval });
+      })
+      .catch(() => {
+        // A failed read leaves the line absent: rendering "no band" would claim
+        // the score carries none, which is a different fact from an unread one.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [detail, outcome.id, sample, settings.mcp_url]);
+
+  useEffect(() => {
+    const id = outcome.id;
+    if (!detail || !id || sample) return;
+    let cancelled = false;
+    void Promise.all([
+      fetchOutcomeAlternatives(id, settings.mcp_url),
+      fetchExistingSolution(id, settings.mcp_url),
+    ])
+      .then(([pairs, state]) => {
+        if (!cancelled) setAlternativesFor({ id, pairs, state });
+      })
+      .catch(() => {
+        // A failed read leaves the row absent: rendering "not yet inventoried"
+        // would claim we asked and found nothing, which we did not.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [detail, outcome.id, sample, settings.mcp_url]);
+
+  const latestNote =
+    detail && !sample && noteFor && noteFor.id === outcome.id ? noteFor.note : null;
+  const interval =
+    detail && !sample && intervalFor && intervalFor.id === outcome.id
+      ? intervalFor.interval
+      : null;
+  const alternatives =
+    detail && !sample && alternativesFor && alternativesFor.id === outcome.id
+      ? alternativesFor
+      : null;
 
   const opp = outcome.opportunity_score;
   const statement = outcome.statement ?? "Untitled outcome";
-  const outcomeId = outcome.id ?? "O";
   const underserved = isUnderserved(opp);
   const pill = opportunityPill(opp);
 
@@ -54,7 +162,45 @@ export function OutcomeCard({ outcome, sample = false }: { outcome: Outcome; sam
         Satisfaction <b>{outcome.satisfaction ?? "—"}</b>
         <span aria-hidden="true"> · </span>
         Opportunity <b>{formatOpportunityScore(opp)}</b>
+        <span aria-hidden="true"> · </span>
+        <span title="How many people stand behind each score, and how it was obtained">
+          {formatSample(outcome)}
+        </span>
       </p>
+
+      {latestNote ? (
+        <p className="card__meta" data-testid="outcome-note">
+          <span title="The reason recorded with the most recent accepted score change">
+            Note <b>{latestNote}</b>
+          </span>
+        </p>
+      ) : null}
+
+      {detail && !sample && intervalFor?.id === outcome.id ? (
+        <p className="card__meta" data-testid="outcome-band-provenance">
+          <span title="The stored band and the provenance it was recorded with">
+            Band <b>{formatBandProvenance(interval)}</b>
+          </span>
+        </p>
+      ) : null}
+
+      {alternatives ? (
+        <div className="card__meta" data-testid="outcome-alternatives">
+          <span title="What customers use today, and how well it serves them">
+            {existingSolutionLabel(alternatives.state)}
+          </span>
+          {alternatives.pairs.length > 0 ? (
+            <ul className="card__alternatives">
+              {alternatives.pairs.map(({ alternative, link }) => (
+                <li key={alternative.id ?? `${link.outcome_id}-${link.alternative_id}`}>
+                  {alternative.name} ({alternative.kind}, adequacy {link.adequacy})
+                  {link.usage_n != null ? `, n=${link.usage_n}` : ""}
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
+      ) : null}
 
       {showEvidence &&
         (linkedEvidence.length > 0 ? (

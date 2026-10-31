@@ -65,6 +65,27 @@
         }
       }
     },
+    "/api/diagnostics": {
+      "get": {
+        "summary": "Get Diagnostics",
+        "description": "Return diagnostic metadata only; never return database paths or records.",
+        "operationId": "get_diagnostics_api_diagnostics_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Get Diagnostics Api Diagnostics Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/changelog": {
       "get": {
         "summary": "Get Changelog Route",
@@ -1207,6 +1228,254 @@
         }
       }
     },
+    "/api/outcomes/{outcome_id}/history": {
+      "get": {
+        "summary": "Get Outcome History",
+        "description": "Return an outcome's accepted score snapshots, oldest first.\n\nSnapshots carry the score and its sample/method companions. The signed delta\nis served separately at ``/outcomes/{id}/delta`` so this list shape stays\nidentical across the local and MCP backends.",
+        "operationId": "get_outcome_history_api_outcomes__outcome_id__history_get",
+        "parameters": [
+          {
+            "name": "outcome_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Outcome Id"
+            }
+          },
+          {
+            "name": "mcp_url",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Mcp Url"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Get Outcome History Api Outcomes  Outcome Id  History Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/outcomes/{outcome_id}/delta": {
+      "get": {
+        "summary": "Get Outcome Delta",
+        "description": "Return the signed change across an outcome's snapshots (B6.1).\n\n``since`` chooses the baseline (the last snapshot at or before it; the\nearliest when omitted). ``direction`` is the product's sign rule, so a\nconsumer never invents an \"improvement\" from a bare number.",
+        "operationId": "get_outcome_delta_api_outcomes__outcome_id__delta_get",
+        "parameters": [
+          {
+            "name": "outcome_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Outcome Id"
+            }
+          },
+          {
+            "name": "since",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Since"
+            }
+          },
+          {
+            "name": "mcp_url",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Mcp Url"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Get Outcome Delta Api Outcomes  Outcome Id  Delta Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/outcomes/{outcome_id}/interval": {
+      "get": {
+        "summary": "Get Outcome Interval",
+        "description": "Return an outcome's stored band and its provenance (B3.2).\n\n``band: null`` means the score carries no band at all \u2014 an estimate or an\nunscored outcome \u2014 which is a distinct state from a zero-width band. A\nstored band reports the sample, seed, confidence level, method and\ncomputed-at it was recorded with, plus whether a later snapshot moved the\nscore it came from, so a consumer never presents a stale band as current.",
+        "operationId": "get_outcome_interval_api_outcomes__outcome_id__interval_get",
+        "parameters": [
+          {
+            "name": "outcome_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Outcome Id"
+            }
+          },
+          {
+            "name": "mcp_url",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Mcp Url"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Get Outcome Interval Api Outcomes  Outcome Id  Interval Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/outcomes/{outcome_id}/inputs": {
+      "get": {
+        "summary": "Get Outcome Inputs",
+        "description": "Return the paired survey inputs a stored band was reproduced from (B3.1).\n\n``inputs: null`` means no input set is retained \u2014 a legacy or aggregate-only\noutcome \u2014 which is a distinct state from a retained set and never an empty\nlist that would read as zero responses. Each input carries only an opaque\nper-pair token and the two numbers, so the read shape is de-identified.",
+        "operationId": "get_outcome_inputs_api_outcomes__outcome_id__inputs_get",
+        "parameters": [
+          {
+            "name": "outcome_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Outcome Id"
+            }
+          },
+          {
+            "name": "mcp_url",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Mcp Url"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Get Outcome Inputs Api Outcomes  Outcome Id  Inputs Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/signals": {
       "get": {
         "summary": "Get Signals",
@@ -1845,6 +2114,507 @@
                   "type": "object",
                   "additionalProperties": true,
                   "title": "Response Delete Customer Outcome Api Customer Outcomes  Outcome Id  Delete"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/alternatives": {
+      "get": {
+        "summary": "Get Alternatives",
+        "operationId": "get_alternatives_api_alternatives_get",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Job Id"
+            }
+          },
+          {
+            "name": "mcp_url",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Mcp Url"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Get Alternatives Api Alternatives Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Post Alternative",
+        "operationId": "post_alternative_api_alternatives_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddAlternativeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Post Alternative Api Alternatives Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/alternatives/{alternative_id}": {
+      "get": {
+        "summary": "Get Alternative",
+        "operationId": "get_alternative_api_alternatives__alternative_id__get",
+        "parameters": [
+          {
+            "name": "alternative_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Alternative Id"
+            }
+          },
+          {
+            "name": "mcp_url",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Mcp Url"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Get Alternative Api Alternatives  Alternative Id  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete Alternative",
+        "operationId": "delete_alternative_api_alternatives__alternative_id__delete",
+        "parameters": [
+          {
+            "name": "alternative_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Alternative Id"
+            }
+          },
+          {
+            "name": "mcp_url",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Mcp Url"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Delete Alternative Api Alternatives  Alternative Id  Delete"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/outcomes/{outcome_id}/alternatives": {
+      "post": {
+        "summary": "Link Alternative",
+        "operationId": "link_alternative_api_outcomes__outcome_id__alternatives_post",
+        "parameters": [
+          {
+            "name": "outcome_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Outcome Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LinkAlternativeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Link Alternative Api Outcomes  Outcome Id  Alternatives Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "Get Outcome Alternatives",
+        "operationId": "get_outcome_alternatives_api_outcomes__outcome_id__alternatives_get",
+        "parameters": [
+          {
+            "name": "outcome_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Outcome Id"
+            }
+          },
+          {
+            "name": "mcp_url",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Mcp Url"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Get Outcome Alternatives Api Outcomes  Outcome Id  Alternatives Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/outcomes/{outcome_id}/alternatives/{alternative_id}": {
+      "delete": {
+        "summary": "Unlink Alternative",
+        "operationId": "unlink_alternative_api_outcomes__outcome_id__alternatives__alternative_id__delete",
+        "parameters": [
+          {
+            "name": "outcome_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Outcome Id"
+            }
+          },
+          {
+            "name": "alternative_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Alternative Id"
+            }
+          },
+          {
+            "name": "mcp_url",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Mcp Url"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Unlink Alternative Api Outcomes  Outcome Id  Alternatives  Alternative Id  Delete"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/outcomes/{outcome_id}/existing-solution": {
+      "get": {
+        "summary": "Get Has Existing Solution",
+        "operationId": "get_has_existing_solution_api_outcomes__outcome_id__existing_solution_get",
+        "parameters": [
+          {
+            "name": "outcome_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Outcome Id"
+            }
+          },
+          {
+            "name": "mcp_url",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Mcp Url"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Get Has Existing Solution Api Outcomes  Outcome Id  Existing Solution Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/alternative-links": {
+      "get": {
+        "summary": "Get Alternative Links",
+        "description": "Every recorded alternative for one Job, with its outcome and link (M2-07.2).\n\nOne read for the whole Job so the landscape facet can compute a solution\nstate per outcome without a request per row.",
+        "operationId": "get_alternative_links_api_alternative_links_get",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Job Id"
+            }
+          },
+          {
+            "name": "mcp_url",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Mcp Url"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Get Alternative Links Api Alternative Links Get"
                 }
               }
             }
@@ -2863,6 +3633,50 @@
   },
   "components": {
     "schemas": {
+      "AddAlternativeRequest": {
+        "properties": {
+          "mcp_url": {
+            "type": "string",
+            "title": "Mcp Url",
+            "default": ""
+          },
+          "job_id": {
+            "type": "string",
+            "title": "Job Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "source_kind": {
+            "type": "string",
+            "title": "Source Kind",
+            "default": "manual"
+          }
+        },
+        "type": "object",
+        "required": [
+          "job_id",
+          "name",
+          "kind"
+        ],
+        "title": "AddAlternativeRequest"
+      },
       "AddConnectorRequest": {
         "properties": {
           "name": {
@@ -3065,6 +3879,52 @@
             "maximum": 10.0,
             "minimum": 1.0,
             "title": "Satisfaction"
+          },
+          "importance_n": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Importance N"
+          },
+          "satisfaction_n": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Satisfaction N"
+          },
+          "score_method": {
+            "type": "string",
+            "enum": [
+              "estimate",
+              "survey",
+              "import"
+            ],
+            "title": "Score Method",
+            "default": "estimate"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
           }
         },
         "type": "object",
@@ -3470,6 +4330,72 @@
         ],
         "title": "ChatRequest"
       },
+      "ClaimCitationOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "default": ""
+          },
+          "source_name": {
+            "type": "string",
+            "title": "Source Name",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "title": "ClaimCitationOut",
+        "description": "The record label a claim carries, snapshotted when the turn was stored."
+      },
+      "ClaimOut": {
+        "properties": {
+          "index": {
+            "type": "integer",
+            "title": "Index"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "evidence": {
+            "items": {
+              "$ref": "#/components/schemas/ClaimCitationOut"
+            },
+            "type": "array",
+            "title": "Evidence"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "index",
+          "text",
+          "status"
+        ],
+        "title": "ClaimOut",
+        "description": "One declarative sentence and what stands behind it."
+      },
       "ConnectorListItem": {
         "properties": {
           "name": {
@@ -3763,6 +4689,51 @@
         },
         "type": "object",
         "title": "LatestConversationResponse"
+      },
+      "LinkAlternativeRequest": {
+        "properties": {
+          "mcp_url": {
+            "type": "string",
+            "title": "Mcp Url",
+            "default": ""
+          },
+          "alternative_id": {
+            "type": "string",
+            "title": "Alternative Id"
+          },
+          "adequacy": {
+            "type": "number",
+            "title": "Adequacy"
+          },
+          "usage_n": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Usage N"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "alternative_id",
+          "adequacy"
+        ],
+        "title": "LinkAlternativeRequest"
       },
       "LlmHealthRequest": {
         "properties": {
@@ -4516,6 +5487,13 @@
               }
             ],
             "title": "Parent Id"
+          },
+          "claims": {
+            "items": {
+              "$ref": "#/components/schemas/ClaimOut"
+            },
+            "type": "array",
+            "title": "Claims"
           }
         },
         "type": "object",
@@ -4556,6 +5534,13 @@
           "created_at": {
             "type": "string",
             "title": "Created At"
+          },
+          "claims": {
+            "items": {
+              "$ref": "#/components/schemas/ClaimOut"
+            },
+            "type": "array",
+            "title": "Claims"
           }
         },
         "type": "object",
@@ -4727,6 +5712,58 @@
               }
             ],
             "title": "Satisfaction"
+          },
+          "importance_n": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Importance N"
+          },
+          "satisfaction_n": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Satisfaction N"
+          },
+          "score_method": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "estimate",
+                  "survey",
+                  "import"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score Method"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
           },
           "mcp_url": {
             "type": "string",

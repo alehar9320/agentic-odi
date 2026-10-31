@@ -35,6 +35,10 @@ DEFAULT_BACKEND = "local"
 DEFAULT_MCP_URL = "http://localhost:8000/mcp"
 
 _VALUE_RANGE_ERROR = "importance and satisfaction must be between 1.0 and 10.0"
+_SAMPLE_METHOD_ERROR = (
+    "score_method 'estimate' cannot carry a sample count above 1; "
+    "use 'survey' or 'import' when people were asked"
+)
 
 _CUSTOMER_VALUE_FIELDS = (
     "direction",
@@ -101,6 +105,25 @@ def _validation_message(exc: Exception) -> str:
             return str(exc)
         return f"Invalid customer outcome: {first.get('msg', exc)}"
     return f"Invalid customer outcome: {exc}"
+
+
+def _serialize_plan(plan: Any) -> dict[str, Any]:
+    """Render a ``SurveyPlan`` as the JSON shape the CLI and MCP share (B2.2)."""
+    counts = {"accepted": 0, "unmatched": 0, "ambiguous": 0, "invalid": 0}
+    rows: list[dict[str, Any]] = []
+    for row in plan.rows:
+        counts[row.status] += 1
+        rows.append(
+            {
+                "line": row.line,
+                "status": row.status,
+                "reason": row.reason,
+                "outcome_ref": row.outcome_ref,
+                "suggestion": row.suggestion,
+            }
+        )
+    counts["total"] = len(plan.rows)
+    return {"rows": rows, "counts": counts, "writable": plan.writable}
 
 
 class Backend(ABC):
@@ -240,6 +263,7 @@ class LocalBackend(Backend):
     def _add_outcome(self, args: dict[str, Any]) -> dict[str, Any]:
         from agentic_odi_core import (
             JobNotFoundError,
+            SnapshotNoteError,
             StepNotFoundError,
             ValueOutOfRangeError,
             job_not_found,
@@ -247,6 +271,8 @@ class LocalBackend(Backend):
         )
 
         step_id = args.get("step_id")
+        from pydantic import ValidationError
+
         try:
             outcome = self.service.add_outcome(
                 job_id=args["job_id"],
@@ -254,13 +280,27 @@ class LocalBackend(Backend):
                 importance=float(args["importance"]),
                 satisfaction=float(args["satisfaction"]),
                 step_id=step_id,
+                importance_n=args.get("importance_n"),
+                satisfaction_n=args.get("satisfaction_n"),
+                score_method=args.get("score_method", "estimate"),
+                note=args.get("note"),
             )
         except JobNotFoundError:
             raise BackendError(job_not_found(args["job_id"])) from None
         except StepNotFoundError:
             raise BackendError(step_not_found(step_id)) from None
+        except SnapshotNoteError as exc:
+            # Before ValueOutOfRangeError: a bad note is not a bad score, and the
+            # fixed range message would misreport it.
+            raise BackendError(str(exc)) from exc
         except ValueOutOfRangeError as exc:
-            raise BackendError(_VALUE_RANGE_ERROR) from exc
+            raise BackendError(
+                _SAMPLE_METHOD_ERROR if "estimate" in str(exc) else _VALUE_RANGE_ERROR
+            ) from exc
+        except ValidationError as exc:
+            raise BackendError(
+                _SAMPLE_METHOD_ERROR if "estimate" in str(exc) else str(exc)
+            ) from exc
         return outcome.model_dump()
 
     def _get_outcomes(self, args: dict[str, Any]) -> list[dict[str, Any]]:
@@ -286,20 +326,164 @@ class LocalBackend(Backend):
             raise BackendError(outcome_not_found(outcome_id))
         return outcome.model_dump()
 
+    def _get_outcome_history(self, args: dict[str, Any]) -> list[dict[str, Any]]:
+        from agentic_odi_core import OutcomeNotFoundError, outcome_not_found
+
+        try:
+            snapshots = self.service.get_score_history(args["outcome_id"])
+        except OutcomeNotFoundError:
+            raise BackendError(outcome_not_found(args["outcome_id"])) from None
+        return [snapshot.model_dump() for snapshot in snapshots]
+
+    def _get_outcome_delta(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import OutcomeNotFoundError, outcome_not_found
+        from agentic_odi_core.errors import ValidationError
+
+        try:
+            delta = self.service.get_outcome_delta(args["outcome_id"], args.get("since"))
+        except OutcomeNotFoundError:
+            raise BackendError(outcome_not_found(args["outcome_id"])) from None
+        except ValidationError as exc:
+            raise BackendError(str(exc)) from None
+        return {
+            "outcome_id": delta.outcome_id,
+            "importance": delta.importance,
+            "satisfaction": delta.satisfaction,
+            "opportunity": delta.opportunity,
+            "direction": delta.direction,
+        }
+
+    def _get_outcome_interval(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import OutcomeNotFoundError, outcome_not_found
+
+        outcome_id = args["outcome_id"]
+        try:
+            provenance = self.service.get_outcome_interval(outcome_id)
+        except OutcomeNotFoundError:
+            raise BackendError(outcome_not_found(outcome_id)) from None
+        if provenance is None:
+            return {"outcome_id": outcome_id, "band": None}
+        return {
+            "outcome_id": provenance.outcome_id,
+            "band": {
+                "low": provenance.low,
+                "high": provenance.high,
+                "n": provenance.n,
+                "confidence_level": provenance.confidence_level,
+                "seed": provenance.seed,
+                "method": provenance.method,
+                "computed_at": provenance.computed_at,
+                "stale": provenance.stale,
+            },
+        }
+
+    def _get_outcome_inputs(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import OutcomeNotFoundError, outcome_not_found
+
+        outcome_id = args["outcome_id"]
+        try:
+            inputs = self.service.get_outcome_inputs(outcome_id)
+        except OutcomeNotFoundError:
+            raise BackendError(outcome_not_found(outcome_id)) from None
+        if inputs is None:
+            return {"outcome_id": outcome_id, "inputs": None}
+        return {
+            "outcome_id": outcome_id,
+            "inputs": [
+                {
+                    "respondent_id": item.respondent_id,
+                    "importance": item.importance,
+                    "satisfaction": item.satisfaction,
+                }
+                for item in inputs
+            ],
+        }
+
+    def _import_survey(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import OutcomeNotFoundError, outcome_not_found
+        from agentic_odi_core.errors import ValidationError
+
+        try:
+            updated = self.service.import_survey(args["rows"])
+        except OutcomeNotFoundError as exc:
+            raise BackendError(outcome_not_found(exc.resource_id)) from None
+        except ValidationError as exc:
+            raise BackendError(str(exc)) from None
+        return {outcome_id: outcome.model_dump() for outcome_id, outcome in updated.items()}
+
+    def _get_survey_import_plan(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core.errors import ValidationError
+
+        try:
+            plan = self.service.get_survey_import_plan(
+                args["rows"], confirmed_matches=args.get("confirmed_matches")
+            )
+        except ValidationError as exc:
+            raise BackendError(str(exc)) from None
+        return _serialize_plan(plan)
+
+    def _commit_survey_import(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import OutcomeNotFoundError, outcome_not_found
+        from agentic_odi_core.errors import ValidationError
+
+        try:
+            updated = self.service.commit_survey_import(
+                args["rows"], confirmed_matches=args.get("confirmed_matches")
+            )
+        except OutcomeNotFoundError as exc:
+            raise BackendError(outcome_not_found(exc.resource_id)) from None
+        except ValidationError as exc:
+            raise BackendError(str(exc)) from None
+        return {outcome_id: outcome.model_dump() for outcome_id, outcome in updated.items()}
+
+    def _rank_outcomes(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import JobNotFoundError, job_not_found
+
+        try:
+            return self.service.rank_outcomes_for_job(args["job_id"])
+        except JobNotFoundError:
+            raise BackendError(job_not_found(args["job_id"])) from None
+
     def _update_outcome(self, args: dict[str, Any]) -> dict[str, Any]:
-        from agentic_odi_core import OutcomeNotFoundError, ValueOutOfRangeError, outcome_not_found
+        from agentic_odi_core import (
+            OutcomeNotFoundError,
+            SnapshotNoteError,
+            ValueOutOfRangeError,
+            outcome_not_found,
+        )
+        from pydantic import ValidationError
 
         updates: dict[str, Any] = {
             key: args[key]
-            for key in ("statement", "importance", "satisfaction", "step_id")
+            for key in (
+                "statement",
+                "importance",
+                "satisfaction",
+                "step_id",
+                "importance_n",
+                "satisfaction_n",
+                "score_method",
+            )
             if key in args
         }
         try:
-            outcome = self.service.update_outcome(args["outcome_id"], updates)
+            outcome = self.service.update_outcome(
+                args["outcome_id"], updates, note=args.get("note")
+            )
         except OutcomeNotFoundError:
             raise BackendError(outcome_not_found(args["outcome_id"])) from None
+        except SnapshotNoteError as exc:
+            # Before ValueOutOfRangeError: a bad note is not a bad score, and the
+            # fixed range message would misreport it.
+            raise BackendError(str(exc)) from exc
         except ValueOutOfRangeError as exc:
-            raise BackendError(_VALUE_RANGE_ERROR) from exc
+            raise BackendError(
+                _SAMPLE_METHOD_ERROR if "estimate" in str(exc) else _VALUE_RANGE_ERROR
+            ) from exc
+        except ValidationError as exc:
+            raise BackendError(
+                _SAMPLE_METHOD_ERROR if "estimate" in str(exc) else str(exc)
+            ) from exc
         return outcome.model_dump()
 
     def _delete_outcome(self, args: dict[str, Any]) -> str:
@@ -396,6 +580,126 @@ class LocalBackend(Backend):
         except CustomerOutcomeNotFoundError:
             raise BackendError(customer_outcome_not_found(outcome_id)) from None
         return outcome_id
+
+    def _add_alternative(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import JobNotFoundError, job_not_found
+        from pydantic import ValidationError
+
+        try:
+            alternative = self.service.add_alternative(
+                job_id=args["job_id"],
+                name=args["name"],
+                kind=args["kind"],
+                notes=args.get("notes"),
+                source_kind=args.get("source_kind", "manual"),
+            )
+        except JobNotFoundError:
+            raise BackendError(job_not_found(args["job_id"])) from None
+        except ValidationError as exc:
+            raise BackendError(str(exc)) from None
+        return alternative.model_dump()
+
+    def _get_alternative(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import AlternativeNotFoundError
+
+        alternative_id = args["alternative_id"]
+        try:
+            alternative = self.service.get_alternative(alternative_id)
+        except AlternativeNotFoundError:
+            raise BackendError(f"alternative not found: {alternative_id}") from None
+        return alternative.model_dump()
+
+    def _list_alternatives(self, args: dict[str, Any]) -> list[dict[str, Any]]:
+        kwargs: dict[str, Any] = {"job_id": args.get("job_id")}
+        if "limit" in args:
+            kwargs["limit"] = args["limit"]
+        if "offset" in args:
+            kwargs["offset"] = args["offset"]
+        alternatives = self.service.list_alternatives(**kwargs)
+        return [alternative.model_dump() for alternative in alternatives]
+
+    def _delete_alternative(self, args: dict[str, Any]) -> str:
+        from agentic_odi_core import AlternativeNotFoundError
+
+        alternative_id = args["alternative_id"]
+        try:
+            self.service.delete_alternative(alternative_id)
+        except AlternativeNotFoundError:
+            raise BackendError(f"alternative not found: {alternative_id}") from None
+        return alternative_id
+
+    def _link_alternative(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import (
+            AlternativeNotFoundError,
+            OutcomeNotFoundError,
+            outcome_not_found,
+        )
+        from pydantic import ValidationError
+
+        try:
+            link = self.service.link_alternative(
+                outcome_id=args["outcome_id"],
+                alternative_id=args["alternative_id"],
+                adequacy=args["adequacy"],
+                usage_n=args.get("usage_n"),
+                note=args.get("note"),
+            )
+        except OutcomeNotFoundError:
+            raise BackendError(outcome_not_found(args["outcome_id"])) from None
+        except AlternativeNotFoundError:
+            raise BackendError(f"alternative not found: {args['alternative_id']}") from None
+        except ValidationError as exc:
+            raise BackendError(str(exc)) from None
+        return link.model_dump()
+
+    def _unlink_alternative(self, args: dict[str, Any]) -> dict[str, Any]:
+        from pydantic import ValidationError
+
+        try:
+            self.service.unlink_alternative(args["outcome_id"], args["alternative_id"])
+        except ValidationError as exc:
+            raise BackendError(str(exc)) from None
+        return {"outcome_id": args["outcome_id"], "alternative_id": args["alternative_id"]}
+
+    def _get_outcome_alternatives(self, args: dict[str, Any]) -> list[dict[str, Any]]:
+        from agentic_odi_core import OutcomeNotFoundError, outcome_not_found
+
+        outcome_id = args["outcome_id"]
+        try:
+            pairs = self.service.outcome_alternatives(outcome_id)
+        except OutcomeNotFoundError:
+            raise BackendError(outcome_not_found(outcome_id)) from None
+        return [
+            {"alternative": alternative.model_dump(), "link": link.model_dump()}
+            for alternative, link in pairs
+        ]
+
+    def _get_has_existing_solution(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import OutcomeNotFoundError, outcome_not_found
+
+        outcome_id = args["outcome_id"]
+        try:
+            verdict = self.service.has_existing_solution(outcome_id)
+        except OutcomeNotFoundError:
+            raise BackendError(outcome_not_found(outcome_id)) from None
+        return {"outcome_id": outcome_id, "existing_solution": verdict}
+
+    def _list_alternative_links(self, args: dict[str, Any]) -> list[dict[str, Any]]:
+        from agentic_odi_core import JobNotFoundError, job_not_found
+
+        job_id = args["job_id"]
+        try:
+            triples = self.service.job_outcome_alternatives(job_id)
+        except JobNotFoundError:
+            raise BackendError(job_not_found(job_id)) from None
+        return [
+            {
+                "outcome_id": outcome_id,
+                "alternative": alternative.model_dump(),
+                "link": link.model_dump(),
+            }
+            for outcome_id, alternative, link in triples
+        ]
 
     def _add_evidence(self, args: dict[str, Any]) -> dict[str, Any]:
         from agentic_odi_core import (
@@ -687,6 +991,14 @@ _LOCAL_HANDLERS = {
     "add_outcome": LocalBackend._add_outcome,
     "get_outcomes": LocalBackend._get_outcomes,
     "get_outcome": LocalBackend._get_outcome,
+    "get_outcome_history": LocalBackend._get_outcome_history,
+    "get_outcome_delta": LocalBackend._get_outcome_delta,
+    "get_outcome_interval": LocalBackend._get_outcome_interval,
+    "get_outcome_inputs": LocalBackend._get_outcome_inputs,
+    "import_survey": LocalBackend._import_survey,
+    "get_survey_import_plan": LocalBackend._get_survey_import_plan,
+    "commit_survey_import": LocalBackend._commit_survey_import,
+    "rank_outcomes": LocalBackend._rank_outcomes,
     "update_outcome": LocalBackend._update_outcome,
     "delete_outcome": LocalBackend._delete_outcome,
     "add_customer_outcome": LocalBackend._add_customer_outcome,
@@ -694,6 +1006,15 @@ _LOCAL_HANDLERS = {
     "list_customer_outcomes": LocalBackend._list_customer_outcomes,
     "update_customer_outcome": LocalBackend._update_customer_outcome,
     "delete_customer_outcome": LocalBackend._delete_customer_outcome,
+    "add_alternative": LocalBackend._add_alternative,
+    "get_alternative": LocalBackend._get_alternative,
+    "list_alternatives": LocalBackend._list_alternatives,
+    "delete_alternative": LocalBackend._delete_alternative,
+    "link_alternative": LocalBackend._link_alternative,
+    "unlink_alternative": LocalBackend._unlink_alternative,
+    "get_outcome_alternatives": LocalBackend._get_outcome_alternatives,
+    "get_has_existing_solution": LocalBackend._get_has_existing_solution,
+    "list_alternative_links": LocalBackend._list_alternative_links,
     "add_evidence": LocalBackend._add_evidence,
     "get_evidence": LocalBackend._get_evidence,
     "list_evidence": LocalBackend._list_evidence,
@@ -780,6 +1101,7 @@ _LIST_TOOLS = frozenset(
         "get_jobs",
         "get_job_map",
         "get_outcomes",
+        "get_outcome_history",
         "list_customer_outcomes",
         "list_evidence",
         "list_signals",
