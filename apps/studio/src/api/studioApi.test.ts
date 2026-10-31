@@ -22,6 +22,7 @@ import {
   fetchConfig,
   fetchConnectorCatalog,
   fetchConnectors,
+  health,
   healthLlm,
   healthMcp,
   streamChat,
@@ -89,6 +90,38 @@ describe("health probes", () => {
     await expect(
       healthLlm({ base_url: "u", api_key: "k", model: "m" }),
     ).resolves.toEqual({ healthy: true, message: "ok" });
+  });
+
+  it("reads the one health answer and passes the configuration as query", async () => {
+    const report = {
+      status: "degraded",
+      request_id: "req-1",
+      checks: {
+        sidecar: { ok: true, detail: "the sidecar is serving requests", latency_ms: 0 },
+        store: { ok: true, detail: "the store answers (:memory:)", latency_ms: 1 },
+        mcp: { ok: false, detail: "http://mcp/mcp — not reachable", latency_ms: 2 },
+        llm: { ok: false, detail: "LLM server offline (Local Studio Mode enabled)", latency_ms: 3 },
+      },
+    };
+    mockJson(report);
+
+    await expect(
+      health({ mcp_url: "http://mcp/mcp", base_url: "http://llm/v1", model: "m" }),
+    ).resolves.toEqual(report);
+
+    const called = String((fetch as unknown as { mock: { calls: unknown[][] } }).mock.calls[0][0]);
+    expect(called).toContain("/api/health?");
+    expect(called).toContain("mcp_url=http%3A%2F%2Fmcp%2Fmcp");
+    expect(called).toContain("base_url=http%3A%2F%2Fllm%2Fv1");
+    expect(called).toContain("model=m");
+  });
+
+  it("asks the bare health route when no configuration is given", async () => {
+    mockJson({ status: "ok", request_id: "", checks: {} });
+
+    await health();
+
+    expect(fetch).toHaveBeenCalledWith("/api/health", expect.objectContaining({ headers: expect.any(Object) }));
   });
 });
 

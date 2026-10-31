@@ -390,6 +390,26 @@ class CapabilitiesResponse(BaseModel):
     capabilities: list[CapabilityItem]
 
 
+class HealthCheck(BaseModel):
+    """One component's state, in the shape every surface reads."""
+
+    ok: bool
+    detail: str
+    latency_ms: int = 0
+
+
+class HealthReport(BaseModel):
+    """The single health answer: sidecar, store, MCP, and model.
+
+    ``status`` is ``ok``, ``degraded``, or ``down``; each check names what it
+    found so a person can act on it instead of guessing from a port.
+    """
+
+    status: Literal["ok", "degraded", "down"]
+    checks: dict[str, HealthCheck]
+    request_id: str = ""
+
+
 class ScheduleWorkRequest(BaseModel):
     mcp_url: str = ""
     name: str

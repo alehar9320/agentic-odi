@@ -68,6 +68,9 @@ Tests live next to their package (`packages/*/tests`, `apps/*/tests`). `testpath
 - `test_studio_errors.py` — failures surface as considered errors, not log noise.
 - `test_studio_observability.py` — the per-turn structured log line and its redaction.
 - `test_studio_probes.py` — endpoint probing and LLM health classification.
+- `test_studio_health.py` — the one health answer: the four checks, the status
+  rule, and that a machine with no model and no MCP server reports `degraded`
+  rather than claiming everything works.
 - `test_studio_ui_spec.py` — catalog-driven UI validation.
 - `test_studio_router.py` — passthrough responses from the Studio router.
 - `test_app_spa.py` — static SPA fallback and the local server entrypoint.
@@ -214,6 +217,12 @@ them: `chromium` for the local backend (the product default) and
 
 Locators bind to what a user perceives — a role, a label, or visible text —
 never to a `data-testid`, of which the application has none.
+
+`first-light.spec.ts` is the Pillar 0 proof: on a cold start with no model and
+no MCP server, it walks the seven promises of M0 — reach the Studio, get an
+answer to one sentence, see an empty canvas that invents nothing, record a
+scored outcome, reopen and find it, read one accurate health line, and do all
+of it in one run.
 
 CI runs the suite in the `e2e` job. It is deliberately non-blocking: set the
 repository variable `AGENTIC_ODI_E2E` to `false` to skip it, and the

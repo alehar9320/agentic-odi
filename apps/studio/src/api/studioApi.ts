@@ -14,6 +14,7 @@ import type {
   Conversation,
   ConversationTree,
   CreateJobPayload,
+  HealthReport,
   Job,
   LatestConversation,
   LlmHealth,
@@ -280,6 +281,29 @@ export async function fetchCanvas(mcpUrl: string): Promise<CanvasData> {
 
 export function healthMcp(mcpUrl: string): Promise<McpHealth> {
   return postJson<McpHealth>("/api/health/mcp", { mcp_url: mcpUrl });
+}
+
+/**
+ * The one health answer. Optional overrides let Settings check a configuration
+ * that has not been saved yet, exactly as the wizard does.
+ */
+export function health(params: {
+  mcp_url?: string;
+  base_url?: string;
+  model?: string;
+} = {}): Promise<HealthReport> {
+  const query = new URLSearchParams();
+  if (params.mcp_url) {
+    query.set("mcp_url", params.mcp_url);
+  }
+  if (params.base_url) {
+    query.set("base_url", params.base_url);
+  }
+  if (params.model) {
+    query.set("model", params.model);
+  }
+  const suffix = query.toString() ? `?${query.toString()}` : "";
+  return getJson<HealthReport>(`/api/health${suffix}`);
 }
 
 export function healthLlm(config: {

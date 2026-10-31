@@ -84,6 +84,29 @@ function route(
       defaults: { base_url: "http://llm", api_key: "k", model_name: "m", mcp_url: "http://mcp" },
     });
   }
+  if (url.startsWith("/api/health/mcp")) {
+    return json({ reachable: true });
+  }
+  if (url.startsWith("/api/health/llm")) {
+    llmHealthFetches += 1;
+    return json({ healthy: true, message: "ok" });
+  }
+  if (url.startsWith("/api/health")) {
+    if (configFails) {
+      throw new TypeError("fetch failed");
+    }
+    llmHealthFetches += 1;
+    return json({
+      status: "degraded",
+      request_id: "req-1",
+      checks: {
+        sidecar: { ok: true, detail: "the sidecar is serving requests", latency_ms: 0 },
+        store: { ok: true, detail: "the store answers (:memory:)", latency_ms: 1 },
+        mcp: { ok: true, detail: "http://mcp", latency_ms: 2 },
+        llm: { ok: true, detail: "LLM backend is reachable.", latency_ms: 3 },
+      },
+    });
+  }
   if (url.startsWith("/api/canvas")) {
     if (canvasFails) {
       return new Response(JSON.stringify({ error: { code: "mcp_unreachable", message: "The MCP server is unreachable.", retryable: true } }), {

@@ -28,6 +28,24 @@ it is merged; the link is the proof.
 - [x] **`odi data export`** — back the ODI state up as JSON ([PR #293](https://github.com/alehar9320/agentic-odi/pull/293)).
 - [x] **`odi connectors list-presets`** — discover and copy a preset from the terminal ([PR #290](https://github.com/alehar9320/agentic-odi/pull/290)).
 
+## Pillar 0 · Arrive — a stranger gets value in five minutes
+
+The first horizon. M0 is complete only when a person who has never seen this
+repository, on a machine with no MCP server and no model, can reach the Studio,
+get an answer, see an empty canvas that teaches the next step, produce a scored
+outcome, come back and find it, read one accurate health line, and have all of
+that proved by an automated test on every pull request. Each increment below is
+one issue in the pillar; an entry moves to "Shipped" only when its pull request
+is merged.
+
+- [ ] **One health answer, in the shape everything else uses** — `GET /api/health`
+  reports the sidecar, the store, the MCP server, and the model as four checks
+  with a detail and a latency, the legacy `/health` returns the same report, and
+  `/status` reads it, so no surface guesses health from an open port.
+- [ ] **A stranger's path is an automated test** — the seven promises of M0 are
+  driven end to end against the real sidecar on a cold start, with no model and
+  no MCP server, on every pull request.
+
 ## In flight
 
 Open pull requests that change a capability this milestone cares about. Each

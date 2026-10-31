@@ -52,9 +52,8 @@ export function ChatStage() {
     setupOpen,
     canvas,
     brief,
-    settings,
-    mcpReachable,
     llmHealth,
+    healthReport,
   } = useStudio();
 
   const empty = messages.length === 0;
@@ -109,17 +108,14 @@ export function ChatStage() {
         );
         return;
       case "status":
+        // One line, from the one health answer: the model, the store, and the
+        // MCP server, each saying what it found rather than a guess from a port.
         pushNotice(
           [
             "**Studio status**",
-            `- Model: ${settings.model_name} at ${settings.base_url} — ${
-              llmHealth.healthy === null
-                ? "checking"
-                : llmHealth.healthy
-                  ? "reachable"
-                  : "offline"
-            }`,
-            `- MCP: ${mcpReachable ? "connected" : "offline"} (${settings.mcp_url})`,
+            `- Model: ${healthReport?.checks.llm?.detail ?? "not checked yet"}`,
+            `- Store: ${healthReport?.checks.store?.detail ?? "not checked yet"}`,
+            `- MCP: ${healthReport?.checks.mcp?.detail ?? "not checked yet"}`,
             `- Context: ${
               brief ? `${brief.product_name || "named job"} — ${brief.job_statement}` : "not set"
             }`,

@@ -40,6 +40,7 @@ import {
   fetchSignals,
   fetchStrategy,
   fetchUnreadSignalCount,
+  health,
   healthLlm,
   healthMcp,
   markSignalRead as apiMarkSignalRead,
@@ -73,6 +74,7 @@ import type {
   ConnectorPreset,
   ConnectorSuggestion,
   CustomizeTarget,
+  HealthReport,
   MarketplaceListing,
   MarketplaceSearch,
   Observation,
@@ -292,6 +294,8 @@ export interface StudioContextValue {
   refreshModels: (config?: { base_url: string; api_key: string }) => Promise<void>;
   mcpReachable: boolean;
   sidecarReachable: boolean | null;
+  /** The one health answer (sidecar, store, MCP, model), or null until probed. */
+  healthReport: HealthReport | null;
   /** Whether the user has dismissed this session's sidecar-down notice. */
   dismissedSidecarNotice: boolean;
   /** Probe again now, e.g. after the user started the sidecar. */
@@ -545,6 +549,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [modelsMessage, setModelsMessage] = useState<string | null>(null);
   const [mcpReachable, setMcpReachable] = useState(false);
   const [sidecarReachable, setSidecarReachable] = useState<boolean | null>(null);
+  const [healthReport, setHealthReport] = useState<HealthReport | null>(null);
   const [dismissedSidecarNotice, setDismissedSidecarNotice] = useState<boolean>(loadSidecarNoticeDismissed);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
@@ -914,23 +919,29 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const checkConnections = useCallback(
     async (override: Partial<StudioConfig> = {}): Promise<ConnectionReport> => {
       const target = { ...settings, ...override };
-      const [sidecar, mcp, llm] = await Promise.all([
-        fetchConfig()
-          .then(() => true)
-          .catch(() => false),
-        healthMcp(target.mcp_url)
-          .then((result) => result.reachable)
-          .catch(() => false),
-        healthLlm({
-          base_url: target.base_url,
-          api_key: target.api_key,
-          model: target.model_name,
-        }).catch((error: unknown) => ({
-          healthy: false,
-          message: (error as Error).message || "The model did not answer.",
-        })),
-      ]);
+      // One health answer, not three probes: the sidecar owns the vocabulary
+      // for what is working, and the SPA must not re-derive it from a port.
+      const report = await health({
+        mcp_url: target.mcp_url,
+        base_url: target.base_url,
+        model: target.model_name,
+      }).catch(() => null);
 
+      if (report === null) {
+        setHealthReport(null);
+        setSidecarReachable(false);
+        setMcpReachable(false);
+        setLlmHealth({ healthy: false, message: "The studio sidecar did not answer." });
+        return { sidecarReachable: false, mcpReachable: false, llmHealthy: false };
+      }
+
+      const sidecar = report.checks.sidecar?.ok ?? false;
+      const mcp = report.checks.mcp?.ok ?? false;
+      const llm = {
+        healthy: report.checks.llm?.ok ?? false,
+        message: report.checks.llm?.detail ?? "The model did not answer.",
+      };
+      setHealthReport(report);
       setSidecarReachable(sidecar);
       setMcpReachable(mcp);
       setLlmHealth(llm);
@@ -1943,6 +1954,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       refreshModels,
       mcpReachable,
       sidecarReachable,
+      healthReport,
       dismissedSidecarNotice,
       dismissSidecarNotice,
       recheckConnections,
@@ -2055,6 +2067,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       refreshModels,
       mcpReachable,
       sidecarReachable,
+      healthReport,
       dismissedSidecarNotice,
       dismissSidecarNotice,
       recheckConnections,
