@@ -392,8 +392,8 @@ The copilot does not only talk. When a surface carries the evidence better than 
 paragraph, the agent renders one **inline in the conversation**: a scored
 outcome, a ranked opportunity board, a before/after simulation of a bet, a
 customer quote with its lineage, the eight-stage job map, an opportunity thesis,
-a decision record, or the candidate review queue with each proposal beside the
-sentence it came from.
+a decision record, a scoring pass, or the candidate review queue with each
+proposal beside the sentence it came from.
 Three properties keep this safe and cheap to extend:
 
 - **The catalog is closed and owned by the SPA.**
@@ -428,6 +428,18 @@ The opportunity thesis is the intent-first card: one opportunity with its
 importance, satisfaction, the gap in plain words, the thesis itself, and the
 smallest next move. It is the shape the agent reaches for when the PM is deciding
 what to chase, rather than when they are inspecting a single score.
+
+The scoring pass is the one card that writes. `odi score` walks twenty outcomes
+at the keyboard; the `batch-scoring` card walks the same working set, in the same
+ranked order, with the customer's sentence beside the number. It calls the same
+`POST /outcomes/score-batch` endpoint, one item per write, so a click and a
+keypress reach the same store and the same 1–10 bounds. Progress advances only
+after the server reports a result: a refused write leaves the person on the same
+outcome with the reason beside it, and `Undo` replays the previous pair through
+the same endpoint — a prior `null`/`null` restores a truly unscored outcome
+rather than writing a zero. This is the deliberate exception to "cards are views,
+never actors": scoring is direct manipulation, and it is the same act the CLI
+already performs.
 
 The conversation keeps the order the agent produced: a `delta` appends to the
 open prose part, a `ui` event opens a card, and the next `delta` opens a new

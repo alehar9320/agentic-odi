@@ -12,6 +12,7 @@ const DOMAIN_CARDS = [
   "evidence-quote",
   "job-map",
   "decision-record",
+  "batch-scoring",
   "candidate-queue",
 ];
 

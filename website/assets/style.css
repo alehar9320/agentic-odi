@@ -2520,3 +2520,11 @@ html.search-open body {
     display: none;
   }
 }
+
+/* ---------------------------------------------------------------- */
+/* Scoring pass                                                     */
+/* ---------------------------------------------------------------- */
+
+.surface[data-surface="batch-scoring"] .surface__scores {
+  color: var(--muted);
+}

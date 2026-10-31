@@ -46,6 +46,7 @@ import {
   markSignalRead as apiMarkSignalRead,
   promoteEvidence as apiPromoteEvidence,
   resolveApproval as apiResolveApproval,
+  scoreOutcomes as apiScoreOutcomes,
   setConversationHead as apiSetConversationHead,
   streamChat,
   updateJob as apiUpdateJob,
@@ -60,6 +61,8 @@ import { capabilityRegistry, type Capability } from "../bff/capabilities/registr
 import type {
   AddConnectorPayload,
   AddOutcomePayload,
+  ScoreBatchItemResult,
+  ScoreOutcomePayload,
   AddStepPayload,
   CanvasData,
   CanvasState,
@@ -286,6 +289,12 @@ export interface StudioContextValue {
     outcomeId: string,
     payload: { statement?: string; importance?: number; satisfaction?: number },
   ) => Promise<void>;
+  /**
+   * Score one outcome through the shared batch endpoint, one item per call.
+   * Returns the item's result so the caller can show the server's refusal
+   * verbatim; it never throws a refusal away as a generic error.
+   */
+  scoreOutcome: (item: ScoreOutcomePayload) => Promise<ScoreBatchItemResult>;
   deleteOutcome: (outcomeId: string) => Promise<void>;
   deleteEvidence: (evidenceId: string) => Promise<void>;
   promoteEvidence: (
@@ -1117,6 +1126,23 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     [settings.mcp_url, pushToast, refreshCanvas],
   );
 
+  const scoreOutcome = useCallback(
+    async (item: ScoreOutcomePayload): Promise<ScoreBatchItemResult> => {
+      const response = await apiScoreOutcomes([item], settings.mcp_url);
+      const [result] = response.results;
+      if (!result) {
+        // The endpoint echoes one result per item; an empty answer is a
+        // transport surprise, not a silent success.
+        throw new Error("The scoring endpoint returned no result for the outcome.");
+      }
+      if (result.ok) {
+        await refreshCanvas();
+      }
+      return result;
+    },
+    [settings.mcp_url, refreshCanvas],
+  );
+
   const fetchOutcomeEvidence = useCallback(
     async (outcomeId: string): Promise<Evidence[]> => {
       const response = await apiFetchOutcomeEvidence(outcomeId, settings.mcp_url);
@@ -1919,6 +1945,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       updateStep,
       deleteStep,
       updateOutcome,
+      scoreOutcome,
       deleteOutcome,
       deleteEvidence,
       fetchOutcomeEvidence,
@@ -2030,6 +2057,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       updateStep,
       deleteStep,
       updateOutcome,
+      scoreOutcome,
       deleteOutcome,
       deleteEvidence,
       fetchOutcomeEvidence,

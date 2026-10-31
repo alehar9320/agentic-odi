@@ -1,10 +1,11 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const toast = vi.hoisted(() => ({ pushToast: vi.fn() }));
+const studio = vi.hoisted(() => ({ scoreOutcome: vi.fn() }));
 
 vi.mock("../state/StudioContext", () => ({
-  useStudio: () => ({ pushToast: toast.pushToast }),
+  useStudio: () => ({ pushToast: toast.pushToast, scoreOutcome: studio.scoreOutcome }),
 }));
 
 import { UiActionContext } from "./actions";
@@ -430,5 +431,236 @@ describe("impact simulation provenance", () => {
       );
       expect(result.ok).toBe(false);
     }
+  });
+});
+
+describe("batch scoring pass", () => {
+  const pass = {
+    type: "batch-scoring",
+    props: {
+      state: "ready",
+      outcomes: [
+        {
+          id: "O-1",
+          statement: "Minimize the time it takes to onboard",
+          importance: 9,
+          satisfaction: 3,
+          quote: "Setup takes forever when a new hire starts.",
+        },
+        {
+          id: "O-2",
+          statement: "Minimize the effort to reconcile invoices",
+          quote: "I reconcile invoices by hand every Friday.",
+        },
+      ],
+    },
+  };
+
+  beforeEach(() => {
+    studio.scoreOutcome.mockReset();
+    studio.scoreOutcome.mockResolvedValue({
+      outcome_id: "O-1",
+      importance: 9,
+      satisfaction: 3,
+      ok: true,
+      outcome: { id: "O-1", importance: 9, satisfaction: 3, opportunity_score: 15 },
+    });
+  });
+
+  it("shows one outcome at a time with its sentence and progress", () => {
+    renderSpec(pass);
+
+    expect(screen.getByLabelText("Scoring pass 1 of 2")).toBeInTheDocument();
+    expect(screen.getByText("Minimize the time it takes to onboard")).toBeInTheDocument();
+    expect(screen.getByText("Setup takes forever when a new hire starts.")).toBeInTheDocument();
+    expect(screen.getByText("1/2")).toBeInTheDocument();
+    // The second outcome is not on stage until the first is dealt with.
+    expect(screen.queryByText("I reconcile invoices by hand every Friday.")).not.toBeInTheDocument();
+  });
+
+  it("reads an unscored outcome as unscored, never as zero", () => {
+    renderSpec({
+      type: "batch-scoring",
+      props: { state: "ready", outcomes: [pass.props.outcomes[1]] },
+    });
+    expect(screen.getByText("Current · unscored")).toBeInTheDocument();
+  });
+
+  it("writes through the shared endpoint and advances only on a real result", async () => {
+    renderSpec(pass);
+    fireEvent.click(screen.getByRole("button", { name: "Score" }));
+
+    await waitFor(() =>
+      expect(studio.scoreOutcome).toHaveBeenCalledWith({
+        outcome_id: "O-1",
+        importance: 9,
+        satisfaction: 3,
+      }),
+    );
+    expect(await screen.findByLabelText("Scoring pass 2 of 2")).toBeInTheDocument();
+  });
+
+  it("keeps the person on the same outcome when the server refuses", async () => {
+    studio.scoreOutcome.mockResolvedValueOnce({
+      outcome_id: "O-1",
+      importance: 9,
+      satisfaction: 3,
+      ok: false,
+      error: "importance must be between 1.0 and 10.0",
+    });
+    renderSpec(pass);
+    fireEvent.click(screen.getByRole("button", { name: "Score" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "importance must be between 1.0 and 10.0",
+    );
+    // Still on the first outcome: progress did not move optimistically.
+    expect(screen.getByLabelText("Scoring pass 1 of 2")).toBeInTheDocument();
+  });
+
+  it("reports a request failure without scoring the next item", async () => {
+    studio.scoreOutcome.mockRejectedValueOnce(new Error("The sidecar is unreachable."));
+    renderSpec(pass);
+    fireEvent.click(screen.getByRole("button", { name: "Score" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("The sidecar is unreachable.");
+    expect(screen.getByLabelText("Scoring pass 1 of 2")).toBeInTheDocument();
+  });
+
+  it("skips without a write", () => {
+    renderSpec(pass);
+    fireEvent.click(screen.getByRole("button", { name: "Skip" }));
+
+    expect(studio.scoreOutcome).not.toHaveBeenCalled();
+    expect(screen.getByLabelText("Scoring pass 2 of 2")).toBeInTheDocument();
+  });
+
+  it("undoes the last write by replaying the previous pair through the same endpoint", async () => {
+    renderSpec(pass);
+    fireEvent.click(screen.getByRole("button", { name: "Score" }));
+    await screen.findByLabelText("Scoring pass 2 of 2");
+
+    fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+
+    await waitFor(() =>
+      expect(studio.scoreOutcome).toHaveBeenLastCalledWith({
+        outcome_id: "O-1",
+        importance: 9,
+        satisfaction: 3,
+      }),
+    );
+    expect(await screen.findByLabelText("Scoring pass 1 of 2")).toBeInTheDocument();
+  });
+
+  it("scores three of five and leaves the last two untouched", async () => {
+    const five = Array.from({ length: 5 }, (_, index) => ({
+      id: `O-${index + 1}`,
+      statement: `Outcome ${index + 1}`,
+      quote: `Sentence ${index + 1}.`,
+    }));
+    studio.scoreOutcome.mockImplementation((item: { outcome_id: string; importance: number; satisfaction: number }) =>
+      Promise.resolve({
+        outcome_id: item.outcome_id,
+        importance: item.importance,
+        satisfaction: item.satisfaction,
+        ok: true,
+        outcome: { id: item.outcome_id },
+      }),
+    );
+    renderSpec({ type: "batch-scoring", props: { state: "ready", outcomes: five } });
+
+    for (let step = 0; step < 3; step += 1) {
+      fireEvent.click(screen.getByRole("button", { name: "Score" }));
+      await screen.findByLabelText(`Scoring pass ${step + 2} of 5`);
+    }
+    // The fourth outcome is on stage, but the last two were never written.
+    expect(screen.getByLabelText("Scoring pass 4 of 5")).toBeInTheDocument();
+    expect(studio.scoreOutcome.mock.calls.map(([item]) => item.outcome_id)).toEqual([
+      "O-1",
+      "O-2",
+      "O-3",
+    ]);
+  });
+
+  it("a double submit cannot score the next item", async () => {
+    let resolveWrite: ((value: unknown) => void) | undefined;
+    studio.scoreOutcome.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveWrite = resolve;
+        }),
+    );
+    renderSpec(pass);
+
+    const button = screen.getByRole("button", { name: "Score" });
+    fireEvent.click(button);
+    // The control is disabled while the write is in flight, so a second click
+    // is inert: the first write must land before progress can move.
+    expect(button).toBeDisabled();
+    fireEvent.click(button);
+    expect(studio.scoreOutcome).toHaveBeenCalledTimes(1);
+
+    resolveWrite?.({
+      outcome_id: "O-1",
+      importance: 9,
+      satisfaction: 3,
+      ok: true,
+      outcome: { id: "O-1" },
+    });
+    expect(await screen.findByLabelText("Scoring pass 2 of 2")).toBeInTheDocument();
+  });
+
+  it("has nothing to undo before the first write", () => {
+    renderSpec(pass);
+    expect(screen.getByRole("button", { name: "Undo" })).toBeDisabled();
+  });
+
+  it("closes with an honest tally", async () => {
+    renderSpec(pass);
+    fireEvent.click(screen.getByRole("button", { name: "Skip" }));
+    fireEvent.click(screen.getByRole("button", { name: "Skip" }));
+
+    expect(await screen.findByLabelText("Scoring pass complete")).toBeInTheDocument();
+    expect(screen.getByText("Scoring complete: scored 0, skipped 2.")).toBeInTheDocument();
+  });
+
+  it("distinguishes loading, empty, and failed", () => {
+    const { unmount } = render(
+      <UiActionContext.Provider value={{ onIntent: vi.fn(), busy: false }}>
+        <UiRenderer node={nodeOf({ type: "batch-scoring", props: { state: "loading" } })} />
+      </UiActionContext.Provider>,
+    );
+    expect(screen.getByLabelText("Loading the scoring pass")).toHaveAttribute("aria-busy", "true");
+    unmount();
+
+    const empty = render(
+      <UiActionContext.Provider value={{ onIntent: vi.fn(), busy: false }}>
+        <UiRenderer node={nodeOf({ type: "batch-scoring", props: { state: "empty" } })} />
+      </UiActionContext.Provider>,
+    );
+    expect(screen.getByLabelText("Nothing to score")).toBeInTheDocument();
+    empty.unmount();
+
+    renderSpec({
+      type: "batch-scoring",
+      props: { state: "failed", message: "The sidecar is unreachable." },
+    });
+    expect(screen.getByLabelText("The scoring pass could not be loaded")).toBeInTheDocument();
+    expect(screen.getByText("The sidecar is unreachable.")).toBeInTheDocument();
+  });
+
+  it("treats a ready pass with no outcomes as empty", () => {
+    renderSpec({ type: "batch-scoring", props: { state: "ready", outcomes: [] } });
+    expect(screen.getByLabelText("Nothing to score")).toBeInTheDocument();
+  });
+
+  it("says when no customer sentence was captured instead of inventing one", () => {
+    renderSpec({
+      type: "batch-scoring",
+      props: { state: "ready", outcomes: [{ id: "O-9", statement: "Minimize something" }] },
+    });
+    expect(
+      screen.getByText("No customer sentence was captured for this outcome."),
+    ).toBeInTheDocument();
   });
 });

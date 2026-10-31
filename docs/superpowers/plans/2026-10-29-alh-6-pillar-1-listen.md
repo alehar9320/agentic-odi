@@ -216,10 +216,10 @@ The **Persistence checklist** in every child points at `packages/core/tests/test
 
 ### Task 13: A9.2 — The same pass in the Studio ([ALH-154])
 
-**Files:** Studio `batch_scoring` card; component tests.
+**Files:** Studio `batch-scoring` card; component tests.
 
-- [ ] **Step 1:** Drive the same `score-batch` endpoint one outcome at a time with the same skip/undo semantics and progress; no second scoring endpoint (asserted by the router enumeration).
-- [ ] **Step 2:** Component fixtures cover importance/satisfaction, skip, undo, invalid row, request failure, completion; persisted result matches the CLI sequence; progress advances only on a real result, not optimistic success; double-submit/retry cannot silently score the next item; empty list / missing evidence / unavailable previous value are honest states.
+- [x] **Step 1:** Drive the same `score-batch` endpoint one outcome at a time with the same skip/undo semantics and progress; no second scoring endpoint (asserted by the router enumeration).
+- [x] **Step 2:** Component fixtures cover importance/satisfaction, skip, undo, invalid row, request failure, completion; persisted result matches the CLI sequence; progress advances only on a real result, not optimistic success; double-submit/retry cannot silently score the next item; empty list / missing evidence / unavailable previous value are honest states.
 
 ### Task 14: A2.2 — Import a transcript from the thread ([ALH-152])
 
