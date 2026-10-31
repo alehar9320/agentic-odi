@@ -49,7 +49,6 @@ const state = vi.hoisted(() => ({
   markSignalAsRead: vi.fn(),
   dismissSignal: vi.fn(),
   focusSignalSubject: vi.fn(),
-  simulateBackgroundEvent: vi.fn(),
   // Settings and connectors
   settings: {
     base_url: "http://localhost:8001/v1",
