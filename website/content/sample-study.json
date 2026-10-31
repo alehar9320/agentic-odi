@@ -1,0 +1,44 @@
+{
+  "origin": "sample",
+  "generated": "2026-10-31",
+  "job": {
+    "id": "JOB-SAMPLE",
+    "name": "Reconcile invoices",
+    "description": "Finance leads closing the month without matching every line by hand."
+  },
+  "steps": [
+    { "order": 1, "name": "Collect the statements" },
+    { "order": 2, "name": "Match each line" },
+    { "order": 3, "name": "Review the exceptions" },
+    { "order": 4, "name": "File and close" }
+  ],
+  "outcomes": [
+    {
+      "id": "OUT-1",
+      "statement": "Reconcile invoices without manual effort",
+      "importance": 8,
+      "satisfaction": 3,
+      "opportunity": 13.0
+    },
+    {
+      "id": "OUT-2",
+      "statement": "Catch a failed payment before it churns",
+      "importance": 9,
+      "satisfaction": 6,
+      "opportunity": 12.0
+    },
+    {
+      "id": "OUT-3",
+      "statement": "Hand a refund back in one step",
+      "importance": 6,
+      "satisfaction": 5,
+      "opportunity": 7.0
+    }
+  ],
+  "evidence": [
+    {
+      "source": "Support call",
+      "quote": "I spend every Friday matching invoices to receipts. It is the part of the job I dread."
+    }
+  ]
+}
