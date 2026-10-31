@@ -1,9 +1,13 @@
 name: PR Risk Classification
 
+# No `branches:` filter on purpose. Stacked pull requests target another feature
+# branch, not `main`, and a reviewer still needs the size, domain, and risk
+# labels to triage them. Scoping the trigger to `main` left every stacked PR
+# unlabeled. Fork PRs are still skipped per-job, so widening the trigger does
+# not turn a read-only token into a red run.
 on:
   pull_request:
     types: [opened, synchronize, reopened]
-    branches: [main]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
