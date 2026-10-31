@@ -113,6 +113,7 @@ Start here, then take the one that answers your question.
 | [The generative UI protocol](ui-protocol.md) | The closed catalog, validation on both ends, limits, and the action model. |
 | [Studio banners](banners.md) | The Studio's unified notice system. |
 | [Testing](testing.md) | Test layout, commands, and what each suite is responsible for. |
+| [Agent assignment](../agents.md) | Which agents can take an issue, how a claim is recorded, and what expires. |
 | [Decisions (ADRs)](adr/README.md) | Why the architecture looks the way it does. |
 
 ## Related
