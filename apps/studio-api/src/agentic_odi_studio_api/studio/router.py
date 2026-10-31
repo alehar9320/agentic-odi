@@ -90,6 +90,7 @@ from agentic_odi_studio_api.studio.schemas import (
     ObservationUpdateRequest,
     PromoteEvidenceRequest,
     ScheduleWorkRequest,
+    ScoreItem,
     SignalActionRequest,
     TurnNode,
     UpdateConversationRequest,
@@ -168,6 +169,34 @@ def _payload_from_text(text: str) -> dict[str, Any]:
     if isinstance(payload, dict):
         return payload
     return {"result": text}
+
+
+def _score_result(
+    item: ScoreItem,
+    *,
+    ok: bool,
+    outcome: Any = None,
+    error: str | None = None,
+) -> dict[str, Any]:
+    """One item's outcome from a batch, correlated back to its input.
+
+    ``why`` is echoed so a caller can pair a decision with the row that made
+    it. Both keys the caller sent are echoed, so a client never has to guess
+    which score a result belongs to.
+    """
+    result: dict[str, Any] = {
+        "outcome_id": item.outcome_id,
+        "importance": item.importance,
+        "satisfaction": item.satisfaction,
+        "ok": ok,
+    }
+    if item.why is not None:
+        result["why"] = item.why
+    if ok:
+        result["outcome"] = outcome
+    else:
+        result["error"] = error
+    return result
 
 
 def _connectors(request: Request) -> ConnectorService:
@@ -615,6 +644,69 @@ async def patch_outcome(outcome_id: str, body: UpdateOutcomeRequest, request: Re
     except Exception as exc:  # noqa: BLE001
         raise _as_http_error(exc) from exc
     return outcome.model_dump(mode="json")
+
+
+@router.post("/outcomes/score-batch")
+async def score_batch(
+    body: list[ScoreItem],
+    request: Request,
+    mcp_url: str | None = Query(None),
+) -> dict:
+    """Score many outcomes in one request, one result per item.
+
+    Each item is applied on its own, through the same
+    :meth:`ODIService.update_outcome` the single-outcome route uses, so the
+    1–10 bounds and the opportunity recompute cannot be bypassed. A bad row
+    fails only itself: the rest of the batch still lands, and every item comes
+    back with ``ok`` and either the updated ``outcome`` or the ``error`` that
+    refused it. This is the pass behind ``odi score`` and the Studio's
+    ``batch-scoring`` card, so one keypress and one click reach the same store.
+    """
+    if _uses_mcp(request):
+        target = _require_mcp_url(mcp_url or "")
+        results: list[dict[str, Any]] = []
+        for item in body:
+            if item.importance is None or item.satisfaction is None:
+                # The MCP ``update_outcome`` tool treats a null score as "leave
+                # it unchanged", so it cannot restore an unscored outcome. Say
+                # so rather than reporting a clear that did not happen.
+                results.append(
+                    _score_result(
+                        item,
+                        ok=False,
+                        error=(
+                            "The MCP backend cannot clear a score; restore an unscored "
+                            "outcome against the local backend."
+                        ),
+                    )
+                )
+                continue
+            args: dict[str, Any] = {
+                "outcome_id": item.outcome_id,
+                "importance": item.importance,
+                "satisfaction": item.satisfaction,
+            }
+            try:
+                result = await call_mcp_tool(target, ToolName.UPDATE_OUTCOME.value, args)
+            except Exception as exc:  # noqa: BLE001
+                results.append(_score_result(item, ok=False, error=str(exc)))
+                continue
+            results.append(_score_result(item, ok=True, outcome=_json_or_raw(result)))
+        return {"ok": True, "results": results}
+    service = _service(request)
+    results = []
+    for item in body:
+        try:
+            outcome = service.update_outcome(
+                item.outcome_id,
+                {"importance": item.importance, "satisfaction": item.satisfaction},
+            )
+        except Exception as exc:  # noqa: BLE001
+            error = _as_http_error(exc)
+            results.append(_score_result(item, ok=False, error=error.error.message))
+            continue
+        results.append(_score_result(item, ok=True, outcome=outcome.model_dump(mode="json")))
+    return {"ok": True, "results": results}
 
 
 @router.get("/outcomes/{outcome_id}/evidence")

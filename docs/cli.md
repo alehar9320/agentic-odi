@@ -377,6 +377,40 @@ There is no undo command. A merge is reversible only by deleting the added
 evidence and re-extracting from the original quotes, which is why the source
 candidate and its quote are kept rather than deleted.
 
+### Score many outcomes at the keyboard
+
+`score` with no numbers opens the scoring pass: one outcome at a time, with the
+current score and the customer's sentence in view, and a `3/20` progress line.
+Each prompt takes an importance `1-10`, then a satisfaction `1-10`, with four
+keys:
+
+| Key | Action |
+| --- | --- |
+| a number `1-10` | set importance, then satisfaction |
+| `s` | skip — nothing changes |
+| `u` | undo the last write — replays the previous pair |
+| `q` | quit — the remaining outcomes are left untouched |
+
+Every write goes through the same `update_outcome` the API uses, so a keypress
+and a click cannot diverge. `s`, `q`, and end-of-input all make no further
+writes, and `q` never scores anything. A value outside `1-10` is refused for
+that prompt only and re-prompted, so one bad entry cannot abort the pass. `u`
+replays the previous `(importance, satisfaction)` pair through the same tool; a
+truly unscored outcome has no prior pair, so undo restores it to `unscored`
+rather than inventing a zero.
+
+```bash
+agentic-odi score                          # every outcome, ranked
+agentic-odi score --job JOB-1              # one job's outcomes
+agentic-odi score --unscored               # only outcomes with no score yet
+agentic-odi score --limit 20               # the first twenty of the ranking
+agentic-odi score --json                   # machine-readable summary
+```
+
+`--json` emits one summary object with `scored`, `skipped`, `failed`, `undone`,
+`total`, and a per-item `results` array. An empty working set prints an honest
+completion (`total 0`) rather than a false success.
+
 ## Schema, scoring, and guidance
 
 ```bash
