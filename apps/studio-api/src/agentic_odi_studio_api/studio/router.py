@@ -19,6 +19,7 @@ from agentic_odi_connectors.registry import (
     DuplicateConnectorError,
 )
 from agentic_odi_core import (
+    SCHEMA_VERSION,
     DecisionNotFoundError,
     EvidenceNotFoundError,
     JobNotFoundError,
@@ -33,6 +34,8 @@ from agentic_odi_core import (
     ValueOutOfRangeError,
     error_status,
     outcome_delta,
+    render_memo_html,
+    render_memo_markdown,
 )
 from agentic_odi_core.remote import StudioError, StudioErrorCode
 from fastapi import APIRouter, HTTPException, Query, Request
@@ -100,6 +103,7 @@ from agentic_odi_studio_api.studio.schemas import (
     PromoteEvidenceRequest,
     RecordBetRequest,
     RecordDecisionRequest,
+    RenderMemoRequest,
     ReviewDecisionRequest,
     ScheduleWorkRequest,
     SetOutcomeValueRequest,
@@ -698,6 +702,90 @@ async def post_decision_review(body: ReviewDecisionRequest, request: Request) ->
             }
             for o in review.outcomes
         ],
+    }
+
+
+@router.post("/decisions/memo")
+async def post_decision_memo(body: RenderMemoRequest, request: Request) -> dict:
+    """Assemble the decision memo from what is already recorded.
+
+    A read-only projection: it writes nothing and invokes no provider. Every
+    section is a projection of rows that already exist; a missing one is omitted
+    with a one-line reason, never placeholder prose and never a zero.
+
+    ``format=html`` returns the same facts as a standalone, printable document
+    that carries the supplied timestamp and the store's schema version, so the
+    Studio's download action and the CLI export share one projection.
+    """
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(body.mcp_url),
+            ToolName.RENDER_MEMO.value,
+            {"decision_id": body.decision_id},
+        )
+        return {"decision_id": body.decision_id, "markdown": _payload_from_text(result)}
+    try:
+        memo = _service(request).build_memo(body.decision_id)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    if body.format == "html":
+        document = render_memo_html(
+            memo,
+            source=f"decision {body.decision_id}",
+            generated_at=body.generated_at or datetime.now(timezone.utc).isoformat(),
+            schema_version=SCHEMA_VERSION,
+        )
+        return {
+            "decision_id": memo.decision_id,
+            "format": "html",
+            "markdown": render_memo_markdown(memo),
+            "html": document,
+            "filename": f"decision-{memo.decision_id}.html",
+            "schema_version": SCHEMA_VERSION,
+        }
+    return {
+        "decision_id": memo.decision_id,
+        "format": "md",
+        "markdown": render_memo_markdown(memo),
+        "filename": f"decision-{memo.decision_id}.md",
+        "schema_version": SCHEMA_VERSION,
+    }
+
+
+@router.get("/decisions/{decision_id}/message")
+async def get_decision_message(
+    decision_id: str,
+    request: Request,
+    channel: str = Query("slack"),
+    link: str | None = Query(None),
+    mcp_url: str = Query(""),
+) -> dict:
+    """Cut the decision's memo to a short, pasteable stakeholder message.
+
+    A read-only projection: it writes nothing and sends nothing. The largest
+    unknown is never dropped for length; a budget that cannot fit it is a 422,
+    not a silently caveat-free message.
+    """
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(mcp_url),
+            ToolName.RENDER_STAKEHOLDER_MESSAGE.value,
+            {"decision_id": decision_id, "channel": channel, "link": link},
+        )
+        return _payload_from_text(result)
+    try:
+        message = _service(request).build_stakeholder_message(
+            decision_id, channel=channel, link=link
+        )
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return {
+        "decision_id": decision_id,
+        "channel": message.channel,
+        "subject": message.subject,
+        "body": message.body,
+        "word_count": message.word_count,
+        "dropped": list(message.dropped),
     }
 
 

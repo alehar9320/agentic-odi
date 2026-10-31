@@ -295,3 +295,103 @@ def test_brief_export_omits_the_strategy_section_when_none_is_recorded(tmp_path)
 
     assert result.exit_code == 0, result.output
     assert "## The strategy" not in result.output
+
+
+def test_brief_export_default_renders_no_drafted_block(tmp_path) -> None:
+    db = str(tmp_path / "studio.db")
+    job_id = _seed(db)
+
+    result = runner.invoke(app, ["--db", db, "brief", "export", "--job-id", job_id])
+
+    assert result.exit_code == 0, result.output
+    assert "Drafted" not in result.output
+
+
+def test_brief_export_no_narrate_matches_the_default_byte_for_byte(tmp_path) -> None:
+    db = str(tmp_path / "studio.db")
+    job_id = _seed(db)
+
+    default = runner.invoke(
+        app,
+        [
+            "--db",
+            db,
+            "brief",
+            "export",
+            "--job-id",
+            job_id,
+            "--generated-at",
+            "2026-10-29T00:00:00Z",
+        ],
+    )
+    explicit = runner.invoke(
+        app,
+        [
+            "--db",
+            db,
+            "brief",
+            "export",
+            "--job-id",
+            job_id,
+            "--generated-at",
+            "2026-10-29T00:00:00Z",
+            "--no-narrate",
+        ],
+    )
+
+    assert default.exit_code == 0, default.output
+    assert explicit.exit_code == 0, explicit.output
+    assert default.output == explicit.output
+
+
+def test_brief_export_narrate_with_no_provider_degrades_to_the_factual_brief(
+    tmp_path, monkeypatch
+) -> None:
+    """No provider must not fail the export: it renders the factual brief."""
+    from agentic_odi_cli import narrator as narrator_module
+
+    def _boom(*args, **kwargs):
+        raise RuntimeError("no provider configured")
+
+    monkeypatch.setattr(narrator_module.OpenAINarrator, "from_env", staticmethod(_boom))
+
+    db = str(tmp_path / "studio.db")
+    job_id = _seed(db)
+    result = runner.invoke(app, ["--db", db, "brief", "export", "--job-id", job_id, "--narrate"])
+
+    assert result.exit_code == 0, result.output
+    assert "## Underserved outcomes" in result.output
+    # The drafted block states why nothing was drafted rather than omitting it.
+    assert "no narrator configured" in result.output
+
+
+def test_brief_export_narrate_with_a_fixture_narrator_labels_the_block(
+    tmp_path, monkeypatch
+) -> None:
+    """A fixture narrator stands in for the model; the block is labelled."""
+    from agentic_odi_cli import brief as brief_module
+    from agentic_odi_core import DraftedClaim, NarrativeDraft, render_narrative
+
+    class _Fixture:
+        def draft(self, brief_input):
+            first = brief_input.outcomes[0]
+            return NarrativeDraft(
+                supported=(
+                    DraftedClaim("The leading outcome is underserved.", (first.outcome_id,)),
+                ),
+            )
+
+    def _fake_narrate(brief_inputs, *, narrator=None):
+        from agentic_odi_cli.brief import _build_brief_input
+
+        return render_narrative(_build_brief_input(brief_inputs), _Fixture())
+
+    monkeypatch.setattr(brief_module, "_narrate", _fake_narrate)
+
+    db = str(tmp_path / "studio.db")
+    job_id = _seed(db)
+    result = runner.invoke(app, ["--db", db, "brief", "export", "--job-id", job_id, "--narrate"])
+
+    assert result.exit_code == 0, result.output
+    assert "Drafted — numbers from the table above" in result.output
+    assert "The leading outcome is underserved." in result.output

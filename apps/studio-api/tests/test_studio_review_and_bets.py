@@ -245,3 +245,129 @@ def test_advancing_an_unknown_bet_is_404() -> None:
     client, _ = _client()
     response = client.post("/api/bets/nope/advance", json={"status": "running"})
     assert response.status_code == 404
+
+
+def test_memo_projects_the_decision_read_only() -> None:
+    """POST /api/decisions/memo is a read-only projection, no memo row stored."""
+    client, repo = _client()
+    service, job, chosen, other, decision = _seed(repo)
+    service.add_evidence(
+        "Interview 7",
+        "manual",
+        "interview-7",
+        "Publishing is slow",
+        job_id=job.id,
+        outcome_id=chosen.id,
+    )
+
+    before = {name: len(getattr(repo, name)) for name in ("decisions", "outcomes", "evidence")}
+    body = client.post("/api/decisions/memo", json={"decision_id": decision.id}).json()
+    after = {name: len(getattr(repo, name)) for name in ("decisions", "outcomes", "evidence")}
+
+    assert before == after
+    assert body["decision_id"] == decision.id
+    for section in (
+        "## Decision",
+        "## Why now",
+        "## What the evidence says",
+        "## What it is worth",
+        "## How we will know",
+        "## What we do not know",
+        "## Sources",
+    ):
+        assert section in body["markdown"]
+    assert "interview-7" in body["markdown"]
+
+
+def test_memo_omits_a_missing_value_with_a_reason_not_a_zero() -> None:
+    client, repo = _client()
+    _, _, _, _, decision = _seed(repo)
+    body = client.post("/api/decisions/memo", json={"decision_id": decision.id}).json()
+    assert "No value estimate recorded" in body["markdown"]
+    assert "0 currency" not in body["markdown"]
+
+
+def test_memo_of_an_unknown_decision_is_404() -> None:
+    client, _ = _client()
+    response = client.post("/api/decisions/memo", json={"decision_id": "nope"})
+    assert response.status_code == 404
+
+
+def test_message_projects_the_memo_read_only() -> None:
+    """GET /api/decisions/{id}/message is a read-only projection, nothing sent."""
+    client, repo = _client()
+    _, _, _, _, decision = _seed(repo)
+    before = {name: len(getattr(repo, name)) for name in ("decisions", "outcomes", "evidence")}
+    body = client.get(
+        f"/api/decisions/{decision.id}/message",
+        params={"channel": "slack", "link": "https://example.test/memo"},
+    ).json()
+    after = {name: len(getattr(repo, name)) for name in ("decisions", "outcomes", "evidence")}
+    assert before == after
+    assert body["channel"] == "slack"
+    assert body["subject"] is None
+    assert body["word_count"] <= 120
+    assert "https://example.test/memo" in body["body"]
+
+
+def test_message_email_carries_a_subject() -> None:
+    client, repo = _client()
+    _, _, _, _, decision = _seed(repo)
+    body = client.get(f"/api/decisions/{decision.id}/message", params={"channel": "email"}).json()
+    assert body["subject"].startswith("Decision:")
+
+
+def test_message_of_an_unknown_decision_is_404() -> None:
+    client, _ = _client()
+    response = client.get("/api/decisions/nope/message")
+    assert response.status_code == 404
+
+
+def test_memo_html_format_is_standalone_and_carries_the_schema_version() -> None:
+    """format=html returns the same facts as a printable document, still read-only."""
+    from agentic_odi_core import SCHEMA_VERSION
+
+    client, repo = _client()
+    service, job, chosen, other, decision = _seed(repo)
+    before = {name: len(getattr(repo, name)) for name in ("decisions", "outcomes", "evidence")}
+
+    body = client.post(
+        "/api/decisions/memo",
+        json={
+            "decision_id": decision.id,
+            "format": "html",
+            "generated_at": "2026-10-29T12:00:00Z",
+        },
+    ).json()
+    after = {name: len(getattr(repo, name)) for name in ("decisions", "outcomes", "evidence")}
+
+    assert before == after
+    assert body["format"] == "html"
+    assert body["filename"] == f"decision-{decision.id}.html"
+    assert body["schema_version"] == SCHEMA_VERSION
+    assert body["html"].startswith("<!DOCTYPE html>")
+    assert f"Schema version: {SCHEMA_VERSION}" in body["html"]
+    assert "2026-10-29T12:00:00Z" in body["html"]
+    assert "http://" not in body["html"] and "https://" not in body["html"]
+    assert body["markdown"].startswith("# Decision memo")
+
+
+def test_memo_markdown_format_names_its_filename_and_version() -> None:
+    from agentic_odi_core import SCHEMA_VERSION
+
+    client, repo = _client()
+    _, _, _, _, decision = _seed(repo)
+    body = client.post("/api/decisions/memo", json={"decision_id": decision.id}).json()
+    assert body["format"] == "md"
+    assert body["filename"] == f"decision-{decision.id}.md"
+    assert body["schema_version"] == SCHEMA_VERSION
+    assert body["markdown"].startswith("# Decision memo")
+
+
+def test_memo_rejects_an_unknown_format() -> None:
+    client, repo = _client()
+    _, _, _, _, decision = _seed(repo)
+    response = client.post(
+        "/api/decisions/memo", json={"decision_id": decision.id, "format": "pdf"}
+    )
+    assert response.status_code == 422

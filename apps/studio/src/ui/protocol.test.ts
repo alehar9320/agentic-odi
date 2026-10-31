@@ -15,6 +15,7 @@ const DOMAIN_CARDS = [
   "evidence-quote",
   "job-map",
   "decision-record",
+  "decision-memo",
   "decision-review",
   "bet",
   "segment-profile",

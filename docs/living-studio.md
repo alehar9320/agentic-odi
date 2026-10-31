@@ -384,6 +384,29 @@ change, no evidence, or orphaned. A missing measurement is `no evidence`, never
 `no change`; an outcome that no longer exists is `orphaned`, never a crash. It is
 the same projection `odi review show` renders.
 
+The decision memo is the one-page case assembled on read from what is already
+recorded: the decision, why now, the evidence with its citations, the options
+rejected and why, what the chosen outcome is worth, how we will know it worked,
+and what we still do not know. It writes nothing and invokes no model; a section
+with nothing to say is omitted with a one-line reason, never placeholder prose
+and never a zero. It is the same projection `odi decide memo` renders and the
+MCP `render_memo` tool returns.
+
+The memo can leave the app: `odi decide memo --format html --out memo.html`
+writes a standalone, printable document that inlines its own paper CSS, escapes
+hostile text and carries the export time and the store's schema version.
+`--narrate` adds one labelled framing paragraph through the same narrator the
+brief uses, with the same numeral guarantee; the default export stays
+byte-identical to the factual memo. The `decision_memo` card shows the same
+markdown and offers one keyboard-reachable download action, so a memo that was
+read can also be signed.
+
+The stakeholder message is that memo cut to a pasteable length: what we found,
+what we are doing, what it is worth, the largest unknown, and a link, within a
+channel's word budget. The largest unknown is never dropped for length, and
+nothing is sent — it is the same projection `odi decide message` renders and the
+MCP `render_stakeholder_message` tool returns.
+
 The bet card is a recorded expectation: the hypothesis, the outcome it targets,
 the baseline captured at creation, the target, and the date to look. The baseline
 is stored at creation and never recomputed from the live score, so the starting

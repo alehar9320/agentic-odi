@@ -14,6 +14,7 @@ import {
   SegmentProfile,
   OpportunityThesis,
   OutcomeCard,
+  DecisionMemo,
 } from "./cards";
 import {
   Callout,
@@ -54,6 +55,7 @@ export const NODE_COMPONENTS: Record<string, ComponentType<NodeProps>> = {
   "evidence-quote": EvidenceQuote,
   "job-map": JobMap,
   "decision-record": DecisionRecord,
+  "decision-memo": DecisionMemo,
   "decision-review": DecisionReview,
   bet: Bet,
   "segment-profile": SegmentProfile,

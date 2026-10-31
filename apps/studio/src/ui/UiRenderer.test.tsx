@@ -541,3 +541,103 @@ describe("bet", () => {
     }
   });
 });
+
+describe("decision-memo", () => {
+  const fullProps = {
+    title: "Publish a plugin faster",
+    markdown: "# Decision memo — `dec-1`\n\n## Decision\n\nPublish speed first.",
+    source: "decision dec-1",
+    generated_at: "2026-10-29T12:00:00Z",
+    schema_version: 4,
+    filename: "decision-dec-1.md",
+    drafted: true,
+  };
+
+  it("renders the memo, its metadata and the download action", () => {
+    renderSpec({ type: "decision-memo", props: fullProps });
+
+    expect(screen.getByLabelText("Publish a plugin faster")).toBeInTheDocument();
+    expect(screen.getByText(/Source: decision dec-1/)).toBeInTheDocument();
+    expect(screen.getByText(/Schema v4/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Download memo" })).toBeInTheDocument();
+  });
+
+  it("downloads the payload markdown under the supplied filename", () => {
+    const createObjectURL = vi.fn(() => "blob:memo");
+    const revokeObjectURL = vi.fn();
+    const originalCreate = URL.createObjectURL;
+    const originalRevoke = URL.revokeObjectURL;
+    Object.defineProperty(URL, "createObjectURL", { value: createObjectURL, configurable: true });
+    Object.defineProperty(URL, "revokeObjectURL", { value: revokeObjectURL, configurable: true });
+
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+    try {
+      renderSpec({ type: "decision-memo", props: fullProps });
+      fireEvent.click(screen.getByRole("button", { name: "Download memo" }));
+
+      expect(createObjectURL).toHaveBeenCalledOnce();
+      expect(click).toHaveBeenCalledOnce();
+      expect(revokeObjectURL).toHaveBeenCalledWith("blob:memo");
+    } finally {
+      click.mockRestore();
+      Object.defineProperty(URL, "createObjectURL", {
+        value: originalCreate,
+        configurable: true,
+      });
+      Object.defineProperty(URL, "revokeObjectURL", {
+        value: originalRevoke,
+        configurable: true,
+      });
+    }
+  });
+
+  it("shows a one-line empty state when there is no memo", () => {
+    renderSpec({ type: "decision-memo", props: { markdown: "" } });
+
+    expect(screen.getByText(/Nothing to export yet/)).toBeInTheDocument();
+  });
+
+  it("downloads the standalone HTML when the server supplied one", () => {
+    const createObjectURL = vi.fn(() => "blob:memo");
+    const revokeObjectURL = vi.fn();
+    const originalCreate = URL.createObjectURL;
+    const originalRevoke = URL.revokeObjectURL;
+    Object.defineProperty(URL, "createObjectURL", { value: createObjectURL, configurable: true });
+    Object.defineProperty(URL, "revokeObjectURL", { value: revokeObjectURL, configurable: true });
+
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+    try {
+      renderSpec({
+        type: "decision-memo",
+        props: {
+          ...fullProps,
+          html: "<!DOCTYPE html><html><body>memo</body></html>",
+          filename: "decision-dec-1.html",
+        },
+      });
+      fireEvent.click(screen.getByRole("button", { name: "Download memo" }));
+
+      // The card still renders the markdown body, but the download is the HTML.
+      expect(screen.getByText(/Source: decision dec-1/)).toBeInTheDocument();
+      expect(createObjectURL).toHaveBeenCalledOnce();
+    } finally {
+      click.mockRestore();
+      Object.defineProperty(URL, "createObjectURL", {
+        value: originalCreate,
+        configurable: true,
+      });
+      Object.defineProperty(URL, "revokeObjectURL", {
+        value: originalRevoke,
+        configurable: true,
+      });
+    }
+  });
+
+  it("rejects a decision-memo missing its required markdown prop", () => {
+    const result = parseUiSpec({ type: "decision-memo", props: { title: "x" } }, catalogManifest());
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.reason).toContain("decision-memo");
+    }
+  });
+});

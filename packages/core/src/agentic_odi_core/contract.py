@@ -45,6 +45,8 @@ class ToolName(str, Enum):
     GET_DECISION = "get_decision"
     LIST_DECISIONS = "list_decisions"
     REVIEW_DECISION = "review_decision"
+    RENDER_MEMO = "render_memo"
+    RENDER_STAKEHOLDER_MESSAGE = "render_stakeholder_message"
     GET_OUTCOME_HISTORY = "get_outcome_history"
     GET_OUTCOME_DELTA = "get_outcome_delta"
     RECORD_BET = "record_bet"
@@ -102,9 +104,11 @@ class ToolSpec:
 def _derive_effect(name: str) -> ToolEffect:
     """Derive a tool's effect from its name.
 
-    get_*/list_* → READ, delete_* → DESTRUCTIVE, everything else → WRITE.
+    get_*/list_*/render_* → READ, delete_* → DESTRUCTIVE, everything else → WRITE.
+    A renderer projects what is already recorded and writes nothing, so it is
+    read-only by the same rule that governs a getter.
     """
-    if name.startswith(("get_", "list_")):
+    if name.startswith(("get_", "list_", "render_")):
         return ToolEffect.READ
     if name.startswith("delete_"):
         return ToolEffect.DESTRUCTIVE
@@ -494,6 +498,38 @@ TOOL_SPECS: dict[str, ToolSpec] = {
         returns=(
             "The review: days elapsed and, per chosen outcome, its state. A "
             "missing measurement is 'no evidence', never 'no change'."
+        ),
+        stage="6",
+    ),
+    ToolName.RENDER_MEMO.value: ToolSpec(
+        name="render_memo",
+        summary=(
+            "Assemble the decision memo from what is already recorded: the "
+            "decision, why now, the evidence with citations, the rejected "
+            "options, the value, the success criteria and bet, and the holes."
+        ),
+        effect=ToolEffect.READ,
+        arguments=("decision_id",),
+        required=("decision_id",),
+        returns=(
+            "The rendered memo markdown. A missing section is omitted with a "
+            "one-line reason; no number is invented and none is rendered as zero."
+        ),
+        stage="6",
+    ),
+    ToolName.RENDER_STAKEHOLDER_MESSAGE.value: ToolSpec(
+        name="render_stakeholder_message",
+        summary=(
+            "Cut a decision's memo to a short, pasteable stakeholder message "
+            "within a channel's word budget: what we found, what we are doing, "
+            "what it is worth, the largest unknown, and a link."
+        ),
+        effect=ToolEffect.READ,
+        arguments=("decision_id", "channel", "link"),
+        required=("decision_id",),
+        returns=(
+            "The message body and word count. The largest unknown is never "
+            "dropped; a budget that cannot fit it fails rather than omitting it."
         ),
         stage="6",
     ),

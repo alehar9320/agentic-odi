@@ -5,15 +5,37 @@ things: what has shipped (and where to verify it), what is open in review, and
 what is queued next. An entry is only "Shipped" when the pull request that built
 it is merged; the link is the proof.
 
-# Roadmap
-
-A roadmap that says everything is done is not a roadmap. This page tracks three
-things: what has shipped (and where to verify it), what is open in review, and
-what is queued next. An entry is only "Shipped" when the pull request that built
-it is merged; the link is the proof.
-
 ## Shipped
 
+- [x] **A drafted argument that cannot invent a number**: `odi brief export
+  --narrate` asks the model to draft the brief's argument, and every numeral in
+  a surviving sentence is checked to exist in the brief and to belong to an
+  outcome the sentence links; a failing sentence is dropped with its reason. The
+  drafted block is always labelled, `--no-narrate` is byte-identical to the
+  factual brief, and a missing provider still renders the facts.
+- [x] **The decision memo writes itself**: `odi decide memo` assembles the
+  one-page case from what is already recorded — the decision, why now, the
+  evidence with its citations, the options rejected and why, what the chosen
+  outcome is worth, how we will know it worked, and what we still do not know.
+  It reads no clock and invokes no model, so the same records render the same
+  bytes; a missing section is omitted with a one-line reason, never a zero. The
+  same projection backs `POST /api/decisions/memo` and the MCP `render_memo`
+  tool.
+- [x] **The memo leaves the app**: `odi decide memo --format html --out memo.html`
+  writes a standalone, printable document that inlines its own paper CSS, escapes
+  hostile text and carries the export time and the store's schema version.
+  `--narrate` adds one labelled framing paragraph through the brief's narrator
+  and its numeral guarantee; `--no-narrate` stays byte-identical to the factual
+  memo. The `decision-memo` card shows the same markdown with one keyboard
+  download action, and `POST /api/decisions/memo?format=html` returns the same
+  document the CLI writes.
+- [x] **The stakeholder message writes itself**: `odi decide message` cuts the
+  memo to a short, pasteable message within a channel's word budget (`slack` 120,
+  `email` 200) — what we found, what we are doing, what it is worth, the largest
+  unknown, and a link. The largest unknown and a supplied link are never dropped
+  for length; a budget that cannot fit them fails loudly. It reads and writes
+  nothing, and the same projection backs `GET /api/decisions/{id}/message` and the
+  MCP `render_stakeholder_message` tool.
 - [x] **One tool contract, exposed** — `ToolName` / `TOOL_SPECS` in `packages/core` are the single source of truth, and `get_capabilities` describes the surface from it ([PR #263](https://github.com/alehar9320/agentic-odi/pull/263)).
 - [x] **Generated capability manifest** — the CLI, MCP server, and Studio read the same capability manifest, and the CLI's local handlers are checked for parity ([PR #272](https://github.com/alehar9320/agentic-odi/pull/272)).
 - [x] **ODI write contract on every path** — every write path validates Job, Step, and Outcome rules instead of trusting the caller ([PR #270](https://github.com/alehar9320/agentic-odi/pull/270)).

@@ -252,6 +252,7 @@ stage. `capabilities --json` emits the full machine-readable manifest.
 agentic-odi brief export --job-id JOB-1                # markdown to stdout
 agentic-odi brief export --job-id JOB-1 --format html  # standalone HTML document
 agentic-odi brief export --job-id JOB-1 --out case.md  # write a file, print its path
+agentic-odi brief export --job-id JOB-1 --narrate      # add a drafted, labelled argument
 ```
 
 `brief export` renders the same deterministic case the Studio shows: the job,
@@ -261,6 +262,16 @@ measurement; a field nobody supplied renders `not measured`, never `0`. The
 `--format html` document inlines its own print styles, so it opens and prints
 with no app CSS and no network access. `--generated-at` stamps a fixed
 timestamp when you need byte-identical output.
+
+`--narrate` asks the configured model to draft the brief's argument and adds it
+in a block headed *Drafted — numbers from the table above*. The draft is only a
+proposal: every numeral in a surviving sentence is checked to exist in the
+brief and to belong to an outcome the sentence links, and a sentence that fails
+is dropped with its reason shown in the same block — so a draft that survives
+nothing still states why. `--no-narrate` — the default — invokes no model and is
+byte-identical to the factual brief. With no provider configured, `--narrate`
+still renders the factual brief and records in that block why nothing was
+drafted.
 
 ## Record a decision
 
@@ -313,6 +324,58 @@ snapshot and prints one line per outcome: `improved`, `degraded`, `no change`,
 never a crash. `--today` pins the comparison date so the day count and the
 verdicts are reproducible. The same projection backs `POST /api/decisions/review`
 and the Studio's decision-review card.
+
+## Assemble the decision memo
+
+```bash
+agentic-odi decide memo --decision-id DEC-1
+agentic-odi decide memo --decision-id DEC-1 --json
+agentic-odi decide memo --decision-id DEC-1 --format html --out memo.html
+agentic-odi decide memo --decision-id DEC-1 --narrate
+```
+
+`decide memo` assembles the one-page memo a product leader can sign from what is
+already recorded: the decision, why now, the evidence with its citations, the
+options rejected and why, what the chosen outcome is worth, how we will know it
+worked, and what we still do not know. Every number is copied from a record —
+the assembler reads no clock, opens no store and invokes no model, so the same
+records always render the same bytes. A section with nothing to say is omitted
+with a one-line reason (`No value estimate recorded`, `No bet recorded`), never
+placeholder prose and never a zero; a value's unit and source travel with the
+number. The same projection backs `POST /api/decisions/memo` and the MCP
+`render_memo` tool.
+
+The memo can leave the app. `--format html` wraps the same markdown in a
+standalone, printable document that inlines its own paper CSS, escapes hostile
+text and carries the export time (`--generated-at`, defaulting to now in UTC) and
+the store's schema version — the file opens offline and prints as it reads.
+`--out` writes it to a path instead of stdout and prints the path; an unwritable
+destination exits non-zero and leaves no artifact. `--narrate` adds one labelled
+framing paragraph drafted through the same narrator `odi brief export --narrate`
+uses: every numeral is checked to exist in the memo, a failing sentence is
+dropped and recorded, and `--no-narrate` — the default — is byte-identical to the
+factual memo. The memo is generated on read and never stored as a row.
+
+## Draft the stakeholder message
+
+```bash
+agentic-odi decide message --decision-id DEC-1
+agentic-odi decide message --decision-id DEC-1 --channel email --link "$MEMO_URL"
+agentic-odi decide message --decision-id DEC-1 --json
+```
+
+`decide message` cuts the memo to a short, pasteable message: what we found,
+what we are doing, what it is worth, the largest unknown, and a link. `--channel`
+sets a hard word budget (`slack` 120, `email` 200). The largest unknown and a
+supplied `--link` are never dropped for length — a budget that cannot fit them
+fails loudly rather than sending a message with its caveat removed. The `slack`
+variant carries no markdown heading, because a heading renders as a literal `#`
+there; the `email` variant adds a `Subject:`. `--copy` copies the body when a
+clipboard tool (`pbcopy`, `wl-copy`, `xclip`, `clip`) is present and prints it
+otherwise, so it never fails on a machine without one. `--verbose` reports which
+optional sentences were dropped to fit. It reads and writes nothing: the same
+projection backs `GET /api/decisions/{id}/message` and the MCP
+`render_stakeholder_message` tool.
 
 ## Track a bet
 

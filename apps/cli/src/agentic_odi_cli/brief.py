@@ -32,6 +32,14 @@ GENERATED_AT_OPTION = typer.Option(
     "--generated-at",
     help="Timestamp to stamp on the brief. Defaults to the export time in UTC.",
 )
+NARRATE_OPTION = typer.Option(
+    False,
+    "--narrate/--no-narrate",
+    help=(
+        "Draft the brief's argument with a model, in a labelled block. "
+        "Off by default; --no-narrate is byte-identical to the factual brief."
+    ),
+)
 
 # The paper rules the Studio's print.css applies, inlined so the exported file
 # is standalone. Colours and margins match that sheet.
@@ -191,8 +199,13 @@ def _select_strategy(brief_inputs: dict[str, Any]) -> Any:
     return select_brief_strategy(brief_inputs.get("chosen_outcome_ids", []), segments, strategies)
 
 
-def _render(brief_inputs: dict[str, Any]) -> str:
-    from agentic_odi_core import BriefInput, BriefOutcome, render_brief
+def _build_brief_input(brief_inputs: dict[str, Any], narrative: Any = None) -> Any:
+    """The core ``BriefInput`` the renderer and the narrator both use.
+
+    One construction site, so the factual brief the narrator drafts against and
+    the brief that renders are the same object minus the narrative.
+    """
+    from agentic_odi_core import BriefInput, BriefOutcome
 
     outcomes = tuple(
         BriefOutcome(
@@ -211,7 +224,7 @@ def _render(brief_inputs: dict[str, Any]) -> str:
         )
         for item in brief_inputs["outcomes"]
     )
-    brief = BriefInput(
+    return BriefInput(
         job_id=brief_inputs["job_id"],
         job_name=brief_inputs["job_name"],
         generated_at=brief_inputs["generated_at"],
@@ -219,8 +232,34 @@ def _render(brief_inputs: dict[str, Any]) -> str:
         decision_consideration=brief_inputs["decision_consideration"],
         evidence_count=brief_inputs["evidence_count"],
         strategy=_select_strategy(brief_inputs),
+        narrative=narrative,
     )
-    return render_brief(brief)
+
+
+def _render(brief_inputs: dict[str, Any], narrative: Any = None) -> str:
+    from agentic_odi_core import render_brief
+
+    return render_brief(_build_brief_input(brief_inputs, narrative))
+
+
+def _narrate(brief_inputs: dict[str, Any], *, narrator: Any = None) -> Any:
+    """Draft and check the brief's argument against the factual brief.
+
+    A provider failure — including no provider at all — is surfaced as a
+    narrative whose drop list names it, so the factual brief still renders and
+    the reader sees why the drafted block is absent. The import is local:
+    ``--narrate`` is the only path that pulls in the model client.
+    """
+    from agentic_odi_core import DroppedSentence, Narrative, render_narrative
+
+    if narrator is None:
+        from agentic_odi_cli.narrator import OpenAINarrator
+
+        try:
+            narrator = OpenAINarrator.from_env()
+        except Exception as error:  # noqa: BLE001 - no provider is a drop, not a crash
+            return Narrative(dropped=(DroppedSentence("", f"no narrator configured: {error}"),))
+    return render_narrative(_build_brief_input(brief_inputs), narrator)
 
 
 @brief_app.command("export")
@@ -229,6 +268,7 @@ def export(
     output_format: str = FORMAT_OPTION,
     out: Path | None = OUT_OPTION,
     generated_at: str | None = GENERATED_AT_OPTION,
+    narrate: bool = NARRATE_OPTION,
 ) -> None:
     """Render the factual case and print its path (or write it to stdout)."""
     fmt = output_format.lower()
@@ -256,7 +296,8 @@ def export(
         segments=segments if isinstance(segments, list) else [],
         strategies=strategies if isinstance(strategies, list) else [],
     )
-    markdown = _render(brief_inputs)
+    narrative = _narrate(brief_inputs) if narrate else None
+    markdown = _render(brief_inputs, narrative)
     document = markdown if fmt == "md" else brief_to_html(markdown, source=f"job {job_id}")
 
     if out is None:

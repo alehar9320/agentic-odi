@@ -22,6 +22,8 @@ from agentic_odi_core import (
     EvidenceNotFoundError,
     JobNotFoundError,
     JobStage,
+    MemoDecisionNotFoundError,
+    MessageBudgetError,
     OdiError,
     ODIService,
     OutcomeNotFoundError,
@@ -46,6 +48,9 @@ from agentic_odi_core import (
 )
 from agentic_odi_core import (
     outcome_delta as outcome_delta_read,
+)
+from agentic_odi_core import (
+    render_memo as render_memo_text,
 )
 from fastmcp import Context, FastMCP
 from pydantic import ValidationError
@@ -816,6 +821,41 @@ def review_decision(decision_id: str, today: str) -> str:
         ],
     }
     return json.dumps(payload)
+
+
+@mcp.tool
+def render_memo(decision_id: str) -> str:
+    """Assemble the decision memo from what is already recorded."""
+    try:
+        memo = service.build_memo(decision_id)
+    except MemoDecisionNotFoundError:
+        return f"Error: decision not found: {decision_id}"
+    return render_memo_text(memo)
+
+
+@mcp.tool
+def render_stakeholder_message(
+    decision_id: str, channel: str = "slack", link: str | None = None
+) -> str:
+    """Cut a decision's memo to a short, pasteable stakeholder message."""
+    try:
+        message = service.build_stakeholder_message(decision_id, channel=channel, link=link)
+    except MemoDecisionNotFoundError:
+        return f"Error: decision not found: {decision_id}"
+    except MessageBudgetError as exc:
+        return f"Error: {exc}"
+    except (OdiError, ValueError) as exc:
+        return f"Error: {exc}"
+    return json.dumps(
+        {
+            "decision_id": decision_id,
+            "channel": message.channel,
+            "subject": message.subject,
+            "body": message.body,
+            "word_count": message.word_count,
+            "dropped": list(message.dropped),
+        }
+    )
 
 
 @mcp.tool
