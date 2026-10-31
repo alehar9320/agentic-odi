@@ -65,12 +65,15 @@ per-platform archives with SHA-256 checksums for a manual download. See
 - **A brain for customer needs.** Jobs, desired outcomes, evidence, and
   opportunity scores in one store — queryable by any MCP client.
 - **A conversation, not a form.** The Living Studio opens on one question —
-  **What do you want to win?** — with the composer focused. Its optional
-  four-step tour stays out of the way, and in-place guidance appears only after
-  the first exchange. It turns "a customer still reconciles invoices by hand"
-  into a scored outcome, a job map, and a ranked opportunity board — inline in
-  the thread. Every claim in a reply names the record behind it, or says it is a
-  hypothesis.
+  **What do you want to win?** — with the composer focused. When you ask for
+  context, the agent speaks first: who you are and your team, who feels the
+  problem, what they are trying to win, where it breaks, and what you already
+  have. The answers come back as a brief you can edit line by line, not a
+  settings dialog. Its optional four-step tour stays out of the way, and
+  in-place guidance appears only after the first exchange. It turns "a customer
+  still reconciles invoices by hand" into a scored outcome, a job map, and a
+  ranked opportunity board — inline in the thread. Every claim in a reply names
+  the record behind it, or says it is a hypothesis.
 - **Local-first by default.** The CLI and server work with no network and no
   account. Point them at a remote MCP server with one flag.
 - **A catch-up that means something.** Writes emit signals — an outcome
