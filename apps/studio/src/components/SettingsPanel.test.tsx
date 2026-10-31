@@ -359,4 +359,23 @@ describe("SettingsPanel notification policy", () => {
       ),
     );
   });
+
+  it("keeps the stored policy and shows an error when a save fails", async () => {
+    const { saveNotificationRule } = await import("../api/studioApi");
+    vi.mocked(saveNotificationRule).mockRejectedValueOnce(new Error("sidecar is offline"));
+    vi.mocked(useStudio).mockReturnValue(stubContext());
+
+    renderPanel();
+
+    const policy = await screen.findByRole("region", { name: "Notifications" });
+    const coverage = within(policy).getByRole("checkbox", {
+      name: /a job-map stage has no outcomes/i,
+    }) as HTMLInputElement;
+    fireEvent.click(coverage);
+
+    // The failed write is surfaced, not silently swallowed, and the checkbox
+    // falls back to the stored value rather than showing a false saved state.
+    expect(await within(policy).findByText("sidecar is offline")).toBeInTheDocument();
+    expect(coverage.checked).toBe(false);
+  });
 });

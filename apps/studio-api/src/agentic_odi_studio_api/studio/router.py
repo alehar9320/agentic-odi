@@ -20,13 +20,16 @@ from agentic_odi_connectors.registry import (
 from agentic_odi_core import (
     EvidenceNotFoundError,
     JobNotFoundError,
+    NotificationRule,
     OdiError,
     ODIService,
     OutcomeNotFoundError,
     OutcomeStatementError,
+    Signal,
     StepNotFoundError,
     ToolName,
     ValueOutOfRangeError,
+    count_notifiable,
     error_status,
 )
 from agentic_odi_core.remote import StudioError, StudioErrorCode
@@ -697,16 +700,38 @@ async def get_signals(
 async def get_signal_unread_count(
     request: Request, mcp_url: str | None = Query(None)
 ) -> dict[str, int]:
-    """What the bell badge shows. Suppressed and dismissed signals never count."""
+    """What the bell badge shows: unread, undismissed, and eligible to interrupt.
+
+    The bell is the interruption count, so it applies the same shared policy the
+    digest does. A kind turned off in Settings, a coverage gap under the
+    defaults, or a score move below its threshold stays real in the feed but
+    never rings the bell.
+    """
     if _uses_mcp(request):
-        result = await call_mcp_tool(
-            _require_mcp_url(mcp_url or ""),
-            ToolName.LIST_SIGNALS.value,
-            {"unread_only": True, "limit": 1000},
+        unread = _json_or_raw(
+            await call_mcp_tool(
+                _require_mcp_url(mcp_url or ""),
+                ToolName.LIST_SIGNALS.value,
+                {"unread_only": True, "limit": 1000},
+            )
         )
-        parsed = _json_or_raw(result)
-        return {"count": len(parsed) if isinstance(parsed, list) else 0}
-    return {"count": _service(request).count_unread_signals()}
+        rules = _json_or_raw(
+            await call_mcp_tool(
+                _require_mcp_url(mcp_url or ""),
+                ToolName.LIST_NOTIFICATION_RULES.value,
+                {},
+            )
+        )
+        signals = (
+            [Signal.model_validate(signal) for signal in unread] if isinstance(unread, list) else []
+        )
+        parsed_rules = (
+            [NotificationRule.model_validate(rule) for rule in rules]
+            if isinstance(rules, list)
+            else []
+        )
+        return {"count": count_notifiable(signals, parsed_rules)}
+    return {"count": _service(request).count_notifiable_signals()}
 
 
 @router.post("/signals/{signal_id}/read")

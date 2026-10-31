@@ -554,7 +554,7 @@ class SQLiteRepository(Repository):
             self._sync()
             return self.signals.get(signal_id)
 
-    def list_signals(self, unread_only: bool = False, limit: int = 50) -> list[Signal]:
+    def list_signals(self, unread_only: bool = False, limit: int | None = 50) -> list[Signal]:
         with self._lock:
             self._sync()
             items = (

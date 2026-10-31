@@ -25,6 +25,20 @@ def _make_signal(client: TestClient) -> dict:
     return signals[0]
 
 
+def _record(client: TestClient, kind: str, title: str, **fields: object) -> dict:
+    """Record one signal straight into the store, as a real write would."""
+    service = client.app.state.service  # type: ignore[attr-defined]
+    signal = service.record_signal(
+        SignalKind(kind),
+        title,
+        subject_kind="job",
+        subject_id="j-1",
+        discriminator=title,
+        **fields,
+    )
+    return signal.model_dump(mode="json")
+
+
 def test_local_backend_lists_job_added_as_a_real_signal() -> None:
     client = _client()
     signal = _make_signal(client)
@@ -36,7 +50,7 @@ def test_local_backend_lists_job_added_as_a_real_signal() -> None:
 
 def test_local_backend_unread_count_tracks_reads_and_dismissals() -> None:
     client = _client()
-    signal = _make_signal(client)
+    signal = _record(client, "bet_due", "Bet is due")
     assert client.get("/api/signals/unread-count").json() == {"count": 1}
 
     read = client.post(f"/api/signals/{signal['id']}/read", json={})
@@ -50,9 +64,36 @@ def test_local_backend_unread_count_tracks_reads_and_dismissals() -> None:
     assert client.get("/api/signals").json() == []
 
 
+def test_local_backend_bell_applies_the_shared_policy() -> None:
+    client = _client()
+    # A coverage gap is real and visible in the feed but off by default, so it
+    # never rings the bell; a bet coming due does.
+    gap = _record(client, "coverage_gap", "A stage has no outcomes")
+    _record(client, "bet_due", "Bet is due")
+    assert client.get("/api/signals/unread-count").json() == {"count": 1}
+    assert {signal["kind"] for signal in client.get("/api/signals").json()} == {
+        "coverage_gap",
+        "bet_due",
+    }
+
+    # A rule edit changes the count immediately, and never marks the signal
+    # read or dismisses it.
+    assert (
+        client.put(
+            "/api/notification-rules",
+            json={"kind": "coverage_gap", "threshold": 0.0, "enabled": True},
+        ).status_code
+        == 200
+    )
+    assert client.get("/api/signals/unread-count").json() == {"count": 2}
+    gap_row = next(s for s in client.get("/api/signals").json() if s["id"] == gap["id"])
+    assert gap_row["read_at"] is None
+    assert gap_row["dismissed_at"] is None
+
+
 def test_local_backend_repeated_reads_write_nothing() -> None:
     client = _client()
-    _make_signal(client)
+    _record(client, "bet_due", "Bet is due")
     first = client.get("/api/signals").json()
     second = client.get("/api/signals").json()
     # Derivation is read-only: two reads return identical, stable rows and the
@@ -73,19 +114,39 @@ def test_local_backend_returns_404_for_an_unknown_signal_id() -> None:
 def test_local_backend_excludes_budget_suppressed_signals(monkeypatch) -> None:
     monkeypatch.delenv("AGENTIC_ODI_SIGNAL_BUDGET", raising=False)
     client = _client()
-    _make_signal(client)
     service = client.app.state.service  # type: ignore[attr-defined]
     for index in range(25):
         service.record_signal(
-            SignalKind.JOB_ADDED,
-            f"extra job {index}",
-            subject_kind="job",
-            subject_id=f"j-{index}",
-            discriminator=f"j-{index}",
+            SignalKind.BET_DUE,
+            f"extra bet {index}",
+            subject_kind="bet",
+            subject_id=f"b-{index}",
+            discriminator=f"b-{index}",
         )
     feed = client.get("/api/signals").json()
     assert len(feed) == 20
+    # The budget caps the feed, and the bell only counts what the policy lets
+    # interrupt, so both stop at the same 20 eligible signals.
     assert client.get("/api/signals/unread-count").json() == {"count": 20}
+
+
+def test_local_backend_rule_edit_does_not_resurrect_a_dismissed_signal() -> None:
+    client = _client()
+    gap = _record(client, "coverage_gap", "A stage has no outcomes")
+    assert client.post(f"/api/signals/{gap['id']}/dismiss", json={}).status_code == 200
+    assert client.get("/api/signals/unread-count").json() == {"count": 0}
+
+    # Turning the kind on makes the *kind* eligible but must not undo a
+    # dismissal: the dismissed signal stays out of the feed and the bell.
+    assert (
+        client.put(
+            "/api/notification-rules",
+            json={"kind": "coverage_gap", "threshold": 0.0, "enabled": True},
+        ).status_code
+        == 200
+    )
+    assert client.get("/api/signals/unread-count").json() == {"count": 0}
+    assert client.get("/api/signals").json() == []
 
 
 def test_mcp_backend_calls_the_contract_tools(monkeypatch) -> None:
@@ -114,13 +175,22 @@ def test_mcp_backend_calls_the_contract_tools(monkeypatch) -> None:
 
 def test_mcp_backend_unread_counts_from_the_list_tool(monkeypatch) -> None:
     async def _call(mcp_url: str, tool: str, arguments: dict) -> str:
+        if tool == "list_notification_rules":
+            return json.dumps([{"kind": "bet_due", "threshold": 0.0, "enabled": True}])
         assert tool == "list_signals"
         assert arguments == {"unread_only": True, "limit": 1000}
-        return json.dumps([{"id": "a"}, {"id": "b"}])
+        return json.dumps(
+            [
+                {"id": "a", "kind": "bet_due", "title": "due", "fingerprint": "fa"},
+                {"id": "b", "kind": "coverage_gap", "title": "gap", "fingerprint": "fb"},
+            ]
+        )
 
     monkeypatch.setattr(router_module, "call_mcp_tool", _call)
     client = _client(backend="mcp")
-    assert client.get("/api/signals/unread-count?mcp_url=http://mcp").json() == {"count": 2}
+    # The bell applies the shared policy, so the coverage gap (off by default)
+    # stays in the feed but does not count.
+    assert client.get("/api/signals/unread-count?mcp_url=http://mcp").json() == {"count": 1}
 
 
 def test_mcp_backend_maps_unknown_signal_ids_to_404(monkeypatch) -> None:

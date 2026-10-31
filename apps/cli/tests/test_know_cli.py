@@ -439,6 +439,35 @@ def test_digest_honours_the_shared_policy(tmp_path):
     assert any(s["kind"] == "bet_due" for s in signals)
 
 
+def test_digest_keeps_read_signals_the_bell_drops(tmp_path):
+    """The weekly record is not personal read-state.
+
+    ALH-242 pins the choice explicitly: reading a signal clears the bell but must
+    not erase it from the digest. The digest filters by the shared policy, not by
+    read/dismissed state.
+    """
+    from agentic_odi_cli.backend import LocalBackend
+
+    db = str(tmp_path / "odi.db")
+    runner = CliRunner()
+    job_id = _job(runner, db)
+    outcome_id = _outcome(runner, db, job_id)
+    decision_id = _decision(runner, db, job_id, outcome_id)
+    _bet(runner, db, decision_id, outcome_id)
+
+    # Refresh the inbox, then read the due bet.
+    _invoke(runner, db, "know", "digest", "--since", "3650d")
+    backend = LocalBackend(db_path=db)
+    due = next(s for s in backend.call("list_signals", {"limit": 200}) if s["kind"] == "bet_due")
+    backend.call("mark_signal_read", {"signal_id": due["id"]})
+
+    # The bell no longer counts it, but the digest still records it: the weekly
+    # record is not personal read-state.
+    unread = backend.call("list_signals", {"unread_only": True, "limit": 200})
+    assert due["id"] not in {signal["id"] for signal in unread}
+    assert "## Bets due" in _invoke(runner, db, "know", "digest", "--since", "3650d").output
+
+
 def test_digest_rejects_a_bad_window(tmp_path):
     db = str(tmp_path / "odi.db")
     runner = CliRunner()

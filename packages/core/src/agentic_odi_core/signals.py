@@ -68,6 +68,17 @@ def should_notify(signal: Signal, rules: dict[SignalKind, NotificationRule] | No
     return True
 
 
+def count_notifiable(signals: list[Signal], rules: list[NotificationRule]) -> int:
+    """How many of these signals may interrupt, under one policy.
+
+    The bell is the interruption count, so it is computed from the same
+    ``should_notify`` the digest uses rather than from raw unread state. Pure
+    and clock-free, so the same signals and rules give the same count everywhere.
+    """
+    policy = {rule.kind: rule for rule in rules}
+    return sum(1 for signal in signals if should_notify(signal, policy))
+
+
 def emit_know_signals(
     service, *, job_id: str | None = None, now: datetime | None = None
 ) -> list[Signal]:
@@ -137,6 +148,7 @@ def _covered_stages(repo, job_id: str) -> set:
 
 __all__ = [
     "DEFAULT_SCORE_MOVE_THRESHOLD",
+    "count_notifiable",
     "default_rules",
     "emit_know_signals",
     "should_notify",

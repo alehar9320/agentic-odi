@@ -87,7 +87,10 @@ only hidden from the feed and the unread count.
 - **Studio API:** `GET /api/signals`, `GET /api/signals/unread-count`, `POST
   /api/signals/{id}/read`, `POST /api/signals/{id}/dismiss` — under both the
   `local` and `mcp` backends; unknown id is 404.
-- **Studio:** the bell badge is `/api/signals/unread-count`. The Catch Up lens
+- **Studio:** the bell badge is `/api/signals/unread-count`. It counts the unread
+  signals the shared notification policy lets interrupt, so a kind turned off in
+  Settings (or a coverage gap under the defaults) stays real in the feed without
+  ringing the bell. The Catch Up lens
   loads on boot, re-reads after every canvas refresh (including the `canvas_dirty`
   chat frame), and polls every 60 s while the window is visible.
 

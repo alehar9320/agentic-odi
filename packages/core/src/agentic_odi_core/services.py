@@ -263,7 +263,7 @@ class ODIService:
         )
         return self.repo.add_signal(signal)
 
-    def list_signals(self, unread_only: bool = False, limit: int = 50) -> list[Signal]:
+    def list_signals(self, unread_only: bool = False, limit: int | None = 50) -> list[Signal]:
         return self.repo.list_signals(unread_only=unread_only, limit=limit)
 
     def mark_signal_read(self, signal_id: str) -> Signal:
@@ -280,6 +280,23 @@ class ODIService:
 
     def count_unread_signals(self) -> int:
         return self.repo.count_unread_signals()
+
+    def count_notifiable_signals(self) -> int:
+        """The bell count: unread, undismissed, and eligible to interrupt.
+
+        The shared policy decides what may interrupt, and the bell is the
+        interruption count, so it must apply ``should_notify`` exactly as the
+        digest does. A signal the policy keeps feed-only (a coverage gap under
+        the defaults, or any kind turned off in Settings) is real and visible
+        but never rings the bell. Computed at read time from the current rules,
+        so a rule edit changes the count immediately with no stored counter.
+        """
+        from agentic_odi_core.signals import count_notifiable
+
+        return count_notifiable(
+            self.repo.list_signals(unread_only=True, limit=None),
+            self.list_notification_rules(),
+        )
 
     def add_job(self, name: str, description: str | None = None) -> Job:
         job = Job(name=name, description=description)

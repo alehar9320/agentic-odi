@@ -190,8 +190,11 @@ it renders. The catch-up feed starts empty rather than inventing activity, and
 no surface can fabricate a signal: the three example signals live only in test
 fixtures. Its real content is the store's signal inbox
 ([The Signal Inbox](architecture/notifications.md)): the bell count comes from
-`/api/signals/unread-count`, the feed loads on boot, re-reads after every canvas
-refresh, and polls once a minute while the window is visible. Connector rows in Settings come from the real connector
+`/api/signals/unread-count`, which counts the unread signals the shared
+notification policy actually lets interrupt — a coverage gap or a kind toggled
+off in Settings stays in the feed but never rings the bell. The feed loads on
+boot, re-reads after every canvas refresh, and polls once a minute while the
+window is visible. Connector rows in Settings come from the real connector
 store, grouped by capability area; nothing is pre-listed as though it were
 already connected.
 
@@ -344,7 +347,9 @@ in the feed.
 The **Notifications** section in Settings edits that shared policy. It reads and
 writes the same `/api/notification-rules` the digest and the bell consult, so a
 kind toggled off there stops interrupting everywhere — the signal stays in the
-feed.
+feed, and the bell count drops on the next read with no stored counter to drift.
+Reading a signal clears the bell but does not erase it from the weekly digest:
+the digest is the record of what happened, not your personal read-state.
 
 ### The thread comes back
 

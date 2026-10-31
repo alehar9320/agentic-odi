@@ -105,6 +105,7 @@ from agentic_odi_core.services import (
     ValueOutOfRangeError,
 )
 from agentic_odi_core.signals import (
+    count_notifiable,
     default_rules,
     emit_know_signals,
     should_notify,
@@ -192,6 +193,7 @@ __all__ = [
     "compute_opportunity_score",
     "create_job",
     "customer_outcome_not_found",
+    "count_notifiable",
     "default_rules",
     "emit_know_signals",
     "error_status",

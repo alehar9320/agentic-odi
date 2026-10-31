@@ -376,6 +376,65 @@ def test_should_notify_unsupported_kind_has_an_explicit_result() -> None:
     assert should_notify(signal) is False
 
 
+def test_count_notifiable_matches_should_notify_per_signal() -> None:
+    from agentic_odi_core.models import Signal
+    from agentic_odi_core.signals import count_notifiable, default_rules
+
+    rules = list(default_rules().values())
+    due = Signal(
+        kind=SignalKind.BET_DUE,
+        title="due",
+        subject_kind="bet",
+        subject_id="b",
+        fingerprint="f-due",
+    )
+    wobble = Signal(
+        kind=SignalKind.SCORE_MOVED,
+        title="moved",
+        subject_kind="outcome",
+        subject_id="o",
+        magnitude=0.2,
+        fingerprint="f-wobble",
+    )
+    crossing = wobble.model_copy(update={"magnitude": -1.2, "fingerprint": "f-cross"})
+    gap = Signal(
+        kind=SignalKind.COVERAGE_GAP,
+        title="gap",
+        subject_kind="job_stage",
+        subject_id="s",
+        fingerprint="f-gap",
+    )
+    # Only the due bet and the real crossing may interrupt; the wobble and the
+    # off-by-default gap stay in the feed but do not ring the bell.
+    assert count_notifiable([due, wobble, crossing, gap], rules) == 2
+    assert count_notifiable([], rules) == 0
+
+
+def test_bell_count_applies_the_policy_at_read_time(service: ODIService) -> None:
+    from agentic_odi_core.models import SignalKind
+
+    # A coverage gap is real feed data but off by default; a bet coming due
+    # interrupts. The bell is the interruption count, so it counts one.
+    service.record_signal(
+        SignalKind.COVERAGE_GAP, "stage uncovered", subject_kind="job_stage", subject_id="s-1"
+    )
+    service.record_signal(SignalKind.BET_DUE, "bet due", subject_kind="bet", subject_id="b-1")
+    assert service.count_unread_signals() == 2
+    assert service.count_notifiable_signals() == 1
+
+    # Turning the gap on changes the count immediately, without marking the
+    # signal read or dismissing it.
+    service.set_notification_rule(SignalKind.COVERAGE_GAP, enabled=True)
+    assert service.count_notifiable_signals() == 2
+    gap = next(s for s in service.list_signals() if s.kind is SignalKind.COVERAGE_GAP)
+    assert gap.read_at is None and gap.dismissed_at is None
+
+    # Reading the bet drops it from the bell; the count follows the state.
+    bet = next(s for s in service.list_signals() if s.kind is SignalKind.BET_DUE)
+    service.mark_signal_read(bet.id)
+    assert service.count_notifiable_signals() == 1
+
+
 def test_invalid_rule_edit_leaves_the_previous_rule_effective(service: ODIService) -> None:
     before = {rule.kind: rule for rule in service.list_notification_rules()}
     with pytest.raises(ValidationError):
