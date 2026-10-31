@@ -304,6 +304,8 @@ export interface Signal {
   detail?: string | null;
   subject_kind?: SignalSubjectKind | null;
   subject_id?: string | null;
+  /** The Job this fact belongs to; scopes a feed or digest to one job. */
+  job_id?: string | null;
   severity: SignalSeverity;
   created_at: string;
   read_at?: string | null;

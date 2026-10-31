@@ -220,9 +220,28 @@ digest` and `odi know spine` are kept as aliases.
   shared notification policy decides which signals interrupt you (for example a
   score must move by a threshold); everything else stays in the feed.
 - `know digest` refreshes the inbox, then writes deterministic markdown of the
-  know signals inside the window. `know spine` shows each stage — captured,
-  scored, decided, bet, measured — and the first missing link, so you can see
-  exactly where the evidence chain stops.
+  know signals inside the window. `--job <id>` scopes both the refresh and the
+  read to one Job, so a per-job digest never shows another job's facts; an
+  unknown Job is an error rather than a silently empty digest. `--out <path>`
+  writes the same bytes it would print and echoes the path. `know spine` shows
+  each stage — captured, scored, decided, bet, measured — and the first missing
+  link, so you can see exactly where the evidence chain stops. Only the first
+  missing link is named; later stages stay blank, so the counts never imply one
+  closed chain. When an open bet exists, the `measured` row carries the real
+  `measure_by` date; with no open bet the date is absent rather than guessed. An
+  empty store prints `No job yet.` and nothing else. The spine reads only and
+  writes nothing.
+
+```
+$ agentic-odi status --spine --job <job-id>
+Spine for <job-id>
+
+captured   1
+scored     1
+decided    0  → record a decision
+bet        0
+measured   0
+```
 
 Add `--json` to any command for machine-readable output.
 
@@ -264,6 +283,7 @@ emit nothing.
 ```bash
 agentic-odi signals list                 # newest first
 agentic-odi signals list --unread --limit 5
+agentic-odi signals list --job-id <job-id>   # one Job's facts only
 agentic-odi signals unread --json
 agentic-odi signals read <signal-id>
 agentic-odi signals dismiss <signal-id>

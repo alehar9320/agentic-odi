@@ -313,3 +313,51 @@ def test_the_feed_is_newest_first_and_honours_the_limit() -> None:
     feed = service.list_signals(limit=1000)
     assert [signal.title for signal in feed] == ["Job 3", "Job 2", "Job 1", "Job 0"]
     assert [signal.title for signal in service.list_signals(limit=2)] == ["Job 3", "Job 2"]
+
+
+def test_signals_carry_their_job_and_can_be_scoped_to_one_job() -> None:
+    service = _service()
+    first = _job(service)
+    second = service.add_job(name="Other").id
+    service.record_signal(
+        SignalKind.SCORE_MOVED,
+        "First moved",
+        subject_kind="outcome",
+        subject_id="o-1",
+        discriminator="o-1",
+        job_id=first,
+    )
+    service.record_signal(
+        SignalKind.SCORE_MOVED,
+        "Second moved",
+        subject_kind="outcome",
+        subject_id="o-2",
+        discriminator="o-2",
+        job_id=second,
+    )
+
+    scoped = service.list_signals(job_id=first, limit=1000)
+    # Only the first job's facts are visible when scoped, plus its job_added.
+    assert {signal.job_id for signal in scoped} == {first}
+    titles = {signal.title for signal in scoped}
+    assert "First moved" in titles
+    assert "Second moved" not in titles
+
+
+def test_a_job_scoped_digest_read_never_leaks_another_job() -> None:
+    service = _service()
+    first = _job(service)
+    second = service.add_job(name="Other").id
+    for job_id, label in ((first, "A"), (second, "B")):
+        service.record_signal(
+            SignalKind.BET_DUE,
+            f"Bet due: {label}",
+            subject_kind="bet",
+            subject_id=f"bet-{label}",
+            discriminator=f"bet-{label}",
+            job_id=job_id,
+        )
+    scoped = service.list_signals(job_id=second, limit=1000)
+    titles = {signal.title for signal in scoped}
+    assert "Bet due: B" in titles
+    assert "Bet due: A" not in titles

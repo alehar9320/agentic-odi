@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import re
-from datetime import date
+from datetime import date, timedelta
 
 from agentic_odi_cli.cli import app
 from typer.testing import CliRunner
@@ -76,7 +76,15 @@ def _decision(runner: CliRunner, db: str, job_id: str, outcome_id: str) -> str:
     )["id"]
 
 
-def _bet(runner: CliRunner, db: str, decision_id: str, outcome_id: str, *, target: str = "12"):
+def _bet(
+    runner: CliRunner,
+    db: str,
+    decision_id: str,
+    outcome_id: str,
+    *,
+    target: str = "12",
+    measure_by: str = "2020-01-01",
+):
     return json.loads(
         _invoke(
             runner,
@@ -92,7 +100,7 @@ def _bet(runner: CliRunner, db: str, decision_id: str, outcome_id: str, *, targe
             "--target",
             target,
             "--measure-by",
-            "2020-01-01",
+            measure_by,
             "--json",
         ).output
     )
@@ -196,8 +204,82 @@ def test_digest_out_writes_the_same_bytes(tmp_path):
     db = str(tmp_path / "odi.db")
     out = tmp_path / "digest.md"
     runner = CliRunner()
-    _invoke(runner, db, "know", "digest", "--since", "3650d", "--out", str(out))
+    result = _invoke(runner, db, "know", "digest", "--since", "3650d", "--out", str(out))
     assert out.read_text(encoding="utf-8") == "No changes in this period."
+    # The path is printed, and the bytes match the canonical renderer exactly.
+    assert str(out) in _flat(result.output)
+    assert (
+        out.read_text(encoding="utf-8")
+        == _invoke(runner, db, "know", "digest", "--since", "3650d").output
+    )
+
+
+def test_digest_out_unwritable_destination_fails_loudly(tmp_path):
+    db = str(tmp_path / "odi.db")
+    runner = CliRunner()
+    # A directory as the destination cannot be opened as a file.
+    result = runner.invoke(
+        app, ["--db", db, "know", "digest", "--since", "3650d", "--out", str(tmp_path)]
+    )
+    assert result.exit_code != 0
+
+
+def test_digest_window_boundary_is_inclusive_and_excludes_the_past(tmp_path):
+    """A signal exactly on the boundary is kept; one before it is not."""
+    from datetime import datetime, timezone
+
+    from agentic_odi_cli.know import build_digest
+
+    rules = [{"kind": "bet_due", "threshold": 0.0, "enabled": True}]
+    on = {"kind": "bet_due", "created_at": "2026-06-01T00:00:00Z", "id": "b1", "title": "On"}
+    before = {
+        "kind": "bet_due",
+        "created_at": "2026-05-31T23:59:59Z",
+        "id": "b0",
+        "title": "Before",
+    }
+    since = datetime(2026, 6, 1, tzinfo=timezone.utc)
+    assert "On" in build_digest([on], rules, since=since)
+    assert build_digest([before], rules, since=since) == "No changes in this period."
+
+
+def test_digest_same_timestamp_orders_by_id_deterministically():
+    from datetime import datetime, timezone
+
+    from agentic_odi_cli.know import build_digest
+
+    rules = [{"kind": "bet_due", "threshold": 0.0, "enabled": True}]
+    stamp = "2026-06-02T00:00:00Z"
+    rows = [
+        {"kind": "bet_due", "created_at": stamp, "id": "z", "title": "Zeta"},
+        {"kind": "bet_due", "created_at": stamp, "id": "a", "title": "Alpha"},
+    ]
+    since = datetime(2026, 6, 1, tzinfo=timezone.utc)
+    forward = build_digest(rows, rules, since=since)
+    backward = build_digest(list(reversed(rows)), rules, since=since)
+    assert forward == backward
+    assert forward.index("Alpha") < forward.index("Zeta")
+
+
+def test_digest_toplevel_job_filter_narrows_and_unknown_job_errors(tmp_path):
+    db = str(tmp_path / "odi.db")
+    runner = CliRunner()
+    first = _job(runner, db)
+    second = _job(runner, db)
+    first_outcome = _outcome(runner, db, first)
+    second_outcome = _outcome(runner, db, second)
+    first_decision = _decision(runner, db, first, first_outcome)
+    second_decision = _decision(runner, db, second, second_outcome)
+    _bet(runner, db, first_decision, first_outcome)
+    _bet(runner, db, second_decision, second_outcome)
+
+    both = _invoke(runner, db, "digest", "--since", "3650d").output
+    assert both.count("Bet due") == 2
+    scoped = _invoke(runner, db, "digest", "--since", "3650d", "--job", second).output
+    assert scoped.count("Bet due") == 1
+
+    missing = runner.invoke(app, ["--db", db, "digest", "--job", "missing"])
+    assert missing.exit_code != 0
 
 
 def test_spine_reports_first_blocker(tmp_path):
@@ -226,6 +308,74 @@ def test_spine_json_and_auto_job_selection(tmp_path):
     # Only the first missing link is named; later stages stay blank.
     assert by_stage["bet"]["blocker"] == ""
     assert by_stage["measured"]["blocker"] == ""
+    # No bet exists, so no due date is invented.
+    assert all(row["due"] == "" for row in rows)
+
+
+def test_spine_shows_a_real_due_date_when_a_bet_is_open(tmp_path):
+    db = str(tmp_path / "odi.db")
+    runner = CliRunner()
+    job_id = _job(runner, db)
+    outcome_id = _outcome(runner, db, job_id)
+    decision_id = _decision(runner, db, job_id, outcome_id)
+    _bet(runner, db, decision_id, outcome_id)  # measure_by 2020-01-01
+
+    rows = json.loads(_invoke(runner, db, "know", "spine", "--job", job_id, "--json").output)
+    measured = next(row for row in rows if row["stage"] == "measured")
+    # The bet is open and unmeasured, so the real measure_by date is shown.
+    assert measured["count"] == 0
+    assert measured["due"] == "2020-01-01"
+
+
+def test_spine_golden_output_is_byte_stable(tmp_path):
+    db = str(tmp_path / "odi.db")
+    runner = CliRunner()
+    job_id = _job(runner, db)
+    _outcome(runner, db, job_id)
+
+    expected = (
+        f"Spine for {job_id}\n"
+        "\n"
+        "captured   1\n"
+        "scored     1\n"
+        "decided    0  → record a decision\n"
+        "bet        0\n"
+        "measured   0\n"
+    )
+    first = _invoke(runner, db, "know", "spine", "--job", job_id).output
+    second = _invoke(runner, db, "know", "spine", "--job", job_id).output
+    assert first == expected
+    assert second == expected  # same store, same bytes
+
+
+def test_spine_writes_nothing_to_the_store(tmp_path):
+    db = str(tmp_path / "odi.db")
+    runner = CliRunner()
+    job_id = _job(runner, db)
+    _outcome(runner, db, job_id)
+    before = json.loads(_invoke(runner, db, "signals", "list", "--json").output)
+    _invoke(runner, db, "know", "spine", "--job", job_id)
+    after = json.loads(_invoke(runner, db, "signals", "list", "--json").output)
+    # The spine is read-only: it records no signal of its own.
+    assert after == before
+
+
+def test_spine_counts_do_not_claim_one_closed_chain(tmp_path):
+    """Two unrelated outcomes score, but no bet ties them: totals stay honest."""
+    db = str(tmp_path / "odi.db")
+    runner = CliRunner()
+    job_id = _job(runner, db)
+    _outcome(runner, db, job_id)
+    _outcome(runner, db, job_id)  # a second, disconnected outcome
+
+    rows = json.loads(_invoke(runner, db, "know", "spine", "--job", job_id, "--json").output)
+    by_stage = {row["stage"]: row for row in rows}
+    assert by_stage["captured"]["count"] == 2
+    assert by_stage["scored"]["count"] == 2
+    # No decision yet: the chain stops at 'decided' and later stages stay blank.
+    assert by_stage["decided"]["blocker"] == "record a decision"
+    assert by_stage["bet"]["count"] == 0
+    assert by_stage["measured"]["count"] == 0
 
 
 def test_toplevel_digest_matches_the_know_alias(tmp_path):
@@ -593,3 +743,89 @@ def test_digest_unruled_kind_never_interrupts():
     assert _should_notify({"kind": "job_added"}, {}) is False
     assert _should_notify({"kind": "bet_due"}, {"bet_due": {"enabled": True}}) is True
     assert _should_notify({"kind": "bet_due"}, {"bet_due": {"enabled": False}}) is False
+
+
+def test_digest_job_filter_narrows_and_unknown_job_errors(tmp_path):
+    db = str(tmp_path / "odi.db")
+    runner = CliRunner()
+    first = _job(runner, db)
+    second = _job(runner, db)
+    first_outcome = _outcome(runner, db, first)
+    second_outcome = _outcome(runner, db, second)
+    first_decision = _decision(runner, db, first, first_outcome)
+    second_decision = _decision(runner, db, second, second_outcome)
+    _bet(runner, db, first_decision, first_outcome, target="12")
+    _bet(runner, db, second_decision, second_outcome, target="12")
+
+    # Prime the inbox with both jobs' facts, then scope the read to one job.
+    both = _invoke(runner, db, "digest", "--since", "3650d").output
+    assert both.count("Bet due") == 2
+    scoped = _invoke(runner, db, "digest", "--since", "3650d", "--job", first).output
+    # The second job's bet must not leak into the first job's digest.
+    assert scoped.count("Bet due") == 1
+
+    missing = runner.invoke(app, ["--db", db, "digest", "--job", "missing"])
+    assert missing.exit_code != 0
+
+
+def test_digest_golden_output_over_a_fixture(tmp_path):
+    db = str(tmp_path / "odi.db")
+    runner = CliRunner()
+    job_id = _job(runner, db)
+    outcome_id = _outcome(runner, db, job_id)
+    decision_id = _decision(runner, db, job_id, outcome_id)
+    _bet(runner, db, decision_id, outcome_id, target="12")  # measure_by 2020-01-01
+
+    output = _invoke(runner, db, "digest", "--since", "3650d").output
+    # One stable heading and a dated bullet per proven signal; no LLM wording.
+    assert output.startswith("## Bets due\n")
+    lines = [line for line in output.splitlines() if line.startswith("- ")]
+    assert len(lines) == 1
+    assert re.match(r"^- \d{4}-\d{2}-\d{2} · Bet due: Time drops$", lines[0])
+    # Re-reading changes nothing: the digest is deterministic over the store.
+    assert _invoke(runner, db, "digest", "--since", "3650d").output == output
+
+
+def test_spine_multiple_jobs_selects_lowest_id_and_unknown_job_errors(tmp_path):
+    db = str(tmp_path / "odi.db")
+    runner = CliRunner()
+    first = _job(runner, db)
+    second = _job(runner, db)
+    lowest = min(first, second)
+
+    # With no --job the lowest id is chosen deterministically.
+    output = _invoke(runner, db, "know", "spine").output
+    assert f"Spine for {lowest}" in output
+
+    # An unknown job is an honest error, not an invented empty spine.
+    missing = runner.invoke(app, ["--db", db, "know", "spine", "--job", "missing"])
+    assert missing.exit_code != 0
+
+
+def test_bets_list_orders_by_measure_by_and_marks_only_open_bets_overdue(tmp_path):
+    db = str(tmp_path / "odi.db")
+    runner = CliRunner()
+    job_id = _job(runner, db)
+    outcome_id = _outcome(runner, db, job_id)
+    decision_id = _decision(runner, db, job_id, outcome_id)
+    today = date.today()
+    # Insert out of order; the list must still read in measure_by order.
+    later = _bet(
+        runner, db, decision_id, outcome_id, measure_by=(today + timedelta(days=1)).isoformat()
+    )
+    due = _bet(runner, db, decision_id, outcome_id, measure_by=today.isoformat())
+    past = _bet(
+        runner, db, decision_id, outcome_id, measure_by=(today - timedelta(days=1)).isoformat()
+    )
+
+    listed = json.loads(_invoke(runner, db, "bets", "list", "--json").output)
+    assert [b["id"] for b in listed] == [past["id"], due["id"], later["id"]]
+
+    output = _invoke(runner, db, "bets", "list").output
+    # Only the open bet with a past measure_by is labelled overdue.
+    assert output.count("(overdue)") == 1
+
+    # A terminal bet is not overdue even with a past date.
+    _invoke(runner, db, "bets", "status", past["id"], "abandoned")
+    after = _invoke(runner, db, "bets", "list").output
+    assert "(overdue)" not in after

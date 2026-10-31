@@ -187,6 +187,24 @@ def test_mark_signal_rejects_a_blank_id(memory: StudioMemory) -> None:
         memory.mark_signal("   ")
 
 
+def test_read_and_dismiss_state_survives_a_reload(tmp_path) -> None:
+    db = tmp_path / "studio.db"
+    first = StudioMemory(db)
+    first.mark_signal("signal-1")
+    first.mark_signal("signal-2", dismissed=True)
+    first.close()
+
+    # A brand-new store over the same file still knows what was read/dismissed.
+    second = StudioMemory(db)
+    try:
+        state = second.signal_state()
+        assert state["signal-1"]["read_at"] is not None
+        assert state["signal-1"]["dismissed_at"] is None
+        assert state["signal-2"]["dismissed_at"] is not None
+    finally:
+        second.close()
+
+
 def test_default_db_path_prefers_environment(tmp_path, monkeypatch) -> None:
     target = tmp_path / "studio.db"
     monkeypatch.setenv("AGENTIC_ODI_STUDIO_DB", str(target))

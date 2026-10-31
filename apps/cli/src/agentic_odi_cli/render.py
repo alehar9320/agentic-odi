@@ -473,12 +473,21 @@ def render_measurement(result: Any, *, as_json: bool) -> str:
             f"No data yet: no score at or after {result.get('measure_by', '')} "
             f"(looked {result.get('looked_at', '')})."
         )
-    return (
+    parts = [
         f"{outcome.upper()}: observed {_num(result.get('observed', ''))} "
         f"vs target {_num(result.get('target', ''))} "
         f"(baseline {_num(result.get('baseline', ''))}, "
         f"delta {_num(result.get('delta', ''))})"
-    )
+    ]
+    for label, key in (
+        ("importance", "delta_importance"),
+        ("satisfaction", "delta_satisfaction"),
+        ("opportunity", "delta_opportunity"),
+    ):
+        value = result.get(key)
+        if value is not None:
+            parts.append(f"{label} {_num(value)}")
+    return "; ".join(parts)
 
 
 def render_decision_list(decisions: Any, *, as_json: bool) -> str:

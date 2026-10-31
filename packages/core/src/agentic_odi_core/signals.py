@@ -103,6 +103,7 @@ def emit_know_signals(
                     severity="notice",
                     detail=f"Measure by {bet.measure_by.isoformat()}",
                     discriminator=bet.measure_by.isoformat(),
+                    job_id=bet.job_id,
                 )
             )
 
@@ -120,6 +121,7 @@ def emit_know_signals(
                     severity="info",
                     detail=f"Job {job.name} has an empty stage",
                     discriminator=job.id,
+                    job_id=job.id,
                 )
             )
 

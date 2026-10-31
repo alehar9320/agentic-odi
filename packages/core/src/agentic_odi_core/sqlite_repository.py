@@ -554,14 +554,17 @@ class SQLiteRepository(Repository):
             self._sync()
             return self.signals.get(signal_id)
 
-    def list_signals(self, unread_only: bool = False, limit: int | None = 50) -> list[Signal]:
+    def list_signals(
+        self, unread_only: bool = False, limit: int | None = 50, job_id: str | None = None
+    ) -> list[Signal]:
         with self._lock:
             self._sync()
-            items = (
-                unread_signals(list(self.signals.values()))
-                if unread_only
-                else rank_signals(list(self.signals.values()))
-            )
+            candidates = [
+                signal
+                for signal in self.signals.values()
+                if job_id is None or signal.job_id == job_id
+            ]
+            items = unread_signals(candidates) if unread_only else rank_signals(candidates)
             return page(items, limit)
 
     def mark_signal_read(self, signal_id: str) -> Signal | None:

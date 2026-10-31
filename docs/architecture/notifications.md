@@ -33,11 +33,13 @@ Connector and agent-work kinds belong to
 
 ## The Monday digest and the spine
 
-`odi know digest [--since 7d] [--out FILE]` refreshes the inbox, then writes a
-deterministic markdown digest of the signals inside the window, grouped by the
-four know kinds. It is deterministic: the same store and the same window
-produce byte-identical output. An empty window prints `No changes in this
-period.` — never a fabricated row.
+`odi know digest [--since 7d] [--job ID] [--out FILE]` refreshes the inbox,
+then writes a deterministic markdown digest of the signals inside the window,
+grouped by the four know kinds. It is deterministic: the same store and the same
+window produce byte-identical output. An empty window prints `No changes in this
+period.` — never a fabricated row. `--job ID` scopes both the refresh and the
+read to one Job, so a per-job digest never shows another job's facts; an unknown
+Job is an error rather than a silently empty digest.
 
 `odi know spine [--job ID]` walks the evidence chain stage by stage —
 `captured → scored → decided → bet → measured` — and shows the first stage with
@@ -81,9 +83,9 @@ only hidden from the feed and the unread count.
 - **MCP tools:** `list_signals`, `mark_signal_read`, `dismiss_signal`
   (registered in `contract.py`, so the CLI's local backend must implement them
   too — `tests/contract/test_cli_contract.py` enforces that).
-- **CLI:** `odi signals list [--unread] [--limit N] [--json]`, `odi signals
+- **CLI:** `odi signals list [--unread] [--limit N] [--job-id ID] [--json]`, `odi signals
   unread`, `odi signals read <id>`, `odi signals dismiss <id>`. An unknown id
-  exits non-zero.
+  exits non-zero; `--job-id` narrows the feed to one Job's facts.
 - **Studio API:** `GET /api/signals`, `GET /api/signals/unread-count`, `POST
   /api/signals/{id}/read`, `POST /api/signals/{id}/dismiss` — under both the
   `local` and `mcp` backends; unknown id is 404.

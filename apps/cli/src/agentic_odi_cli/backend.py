@@ -627,6 +627,7 @@ class LocalBackend(Backend):
         signals = self.service.list_signals(
             unread_only=bool(args.get("unread_only", False)),
             limit=int(args.get("limit", 50)),
+            job_id=args.get("job_id"),
         )
         return [signal.model_dump(mode="json") for signal in signals]
 

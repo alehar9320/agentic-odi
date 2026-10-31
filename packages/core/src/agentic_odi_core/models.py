@@ -268,6 +268,9 @@ class Signal(BaseModel):
         | None
     ) = None
     subject_id: str | None = None
+    #: The Job this fact belongs to, for scoping a feed or digest to one job.
+    #: ``None`` only for a fact that genuinely has no job yet.
+    job_id: str | None = None
     severity: SignalSeverity = "info"
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     read_at: datetime | None = None

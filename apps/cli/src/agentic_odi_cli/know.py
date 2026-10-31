@@ -141,11 +141,20 @@ def _run_digest(since: str, job_id: str | None, out: str | None) -> None:
     window_start = _parse_since(since)
     args: dict[str, Any] = {}
     if job_id is not None:
+        # An unknown job is an honest error, not an empty successful digest.
+        job = run_tool("get_job", {"job_id": job_id})
+        if not job:
+            raise typer.BadParameter(f"job not found: {job_id}")
         args["job_id"] = job_id
     # Refresh the inbox first: the time-based know signals (a bet coming due, a
     # stage still uncovered) are recorded here, not invented by the digest.
     run_tool("emit_know_signals", args)
-    signals = run_tool("list_signals", {"limit": 200})
+    # Read the same scope back, so a per-job digest never shows another job's
+    # facts even when the inbox already held them.
+    read_args: dict[str, Any] = {"limit": 200}
+    if job_id is not None:
+        read_args["job_id"] = job_id
+    signals = run_tool("list_signals", read_args)
     rules = run_tool("list_notification_rules", {})
     body = build_digest(
         signals if isinstance(signals, list) else [],
@@ -187,14 +196,25 @@ def _spine_rows(
     outcomes: list[dict[str, Any]],
     decisions: list[dict[str, Any]],
     bets: list[dict[str, Any]],
-) -> list[tuple[str, int, str]]:
+) -> list[tuple[str, int, str, str]]:
     """Count each stage and describe its next blocker.
 
-    Counts are cumulative reach, not a claim that one chain is closed.
+    Counts are cumulative reach, not a claim that one chain is closed: the
+    numbers alone never say that a scored outcome, a decision and a measured bet
+    refer to the same outcome.
+
+    ``due`` carries a real date only when the store holds one — the earliest
+    ``measure_by`` among bets still open. It is never inferred.
     """
     scored = [o for o in outcomes if o.get("importance") is not None]
     live_decisions = [d for d in decisions if not d.get("superseded_by")]
     measured = [b for b in bets if b.get("status") == "measured"]
+    open_dates = sorted(
+        str(b.get("measure_by", ""))
+        for b in bets
+        if b.get("status") in ("planned", "running") and b.get("measure_by")
+    )
+    next_due = open_dates[0] if open_dates else ""
     counts = {
         "captured": len(outcomes),
         "scored": len(scored),
@@ -209,13 +229,16 @@ def _spine_rows(
         "bet": "create a bet from a recorded decision",
         "measured": "measure a bet once a score exists after its date",
     }
-    rows: list[tuple[str, int, str]] = []
+    rows: list[tuple[str, int, str, str]] = []
     blocked = False
     for stage in _SPINE_STAGES:
         if counts[stage] > 0:
-            rows.append((stage, counts[stage], ""))
+            rows.append((stage, counts[stage], "", ""))
             continue
-        rows.append((stage, 0, blockers[stage] if not blocked else ""))
+        # Only the first missing link is named; later stages stay blank so the
+        # totals never imply one closed chain.
+        due = next_due if (not blocked and stage == "measured" and next_due) else ""
+        rows.append((stage, 0, blockers[stage] if not blocked else "", due))
         blocked = True
     return rows
 
@@ -262,11 +285,18 @@ def _run_spine(job_id: str | None, json_output: bool) -> None:
     )
     if json_output:
         typer.echo(
-            json.dumps([{"stage": s, "count": c, "blocker": b} for s, c, b in rows], indent=2)
+            json.dumps(
+                [{"stage": s, "count": c, "blocker": b, "due": d} for s, c, b, d in rows],
+                indent=2,
+            )
         )
         return
     lines = [f"Spine for {resolved_id}", ""]
-    for stage, count, blocker in rows:
-        suffix = f"  → {blocker}" if blocker else ""
+    for stage, count, blocker, due in rows:
+        suffix = ""
+        if blocker:
+            suffix = f"  → {blocker}"
+        if due:
+            suffix += f" (due {due})"
         lines.append(f"{stage.ljust(10)} {count}{suffix}")
     typer.echo("\n".join(lines))

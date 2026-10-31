@@ -791,9 +791,13 @@ def emit_know_signals(job_id: str | None = None) -> str:
 
 
 @mcp.tool
-def list_signals(unread_only: bool = False, limit: int = 50) -> str:
-    """List recorded signals, newest first; ``unread_only`` trims to the badge."""
-    signals = service.list_signals(unread_only=unread_only, limit=limit)
+def list_signals(unread_only: bool = False, limit: int = 50, job_id: str | None = None) -> str:
+    """List recorded signals, newest first; ``unread_only`` trims to the badge.
+
+    ``job_id`` narrows to one Job's signals, so a per-job feed or digest never
+    shows another job's facts.
+    """
+    signals = service.list_signals(unread_only=unread_only, limit=limit, job_id=job_id)
     return json.dumps([signal.model_dump(mode="json") for signal in signals])
 
 

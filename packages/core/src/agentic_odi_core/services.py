@@ -225,6 +225,7 @@ class ODIService:
         detail: str | None = None,
         discriminator: str = "",
         magnitude: float | None = None,
+        job_id: str | None = None,
     ) -> Signal:
         """Record one fact. A signal with the same fingerprint already exists.
 
@@ -256,6 +257,7 @@ class ODIService:
             detail=detail,
             subject_kind=subject_kind,  # type: ignore[arg-type]
             subject_id=subject_id,
+            job_id=job_id,
             severity=severity,  # type: ignore[arg-type]
             suppressed=not budget.surfaces(severity, surfaced_today),
             magnitude=magnitude,
@@ -263,8 +265,10 @@ class ODIService:
         )
         return self.repo.add_signal(signal)
 
-    def list_signals(self, unread_only: bool = False, limit: int | None = 50) -> list[Signal]:
-        return self.repo.list_signals(unread_only=unread_only, limit=limit)
+    def list_signals(
+        self, unread_only: bool = False, limit: int | None = 50, job_id: str | None = None
+    ) -> list[Signal]:
+        return self.repo.list_signals(unread_only=unread_only, limit=limit, job_id=job_id)
 
     def mark_signal_read(self, signal_id: str) -> Signal:
         signal = self.repo.mark_signal_read(signal_id)
@@ -307,6 +311,7 @@ class ODIService:
             subject_kind="job",
             subject_id=job.id,
             discriminator=job.id,
+            job_id=job.id,
         )
         return job
 
@@ -382,6 +387,7 @@ class ODIService:
                     f"satisfaction {before.satisfaction} -> {after.satisfaction}"
                 ),
                 discriminator=f"importance={after.importance},satisfaction={after.satisfaction}",
+                job_id=after.job_id,
             )
         crossing = _opportunity_crossing(before.opportunity_score, after.opportunity_score)
         if crossing is not None:
@@ -394,6 +400,7 @@ class ODIService:
                 severity=severity,
                 detail=f"{before.opportunity_score} -> {after.opportunity_score}",
                 discriminator=f"{direction}:{after.opportunity_score}",
+                job_id=after.job_id,
             )
 
     def _emit_job_map_completed(self, job_id: str) -> None:
@@ -411,6 +418,7 @@ class ODIService:
             subject_id=job_id,
             severity="notice",
             discriminator="all-stages",
+            job_id=job_id,
         )
 
     def delete_outcome(self, outcome_id: str) -> None:
@@ -609,6 +617,7 @@ class ODIService:
             subject_kind="evidence",
             subject_id=evidence.id,
             discriminator=evidence.id,
+            job_id=evidence.job_id,
         )
         return evidence
 
@@ -683,6 +692,7 @@ class ODIService:
                 subject_id=outcome.id,
                 severity="notice",
                 discriminator=outcome.id,
+                job_id=outcome.job_id,
             )
             return outcome
         raise ValidationError(f"Unknown promotion target: {target}")
@@ -854,6 +864,7 @@ class ODIService:
                 severity="notice",
                 detail=f"Replaced by {created.id}",
                 discriminator=created.id,
+                job_id=prior.job_id,
             )
         return created
 
@@ -928,6 +939,7 @@ class ODIService:
                     detail=f"{earlier[0].opportunity_score:.2f} → {snapshot.opportunity_score:.2f}",
                     discriminator=saved.id,
                     magnitude=delta,
+                    job_id=snapshot.job_id,
                 )
         return saved
 
@@ -1101,6 +1113,14 @@ class ODIService:
         none exists the answer is ``no_data`` with the date it looked — never the
         latest snapshot overall (which would measure the wrong period), never a
         zero, and never an exception. Measuring twice writes nothing.
+
+        The result carries signed deltas for importance, satisfaction and
+        opportunity against the baseline the bet froze, plus the selected
+        snapshot's identity so a caller can audit the comparison.
+
+        If the bet never stored its per-component baseline, the comparison is
+        not like-for-like: the answer is ``no_data`` with a reason, never a
+        fabricated delta or a met/missed claim.
         """
         bet = self.get_bet(bet_id)
         when = looked_at or _utcnow()
@@ -1120,6 +1140,24 @@ class ODIService:
                 "baseline": bet.baseline,
                 "target": bet.target,
                 "direction": bet.direction.value,
+                "baseline_snapshot_id": bet.baseline_snapshot_id,
+            }
+
+        if bet.baseline_importance is None or bet.baseline_satisfaction is None:
+            return {
+                "bet_id": bet.id,
+                "result": BetMeasurementResult.NO_DATA.value,
+                "looked_at": when.isoformat(),
+                "measure_by": cutoff.isoformat(),
+                "reason": (
+                    "baseline provenance is incomplete: the bet did not store "
+                    "importance/satisfaction at creation, so the deltas cannot "
+                    "be compared like-for-like"
+                ),
+                "baseline": bet.baseline,
+                "target": bet.target,
+                "direction": bet.direction.value,
+                "baseline_snapshot_id": bet.baseline_snapshot_id,
             }
 
         latest = eligible[-1]
@@ -1140,8 +1178,16 @@ class ODIService:
             "direction": bet.direction.value,
             "observed": observed,
             "delta": observed - bet.baseline,
+            "baseline_importance": bet.baseline_importance,
+            "baseline_satisfaction": bet.baseline_satisfaction,
+            "observed_importance": latest.importance,
+            "observed_satisfaction": latest.satisfaction,
+            "delta_importance": latest.importance - bet.baseline_importance,
+            "delta_satisfaction": latest.satisfaction - bet.baseline_satisfaction,
+            "delta_opportunity": observed - bet.baseline,
             "snapshot_id": latest.id,
             "snapshot_at": latest.at.isoformat(),
+            "snapshot_method": latest.method,
             "baseline_snapshot_id": bet.baseline_snapshot_id,
         }
 

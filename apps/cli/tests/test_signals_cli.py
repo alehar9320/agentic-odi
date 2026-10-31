@@ -105,3 +105,16 @@ def test_signals_list_survives_the_mcp_backend_shape(tmp_path, monkeypatch):
         ("list_signals", {"unread_only": False, "limit": 50}),
         ("mark_signal_read", {"signal_id": "sig-1"}),
     ]
+
+
+def test_signals_list_narrows_to_one_job(tmp_path):
+    db = str(tmp_path / "odi.db")
+    runner = CliRunner()
+    first = _add_job(runner, db, "First")
+    _add_job(runner, db, "Second")
+
+    scoped = runner.invoke(app, ["--db", db, "signals", "list", "--job-id", first, "--json"])
+    assert scoped.exit_code == 0, scoped.output
+    payload = json.loads(scoped.output)
+    # Only the first job's own facts, never the second job's job_added.
+    assert {item["job_id"] for item in payload} == {first}

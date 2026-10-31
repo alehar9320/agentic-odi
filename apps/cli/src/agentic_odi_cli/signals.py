@@ -21,15 +21,14 @@ JSON_OPTION = typer.Option(False, "--json", help="Emit machine-readable JSON.")
 def list_signals(
     unread_only: bool = typer.Option(False, "--unread", help="Only signals nobody has read"),
     limit: int = typer.Option(50, "--limit", min=1, help="How many signals to fetch"),
+    job_id: str | None = typer.Option(None, "--job-id", help="Limit to one Job"),
     json_output: bool = JSON_OPTION,
 ) -> None:
-    """List signals, newest first."""
-    typer.echo(
-        render_signal_list(
-            run_tool("list_signals", {"unread_only": unread_only, "limit": limit}),
-            as_json=json_output,
-        )
-    )
+    """List signals, newest first; ``--job-id`` scopes the feed to one Job."""
+    args: dict[str, object] = {"unread_only": unread_only, "limit": limit}
+    if job_id is not None:
+        args["job_id"] = job_id
+    typer.echo(render_signal_list(run_tool("list_signals", args), as_json=json_output))
 
 
 @signals_app.command("unread")

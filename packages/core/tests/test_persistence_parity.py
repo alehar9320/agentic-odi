@@ -84,6 +84,10 @@ def _assert_state(service: ODIService, ids: dict[str, str]) -> None:
     rules = {r.kind: r for r in service.list_notification_rules()}
     assert rules[SignalKind.SCORE_MOVED].threshold == 0.75
 
+    # A signal's job survives replay, so a scoped feed is stable across adapters.
+    signals = {s.kind: s for s in service.list_signals(limit=1000)}
+    assert signals[SignalKind.JOB_ADDED].job_id == ids["job"]
+
 
 def test_in_memory_parity() -> None:
     repo = InMemoryRepository()

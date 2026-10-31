@@ -143,7 +143,9 @@ class Repository(Protocol):
     def delete_evidence(self, evidence_id: str) -> bool: ...
     def add_signal(self, signal: Signal) -> Signal: ...
     def get_signal(self, signal_id: str) -> Signal | None: ...
-    def list_signals(self, unread_only: bool = False, limit: int | None = 50) -> list[Signal]: ...
+    def list_signals(
+        self, unread_only: bool = False, limit: int | None = 50, job_id: str | None = None
+    ) -> list[Signal]: ...
     def mark_signal_read(self, signal_id: str) -> Signal | None: ...
     def dismiss_signal(self, signal_id: str) -> Signal | None: ...
     def count_unread_signals(self) -> int: ...
@@ -384,12 +386,13 @@ class InMemoryRepository:
     def get_signal(self, signal_id: str) -> Signal | None:
         return self.signals.get(signal_id)
 
-    def list_signals(self, unread_only: bool = False, limit: int | None = 50) -> list[Signal]:
-        items = (
-            unread_signals(list(self.signals.values()))
-            if unread_only
-            else rank_signals(list(self.signals.values()))
-        )
+    def list_signals(
+        self, unread_only: bool = False, limit: int | None = 50, job_id: str | None = None
+    ) -> list[Signal]:
+        candidates = [
+            signal for signal in self.signals.values() if job_id is None or signal.job_id == job_id
+        ]
+        items = unread_signals(candidates) if unread_only else rank_signals(candidates)
         return page(items, limit)
 
     def mark_signal_read(self, signal_id: str) -> Signal | None:

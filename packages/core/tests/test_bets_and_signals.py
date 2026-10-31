@@ -228,6 +228,47 @@ def test_measure_bet_met_and_missed(service: ODIService) -> None:
     assert missed["observed"] == 5.0
 
 
+def test_measure_bet_reports_importance_satisfaction_and_opportunity_deltas(
+    service: ODIService,
+) -> None:
+    job, outcome = _job_with_outcome(service)  # importance 8, satisfaction 4 → 12
+    decision = _decision_for(service, job, outcome)
+    bet = service.create_bet(decision.id, outcome.id, "h", 20.0, date(2026, 6, 1))
+    # The baseline provenance is frozen on the bet, so the deltas are auditable.
+    assert bet.baseline_importance == 8.0
+    assert bet.baseline_satisfaction == 4.0
+
+    service.update_outcome(outcome.id, {"importance": 9.0, "satisfaction": 2.0})  # 16
+    service.record_score_snapshot(outcome.id, at=datetime(2026, 6, 2, tzinfo=timezone.utc))
+    result = service.measure_bet(bet.id, looked_at=datetime(2026, 6, 3, tzinfo=timezone.utc))
+    assert result["delta_importance"] == 1.0
+    assert result["delta_satisfaction"] == -2.0
+    assert result["delta_opportunity"] == 4.0
+    assert result["observed_importance"] == 9.0
+    assert result["observed_satisfaction"] == 2.0
+    # The selected snapshot is named so the comparison can be audited.
+    assert result["snapshot_id"]
+    assert result["baseline_snapshot_id"] == bet.baseline_snapshot_id
+
+
+def test_measure_bet_is_no_data_when_baseline_provenance_is_missing(
+    service: ODIService,
+) -> None:
+    job, outcome = _job_with_outcome(service)
+    decision = _decision_for(service, job, outcome)
+    bet = service.create_bet(decision.id, outcome.id, "h", 20.0, date(2026, 6, 1))
+    # Simulate a legacy bet whose per-component baseline was never captured.
+    service.repo.update_bet(bet.id, {"baseline_importance": None, "baseline_satisfaction": None})
+    service.update_outcome(outcome.id, {"importance": 9.0, "satisfaction": 2.0})
+    service.record_score_snapshot(outcome.id, at=datetime(2026, 6, 2, tzinfo=timezone.utc))
+    result = service.measure_bet(bet.id, looked_at=datetime(2026, 6, 3, tzinfo=timezone.utc))
+    # Not like-for-like: an explicit no_data with a reason, never a guessed delta.
+    assert result["result"] == "no_data"
+    assert "baseline provenance" in result["reason"]
+    assert "observed" not in result
+    assert "delta_importance" not in result
+
+
 def test_measure_bet_ignores_snapshots_before_measure_by(service: ODIService) -> None:
     job, outcome = _job_with_outcome(service)
     decision = _decision_for(service, job, outcome)
@@ -475,3 +516,61 @@ def test_measure_bet_excludes_future_dated_snapshots(service: ODIService) -> Non
     result = service.measure_bet(bet.id, looked_at=datetime(2026, 6, 3, tzinfo=timezone.utc))
     assert result["result"] == "met"
     assert result["observed"] == 16.0
+
+
+def test_measure_bet_unknown_id_is_an_error_not_no_data(service: ODIService) -> None:
+    from agentic_odi_core.errors import NotFoundError
+
+    with pytest.raises(NotFoundError):
+        service.measure_bet("does-not-exist")
+
+
+def test_measure_bet_never_selects_another_outcomes_snapshot(service: ODIService) -> None:
+    job, outcome = _job_with_outcome(service)
+    other = service.add_outcome(job.id, STATEMENT, 8.0, 4.0)
+    decision = _decision_for(service, job, outcome)
+    bet = service.create_bet(decision.id, outcome.id, "h", 12.0, date(2026, 6, 1))
+    # A snapshot on a different outcome must not be read as this bet's movement.
+    service.record_score_snapshot(other.id, at=datetime(2026, 6, 2, tzinfo=timezone.utc))
+    result = service.measure_bet(bet.id, looked_at=datetime(2026, 6, 3, tzinfo=timezone.utc))
+    assert result["result"] == "no_data"
+    assert "observed" not in result
+
+
+def test_measure_bet_exact_target_is_met_for_both_directions(service: ODIService) -> None:
+    from agentic_odi_core.models import Direction
+
+    job, outcome = _job_with_outcome(service)  # opportunity 12
+    decision = _decision_for(service, job, outcome)
+    # Maximize: observed exactly equals the target → met.
+    up = service.create_bet(decision.id, outcome.id, "up", 12.0, date(2026, 6, 1))
+    service.record_score_snapshot(outcome.id, at=datetime(2026, 6, 2, tzinfo=timezone.utc))
+    assert (
+        service.measure_bet(up.id, looked_at=datetime(2026, 6, 3, tzinfo=timezone.utc))["result"]
+        == "met"
+    )
+
+    # Minimize: a lower target is met by a value at or below it, equality included.
+    down = service.create_bet(
+        decision.id, outcome.id, "down", 12.0, date(2026, 6, 1), direction=Direction.MINIMIZE
+    )
+    service.record_score_snapshot(outcome.id, at=datetime(2026, 6, 4, tzinfo=timezone.utc))
+    result = service.measure_bet(down.id, looked_at=datetime(2026, 6, 5, tzinfo=timezone.utc))
+    assert result["result"] == "met"
+    assert result["direction"] == "minimize"
+
+
+def test_measure_bet_names_the_selected_snapshot_and_its_time(service: ODIService) -> None:
+    job, outcome = _job_with_outcome(service)
+    decision = _decision_for(service, job, outcome)
+    bet = service.create_bet(decision.id, outcome.id, "h", 12.0, date(2026, 6, 1))
+    service.record_score_snapshot(
+        outcome.id, at=datetime(2026, 6, 2, 9, 30, tzinfo=timezone.utc), method="survey"
+    )
+    result = service.measure_bet(bet.id, looked_at=datetime(2026, 6, 3, tzinfo=timezone.utc))
+    assert result["snapshot_at"] == "2026-06-02T09:30:00+00:00"
+    assert result["snapshot_method"] == "survey"
+    assert result["snapshot_id"]
+    # The result is descriptive, never a significance claim.
+    assert "p_value" not in result
+    assert "significant" not in result

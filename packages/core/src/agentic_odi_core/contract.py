@@ -411,8 +411,8 @@ TOOL_SPECS: dict[str, ToolSpec] = {
         name="list_signals",
         summary="List signals the store recorded — real changes worth attention.",
         effect=_derive_effect("list_signals"),
-        arguments=("unread_only", "limit"),
-        returns="A list of Signals, newest first.",
+        arguments=("unread_only", "limit", "job_id"),
+        returns="A list of Signals, newest first, optionally scoped to one Job.",
     ),
     ToolName.EMIT_KNOW_SIGNALS.value: ToolSpec(
         name="emit_know_signals",
