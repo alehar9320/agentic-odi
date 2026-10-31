@@ -567,6 +567,52 @@ def render_review_summary(result: dict[str, Any]) -> str:
     return "Review complete: " + ", ".join(parts) + "."
 
 
+def render_score_prompt(
+    position: int,
+    total: int,
+    outcome: dict[str, Any],
+    sentence: str | None,
+) -> str:
+    """One scoring step: the progress line, the current score, and the sentence.
+
+    The customer's sentence stays beside the number so a person scores with the
+    evidence in view. When no sentence was captured the prompt says so rather
+    than inventing one.
+    """
+    lines = [f"[{position}/{total}] {outcome.get('id', '')}"]
+    statement = str(outcome.get("statement", "")).strip()
+    lines.append(f"  statement    {statement}")
+    importance = outcome.get("importance")
+    satisfaction = outcome.get("satisfaction")
+    if importance is None or satisfaction is None:
+        lines.append("  current      unscored")
+    else:
+        lines.append(
+            f"  current      importance {_num(importance)}  satisfaction {_num(satisfaction)}"
+        )
+    lines.append(
+        f"  customer     {sentence}"
+        if sentence
+        else "  customer     (no customer sentence captured)"
+    )
+    return "\n".join(lines)
+
+
+def render_score_summary(result: dict[str, Any]) -> str:
+    """The end-of-pass tally: what was scored, skipped, failed, or undone."""
+    parts = [
+        f"scored {result.get('scored', 0)}",
+        f"skipped {result.get('skipped', 0)}",
+    ]
+    undone = result.get("undone", 0)
+    if undone:
+        parts.append(f"undone {undone}")
+    failed = result.get("failed", 0)
+    if failed:
+        parts.append(f"failed {failed}")
+    return "Scoring complete: " + ", ".join(parts) + "."
+
+
 def render_duplicate_groups(result: Any, *, as_json: bool) -> str:
     """Render suggested duplicate groups as one line of candidate ids per group."""
     if not isinstance(result, dict):
