@@ -40,6 +40,7 @@ export GITHUB_PERSONAL_ACCESS_TOKEN=ghp_...
 python -m agentic_odi_cli connectors add mcp --preset github
 python -m agentic_odi_cli connectors health --name github
 python -m agentic_odi_cli connectors ingest --name github
+python -m agentic_odi_cli connectors list-presets   # markdown table of built-in presets
 
 # OAuth-based preset: the browser consent flow starts on first use
 python -m agentic_odi_cli connectors add mcp --preset notion
