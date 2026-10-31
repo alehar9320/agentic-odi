@@ -18,7 +18,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol
 
-from agentic_odi_core import ODIService, ScheduledWorkStatus, build_repository
+from agentic_odi_core import ScheduledWorkStatus
 from agentic_odi_core.schedule_expr import next_occurrence
 from agentic_odi_openhands.client import AgentServerClient, OpenHandsClient
 from agentic_odi_openhands.events import final_message, pending_actions, pr_urls
@@ -32,6 +32,10 @@ from agentic_odi_openhands.models import (
 )
 
 from agentic_odi_integrations_openhands import config
+from agentic_odi_integrations_openhands.adapters.odi import (
+    OdiScheduleAdapter,
+    OdiSignalAdapter,
+)
 from agentic_odi_integrations_openhands.models import (
     AgentRun,
     AgentRunStatus,
@@ -52,6 +56,7 @@ from agentic_odi_integrations_openhands.policy import (
     PolicyDecision,
     args_digest,
 )
+from agentic_odi_integrations_openhands.ports import SchedulePort
 from agentic_odi_integrations_openhands.signals import SignalSink, terminal_signal
 from agentic_odi_integrations_openhands.store import OrchestratorStore
 
@@ -204,7 +209,7 @@ class OrchestratorService:
         settings: OrchestratorSettings | None = None,
         *,
         signals: SignalSink | None = None,
-        odi_service: ODIService | None = None,
+        schedule: SchedulePort | None = None,
         cloud_factory: Callable[[AgentTarget], CloudClient] | None = None,
         agent_factory: Callable[[str, str | None], ConversationAgent] | None = None,
         workspace_root: str | None = None,
@@ -216,7 +221,7 @@ class OrchestratorService:
         self.settings = settings or config.load_settings()
         self.store = store or OrchestratorStore()
         self._signals = signals
-        self._odi = odi_service
+        self._schedule_port = schedule
         self._cloud_factory = cloud_factory or _default_cloud
         self._agent_factory = agent_factory or _default_agent
         self.workspace = str(
@@ -237,13 +242,13 @@ class OrchestratorService:
 
     def _sink(self) -> SignalSink:
         if self._signals is None:
-            self._signals = ODIService(build_repository())
+            self._signals = OdiSignalAdapter()
         return self._signals
 
-    def _odi_service(self) -> ODIService:
-        if self._odi is None:
-            self._odi = ODIService(build_repository())
-        return self._odi
+    def _schedule(self) -> SchedulePort:
+        if self._schedule_port is None:
+            self._schedule_port = OdiScheduleAdapter()
+        return self._schedule_port
 
     def _now(self) -> datetime:
         return self.clock().astimezone(timezone.utc)
@@ -466,8 +471,8 @@ class OrchestratorService:
 
     def _enqueue_due_schedules(self, now: datetime) -> int:
         try:
-            odi = self._odi_service()
-            schedules = odi.list_scheduled_work(status=ScheduledWorkStatus.SCHEDULED.value)
+            sched = self._schedule()
+            schedules = sched.list_scheduled_work(status=ScheduledWorkStatus.SCHEDULED.value)
         except Exception:  # noqa: BLE001 - the ODI store is optional for manual-only use
             return 0
         created = 0
@@ -502,7 +507,7 @@ class OrchestratorService:
                     metadata={"schedule_name": schedule.name, "scheduled_for": due_at},
                 )
             except (OrchestratorError, ValueError) as exc:
-                self._odi_service().repo.update_scheduled_work(
+                sched.update_scheduled_work(
                     schedule.id,
                     {"result_summary": f"Could not queue: {exc}", "last_run_at": now.isoformat()},
                 )
@@ -519,7 +524,7 @@ class OrchestratorService:
                 updates["next_run_at"] = None
                 updates["status"] = ScheduledWorkStatus.RUNNING
             updates["result_summary"] = "Queued for the orchestrator; no result yet."
-            self._odi_service().repo.update_scheduled_work(schedule.id, updates)
+            sched.update_scheduled_work(schedule.id, updates)
             created += int(was_created)
         return created
 
@@ -527,8 +532,8 @@ class OrchestratorService:
         if work.source_kind is not SourceKind.SCHEDULE or not work.source_ref:
             return
         try:
-            odi = self._odi_service()
-            schedule = odi.repo.get_scheduled_work(work.source_ref)
+            sched = self._schedule()
+            schedule = sched.get_scheduled_work(work.source_ref)
             if schedule is None:
                 return
             status = {
@@ -540,7 +545,7 @@ class OrchestratorService:
             if schedule.trigger_type.value == "cron":
                 status = ScheduledWorkStatus.SCHEDULED
             summary = run.summary or run.error or run.blocked_reason or run.status.value
-            odi.repo.update_scheduled_work(
+            sched.update_scheduled_work(
                 schedule.id,
                 {
                     "status": status,

@@ -15,6 +15,7 @@ from agentic_odi_integrations_openhands import (
     OrchestratorStore,
     WorkItemStatus,
 )
+from agentic_odi_integrations_openhands.adapters.odi import OdiScheduleAdapter
 from agentic_odi_openhands import AgentServerClient, OpenHandsClient
 
 CLOUD = "https://cloud.test"
@@ -164,7 +165,7 @@ def _service(
     clock: Clock,
     sink: RecordingSink,
     *,
-    odi_service: Any | None = None,
+    schedule: Any | None = None,
     **target_overrides: Any,
 ) -> OrchestratorService:
     target = AgentTarget(
@@ -184,7 +185,7 @@ def _service(
         store=store,
         settings=settings,
         signals=sink,
-        odi_service=odi_service,
+        schedule=schedule,
         cloud_factory=lambda _target: OpenHandsClient(
             CLOUD, api_key="test-key", transport=httpx.MockTransport(canvas.cloud)
         ),
@@ -431,7 +432,7 @@ def _odi_store() -> Any:
 def test_due_one_shot_schedule_is_queued_then_completed(tmp_path) -> None:
     canvas, clock, sink = FakeCanvas(), Clock(), RecordingSink()
     odi = _odi_store()
-    service = _service(tmp_path, canvas, clock, sink, odi_service=odi)
+    service = _service(tmp_path, canvas, clock, sink, schedule=OdiScheduleAdapter(odi))
     schedule = odi.schedule_work(
         name="Nightly audit",
         schedule_expression="+1h",
@@ -473,7 +474,7 @@ def test_due_one_shot_schedule_is_queued_then_completed(tmp_path) -> None:
 def test_recurring_schedule_advances_and_does_not_duplicate(tmp_path) -> None:
     canvas, clock, sink = FakeCanvas(), Clock(), RecordingSink()
     odi = _odi_store()
-    service = _service(tmp_path, canvas, clock, sink, odi_service=odi)
+    service = _service(tmp_path, canvas, clock, sink, schedule=OdiScheduleAdapter(odi))
     schedule = odi.schedule_work(
         name="Daily sweep",
         schedule_expression="0 9 * * *",
