@@ -41,6 +41,7 @@ class ProposalStatus(StrEnum):
     REJECTED = "rejected"
     EDITED = "edited"
 
+
 class OutcomeProposal(BaseModel):
     id: str
     evidence_id: str
@@ -53,9 +54,9 @@ class OutcomeProposal(BaseModel):
     contextual_clarifier: str | None
     importance: float | None
     satisfaction: float | None
-    confidence: float                 # 0.0 - 1.0
-    rationale: str                    # why the system thinks this
-    quote: str | None                 # exact supporting passage
+    confidence: float  # 0.0 - 1.0
+    rationale: str  # why the system thinks this
+    quote: str | None  # exact supporting passage
     source_name: str
     status: ProposalStatus = PROPOSED
     created_at: datetime
@@ -75,7 +76,9 @@ Implement `packages/core/src/agentic_odi_core/mapping.py::HeuristicProposalStrat
 
 ```python
 class ProposalStrategy(Protocol):
-    def propose(self, evidence: Evidence, jobs: Sequence[Job], steps: Sequence[Step]) -> OutcomeProposal: ...
+    def propose(
+        self, evidence: Evidence, jobs: Sequence[Job], steps: Sequence[Step]
+    ) -> OutcomeProposal: ...
 ```
 
 The default strategy must:
