@@ -10,8 +10,11 @@ Pydantic's identically named class. Import it from
 
 from agentic_odi_core.connection import MCPConnectionConfig
 from agentic_odi_core.contract import (
+    RESOURCE_SPECS,
     TOOL_NAMES,
     TOOL_SPECS,
+    ResourceName,
+    ResourceSpec,
     ToolEffect,
     ToolName,
     ToolSpec,
@@ -151,6 +154,9 @@ __all__ = [
     "ModelRouter",
     "ModelTier",
     "NotFoundError",
+    "RESOURCE_SPECS",
+    "ResourceName",
+    "ResourceSpec",
     "ODIService",
     "ODI_ASSISTANT_PROMPT",
     "ODI_FRAMEWORK_GUIDELINES",

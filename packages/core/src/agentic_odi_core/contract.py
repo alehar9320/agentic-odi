@@ -506,6 +506,112 @@ _STAGE_NAMES: dict[str | None, str] = {
     None: "Supporting Tools",
 }
 
+
+class ResourceName(str, Enum):
+    """Identifiers for the read-only ``odi://`` resource surface."""
+
+    SCHEMA = "schema"
+    CAPABILITIES = "capabilities"
+    FRAMEWORK = "framework"
+    LANDSCAPE = "landscape"
+    VISION = "vision"
+    JOB = "job"
+    JOB_LANDSCAPE = "job_landscape"
+    OUTCOME = "outcome"
+    EVIDENCE = "evidence"
+    EVIDENCE_LIST = "evidence_list"
+
+
+@dataclass(frozen=True)
+class ResourceSpec:
+    """Metadata for one MCP resource: its URI template, summary, MIME type,
+    arguments, required subset, and whether the body is paged."""
+
+    name: str
+    uri: str
+    summary: str
+    mime_type: str
+    arguments: tuple[str, ...] = field(default_factory=tuple)
+    required: tuple[str, ...] = field(default_factory=tuple)
+    paginated: bool = False
+
+
+RESOURCE_SPECS: dict[str, ResourceSpec] = {
+    ResourceName.SCHEMA.value: ResourceSpec(
+        name="schema",
+        uri="odi://schema",
+        summary="The canonical JSON schema for every ODI entity.",
+        mime_type="application/schema+json",
+    ),
+    ResourceName.CAPABILITIES.value: ResourceSpec(
+        name="capabilities",
+        uri="odi://capabilities",
+        summary="The generated manifest of the MCP tool surface.",
+        mime_type="application/json",
+    ),
+    ResourceName.FRAMEWORK.value: ResourceSpec(
+        name="framework",
+        uri="odi://framework",
+        summary="The ODI framework guidelines as Markdown.",
+        mime_type="text/markdown",
+    ),
+    ResourceName.LANDSCAPE.value: ResourceSpec(
+        name="landscape",
+        uri="odi://landscape",
+        summary="Every job and its ranked outcomes, with counts.",
+        mime_type="application/json",
+        paginated=True,
+    ),
+    ResourceName.VISION.value: ResourceSpec(
+        name="vision",
+        uri="odi://vision",
+        summary="The Studio brief. Not stored on the MCP server yet, so it raises.",
+        mime_type="application/json",
+    ),
+    ResourceName.JOB.value: ResourceSpec(
+        name="job",
+        uri="odi://jobs/{job_id}",
+        summary="One Job-to-be-Done by id.",
+        mime_type="application/json",
+        arguments=("job_id",),
+        required=("job_id",),
+    ),
+    ResourceName.JOB_LANDSCAPE.value: ResourceSpec(
+        name="job_landscape",
+        uri="odi://jobs/{job_id}/landscape",
+        summary="One job's outcomes, ranked, with counts.",
+        mime_type="application/json",
+        arguments=("job_id",),
+        required=("job_id",),
+        paginated=True,
+    ),
+    ResourceName.OUTCOME.value: ResourceSpec(
+        name="outcome",
+        uri="odi://outcomes/{outcome_id}",
+        summary="One desired outcome by id.",
+        mime_type="application/json",
+        arguments=("outcome_id",),
+        required=("outcome_id",),
+    ),
+    ResourceName.EVIDENCE.value: ResourceSpec(
+        name="evidence",
+        uri="odi://evidence/{evidence_id}",
+        summary="One captured evidence record by id.",
+        mime_type="application/json",
+        arguments=("evidence_id",),
+        required=("evidence_id",),
+    ),
+    ResourceName.EVIDENCE_LIST.value: ResourceSpec(
+        name="evidence_list",
+        uri="odi://evidence{?job_id,outcome_id,limit,offset}",
+        summary="Evidence records, filtered and paged.",
+        mime_type="application/json",
+        arguments=("job_id", "outcome_id", "limit", "offset"),
+        paginated=True,
+    ),
+}
+
+
 _EFFECT_ORDER: tuple[ToolEffect, ...] = (
     ToolEffect.READ,
     ToolEffect.WRITE,
