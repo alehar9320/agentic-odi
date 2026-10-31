@@ -155,6 +155,7 @@ soon". See [External Connectors](docs/connectors.md).
 | [Decisions](docs/decision.md) | Brief → decision → bet → measure, and the honest empty states |
 | [CLI Reference](docs/cli.md) | Backends, chat, entities, scoring, and environment variables |
 | [External Connectors](docs/connectors.md) | Presets, the registry, and the `Connector` protocol |
+| [Integrate an Agent](docs/integration.md) | Connect an external agent over MCP: connect, read, write under consent, and errors |
 | [Local LLM Backend](docs/local-llm.md) | Running a local OpenAI-compatible model with tool calling |
 | [Architecture](docs/architecture/README.md) | Workspace layout, dependency direction, data flow, and testing |
 | [Development](docs/development.md) | Lint, types, frontend checks, tests, and PR risk labels |

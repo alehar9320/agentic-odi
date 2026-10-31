@@ -22,6 +22,7 @@
       "guides": [
         { "slug": "cli", "title": "CLI reference", "source": "docs/cli.md", "blurb": "Backends, chat, entities, and scoring." },
         { "slug": "connectors", "title": "Connectors", "source": "docs/connectors.md", "blurb": "The registry, the presets, and the protocol." },
+        { "slug": "integration", "title": "Integrate an agent", "source": "docs/integration.md", "blurb": "Connect an external agent over MCP: read, write under consent, and errors." },
         { "slug": "mcp", "title": "MCP tool reference", "source": null, "blurb": "Every tool the server exposes." },
         { "slug": "architecture", "title": "Architecture", "source": "docs/architecture/README.md", "blurb": "The workspace, the data flow, and the testing strategy." }
       ]

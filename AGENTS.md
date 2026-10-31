@@ -229,3 +229,13 @@ For the full Kiro tool reference including subagent dispatch patterns and git wo
   screenshot capture) is unblocked in the graph but not deliverable in this
   sandbox: the Studio e2e harness is blocked by an interstitial modal in
   headless Chromium.
+- **The integration guide is generated and executed.** `docs/integration.md`'s
+  tool table lives between `GENERATED TOOLS` markers and is rewritten by
+  `uv run python scripts/integration_guide.py`; `tests/test_integration_example.py`
+  runs `examples/agent_client/` against a real FastMCP server and fails if the
+  table is stale or a tool is missing. Never hand-edit the table.
+- **The consent gate derives from the contract.** `agentic_odi_core.consent`
+  computes `READ_ONLY_TOOLS`/`ACTING_TOOLS` from `TOOL_SPECS` effects — never
+  hand-maintain them. A tool is read-only in exactly one place: its
+  `ToolSpec.effect`. `test_the_gate_agrees_with_the_contract_on_what_needs_consent`
+  pins the equality.

@@ -273,3 +273,43 @@ Every remaining M4/M5 child names a policy or contract that does not exist yet
 destination identity, contract-version and provenance-format sources). Per the
 epic and the children, these remain explicit blockers rather than invented
 constants.
+
+## Wave 2b · ALH-129: the integration guide for external agents (delivered)
+
+ALH-129 asked for the guide an external agent needs to connect, read, and write
+under consent. The spine and the contract version it named now exist, so the
+guide is written against the shipped server and every claim in it is executed.
+
+- `docs/integration.md` — connect, read, write under consent, errors, the tool
+  table, and the two versions that bound an integration (package `0.14.0`, store
+  schema `1`). Its tool table is generated, not hand-written.
+- `scripts/integration_guide.py` — the generator. It reads `TOOL_SPECS` (effects,
+  arguments, required, stage) and the server source (one-line purposes), and
+  rewrites the fenced block between the `GENERATED TOOLS` markers.
+- `examples/agent_client/` — a runnable, in-memory MCP client: discover the
+  surface, page a list to a short-page stop, read an honest empty score, and
+  hold a write behind `ConsentGate`. `python -m examples.agent_client.client`
+  prints a walkthrough against a disposable store.
+- `tests/test_integration_example.py` — executes the example against a real
+  FastMCP server on its own SQLite file, and pins the generated table to the
+  contract in both directions. The guide is tested, not just written.
+- `website/tools/markdown_render.py` — HTML comments are now stripped as prose
+  (kept inside code fences), so a tool's generation marker is invisible on the
+  site as it is on GitHub. Covered by `test_docs_render.py`.
+- The guide is published: `website/content/nav.json` and the README table.
+
+**Authorization coherence (found while writing the guide).** The guide claims the
+consent gate derives its acting set from the contract; it did not — `consent.py`
+hand-maintained a read-only set that had drifted from `TOOL_SPECS` in eight
+places (six genuine reads were treated as acting; two pure computations were
+declared `write`). The gate now derives both sets from the contract's declared
+effects, and `test_the_gate_agrees_with_the_contract_on_what_needs_consent` pins
+the equality so the two cannot drift again. No authorization was weakened: the
+tools that stop requiring consent are ones the contract declares read and that
+write nothing.
+
+### ALH-236 — still not attempted
+
+Unchanged from Wave 2: the Studio screenshot slice needs a click-capable browser
+the sandbox cannot provide, so it stays open with its blocker recorded rather
+than committing an unverified capture.

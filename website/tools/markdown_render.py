@@ -165,6 +165,33 @@ def _rewrite_links(
     return re.sub(r'href="([^"]+)"', replace, html)
 
 
+def _strip_html_comments(md: str) -> str:
+    """Drop HTML comments from a guide, leaving fenced code untouched.
+
+    Comments are invisible on GitHub, so a marker a tool writes into a guide
+    (a generated-block fence, a "do not edit" note) must not become visible
+    text on the site. Fenced code is copied through verbatim, so a comment
+    shown *as an example* inside a fence is preserved.
+    """
+    out: list[str] = []
+    in_fence = False
+    fence = ""
+    for line in md.splitlines(keepends=True):
+        stripped = line.lstrip()
+        if not in_fence and stripped[:3] in ("```", "~~~"):
+            in_fence = True
+            fence = stripped[:3]
+            out.append(line)
+            continue
+        if in_fence:
+            out.append(line)
+            if stripped.startswith(fence):
+                in_fence = False
+            continue
+        out.append(re.sub(r"<!--.*?-->", "", line, flags=re.DOTALL))
+    return "".join(out)
+
+
 def render(
     md: str,
     *,
@@ -173,7 +200,7 @@ def render(
     page_path: str | None = None,
 ) -> str:
     """A guide's prose, as HTML, with a link back to its source."""
-    html = _MARKDOWN.render(md)
+    html = _MARKDOWN.render(_strip_html_comments(md))
 
     if source_path and link_map is not None and page_path is not None:
         html = _rewrite_links(
