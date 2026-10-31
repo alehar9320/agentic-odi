@@ -695,6 +695,23 @@ Do not start B3 (interval) before the bootstrap convention is approved, B4 befor
 lands, B6.1 before the delta semantics are approved, or M2-19 (blind scoring) before
 its trusted-viewer authorization decision.
 
+## B6 snapshot behaviour (implemented, not gated)
+
+The append-only writer's edge behaviour is decided and pinned rather than left
+implicit, because ALH-29 asks for it explicitly:
+
+- A metadata-only edit (method/count, scores untouched) appends a snapshot —
+  `test_a_metadata_only_edit_records_a_new_snapshot`.
+- An equal-value re-submission appends a distinct snapshot —
+  `test_an_equal_value_submission_records_a_new_snapshot`.
+- A count/method-only change keeps its evidence-state distinction, so
+  `estimate`/`n=None` stays visible next to `survey`/`n=40` —
+  `test_a_count_only_change_keeps_its_evidence_state`.
+- A note carrying markup renders as text, never as HTML, in the child surface —
+  `OutcomeCardNote.test.tsx` "renders a note containing markup as text, not HTML".
+- `rank_outcomes` keeps an unscored outcome after every scored one instead of
+  sorting it as `0.0` — `test_rank_outcomes_puts_unscored_last_not_at_zero`.
+
 ## Seams added ahead of the gates
 
 `packages/core/src/agentic_odi_core/trust.py` names the contract each blocked
