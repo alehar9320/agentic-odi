@@ -503,14 +503,14 @@ describe("first run", () => {
       await screen.findByRole("heading", { name: "What do you want to win?" }),
     ).toBeInTheDocument();
     // Nothing to correct before the first exchange.
-    expect(screen.queryByText(/I don't know your product yet/)).toBeNull();
+    expect(screen.queryByText("Tell the studio what you are building.")).toBeNull();
 
     const composer = screen.getByRole("textbox", { name: /message the studio/i });
     fireEvent.change(composer, { target: { value: "Where do I start?" } });
     fireEvent.click(screen.getByRole("button", { name: /send message/i }));
 
     expect(
-      await screen.findByText(/I don't know your product yet/),
+      await screen.findByText("Tell the studio what you are building."),
     ).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /add context/i }));
