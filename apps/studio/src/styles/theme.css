@@ -2453,6 +2453,10 @@ input[type="range"] {
   color: var(--faint);
 }
 
+.catchup-empty__actions {
+  margin-top: 14px;
+}
+
 .catchup-card {
   position: relative;
   cursor: pointer;
@@ -5960,11 +5964,6 @@ details[open] summary {
 
 .canvas-provenance strong {
   color: var(--text);
-}
-
-.catchup-card.is-simulated {
-  border-style: dashed;
-  opacity: 0.88;
 }
 
 .settings__preset-group {
