@@ -63,6 +63,32 @@ filename instead of running every test in a browser. Browser mode needs Chromium
 locally: `npx playwright install chromium`. See
 [Deployment](deployment.md) for the project setup and budget rules.
 
+### Copied components (`src/vendor`)
+
+Tailwind v4 styles `src/vendor/**` and nothing else (issue #385). The stylesheet
+imports the theme and utility layers with `source(none)` and then rescans that
+directory alone, so no product class is ever generated and Tailwind's
+document-wide reset stays out of the bundle. The product keeps rendering from
+`src/styles/theme.css`, which `src/main.tsx` imports first; vendor utilities land
+in `@layer utilities`, and an unlayered product rule always outranks a layered
+utility, so the two can never fight over the same element.
+
+`components.json` points the shadcn CLI at that stylesheet and at the `@/` alias,
+which resolves to `src/vendor/` in the Vite config and in both tsconfigs. A copied
+file therefore keeps the import paths it shipped with:
+
+```bash
+npx --yes shadcn@latest add button   # → apps/studio/src/vendor/components/ui/button.tsx
+```
+
+Every copied file carries a header naming the registry and any edit made after the
+copy; refresh with the CLI instead of editing the markup by hand. Today that is one
+line: the registry items import their class merger from the `cn` package, and the
+vendor tree standardises on `src/vendor/lib/utils.ts`, so `npm rm cn` and point the
+import back at `@/lib/utils` after each add.
+`npm --prefix apps/studio test -- --run src/vendor` proves the scope by reading the
+compiled stylesheet.
+
 ### Conversational UI coverage
 
 The agent-composed surfaces, first-minute guidance, and the product tour are
@@ -72,6 +98,7 @@ control while following a streamed turn and returning to the live end:
 | File | What it covers |
 |---|---|
 | `apps/studio/src/ui/protocol.test.ts` | Spec parsing: prop types, enums, ranges, required props, depth/node/size ceilings, unknown types |
+| `apps/studio/src/vendor/vendor.test.tsx` | Tailwind scope: a vendor utility is compiled, a product-only utility is not, no preflight reset, the copied button renders |
 | `apps/studio/src/ui/UiRenderer.test.tsx` | Card rendering, computed opportunity scores, action dispatch, per-node failure isolation, catalog/registry parity |
 | `apps/studio/src/assistant/convert.test.ts` | Every part mapping in both directions, unknown parts dropped, `content` preserved for history |
 | `apps/studio/src/api/studioApi.test.ts` | Chat request serialization: visible-path messages and attachment fields match the sidecar schema |
@@ -80,6 +107,7 @@ control while following a streamed turn and returning to the live end:
 | `apps/studio/src/components/chat/Conversation.test.tsx` | Prose and surfaces interleaved in the agent's order through the real runtime; card actions become messages; named alternative N of M and its switch; reasoning disclosure opens on request; the phase is announced and the reply is busy while streaming; failure retry |
 | `apps/studio/src/components/chat/Composer.test.tsx` | Send, stop, the slash palette, keyboard focus, dropped and pasted attachments, refusal of unreadable files, and accessible attachment format/size limits in the runtime-bound composer |
 | `apps/studio/src/components/chat/StallNotice.test.tsx` | The eight-second silence line: appears only while a run is stalled, disappears when it settles, and announces once rather than on every tick |
+| `apps/studio/src/assistant/dictation.test.ts`, `src/components/chat/Dictation.test.tsx` | The speech-recognition support gate, the microphone starting a session, and the absence of the control where the API is missing |
 | `apps/studio/src/components/chat/ModelPicker.test.tsx` | Listing and marking the configured model, selection writes through `saveSettings`, arrow/Enter/Escape operation, an unreachable backend explained with a Settings path, one probe per backend |
 | `apps/studio/src/assistant/attachments.test.ts` | Acceptance by extension and type, the 5 MB image ceiling, and human-readable sizes |
 | `apps/studio/src/assistant/starterCopy.test.ts` | The first-run starter lint: situation-first titles, material-first prompts, a promised artifact, no quality adjectives, no claim literal, and the untouched returning-user swaps |
@@ -102,7 +130,10 @@ control while following a streamed turn and returning to the live end:
 | `apps/studio/src/test/keyboard.test.tsx` | Shell landmarks and skip link, the tab path order (skip link → top bar → rail → transcript), and a project-wide AST scan for click handlers on non-controls |
 | `apps/studio/src/styles/theme.test.ts` | Palette contrast in both themes (4.5:1 text, 3:1 focus ring) and no custom property referenced without a definition |
 | `apps/studio/src/lib/guidance.test.ts` | One hint at a time, context before evidence, silence before the first exchange, permanent dismissal, defensive storage |
-| `apps/studio/src/App.test.tsx` | First-minute ordering: no tour or interview over the stage, tour on request, context hint after the first reply, job handoff, chosen surface opens, flag off in shell tests |
+| `apps/studio/src/App.test.tsx` | First-minute ordering: no tour or interview over the stage, tour on request, context hint after the first reply, job handoff, chosen surface opens, flag off in shell tests, and a complete introduction that saves the brief |
+| `apps/studio/src/lib/intro.test.ts` | Introduction turns, parsing under empty, very long, and multi-fact replies, the proposed defaults, draft storage, and one-shot migration |
+| `apps/studio/src/components/setup/IntroConversation.test.tsx` | Five turns, skip, Escape, in-place summary edits, and the accepted brief with role, team, and evidence |
+| `apps/studio/src/components/setup/IntroConversation.visual.test.tsx` | The summary card as one Chromatic snapshot |
 
 ## Website Checks (GitHub Pages)
 
