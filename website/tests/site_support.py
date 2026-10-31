@@ -17,6 +17,11 @@ TOOLS = SITE / "tools"
 # The tool modules live in website/tools, which pytest does not put on the path.
 sys.path.insert(0, str(TOOLS))
 
+#: Pages that are intentionally one self-contained file with no shared chrome:
+#: the 404 and the read-only sample workspace. The site-wide chrome checks do
+#: not apply to them.
+SELF_CONTAINED = frozenset({"404.html", "sample/index.html"})
+
 STUDIO_THEME = ROOT / "apps" / "studio" / "src" / "styles" / "theme.css"
 MCP_SERVER_PY = ROOT / "apps" / "mcp-server" / "src" / "agentic_odi_mcp_server" / "mcp_server.py"
 CONTRACT_PY = ROOT / "packages" / "core" / "src" / "agentic_odi_core" / "contract.py"
@@ -59,10 +64,20 @@ def read_page(page: str) -> str:
 
 
 def all_pages() -> list[str]:
-    """Every built HTML page, as a path relative to the built site root."""
+    """Every built HTML page that carries the shared site chrome.
+
+    The 404 page and the read-only sample workspace are deliberately
+    self-contained: one file each, no client script, no external request. The
+    chrome-wide assertions (the theme toggle, the shared stylesheets) do not
+    apply to them, so they are excluded here. Their own contracts live in
+    ``test_site.py::test_the_404_page_is_self_contained`` and
+    ``test_sample.py``.
+    """
     assert _BUILT is not None, "the site was not built"
     return sorted(
-        p.relative_to(_BUILT).as_posix() for p in _BUILT.rglob("*.html") if p.name != "404.html"
+        p.relative_to(_BUILT).as_posix()
+        for p in _BUILT.rglob("*.html")
+        if p.relative_to(_BUILT).as_posix() not in SELF_CONTAINED
     )
 
 

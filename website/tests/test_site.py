@@ -39,6 +39,8 @@ ALLOWED_EXTERNAL_PREFIXES = (
     "https://agentic-odi.alehar.workers.dev/",
     "https://agentic-odi.fastmcp.app/mcp",
     "https://horizon.prefect.io/alhase/servers/agentic-odi/chat",
+    # The roadmap names the tracking issue behind a shipped capability.
+    "https://linear.app/alhase-personal/issue/",
     # Tooling the guides mention.
     "https://docs.astral.sh/uv/",
     "https://modelcontextprotocol.io",

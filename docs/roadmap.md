@@ -36,6 +36,8 @@ links to the pull request; a red or draft entry is stated as such rather than
 counted as done.
 
 - [ ] **A cold open under a second** — a deterministic 1,500-outcome study corpus, per-segment measurement, an incremental event replay instead of a full rescan, and a deferred landscape render; before/after recorded in `docs/development.md` (this change).
+- [ ] **A public sample workspace on the site** — a read-only page generated from the demo loader's own fixture, every row marked a sample, published under `/sample/` ([ALH-126](https://linear.app/alhase-personal/issue/ALH-126/m0-18-honest-a-public-sample-workspace-on-the-site)).
+- [ ] **Resume the last job, step, or outcome after a reload** — the Studio keeps its place in browser storage ([PR #299](https://github.com/alehar9320/agentic-odi/pull/299)).
 - [ ] **Rate-limit the ingest sink** — a token bucket sheds a high-volume batch instead of exhausting memory ([PR #298](https://github.com/alehar9320/agentic-odi/pull/298)).
 - [ ] **Job validation at the model level** — name and description constraints live in `packages/core` ([PR #296](https://github.com/alehar9320/agentic-odi/pull/296)).
 - [ ] **MCP connection limits** — timeout and pool settings so a hanging connection is bounded ([PR #294](https://github.com/alehar9320/agentic-odi/pull/294)).

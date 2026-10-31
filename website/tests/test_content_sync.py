@@ -160,3 +160,22 @@ def test_the_copy_control_reports_that_it_copied():
     script = (SITE / "assets" / "main.js").read_text(encoding="utf-8")
     assert 'document.querySelectorAll("[data-copy]")' in script
     assert 'button.textContent = "Copied"' in script
+
+
+def test_the_sample_page_matches_a_fresh_render():
+    # The sample workspace is generated from its fixture. This regenerates it
+    # and compares, so the committed page cannot drift from the fixture the
+    # product's demo loader shares — the same alarm build_site.py's output has.
+    import build_sample
+
+    build_sample.build(SITE, check=True)
+
+
+def test_the_sample_fixture_still_derives_from_the_demo_loader():
+    # The sample is not a second corpus: relabelling the demo fixture must
+    # reproduce the committed file exactly, or the two presentations have
+    # started to diverge.
+    import build_sample
+
+    committed = json.loads((SITE / "content" / "sample-study.json").read_text(encoding="utf-8"))
+    assert build_sample.build_fixture(generated=committed["generated"]) == committed
