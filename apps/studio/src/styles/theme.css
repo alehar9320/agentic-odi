@@ -878,6 +878,30 @@ a {
   font-size: 0.74rem;
 }
 
+/* Interim recognition output. The label is text so the state never depends on
+   colour alone, and the final sentence replaces this line entirely. */
+.composer__dictation {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  margin: 0 0 6px;
+  padding: 0 4px;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.composer__dictation-label {
+  color: var(--accent);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.composer__mic.is-listening {
+  color: var(--accent);
+}
+
 .composer__attach {
   display: grid;
   place-items: center;
