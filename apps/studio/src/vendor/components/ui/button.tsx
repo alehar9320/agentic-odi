@@ -1,6 +1,9 @@
 // vendored: https://ui.shadcn.com@shadcn-cli-4.23.0 — MIT — local edits: the cn import points at @/lib/utils instead of the cn package
-// Copied by `npx shadcn@latest add button` (issue #385). Refresh with the CLI,
-// then restore that import line; do not restate the markup by hand.
+// Copied from the shadcn registry by `npx shadcn@latest add button` (issue #385).
+// The registry item imports its class merger from the "cn" package, while this
+// tree standardises on the local helper, so the import points at "@/lib/utils"
+// (src/vendor/lib/utils.ts). Refresh with the CLI, then restore that line; do
+// not restate the markup by hand.
 
 import * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
