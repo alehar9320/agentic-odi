@@ -260,6 +260,7 @@ without giving up the message model the sidecar already understands.
 | **Branching** | **Edit** a user turn or **Regenerate** a reply and both versions are kept as siblings. **Alternative 2 of 3** with `‹`/`›` steps between them, and the visible branch is saved as the conversation's `head_id`, so a reload reopens the branch you were reading. |
 | **Suggestions** | The empty-stage pills are chosen from the canvas and handed to the runtime as suggestion prompts. |
 | **Generative UI** | A validated `UiNode` travels as an assistant-ui **data part** (`data-odi-surface`) and renders through the same `UiRenderer`. The catalog stays ours and server-validated. |
+| **Read aloud** | A settled reply with prose offers **Read aloud**. Starting another reply stops the first; **Stop reading**, Escape inside the thread, and leaving the conversation end it. The runtime gets a `WebSpeechSynthesisAdapter` only where `speechSynthesis` exists, so the control is absent rather than broken in a shell without it. Speech is never persisted and a streaming reply is never spoken. |
 | **Dictation** | Where the shell supports speech recognition, the composer shows a microphone: it turns speech into text, marks the interim transcript as *Listening*, and commits one final sentence to the input. It never sends by itself, no audio leaves the browser, and nothing is stored. In a shell without the API — notably parts of Tauri's WebKit webview — there is no microphone at all. No fallback provider and no realtime voice. |
 
 #### Where the bridge lives
