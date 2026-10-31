@@ -44,6 +44,11 @@ class ToolName(str, Enum):
     ADD_QUOTE = "add_quote"
     LIST_QUOTES = "list_quotes"
     IMPORT_TRANSCRIPT = "import_transcript"
+    EXTRACT_CANDIDATES = "extract_candidates"
+    LIST_CANDIDATES = "list_candidates"
+    GET_CANDIDATE = "get_candidate"
+    UPDATE_CANDIDATE = "update_candidate"
+    DELETE_CANDIDATE = "delete_candidate"
     PROMOTE_EVIDENCE = "promote_evidence"
     EVALUATE_OUTCOME = "evaluate_outcome"
     GET_ODI_SCHEMA = "get_odi_schema"
@@ -403,6 +408,45 @@ TOOL_SPECS: dict[str, ToolSpec] = {
         ),
         required=("text", "title", "participant_label"),
         returns="The created Interview and the number of quotes.",
+    ),
+    ToolName.EXTRACT_CANDIDATES.value: ToolSpec(
+        name="extract_candidates",
+        summary="Propose outcome candidates from one interview quote.",
+        effect=_derive_effect("extract_candidates"),
+        arguments=("quote_id", "stage_hint"),
+        required=("quote_id",),
+        returns="The newly stored OutcomeCandidates (valid ones proposed, invalid ones rejected).",
+    ),
+    ToolName.LIST_CANDIDATES.value: ToolSpec(
+        name="list_candidates",
+        summary="List outcome candidates, optionally filtered by interview or status.",
+        effect=_derive_effect("list_candidates"),
+        arguments=("interview_id", "status", "limit", "offset"),
+        returns="A list of OutcomeCandidates.",
+    ),
+    ToolName.GET_CANDIDATE.value: ToolSpec(
+        name="get_candidate",
+        summary="Get a single OutcomeCandidate by ID.",
+        effect=_derive_effect("get_candidate"),
+        arguments=("candidate_id",),
+        required=("candidate_id",),
+        returns="The OutcomeCandidate, or an error string if not found.",
+    ),
+    ToolName.UPDATE_CANDIDATE.value: ToolSpec(
+        name="update_candidate",
+        summary="Update an outcome candidate's review state or statement.",
+        effect=_derive_effect("update_candidate"),
+        arguments=("candidate_id", "status", "statement", "decision_reason"),
+        required=("candidate_id",),
+        returns="The updated OutcomeCandidate.",
+    ),
+    ToolName.DELETE_CANDIDATE.value: ToolSpec(
+        name="delete_candidate",
+        summary="Delete an OutcomeCandidate.",
+        effect=_derive_effect("delete_candidate"),
+        arguments=("candidate_id",),
+        required=("candidate_id",),
+        returns="The deleted candidate ID.",
     ),
     ToolName.PROMOTE_EVIDENCE.value: ToolSpec(
         name="promote_evidence",

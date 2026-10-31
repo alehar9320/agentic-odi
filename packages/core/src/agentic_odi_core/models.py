@@ -220,6 +220,44 @@ class InterviewQuote(BaseModel):
     end_ms: int | None = Field(None, ge=0, description="End offset in milliseconds")
 
 
+class CandidateStatus(str, Enum):
+    """The review state of a proposed outcome candidate."""
+
+    PROPOSED = "proposed"
+    ACCEPTED = "accepted"
+    REJECTED = "rejected"
+    MERGED = "merged"
+
+
+class OutcomeCandidate(BaseModel):
+    """A desired-outcome statement proposed from one interview quote.
+
+    A candidate is not an :class:`Outcome`; it carries the evidence and the
+    decision until a person accepts it. ``status`` is the whole state machine,
+    and ``outcome_id`` records what acceptance produced so a retry cannot make
+    a second outcome.
+    """
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    interview_id: str = Field(..., description="The Interview the quote belongs to")
+    quote_id: str = Field(..., description="The verbatim quote this candidate came from")
+    statement: str = Field(..., description="The proposed desired-outcome statement")
+    rationale: str = Field(
+        "", description="Why the extractor proposed it, or why a validator refused it"
+    )
+    confidence: float = Field(..., ge=0.0, le=1.0, description="Extractor confidence, 0 to 1")
+    status: CandidateStatus = Field(CandidateStatus.PROPOSED, description="Review state")
+    merged_into: str | None = Field(
+        None, description="The candidate or outcome this was merged into, once merged"
+    )
+    outcome_id: str | None = Field(
+        None, description="The Outcome acceptance produced, once accepted"
+    )
+    decision_reason: str | None = Field(
+        None, description="The reviewer's reason, required when rejected"
+    )
+
+
 class CustomerOutcome(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     job_id: str = Field(..., description="The ID of the Job this outcome relates to")

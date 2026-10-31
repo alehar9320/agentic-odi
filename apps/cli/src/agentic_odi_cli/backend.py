@@ -635,6 +635,71 @@ class LocalBackend(Backend):
             raise BackendError(f"{display}: {exc}") from None
         return {"interview": interview.model_dump(), "quote_count": len(quotes)}
 
+    def _extract_candidates(self, args: dict[str, Any]) -> list[dict[str, Any]]:
+        from agentic_odi_core import (
+            InterviewNotFoundError,
+            QuoteNotFoundError,
+            interview_not_found,
+            quote_not_found,
+        )
+        from agentic_odi_core.extraction import FixtureExtractor
+
+        try:
+            candidates = self.service.extract_candidates(
+                args["quote_id"], FixtureExtractor(), args.get("stage_hint")
+            )
+        except QuoteNotFoundError:
+            raise BackendError(quote_not_found(args["quote_id"])) from None
+        except InterviewNotFoundError as exc:
+            raise BackendError(interview_not_found(exc.interview_id)) from None
+        return [candidate.model_dump(mode="json") for candidate in candidates]
+
+    def _get_candidate(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import candidate_not_found
+
+        candidate = self.service.get_candidate(args["candidate_id"])
+        if candidate is None:
+            raise BackendError(candidate_not_found(args["candidate_id"]))
+        return candidate.model_dump(mode="json")
+
+    def _list_candidates(self, args: dict[str, Any]) -> list[dict[str, Any]]:
+        from agentic_odi_core import CandidateStatus
+
+        raw_status = args.get("status")
+        status = CandidateStatus(raw_status) if raw_status is not None else None
+        items = self.service.list_candidates(
+            interview_id=args.get("interview_id"),
+            status=status,
+            limit=args.get("limit"),
+            offset=args.get("offset", 0),
+        )
+        return [item.model_dump(mode="json") for item in items]
+
+    def _update_candidate(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import CandidateNotFoundError, CandidateStatus, candidate_not_found
+
+        updates: dict[str, Any] = {}
+        if args.get("status") is not None:
+            updates["status"] = CandidateStatus(args["status"])
+        if args.get("statement") is not None:
+            updates["statement"] = args["statement"]
+        if args.get("decision_reason") is not None:
+            updates["decision_reason"] = args["decision_reason"]
+        try:
+            candidate = self.service.update_candidate(args["candidate_id"], updates)
+        except CandidateNotFoundError:
+            raise BackendError(candidate_not_found(args["candidate_id"])) from None
+        return candidate.model_dump(mode="json")
+
+    def _delete_candidate(self, args: dict[str, Any]) -> str:
+        from agentic_odi_core import CandidateNotFoundError, candidate_not_found
+
+        try:
+            self.service.delete_candidate(args["candidate_id"])
+        except CandidateNotFoundError:
+            raise BackendError(candidate_not_found(args["candidate_id"])) from None
+        return args["candidate_id"]
+
     def _evaluate_outcome(self, args: dict[str, Any]) -> str:
         from agentic_odi_core import job_not_found
         from agentic_odi_core.evaluation import (
@@ -747,6 +812,11 @@ _LOCAL_HANDLERS = {
     "add_quote": LocalBackend._add_quote,
     "list_quotes": LocalBackend._list_quotes,
     "import_transcript": LocalBackend._import_transcript,
+    "extract_candidates": LocalBackend._extract_candidates,
+    "get_candidate": LocalBackend._get_candidate,
+    "list_candidates": LocalBackend._list_candidates,
+    "update_candidate": LocalBackend._update_candidate,
+    "delete_candidate": LocalBackend._delete_candidate,
     "promote_evidence": LocalBackend._promote_evidence,
     "schedule_work": LocalBackend._schedule_work,
     "get_scheduled_work": LocalBackend._get_scheduled_work,

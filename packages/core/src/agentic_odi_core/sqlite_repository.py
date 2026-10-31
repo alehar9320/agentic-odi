@@ -13,12 +13,14 @@ from pydantic import BaseModel, ValidationError
 from agentic_odi_core.events import DEFAULT_DEVICE, DEFAULT_WORKSPACE, Event
 from agentic_odi_core.intent_store import IntentStore
 from agentic_odi_core.models import (
+    CandidateStatus,
     CustomerOutcome,
     Evidence,
     Interview,
     InterviewQuote,
     Job,
     Outcome,
+    OutcomeCandidate,
     ScheduledWork,
     Signal,
     Step,
@@ -64,6 +66,7 @@ class SQLiteRepository(Repository):
         self.scheduled_work: dict[str, ScheduledWork] = {}
         self.interviews: dict[str, Interview] = {}
         self.quotes: dict[str, InterviewQuote] = {}
+        self.candidates: dict[str, OutcomeCandidate] = {}
         self._last_event_id = 0
         for ev in self.store.get_stream(workspace_id=self._workspace_id, replay_order=True):
             self._apply_event(ev)
@@ -128,6 +131,8 @@ class SQLiteRepository(Repository):
             self.interviews[p["id"]] = Interview.model_validate(p)
         elif et == "QUOTE_CREATED":
             self.quotes[p["id"]] = InterviewQuote.model_validate(p)
+        elif et == "CANDIDATE_CREATED":
+            self.candidates[p["id"]] = OutcomeCandidate.model_validate(p)
         elif et == "JOB_UPDATED":
             self._merge_updates(self.jobs, p, Job)
         elif et == "STEP_UPDATED":
@@ -138,6 +143,8 @@ class SQLiteRepository(Repository):
             self._merge_updates(self.customer_outcomes, p, CustomerOutcome)
         elif et == "INTERVIEW_UPDATED":
             self._merge_updates(self.interviews, p, Interview)
+        elif et == "CANDIDATE_UPDATED":
+            self._merge_updates(self.candidates, p, OutcomeCandidate)
         elif et == "JOB_DELETED":
             job_id = p["id"]
             self.jobs.pop(job_id, None)
@@ -159,6 +166,10 @@ class SQLiteRepository(Repository):
                 del self.interviews[key]
                 for quote_key in [q for q, v in self.quotes.items() if v.interview_id == key]:
                     del self.quotes[quote_key]
+                for candidate_key in [
+                    c for c, v in self.candidates.items() if v.interview_id == key
+                ]:
+                    del self.candidates[candidate_key]
         elif et == "STEP_DELETED":
             step_id = p["id"]
             self.steps.pop(step_id, None)
@@ -198,6 +209,15 @@ class SQLiteRepository(Repository):
                 cascade = [k for k, v in self.quotes.items() if v.interview_id == interview_id]
             for quote_id in cascade:
                 self.quotes.pop(quote_id, None)
+            candidate_cascade = p.get("cascaded_candidate_ids")
+            if candidate_cascade is None:
+                candidate_cascade = [
+                    c for c, v in self.candidates.items() if v.interview_id == interview_id
+                ]
+            for candidate_id in candidate_cascade:
+                self.candidates.pop(candidate_id, None)
+        elif et == "CANDIDATE_DELETED":
+            self.candidates.pop(p["id"], None)
         elif et == "CUSTOMER_OUTCOME_DELETED":
             self.customer_outcomes.pop(p["id"], None)
         elif et == "SIGNAL_CREATED":
@@ -679,9 +699,16 @@ class SQLiteRepository(Repository):
             if interview_id not in self.interviews:
                 return []
             cascaded = [k for k, v in self.quotes.items() if v.interview_id == interview_id]
+            cascaded_candidates = [
+                c for c, v in self.candidates.items() if v.interview_id == interview_id
+            ]
             self.store.append(
                 "INTERVIEW_DELETED",
-                {"id": interview_id, "cascaded_quote_ids": cascaded},
+                {
+                    "id": interview_id,
+                    "cascaded_quote_ids": cascaded,
+                    "cascaded_candidate_ids": cascaded_candidates,
+                },
                 workspace_id=self._workspace_id,
                 device_id=self._device_id,
             )
@@ -709,6 +736,74 @@ class SQLiteRepository(Repository):
             self._sync()
             items = [q for q in self.quotes.values() if q.interview_id == interview_id]
             return sorted(items, key=lambda q: q.ordinal)
+
+    def add_candidate(self, candidate: OutcomeCandidate) -> OutcomeCandidate:
+        with self._lock:
+            self.store.append(
+                "CANDIDATE_CREATED",
+                candidate.model_dump(mode="json"),
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return candidate
+
+    def get_candidate(self, candidate_id: str) -> OutcomeCandidate | None:
+        with self._lock:
+            self._sync()
+            return self.candidates.get(candidate_id)
+
+    def list_candidates(
+        self,
+        interview_id: str | None = None,
+        status: CandidateStatus | None = None,
+        limit: int | None = None,
+        offset: int = 0,
+    ) -> list[OutcomeCandidate]:
+        with self._lock:
+            self._sync()
+            items = list(self.candidates.values())
+            if interview_id is not None:
+                items = [c for c in items if c.interview_id == interview_id]
+            if status is not None:
+                items = [c for c in items if c.status == status]
+            return page(items, limit, offset)
+
+    def update_candidate(self, candidate_id: str, updates: dict) -> OutcomeCandidate | None:
+        with self._lock:
+            self._sync()
+            candidate = self.candidates.get(candidate_id)
+            if not candidate:
+                return None
+            current = candidate.model_dump(exclude_unset=True)
+            current.update(updates)
+            new_candidate = candidate.model_validate(current)
+            serialised = {
+                key: value.value if isinstance(value, CandidateStatus) else value
+                for key, value in updates.items()
+            }
+            self.store.append(
+                "CANDIDATE_UPDATED",
+                {"id": candidate_id, "updates": serialised},
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return new_candidate
+
+    def delete_candidate(self, candidate_id: str) -> bool:
+        with self._lock:
+            self._sync()
+            if candidate_id in self.candidates:
+                self.store.append(
+                    "CANDIDATE_DELETED",
+                    {"id": candidate_id},
+                    workspace_id=self._workspace_id,
+                    device_id=self._device_id,
+                )
+                self._sync()
+                return True
+            return False
 
     def clear(self) -> None:
         with self._lock:

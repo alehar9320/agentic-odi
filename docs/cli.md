@@ -257,6 +257,24 @@ text, each paragraph becomes one quote with no speaker.
 real name, email, or company. Quotes are ordered by a service-assigned ordinal;
 deleting an interview removes its quotes and nothing else.
 
+### Extract candidate outcomes
+
+`interviews extract` turns one quote into candidate desired-outcome statements.
+It never writes an Outcome: a valid proposal is stored `proposed`, and a
+proposal that fails the ODI statement check is stored `rejected` with the
+validator's reason, so a bad extractor is visible rather than silent. Running it
+again adds nothing and never resets a decision.
+
+```bash
+agentic-odi interviews extract <quote-id>
+agentic-odi candidates list --status proposed
+agentic-odi candidates list --interview-id <interview-id> --json
+agentic-odi candidates get <candidate-id>
+agentic-odi candidates delete <candidate-id> --yes
+```
+
+Deleting an interview removes its candidates along with its quotes.
+
 ## Schema, scoring, and guidance
 
 ```bash
