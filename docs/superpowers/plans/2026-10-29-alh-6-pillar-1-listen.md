@@ -35,13 +35,24 @@ Uncovered inputs/conditions most likely to bite, each with a test in the owning 
 
 ## Implementation status
 
-- **Task 0 (parity harness)** — done in this branch: `packages/core/tests/test_persistence_parity.py` drives both repositories and fails on a missed link.
-- **Task 1 (A1 — interviews and quotes)** — done in this branch: models, repository (Protocol + in-memory + SQLite), schema, service, contract, MCP tools, CLI group + renderers, docs, and tests.
-- **Task 9 (A7 — stages become data)** — done in this branch: `order`↔`stage` agreement on the model and service, `STEP_STAGE_BACKFILLED` on open, schema enum, CLI/MCP/API stage updates, docs, and `packages/core/tests/test_stages.py`.
-- **Task 10 (A7.2 — the map draws the stages it is given)** — done in this branch: `stage_catalog()` + `GET /api/schema`, the Studio fetches the stages at boot and `JobMap` renders exactly that list.
-- **Task 11 (A8 — coverage)** — done in this branch: `build_coverage_report` + `coverage_report(job_id)`, `get_coverage` MCP tool, `GET /api/jobs/{id}/coverage`, the CLI's `coverage`, the Studio's **Coverage** lens, docs, and tests in `packages/core/tests/test_coverage.py`, `apps/cli/tests/test_coverage_cli.py`, `apps/mcp-server/tests/test_coverage_tool.py`, `apps/studio-api/tests/test_studio_coverage.py`.
-- **Task 14 (A2.2 — import from the thread)** — done in this branch: `POST /api/interviews/import` + `ImportInterviewRequest`, the `/interview` command, the thread's import/refusal path, and tests in `apps/studio-api/tests/test_interview_import.py` (incl. CLI/HTTP parity), `apps/studio/src/lib/commands.test.ts`, and `apps/studio/src/components/chat/ChatStage.test.tsx`.
-- **Tasks 2–13 and Phases 2–4** — not started; each is its own issue and PR.
+The **M1 backbone is complete**: every Task below (0–14) has landed as its own PR, stacked child-on-child per the one-PR-per-child policy. Each PR is a draft until its predecessor merges.
+
+- **Task 0 (parity harness)** — `packages/core/tests/test_persistence_parity.py` drives both repositories and fails on a missed link. PR #279's branch.
+- **Task 1 (A1 — interviews and quotes)** — models, repository (Protocol + in-memory + SQLite), schema, service, contract, MCP tools, CLI group + renderers, docs, and tests. PR #279.
+- **Task 2 (A2 — import from the command line)** — `transcript.py` parsers (VTT/SRT/markdown/prose), `odi interviews import`, `docs/cli.md`. PR #280.
+- **Task 3 (A4 — extract candidates)** — `similarity.py` + `extraction.py`, `OutcomeCandidate` through the checklist. PR #282.
+- **Task 4 (A5.1a — accept or reject)** — service state machine, `GET/PATCH /api/candidates`, verbatim evidence on acceptance. PR #284.
+- **Task 5 (A5.1b — merge evidence)** — `find_duplicate_groups`, `merge_candidates`, merge transition. PR #291.
+- **Task 6 (A5.1c — review beside the quote)** — Studio `candidate_queue` card. PR #300.
+- **Task 7 (A5.2 — keyboard review queue)** — `odi interviews review`. PR #353.
+- **Task 8 (A10 — provenance travels with the number)** — evidence write on acceptance, `GET /api/outcomes/{id}/evidence`, deletion-safe provenance. PR #355.
+- **Task 9 (A7 — stages become data)** — `order`↔`stage` agreement, `STEP_STAGE_BACKFILLED` on open, schema enum. PR #356.
+- **Task 10 (A7.2 — the map draws the stages it is given)** — `stage_catalog()` + `GET /api/schema`, `JobMap` renders exactly that list. PR #365.
+- **Task 11 (A8 — coverage)** — `coverage_report(job_id)`, `get_coverage`, `GET /api/jobs/{id}/coverage`, CLI `coverage`, Studio **Coverage** lens. PR #366.
+- **Task 12 (A9 — twenty outcomes in one keyboard pass)** — `POST /api/outcomes/score-batch`, `odi score`. PR #368.
+- **Task 13 (A9.2 — the same pass in the Studio)** — the `batch-scoring` card. PR #369.
+- **Task 14 (A2.2 — import from the thread)** — `POST /api/interviews/import` + `ImportInterviewRequest`, the `/interview` command, the thread's import/refusal path, CLI/HTTP parity. PR #370.
+- **Phases 2–4 (M2/M3/M5)** — not started; each is its own issue and PR, and the shared readiness blockers below must be decided by the method owner before coding.
 
 ---
 
@@ -57,10 +68,10 @@ The **Persistence checklist** in every child points at `packages/core/tests/test
 **Interfaces:**
 - Produces: a table-driven parity harness `assert_repository_parity(seed, *, entities)` that, for a seed of writes, asserts `InMemoryRepository` and `SQLiteRepository` produce identical reads and that a reload of the SQLite event log reproduces the same state.
 
-- [ ] **Step 1:** Enumerate the entity surface from `Repository` (jobs, steps, outcomes, customer_outcomes, evidence) and drive both repositories through create/update/delete/cascade.
-- [ ] **Step 2:** Assert equality of every read after (a) live writes, (b) `reload()` from the event log, (c) a fresh `SQLiteRepository` on the same path.
-- [ ] **Step 3:** Make the harness entity-registry driven so a new entity is one line, and let it **fail on a missed link** (a new model with no `_apply_event` branch) rather than pass silently.
-- [ ] **Step 4:** Run `uv run pytest packages/core/tests/test_persistence_parity.py`; confirm green on `main`'s current surface.
+- [x] **Step 1:** Enumerate the entity surface from `Repository` (jobs, steps, outcomes, customer_outcomes, evidence) and drive both repositories through create/update/delete/cascade.
+- [x] **Step 2:** Assert equality of every read after (a) live writes, (b) `reload()` from the event log, (c) a fresh `SQLiteRepository` on the same path.
+- [x] **Step 3:** Make the harness entity-registry driven so a new entity is one line, and let it **fail on a missed link** (a new model with no `_apply_event` branch) rather than pass silently.
+- [x] **Step 4:** Run `uv run pytest packages/core/tests/test_persistence_parity.py`; confirm green on `main`'s current surface.
 
 **Acceptance:** the harness passes on the current surface and fails red if any single link is removed (add a temporary negative case, then remove it).
 
@@ -79,12 +90,12 @@ The **Persistence checklist** in every child points at `packages/core/tests/test
 - Service: `add_interview`, `get_interview`, `list_interviews`, `add_quote`, `list_quotes` (ordered by `ordinal`), `delete_interview` (cascade ids recorded in the delete payload).
 - New `InterviewNotFoundError` beside the existing not-found classes.
 
-- [ ] **Step 1:** Add both models; `participant_label` is free text, never an email/phone/company; no raw-transcript BLOB.
-- [ ] **Step 2:** Extend `Repository` Protocol + `InMemoryRepository`; cascade delete removes only that interview's quotes.
-- [ ] **Step 3:** Add `_apply_event` branches for all four events; the `INTERVIEW_DELETED` payload carries the cascaded quote ids.
-- [ ] **Step 4:** Assign `ordinal = max(ordinal)+1` in the service (not the caller, not `created_at`); reject `add_quote` for a missing interview with no event written.
-- [ ] **Step 5:** Register both models in `_SCHEMA_MODELS`; mirror in `remote.py`; add contract tools (`add_interview`, `get_interview`, `list_interviews`, `add_quote`, `list_quotes`, `delete_interview`) and MCP handlers; wire the CLI local handlers so `set(_LOCAL_HANDLERS) == set(TOOL_NAMES)` still holds.
-- [ ] **Step 6:** Tests: one interview with three quotes round-trips a reload; quotes in `ordinal` order; delete removes only its quotes; `get_odi_schema` exposes both; legacy store without these entities opens cleanly; equal `created_at` still deterministic.
+- [x] **Step 1:** Add both models; `participant_label` is free text, never an email/phone/company; no raw-transcript BLOB.
+- [x] **Step 2:** Extend `Repository` Protocol + `InMemoryRepository`; cascade delete removes only that interview's quotes.
+- [x] **Step 3:** Add `_apply_event` branches for all four events; the `INTERVIEW_DELETED` payload carries the cascaded quote ids.
+- [x] **Step 4:** Assign `ordinal = max(ordinal)+1` in the service (not the caller, not `created_at`); reject `add_quote` for a missing interview with no event written.
+- [x] **Step 5:** Register both models in `_SCHEMA_MODELS`; mirror in `remote.py`; add contract tools (`add_interview`, `get_interview`, `list_interviews`, `add_quote`, `list_quotes`, `delete_interview`) and MCP handlers; wire the CLI local handlers so `set(_LOCAL_HANDLERS) == set(TOOL_NAMES)` still holds.
+- [x] **Step 6:** Tests: one interview with three quotes round-trips a reload; quotes in `ordinal` order; delete removes only its quotes; `get_odi_schema` exposes both; legacy store without these entities opens cleanly; equal `created_at` still deterministic.
 
 **Readiness blocker (surface, do not invent):** the issue's opening claim of "a retained raw transcript" has no model field and conflicts with the quote-row-only guidance. Confirm the retention contract before adding any raw-file storage. Coordinate the deletion behavior with ALH-23: retained `Evidence` snapshots must not cascade away with quotes.
 
@@ -97,11 +108,11 @@ The **Persistence checklist** in every child points at `packages/core/tests/test
 - `parse_vtt`, `parse_srt`, `parse_markdown_dialogue` (`**Ana:** …` and `Ana: …`), `parse_prose`.
 - CLI `odi interviews import <path|-> --job <id> --title ... --participant ... --role ... [--format auto|md|txt|vtt|srt]`.
 
-- [ ] **Step 1:** Implement the four parsers; handle BOM, CRLF, blank runs, wrapped lines, missing `WEBVTT` header; unknown speaker stays `None`; malformed timestamp reports the line and never drops a turn.
-- [ ] **Step 2:** Format sniffing is **extension first, then a content check**; unknown format is refused, never guessed. Parse **before** any service write so a refusal leaves no partial interview.
-- [ ] **Step 3:** Persist via Task 1's service (service assigns ordinals). Refusals name the supplied filename (or `stdin`) and the line/reason.
-- [ ] **Step 4:** Register the `interviews` Typer group in `cli.py`; add the command to `docs/cli.md`.
-- [ ] **Step 5:** Tests: a table-driven suite of ≥12 cases across all four formats, stdin, empty/unknown input; `.vtt` yields speaker+timestamp quotes; plain text yields one quote per paragraph with `speaker=None`; empty file refused with the filename; failed validation creates no interview/quotes.
+- [x] **Step 1:** Implement the four parsers; handle BOM, CRLF, blank runs, wrapped lines, missing `WEBVTT` header; unknown speaker stays `None`; malformed timestamp reports the line and never drops a turn.
+- [x] **Step 2:** Format sniffing is **extension first, then a content check**; unknown format is refused, never guessed. Parse **before** any service write so a refusal leaves no partial interview.
+- [x] **Step 3:** Persist via Task 1's service (service assigns ordinals). Refusals name the supplied filename (or `stdin`) and the line/reason.
+- [x] **Step 4:** Register the `interviews` Typer group in `cli.py`; add the command to `docs/cli.md`.
+- [x] **Step 5:** Tests: a table-driven suite of ≥12 cases across all four formats, stdin, empty/unknown input; `.vtt` yields speaker+timestamp quotes; plain text yields one quote per paragraph with `speaker=None`; empty file refused with the filename; failed validation creates no interview/quotes.
 
 **Readiness blocker (settle before coding):** the spec alternates between a parser returning `Quote{ordinal,…}` and persistence-assigned ordinals. Fix the pure-parser return type (`Turn`, no ordinal) and the format/extension mismatch behavior, and keep the final interface identical for the HTTP path (Task 7).
 
@@ -115,12 +126,12 @@ The **Persistence checklist** in every child points at `packages/core/tests/test
 - `OutcomeCandidate{id, interview_id, quote_id, statement, rationale, confidence, status: proposed|accepted|rejected|merged, merged_into?, outcome_id?}` — event-sourced.
 - Service: `extract_candidates(quote_id, extractor)`, `list_candidates(interview_id=None, status=None)`, candidate update path.
 
-- [ ] **Step 1:** Implement `similarity.py` with a single documented normaliser and stopword vocabulary; define empty-normalised handling.
-- [ ] **Step 2:** Implement `extraction.py`; every proposal passes `evaluate_outcome_statement` **before** storage; an invalid one is stored `status='rejected'` with the validator's message in `rationale` (keep the evidence the extractor is wrong).
-- [ ] **Step 3:** Key candidates on `(quote_id, normalised_statement)` for idempotency; re-running extraction adds nothing and never resets a human decision.
-- [ ] **Step 4:** Persist `outcome_id` on the candidate (readiness blocker from ALH-191: the listed fields omit it although acceptance requires it).
-- [ ] **Step 5:** Full checklist wiring for `OutcomeCandidate` (events `CANDIDATE_CREATED|UPDATED`, schema, contract/MCP, CLI backend, studio-api, studio types).
-- [ ] **Step 6:** Tests: fixture extractor returning three statements, one invalid → two `proposed`, one `rejected` with the message; **no** `Outcome` exists after extraction; re-extraction does not duplicate; malformed payload / confidence outside `[0,1]` / missing quote / extractor failure are explicit and leave no partial invalid state; normalised repeated statements collapse.
+- [x] **Step 1:** Implement `similarity.py` with a single documented normaliser and stopword vocabulary; define empty-normalised handling.
+- [x] **Step 2:** Implement `extraction.py`; every proposal passes `evaluate_outcome_statement` **before** storage; an invalid one is stored `status='rejected'` with the validator's message in `rationale` (keep the evidence the extractor is wrong).
+- [x] **Step 3:** Key candidates on `(quote_id, normalised_statement)` for idempotency; re-running extraction adds nothing and never resets a human decision.
+- [x] **Step 4:** Persist `outcome_id` on the candidate (readiness blocker from ALH-191: the listed fields omit it although acceptance requires it).
+- [x] **Step 5:** Full checklist wiring for `OutcomeCandidate` (events `CANDIDATE_CREATED|UPDATED`, schema, contract/MCP, CLI backend, studio-api, studio types).
+- [x] **Step 6:** Tests: fixture extractor returning three statements, one invalid → two `proposed`, one `rejected` with the message; **no** `Outcome` exists after extraction; re-extraction does not duplicate; malformed payload / confidence outside `[0,1]` / missing quote / extractor failure are explicit and leave no partial invalid state; normalised repeated statements collapse.
 
 **Readiness blocker:** pin the stopword vocabulary and the empty-normalised behavior; do not invent score/stage values to make future acceptance pass.
 
@@ -132,10 +143,10 @@ The **Persistence checklist** in every child points at `packages/core/tests/test
 - `GET /api/candidates?interview_id=&status=proposed`, `PATCH /api/candidates/{id}` `{status, statement?, reason?}`.
 - Service `decide_candidate(candidate_id, status, statement=None, reason=None)`.
 
-- [ ] **Step 1:** Acceptance calls `ODIService.add_outcome` (validator + score rules apply), writes the verbatim `Evidence` snapshot from Task 8, then records `accepted` + `outcome_id`. Retry cannot duplicate outcome or evidence.
-- [ ] **Step 2:** Rejection requires a nonblank reason and retains the candidate. Skip is no write.
-- [ ] **Step 3:** Failure boundary: invalid statement / missing quote/interview / failed evidence write leaves **no** accepted candidate with missing evidence and **no** orphan outcome; verify by reload/replay.
-- [ ] **Step 4:** Router tests assert filter isolation and per-decision store state; unknown candidate id returns the established not-found error.
+- [x] **Step 1:** Acceptance calls `ODIService.add_outcome` (validator + score rules apply), writes the verbatim `Evidence` snapshot from Task 8, then records `accepted` + `outcome_id`. Retry cannot duplicate outcome or evidence.
+- [x] **Step 2:** Rejection requires a nonblank reason and retains the candidate. Skip is no write.
+- [x] **Step 3:** Failure boundary: invalid statement / missing quote/interview / failed evidence write leaves **no** accepted candidate with missing evidence and **no** orphan outcome; verify by reload/replay.
+- [x] **Step 4:** Router tests assert filter isolation and per-decision store state; unknown candidate id returns the established not-found error.
 
 **Readiness blocker (must resolve first):** how a newly accepted candidate supplies the **required stage/score inputs** of the outcome contract. Do not invent measurements or a stage, bypass `add_outcome`, or relax validation to make acceptance succeed. Decide the input contract (default scores from the review pass? explicit reviewer entry?) before coding.
 
@@ -143,9 +154,9 @@ The **Persistence checklist** in every child points at `packages/core/tests/test
 
 **Files:** `services.py` (`merge_candidates(target_id, merged_ids)`), `similarity.py` (`find_duplicate_groups(candidates, threshold=0.82)`), router `PATCH` merge branch; tests `packages/core/tests/test_merge_candidates.py`.
 
-- [ ] **Step 1:** `find_duplicate_groups` is read-only (no write during detection); a match is only a suggestion; the person chooses the target.
-- [ ] **Step 2:** Mark sources `merged` with `merged_into`, retain originals and verbatim evidence; five paraphrases merge into one outcome with five distinct evidence links and no second outcome; two unrelated statements are not suggested.
-- [ ] **Step 3:** A repeated merge changes nothing and duplicates no evidence; unknown target / invalid source transition fails with no partial moves. Document the recovery limit (no UI undo; re-extract from originals).
+- [x] **Step 1:** `find_duplicate_groups` is read-only (no write during detection); a match is only a suggestion; the person chooses the target.
+- [x] **Step 2:** Mark sources `merged` with `merged_into`, retain originals and verbatim evidence; five paraphrases merge into one outcome with five distinct evidence links and no second outcome; two unrelated statements are not suggested.
+- [x] **Step 3:** A repeated merge changes nothing and duplicates no evidence; unknown target / invalid source transition fails with no partial moves. Document the recovery limit (no UI undo; re-extract from originals).
 
 **Readiness blocker:** the absorbed spec calls its target a candidate while the active PATCH contract requires an outcome — confirm target semantics and eligible source states; do not silently reinterpret ids. Must not merge accepted library outcomes (that is ALH-85).
 
@@ -153,25 +164,25 @@ The **Persistence checklist** in every child points at `packages/core/tests/test
 
 **Files:** `apps/studio/src/ui/catalog.ts` (read-only `candidate_queue` entry with actions), `apps/studio/src/ui/protocol.ts`, component + tests.
 
-- [ ] **Step 1:** Card shows quote + statement + actions (accept, edit-and-accept, reviewer-selected merge, reject-with-reason, skip); no arbitrary HTML, no second state machine.
-- [ ] **Step 2:** A candidate cannot disappear as accepted until its write succeeds; rejection without a reason and invalid edited statements show the server's reason and retain the item.
-- [ ] **Step 3:** Empty queue / loading / failed fetch are distinguishable; retry/double-click cannot duplicate outcomes or evidence; candidate and source quote stay paired after progression; merge requires an explicit target.
+- [x] **Step 1:** Card shows quote + statement + actions (accept, edit-and-accept, reviewer-selected merge, reject-with-reason, skip); no arbitrary HTML, no second state machine.
+- [x] **Step 2:** A candidate cannot disappear as accepted until its write succeeds; rejection without a reason and invalid edited statements show the server's reason and retain the item.
+- [x] **Step 3:** Empty queue / loading / failed fetch are distinguishable; retry/double-click cannot duplicate outcomes or evidence; candidate and source quote stay paired after progression; merge requires an explicit target.
 
 ### Task 7: A5.2 — Work the review queue at the keyboard ([ALH-153])
 
 **Files:** `apps/cli/src/agentic_odi_cli/interviews.py` (`review` command), `docs/cli.md`; tests `apps/cli/tests/test_interviews_review.py`.
 
-- [ ] **Step 1:** `odi interviews review <id>` with `a`/`e`/`m`/`r`/`s`/`q`, progress `3/17`, and a `--yes` non-interactive mode; each prompt shows the statement beside its quote.
-- [ ] **Step 2:** Drives the same service state machine as the API; `--yes` is explicit human-issued batch consent, touches only `proposed` candidates, prints accurate success/failure counts, and never accepts on `q`.
-- [ ] **Step 3:** Scripted stdin covers edit-with-validation-error, merge with invalid/valid target, blank/nonblank reject reason, skip, quit, EOF; skip/quit/EOF preserve every remaining candidate; empty queue prints a meaningful zero-work result; re-running cannot duplicate outcomes/evidence.
+- [x] **Step 1:** `odi interviews review <id>` with `a`/`e`/`m`/`r`/`s`/`q`, progress `3/17`, and a `--yes` non-interactive mode; each prompt shows the statement beside its quote.
+- [x] **Step 2:** Drives the same service state machine as the API; `--yes` is explicit human-issued batch consent, touches only `proposed` candidates, prints accurate success/failure counts, and never accepts on `q`.
+- [x] **Step 3:** Scripted stdin covers edit-with-validation-error, merge with invalid/valid target, blank/nonblank reject reason, skip, quit, EOF; skip/quit/EOF preserve every remaining candidate; empty queue prints a meaningful zero-work result; re-running cannot duplicate outcomes/evidence.
 
 ### Task 8: A10 — Provenance travels with the number ([ALH-23])
 
 **Files:** `services.py` (acceptance writes the `Evidence` row; deletion-safe provenance), `apps/studio-api/.../router.py` (`GET /api/outcomes/{id}/evidence`), `apps/studio/src/ui/cards.tsx` (quote chip); tests `packages/core/tests/test_provenance.py`.
 
-- [ ] **Step 1:** On acceptance, write `Evidence{outcome_id, content: quote.text, source_name: interview title, source_kind: "interview", raw: {interview_id, quote_id}}` — content verbatim, never a whole transcript.
-- [ ] **Step 2:** `GET /api/outcomes/{id}/evidence`; outcome detail and landscape row show a quote count computed from `list_evidence` (never a stored counter), that opens the quotes.
-- [ ] **Step 3:** Deleting an interview **keeps** the evidence and nulls the link; record that in `docs/living-studio.md`. Repeated acceptance/retry has one evidence link per source; unknown speaker/date stay visibly unknown.
+- [x] **Step 1:** On acceptance, write `Evidence{outcome_id, content: quote.text, source_name: interview title, source_kind: "interview", raw: {interview_id, quote_id}}` — content verbatim, never a whole transcript.
+- [x] **Step 2:** `GET /api/outcomes/{id}/evidence`; outcome detail and landscape row show a quote count computed from `list_evidence` (never a stored counter), that opens the quotes.
+- [x] **Step 3:** Deleting an interview **keeps** the evidence and nulls the link; record that in `docs/living-studio.md`. Repeated acceptance/retry has one evidence link per source; unknown speaker/date stay visibly unknown.
 
 **Readiness blocker:** define whether `raw.interview_id` remains as an unavailable historical id or is also nulled, and which event records the change; confirm which snapshot fields retain speaker/date once the interview is gone. Do not fabricate attribution from deleted records.
 
