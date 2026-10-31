@@ -29,7 +29,12 @@ dev = [
     "pytest-cov==7.1.0",
     "ruff==0.17.1",
     "pillow==12.3.0",
+    "inline-snapshot==0.36.1",
 ]
+
+[tool.inline-snapshot]
+# Snapshots are formatted with the formatter the workspace already pins.
+format-command = "ruff format --stdin-filename {filename}"
 
 [tool.bandit]
 exclude_dirs = [".venv", "tests", ".worktrees", "node_modules"]
