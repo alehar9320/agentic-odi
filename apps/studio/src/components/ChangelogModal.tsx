@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { fetchChangelog } from "../api/studioApi";
 import { markReleasesRead, readReleaseVersions, unreadReleases } from "../lib/changelogRead";
+import { useFocusTrap } from "../lib/useFocusTrap";
 import type { ChangelogData } from "../types";
 
 interface ChangelogModalProps {
@@ -23,6 +24,9 @@ export function ChangelogModal({ isOpen, onClose }: ChangelogModalProps) {
     () => new Set(unread.map((release) => release.version)),
     [unread],
   );
+
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(dialogRef, isOpen);
 
   function markAllRead() {
     setReadVersions(markReleasesRead((changelog?.releases ?? []).map((r) => r.version)));
@@ -64,16 +68,22 @@ export function ChangelogModal({ isOpen, onClose }: ChangelogModalProps) {
   if (!isOpen) return null;
 
   return (
-    <div
-      className="changelog-overlay fade-in"
-      onClick={onClose}
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="changelog-modal-title"
-    >
+    <div className="changelog-overlay fade-in">
+      {/* A real control so a pointer can dismiss; Escape and the close button
+          are the keyboard paths. */}
+      <button
+        type="button"
+        className="changelog-scrim"
+        aria-label="Close release notes"
+        tabIndex={-1}
+        onClick={onClose}
+      />
       <div
+        ref={dialogRef}
         className="changelog-modal"
-        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="changelog-modal-title"
       >
         <header className="changelog-modal__header">
           <div>

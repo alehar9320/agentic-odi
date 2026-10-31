@@ -146,6 +146,27 @@ describe("StudioBar", () => {
     expect(bell.querySelector(".bell-badge")).toBeNull();
   });
 
+  it("announces the unread count politely when it changes", () => {
+    vi.mocked(useStudio).mockReturnValue(stubContext({ unreadSignalCount: 0 }) as never);
+    const { rerender } = render(
+      <StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />,
+    );
+
+    const status = screen.getByRole("status");
+    expect(status).toHaveAttribute("aria-live", "polite");
+    expect(status).toHaveTextContent("");
+
+    vi.mocked(useStudio).mockReturnValue(stubContext({ unreadSignalCount: 4 }) as never);
+    rerender(<StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />);
+
+    expect(screen.getByRole("status")).toHaveTextContent("4 new notifications");
+
+    vi.mocked(useStudio).mockReturnValue(stubContext({ unreadSignalCount: 1 }) as never);
+    rerender(<StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />);
+
+    expect(screen.getByRole("status")).toHaveTextContent("1 new notification");
+  });
+
   it("shows the running version and opens update settings", () => {
     const openPanel = vi.fn();
     vi.mocked(useStudio).mockReturnValue(stubContext({ openPanel }) as never);

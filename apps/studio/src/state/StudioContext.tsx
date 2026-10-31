@@ -64,6 +64,9 @@ import type {
   ChatAttachment,
   ChatMessage,
   ChatPart,
+  Claim,
+  ClaimCitation,
+  ClaimStatus,
   ConnectorListItem,
   ConnectorPreset,
   ConnectorSuggestion,
@@ -84,6 +87,7 @@ import type {
 } from "../types";
 import { catalogManifest } from "../ui/catalog";
 import { parseUiSpec } from "../ui/protocol";
+import { recordStream, recordStudioError } from "../diagnostics/bundle";
 
 /**
  * The visible path of a persisted conversation: from the head back to the root.
@@ -118,23 +122,74 @@ export function turnsToMessages(
       return [];
     }
     const content = node.content ?? "";
+    const claims = node.claims ?? [];
     return [
       {
         id: node.id,
         parentId: node.parent_id,
         role: node.role,
         content,
-        parts: content ? [{ kind: "text" as const, text: content }] : [],
+        parts: claims.length
+          ? [{ kind: "claims" as const, content, claims }]
+          : content
+            ? [{ kind: "text" as const, text: content }]
+            : [],
       },
     ];
   });
+}
+
+const CLAIM_STATUSES = new Set<ClaimStatus>(["cited", "hypothesis", "uncited"]);
+
+/** The claims a terminal frame carries, read defensively. */
+function readClaims(raw: unknown): Claim[] {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  const claims: Claim[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== "object") {
+      continue;
+    }
+    const candidate = item as Partial<Claim>;
+    if (typeof candidate.index !== "number" || typeof candidate.text !== "string") {
+      continue;
+    }
+    const evidence: ClaimCitation[] = [];
+    for (const rawCitation of Array.isArray(candidate.evidence) ? candidate.evidence : []) {
+      if (!rawCitation || typeof rawCitation !== "object") {
+        continue;
+      }
+      const citation = rawCitation as Partial<ClaimCitation>;
+      if (typeof citation.id !== "string" || !citation.id) {
+        continue;
+      }
+      evidence.push({
+        id: citation.id,
+        name: typeof citation.name === "string" ? citation.name : citation.id,
+        source_name: typeof citation.source_name === "string" ? citation.source_name : "",
+      });
+    }
+    const status =
+      typeof candidate.status === "string" && CLAIM_STATUSES.has(candidate.status as ClaimStatus)
+        ? (candidate.status as ClaimStatus)
+        : "uncited";
+    claims.push({
+      index: candidate.index,
+      text: candidate.text,
+      status,
+      evidence,
+      reason: typeof candidate.reason === "string" ? candidate.reason : null,
+    });
+  }
+  return claims;
 }
 
 /** Read the failure the sidecar reported on an SSE `error` event. */
 function readStudioError(raw: unknown): StudioError {
   if (raw && typeof raw === "object" && "code" in raw) {
     const error = raw as Partial<StudioError>;
-    return {
+    const parsed = {
       code: String(error.code ?? "internal"),
       message: String(error.message ?? "The assistant could not finish this turn."),
       detail: error.detail ?? null,
@@ -142,12 +197,16 @@ function readStudioError(raw: unknown): StudioError {
       retryable: Boolean(error.retryable),
       request_id: error.request_id ?? null,
     };
+    recordStudioError(parsed, "/api/chat");
+    return parsed;
   }
-  return {
+  const parsed: StudioError = {
     code: "internal",
     message: "The assistant could not finish this turn.",
     retryable: true,
   };
+  recordStudioError(parsed, "/api/chat");
+  return parsed;
 }
 
 const SETTINGS_KEY = "studio.settings";
@@ -349,6 +408,9 @@ export interface StudioContextValue {
   focusedSubject: { kind: SignalSubjectKind; id: string } | null;
   /** The job that owns the focused subject, so canvas panels can select it. */
   focusedJobId: string | null;
+  /** The evidence record a citation chip asked the Evidence lens to show. */
+  focusedEvidenceId: string | null;
+  focusEvidence: (evidenceId: string) => void;
   simulateBackgroundEvent: () => void;
 }
 
@@ -499,6 +561,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     kind: SignalSubjectKind;
     id: string;
   } | null>(loadFocusedSubject);
+  const [focusedEvidenceId, setFocusedEvidenceId] = useState<string | null>(null);
   const [customizeOpen, setCustomizeOpen] = useState(false);
   const [customizeTarget, setCustomizeTarget] = useState<CustomizeTarget | null>(null);
   const [marketplace, setMarketplace] = useState<MarketplaceSearch | null>(null);
@@ -1140,6 +1203,18 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     [markSignalAsRead, openPanel, focusSubject],
   );
 
+  /**
+   * A citation chip opens the record it names: the Evidence lens, focused on
+   * that row. The snapshot label stays even when the record is gone.
+   */
+  const focusEvidence = useCallback(
+    (evidenceId: string) => {
+      setFocusedEvidenceId(evidenceId);
+      openPanel("evidence");
+    },
+    [openPanel],
+  );
+
   /** The job owning the focused subject, so canvas panels can select it. */
   const focusedJobId = useMemo(() => {
     if (!focusedSubject) {
@@ -1205,6 +1280,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
         ...(attachments.length ? { attachments } : {}),
       };
       const assistantId = crypto.randomUUID();
+      const turnStartedAt = Date.now();
+      let streamFrames = 0;
       const history: ChatMessage[] =
         existingUserMessage && base.at(-1)?.id === existingUserMessage.id
           ? base
@@ -1322,6 +1399,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       };
 
       const handleEvent = (event: RawSseEvent) => {
+        streamFrames += 1;
         switch (event.event) {
           case "status": {
             const phase = String(event.data.phase ?? "");
@@ -1412,7 +1490,24 @@ export function StudioProvider({ children }: { children: ReactNode }) {
             // never erase structured parts: thinking, tool calls, citations,
             // and surfaces sit between the paragraphs that frame them.
             content = String(event.data.content ?? content);
-            if (content && !parts.some((part) => part.kind === "text")) {
+            const claims = readClaims(event.data.claims);
+            if (claims.length > 0) {
+              // The finished list replaces the streamed prose in place, so each
+              // sentence keeps its own chip.
+              let preceding = 0;
+              for (const part of parts) {
+                if (part.kind === "text") {
+                  break;
+                }
+                preceding += 1;
+              }
+              const structured = parts.filter((part) => part.kind !== "text");
+              parts = [
+                ...structured.slice(0, preceding),
+                { kind: "claims", content, claims },
+                ...structured.slice(preceding),
+              ];
+            } else if (content && !parts.some((part) => part.kind === "text")) {
               parts = [...parts, { kind: "text", text: content }];
             }
             publish();
@@ -1504,6 +1599,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
         } else {
           terminal = true;
           failure = asStudioError(error);
+          recordStudioError(failure, "/api/chat");
           publish();
         }
       } finally {
@@ -1516,8 +1612,15 @@ export function StudioProvider({ children }: { children: ReactNode }) {
             suggestion: "Try again — your question is still here.",
             retryable: true,
           };
+          recordStudioError(failure, "/api/chat");
           publish();
         }
+        recordStream({
+          assistant_id: assistantId,
+          frames: streamFrames,
+          terminal: failure ? "failed" : stopped ? "stopped" : "completed",
+          duration_ms: Math.max(0, Date.now() - turnStartedAt),
+        });
         setStreaming(false);
         setThinkingPhase(null);
         abortRef.current = null;
@@ -1690,7 +1793,9 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       try {
         await apiDeleteObservation(observationId);
         setMemory((prev) => prev.filter((item) => item.id !== observationId));
-      } catch {
+      } catch (error) {
+        const problem = asStudioError(error);
+        recordStudioError(problem, "/api/memory/observations");
         pushToast("error", "I couldn't forget that.");
       }
     },
@@ -1704,7 +1809,9 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       setConversationId(null);
       setMessages([]);
       setToolActivity([]);
-    } catch {
+    } catch (error) {
+      const problem = asStudioError(error);
+      recordStudioError(problem, "/api/memory");
       pushToast("error", "I couldn't clear what I've learned.");
     }
   }, [pushToast]);
@@ -1942,6 +2049,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       focusSubject,
       focusedSubject,
       focusedJobId,
+      focusedEvidenceId,
+      focusEvidence,
       simulateBackgroundEvent,
     }),
     [
@@ -2049,6 +2158,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       focusSubject,
       focusedSubject,
       focusedJobId,
+      focusedEvidenceId,
+      focusEvidence,
       simulateBackgroundEvent,
     ],
   );

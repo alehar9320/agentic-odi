@@ -123,7 +123,7 @@ async def test_compute_opportunity_out_of_range():
 @pytest.mark.asyncio
 async def test_update_partial_merge():
     async with Client(mcp) as client:
-        await client.call_tool("add_job", {"name": "J"})
+        await client.call_tool("add_job", {"name": "Job"})
         jobs = json.loads((await client.call_tool("get_jobs", {})).content[0].text)  # type: ignore[index]
         job_id = jobs[0]["id"]
         cv = {

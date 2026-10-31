@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, within, act } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { CanvasState } from "../../types";
@@ -120,6 +120,83 @@ describe("OpportunityLandscape Data Visualization", () => {
 
     fireEvent.click(checkbox);
     expect(checkbox).toBeChecked();
+  });
+});
+
+describe("OpportunityLandscape accessibility", () => {
+  beforeEach(() => {
+    harness.state.canvasState = { kind: "ready", data: mockCanvasData } as unknown as CanvasState;
+  });
+
+  it("names the matrix and summarizes it for assistive technology", () => {
+    const { container } = render(<OpportunityLandscape />);
+
+    const map = screen.getByRole("img", { name: "Opportunity map" });
+    expect(map.tagName).toBe("svg");
+    expect(map.querySelector("desc")?.textContent).toMatch(
+      /2 outcomes, 1 of them underserved, spanning importance 8 to 9/i,
+    );
+    expect(container.querySelector(".opportunity-matrix")).not.toBeNull();
+  });
+
+  it("lists the plotted outcomes as text, not only as pixels", () => {
+    render(<OpportunityLandscape />);
+
+    const list = screen.getByRole("list", { name: "Opportunities on the map" });
+    const items = within(list).getAllByRole("listitem");
+    expect(items).toHaveLength(2);
+    expect(items[0]).toHaveTextContent("O-101");
+    expect(items[0]).toHaveTextContent(/Minimize time spent syncing secrets/);
+    expect(items[0]).toHaveTextContent(/underserved/i);
+  });
+
+  it("labels the search field", () => {
+    render(<OpportunityLandscape />);
+
+    expect(screen.getByRole("textbox", { name: /search outcomes/i })).toBeInTheDocument();
+  });
+
+  it("turns each plotted outcome into a named, selectable control", () => {
+    render(<OpportunityLandscape />);
+
+    const node = screen.getByRole("button", {
+      name: /O-101.*Minimize time spent syncing secrets.*score 16.*underserved/i,
+    });
+    expect(node).toHaveAttribute("tabindex", "0");
+    expect(node).toHaveAttribute("aria-pressed", "false");
+
+    fireEvent.keyDown(node, { key: "Enter" });
+
+    expect(node).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("selects an outcome with Space from the plot", () => {
+    render(<OpportunityLandscape />);
+
+    const node = screen.getByRole("button", { name: /O-102/ });
+    fireEvent.keyDown(node, { key: " " });
+
+    expect(node).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("moves between plotted outcomes with arrow keys using a roving tab index", () => {
+    render(<OpportunityLandscape />);
+
+    const first = screen.getByRole("button", { name: /O-101/ });
+    const second = screen.getByRole("button", { name: /O-102/ });
+    expect(first).toHaveAttribute("tabindex", "0");
+    expect(second).toHaveAttribute("tabindex", "-1");
+
+    act(() => first.focus());
+    fireEvent.keyDown(first, { key: "ArrowRight" });
+
+    expect(second).toHaveFocus();
+    expect(second).toHaveAttribute("tabindex", "0");
+    expect(first).toHaveAttribute("tabindex", "-1");
+
+    fireEvent.keyDown(second, { key: "ArrowLeft" });
+
+    expect(first).toHaveFocus();
   });
 });
 

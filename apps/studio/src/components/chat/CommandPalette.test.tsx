@@ -55,4 +55,32 @@ describe("Composer command palette", () => {
     fireEvent.keyDown(screen.getByRole("textbox"), { key: "Enter" });
     expect(onCommand).toHaveBeenCalledWith(expect.objectContaining({ id: "status" }));
   });
+
+  it("points the textbox at the highlighted option with aria-activedescendant", () => {
+    vi.mocked(useStudio).mockReturnValue(stubContext);
+    render(<Composer {...baseProps} value="/" />);
+
+    const textbox = screen.getByRole("textbox");
+    const options = screen.getAllByRole("option");
+    expect(options[0].id).not.toBe("");
+    expect(textbox).toHaveAttribute("aria-activedescendant", options[0].id);
+
+    fireEvent.keyDown(textbox, { key: "ArrowDown" });
+
+    const highlighted = screen.getAllByRole("option")[1];
+    expect(highlighted).toHaveAttribute("aria-selected", "true");
+    expect(textbox).toHaveAttribute("aria-activedescendant", highlighted.id);
+  });
+
+  it("drops the active descendant when the palette closes", () => {
+    vi.mocked(useStudio).mockReturnValue(stubContext);
+    const { rerender } = render(<Composer {...baseProps} value="/" />);
+
+    expect(screen.getByRole("textbox")).toHaveAttribute("aria-activedescendant");
+
+    rerender(<Composer {...baseProps} value="plain text" />);
+
+    expect(screen.queryByRole("listbox")).toBeNull();
+    expect(screen.getByRole("textbox")).not.toHaveAttribute("aria-activedescendant");
+  });
 });

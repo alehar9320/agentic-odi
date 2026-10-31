@@ -1,6 +1,7 @@
-import { useMemo, useState, type FormEvent, type KeyboardEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 
 import { asStudioError } from "../../api/studioApi";
+import { focusLastClaimChip } from "../../assistant/claims";
 import { useStudio } from "../../state/StudioContext";
 import type { Evidence, StudioError } from "../../types";
 import { FailurePanel } from "../FailurePanel";
@@ -26,11 +27,13 @@ function writeStoredOrder(ids: string[]) {
 }
 
 export function EvidenceStream() {
-  const { canvasState, openPanel, promoteEvidence } = useStudio();
+  const { canvasState, closePanel, focusedEvidenceId, openPanel, promoteEvidence } = useStudio();
   const evidence = useMemo(() => canvasState.data?.evidence ?? [], [canvasState.data]);
   const jobs = useMemo(() => canvasState.data?.jobs ?? [], [canvasState.data]);
   const [storedOrder, setStoredOrder] = useState<string[]>(readStoredOrder);
   const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [highlightedId, setHighlightedId] = useState<string | null>(null);
+  const itemRefs = useRef(new Map<string, HTMLLIElement>());
 
   const [promotingId, setPromotingId] = useState<string | null>(null);
   const [jobId, setJobId] = useState("");
@@ -51,6 +54,23 @@ export function EvidenceStream() {
     () => new Map(jobs.map((job) => [job.id, job.name || job.id])),
     [jobs],
   );
+
+  // A citation chip asked for this row: bring it into view, mark it briefly,
+  // and put the keyboard there so the next Tab continues from the record.
+  useEffect(() => {
+    if (!focusedEvidenceId) {
+      return;
+    }
+    const element = itemRefs.current.get(focusedEvidenceId);
+    if (!element) {
+      return;
+    }
+    element.scrollIntoView({ block: "center" });
+    element.focus({ preventScroll: true });
+    setHighlightedId(focusedEvidenceId);
+    const timer = window.setTimeout(() => setHighlightedId(null), 1800);
+    return () => window.clearTimeout(timer);
+  }, [focusedEvidenceId, ordered]);
 
   const commit = (next: Evidence[]) => {
     const ids = next.map((item) => item.id);
@@ -164,12 +184,27 @@ export function EvidenceStream() {
           return (
             <li
               key={item.id}
-              className="evidence"
+              ref={(element) => {
+                if (element) {
+                  itemRefs.current.set(item.id, element);
+                } else {
+                  itemRefs.current.delete(item.id);
+                }
+              }}
+              className={`evidence${highlightedId === item.id ? " is-focused" : ""}`}
               draggable
               tabIndex={0}
               aria-label={`${label} (${index + 1} of ${ordered.length})`}
               aria-roledescription="sortable evidence record"
-              onKeyDown={(event) => onKeyDown(event, item.id)}
+              onKeyDown={(event) => {
+                if (event.key === "Escape") {
+                  // Close the lens and hand focus back to the chip that asked.
+                  closePanel();
+                  focusLastClaimChip();
+                  return;
+                }
+                onKeyDown(event, item.id);
+              }}
               onDragStart={() => setDraggingId(item.id)}
               onDragOver={(event) => event.preventDefault()}
               onDrop={(event) => {

@@ -60,7 +60,7 @@ apps/cli ──────────────▶ packages/connectors
 
 ## MCP Contract
 
-`packages/core/src/agentic_odi_core/contract.py` owns `ToolName`, `ToolSpec`, `TOOL_SPECS`, and `TOOL_NAMES`. The live FastMCP registry is asserted against it by `tests/contract/test_mcp_contract.py`; the CLI's local handlers are checked by `tests/contract/test_cli_contract.py`.
+`packages/core/src/agentic_odi_core/contract.py` owns `ToolName`, `ToolSpec`, `TOOL_SPECS`, and `TOOL_NAMES`. The live FastMCP registry is asserted against it by `tests/contract/test_mcp_contract.py`; the CLI's local handlers are checked by `tests/contract/test_cli_contract.py`. The MCP server also validates the contract against its live registry at startup and exits before serving if any tool is missing or misdeclared.
 
 ## Entry Points
 
@@ -97,9 +97,34 @@ Repository ruleset `main-requires-ci-green` (id `25356329`) requires both
 for pull requests (`bypass_mode: pull_request`). Rulesets are repository
 settings, not files; change them with `gh api` and record it here.
 
+## Documents
+
+Start here, then take the one that answers your question.
+
+| Document | One line |
+|---|---|
+| [ODI contract](odi-contract.md) | The methodology rules — format, score, stages — and where each is enforced. |
+| [Data flow](data-flow.md) | How a write and a read travel from the CLI, MCP, and Studio to storage and back. |
+| [The signal inbox](notifications.md) | The operational surface of signals: kinds, dedupe, budget, and how each client reads them. |
+| [Signals](signals.md) | The design behind signals: why they are events, what they must describe, and what they do not do. |
+| [Evidence mapping](evidence-mapping.md) | How a connector record becomes an evidence draft, and how evidence is promoted. |
+| [Consent and approvals](consent.md) | What the conversational agent must ask before it writes, and what is not covered. |
+| [Trust boundaries](trust-boundaries.md) | What each process may reach, where credentials live, and what crosses the wire. |
+| [The generative UI protocol](ui-protocol.md) | The closed catalog, validation on both ends, limits, and the action model. |
+| [Studio banners](banners.md) | The Studio's unified notice system. |
+| [Testing](testing.md) | Test layout, commands, and what each suite is responsible for. |
+| [Decisions (ADRs)](adr/README.md) | Why the architecture looks the way it does. |
+
 ## Related
 
 - [Data flow](data-flow.md)
 - [Studio banners](banners.md)
 - [Testing](testing.md)
 - [Decisions (ADRs)](adr/README.md) — why the architecture looks the way it does
+
+## What this does not do
+
+This index describes the repository's architecture, not a deployment guide, an
+API reference, or a tutorial. It does not cover historical designs — those live
+under `docs/superpowers/` as a frozen record — and it does not promise
+capabilities that are still open issues; each document links its own gaps.

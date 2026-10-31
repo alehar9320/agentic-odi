@@ -1,16 +1,19 @@
 """Agentic ODI MCP Server (FastMCP)."""
 
 import argparse
+import asyncio
 import json
 import os
 import signal
-from collections.abc import AsyncIterator
+import sys
+from collections.abc import AsyncIterator, Mapping, Sequence
 from contextlib import asynccontextmanager
 from typing import Any
 
 from agentic_odi_core import (
     ODI_ASSISTANT_PROMPT,
     ODI_FRAMEWORK_GUIDELINES,
+    TOOL_SPECS,
     CustomerOutcomeNotFoundError,
     EvidenceItemType,
     EvidenceNotFoundError,
@@ -23,6 +26,7 @@ from agentic_odi_core import (
     ScheduledWorkNotFoundError,
     SignalNotFoundError,
     StepNotFoundError,
+    ToolName,
     ValueOutOfRangeError,
     build_repository,
     capability_manifest,
@@ -333,6 +337,14 @@ def get_capabilities() -> str:
 @mcp.tool
 def get_capabilities_manifest() -> str:
     return json.dumps(capability_manifest())
+
+
+@mcp.tool
+def get_health() -> str:
+    """Report whether the ODI store can be queried right now."""
+    if _repo.health():
+        return json.dumps({"status": "ok", "store": "accessible"})
+    return json.dumps({"status": "degraded", "store": "locked"})
 
 
 @mcp.tool
@@ -672,6 +684,67 @@ def resolve_port(cli_port: int | None = None) -> int:
         raise ValueError(f"AGENTIC_ODI_MCP_PORT must be an integer, got {raw!r}") from exc
 
 
+def validate_tool_specs(
+    specs: Mapping[str, Any] | None = None,
+    tools: Sequence[Any] | None = None,
+) -> list[str]:
+    """Return every mismatch between the contract and the live tool registry.
+
+    ``tools`` is FastMCP's registry; omitting it checks the contract alone.
+    """
+    specs = TOOL_SPECS if specs is None else specs
+    errors: list[str] = []
+    enum_names = {member.value for member in ToolName}
+    for name in sorted(enum_names - set(specs)):
+        errors.append(f"{name}: ToolName member has no TOOL_SPECS entry")
+    for name in sorted(set(specs) - enum_names):
+        errors.append(f"{name}: TOOL_SPECS entry is not a ToolName member")
+    declared = [spec.name for spec in specs.values()]
+    for name in sorted({item for item in declared if declared.count(item) > 1}):
+        errors.append(f"{name}: duplicate TOOL_SPECS name")
+    if tools is None:
+        return errors
+    by_name: dict[str, Any] = {}
+    for tool in tools:
+        if tool.name in by_name:
+            errors.append(f"{tool.name}: duplicate tool registration")
+        by_name[tool.name] = tool
+    for name in sorted(set(specs) - set(by_name)):
+        errors.append(f"{name}: contract tool has no registered handler")
+    for name in sorted(set(by_name) - set(specs)):
+        errors.append(f"{name}: registered tool is not in TOOL_SPECS")
+    for name in sorted(set(specs) & set(by_name)):
+        spec = specs[name]
+        tool = by_name[name]
+        schema = getattr(tool, "parameters", None) or {}
+        arguments = set(schema.get("properties", {}))
+        if arguments != set(spec.arguments):
+            errors.append(
+                f"{name}: contract arguments {sorted(spec.arguments)} do not match "
+                f"handler arguments {sorted(arguments)}"
+            )
+        required = set(schema.get("required", []))
+        if required != set(spec.required):
+            errors.append(
+                f"{name}: contract required {sorted(spec.required)} do not match "
+                f"handler required {sorted(required)}"
+            )
+        handler = getattr(tool, "fn", None)
+        if handler is not None and not callable(handler):
+            errors.append(f"{name}: registered handler is not callable")
+    return errors
+
+
+def validate_at_startup() -> None:
+    """Refuse to serve when the registry disagrees with the contract."""
+    errors = validate_tool_specs(tools=asyncio.run(mcp.list_tools()))
+    if not errors:
+        return
+    for error in errors:
+        print(f"Error: {error}", file=sys.stderr)
+    sys.exit(1)
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description="Run the Agentic ODI MCP server over HTTP.")
     parser.add_argument(
@@ -681,6 +754,7 @@ def main(argv: list[str] | None = None) -> None:
         help=f"Port to listen on (default: $AGENTIC_ODI_MCP_PORT or {DEFAULT_PORT}).",
     )
     args = parser.parse_args(argv)
+    validate_at_startup()
     setup_graceful_shutdown()
     mcp.run(transport="http", port=resolve_port(args.port))
 
