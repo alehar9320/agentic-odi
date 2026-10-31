@@ -15,6 +15,8 @@ from agentic_odi_core.intent_store import IntentStore
 from agentic_odi_core.models import (
     CustomerOutcome,
     Evidence,
+    Interview,
+    InterviewQuote,
     Job,
     Outcome,
     ScheduledWork,
@@ -60,6 +62,8 @@ class SQLiteRepository(Repository):
         self.evidence: dict[str, Evidence] = {}
         self.signals: dict[str, Signal] = {}
         self.scheduled_work: dict[str, ScheduledWork] = {}
+        self.interviews: dict[str, Interview] = {}
+        self.quotes: dict[str, InterviewQuote] = {}
         self._last_event_id = 0
         for ev in self.store.get_stream(workspace_id=self._workspace_id, replay_order=True):
             self._apply_event(ev)
@@ -120,6 +124,10 @@ class SQLiteRepository(Repository):
             self.customer_outcomes[p["id"]] = CustomerOutcome.model_validate(p)
         elif et == "EVIDENCE_CREATED":
             self.evidence[p["id"]] = Evidence.model_validate(p)
+        elif et == "INTERVIEW_CREATED":
+            self.interviews[p["id"]] = Interview.model_validate(p)
+        elif et == "QUOTE_CREATED":
+            self.quotes[p["id"]] = InterviewQuote.model_validate(p)
         elif et == "JOB_UPDATED":
             self._merge_updates(self.jobs, p, Job)
         elif et == "STEP_UPDATED":
@@ -128,6 +136,8 @@ class SQLiteRepository(Repository):
             self._merge_updates(self.outcomes, p, Outcome)
         elif et == "CUSTOMER_OUTCOME_UPDATED":
             self._merge_updates(self.customer_outcomes, p, CustomerOutcome)
+        elif et == "INTERVIEW_UPDATED":
+            self._merge_updates(self.interviews, p, Interview)
         elif et == "JOB_DELETED":
             job_id = p["id"]
             self.jobs.pop(job_id, None)
@@ -145,6 +155,10 @@ class SQLiteRepository(Repository):
                 or (v.outcome_id is not None and v.outcome_id not in self.outcomes)
             ]:
                 del self.evidence[key]
+            for key in [k for k, v in self.interviews.items() if v.job_id == job_id]:
+                del self.interviews[key]
+                for quote_key in [q for q, v in self.quotes.items() if v.interview_id == key]:
+                    del self.quotes[quote_key]
         elif et == "STEP_DELETED":
             step_id = p["id"]
             self.steps.pop(step_id, None)
@@ -173,6 +187,17 @@ class SQLiteRepository(Repository):
         elif et == "SCHEDULED_WORK_DELETED":
             self.scheduled_work.pop(p["id"], None)
 
+        elif et == "INTERVIEW_DELETED":
+            interview_id = p["id"]
+            self.interviews.pop(interview_id, None)
+            # Replay must reproduce the cascade: prefer the recorded ids, but
+            # fall back to the live mapping for events written before the ids
+            # were recorded, so an old log still converges.
+            cascade = p.get("cascaded_quote_ids")
+            if cascade is None:
+                cascade = [k for k, v in self.quotes.items() if v.interview_id == interview_id]
+            for quote_id in cascade:
+                self.quotes.pop(quote_id, None)
         elif et == "CUSTOMER_OUTCOME_DELETED":
             self.customer_outcomes.pop(p["id"], None)
         elif et == "SIGNAL_CREATED":
@@ -599,6 +624,91 @@ class SQLiteRepository(Repository):
                 self._sync()
                 return True
             return False
+
+    def add_interview(self, interview: Interview) -> Interview:
+        with self._lock:
+            self.store.append(
+                "INTERVIEW_CREATED",
+                interview.model_dump(),
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return interview
+
+    def get_interview(self, interview_id: str) -> Interview | None:
+        with self._lock:
+            self._sync()
+            return self.interviews.get(interview_id)
+
+    def list_interviews(
+        self,
+        job_id: str | None = None,
+        limit: int | None = None,
+        offset: int = 0,
+    ) -> list[Interview]:
+        with self._lock:
+            self._sync()
+            if job_id is None:
+                items = list(self.interviews.values())
+            else:
+                items = [i for i in self.interviews.values() if i.job_id == job_id]
+            return page(items, limit, offset)
+
+    def update_interview(self, interview_id: str, updates: dict) -> Interview | None:
+        with self._lock:
+            self._sync()
+            interview = self.interviews.get(interview_id)
+            if not interview:
+                return None
+            current = interview.model_dump(exclude_unset=True)
+            current.update(updates)
+            new_interview = interview.model_validate(current)
+            self.store.append(
+                "INTERVIEW_UPDATED",
+                {"id": interview_id, "updates": updates},
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return new_interview
+
+    def delete_interview(self, interview_id: str) -> list[str]:
+        with self._lock:
+            self._sync()
+            if interview_id not in self.interviews:
+                return []
+            cascaded = [k for k, v in self.quotes.items() if v.interview_id == interview_id]
+            self.store.append(
+                "INTERVIEW_DELETED",
+                {"id": interview_id, "cascaded_quote_ids": cascaded},
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return cascaded
+
+    def add_quote(self, quote: InterviewQuote) -> InterviewQuote:
+        with self._lock:
+            self.store.append(
+                "QUOTE_CREATED",
+                quote.model_dump(),
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return quote
+
+    def get_quote(self, quote_id: str) -> InterviewQuote | None:
+        with self._lock:
+            self._sync()
+            return self.quotes.get(quote_id)
+
+    def list_quotes(self, interview_id: str) -> list[InterviewQuote]:
+        with self._lock:
+            self._sync()
+            items = [q for q in self.quotes.values() if q.interview_id == interview_id]
+            return sorted(items, key=lambda q: q.ordinal)
 
     def clear(self) -> None:
         with self._lock:

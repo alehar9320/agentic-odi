@@ -37,6 +37,12 @@ class ToolName(str, Enum):
     GET_EVIDENCE = "get_evidence"
     LIST_EVIDENCE = "list_evidence"
     DELETE_EVIDENCE = "delete_evidence"
+    ADD_INTERVIEW = "add_interview"
+    GET_INTERVIEW = "get_interview"
+    LIST_INTERVIEWS = "list_interviews"
+    DELETE_INTERVIEW = "delete_interview"
+    ADD_QUOTE = "add_quote"
+    LIST_QUOTES = "list_quotes"
     PROMOTE_EVIDENCE = "promote_evidence"
     EVALUATE_OUTCOME = "evaluate_outcome"
     GET_ODI_SCHEMA = "get_odi_schema"
@@ -324,6 +330,61 @@ TOOL_SPECS: dict[str, ToolSpec] = {
         arguments=("evidence_id",),
         required=("evidence_id",),
         returns="The deleted Evidence ID.",
+    ),
+    ToolName.ADD_INTERVIEW.value: ToolSpec(
+        name="add_interview",
+        summary="Record a research interview (who, when, the job it informs).",
+        effect=_derive_effect("add_interview"),
+        arguments=(
+            "title",
+            "participant_label",
+            "job_id",
+            "participant_role",
+            "conducted_at",
+            "source_kind",
+            "notes",
+        ),
+        required=("title", "participant_label"),
+        returns="The created Interview.",
+    ),
+    ToolName.GET_INTERVIEW.value: ToolSpec(
+        name="get_interview",
+        summary="Get a single Interview by ID.",
+        effect=_derive_effect("get_interview"),
+        arguments=("interview_id",),
+        required=("interview_id",),
+        returns="The Interview, or an error string if not found.",
+    ),
+    ToolName.LIST_INTERVIEWS.value: ToolSpec(
+        name="list_interviews",
+        summary="List interviews, optionally filtered by job.",
+        effect=_derive_effect("list_interviews"),
+        arguments=("job_id", "limit", "offset"),
+        returns="A list of Interviews.",
+    ),
+    ToolName.DELETE_INTERVIEW.value: ToolSpec(
+        name="delete_interview",
+        summary="Delete an Interview and its cascading quotes.",
+        effect=_derive_effect("delete_interview"),
+        arguments=("interview_id",),
+        required=("interview_id",),
+        returns="The deleted Interview ID.",
+    ),
+    ToolName.ADD_QUOTE.value: ToolSpec(
+        name="add_quote",
+        summary="Append a verbatim quote to an interview.",
+        effect=_derive_effect("add_quote"),
+        arguments=("interview_id", "text", "speaker", "start_ms", "end_ms"),
+        required=("interview_id", "text"),
+        returns="The created InterviewQuote.",
+    ),
+    ToolName.LIST_QUOTES.value: ToolSpec(
+        name="list_quotes",
+        summary="List an interview's quotes in ordinal order.",
+        effect=_derive_effect("list_quotes"),
+        arguments=("interview_id",),
+        required=("interview_id",),
+        returns="A list of InterviewQuotes ordered by ordinal.",
     ),
     ToolName.PROMOTE_EVIDENCE.value: ToolSpec(
         name="promote_evidence",

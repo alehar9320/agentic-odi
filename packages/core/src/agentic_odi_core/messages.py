@@ -98,3 +98,7 @@ def scheduled_work_not_found(work_id: str | None, hint: str | None = None) -> st
     if hint:
         message = f"{message}. {hint}"
     return message
+
+
+def interview_not_found(interview_id: str | None) -> str:
+    return f"Interview not found: {interview_id}"

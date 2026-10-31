@@ -44,6 +44,7 @@ counted as done.
 - [ ] **MCP `/health` store probe** — the server reports whether its SQLite store is reachable ([PR #286](https://github.com/alehar9320/agentic-odi/pull/286)).
 - [ ] **Durable sessions and a real memory** — the conversation survives a reload ([PR #285](https://github.com/alehar9320/agentic-odi/pull/285)).
 - [ ] **Accept or reject a candidate without losing evidence** — the review half of candidate extraction ([PR #284](https://github.com/alehar9320/agentic-odi/pull/284)).
+- [ ] **Interviews and quotes, persisted** — research enters the product as an interview and its verbatim quotes (ALH-6 · ALH-14, [PR #279](https://github.com/alehar9320/agentic-odi/pull/279)).
 
 ## Next
 

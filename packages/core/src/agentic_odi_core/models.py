@@ -207,6 +207,40 @@ class Evidence(BaseModel):
     outcome_id: str | None = Field(None, description="Desired Outcome this evidence supports")
 
 
+class Interview(BaseModel):
+    """A research conversation: who took part, when, and the job it informs.
+
+    ``participant_label`` is a free-text label, never a real name, email, or
+    company. The quote rows are the unit of work; there is no raw-transcript
+    field, because a filesystem/BLOB store would be a second record of truth.
+    """
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    job_id: str | None = Field(None, description="The Job this interview informs")
+    title: str = Field(..., description="Short human-readable title for the interview")
+    participant_label: str = Field(
+        ..., description="Free-text label such as 'Ana' or 'Participant 3', never a real name"
+    )
+    participant_role: str | None = Field(None, description="The participant's role, if known")
+    conducted_at: str | None = Field(
+        None, description="ISO-8601 date/time the interview was conducted"
+    )
+    source_kind: str = Field("manual", description="Where the transcript came from, e.g. manual")
+    notes: str | None = Field(None, description="Researcher notes about the interview")
+
+
+class InterviewQuote(BaseModel):
+    """One verbatim sentence from an interview, in service-assigned order."""
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    interview_id: str = Field(..., description="The Interview this quote belongs to")
+    speaker: str | None = Field(None, description="Who said it, if the transcript names them")
+    text: str = Field(..., description="The verbatim quote text")
+    ordinal: int = Field(..., ge=0, description="Service-assigned order within the interview")
+    start_ms: int | None = Field(None, ge=0, description="Start offset in milliseconds")
+    end_ms: int | None = Field(None, ge=0, description="End offset in milliseconds")
+
+
 class CustomerOutcome(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     job_id: str = Field(..., description="The ID of the Job this outcome relates to")

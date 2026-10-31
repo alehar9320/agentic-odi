@@ -23,6 +23,8 @@ from agentic_odi_core.models import (
     CustomerValue,
     Evidence,
     EvidenceItemType,
+    Interview,
+    InterviewQuote,
     Job,
     JobStage,
     Outcome,
@@ -127,6 +129,12 @@ class SignalBudget:
         if _SEVERITY_RANK[severity] < _SEVERITY_RANK[self.min_severity]:
             return False
         return surfaced_today < self.daily_cap
+
+
+class InterviewNotFoundError(NotFoundError):
+    def __init__(self, interview_id: str) -> None:
+        self.interview_id = interview_id
+        super().__init__(interview_id, "interview")
 
 
 class InvalidOutcomeStatementError(OutcomeStatementError):
@@ -569,6 +577,89 @@ class ODIService:
                 evidence_id,
                 "List the stored records with list_evidence() to find a valid id.",
             )
+
+    def add_interview(
+        self,
+        title: str,
+        participant_label: str,
+        job_id: str | None = None,
+        participant_role: str | None = None,
+        conducted_at: str | None = None,
+        source_kind: str = "manual",
+        notes: str | None = None,
+    ) -> Interview:
+        if job_id is not None and self.repo.get_job(job_id) is None:
+            raise JobNotFoundError(job_id)
+        interview = Interview(
+            id=str(uuid.uuid4()),
+            job_id=job_id,
+            title=title,
+            participant_label=participant_label,
+            participant_role=participant_role,
+            conducted_at=conducted_at,
+            source_kind=source_kind,
+            notes=notes,
+        )
+        return self.repo.add_interview(interview)
+
+    def get_interview(self, interview_id: str) -> Interview | None:
+        return self.repo.get_interview(interview_id)
+
+    def list_interviews(
+        self,
+        job_id: str | None = None,
+        limit: int | None = None,
+        offset: int = 0,
+    ) -> list[Interview]:
+        return self.repo.list_interviews(job_id, limit=limit, offset=offset)
+
+    def update_interview(self, interview_id: str, updates: dict[str, Any]) -> Interview:
+        res = self.repo.update_interview(interview_id, updates)
+        if not res:
+            raise InterviewNotFoundError(interview_id)
+        return res
+
+    def delete_interview(self, interview_id: str) -> list[str]:
+        """Delete an interview; return the ids of the quotes removed with it."""
+        if self.repo.get_interview(interview_id) is None:
+            raise InterviewNotFoundError(interview_id)
+        return self.repo.delete_interview(interview_id)
+
+    def add_quote(
+        self,
+        interview_id: str,
+        text: str,
+        speaker: str | None = None,
+        start_ms: int | None = None,
+        end_ms: int | None = None,
+    ) -> InterviewQuote:
+        """Append a quote to an interview.
+
+        The ordinal is assigned here as ``max(ordinal)+1`` within the
+        interview, so two quotes created in the same millisecond still have a
+        deterministic order. A missing interview is rejected before any event
+        is written.
+        """
+        if self.repo.get_interview(interview_id) is None:
+            raise InterviewNotFoundError(interview_id)
+        existing = self.repo.list_quotes(interview_id)
+        next_ordinal = (existing[-1].ordinal + 1) if existing else 0
+        quote = InterviewQuote(
+            id=str(uuid.uuid4()),
+            interview_id=interview_id,
+            speaker=speaker,
+            text=text,
+            ordinal=next_ordinal,
+            start_ms=start_ms,
+            end_ms=end_ms,
+        )
+        return self.repo.add_quote(quote)
+
+    def list_quotes(self, interview_id: str) -> list[InterviewQuote]:
+        return self.repo.list_quotes(interview_id)
+
+    def get_quote(self, quote_id: str) -> InterviewQuote | None:
+        return self.repo.get_quote(quote_id)
 
     def promote_evidence(
         self,
