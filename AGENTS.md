@@ -222,3 +222,27 @@ For the full Kiro tool reference including subagent dispatch patterns and git wo
   inputs, computed scores, and structural positions. Pulling numerals out of a random UUID (as
   one pillar test did) makes the assertion pass by luck.
 
+
+## Merging `origin/main` into a long-lived feature branch
+
+- Resolve by **union, not by picking a side**, when both branches added to the same region
+  (entities, service methods, MCP tools, router handlers). Verify the union mechanically: parse
+  each side and the merged file with `ast` and assert `ours - merged == []` and
+  `theirs - merged == []` for top-level names, and scan for duplicate method names inside a class
+  (a set-based check hides a duplicated method).
+- A `git checkout -m -- <file>` or a partially-staged resolution makes a later `git merge-file`
+  treat the *staged* content as "ours". If a resolution looks wrong, regenerate the three stages
+  with `git show :1:/:2:/:3:<path>` and re-run `git merge-file` on the true stages.
+- Splices leave duplicate imports and stray blank lines. After resolving, run
+  `uv run ruff check . --fix && uv run ruff format .` before trusting the diff — `I001`/`F811`
+  catch the leftover union imports.
+- **Semantic merge bugs hide where both sides changed one function.** A function that main
+  rewrote and the branch extended can silently lose one side's behavior. Re-read the merged body
+  of any function both sides touched (`update_outcome` dropped main's signal emission this way);
+  the full suite's behavior tests, not the import check, catch it.
+- Raise a size/budget tripwire to the measured merged size, never to the larger of the two old
+  constants, and say in the comment what grew. The website page budget is a build-from-source
+  test, so the real byte count is what matters.
+- CI (`npm run lint`) can fail on branch code that predates a plugin bump from main (the
+  `react-hooks` immutability rule). Fix the branch code (precompute instead of mutating during
+  render) rather than loosening the config.
