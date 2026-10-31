@@ -17,8 +17,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from agentic_odi_orchestrator import config
-from agentic_odi_orchestrator.models import (
+from agentic_odi_integrations_openhands import config
+from agentic_odi_integrations_openhands.models import (
     AgentRun,
     AgentRunStatus,
     ApprovalRecord,
@@ -244,7 +244,7 @@ class OrchestratorStore:
         return runs[:limit] if limit is not None else runs
 
     def active_runs(self) -> list[AgentRun]:
-        from agentic_odi_orchestrator.models import ACTIVE_RUN_STATUSES
+        from agentic_odi_integrations_openhands.models import ACTIVE_RUN_STATUSES
 
         return self.list_runs(statuses=ACTIVE_RUN_STATUSES)
 

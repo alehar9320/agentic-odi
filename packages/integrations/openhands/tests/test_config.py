@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 
 import pytest
-from agentic_odi_orchestrator import (
+from agentic_odi_integrations_openhands import (
     AgentTarget,
     OrchestratorSettings,
     default_target,
@@ -52,7 +52,7 @@ def test_non_object_config_is_rejected(tmp_path) -> None:
 
 
 def test_env_overrides_paths(tmp_path, monkeypatch) -> None:
-    from agentic_odi_orchestrator import config
+    from agentic_odi_integrations_openhands import config
 
     config_file = tmp_path / "custom.json"
     db_file = tmp_path / "custom.db"
@@ -75,7 +75,7 @@ def test_default_target_helper() -> None:
 
 
 def test_default_paths_follow_xdg_and_home(tmp_path, monkeypatch) -> None:
-    from agentic_odi_orchestrator import config
+    from agentic_odi_integrations_openhands import config
 
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "config"))
     monkeypatch.delenv("AGENTIC_ODI_OPENHANDS_CONFIG", raising=False)
@@ -88,7 +88,7 @@ def test_default_paths_follow_xdg_and_home(tmp_path, monkeypatch) -> None:
 
 
 def test_heartbeat_and_workspace_follow_settings_overrides(tmp_path) -> None:
-    from agentic_odi_orchestrator import config
+    from agentic_odi_integrations_openhands import config
 
     heartbeat = tmp_path / "heartbeat.json"
     settings = OrchestratorSettings(heartbeat_path=str(heartbeat), workspace_root=str(tmp_path))

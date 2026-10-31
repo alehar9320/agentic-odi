@@ -9,8 +9,8 @@ from pathlib import Path
 from types import FrameType
 from typing import Any
 
-from agentic_odi_orchestrator import config
-from agentic_odi_orchestrator.service import (
+from agentic_odi_integrations_openhands import config
+from agentic_odi_integrations_openhands.service import (
     OrchestratorService,
     TickReport,
     sleep_until_next,

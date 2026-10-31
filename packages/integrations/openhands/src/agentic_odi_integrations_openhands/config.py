@@ -12,7 +12,7 @@ import os
 import sys
 from pathlib import Path
 
-from agentic_odi_orchestrator.models import AgentTarget, OrchestratorSettings
+from agentic_odi_integrations_openhands.models import AgentTarget, OrchestratorSettings
 
 CONFIG_FILE_NAME = "openhands.json"
 DB_FILE_NAME = "orchestrator.db"

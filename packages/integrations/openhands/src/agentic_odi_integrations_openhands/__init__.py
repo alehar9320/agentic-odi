@@ -6,7 +6,7 @@ policy, and the daemon loop. It talks to OpenHands through
 signal inbox.
 """
 
-from agentic_odi_orchestrator.config import (
+from agentic_odi_integrations_openhands.config import (
     config_path,
     db_path,
     default_target,
@@ -14,8 +14,8 @@ from agentic_odi_orchestrator.config import (
     save_settings,
     settings_with_default_target,
 )
-from agentic_odi_orchestrator.daemon import AlreadyRunning, DaemonLock, OrchestratorDaemon
-from agentic_odi_orchestrator.models import (
+from agentic_odi_integrations_openhands.daemon import AlreadyRunning, DaemonLock, OrchestratorDaemon
+from agentic_odi_integrations_openhands.models import (
     ACTIVE_RUN_STATUSES,
     ACTIVE_WORK_STATUSES,
     TERMINAL_RUN_STATUSES,
@@ -33,7 +33,7 @@ from agentic_odi_orchestrator.models import (
     WorkItemStatus,
     utcnow,
 )
-from agentic_odi_orchestrator.service import (
+from agentic_odi_integrations_openhands.service import (
     InvalidTransition,
     OrchestratorError,
     OrchestratorService,
@@ -41,7 +41,7 @@ from agentic_odi_orchestrator.service import (
     TickReport,
     WorkItemNotFound,
 )
-from agentic_odi_orchestrator.store import OrchestratorStore
+from agentic_odi_integrations_openhands.store import OrchestratorStore
 
 __all__ = [
     "ACTIVE_RUN_STATUSES",

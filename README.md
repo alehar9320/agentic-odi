@@ -273,7 +273,7 @@ shared tooling at the root. Packages live in `packages/`, runnable services in
 | **`packages/core/`** | `agentic-odi-core` | Domain models, the `ODIService` layer, in-memory and SQLite repositories, the shared MCP tool contract, and opportunity-score computation. |
 | **`packages/connectors/`** | `agentic-odi-connectors` | Pluggable MCP and REST connectors with presets and an ingest sink. |
 | **`packages/openhands/`** | `agentic-odi-openhands` | Thin OpenHands Cloud and Agent Server HTTP client with wire models; no ODI imports. |
-| **`packages/orchestrator/`** | `agentic-odi-orchestrator` | Work queue, run state machine, daemon, approval policy, schedule and GitHub sources. |
+| **`packages/integrations/openhands/`** | `agentic-odi-integrations-openhands` | Work queue, run state machine, daemon, approval policy, schedule and GitHub sources. |
 | **`apps/mcp-server/`** | `agentic-odi-mcp-server` | FastMCP server exposing Jobs, Steps, Desired Outcomes, Customer Outcomes, Evidence, and context tools over HTTP. SQLite by default. |
 | **`apps/studio-api/`** | `agentic-odi-studio-api` | FastAPI **Living Studio sidecar**: config, health, canvas, local mutations, MCP passthrough, SSE chat, conversations, and PM memory. |
 | **`apps/cli/`** | `agentic-odi-cli` | Typer CLI with interactive chat, full entity CRUD, `schema`, `connectors`, and local or remote data access. |

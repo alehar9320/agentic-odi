@@ -131,8 +131,8 @@ def _seed_terminal_work(
     error: str | None = None,
     blocked_reason: str | None = None,
 ) -> str:
-    from agentic_odi_orchestrator import OrchestratorService
-    from agentic_odi_orchestrator.models import AgentRun, AgentRunStatus, WorkItemStatus
+    from agentic_odi_integrations_openhands import OrchestratorService
+    from agentic_odi_integrations_openhands.models import AgentRun, AgentRunStatus, WorkItemStatus
 
     service = OrchestratorService()
     work, _ = service.add_work_item(title, "Fix the README typo", work_key=key)
@@ -256,8 +256,8 @@ def test_runs_human_output_and_empty_result(tmp_path, monkeypatch) -> None:
 
 def test_start_once_accepts_overrides_and_surfaces_tick_warnings(tmp_path, monkeypatch) -> None:
     _env(tmp_path, monkeypatch)
-    from agentic_odi_orchestrator import OrchestratorDaemon
-    from agentic_odi_orchestrator.service import TickReport
+    from agentic_odi_integrations_openhands import OrchestratorDaemon
+    from agentic_odi_integrations_openhands.service import TickReport
 
     monkeypatch.setattr(
         OrchestratorDaemon,
@@ -275,7 +275,7 @@ def test_start_once_accepts_overrides_and_surfaces_tick_warnings(tmp_path, monke
 
 def test_start_reports_an_already_running_daemon(tmp_path, monkeypatch) -> None:
     _env(tmp_path, monkeypatch)
-    from agentic_odi_orchestrator import AlreadyRunning, OrchestratorDaemon
+    from agentic_odi_integrations_openhands import AlreadyRunning, OrchestratorDaemon
 
     def _fail(self) -> None:
         raise AlreadyRunning("another daemon holds the lock")
@@ -288,7 +288,7 @@ def test_start_reports_an_already_running_daemon(tmp_path, monkeypatch) -> None:
 
 def test_start_reports_no_tick(tmp_path, monkeypatch) -> None:
     _env(tmp_path, monkeypatch)
-    from agentic_odi_orchestrator import OrchestratorDaemon
+    from agentic_odi_integrations_openhands import OrchestratorDaemon
 
     monkeypatch.setattr(OrchestratorDaemon, "run", lambda self: None)
     res = runner.invoke(app, ["orchestrate", "start", "--once"])

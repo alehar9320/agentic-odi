@@ -106,7 +106,7 @@ Tests live next to their package (`packages/*/tests`, `apps/*/tests`). `testpath
 - `test_client.py` — request bodies, auth header variants, status-to-error mapping, redaction, and every Cloud/Agent Server path, all through `httpx.MockTransport`.
 - `test_wire_models.py` — start-task and conversation flattening, risk coercion, unknown-event degradation, pending-action rules, and final message/PR extraction.
 
-### `packages/orchestrator/tests/`
+### `packages/integrations/openhands/tests/`
 
 - `test_orchestrator_models.py` — status sets, target key redaction, confirmation policies, alias uniqueness.
 - `test_store.py` — event replay across processes, dedupe by work key, latest run, counts, and daily spend.

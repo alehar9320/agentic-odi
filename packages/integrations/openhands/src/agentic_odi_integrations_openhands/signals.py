@@ -11,7 +11,7 @@ from typing import Protocol
 
 from agentic_odi_core import SignalKind
 
-from agentic_odi_orchestrator.models import (
+from agentic_odi_integrations_openhands.models import (
     AgentRun,
     AgentRunStatus,
     WorkItem,

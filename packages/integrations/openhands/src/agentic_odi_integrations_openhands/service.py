@@ -31,8 +31,8 @@ from agentic_odi_openhands.models import (
     StartTask,
 )
 
-from agentic_odi_orchestrator import config
-from agentic_odi_orchestrator.models import (
+from agentic_odi_integrations_openhands import config
+from agentic_odi_integrations_openhands.models import (
     AgentRun,
     AgentRunStatus,
     AgentTarget,
@@ -46,17 +46,17 @@ from agentic_odi_orchestrator.models import (
     serialize,
     utcnow,
 )
-from agentic_odi_orchestrator.policy import (
+from agentic_odi_integrations_openhands.policy import (
     ActionRequest,
     ApprovalPolicy,
     PolicyDecision,
     args_digest,
 )
-from agentic_odi_orchestrator.signals import SignalSink, terminal_signal
-from agentic_odi_orchestrator.store import OrchestratorStore
+from agentic_odi_integrations_openhands.signals import SignalSink, terminal_signal
+from agentic_odi_integrations_openhands.store import OrchestratorStore
 
 if TYPE_CHECKING:
-    from agentic_odi_orchestrator.github_source import GitHubSource
+    from agentic_odi_integrations_openhands.github_source import GitHubSource
 
 DEFAULT_BOUNDARY = (
     "Open a pull request when the work is done. Do not merge it. "
@@ -449,7 +449,7 @@ class OrchestratorService:
 
     def _github_source(self) -> GitHubSource:
         if self._github is None:
-            from agentic_odi_orchestrator.github_source import GitHubSource
+            from agentic_odi_integrations_openhands.github_source import GitHubSource
 
             self._github = GitHubSource(self.settings.github)
         return self._github
@@ -555,7 +555,7 @@ class OrchestratorService:
         if work.source_kind is not SourceKind.GITHUB or not self.settings.github.enabled:
             return
         try:
-            from agentic_odi_orchestrator.github_source import GitHubNotifier
+            from agentic_odi_integrations_openhands.github_source import GitHubNotifier
 
             GitHubNotifier(self.settings.github).notify_terminal(work, run)
         except Exception:  # noqa: BLE001 - GitHub is a mirror, not the source of truth

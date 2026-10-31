@@ -17,7 +17,7 @@ orchestrate_app = typer.Typer(
 
 
 def _service() -> Any:
-    from agentic_odi_orchestrator import OrchestratorService
+    from agentic_odi_integrations_openhands import OrchestratorService
 
     return OrchestratorService()
 
@@ -33,7 +33,7 @@ def start_cmd(
     ),
 ) -> None:
     """Run the orchestrator daemon in the foreground until SIGINT/SIGTERM."""
-    from agentic_odi_orchestrator import AlreadyRunning, OrchestratorDaemon
+    from agentic_odi_integrations_openhands import AlreadyRunning, OrchestratorDaemon
 
     service = _service()
     if max_concurrency is not None:

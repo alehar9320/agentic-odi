@@ -3,8 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 
 import pytest
-from agentic_odi_openhands import AlwaysConfirm, ConfirmRisky, NeverConfirm
-from agentic_odi_orchestrator import (
+from agentic_odi_integrations_openhands import (
     ACTIVE_WORK_STATUSES,
     TERMINAL_WORK_STATUSES,
     AgentTarget,
@@ -12,6 +11,7 @@ from agentic_odi_orchestrator import (
     WorkItem,
     WorkItemStatus,
 )
+from agentic_odi_openhands import AlwaysConfirm, ConfirmRisky, NeverConfirm
 from pydantic import ValidationError
 
 

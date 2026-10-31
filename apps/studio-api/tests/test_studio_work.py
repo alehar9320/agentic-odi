@@ -2,14 +2,14 @@ from __future__ import annotations
 
 import pytest
 from agentic_odi_core.repository import InMemoryRepository
-from agentic_odi_orchestrator.models import (
+from agentic_odi_integrations_openhands.models import (
     AgentRun,
     AgentRunStatus,
     AgentTarget,
     OrchestratorSettings,
 )
-from agentic_odi_orchestrator.service import OrchestratorService
-from agentic_odi_orchestrator.store import OrchestratorStore
+from agentic_odi_integrations_openhands.service import OrchestratorService
+from agentic_odi_integrations_openhands.store import OrchestratorStore
 from agentic_odi_studio_api.app import create_app
 from fastapi.testclient import TestClient
 
@@ -205,7 +205,7 @@ class _BrokenOrchestrator:
     ],
 )
 def test_orchestrator_failures_become_typed_errors(method: str, path: str):
-    from agentic_odi_orchestrator.service import OrchestratorError
+    from agentic_odi_integrations_openhands.service import OrchestratorError
 
     broken = _BrokenOrchestrator(OrchestratorError("the store is unavailable"))
     client = TestClient(create_app(InMemoryRepository(), orchestrator=broken))

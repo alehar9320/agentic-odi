@@ -16,7 +16,7 @@ from typing import Any
 
 from agentic_odi_openhands.models import SecurityRisk
 
-from agentic_odi_orchestrator.models import Decision
+from agentic_odi_integrations_openhands.models import Decision
 
 # Commands that end the run immediately, regardless of risk or allowlist.
 _DENY_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (

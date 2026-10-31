@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import pytest
-from agentic_odi_openhands.models import SecurityRisk
-from agentic_odi_orchestrator.models import Decision
-from agentic_odi_orchestrator.policy import (
+from agentic_odi_integrations_openhands.models import Decision
+from agentic_odi_integrations_openhands.policy import (
     ActionRequest,
     ApprovalPolicy,
     args_digest,
 )
+from agentic_odi_openhands.models import SecurityRisk
 
 
 def _bash(command: str, **kwargs) -> ActionRequest:

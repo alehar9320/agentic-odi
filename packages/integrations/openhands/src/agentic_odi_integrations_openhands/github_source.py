@@ -12,7 +12,7 @@ from typing import Any
 
 import httpx
 
-from agentic_odi_orchestrator.models import (
+from agentic_odi_integrations_openhands.models import (
     AgentRun,
     AgentRunStatus,
     GitHubSettings,

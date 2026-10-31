@@ -26,7 +26,7 @@ import typer
 
 if TYPE_CHECKING:
     from agentic_odi_core import ODIService
-    from agentic_odi_orchestrator import OrchestratorService
+    from agentic_odi_integrations_openhands import OrchestratorService
 
 # Kept as literals so importing the CLI does not pull in the core package
 # (``agentic-odi --version`` must stay lightweight). ``tests/contract`` asserts
@@ -122,7 +122,7 @@ class LocalBackend(Backend):
     @property
     def orchestrator(self) -> OrchestratorService:
         if self._orchestrator is None:
-            from agentic_odi_orchestrator import OrchestratorService
+            from agentic_odi_integrations_openhands import OrchestratorService
 
             self._orchestrator = OrchestratorService()
         return self._orchestrator
@@ -639,7 +639,7 @@ class LocalBackend(Backend):
         return signal.model_dump(mode="json")
 
     def _add_work_item(self, args: dict[str, Any]) -> dict[str, Any]:
-        from agentic_odi_orchestrator import OrchestratorError
+        from agentic_odi_integrations_openhands import OrchestratorError
 
         try:
             work, created = self.orchestrator.add_work_item(
@@ -657,7 +657,7 @@ class LocalBackend(Backend):
         return {"created": created, "work_item": work.model_dump(mode="json")}
 
     def _list_work_items(self, args: dict[str, Any]) -> list[dict[str, Any]]:
-        from agentic_odi_orchestrator import OrchestratorError
+        from agentic_odi_integrations_openhands import OrchestratorError
 
         try:
             items = self.orchestrator.list_work_items(
@@ -668,7 +668,7 @@ class LocalBackend(Backend):
         return [item.model_dump(mode="json") for item in items]
 
     def _get_work_item(self, args: dict[str, Any]) -> dict[str, Any]:
-        from agentic_odi_orchestrator import OrchestratorError
+        from agentic_odi_integrations_openhands import OrchestratorError
 
         try:
             work = self.orchestrator.get_work_item(args["work_id"])
@@ -681,7 +681,7 @@ class LocalBackend(Backend):
         }
 
     def _cancel_work_item(self, args: dict[str, Any]) -> dict[str, Any]:
-        from agentic_odi_orchestrator import OrchestratorError
+        from agentic_odi_integrations_openhands import OrchestratorError
 
         try:
             work = self.orchestrator.cancel_work_item(args["work_id"])
@@ -690,7 +690,7 @@ class LocalBackend(Backend):
         return work.model_dump(mode="json")
 
     def _retry_work_item(self, args: dict[str, Any]) -> dict[str, Any]:
-        from agentic_odi_orchestrator import OrchestratorError
+        from agentic_odi_integrations_openhands import OrchestratorError
 
         try:
             work = self.orchestrator.retry_work_item(args["work_id"])
@@ -702,7 +702,7 @@ class LocalBackend(Backend):
         return [target.public_view() for target in self.orchestrator.targets()]
 
     def _list_agent_runs(self, args: dict[str, Any]) -> list[dict[str, Any]]:
-        from agentic_odi_orchestrator import OrchestratorError
+        from agentic_odi_integrations_openhands import OrchestratorError
 
         try:
             runs = self.orchestrator.list_runs(args.get("work_id"))
@@ -711,7 +711,7 @@ class LocalBackend(Backend):
         return [run.public_view() for run in runs]
 
     def _get_agent_run(self, args: dict[str, Any]) -> dict[str, Any]:
-        from agentic_odi_orchestrator import OrchestratorError
+        from agentic_odi_integrations_openhands import OrchestratorError
 
         try:
             run = self.orchestrator.get_run(args["run_id"])

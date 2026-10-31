@@ -15,7 +15,7 @@ packages/
   core/           agentic_odi_core        Domain, services, repositories, contract
   connectors/     agentic_odi_connectors  MCP client connectors and catalog
   openhands/      agentic_odi_openhands   OpenHands Cloud/Agent Server HTTP client
-  orchestrator/   agentic_odi_orchestrator Queue, daemon, policy, GitHub and schedule sources
+  integrations/openhands/   agentic_odi_integrations_openhands Queue, daemon, policy, GitHub and schedule sources
 infra/cloudflare/ Worker script; wrangler.jsonc lives at the repo root
 scripts/          Dev launcher, binary build, installer checks
 tests/            Cross-package contract and launcher tests only
@@ -31,16 +31,16 @@ apps/mcp-server ───────┼──▶ packages/core
 apps/studio-api ───────┘         ▲
                                  │
 apps/cli ──────────────▶ packages/connectors
-apps/cli ──────────────▶ packages/orchestrator ──▶ packages/openhands
-apps/mcp-server ───────▶ packages/orchestrator
-apps/studio-api ───────▶ packages/orchestrator
+apps/cli ──────────────▶ packages/integrations/openhands ──▶ packages/openhands
+apps/mcp-server ───────▶ packages/integrations/openhands
+apps/studio-api ───────▶ packages/integrations/openhands
 ```
 
 - `packages/core` depends on no other workspace package.
 - `packages/connectors` depends on `core` only where it needs shared models.
 - `packages/openhands` is a pure HTTP and wire-model package; it imports no ODI
   domain code and makes no policy decisions.
-- `packages/orchestrator` depends on `core` for signals and schedules, and on
+- `packages/integrations/openhands` depends on `core` for signals and schedules, and on
   `openhands` for the client. It owns queueing, run state, the approval policy,
   GitHub intake, and the daemon loop.
 - Every runnable app may depend on `core`; none of them imports another app.

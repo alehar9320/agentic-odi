@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from agentic_odi_core.remote import StudioError, StudioErrorCode
-from agentic_odi_orchestrator.service import (
+from agentic_odi_integrations_openhands.service import (
     InvalidTransition,
     OrchestratorError,
     OrchestratorService,

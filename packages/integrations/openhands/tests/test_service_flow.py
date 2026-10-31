@@ -6,8 +6,7 @@ from typing import Any
 
 import httpx
 from agentic_odi_core import SignalKind
-from agentic_odi_openhands import AgentServerClient, OpenHandsClient
-from agentic_odi_orchestrator import (
+from agentic_odi_integrations_openhands import (
     AgentRun,
     AgentRunStatus,
     AgentTarget,
@@ -16,6 +15,7 @@ from agentic_odi_orchestrator import (
     OrchestratorStore,
     WorkItemStatus,
 )
+from agentic_odi_openhands import AgentServerClient, OpenHandsClient
 
 CLOUD = "https://cloud.test"
 AGENT = "https://agent.test"

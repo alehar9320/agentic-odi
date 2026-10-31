@@ -5,13 +5,13 @@ import os
 from datetime import datetime, timezone
 
 import pytest
-from agentic_odi_orchestrator import (
+from agentic_odi_integrations_openhands import (
     AlreadyRunning,
     DaemonLock,
     OrchestratorDaemon,
     OrchestratorSettings,
 )
-from agentic_odi_orchestrator.service import TickReport, _read_heartbeat
+from agentic_odi_integrations_openhands.service import TickReport, _read_heartbeat
 
 
 class StubService:

@@ -3,8 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 import pytest
-from agentic_odi_openhands import SecurityRisk
-from agentic_odi_orchestrator import (
+from agentic_odi_integrations_openhands import (
     AgentRun,
     AgentRunStatus,
     ApprovalRecord,
@@ -13,6 +12,7 @@ from agentic_odi_orchestrator import (
     WorkItem,
     WorkItemStatus,
 )
+from agentic_odi_openhands import SecurityRisk
 
 
 def _work(key: str = "manual:1") -> WorkItem:

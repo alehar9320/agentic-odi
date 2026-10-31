@@ -4,12 +4,12 @@ import json
 from typing import Any
 
 import httpx
-from agentic_odi_orchestrator.github_source import (
+from agentic_odi_integrations_openhands.github_source import (
     GitHubClient,
     GitHubNotifier,
     GitHubSource,
 )
-from agentic_odi_orchestrator.models import (
+from agentic_odi_integrations_openhands.models import (
     AgentRun,
     AgentRunStatus,
     AgentTarget,
@@ -19,8 +19,8 @@ from agentic_odi_orchestrator.models import (
     WorkItem,
     WorkItemStatus,
 )
-from agentic_odi_orchestrator.service import OrchestratorService
-from agentic_odi_orchestrator.store import OrchestratorStore
+from agentic_odi_integrations_openhands.service import OrchestratorService
+from agentic_odi_integrations_openhands.store import OrchestratorStore
 
 REPO = "acme/repo"
 

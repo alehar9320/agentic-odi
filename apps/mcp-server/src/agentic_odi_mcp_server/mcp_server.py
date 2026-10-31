@@ -637,7 +637,7 @@ def orchestrator_service() -> Any:
     """Compose the orchestrator lazily so ordinary MCP startup stays light."""
     global _orchestrator
     if _orchestrator is None:
-        from agentic_odi_orchestrator import OrchestratorService
+        from agentic_odi_integrations_openhands import OrchestratorService
 
         _orchestrator = OrchestratorService()
     return _orchestrator
@@ -658,7 +658,7 @@ def add_work_item(
 
     The tool returns immediately; the daemon dispatches it on its next tick.
     """
-    from agentic_odi_orchestrator import OrchestratorError
+    from agentic_odi_integrations_openhands import OrchestratorError
 
     try:
         work, created = orchestrator_service().add_work_item(
@@ -685,7 +685,7 @@ def list_work_items(status: str | None = None, source: str | None = None) -> str
 
 @mcp.tool
 def get_work_item(work_id: str) -> str:
-    from agentic_odi_orchestrator import OrchestratorError
+    from agentic_odi_integrations_openhands import OrchestratorError
 
     try:
         orchestrator = orchestrator_service()
@@ -703,7 +703,7 @@ def get_work_item(work_id: str) -> str:
 
 @mcp.tool
 def cancel_work_item(work_id: str) -> str:
-    from agentic_odi_orchestrator import OrchestratorError
+    from agentic_odi_integrations_openhands import OrchestratorError
 
     try:
         work = orchestrator_service().cancel_work_item(work_id)
@@ -714,7 +714,7 @@ def cancel_work_item(work_id: str) -> str:
 
 @mcp.tool
 def retry_work_item(work_id: str) -> str:
-    from agentic_odi_orchestrator import OrchestratorError
+    from agentic_odi_integrations_openhands import OrchestratorError
 
     try:
         work = orchestrator_service().retry_work_item(work_id)
@@ -730,7 +730,7 @@ def list_agent_targets() -> str:
 
 @mcp.tool
 def list_agent_runs(work_id: str | None = None) -> str:
-    from agentic_odi_orchestrator import OrchestratorError
+    from agentic_odi_integrations_openhands import OrchestratorError
 
     try:
         runs = orchestrator_service().list_runs(work_id)
@@ -741,7 +741,7 @@ def list_agent_runs(work_id: str | None = None) -> str:
 
 @mcp.tool
 def get_agent_run(run_id: str) -> str:
-    from agentic_odi_orchestrator import OrchestratorError
+    from agentic_odi_integrations_openhands import OrchestratorError
 
     try:
         orchestrator = orchestrator_service()

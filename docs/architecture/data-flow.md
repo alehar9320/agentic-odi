@@ -9,7 +9,7 @@
 | `apps/studio-api` | Studio API, canvas projection, chat tool loop, conversation history, PM memory | Via the same repository when the local backend is active; conversations and memory in `~/.agentic-odi/studio.db` |
 | `packages/connectors` | Connector protocol, presets, record mapping | Shared `connectors.json` registry; ingested batches land in an in-process sink |
 | `packages/openhands` | Cloud and Agent Server wire models, HTTP calls, status mapping | Nothing; it is a client |
-| `packages/orchestrator` | Work queue, run state machine, approval policy, GitHub intake, daemon | Its own event-sourced SQLite database, `~/.agentic-odi/orchestrator.db` |
+| `packages/integrations/openhands` | Work queue, run state machine, approval policy, GitHub intake, daemon | Its own event-sourced SQLite database, `~/.agentic-odi/orchestrator.db` |
 | `apps/studio` | Presentation state, the visible conversation path, optimistic canvas updates; the conversation runtime is assistant-ui | Browser cache only |
 | `apps/cli` | Terminal rendering, local/remote backend selection | SQLite directly for `local`, no local writes for `mcp` |
 
