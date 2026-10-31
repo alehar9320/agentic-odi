@@ -483,8 +483,9 @@ def test_every_page_resolves_its_own_assets(page: str):
 def test_page_weights_are_within_budget(page: str):
     size = _built_root(page).stat().st_size
     # The MCP reference is the long pole: every tool's argument table and the
-    # full ODI entity schema live on that one page, so it grows with each tool
-    # and each entity we add. The budget is a tripwire, not a target. Raised
-    # from 80 KiB for pillar 3, which added the decision-review, score-history
-    # and bet tools plus the ScoreSnapshot and Bet entities.
+    # whole ODI entity schema live on that one page, so it grows with each tool
+    # and each entity we add. The budget is a tripwire, not a target. Raised for
+    # pillar 3, which added the decision-review, score-history and bet tools plus
+    # the ScoreSnapshot and Bet entities, on top of the scheduled-work and signal
+    # tools already on the page.
     assert size <= 100 * 1024, f"{page}: {size} bytes"

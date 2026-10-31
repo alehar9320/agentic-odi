@@ -47,7 +47,9 @@ locally: `npx playwright install chromium`. See
 
 ### Conversational UI coverage
 
-The agent-composed surfaces and the first-run tour are covered at these levels. `ChatStage.test.tsx` also covers the latest-message control while following a streamed turn and returning to the live end:
+The agent-composed surfaces, first-minute guidance, and the product tour are
+covered at these levels. `ChatStage.test.tsx` also covers the latest-message
+control while following a streamed turn and returning to the live end:
 
 | File | What it covers |
 |---|---|
@@ -69,8 +71,9 @@ The agent-composed surfaces and the first-run tour are covered at these levels. 
 | `apps/studio-api/tests/test_studio_approvals.py` | Gate lifecycle: resolve, timeout, double resolve, unknown id |
 | `apps/studio/src/features/flags.test.ts` | Flag precedence (query → storage → env → default), value parsing, local overrides |
 | `apps/studio/src/onboarding/machine.test.ts` | Tour transitions, no forward motion without a goal, versioned storage, malformed records |
-| `apps/studio/src/onboarding/FirstRunWizard.test.tsx` | Auto-open, full flow to a destination, skip/Escape, focus trap, resume, replay, inline model repair, flag off |
-| `apps/studio/src/App.test.tsx` | First-run ordering: tour over the context conversation, job handoff, chosen surface opens, contextual starter-card labels and prompts, flag off in shell tests |
+| `apps/studio/src/onboarding/FirstRunWizard.test.tsx` | Never auto-opens, explicit open, full flow to a destination, skip/Escape, focus trap, resume, replay, inline model repair, flag off |
+| `apps/studio/src/lib/guidance.test.ts` | One hint at a time, context before evidence, silence before the first exchange, permanent dismissal, defensive storage |
+| `apps/studio/src/App.test.tsx` | First-minute ordering: no tour or interview over the stage, tour on request, context hint after the first reply, job handoff, chosen surface opens, flag off in shell tests |
 
 ## Website Checks (GitHub Pages)
 
@@ -144,7 +147,51 @@ Scoring factors:
 - **Test delta** — source code changed without a corresponding
   `*.test.*`/`*.spec.*`/`tests/**` file adds 20 points.
 
-The workflow is silent: it updates labels only and never posts PR comments.
+### PR labels
+
+The same workflow also labels every pull request so a reviewer can read its
+shape at a glance, without opening the diff. Labelling is deterministic — no
+LLM calls, no network beyond the GitHub API — so it cannot invent a label.
+
+| Axis | Labels | What it tells a reviewer |
+|---|---|---|
+| Provenance | `🤖 agent`, `👤 human` | Whether a coding agent or a human wrote it. Detected from the PR author, the branch prefix, and the commit identities, because agents in this repository push on the owner's account. |
+| Size | `size/XS` … `size/XL` | How much there is to read: <50, 50–249, 250–799, 800–1999, 2000+ lines changed. |
+| Domain | `area/studio`, `area/cli`, `area/core`, `area/infra`, `area/docs`, … | Which components the diff touches. A PR can carry several. |
+| Supply chain | `dependencies` | A manifest or lockfile changed (`package-lock.json`, `pyproject.toml`, `Cargo.lock`, `go.sum`, …). Worth a careful read even when the diff is one line. |
+| Agent telemetry | `breaking change`, `needs deep dive`, `telemetry invalid` | What the agent declared about its own work. |
+
+#### Agent telemetry
+
+Coding agents declare what they know in the pull request body. Add this block to
+the description; the [pull request
+template](../.github/pull_request_template.md) already includes it:
+
+```html
+<!-- AGENT_METADATA {"has_breaking_changes": true, "agent_confidence": "low"} -->
+```
+
+- `has_breaking_changes: true` applies `breaking change`.
+- `agent_confidence: "low"` applies `needs deep dive`.
+- A block that cannot be parsed applies `telemetry invalid`. The workflow keeps
+  going either way and never fails the check suite on a malformed block.
+
+Human authors can leave the block alone: the shipped defaults claim nothing.
+
+Labels are managed idempotently. Each run adds the labels it computed and
+removes the ones it previously added that no longer apply, so re-pushing a
+branch corrects the size label instead of stacking a second one. The set of
+labels this system owns is defined once, in `scripts/pr_labels.py`:
+
+```bash
+python3 scripts/pr_labels.py --managed          # list every managed label
+echo '{"author":{"login":"x","type":"User"},"files":[]}' | python3 scripts/pr_labels.py
+```
+
+The risk tier labels (`safe to merge`, `needs a look`, `danger zone`) and the
+merge-state labels (`ready-for-merge`, `merge-conflict`) are owned by other
+workflows and are deliberately left alone. The workflow is silent: it updates
+labels only and never posts PR comments.
 
 ## Testing
 

@@ -55,6 +55,7 @@ function loadDraft(): SetupDraft {
         target_user: String(parsed.target_user ?? ""),
         job_statement: String(parsed.job_statement ?? ""),
         core_problem: String(parsed.core_problem ?? ""),
+        vision: String(parsed.vision ?? ""),
       };
     }
   } catch {
@@ -164,7 +165,7 @@ export function SetupConversation() {
     }
     const intro = resumed
       ? "Welcome back — let's pick up where we left off."
-      : "Let's make this yours. Four quick questions — answer in your own words, or skip anything. You can explore on your own at any point.";
+      : "Let's make this yours. Five quick questions — answer in your own words, or skip anything. You can explore on your own at any point.";
     return [{ role: "assistant", content: `${intro}\n\n${questionContent(phase.index, draft)}` }];
   });
   const [input, setInput] = useState("");
@@ -338,6 +339,9 @@ export function SetupConversation() {
       target_user: draft.target_user.trim(),
       job_statement: draft.job_statement.trim(),
       core_problem: draft.core_problem.trim(),
+      v2mom: draft.vision.trim()
+        ? { ...brief?.v2mom, vision: draft.vision.trim() }
+        : brief?.v2mom,
     };
     const jobName = context.job_statement || context.product_name;
     const description = [context.target_user, context.core_problem].filter(Boolean).join(" — ");

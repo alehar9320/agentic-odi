@@ -16,6 +16,7 @@ from agentic_odi_connectors.registry import (
 )
 from agentic_odi_core import (
     DecisionNotFoundError,
+    EvidenceNotFoundError,
     JobNotFoundError,
     OdiError,
     ODIService,
@@ -60,6 +61,8 @@ from agentic_odi_studio_api.studio.probes import (
 )
 from agentic_odi_studio_api.studio.schemas import (
     AddConnectorRequest,
+    AddCustomerOutcomeRequest,
+    AddEvidenceRequest,
     AddOutcomeRequest,
     AddStepRequest,
     AdvanceBetRequest,
@@ -84,12 +87,16 @@ from agentic_odi_studio_api.studio.schemas import (
     ObservationListResponse,
     ObservationResponse,
     ObservationUpdateRequest,
+    PromoteEvidenceRequest,
     RecordBetRequest,
     RecordDecisionRequest,
     ReviewDecisionRequest,
+    ScheduleWorkRequest,
     SetOutcomeValueRequest,
+    SignalActionRequest,
     TurnNode,
     UpdateConversationRequest,
+    UpdateCustomerOutcomeRequest,
     UpdateJobRequest,
     UpdateOutcomeRequest,
     UpdateStepRequest,
@@ -135,7 +142,14 @@ def _as_http_error(exc: Exception) -> StudioHTTPError:
             status_code=422,
         )
     if isinstance(
-        exc, (JobNotFoundError, StepNotFoundError, OutcomeNotFoundError, DecisionNotFoundError)
+        exc,
+        (
+            JobNotFoundError,
+            StepNotFoundError,
+            OutcomeNotFoundError,
+            DecisionNotFoundError,
+            EvidenceNotFoundError,
+        ),
     ):
         return StudioHTTPError(StudioError(code=StudioErrorCode.NOT_FOUND, message=str(exc)))
     if isinstance(exc, ValueOutOfRangeError):
@@ -900,6 +914,224 @@ async def delete_outcome(
     return {"deleted": outcome_id}
 
 
+@router.get("/signals", response_model=list[dict[str, Any]])
+async def get_signals(
+    request: Request,
+    unread_only: bool = Query(False),
+    limit: int = Query(50, ge=1, le=1000),
+    mcp_url: str | None = Query(None),
+) -> list[dict[str, Any]]:
+    """The signal feed, newest first. Same facts under both backends."""
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(mcp_url or ""),
+            ToolName.LIST_SIGNALS.value,
+            {"unread_only": unread_only, "limit": limit},
+        )
+        parsed = _json_or_raw(result)
+        return parsed if isinstance(parsed, list) else []
+    return [
+        signal.model_dump(mode="json")
+        for signal in _service(request).list_signals(unread_only=unread_only, limit=limit)
+    ]
+
+
+@router.get("/signals/unread-count")
+async def get_signal_unread_count(
+    request: Request, mcp_url: str | None = Query(None)
+) -> dict[str, int]:
+    """What the bell badge shows. Suppressed and dismissed signals never count."""
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(mcp_url or ""),
+            ToolName.LIST_SIGNALS.value,
+            {"unread_only": True, "limit": 1000},
+        )
+        parsed = _json_or_raw(result)
+        return {"count": len(parsed) if isinstance(parsed, list) else 0}
+    return {"count": _service(request).count_unread_signals()}
+
+
+@router.post("/signals/{signal_id}/read")
+async def post_signal_read(
+    signal_id: str, body: SignalActionRequest, request: Request
+) -> dict[str, Any]:
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(body.mcp_url),
+            ToolName.MARK_SIGNAL_READ.value,
+            {"signal_id": signal_id},
+        )
+        return _payload_from_text(result)
+    try:
+        signal = _service(request).mark_signal_read(signal_id)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return signal.model_dump(mode="json")
+
+
+@router.post("/signals/{signal_id}/dismiss")
+async def post_signal_dismiss(
+    signal_id: str, body: SignalActionRequest, request: Request
+) -> dict[str, Any]:
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(body.mcp_url),
+            ToolName.DISMISS_SIGNAL.value,
+            {"signal_id": signal_id},
+        )
+        return _payload_from_text(result)
+    try:
+        signal = _service(request).dismiss_signal(signal_id)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return signal.model_dump(mode="json")
+
+
+def _customer_outcome_args(body: AddCustomerOutcomeRequest) -> dict[str, Any]:
+    return {
+        "job_id": body.job_id,
+        "customer_value": body.customer_value.model_dump(mode="json"),
+        "business_value": body.business_value.model_dump(mode="json"),
+        "step_id": body.step_id,
+    }
+
+
+@router.get("/customer-outcomes")
+async def get_customer_outcomes(
+    request: Request,
+    job_id: str | None = Query(None),
+    mcp_url: str | None = Query(None),
+) -> dict:
+    if _uses_mcp(request):
+        arguments: dict[str, Any] = {}
+        if job_id:
+            arguments["job_id"] = job_id
+        result = await call_mcp_tool(
+            _require_mcp_url(mcp_url or ""), ToolName.LIST_CUSTOMER_OUTCOMES.value, arguments
+        )
+        return {"ok": True, "result": _json_or_raw(result)}
+    outcomes = _service(request).list_customer_outcomes(job_id)
+    return {"ok": True, "result": [item.model_dump(mode="json") for item in outcomes]}
+
+
+@router.get("/customer-outcomes/{outcome_id}")
+async def get_customer_outcome(
+    outcome_id: str, request: Request, mcp_url: str | None = Query(None)
+) -> dict:
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(mcp_url or ""),
+            ToolName.GET_CUSTOMER_OUTCOME.value,
+            {"outcome_id": outcome_id},
+        )
+        return {"ok": True, "result": _json_or_raw(result)}
+    try:
+        outcome = _service(request).get_customer_outcome(outcome_id)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return {"ok": True, "result": outcome.model_dump(mode="json")}
+
+
+@router.post("/customer-outcomes")
+async def post_customer_outcome(body: AddCustomerOutcomeRequest, request: Request) -> dict:
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            body.mcp_url, ToolName.ADD_CUSTOMER_OUTCOME.value, _customer_outcome_args(body)
+        )
+        return {"ok": True, "result": _json_or_raw(result)}
+    try:
+        outcome = _service(request).add_customer_outcome(
+            job_id=body.job_id,
+            customer_value=body.customer_value,
+            business_value=body.business_value,
+            step_id=body.step_id,
+        )
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return {"ok": True, "result": outcome.model_dump(mode="json")}
+
+
+@router.patch("/customer-outcomes/{outcome_id}")
+async def patch_customer_outcome(
+    outcome_id: str, body: UpdateCustomerOutcomeRequest, request: Request
+) -> dict:
+    updates = body.model_dump(exclude_none=True, exclude={"mcp_url"})
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(body.mcp_url),
+            ToolName.UPDATE_CUSTOMER_OUTCOME.value,
+            {"outcome_id": outcome_id, **updates},
+        )
+        return {"ok": True, "result": _json_or_raw(result)}
+    try:
+        outcome = _service(request).update_customer_outcome(outcome_id, updates)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return {"ok": True, "result": outcome.model_dump(mode="json")}
+
+
+@router.delete("/customer-outcomes/{outcome_id}")
+async def delete_customer_outcome(
+    outcome_id: str, request: Request, mcp_url: str | None = Query(None)
+) -> dict:
+    if _uses_mcp(request):
+        await call_mcp_tool(
+            _require_mcp_url(mcp_url or ""),
+            ToolName.DELETE_CUSTOMER_OUTCOME.value,
+            {"outcome_id": outcome_id},
+        )
+        return {"ok": True}
+    try:
+        _service(request).delete_customer_outcome(outcome_id)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return {"ok": True}
+
+
+@router.get("/evidence")
+async def get_evidence_records(
+    request: Request,
+    job_id: str | None = Query(None),
+    step_id: str | None = Query(None),
+    outcome_id: str | None = Query(None),
+    mcp_url: str | None = Query(None),
+) -> dict:
+    if _uses_mcp(request):
+        arguments = {
+            key: value
+            for key, value in {
+                "job_id": job_id,
+                "step_id": step_id,
+                "outcome_id": outcome_id,
+            }.items()
+            if value
+        }
+        result = await call_mcp_tool(
+            _require_mcp_url(mcp_url or ""), ToolName.LIST_EVIDENCE.value, arguments
+        )
+        return {"ok": True, "result": _json_or_raw(result)}
+    records = _service(request).list_evidence(job_id=job_id, step_id=step_id, outcome_id=outcome_id)
+    return {"ok": True, "result": [record.model_dump(mode="json") for record in records]}
+
+
+@router.get("/evidence/{evidence_id}")
+async def get_evidence(
+    evidence_id: str, request: Request, mcp_url: str | None = Query(None)
+) -> dict:
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(mcp_url or ""),
+            ToolName.GET_EVIDENCE.value,
+            {"evidence_id": evidence_id},
+        )
+        return {"ok": True, "result": _json_or_raw(result)}
+    record = _service(request).get_evidence(evidence_id)
+    if record is None:
+        raise _as_http_error(EvidenceNotFoundError(evidence_id))
+    return {"ok": True, "result": record.model_dump(mode="json")}
+
+
 @router.get("/memory/observations", response_model=ObservationListResponse)
 def list_observations(request: Request) -> ObservationListResponse:
     observations = _memory(request).list_observations()
@@ -1029,7 +1261,15 @@ def patch_conversation(
     try:
         if body.title is not None:
             memory.update_title(conversation_id, body.title)
-        conversation = memory.set_head(conversation_id, body.head_id)
+        # A rename must not clear the selected branch; only touch the head when
+        # the caller actually sent one.
+        if "head_id" in body.model_fields_set:
+            conversation = memory.set_head(conversation_id, body.head_id)
+        else:
+            found = memory.get_conversation(conversation_id)
+            if found is None:
+                raise ConversationNotFoundError(conversation_id)
+            conversation = found
     except ConversationNotFoundError as exc:
         raise StudioHTTPError(
             StudioError(
@@ -1041,7 +1281,7 @@ def patch_conversation(
 
 
 @router.post("/approvals/{approval_id}", response_model=ApprovalDecisionResponse)
-def resolve_approval(
+async def resolve_approval(
     approval_id: str, body: ApprovalDecisionRequest, request: Request
 ) -> ApprovalDecisionResponse:
     """Answer a paused write. The paused turn resumes on its own stream."""
@@ -1191,3 +1431,179 @@ async def proxy_llm_chat(body: LlmProxyRequest) -> StreamingResponse:
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+@router.get("/schedule")
+async def get_scheduled_work(
+    request: Request,
+    job_id: str | None = Query(None),
+    status: str | None = Query(None),
+    mcp_url: str | None = Query(None),
+) -> dict:
+    if _uses_mcp(request):
+        url = _require_mcp_url(mcp_url or "")
+        args: dict = {}
+        if job_id:
+            args["job_id"] = job_id
+        if status:
+            args["status"] = status
+        res = await call_mcp_tool(url, ToolName.LIST_SCHEDULED_WORK.value, args)
+        return {"ok": True, "result": json.loads(res) if isinstance(res, str) else res}
+    items = _service(request).list_scheduled_work(job_id=job_id, status=status)
+    return {"ok": True, "result": [item.model_dump(mode="json") for item in items]}
+
+
+@router.post("/schedule")
+async def post_scheduled_work(body: ScheduleWorkRequest, request: Request) -> dict:
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(body.mcp_url),
+            ToolName.SCHEDULE_WORK.value,
+            {
+                "name": body.name,
+                "schedule_expression": body.schedule_expression,
+                "agent_id": body.agent_id,
+                "trigger_type": body.trigger_type,
+                "payload": body.payload,
+                "job_id": body.job_id,
+            },
+        )
+        return {"ok": True, "result": result}
+    work = _service(request).schedule_work(
+        name=body.name,
+        schedule_expression=body.schedule_expression,
+        agent_id=body.agent_id,
+        trigger_type=body.trigger_type,
+        payload=body.payload,
+        job_id=body.job_id,
+    )
+    return {"ok": True, "result": work.model_dump(mode="json")}
+
+
+@router.post("/schedule/{work_id}/trigger")
+async def post_trigger_scheduled_work(
+    work_id: str, request: Request, mcp_url: str | None = Query(None)
+) -> dict:
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(mcp_url or ""),
+            ToolName.TRIGGER_SCHEDULED_WORK.value,
+            {"work_id": work_id},
+        )
+        return {"ok": True, "result": result}
+    try:
+        work = _service(request).trigger_scheduled_work(work_id)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return {"ok": True, "result": work.model_dump(mode="json")}
+
+
+@router.post("/schedule/{work_id}/cancel")
+async def post_cancel_scheduled_work(
+    work_id: str, request: Request, mcp_url: str | None = Query(None)
+) -> dict:
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(mcp_url or ""),
+            ToolName.CANCEL_SCHEDULED_WORK.value,
+            {"work_id": work_id},
+        )
+        return {"ok": True, "result": result}
+    try:
+        work = _service(request).cancel_scheduled_work(work_id)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return {"ok": True, "result": work.model_dump(mode="json")}
+
+
+@router.post("/evidence")
+async def post_evidence(body: AddEvidenceRequest, request: Request) -> dict:
+    """Capture a research record, keeping the knowledge where it already lives."""
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(body.mcp_url),
+            ToolName.ADD_EVIDENCE.value,
+            {
+                "source_name": body.source_name,
+                "source_kind": body.source_kind,
+                "name": body.name,
+                "content": body.content,
+                "url": body.url,
+                "item_type": body.item_type,
+                "job_id": body.job_id,
+                "step_id": body.step_id,
+                "outcome_id": body.outcome_id,
+            },
+        )
+        return {"ok": True, "result": result}
+    try:
+        evidence = _service(request).add_evidence(
+            source_name=body.source_name,
+            source_kind=body.source_kind,
+            name=body.name,
+            content=body.content,
+            url=body.url,
+            item_type=body.item_type,
+            job_id=body.job_id,
+            step_id=body.step_id,
+            outcome_id=body.outcome_id,
+        )
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return {"ok": True, "result": evidence.model_dump(mode="json")}
+
+
+@router.delete("/evidence/{evidence_id}")
+async def delete_evidence(
+    evidence_id: str, request: Request, mcp_url: str | None = Query(None)
+) -> dict:
+    if _uses_mcp(request):
+        await call_mcp_tool(
+            _require_mcp_url(mcp_url or ""),
+            ToolName.DELETE_EVIDENCE.value,
+            {"evidence_id": evidence_id},
+        )
+        return {"ok": True}
+    try:
+        _service(request).delete_evidence(evidence_id)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return {"ok": True}
+
+
+@router.post("/evidence/{evidence_id}/promote")
+async def promote_evidence(
+    evidence_id: str, body: PromoteEvidenceRequest, request: Request
+) -> dict:
+    """Promote a record into a Job or a Desired Outcome."""
+    if _uses_mcp(request):
+        args: dict[str, Any] = {"evidence_id": evidence_id, "target": body.target}
+        if body.job_id:
+            args["job_id"] = body.job_id
+        if body.statement:
+            args["statement"] = body.statement
+        if body.name:
+            args["name"] = body.name
+        if body.importance is not None:
+            args["importance"] = body.importance
+        if body.satisfaction is not None:
+            args["satisfaction"] = body.satisfaction
+        result = await call_mcp_tool(
+            _require_mcp_url(body.mcp_url),
+            ToolName.PROMOTE_EVIDENCE.value,
+            args,
+        )
+        return {"ok": True, "result": result}
+    try:
+        artifact = _service(request).promote_evidence(
+            evidence_id=evidence_id,
+            target=body.target,
+            job_id=body.job_id,
+            statement=body.statement,
+            name=body.name,
+            importance=body.importance,
+            satisfaction=body.satisfaction,
+        )
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return {"ok": True, "result": artifact.model_dump(mode="json")}

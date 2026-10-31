@@ -65,6 +65,7 @@ export function OutcomeCard({ node }: NodeProps) {
   const evidence = str(node.props, "evidence");
   const score = scoreOf(node.props);
   const underserved = isUnderserved(score);
+  const sample = node.props.sample === true;
 
   return (
     <article
@@ -73,6 +74,14 @@ export function OutcomeCard({ node }: NodeProps) {
     >
       <header className="ui-card__head">
         <span className="ui-card__id">{id}</span>
+        {sample ? (
+          <span
+            className="badge badge--amber"
+            title="This is bundled sample data, not yours."
+          >
+            Sample
+          </span>
+        ) : null}
         <ScorePill tone={bandTone(score)}>{bandLabel(score)}</ScorePill>
       </header>
 
@@ -578,7 +587,15 @@ export function Roadmap({ node }: NodeProps) {
   const undecidedCount =
     typeof node.props.undecided_count === "number" ? node.props.undecided_count : null;
 
-  let currentPeriod: string | null = null;
+  const rows = entries.map((entry, index) => {
+    const period = str(entry, "period");
+    return {
+      entry,
+      index,
+      period,
+      showPeriod: period !== (index > 0 ? str(entries[index - 1], "period") : null),
+    };
+  });
 
   return (
     <article className="ui-card ui-card--roadmap" aria-label={title || "Outcome roadmap"}>
@@ -586,12 +603,9 @@ export function Roadmap({ node }: NodeProps) {
 
       {entries.length > 0 ? (
         <ol className="ui-roadmap" aria-label="Roadmap entries">
-          {entries.map((entry, index) => {
-            const period = str(entry, "period");
+          {rows.map(({ entry, index, period, showPeriod }) => {
             const statement = str(entry, "statement");
             const decisionId = str(entry, "decision_id");
-            const showPeriod = period !== currentPeriod;
-            currentPeriod = period;
             return (
               <li className="ui-roadmap__entry" key={`${decisionId}-${statement}-${index}`}>
                 {showPeriod ? <span className="ui-roadmap__period">{period}</span> : null}

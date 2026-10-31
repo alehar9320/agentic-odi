@@ -34,6 +34,8 @@ export interface Evidence {
   item_type?: string;
   name?: string;
   content?: string;
+  /** Deep link back to the record in the tool that holds it, when it has one. */
+  url?: string | null;
   job_id?: string | null;
   step_id?: string | null;
   outcome_id?: string | null;
@@ -161,6 +163,7 @@ export interface CanvasData {
   outcomes: Outcome[];
   /** Captured research records, in capture order until the user reorders them. */
   evidence?: Evidence[];
+  scheduled_work?: ScheduledWork[];
   source: "mcp" | "seed" | "local";
   /** Why the board is not what the server actually holds, when the sidecar knows. */
   warnings?: string[];
@@ -217,20 +220,19 @@ export interface McpHealth {
   reachable: boolean;
 }
 
-/**
- * Everything one turn can contain, in the order the agent produced it.
- *
- * Text and surfaces are the Studio's own vocabulary. Reasoning, tool calls,
- * sources, approvals, and attachments are conversation primitives the runtime
- * renders — the bridge in `assistant/convert.ts` maps each one to its
- * assistant-ui message part.
- */
 export type ToolStatus = "running" | "ok" | "error" | "declined";
 
 /** A write the agent is asking permission for. */
 export interface ToolApproval {
   id: string;
   prompt: string;
+}
+
+/** What goes on the wire with a turn: the sidecar's snake-case shape. */
+export interface ChatAttachmentPayload {
+  name: string;
+  media_type: string;
+  data: string;
 }
 
 export interface ChatAttachment {
@@ -293,6 +295,18 @@ export interface ChatMessage {
  * The user's context, captured on first run. Kept in local storage and sent to
  * the sidecar so every reply starts from the user's actual product and job.
  */
+/**
+ * The domain's V2MOM artifact. Only `vision` is captured today, by the setup
+ * conversation; the other four fields have no input path yet.
+ */
+export interface V2Mom {
+  vision?: string;
+  values?: string[];
+  methods?: string[];
+  obstacles?: string[];
+  measures?: string[];
+}
+
 export interface StudioBrief {
   product_name: string;
   product_url?: string;
@@ -300,6 +314,7 @@ export interface StudioBrief {
   job_statement: string;
   core_problem: string;
   job_id?: string;
+  v2mom?: V2Mom;
 }
 
 /**
@@ -313,23 +328,47 @@ export type WorkspacePanelId =
   | "capture"
   | "memory"
   | "catchup"
+  | "schedule"
   | "settings";
 
-export type NotificationCategory = "outcome" | "simulation" | "evidence" | "job" | "insight";
+/**
+ * One recorded fact from the shared store. Kinds are exactly the ones a real
+ * mutation can emit; nothing here is invented by the client.
+ */
+export type SignalKind =
+  | "job_added"
+  | "outcome_scored"
+  | "opportunity_crossed"
+  | "evidence_ingested"
+  | "evidence_promoted"
+  | "job_map_completed";
 
-export interface StudioNotification {
+export type SignalSeverity = "info" | "notice" | "urgent";
+
+export type SignalSubjectKind =
+  | "job"
+  | "step"
+  | "outcome"
+  | "evidence"
+  | "connector"
+  | "agent_work";
+
+export interface Signal {
   id: string;
+  kind: SignalKind;
   title: string;
-  message: string;
-  category: NotificationCategory;
-  timestamp: string;
-  read: boolean;
-  /** True for a demonstration event. Simulated events never count as unread. */
-  simulated: boolean;
-  targetPanel?: WorkspacePanelId;
-  targetId?: string;
-  actionText?: string;
-  chatPrompt?: string;
+  detail?: string | null;
+  subject_kind?: SignalSubjectKind | null;
+  subject_id?: string | null;
+  severity: SignalSeverity;
+  created_at: string;
+  read_at?: string | null;
+  dismissed_at?: string | null;
+  /** Past the daily attention budget: recorded, but never surfaced or counted. */
+  suppressed: boolean;
+  fingerprint: string;
+  /** Only the developer simulator (#78) sets this. Simulated entries never count. */
+  simulated?: boolean;
 }
 
 export interface ChatStreamRequest {
@@ -547,4 +586,18 @@ export interface ChangelogRelease {
 
 export interface ChangelogData {
   releases: ChangelogRelease[];
+}
+
+export interface ScheduledWork {
+  id: string;
+  name: string;
+  agent_id: string;
+  trigger_type: "oneshot" | "cron" | "interval";
+  schedule_expression: string;
+  payload?: Record<string, unknown>;
+  status: "pending" | "scheduled" | "running" | "completed" | "failed" | "cancelled";
+  job_id?: string | null;
+  created_at: string;
+  last_run_at?: string | null;
+  result_summary?: string | null;
 }

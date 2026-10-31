@@ -300,6 +300,7 @@ def test_mutating_tools_are_named_by_prefix() -> None:
     assert chat.is_mutating_tool("add_job")
     assert chat.is_mutating_tool("delete_outcome")
     assert chat.is_mutating_tool("ingest_notion")
+    assert chat.is_mutating_tool("promote_evidence")
     assert not chat.is_mutating_tool("get_jobs")
     assert not chat.is_mutating_tool("remember")
     assert not chat.is_mutating_tool("render_ui")

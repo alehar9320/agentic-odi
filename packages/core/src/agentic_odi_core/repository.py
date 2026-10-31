@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import Protocol, TypeVar
 
 from agentic_odi_core.models import (
@@ -11,7 +12,9 @@ from agentic_odi_core.models import (
     Evidence,
     Job,
     Outcome,
+    ScheduledWork,
     ScoreSnapshot,
+    Signal,
     Step,
 )
 
@@ -43,6 +46,25 @@ def page(items: list[_Item], limit: int | None = None, offset: int = 0) -> list[
     return sliced if limit is None else sliced[:limit]
 
 
+def rank_signals(signals: list[Signal]) -> list[Signal]:
+    """Surfaced signals, newest first.
+
+    Dismissed signals left the feed; budget-suppressed ones were recorded but
+    are not surfaced, so neither kind appears. Urgent signals bypass the
+    budget, so they were never suppressed in the first place.
+    """
+    return sorted(
+        (signal for signal in signals if signal.dismissed_at is None and not signal.suppressed),
+        key=lambda signal: signal.created_at,
+        reverse=True,
+    )
+
+
+def unread_signals(signals: list[Signal]) -> list[Signal]:
+    """Unread means unseen: surfaced and not yet read."""
+    return [signal for signal in rank_signals(signals) if signal.read_at is None]
+
+
 OUTCOME_SORTS = ("opportunity_score", "insertion")
 
 
@@ -69,6 +91,8 @@ class Repository(Protocol):
     decisions: dict[str, Decision]
     bets: dict[str, Bet]
     score_snapshots: list[ScoreSnapshot]
+    signals: dict[str, Signal]
+    scheduled_work: dict[str, ScheduledWork]
 
     def add_job(self, job: Job) -> Job: ...
     def list_jobs(self, limit: int | None = None, offset: int = 0) -> list[Job]: ...
@@ -133,6 +157,20 @@ class Repository(Protocol):
     def update_bet(self, bet_id: str, updates: dict) -> Bet | None: ...
     def add_score_snapshot(self, snapshot: ScoreSnapshot) -> ScoreSnapshot: ...
     def list_score_snapshots(self, outcome_id: str | None = None) -> list[ScoreSnapshot]: ...
+    def add_signal(self, signal: Signal) -> Signal: ...
+    def get_signal(self, signal_id: str) -> Signal | None: ...
+    def list_signals(self, unread_only: bool = False, limit: int = 50) -> list[Signal]: ...
+    def mark_signal_read(self, signal_id: str) -> Signal | None: ...
+    def dismiss_signal(self, signal_id: str) -> Signal | None: ...
+    def count_unread_signals(self) -> int: ...
+    def add_scheduled_work(self, work: ScheduledWork) -> ScheduledWork: ...
+    def get_scheduled_work(self, work_id: str) -> ScheduledWork | None: ...
+    def list_scheduled_work(
+        self, job_id: str | None = None, status: str | None = None
+    ) -> list[ScheduledWork]: ...
+    def update_scheduled_work(self, work_id: str, updates: dict) -> ScheduledWork | None: ...
+    def delete_scheduled_work(self, work_id: str) -> bool: ...
+
     def clear(self) -> None: ...
     def reload(self) -> None: ...
     def commit(self) -> None: ...
@@ -149,6 +187,8 @@ class InMemoryRepository:
         self.decisions: dict[str, Decision] = {}
         self.bets: dict[str, Bet] = {}
         self.score_snapshots: list[ScoreSnapshot] = []
+        self.signals: dict[str, Signal] = {}
+        self.scheduled_work: dict[str, ScheduledWork] = {}
 
     def add_job(self, job: Job) -> Job:
         self.jobs[job.id] = job
@@ -439,8 +479,76 @@ class InMemoryRepository:
         # Append-only, so the stored order is the chronological order.
         return list(items)
 
+    def add_signal(self, signal: Signal) -> Signal:
+        self.signals[signal.id] = signal
+        return signal
+
+    def get_signal(self, signal_id: str) -> Signal | None:
+        return self.signals.get(signal_id)
+
+    def list_signals(self, unread_only: bool = False, limit: int = 50) -> list[Signal]:
+        items = (
+            unread_signals(list(self.signals.values()))
+            if unread_only
+            else rank_signals(list(self.signals.values()))
+        )
+        return page(items, limit)
+
+    def mark_signal_read(self, signal_id: str) -> Signal | None:
+        signal = self.signals.get(signal_id)
+        if signal is None:
+            return None
+        if signal.read_at is None:
+            signal.read_at = datetime.now(timezone.utc)
+        return signal
+
+    def dismiss_signal(self, signal_id: str) -> Signal | None:
+        signal = self.signals.get(signal_id)
+        if signal is None:
+            return None
+        if signal.dismissed_at is None:
+            signal.dismissed_at = datetime.now(timezone.utc)
+        return signal
+
+    def count_unread_signals(self) -> int:
+        return len(unread_signals(list(self.signals.values())))
+
+    def add_scheduled_work(self, work: ScheduledWork) -> ScheduledWork:
+        self.scheduled_work[work.id] = work
+        return work
+
+    def get_scheduled_work(self, work_id: str) -> ScheduledWork | None:
+        return self.scheduled_work.get(work_id)
+
+    def list_scheduled_work(
+        self, job_id: str | None = None, status: str | None = None
+    ) -> list[ScheduledWork]:
+        items = list(self.scheduled_work.values())
+        if job_id is not None:
+            items = [item for item in items if item.job_id == job_id]
+        if status is not None:
+            items = [item for item in items if item.status == status]
+        return items
+
+    def update_scheduled_work(self, work_id: str, updates: dict) -> ScheduledWork | None:
+        work = self.scheduled_work.get(work_id)
+        if not work:
+            return None
+        current = work.model_dump(exclude_unset=True)
+        current.update(updates)
+        new_work = work.model_validate(current)
+        self.scheduled_work[work_id] = new_work
+        return new_work
+
+    def delete_scheduled_work(self, work_id: str) -> bool:
+        if work_id in self.scheduled_work:
+            del self.scheduled_work[work_id]
+            return True
+        return False
+
     def clear(self) -> None:
         self.jobs.clear()
+        self.scheduled_work.clear()
         self.steps.clear()
         self.outcomes.clear()
         self.customer_outcomes.clear()
@@ -448,6 +556,7 @@ class InMemoryRepository:
         self.decisions.clear()
         self.bets.clear()
         self.score_snapshots.clear()
+        self.signals.clear()
 
     def reload(self) -> None:
         """Reset in-memory state; there is no external store to re-read."""

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Literal
 
+from agentic_odi_core import BusinessValue, CustomerValue
 from agentic_odi_core.models import (
     MAX_VALUE_SOURCE,
     BetStatus,
@@ -162,6 +163,43 @@ class AdvanceBetRequest(BaseModel):
     mcp_url: str = ""
 
 
+class SignalActionRequest(BaseModel):
+    """Body for the read/dismiss signal routes; only the MCP backend needs it."""
+
+    mcp_url: str = ""
+
+
+class V2MOM(BaseModel):
+    """The domain's V2MOM artifact: Vision, Values, Methods, Obstacles, Measures.
+
+    Only ``vision`` is captured today, by the context conversation; the other
+    four fields have no input path yet and arrive empty.
+    """
+
+    vision: str = ""
+    values: list[str] = Field(default_factory=list)
+    methods: list[str] = Field(default_factory=list)
+    obstacles: list[str] = Field(default_factory=list)
+    measures: list[str] = Field(default_factory=list)
+
+
+class AddCustomerOutcomeRequest(BaseModel):
+    mcp_url: str = ""
+    job_id: str
+    customer_value: CustomerValue
+    business_value: BusinessValue
+    step_id: str | None = None
+
+
+class UpdateCustomerOutcomeRequest(BaseModel):
+    """Both values are replaced wholesale — a partial score would be ambiguous."""
+
+    mcp_url: str = ""
+    customer_value: CustomerValue | None = None
+    business_value: BusinessValue | None = None
+    step_id: str | None = None
+
+
 class StudioBrief(BaseModel):
     """The user's context, captured during first-run onboarding."""
 
@@ -170,6 +208,7 @@ class StudioBrief(BaseModel):
     target_user: str = ""
     job_statement: str = ""
     core_problem: str = ""
+    v2mom: V2MOM | None = None
 
 
 class UiCatalogRequest(BaseModel):
@@ -398,3 +437,40 @@ class CapabilityItem(BaseModel):
 
 class CapabilitiesResponse(BaseModel):
     capabilities: list[CapabilityItem]
+
+
+class ScheduleWorkRequest(BaseModel):
+    mcp_url: str = ""
+    name: str
+    schedule_expression: str
+    agent_id: str = "default-agent"
+    trigger_type: str = "oneshot"
+    payload: dict[str, Any] = Field(default_factory=dict)
+    job_id: str | None = None
+
+
+class AddEvidenceRequest(BaseModel):
+    """A research record delegated from an external tool, or captured by hand."""
+
+    source_name: str
+    source_kind: str = "manual"
+    name: str
+    content: str
+    url: str | None = None
+    item_type: Literal["catalog", "resource", "tool_result", "manual", "note"] = "manual"
+    job_id: str | None = None
+    step_id: str | None = None
+    outcome_id: str | None = None
+    mcp_url: str = ""
+
+
+class PromoteEvidenceRequest(BaseModel):
+    """Turn a captured record into a Job or a Desired Outcome."""
+
+    target: Literal["job", "outcome"]
+    job_id: str | None = None
+    statement: str | None = None
+    name: str | None = None
+    importance: float | None = None
+    satisfaction: float | None = None
+    mcp_url: str = ""

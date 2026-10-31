@@ -74,39 +74,33 @@ export function OdiMascot({
       <rect x="29" y="12" width="1" height="1" fill="#1B1410"/>
       <rect x="30" y="12" width="2" height="1" fill="#131722"/>
       <rect x="0" y="13" width="3" height="1" fill="#131722"/>
-      <rect x="3" y="13" width="4" height="1" fill="#1B1410"/>
-      <rect x="7" y="13" width="18" height="1" fill="#B4794C"/>
-      <rect x="25" y="13" width="4" height="1" fill="#1B1410"/>
+      <rect x="3" y="13" width="26" height="1" fill="#1B1410"/>
       <rect x="29" y="13" width="3" height="1" fill="#131722"/>
       <rect x="0" y="14" width="5" height="1" fill="#131722"/>
-      <rect x="5" y="14" width="1" height="1" fill="#1B1410"/>
-      <rect x="6" y="14" width="1" height="1" fill="#B4794C"/>
-      <rect x="7" y="14" width="4" height="1" fill="#1B1410"/>
+      <rect x="5" y="14" width="6" height="1" fill="#1B1410"/>
       <rect x="11" y="14" width="10" height="1" fill="#B4794C"/>
-      <rect x="21" y="14" width="4" height="1" fill="#1B1410"/>
-      <rect x="25" y="14" width="1" height="1" fill="#B4794C"/>
-      <rect x="26" y="14" width="1" height="1" fill="#1B1410"/>
+      <rect x="21" y="14" width="6" height="1" fill="#1B1410"/>
       <rect x="27" y="14" width="5" height="1" fill="#131722"/>
       <rect x="0" y="15" width="4" height="1" fill="#131722"/>
       <rect x="4" y="15" width="1" height="1" fill="#1B1410"/>
-      <rect x="5" y="15" width="2" height="1" fill="#B4794C"/>
-      <rect x="7" y="15" width="1" height="1" fill="#1B1410"/>
+      <rect x="5" y="15" width="1" height="1" fill="#B4794C"/>
+      <rect x="6" y="15" width="2" height="1" fill="#1B1410"/>
       <rect x="8" y="15" width="1" height="1" fill="#F6EAD8"/>
       <rect x="9" y="15" width="2" height="1" fill="#1B1410"/>
       <rect x="11" y="15" width="10" height="1" fill="#B4794C"/>
       <rect x="21" y="15" width="1" height="1" fill="#1B1410"/>
       <rect x="22" y="15" width="1" height="1" fill="#F6EAD8"/>
-      <rect x="23" y="15" width="2" height="1" fill="#1B1410"/>
-      <rect x="25" y="15" width="2" height="1" fill="#B4794C"/>
+      <rect x="23" y="15" width="3" height="1" fill="#1B1410"/>
+      <rect x="26" y="15" width="1" height="1" fill="#B4794C"/>
       <rect x="27" y="15" width="1" height="1" fill="#1B1410"/>
       <rect x="28" y="15" width="4" height="1" fill="#131722"/>
       <rect x="0" y="16" width="4" height="1" fill="#131722"/>
       <rect x="4" y="16" width="1" height="1" fill="#1B1410"/>
-      <rect x="5" y="16" width="2" height="1" fill="#B4794C"/>
-      <rect x="7" y="16" width="4" height="1" fill="#1B1410"/>
+      <rect x="5" y="16" width="1" height="1" fill="#B4794C"/>
+      <rect x="6" y="16" width="5" height="1" fill="#1B1410"/>
       <rect x="11" y="16" width="10" height="1" fill="#B4794C"/>
-      <rect x="21" y="16" width="4" height="1" fill="#1B1410"/>
-      <rect x="25" y="16" width="2" height="1" fill="#B4794C"/>
+      <rect x="21" y="16" width="5" height="1" fill="#1B1410"/>
+      <rect x="26" y="16" width="1" height="1" fill="#B4794C"/>
       <rect x="27" y="16" width="1" height="1" fill="#1B1410"/>
       <rect x="28" y="16" width="4" height="1" fill="#131722"/>
       <rect x="0" y="17" width="4" height="1" fill="#131722"/>

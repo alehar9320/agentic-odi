@@ -328,7 +328,7 @@ describe("Conversation live regions", () => {
 
     const trace = container.querySelector(".tool-trace") as HTMLElement;
     expect(trace.textContent).toContain("list jobs");
-    expect(trace).toHaveAttribute("aria-live", "polite");
+    expect(container.querySelector(".conversation")).toHaveAttribute("aria-live", "polite");
   });
 });
 

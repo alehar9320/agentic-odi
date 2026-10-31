@@ -8,36 +8,76 @@
  */
 
 import type { ReactNode } from "react";
+import { useAuiState } from "@assistant-ui/react";
 
 import { isCommandDraft, type StudioCommand } from "../../lib/commands";
 import { useStudio } from "../../state/StudioContext";
+import { BoltIcon, CaptureIcon, CompassIcon, SparkIcon } from "../icons";
 
-function CommandOption({
-  command,
-  active,
-  onHover,
-  onChoose,
-}: {
-  command: StudioCommand;
-  active: boolean;
-  onHover: () => void;
-  onChoose: (command: StudioCommand) => void;
-}) {
+const PILL_ICONS: ReactNode[] = [
+  <SparkIcon size={15} key="spark" />,
+  <BoltIcon size={15} key="bolt" />,
+  <CaptureIcon size={15} key="capture" />,
+];
+
+interface QuickPill {
+  id: string;
+  label: string;
+  icon: ReactNode;
+  run: () => void;
+  conversational?: boolean;
+}
+
+/**
+ * The runtime's suggestions, pinned to the composer so they stay reachable
+ * once the thread starts. What is offered here and what the thread knows are
+ * the same store, so they cannot drift apart.
+ */
+export function SuggestionPills() {
+  const { canvas, llmHealth, openPanel, streaming, sendMessage } = useStudio();
+  const suggestions = useAuiState((state) => state.thread.suggestions);
+
+  const jobs = canvas?.jobs.length ?? 0;
+
+  const pills: QuickPill[] = suggestions.map((suggestion, index) => ({
+    id: `suggestion-${index}`,
+    label: suggestion.title ?? suggestion.prompt,
+    icon: PILL_ICONS[index % PILL_ICONS.length],
+    run: () => void sendMessage(suggestion.prompt),
+    conversational: true,
+  }));
+
+  pills.push(
+    jobs > 0 && llmHealth.healthy === false
+      ? {
+          id: "capture",
+          label: "Capture what you heard",
+          icon: <CaptureIcon size={15} />,
+          run: () => openPanel("capture"),
+        }
+      : {
+          id: "landscape",
+          label: "Opportunity landscape",
+          icon: <CompassIcon size={15} />,
+          run: () => openPanel("landscape"),
+        },
+  );
+
   return (
-    <button
-      type="button"
-      role="option"
-      aria-selected={active}
-      className={`palette__item${active ? " is-active" : ""}`}
-      onMouseEnter={onHover}
-      onClick={() => onChoose(command)}
-    >
-      <code className="palette__name">{command.name}</code>
-      <span className="palette__text">
-        <span className="palette__label">{command.label}</span>
-        <span className="palette__description">{command.description}</span>
-      </span>
-    </button>
+    <div className="composer__pills" aria-label="Suggested next steps">
+      {pills.map((pill) => (
+        <button
+          key={pill.id}
+          type="button"
+          className="suggestion"
+          disabled={Boolean(pill.conversational && streaming)}
+          onClick={pill.run}
+        >
+          {pill.icon}
+          {pill.label}
+        </button>
+      ))}
+    </div>
   );
 }
 
@@ -61,31 +101,25 @@ export function CommandPalette({
     return null;
   }
 
-  // Group the matches under their category, keeping the flat match index so
-  // arrow keys still walk one ordered list.
-  const groups = new Map<string, { command: StudioCommand; index: number }[]>();
-  matches.forEach((command, index) => {
-    const bucket = groups.get(command.category) ?? [];
-    bucket.push({ command, index });
-    groups.set(command.category, bucket);
-  });
-
   return (
     <div className="palette" role="listbox" id={id} aria-label="Commands">
       {matches.length ? (
-        [...groups.entries()].map(([category, entries]) => (
-          <div key={category} className="palette__group" role="group" aria-label={category}>
-            <p className="palette__group-title">{category}</p>
-            {entries.map(({ command, index }) => (
-              <CommandOption
-                key={command.id}
-                command={command}
-                active={index === activeIndex}
-                onHover={() => onHover(index)}
-                onChoose={onChoose}
-              />
-            ))}
-          </div>
+        matches.map((command, index) => (
+          <button
+            key={command.id}
+            type="button"
+            role="option"
+            aria-selected={index === activeIndex}
+            className={`palette__item${index === activeIndex ? " is-active" : ""}`}
+            onMouseEnter={() => onHover(index)}
+            onClick={() => onChoose(command)}
+          >
+            <code className="palette__name">{command.name}</code>
+            <span className="palette__text">
+              <span className="palette__label">{command.label}</span>
+              <span className="palette__description">{command.description}</span>
+            </span>
+          </button>
         ))
       ) : (
         <p className="palette__empty">
@@ -117,13 +151,13 @@ export function ConnectorChips() {
             key={id}
             type="button"
             className="composer__suggestion"
-            aria-label={`Dismiss suggestion: ${label}`}
+            aria-label={`Added ${label}, dismiss`}
             onClick={() => {
               dismissConnectorSuggestion(id);
               void refreshConnectors();
             }}
           >
-            <span>Suggested: {label}</span>
+            <span>Added {label}</span>
             <span aria-hidden>✕</span>
           </button>
         );

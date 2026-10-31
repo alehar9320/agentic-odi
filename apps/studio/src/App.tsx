@@ -1,17 +1,19 @@
 import { useEffect, useState } from "react";
 
-import { StudioRuntimeProvider } from "./assistant/StudioRuntime";
+import { BannerBridge, useBannerActionDispatcher } from "./banners/BannerBridge";
+import { BannerProvider, useBanner } from "./banners/BannerProvider";
+import { BannerStack } from "./banners/BannerStack";
+import { BannerToasts } from "./banners/BannerToasts";
 import { ChangelogModal } from "./components/ChangelogModal";
 import { ChatStage } from "./components/chat/ChatStage";
 import { ConnectorSuggestionModal } from "./components/customize/ConnectorSuggestionModal";
 import { CustomizePage } from "./components/customize/CustomizePage";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { StudioBar } from "./components/layout/StudioBar";
-import { SidecarNotice } from "./components/notices/SidecarNotice";
-import { Toasts } from "./components/Toasts";
 import { WorkbenchRail } from "./components/workspace/WorkbenchRail";
 import { WorkspacePanel } from "./components/workspace/WorkspacePanel";
 import { FirstRunWizard, OnboardingProvider } from "./onboarding";
+import { StudioRuntimeProvider } from "./assistant/StudioRuntime";
 import { StudioProvider, useStudio } from "./state/StudioContext";
 import { UpdateBanner, UpdateProvider } from "./updater";
 
@@ -24,7 +26,17 @@ import { UpdateBanner, UpdateProvider } from "./updater";
  * composer never leaves the screen.
  */
 function StudioShell() {
-  const { closePanel, clearChat, closeSetup, customizeOpen, closeCustomize } = useStudio();
+  const {
+    closePanel,
+    clearChat,
+    closeSetup,
+    customizeOpen,
+    closeCustomize,
+    streaming,
+    stopStreaming,
+  } = useStudio();
+  const { view } = useBanner();
+  const { onIntent, onAction, onDismiss } = useBannerActionDispatcher();
   const [showChangelog, setShowChangelog] = useState(false);
 
   function goHome() {
@@ -37,22 +49,35 @@ function StudioShell() {
   function newConversation() {
     clearChat();
     closePanel();
+    closeSetup();
     closeCustomize();
   }
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
+        if (streaming) {
+          stopStreaming();
+          return;
+        }
         closePanel();
       }
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [closePanel]);
+  }, [closePanel, streaming, stopStreaming]);
 
   return (
     <div className="studio-app">
-      <SidecarNotice />
+      <BannerBridge />
+      <BannerToasts />
+      <BannerStack
+        banners={view.visible}
+        overflow={view.overflow}
+        onDismiss={onDismiss}
+        onAction={onAction}
+        onIntent={onIntent}
+      />
       <main className="stage">
         <StudioBar
           onHome={goHome}
@@ -74,7 +99,6 @@ function StudioShell() {
       </main>
       <ChangelogModal isOpen={showChangelog} onClose={() => setShowChangelog(false)} />
       <ConnectorSuggestionModal />
-      <Toasts />
     </div>
   );
 }
@@ -84,12 +108,14 @@ export default function App() {
     <ErrorBoundary>
       <UpdateProvider>
         <StudioProvider>
-          <StudioRuntimeProvider>
-            <OnboardingProvider>
-              <StudioShell />
-              <FirstRunWizard />
-            </OnboardingProvider>
-          </StudioRuntimeProvider>
+          <BannerProvider>
+            <StudioRuntimeProvider>
+              <OnboardingProvider>
+                <StudioShell />
+                <FirstRunWizard />
+              </OnboardingProvider>
+            </StudioRuntimeProvider>
+          </BannerProvider>
         </StudioProvider>
       </UpdateProvider>
     </ErrorBoundary>

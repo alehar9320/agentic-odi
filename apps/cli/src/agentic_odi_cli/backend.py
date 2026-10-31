@@ -133,7 +133,12 @@ class LocalBackend(Backend):
         return job.model_dump()
 
     def _get_jobs(self, args: dict[str, Any]) -> list[dict[str, Any]]:
-        return [job.model_dump() for job in self.service.get_jobs()]
+        kwargs: dict[str, Any] = {}
+        if "limit" in args:
+            kwargs["limit"] = args["limit"]
+        if "offset" in args:
+            kwargs["offset"] = args["offset"]
+        return [job.model_dump() for job in self.service.get_jobs(**kwargs)]
 
     def _get_job(self, args: dict[str, Any]) -> dict[str, Any]:
         from agentic_odi_core import job_not_found
@@ -185,7 +190,12 @@ class LocalBackend(Backend):
         job_id = args["job_id"]
         if self.service.get_job(job_id) is None:
             raise BackendError(job_not_found(job_id))
-        return [step.model_dump() for step in self.service.get_job_map(job_id)]
+        kwargs: dict[str, Any] = {"job_id": job_id}
+        if "limit" in args:
+            kwargs["limit"] = args["limit"]
+        if "offset" in args:
+            kwargs["offset"] = args["offset"]
+        return [step.model_dump() for step in self.service.get_job_map(**kwargs)]
 
     def _get_step(self, args: dict[str, Any]) -> dict[str, Any]:
         from agentic_odi_core import step_not_found
@@ -253,7 +263,12 @@ class LocalBackend(Backend):
         job_id = args["job_id"]
         if self.service.get_job(job_id) is None:
             raise BackendError(job_not_found(job_id))
-        outcomes = self.service.get_outcomes(job_id=job_id, step_id=args.get("step_id"))
+        kwargs: dict[str, Any] = {"job_id": job_id, "step_id": args.get("step_id")}
+        if "limit" in args:
+            kwargs["limit"] = args["limit"]
+        if "offset" in args:
+            kwargs["offset"] = args["offset"]
+        outcomes = self.service.get_outcomes(**kwargs)
         return [outcome.model_dump() for outcome in outcomes]
 
     def _get_outcome(self, args: dict[str, Any]) -> dict[str, Any]:
@@ -355,7 +370,12 @@ class LocalBackend(Backend):
         return outcome.model_dump()
 
     def _list_customer_outcomes(self, args: dict[str, Any]) -> list[dict[str, Any]]:
-        outcomes = self.service.list_customer_outcomes(args.get("job_id"))
+        kwargs: dict[str, Any] = {"job_id": args.get("job_id")}
+        if "limit" in args:
+            kwargs["limit"] = args["limit"]
+        if "offset" in args:
+            kwargs["offset"] = args["offset"]
+        outcomes = self.service.list_customer_outcomes(**kwargs)
         return [outcome.model_dump() for outcome in outcomes]
 
     def _update_customer_outcome(self, args: dict[str, Any]) -> dict[str, Any]:
@@ -424,6 +444,7 @@ class LocalBackend(Backend):
                 name=args["name"],
                 content=args["content"],
                 item_type=args.get("item_type", "manual"),
+                url=args.get("url"),
                 raw=args.get("raw"),
                 job_id=args.get("job_id"),
                 step_id=args.get("step_id"),
@@ -454,11 +475,16 @@ class LocalBackend(Backend):
         return evidence.model_dump()
 
     def _list_evidence(self, args: dict[str, Any]) -> list[dict[str, Any]]:
-        items = self.service.list_evidence(
-            job_id=args.get("job_id"),
-            step_id=args.get("step_id"),
-            outcome_id=args.get("outcome_id"),
-        )
+        kwargs: dict[str, Any] = {
+            "job_id": args.get("job_id"),
+            "step_id": args.get("step_id"),
+            "outcome_id": args.get("outcome_id"),
+        }
+        if "limit" in args:
+            kwargs["limit"] = args["limit"]
+        if "offset" in args:
+            kwargs["offset"] = args["offset"]
+        items = self.service.list_evidence(**kwargs)
         return [item.model_dump() for item in items]
 
     def _delete_evidence(self, args: dict[str, Any]) -> str:
@@ -509,6 +535,61 @@ class LocalBackend(Backend):
             raise BackendError(str(exc)) from None
         return artifact.model_dump()
 
+    def _schedule_work(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import JobNotFoundError, job_not_found
+
+        try:
+            work = self.service.schedule_work(
+                name=args["name"],
+                schedule_expression=args["schedule_expression"],
+                agent_id=args.get("agent_id", "default-agent"),
+                trigger_type=args.get("trigger_type", "oneshot"),
+                payload=args.get("payload"),
+                job_id=args.get("job_id"),
+            )
+        except JobNotFoundError:
+            raise BackendError(job_not_found(args.get("job_id") or "")) from None
+        except ValueError as exc:
+            raise BackendError(str(exc)) from None
+        return work.model_dump()
+
+    def _get_scheduled_work(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import ScheduledWorkNotFoundError, scheduled_work_not_found
+
+        work_id = args["work_id"]
+        try:
+            work = self.service.get_scheduled_work(work_id)
+        except ScheduledWorkNotFoundError:
+            raise BackendError(scheduled_work_not_found(work_id)) from None
+        return work.model_dump()
+
+    def _list_scheduled_work(self, args: dict[str, Any]) -> list[dict[str, Any]]:
+        items = self.service.list_scheduled_work(
+            job_id=args.get("job_id"),
+            status=args.get("status"),
+        )
+        return [item.model_dump() for item in items]
+
+    def _cancel_scheduled_work(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import ScheduledWorkNotFoundError, scheduled_work_not_found
+
+        work_id = args["work_id"]
+        try:
+            work = self.service.cancel_scheduled_work(work_id)
+        except ScheduledWorkNotFoundError:
+            raise BackendError(scheduled_work_not_found(work_id)) from None
+        return work.model_dump()
+
+    def _trigger_scheduled_work(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import ScheduledWorkNotFoundError, scheduled_work_not_found
+
+        work_id = args["work_id"]
+        try:
+            work = self.service.trigger_scheduled_work(work_id)
+        except ScheduledWorkNotFoundError:
+            raise BackendError(scheduled_work_not_found(work_id)) from None
+        return work.model_dump()
+
     def _get_odi_schema(self, args: dict[str, Any]) -> dict[str, Any]:
         from agentic_odi_core import odi_schema
 
@@ -547,7 +628,7 @@ class LocalBackend(Backend):
 
         return capability_summary()
 
-    def _get_capabilities_manifest(self, args: dict[str, Any]) -> dict:
+    def _get_capabilities_manifest(self, args: dict[str, Any]) -> dict[str, Any]:
         from agentic_odi_core import capability_manifest
 
         return capability_manifest()
@@ -775,6 +856,33 @@ class LocalBackend(Backend):
             raise BackendError(str(exc)) from None
         return bet.model_dump(mode="json")
 
+    def _list_signals(self, args: dict[str, Any]) -> list[dict[str, Any]]:
+        signals = self.service.list_signals(
+            unread_only=bool(args.get("unread_only", False)),
+            limit=int(args.get("limit", 50)),
+        )
+        return [signal.model_dump(mode="json") for signal in signals]
+
+    def _mark_signal_read(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import SignalNotFoundError
+
+        signal_id = args["signal_id"]
+        try:
+            signal = self.service.mark_signal_read(signal_id)
+        except SignalNotFoundError:
+            raise BackendError(f"signal not found: {signal_id}") from None
+        return signal.model_dump(mode="json")
+
+    def _dismiss_signal(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import SignalNotFoundError
+
+        signal_id = args["signal_id"]
+        try:
+            signal = self.service.dismiss_signal(signal_id)
+        except SignalNotFoundError:
+            raise BackendError(f"signal not found: {signal_id}") from None
+        return signal.model_dump(mode="json")
+
 
 _LOCAL_HANDLERS = {
     "add_job": LocalBackend._add_job,
@@ -802,6 +910,11 @@ _LOCAL_HANDLERS = {
     "list_evidence": LocalBackend._list_evidence,
     "delete_evidence": LocalBackend._delete_evidence,
     "promote_evidence": LocalBackend._promote_evidence,
+    "schedule_work": LocalBackend._schedule_work,
+    "get_scheduled_work": LocalBackend._get_scheduled_work,
+    "list_scheduled_work": LocalBackend._list_scheduled_work,
+    "cancel_scheduled_work": LocalBackend._cancel_scheduled_work,
+    "trigger_scheduled_work": LocalBackend._trigger_scheduled_work,
     "get_odi_schema": LocalBackend._get_odi_schema,
     "compute_opportunity": LocalBackend._compute_opportunity,
     "evaluate_outcome": LocalBackend._evaluate_outcome,
@@ -821,6 +934,9 @@ _LOCAL_HANDLERS = {
     "get_odi_framework_guidelines": LocalBackend._get_odi_framework_guidelines,
     "get_capabilities": LocalBackend._get_capabilities,
     "get_capabilities_manifest": LocalBackend._get_capabilities_manifest,
+    "list_signals": LocalBackend._list_signals,
+    "mark_signal_read": LocalBackend._mark_signal_read,
+    "dismiss_signal": LocalBackend._dismiss_signal,
 }
 
 
@@ -885,6 +1001,8 @@ _LIST_TOOLS = frozenset(
         "get_outcomes",
         "list_customer_outcomes",
         "list_evidence",
+        "list_signals",
+        "list_scheduled_work",
     }
 )
 

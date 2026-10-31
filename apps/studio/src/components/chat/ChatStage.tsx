@@ -12,8 +12,8 @@ import { useStudio } from "../../state/StudioContext";
 import type { WorkspacePanelId } from "../../types";
 import { SetupConversation } from "../setup/SetupConversation";
 import { Conversation } from "./Conversation";
+import { GuidanceHint } from "./GuidanceHint";
 import { Hero } from "./Hero";
-import { OfflineNotice } from "./OfflineNotice";
 import { ThreadComposer } from "./ThreadComposer";
 
 const VIEW_COMMANDS = new Set<string>(["landscape", "jobmap", "evidence", "settings"]);
@@ -153,7 +153,6 @@ export function ChatStage() {
   if (empty) {
     return (
       <section className="chat chat--empty" aria-label="Studio conversation">
-        <OfflineNotice />
         <div className="chat__welcome">
           <div className="chat__welcome-inner">
             <Hero />
@@ -170,7 +169,6 @@ export function ChatStage() {
 
   return (
     <ThreadPrimitive.Root className="chat" aria-label="Studio conversation">
-      <OfflineNotice />
       <div className="chat__transcript">
         <ThreadPrimitive.Viewport className="chat__scroll" autoScroll>
           <div className="chat__thread">
@@ -180,6 +178,7 @@ export function ChatStage() {
         <LatestMessageButton />
       </div>
       <div className="chat__dock">
+        <GuidanceHint />
         <ThreadComposer
           onCommand={(command) => runCommand(command)}
           onSlashCommand={submitCommand}
