@@ -81,7 +81,7 @@ describe("Conversation", () => {
       },
     ]);
 
-    const text = container.textContent ?? "";
+    const text = (container.querySelector(".conversation") as HTMLElement).textContent ?? "";
     const intro = text.indexOf("Here is the board.");
     const card = text.indexOf("Minimize the time it takes to propagate secrets");
     const outro = text.indexOf("It is the top bet.");
@@ -312,7 +312,7 @@ describe("Conversation offline context", () => {
 
 
 describe("Conversation live regions", () => {
-  it("announces tool traces politely as they arrive", () => {
+  it("announces tool traces politely as they arrive without making the log live", () => {
     const { container } = renderTurn([
       {
         id: "m-1",
@@ -328,7 +328,51 @@ describe("Conversation live regions", () => {
 
     const trace = container.querySelector(".tool-trace") as HTMLElement;
     expect(trace.textContent).toContain("list jobs");
-    expect(container.querySelector(".conversation")).toHaveAttribute("aria-live", "polite");
+    expect(screen.getByRole("log", { name: "Conversation" })).not.toHaveAttribute("aria-live");
+  });
+
+  it("announces only the newest reply, not the history", () => {
+    renderTurn([
+      { id: "u-1", parentId: null, role: "user", content: "Check this bet" },
+      { id: "a-1", parentId: "u-1", role: "assistant", content: "An older reply." },
+      { id: "a-2", parentId: "u-1", role: "assistant", content: "The newest reply." },
+    ]);
+
+    const status = screen.getByRole("status");
+    expect(status).toHaveTextContent("The newest reply.");
+    expect(status).not.toHaveTextContent("An older reply.");
+    expect(status).not.toHaveTextContent("Check this bet");
+  });
+
+  it("holds the live region while a reply streams, then announces it settled", () => {
+    harness.state.streaming = true;
+    harness.state.thinkingPhase = "model";
+    const messages: ChatMessage[] = [
+      { id: "u-1", parentId: null, role: "user", content: "Check this bet" },
+      { id: "a-1", parentId: "u-1", role: "assistant", content: "Half a reply" },
+    ];
+    harness.state.messages = messages;
+    const { rerender } = render(
+      <StudioRuntimeProvider>
+        <Conversation />
+      </StudioRuntimeProvider>,
+    );
+
+    const status = screen.getByRole("status");
+    expect(status).toHaveAttribute("aria-busy", "true");
+    expect(status).toHaveTextContent("Thinking");
+    expect(status).not.toHaveTextContent("Half a reply");
+
+    harness.state.streaming = false;
+    harness.state.thinkingPhase = null;
+    rerender(
+      <StudioRuntimeProvider>
+        <Conversation />
+      </StudioRuntimeProvider>,
+    );
+
+    expect(screen.getByRole("status")).toHaveAttribute("aria-busy", "false");
+    expect(screen.getByRole("status")).toHaveTextContent("Half a reply");
   });
 });
 

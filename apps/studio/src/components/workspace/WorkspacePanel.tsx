@@ -1,3 +1,6 @@
+import { useEffect, useRef } from "react";
+
+import { useFocusTrap } from "../../lib/useFocusTrap";
 import { useStudio } from "../../state/StudioContext";
 import { useMediaQuery } from "../../lib/useMediaQuery";
 import { CloseIcon } from "../icons";
@@ -20,20 +23,68 @@ function PanelBody({ panel }: { panel: PanelDefinition }) {
  * On a wide screen it docks to the right and the thread keeps the stage: the
  * composer is still there, still focused, still usable. On a narrow screen
  * there is no room for both, so it becomes a sheet over the thread with a scrim
- * and a close control.
+ * and a close control. A sheet is a modal: focus stays inside it, Escape
+ * closes it, and focus returns to whatever opened it.
  */
 export function WorkspacePanel() {
   const { activePanel, closePanel, sendMessage } = useStudio();
   const isMobile = useMediaQuery(MOBILE_QUERY);
+  const panel = activePanel ? findPanel(activePanel) : null;
+  const panelRef = useRef<HTMLElement>(null);
 
-  if (!activePanel) {
+  useFocusTrap(panelRef, isMobile && Boolean(panel));
+
+  // Everything behind the sheet is out of reach while it is open.
+  useEffect(() => {
+    if (!isMobile || !activePanel || !panelRef.current) {
+      return;
+    }
+    const hidden: HTMLElement[] = [];
+    let node: HTMLElement | null = panelRef.current;
+    while (node && node !== document.body) {
+      for (const sibling of Array.from(node.parentElement?.children ?? [])) {
+        if (
+          sibling !== node &&
+          sibling instanceof HTMLElement &&
+          !sibling.hasAttribute("aria-hidden") &&
+          sibling.tagName !== "SCRIPT"
+        ) {
+          sibling.setAttribute("aria-hidden", "true");
+          hidden.push(sibling);
+        }
+      }
+      node = node.parentElement;
+    }
+    return () => {
+      for (const element of hidden) {
+        element.removeAttribute("aria-hidden");
+      }
+    };
+  }, [isMobile, activePanel, panel?.id]);
+
+  // Capture so the escape never reaches the app-level handler, which would
+  // stop a running reply instead of closing the sheet the person is looking at.
+  useEffect(() => {
+    if (!isMobile || !activePanel) {
+      return;
+    }
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopPropagation();
+        closePanel();
+      }
+    }
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
+  }, [isMobile, activePanel, closePanel]);
+
+  if (!panel) {
     return null;
   }
 
-  const panel = findPanel(activePanel);
-
   function talk() {
-    if (!panel.talk) {
+    if (!panel?.talk) {
       return;
     }
     closePanel();
@@ -51,10 +102,12 @@ export function WorkspacePanel() {
         />
       )}
       <aside
+        ref={panelRef}
         className="lens"
         role={isMobile ? "dialog" : "complementary"}
         aria-modal={isMobile || undefined}
         aria-label={panel.title}
+        tabIndex={-1}
         key={panel.id}
       >
         <header className="lens__head">
