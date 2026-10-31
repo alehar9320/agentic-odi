@@ -22,6 +22,7 @@ from contextlib import AsyncExitStack
 from typing import Any
 
 from agentic_odi_core import ModelRouter, ModelTier, ODIService, RoutingMode
+from agentic_odi_core.contract import TOOL_SPECS, ToolEffect
 from agentic_odi_core.remote import (
     StudioError,
     StudioErrorCode,
@@ -60,22 +61,9 @@ log = logging.getLogger(__name__)
 #: missing must not be able to loop forever.
 MAX_TOOL_ROUNDS = 3
 
-#: Tool names that change stored data. Everything else is a read, a surface, or
-#: a memory note — none of which needs a confirmation the user would learn to
-#: click through.
-MUTATING_TOOL_PREFIXES: tuple[str, ...] = (
-    "add_",
-    "create_",
-    "update_",
-    "delete_",
-    "ingest_",
-    "remove_",
-)
-
-#: Writes whose names do not follow the verb-prefix convention.
-MUTATING_TOOLS: frozenset[str] = frozenset(
-    {"promote_evidence", "segment_market", "propose_strategy"}
-)
+#: Local tools deliberately handled without a write approval: rendering a UI
+#: and suggesting a memory observation retain their existing conversation flow.
+_LOCAL_UNGATED_TOOLS = frozenset({"remember", RENDER_UI_TOOL})
 
 #: Attachments are context, not a corpus: five files, and a bounded slice of each.
 MAX_ATTACHMENTS = 5
@@ -87,7 +75,10 @@ MAX_SOURCE_PREVIEW = 160
 
 def is_mutating_tool(name: str) -> bool:
     """Whether a tool call changes stored data and should be confirmed."""
-    return name in MUTATING_TOOLS or name.startswith(MUTATING_TOOL_PREFIXES)
+    if name in _LOCAL_UNGATED_TOOLS:
+        return False
+    spec = TOOL_SPECS.get(name)
+    return spec is None or spec.effect != ToolEffect.READ
 
 
 SYSTEM_PROMPT = """You are an elite product strategist working inside The Living Studio, a room built for product managers.

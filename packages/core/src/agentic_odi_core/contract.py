@@ -348,7 +348,7 @@ TOOL_SPECS: dict[str, ToolSpec] = {
     ToolName.EVALUATE_OUTCOME.value: ToolSpec(
         name="evaluate_outcome",
         summary="Evaluate an outcome statement against ODI format rules.",
-        effect=_derive_effect("evaluate_outcome"),
+        effect=ToolEffect.READ,
         arguments=("statement", "job_id"),
         required=("statement",),
         returns="A verdict with coded issues and suggestions.",
@@ -364,7 +364,7 @@ TOOL_SPECS: dict[str, ToolSpec] = {
     ToolName.COMPUTE_OPPORTUNITY.value: ToolSpec(
         name="compute_opportunity",
         summary="Compute an ODI opportunity score from importance and satisfaction.",
-        effect=_derive_effect("compute_opportunity"),
+        effect=ToolEffect.READ,
         arguments=("importance", "satisfaction"),
         required=("importance", "satisfaction"),
         returns="The opportunity score as a float.",
