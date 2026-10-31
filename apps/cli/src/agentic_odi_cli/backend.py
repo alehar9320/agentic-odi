@@ -592,6 +592,11 @@ class LocalBackend(Backend):
 
         return capability_manifest()
 
+    def _get_health(self, args: dict[str, Any]) -> dict[str, Any]:
+        if self.service.repo.health():
+            return {"status": "ok", "store": "accessible"}
+        return {"status": "degraded", "store": "locked"}
+
     def _compute_opportunity(self, args: dict[str, Any]) -> float:
         from agentic_odi_core import compute_opportunity_score
 
@@ -669,6 +674,7 @@ _LOCAL_HANDLERS = {
     "list_signals": LocalBackend._list_signals,
     "mark_signal_read": LocalBackend._mark_signal_read,
     "dismiss_signal": LocalBackend._dismiss_signal,
+    "get_health": LocalBackend._get_health,
 }
 
 
