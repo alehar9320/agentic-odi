@@ -28,6 +28,7 @@ from agentic_odi_core import (
 from agentic_odi_core.remote import StudioError, StudioErrorCode
 from fastapi import APIRouter, Query, Request
 from fastapi.responses import StreamingResponse
+from pydantic import ValidationError
 
 from agentic_odi_studio_api.studio.approvals import (
     ApprovalDecision,
@@ -125,8 +126,24 @@ def _json_or_raw(value: str) -> Any:
         return value
 
 
+def _first_validation_error(exc: ValidationError) -> str:
+    """One line naming the first field a model rejected."""
+    errors = exc.errors()
+    if not errors:
+        return str(exc)
+    first = errors[0]
+    location = ".".join(str(part) for part in first.get("loc", ()))
+    message = str(first.get("msg", exc))
+    return f"{location}: {message}" if location else message
+
+
 def _as_http_error(exc: Exception) -> StudioHTTPError:
     """Translate domain errors into typed HTTP responses without leaking 500s."""
+    if isinstance(exc, ValidationError):
+        return StudioHTTPError(
+            StudioError(code=StudioErrorCode.VALIDATION, message=_first_validation_error(exc)),
+            status_code=422,
+        )
     if isinstance(exc, OutcomeStatementError):
         return StudioHTTPError(
             StudioError(code=StudioErrorCode.VALIDATION, message=str(exc)),
