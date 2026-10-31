@@ -94,6 +94,7 @@ outcomes_db = _repo.outcomes
 customer_outcomes_db = _repo.customer_outcomes
 evidence_db = _repo.evidence
 signals_db = _repo.signals
+candidates_db = _repo.candidates
 
 
 def _step_not_found(step_id: str | None) -> str:
