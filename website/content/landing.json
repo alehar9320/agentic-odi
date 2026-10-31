@@ -236,7 +236,7 @@
   "tools": {
     "id": "tools",
     "eyebrow": "The MCP surface",
-    "title": "Thirty tools. One contract.",
+    "title": "Every tool. One contract.",
     "blurb": "Every tool the server exposes is listed, with its arguments, in the reference. A few of them:",
     "peek": [
       "get_job_map",
