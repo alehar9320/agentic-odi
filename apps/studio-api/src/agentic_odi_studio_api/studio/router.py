@@ -20,14 +20,17 @@ from agentic_odi_connectors.registry import (
 from agentic_odi_core import (
     EvidenceNotFoundError,
     JobNotFoundError,
+    NoStrategyEvidenceError,
     OdiError,
     ODIService,
     OutcomeNotFoundError,
     OutcomeStatementError,
+    SegmentNotFoundError,
     StepNotFoundError,
     ToolName,
     ValueOutOfRangeError,
     error_status,
+    invalid_strategy_request,
 )
 from agentic_odi_core.remote import StudioError, StudioErrorCode
 from fastapi import APIRouter, Query, Request
@@ -91,6 +94,7 @@ from agentic_odi_studio_api.studio.schemas import (
     ObservationResponse,
     ObservationUpdateRequest,
     PromoteEvidenceRequest,
+    ProposeStrategyRequest,
     ScheduleWorkRequest,
     SignalActionRequest,
     TurnNode,
@@ -158,9 +162,25 @@ def _as_http_error(exc: Exception) -> StudioHTTPError:
         )
     if isinstance(
         exc,
-        (JobNotFoundError, StepNotFoundError, OutcomeNotFoundError, EvidenceNotFoundError),
+        (
+            JobNotFoundError,
+            StepNotFoundError,
+            OutcomeNotFoundError,
+            EvidenceNotFoundError,
+            SegmentNotFoundError,
+        ),
     ):
         return StudioHTTPError(StudioError(code=StudioErrorCode.NOT_FOUND, message=str(exc)))
+    if isinstance(exc, NoStrategyEvidenceError):
+        # Stage 6 refusing to invent a bet is a problem with the request, and the
+        # MCP backend reports it with this same spelling, so both say it alike.
+        return StudioHTTPError(
+            StudioError(
+                code=StudioErrorCode.VALIDATION,
+                message=invalid_strategy_request(str(exc)),
+            ),
+            status_code=422,
+        )
     if isinstance(exc, ValueOutOfRangeError):
         return StudioHTTPError(StudioError(code=StudioErrorCode.OUT_OF_RANGE, message=str(exc)))
     if isinstance(exc, OdiError):
@@ -897,6 +917,73 @@ async def post_signal_dismiss(
     except Exception as exc:  # noqa: BLE001
         raise _as_http_error(exc) from exc
     return signal.model_dump(mode="json")
+
+
+@router.get("/segments", response_model=list[dict[str, Any]])
+async def get_segments(
+    request: Request,
+    job_id: str | None = Query(None),
+    mcp_url: str | None = Query(None),
+) -> list[dict[str, Any]]:
+    """Stage 5's segments, same records under both backends.
+
+    Empty until the agent has run ``segment_market``: a segment is derived from
+    scored outcomes, never typed in.
+    """
+    if _uses_mcp(request):
+        arguments: dict[str, Any] = {}
+        if job_id:
+            arguments["job_id"] = job_id
+        result = await call_mcp_tool(
+            _require_mcp_url(mcp_url or ""), ToolName.GET_SEGMENTS.value, arguments
+        )
+        parsed = _json_or_raw(result)
+        return parsed if isinstance(parsed, list) else []
+    return [
+        segment.model_dump(mode="json")
+        for segment in _service(request).list_segments(job_id=job_id)
+    ]
+
+
+@router.get("/strategy", response_model=dict[str, Any] | None)
+async def get_strategy(
+    request: Request,
+    mcp_url: str | None = Query(None),
+) -> dict[str, Any] | None:
+    """The recorded strategy and the paths it beat, or ``null`` before Stage 6."""
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(mcp_url or ""), ToolName.GET_STRATEGY.value, {}
+        )
+        parsed = _json_or_raw(result)
+        return parsed if isinstance(parsed, dict) else None
+    strategy = _service(request).get_strategy()
+    return None if strategy is None else strategy.model_dump(mode="json")
+
+
+@router.post("/strategy/propose", response_model=dict[str, Any])
+async def post_strategy_propose(
+    body: ProposeStrategyRequest,
+    request: Request,
+) -> dict[str, Any]:
+    """Ask which innovation path the evidence supports.
+
+    A 422 with the missing evidence spelled out is the honest answer when no
+    path has support: the tool refuses rather than inventing a bet.
+    """
+    if _uses_mcp(request):
+        arguments: dict[str, Any] = {}
+        if body.job_id:
+            arguments["job_id"] = body.job_id
+        result = await call_mcp_tool(
+            _require_mcp_url(body.mcp_url), ToolName.PROPOSE_STRATEGY.value, arguments
+        )
+        return _payload_from_text(result)
+    try:
+        strategy = _service(request).propose_strategy(job_id=body.job_id)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return strategy.model_dump(mode="json")
 
 
 def _customer_outcome_args(body: AddCustomerOutcomeRequest) -> dict[str, Any]:

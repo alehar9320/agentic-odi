@@ -97,6 +97,17 @@ class SignalActionRequest(BaseModel):
     mcp_url: str = ""
 
 
+class ProposeStrategyRequest(BaseModel):
+    """Body for ``POST /api/strategy/propose``.
+
+    ``job_id`` narrows the bet to one job's segments; omitting it asks across the
+    whole workspace.
+    """
+
+    job_id: str | None = None
+    mcp_url: str = ""
+
+
 class V2MOM(BaseModel):
     """The domain's V2MOM artifact: Vision, Values, Methods, Obstacles, Measures.
 

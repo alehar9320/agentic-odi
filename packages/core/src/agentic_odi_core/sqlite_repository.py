@@ -22,8 +22,10 @@ from agentic_odi_core.models import (
     Outcome,
     ScheduledWork,
     ScoreSnapshot,
+    Segment,
     Signal,
     Step,
+    Strategy,
     SurveyInputSet,
     compute_opportunity_score,
 )
@@ -72,6 +74,8 @@ class SQLiteRepository(Repository):
         self.scheduled_work: dict[str, ScheduledWork] = {}
         self.score_snapshots: list[ScoreSnapshot] = []
         self.survey_input_sets: dict[str, SurveyInputSet] = {}
+        self.segments: dict[str, Segment] = {}
+        self.strategies: dict[str, Strategy] = {}
         self._last_event_id = 0
         self._legacy_method_ids = set()
         self._method_backfilled_ids = set()
@@ -253,6 +257,14 @@ class SQLiteRepository(Repository):
             self._merge_updates(self.signals, p, Signal)
         elif et == "SIGNAL_DISMISSED":
             self._merge_updates(self.signals, p, Signal)
+        elif et == "SEGMENT_CREATED":
+            self.segments[p["id"]] = Segment.model_validate(p)
+        elif et == "SEGMENT_UPDATED":
+            self._merge_updates(self.segments, p, Segment)
+        elif et == "STRATEGY_CREATED":
+            self.strategies[p["id"]] = Strategy.model_validate(p)
+        elif et == "STRATEGY_UPDATED":
+            self._merge_updates(self.strategies, p, Strategy)
         self._last_event_id = max(self._last_event_id, ev["id"])
 
     def _drop_orphan_survey_input_sets(self) -> None:
@@ -842,6 +854,96 @@ class SQLiteRepository(Repository):
                 self._sync()
                 return True
             return False
+
+    def add_segment(self, segment: Segment) -> Segment:
+        with self._lock:
+            self.store.append(
+                "SEGMENT_CREATED",
+                segment.model_dump(mode="json"),
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return segment
+
+    def get_segment(self, segment_id: str) -> Segment | None:
+        with self._lock:
+            self._sync()
+            return self.segments.get(segment_id)
+
+    def list_segments(self, job_id: str | None = None) -> list[Segment]:
+        with self._lock:
+            self._sync()
+            items = list(self.segments.values())
+            if job_id is not None:
+                items = [segment for segment in items if segment.job_id == job_id]
+            return items
+
+    def update_segment(self, segment_id: str, updates: dict[str, Any]) -> Segment | None:
+        with self._lock:
+            self._sync()
+            segment = self.segments.get(segment_id)
+            if segment is None:
+                return None
+            current = segment.model_dump(exclude_unset=True)
+            current.update(updates)
+            try:
+                new_segment = segment.model_validate(current)
+            except ValidationError:
+                return None
+            self.store.append(
+                "SEGMENT_UPDATED",
+                {"id": segment_id, "updates": updates},
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return new_segment
+
+    def add_strategy(self, strategy: Strategy) -> Strategy:
+        with self._lock:
+            self.store.append(
+                "STRATEGY_CREATED",
+                strategy.model_dump(mode="json"),
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return strategy
+
+    def get_strategy(self, strategy_id: str) -> Strategy | None:
+        with self._lock:
+            self._sync()
+            return self.strategies.get(strategy_id)
+
+    def list_strategies(self, segment_id: str | None = None) -> list[Strategy]:
+        with self._lock:
+            self._sync()
+            items = list(self.strategies.values())
+            if segment_id is not None:
+                items = [strategy for strategy in items if strategy.segment_id == segment_id]
+            return items
+
+    def update_strategy(self, strategy_id: str, updates: dict[str, Any]) -> Strategy | None:
+        with self._lock:
+            self._sync()
+            strategy = self.strategies.get(strategy_id)
+            if strategy is None:
+                return None
+            current = strategy.model_dump(exclude_unset=True)
+            current.update(updates)
+            try:
+                new_strategy = strategy.model_validate(current)
+            except ValidationError:
+                return None
+            self.store.append(
+                "STRATEGY_UPDATED",
+                {"id": strategy_id, "updates": updates},
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return new_strategy
 
     def clear(self) -> None:
         with self._lock:

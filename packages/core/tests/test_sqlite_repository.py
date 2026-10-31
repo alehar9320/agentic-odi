@@ -14,9 +14,13 @@ from agentic_odi_core.models import (
     Evidence,
     Job,
     Outcome,
+    Segment,
+    SegmentVerdict,
     Signal,
     SignalKind,
     Step,
+    Strategy,
+    StrategyKind,
 )
 from agentic_odi_core.sqlite_repository import SQLiteRepository
 
@@ -624,3 +628,79 @@ def test_method_backfill_preserves_the_original_score(tmp_path) -> None:
     assert (reloaded.importance, reloaded.satisfaction) == (8.0, 6.0)
     assert reloaded.opportunity_score == 10.0
     repo.close()
+
+
+def _segment(id: str = "seg-1", confidence: float = 0.75) -> Segment:
+    return Segment(
+        id=id,
+        job_id="job-1",
+        name="Platform engineers, gather the current values",
+        people="Platform engineers",
+        job_statement="Rotate a leaked secret without an outage",
+        outcome_ids=["o-1", "o-2"],
+        verdict=SegmentVerdict.UNDERSERVED,
+        rationale="2 outcomes on the gather step.",
+        confidence=confidence,
+    )
+
+
+def _strategy() -> Strategy:
+    return Strategy(
+        id="st-1",
+        kind=StrategyKind.DIFFERENTIATED,
+        segment_id="seg-1",
+        thesis="Improve the existing product against the gap.",
+        bets=["Build against o-1"],
+        rejected=[{"kind": "disruptive", "why": "nobody is overserved"}],
+    )
+
+
+def test_segments_and_strategies_survive_a_reload_from_the_event_log(tmp_path) -> None:
+    db = str(tmp_path / "odi.db")
+    repo = SQLiteRepository(db_path=db)
+    repo.add_job(Job(id="job-1", name="Rotate a leaked secret"))
+    repo.add_segment(_segment())
+    repo.add_strategy(_strategy())
+
+    assert repo.update_segment("seg-1", {"confidence": 0.9}) is not None
+    assert repo.update_strategy("st-1", {"thesis": "Revised after the interview."}) is not None
+
+    reopened = SQLiteRepository(db_path=db)
+    restored_segment = reopened.get_segment("seg-1")
+    restored_strategy = reopened.get_strategy("st-1")
+    assert restored_segment is not None and restored_strategy is not None
+    assert restored_segment.confidence == 0.9
+    assert restored_segment.outcome_ids == ["o-1", "o-2"]
+    assert restored_segment.verdict is SegmentVerdict.UNDERSERVED
+    assert restored_strategy.thesis == "Revised after the interview."
+    assert restored_strategy.rejected == [{"kind": "disruptive", "why": "nobody is overserved"}]
+    assert [segment.id for segment in reopened.list_segments()] == ["seg-1"]
+    assert reopened.list_segments(job_id="job-2") == []
+    assert [strategy.id for strategy in reopened.list_strategies()] == ["st-1"]
+    assert reopened.list_strategies(segment_id="other") == []
+
+
+def test_segments_and_strategies_are_recorded_as_events(tmp_path) -> None:
+    db = str(tmp_path / "odi.db")
+    repo = SQLiteRepository(db_path=db)
+    repo.add_job(Job(id="job-1", name="Rotate a leaked secret"))
+    repo.add_segment(_segment())
+    repo.add_strategy(_strategy())
+    repo.update_segment("seg-1", {"confidence": 0.9})
+
+    assert [event["type"] for event in repo.store.get_stream()] == [
+        "JOB_CREATED",
+        "SEGMENT_CREATED",
+        "STRATEGY_CREATED",
+        "SEGMENT_UPDATED",
+    ]
+
+
+def test_a_segment_update_for_an_unknown_id_is_not_recorded(tmp_path) -> None:
+    db = str(tmp_path / "odi.db")
+    repo = SQLiteRepository(db_path=db)
+
+    assert repo.update_segment("missing", {"confidence": 0.5}) is None
+    assert repo.update_strategy("missing", {"thesis": "Nothing"}) is None
+    assert repo.get_segment("missing") is None
+    assert repo.get_strategy("missing") is None

@@ -639,3 +639,98 @@ def _signed(value: Any) -> str:
     if value is None:
         return "unknown"
     return f"{float(value):+g}"
+
+
+def _verdict(segment: dict[str, Any]) -> str:
+    """A verdict never appears without its confidence, and never when unscored."""
+    verdict = _cell(segment, "verdict")
+    if not verdict or verdict == "None":
+        return f"not classifiable (confidence {_num(segment.get('confidence', ''))})"
+    return f"{verdict} (confidence {_num(segment.get('confidence', ''))})"
+
+
+def render_segment_list(segments: Any, *, as_json: bool) -> str:
+    """Render segments as a table where every verdict carries its confidence."""
+    if not isinstance(segments, list):
+        return _json(segments) if as_json else str(segments)
+    if as_json:
+        return _json(segments)
+    return _table(
+        ("id", "people", "job_id", "outcomes", "verdict"),
+        [
+            (
+                _cell(item, "id"),
+                _truncate(_cell(item, "people")),
+                _cell(item, "job_id"),
+                str(len(item.get("outcome_ids") or [])),
+                _verdict(item),
+            )
+            for item in segments
+        ],
+        empty="No segments yet — run `odi segments run` on a scored job.",
+    )
+
+
+def render_segment(segment: Any, *, as_json: bool) -> str:
+    """Render one segment, including the outcomes it rests on."""
+    if not isinstance(segment, dict):
+        return _json(segment) if as_json else str(segment)
+    if as_json:
+        return _json(segment)
+    outcome_ids = segment.get("outcome_ids") or []
+    return "\n".join(
+        [
+            _block(
+                [
+                    ("id", _cell(segment, "id")),
+                    ("name", _cell(segment, "name")),
+                    ("people", _cell(segment, "people")),
+                    ("inferred", _cell(segment, "people_inferred")),
+                    ("job", _cell(segment, "job_statement")),
+                    ("verdict", _verdict(segment)),
+                    ("evidence", f"{len(outcome_ids)} outcomes"),
+                ]
+            ),
+            "",
+            str(segment.get("rationale", "")),
+        ]
+    )
+
+
+def render_strategy(strategy: Any, *, as_json: bool) -> str:
+    """Render the chosen path with every path it beat.
+
+    A strategy whose rejections are missing is rendered as the incomplete record
+    it is rather than being shown as a recommendation.
+    """
+    if strategy is None:
+        return "null" if as_json else "No strategy recorded — run `odi strategy propose`."
+    if not isinstance(strategy, dict):
+        return _json(strategy) if as_json else str(strategy)
+    if as_json:
+        return _json(strategy)
+    lines = [
+        _block(
+            [
+                ("id", _cell(strategy, "id")),
+                ("path", _cell(strategy, "kind")),
+                ("segment", _cell(strategy, "segment_id") or "—"),
+                ("bets", str(len(strategy.get("bets") or []))),
+            ]
+        ),
+        "",
+        str(strategy.get("thesis", "")),
+    ]
+    bets = strategy.get("bets") or []
+    if bets:
+        lines.append("")
+        lines.extend(f"- {bet}" for bet in bets)
+    rejected = strategy.get("rejected") or []
+    if rejected:
+        lines.append("")
+        lines.append("Paths this one beat:")
+        lines.extend(f"- {_cell(item, 'kind')}: {item.get('why', '')}" for item in rejected)
+    else:
+        lines.append("")
+        lines.append("No rejected paths recorded — this is a conclusion, not a recommendation.")
+    return "\n".join(lines)

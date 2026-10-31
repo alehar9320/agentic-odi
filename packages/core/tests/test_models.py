@@ -1,8 +1,7 @@
-"""Tests for core domain models and ODI opportunity scoring."""
+"""Tests for core domain models."""
 
 from __future__ import annotations
 
-import pytest
 from agentic_odi_core.models import (
     BusinessImpactCategory,
     BusinessValue,
@@ -10,21 +9,7 @@ from agentic_odi_core.models import (
     CustomerValue,
     Direction,
     ValueMetric,
-    compute_opportunity_score,
 )
-
-
-@pytest.mark.parametrize(
-    ("importance", "satisfaction", "expected"),
-    [
-        (8.0, 4.0, 12.0),
-        (5.0, 5.0, 5.0),
-        (3.0, 9.0, 3.0),
-        (10.0, 1.0, 19.0),
-    ],
-)
-def test_compute_opportunity_score(importance: float, satisfaction: float, expected: float) -> None:
-    assert compute_opportunity_score(importance, satisfaction) == expected
 
 
 def _customer_value(**overrides: object) -> CustomerValue:

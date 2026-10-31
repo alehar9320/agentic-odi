@@ -345,11 +345,12 @@ below the thread instead of being clipped off-screen.
 The copilot does not only talk. When a surface carries the evidence better than a
 paragraph, the agent renders one **inline in the conversation**: a scored
 outcome, a ranked opportunity board, a before/after simulation of a bet, a
-customer quote with its lineage, the eight-stage job map, an opportunity thesis, or a decision record.
+customer quote with its lineage, the eight-stage job map, an opportunity thesis,
+a decision record, an outcome-based segment, or the strategy it implies.
 Three properties keep this safe and cheap to extend:
 
 - **The catalog is closed and owned by the SPA.**
-  `apps/studio/src/ui/catalog.ts` declares nine primitives and seven cards, their
+  `apps/studio/src/ui/catalog.ts` declares nine primitives and nine cards, their
   JSON Schema props, and the description the model reads. There is no HTML, no
   eval, and no third-party component in the path. Prose is rendered by the same
   `Markdown` component the transcript already used.
@@ -428,6 +429,14 @@ through `fetchAlternatives` / `linkAlternative`. The `existing-solution` read
 returns the explicit three-state result `yes | no_linked_nothing | no_link_at_all`,
 so the outcome detail can distinguish "we asked and there is nothing" from "we
 have not asked" without inferring a solution from a score.
+
+The segment card is the answer to "who is this for?": the people, the job they
+are doing, the step their outcomes cluster on, and the verdict those outcomes
+support. A verdict is never shown apart from the confidence behind it, and
+outcomes that joined no cluster are listed under the card rather than folded in.
+The strategy card carries Stage 6: the one path the evidence supports, the moves
+it proposes, and **every path it beat with the reason**. The catalog requires at
+least two rejected paths, so a strategy that records none cannot be validated.
 
 The conversation keeps the order the agent produced: a `delta` appends to the
 open prose part, a `ui` event opens a card, and the next `delta` opens a new

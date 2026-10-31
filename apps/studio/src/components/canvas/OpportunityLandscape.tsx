@@ -57,7 +57,14 @@ export function OpportunityLandscape() {
   const provenance = canvasStatus(canvas);
 
   const jobIds = useMemo(
-    () => [...new Set(outcomes.map((outcome) => outcome.job_id).filter(Boolean))].sort(),
+    () =>
+      [
+        ...new Set(
+          outcomes
+            .map((outcome) => outcome.job_id)
+            .filter((jobId): jobId is string => Boolean(jobId)),
+        ),
+      ].sort(),
     [outcomes],
   );
   const jobKey = jobIds.join(",");

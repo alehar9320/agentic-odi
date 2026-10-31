@@ -1703,6 +1703,171 @@
         }
       }
     },
+    "/api/segments": {
+      "get": {
+        "summary": "Get Segments",
+        "description": "Stage 5's segments, same records under both backends.\n\nEmpty until the agent has run ``segment_market``: a segment is derived from\nscored outcomes, never typed in.",
+        "operationId": "get_segments_api_segments_get",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Job Id"
+            }
+          },
+          {
+            "name": "mcp_url",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Mcp Url"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  "title": "Response Get Segments Api Segments Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/strategy": {
+      "get": {
+        "summary": "Get Strategy",
+        "description": "The recorded strategy and the paths it beat, or ``null`` before Stage 6.",
+        "operationId": "get_strategy_api_strategy_get",
+        "parameters": [
+          {
+            "name": "mcp_url",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Mcp Url"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "additionalProperties": true
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Response Get Strategy Api Strategy Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/strategy/propose": {
+      "post": {
+        "summary": "Post Strategy Propose",
+        "description": "Ask which innovation path the evidence supports.\n\nA 422 with the missing evidence spelled out is the honest answer when no\npath has support: the tool refuses rather than inventing a bet.",
+        "operationId": "post_strategy_propose_api_strategy_propose_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProposeStrategyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Post Strategy Propose Api Strategy Propose Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/customer-outcomes": {
       "get": {
         "summary": "Get Customer Outcomes",
@@ -5152,6 +5317,29 @@
         ],
         "title": "PromoteEvidenceRequest",
         "description": "Turn a captured record into a Job or a Desired Outcome."
+      },
+      "ProposeStrategyRequest": {
+        "properties": {
+          "job_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Id"
+          },
+          "mcp_url": {
+            "type": "string",
+            "title": "Mcp Url",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "title": "ProposeStrategyRequest",
+        "description": "Body for ``POST /api/strategy/propose``.\n\n``job_id`` narrows the bet to one job's segments; omitting it asks across the\nwhole workspace."
       },
       "ScheduleWorkRequest": {
         "properties": {

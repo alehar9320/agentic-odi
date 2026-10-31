@@ -322,6 +322,42 @@ ones — an opportunity score crossing 10 upward — bypass that cap. Suppressed
 signals stay in the store and stay reachable by id.
 See [The Signal Inbox](architecture/notifications.md).
 
+## Segments and the strategy (Stages 5 and 6)
+
+Segments are derived from scored outcomes, never from demographics: a segment is
+a group of people plus the functional job they are doing. `segments run` clusters
+the outcomes by job and job-map step and stores what it found; re-running updates
+the same segment instead of adding a second copy.
+
+```bash
+agentic-odi segments run                          # every job with scored outcomes
+agentic-odi segments run --job <job-id> --people "Finance leads"
+agentic-odi segments list
+agentic-odi segments list --job <job-id> --json
+agentic-odi segments show <segment-id>
+```
+
+A segment's verdict is always shown with the confidence behind it — `underserved`
+when at least one outcome scores above 10, `overserved` when satisfaction is at or
+above importance everywhere, and `not classifiable` when any outcome is unscored.
+An outcome that joins no cluster is reported as unclustered, never dropped or
+inflated into a market.
+
+`strategy propose` reads the segments and recommends exactly one of the three
+paths — differentiated, disruptive, or new-market — recording the two it rejected
+and why. A recommendation without its rejected paths would be a conclusion.
+
+```bash
+agentic-odi strategy propose
+agentic-odi strategy propose --job <job-id>
+agentic-odi strategy show
+agentic-odi strategy show --json
+```
+
+When no path has evidence, `strategy propose` exits non-zero and says what is
+missing rather than inventing a bet. Until one exists, `strategy show` prints
+"No strategy recorded" and points at `strategy propose`.
+
 ## Schema, scoring, and guidance
 
 ```bash
