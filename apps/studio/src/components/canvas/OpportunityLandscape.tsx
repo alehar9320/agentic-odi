@@ -17,10 +17,20 @@ import { OutcomeCard } from "./OutcomeCard";
 type ViewMode = "matrix" | "cards" | "table";
 
 export function OpportunityLandscape() {
-  const { canvasState, deleteThesis, openPanel, refreshCanvas, theses } = useStudio();
+  const {
+    canvasState,
+    deleteThesis,
+    openPanel,
+    refreshCanvas,
+    theses,
+    focusedSubject,
+    focusSubject,
+  } = useStudio();
   const [underservedOnly, setUnderservedOnly] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedOutcomeId, setSelectedOutcomeId] = useState<string | null>(null);
+  const [selectedOutcomeId, setSelectedOutcomeId] = useState<string | null>(
+    focusedSubject?.kind === "outcome" ? focusedSubject.id : null,
+  );
   const [viewMode, setViewMode] = useState<ViewMode>("matrix");
   const [hoveredOutcome, setHoveredOutcome] = useState<Outcome | null>(null);
 
@@ -75,6 +85,14 @@ export function OpportunityLandscape() {
       return lowB - lowA;
     });
   }, [filteredOutcomes]);
+
+  function toggleOutcome(id: string) {
+    const next = selectedOutcomeId === id ? null : id;
+    setSelectedOutcomeId(next);
+    if (next) {
+      focusSubject("outcome", next);
+    }
+  }
 
   const activeOutcome = useMemo(() => {
     if (selectedOutcomeId) {
@@ -235,7 +253,7 @@ export function OpportunityLandscape() {
         <OpportunityMatrixView
           outcomes={filteredOutcomes}
           selectedOutcomeId={selectedOutcomeId}
-          onSelectOutcome={(id) => setSelectedOutcomeId(selectedOutcomeId === id ? null : id)}
+          onSelectOutcome={toggleOutcome}
           onHoverOutcome={setHoveredOutcome}
           activeOutcome={activeOutcome}
           sample={sample}
@@ -244,7 +262,7 @@ export function OpportunityLandscape() {
         <OpportunityTableView
           outcomes={sortedOutcomes}
           selectedOutcomeId={selectedOutcomeId}
-          onSelectOutcome={(id) => setSelectedOutcomeId(selectedOutcomeId === id ? null : id)}
+          onSelectOutcome={toggleOutcome}
         />
       ) : sortedOutcomes.length ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>

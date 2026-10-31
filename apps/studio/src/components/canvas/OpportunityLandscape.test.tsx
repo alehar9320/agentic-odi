@@ -31,6 +31,8 @@ const harness = vi.hoisted(() => ({
     theses: [],
     deleteThesis: vi.fn(),
     settings: { mcp_url: "http://localhost:8000/mcp" },
+    focusedSubject: null as { kind: string; id: string } | null,
+    focusSubject: vi.fn(),
   },
 }));
 
@@ -41,6 +43,8 @@ vi.mock("../../state/StudioContext", () => ({
 describe("OpportunityLandscape Data Visualization", () => {
   beforeEach(() => {
     harness.state.canvasState = { kind: "ready", data: mockCanvasData } as unknown as CanvasState;
+    harness.state.focusedSubject = null;
+    harness.state.focusSubject.mockClear();
   });
 
   it("renders opportunity landscape header and mode buttons", () => {
@@ -89,6 +93,19 @@ describe("OpportunityLandscape Data Visualization", () => {
     fireEvent.keyDown(row, { key: "Enter" });
 
     expect(row).toHaveAttribute("aria-selected", "true");
+    expect(harness.state.focusSubject).toHaveBeenCalledWith("outcome", "O-101");
+  });
+
+  it("reopens on the outcome from the previous session", () => {
+    harness.state.focusedSubject = { kind: "outcome", id: "O-102" };
+
+    render(<OpportunityLandscape />);
+    fireEvent.click(screen.getByText("📋 Table View"));
+
+    expect(screen.getByRole("row", { name: /Minimize risk of configuration drift/i })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
   });
 
   it("toggles table selection with Space", () => {

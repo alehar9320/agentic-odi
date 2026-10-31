@@ -9,11 +9,14 @@
 
 import type { ThreadMessage, ThreadMessageLike } from "@assistant-ui/react";
 
-import type { ChatAttachment, ChatMessage, ChatPart, StudioError } from "../types";
+import type { ChatAttachment, ChatMessage, ChatPart, Claim, StudioError } from "../types";
 import type { UiNode } from "../ui/protocol";
 
 /** The name our generated-surface parts travel under. */
 export const SURFACE_PART = "odi-surface";
+
+/** Assistant prose that carries a claim per sentence. */
+export const CLAIMS_PART = "odi-claims";
 
 type LikePart = Exclude<ThreadMessageLike["content"], string>[number];
 
@@ -42,6 +45,13 @@ function toPart(part: ChatPart): LikePart | null {
         title: part.title,
         mediaType: part.mediaType,
         ...(part.filename ? { filename: part.filename } : {}),
+      };
+
+    case "claims":
+      return {
+        type: "data",
+        name: CLAIMS_PART,
+        data: { content: part.content, claims: part.claims },
       };
 
     case "tool": {
@@ -223,6 +233,15 @@ export function toChatMessage(
             id: part.id ?? `ui-${parts.length}`,
             node: part.data as UiNode,
           });
+        } else if (part.name === CLAIMS_PART) {
+          const data = part.data as { content?: string; claims?: Claim[] } | undefined;
+          if (data?.claims?.length) {
+            parts.push({
+              kind: "claims",
+              content: data.content ?? data.claims.map((claim) => claim.text).join(" "),
+              claims: data.claims,
+            });
+          }
         }
         break;
 
