@@ -455,7 +455,7 @@ def test_connectors_ingest_maps_records_to_evidence(tmp_path: Path, monkeypatch)
             str(config),
         ],
     )
-    job_result = runner.invoke(app, ["--db", db, "jobs", "add", "--name", "J", "--json"])
+    job_result = runner.invoke(app, ["--db", db, "jobs", "add", "--name", "Job", "--json"])
     job_id = json.loads(job_result.output)["id"]
     batch = IngestBatch(
         connector_name="gong",
@@ -660,3 +660,59 @@ def test_connectors_list_json_is_an_empty_array(tmp_path: Path) -> None:
 
     assert result.exit_code == 0
     assert json.loads(_strip(result.output)) == []
+
+
+class _UnhealthyConnector:
+    async def health(self) -> HealthStatus:
+        return HealthStatus(ok=False, message="connection refused")
+
+
+def _add_connector(config: Path, name: str, kind: str, url: str) -> None:
+    runner.invoke(
+        app,
+        ["connectors", "add", kind, "--name", name, "--url", url, "--config", str(config)],
+    )
+
+
+def test_connectors_health_without_name_prints_a_table(tmp_path: Path, monkeypatch) -> None:
+    config = tmp_path / "connectors.json"
+    _add_connector(config, "gong", "mcp", "http://localhost:9000/mcp")
+    _add_connector(config, "jira", "rest", "https://api.example/records")
+    monkeypatch.setattr(
+        "agentic_odi_cli.connectors.build_connector", lambda _config: _FakeConnector()
+    )
+
+    result = runner.invoke(app, ["connectors", "health", "--config", str(config)])
+
+    output = _strip(result.output)
+    assert result.exit_code == 0
+    assert "| Connector | Status | Latency (ms) |" in output
+    assert "| gong | healthy |" in output
+    assert "| jira | healthy |" in output
+
+
+def test_connectors_health_table_marks_unreachable(tmp_path: Path, monkeypatch) -> None:
+    config = tmp_path / "connectors.json"
+    _add_connector(config, "gong", "mcp", "http://localhost:9000/mcp")
+    _add_connector(config, "jira", "rest", "https://api.example/records")
+
+    def fake_build(connector_config):
+        return _FakeConnector() if connector_config.name == "gong" else _UnhealthyConnector()
+
+    monkeypatch.setattr("agentic_odi_cli.connectors.build_connector", fake_build)
+
+    result = runner.invoke(app, ["connectors", "health", "--config", str(config)])
+
+    output = _strip(result.output)
+    assert result.exit_code == 1
+    assert "| gong | healthy |" in output
+    assert "| jira | unreachable: connection refused |" in output
+
+
+def test_connectors_health_without_connectors_says_so(tmp_path: Path) -> None:
+    config = tmp_path / "connectors.json"
+
+    result = runner.invoke(app, ["connectors", "health", "--config", str(config)])
+
+    assert result.exit_code == 0
+    assert "No connectors configured." in _strip(result.output)

@@ -9,6 +9,7 @@ import {
   markSignalRead,
 } from "../../api/studioApi";
 import type { Signal } from "../../types";
+import { DEMO_SIGNALS } from "./__fixtures__/signals";
 
 const api = vi.hoisted(() => ({
   fetchConfig: vi.fn(async () => ({
@@ -160,7 +161,7 @@ describe("Catch Up reads the signal inbox", () => {
     expect(screen.getByText("Evidence captured from Support")).toBeInTheDocument();
   });
 
-  it("activates a card with Enter alone: mark read, then open what it is about", async () => {
+  it("activates a card in one step: mark read, then open what it is about", async () => {
     serveFeed([
       signal({
         kind: "job_added",
@@ -175,22 +176,21 @@ describe("Catch Up reads the signal inbox", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Signal inbox: 1 unread" }));
     const card = await screen.findByRole("button", { name: /^Job added: "Deploy services"\./i });
 
-    fireEvent.keyDown(card, { key: "Enter" });
+    fireEvent.click(card);
 
     await waitFor(() => expect(markSignalRead).toHaveBeenCalledWith("sig-1", MCP_URL));
     expect(await screen.findByRole("heading", { name: /universal job map/i })).toBeInTheDocument();
   });
 
-  it("activates a card with Space alone too", async () => {
+  it("makes the card itself a native button so Enter and Space activate it", async () => {
     serveFeed([signal({ kind: "job_added", subject_kind: "job", subject_id: "JOB-1" })]);
 
     render(<App />);
     fireEvent.click(await screen.findByRole("button", { name: "Signal inbox: 1 unread" }));
     const card = await screen.findByRole("button", { name: /^Outcome rescored: minimize deploy time\./i });
 
-    fireEvent.keyDown(card, { key: " " });
-
-    await waitFor(() => expect(markSignalRead).toHaveBeenCalledWith("sig-1", MCP_URL));
+    expect(card.tagName).toBe("BUTTON");
+    expect(card).toHaveAttribute("type", "button");
   });
 
   it("dismisses through the store and drops the card", async () => {
@@ -216,15 +216,25 @@ describe("Catch Up reads the signal inbox", () => {
     expect(dismissSignal).toHaveBeenCalledWith("sig-1", MCP_URL);
   });
 
-  it("labels a simulated event and keeps it out of every count", async () => {
+  it("has no simulate control and offers a real next step when empty", async () => {
     render(<App />);
     fireEvent.click(await screen.findByRole("button", { name: "Signal inbox: no unread signals" }));
     await screen.findByText(/nothing happened while you were away/i);
 
-    fireEvent.click(screen.getByRole("button", { name: /\+ simulate update/i }));
+    expect(screen.queryByRole("button", { name: /simulate/i })).toBeNull();
+    expect(screen.getByRole("button", { name: /capture evidence/i })).toBeInTheDocument();
+  });
 
-    expect(await screen.findByText(/^Simulated$/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "All (0)" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Unread (0)" })).toBeInTheDocument();
+  it("renders the demo fixture like any other signal", async () => {
+    serveFeed(DEMO_SIGNALS);
+
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: "Signal inbox: 3 unread" }));
+
+    expect(
+      await screen.findByText("Opportunity score crossed 10 (up): validation rules"),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/^Simulated$/i)).toBeNull();
+    expect(screen.getByRole("button", { name: "All (3)" })).toBeInTheDocument();
   });
 });

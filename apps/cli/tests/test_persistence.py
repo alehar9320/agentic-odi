@@ -10,7 +10,7 @@ def test_every_entity_type_survives_reopen(tmp_path):
     db = str(tmp_path / "odi.db")
     backend = LocalBackend(db_path=db)
 
-    job_id = backend.call("add_job", {"name": "J", "description": "d"})["id"]
+    job_id = backend.call("add_job", {"name": "Job", "description": "d"})["id"]
     # An outcome must exist before steps can be added.
     backend.call(
         "add_outcome",
@@ -71,7 +71,7 @@ def test_every_entity_type_survives_reopen(tmp_path):
     )
 
     repo = SQLiteRepository(db_path=db)
-    assert repo.get_job(job_id).name == "J"  # type: ignore[union-attr]
+    assert repo.get_job(job_id).name == "Job"  # type: ignore[union-attr]
     assert repo.get_step(step_id).order == 1  # type: ignore[union-attr]
     stored_outcome = repo.get_outcome(outcome["id"])
     assert stored_outcome is not None and stored_outcome.opportunity_score == 12.0

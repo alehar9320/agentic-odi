@@ -6,7 +6,7 @@ from fastmcp import Client
 
 
 async def _new_job(client) -> str:
-    res = await client.call_tool("add_job", {"name": "J"})
+    res = await client.call_tool("add_job", {"name": "Job"})
     return json.loads(res.content[0].text.split(": ", 1)[1])["id"]  # type: ignore[index]
 
 

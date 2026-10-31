@@ -6,6 +6,11 @@ import sqlite3
 
 from agentic_odi_core import InMemoryRepository
 from agentic_odi_studio_api.app import create_app
+from agentic_odi_studio_api.studio.claims import (
+    EvidenceIndex,
+    EvidenceSnapshot,
+    split_claims,
+)
 from agentic_odi_studio_api.studio.memory import StudioMemory
 from fastapi.testclient import TestClient
 
@@ -167,3 +172,64 @@ def test_an_approval_can_be_answered_through_the_api() -> None:
 
     assert response.status_code == 404
     assert response.json()["error"]["code"] == "not_found"
+
+
+def _evidence_index() -> EvidenceIndex:
+    index = EvidenceIndex()
+    index.remember(EvidenceSnapshot("E-1", "Call with Acme", "Gong"))
+    return index
+
+
+CONTENT = "Three accounts stalled. [[ev:E-1]] Nobody said why. [[hypothesis]]"
+
+
+def test_claims_are_stored_beside_the_turn_and_restored_by_index() -> None:
+    memory = _memory()
+    conversation = memory.create_conversation()
+
+    turn_id = memory.append_turn(conversation.id, "assistant", CONTENT, "m-1", None)
+    memory.add_citations(turn_id, split_claims(CONTENT, _evidence_index()))
+
+    restored = memory.conversation_tree(conversation.id)[0].claims
+
+    assert [claim.status for claim in restored] == ["cited", "hypothesis"]
+    assert restored[0].text == "Three accounts stalled."
+    assert [snapshot.to_dict() for snapshot in restored[0].evidence] == [
+        {"id": "E-1", "name": "Call with Acme", "source_name": "Gong"}
+    ]
+
+
+def test_a_duplicate_retry_does_not_duplicate_rows() -> None:
+    memory = _memory()
+    conversation = memory.create_conversation()
+    claims = split_claims(CONTENT, _evidence_index())
+
+    turn_id = memory.append_turn(conversation.id, "assistant", CONTENT, "m-1", None)
+    memory.add_citations(turn_id, claims)
+    memory.add_citations(turn_id, claims)
+
+    assert len(memory.citations_for_turn(turn_id)) == len(claims)
+
+
+def test_a_count_mismatch_drops_the_citations_instead_of_mis_attaching_them() -> None:
+    memory = _memory()
+    conversation = memory.create_conversation()
+
+    turn_id = memory.append_turn(conversation.id, "assistant", "Only one sentence.", "m-1", None)
+    memory.add_citations(turn_id, split_claims("First. Second.", _evidence_index()))
+
+    assert memory.conversation_tree(conversation.id)[0].claims == []
+
+
+def test_the_tree_endpoint_restores_claims_with_their_labels() -> None:
+    memory = _memory()
+    conversation = memory.create_conversation()
+    turn_id = memory.append_turn(conversation.id, "assistant", CONTENT, "m-1", None)
+    memory.add_citations(turn_id, split_claims(CONTENT, _evidence_index()))
+    client = TestClient(create_app(repo=InMemoryRepository(), memory=memory))
+
+    body = client.get(f"/api/conversations/{conversation.id}/tree").json()
+
+    claims = body["messages"][0]["claims"]
+    assert [claim["status"] for claim in claims] == ["cited", "hypothesis"]
+    assert claims[0]["evidence"] == [{"id": "E-1", "name": "Call with Acme", "source_name": "Gong"}]
