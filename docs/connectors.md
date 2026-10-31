@@ -117,3 +117,19 @@ explicit `RateLimiter` to override the rate or the burst in-process.
 
 Additional kinds (REST, webhooks, and so on) can register against the same
 `Connector` protocol later.
+
+## HTTP client configuration
+
+Connector HTTP traffic goes through one configurable client,
+`agentic_odi_connectors.get_http_client()`, so pool size, timeout, and retry
+behavior are predictable. Tune it with environment variables:
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `AGENTIC_ODI_HTTP_POOL_SIZE` | `10` | Maximum open connections (and keep-alive connections) |
+| `AGENTIC_ODI_HTTP_TIMEOUT` | `30.0` | Per-request timeout in seconds |
+| `AGENTIC_ODI_HTTP_RETRIES` | `3` | Retries for connection-level failures |
+
+Invalid or out-of-range values fall back to the default instead of failing the
+process.
+

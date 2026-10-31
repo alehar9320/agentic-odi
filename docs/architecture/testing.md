@@ -85,6 +85,7 @@ Tests live next to their package (`packages/*/tests`, `apps/*/tests`). `testpath
 - `test_update.py`, `test_update_command.py`, `test_update_edges.py`, `test_update_check.py` — update checks and installation.
 - `test_profile.py`, `test_paths.py` — config/data directories and `--profile`.
 - `test_persistence.py` — every entity survives a fresh repository.
+- `test_data_export.py` — `data-export` writes a restorable JSON snapshot.
 - `test_render.py` — table and JSON rendering.
 - `test_mascot.py` — the CLI banner.
 - `test_build_info.py` — the version string matches build metadata.
@@ -98,6 +99,7 @@ Tests live next to their package (`packages/*/tests`, `apps/*/tests`). `testpath
 - `test_config_path.py` — `AGENTIC_ODI_CONNECTORS_CONFIG` and the default path.
 - `test_mcp_connector.py`, `test_rest_connector.py` — MCP and REST ingest.
 - `test_mapping.py` — connector records mapped to evidence drafts.
+- `test_http_client.py` — the shared HTTP client reads its pool, timeout, and retry settings from the environment.
 - `test_rate_limit.py` — token-bucket ingest limits and environment configuration.
 - `test_sink.py` — the in-process ingest sink and its rate gate.
 

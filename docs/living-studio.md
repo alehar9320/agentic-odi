@@ -41,7 +41,7 @@ The Studio opens as a conversation, not a dashboard.
 | **Product tour** | An optional four-step tour: what the studio is, which ambition brought you here, the live state of your sidecar/MCP/model (with inline repair when the model is down), and the first move. The four doors are **I have one in mind**, **My boss handed me a priority**, **Help me find the next one**, and **Pressure-test a bet**; each starts the matching conversation. It never opens by itself: **Show me around** on the home stage opens it, and **Settings → Replay the tour** starts it over. |
 | **Context conversation** | Opened when you ask for it — the **Tell me what you're building** starter, the context hint, `/start`, or Settings. A short conversation in the chat, not a form: what you are building, who feels the problem, the job they are trying to get done, then where it hurts. One question at a time, with a reflection before the next ask, quick replies, and **Explore on my own** always visible. Skipping is allowed; answers and progress are kept as a draft. |
 | **Hero** | One headline above the composer. A first run holds a single invitation — *What do you want to win?* — and never changes while you think. With context or canvas data it becomes a quiet rotation: a greeting (time of day, plus your name if you set one in Settings), the product/job you set up, or what is already on the canvas. It stays still under `prefers-reduced-motion`. |
-| **Starter cards** | Below the headline, three canvas-aware conversation cards pair a clear next move with a short reason: **Sharpen an opportunity**, **Pressure-test a bet** or **Find the next opportunity**, and **Capture what you heard** or **Name the job**. Select one to start that prompt in the thread; the cards disappear once the conversation begins. **Opportunity landscape** remains a separate, quiet shortcut. |
+| **Starter cards** | Above the composer, three canvas-aware conversation cards name a situation the person is actually in rather than one of our nouns: **Turn 40 interview notes into one bet**, **Find what the churn spike is telling you**, and **Inherit a roadmap without inheriting its assumptions**. An empty canvas always offers those three, in that order; once the canvas holds outcomes or jobs the second and third swap to **Pressure-test a bet** and **Capture what you heard**. Each card carries a subtitle and the artifact it produces (`artifact` on `StudioSuggestion`), which the card layout (#317) renders. Select one to start that prompt in the thread — the prompt is sent verbatim, and it opens with the material the person brings. **Opportunity landscape** remains a separate, quiet shortcut. |
 | **Composer** | Docked at the bottom of the transcript. `Enter` sends, `Shift`+`Enter` adds a line, `Cmd/Ctrl`+`K` focuses it, `/` opens the command palette, and the paperclip attaches a text file or an image. Files can also be dropped anywhere on the composer or pasted from the clipboard, and each one is shown with a size (and a thumbnail, for images) plus a remove control before it is sent; a file the studio cannot read is refused with the reason instead of becoming a chip that promises content the model will never see. The hint row's **Model** control lists the ids the configured backend reports and writes the choice through the same Settings store as the Base URL field. The send button becomes a stop button while a reply streams. |
 | **Bar** | The only persistent chrome: home, new conversation, catch-up, live model status, **Customize**, and settings. There is no navigation drawer to compete with the thread. |
 | **Customize** | The one place to manage connectors. It replaces the conversation while open (the bar stays, so leaving is one gesture) and shows three bands: what is installed, read from the same `connectors.json` the CLI uses; a handful of curated picks as non-gating examples; and the marketplace, populated from the trusted vendor registry so a listing can be added by id. Capability areas filter the shelf, a listing that needs a token names its environment variable and stores nothing, a listing that cannot be installed says why, and an unreachable marketplace is reported rather than shown as an empty list. A studio with nothing installed suggests a connector when one would help; dismissing the suggestion keeps it dismissed. |
@@ -158,7 +158,13 @@ otherwise.
 - Sending a message does not fire off a doomed request: it drops a quiet in-thread
   notice pointing to Settings, and the composer never spins.
 - The canvas keeps showing the last thing it drew instead of going blank; a failed
-  canvas is a failure panel with Retry, not an empty board.
+  canvas is a failure panel with Retry, not an empty board. **Settings → About →
+  Diagnostics** creates an opt-in, in-memory-only local bundle. It previews the
+  exact JSON and byte count before Copy or Save, recursively redacts secrets,
+  strips URL credentials and query strings, and contains machine metadata and
+  turn counts/timings only — never messages, observations, brief, theses,
+  attachments, or canvas entities. It works with the sidecar down. No report is
+  uploaded, and no diagnostic capture is retained across reloads.
 - **What's New** still opens in front-end-only mode; without the sidecar it
   explains that release notes are unavailable rather than showing invented notes.
 
@@ -181,8 +187,8 @@ The studio repeats that label where a person can see it: the rail shows a
 **DEMO** or **OFFLINE** chip, the Opportunity Landscape shows a sample-data
 notice, and an impact simulation must carry `provenance: live | simulated` before
 it renders. The catch-up feed starts empty rather than inventing activity, and
-every event produced by **Simulate update** is marked **Simulated** and excluded
-from the unread count. Its real content is the store's signal inbox
+no surface can fabricate a signal: the three example signals live only in test
+fixtures. Its real content is the store's signal inbox
 ([The Signal Inbox](architecture/notifications.md)): the bell count comes from
 `/api/signals/unread-count`, the feed loads on boot, re-reads after every canvas
 refresh, and polls once a minute while the window is visible. Connector rows in Settings come from the real connector
@@ -215,6 +221,7 @@ without giving up the message model the sidecar already understands.
 | **Tools** | Each MCP call is a trace chip with its status and a short preview of what came back. |
 | **Approval** | A writing tool (`add_`, `create_`, `update_`, `delete_`, `ingest_`, `remove_`) pauses the turn until you answer **Allow** or **Decline**. A decline is a tool result, not an error: the model is told no and may propose something else. |
 | **Sources** | Every tool call that returned data emits a `source`, titled with the tool and a preview. Provenance is what the turn actually read; a citation is never invented. |
+| **Claims** | Each declarative sentence ends with an evidence marker, and the reply arrives with a validated claim list. A chip names the source and the record (`Gong · Call with Acme`), never the tool; `Hypothesis` tags an ungrounded guess; an unmarked sentence keeps its place with a dotted underline and the accessible name *Uncited claim*. A chip opens that row in the Evidence lens, and Escape returns focus to the chip. Claims are stored with the turn, so they survive a reload; a record deleted later keeps its snapshot label and stops being a link. A seeded demo reply labels its chips **Sample** and does not count as cited. |
 | **Attachments** | Attach from the paperclip, by dropping files on the composer, or by pasting a screenshot. The composer describes accepted text-like files (`.md`, `.mdx`, `.json`, `.csv`, `.yaml`, `.yml`, `.log`, `text/*`) and images (PNG/JPEG/WebP/GIF, at most 5 MB); a drop or paste of anything else is refused with the reason. Chips show a name, size, an image preview, and a remove control. Text is extracted in the browser, capped at 20,000 characters, and sent with the turn. Nothing is stored server-side. |
 | **Model** | The hint row's picker asks the sidecar (`POST /api/models`) which ids the configured backend serves, keeps the configured model selectable even when the backend omits it, and saves the choice through `saveSettings`, so Settings and the composer never disagree. An unreachable or empty backend is explained in the menu rather than shown as an empty list. |
 | **Branching** | **Edit** a user turn or **Regenerate** a reply and both versions are kept as siblings. **Alternative 2 of 3** with `‹`/`›` steps between them, and the visible branch is saved as the conversation's `head_id`, so a reload reopens the branch you were reading. |
@@ -229,13 +236,15 @@ without giving up the message model the sidecar already understands.
 | `apps/studio/src/assistant/convert.ts` | The only mapping between `ChatMessage`/`ChatPart` and assistant-ui parts, in both directions. Pure, and tested without a runtime. |
 | `apps/studio/src/assistant/StudioRuntime.tsx` | `useExternalStoreRuntime`: `onNew`, `onEdit`, `onReload`, `onCancel`, `setMessages`, `onRespondToToolApproval`, suggestions, attachments. |
 | `apps/studio/src/assistant/attachments.ts` | The attachment adapter and the browser-side text/image extraction. |
-| `apps/studio/src/assistant/parts.tsx` | One renderer per part: text, reasoning, tool (with its approval), source, file, generated surface. |
+| `apps/studio/src/assistant/parts.tsx` | One renderer per part: text, reasoning, tool (with its approval), source, file, generated surface, claims. |
+| `apps/studio/src/assistant/claims.ts` | Hides claim markers (including one split across streamed chunks), cuts the reply so every chip lands after its own sentence, and counts citations without a seeded demo. |
 | `apps/studio/src/components/chat/Conversation.tsx` | `MessagePrimitive.Parts`, the branch picker, the action bar, and the in-place edit composer. |
 | `apps/studio/src/components/chat/ThreadComposer.tsx` | `ComposerPrimitive` plus the slash palette, connector chips, attachment drop/paste, and attachment-format/size guidance. |
 | `apps/studio/src/components/chat/ModelPicker.tsx` | The composer's model listbox: opens the sidecar's `/api/models`, keeps the configured id selectable, and saves through Settings. |
 
 The sidecar remains the source of truth for what happened. Its additions are
 opt-in and additive: `reasoning`, `source`, and `approval` stream events;
+`claims` on the terminal `message` frame and on every restored turn;
 `attachments` and `approvals` on `/api/chat`; `GET
 /api/conversations/{id}/tree`; `PATCH /api/conversations/{id}`; and `POST
 /api/models`, which lists the configured backend's ids without raising when it
@@ -294,6 +303,7 @@ Storage is a separate SQLite file from the ODI repository:
 | `PATCH` | `/api/memory/observations/{id}` | Edit text, confidence, or status |
 | `DELETE` | `/api/memory/observations/{id}` | Forget one note |
 | `DELETE` | `/api/memory` | Forget all notes and conversations |
+| `GET` | `/api/diagnostics` | App/runtime and database metadata/counts only; never config, database paths, or row contents |
 
 **Forget everything** is a two-step confirmation and also clears the visible
 thread, because the server deletes the conversations behind it.
@@ -313,6 +323,17 @@ The bar's overflow menu has **Export → Markdown**. The file labels every
 speaker, keeps the prose as Markdown, and writes each agent-composed surface as
 a fenced JSON block, so a thread can be pasted into a doc or a ticket without
 the reader needing the Studio.
+
+**Diagnostics are separate from conversation export.** Settings → About →
+Diagnostics builds a local, opt-in bundle, then shows the exact pretty-printed
+JSON, byte count, and Included / Never included lists before Copy or Save. Capture
+rings live only in memory after the person presses the button and are cleared on
+reload. The bundle contains app version/build/platform/theme, sanitized sidecar
+configuration and metadata, capabilities, redacted error/console entries, and
+turn frame counts/timing; it never includes messages, observations, brief,
+theses, attachments, or canvas entities. Secrets, email addresses, bearer tokens,
+URL credentials and query strings are redacted, and file paths become basenames.
+It still exports while the sidecar is stopped; nothing is uploaded.
 
 Printing (`Cmd`/`Ctrl`+`P`) lays the open conversation out for A4: the bar,
 rail, composer, and floating chrome are hidden, the palette switches to paper,
