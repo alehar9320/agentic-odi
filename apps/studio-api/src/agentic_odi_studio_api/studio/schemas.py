@@ -138,6 +138,29 @@ class ScoreItem(BaseModel):
     why: str | None = None
 
 
+class ImportInterviewRequest(BaseModel):
+    """One transcript handed to the shared importer from the thread.
+
+    The composer already holds the attachment's text, so the route takes text
+    plus metadata rather than a multipart upload — a second upload path would
+    double the refusal surface. ``filename`` and ``format`` are the metadata the
+    shared importer already accepts: the filename drives extension detection and
+    names the refusal, and ``format`` overrides detection for an extensionless
+    file. ``participant`` and ``role`` map onto the importer's
+    ``participant_label`` and ``participant_role``.
+    """
+
+    text: str
+    title: str = Field(min_length=1)
+    participant: str = Field(default="Participant", min_length=1)
+    role: str | None = None
+    job_id: str | None = None
+    filename: str | None = None
+    format: str | None = None
+    conducted_at: str | None = None
+    mcp_url: str = ""
+
+
 class DecideCandidateRequest(BaseModel):
     """One reviewer decision on a candidate.
 

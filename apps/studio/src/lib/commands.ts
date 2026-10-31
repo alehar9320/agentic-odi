@@ -15,6 +15,7 @@ export type CommandId =
   | "start"
   | "status"
   | "impact"
+  | "interview"
   | WorkspacePanelId;
 
 export interface StudioCommand {
@@ -111,6 +112,14 @@ export const STUDIO_COMMANDS: StudioCommand[] = [
     keywords: ["simulate", "bet"],
   },
   {
+    id: "interview",
+    name: "/interview",
+    label: "Import a transcript",
+    description: "Turn an attached transcript into an interview and its quotes.",
+    category: "Act",
+    keywords: ["transcript", "import", "interview", "quotes", "vtt", "srt"],
+  },
+  {
     id: "evidence",
     name: "/evidence",
     label: "Evidence",
@@ -151,6 +160,68 @@ export const HELP_TEXT = [
   "",
   "Anything else is a message to the model. Type `/` to open the palette.",
 ].join("\n");
+
+/** The transcript formats the shared importer accepts, by extension. */
+export const TRANSCRIPT_EXTENSIONS = ["md", "mdx", "txt", "vtt", "srt"] as const;
+
+/** One composer attachment, reduced to what the import decision needs. */
+export interface TranscriptFile {
+  name: string;
+  contentType?: string;
+  /** The file's text, read in the browser; absent when it could not be read. */
+  text?: string;
+}
+
+/**
+ * What `/interview` should do with the composer's attachments.
+ *
+ * The import decision is pure so it can be tested without a composer: a
+ * transcript is one readable text file, and anything else — none, several, an
+ * image, or a file whose text could not be read — is refused with the reason
+ * the thread shows beside the filename.
+ */
+export type InterviewPlan =
+  | { kind: "import"; title: string; format?: string }
+  | { kind: "refuse"; reason: string };
+
+/** The importer format for a filename, or undefined to let the importer detect it. */
+export function transcriptFormatFor(filename: string): string | undefined {
+  const suffix = filename.split(".").pop()?.toLowerCase() ?? "";
+  return (TRANSCRIPT_EXTENSIONS as readonly string[]).includes(suffix) ? suffix : undefined;
+}
+
+/** A short, human title for an imported transcript, derived from its filename. */
+export function transcriptTitleFor(filename: string): string {
+  const stem = filename.replace(/\.[^./\\]+$/, "").trim();
+  return stem || "Attached transcript";
+}
+
+export function planInterview(attachments: readonly TranscriptFile[]): InterviewPlan {
+  if (attachments.length === 0) {
+    return { kind: "refuse", reason: "Attach a transcript first, then run `/interview`." };
+  }
+  if (attachments.length > 1) {
+    return {
+      kind: "refuse",
+      reason: `Attach one transcript at a time — ${attachments.length} files are attached.`,
+    };
+  }
+  const [attachment] = attachments;
+  if (attachment.contentType?.startsWith("image/")) {
+    return { kind: "refuse", reason: `${attachment.name} is an image, not a transcript.` };
+  }
+  if (attachment.text === undefined) {
+    return {
+      kind: "refuse",
+      reason: `${attachment.name} could not be read as text. Attach a .md, .txt, .vtt, or .srt file.`,
+    };
+  }
+  return {
+    kind: "import",
+    title: transcriptTitleFor(attachment.name),
+    format: transcriptFormatFor(attachment.name),
+  };
+}
 
 /** True while the draft is a bare command (no arguments typed yet). */
 export function isCommandDraft(draft: string): boolean {

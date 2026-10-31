@@ -43,6 +43,7 @@ import {
   fetchCoverage,
   healthLlm,
   healthMcp,
+  importInterview as apiImportInterview,
   markSignalRead as apiMarkSignalRead,
   promoteEvidence as apiPromoteEvidence,
   resolveApproval as apiResolveApproval,
@@ -74,6 +75,8 @@ import type {
   ConnectorSuggestion,
   CustomizeTarget,
   Evidence,
+  ImportInterviewPayload,
+  ImportInterviewResult,
   MarketplaceListing,
   MarketplaceSearch,
   Observation,
@@ -295,6 +298,13 @@ export interface StudioContextValue {
    * verbatim; it never throws a refusal away as a generic error.
    */
   scoreOutcome: (item: ScoreOutcomePayload) => Promise<ScoreBatchItemResult>;
+  /**
+   * Import an attached transcript through the shared importer, as one
+   * interview. Throws the server's refusal (naming the file and the reason) so
+   * the thread can render it verbatim; the parse runs before any write, so a
+   * refusal leaves no partial interview.
+   */
+  importInterview: (payload: ImportInterviewPayload) => Promise<ImportInterviewResult>;
   deleteOutcome: (outcomeId: string) => Promise<void>;
   deleteEvidence: (evidenceId: string) => Promise<void>;
   promoteEvidence: (
@@ -1151,6 +1161,17 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     [settings.mcp_url],
   );
 
+  const importInterview = useCallback(
+    async (payload: ImportInterviewPayload): Promise<ImportInterviewResult> => {
+      const result = await apiImportInterview(payload, settings.mcp_url);
+      // A new interview changes what the canvas knows, so refresh it the same
+      // way a captured outcome does.
+      await refreshCanvas();
+      return result;
+    },
+    [settings.mcp_url, refreshCanvas],
+  );
+
   const closePanel = useCallback(() => setActivePanel(null), []);
 
   const openPanel = useCallback(
@@ -1946,6 +1967,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       deleteStep,
       updateOutcome,
       scoreOutcome,
+      importInterview,
       deleteOutcome,
       deleteEvidence,
       fetchOutcomeEvidence,
@@ -2058,6 +2080,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       deleteStep,
       updateOutcome,
       scoreOutcome,
+      importInterview,
       deleteOutcome,
       deleteEvidence,
       fetchOutcomeEvidence,
