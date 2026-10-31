@@ -177,6 +177,8 @@ the demo seed only in `mcp` mode when MCP is unreachable or returns no jobs. `lo
 | `AGENTIC_ODI_DB` | core SQLite repository | `~/.agentic-odi/odi.db` |
 | `AGENTIC_ODI_BACKEND` | CLI, Studio API | `local` |
 | `AGENTIC_ODI_MCP_URL` | CLI, Studio defaults | `http://localhost:8000/mcp` |
+| `AGENTIC_ODI_MCP_TIMEOUT` | CLI MCP client calls | `30` seconds |
+| `AGENTIC_ODI_MCP_KEEPALIVE` | MCP session keepalive interval | `15` seconds (`0` disables) |
 | `AGENTIC_ODI_STUDIO_DB` | Studio API memory | `~/.agentic-odi/studio.db` |
 | `AGENTIC_ODI_CONNECTORS_CONFIG` | connectors registry (CLI, Studio, MCP) | `~/.config/agentic-odi/connectors.json` |
 | `AGENTIC_ODI_CONNECTOR_TIMEOUT` | connector health/ingest calls | `30` seconds |
@@ -192,16 +194,19 @@ the demo seed only in `mcp` mode when MCP is unreachable or returns no jobs. `lo
 
 ## Trust Boundaries
 
-- The SPA runs in a browser or Tauri webview and only trusts the sidecar origin.
-- The sidecar may reach MCP and the LLM; CORS is restricted to known Studio origins.
-- MCP is an HTTP service with no authentication in local development. Do not expose it directly to the internet; the Cloudflare setup tunnels the sidecar, not MCP.
-- The Tauri desktop shell contacts the GitHub releases endpoint for `latest.json`, verifies the artifact signatures against the key pinned in `tauri.conf.json`, and only stages an update after verification. The updater cannot be reached from the browser build.
-- The orchestrator treats agent output as untrusted: every pending action is
-  checked against the deterministic allowlist and repository scope before it is
-  accepted. Session API keys live only in the orchestrator store, never in logs,
-  signals, GitHub comments, or Studio responses (`AgentRun.public_view`).
-- GitHub issue bodies and labels are untrusted input. Intake is limited to
-  allowlisted repositories and one opt-in label; a pull request is never intake.
+Each process, the credentials it holds, and what crosses every wire are
+documented in [Trust boundaries](trust-boundaries.md). The short version: the
+SPA trusts only the sidecar; the sidecar reaches MCP and the LLM; MCP is an
+unauthenticated local HTTP service and must not be exposed; the hosted Worker
+tunnels the sidecar, not MCP; and the Tauri updater verifies signatures before
+staging an update.
+
+The orchestrator treats agent output as untrusted: every pending action is
+checked against the deterministic allowlist and repository scope before it is
+accepted. Session API keys live only in the orchestrator store, never in logs,
+signals, GitHub comments, or Studio responses (`AgentRun.public_view`). GitHub
+issue bodies and labels are untrusted input: intake is limited to allowlisted
+repositories and one opt-in label, and a pull request is never intake.
 
 ## The Failure Path
 

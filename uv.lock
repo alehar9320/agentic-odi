@@ -95,12 +95,14 @@ version = "0.14.0"
 source = { editable = "packages/connectors" }
 dependencies = [
     { name = "fastmcp" },
+    { name = "httpx" },
     { name = "pydantic" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "fastmcp" },
+    { name = "httpx" },
     { name = "pydantic" },
 ]
 

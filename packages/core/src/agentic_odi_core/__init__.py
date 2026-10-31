@@ -8,6 +8,7 @@ Pydantic's identically named class. Import it from
 ``agentic_odi_core.errors`` instead.
 """
 
+from agentic_odi_core.connection import MCPConnectionConfig
 from agentic_odi_core.contract import (
     TOOL_NAMES,
     TOOL_SPECS,
@@ -65,6 +66,7 @@ from agentic_odi_core.models import (
     Step,
     ValueMetric,
     compute_opportunity_score,
+    create_job,
     job_stage_catalog,
 )
 from agentic_odi_core.remote import (
@@ -116,6 +118,7 @@ __all__ = [
     "JobStage",
     "JOB_STAGE_INDEX",
     "JOB_STAGE_ORDER",
+    "MCPConnectionConfig",
     "ModelRouter",
     "ModelTier",
     "NotFoundError",
@@ -154,6 +157,7 @@ __all__ = [
     "Repository",
     "build_repository",
     "compute_opportunity_score",
+    "create_job",
     "customer_outcome_not_found",
     "error_status",
     "evaluate_outcome_statement",

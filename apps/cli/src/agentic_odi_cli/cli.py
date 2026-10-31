@@ -7,6 +7,7 @@ import sys
 import tempfile
 import threading
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -182,6 +183,65 @@ def _reexec_current() -> None:
 def schema_cmd() -> None:
     """Print the canonical JSON schema for every ODI entity."""
     typer.echo(json.dumps(run_tool("get_odi_schema", {}), indent=2))
+
+
+@app.command(name="health")
+def health_cmd(
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
+) -> None:
+    """Check that the ODI store is reachable."""
+    result = run_tool("get_health", {})
+    parsed = json.loads(result) if isinstance(result, str) else result
+    if json_output:
+        typer.echo(json.dumps(parsed))
+    else:
+        typer.echo(f"{parsed['status']}: store {parsed['store']}")
+    if parsed.get("status") != "ok":
+        raise typer.Exit(code=1)
+
+
+def _export_payload(job_id: str | None) -> dict[str, Any]:
+    if job_id is None:
+        jobs = run_tool("get_jobs", {})
+    else:
+        jobs = [run_tool("get_job", {"job_id": job_id})]
+    steps: list[Any] = []
+    outcomes: list[Any] = []
+    for job in jobs:
+        steps.extend(run_tool("get_job_map", {"job_id": job["id"]}))
+        outcomes.extend(run_tool("get_outcomes", {"job_id": job["id"]}))
+    scope: dict[str, Any] = {"job_id": job_id} if job_id is not None else {}
+    return {
+        "format": "agentic-odi-export",
+        "version": 1,
+        "exported_at": datetime.now(timezone.utc).isoformat(),
+        "job_id": job_id,
+        "jobs": jobs,
+        "steps": steps,
+        "outcomes": outcomes,
+        "customer_outcomes": run_tool("list_customer_outcomes", scope),
+        "evidence": run_tool("list_evidence", scope),
+    }
+
+
+@app.command(name="data-export")
+def data_export_cmd(
+    job_id: str | None = typer.Option(  # noqa: B008
+        None, "--job-id", help="Export only this job and the records beneath it."
+    ),
+    output: Path | None = typer.Option(  # noqa: B008
+        None,
+        "--output",
+        "-o",
+        help="Destination file (default: ./odi-export-<timestamp>.json).",
+    ),
+) -> None:
+    """Write ODI jobs, steps, outcomes, and evidence to a JSON file."""
+    payload = _export_payload(job_id)
+    path = output or Path(f"odi-export-{datetime.now(timezone.utc):%Y%m%dT%H%M%SZ}.json")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    typer.echo(f"Exported {len(payload['jobs'])} job(s) to {path}")
 
 
 @app.command(name="evaluate")

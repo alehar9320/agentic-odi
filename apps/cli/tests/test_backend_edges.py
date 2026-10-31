@@ -234,8 +234,9 @@ class _Client:
     payload = "ok"
     error: Exception | None = None
 
-    def __init__(self, url: str) -> None:
+    def __init__(self, url: str, **kwargs) -> None:
         self.url = url
+        self.kwargs = kwargs
 
     async def __aenter__(self) -> _Client:
         return self
