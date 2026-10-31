@@ -27,6 +27,8 @@ export const ATTACHMENT_ACCEPT = [
   ".yaml",
   ".yml",
   ".log",
+  ".vtt",
+  ".srt",
   "image/png",
   "image/jpeg",
   "image/webp",
@@ -42,7 +44,7 @@ export function isTextLike(name: string, contentType: string): boolean {
   if (TEXT_LIKE.test(contentType)) {
     return true;
   }
-  return /\.(md|mdx|json|csv|ya?ml|txt|log)$/i.test(name);
+  return /\.(md|mdx|json|csv|ya?ml|txt|log|vtt|srt)$/i.test(name);
 }
 
 export function isImageLike(contentType: string): boolean {
@@ -193,4 +195,16 @@ export function preparedAttachments(
     const ready = ATTACHMENTS.get(attachment.id);
     return ready ? [ready] : [];
   });
+}
+
+/** The transcript formats the shared importer accepts, by extension. */
+export const TRANSCRIPT_EXTENSIONS = ["md", "mdx", "txt", "vtt", "srt"] as const;
+
+/**
+ * The full text of one attachment for an import, read from the original file.
+ * The model's excerpt is capped at ``MAX_ATTACHMENT_CHARS``; an interview must
+ * not be, so the import reads the whole file rather than the truncation.
+ */
+export async function attachmentText(file: File): Promise<string> {
+  return file.text();
 }

@@ -72,6 +72,7 @@ the model, so they work when it is offline.
 | `/jobs` | Job summary, then the job map |
 | `/landscape`, `/jobmap`, `/coverage`, `/evidence`, `/settings` | Open that lens beside the conversation |
 | `/impact`, `/capture` | Start the conversation that produces the card. `/capture` falls back to the offline form when no model answers. |
+| `/interview` | Import the attached transcript as an interview and its quotes |
 | `/status` | Model, MCP, context, and canvas status |
 
 Unknown commands produce a transcript notice pointing at `/help`.
@@ -188,6 +189,25 @@ from the unread count. Its real content is the store's signal inbox
 refresh, and polls once a minute while the window is visible. Connector rows in Settings come from the real connector
 store, grouped by capability area; nothing is pre-listed as though it were
 already connected.
+
+#### A transcript becomes an interview
+
+The command line already turns a transcript file into an interview and its
+quotes. The thread reaches the same importer: attach a transcript, type
+`/interview`, and the composer's attachment goes to
+`POST /api/interviews/import` — never to a chat turn. The route calls the same
+shared importer `odi interviews import` calls, so the browser never re-sniffs
+the format; a `.vtt`, an `.srt`, and an extensionless paste land as the same
+interview the CLI would produce. The same WebVTT yields the same ordered quote
+text, speakers, and times whichever surface asked for it.
+
+The command reads the attachment's **full** text rather than the model's
+excerpt, because an interview must not be truncated. It refuses, with the reason
+in the thread, when nothing is attached, when more than one file is attached,
+when the file is an image, or when its text cannot be read. A malformed
+transcript is refused by the importer before anything is written, so a failure
+names the file and the parser's line and leaves no partial interview behind. A
+second `/interview` while the first is still importing cannot import twice.
 
 #### Provenance travels with the number
 

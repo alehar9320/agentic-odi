@@ -15,6 +15,8 @@ import type {
   ConversationTree,
   CreateJobPayload,
   Evidence,
+  ImportInterviewPayload,
+  ImportInterviewResult,
   Job,
   LatestConversation,
   LlmHealth,
@@ -376,6 +378,25 @@ export function scoreOutcomes(
 ): Promise<ScoreBatchResponse> {
   const query = mcpUrl ? `?mcp_url=${encodeURIComponent(mcpUrl)}` : "";
   return postJson<ScoreBatchResponse>(`/api/outcomes/score-batch${query}`, items);
+}
+
+/**
+ * Import a transcript the composer attached, through the shared importer.
+ *
+ * The browser sends the extracted text plus the attachment's filename and
+ * format, never a file: the same importer `odi interviews import` calls does
+ * the parsing and the refusal, so a `.vtt` and an extensionless paste both land
+ * as the same interview the CLI would produce.
+ */
+export function importInterview(
+  payload: ImportInterviewPayload,
+  mcpUrl?: string,
+): Promise<ImportInterviewResult> {
+  const query = mcpUrl ? `?mcp_url=${encodeURIComponent(mcpUrl)}` : "";
+  return postJson<ImportInterviewResult>(
+    `/api/interviews/import${query}`,
+    mcpUrl ? { ...payload, mcp_url: mcpUrl } : payload,
+  );
 }
 
 /**
