@@ -39,7 +39,7 @@ The Studio opens as a conversation, not a dashboard.
 |---|---|
 | **First minute** | The studio opens on one question — what do you want to win — with three starters and the composer already focused. Nothing covers the stage: no tour, no form, no required step. After the first exchange, at most one quiet line suggests the next thing (add context, or capture the evidence a score is missing). It sits above the composer, never over the thread, and can be dismissed forever. |
 | **Product tour** | An optional four-step tour: what the studio is, which ambition brought you here, the live state of your sidecar/MCP/model (with inline repair when the model is down), and the first move. The four doors are **I have one in mind**, **My boss handed me a priority**, **Help me find the next one**, and **Pressure-test a bet**; each starts the matching conversation. It never opens by itself: **Show me around** on the home stage opens it, and **Settings → Replay the tour** starts it over. |
-| **Context conversation** | Opened when you ask for it — the **Tell me what you're building** starter, the context hint, `/start`, or Settings. A short conversation in the chat, not a form: what you are building, who feels the problem, the job they are trying to get done, then where it hurts. One question at a time, with a reflection before the next ask, quick replies, and **Explore on my own** always visible. Skipping is allowed; answers and progress are kept as a draft. |
+| **Context conversation** | Opened when you ask for it — the **Start with you and your team** starter, the context hint, `/start`, or Settings. A five-turn introduction in the chat, led by the agent: who you are and your team, who feels the problem first, what they are trying to win, where it breaks, and what you already have. One question at a time, examples shown as muted text, with **Skip this question** and **Explore on my own** always available. The five answers come back as an editable card, in your words; skipping stores nothing, and progress is kept as a draft. |
 | **Hero** | One headline above the composer. A first run holds a single invitation — *What do you want to win?* — and never changes while you think. With context or canvas data it becomes a quiet rotation: a greeting (time of day, plus your name if you set one in Settings), the product/job you set up, or what is already on the canvas. It stays still under `prefers-reduced-motion`. |
 | **Starter cards** | Above the composer, three canvas-aware conversation cards name a situation the person is actually in rather than one of our nouns: **Turn 40 interview notes into one bet**, **Find what the churn spike is telling you**, and **Inherit a roadmap without inheriting its assumptions**. An empty canvas always offers those three, in that order; once the canvas holds outcomes or jobs the second and third swap to **Pressure-test a bet** and **Capture what you heard**. Each card carries a subtitle and the artifact it produces (`artifact` on `StudioSuggestion`), which the card layout (#317) renders. Select one to start that prompt in the thread — the prompt is sent verbatim, and it opens with the material the person brings. **Opportunity landscape** remains a separate, quiet shortcut. |
 | **Composer** | Docked at the bottom of the transcript. `Enter` sends, `Shift`+`Enter` adds a line, `Cmd/Ctrl`+`K` focuses it, `/` opens the command palette, and the paperclip attaches a text file or an image. Files can also be dropped anywhere on the composer or pasted from the clipboard, and each one is shown with a size (and a thumbnail, for images) plus a remove control before it is sent; a file the studio cannot read is refused with the reason instead of becoming a chip that promises content the model will never see. The hint row's **Model** control lists the ids the configured backend reports and writes the choice through the same Settings store as the Base URL field. The send button becomes a stop button while a reply streams. |
@@ -113,10 +113,43 @@ Accepted values are `1`/`0`, `true`/`false`, `on`/`off`, `yes`/`no`, and
 `enabled`/`disabled`. With the flag off, no dialog renders, no onboarding state
 is written, and Settings hides the replay action.
 
+### The first-run introduction
+
+The stage's **Start with you and your team** door opens a five-turn
+introduction, in the order a colleague would ask: what you are working on and
+your part in it, who feels the problem first, what they are trying to win,
+where it breaks, and what you already have. The agent speaks first and asks one
+question at a time; the two example answers under the composer are illustrations
+and never quick replies, so a click can never store an example as the answer.
+
+Every reply is kept whole as a quote and its turn gets the sentence, capped at
+280 characters. Skipping stores nothing; **Explore on my own** and `Escape`
+close without saving a partial brief. Progress lives in
+`localStorage["studio.intro"]`, so a reload resumes on the same turn. The five
+answers become a card of five lines, each editable in place (Enter saves,
+Escape cancels), with one primary **Looks like me** and a quiet **Skip the
+rest**. Accepting writes `StudioBrief` — now with optional `role`, `team`, and
+`evidence_at_hand` — and creates or updates the Job through the same path the
+old panel used. No sidecar call and no model are needed.
+
+A `studio.setupDraft` from the five-field panel is migrated once into turns 1–4
+and its vision line into a note, then removed. The introduction is behind the
+`firstRunIntro` flag, which defaults to on and resolves in the same order as the
+tour: `?flags=firstRunIntro:off`,
+`localStorage["studio.flags.firstRunIntro"]`, then
+`VITE_STUDIO_FIRST_RUN_INTRO`. With it off, the old `SetupConversation` stays
+mounted for one release.
+
+| File | Role |
+|---|---|
+| `apps/studio/src/lib/intro.ts` | Turns, parsing, proposed defaults, draft storage, migration, and brief mapping |
+| `apps/studio/src/components/setup/IntroConversation.tsx` | The conversation and the editable summary card |
+| `../features/flags.ts` | The `firstRunIntro` toggle |
+
 ### Guidance, not gates
 
-Nothing is a prerequisite. The home stage keeps a dashed **Tell me what you're
-building** pill, and the context conversation reopens exactly where you left off.
+Nothing is a prerequisite. The home stage keeps a dashed **Start with you and
+your team** pill, and the introduction reopens exactly where you left off.
 `/start` and Settings do the same. The conversation also understands a natural
 reply: say "skip", "not now", or "show me the landscape" and it reacts instead
 of recording it as an answer. When a brief exists, it opens on a review and asks
@@ -227,7 +260,7 @@ without giving up the message model the sidecar already understands.
 | **Branching** | **Edit** a user turn or **Regenerate** a reply and both versions are kept as siblings. **Alternative 2 of 3** with `‹`/`›` steps between them, and the visible branch is saved as the conversation's `head_id`, so a reload reopens the branch you were reading. |
 | **Suggestions** | The empty-stage pills are chosen from the canvas and handed to the runtime as suggestion prompts. |
 | **Generative UI** | A validated `UiNode` travels as an assistant-ui **data part** (`data-odi-surface`) and renders through the same `UiRenderer`. The catalog stays ours and server-validated. |
-| **Voice** | Deliberately not wired yet. The seam is `adapters.dictation` plus `ComposerPrimitive.Dictate`: no backend change and no message-model change. It waits because Tauri's WebKit webview support for the Web Speech API is uneven, and a microphone button that works in only one shell is worse than none. |
+| **Dictation** | Where the shell supports speech recognition, the composer shows a microphone: it turns speech into text, marks the interim transcript as *Listening*, and commits one final sentence to the input. It never sends by itself, no audio leaves the browser, and nothing is stored. In a shell without the API — notably parts of Tauri's WebKit webview — there is no microphone at all. No fallback provider and no realtime voice. |
 
 #### Where the bridge lives
 
