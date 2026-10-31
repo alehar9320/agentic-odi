@@ -97,3 +97,58 @@ def test_a_snapshot_note_stays_unknown_after_reload(repo: Repository) -> None:
     loaded = _reopen(repo).list_score_snapshots("outcome-1")
     assert loaded[0].note is None
     assert loaded[0].importance_n is None
+
+
+def test_band_and_provenance_survive_every_repository(repo: Repository) -> None:
+    outcome = repo.add_outcome(
+        Outcome(
+            job_id="job-1",
+            statement=_STATEMENT,
+            importance=8.0,
+            satisfaction=6.0,
+            importance_n=40,
+            satisfaction_n=40,
+            score_method="survey",
+            opportunity_low=9.5,
+            opportunity_high=11.5,
+            interval_n=40,
+            interval_seed=7,
+            interval_confidence_level=0.95,
+            interval_computed_at="2026-01-01T00:00:00Z",
+        )
+    )
+
+    loaded = _reopen(repo).get_outcome(outcome.id)
+    assert loaded is not None
+    assert (loaded.opportunity_low, loaded.opportunity_high) == (9.5, 11.5)
+    assert loaded.interval_n == 40
+    assert loaded.interval_seed == 7
+    assert loaded.interval_confidence_level == 0.95
+
+
+def test_a_score_edit_clears_a_stale_band_on_every_repository(repo: Repository) -> None:
+    from agentic_odi_core.services import ODIService
+
+    service = ODIService(repo)
+    outcome = repo.add_outcome(
+        Outcome(
+            job_id="job-1",
+            statement="Minimize the time to onboard when a new engineer joins.",
+            importance=8.0,
+            satisfaction=6.0,
+            importance_n=40,
+            satisfaction_n=40,
+            score_method="survey",
+            opportunity_low=9.5,
+            opportunity_high=11.5,
+            interval_n=40,
+        )
+    )
+
+    service.update_outcome(outcome.id, {"satisfaction": 5.0})
+
+    loaded = _reopen(repo).get_outcome(outcome.id)
+    assert loaded is not None
+    assert loaded.opportunity_low is None
+    assert loaded.opportunity_high is None
+    assert loaded.interval_n is None

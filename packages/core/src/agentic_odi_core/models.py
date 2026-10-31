@@ -199,6 +199,13 @@ class Outcome(BaseModel):
             and self.opportunity_low > self.opportunity_high
         ):
             raise ValueError("opportunity_low cannot exceed opportunity_high")
+        # Provenance describes a band. With no band there is nothing to describe,
+        # so drop it rather than letting a cleared band keep a stale seed/level.
+        if self.opportunity_low is None:
+            self.interval_n = None
+            self.interval_seed = None
+            self.interval_confidence_level = None
+            self.interval_computed_at = None
         return self
 
 

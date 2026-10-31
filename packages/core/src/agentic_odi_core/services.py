@@ -377,6 +377,19 @@ class ODIService:
         else:
             updates = dict(updates)
             updates["opportunity_score"] = None
+        # A band describes one exact score and sample. When a caller changes the
+        # score without supplying a fresh band, the old band is stale: clear it in
+        # the same write rather than letting a new number carry an old range.
+        if "opportunity_low" not in updates and "opportunity_high" not in updates:
+            score_changed = (importance, satisfaction) != (
+                existing.importance,
+                existing.satisfaction,
+            )
+            method_changed = method != existing.score_method
+            if existing.opportunity_low is not None and (score_changed or method_changed):
+                updates["opportunity_low"] = None
+                updates["opportunity_high"] = None
+                updates["interval_n"] = None
         res = self.repo.update_outcome(outcome_id, updates)
         if not res:
             raise OutcomeNotFoundError(outcome_id)
