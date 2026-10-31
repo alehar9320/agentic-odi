@@ -299,6 +299,7 @@ class StudioMemory:
             self._connection.execute("PRAGMA busy_timeout = 5000")
         with self._connection:
             self._connection.executescript(_SCHEMA)
+            self._connection.execute("PRAGMA user_version = 1")
             _migrate(self._connection)
 
     def close(self) -> None:

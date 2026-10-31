@@ -206,6 +206,129 @@ def health_cmd(
         raise typer.Exit(code=1)
 
 
+@app.command(name="doctor")
+def doctor_cmd(
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
+    backup: bool = typer.Option(False, "--backup", help="Take a fresh backup of the ODI store."),
+) -> None:
+    """Check store integrity: quick_check, WAL size, entity counts, schema version, backups."""
+    from agentic_odi_core.errors import StoreCorrupt
+    from agentic_odi_core.sqlite_repository import SQLiteRepository
+
+    db_path_str = os.environ.get("AGENTIC_ODI_DB", os.path.expanduser("~/.agentic-odi/odi.db"))
+
+    results: dict[str, Any] = {}
+    overall_ok = True
+
+    if not os.path.exists(db_path_str):
+        results["odi"] = {"status": "missing", "path": db_path_str}
+        overall_ok = False
+    else:
+        repo = SQLiteRepository(db_path=db_path_str)
+        try:
+            with repo._lock:
+                cursor = repo.store.conn.execute("PRAGMA quick_check")
+                qc_row = cursor.fetchone()
+                quick_check = qc_row[0] if qc_row else "unknown"
+
+                cursor = repo.store.conn.execute("PRAGMA user_version")
+                uv_row = cursor.fetchone()
+                schema_version = uv_row[0] if uv_row else 0
+
+                cursor = repo.store.conn.execute("PRAGMA wal_checkpoint(PASSIVE)")
+                wal_row = cursor.fetchone()
+                wal_size = wal_row[2] if wal_row else 0
+
+            entity_counts = {
+                "jobs": len(repo.jobs),
+                "steps": len(repo.steps),
+                "outcomes": len(repo.outcomes),
+                "evidence": len(repo.evidence),
+                "signals": len(repo.signals),
+                "proposals": len(repo.proposals),
+            }
+            results["odi"] = {
+                "status": "ok" if quick_check == "ok" else "corrupt",
+                "path": db_path_str,
+                "quick_check": quick_check,
+                "schema_version": schema_version,
+                "wal_size_bytes": wal_size,
+                "entity_counts": entity_counts,
+            }
+            if quick_check != "ok":
+                overall_ok = False
+        except Exception as exc:  # noqa: BLE001
+            results["odi"] = {"status": "error", "path": db_path_str, "error": str(exc)}
+            overall_ok = False
+        finally:
+            repo.close()
+
+    if backup:
+        repo = SQLiteRepository(db_path=db_path_str)
+        backup_dir = os.path.join(os.path.dirname(db_path_str), "backups")
+        os.makedirs(backup_dir, exist_ok=True)
+        repo.backup(
+            os.path.join(
+                backup_dir, f"odi-{datetime.now(timezone.utc):%Y%m%dT%H%M%SZ}.db"
+            )
+        )
+        repo.close()
+
+    if json_output:
+        typer.echo(json.dumps({"ok": overall_ok, "databases": results}))
+    else:
+        for label, res in results.items():
+            typer.echo(f"{label}: {res['status']} ({res.get('path', 'n/a')})")
+            if res.get("quick_check"):
+                typer.echo(f"  quick_check: {res['quick_check']}")
+            if res.get("schema_version") is not None:
+                typer.echo(f"  schema_version: {res['schema_version']}")
+            if res.get("wal_size_bytes") is not None:
+                typer.echo(f"  wal_size: {res['wal_size_bytes']} bytes")
+            if res.get("entity_counts"):
+                typer.echo(f"  entities: {res['entity_counts']}")
+            if res.get("error"):
+                typer.echo(f"  error: {res['error']}")
+        if not overall_ok:
+            typer.echo(
+                "\nOne or more stores are corrupt or missing. Run 'agentic-odi restore' to recover.",
+                err=True,
+            )
+            raise typer.Exit(code=1)
+
+
+@app.command(name="restore")
+def restore_cmd(
+    backup_file: Path = typer.Argument(..., help="Path to the backup file to restore from."),
+    yes: bool = typer.Option(False, "--yes", help="Skip confirmation and restore immediately."),
+) -> None:
+    """Restore the ODI store from a backup file."""
+    from agentic_odi_core.errors import StoreCorrupt
+    from agentic_odi_core.sqlite_repository import SQLiteRepository
+
+    db_path_str = os.environ.get("AGENTIC_ODI_DB", os.path.expanduser("~/.agentic-odi/odi.db"))
+
+    if not yes:
+        typer.echo(
+            f"This will replace {db_path_str} with {backup_file}. "
+            "The current database will be moved to a .pre-restore-* file. Continue?"
+        )
+        if not typer.confirm("Proceed?"):
+            typer.echo("Aborted.")
+            raise typer.Exit(code=0)
+
+    repo = SQLiteRepository(db_path=db_path_str)
+    try:
+        repo.restore(str(backup_file))
+    except (StoreCorrupt, Exception) as exc:  # noqa: BLE001
+        typer.echo(f"Restore failed: {exc}", err=True)
+        raise typer.Exit(code=1)
+    finally:
+        repo.close()
+
+    typer.echo(f"Restored {db_path_str} from {backup_file}.")
+
+
 def _export_payload(job_id: str | None) -> dict[str, Any]:
     if job_id is None:
         jobs = run_tool("get_jobs", {})
