@@ -19,8 +19,9 @@ import asyncio
 import json
 import os
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, NoReturn
 
 import typer
 
@@ -108,6 +109,15 @@ class Backend(ABC):
     def call(self, tool_name: str, args: dict[str, Any]) -> Any:
         """Run ``tool_name`` and return parsed data (dict, list, str, or float)."""
 
+    @property
+    def service(self) -> ODIService:
+        """The in-process service, for commands that only mean something locally.
+
+        A remote backend has no local store to write into, so it refuses rather
+        than reporting rows that went nowhere.
+        """
+        raise BackendError("This command writes to the local store; rerun with --backend local.")
+
 
 class LocalBackend(Backend):
     """Run ODI logic in-process against a local SQLite store."""
@@ -140,7 +150,11 @@ class LocalBackend(Backend):
             raise BackendError(str(exc)) from exc
 
     def _add_job(self, args: dict[str, Any]) -> dict[str, Any]:
-        job = self.service.add_job(name=args["name"], description=args.get("description"))
+        job = self.service.add_job(
+            name=args["name"],
+            description=args.get("description"),
+            origin=args.get("origin", "user"),
+        )
         return job.model_dump()
 
     def _get_jobs(self, args: dict[str, Any]) -> list[dict[str, Any]]:
@@ -190,6 +204,7 @@ class LocalBackend(Backend):
                 order=args["order"],
                 stage=args.get("stage"),
                 allow_empty_job_map=args.get("allow_empty_job_map", False),
+                origin=args.get("origin", "user"),
             )
         except JobNotFoundError:
             raise BackendError(job_not_found(args["job_id"])) from None
@@ -254,6 +269,7 @@ class LocalBackend(Backend):
                 importance=float(args["importance"]),
                 satisfaction=float(args["satisfaction"]),
                 step_id=step_id,
+                origin=args.get("origin", "user"),
             )
         except JobNotFoundError:
             raise BackendError(job_not_found(args["job_id"])) from None
@@ -419,6 +435,7 @@ class LocalBackend(Backend):
                 job_id=args.get("job_id"),
                 step_id=args.get("step_id"),
                 outcome_id=args.get("outcome_id"),
+                origin=args.get("origin", "user"),
             )
         except JobNotFoundError:
             raise BackendError(job_not_found(args.get("job_id") or "")) from None
@@ -867,6 +884,11 @@ class AutoBackend(Backend):
                 self._announced = True
             return result
 
+    @property
+    def service(self) -> ODIService:
+        """Auto keeps the local store as its home, so the service is the local one."""
+        return self._local.service
+
 
 @dataclass
 class BackendConfig:
@@ -901,15 +923,37 @@ def require_backend() -> Backend:
     return resolve_backend(context.config())
 
 
+def _report_failure(exc: BackendError) -> NoReturn:
+    """Print one backend failure the way every command prints it, then exit."""
+    message = str(exc)
+    if message.startswith("Error: "):
+        message = message[len("Error: ") :]
+    typer.secho(f"Error: {message}", fg="red", err=True)
+    if exc.suggestion:
+        typer.secho(f"Hint: {exc.suggestion}", fg="yellow", err=True)
+    raise typer.Exit(code=1) from exc
+
+
 def run_tool(tool_name: str, args: dict[str, Any]) -> Any:
     """Call ``tool_name`` on the resolved backend, reporting failures cleanly."""
     try:
         return require_backend().call(tool_name, args)
     except BackendError as exc:
-        message = str(exc)
-        if message.startswith("Error: "):
-            message = message[len("Error: ") :]
-        typer.secho(f"Error: {message}", fg="red", err=True)
-        if exc.suggestion:
-            typer.secho(f"Hint: {exc.suggestion}", fg="yellow", err=True)
-        raise typer.Exit(code=1) from exc
+        _report_failure(exc)
+
+
+def run_local(operation: Callable[[ODIService], Any]) -> Any:
+    """Run one operation against the resolved backend's local service.
+
+    A command that writes a whole set of rows in one go — the demo loader —
+    needs the service rather than a single tool call. Failures surface exactly
+    as they do through :func:`run_tool`, so no command invents its own error text.
+    """
+    from agentic_odi_core import OdiError
+
+    try:
+        return operation(require_backend().service)
+    except BackendError as exc:
+        _report_failure(exc)
+    except OdiError as exc:
+        _report_failure(BackendError(str(exc)))

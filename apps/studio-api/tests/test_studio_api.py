@@ -9,6 +9,7 @@ from typing import Any
 
 import pytest
 from agentic_odi_core import InMemoryRepository, ODIService
+from agentic_odi_core.demo import DEMO_JOB_ID, FIXTURE_COUNTS
 from agentic_odi_studio_api.app import create_app
 from fastapi.testclient import TestClient
 
@@ -164,12 +165,14 @@ def test_canvas_falls_back_to_seed_when_mcp_unreachable() -> None:
     assert response.status_code == 200
     body = response.json()
     assert body["source"] == "seed"
-    assert body["jobs"][0]["id"] == "JOB-402"
-    assert len(body["steps"]) == 8
-    assert len(body["outcomes"]) == 3
-    assert body["outcomes"][0]["id"] == "O-1"
-    assert body["outcomes"][0]["opportunity_score"] == 15.3
-    assert body["outcomes"][0]["evidence"].startswith("Customer Call #104")
+    assert body["jobs"][0]["id"] == DEMO_JOB_ID
+    assert len(body["steps"]) == FIXTURE_COUNTS["steps"]
+    assert len(body["outcomes"]) == FIXTURE_COUNTS["outcomes"]
+    first = body["outcomes"][0]
+    assert first["id"] == "O-1"
+    assert first["opportunity_score"] == pytest.approx(12.7)
+    assert first["origin"] == "demo"
+    assert "evidence" not in first, "an outcome cites evidence rows; it does not hold one"
 
 
 # ---------------------------------------------------------------------------

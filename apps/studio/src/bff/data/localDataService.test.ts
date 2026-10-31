@@ -104,3 +104,36 @@ describe("outcome scoring and cascades", () => {
     expect(canvas.outcomes).toEqual([]);
   });
 });
+
+describe("row provenance", () => {
+  it("marks a row the studio created as the customer's own", async () => {
+    const service = new LocalDataService(makeStore());
+    const job = await service.createJob({ name: "Job A" });
+    const step = await service.addStep({ job_id: job.id, name: "Step 1", order: 1 });
+    const outcome = await service.addOutcome({
+      job_id: job.id,
+      step_id: step.id,
+      statement: "Minimize the time it takes to sign up when onboarding",
+      importance: 8,
+      satisfaction: 3,
+    });
+
+    expect(job.origin).toBe("user");
+    expect(step.origin).toBe("user");
+    expect(outcome.origin).toBe("user");
+  });
+
+  it("carries origin through the canvas instead of dropping it", async () => {
+    const store = makeStore();
+    const service = new LocalDataService(store);
+    const job = await service.createJob({ name: "Job A" });
+    await service.addStep({ job_id: job.id, name: "Step 1", order: 1 });
+    const stored = await store.getJob(job.id);
+    await store.putJob({ ...stored!, origin: "demo" });
+
+    const canvas = await service.fetchCanvas();
+
+    expect(canvas.jobs[0].origin).toBe("demo");
+    expect(canvas.steps[0].origin).toBe("user");
+  });
+});

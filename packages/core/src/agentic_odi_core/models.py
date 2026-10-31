@@ -92,6 +92,14 @@ JOB_NAME_MIN_LENGTH = 3
 JOB_NAME_MAX_LENGTH = 64
 JOB_DESCRIPTION_MAX_LENGTH = 500
 
+#: Where a row came from. ``user`` is typed or imported by the customer,
+#: ``demo`` is loaded on purpose by ``odi demo load``, ``sample`` arrives with
+#: the product, and ``imported`` comes from a connector or file. Presentation
+#: decides how a non-``user`` row is marked; storage records the fact.
+Origin = Literal["user", "demo", "sample", "imported"]
+
+ORIGIN_FIELD_DESCRIPTION = "Provenance of the row: user, demo, sample, or imported"
+
 
 class Job(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -107,6 +115,7 @@ class Job(BaseModel):
         max_length=JOB_DESCRIPTION_MAX_LENGTH,
         description="Detailed description of the Job",
     )
+    origin: Origin = Field("user", description=ORIGIN_FIELD_DESCRIPTION)
 
 
 def create_job(name: str, description: str | None = None) -> Job:
@@ -125,6 +134,7 @@ class Step(BaseModel):
     stage_index: int | None = Field(
         None, ge=1, le=8, description="Position (1-8) in the canonical stage order"
     )
+    origin: Origin = Field("user", description=ORIGIN_FIELD_DESCRIPTION)
 
 
 class Outcome(BaseModel):
@@ -143,6 +153,7 @@ class Outcome(BaseModel):
     opportunity_score: float | None = Field(
         None, description="Opportunity score (Importance + max(Importance - Satisfaction, 0))"
     )
+    origin: Origin = Field("user", description=ORIGIN_FIELD_DESCRIPTION)
 
 
 class ValueMetric(BaseModel):
@@ -191,7 +202,11 @@ class Evidence(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     source_name: str = Field(..., description="Connector or person that produced the record")
     source_kind: str = Field(
-        ..., description="Connector kind, e.g. mcp, rest, webhook, manual — or demo for a fixture"
+        ...,
+        description=(
+            "Connector kind, e.g. mcp, rest, webhook, manual, interview. "
+            "Provenance is `origin`, never this field."
+        ),
     )
     item_type: EvidenceItemType = Field(
         "manual", description="Normalized record kind produced by the connector"
@@ -205,6 +220,7 @@ class Evidence(BaseModel):
     job_id: str | None = Field(None, description="Job this evidence supports")
     step_id: str | None = Field(None, description="Job-map Step this evidence supports")
     outcome_id: str | None = Field(None, description="Desired Outcome this evidence supports")
+    origin: Origin = Field("user", description=ORIGIN_FIELD_DESCRIPTION)
 
 
 class CustomerOutcome(BaseModel):

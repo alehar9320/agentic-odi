@@ -502,3 +502,28 @@ def render_strategy(strategy: Any, *, as_json: bool) -> str:
         lines.append("")
         lines.append("No rejected paths recorded — this is a conclusion, not a recommendation.")
     return "\n".join(lines)
+
+
+#: The fixture's entity keys, spelled the way a person would say them.
+_DEMO_ROW_LABELS = {
+    "jobs": "job",
+    "steps": "steps",
+    "outcomes": "outcomes",
+    "evidence": "evidence records",
+}
+
+
+def render_demo_load(payload: Any, *, as_json: bool) -> str:
+    """Report which job the study filled and how many rows it wrote."""
+    if as_json:
+        return _json(payload)
+    counts = payload.get("counts") or {}
+    written = ", ".join(
+        f"{counts[key]} {_DEMO_ROW_LABELS.get(key, key)}"
+        for key in _DEMO_ROW_LABELS
+        if counts.get(key)
+    )
+    return (
+        f"Demo workspace loaded on {payload.get('job_id', '')}: {written}.\n"
+        "Every row is marked as a demo. Nothing you wrote was changed."
+    )
