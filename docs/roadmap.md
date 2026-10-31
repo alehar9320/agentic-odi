@@ -112,6 +112,17 @@ The open issues this milestone still has to answer, grouped by what they change.
   never inferring an "improvement" from a bare number. `desired-outcomes history
   --why` and `GET /api/outcomes/{id}/delta` expose it; a missing dimension stays
   `null`, not `0`.
+- [x] **Thin-sample advisory (M2-14)**: one `MIN_MEANINGFUL_N = 20` constant and
+  one `n_advisory(outcome) -> Advisory | None` in `evaluation.py` warn when a
+  recorded sample is below the threshold. The advisory takes the smaller of the
+  two counts and names the dimension that triggered it, returns a single sentence
+  plus `{n, threshold, method, dimension}`, and is worded as "below the advisory
+  threshold" — a product warning, not a claim of statistical validity on either
+  side. It is a statement about the data, never a filter: the score still renders
+  and still ranks. `odi top` prints it as a footer line, `desired-outcomes get`
+  prints it as an `advisory` line, and the landscape shows an `n<20` chip with the
+  sentence on hover; an estimate or an unknown count produces no advisory rather
+  than a fabricated `n=0`.
 - [x] **Trust seams for the gated increments**: The remaining Pillar-2
   increments wait on decisions that are not yet approved, so `agentic_odi_core.trust`
   exposes their shapes and refuses to answer: `retain_survey_inputs` (retention

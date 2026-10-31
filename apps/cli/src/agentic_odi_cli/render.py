@@ -207,6 +207,25 @@ def _sample_label(outcome: dict[str, Any]) -> str:
     return f"n={importance_n or '?'}/{satisfaction_n or '?'} ({method})"
 
 
+def _advisory_line(outcome: dict[str, Any]) -> str | None:
+    """The M2-14 below-threshold advisory for an outcome mapping, or ``None``.
+
+    Reads the same fields the sample label does and calls the core's single
+    advisory implementation, so the CLI, the landscape and the brief word the
+    warning identically. It never invents a count for an estimate or an unknown
+    sample; those produce no advisory.
+    """
+    from agentic_odi_core.evaluation import advisory_for
+
+    advisory = advisory_for(
+        method=outcome.get("score_method") or outcome.get("method") or "estimate",
+        importance_n=outcome.get("importance_n"),
+        satisfaction_n=outcome.get("satisfaction_n"),
+        opportunity_score=outcome.get("opportunity_score"),
+    )
+    return advisory.message if advisory else None
+
+
 def render_interval_provenance(interval: Any, *, as_json: bool = False) -> str:
     """Render a stored band and its provenance, or the no-band reason (B3.2).
 
@@ -272,6 +291,9 @@ def render_outcome(
         ("opportunity", _num(outcome.get("opportunity_score", ""))),
         ("sample", _sample_label(outcome)),
     ]
+    advisory = _advisory_line(outcome)
+    if advisory:
+        rows.append(("advisory", advisory))
     if latest_note:
         note_line = _note_cell(latest_note)
         if note_line:

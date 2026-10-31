@@ -417,3 +417,65 @@ describe("OpportunityLandscape canvas states", () => {
     expect(rows[2]).toHaveTextContent("Minimize the risk of a thin high guess");
   });
 });
+
+describe("OpportunityLandscape M2-14 advisory chip", () => {
+  beforeEach(() => {
+    harness.state.canvasState = {
+      kind: "ready",
+      data: {
+        jobs: [{ id: "JOB-1", name: "Deploy Service" }],
+        steps: [],
+        outcomes: [
+          {
+            id: "O-MEASURED",
+            statement: "Minimize time spent syncing secrets",
+            importance: 9,
+            satisfaction: 2,
+            opportunity_score: 16,
+            score_method: "survey",
+            importance_n: 40,
+            satisfaction_n: 40,
+          },
+          {
+            id: "O-THIN",
+            statement: "Minimize risk of configuration drift",
+            importance: 8,
+            satisfaction: 7,
+            opportunity_score: 9,
+            score_method: "survey",
+            importance_n: 4,
+            satisfaction_n: 4,
+          },
+          {
+            id: "O-ESTIMATE",
+            statement: "Minimize the cost of rollbacks",
+            importance: 7,
+            satisfaction: 3,
+            opportunity_score: 11,
+            score_method: "estimate",
+          },
+        ],
+        source: "seed" as const,
+      },
+    } as unknown as CanvasState;
+  });
+
+  it("marks exactly the outcomes the shared advisory flags, never the estimate", () => {
+    render(<OpportunityLandscape />);
+    fireEvent.click(screen.getByText("📋 Table View"));
+
+    // The thin survey row is flagged; the measured row and the estimate are not.
+    expect(screen.getByTestId("advisory-O-THIN")).toBeInTheDocument();
+    expect(screen.queryByTestId("advisory-O-MEASURED")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("advisory-O-ESTIMATE")).not.toBeInTheDocument();
+  });
+
+  it("puts the advisory sentence in the chip's title so it is readable on hover", () => {
+    render(<OpportunityLandscape />);
+    fireEvent.click(screen.getByText("📋 Table View"));
+
+    const chip = screen.getByTestId("advisory-O-THIN");
+    expect(chip.getAttribute("title")).toContain("below the advisory threshold");
+    expect(chip.getAttribute("title")).toContain("4");
+  });
+});

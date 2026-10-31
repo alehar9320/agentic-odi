@@ -130,6 +130,46 @@ def test_top_excludes_thin_and_unscored_by_default(tmp_path):
     assert payload["excluded"]["none"] == 1
 
 
+def test_top_prints_the_advisory_footer_for_a_thin_included_row(tmp_path):
+    db = str(tmp_path / "odi.db")
+    runner = CliRunner()
+    job_id = _job_id(runner, db)
+    # A thin survey sample is included with --include-thin and carries the
+    # advisory; the measured row above the threshold does not.
+    _add(runner, db, job_id, "--importance-n", "40", "--satisfaction-n", "40", "--method", "survey")
+    thin = _add(
+        runner, db, job_id, "--importance-n", "4", "--satisfaction-n", "4", "--method", "survey"
+    )
+
+    result = runner.invoke(app, ["--db", db, "top", "--job", job_id, "--include-thin"])
+
+    assert result.exit_code == 0, result.output
+    assert "below the advisory threshold" in result.output
+    # Exactly one advisory: the measured 40/40 row is above the threshold.
+    assert result.output.count("below the advisory threshold") == 1
+    assert thin["id"] in result.output
+
+
+def test_top_json_exposes_the_advisory_payload(tmp_path):
+    db = str(tmp_path / "odi.db")
+    runner = CliRunner()
+    job_id = _job_id(runner, db)
+    _add(runner, db, job_id, "--importance-n", "40", "--satisfaction-n", "40", "--method", "survey")
+    thin = _add(
+        runner, db, job_id, "--importance-n", "4", "--satisfaction-n", "4", "--method", "survey"
+    )
+
+    result = runner.invoke(app, ["--db", db, "top", "--job", job_id, "--include-thin", "--json"])
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    thin_entry = next(entry for entry in payload["thin"] if entry["id"] == thin["id"])
+    assert thin_entry["advisory"]["n"] == 4
+    assert thin_entry["advisory"]["threshold"] == 20
+    measured_entry = payload["measured"][0]
+    assert measured_entry["advisory"] is None
+
+
 def test_coverage_counts_every_outcome(tmp_path):
     db = str(tmp_path / "odi.db")
     runner = CliRunner()

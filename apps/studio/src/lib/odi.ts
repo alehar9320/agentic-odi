@@ -120,3 +120,53 @@ export function confidenceClass(outcome: SampleMetadata): ConfidenceClass {
   }
   return Math.min(...counts) >= 30 ? "measured" : "thin";
 }
+
+/**
+ * The M2-14 advisory threshold. A product warning line, not a claim that a
+ * sample below it is worthless or that one above it is reliable. Mirrors the
+ * core's `MIN_MEANINGFUL_N` so the landscape chip and the CLI footer agree.
+ */
+export const MIN_MEANINGFUL_N = 20;
+
+export interface Advisory {
+  n: number;
+  threshold: number;
+  method: string;
+  dimension: "importance" | "satisfaction" | "both";
+  message: string;
+}
+
+/**
+ * Warn when a score's recorded sample is below the advisory threshold (M2-14).
+ *
+ * Returns `null` for an estimate, an unknown count, an unscored outcome or a
+ * sample at or above the threshold — an estimate must never be advised at a
+ * fabricated `n=0`. The advisory uses the smaller of the two counts and names
+ * the dimension that triggered it, mirroring the core's `n_advisory` so both
+ * surfaces word the warning identically.
+ */
+export function nAdvisory(outcome: SampleMetadata & { opportunity_score?: number | null }): Advisory | null {
+  const method = outcome.score_method ?? "estimate";
+  if (outcome.opportunity_score == null || method === "estimate") {
+    return null;
+  }
+  const known: [Advisory["dimension"], number][] = [];
+  if (outcome.importance_n != null) known.push(["importance", outcome.importance_n]);
+  if (outcome.satisfaction_n != null) known.push(["satisfaction", outcome.satisfaction_n]);
+  if (!known.length) {
+    return null;
+  }
+  const smallest = Math.min(...known.map(([, n]) => n));
+  if (smallest >= MIN_MEANINGFUL_N) {
+    return null;
+  }
+  const below = known.filter(([, n]) => n === smallest);
+  const dimension: Advisory["dimension"] = below.length === 2 ? "both" : below[0][0];
+  return {
+    n: smallest,
+    threshold: MIN_MEANINGFUL_N,
+    method,
+    dimension,
+    message: `n=${smallest} (${dimension}) is below the advisory threshold of ${MIN_MEANINGFUL_N}; treat this score as a lead to confirm, not a finding.`,
+  };
+}

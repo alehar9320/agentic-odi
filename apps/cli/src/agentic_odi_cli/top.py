@@ -87,6 +87,12 @@ def top(
             f"  [thin] {entry['id']}  {entry['opportunity_score']}  {_band_label(entry)}  "
             f"{_sample_label(entry)}  {entry['statement']}"
         )
+    # The M2-14 advisory is a footer line, not a filter: a below-threshold score
+    # still renders and still ranks, it just says how thin its sample is.
+    for entry in measured + thin:
+        advisory = entry.get("advisory")
+        if advisory:
+            typer.echo(f"  note: {advisory['message']}")
     if not include_thin and sections["thin"]:
         typer.echo(f"  ({len(sections['thin'])} thin outcome(s) not shown; pass --include-thin)")
     if sections["none"]:

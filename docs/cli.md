@@ -214,15 +214,22 @@ agentic-odi coverage --job <job-id>
 default it shows measured outcomes only and names the thin and unscored counts
 it excluded; `--include-thin` adds the thin section, while unscored outcomes stay
 counted but never listed as zero. Each row shows the score, its band or the
-reason it has none, and the per-dimension sample and method. `coverage` reports
-the measured/thin/unscored split for a Job. The `--json` shape for `top` is
-`{"measured": [...], "thin": [...], "excluded": {"thin": n, "none": n}}`, where
-each entry shares keys and semantics with the landscape's outcome entries.
+reason it has none, and the per-dimension sample and method. A row whose recorded
+sample is below the advisory threshold (`MIN_MEANINGFUL_N = 20`) also gets a
+`note:` footer line naming the count, the dimension that triggered it and the
+threshold — a warning, not a filter: the outcome still renders and still ranks.
+`coverage` reports the measured/thin/unscored split for a Job. The `--json` shape
+for `top` is `{"measured": [...], "thin": [...], "excluded": {"thin": n, "none":
+n}}`, where each entry shares keys and semantics with the landscape's outcome
+entries, including an `advisory` object (`{n, threshold, method, dimension,
+message}`) or `null`.
 
 `get` shows the reason from the most recent accepted change as a `note` line, so
-the detail view carries the same "why" as the history. When no reason was
-recorded, or the outcome has no history yet, the line is omitted rather than
-shown empty.
+the detail view carries the same "why" as the history, and prints an `advisory`
+line when the recorded sample is below the threshold. An estimate or an unknown
+count has no advisory — an unknown sample is never reported as `n=0`. When no
+reason was recorded, or the outcome has no history yet, the line is omitted
+rather than shown empty.
 
 `get` also shows the stored band and its provenance as `band` lines: the bounds,
 the sample (`band n`), the confidence level, the seed, the method and the

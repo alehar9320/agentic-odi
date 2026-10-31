@@ -7,6 +7,7 @@ import {
   formatOpportunityScore,
   formatSample,
   isUnderserved,
+  nAdvisory,
 } from "../../lib/odi";
 import { useStudio } from "../../state/StudioContext";
 import type { Outcome } from "../../types";
@@ -746,6 +747,26 @@ function OpportunityTableView({
                   title="How many people stand behind each score, and how it was obtained"
                 >
                   {formatSample(outcome)}
+                  {(() => {
+                    // The M2-14 chip marks exactly the outcomes the shared
+                    // advisory flags; it never hides or re-ranks a row.
+                    const advisory = nAdvisory(outcome);
+                    return advisory ? (
+                      <span
+                        className="studio-pill"
+                        data-testid={`advisory-${outcome.id}`}
+                        title={advisory.message}
+                        style={{
+                          marginLeft: 6,
+                          background: "rgba(251, 191, 36, 0.15)",
+                          color: "var(--studio-amber)",
+                          fontSize: "0.68rem",
+                        }}
+                      >
+                        n&lt;{advisory.threshold}
+                      </span>
+                    ) : null;
+                  })()}
                 </td>
                 <td style={{ padding: "10px 14px", textAlign: "center" }}>
                   <span

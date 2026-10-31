@@ -13,6 +13,7 @@ from agentic_odi_core.errors import NotFoundError, ValidationError
 from agentic_odi_core.evaluation import (
     OutcomeStatementError,
     evaluate_outcome_statement,
+    n_advisory,
     require_outcome_statement,
 )
 from agentic_odi_core.models import (
@@ -454,7 +455,8 @@ class ODIService:
         }
 
     def _ranking_entry(self, outcome: Outcome) -> dict[str, Any]:
-        """The shared ranking entry: score, band, sample and method (B4)."""
+        """The shared ranking entry: score, band, sample, method and advisory (B4)."""
+        advisory = n_advisory(outcome)
         return {
             "id": outcome.id,
             "statement": outcome.statement,
@@ -465,6 +467,17 @@ class ODIService:
             "satisfaction_n": outcome.satisfaction_n,
             "score_method": outcome.score_method,
             "confidence": classify_confidence(outcome),
+            "advisory": (
+                None
+                if advisory is None
+                else {
+                    "n": advisory.n,
+                    "threshold": advisory.threshold,
+                    "method": advisory.method,
+                    "dimension": advisory.dimension,
+                    "message": advisory.message,
+                }
+            ),
         }
 
     def _survey_reference_index(self) -> tuple[set[str], dict[str, str | None]]:

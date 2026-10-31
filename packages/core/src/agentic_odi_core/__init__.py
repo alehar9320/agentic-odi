@@ -28,8 +28,13 @@ from agentic_odi_core.errors import (
     error_status,
 )
 from agentic_odi_core.evaluation import (
+    MIN_MEANINGFUL_N,
+    Advisory,
+    AdvisoryDimension,
     OutcomeStatementError,
+    advisory_for,
     evaluate_outcome_statement,
+    n_advisory,
     statement_to_dict,
 )
 from agentic_odi_core.factory import build_repository
@@ -156,6 +161,11 @@ __all__ = [
     "OnDeviceLLMEngine",
     "OpportunityInterval",
     "OutcomeDelta",
+    "MIN_MEANINGFUL_N",
+    "Advisory",
+    "AdvisoryDimension",
+    "advisory_for",
+    "n_advisory",
     "RateLimitError",
     "RoutingMode",
     "ScoreMethod",

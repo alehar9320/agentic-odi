@@ -414,3 +414,62 @@ def test_show_renders_the_stored_band_and_its_provenance(tmp_path) -> None:
     assert "band n" in shown.output
     assert "band stale" in shown.output
     assert "band stale       no" in shown.output
+
+
+def test_show_prints_the_advisory_for_a_thin_sample(tmp_path) -> None:
+    runner = CliRunner()
+    db = str(tmp_path / "odi.db")
+    job_id = _job_id(runner, db)
+    added = _add(
+        runner,
+        db,
+        job_id,
+        "--importance-n",
+        "4",
+        "--satisfaction-n",
+        "4",
+        "--method",
+        "survey",
+    )
+
+    shown = runner.invoke(app, ["--db", db, "desired-outcomes", "get", added["id"]])
+
+    assert shown.exit_code == 0, shown.output
+    assert "advisory" in shown.output
+    assert "below the advisory threshold" in shown.output
+    assert "4" in shown.output
+
+
+def test_show_omits_the_advisory_for_a_sufficient_sample(tmp_path) -> None:
+    runner = CliRunner()
+    db = str(tmp_path / "odi.db")
+    job_id = _job_id(runner, db)
+    added = _add(
+        runner,
+        db,
+        job_id,
+        "--importance-n",
+        "25",
+        "--satisfaction-n",
+        "25",
+        "--method",
+        "survey",
+    )
+
+    shown = runner.invoke(app, ["--db", db, "desired-outcomes", "get", added["id"]])
+
+    assert shown.exit_code == 0, shown.output
+    assert "advisory" not in shown.output
+
+
+def test_show_omits_the_advisory_for_an_estimate(tmp_path) -> None:
+    # An estimate has no sample; it must not be advised at a fabricated n=0.
+    runner = CliRunner()
+    db = str(tmp_path / "odi.db")
+    job_id = _job_id(runner, db)
+    added = _add(runner, db, job_id)
+
+    shown = runner.invoke(app, ["--db", db, "desired-outcomes", "get", added["id"]])
+
+    assert shown.exit_code == 0, shown.output
+    assert "advisory" not in shown.output

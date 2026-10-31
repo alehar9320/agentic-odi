@@ -388,6 +388,15 @@ the opportunity landscape render them as `est.`, never `n=0`, and show both
 counts (`n=40/12 (survey)`) when the dimensions differ. An `estimate` claiming a
 count above one is rejected before the write.
 
+A recorded sample below the advisory threshold (`MIN_MEANINGFUL_N = 20`) is
+flagged, not hidden. One shared read decides it — `evaluation.n_advisory` in the
+core and `nAdvisory` in `lib/odi.ts` — so the CLI footer, the `desired-outcomes
+get` `advisory` line and the landscape's `n<20` chip word the warning
+identically: the count, the dimension that triggered it (the smaller of the two),
+and the threshold. The advisory is a statement about the data, never a verdict on
+the score, so the row still renders and still ranks; an estimate or an unknown
+count produces no advisory rather than a fabricated `n=0`.
+
 Each accepted score change is also recorded as a `ScoreSnapshot` in the same
 append-only event log, so a score's history replays with the store. The sidecar
 exposes it at `GET /api/outcomes/{outcome_id}/history`; `ScoreSnapshot` is

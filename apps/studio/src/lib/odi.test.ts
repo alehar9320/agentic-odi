@@ -1,12 +1,14 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  MIN_MEANINGFUL_N,
   confidenceClass,
   formatBand,
   formatBandProvenance,
   formatOpportunityScore,
   formatSample,
   isUnderserved,
+  nAdvisory,
   opportunityPill,
   opportunityScore,
 } from "./odi";
@@ -184,5 +186,68 @@ describe("formatBandProvenance", () => {
         },
       }),
     ).toBe("n=40 · 95% · seed unrecorded · stale");
+  });
+});
+
+describe("nAdvisory (M2-14)", () => {
+  it("uses the documented threshold of 20", () => {
+    expect(MIN_MEANINGFUL_N).toBe(20);
+  });
+
+  it("advises a four-response sample and names the number and threshold", () => {
+    const advisory = nAdvisory({
+      score_method: "survey",
+      importance_n: 4,
+      satisfaction_n: 4,
+      opportunity_score: 12,
+    });
+    expect(advisory).not.toBeNull();
+    expect(advisory?.n).toBe(4);
+    expect(advisory?.threshold).toBe(20);
+    expect(advisory?.dimension).toBe("both");
+    expect(advisory?.message).toContain("4");
+    expect(advisory?.message).toContain("20");
+    expect(advisory?.message).toContain("below the advisory threshold");
+  });
+
+  it("does not advise a sample at or above the threshold", () => {
+    expect(
+      nAdvisory({ score_method: "survey", importance_n: 25, satisfaction_n: 25, opportunity_score: 12 }),
+    ).toBeNull();
+  });
+
+  it("pins the boundary strictly below twenty", () => {
+    expect(
+      nAdvisory({ score_method: "survey", importance_n: 19, satisfaction_n: 19, opportunity_score: 12 }),
+    ).not.toBeNull();
+    expect(
+      nAdvisory({ score_method: "survey", importance_n: 20, satisfaction_n: 20, opportunity_score: 12 }),
+    ).toBeNull();
+  });
+
+  it("names the smaller dimension when the two differ", () => {
+    const advisory = nAdvisory({
+      score_method: "survey",
+      importance_n: 40,
+      satisfaction_n: 12,
+      opportunity_score: 12,
+    });
+    expect(advisory?.n).toBe(12);
+    expect(advisory?.dimension).toBe("satisfaction");
+  });
+
+  it("never advises an estimate or an unknown count at a fabricated zero", () => {
+    expect(
+      nAdvisory({ score_method: "estimate", opportunity_score: 12 }),
+    ).toBeNull();
+    expect(
+      nAdvisory({ score_method: "survey", importance_n: null, satisfaction_n: null, opportunity_score: 12 }),
+    ).toBeNull();
+  });
+
+  it("never advises an unscored outcome", () => {
+    expect(
+      nAdvisory({ score_method: "survey", importance_n: 3, satisfaction_n: 3, opportunity_score: null }),
+    ).toBeNull();
   });
 });
