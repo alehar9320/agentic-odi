@@ -4380,6 +4380,120 @@ details[open] summary {
   text-overflow: ellipsis;
 }
 
+/* Claim contract: a chip, a tag, or an underline per sentence */
+.claim-text {
+  display: block;
+}
+
+.claim-text > p,
+.claim-text__heading,
+.claim-text__list {
+  margin: 0 0 0.7em;
+  line-height: 1.62;
+}
+
+.claim-text > *:last-child {
+  margin-bottom: 0;
+}
+
+.claim-text__heading {
+  font-weight: 600;
+}
+
+.claim-text__list {
+  padding-left: 1.2em;
+}
+
+.claim-text__code {
+  margin: 0 0 0.7em;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--surface);
+  overflow-x: auto;
+  font-size: 0.8rem;
+}
+
+.claim-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  max-width: 28ch;
+  margin: 0 3px;
+  padding: 1px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.72em;
+  line-height: 1.6;
+  vertical-align: baseline;
+  cursor: pointer;
+}
+
+.claim-chip:hover {
+  color: var(--text, currentColor);
+  border-color: var(--muted);
+}
+
+.claim-chip:focus-visible {
+  outline: 2px solid var(--muted);
+  outline-offset: 2px;
+}
+
+.claim-chip--missing {
+  cursor: default;
+  border-style: dashed;
+  color: var(--faint);
+}
+
+.claim-chip__label {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.claim-chip__order {
+  color: var(--faint);
+  font-size: 0.8em;
+}
+
+.claim-chip__sample {
+  color: var(--faint);
+  font-size: 0.8em;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.claim-tag {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 1px 7px;
+  border: 1px dashed var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 0.68em;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.claim--uncited {
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+}
+
+.claim-banner {
+  margin: 6px 0 0;
+  color: var(--faint);
+  font-size: 0.72rem;
+}
+
+.evidence.is-focused {
+  border-left-color: var(--amber);
+  box-shadow: 0 0 0 1px var(--line);
+}
+
 .tool-trace {
   display: flex;
   align-items: baseline;

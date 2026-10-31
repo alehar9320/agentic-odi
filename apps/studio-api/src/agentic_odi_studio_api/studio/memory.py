@@ -21,6 +21,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from agentic_odi_studio_api.studio.claims import (
+    Claim,
+    EvidenceSnapshot,
+    split_claims,
+)
+
 OBSERVATION_KINDS: frozenset[str] = frozenset(
     {
         "career",
@@ -55,6 +61,19 @@ class ConversationNotFoundError(MemoryError):
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _json_values(raw: Any) -> list[str]:
+    """Read a snapshot column: a JSON array, or a single plain value."""
+    if not isinstance(raw, str):
+        return []
+    try:
+        parsed = json.loads(raw)
+    except (TypeError, ValueError):
+        return [raw] if raw else []
+    if isinstance(parsed, list):
+        return [value for value in parsed if isinstance(value, str)]
+    return [parsed] if isinstance(parsed, str) else []
 
 
 def default_db_path() -> Path:
@@ -93,6 +112,8 @@ class Turn:
     #: Stable client-facing id, so a branch can be rebuilt without guessing.
     message_id: str | None = None
     parent_id: str | None = None
+    #: What each sentence of this turn stands behind, when it was recorded.
+    claims: list[Claim] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -103,7 +124,24 @@ class Turn:
             "created_at": self.created_at,
             "message_id": self.message_id,
             "parent_id": self.parent_id,
+            "claims": [claim.to_dict() for claim in self.claims],
         }
+
+
+@dataclass
+class TurnCitation:
+    """One stored claim: its status, and the record labels it carried.
+
+    A claim may cite up to three records, and the primary key is the claim, so
+    the three snapshot columns hold JSON arrays. Reading tolerates a plain
+    string, which keeps an older row readable.
+    """
+
+    turn_id: int
+    claim_index: int
+    status: str
+    evidence: list[EvidenceSnapshot] = field(default_factory=list)
+    reason: str | None = None
 
 
 @dataclass
@@ -152,6 +190,17 @@ CREATE TABLE IF NOT EXISTS turns (
 );
 
 CREATE INDEX IF NOT EXISTS turns_by_conversation ON turns(conversation_id);
+
+CREATE TABLE IF NOT EXISTS turn_citations (
+    turn_id INTEGER NOT NULL REFERENCES turns(id) ON DELETE CASCADE,
+    claim_index INTEGER NOT NULL,
+    evidence_id TEXT NOT NULL DEFAULT '[]',
+    evidence_name TEXT NOT NULL DEFAULT '[]',
+    source_name TEXT NOT NULL DEFAULT '[]',
+    status TEXT NOT NULL,
+    reason TEXT,
+    PRIMARY KEY (turn_id, claim_index)
+);
 
 CREATE TABLE IF NOT EXISTS observations (
     id TEXT PRIMARY KEY,
@@ -298,7 +347,8 @@ class StudioMemory:
         content: str,
         message_id: str | None = None,
         parent_id: str | None = None,
-    ) -> None:
+    ) -> int:
+        """Record a turn and return its row id, so citations can be attached."""
         if role not in TURN_ROLES:
             raise MemoryError(f"unknown turn role: {role}")
 
@@ -310,7 +360,7 @@ class StudioMemory:
             if exists is None:
                 raise ConversationNotFoundError(conversation_id)
 
-            self._connection.execute(
+            cursor = self._connection.execute(
                 "INSERT INTO turns "
                 "(conversation_id, role, content, created_at, message_id, parent_id) "
                 "VALUES (?, ?, ?, ?, ?, ?)",
@@ -335,6 +385,72 @@ class StudioMemory:
                 "UPDATE conversations SET updated_at = ? WHERE id = ?",
                 (now, conversation_id),
             )
+        return int(cursor.lastrowid or 0)
+
+    # -- citations ---------------------------------------------------------
+
+    def add_citations(self, turn_id: int, claims: list[Claim]) -> None:
+        """Store one row per claim, idempotently.
+
+        A duplicate retry rewrites the same rows instead of stacking new ones.
+        """
+        with self._lock, self._connection:
+            self._connection.execute("DELETE FROM turn_citations WHERE turn_id = ?", (turn_id,))
+            for claim in claims:
+                ids = [snapshot.id for snapshot in claim.evidence]
+                names = [snapshot.name for snapshot in claim.evidence]
+                sources = [snapshot.source_name for snapshot in claim.evidence]
+                self._connection.execute(
+                    "INSERT OR REPLACE INTO turn_citations "
+                    "(turn_id, claim_index, evidence_id, evidence_name, source_name, status, reason) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    (
+                        turn_id,
+                        claim.index,
+                        json.dumps(ids),
+                        json.dumps(names),
+                        json.dumps(sources),
+                        claim.status,
+                        claim.reason,
+                    ),
+                )
+
+    def citations_for_turn(self, turn_id: int) -> list[TurnCitation]:
+        with self._lock:
+            rows = self._connection.execute(
+                "SELECT * FROM turn_citations WHERE turn_id = ? ORDER BY claim_index ASC",
+                (turn_id,),
+            ).fetchall()
+        return [self._citation_from_row(row) for row in rows]
+
+    def claims_for_turn(self, turn: Turn) -> list[Claim]:
+        """Attach stored citations to a turn by splitting its content again.
+
+        A mismatch in counts means the content and its citations disagree; the
+        citations are dropped rather than attached to the wrong sentence.
+        """
+        rows = self.citations_for_turn(turn.id)
+        if not rows:
+            return []
+        claims = split_claims(turn.content)
+        if len(rows) != len(claims):
+            return []
+        by_index = {row.claim_index: row for row in rows}
+        attached: list[Claim] = []
+        for claim in claims:
+            row = by_index.get(claim.index)
+            if row is None:
+                return []
+            attached.append(
+                Claim(
+                    index=claim.index,
+                    text=claim.text,
+                    status=row.status,  # type: ignore[arg-type]
+                    evidence=tuple(row.evidence),
+                    reason=row.reason,
+                )
+            )
+        return attached
 
     def list_turns(self, conversation_id: str) -> list[Turn]:
         with self._lock:
@@ -403,6 +519,7 @@ class StudioMemory:
                 turn.message_id = f"turn-{turn.id}"
                 turn.parent_id = previous
             previous = turn.message_id
+            turn.claims = self.claims_for_turn(turn)
         return turns
 
     # -- observations ------------------------------------------------------
@@ -507,6 +624,7 @@ class StudioMemory:
 
     def clear_memory(self) -> None:
         with self._lock, self._connection:
+            self._connection.execute("DELETE FROM turn_citations")
             self._connection.execute("DELETE FROM turns")
             self._connection.execute("DELETE FROM observations")
             self._connection.execute("DELETE FROM conversations")
@@ -564,6 +682,28 @@ class StudioMemory:
         )
 
     @staticmethod
+    def _citation_from_row(row: sqlite3.Row) -> TurnCitation:
+        ids = _json_values(row["evidence_id"])
+        names = _json_values(row["evidence_name"])
+        sources = _json_values(row["source_name"])
+        evidence: list[EvidenceSnapshot] = []
+        for position, evidence_id in enumerate(ids):
+            evidence.append(
+                EvidenceSnapshot(
+                    id=evidence_id,
+                    name=names[position] if position < len(names) else evidence_id,
+                    source_name=sources[position] if position < len(sources) else "",
+                )
+            )
+        return TurnCitation(
+            turn_id=row["turn_id"],
+            claim_index=row["claim_index"],
+            status=row["status"],
+            evidence=evidence,
+            reason=row["reason"],
+        )
+
+    @staticmethod
     def _observation_from_row(row: sqlite3.Row) -> Observation:
         try:
             data = json.loads(row["data"])
@@ -594,5 +734,6 @@ __all__ = [
     "ObservationNotFoundError",
     "StudioMemory",
     "Turn",
+    "TurnCitation",
     "default_db_path",
 ]

@@ -69,7 +69,8 @@ per-platform archives with SHA-256 checksums for a manual download. See
   four-step tour stays out of the way, and in-place guidance appears only after
   the first exchange. It turns "a customer still reconciles invoices by hand"
   into a scored outcome, a job map, and a ranked opportunity board — inline in
-  the thread.
+  the thread. Every claim in a reply names the record behind it, or says it is a
+  hypothesis.
 - **Local-first by default.** The CLI and server work with no network and no
   account. Point them at a remote MCP server with one flag.
 - **A catch-up that means something.** Writes emit signals — an outcome
