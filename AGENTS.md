@@ -248,3 +248,10 @@ For the full Kiro tool reference including subagent dispatch patterns and git wo
   `uv run python scripts/pr_guards.py body-truth --base-ref origin/main
   --body-file <file>` before editing the PR. A description that says the spine
   "does not exist yet" while the branch ships it is the failure this catches.
+- **The guides' commands are checked against the CLI and run.** `docs/interviews.md`,
+  `docs/scoring.md`, `docs/decision.md` are parsed by `tests/test_guide_commands.py`,
+  which fails on an unknown command or flag and executes the sequences against a
+  disposable store. `tests/scripts/test_cli_docs.py` fails when any non-hidden
+  CLI command is missing from `docs/cli.md`, so a new command cannot ship
+  undocumented. A hidden group (`outcomes`, the alias of `customer-outcomes`) is
+  exempt; everything else is not.

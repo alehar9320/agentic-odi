@@ -384,6 +384,7 @@ agentic-odi customer-outcomes delete <outcome-id> --yes
 # Compute an ODI Opportunity Score (top-level, also under the group)
 agentic-odi score 8 2
 agentic-odi outcomes score 8 2
+agentic-odi customer-outcomes score 8 2
 ```
 
 `score` applies the ODI opportunity formula,
