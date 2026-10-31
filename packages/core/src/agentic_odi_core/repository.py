@@ -11,8 +11,10 @@ from agentic_odi_core.models import (
     Job,
     Outcome,
     ScheduledWork,
+    Segment,
     Signal,
     Step,
+    Strategy,
 )
 
 _Item = TypeVar("_Item")
@@ -87,6 +89,8 @@ class Repository(Protocol):
     evidence: dict[str, Evidence]
     signals: dict[str, Signal]
     scheduled_work: dict[str, ScheduledWork]
+    segments: dict[str, Segment]
+    strategies: dict[str, Strategy]
 
     def add_job(self, job: Job) -> Job: ...
     def list_jobs(self, limit: int | None = None, offset: int = 0) -> list[Job]: ...
@@ -146,6 +150,14 @@ class Repository(Protocol):
     ) -> list[ScheduledWork]: ...
     def update_scheduled_work(self, work_id: str, updates: dict) -> ScheduledWork | None: ...
     def delete_scheduled_work(self, work_id: str) -> bool: ...
+    def add_segment(self, segment: Segment) -> Segment: ...
+    def get_segment(self, segment_id: str) -> Segment | None: ...
+    def list_segments(self, job_id: str | None = None) -> list[Segment]: ...
+    def update_segment(self, segment_id: str, updates: dict) -> Segment | None: ...
+    def add_strategy(self, strategy: Strategy) -> Strategy: ...
+    def get_strategy(self, strategy_id: str) -> Strategy | None: ...
+    def list_strategies(self, segment_id: str | None = None) -> list[Strategy]: ...
+    def update_strategy(self, strategy_id: str, updates: dict) -> Strategy | None: ...
 
     def clear(self) -> None: ...
     def reload(self) -> None: ...
@@ -162,6 +174,8 @@ class InMemoryRepository:
         self.evidence: dict[str, Evidence] = {}
         self.signals: dict[str, Signal] = {}
         self.scheduled_work: dict[str, ScheduledWork] = {}
+        self.segments: dict[str, Segment] = {}
+        self.strategies: dict[str, Strategy] = {}
 
     def add_job(self, job: Job) -> Job:
         self.jobs[job.id] = job
@@ -413,6 +427,52 @@ class InMemoryRepository:
             return True
         return False
 
+    def add_segment(self, segment: Segment) -> Segment:
+        self.segments[segment.id] = segment
+        return segment
+
+    def get_segment(self, segment_id: str) -> Segment | None:
+        return self.segments.get(segment_id)
+
+    def list_segments(self, job_id: str | None = None) -> list[Segment]:
+        items = list(self.segments.values())
+        if job_id is not None:
+            items = [segment for segment in items if segment.job_id == job_id]
+        return items
+
+    def update_segment(self, segment_id: str, updates: dict) -> Segment | None:
+        segment = self.segments.get(segment_id)
+        if segment is None:
+            return None
+        current = segment.model_dump(exclude_unset=True)
+        current.update(updates)
+        new_segment = segment.model_validate(current)
+        self.segments[segment_id] = new_segment
+        return new_segment
+
+    def add_strategy(self, strategy: Strategy) -> Strategy:
+        self.strategies[strategy.id] = strategy
+        return strategy
+
+    def get_strategy(self, strategy_id: str) -> Strategy | None:
+        return self.strategies.get(strategy_id)
+
+    def list_strategies(self, segment_id: str | None = None) -> list[Strategy]:
+        items = list(self.strategies.values())
+        if segment_id is not None:
+            items = [strategy for strategy in items if strategy.segment_id == segment_id]
+        return items
+
+    def update_strategy(self, strategy_id: str, updates: dict) -> Strategy | None:
+        strategy = self.strategies.get(strategy_id)
+        if strategy is None:
+            return None
+        current = strategy.model_dump(exclude_unset=True)
+        current.update(updates)
+        new_strategy = strategy.model_validate(current)
+        self.strategies[strategy_id] = new_strategy
+        return new_strategy
+
     def clear(self) -> None:
         self.jobs.clear()
         self.scheduled_work.clear()
@@ -421,6 +481,8 @@ class InMemoryRepository:
         self.customer_outcomes.clear()
         self.evidence.clear()
         self.signals.clear()
+        self.segments.clear()
+        self.strategies.clear()
 
     def reload(self) -> None:
         """Reset in-memory state; there is no external store to re-read."""
