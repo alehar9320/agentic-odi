@@ -16,6 +16,7 @@ import json
 import shutil
 import subprocess
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
 import typer
@@ -38,6 +39,23 @@ DECIDED_AT_OPTION = typer.Option(
 )
 SUPERSEDES_OPTION = typer.Option(None, "--supersedes", help="Decision ID this one replaces")
 DECISION_ID_OPTION = typer.Option(..., "--decision-id", help="Decision to assemble a memo for")
+MEMO_FORMATS = ("md", "html")
+MEMO_FORMAT_OPTION = typer.Option("md", "--format", help="Output format: md or html.")
+MEMO_OUT_OPTION = typer.Option(None, "--out", help="Write to this path instead of stdout.")
+MEMO_GENERATED_AT_OPTION = typer.Option(
+    None,
+    "--generated-at",
+    help="Timestamp stamped on the export. Defaults to the export time in UTC.",
+)
+MEMO_NARRATE_OPTION = typer.Option(
+    False,
+    "--narrate/--no-narrate",
+    help=(
+        "Add one labelled framing paragraph, drafted by a model and checked "
+        "against the memo's own numbers. Off by default; --no-narrate is "
+        "byte-identical to the factual memo."
+    ),
+)
 CHANNEL_OPTION = typer.Option("slack", "--channel", help="slack or email")
 LINK_OPTION = typer.Option(None, "--link", help="Canonical link to the full memo")
 VERBOSE_OPTION = typer.Option(False, "--verbose", help="Report dropped sentences")
@@ -62,9 +80,7 @@ def copy_to_clipboard(text: str) -> bool:
         if executable is None:
             continue
         try:
-            completed = subprocess.run(
-                [executable, *args], input=text.encode(), check=False
-            )
+            completed = subprocess.run([executable, *args], input=text.encode(), check=False)
         except OSError:
             continue
         if completed.returncode == 0:
@@ -134,15 +150,112 @@ def record(
 @decide_app.command("memo")
 def memo(
     decision_id: str = DECISION_ID_OPTION,
+    output_format: str = MEMO_FORMAT_OPTION,
+    out: Path | None = MEMO_OUT_OPTION,
+    generated_at: str | None = MEMO_GENERATED_AT_OPTION,
+    narrate: bool = MEMO_NARRATE_OPTION,
     json_output: bool = JSON_OPTION,
 ) -> None:
-    """Assemble the decision memo from what is already recorded."""
-    payload = run_tool("render_memo", {"decision_id": decision_id})
+    """Assemble the decision memo from what is already recorded, and export it.
+
+    With no ``--format``/``--out``/``--narrate`` this is the same markdown the
+    Studio shows, byte for byte. ``--format html`` wraps it in a standalone,
+    printable document that carries the export time and the store's schema
+    version. ``--narrate`` adds one labelled framing paragraph through the same
+    narrator ``M3-04`` uses; a sentence with an absent numeral is dropped and
+    recorded rather than printed. The memo is generated on read, never stored.
+    """
+    fmt = output_format.lower()
+    if fmt not in MEMO_FORMATS:
+        typer.echo(f"Error: unknown format '{output_format}', expected md or html", err=True)
+        raise typer.Exit(code=1)
+
+    from agentic_odi_core import (
+        SCHEMA_VERSION,
+        Bet,
+        Decision,
+        Evidence,
+        Outcome,
+        build_memo,
+        render_memo_html,
+        render_memo_markdown,
+    )
+
+    raw_decision = run_tool("get_decision", {"decision_id": decision_id})
+    try:
+        decision = Decision.model_validate(raw_decision)
+    except Exception as error:  # noqa: BLE001 - an unreadable record is "not found" here
+        typer.echo(f"Error: decision not found: {decision_id}", err=True)
+        raise typer.Exit(code=1) from error
+
+    outcomes = [
+        Outcome.model_validate(record)
+        for record in _as_list(run_tool("get_outcomes", {"job_id": decision.job_id}))
+    ]
+    evidence = [
+        Evidence.model_validate(record)
+        for record in _as_list(run_tool("list_evidence", {"job_id": decision.job_id}))
+    ]
+    bets = [
+        Bet.model_validate(record)
+        for record in _as_list(run_tool("list_bets", {"decision_id": decision.id}))
+    ]
+    memo = build_memo(decision, outcomes=outcomes, evidence=evidence, bets=bets)
+
+    narrative = _narrate_memo(memo) if narrate else None
+    stamped_at = generated_at or datetime.now(timezone.utc).isoformat()
+    if fmt == "html":
+        document = render_memo_html(
+            memo,
+            source=f"decision {decision_id}",
+            generated_at=stamped_at,
+            schema_version=SCHEMA_VERSION,
+            narrative=narrative,
+        )
+    else:
+        document = render_memo_markdown(memo, narrative=narrative)
+
     if json_output:
+        payload: dict[str, Any] = {"decision_id": decision_id, "markdown": document}
+        if narrative is not None:
+            payload["dropped"] = [
+                {"sentence": drop.sentence, "reason": drop.reason} for drop in narrative.dropped
+            ]
         typer.echo(json.dumps(payload, indent=2, ensure_ascii=False))
         return
-    markdown = payload["markdown"] if isinstance(payload, dict) else payload
-    typer.echo(markdown, nl=False)
+
+    if out is None:
+        typer.echo(document, nl=False)
+        return
+    try:
+        out.write_text(document, encoding="utf-8")
+    except OSError as error:
+        typer.echo(f"Error: could not write {out}: {error}", err=True)
+        raise typer.Exit(code=1) from error
+    typer.echo(str(out))
+
+
+def _as_list(payload: Any) -> list[dict[str, Any]]:
+    """A tool result as a list of records. A non-list is treated as empty."""
+    return [item for item in payload if isinstance(item, dict)] if isinstance(payload, list) else []
+
+
+def _narrate_memo(memo: Any) -> Any:
+    """Draft and check the memo's one framing paragraph (M3-11.2/ALH-171).
+
+    Reuses ``M3-04``'s narrator and numeral guarantee. A provider failure — or no
+    provider — becomes a narrative whose drop list names it, so the factual memo
+    still exports and the reader sees why the drafted block is absent.
+    """
+    from agentic_odi_core import DroppedSentence, Narrative, narrate_memo
+
+    from agentic_odi_cli.narrator import OpenAINarrator
+
+    try:
+        narrator = OpenAINarrator.from_env()
+    except Exception as error:  # noqa: BLE001 - no provider is a drop, not a crash
+        return Narrative(dropped=(DroppedSentence("", f"no narrator configured: {error}"),))
+    return narrate_memo(memo, narrator)
 
 
 @decide_app.command("message")

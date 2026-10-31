@@ -149,6 +149,8 @@ class RenderMemoRequest(BaseModel):
     """Assemble the decision memo from what is already recorded."""
 
     decision_id: str = Field(min_length=1)
+    format: Literal["md", "html"] = "md"
+    generated_at: str | None = None
     mcp_url: str = ""
 
 

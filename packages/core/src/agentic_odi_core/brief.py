@@ -656,6 +656,20 @@ def _render_narrative(narrative: Narrative | None) -> list[str]:
     return lines
 
 
+def render_narrative_block(narrative: Narrative | None) -> str:
+    """The drafted block as a standalone fragment, or ``""`` when there is none.
+
+    The one public seam onto :func:`_render_narrative`, so an exporter that
+    composes its own document (the memo export, M3-11.2/ALH-171) cannot print an
+    unlabelled drafted claim or invent a second label string. Returns markdown
+    ending in a newline, or the empty string when nothing should be shown.
+    """
+    lines = _render_narrative(narrative)
+    if not lines:
+        return ""
+    return "\n".join(lines).rstrip("\n") + "\n"
+
+
 def _render_strategy(strategy: BriefStrategy | None) -> list[str]:
     """*The strategy* — the recorded choice, its reason, and its expected effect.
 

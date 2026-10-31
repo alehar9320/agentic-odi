@@ -248,3 +248,131 @@ def test_message_verbose_reports_a_dropped_sentence(tmp_path) -> None:
     assert message.exit_code == 0, message.output
     assert "dropped for length" in message.output
     assert "action" in message.output
+
+
+# ------------------------------------------ export + narrate (M3-11.2/ALH-171)
+
+
+def test_memo_html_export_is_standalone_and_carries_the_schema_version(tmp_path) -> None:
+    from agentic_odi_core import SCHEMA_VERSION
+
+    db = str(tmp_path / "studio.db")
+    job_id, ids = _seed(db)
+    decision_id = _decide(db, job_id, ids[0], ids[1])
+
+    result = runner.invoke(
+        app,
+        [
+            "--db",
+            db,
+            "decide",
+            "memo",
+            "--decision-id",
+            decision_id,
+            "--format",
+            "html",
+            "--generated-at",
+            "2026-10-29T12:00:00Z",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert result.output.startswith("<!DOCTYPE html>")
+    assert "<style>" in result.output
+    assert "Exported from the recorded data" in result.output
+    assert f"Schema version: {SCHEMA_VERSION}" in result.output
+    assert "2026-10-29T12:00:00Z" in result.output
+    assert "http://" not in result.output and "https://" not in result.output
+
+
+def test_memo_default_export_is_unchanged_markdown(tmp_path) -> None:
+    db = str(tmp_path / "studio.db")
+    job_id, ids = _seed(db)
+    decision_id = _decide(db, job_id, ids[0], ids[1])
+
+    default = runner.invoke(app, ["--db", db, "decide", "memo", "--decision-id", decision_id])
+    explicit = runner.invoke(
+        app, ["--db", db, "decide", "memo", "--decision-id", decision_id, "--no-narrate"]
+    )
+    assert default.exit_code == 0 and explicit.exit_code == 0
+    assert default.output == explicit.output
+    assert default.output.startswith("# Decision memo")
+
+
+def test_memo_export_writes_to_out_path(tmp_path) -> None:
+    db = str(tmp_path / "studio.db")
+    job_id, ids = _seed(db)
+    decision_id = _decide(db, job_id, ids[0], ids[1])
+    destination = tmp_path / "memo.md"
+
+    result = runner.invoke(
+        app,
+        [
+            "--db",
+            db,
+            "decide",
+            "memo",
+            "--decision-id",
+            decision_id,
+            "--out",
+            str(destination),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert result.output.strip() == str(destination)
+    assert destination.read_text(encoding="utf-8").startswith("# Decision memo")
+
+
+def test_memo_unknown_format_exits_nonzero(tmp_path) -> None:
+    db = str(tmp_path / "studio.db")
+    job_id, ids = _seed(db)
+    decision_id = _decide(db, job_id, ids[0], ids[1])
+    result = runner.invoke(
+        app, ["--db", db, "decide", "memo", "--decision-id", decision_id, "--format", "pdf"]
+    )
+    assert result.exit_code != 0
+    assert "unknown format" in result.output.lower()
+
+
+def test_memo_unwritable_destination_exits_nonzero(tmp_path) -> None:
+    db = str(tmp_path / "studio.db")
+    job_id, ids = _seed(db)
+    decision_id = _decide(db, job_id, ids[0], ids[1])
+    missing_dir = tmp_path / "nope" / "memo.md"
+    result = runner.invoke(
+        app,
+        [
+            "--db",
+            db,
+            "decide",
+            "memo",
+            "--decision-id",
+            decision_id,
+            "--out",
+            str(missing_dir),
+        ],
+    )
+    assert result.exit_code != 0
+    assert "could not write" in result.output.lower()
+    assert not missing_dir.exists()
+
+
+def test_memo_narrate_without_a_provider_still_exports_and_reports(tmp_path, monkeypatch) -> None:
+    """--narrate with no provider keeps the factual memo and says why the block is absent."""
+
+    def _no_provider(cls=None):
+        raise RuntimeError("no provider configured")
+
+    monkeypatch.setattr(
+        "agentic_odi_cli.narrator.OpenAINarrator.from_env", classmethod(_no_provider)
+    )
+    db = str(tmp_path / "studio.db")
+    job_id, ids = _seed(db)
+    decision_id = _decide(db, job_id, ids[0], ids[1])
+
+    result = runner.invoke(
+        app,
+        ["--db", db, "decide", "memo", "--decision-id", decision_id, "--narrate"],
+    )
+    assert result.exit_code == 0, result.output
+    assert result.output.startswith("# Decision memo")
+    assert "narrator failed" in result.output or "no narrator configured" in result.output

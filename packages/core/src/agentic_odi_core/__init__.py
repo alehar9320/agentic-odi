@@ -25,6 +25,7 @@ from agentic_odi_core.brief import (
     NarratorError,
     render_brief,
     render_narrative,
+    render_narrative_block,
     select_brief_strategy,
     select_underserved,
 )
@@ -80,11 +81,16 @@ from agentic_odi_core.memo import (
     Memo,
     MemoBet,
     MemoDecisionNotFoundError,
+    MemoNarrativeInput,
     MemoRejection,
     MessageBudgetError,
     StakeholderMessage,
     build_memo,
+    memo_narrative_input,
+    narrate_memo,
     render_memo,
+    render_memo_html,
+    render_memo_markdown,
     render_stakeholder_message,
 )
 from agentic_odi_core.messages import (
@@ -164,7 +170,7 @@ from agentic_odi_core.roadmap import (
     render_roadmap,
 )
 from agentic_odi_core.router import ModelRouter, ModelTier, OnDeviceLLMEngine, RoutingMode
-from agentic_odi_core.schema import odi_schema
+from agentic_odi_core.schema import SCHEMA_VERSION, odi_schema
 from agentic_odi_core.segment_profile import (
     ProfileEntry,
     SegmentProfile,
@@ -250,6 +256,7 @@ __all__ = [
     "Narrator",
     "NarratorError",
     "render_narrative",
+    "render_narrative_block",
     "Memo",
     "MemoBet",
     "MemoRejection",
@@ -262,6 +269,11 @@ __all__ = [
     "build_memo",
     "render_memo",
     "render_stakeholder_message",
+    "MemoNarrativeInput",
+    "memo_narrative_input",
+    "narrate_memo",
+    "render_memo_markdown",
+    "render_memo_html",
     "Roadmap",
     "RoadmapEntry",
     "build_roadmap",
@@ -353,6 +365,7 @@ __all__ = [
     "job_not_found",
     "job_stage_catalog",
     "odi_schema",
+    "SCHEMA_VERSION",
     "outcome_not_found",
     "parse_tool_result",
     "statement_to_dict",

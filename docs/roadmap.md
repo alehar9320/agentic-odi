@@ -27,6 +27,14 @@ it is merged; the link is the proof.
   bytes; a missing section is omitted with a one-line reason, never a zero. The
   same projection backs `POST /api/decisions/memo` and the MCP `render_memo`
   tool.
+- [x] **The memo leaves the app**: `odi decide memo --format html --out memo.html`
+  writes a standalone, printable document that inlines its own paper CSS, escapes
+  hostile text and carries the export time and the store's schema version.
+  `--narrate` adds one labelled framing paragraph through the brief's narrator
+  and its numeral guarantee; `--no-narrate` stays byte-identical to the factual
+  memo. The `decision-memo` card shows the same markdown with one keyboard
+  download action, and `POST /api/decisions/memo?format=html` returns the same
+  document the CLI writes.
 - [x] **The stakeholder message writes itself**: `odi decide message` cuts the
   memo to a short, pasteable message within a channel's word budget (`slack` 120,
   `email` 200) — what we found, what we are doing, what it is worth, the largest

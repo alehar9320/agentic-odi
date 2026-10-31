@@ -19,6 +19,7 @@ from agentic_odi_connectors.registry import (
     DuplicateConnectorError,
 )
 from agentic_odi_core import (
+    SCHEMA_VERSION,
     DecisionNotFoundError,
     EvidenceNotFoundError,
     JobNotFoundError,
@@ -33,7 +34,8 @@ from agentic_odi_core import (
     ValueOutOfRangeError,
     error_status,
     outcome_delta,
-    render_memo,
+    render_memo_html,
+    render_memo_markdown,
 )
 from agentic_odi_core.remote import StudioError, StudioErrorCode
 from fastapi import APIRouter, HTTPException, Query, Request
@@ -710,6 +712,10 @@ async def post_decision_memo(body: RenderMemoRequest, request: Request) -> dict:
     A read-only projection: it writes nothing and invokes no provider. Every
     section is a projection of rows that already exist; a missing one is omitted
     with a one-line reason, never placeholder prose and never a zero.
+
+    ``format=html`` returns the same facts as a standalone, printable document
+    that carries the supplied timestamp and the store's schema version, so the
+    Studio's download action and the CLI export share one projection.
     """
     if _uses_mcp(request):
         result = await call_mcp_tool(
@@ -722,7 +728,28 @@ async def post_decision_memo(body: RenderMemoRequest, request: Request) -> dict:
         memo = _service(request).build_memo(body.decision_id)
     except Exception as exc:  # noqa: BLE001
         raise _as_http_error(exc) from exc
-    return {"decision_id": memo.decision_id, "markdown": render_memo(memo)}
+    if body.format == "html":
+        document = render_memo_html(
+            memo,
+            source=f"decision {body.decision_id}",
+            generated_at=body.generated_at or datetime.now(timezone.utc).isoformat(),
+            schema_version=SCHEMA_VERSION,
+        )
+        return {
+            "decision_id": memo.decision_id,
+            "format": "html",
+            "markdown": render_memo_markdown(memo),
+            "html": document,
+            "filename": f"decision-{memo.decision_id}.html",
+            "schema_version": SCHEMA_VERSION,
+        }
+    return {
+        "decision_id": memo.decision_id,
+        "format": "md",
+        "markdown": render_memo_markdown(memo),
+        "filename": f"decision-{memo.decision_id}.md",
+        "schema_version": SCHEMA_VERSION,
+    }
 
 
 @router.get("/decisions/{decision_id}/message")

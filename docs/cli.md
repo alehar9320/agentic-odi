@@ -330,6 +330,8 @@ and the Studio's decision-review card.
 ```bash
 agentic-odi decide memo --decision-id DEC-1
 agentic-odi decide memo --decision-id DEC-1 --json
+agentic-odi decide memo --decision-id DEC-1 --format html --out memo.html
+agentic-odi decide memo --decision-id DEC-1 --narrate
 ```
 
 `decide memo` assembles the one-page memo a product leader can sign from what is
@@ -342,6 +344,17 @@ with a one-line reason (`No value estimate recorded`, `No bet recorded`), never
 placeholder prose and never a zero; a value's unit and source travel with the
 number. The same projection backs `POST /api/decisions/memo` and the MCP
 `render_memo` tool.
+
+The memo can leave the app. `--format html` wraps the same markdown in a
+standalone, printable document that inlines its own paper CSS, escapes hostile
+text and carries the export time (`--generated-at`, defaulting to now in UTC) and
+the store's schema version — the file opens offline and prints as it reads.
+`--out` writes it to a path instead of stdout and prints the path; an unwritable
+destination exits non-zero and leaves no artifact. `--narrate` adds one labelled
+framing paragraph drafted through the same narrator `odi brief export --narrate`
+uses: every numeral is checked to exist in the memo, a failing sentence is
+dropped and recorded, and `--no-narrate` — the default — is byte-identical to the
+factual memo. The memo is generated on read and never stored as a row.
 
 ## Draft the stakeholder message
 

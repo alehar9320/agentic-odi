@@ -392,6 +392,15 @@ with nothing to say is omitted with a one-line reason, never placeholder prose
 and never a zero. It is the same projection `odi decide memo` renders and the
 MCP `render_memo` tool returns.
 
+The memo can leave the app: `odi decide memo --format html --out memo.html`
+writes a standalone, printable document that inlines its own paper CSS, escapes
+hostile text and carries the export time and the store's schema version.
+`--narrate` adds one labelled framing paragraph through the same narrator the
+brief uses, with the same numeral guarantee; the default export stays
+byte-identical to the factual memo. The `decision_memo` card shows the same
+markdown and offers one keyboard-reachable download action, so a memo that was
+read can also be signed.
+
 The stakeholder message is that memo cut to a pasteable length: what we found,
 what we are doing, what it is worth, the largest unknown, and a link, within a
 channel's word budget. The largest unknown is never dropped for length, and

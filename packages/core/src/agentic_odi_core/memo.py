@@ -25,9 +25,15 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
-from agentic_odi_core.brief import NOT_MEASURED
+from agentic_odi_core.brief import (
+    NOT_MEASURED,
+    BriefInput,
+    BriefOutcome,
+    Narrative,
+    render_narrative_block,
+)
 from agentic_odi_core.errors import NotFoundError, ValidationError
 from agentic_odi_core.evaluation import classify_opportunity, classify_value
 from agentic_odi_core.models import Bet, Decision, Evidence, Outcome
@@ -462,8 +468,8 @@ def render_memo(memo: Memo) -> str:
     Every section is present only when it has something to say; a missing one is
     replaced by its one-line reason, never placeholder prose and never a zero.
     """
-    lines: list[str] = [f"# Decision memo — `{memo.decision_id}`", ""]
 
+    lines: list[str] = [f"# Decision memo — `{memo.decision_id}`", ""]
     lines.append("## Decision")
     lines.append("")
     if memo.superseded_by:
@@ -538,3 +544,149 @@ def render_memo(memo: Memo) -> str:
     lines.append("")
 
     return "\n".join(lines).rstrip("\n") + "\n"
+
+
+# ------------------------------------------------------------ export (M3-11.2)
+
+
+@dataclass(frozen=True)
+class MemoNarrativeInput:
+    """The memo's facts, shaped for the narrator's numeral guarantee (M3-11.2).
+
+    The memo is a projection of records, not a :class:`BriefInput`, so a narrator
+    that speaks :class:`~agentic_odi_core.brief.Narrator` needs the facts it
+    checks numerals against. This is the one adapter between the two: the memo's
+    chosen claims become brief outcomes (score, sample and sources travel with
+    them), and the decision's rationale is the consideration. Nothing is
+    recomputed — a field nobody supplied stays ``None``.
+    """
+
+    memo: Memo
+    brief: BriefInput
+
+
+def memo_narrative_input(memo: Memo) -> MemoNarrativeInput:
+    """Project a :class:`Memo` into the :class:`BriefInput` a narrator checks against.
+
+    Only the chosen outcomes are exposed: a drafted framing sentence is about the
+    decision, so a numeral must trace to a chosen outcome or a memo-level fact
+    (the decision id, the evidence count). The rationale is the decision under
+    consideration, and the holes are the recorded unknowns.
+    """
+    outcomes = tuple(
+        BriefOutcome(
+            outcome_id=claim.outcome_id,
+            statement=claim.statement or claim.outcome_id,
+            score=claim.score,
+            n=claim.n,
+            sources=claim.sources,
+        )
+        for claim in memo.chosen
+    )
+    brief = BriefInput(
+        job_id=memo.job_id,
+        job_name=memo.job_id,
+        generated_at=memo.decided_at,
+        outcomes=outcomes,
+        decision_consideration=memo.rationale,
+        evidence_count=len(memo.sources),
+        holes=memo.holes,
+    )
+    return MemoNarrativeInput(memo=memo, brief=brief)
+
+
+def narrate_memo(memo: Memo, narrator: Any) -> Narrative:
+    """Draft and check one framing paragraph for the memo (M3-11.2/ALH-171).
+
+    Reuses ``M3-04``'s narrator and its numeral/link guarantee — there is no
+    second model policy. The narrator is handed the memo's own facts and its
+    draft is validated by :func:`~agentic_odi_core.brief.render_narrative`, so a
+    sentence with an absent numeral is dropped with a recorded reason rather than
+    printed. The result is a :class:`Narrative` the export renders in one
+    labelled block; the factual memo is unchanged whether or not it survives.
+    """
+    from agentic_odi_core.brief import render_narrative
+
+    return render_narrative(memo_narrative_input(memo).brief, narrator)
+
+
+def render_memo_markdown(memo: Memo, *, narrative: Narrative | None = None) -> str:
+    """The exported markdown: the factual memo, plus one labelled drafted block.
+
+    With no narrative this is byte-identical to :func:`render_memo` — the default
+    export stays the deterministic assembly. A narrated export appends the
+    labelled block after the memo's own sections, so a reader always knows which
+    paragraph a model wrote.
+    """
+    base = render_memo(memo)
+    if narrative is None:
+        return base
+    block = render_narrative_block(narrative)
+    if not block:
+        return base
+    return base.rstrip("\n") + "\n\n" + block
+
+
+def render_memo_html(
+    memo: Memo,
+    *,
+    source: str,
+    generated_at: str,
+    schema_version: int,
+    narrative: Narrative | None = None,
+) -> str:
+    """A standalone, printable HTML memo (M3-11.2/ALH-171).
+
+    Reuses ``C4``'s approach: the markdown is escaped and rendered as pre-wrapped
+    text, so a quote that contains markup stays text instead of executing, and
+    the document carries no app CSS and no network asset, so it opens offline.
+    The banner states the source, the export time and the schema version — the
+    metadata the caller supplied, never a research claim.
+    """
+    import html as _html
+
+    body = _html.escape(render_memo_markdown(memo, narrative=narrative))
+    banner = (
+        '<p class="memo__banner">'
+        "Exported from the recorded data — a snapshot, not a live view. "
+        f"Source: {_html.escape(source)}. "
+        f"Generated: {_html.escape(generated_at)}. "
+        f"Schema version: {schema_version}."
+        "</p>"
+    )
+    return (
+        "<!DOCTYPE html>\n"
+        '<html lang="en">\n<head>\n<meta charset="utf-8">\n'
+        "<title>Decision memo</title>\n"
+        f"<style>{_MEMO_PRINT_TOKENS}</style>\n</head>\n<body>\n"
+        f"{banner}\n"
+        f'<div class="memo__body">{body}</div>\n'
+        "</body>\n</html>\n"
+    )
+
+
+#: The paper rules the Studio's print sheet uses, inlined so the exported file is
+#: standalone. Kept here so the memo's HTML export needs no app asset.
+_MEMO_PRINT_TOKENS = """
+  @page { size: A4; margin: 14mm; }
+  body {
+    margin: 0 auto;
+    max-width: 46rem;
+    padding: 2rem 1.25rem 4rem;
+    background: #fff;
+    color: #111;
+    font: 16px/1.6 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  h1 { font-size: 1.6rem; line-height: 1.2; }
+  h2 { margin-top: 2rem; font-size: 1.2rem; }
+  code { background: #f4f4f5; padding: 0.1em 0.3em; border-radius: 4px; }
+  .memo__banner {
+    margin: 0 0 2rem;
+    padding: 0.6rem 0.8rem;
+    border: 1px solid #d4d4d8;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    color: #3f3f46;
+  }
+  .memo__body { white-space: pre-wrap; }
+"""

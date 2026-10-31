@@ -328,6 +328,45 @@ export const CATALOG: readonly UiCatalogEntry[] = [
     ["title", "bet", "rationale"],
   ),
   entry(
+    "decision-memo",
+    "leaf",
+    "The one-page decision memo, ready to leave the app. Shows the same markdown `odi decide memo` renders and offers one download. The file is written from the payload alone, so it carries no live view; a missing measurement is `not measured`, never a zero. Render it once, then one sentence — never restate in prose what the card shows.",
+    {
+      title: { type: "string" },
+      markdown: {
+        type: "string",
+        description: "The memo body, exactly as the projection rendered it.",
+      },
+      html: {
+        type: "string",
+        description:
+          "The standalone printable document, when the server rendered one. The download uses this; the card still shows the markdown.",
+      },
+      source: {
+        type: "string",
+        description: "What the export names as its origin, e.g. \"decision DEC-1\".",
+      },
+      generated_at: {
+        type: "string",
+        description: "Supplied export timestamp; the client never reads its own clock.",
+      },
+      schema_version: {
+        type: "integer",
+        minimum: 0,
+        description: "The store's schema version stamped on the export.",
+      },
+      filename: {
+        type: "string",
+        description: "Suggested download filename. Defaults to the decision id.",
+      },
+      drafted: {
+        type: "boolean",
+        description: "True when a labelled, model-written framing block is included.",
+      },
+    },
+    ["markdown"],
+  ),
+  entry(
     "outcome-compare",
     "leaf",
     "Two or three outcomes on the same axes, one row per metric and one column per outcome, so a choice is visible instead of argued. Use when comparing bets; never name a winner.",

@@ -7,6 +7,7 @@ import { readActions } from "./actions";
 import { ActionRow, MeterBar, ScorePill, type NodeProps } from "./primitives";
 import { num, str, type Tone } from "./props";
 import { Markdown } from "../components/chat/Markdown";
+import { downloadMarkdown } from "../lib/export";
 
 /* ------------------------------------------------------------------ */
 /* Shared readers                                                      */
@@ -419,6 +420,75 @@ export function DecisionRecord({ node }: NodeProps) {
           </dd>
         </div>
       </dl>
+
+      <ActionRow actions={readActions(node.props)} />
+    </article>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* decision-memo                                                       */
+/* ------------------------------------------------------------------ */
+
+export function DecisionMemo({ node }: NodeProps) {
+  const title = str(node.props, "title");
+  const markdown = str(node.props, "markdown");
+  const html = str(node.props, "html");
+  const source = str(node.props, "source");
+  const generatedAt = str(node.props, "generated_at");
+  const schemaVersion =
+    typeof node.props.schema_version === "number" ? node.props.schema_version : null;
+  const drafted = node.props.drafted === true;
+  const fallback = html ? "decision-memo.html" : "decision-memo.md";
+  const filename = str(node.props, "filename") || fallback;
+  const downloadBody = html || markdown;
+
+  const meta: string[] = [];
+  if (source) {
+    meta.push(`Source: ${source}`);
+  }
+  if (generatedAt) {
+    meta.push(`Generated ${generatedAt}`);
+  }
+  if (schemaVersion != null) {
+    meta.push(`Schema v${schemaVersion}`);
+  }
+
+  return (
+    <article className="ui-card ui-card--memo" aria-label={title || "Decision memo"}>
+      <header className="ui-card__head">
+        <span className="ui-card__id">Decision memo</span>
+        {drafted ? <ScorePill tone="info">Includes drafted framing</ScorePill> : null}
+      </header>
+
+      {title ? <h4 className="ui-card__title">{title}</h4> : null}
+
+      {meta.length > 0 ? <p className="ui-memo__meta">{meta.join(" · ")}</p> : null}
+
+      {markdown ? (
+        <div className="ui-memo__body">
+          <Markdown source={markdown} />
+        </div>
+      ) : (
+        <p className="ui-memo__empty">Nothing to export yet — no memo was assembled.</p>
+      )}
+
+      <div className="ui-memo__actions">
+        <button
+          type="button"
+          className="ui-action ui-action--primary"
+          disabled={!downloadBody}
+          onClick={() =>
+            downloadMarkdown(
+              downloadBody,
+              filename,
+              html ? "text/html;charset=utf-8" : "text/markdown;charset=utf-8",
+            )
+          }
+        >
+          Download memo
+        </button>
+      </div>
 
       <ActionRow actions={readActions(node.props)} />
     </article>

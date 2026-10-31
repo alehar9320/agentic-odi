@@ -21,6 +21,13 @@ import re
 from pathlib import Path
 
 import pytest
+from agentic_odi_core.brief import (
+    DRAFTED_LABEL,
+    BriefInput,
+    DraftedClaim,
+    NarrativeDraft,
+    NarratorError,
+)
 from agentic_odi_core.memo import (
     EMAIL_WORD_BUDGET,
     NO_CRITERIA_NOTE,
@@ -32,11 +39,15 @@ from agentic_odi_core.memo import (
     MemoDecisionNotFoundError,
     MessageBudgetError,
     build_memo,
+    narrate_memo,
     render_memo,
+    render_memo_html,
+    render_memo_markdown,
     render_stakeholder_message,
 )
 from agentic_odi_core.models import Decision, Evidence, Outcome, Rejection
 from agentic_odi_core.repository import InMemoryRepository
+from agentic_odi_core.schema import SCHEMA_VERSION
 from agentic_odi_core.services import ODIService
 
 GOLDEN = Path(__file__).parent / "golden" / "memo_fixture_decision.md"
@@ -530,3 +541,141 @@ def test_building_a_message_writes_nothing() -> None:
     before = snapshot()
     service.build_stakeholder_message(decision.id, channel="slack")
     assert snapshot() == before
+
+
+# ----------------------------------------------- export + narrate (M3-11.2/ALH-171)
+
+
+class _ExportNarrator:
+    """A fixture narrator that returns a fixed draft. No model is involved."""
+
+    def __init__(self, draft: NarrativeDraft) -> None:
+        self._draft = draft
+
+    def draft(self, brief: BriefInput) -> NarrativeDraft:
+        return self._draft
+
+
+def _export_memo():
+    return _full_memo()
+
+
+def test_default_markdown_export_is_byte_identical_to_the_factual_memo() -> None:
+    memo = _export_memo()
+    assert render_memo_markdown(memo) == render_memo(memo)
+    assert render_memo_markdown(memo, narrative=None) == render_memo(memo)
+
+
+def test_a_narrated_markdown_export_appends_one_labelled_block() -> None:
+    memo = _export_memo()
+    narrator = _ExportNarrator(
+        NarrativeDraft(
+            recommendation=(DraftedClaim("Invest in publishing speed.", ("out-1",)),),
+        )
+    )
+    narrative = narrate_memo(memo, narrator)
+    text = render_memo_markdown(memo, narrative=narrative)
+    assert text.startswith(render_memo(memo).rstrip("\n"))
+    assert f"## {DRAFTED_LABEL}" in text
+    assert "Invest in publishing speed." in text
+
+
+def test_a_fabricated_numeral_is_dropped_and_recorded_not_printed() -> None:
+    """The framing paragraph inherits M3-04's numeral guarantee."""
+    memo = _export_memo()
+    narrator = _ExportNarrator(
+        NarrativeDraft(
+            recommendation=(DraftedClaim("Publishing takes 99 hours.", ("out-1",)),),
+        )
+    )
+    narrative = narrate_memo(memo, narrator)
+    # Nothing survived: the sentence is not printed as a claim.
+    assert narrative.is_empty
+    assert "99" not in (narrative.recommendation or "")
+    assert any("99" in drop.reason for drop in narrative.dropped)
+    # It is *recorded* in the dropped list, so the omission is visible.
+    text = render_memo_markdown(memo, narrative=narrative)
+    assert "Dropped, with the reason" in text
+    assert any("99" in drop.reason for drop in narrative.dropped)
+
+
+def test_a_narrated_export_with_nothing_surviving_is_the_factual_memo() -> None:
+    memo = _export_memo()
+    narrator = _ExportNarrator(NarrativeDraft())
+    narrative = narrate_memo(memo, narrator)
+    assert render_memo_markdown(memo, narrative=narrative) == render_memo(memo)
+
+
+def test_a_narrator_failure_still_exports_the_factual_memo() -> None:
+    class _Broken:
+        def draft(self, brief: BriefInput) -> NarrativeDraft:
+            raise NarratorError("model unavailable")
+
+    memo = _export_memo()
+    narrative = narrate_memo(memo, _Broken())
+    text = render_memo_markdown(memo, narrative=narrative)
+    assert render_memo(memo).rstrip("\n") in text
+    assert any("narrator failed" in drop.reason for drop in narrative.dropped)
+
+
+def test_html_export_is_standalone_and_carries_version_and_time() -> None:
+    memo = _export_memo()
+    document = render_memo_html(
+        memo,
+        source="decision dec-1",
+        generated_at="2026-10-29T12:00:00Z",
+        schema_version=SCHEMA_VERSION,
+    )
+    assert document.startswith("<!DOCTYPE html>")
+    assert "<style>" in document
+    assert "2026-10-29T12:00:00Z" in document
+    assert f"Schema version: {SCHEMA_VERSION}" in document
+    assert "http://" not in document and "https://" not in document
+    # The facts travel: the chosen outcome and its score are in the document.
+    assert "out-1" in document
+    assert "15" in document
+
+
+def test_html_export_escapes_hostile_text() -> None:
+    decision = Decision(
+        id="dec-1",
+        job_id="job-1",
+        chosen_outcome_ids=["out-1"],
+        rationale="<script>alert(1)</script>",
+        decided_by="alex",
+        decided_at="2026-01-02T00:00:00Z",
+    )
+    memo = build_memo(decision, outcomes=_FIXTURE_OUTCOMES, evidence=_FIXTURE_EVIDENCE)
+    document = render_memo_html(
+        memo, source="job <b>1</b>", generated_at="2026-10-29", schema_version=1
+    )
+    # No live markup: the quote's angle brackets are entities, so nothing runs.
+    assert "<script>alert" not in document
+    assert "<b>1</b>" not in document
+    assert "alert(1)" in document
+    assert "job &lt;b&gt;1&lt;/b&gt;" in document
+
+
+def test_exporting_writes_nothing() -> None:
+    service = ODIService(InMemoryRepository())
+    job = service.add_job("Publish a plugin")
+    outcome = service.add_outcome(
+        job.id,
+        "Minimize the time it takes to publish a plugin when a release is ready",
+        9.0,
+        3.0,
+        at="2026-01-01T00:00:00Z",
+    )
+    decision = service.record_decision(
+        job.id,
+        [outcome.id],
+        rationale="Publishing speed blocks every release.",
+        decided_by="alex",
+        decided_at="2026-01-02T00:00:00Z",
+    )
+    before = repr([d.model_dump(mode="json") for d in service.repo.decisions.values()])
+    memo = service.build_memo(decision.id)
+    render_memo_markdown(memo)
+    render_memo_html(memo, source="x", generated_at="y", schema_version=1)
+    after = repr([d.model_dump(mode="json") for d in service.repo.decisions.values()])
+    assert before == after
