@@ -102,3 +102,93 @@ def test_extract_unknown_quote_reports_not_found(tmp_path):
     result = runner.invoke(app, ["--db", db, "interviews", "extract", "missing"])
     assert result.exit_code != 0
     assert "not found" in result.output.lower()
+
+
+def _first_proposed(runner: CliRunner, db: str) -> str:
+    _, quote_id = _interview_with_quote(runner, db)
+    runner.invoke(app, ["--db", db, "interviews", "extract", quote_id, "--json"])
+    listed = runner.invoke(
+        app, ["--db", db, "candidates", "list", "--status", "proposed", "--json"]
+    )
+    return json.loads(listed.output)[0]["id"]
+
+
+def test_accept_candidate_prints_the_outcome_and_evidence(tmp_path):
+    db = str(tmp_path / "odi.db")
+    runner = CliRunner()
+    candidate_id = _first_proposed(runner, db)
+
+    accepted = runner.invoke(
+        app,
+        [
+            "--db",
+            db,
+            "candidates",
+            "accept",
+            candidate_id,
+            "--importance",
+            "8",
+            "--satisfaction",
+            "3",
+            "--json",
+        ],
+    )
+
+    assert accepted.exit_code == 0, accepted.output
+    payload = json.loads(accepted.output)
+    assert payload["candidate"]["status"] == "accepted"
+    assert payload["outcome"]["statement"]
+    assert payload["evidence"]["content"] == QUOTE
+
+
+def test_accept_candidate_twice_keeps_one_outcome(tmp_path):
+    db = str(tmp_path / "odi.db")
+    runner = CliRunner()
+    candidate_id = _first_proposed(runner, db)
+    args = [
+        "--db",
+        db,
+        "candidates",
+        "accept",
+        candidate_id,
+        "--importance",
+        "8",
+        "--satisfaction",
+        "3",
+        "--json",
+    ]
+
+    first = json.loads(runner.invoke(app, args).output)
+    second = json.loads(runner.invoke(app, args).output)
+
+    assert first["outcome"]["id"] == second["outcome"]["id"]
+    outcomes = runner.invoke(
+        app,
+        ["--db", db, "desired-outcomes", "list", "--job-id", first["outcome"]["job_id"], "--json"],
+    )
+    assert len(json.loads(outcomes.output)) == 1
+
+
+def test_reject_candidate_keeps_the_reason(tmp_path):
+    db = str(tmp_path / "odi.db")
+    runner = CliRunner()
+    candidate_id = _first_proposed(runner, db)
+
+    rejected = runner.invoke(
+        app,
+        ["--db", db, "candidates", "reject", candidate_id, "--reason", "not a need", "--json"],
+    )
+
+    assert rejected.exit_code == 0, rejected.output
+    assert json.loads(rejected.output)["decision_reason"] == "not a need"
+
+
+def test_reject_candidate_without_a_reason_fails(tmp_path):
+    db = str(tmp_path / "odi.db")
+    runner = CliRunner()
+    candidate_id = _first_proposed(runner, db)
+
+    result = runner.invoke(app, ["--db", db, "candidates", "reject", candidate_id, "--reason", " "])
+
+    assert result.exit_code != 0
+    assert "reason is required" in result.output.lower()

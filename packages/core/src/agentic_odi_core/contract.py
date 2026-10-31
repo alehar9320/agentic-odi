@@ -49,6 +49,8 @@ class ToolName(str, Enum):
     GET_CANDIDATE = "get_candidate"
     UPDATE_CANDIDATE = "update_candidate"
     DELETE_CANDIDATE = "delete_candidate"
+    ACCEPT_CANDIDATE = "accept_candidate"
+    REJECT_CANDIDATE = "reject_candidate"
     PROMOTE_EVIDENCE = "promote_evidence"
     EVALUATE_OUTCOME = "evaluate_outcome"
     GET_ODI_SCHEMA = "get_odi_schema"
@@ -447,6 +449,22 @@ TOOL_SPECS: dict[str, ToolSpec] = {
         arguments=("candidate_id",),
         required=("candidate_id",),
         returns="The deleted candidate ID.",
+    ),
+    ToolName.ACCEPT_CANDIDATE.value: ToolSpec(
+        name="accept_candidate",
+        summary="Accept a candidate into exactly one outcome, with its quote as evidence.",
+        effect=_derive_effect("accept_candidate"),
+        arguments=("candidate_id", "importance", "satisfaction", "statement", "step_id"),
+        required=("candidate_id", "importance", "satisfaction"),
+        returns="The accepted candidate, the new Outcome, and the verbatim Evidence.",
+    ),
+    ToolName.REJECT_CANDIDATE.value: ToolSpec(
+        name="reject_candidate",
+        summary="Reject a candidate with a nonblank reason, keeping it and its quote.",
+        effect=_derive_effect("reject_candidate"),
+        arguments=("candidate_id", "reason"),
+        required=("candidate_id", "reason"),
+        returns="The rejected OutcomeCandidate.",
     ),
     ToolName.PROMOTE_EVIDENCE.value: ToolSpec(
         name="promote_evidence",

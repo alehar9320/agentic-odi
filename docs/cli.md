@@ -270,10 +270,37 @@ agentic-odi interviews extract <quote-id>
 agentic-odi candidates list --status proposed
 agentic-odi candidates list --interview-id <interview-id> --json
 agentic-odi candidates get <candidate-id>
+agentic-odi candidates accept <candidate-id> --importance 8 --satisfaction 3
+agentic-odi candidates reject <candidate-id> --reason "not a real need"
 agentic-odi candidates delete <candidate-id> --yes
 ```
 
 Deleting an interview removes its candidates along with its quotes.
+
+### Accept or reject a candidate
+
+`candidates accept` turns one proposed candidate into exactly one Outcome. The
+statement is validated before anything is written; the verbatim quote is then
+stored as an `Evidence` row with `source_kind="interview"` and
+`raw={interview_id, quote_id}`, so the number travels with the sentence that
+produced it. Accepting twice returns the first outcome — a retry never
+duplicates the outcome or its evidence.
+
+The interview must be linked to a job (`interviews add --job-id`) so the new
+outcome has somewhere to live; an unlinked interview is refused rather than
+guessed at. Pass `--statement` to edit the wording first, and `--step-id` to
+place the outcome on a job-map step.
+
+`candidates reject` keeps the candidate and requires a nonblank `--reason`, so
+a decision is defensible later. Rejecting an accepted candidate is refused: it
+would orphan the outcome the acceptance produced.
+
+```bash
+agentic-odi candidates accept <candidate-id> --importance 8 --satisfaction 3
+agentic-odi candidates accept <candidate-id> --statement "Minimize the time to onboard" \
+  --importance 8 --satisfaction 3 --json
+agentic-odi candidates reject <candidate-id> --reason "covered by another outcome"
+```
 
 ## Schema, scoring, and guidance
 

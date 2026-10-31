@@ -15,6 +15,7 @@ from agentic_odi_core.evaluation import (
     evaluate_outcome_statement,
     require_outcome_statement,
 )
+from agentic_odi_core.messages import candidate_reason_required
 from agentic_odi_core.models import (
     JOB_STAGE_INDEX,
     JOB_STAGE_ORDER,
@@ -810,6 +811,123 @@ class ODIService:
     def delete_candidate(self, candidate_id: str) -> None:
         if not self.repo.delete_candidate(candidate_id):
             raise CandidateNotFoundError(candidate_id)
+
+    def accept_candidate(
+        self,
+        candidate_id: str,
+        *,
+        importance: float,
+        satisfaction: float,
+        statement: str | None = None,
+        step_id: str | None = None,
+    ) -> tuple[OutcomeCandidate, Outcome, Evidence]:
+        """Turn one proposed candidate into exactly one outcome with its evidence.
+
+        The edited ``statement`` (or the proposed one) is validated *before* any
+        write, then ``add_outcome`` runs, then the verbatim quote is written as
+        an ``Evidence`` row, and only then is the candidate marked ``accepted``
+        with the new ``outcome_id``. If the evidence write fails the new outcome
+        is removed again, so a failure can never leave an accepted candidate
+        without evidence or an orphan outcome.
+
+        Accepting an already-accepted candidate is a no-op that returns what the
+        first acceptance produced, so a retry cannot duplicate either the
+        outcome or the evidence.
+        """
+        candidate = self.repo.get_candidate(candidate_id)
+        if candidate is None:
+            raise CandidateNotFoundError(candidate_id)
+
+        if candidate.status == CandidateStatus.ACCEPTED and candidate.outcome_id:
+            outcome = self.repo.get_outcome(candidate.outcome_id)
+            if outcome is not None:
+                return candidate, outcome, self._candidate_evidence(candidate)
+        if candidate.status is not CandidateStatus.PROPOSED:
+            raise ValidationError(
+                f"Outcome candidate {candidate_id} is {candidate.status.value}, not proposed"
+            )
+
+        quote = self.repo.get_quote(candidate.quote_id)
+        if quote is None:
+            raise QuoteNotFoundError(candidate.quote_id)
+        interview = self.repo.get_interview(candidate.interview_id)
+        if interview is None:
+            raise InterviewNotFoundError(candidate.interview_id)
+        if interview.job_id is None:
+            raise ValidationError(
+                f"Interview {interview.id} is not linked to a job, so a candidate cannot "
+                "become an outcome. Link the interview to a job first."
+            )
+
+        text = (statement or candidate.statement).strip()
+        verdict = evaluate_outcome_statement(text)
+        if not verdict["valid"]:
+            raise InvalidOutcomeStatementError(verdict)
+
+        outcome = self.add_outcome(
+            interview.job_id,
+            text,
+            importance=importance,
+            satisfaction=satisfaction,
+            step_id=step_id,
+        )
+        try:
+            evidence = self.add_evidence(
+                source_name=interview.title,
+                source_kind="interview",
+                name="quote",
+                content=quote.text,
+                item_type="manual",
+                raw={"interview_id": interview.id, "quote_id": quote.id},
+                outcome_id=outcome.id,
+            )
+        except Exception:
+            self.repo.delete_outcome(outcome.id)
+            raise
+        accepted = self.repo.update_candidate(
+            candidate.id,
+            {
+                "status": CandidateStatus.ACCEPTED,
+                "statement": text,
+                "outcome_id": outcome.id,
+            },
+        )
+        assert accepted is not None  # the candidate existed a moment ago
+        return accepted, outcome, evidence
+
+    def reject_candidate(self, candidate_id: str, *, reason: str) -> OutcomeCandidate:
+        """Reject a candidate, keeping it and a nonblank reason.
+
+        The quote stays attached, so a rejected idea is still auditable. An
+        empty reason is refused without touching the store.
+        """
+        candidate = self.repo.get_candidate(candidate_id)
+        if candidate is None:
+            raise CandidateNotFoundError(candidate_id)
+        cleaned = (reason or "").strip()
+        if not cleaned:
+            raise ValidationError(candidate_reason_required(candidate_id))
+        if candidate.status is CandidateStatus.ACCEPTED:
+            raise ValidationError(
+                f"Outcome candidate {candidate_id} was accepted; rejecting it would orphan "
+                "the outcome it produced."
+            )
+        rejected = self.repo.update_candidate(
+            candidate_id,
+            {"status": CandidateStatus.REJECTED, "decision_reason": cleaned},
+        )
+        assert rejected is not None
+        return rejected
+
+    def _candidate_evidence(self, candidate: OutcomeCandidate) -> Evidence:
+        """The evidence row acceptance wrote for a candidate."""
+        for item in self.repo.list_evidence(outcome_id=candidate.outcome_id):
+            if item.raw.get("quote_id") == candidate.quote_id:
+                return item
+        raise EvidenceNotFoundError(
+            candidate.outcome_id or candidate.id,
+            "Acceptance should have written one evidence row for this candidate.",
+        )
 
     def promote_evidence(
         self,
