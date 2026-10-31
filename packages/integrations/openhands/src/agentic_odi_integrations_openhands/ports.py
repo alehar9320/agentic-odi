@@ -49,15 +49,11 @@ class SignalPort(Protocol):
 class SchedulePort(Protocol):
     """Read and update scheduled work in the ODI store."""
 
-    def list_scheduled_work(
-        self, status: str | None = None
-    ) -> list[ScheduledWork]: ...
+    def list_scheduled_work(self, status: str | None = None) -> list[ScheduledWork]: ...
 
     def get_scheduled_work(self, work_id: str) -> ScheduledWork | None: ...
 
-    def update_scheduled_work(
-        self, work_id: str, updates: dict
-    ) -> ScheduledWork | None: ...
+    def update_scheduled_work(self, work_id: str, updates: dict) -> ScheduledWork | None: ...
 
 
 class ClockPort(Protocol):

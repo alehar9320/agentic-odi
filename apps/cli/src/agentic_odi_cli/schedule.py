@@ -116,7 +116,6 @@ def trigger_cmd(
     """Queue a scheduled task for the orchestrator to dispatch."""
     result = run_tool("trigger_scheduled_work", {"work_id": work_id})
     typer.secho(
-        f"Queued task '{result.get('name')}' for the orchestrator: "
-        f"{result.get('result_summary')}",
+        f"Queued task '{result.get('name')}' for the orchestrator: {result.get('result_summary')}",
         fg="green",
     )

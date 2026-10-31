@@ -96,9 +96,7 @@ def parse_schedule(expression: str, now: datetime | None = None) -> ParsedSchedu
             next_run = croniter(raw, base).get_next(datetime)
         except (ValueError, KeyError) as exc:
             raise ScheduleExpressionError(expression, str(exc)) from exc
-        return ParsedSchedule(
-            raw, ScheduledWorkTriggerType.CRON, _aware(next_run), True
-        )
+        return ParsedSchedule(raw, ScheduledWorkTriggerType.CRON, _aware(next_run), True)
 
     raise ScheduleExpressionError(expression)
 

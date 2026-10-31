@@ -126,9 +126,7 @@ def list_agent_targets(request: Request) -> dict[str, Any]:
 
 
 @router.get("/agent-runs")
-def list_agent_runs(
-    request: Request, work_id: str | None = Query(None)
-) -> dict[str, Any]:
+def list_agent_runs(request: Request, work_id: str | None = Query(None)) -> dict[str, Any]:
     try:
         runs = _orchestrator(request).list_runs(work_id)
     except Exception as exc:  # noqa: BLE001

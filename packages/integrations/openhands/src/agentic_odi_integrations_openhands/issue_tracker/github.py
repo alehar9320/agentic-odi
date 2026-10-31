@@ -46,17 +46,13 @@ class GitHubIssueTracker(IssueTrackerPort):
 
     def _request(self, method: str, path: str, **kwargs: Any) -> httpx.Response:
         headers = {**self._headers, **kwargs.pop("headers", {})}
-        response = self._client.request(
-            method, f"{GITHUB_API}{path}", headers=headers, **kwargs
-        )
+        response = self._client.request(method, f"{GITHUB_API}{path}", headers=headers, **kwargs)
         if response.status_code == 401:
             raise RuntimeError("GitHub rejected the token (401)")
         if response.status_code == 403 and "rate limit" in response.text.lower():
             raise RuntimeError("GitHub rate limit reached")
         if response.status_code >= 400:
-            raise RuntimeError(
-                f"GitHub {method} {path} returned {response.status_code}"
-            )
+            raise RuntimeError(f"GitHub {method} {path} returned {response.status_code}")
         return response
 
     def due_issues(self, since: datetime | None = None) -> list[Issue]:
@@ -73,9 +69,7 @@ class GitHubIssueTracker(IssueTrackerPort):
             if since is not None:
                 params["since"] = since.astimezone(timezone.utc).isoformat()
             try:
-                resp = self._request(
-                    "GET", f"/repos/{repo}/issues", params=params
-                )
+                resp = self._request("GET", f"/repos/{repo}/issues", params=params)
             except RuntimeError:
                 continue
             for item in resp.json():

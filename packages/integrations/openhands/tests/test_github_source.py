@@ -78,9 +78,7 @@ class FakeGitHub:
         return [call["path"] for call in self.calls if call["method"] == method]
 
 
-def _service(
-    tmp_path, github: FakeGitHub, *, max_concurrency: int = 0
-) -> OrchestratorService:
+def _service(tmp_path, github: FakeGitHub, *, max_concurrency: int = 0) -> OrchestratorService:
     target = AgentTarget(
         alias="cloud", base_url="https://cloud.test", api_key="test-key", repository=REPO
     )
@@ -131,7 +129,9 @@ def test_tick_creates_one_work_item_per_labeled_issue(tmp_path, monkeypatch):
     assert "Fix the README typo" in work.prompt
     # The pull request was skipped and the running label was applied once.
     assert f"/repos/{REPO}/issues/8/labels" not in github.paths("POST")
-    label_calls = [call for call in github.calls if call["path"] == f"/repos/{REPO}/issues/7/labels"]
+    label_calls = [
+        call for call in github.calls if call["path"] == f"/repos/{REPO}/issues/7/labels"
+    ]
     assert label_calls[-1]["body"] == {"labels": ["odi:running"]}
 
 
@@ -221,7 +221,11 @@ def test_notifier_labels_and_comments_once_with_the_real_result(tmp_path, monkey
     notifier.notify_terminal(work, run)
 
     assert f"/repos/{REPO}/issues/7/labels/odi:running" in github.paths("DELETE")
-    added = [call for call in github.calls if call["method"] == "POST" and call["path"].endswith("/labels")]
+    added = [
+        call
+        for call in github.calls
+        if call["method"] == "POST" and call["path"].endswith("/labels")
+    ]
     assert added[-1]["body"] == {"labels": ["odi:done"]}
     comment = [call for call in github.calls if call["path"].endswith("/comments")][-1]
     body = comment["body"]["body"]
@@ -256,5 +260,9 @@ def test_notifier_uses_failed_label_for_blocked_runs(tmp_path, monkeypatch):
 
     notifier.notify_terminal(work, run)
 
-    added = [call for call in github.calls if call["method"] == "POST" and call["path"].endswith("/labels")]
+    added = [
+        call
+        for call in github.calls
+        if call["method"] == "POST" and call["path"].endswith("/labels")
+    ]
     assert added[-1]["body"] == {"labels": ["odi:blocked"]}

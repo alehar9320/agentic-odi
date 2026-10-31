@@ -50,7 +50,11 @@ def _imported_names(module_path: Path) -> set[str]:
     tree = ast.parse(module_path.read_text())
     names: set[str] = set()
     for node in ast.walk(tree):
-        if isinstance(node, ast.ImportFrom) and node.module and node.module.startswith("agentic_odi_core"):
+        if (
+            isinstance(node, ast.ImportFrom)
+            and node.module
+            and node.module.startswith("agentic_odi_core")
+        ):
             for alias in node.names:
                 names.add(alias.name)
     return names
@@ -94,10 +98,7 @@ def test_ports_are_protocols() -> None:
         node.name
         for node in ast.walk(tree)
         if isinstance(node, ast.ClassDef)
-        and any(
-            isinstance(base, ast.Name) and base.id == "Protocol"
-            for base in node.bases
-        )
+        and any(isinstance(base, ast.Name) and base.id == "Protocol" for base in node.bases)
     ]
     expected = {"SignalPort", "SchedulePort", "ClockPort", "IssueTrackerPort"}
     assert set(class_names) == expected, f"Expected ports {expected}, got {set(class_names)}"

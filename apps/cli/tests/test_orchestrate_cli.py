@@ -45,7 +45,7 @@ def test_add_list_show_cancel(tmp_path, monkeypatch) -> None:
             "Fix typo",
             "--prompt",
             "Fix the README typo",
-                    ],
+        ],
     )
     assert added.exit_code == 0, added.stdout
     assert "Queued work item" in added.stdout
@@ -80,7 +80,7 @@ def test_work_key_is_idempotent(tmp_path, monkeypatch) -> None:
         "Do it",
         "--work-key",
         "manual:fixed",
-            ]
+    ]
     first = runner.invoke(app, args)
     assert first.exit_code == 0, first.stdout
     second = runner.invoke(app, args)

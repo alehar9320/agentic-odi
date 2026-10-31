@@ -49,9 +49,7 @@ _DENY_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"\bprintenv\b|(^|\s)env(\s|$)"), "dumping the environment is not allowed"),
     (re.compile(r"~/\.config/agentic-odi|agentic-odi/openhands\.json"), "credential files"),
     (
-        re.compile(
-            r"(^|[;&|]\s*)history\b|(^|[\s/])\.?(bash|zsh|sh|fish)_history\b"
-        ),
+        re.compile(r"(^|[;&|]\s*)history\b|(^|[\s/])\.?(bash|zsh|sh|fish)_history\b"),
         "shell history is out of scope",
     ),
 )
@@ -236,9 +234,7 @@ def _pipe_decision(tokens: list[str]) -> PolicyDecision | None:
                 Decision.BLOCK, "denylist", "pipe to shell interpreter is not allowed"
             )
         if program in _EXFILTRATION_TOOLS:
-            return PolicyDecision(
-                Decision.BLOCK, "denylist", "piped exfiltration is not allowed"
-            )
+            return PolicyDecision(Decision.BLOCK, "denylist", "piped exfiltration is not allowed")
     return None
 
 

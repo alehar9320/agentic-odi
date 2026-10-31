@@ -577,18 +577,14 @@ class OrchestratorService:
         report.automation_adopted = adopted
         return adopted
 
-    def _search_automation_conversations(
-        self, target: AgentTarget
-    ) -> list[ConversationInfo]:
+    def _search_automation_conversations(self, target: AgentTarget) -> list[ConversationInfo]:
         """Search for Automation conversations for one target.
 
         Returns an empty list on any error so one target never blocks another.
         """
         try:
             client = self._cloud_factory(target)
-            return client.search_conversations(
-                title_contains=self.settings.automation.label
-            )
+            return client.search_conversations(title_contains=self.settings.automation.label)
         except Exception:  # noqa: BLE001 - one target must not block adoption
             return []
 

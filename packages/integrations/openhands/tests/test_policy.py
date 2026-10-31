@@ -169,9 +169,7 @@ def test_allowlisted_commands_are_accepted(policy: ApprovalPolicy, command: str)
         ("xargs rm", "command_unlisted"),
     ],
 )
-def test_unlisted_commands_are_rejected(
-    policy: ApprovalPolicy, command: str, rule: str
-) -> None:
+def test_unlisted_commands_are_rejected(policy: ApprovalPolicy, command: str, rule: str) -> None:
     decision = policy.evaluate(_bash(command))
     assert decision.decision is Decision.REJECT
     assert decision.rule_id == rule
@@ -197,9 +195,7 @@ def test_push_needs_an_explicit_remote_and_branch(policy: ApprovalPolicy) -> Non
         "git push origin feature:main",
     ],
 )
-def test_push_to_the_default_branch_is_blocked(
-    policy: ApprovalPolicy, command: str
-) -> None:
+def test_push_to_the_default_branch_is_blocked(policy: ApprovalPolicy, command: str) -> None:
     decision = policy.evaluate(_bash(command))
     assert decision.decision is Decision.BLOCK
     assert decision.rule_id == "push_default_branch"
