@@ -100,12 +100,16 @@ beforeEach(() => {
     "studio.displayName",
     "studio.setupDismissed",
     "studio.setupDraft",
+    "studio.setupStep",
+    "studio.intro",
     "studio.onboarding",
   ]) {
     window.localStorage.removeItem(key);
   }
   // Shell tests are not about onboarding: keep the tour out of their way.
   window.localStorage.setItem("studio.flags.firstRunWizard", "off");
+  // The old five-field panel is the subject of its own suite below.
+  window.localStorage.setItem("studio.flags.firstRunIntro", "off");
   window.localStorage.setItem("studio.brief", JSON.stringify(BRIEF));
   vi.mocked(healthLlm).mockResolvedValue({
     healthy: true,
@@ -321,7 +325,7 @@ describe("studio shell", () => {
     render(<App />);
 
     fireEvent.click(
-      await screen.findByRole("button", { name: /tell me what you're building/i }),
+      await screen.findByRole("button", { name: /start with you and your team/i }),
     );
     expect(
       await screen.findByText("What are you building?", { selector: "strong" }),
@@ -435,7 +439,7 @@ describe("first run", () => {
 
     // The stage first; the interview is an answer, not a gate.
     fireEvent.click(
-      await screen.findByRole("button", { name: /tell me what you're building/i }),
+      await screen.findByRole("button", { name: /start with you and your team/i }),
     );
     expect(
       await screen.findByText("What are you building?", { selector: "strong" }),
@@ -525,7 +529,7 @@ describe("first run", () => {
     render(<App />);
 
     fireEvent.click(
-      await screen.findByRole("button", { name: /tell me what you're building/i }),
+      await screen.findByRole("button", { name: /start with you and your team/i }),
     );
     expect(
       await screen.findByText("What are you building?", { selector: "strong" }),
@@ -543,6 +547,57 @@ describe("first run", () => {
       await screen.findByRole("heading", { name: "What do you want to win?" }),
     ).toBeInTheDocument();
     expect(screen.queryByText("What are you building?", { selector: "strong" })).toBeNull();
+  });
+
+  it("introduces itself in the person's own words and keeps the brief", async () => {
+    window.localStorage.removeItem("studio.brief");
+    window.localStorage.setItem("studio.flags.firstRunIntro", "on");
+    render(<App />);
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: /start with you and your team/i }),
+    );
+    expect(
+      await screen.findByText("What are you working on, and what's your part in it?", {
+        selector: "strong",
+      }),
+    ).toBeInTheDocument();
+
+    const replies = [
+      "I'm the PM for the deploy tool; the team is four engineers and a designer.",
+      "The on-call platform engineer at 2am",
+      "Ship a service without hand-copying config",
+      "A missed key costs a deploy day",
+      "Nine onboarding calls, a very angry ticket, and a Slack thread",
+    ];
+    const composer = screen.getByRole("textbox", { name: /message the studio/i });
+    for (const reply of replies) {
+      fireEvent.change(composer, { target: { value: reply } });
+      fireEvent.keyDown(composer, { key: "Enter" });
+    }
+
+    expect(
+      await screen.findByRole("heading", { name: "Does this look like you?" }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Looks like me" }));
+
+    await waitFor(() => {
+      const saved = JSON.parse(window.localStorage.getItem("studio.brief") ?? "null");
+      expect(saved).toMatchObject({
+        role: replies[0],
+        team: "four engineers and a designer",
+        target_user: replies[1],
+        job_statement: replies[2],
+        core_problem: replies[3],
+        evidence_at_hand: [
+          "Nine onboarding calls",
+          "a very angry ticket",
+          "a Slack thread",
+        ],
+      });
+    });
+    expect(await screen.findByRole("button", { name: "Edit context" })).toBeInTheDocument();
   });
 
   it("edits an existing context as a conversation", async () => {
