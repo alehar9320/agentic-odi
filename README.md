@@ -135,7 +135,7 @@ odi desired-outcomes list --job-id <id>
 odi signals unread                    # what changed while you were away
 odi score 8 2                        # → 14.00
 odi bets list                        # dated expectations with a frozen baseline
-odi know spine --job <id>            # where the evidence chain stops
+odi status --spine --job <id>        # where the evidence chain stops
 odi                                  # interactive chat in a terminal
 ```
 

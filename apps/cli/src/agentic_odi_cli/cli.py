@@ -21,7 +21,8 @@ from agentic_odi_cli.customer_outcomes import customer_outcomes_app, score
 from agentic_odi_cli.desired_outcomes import desired_outcomes_app
 from agentic_odi_cli.evidence import evidence_app
 from agentic_odi_cli.jobs import jobs_app
-from agentic_odi_cli.know import know_app
+from agentic_odi_cli.know import digest as digest_command
+from agentic_odi_cli.know import know_app, status_spine
 from agentic_odi_cli.onboard import maybe_run_first_launch
 from agentic_odi_cli.profile import app as profile_app
 from agentic_odi_cli.profile import setup_wizard
@@ -61,6 +62,20 @@ app.add_typer(
     hidden=True,
 )
 app.command(name="score")(score)
+app.command(name="digest")(digest_command)
+
+
+@app.command(name="status")
+def status(
+    spine: bool = typer.Option(False, "--spine", help="Show where the evidence spine stops."),
+    job_id: str | None = typer.Option(None, "--job", help="Job to inspect"),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
+) -> None:
+    """Show where the end-to-end evidence spine stops."""
+    if not spine:
+        typer.echo("Run `agentic-odi status --spine` to see where the evidence spine stops.")
+        return
+    status_spine(job_id, json_output)
 
 
 def _version_callback(ctx: typer.Context, value: bool) -> None:

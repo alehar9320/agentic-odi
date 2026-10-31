@@ -197,9 +197,12 @@ agentic-odi bets status <bet-id> running
 
 # Signals, the digest, and where the spine stops
 agentic-odi signals list --unread
-agentic-odi know digest --since 7d --out digest.md
-agentic-odi know spine --job <job-id>
+agentic-odi digest --since 7d --out digest.md
+agentic-odi status --spine --job <job-id>
 ```
+
+`odi digest` and `odi status --spine` are the documented spellings; `odi know
+digest` and `odi know spine` are kept as aliases.
 
 - A **decision** names the chosen outcomes, the rejected ones with reasons, the
   rationale, and who decided. Recording a second decision for the same Job marks

@@ -228,6 +228,50 @@ def test_spine_json_and_auto_job_selection(tmp_path):
     assert by_stage["measured"]["blocker"] == ""
 
 
+def test_toplevel_digest_matches_the_know_alias(tmp_path):
+    """E4 promises `odi digest`; the `know digest` alias must be identical."""
+    db = str(tmp_path / "odi.db")
+    runner = CliRunner()
+    job_id = _job(runner, db)
+    outcome_id = _outcome(runner, db, job_id)
+    decision_id = _decision(runner, db, job_id, outcome_id)
+    _bet(runner, db, decision_id, outcome_id)
+
+    assert (
+        _invoke(runner, db, "digest", "--since", "3650d").output
+        == _invoke(runner, db, "know", "digest", "--since", "3650d").output
+    )
+
+
+def test_toplevel_digest_out_writes_the_same_bytes(tmp_path):
+    db = str(tmp_path / "odi.db")
+    out = tmp_path / "digest.md"
+    runner = CliRunner()
+    _invoke(runner, db, "digest", "--since", "3650d", "--out", str(out))
+    assert out.read_text(encoding="utf-8") == "No changes in this period."
+
+
+def test_toplevel_status_spine_matches_the_know_alias(tmp_path):
+    """E4.1 promises `odi status --spine`; the `know spine` alias must match."""
+    db = str(tmp_path / "odi.db")
+    runner = CliRunner()
+    assert "No job yet." in _invoke(runner, db, "status", "--spine").output
+
+    job_id = _job(runner, db)
+    _outcome(runner, db, job_id)
+    assert (
+        _invoke(runner, db, "status", "--spine", "--job", job_id).output
+        == _invoke(runner, db, "know", "spine", "--job", job_id).output
+    )
+
+
+def test_toplevel_status_without_spine_writes_nothing(tmp_path):
+    db = str(tmp_path / "odi.db")
+    runner = CliRunner()
+    output = _invoke(runner, db, "status").output
+    assert "--spine" in output
+
+
 def test_bets_list_narrows_to_one_job(tmp_path):
     db = str(tmp_path / "odi.db")
     runner = CliRunner()

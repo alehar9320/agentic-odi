@@ -137,13 +137,7 @@ def _within(signal: dict[str, Any], since: datetime) -> bool:
     return parsed is not None and parsed >= since
 
 
-@know_app.command("digest")
-def digest_cmd(
-    since: str = typer.Option("7d", "--since", help="Window: 7d, 24h or YYYY-MM-DD"),
-    job_id: str | None = typer.Option(None, "--job", help="Limit to one Job"),
-    out: str | None = typer.Option(None, "--out", help="Write the digest to a file"),
-) -> None:
-    """Write a deterministic digest of the signals in the window."""
+def _run_digest(since: str, job_id: str | None, out: str | None) -> None:
     window_start = _parse_since(since)
     args: dict[str, Any] = {}
     if job_id is not None:
@@ -164,6 +158,28 @@ def digest_cmd(
         typer.echo(f"Digest written to {out}")
     else:
         typer.echo(body, nl=False)
+
+
+@know_app.command("digest")
+def digest_cmd(
+    since: str = typer.Option("7d", "--since", help="Window: 7d, 24h or YYYY-MM-DD"),
+    job_id: str | None = typer.Option(None, "--job", help="Limit to one Job"),
+    out: str | None = typer.Option(None, "--out", help="Write the digest to a file"),
+) -> None:
+    """Write a deterministic digest of the signals in the window."""
+    _run_digest(since, job_id, out)
+
+
+def digest(
+    since: str = typer.Option("7d", "--since", help="Window: 7d, 24h or YYYY-MM-DD"),
+    job_id: str | None = typer.Option(None, "--job", help="Limit to one Job"),
+    out: str | None = typer.Option(None, "--out", help="Write the digest to a file"),
+) -> None:
+    """Write a deterministic digest of the signals in the window.
+
+    The top-level spelling promised by E4; ``odi know digest`` remains an alias.
+    """
+    _run_digest(since, job_id, out)
 
 
 def _spine_rows(
@@ -210,6 +226,22 @@ def spine(
     json_output: bool = JSON_OPTION,
 ) -> None:
     """Show where the end-to-end evidence spine stops for a job."""
+    _run_spine(job_id, json_output)
+
+
+def status_spine(
+    job_id: str | None = typer.Option(None, "--job", help="Job to inspect"),
+    json_output: bool = JSON_OPTION,
+) -> None:
+    """Show where the end-to-end evidence spine stops for a job.
+
+    The top-level ``odi status --spine`` spelling promised by E4.1; ``odi know
+    spine`` remains an alias. It reads the store and writes nothing.
+    """
+    _run_spine(job_id, json_output)
+
+
+def _run_spine(job_id: str | None, json_output: bool) -> None:
     jobs = run_tool("get_jobs", {})
     if not isinstance(jobs, list) or not jobs:
         typer.echo("No job yet.")
