@@ -25,6 +25,8 @@ import type {
   ObservationKind,
   ObservationStatus,
   Outcome,
+  ScoreBatchResponse,
+  ScoreOutcomePayload,
   Signal,
   Step,
   StudioConfig,
@@ -381,6 +383,23 @@ export function deleteOutcome(outcomeId: string, mcpUrl: string): Promise<{ dele
   return deleteJson<{ deleted: string }>(
     `/api/outcomes/${encodeURIComponent(outcomeId)}?mcp_url=${encodeURIComponent(mcpUrl)}`,
   );
+}
+
+/**
+ * Score one or more outcomes in a single call, one result per item.
+ *
+ * This is the same route `odi score` drives, so a click and a keypress reach
+ * the same store. The Studio sends one item at a time to keep the pass
+ * sequential — the endpoint accepts a list, but a client-side queue would need
+ * its own per-item error handling and undo and would then disagree with the
+ * CLI. A refusal lands in that item's result and never throws away the batch.
+ */
+export function scoreOutcomes(
+  items: ScoreOutcomePayload[],
+  mcpUrl: string,
+): Promise<ScoreBatchResponse> {
+  const query = mcpUrl ? `?mcp_url=${encodeURIComponent(mcpUrl)}` : "";
+  return postJson<ScoreBatchResponse>(`/api/outcomes/score-batch${query}`, items);
 }
 
 /**

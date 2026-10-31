@@ -475,6 +475,42 @@ export interface AddOutcomePayload {
   satisfaction: number;
 }
 
+/**
+ * One outcome's scores in a batch pass. ``importance`` and ``satisfaction`` are
+ * nullable so a truly unscored outcome — an absent pair, never a fabricated
+ * zero — can be restored to that state through the same endpoint.
+ */
+export interface ScoreOutcomePayload {
+  outcome_id: string;
+  importance: number | null;
+  satisfaction: number | null;
+  why?: string;
+}
+
+/** The updated outcome echoed back on a successful item. */
+export interface ScoredOutcome {
+  id?: string;
+  importance?: number | null;
+  satisfaction?: number | null;
+  opportunity_score?: number | null;
+}
+
+/** One item's result from ``POST /api/outcomes/score-batch``, correlated to its input. */
+export interface ScoreBatchItemResult {
+  outcome_id: string;
+  importance: number | null;
+  satisfaction: number | null;
+  ok: boolean;
+  why?: string;
+  outcome?: ScoredOutcome;
+  error?: string;
+}
+
+export interface ScoreBatchResponse {
+  ok: boolean;
+  results: ScoreBatchItemResult[];
+}
+
 export interface ConnectorPreset {
   id: string;
   label: string;

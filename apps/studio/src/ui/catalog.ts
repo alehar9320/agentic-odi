@@ -328,6 +328,41 @@ export const CATALOG: readonly UiCatalogEntry[] = [
     ["title", "bet", "rationale"],
   ),
   entry(
+    "batch-scoring",
+    "leaf",
+    "The scoring pass: one outcome at a time with the customer's sentence in view, so a person scores twenty in a row without leaving the thread. Use when several outcomes need scores and the person would rather click through them than type a score for each.",
+    {
+      state: {
+        enum: ["loading", "ready", "empty", "failed"],
+        description:
+          "Be honest about which it is: `loading` while the working set is assembled, `failed` with `message` when it could not be, `empty` when no outcome matches, `ready` with `outcomes` otherwise.",
+      },
+      outcomes: {
+        type: "array",
+        maxItems: UI_LIMITS.maxChildren,
+        description:
+          "The working set, already ranked highest-opportunity first (unscored last). The pass walks this order; the card writes one outcome at a time through the same endpoint `odi score` uses.",
+        items: {
+          type: "object",
+          properties: {
+            id: { type: "string" },
+            statement: { type: "string" },
+            importance: { type: "number", minimum: 1, maximum: 10, description: "Omit when the outcome is unscored; never send a fabricated zero." },
+            satisfaction: { type: "number", minimum: 1, maximum: 10, description: "Omit when the outcome is unscored." },
+            quote: { type: "string", description: "The verbatim customer sentence behind the outcome, kept beside the number. Never paraphrase inside this field." },
+          },
+          required: ["id", "statement"],
+        },
+      },
+      message: {
+        type: "string",
+        description: "Why the pass is empty or failed, in the server's words. Omit when it is ready.",
+      },
+    },
+    ["state"],
+  ),
+
+  entry(
     "candidate-queue",
     "leaf",
     "The review queue for one interview's proposed candidates: each candidate's statement beside the sentence it came from, with the decision actions. Use when a person is turning proposals into outcomes.",

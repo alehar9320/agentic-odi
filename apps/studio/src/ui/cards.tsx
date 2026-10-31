@@ -1,8 +1,11 @@
+import { useState } from "react";
+
 import {
   formatOpportunityScore,
   isUnderserved,
   opportunityScore,
 } from "../lib/odi";
+import { useStudio } from "../state/StudioContext";
 import { readActions } from "./actions";
 import { ActionRow, MeterBar, ScorePill, type NodeProps } from "./primitives";
 import { num, str, type Tone } from "./props";
@@ -544,6 +547,314 @@ export function CandidateQueue({ node }: NodeProps) {
       </ol>
 
       {interviewId ? <p className="ui-caption">Interview {interviewId}</p> : null}
+
+      <ActionRow actions={actions} />
+    </article>
+  );
+}
+
+/* batch-scoring                                                       */
+/* ------------------------------------------------------------------ */
+
+interface AppliedScore {
+  index: number;
+  id: string;
+  /** The pair the outcome held before this write; `null` is truly unscored. */
+  importance: number | null;
+  satisfaction: number | null;
+}
+
+/**
+ * The same pass as `odi score`, driven from the thread.
+ *
+ * One outcome at a time, with the customer's sentence in view. Every write goes
+ * through the shared `score-batch` endpoint — one item per call — so a click
+ * and a keypress reach the same store and the same 1–10 bounds. Progress moves
+ * only after the server reports a result: a refused write leaves the person on
+ * the same outcome with the reason beside it, never silently on the next one.
+ */
+export function BatchScoring({ node }: NodeProps) {
+  const { scoreOutcome } = useStudio();
+  const state = str(node.props, "state", "ready");
+  const outcomes = recordList(node.props.outcomes);
+  const message = str(node.props, "message");
+
+  const [index, setIndex] = useState(0);
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
+  const [applied, setApplied] = useState<AppliedScore[]>([]);
+  const [tally, setTally] = useState({ scored: 0, skipped: 0, undone: 0 });
+
+  const current = outcomes[index];
+  const total = outcomes.length;
+  const actions = readActions(node.props);
+
+  if (state === "loading") {
+    return (
+      <article
+        className="ui-card ui-card--scoring"
+        aria-label="Loading the scoring pass"
+        aria-busy="true"
+      >
+        <p className="ui-caption">Assembling the pass…</p>
+      </article>
+    );
+  }
+
+  if (state === "failed") {
+    return (
+      <article className="ui-card ui-card--scoring" aria-label="The scoring pass could not be loaded">
+        <header className="ui-card__head">
+          <span className="ui-card__id">Scoring pass</span>
+        </header>
+        <p className="ui-card__statement">{message || "The pass could not be loaded."}</p>
+        <ActionRow actions={actions} />
+      </article>
+    );
+  }
+
+  if (state === "empty" || total === 0) {
+    return (
+      <article className="ui-card ui-card--scoring" aria-label="Nothing to score">
+        <header className="ui-card__head">
+          <span className="ui-card__id">Scoring pass</span>
+        </header>
+        <p className="ui-card__statement">{message || "Nothing to score: no outcomes match."}</p>
+        <ActionRow actions={actions} />
+      </article>
+    );
+  }
+
+  if (index >= total) {
+    const parts = [`scored ${tally.scored}`, `skipped ${tally.skipped}`];
+    if (tally.undone) {
+      parts.push(`undone ${tally.undone}`);
+    }
+    return (
+      <article className="ui-card ui-card--scoring" aria-label="Scoring pass complete">
+        <header className="ui-card__head">
+          <span className="ui-card__id">Scoring pass</span>
+          <span className="ui-caption">Complete</span>
+        </header>
+        <p className="ui-card__statement">Scoring complete: {parts.join(", ")}.</p>
+        <ActionRow actions={actions} />
+      </article>
+    );
+  }
+
+  function recordWrite(importance: number | null, satisfaction: number | null) {
+    setApplied((prev) => [...prev, { index, id: str(current, "id"), importance, satisfaction }]);
+    setTally((prev) => ({ ...prev, scored: prev.scored + 1 }));
+    setIndex((prev) => prev + 1);
+  }
+
+  function score(importance: number, satisfaction: number) {
+    if (busy) {
+      return;
+    }
+    setBusy(true);
+    setNote(null);
+    void scoreOutcome({ outcome_id: str(current, "id"), importance, satisfaction })
+      .then((result) => {
+        if (!result.ok) {
+          setNote(result.error ?? "The server refused this score.");
+          return;
+        }
+        recordWrite(
+          typeof current.importance === "number" ? current.importance : null,
+          typeof current.satisfaction === "number" ? current.satisfaction : null,
+        );
+      })
+      .catch((error: unknown) => {
+        setNote((error as Error).message);
+      })
+      .finally(() => setBusy(false));
+  }
+
+  function skip() {
+    if (busy) {
+      return;
+    }
+    setTally((prev) => ({ ...prev, skipped: prev.skipped + 1 }));
+    setIndex((prev) => prev + 1);
+  }
+
+  function undo() {
+    if (busy || applied.length === 0) {
+      return;
+    }
+    const last = applied[applied.length - 1];
+    setBusy(true);
+    setNote(null);
+    // Undo replays the previous pair through the same endpoint; a prior
+    // null/null restores the outcome to truly unscored rather than to zero.
+    void scoreOutcome({
+      outcome_id: last.id,
+      importance: last.importance,
+      satisfaction: last.satisfaction,
+    })
+      .then((result) => {
+        if (!result.ok) {
+          setNote(result.error ?? "The server refused to undo this score.");
+          return;
+        }
+        setApplied((prev) => prev.slice(0, -1));
+        setTally((prev) => ({
+          scored: Math.max(prev.scored - 1, 0),
+          skipped: prev.skipped,
+          undone: prev.undone + 1,
+        }));
+        setIndex(last.index);
+      })
+      .catch((error: unknown) => {
+        setNote((error as Error).message);
+      })
+      .finally(() => setBusy(false));
+  }
+
+  return (
+    <ScoringStep
+      key={`${index}:${str(current, "id")}`}
+      outcome={current}
+      position={index + 1}
+      total={total}
+      busy={busy}
+      note={note}
+      canUndo={applied.length > 0}
+      onScore={score}
+      onSkip={skip}
+      onUndo={undo}
+      actions={actions}
+    />
+  );
+}
+
+interface ScoringStepProps {
+  outcome: Record<string, unknown>;
+  position: number;
+  total: number;
+  busy: boolean;
+  note: string | null;
+  canUndo: boolean;
+  onScore: (importance: number, satisfaction: number) => void;
+  onSkip: () => void;
+  onUndo: () => void;
+  actions: ReturnType<typeof readActions>;
+}
+
+/**
+ * One outcome on stage. Keyed by id, so its controls start from this outcome's
+ * own scores; an unscored outcome opens at the middle rather than pretending a
+ * prior pair exists.
+ */
+function ScoringStep({
+  outcome,
+  position,
+  total,
+  busy,
+  note,
+  canUndo,
+  onScore,
+  onSkip,
+  onUndo,
+  actions,
+}: ScoringStepProps) {
+  const outcomeId = str(outcome, "id");
+  const statement = str(outcome, "statement");
+  const quote = str(outcome, "quote");
+  const wasScored =
+    typeof outcome.importance === "number" && typeof outcome.satisfaction === "number";
+  const [importance, setImportance] = useState(() =>
+    typeof outcome.importance === "number" ? outcome.importance : 5,
+  );
+  const [satisfaction, setSatisfaction] = useState(() =>
+    typeof outcome.satisfaction === "number" ? outcome.satisfaction : 5,
+  );
+
+  return (
+    <article className="ui-card ui-card--scoring" aria-label={`Scoring pass ${position} of ${total}`}>
+      <header className="ui-card__head">
+        <span className="ui-card__id">{outcomeId}</span>
+        <span className="ui-caption">
+          {position}/{total}
+        </span>
+      </header>
+
+      <p className="ui-card__statement">{statement}</p>
+
+      <p className="ui-caption">
+        {wasScored
+          ? `Current · importance ${outcome.importance} · satisfaction ${outcome.satisfaction}`
+          : "Current · unscored"}
+      </p>
+
+      {quote ? (
+        <blockquote className="ui-quote">
+          <Markdown source={quote} />
+        </blockquote>
+      ) : (
+        <p className="ui-caption">No customer sentence was captured for this outcome.</p>
+      )}
+
+      <label className="ui-scoring__field" htmlFor={`score-importance-${outcomeId}`}>
+        Importance · {importance.toFixed(1)}
+        <input
+          id={`score-importance-${outcomeId}`}
+          type="range"
+          min={1}
+          max={10}
+          step={0.1}
+          value={importance}
+          disabled={busy}
+          onChange={(event) => setImportance(Number(event.target.value))}
+        />
+      </label>
+
+      <label className="ui-scoring__field" htmlFor={`score-satisfaction-${outcomeId}`}>
+        Satisfaction · {satisfaction.toFixed(1)}
+        <input
+          id={`score-satisfaction-${outcomeId}`}
+          type="range"
+          min={1}
+          max={10}
+          step={0.1}
+          value={satisfaction}
+          disabled={busy}
+          onChange={(event) => setSatisfaction(Number(event.target.value))}
+        />
+      </label>
+
+      <p className="ui-caption">
+        Opportunity <b>{formatOpportunityScore(opportunityScore(importance, satisfaction))}</b>
+      </p>
+
+      {note ? (
+        <aside className="ui-callout ui-callout--warning" role="alert">
+          <div className="ui-callout__body">{note}</div>
+        </aside>
+      ) : null}
+
+      <div className="ui-actions">
+        <button
+          type="button"
+          className="ui-action ui-action--primary"
+          disabled={busy}
+          onClick={() => onScore(importance, satisfaction)}
+        >
+          {busy ? "Saving…" : "Score"}
+        </button>
+        <button type="button" className="ui-action ui-action--ghost" disabled={busy} onClick={onSkip}>
+          Skip
+        </button>
+        <button
+          type="button"
+          className="ui-action ui-action--ghost"
+          disabled={busy || !canUndo}
+          onClick={onUndo}
+        >
+          Undo
+        </button>
+      </div>
 
       <ActionRow actions={actions} />
     </article>
