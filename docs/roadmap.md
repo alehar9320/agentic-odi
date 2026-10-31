@@ -76,9 +76,33 @@ The open issues this milestone still has to answer, grouped by what they change.
 - [ ] **The docs must be the truth** — README, architecture, and a roadmap that tracks reality (this change).
 - [x] **Outcome sample and method** — every desired-outcome score carries `importance_n`, `satisfaction_n` and `score_method` (`estimate`, `survey`, `import`) through the model, service, SQLite replay, MCP tools, CLI and Studio API; an unknown count renders as `est.`, and an `estimate` that claims a sample above one is refused before the write ([PR #281](https://github.com/alehar9320/agentic-odi/pull/281)).
 
-- [x] **Score history** — every accepted score change is written as an append-only `ScoreSnapshot` alongside the score's sample and method, with an optional `note`. `desired-outcomes history`, `get_outcome_history` and `GET /api/outcomes/{id}/history` replay the trail; a rejected mutation writes no snapshot, so history never shows a change that did not happen ([PR #281](https://github.com/alehar9320/agentic-odi/pull/281)).
-
 - [x] **Score history** — every accepted score change is written as an append-only `ScoreSnapshot` alongside the score's sample and method, with an optional `note`. `desired-outcomes history`, `get_outcome_history` and `GET /api/outcomes/{id}/history` replay the trail; a rejected mutation writes no snapshot, so history never shows a change that did not happen. `desired-outcomes get` shows the latest accepted reason as a `note` line, so the detail view carries the same "why" as the history without inventing one ([PR #281](https://github.com/alehar9320/agentic-odi/pull/281)).
 
-- [x] **Trust seams for the gated increments** — the remaining Pillar-2 increments wait on decisions that are not yet approved, so `agentic_odi_core.trust` exposes their shapes and refuses to answer: `parse_survey`/`aggregate_survey` (import policy), `retain_survey_inputs` (retention policy), `opportunity_interval`/`persisted_interval` (bootstrap convention), `classify_confidence`/`rank_outcomes_honestly` (confidence table) and `outcome_delta` (delta semantics). Each raises `TrustContractPendingError` naming the blocking decision instead of returning a fabricated band, class or direction ([PR #281](https://github.com/alehar9320/agentic-odi/pull/281)).
+- [x] **Survey import**: `odi survey import <csv>` parses a response file,
+  aggregates one mean per outcome and lands the mean, its sample (`n`) and a
+  bootstrap band computed from the real paired responses. The import is
+  all-or-nothing: an unresolved reference or a malformed row fails before any
+  outcome is written.
+- [x] **Reproducible bands**: A survey outcome stores `opportunity_low`/
+  `opportunity_high` with their provenance (`interval_n`, seed, confidence level,
+  computed-at). A score or method edit without a fresh band clears the stale one
+  in the same write, so a new number never carries an old range; an estimate
+  keeps the no-band placeholder rather than a fabricated width.
+- [x] **Honest ranking**: `classify_confidence` labels each outcome
+  `measured`/`thin`/`none` from its weakest dimension, and
+  `rank_outcomes_for_job` ranks within a section by the band's low end, so an
+  estimate can no longer outrank a measured score. `odi top` lists the measured
+  section (naming the thin and unscored it excluded) and `odi coverage` reports
+  the split; the landscape renders the same band and groups by confidence class.
+- [x] **Signed deltas**: `outcome_delta` reads the recorded snapshots and reports
+  the per-dimension and opportunity differences with an explicit `direction`,
+  never inferring an "improvement" from a bare number. `desired-outcomes history
+  --why` and `GET /api/outcomes/{id}/delta` expose it; a missing dimension stays
+  `null`, not `0`.
+- [x] **Trust seams for the gated increments**: The remaining Pillar-2
+  increments wait on decisions that are not yet approved, so `agentic_odi_core.trust`
+  exposes their shapes and refuses to answer: `retain_survey_inputs` (retention
+  policy) and `persisted_interval` when no band is stored (interval provenance).
+  Each raises `TrustContractPendingError` naming the blocking decision instead of
+  returning a fabricated band, class or direction.
 

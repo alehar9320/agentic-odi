@@ -99,6 +99,15 @@ count stays unknown — the CLI renders it as `est.`, never `n=0` — and an
 `estimate` that claims a sample above one is refused before the write. See
 [CLI reference](docs/cli.md#desired-outcomes) for the flags.
 
+A score is a number with a **range**, not a point. Importing a survey with
+`odi survey import <csv>` lands each outcome's mean, its sample and a bootstrap
+band from the real paired responses; editing the score without a fresh band
+clears the stale one, so a new number never carries an old range.
+`odi top` answers "what should we build next?" from the measured section only —
+highest low end of the band first — naming the thin and unscored outcomes it
+left out, and `odi coverage` reports that split. An estimate can no longer
+outrank a measured score.
+
 ## Quick Start
 
 **Run the full stack locally.** Prerequisites: Python 3.10+,

@@ -177,10 +177,11 @@ agentic-odi survey import responses.csv
 agentic-odi survey import responses.csv --json
 
 `survey import` reads a CSV of responses (one row per respondent, columns named
-for the outcome) and lands each outcome's accepted mean, sample size (`n`) and
-band on the matching outcome. A row that matches no outcome is reported, not
-silently dropped. The import is all-or-nothing: a malformed file fails without a
-partial write.
+for the outcome) and lands each outcome's accepted mean, sample size (`n`) and a
+bootstrap band computed from the real paired responses on the matching outcome.
+The import is all-or-nothing: a row that matches no outcome, a malformed value
+or a duplicate respondent fails the whole import before any outcome is written,
+so nothing is silently dropped or partially applied.
 
 # Evidence-aware ranking
 agentic-odi top
