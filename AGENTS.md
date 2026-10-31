@@ -239,3 +239,12 @@ For the full Kiro tool reference including subagent dispatch patterns and git wo
   hand-maintain them. A tool is read-only in exactly one place: its
   `ToolSpec.effect`. `test_the_gate_agrees_with_the_contract_on_what_needs_consent`
   pins the equality.
+- **Coverage floor is `fail-under=89`.** New branch-only modules drag the total
+  down fast, so add their tests in the same change. The MCP `reset_db` fixture
+  in `apps/mcp-server/tests/conftest.py` clears every store a test can write —
+  including `candidates_db`; a store missing from it leaks rows across tests.
+- **Keep the PR body true.** `scripts/pr_guards.py body-truth` (advisory) reads
+  file/test counts and named files out of the description; run it locally with
+  `uv run python scripts/pr_guards.py body-truth --base-ref origin/main
+  --body-file <file>` before editing the PR. A description that says the spine
+  "does not exist yet" while the branch ships it is the failure this catches.
