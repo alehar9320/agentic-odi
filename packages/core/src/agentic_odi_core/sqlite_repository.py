@@ -9,12 +9,16 @@ from typing import Any
 
 from pydantic import BaseModel, ValidationError
 
-from agentic_odi_core.events import DEFAULT_DEVICE, DEFAULT_WORKSPACE, Event
+from agentic_odi_core.events import DEFAULT_WORKSPACE, Event, resolve_device_id
 from agentic_odi_core.intent_store import IntentStore
 from agentic_odi_core.models import (
+    Brief,
+    Conversation,
     CustomerOutcome,
     Evidence,
     Job,
+    Message,
+    Observation,
     Outcome,
     ScheduledWork,
     Signal,
@@ -23,9 +27,11 @@ from agentic_odi_core.models import (
 )
 from agentic_odi_core.repository import (
     Repository,
+    epoch_seconds,
     page,
     rank_signals,
     sort_outcomes,
+    thread_window,
     unread_signals,
 )
 
@@ -44,7 +50,9 @@ class SQLiteRepository(Repository):
         self._workspace_id = workspace_id or os.environ.get(
             "AGENTIC_ODI_WORKSPACE", DEFAULT_WORKSPACE
         )
-        self._device_id = device_id or os.environ.get("AGENTIC_ODI_DEVICE_ID", DEFAULT_DEVICE)
+        # A real device id, persisted on first use, so two installs are
+        # distinguishable in the event log instead of both claiming "local".
+        self._device_id = device_id or resolve_device_id()
         self.store = IntentStore(db_path, check_same_thread=False)
         self._last_event_id = 0
         self._backfilled = False
@@ -57,6 +65,10 @@ class SQLiteRepository(Repository):
         self.outcomes: dict[str, Outcome] = {}
         self.customer_outcomes: dict[str, CustomerOutcome] = {}
         self.evidence: dict[str, Evidence] = {}
+        self.conversations: dict[str, Conversation] = {}
+        self.messages: dict[str, Message] = {}
+        self.observations: dict[str, Observation] = {}
+        self.brief: Brief | None = None
         self.signals: dict[str, Signal] = {}
         self.scheduled_work: dict[str, ScheduledWork] = {}
         self._last_event_id = 0
@@ -174,6 +186,29 @@ class SQLiteRepository(Repository):
 
         elif et == "CUSTOMER_OUTCOME_DELETED":
             self.customer_outcomes.pop(p["id"], None)
+        elif et == "CONVERSATION_CREATED":
+            self.conversations[p["id"]] = Conversation.model_validate(p)
+        elif et == "CONVERSATION_UPDATED":
+            self._merge_updates(self.conversations, p, Conversation)
+        elif et == "CONVERSATION_DELETED":
+            conversation_id = p["id"]
+            self.conversations.pop(conversation_id, None)
+            for key in [
+                k for k, v in self.messages.items() if v.conversation_id == conversation_id
+            ]:
+                del self.messages[key]
+        elif et == "MESSAGE_APPENDED":
+            message = Message.model_validate(p)
+            self.messages[message.id] = message
+        elif et == "OBSERVATION_CREATED":
+            observation = Observation.model_validate(p)
+            self.observations[observation.id] = observation
+        elif et == "OBSERVATION_UPDATED":
+            self._merge_updates(self.observations, p, Observation)
+        elif et == "OBSERVATION_DELETED":
+            self.observations.pop(p["id"], None)
+        elif et == "BRIEF_SAVED":
+            self.brief = Brief.model_validate(p)
         elif et == "SIGNAL_CREATED":
             self.signals[p["id"]] = Signal.model_validate(p)
         elif et == "SIGNAL_READ":
@@ -481,6 +516,135 @@ class SQLiteRepository(Repository):
                 self._sync()
                 return True
             return False
+
+    def _append(self, event_type: str, payload: dict) -> None:
+        self.store.append(
+            event_type,
+            payload,
+            workspace_id=self._workspace_id,
+            device_id=self._device_id,
+        )
+
+    def add_conversation(self, conversation: Conversation) -> Conversation:
+        with self._lock:
+            stored = conversation.model_copy(
+                update={"workspace_id": self._workspace_id, "device_id": self._device_id}
+            )
+            self._append("CONVERSATION_CREATED", stored.model_dump(mode="json"))
+            self._sync()
+            return stored
+
+    def get_conversation(self, conversation_id: str) -> Conversation | None:
+        with self._lock:
+            self._sync()
+            return self.conversations.get(conversation_id)
+
+    def list_conversations(self, limit: int | None = None, offset: int = 0) -> list[Conversation]:
+        with self._lock:
+            self._sync()
+            ordered = sorted(
+                self.conversations.values(),
+                key=lambda conversation: epoch_seconds(conversation.updated_at),
+                reverse=True,
+            )
+            return page(ordered, limit, offset)
+
+    def update_conversation(self, conversation_id: str, updates: dict) -> Conversation | None:
+        with self._lock:
+            self._sync()
+            if conversation_id not in self.conversations:
+                return None
+            self._append(
+                "CONVERSATION_UPDATED",
+                {"id": conversation_id, "updates": updates},
+            )
+            self._sync()
+            return self.conversations.get(conversation_id)
+
+    def delete_conversation(self, conversation_id: str) -> bool:
+        with self._lock:
+            self._sync()
+            if conversation_id not in self.conversations:
+                return False
+            self._append("CONVERSATION_DELETED", {"id": conversation_id})
+            self._sync()
+            return True
+
+    def add_message(self, message: Message) -> Message:
+        with self._lock:
+            stored = message.model_copy(update={"workspace_id": self._workspace_id})
+            self._append("MESSAGE_APPENDED", stored.model_dump(mode="json"))
+            self._sync()
+            return stored
+
+    def get_message(self, message_id: str) -> Message | None:
+        with self._lock:
+            self._sync()
+            return self.messages.get(message_id)
+
+    def list_messages(
+        self, conversation_id: str, limit: int | None = None, before: str | None = None
+    ) -> list[Message]:
+        with self._lock:
+            self._sync()
+            thread = [m for m in self.messages.values() if m.conversation_id == conversation_id]
+            return thread_window(thread, limit, before)
+
+    def add_observation(self, observation: Observation) -> Observation:
+        with self._lock:
+            stored = observation.model_copy(update={"workspace_id": self._workspace_id})
+            self._append("OBSERVATION_CREATED", stored.model_dump(mode="json"))
+            self._sync()
+            return stored
+
+    def get_observation(self, observation_id: str) -> Observation | None:
+        with self._lock:
+            self._sync()
+            return self.observations.get(observation_id)
+
+    def list_observations(
+        self, status: str | None = None, limit: int | None = None, offset: int = 0
+    ) -> list[Observation]:
+        with self._lock:
+            self._sync()
+            items = sorted(
+                self.observations.values(),
+                key=lambda observation: epoch_seconds(observation.created_at),
+                reverse=True,
+            )
+            if status is not None:
+                items = [item for item in items if item.status == status]
+            return page(items, limit, offset)
+
+    def update_observation(self, observation_id: str, updates: dict) -> Observation | None:
+        with self._lock:
+            self._sync()
+            if observation_id not in self.observations:
+                return None
+            self._append("OBSERVATION_UPDATED", {"id": observation_id, "updates": updates})
+            self._sync()
+            return self.observations.get(observation_id)
+
+    def delete_observation(self, observation_id: str) -> bool:
+        with self._lock:
+            self._sync()
+            if observation_id not in self.observations:
+                return False
+            self._append("OBSERVATION_DELETED", {"id": observation_id})
+            self._sync()
+            return True
+
+    def save_brief(self, brief: Brief) -> Brief:
+        with self._lock:
+            stored = brief.model_copy(update={"workspace_id": self._workspace_id})
+            self._append("BRIEF_SAVED", stored.model_dump(mode="json"))
+            self._sync()
+            return stored
+
+    def get_brief(self) -> Brief | None:
+        with self._lock:
+            self._sync()
+            return self.brief
 
     def add_signal(self, signal: Signal) -> Signal:
         with self._lock:

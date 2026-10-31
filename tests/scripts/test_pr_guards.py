@@ -7,6 +7,7 @@ from pathlib import Path
 
 from pr_guards import (
     GuardConfig,
+    budget_exception,
     build_diff_args,
     changed_files_from_status,
     check_deletions,
@@ -14,6 +15,7 @@ from pr_guards import (
     check_freshness,
     guard_diff_shape,
     is_generated,
+    load_budget_exceptions,
     parse_name_status,
     parse_numstat,
 )
@@ -110,6 +112,90 @@ def test_exceeding_the_changed_file_budget_fails() -> None:
 
     assert len(errors) == 1
     assert "11" in errors[0]
+
+
+# --- Gate 2b: an approved, per-branch exception ------------------------------
+
+_EIGHTY_ONE = {
+    "issue": 81,
+    "branch": "issue-81-sessions",
+    "max_deletions": 1500,
+    "reason": "the issue replaces the sidecar's private store",
+}
+
+
+def _deletions(lines: int) -> dict[str, tuple[int, int]]:
+    return {"apps/studio-api/src/agentic_odi_studio_api/studio/memory.py": (0, lines)}
+
+
+def test_an_approved_exception_lifts_the_budget_for_its_branch() -> None:
+    result = guard_diff_shape(
+        deleted=[],
+        numstat=_deletions(1148),
+        allowlist=[],
+        config=GuardConfig(),
+        release_lookup=_release,
+        branch="issue-81-sessions",
+        budget_exceptions=[_EIGHTY_ONE],
+    )
+
+    assert result.errors == []
+    assert any("1500" in warning and "#81" in warning for warning in result.warnings)
+
+
+def test_the_exception_still_bounds_the_diff_it_approves() -> None:
+    result = guard_diff_shape(
+        deleted=[],
+        numstat=_deletions(1501),
+        allowlist=[],
+        config=GuardConfig(),
+        release_lookup=_release,
+        branch="issue-81-sessions",
+        budget_exceptions=[_EIGHTY_ONE],
+    )
+
+    assert len(result.errors) == 1
+    assert "1501 lines, over the 1500-line budget" in result.errors[0]
+
+
+def test_an_exception_does_not_apply_to_another_branch() -> None:
+    result = guard_diff_shape(
+        deleted=[],
+        numstat=_deletions(1148),
+        allowlist=[],
+        config=GuardConfig(),
+        release_lookup=_release,
+        branch="some-other-work",
+        budget_exceptions=[_EIGHTY_ONE],
+    )
+
+    assert len(result.errors) == 1
+    assert "500-line budget" in result.errors[0]
+
+
+def test_without_exceptions_the_default_budget_still_blocks() -> None:
+    errors = check_diff_budget(_deletions(1148), GuardConfig())
+
+    assert len(errors) == 1
+
+
+def test_an_incomplete_exception_is_ignored() -> None:
+    for field in ("issue", "branch", "reason"):
+        broken = {**_EIGHTY_ONE, field: ""}
+        assert budget_exception("issue-81-sessions", [broken]) is None, field
+    for ceiling in (0, -5, "1500", None):
+        assert (
+            budget_exception("issue-81-sessions", [{**_EIGHTY_ONE, "max_deletions": ceiling}])
+            is None
+        )
+
+
+def test_a_blank_branch_matches_no_exception() -> None:
+    assert budget_exception("", [_EIGHTY_ONE]) is None
+
+
+def test_a_missing_exception_file_grants_nothing(tmp_path: Path) -> None:
+    assert load_budget_exceptions(tmp_path / "absent.yml") == []
 
 
 # --- Gate 3: branch freshness ------------------------------------------------
@@ -491,6 +577,7 @@ ROOT = Path(__file__).resolve().parents[2]
 WORKFLOW = ROOT / ".github" / "workflows" / "pr-guardrails.yml"
 CONFIG = ROOT / ".github" / "pr-guardrails" / "config.yml"
 ALLOWLIST = ROOT / ".github" / "pr-guardrails" / "deletion-allowlist.yml"
+BUDGET_EXCEPTIONS = ROOT / ".github" / "pr-guardrails" / "diff-budget-exceptions.yml"
 TEMPLATE = ROOT / ".github" / "pull_request_template.md"
 
 
@@ -543,6 +630,30 @@ def test_the_allowlist_only_approves_banner_component_replacements() -> None:
         "apps/studio/src/components/notices/SidecarNotice.tsx",
     }
     assert all(entry["issue"] == 264 and entry["reason"] for entry in allowlist)
+
+
+def test_every_approved_budget_exception_is_complete() -> None:
+    import yaml
+
+    exceptions = yaml.safe_load(BUDGET_EXCEPTIONS.read_text(encoding="utf-8"))
+
+    for entry in exceptions:
+        assert str(entry["issue"]).isdigit(), entry
+        assert entry["branch"], entry
+        assert entry["reason"], entry
+        assert isinstance(entry["max_deletions"], int), entry
+        assert 500 < entry["max_deletions"] <= 2000, entry
+        assert budget_exception(str(entry["branch"]), exceptions) is entry
+
+
+def test_the_workflow_names_the_branch_the_exception_applies_to() -> None:
+    workflow = WORKFLOW.read_text(encoding="utf-8")
+
+    assert "--branch" in workflow
+    # Event payloads reach the shell through an environment variable, never
+    # interpolated into the command line.
+    assert "HEAD_BRANCH: ${{ github.head_ref }}" in workflow
+    assert '--branch "$HEAD_BRANCH"' in workflow
 
 
 def test_the_template_asks_for_experience_verification_and_scope() -> None:

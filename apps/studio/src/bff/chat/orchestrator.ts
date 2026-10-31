@@ -3,7 +3,7 @@ import type {
   ChatMessage,
   ChatStreamRequest,
   Observation,
-  ObservationKind,
+  ObservationCategory,
   Outcome,
 } from "../../types";
 import { asStudioError } from "../../api/studioApi";
@@ -164,20 +164,23 @@ const TOOLS = [
   },
   {
     name: "remember",
-    description: "Save an observation to local memory.",
+    description: "Propose an observation for the person to confirm.",
     parameters: {
       type: "object",
       properties: {
-        kind: {
+        category: {
           type: "string",
           enum: [
             "career",
             "opportunity",
             "business",
-            "stakeholder",
+            "customer",
             "constraint",
+            "decision",
+            "stakeholder",
             "evidence",
             "preference",
+            "other",
           ],
         },
         text: { type: "string" },
@@ -282,7 +285,7 @@ export class ChatOrchestrator {
     if (latest.conversation) {
       return latest.conversation;
     }
-    return this.memory.createConversation("New conversation");
+    return this.memory.createConversation();
   }
 
   private async streamDeterministic(
@@ -407,15 +410,17 @@ export class ChatOrchestrator {
         return;
       }
       const observation = await this.memory.addObservation({
-        kind: "evidence",
+        category: "other",
         text,
-        confirmed: true,
       });
       emit(toolEvent("remember", "running", text.slice(0, 60)), onEvent);
       emit(toolEvent("remember", "ok", JSON.stringify(observation)), onEvent);
       emit({ event: "memory", data: { observation } }, onEvent);
-      emit({ event: "delta", data: { text: "Saved to memory." } }, onEvent);
-      emit({ event: "message", data: { content: "Saved to memory." } }, onEvent);
+      emit({ event: "delta", data: { text: "Noted. Confirm it if I got it right." } }, onEvent);
+      emit(
+        { event: "message", data: { content: "Noted. Confirm it if I got it right." } },
+        onEvent,
+      );
       return;
     }
 
@@ -837,9 +842,9 @@ export class ChatOrchestrator {
           }
           case "remember": {
             observation = await this.memory.addObservation({
-              kind: (call.argumentsObj.kind as ObservationKind) ?? "evidence",
+              category:
+                (call.argumentsObj.category as ObservationCategory) ?? "other",
               text: String(call.argumentsObj.text ?? ""),
-              confirmed: true,
             });
             output = observation;
             break;
@@ -898,7 +903,7 @@ export class ChatOrchestrator {
 
 interface StoredConversationLike {
   id: string;
-  title: string;
+  title: string | null;
   created_at: string;
   updated_at: string;
 }

@@ -17,6 +17,11 @@ import { StudioBar } from "./StudioBar";
 const stubContext = (overrides: Record<string, unknown> = {}) => ({
   llmHealth: { healthy: true, message: "ok" },
   messages: [],
+  conversations: [],
+  conversationId: null,
+  openConversation: vi.fn(),
+  deleteConversation: vi.fn(),
+  refreshConversations: vi.fn(),
   unreadSignalCount: 0,
   openPanel: vi.fn(),
   pushToast: vi.fn(),
@@ -185,5 +190,54 @@ describe("StudioBar", () => {
     render(<StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />);
 
     expect(screen.getByRole("button", { name: "Update ready" })).toBeInTheDocument();
+  });
+
+  it("reopens and deletes a stored conversation from the thread list", () => {
+    const openConversation = vi.fn();
+    const deleteConversation = vi.fn();
+    const refreshConversations = vi.fn();
+    vi.mocked(useStudio).mockReturnValue(
+      stubContext({
+        conversationId: "c-1",
+        conversations: [
+          {
+            id: "c-1",
+            title: "I own activation",
+            created_at: "2026-10-22T10:00:00+00:00",
+            updated_at: "2026-10-22T10:00:00+00:00",
+          },
+          {
+            id: "c-2",
+            title: null,
+            archived: true,
+            created_at: "2026-10-22T09:00:00+00:00",
+            updated_at: "not-a-date",
+          },
+        ],
+        openConversation,
+        deleteConversation,
+        refreshConversations,
+      }) as never,
+    );
+
+    render(<StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />);
+    fireEvent.click(screen.getByRole("button", { name: "Open stored conversations" }));
+    expect(refreshConversations).toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("menuitem", { name: /I own activation/ }));
+    expect(openConversation).toHaveBeenCalledWith("c-1");
+
+    fireEvent.click(screen.getByRole("button", { name: "Open stored conversations" }));
+    expect(screen.getByText("archived")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Delete Untitled conversation" }));
+    expect(deleteConversation).toHaveBeenCalledWith("c-2");
+  });
+
+  it("says so when nothing is stored yet", () => {
+    vi.mocked(useStudio).mockReturnValue(stubContext() as never);
+    render(<StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />);
+    fireEvent.click(screen.getByRole("button", { name: "Open stored conversations" }));
+
+    expect(screen.getByText("Nothing stored yet.")).toBeInTheDocument();
   });
 });

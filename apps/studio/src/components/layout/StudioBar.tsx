@@ -3,8 +3,30 @@ import { useEffect, useRef, useState } from "react";
 import { conversationToMarkdown, downloadMarkdown, exportFilename } from "../../lib/export";
 import { useStudio } from "../../state/StudioContext";
 import { useUpdateSnapshot } from "../../updater";
-import { BellIcon, MenuIcon, MoonIcon, PlugIcon, PlusIcon, SettingsIcon, SunIcon } from "../icons";
+import type { Conversation } from "../../types";
+import {
+  BellIcon,
+  MenuIcon,
+  MoonIcon,
+  PlugIcon,
+  PlusIcon,
+  SettingsIcon,
+  SunIcon,
+  ThreadsIcon,
+} from "../icons";
 import { OdiMascot } from "../OdiMascot";
+
+/** A thread is named by the first thing said in it; until then, by when it was left. */
+function threadTitle(conversation: Conversation): string {
+  const title = conversation.title?.trim();
+  if (title) {
+    return title;
+  }
+  const when = new Date(conversation.updated_at);
+  return Number.isNaN(when.getTime())
+    ? "Untitled conversation"
+    : `Conversation, ${when.toLocaleString()}`;
+}
 
 /**
  * The only persistent chrome: where you are, how to start again, whether the
@@ -29,25 +51,37 @@ export function StudioBar({
     pushToast,
     saveSettings,
     settings,
+    conversations,
+    conversationId,
+    openConversation,
+    deleteConversation,
+    refreshConversations,
   } = useStudio();
   const update = useUpdateSnapshot();
   const theme = settings.theme === "light" ? "light" : "dark";
   const nextTheme = theme === "dark" ? "light" : "dark";
   const [menuOpen, setMenuOpen] = useState(false);
+  const [threadsOpen, setThreadsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const threadsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!menuOpen) {
+    if (!menuOpen && !threadsOpen) {
       return;
     }
     function onPointerDown(event: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+      const target = event.target as Node;
+      if (menuRef.current && !menuRef.current.contains(target)) {
         setMenuOpen(false);
+      }
+      if (threadsRef.current && !threadsRef.current.contains(target)) {
+        setThreadsOpen(false);
       }
     }
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
         setMenuOpen(false);
+        setThreadsOpen(false);
       }
     }
     window.addEventListener("mousedown", onPointerDown);
@@ -56,7 +90,7 @@ export function StudioBar({
       window.removeEventListener("mousedown", onPointerDown);
       window.removeEventListener("keydown", onKeyDown);
     };
-  }, [menuOpen]);
+  }, [menuOpen, threadsOpen]);
 
   function exportConversation() {
     const exportedAt = new Date();
@@ -111,6 +145,68 @@ export function StudioBar({
         >
           ✨ What's New
         </button>
+
+        <div className="bar__menu" ref={threadsRef}>
+          <button
+            type="button"
+            className="icon-button"
+            aria-label="Open stored conversations"
+            title="Stored conversations"
+            aria-haspopup="menu"
+            aria-expanded={threadsOpen}
+            onClick={() => {
+              setThreadsOpen((open) => !open);
+              void refreshConversations();
+            }}
+          >
+            <ThreadsIcon size={17} />
+          </button>
+          {threadsOpen && (
+            <div
+              className="bar__menu-list bar__threads"
+              role="menu"
+              aria-label="Stored conversations"
+            >
+              {conversations.length === 0 && (
+                <p className="bar__threads-empty">Nothing stored yet.</p>
+              )}
+              {conversations.map((conversation) => (
+                <div
+                  key={conversation.id}
+                  className={`bar__thread${
+                    conversation.id === conversationId ? " is-current" : ""
+                  }`}
+                >
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="bar__menu-item bar__thread-open"
+                    onClick={() => {
+                      setThreadsOpen(false);
+                      void openConversation(conversation.id);
+                    }}
+                  >
+                    <span className="bar__thread-title">{threadTitle(conversation)}</span>
+                    {conversation.archived && (
+                      <span className="bar__thread-tag">archived</span>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    className="bar__thread-delete"
+                    aria-label={`Delete ${threadTitle(conversation)}`}
+                    title="Delete this conversation"
+                    onClick={() => {
+                      void deleteConversation(conversation.id);
+                    }}
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
 
         <button
           type="button"

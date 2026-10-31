@@ -93,6 +93,14 @@ def evidence_not_found(evidence_id: str | None, hint: str | None = None) -> str:
     return message
 
 
+def conversation_not_found(conversation_id: str | None) -> str:
+    return f"Conversation not found: {conversation_id}"
+
+
+def observation_not_found(observation_id: str | None) -> str:
+    return f"Observation not found: {observation_id}"
+
+
 def scheduled_work_not_found(work_id: str | None, hint: str | None = None) -> str:
     message = f"Scheduled work not found: {work_id}"
     if hint:

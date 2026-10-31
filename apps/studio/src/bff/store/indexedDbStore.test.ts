@@ -77,7 +77,7 @@ describe("IndexedDbLocalStore", () => {
       role: "user",
       content: "hi",
       created_at: "2026-01-01T00:00:00Z",
-      message_id: "m-1",
+      id: "m-1",
       parent_id: null,
     });
     await store.appendTurn({
@@ -85,12 +85,12 @@ describe("IndexedDbLocalStore", () => {
       role: "assistant",
       content: "hello",
       created_at: "2026-01-01T00:00:00Z",
-      message_id: "m-2",
+      id: "m-2",
       parent_id: "m-1",
     });
 
     const tree = await store.conversationTree("c-1");
-    expect(tree.messages.map((m) => m.message_id)).toEqual(["m-1", "m-2"]);
+    expect(tree.messages.map((m) => m.id)).toEqual(["m-1", "m-2"]);
     expect(tree.head_id).toBe("m-2");
 
     await store.setConversationHead("c-1", "m-1");
@@ -133,7 +133,7 @@ describe("IndexedDbLocalStore", () => {
       role: "user",
       content: "hi",
       created_at: "2026-01-01T00:00:00Z",
-      message_id: "m-1",
+      id: "m-1",
       parent_id: null,
     });
     const snapshot = await first.snapshot();
@@ -149,7 +149,7 @@ describe("IndexedDbLocalStore", () => {
     const conversations = await second.listConversations();
     expect(conversations).toHaveLength(1);
     const tree = await second.conversationTree("c-1");
-    expect(tree.messages.map((m) => m.message_id)).toEqual(["m-1"]);
+    expect(tree.messages.map((m) => m.id)).toEqual(["m-1"]);
     second.close();
   });
 });

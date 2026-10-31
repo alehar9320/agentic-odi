@@ -46,9 +46,17 @@ apps/cli ──────────────▶ packages/connectors
 
 - `SQLiteRepository` is the production default for the CLI, MCP server, and Studio API.
 - The default database is `~/.agentic-odi/odi.db`, overridable with `AGENTIC_ODI_DB`.
-- Studio conversation history and PM memory use a separate SQLite database,
-  `~/.agentic-odi/studio.db`, overridable with `AGENTIC_ODI_STUDIO_DB`. They are
-  sidecar-local and never enter the ODI repository or the MCP contract.
+- Studio conversation history and PM memory are stored there as events, not in a
+  database of their own, so the CLI and the MCP server read the same thread the
+  Studio wrote. A pre-core `~/.agentic-odi/studio.db` is imported once and
+  renamed `studio.db.imported`; `AGENTIC_ODI_STUDIO_DB` points at that legacy file.
+- The provider key is the one thing the sidecar keeps out of the event log: it
+  lives in `~/.agentic-odi/studio.json` (`0600`, `AGENTIC_ODI_STUDIO_SETTINGS`)
+  and the SPA only ever receives a mask.
+- Every event carries a `workspace_id` (`AGENTIC_ODI_WORKSPACE`, default `local`)
+  and threads carry a real `device_id`, created once at `~/.agentic-odi/device_id`
+  or set with `AGENTIC_ODI_DEVICE_ID`. Sync is deliberately not implemented; the
+  data is only made durable and portable in format.
 - `build_repository()` chooses SQLite by default and `InMemoryRepository` when `AGENTIC_ODI_DB=:memory:`, which is what tests use.
 - The CLI selects its backend with `--backend local|mcp` or `AGENTIC_ODI_BACKEND`.
 - The Studio API selects `local` (direct service calls) or `mcp` (passthrough) with `AGENTIC_ODI_BACKEND` or `create_app(backend=...)`.
@@ -76,7 +84,12 @@ branch is still visible:
   branch unless it is listed in `.github/pr-guardrails/deletion-allowlist.yml`;
   refuses a diff that deletes more than `max_deletions` lines or changes more
   than `max_changed_files` files, excluding regenerated files. Thresholds live
-  in `.github/pr-guardrails/config.yml`.
+  in `.github/pr-guardrails/config.yml`. A replacement the issue itself calls
+  for - code that must go, rather than a revert - is approved by name in
+  `.github/pr-guardrails/diff-budget-exceptions.yml`: an entry binds one head
+  branch to a larger ceiling and names the issue and the reason, so the default
+  stays deny for every other pull request and the raised budget is visible in
+  the check annotations.
 - **body-truth** (warns; the fenced JSON diff summary blocks): compares
   natural-language file/test claims and the machine-readable block against the
   real diff.

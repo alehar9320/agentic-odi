@@ -9,6 +9,12 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, computed_field
 
+from agentic_odi_core.events import DEFAULT_DEVICE, DEFAULT_WORKSPACE
+
+
+def _utcnow() -> datetime:
+    return datetime.now(timezone.utc)
+
 
 class Direction(str, Enum):
     MINIMIZE = "minimize"
@@ -201,6 +207,90 @@ class CustomerOutcome(BaseModel):
         return self.customer_value.opportunity_score
 
 
+MessageRole = Literal["user", "assistant", "tool", "system"]
+ObservationCategory = Literal[
+    "career",
+    "opportunity",
+    "business",
+    "customer",
+    "constraint",
+    "decision",
+    "stakeholder",
+    "evidence",
+    "preference",
+    "other",
+]
+ObservationStatus = Literal["proposed", "confirmed", "dismissed"]
+
+BRIEF_ID = "brief"
+
+
+class Conversation(BaseModel):
+    """One durable thread between a person and an agent.
+
+    The thread is the product's primary artifact, so it lives in the same
+    event-sourced store as jobs and outcomes rather than in one browser.
+    """
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    title: str | None = Field(None, description="Derived from the first user turn")
+    created_at: datetime = Field(default_factory=_utcnow)
+    updated_at: datetime = Field(default_factory=_utcnow)
+    workspace_id: str = Field(DEFAULT_WORKSPACE, description="Workspace that owns this thread")
+    device_id: str = Field(DEFAULT_DEVICE, description="Device that started this thread")
+    archived: bool = Field(False, description="Archived threads stay readable but leave the rail")
+    head_id: str | None = Field(None, description="Message id of the branch currently on screen")
+
+
+class Message(BaseModel):
+    """One turn of a conversation.
+
+    ``parts`` is the ordered list the client renders — prose, UI specs, tool
+    events — stored raw so a reloaded thread shows the cards it showed live.
+    """
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    conversation_id: str = Field(..., description="Owning conversation")
+    parent_id: str | None = Field(
+        None, description="Message this turn answers; siblings share a parent to branch"
+    )
+    role: MessageRole
+    content: str = Field("", description="Plain-text content of the turn")
+    parts: list[dict[str, Any]] = Field(
+        default_factory=list, description="Ordered render parts: prose, ui specs, tool events"
+    )
+    tool_calls: list[dict[str, Any]] = Field(
+        default_factory=list, description="Tool calls issued during this turn"
+    )
+    created_at: datetime = Field(default_factory=_utcnow)
+    model: str | None = Field(None, description="Model that produced an assistant turn")
+    tokens_in: int | None = Field(None, description="Input tokens for this turn")
+    tokens_out: int | None = Field(None, description="Output tokens for this turn")
+    workspace_id: str = Field(DEFAULT_WORKSPACE, description="Workspace that owns this turn")
+
+
+class Observation(BaseModel):
+    """A short, attributable fact the agent believes about the person.
+
+    Proposed observations carry no weight: only a person can move one to
+    ``confirmed``, and a ``dismissed`` one is never injected into a prompt again.
+    """
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    conversation_id: str | None = Field(None, description="Thread that produced this fact")
+    text: str = Field(..., max_length=300, description="The fact, in the person's words")
+    category: ObservationCategory = "other"
+    status: ObservationStatus = "proposed"
+    data: dict[str, Any] = Field(
+        default_factory=dict, description="Structured detail behind the text"
+    )
+    confidence: float = Field(0.5, description="How sure the agent claims to be, 0 to 1")
+    source_message_id: str | None = Field(None, description="Turn the fact came from")
+    created_at: datetime = Field(default_factory=_utcnow)
+    updated_at: datetime = Field(default_factory=_utcnow)
+    workspace_id: str = Field(DEFAULT_WORKSPACE, description="Workspace that owns this fact")
+
+
 class SignalKind(str, Enum):
     """The facts a signal may report. Every kind here has a real producer."""
 
@@ -259,6 +349,24 @@ class V2MOM(BaseModel):
     measures: list[str] = Field(
         default_factory=list, description="Metrics and key results that measure success"
     )
+
+
+class Brief(BaseModel):
+    """The standing context block: what the person is building and for whom.
+
+    One per workspace, with a stable id, so the CLI, the MCP server, and the
+    Studio all read the same brief instead of each keeping its own copy.
+    """
+
+    id: str = Field(BRIEF_ID, description="Stable id — one brief per workspace")
+    product_name: str = ""
+    product_url: str = ""
+    target_user: str = ""
+    job_statement: str = ""
+    core_problem: str = ""
+    v2mom: V2MOM | None = Field(None, description="The vision this brief is aiming at")
+    updated_at: datetime = Field(default_factory=_utcnow)
+    workspace_id: str = Field(DEFAULT_WORKSPACE, description="Workspace that owns this brief")
 
 
 class ScheduledWorkStatus(str, Enum):

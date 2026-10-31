@@ -256,6 +256,62 @@ a {
   cursor: not-allowed;
 }
 
+.bar__threads {
+  min-width: 260px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.bar__threads-empty {
+  padding: 8px 10px;
+  color: var(--faint);
+  font-size: 0.78rem;
+}
+
+.bar__thread {
+  display: flex;
+  align-items: stretch;
+  border-radius: 7px;
+}
+
+.bar__thread.is-current {
+  background: var(--surface-hover);
+}
+
+.bar__thread-open {
+  flex: 1;
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.bar__thread-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bar__thread-tag {
+  color: var(--faint);
+  font-size: 0.68rem;
+  text-transform: lowercase;
+}
+
+.bar__thread-delete {
+  border: 0;
+  background: transparent;
+  color: var(--faint);
+  font-size: 1rem;
+  line-height: 1;
+  padding: 0 6px;
+  cursor: pointer;
+}
+
+.bar__thread-delete:hover {
+  color: var(--danger);
+}
+
 /* ------------------------------------------------------------------ */
 /* Conversation                                                       */
 /* ------------------------------------------------------------------ */
@@ -5743,4 +5799,11 @@ details[open] summary {
 .settings__preset-id {
   color: var(--muted);
   font-size: 0.72rem;
+}
+
+.memory-item__source {
+  color: var(--faint);
+  font-size: 0.76rem;
+  font-style: italic;
+  margin: 0 0 4px;
 }

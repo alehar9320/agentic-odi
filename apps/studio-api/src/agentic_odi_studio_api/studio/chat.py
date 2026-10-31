@@ -4,11 +4,12 @@ The loop fans the MCP tools and three local tools — ``render_ui``,
 ``remember``, and ``add_connector`` — into the completion. Local tools are
 intercepted rather than forwarded: ``render_ui`` validates its spec against the
 catalog the client sent and streams a ``ui`` event, ``remember`` stores a
-suggested observation and streams a ``memory`` event, and ``add_connector``
+proposed observation and streams a ``memory`` event, and ``add_connector``
 writes the shared connector registry and streams a ``connector`` event.
 
-The conversation is persisted when a memory store is supplied, so a PM can leave
-and come back to the same thread and the same working context.
+The conversation is persisted when a memory store is supplied, in the same
+event-sourced store the canvas uses, so a PM can leave and come back to the
+same thread — with every surface that was rendered — on any install.
 """
 
 from __future__ import annotations
@@ -21,7 +22,7 @@ from collections.abc import AsyncIterator
 from contextlib import AsyncExitStack
 from typing import Any
 
-from agentic_odi_core import ModelRouter, ModelTier, RoutingMode
+from agentic_odi_core import Brief, ModelRouter, ModelTier, RoutingMode
 from agentic_odi_core.remote import (
     StudioError,
     StudioErrorCode,
@@ -36,7 +37,8 @@ from agentic_odi_studio_api.studio.approvals import (
     wait_for_decision,
 )
 from agentic_odi_studio_api.studio.connectors import ConnectorService
-from agentic_odi_studio_api.studio.memory import OBSERVATION_KINDS, StudioMemory
+from agentic_odi_studio_api.studio.memory import MAX_TEXT as MAX_OBSERVATION_TEXT
+from agentic_odi_studio_api.studio.memory import OBSERVATION_CATEGORIES, StudioMemory
 from agentic_odi_studio_api.studio.observability import log_turn
 from agentic_odi_studio_api.studio.probes import check_llm_health, is_endpoint_reachable
 from agentic_odi_studio_api.studio.schemas import (
@@ -94,11 +96,13 @@ How to work:
 6. When a surface carries the evidence better than a paragraph, call `render_ui` once, then write one short sentence. Never describe in prose what a card can already show.
 7. The conversation is the product: every surface you render lands in the thread the PM is already reading. Never tell them to open a panel, a tab, or a view to see something you can show inline.
 8. Capture and simulation are conversations, not forms: ask for the customer's words or the bet in plain language, render the card that carries it, and offer the next move as an action on that card.
-9. When asked to add or query Jobs, Steps, or Outcomes, ALWAYS invoke the corresponding tools.
-10. Be warm, direct, and specific. Short sentences. No corporate jargon, no therapy-speak, no emojis."""
+9. Remember: when the PM states a fact about their product, customer, business, or constraint that will still matter later, call `remember` once with that fact in their words. Never remember a score, a name you inferred, or anything the PM did not say. Never write an observation you would not defend out loud.
+10. The brief and the confirmed observations are the only context you carry forward. If a fact is missing, ask — do not assume, and do not invent history.
+11. When asked to add or query Jobs, Steps, or Outcomes, ALWAYS invoke the corresponding tools.
+12. Be warm, direct, and specific. Short sentences. No corporate jargon, no therapy-speak, no emojis."""
 
 
-def _brief_lines(brief: StudioBrief | None) -> list[str]:
+def _brief_lines(brief: StudioBrief | Brief | None) -> list[str]:
     if brief is None:
         return []
     facts = [
@@ -122,7 +126,7 @@ def _brief_lines(brief: StudioBrief | None) -> list[str]:
     return [f"- {label}: {value}" for label, value in facts if value.strip()]
 
 
-def _brief_block(brief: StudioBrief | None) -> str:
+def _brief_block(brief: StudioBrief | Brief | None) -> str:
     lines = _brief_lines(brief)
     if not lines:
         return ""
@@ -132,7 +136,7 @@ def _brief_block(brief: StudioBrief | None) -> str:
     )
 
 
-def offline_fallback(user_input: str, brief: StudioBrief | None = None) -> str:
+def offline_fallback(user_input: str, brief: StudioBrief | Brief | None = None) -> str:
     """Deterministic, honest guidance when no LLM backend is reachable.
 
     No fabricated customer data, no invented scores: the studio says what it can
@@ -232,8 +236,12 @@ def _user_content(message: ChatMessage, attachments: list[AttachmentRef]) -> Any
     return [{"type": "text", "text": text}, *images]
 
 
-def _to_openai_messages(request: ChatRequest, memory_context: str = "") -> list[dict[str, Any]]:
-    system_prompt = SYSTEM_PROMPT + _brief_block(request.brief)
+def _to_openai_messages(
+    request: ChatRequest,
+    memory_context: str = "",
+    brief: StudioBrief | Brief | None = None,
+) -> list[dict[str, Any]]:
+    system_prompt = SYSTEM_PROMPT + _brief_block(request.brief if brief is None else brief)
     if memory_context:
         system_prompt += "\n\n" + memory_context
     messages: list[dict[str, Any]] = [{"role": "system", "content": system_prompt}]
@@ -298,23 +306,25 @@ REMEMBER_TOOL: dict[str, Any] = {
     "function": {
         "name": "remember",
         "description": (
-            "Save one durable observation about the product manager or their work so "
-            "you can use it in later conversations: a career goal, the opportunity "
+            "Propose one durable observation about the product manager or their work so "
+            "it can be carried into later conversations: a career goal, the opportunity "
             "they are chasing, a business constraint, a stakeholder, a piece of "
-            "evidence, or a working preference. Send the smallest useful sentence. "
-            "The PM will see it in 'What I've learned' and can confirm, edit, or "
-            "dismiss it. Do not call this for transient details of the current task."
+            "evidence, or a working preference. Send the smallest useful sentence in "
+            "their words. The PM sees it in 'What I've learned' and confirms, edits, or "
+            "dismisses it — you cannot confirm your own memory. Do not call this for "
+            "transient details of the current task, a score, or anything they did not say."
         ),
         "parameters": {
             "type": "object",
             "properties": {
-                "kind": {
+                "category": {
                     "type": "string",
-                    "enum": sorted(OBSERVATION_KINDS),
+                    "enum": sorted(OBSERVATION_CATEGORIES),
                     "description": "The area of context this observation belongs to.",
                 },
                 "text": {
                     "type": "string",
+                    "maxLength": MAX_OBSERVATION_TEXT,
                     "description": "One plain-language sentence in the PM's own terms.",
                 },
                 "confidence": {
@@ -328,7 +338,7 @@ REMEMBER_TOOL: dict[str, Any] = {
                     "description": "Optional structured details, such as a job id.",
                 },
             },
-            "required": ["kind", "text"],
+            "required": ["category", "text"],
         },
     },
 }
@@ -355,13 +365,20 @@ def _apply_add_connector(
 
 
 def _apply_remember(
-    arguments: dict[str, Any], memory: StudioMemory | None
+    arguments: dict[str, Any],
+    memory: StudioMemory | None,
+    conversation_id: str | None = None,
+    source_message_id: str | None = None,
 ) -> tuple[str, dict[str, Any] | None]:
-    """Store one suggested observation without asking the PM first."""
+    """Propose one observation for the PM to confirm, without asking first."""
     if memory is None:
         return "Memory is not available to this client.", None
 
-    kind = str(arguments.get("kind", ""))
+    category = str(arguments.get("category", "")).strip()
+    if not category:
+        # Guessing ``other`` here would quietly file the fact under a category
+        # nobody asked for, so send the model back to the tool instead.
+        return "remember needs a category: " + ", ".join(sorted(OBSERVATION_CATEGORIES)), None
     text = str(arguments.get("text", ""))
     data = arguments.get("data")
     try:
@@ -371,15 +388,19 @@ def _apply_remember(
 
     try:
         observation = memory.add_observation(
-            kind=kind,
+            category=category,
             text=text,
             data=data if isinstance(data, dict) else None,
-            status="suggested",
             confidence=confidence,
+            conversation_id=conversation_id,
+            source_message_id=source_message_id,
         )
     except ValueError as exc:
         return f"Could not remember that: {exc}", None
-    return "Saved for the user to review.", {"observation": observation.to_dict()}
+    return (
+        "Proposed for the user to confirm. It is not durable context until they do.",
+        {"observation": observation.model_dump(mode="json")},
+    )
 
 
 def _render_ui_tool(catalog: UiCatalog) -> dict[str, Any]:
@@ -432,17 +453,18 @@ def _persist_turn(
     content: str,
     message_id: str | None = None,
     parent_id: str | None = None,
+    parts: list[dict[str, Any]] | None = None,
 ) -> None:
     """Record a turn, tolerating a duplicate retry and never breaking the reply."""
     if memory is None or conversation_id is None or not content.strip():
         return
     try:
         turns = memory.list_turns(conversation_id)
-        if message_id and any(turn.message_id == message_id for turn in turns):
+        if message_id and any(turn.id == message_id for turn in turns):
             return
         if turns and turns[-1].role == role and turns[-1].content == content:
             return
-        memory.append_turn(conversation_id, role, content, message_id, parent_id)
+        memory.append_turn(conversation_id, role, content, message_id, parent_id, parts)
     except Exception:  # noqa: BLE001
         return
 
@@ -480,6 +502,38 @@ def _denial_result(name: str, decision: Any) -> str | None:
         f"The user declined to run {name}, so nothing was changed.{detail} "
         "Do not retry it without being asked."
     )
+
+
+def _text_parts(text: str) -> list[dict[str, Any]]:
+    """A transcript holding only prose: one part, the way the client renders it."""
+    parts: list[dict[str, Any]] = []
+    _append_text_part(parts, text)
+    return parts
+
+
+def _append_text_part(parts: list[dict[str, Any]], text: str) -> None:
+    """Extend the ordered transcript parts the way the client renders them."""
+    last = parts[-1] if parts else None
+    if last is not None and last.get("kind") == "text":
+        last["text"] = f"{last['text']}{text}"
+    else:
+        parts.append({"kind": "text", "text": text})
+
+
+def _record_tool_part(
+    parts: list[dict[str, Any]], tool_id: str, name: str, status: str, preview: str = ""
+) -> None:
+    """One part per tool call, updated in place as its status changes."""
+    for entry in reversed(parts):
+        if entry.get("kind") == "tool" and entry.get("id") == tool_id:
+            entry["status"] = status
+            if preview:
+                entry["preview"] = preview
+            return
+    part: dict[str, Any] = {"kind": "tool", "id": tool_id, "name": name, "status": status}
+    if preview:
+        part["preview"] = preview
+    parts.append(part)
 
 
 def _source_frame(counters: dict[str, int], name: str, result: str) -> dict[str, Any]:
@@ -535,9 +589,25 @@ async def _turn_frames(
         if conversation is None:
             conversation = memory.create_conversation()
         conversation_id = conversation.id
-        _persist_turn(memory, conversation_id, "user", last_user, user_message_id, user_parent_id)
+        _persist_turn(
+            memory,
+            conversation_id,
+            "user",
+            last_user,
+            user_message_id,
+            user_parent_id,
+            _text_parts(last_user),
+        )
         updated = memory.get_conversation(conversation_id) or conversation
         yield frame("conversation", {"id": updated.id, "title": updated.title})
+
+    # The client sends its brief only when it has one; otherwise read the copy the
+    # CLI, MCP server, and studio all share.
+    brief = (
+        request.brief
+        if request.brief is not None
+        else (memory.get_brief() if memory is not None else None)
+    )
 
     healthy, _message = await check_llm_health(request.base_url, request.api_key, request.model)
 
@@ -554,7 +624,7 @@ async def _turn_frames(
 
     if target_tier == ModelTier.RULE_BASED:
         yield frame("status", {"phase": "offline"})
-        reply = offline_fallback(last_user, request.brief)
+        reply = offline_fallback(last_user, brief)
         yield frame("delta", {"text": reply})
         yield frame("message", {"content": reply})
         _persist_turn(
@@ -564,6 +634,7 @@ async def _turn_frames(
             reply,
             assistant_message_id,
             user_message_id,
+            _text_parts(reply),
         )
         return
 
@@ -582,6 +653,7 @@ async def _turn_frames(
             reply,
             assistant_message_id,
             user_message_id,
+            _text_parts(reply),
         )
         return
 
@@ -623,9 +695,12 @@ async def _turn_frames(
             ) from exc
 
         openai_tools = _openai_tools(mcp_tools) + _local_tools(catalog)
-        messages: list[Any] = _to_openai_messages(request, memory_context)
+        messages: list[Any] = _to_openai_messages(request, memory_context, brief)
 
         spoken: list[str] = []
+        #: The ordered transcript the client renders, stored so a reload shows
+        #: the same cards in the same places.
+        parts: list[dict[str, Any]] = []
         ui_count = 0
         canvas_dirty = False
 
@@ -667,6 +742,7 @@ async def _turn_frames(
                         # simply comes after the sentence that introduces it.
                         turn_text.append(delta.content)
                         spoken.append(delta.content)
+                        _append_text_part(parts, delta.content)
                         yield frame("delta", {"text": delta.content})
                     _collect_tool_calls(delta, tool_calls)
             except Exception as exc:  # noqa: BLE001
@@ -690,6 +766,7 @@ async def _turn_frames(
                     final,
                     assistant_message_id,
                     user_message_id,
+                    parts,
                 )
                 return
 
@@ -715,6 +792,7 @@ async def _turn_frames(
                 name = entry["name"]
                 arguments = _parse_arguments(entry["arguments"])
                 counters["tool_calls"] += 1
+                errors_before = counters["tool_errors"]
 
                 declined: str | None = None
                 if request.approvals and approvals is not None and is_mutating_tool(name):
@@ -748,7 +826,9 @@ async def _turn_frames(
                         yield frame("tool", {"name": name, "status": "ok"})
                 elif name == "remember":
                     yield frame("tool", {"name": name, "status": "start"})
-                    result_str, memory_event = _apply_remember(arguments, memory)
+                    result_str, memory_event = _apply_remember(
+                        arguments, memory, conversation_id, user_message_id
+                    )
                     if memory_event is None:
                         counters["tool_errors"] += 1
                         yield frame(
@@ -783,6 +863,11 @@ async def _turn_frames(
                                 ui_count += 1
                                 result_str = "Rendered inline for the user."
                                 yield frame("tool", {"name": name, "status": "ok"})
+                                # The raw spec is stored, not a rendering of it: a
+                                # later catalog version degrades it, not the record.
+                                parts.append(
+                                    {"kind": "ui", "id": f"ui-{ui_count}", "node": arguments}
+                                )
                                 yield frame("ui", {"id": f"ui-{ui_count}", "spec": arguments})
                     else:
                         try:
@@ -817,7 +902,17 @@ async def _turn_frames(
                                     {"name": name, "status": "ok", "preview": result_str[:280]},
                                 )
                                 source = _source_frame(counters, name, result_str)
+                                parts.append({"kind": "source", **source["data"]})
                                 yield frame(source["event"], source["data"])
+
+                status = (
+                    "declined"
+                    if declined is not None
+                    else "error"
+                    if counters["tool_errors"] > errors_before
+                    else "ok"
+                )
+                _record_tool_part(parts, entry["id"], name, status, result_str)
 
                 messages.append(
                     {
@@ -847,6 +942,7 @@ async def _turn_frames(
             content,
             assistant_message_id,
             user_message_id,
+            parts,
         )
 
 

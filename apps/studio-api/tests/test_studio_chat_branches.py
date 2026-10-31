@@ -158,7 +158,7 @@ def test_retrying_a_persisted_question_does_not_duplicate_its_turn() -> None:
     chat._persist_turn(memory, conversation.id, "user", "list jobs", "user-1", None)
 
     turns = memory.list_turns(conversation.id)
-    assert [(turn.message_id, turn.role, turn.content) for turn in turns] == [
+    assert [(turn.id, turn.role, turn.content) for turn in turns] == [
         ("user-1", "user", "list jobs"),
         ("assistant-1", "assistant", "first answer"),
     ]

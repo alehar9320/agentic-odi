@@ -48,6 +48,7 @@
     "/api/config": {
       "get": {
         "summary": "Get Config",
+        "description": "Environment defaults for the browser, minus the provider key.\n\nThe SPA never needs the secret to ask the sidecar for a completion, and it\nmust not learn it from here: ``/api/settings`` hands back a mask instead.",
         "operationId": "get_config_api_config_get",
         "responses": {
           "200": {
@@ -1947,7 +1948,26 @@
     "/api/memory/observations": {
       "get": {
         "summary": "List Observations",
+        "description": "Newest first. A dismissed observation is only listed when asked for.",
         "operationId": "list_observations_api_memory_observations_get",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -1958,21 +1978,116 @@
                 }
               }
             }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
           }
         }
       },
       "post": {
         "summary": "Create Observation",
+        "description": "A person-confirmed note arrives confirmed; the agent can only propose.",
         "operationId": "create_observation_api_memory_observations_post",
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/ObservationCreateRequest"
               }
             }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObservationResponse"
+                }
+              }
+            }
           },
-          "required": true
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/observations": {
+      "get": {
+        "summary": "List Observations",
+        "description": "Newest first. A dismissed observation is only listed when asked for.",
+        "operationId": "list_observations_api_observations_get",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObservationListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create Observation",
+        "description": "A person-confirmed note arrives confirmed; the agent can only propose.",
+        "operationId": "create_observation_api_observations_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ObservationCreateRequest"
+              }
+            }
+          }
         },
         "responses": {
           "200": {
@@ -2086,6 +2201,94 @@
         }
       }
     },
+    "/api/observations/{observation_id}": {
+      "patch": {
+        "summary": "Update Observation",
+        "operationId": "update_observation_api_observations__observation_id__patch",
+        "parameters": [
+          {
+            "name": "observation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Observation Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ObservationUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObservationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete Observation",
+        "operationId": "delete_observation_api_observations__observation_id__delete",
+        "parameters": [
+          {
+            "name": "observation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Observation Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Delete Observation Api Observations  Observation Id  Delete"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/memory": {
       "delete": {
         "summary": "Clear Memory",
@@ -2099,6 +2302,116 @@
                   "additionalProperties": true,
                   "type": "object",
                   "title": "Response Clear Memory Api Memory Delete"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/brief": {
+      "get": {
+        "summary": "Get Brief",
+        "operationId": "get_brief_api_brief_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BriefResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Put Brief",
+        "description": "The store holds the brief; ``localStorage`` is only the SPA's cache.",
+        "operationId": "put_brief_api_brief_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BriefUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BriefResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings": {
+      "get": {
+        "summary": "Get Settings",
+        "description": "What the SPA may read back: the endpoint, and no secret.",
+        "operationId": "get_settings_api_settings_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Put Settings",
+        "operationId": "put_settings_api_settings_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SettingsUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -2125,6 +2438,47 @@
       }
     },
     "/api/conversations": {
+      "get": {
+        "summary": "List Conversations",
+        "description": "Newest first, archived included: the switcher decides what to show.",
+        "operationId": "list_conversations_api_conversations_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
       "post": {
         "summary": "Create Conversation",
         "operationId": "create_conversation_api_conversations_post",
@@ -2135,6 +2489,133 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ConversationResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/conversations/{conversation_id}": {
+      "get": {
+        "summary": "Get Conversation",
+        "operationId": "get_conversation_api_conversations__conversation_id__get",
+        "parameters": [
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Conversation Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationMessagesResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "summary": "Patch Conversation",
+        "description": "Rename, archive, or record the visible branch \u2014 only the fields sent.",
+        "operationId": "patch_conversation_api_conversations__conversation_id__patch",
+        "parameters": [
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Conversation Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateConversationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete Conversation",
+        "description": "The one way history is destroyed, and the SPA asks before calling it.",
+        "operationId": "delete_conversation_api_conversations__conversation_id__delete",
+        "parameters": [
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Conversation Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Delete Conversation Api Conversations  Conversation Id  Delete"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -2182,11 +2663,60 @@
         }
       }
     },
-    "/api/conversations/{conversation_id}": {
-      "patch": {
-        "summary": "Patch Conversation",
-        "description": "Record the visible branch, or rename the thread.",
-        "operationId": "patch_conversation_api_conversations__conversation_id__patch",
+    "/api/conversations/{conversation_id}/messages": {
+      "get": {
+        "summary": "Conversation Messages",
+        "operationId": "conversation_messages_api_conversations__conversation_id__messages_get",
+        "parameters": [
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Conversation Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 2000,
+              "minimum": 1,
+              "default": 200,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Append Message",
+        "description": "Append a turn the client holds, keyed by the client's own message id.",
+        "operationId": "append_message_api_conversations__conversation_id__messages_post",
         "parameters": [
           {
             "name": "conversation_id",
@@ -2203,7 +2733,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/UpdateConversationRequest"
+                "$ref": "#/components/schemas/AppendMessageRequest"
               }
             }
           }
@@ -2214,7 +2744,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ConversationResponse"
+                  "$ref": "#/components/schemas/MessageResponse"
                 }
               }
             }
@@ -2955,6 +3485,61 @@
         ],
         "title": "AddStepRequest"
       },
+      "AppendMessageRequest": {
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "user",
+              "assistant",
+              "tool",
+              "system"
+            ],
+            "title": "Role"
+          },
+          "content": {
+            "type": "string",
+            "title": "Content",
+            "default": ""
+          },
+          "parts": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Parts"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "role"
+        ],
+        "title": "AppendMessageRequest",
+        "description": "A turn the client appends itself, keyed by its own id."
+      },
       "ApprovalDecisionRequest": {
         "properties": {
           "approved": {
@@ -3042,6 +3627,115 @@
         ],
         "title": "AttachmentRef",
         "description": "One file the user attached to a turn.\n\nNothing is stored server-side: an attachment is part of the message. Text is\nextracted by the client because only the client has the file; images arrive\nas data URLs for backends that accept them."
+      },
+      "BriefModel": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "default": "brief"
+          },
+          "product_name": {
+            "type": "string",
+            "title": "Product Name",
+            "default": ""
+          },
+          "product_url": {
+            "type": "string",
+            "title": "Product Url",
+            "default": ""
+          },
+          "target_user": {
+            "type": "string",
+            "title": "Target User",
+            "default": ""
+          },
+          "job_statement": {
+            "type": "string",
+            "title": "Job Statement",
+            "default": ""
+          },
+          "core_problem": {
+            "type": "string",
+            "title": "Core Problem",
+            "default": ""
+          },
+          "v2mom": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/V2MOM"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "updated_at": {
+            "type": "string",
+            "title": "Updated At",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "title": "BriefModel",
+        "description": "The stored brief: one per workspace, readable by the CLI and MCP too."
+      },
+      "BriefResponse": {
+        "properties": {
+          "brief": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BriefModel"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "title": "BriefResponse"
+      },
+      "BriefUpdateRequest": {
+        "properties": {
+          "product_name": {
+            "type": "string",
+            "title": "Product Name",
+            "default": ""
+          },
+          "product_url": {
+            "type": "string",
+            "title": "Product Url",
+            "default": ""
+          },
+          "target_user": {
+            "type": "string",
+            "title": "Target User",
+            "default": ""
+          },
+          "job_statement": {
+            "type": "string",
+            "title": "Job Statement",
+            "default": ""
+          },
+          "core_problem": {
+            "type": "string",
+            "title": "Core Problem",
+            "default": ""
+          },
+          "v2mom": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/V2MOM"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "title": "BriefUpdateRequest"
       },
       "BusinessImpactCategory": {
         "type": "string",
@@ -3346,6 +4040,38 @@
         ],
         "title": "ConnectorOperationResponse"
       },
+      "ConversationListResponse": {
+        "properties": {
+          "conversations": {
+            "items": {
+              "$ref": "#/components/schemas/ConversationModel"
+            },
+            "type": "array",
+            "title": "Conversations"
+          }
+        },
+        "type": "object",
+        "title": "ConversationListResponse"
+      },
+      "ConversationMessagesResponse": {
+        "properties": {
+          "conversation": {
+            "$ref": "#/components/schemas/ConversationModel"
+          },
+          "messages": {
+            "items": {
+              "$ref": "#/components/schemas/TurnNode"
+            },
+            "type": "array",
+            "title": "Messages"
+          }
+        },
+        "type": "object",
+        "required": [
+          "conversation"
+        ],
+        "title": "ConversationMessagesResponse"
+      },
       "ConversationModel": {
         "properties": {
           "id": {
@@ -3353,7 +4079,14 @@
             "title": "Id"
           },
           "title": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Title"
           },
           "created_at": {
@@ -3374,12 +4107,16 @@
               }
             ],
             "title": "Head Id"
+          },
+          "archived": {
+            "type": "boolean",
+            "title": "Archived",
+            "default": false
           }
         },
         "type": "object",
         "required": [
           "id",
-          "title",
           "created_at",
           "updated_at"
         ],
@@ -3885,6 +4622,31 @@
         ],
         "title": "McpHealthRequest"
       },
+      "MessageListResponse": {
+        "properties": {
+          "messages": {
+            "items": {
+              "$ref": "#/components/schemas/TurnNode"
+            },
+            "type": "array",
+            "title": "Messages"
+          }
+        },
+        "type": "object",
+        "title": "MessageListResponse"
+      },
+      "MessageResponse": {
+        "properties": {
+          "message": {
+            "$ref": "#/components/schemas/TurnModel"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message"
+        ],
+        "title": "MessageResponse"
+      },
       "ModelListRequest": {
         "properties": {
           "base_url": {
@@ -3906,22 +4668,26 @@
       },
       "ObservationCreateRequest": {
         "properties": {
-          "kind": {
+          "category": {
             "type": "string",
             "enum": [
               "career",
               "opportunity",
               "business",
-              "stakeholder",
+              "customer",
               "constraint",
+              "decision",
+              "stakeholder",
               "evidence",
-              "preference"
+              "preference",
+              "other"
             ],
-            "title": "Kind"
+            "title": "Category",
+            "default": "other"
           },
           "text": {
             "type": "string",
-            "maxLength": 2000,
+            "maxLength": 300,
             "minLength": 1,
             "title": "Text"
           },
@@ -3948,11 +4714,21 @@
             "type": "boolean",
             "title": "Confirmed",
             "default": false
+          },
+          "conversation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conversation Id"
           }
         },
         "type": "object",
         "required": [
-          "kind",
           "text"
         ],
         "title": "ObservationCreateRequest"
@@ -3979,37 +4755,48 @@
             "type": "string",
             "title": "Id"
           },
-          "kind": {
-            "type": "string",
-            "title": "Kind"
+          "conversation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conversation Id"
           },
           "text": {
             "type": "string",
             "title": "Text"
+          },
+          "category": {
+            "type": "string",
+            "title": "Category"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
           },
           "data": {
             "additionalProperties": true,
             "type": "object",
             "title": "Data"
           },
-          "status": {
-            "type": "string",
-            "title": "Status"
-          },
           "confidence": {
             "type": "number",
             "title": "Confidence"
           },
-          "source_turn": {
+          "source_message_id": {
             "anyOf": [
               {
-                "type": "integer"
+                "type": "string"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Source Turn"
+            "title": "Source Message Id"
           },
           "created_at": {
             "type": "string",
@@ -4023,8 +4810,8 @@
         "type": "object",
         "required": [
           "id",
-          "kind",
           "text",
+          "category",
           "status",
           "confidence",
           "created_at",
@@ -4050,7 +4837,7 @@
             "anyOf": [
               {
                 "type": "string",
-                "maxLength": 2000,
+                "maxLength": 300,
                 "minLength": 1
               },
               {
@@ -4064,7 +4851,7 @@
               {
                 "type": "string",
                 "enum": [
-                  "suggested",
+                  "proposed",
                   "confirmed",
                   "dismissed"
                 ]
@@ -4231,6 +5018,70 @@
         ],
         "title": "ScheduleWorkRequest"
       },
+      "SettingsResponse": {
+        "properties": {
+          "base_url": {
+            "type": "string",
+            "title": "Base Url",
+            "default": ""
+          },
+          "model": {
+            "type": "string",
+            "title": "Model",
+            "default": ""
+          },
+          "mcp_url": {
+            "type": "string",
+            "title": "Mcp Url",
+            "default": ""
+          },
+          "has_api_key": {
+            "type": "boolean",
+            "title": "Has Api Key",
+            "default": false
+          },
+          "masked": {
+            "type": "string",
+            "title": "Masked",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "title": "SettingsResponse"
+      },
+      "SettingsUpdateRequest": {
+        "properties": {
+          "base_url": {
+            "type": "string",
+            "title": "Base Url",
+            "default": ""
+          },
+          "model": {
+            "type": "string",
+            "title": "Model",
+            "default": ""
+          },
+          "mcp_url": {
+            "type": "string",
+            "title": "Mcp Url",
+            "default": ""
+          },
+          "api_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Api Key"
+          }
+        },
+        "type": "object",
+        "title": "SettingsUpdateRequest",
+        "description": "Model endpoint settings. The key is written here and never read back."
+      },
       "SignalActionRequest": {
         "properties": {
           "mcp_url": {
@@ -4288,7 +5139,7 @@
       "TurnModel": {
         "properties": {
           "id": {
-            "type": "integer",
+            "type": "string",
             "title": "Id"
           },
           "conversation_id": {
@@ -4307,17 +5158,6 @@
             "type": "string",
             "title": "Created At"
           },
-          "message_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Message Id"
-          },
           "parent_id": {
             "anyOf": [
               {
@@ -4328,6 +5168,14 @@
               }
             ],
             "title": "Parent Id"
+          },
+          "parts": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Parts"
           }
         },
         "type": "object",
@@ -4368,6 +5216,14 @@
           "created_at": {
             "type": "string",
             "title": "Created At"
+          },
+          "parts": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Parts"
           }
         },
         "type": "object",
@@ -4424,6 +5280,17 @@
               }
             ],
             "title": "Title"
+          },
+          "archived": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Archived"
           }
         },
         "type": "object",
@@ -4587,6 +5454,7 @@
           "vision": {
             "type": "string",
             "title": "Vision",
+            "description": "What you want to achieve or create",
             "default": ""
           },
           "values": {
@@ -4594,33 +5462,37 @@
               "type": "string"
             },
             "type": "array",
-            "title": "Values"
+            "title": "Values",
+            "description": "Principles and beliefs that guide decisions"
           },
           "methods": {
             "items": {
               "type": "string"
             },
             "type": "array",
-            "title": "Methods"
+            "title": "Methods",
+            "description": "Actions and strategies to achieve the vision"
           },
           "obstacles": {
             "items": {
               "type": "string"
             },
             "type": "array",
-            "title": "Obstacles"
+            "title": "Obstacles",
+            "description": "Challenges and risks that stand in the way"
           },
           "measures": {
             "items": {
               "type": "string"
             },
             "type": "array",
-            "title": "Measures"
+            "title": "Measures",
+            "description": "Metrics and key results that measure success"
           }
         },
         "type": "object",
         "title": "V2MOM",
-        "description": "The domain's V2MOM artifact: Vision, Values, Methods, Obstacles, Measures.\n\nOnly ``vision`` is captured today, by the context conversation; the other\nfour fields have no input path yet and arrive empty."
+        "description": "The domain's V2MOM artifact: Vision, Values, Methods, Obstacles, Measures.\n\nOnly ``vision`` has an input path today, in the Studio's context\nconversation. Nothing extracts the other four from a conversation and no\nsurface captures them, so a V2MOM in practice is its vision and four empty\nlists."
       },
       "ValidationError": {
         "properties": {

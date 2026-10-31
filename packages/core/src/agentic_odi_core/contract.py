@@ -44,6 +44,11 @@ class ToolName(str, Enum):
     GET_FRAMEWORK_GUIDELINES = "get_odi_framework_guidelines"
     GET_CAPABILITIES = "get_capabilities"
     GET_CAPABILITIES_MANIFEST = "get_capabilities_manifest"
+    LIST_CONVERSATIONS = "list_conversations"
+    GET_CONVERSATION = "get_conversation"
+    LIST_OBSERVATIONS = "list_observations"
+    CONFIRM_OBSERVATION = "confirm_observation"
+    DISMISS_OBSERVATION = "dismiss_observation"
     LIST_SIGNALS = "list_signals"
     MARK_SIGNAL_READ = "mark_signal_read"
     DISMISS_SIGNAL = "dismiss_signal"
@@ -385,6 +390,44 @@ TOOL_SPECS: dict[str, ToolSpec] = {
         effect=_derive_effect("get_capabilities_manifest"),
         arguments=(),
         returns="The full tool manifest JSON.",
+    ),
+    ToolName.LIST_CONVERSATIONS.value: ToolSpec(
+        name="list_conversations",
+        summary="List stored conversations, most recently active first.",
+        effect=_derive_effect("list_conversations"),
+        arguments=("limit", "offset"),
+        returns="A list of Conversation records.",
+    ),
+    ToolName.GET_CONVERSATION.value: ToolSpec(
+        name="get_conversation",
+        summary="Read one conversation with its messages, oldest first.",
+        effect=_derive_effect("get_conversation"),
+        arguments=("conversation_id", "message_limit"),
+        required=("conversation_id",),
+        returns="The Conversation and its Message list, including rendered UI parts.",
+    ),
+    ToolName.LIST_OBSERVATIONS.value: ToolSpec(
+        name="list_observations",
+        summary="List what the agent has learned, optionally by status.",
+        effect=_derive_effect("list_observations"),
+        arguments=("status", "limit", "offset"),
+        returns="A list of Observation records, newest first.",
+    ),
+    ToolName.CONFIRM_OBSERVATION.value: ToolSpec(
+        name="confirm_observation",
+        summary="Confirm an observation so it is carried into future prompts.",
+        effect=_derive_effect("confirm_observation"),
+        arguments=("observation_id",),
+        required=("observation_id",),
+        returns="The confirmed Observation.",
+    ),
+    ToolName.DISMISS_OBSERVATION.value: ToolSpec(
+        name="dismiss_observation",
+        summary="Dismiss an observation; a dismissed one never re-enters a prompt.",
+        effect=_derive_effect("dismiss_observation"),
+        arguments=("observation_id",),
+        required=("observation_id",),
+        returns="The dismissed Observation.",
     ),
     ToolName.LIST_SIGNALS.value: ToolSpec(
         name="list_signals",

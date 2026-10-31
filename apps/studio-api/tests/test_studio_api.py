@@ -84,7 +84,7 @@ def _stream(path: str, payload: dict[str, Any]) -> dict[str, list[str]]:
 # ---------------------------------------------------------------------------
 
 
-def test_config_returns_env_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_config_returns_env_defaults_without_the_key(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("AGENTIC_ODI_BASE_URL", "http://llm:9999/v1")
     monkeypatch.setenv("AGENTIC_ODI_API_KEY", "secret-key")
     monkeypatch.setenv("AGENTIC_ODI_MODEL", "my-model")
@@ -95,10 +95,13 @@ def test_config_returns_env_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
     assert response.status_code == 200
     assert response.json()["defaults"] == {
         "base_url": "http://llm:9999/v1",
-        "api_key": "secret-key",
+        "api_key": "",
         "model_name": "my-model",
         "mcp_url": "http://mcp:9999/mcp",
     }
+    # Whatever the environment holds, the browser must not be able to read it
+    # out of this response.
+    assert "secret-key" not in response.text
 
 
 def test_config_uses_streamlit_compatible_fallbacks(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -114,7 +117,7 @@ def test_config_uses_streamlit_compatible_fallbacks(monkeypatch: pytest.MonkeyPa
 
     assert defaults == {
         "base_url": "http://localhost:8001/v1",
-        "api_key": "local",
+        "api_key": "",
         "model_name": "local-tools-model",
         "mcp_url": "http://localhost:8000/mcp",
     }
@@ -518,38 +521,53 @@ def test_memory_observation_crud() -> None:
     client = _client()
 
     created = client.post(
-        "/api/memory/observations",
-        json={"kind": "career", "text": "Owns activation."},
+        "/api/observations",
+        json={"category": "career", "text": "Owns activation."},
     )
     assert created.status_code == 200
     observation = created.json()["observation"]
-    assert observation["status"] == "suggested"
+    assert observation["status"] == "proposed"
+    assert observation["category"] == "career"
 
-    listed = client.get("/api/memory/observations").json()["observations"]
+    listed = client.get("/api/observations").json()["observations"]
     assert [item["id"] for item in listed] == [observation["id"]]
 
     patched = client.patch(
-        f"/api/memory/observations/{observation['id']}",
+        f"/api/observations/{observation['id']}",
         json={"status": "confirmed", "text": "Owns activation end to end."},
     )
     assert patched.status_code == 200
     assert patched.json()["observation"]["status"] == "confirmed"
     assert patched.json()["observation"]["text"] == "Owns activation end to end."
 
-    assert client.delete(f"/api/memory/observations/{observation['id']}").status_code == 200
-    assert client.get("/api/memory/observations").json()["observations"] == []
-    assert client.delete(f"/api/memory/observations/{observation['id']}").status_code == 404
+    assert client.delete(f"/api/observations/{observation['id']}").status_code == 200
+    assert client.get("/api/observations").json()["observations"] == []
+    assert client.delete(f"/api/observations/{observation['id']}").status_code == 404
 
 
-def test_memory_rejects_unknown_kind_and_blank_text() -> None:
+def test_the_legacy_memory_paths_still_answer() -> None:
+    """Clients written against ``/api/memory/observations`` keep working."""
+    client = _client()
+
+    created = client.post(
+        "/api/memory/observations",
+        json={"category": "career", "text": "Owns activation."},
+    )
+    assert created.status_code == 200
+    observation_id = created.json()["observation"]["id"]
+    assert client.get("/api/memory/observations").json()["observations"][0]["id"] == observation_id
+    assert client.delete("/api/memory").status_code == 200
+
+
+def test_observations_reject_unknown_category_and_blank_text() -> None:
     client = _client()
 
     assert (
-        client.post("/api/memory/observations", json={"kind": "nonsense", "text": "x"}).status_code
+        client.post("/api/observations", json={"category": "nonsense", "text": "x"}).status_code
         == 422
     )
     assert (
-        client.post("/api/memory/observations", json={"kind": "career", "text": "   "}).status_code
+        client.post("/api/observations", json={"category": "career", "text": "   "}).status_code
         == 422
     )
 
@@ -557,8 +575,8 @@ def test_memory_rejects_unknown_kind_and_blank_text() -> None:
 def test_pm_authored_context_can_start_confirmed() -> None:
     client = _client()
     response = client.post(
-        "/api/memory/observations",
-        json={"kind": "opportunity", "text": "Activation is the bet.", "confirmed": True},
+        "/api/observations",
+        json={"category": "opportunity", "text": "Activation is the bet.", "confirmed": True},
     )
     assert response.status_code == 200
     assert response.json()["observation"]["status"] == "confirmed"
@@ -600,7 +618,7 @@ def test_chat_resumes_an_existing_conversation() -> None:
 def test_clear_memory_removes_conversations_and_observations() -> None:
     client = _client()
     _stream_with(client, "/api/chat", _chat_body("hello"))
-    client.post("/api/memory/observations", json={"kind": "career", "text": "Owns activation."})
+    client.post("/api/observations", json={"category": "career", "text": "Owns activation."})
 
     assert client.delete("/api/memory").status_code == 200
     assert client.get("/api/conversations/latest").json() == {
