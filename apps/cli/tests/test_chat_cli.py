@@ -15,8 +15,8 @@ from agentic_odi_cli.chat import (
     _to_openai_tools,
     handle_command,
 )
-from agentic_odi_core import ModelRouter
 from agentic_odi_cli.cli import app
+from agentic_odi_core import ModelRouter
 from typer.testing import CliRunner
 
 ANSI_ESCAPE = re.compile(r"\x1b\[[0-9;]*m")

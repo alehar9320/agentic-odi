@@ -1,7 +1,6 @@
 import pytest
 from agentic_odi_core.router import LocalOpenAIEngine, ModelRouter, ModelTier, RoutingMode
 from agentic_odi_core.steve_jobs import (
-    format_opportunity_score_insight,
     generate_steve_jobs_response,
 )
 
@@ -15,7 +14,10 @@ def test_model_tier_names():
 def test_model_router_tier_resolution_auto():
     router = ModelRouter(mode=RoutingMode.AUTO)
     # No remote, no local -> deterministic (honest floor)
-    assert router.resolve_tier(remote_available=False, local_available=False) == ModelTier.DETERMINISTIC
+    assert (
+        router.resolve_tier(remote_available=False, local_available=False)
+        == ModelTier.DETERMINISTIC
+    )
     # Remote wins in AUTO
     assert router.resolve_tier(remote_available=True, local_available=False) == ModelTier.REMOTE_LLM
     # Local beats deterministic when remote is down
@@ -24,13 +26,22 @@ def test_model_router_tier_resolution_auto():
 
 def test_model_router_forced_modes():
     router_forced_det = ModelRouter(mode=RoutingMode.FORCE_DETERMINISTIC)
-    assert router_forced_det.resolve_tier(remote_available=True, local_available=True) == ModelTier.DETERMINISTIC
+    assert (
+        router_forced_det.resolve_tier(remote_available=True, local_available=True)
+        == ModelTier.DETERMINISTIC
+    )
 
     router_forced_local = ModelRouter(mode=RoutingMode.FORCE_LOCAL)
-    assert router_forced_local.resolve_tier(remote_available=True, local_available=True) == ModelTier.LOCAL_LLM
+    assert (
+        router_forced_local.resolve_tier(remote_available=True, local_available=True)
+        == ModelTier.LOCAL_LLM
+    )
 
     router_forced_remote = ModelRouter(mode=RoutingMode.FORCE_REMOTE)
-    assert router_forced_remote.resolve_tier(remote_available=True, local_available=False) == ModelTier.REMOTE_LLM
+    assert (
+        router_forced_remote.resolve_tier(remote_available=True, local_available=False)
+        == ModelTier.REMOTE_LLM
+    )
 
 
 def test_local_engine_is_available_returns_false_when_unreachable():
