@@ -97,4 +97,24 @@ describe("OutcomeCard note", () => {
     expect(history).not.toHaveBeenCalled();
     expect(screen.queryByTestId("outcome-note")).toBeNull();
   });
+
+  it("renders a note containing markup as text, not HTML", async () => {
+    const hostile = '<img src=x onerror="alert(1)"> <script>alert(2)</script>';
+    history.mockResolvedValue([
+      {
+        id: "S-1",
+        outcome_id: "O-101",
+        at: "2026-01-01T00:00:00+00:00",
+        satisfaction: 2,
+        note: hostile,
+      },
+    ]);
+
+    const { container } = render(<OutcomeCard outcome={outcome} detail />);
+
+    await waitFor(() => expect(screen.getByTestId("outcome-note")).toHaveTextContent(hostile));
+    // The note is a value, so it must never be parsed as markup.
+    expect(container.querySelector("script")).toBeNull();
+    expect(container.querySelector("img")).toBeNull();
+  });
 });
