@@ -213,6 +213,9 @@ class CustomerOutcome(BaseModel):
     step_id: str | None = Field(
         default=None, description="The ID of the specific Step, if applicable"
     )
+    quote_id: str | None = Field(
+        default=None, description="The Evidence record this outcome was promoted from"
+    )
     customer_value: CustomerValue
     business_value: BusinessValue
 

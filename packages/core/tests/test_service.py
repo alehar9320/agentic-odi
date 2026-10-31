@@ -8,6 +8,7 @@ from agentic_odi_core.models import (
     BusinessValue,
     CustomerValue,
     Direction,
+    Evidence,
     Job,
     Outcome,
 )
@@ -388,3 +389,94 @@ def test_evidence_delete_and_promote(service: ODIService) -> None:
         service.delete_evidence(evidence.id)
     with pytest.raises(EvidenceNotFoundError):
         service.promote_evidence(evidence.id, "job")
+
+
+def test_add_evidence_deduplicates_by_fingerprint(service: ODIService) -> None:
+    job = service.add_job("Job")
+    first = service.add_evidence(
+        source_name="gong",
+        source_kind="mcp",
+        name="quote",
+        content="Lost hours",
+        job_id=job.id,
+    )
+    second = service.add_evidence(
+        source_name="gong",
+        source_kind="mcp",
+        name="quote",
+        content="Lost hours",
+        job_id=job.id,
+    )
+    #: Same quote imported twice resolves to the one evidence record.
+    assert second.id == first.id
+    assert service.list_evidence(job_id=job.id) == [first]
+
+
+def test_add_evidence_different_content_is_not_deduplicated(service: ODIService) -> None:
+    job = service.add_job("Job")
+    first = service.add_evidence(
+        source_name="gong",
+        source_kind="mcp",
+        name="quote",
+        content="Lost hours",
+        job_id=job.id,
+    )
+    second = service.add_evidence(
+        source_name="gong",
+        source_kind="mcp",
+        name="quote",
+        content="Different hours",
+        job_id=job.id,
+    )
+    assert second.id != first.id
+    assert len(service.list_evidence(job_id=job.id)) == 2
+
+
+def test_promote_evidence_is_idempotent_and_links_back(service: ODIService) -> None:
+    job = service.add_job("Job")
+    evidence = service.add_evidence(
+        source_name="gong",
+        source_kind="mcp",
+        name="quote",
+        content="Lost hours",
+        job_id=job.id,
+    )
+    outcome = service.promote_evidence(
+        evidence.id,
+        "outcome",
+        job_id=job.id,
+        statement="Minimize the time to rotate secrets",
+        importance=8.0,
+        satisfaction=4.0,
+    )
+    #: The evidence row now points back at the outcome.
+    assert service.get_evidence(evidence.id).outcome_id == outcome.id
+    #: Re-promoting the same evidence returns the existing outcome, not a copy.
+    again = service.promote_evidence(
+        evidence.id,
+        "outcome",
+        job_id=job.id,
+        statement="Minimize the time to rotate secrets",
+        importance=8.0,
+        satisfaction=4.0,
+    )
+    assert again.id == outcome.id
+    assert service.get_outcomes(job.id) == [outcome]
+
+
+def test_delete_outcome_unlinks_evidence(service: ODIService) -> None:
+    job = service.add_job("Job")
+    outcome = service.add_outcome(job.id, "Min x", importance=5.0, satisfaction=5.0)
+    evidence = service.add_evidence(
+        source_name="gong",
+        source_kind="mcp",
+        name="quote",
+        content="Lost hours",
+        job_id=job.id,
+        outcome_id=outcome.id,
+    )
+    service.delete_outcome(outcome.id)
+    #: Evidence survives the outcome's removal; the link is nulled.
+    stored = service.get_evidence(evidence.id)
+    assert stored is not None
+    assert stored.outcome_id is None

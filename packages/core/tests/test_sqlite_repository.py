@@ -382,7 +382,7 @@ def test_evidence_round_trips_and_filters(tmp_path):
     assert SQLiteRepository(db_path=db).get_evidence("e1") is None
 
 
-def test_delete_job_cascades_evidence_after_reopen(tmp_path):
+def test_delete_job_unlinks_evidence_instead_of_deleting(tmp_path):
     db = str(tmp_path / "odi.db")
     repo = SQLiteRepository(db_path=db)
     repo.add_job(Job(id="j1", name="Job"))
@@ -392,7 +392,47 @@ def test_delete_job_cascades_evidence_after_reopen(tmp_path):
     assert repo.delete_job("j1") is True
 
     reopened = SQLiteRepository(db_path=db)
-    assert reopened.get_evidence("e1") is None
+    #: e1 survives: its job_id is nulled, the row is not destroyed.
+    e1 = reopened.get_evidence("e1")
+    assert e1 is not None
+    assert e1.job_id is None
+    assert reopened.get_evidence("e2") is not None
+
+
+def test_delete_outcome_unlinks_evidence_instead_of_deleting(tmp_path):
+    db = str(tmp_path / "odi.db")
+    repo = SQLiteRepository(db_path=db)
+    repo.add_evidence(_evidence("e1", outcome_id="o1"))
+    repo.add_evidence(_evidence("e2", outcome_id="o2"))
+    repo.add_outcome(
+        Outcome(id="o1", job_id="j1", statement="Min x", importance=5.0, satisfaction=5.0)
+    )
+    repo.add_outcome(
+        Outcome(id="o2", job_id="j1", statement="Min y", importance=5.0, satisfaction=5.0)
+    )
+
+    assert repo.delete_outcome("o1") is True
+
+    reopened = SQLiteRepository(db_path=db)
+    #: e1 survives: outcome_id nulled, e2 untouched.
+    assert reopened.get_evidence("e1") is not None
+    assert reopened.get_evidence("e1").outcome_id is None  # type: ignore[union-attr]
+    assert reopened.get_evidence("e2") is not None
+
+
+def test_delete_step_unlinks_evidence_instead_of_deleting(tmp_path):
+    db = str(tmp_path / "odi.db")
+    repo = SQLiteRepository(db_path=db)
+    repo.add_step(Step(id="s1", job_id="j1", name="Step", order=1))
+    repo.add_evidence(_evidence("e1", step_id="s1"))
+    repo.add_evidence(_evidence("e2", job_id="j1"))
+
+    assert repo.delete_step("s1") is True
+
+    reopened = SQLiteRepository(db_path=db)
+    #: e1 survives: step_id nulled, e2 untouched.
+    assert reopened.get_evidence("e1") is not None
+    assert reopened.get_evidence("e1").step_id is None  # type: ignore[union-attr]
     assert reopened.get_evidence("e2") is not None
 
 
