@@ -41,6 +41,7 @@ counted as done.
 - [ ] **MCP connection limits** — timeout and pool settings so a hanging connection is bounded ([PR #294](https://github.com/alehar9320/agentic-odi/pull/294)).
 - [ ] **Shared HTTP client for connectors** — configurable connection pools for ingest ([PR #292](https://github.com/alehar9320/agentic-odi/pull/292)).
 - [ ] **Merge duplicate candidate evidence into one outcome** — `odi candidates duplicates` flags near-duplicate proposed candidates without writing anything, and `odi candidates merge` absorbs their quotes as evidence on one accepted outcome, keeping each source traceable ([PR #291](https://github.com/alehar9320/agentic-odi/pull/291)).
+- [ ] **Work the review queue at the keyboard** — `odi interviews review` drives accept, reject, edit, merge, and skip from six keys against the same candidate state machine the API uses; `--yes` is explicit batch consent and never invents a score ([PR #353](https://github.com/alehar9320/agentic-odi/pull/353)).
 - [ ] **`odi connectors health`** — every registered connector's health in one table ([PR #289](https://github.com/alehar9320/agentic-odi/pull/289)).
 - [ ] **MCP `/health` store probe** — the server reports whether its SQLite store is reachable ([PR #286](https://github.com/alehar9320/agentic-odi/pull/286)).
 - [ ] **Durable sessions and a real memory** — the conversation survives a reload ([PR #285](https://github.com/alehar9320/agentic-odi/pull/285)).
