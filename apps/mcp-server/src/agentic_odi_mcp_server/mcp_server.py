@@ -17,12 +17,15 @@ from agentic_odi_core import (
     CustomerOutcomeNotFoundError,
     EvidenceItemType,
     EvidenceNotFoundError,
+    InvalidOutcomeStatementError,
     JobNotFoundError,
     JobStage,
     OdiError,
     ODIService,
     OutcomeNotFoundError,
+    OutcomeProposal,
     OutcomeStatementError,
+    ProposalStatus,
     ScheduledWorkNotFoundError,
     SignalNotFoundError,
     StepNotFoundError,
@@ -721,6 +724,74 @@ def propose_strategy(job_id: str | None = None) -> str:
     except OdiError as exc:
         return f"Error: {invalid_strategy_request(str(exc))}"
     return json.dumps(strategy.model_dump(mode="json"))
+
+
+@mcp.tool
+def propose_outcome(evidence_id: str) -> str:
+    """Propose a desired outcome mined from an evidence record (Stage 2).
+
+    The default heuristic strategy (deterministic, offline, no LLM) reads the
+    evidence, routes it to a job and step, extracts a candidate ODI-format
+    statement, and suggests importance/satisfaction. Nothing is written to the
+    ODI store until the proposal is approved via approve_proposal.
+    """
+    try:
+        proposal = service.propose_outcome_from_evidence(evidence_id)
+    except EvidenceNotFoundError:
+        return f"Error: evidence {evidence_id} not found."
+    except ValidationError as exc:
+        return f"Error: {exc}"
+    return json.dumps(proposal.model_dump(mode="json"))
+
+
+@mcp.tool
+def list_proposals(status: str | None = None) -> str:
+    """List outcome proposals, optionally filtered by status.
+
+    Status values: proposed, approved, rejected, edited. Omit status to list
+    all proposals.
+    """
+    try:
+        proposal_status = (
+            ProposalStatus(status) if status is not None else None
+        )
+    except ValueError:
+        return f"Error: invalid status '{status}'. Use proposed, approved, rejected, or edited."
+    proposals = service.list_proposals(status=proposal_status)
+    return json.dumps([p.model_dump(mode="json") for p in proposals])
+
+
+@mcp.tool
+def approve_proposal(
+    proposal_id: str,
+    statement: str | None = None,
+    importance: float | None = None,
+    satisfaction: float | None = None,
+) -> str:
+    """Approve a proposal and write it as an Outcome through add_outcome.
+
+    If statement is provided, the edited statement is validated before writing.
+    Importance/satisfaction default to the proposal's suggested values.
+    """
+    try:
+        outcome = service.approve_proposal(
+            proposal_id, statement=statement, importance=importance, satisfaction=satisfaction
+        )
+    except ValidationError as exc:
+        return f"Error: {exc}"
+    except InvalidOutcomeStatementError as exc:
+        return f"Error: {exc}"
+    return json.dumps(outcome.model_dump(mode="json"))
+
+
+@mcp.tool
+def reject_proposal(proposal_id: str) -> str:
+    """Reject a proposal. Nothing is written to the ODI store."""
+    try:
+        proposal = service.reject_proposal(proposal_id)
+    except ValidationError as exc:
+        return f"Error: {exc}"
+    return json.dumps(proposal.model_dump(mode="json"))
 
 
 DEFAULT_PORT = 8000
