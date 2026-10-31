@@ -7,7 +7,7 @@
  * setup wizard's composer.
  */
 
-import { ComposerPrimitive, useAui, useAuiState } from "@assistant-ui/react";
+import { AuiIf, ComposerPrimitive, useAui, useAuiState } from "@assistant-ui/react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 
 import {
@@ -18,9 +18,10 @@ import {
   formatFileSize,
   isImageLike,
 } from "../../assistant/attachments";
+import { dictationSupported } from "../../assistant/dictation";
 import { isSlashCommand, matchCommands, type StudioCommand } from "../../lib/commands";
 import { useStudio } from "../../state/StudioContext";
-import { ArrowUpIcon, PaperclipIcon, StopIcon } from "../icons";
+import { ArrowUpIcon, MicIcon, PaperclipIcon, StopIcon } from "../icons";
 import { CommandPalette, ComposerHint, ConnectorChips, SuggestionPills, paletteOpenFor } from "./composerParts";
 import { ModelPicker } from "./ModelPicker";
 
@@ -180,6 +181,14 @@ function ComposerBody({
       />
       <ConnectorChips />
       <AttachmentRow />
+      {/* The live transcript is recognition output, not a draft: it is marked
+          as interim and the primitive replaces it with the final sentence. */}
+      <AuiIf condition={(state) => state.composer.dictation != null}>
+        <p className="composer__dictation">
+          <span className="composer__dictation-label">Listening</span>
+          <ComposerPrimitive.DictationTranscript />
+        </p>
+      </AuiIf>
       <div className="composer__shell">
         <label className="sr-only" htmlFor={inputId}>
           Message the studio
@@ -211,6 +220,28 @@ function ComposerBody({
           }}
         />
         <div className="composer__actions">
+          {/* No microphone where recognition is unavailable, and no second
+              voice system: this is the documented dictation seam. */}
+          {dictationSupported() ? (
+            <>
+              <AuiIf condition={(state) => state.composer.dictation == null}>
+                <ComposerPrimitive.Dictate
+                  className="composer__attach composer__mic"
+                  aria-label="Dictate a message"
+                >
+                  <MicIcon size={16} />
+                </ComposerPrimitive.Dictate>
+              </AuiIf>
+              <AuiIf condition={(state) => state.composer.dictation != null}>
+                <ComposerPrimitive.StopDictation
+                  className="composer__attach composer__mic is-listening"
+                  aria-label="Stop dictating"
+                >
+                  <StopIcon size={14} />
+                </ComposerPrimitive.StopDictation>
+              </AuiIf>
+            </>
+          ) : null}
           <ComposerPrimitive.AddAttachment
             className="composer__attach"
             aria-label="Attach a file"
