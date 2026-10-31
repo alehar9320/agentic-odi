@@ -133,7 +133,9 @@ def opportunity_interval(
             seed=seed,
         )
 
-    rng = random.Random(seed)
+    # A seeded PRNG makes the bootstrap reproducible; it is not a security
+    # primitive and must not be replaced with a system RNG.
+    rng = random.Random(seed)  # nosec B311
     scores: list[float] = []
     for _ in range(samples):
         imp_total = 0.0
