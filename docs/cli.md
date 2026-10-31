@@ -313,6 +313,8 @@ agentic-odi candidates list --interview-id <interview-id> --json
 agentic-odi candidates get <candidate-id>
 agentic-odi candidates accept <candidate-id> --importance 8 --satisfaction 3
 agentic-odi candidates reject <candidate-id> --reason "not a real need"
+agentic-odi candidates duplicates
+agentic-odi candidates merge <outcome-id> <candidate-id> [<candidate-id> ...]
 agentic-odi candidates delete <candidate-id> --yes
 ```
 
@@ -342,6 +344,36 @@ agentic-odi candidates accept <candidate-id> --statement "Minimize the time to o
   --importance 8 --satisfaction 3 --json
 agentic-odi candidates reject <candidate-id> --reason "covered by another outcome"
 ```
+
+### Merge duplicate candidate evidence
+
+Two quotes often describe the same need. `candidates duplicates` suggests which
+proposed candidates look alike; it is read-only and merges nothing, because a
+person decides which candidate becomes the outcome.
+
+```bash
+agentic-odi candidates duplicates
+agentic-odi candidates duplicates --interview-id <interview-id> --threshold 0.9 --json
+```
+
+`candidates merge` takes an accepted **outcome** id and one or more proposed
+candidate ids. Each candidate's verbatim quote is added as another `Evidence`
+row on that outcome, and the candidate is marked `merged` with `merged_into`
+pointing at the outcome. No second outcome is created, and the source candidate
+and its quote are kept, so the original idea can still be traced.
+
+```bash
+agentic-odi candidates merge <outcome-id> <candidate-id> <candidate-id>
+```
+
+A source that is already accepted or rejected is refused — a settled decision
+is not merge material. Merging the same candidates twice changes nothing and
+duplicates no evidence. The target must be an outcome, not a candidate: pass
+the `outcome_id` that `candidates accept` returned.
+
+There is no undo command. A merge is reversible only by deleting the added
+evidence and re-extracting from the original quotes, which is why the source
+candidate and its quote are kept rather than deleted.
 
 ## Schema, scoring, and guidance
 

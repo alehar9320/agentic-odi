@@ -744,6 +744,25 @@ class LocalBackend(Backend):
             raise BackendError(candidate_not_found(args["candidate_id"])) from None
         return candidate.model_dump(mode="json")
 
+    def _suggest_duplicate_candidates(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import DUPLICATE_THRESHOLD
+
+        groups = self.service.suggest_duplicate_groups(
+            args.get("interview_id"),
+            DUPLICATE_THRESHOLD if args.get("threshold") is None else args["threshold"],
+        )
+        return {"groups": groups}
+
+    def _merge_candidates(self, args: dict[str, Any]) -> dict[str, Any]:
+        outcome, evidence, merged = self.service.merge_candidates(
+            args["target_id"], args["merged_ids"]
+        )
+        return {
+            "outcome": outcome.model_dump(mode="json"),
+            "evidence": [item.model_dump(mode="json") for item in evidence],
+            "merged": [item.model_dump(mode="json") for item in merged],
+        }
+
     def _evaluate_outcome(self, args: dict[str, Any]) -> str:
         from agentic_odi_core import job_not_found
         from agentic_odi_core.evaluation import (
@@ -891,6 +910,8 @@ _LOCAL_HANDLERS = {
     "delete_candidate": LocalBackend._delete_candidate,
     "accept_candidate": LocalBackend._accept_candidate,
     "reject_candidate": LocalBackend._reject_candidate,
+    "suggest_duplicate_candidates": LocalBackend._suggest_duplicate_candidates,
+    "merge_candidates": LocalBackend._merge_candidates,
     "promote_evidence": LocalBackend._promote_evidence,
     "schedule_work": LocalBackend._schedule_work,
     "get_scheduled_work": LocalBackend._get_scheduled_work,

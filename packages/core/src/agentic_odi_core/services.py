@@ -15,7 +15,12 @@ from agentic_odi_core.evaluation import (
     evaluate_outcome_statement,
     require_outcome_statement,
 )
-from agentic_odi_core.messages import candidate_reason_required
+from agentic_odi_core.messages import (
+    candidate_reason_required,
+    merge_source_already_merged,
+    merge_source_cannot_absorb_evidence,
+    merge_target_must_be_outcome,
+)
 from agentic_odi_core.models import (
     JOB_STAGE_INDEX,
     JOB_STAGE_ORDER,
@@ -49,7 +54,7 @@ from agentic_odi_core.segmentation import (
     SegmentationStrategy,
     unclustered_outcomes,
 )
-from agentic_odi_core.similarity import normalize
+from agentic_odi_core.similarity import DUPLICATE_THRESHOLD, find_duplicate_groups, normalize
 from agentic_odi_core.strategy import propose_strategy as build_strategy
 
 
@@ -988,6 +993,115 @@ class ODIService:
             candidate.outcome_id or candidate.id,
             "Acceptance should have written one evidence row for this candidate.",
         )
+
+    def suggest_duplicate_groups(
+        self,
+        interview_id: str | None = None,
+        threshold: float = DUPLICATE_THRESHOLD,
+    ) -> list[list[str]]:
+        """Candidate id groups that look like the same need. Read-only.
+
+        Only candidates still ``proposed`` are compared — an accepted or
+        rejected candidate is a settled decision, not a merge source. Nothing is
+        written, so a suggestion can never itself change the store.
+        """
+        candidates = [
+            candidate
+            for candidate in self.repo.list_candidates(interview_id)
+            if candidate.status is CandidateStatus.PROPOSED
+        ]
+        return find_duplicate_groups(candidates, threshold)
+
+    def merge_candidates(
+        self,
+        target_id: str,
+        merged_ids: list[str],
+    ) -> tuple[Outcome, list[Evidence], list[OutcomeCandidate]]:
+        """Absorb other candidates' quotes into one accepted outcome.
+
+        ``target_id`` is an **outcome** id — the outcome a person already
+        accepted. Each id in ``merged_ids`` is a *proposed* candidate whose
+        verbatim quote is written as an additional ``Evidence`` row on that
+        outcome and then marked ``merged`` with ``merged_into=target_id``. No
+        second outcome is created, and the source candidate and its quote are
+        retained, so the original can be recovered by re-extraction.
+
+        Everything is validated before any write: an unknown target, a source
+        that is accepted/rejected, or a source already merged elsewhere fails
+        without moving anything. A source already merged into this same target
+        is skipped, so repeating a merge changes nothing and duplicates no
+        evidence. If an evidence write fails part-way, the evidence rows and
+        candidate updates made by this call are rolled back.
+        """
+        target = self.repo.get_outcome(target_id)
+        if target is None:
+            # A candidate id here is the common mistake: name it, rather than
+            # reporting a bare "outcome not found".
+            if self.repo.get_candidate(target_id) is not None:
+                raise ValidationError(merge_target_must_be_outcome(target_id))
+            raise OutcomeNotFoundError(target_id)
+
+        sources: list[OutcomeCandidate] = []
+        seen: set[str] = set()
+        for candidate_id in merged_ids:
+            if candidate_id in seen:
+                continue
+            seen.add(candidate_id)
+            candidate = self.repo.get_candidate(candidate_id)
+            if candidate is None:
+                raise CandidateNotFoundError(candidate_id)
+            if candidate.status is CandidateStatus.MERGED:
+                if candidate.merged_into == target_id:
+                    continue  # already absorbed here; repeating changes nothing
+                raise ValidationError(
+                    merge_source_already_merged(candidate_id, candidate.merged_into)
+                )
+            if candidate.status is not CandidateStatus.PROPOSED:
+                raise ValidationError(
+                    merge_source_cannot_absorb_evidence(candidate_id, candidate.status.value)
+                )
+            sources.append(candidate)
+
+        written_evidence: list[Evidence] = []
+        merged: list[OutcomeCandidate] = []
+        try:
+            for candidate in sources:
+                quote = self.repo.get_quote(candidate.quote_id)
+                if quote is None:
+                    raise QuoteNotFoundError(candidate.quote_id)
+                interview = self.repo.get_interview(candidate.interview_id)
+                if interview is None:
+                    raise InterviewNotFoundError(candidate.interview_id)
+                evidence = self.add_evidence(
+                    source_name=interview.title,
+                    source_kind="interview",
+                    name="quote",
+                    content=quote.text,
+                    item_type="manual",
+                    raw={
+                        "interview_id": interview.id,
+                        "quote_id": quote.id,
+                        "merged_from_candidate_id": candidate.id,
+                    },
+                    outcome_id=target_id,
+                )
+                written_evidence.append(evidence)
+                updated = self.repo.update_candidate(
+                    candidate.id,
+                    {"status": CandidateStatus.MERGED, "merged_into": target_id},
+                )
+                assert updated is not None  # the candidate existed a moment ago
+                merged.append(updated)
+        except Exception:
+            for evidence in written_evidence:
+                self.repo.delete_evidence(evidence.id)
+            for candidate in merged:
+                self.repo.update_candidate(
+                    candidate.id,
+                    {"status": CandidateStatus.PROPOSED, "merged_into": None},
+                )
+            raise
+        return target, written_evidence, merged
 
     def promote_evidence(
         self,

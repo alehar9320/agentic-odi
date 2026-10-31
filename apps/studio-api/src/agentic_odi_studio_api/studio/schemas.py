@@ -134,17 +134,19 @@ class UpdateCustomerOutcomeRequest(BaseModel):
 class DecideCandidateRequest(BaseModel):
     """One reviewer decision on a candidate.
 
-    ``status`` is ``accepted`` or ``rejected``. Accepting requires the
-    importance and satisfaction the outcome contract needs; rejecting requires
-    a nonblank ``reason``. Omitting ``status`` edits the statement only.
+    ``status`` is ``accepted``, ``rejected`` or ``merged``. Accepting requires
+    the importance and satisfaction the outcome contract needs; rejecting
+    requires a nonblank ``reason``; merging requires the accepted outcome id in
+    ``merged_into``. Omitting ``status`` edits the statement only.
     """
 
-    status: Literal["accepted", "rejected"] | None = None
+    status: Literal["accepted", "rejected", "merged"] | None = None
     statement: str | None = None
     reason: str | None = None
     importance: float | None = Field(default=None, ge=1.0, le=10.0)
     satisfaction: float | None = Field(default=None, ge=1.0, le=10.0)
     step_id: str | None = None
+    merged_into: str | None = None
     mcp_url: str = ""
 
 

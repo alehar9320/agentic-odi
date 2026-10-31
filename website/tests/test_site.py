@@ -487,5 +487,5 @@ def test_page_weights_are_within_budget(page: str):
     # list tool and each entity we add. The V2MOM entity, the five scheduled-work
     # tools, the three signal tools, the four Stage 5 and 6 tools, and the
     # interview/quote tools with their two schema entities, the evidence-claim
-    # markers, and the candidate review tools bring the page to ~101 KB.
-    assert size <= 105 * 1024, f"{page}: {size} bytes"
+    # markers, and the candidate review tools bring the page to ~105 KB.
+    assert size <= 109 * 1024, f"{page}: {size} bytes"

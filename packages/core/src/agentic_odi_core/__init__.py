@@ -117,6 +117,13 @@ from agentic_odi_core.services import (
     StrategyNotFoundError,
     ValueOutOfRangeError,
 )
+from agentic_odi_core.similarity import (
+    DUPLICATE_THRESHOLD,
+    duplicate_suggestions,
+    find_duplicate_groups,
+    normalize,
+    similar,
+)
 from agentic_odi_core.steve_jobs import (
     format_opportunity_score_insight,
     generate_steve_jobs_response,
@@ -148,10 +155,15 @@ __all__ = [
     "CandidateNotFoundError",
     "CandidateStatus",
     "ConflictError",
+    "DUPLICATE_THRESHOLD",
     "CustomerOutcome",
     "CustomerOutcomeNotFoundError",
     "CustomerValue",
     "Direction",
+    "duplicate_suggestions",
+    "find_duplicate_groups",
+    "normalize",
+    "similar",
     "Evidence",
     "EvidenceItemType",
     "EvidenceNotFoundError",
