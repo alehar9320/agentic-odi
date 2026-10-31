@@ -256,7 +256,7 @@ def test_add_step_requires_existing_job(service: ODIService) -> None:
 
 
 def test_add_outcome_requires_existing_job_and_step(service: ODIService) -> None:
-    job = service.add_job("J")
+    job = service.add_job("Job")
     with pytest.raises(JobNotFoundError):
         service.add_outcome("missing", "Min x", importance=5.0, satisfaction=5.0)
     with pytest.raises(StepNotFoundError):
@@ -264,7 +264,7 @@ def test_add_outcome_requires_existing_job_and_step(service: ODIService) -> None
 
 
 def test_update_outcome_recomputes_opportunity_score(service: ODIService) -> None:
-    job = service.add_job("J")
+    job = service.add_job("Job")
     outcome = service.add_outcome(
         job.id,
         "Minimize the time to ship a release when the build is green",
@@ -279,7 +279,7 @@ def test_update_outcome_recomputes_opportunity_score(service: ODIService) -> Non
 
 
 def test_update_outcome_rejects_out_of_range_scores(service: ODIService) -> None:
-    job = service.add_job("J")
+    job = service.add_job("Job")
     outcome = service.add_outcome(
         job.id,
         "Minimize the time to ship a release when the build is green",
@@ -294,7 +294,7 @@ def test_update_outcome_rejects_out_of_range_scores(service: ODIService) -> None
 
 
 def test_job_crud_and_cascade(service: ODIService) -> None:
-    job = service.add_job("J")
+    job = service.add_job("Job")
     service.add_outcome(
         job.id,
         "Minimize the time it takes to deploy when releasing",
@@ -321,7 +321,7 @@ def test_update_unknown_ids_raise(service: ODIService) -> None:
 
 
 def test_add_evidence_resolves_and_validates_links(service: ODIService) -> None:
-    job = service.add_job("J")
+    job = service.add_job("Job")
     service.add_outcome(
         job.id,
         "Minimize the time it takes to deploy when releasing",

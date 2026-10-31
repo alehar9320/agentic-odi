@@ -8,6 +8,7 @@ reference pages must change with it — and CI fails if they do not.
 from __future__ import annotations
 
 import json
+import re
 
 import extract
 from site_support import (
@@ -93,15 +94,26 @@ def test_the_catalog_cards_on_the_site_match_the_studio():
 
 
 def test_the_roadmap_page_is_rendered_from_the_repository():
-    pending = extract.read_roadmap_pending(ROADMAP_MD)
+    # Markdown turns inline code and bold into tags; compare visible text.
     html = read_page("docs/roadmap/index.html")
-    # Every checked item in the repository is a checked item on the site.
+    text = re.sub(r"<[^>]+>", "", html)
+    # Every item in the repository is an item on the site, shipped or queued.
     for line in ROADMAP_MD.read_text(encoding="utf-8").splitlines():
         stripped = line.strip()
-        if stripped.startswith("- [x]"):
-            title = stripped[5:].strip().split("**")[1]
-            assert title in html, f"{title!r} is missing from the roadmap page"
-    assert len(pending) == 0, "the roadmap has pending items; the status copy must change"
+        if stripped.startswith(("- [x]", "- [ ]")):
+            title = stripped[5:].strip().split("**")[1].replace("`", "")
+            assert title in text, f"{title!r} is missing from the roadmap page"
+
+
+def test_the_site_advertises_no_retired_capability():
+    # These names once appeared in the site copy and described nothing that
+    # shipped. If one comes back, it must come with a real surface first.
+    retired = ("Causal Lineage", "Streamlit", "background event simulator")
+    pages = [read_page("index.html"), read_page("docs/roadmap/index.html")]
+    for page in pages:
+        lowered = page.lower()
+        for claim in retired:
+            assert claim.lower() not in lowered, f"the site still claims {claim!r}"
 
 
 def test_the_landing_counts_match_the_source():

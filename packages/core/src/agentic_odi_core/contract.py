@@ -58,6 +58,7 @@ class ToolName(str, Enum):
     LIST_SIGNALS = "list_signals"
     MARK_SIGNAL_READ = "mark_signal_read"
     DISMISS_SIGNAL = "dismiss_signal"
+    GET_HEALTH = "get_health"
     SCHEDULE_WORK = "schedule_work"
     GET_SCHEDULED_WORK = "get_scheduled_work"
     LIST_SCHEDULED_WORK = "list_scheduled_work"
@@ -495,6 +496,13 @@ TOOL_SPECS: dict[str, ToolSpec] = {
         required=("bet_id",),
         returns="The measurement for the bet.",
         stage=None,
+    ),
+    ToolName.GET_HEALTH.value: ToolSpec(
+        name="get_health",
+        summary="Check that the ODI store is reachable.",
+        effect=_derive_effect("get_health"),
+        arguments=(),
+        returns='{"status": "ok", "store": "accessible"} or a degraded status.',
     ),
     ToolName.LIST_SIGNALS.value: ToolSpec(
         name="list_signals",

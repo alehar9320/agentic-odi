@@ -277,6 +277,7 @@ async def test_live_registry_snapshot() -> None:
                 "required": ["evidence_id"],
                 "type": "object",
             },
+            "get_health": {"additionalProperties": False, "properties": {}, "type": "object"},
             "get_job": {
                 "additionalProperties": False,
                 "properties": {"job_id": {"type": "string"}},
@@ -786,6 +787,14 @@ def test_declared_tool_surface_snapshot() -> None:
                 "returns": "The Evidence record, or an error string if not found.",
                 "stage": None,
                 "summary": "Get a single evidence record by ID.",
+            },
+            "get_health": {
+                "arguments": [],
+                "effect": "read",
+                "required": [],
+                "returns": '{"status": "ok", "store": "accessible"} or a degraded status.',
+                "stage": None,
+                "summary": "Check that the ODI store is reachable.",
             },
             "get_job": {
                 "arguments": ["job_id"],
@@ -1449,7 +1458,7 @@ why, and is the parent of the :class:`BetRecord` that tests it.\
             "Job": {
                 "properties": {
                     "description": {
-                        "anyOf": [{"type": "null"}, {"type": "string"}],
+                        "anyOf": [{"maxLength": 500, "type": "string"}, {"type": "null"}],
                         "default": None,
                         "description": "Detailed description of the Job",
                         "title": "Description",
@@ -1457,6 +1466,9 @@ why, and is the parent of the :class:`BetRecord` that tests it.\
                     "id": {"title": "Id", "type": "string"},
                     "name": {
                         "description": "The name of the Job-to-be-Done",
+                        "maxLength": 64,
+                        "minLength": 3,
+                        "pattern": "^[A-Za-z0-9 _-]+$",
                         "title": "Name",
                         "type": "string",
                     },

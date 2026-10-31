@@ -432,6 +432,7 @@ TOOL_PURPOSES: dict[str, str] = {
     "get_odi_framework_guidelines": "Say which tool to use at each stage of ODI.",
     "get_capabilities": "Describe what the assistant can help with.",
     "get_capabilities_manifest": "Return the whole tool surface as machine-readable JSON.",
+    "get_health": "Check that the ODI store is reachable.",
     "extract_candidates": "Propose outcomes from one quote; proposes, accepts nothing.",
     "list_candidates": "List proposed outcomes, optionally by quote, Job, or status, one page at a time.",
     "get_candidate": "Fetch one proposed outcome by id.",

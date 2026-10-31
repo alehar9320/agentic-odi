@@ -87,3 +87,22 @@ def test_spine_json_lists_every_seam_with_its_owner(tmp_path, monkeypatch):
         assert seams[stage]["available"] is True, stage
     assert seams["demo"]["available"] is True  # the loader now exists
     assert seams["template"]["available"] is False
+
+
+def test_health_reports_an_accessible_store(tmp_path, monkeypatch):
+    monkeypatch.setenv("AGENTIC_ODI_DB", str(tmp_path / "odi.db"))
+
+    result = CliRunner().invoke(app, ["health"])
+
+    assert result.exit_code == 0
+    assert "ok" in result.stdout
+    assert "accessible" in result.stdout
+
+
+def test_health_json_is_the_mcp_shape(tmp_path, monkeypatch):
+    monkeypatch.setenv("AGENTIC_ODI_DB", str(tmp_path / "odi.db"))
+
+    result = CliRunner().invoke(app, ["health", "--json"])
+
+    assert result.exit_code == 0
+    assert json.loads(result.stdout) == {"status": "ok", "store": "accessible"}

@@ -82,6 +82,8 @@ export function Composer({
   const canSend = value.trim().length > 0 && !streaming;
   const activeIndex = Math.min(highlight, Math.max(matches.length - 1, 0));
   const activeCommand = matches[activeIndex];
+  const activeOptionId =
+    paletteOpen && matches.length ? `${paletteId}-option-${activeIndex}` : undefined;
 
   function choose(command: StudioCommand) {
     onChange("");
@@ -157,8 +159,9 @@ export function Composer({
               ? "Model offline — type / for commands, or capture what you know…"
               : "Start with what's on your mind…")
           }
-          aria-expanded={paletteOpen}
+          aria-haspopup="listbox"
           aria-controls={paletteOpen ? paletteId : undefined}
+          aria-activedescendant={activeOptionId}
           aria-autocomplete="list"
           onChange={(event) => onChange(event.target.value)}
           onKeyDown={onTextareaKeyDown}

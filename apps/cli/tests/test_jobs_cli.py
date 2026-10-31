@@ -44,6 +44,16 @@ def test_jobs_get_unknown_reports_error(tmp_path):
     assert "Traceback" not in result.output
 
 
+def test_jobs_add_rejects_a_name_that_is_too_short(tmp_path):
+    result = CliRunner().invoke(
+        app, ["--db", str(tmp_path / "odi.db"), "jobs", "add", "--name", "Jo"]
+    )
+
+    assert result.exit_code == 1
+    assert "at least 3 characters" in result.output
+    assert "Traceback" not in result.output
+
+
 def test_jobs_get_returns_full_job(tmp_path):
     db = str(tmp_path / "odi.db")
     runner = CliRunner()

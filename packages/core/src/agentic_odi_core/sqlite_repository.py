@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import sqlite3
 import threading
 from datetime import datetime, timezone
 from typing import Any
@@ -818,3 +819,12 @@ class SQLiteRepository(Repository):
         """Close the event store and let SQLite clean up its journal files."""
         with self._lock:
             self.store.close()
+
+    def health(self) -> bool:
+        """True when the SQLite connection answers a trivial query."""
+        with self._lock:
+            try:
+                self.store.conn.execute("SELECT 1").fetchone()
+            except sqlite3.Error:
+                return False
+            return True
