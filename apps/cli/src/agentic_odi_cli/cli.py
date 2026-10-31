@@ -19,7 +19,7 @@ from agentic_odi_cli.connectors import connectors_app
 from agentic_odi_cli.customer_outcomes import customer_outcomes_app, score
 from agentic_odi_cli.desired_outcomes import desired_outcomes_app
 from agentic_odi_cli.evidence import evidence_app
-from agentic_odi_cli.interviews import interviews_app
+from agentic_odi_cli.interviews import candidates_app, interviews_app
 from agentic_odi_cli.jobs import jobs_app
 from agentic_odi_cli.onboard import maybe_run_first_launch
 from agentic_odi_cli.profile import app as profile_app
@@ -50,6 +50,11 @@ app.add_typer(
     interviews_app,
     name="interviews",
     help="Manage research interviews and their quotes.",
+)
+app.add_typer(
+    candidates_app,
+    name="candidates",
+    help="Review outcome candidates proposed from interview quotes.",
 )
 app.add_typer(customer_outcomes_app, name="customer-outcomes", help="Manage Customer Outcomes")
 app.add_typer(

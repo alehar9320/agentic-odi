@@ -14,6 +14,8 @@ from agentic_odi_core import (
     ODI_ASSISTANT_PROMPT,
     ODI_FRAMEWORK_GUIDELINES,
     TOOL_SPECS,
+    CandidateNotFoundError,
+    CandidateStatus,
     CustomerOutcomeNotFoundError,
     EvidenceItemType,
     EvidenceNotFoundError,
@@ -24,6 +26,7 @@ from agentic_odi_core import (
     ODIService,
     OutcomeNotFoundError,
     OutcomeStatementError,
+    QuoteNotFoundError,
     ScheduledWorkNotFoundError,
     SignalNotFoundError,
     StepNotFoundError,
@@ -100,6 +103,14 @@ def _evidence_not_found(evidence_id: str, hint: str | None = None) -> str:
 
 def _interview_not_found(interview_id: str) -> str:
     return f"Error: Interview with ID {interview_id} not found."
+
+
+def _quote_not_found(quote_id: str) -> str:
+    return f"Error: Quote with ID {quote_id} not found."
+
+
+def _candidate_not_found(candidate_id: str) -> str:
+    return f"Error: Outcome candidate with ID {candidate_id} not found."
 
 
 @mcp.prompt
@@ -658,6 +669,91 @@ def import_transcript(
     except (OdiError, ValueError) as exc:
         return f"Error: {exc}"
     return json.dumps({"interview": interview.model_dump(), "quote_count": len(quotes)})
+
+
+@mcp.tool
+def extract_candidates(quote_id: str, stage_hint: str | None = None) -> str:
+    """Propose outcome candidates from one quote, storing each proposal once.
+
+    Valid proposals are stored ``proposed``; a proposal that fails the ODI
+    statement check is stored ``rejected`` with the validator's reason, so the
+    evidence that the extractor is wrong is kept. No Outcome is created.
+    """
+    from agentic_odi_core.extraction import FixtureExtractor
+
+    try:
+        candidates = service.extract_candidates(quote_id, FixtureExtractor(), stage_hint)
+    except QuoteNotFoundError:
+        return _quote_not_found(quote_id)
+    except InterviewNotFoundError as exc:
+        return _interview_not_found(exc.interview_id)
+    except (OdiError, ValueError) as exc:
+        return f"Error: {exc}"
+    return json.dumps([candidate.model_dump() for candidate in candidates])
+
+
+@mcp.tool
+def list_candidates(
+    interview_id: str | None = None,
+    status: str | None = None,
+    limit: int | None = None,
+    offset: int = 0,
+) -> str:
+    """List outcome candidates, optionally filtered by interview or status."""
+    try:
+        resolved = CandidateStatus(status) if status is not None else None
+    except ValueError:
+        return f"Error: unknown candidate status: {status}"
+    items = service.list_candidates(
+        interview_id=interview_id, status=resolved, limit=limit, offset=offset
+    )
+    return json.dumps([item.model_dump() for item in items])
+
+
+@mcp.tool
+def get_candidate(candidate_id: str) -> str:
+    """Get a single outcome candidate by ID."""
+    candidate = service.get_candidate(candidate_id)
+    if candidate is None:
+        return _candidate_not_found(candidate_id)
+    return candidate.model_dump_json()
+
+
+@mcp.tool
+def update_candidate(
+    candidate_id: str,
+    status: str | None = None,
+    statement: str | None = None,
+    decision_reason: str | None = None,
+) -> str:
+    """Update a candidate's review state or statement."""
+    updates: dict = {}
+    if status is not None:
+        try:
+            updates["status"] = CandidateStatus(status)
+        except ValueError:
+            return f"Error: unknown candidate status: {status}"
+    if statement is not None:
+        updates["statement"] = statement
+    if decision_reason is not None:
+        updates["decision_reason"] = decision_reason
+    try:
+        candidate = service.update_candidate(candidate_id, updates)
+    except CandidateNotFoundError:
+        return _candidate_not_found(candidate_id)
+    except (OdiError, ValueError) as exc:
+        return f"Error: {exc}"
+    return candidate.model_dump_json()
+
+
+@mcp.tool
+def delete_candidate(candidate_id: str) -> str:
+    """Delete an outcome candidate."""
+    try:
+        service.delete_candidate(candidate_id)
+    except CandidateNotFoundError:
+        return _candidate_not_found(candidate_id)
+    return f"Candidate deleted successfully: {candidate_id}"
 
 
 @mcp.tool

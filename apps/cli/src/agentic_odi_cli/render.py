@@ -562,3 +562,42 @@ def render_quote_list(items: Any, *, as_json: bool) -> str:
         ],
         empty="No quotes found.",
     )
+
+
+def render_candidate(item: Any, *, as_json: bool) -> str:
+    """Render one outcome candidate as a labelled block or JSON."""
+    if not isinstance(item, dict):
+        return _json(item) if as_json else str(item)
+    if as_json:
+        return _json(item)
+    return _block(
+        [
+            ("id", item.get("id", "")),
+            ("status", item.get("status", "")),
+            ("statement", item.get("statement", "")),
+            ("confidence", item.get("confidence", "")),
+            ("quote_id", item.get("quote_id") or ""),
+            ("rationale", item.get("rationale") or ""),
+            ("outcome_id", item.get("outcome_id") or ""),
+        ]
+    )
+
+
+def render_candidate_list(items: Any, *, as_json: bool) -> str:
+    """Render outcome candidates as an aligned table or JSON."""
+    if not isinstance(items, list):
+        return _json(items) if as_json else str(items)
+    if as_json:
+        return _json(items)
+    return _table(
+        ("id", "status", "statement"),
+        [
+            (
+                str(item.get("id", "")),
+                str(item.get("status", "")),
+                _truncate(str(item.get("statement", ""))),
+            )
+            for item in items
+        ],
+        empty="No outcome candidates found.",
+    )

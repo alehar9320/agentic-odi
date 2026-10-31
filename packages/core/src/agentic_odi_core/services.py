@@ -19,6 +19,7 @@ from agentic_odi_core.models import (
     JOB_STAGE_INDEX,
     JOB_STAGE_ORDER,
     BusinessValue,
+    CandidateStatus,
     CustomerOutcome,
     CustomerValue,
     Evidence,
@@ -28,6 +29,7 @@ from agentic_odi_core.models import (
     Job,
     JobStage,
     Outcome,
+    OutcomeCandidate,
     ScheduledWork,
     ScheduledWorkStatus,
     ScheduledWorkTriggerType,
@@ -46,6 +48,7 @@ from agentic_odi_core.segmentation import (
     SegmentationStrategy,
     unclustered_outcomes,
 )
+from agentic_odi_core.similarity import normalize
 from agentic_odi_core.strategy import propose_strategy as build_strategy
 
 
@@ -173,6 +176,18 @@ class InterviewNotFoundError(NotFoundError):
     def __init__(self, interview_id: str) -> None:
         self.interview_id = interview_id
         super().__init__(interview_id, "interview")
+
+
+class QuoteNotFoundError(NotFoundError):
+    def __init__(self, quote_id: str) -> None:
+        self.quote_id = quote_id
+        super().__init__(quote_id, "quote")
+
+
+class CandidateNotFoundError(NotFoundError):
+    def __init__(self, candidate_id: str) -> None:
+        self.candidate_id = candidate_id
+        super().__init__(candidate_id, "outcome candidate")
 
 
 class InvalidOutcomeStatementError(OutcomeStatementError):
@@ -762,6 +777,99 @@ class ODIService:
             for turn in turns
         ]
         return interview, quotes
+
+    def extract_candidates(
+        self,
+        quote_id: str,
+        extractor: Any,
+        stage_hint: str | None = None,
+    ) -> list[OutcomeCandidate]:
+        """Propose candidates from one quote, storing each proposal once.
+
+        Every proposal is validated with :func:`evaluate_outcome_statement`. An
+        invalid one is stored as ``rejected`` with the validator's message in
+        ``rationale`` — the evidence that the extractor is wrong is kept, not
+        hidden. Candidates are keyed on ``(quote_id, normalised_statement)`` so
+        re-running extraction adds nothing and never resets a human decision.
+        No :class:`Outcome` is created here; only a person accepts a candidate.
+        """
+        quote = self.repo.get_quote(quote_id)
+        if quote is None:
+            raise QuoteNotFoundError(quote_id)
+        interview = self.repo.get_interview(quote.interview_id)
+        if interview is None:
+            raise InterviewNotFoundError(quote.interview_id)
+
+        existing = self._candidates_by_key(quote_id)
+        # Validate every proposal before the first write: a malformed payload or
+        # an out-of-range confidence must not leave a partly-written quote.
+        proposals = list(extractor.propose(quote, interview, stage_hint))
+        planned: list[tuple[str, OutcomeCandidate]] = []
+        for proposal in proposals:
+            statement = getattr(proposal, "statement", None)
+            if not isinstance(statement, str):
+                raise ValidationError(
+                    f"extractor returned a proposal without a statement: {proposal!r}"
+                )
+            key = normalize(statement)
+            if key in existing:
+                continue
+            verdict = evaluate_outcome_statement(statement)
+            if verdict["valid"]:
+                status = CandidateStatus.PROPOSED
+                rationale = proposal.rationale
+            else:
+                status = CandidateStatus.REJECTED
+                rationale = " ".join(verdict["issues"])
+            planned.append(
+                (
+                    key,
+                    OutcomeCandidate(
+                        id=str(uuid.uuid4()),
+                        interview_id=interview.id,
+                        quote_id=quote_id,
+                        statement=statement,
+                        rationale=rationale,
+                        confidence=proposal.confidence,
+                        status=status,
+                    ),
+                )
+            )
+            # Collapse repeated statements within this same batch.
+            existing.add(key)
+
+        created: list[OutcomeCandidate] = []
+        for _, candidate in planned:
+            created.append(self.repo.add_candidate(candidate))
+        return created
+
+    def _candidates_by_key(self, quote_id: str) -> set[str]:
+        """The normalised statements already stored for a quote."""
+        return {
+            normalize(c.statement) for c in self.repo.list_candidates() if c.quote_id == quote_id
+        }
+
+    def get_candidate(self, candidate_id: str) -> OutcomeCandidate | None:
+        return self.repo.get_candidate(candidate_id)
+
+    def list_candidates(
+        self,
+        interview_id: str | None = None,
+        status: CandidateStatus | None = None,
+        limit: int | None = None,
+        offset: int = 0,
+    ) -> list[OutcomeCandidate]:
+        return self.repo.list_candidates(interview_id, status, limit=limit, offset=offset)
+
+    def update_candidate(self, candidate_id: str, updates: dict[str, Any]) -> OutcomeCandidate:
+        candidate = self.repo.update_candidate(candidate_id, updates)
+        if candidate is None:
+            raise CandidateNotFoundError(candidate_id)
+        return candidate
+
+    def delete_candidate(self, candidate_id: str) -> None:
+        if not self.repo.delete_candidate(candidate_id):
+            raise CandidateNotFoundError(candidate_id)
 
     def promote_evidence(
         self,

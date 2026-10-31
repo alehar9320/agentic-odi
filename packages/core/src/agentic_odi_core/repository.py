@@ -8,12 +8,14 @@ from datetime import datetime, timezone
 from typing import Any, Protocol, TypeVar
 
 from agentic_odi_core.models import (
+    CandidateStatus,
     CustomerOutcome,
     Evidence,
     Interview,
     InterviewQuote,
     Job,
     Outcome,
+    OutcomeCandidate,
     ScheduledWork,
     Segment,
     Signal,
@@ -122,6 +124,7 @@ class Repository(Protocol):
     scheduled_work: dict[str, ScheduledWork]
     interviews: dict[str, Interview]
     quotes: dict[str, InterviewQuote]
+    candidates: dict[str, OutcomeCandidate]
     segments: dict[str, Segment]
     strategies: dict[str, Strategy]
 
@@ -215,6 +218,17 @@ class Repository(Protocol):
     def add_quote(self, quote: InterviewQuote) -> InterviewQuote: ...
     def get_quote(self, quote_id: str) -> InterviewQuote | None: ...
     def list_quotes(self, interview_id: str) -> list[InterviewQuote]: ...
+    def add_candidate(self, candidate: OutcomeCandidate) -> OutcomeCandidate: ...
+    def get_candidate(self, candidate_id: str) -> OutcomeCandidate | None: ...
+    def list_candidates(
+        self,
+        interview_id: str | None = None,
+        status: CandidateStatus | None = None,
+        limit: int | None = None,
+        offset: int = 0,
+    ) -> list[OutcomeCandidate]: ...
+    def update_candidate(self, candidate_id: str, updates: dict) -> OutcomeCandidate | None: ...
+    def delete_candidate(self, candidate_id: str) -> bool: ...
     def clear(self) -> None: ...
     def reload(self) -> None: ...
     def commit(self) -> None: ...
@@ -233,6 +247,7 @@ class InMemoryRepository:
         self.scheduled_work: dict[str, ScheduledWork] = {}
         self.interviews: dict[str, Interview] = {}
         self.quotes: dict[str, InterviewQuote] = {}
+        self.candidates: dict[str, OutcomeCandidate] = {}
         self.segments: dict[str, Segment] = {}
         self.strategies: dict[str, Strategy] = {}
 
@@ -272,6 +287,8 @@ class InMemoryRepository:
             del self.interviews[key]
             for quote_key in [q for q, v in self.quotes.items() if v.interview_id == key]:
                 del self.quotes[quote_key]
+            for candidate_key in [c for c, v in self.candidates.items() if v.interview_id == key]:
+                del self.candidates[candidate_key]
         #: Do not destroy research evidence: unlink references to the removed
         #: job, its steps and its outcomes instead of deleting the rows.
         for key, ev in list(self.evidence.items()):
@@ -576,6 +593,10 @@ class InMemoryRepository:
         removed = [k for k, v in self.quotes.items() if v.interview_id == interview_id]
         for quote_id in removed:
             del self.quotes[quote_id]
+        for candidate_id in [
+            c for c, v in self.candidates.items() if v.interview_id == interview_id
+        ]:
+            del self.candidates[candidate_id]
         return removed
 
     def add_quote(self, quote: InterviewQuote) -> InterviewQuote:
@@ -635,6 +656,40 @@ class InMemoryRepository:
         self.strategies[strategy_id] = new_strategy
         return new_strategy
 
+    def add_candidate(self, candidate: OutcomeCandidate) -> OutcomeCandidate:
+        self.candidates[candidate.id] = candidate
+        return candidate
+
+    def get_candidate(self, candidate_id: str) -> OutcomeCandidate | None:
+        return self.candidates.get(candidate_id)
+
+    def list_candidates(
+        self,
+        interview_id: str | None = None,
+        status: CandidateStatus | None = None,
+        limit: int | None = None,
+        offset: int = 0,
+    ) -> list[OutcomeCandidate]:
+        items = list(self.candidates.values())
+        if interview_id is not None:
+            items = [c for c in items if c.interview_id == interview_id]
+        if status is not None:
+            items = [c for c in items if c.status == status]
+        return page(items, limit, offset)
+
+    def update_candidate(self, candidate_id: str, updates: dict) -> OutcomeCandidate | None:
+        candidate = self.candidates.get(candidate_id)
+        if not candidate:
+            return None
+        current = candidate.model_dump(exclude_unset=True)
+        current.update(updates)
+        new_candidate = candidate.model_validate(current)
+        self.candidates[candidate_id] = new_candidate
+        return new_candidate
+
+    def delete_candidate(self, candidate_id: str) -> bool:
+        return self.candidates.pop(candidate_id, None) is not None
+
     def clear(self) -> None:
         self.jobs.clear()
         self.scheduled_work.clear()
@@ -645,6 +700,7 @@ class InMemoryRepository:
         self.signals.clear()
         self.interviews.clear()
         self.quotes.clear()
+        self.candidates.clear()
         self.segments.clear()
         self.strategies.clear()
 
