@@ -200,6 +200,16 @@ export function FileIcon(props: IconProps) {
   );
 }
 
+export function SpeakerIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M4 9.5h3l5-4v13l-5-4H4z" />
+      <path d="M16 9a4 4 0 0 1 0 6" />
+      <path d="M18.5 6.5a8 8 0 0 1 0 11" />
+    </Icon>
+  );
+}
+
 export function AlertIcon(props: IconProps) {
   return (
     <Icon {...props}>

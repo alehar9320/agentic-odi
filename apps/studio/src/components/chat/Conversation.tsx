@@ -36,7 +36,7 @@ import { useStudio } from "../../state/StudioContext";
 import type { StudioError } from "../../types";
 import { UiActionContext } from "../../ui/actions";
 import { FailurePanel } from "../FailurePanel";
-import { CheckIcon, CopyIcon } from "../icons";
+import { CheckIcon, CopyIcon, SpeakerIcon } from "../icons";
 import { Markdown } from "./Markdown";
 
 const PHASE_LABEL: Record<string, string> = {
@@ -137,6 +137,32 @@ function AssistantMessage() {
               {copied ? <CheckIcon size={14} /> : <CopyIcon size={14} />}
               {copied ? "Copied" : "Copy"}
             </ActionBarPrimitive.Copy>
+            {/* Speech is a per-reply action, never a mode: the control is
+                absent where the shell has no speech API, and only one reply
+                speaks at a time because the runtime owns the utterance. */}
+            <AuiIf
+              condition={(state) =>
+                state.message.speech == null &&
+                state.message.content.some(
+                  (part) => part.type === "text" && part.text.trim().length > 0,
+                )
+              }
+            >
+              <ActionBarPrimitive.Speak className="quiet-action" aria-label="Read reply aloud">
+                <SpeakerIcon size={14} />
+                Read aloud
+              </ActionBarPrimitive.Speak>
+            </AuiIf>
+            <AuiIf condition={(state) => state.message.speech != null}>
+              <ActionBarPrimitive.StopSpeaking className="quiet-action" aria-label="Stop reading">
+                Stop reading
+              </ActionBarPrimitive.StopSpeaking>
+            </AuiIf>
+            <AuiIf condition={(state) => state.message.speech != null}>
+              <p className="sr-only" role="status">
+                Reading this reply aloud.
+              </p>
+            </AuiIf>
             <ActionBarPrimitive.Reload className="quiet-action" aria-label="Regenerate reply">
               Regenerate
             </ActionBarPrimitive.Reload>

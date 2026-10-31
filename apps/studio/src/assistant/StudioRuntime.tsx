@@ -20,6 +20,7 @@ import { useStudio } from "../state/StudioContext";
 import type { ChatMessage } from "../types";
 import { createAttachmentAdapter, preparedAttachments } from "./attachments";
 import { textOf, toThreadMessageLike } from "./convert";
+import { createSpeechAdapter } from "./speech";
 
 export interface StudioSuggestion {
   title: string;
@@ -142,6 +143,9 @@ export function StudioRuntimeProvider({ children }: { children: ReactNode }) {
   } = useStudio();
 
   const attachments = useMemo(() => createAttachmentAdapter(), []);
+  // Null in a shell without Web Speech, so no Speak control is ever rendered
+  // where it could only throw.
+  const speech = useMemo(() => createSpeechAdapter(), []);
   const jobCount = canvas?.jobs.length ?? 0;
   const outcomeCount = canvas?.outcomes.length ?? 0;
   const suggestions = useMemo(
@@ -154,7 +158,7 @@ export function StudioRuntimeProvider({ children }: { children: ReactNode }) {
     messages,
     convertMessage: toThreadMessageLike,
     suggestions,
-    adapters: { attachments },
+    adapters: { attachments, ...(speech ? { speech } : {}) },
     onNew: async (message) => {
       await sendMessage(textOf(message), preparedAttachments(message.attachments));
     },

@@ -227,7 +227,8 @@ without giving up the message model the sidecar already understands.
 | **Branching** | **Edit** a user turn or **Regenerate** a reply and both versions are kept as siblings. **Alternative 2 of 3** with `‹`/`›` steps between them, and the visible branch is saved as the conversation's `head_id`, so a reload reopens the branch you were reading. |
 | **Suggestions** | The empty-stage pills are chosen from the canvas and handed to the runtime as suggestion prompts. |
 | **Generative UI** | A validated `UiNode` travels as an assistant-ui **data part** (`data-odi-surface`) and renders through the same `UiRenderer`. The catalog stays ours and server-validated. |
-| **Voice** | Deliberately not wired yet. The seam is `adapters.dictation` plus `ComposerPrimitive.Dictate`: no backend change and no message-model change. It waits because Tauri's WebKit webview support for the Web Speech API is uneven, and a microphone button that works in only one shell is worse than none. |
+| **Read aloud** | A settled reply with prose offers **Read aloud**. Starting another reply stops the first; **Stop reading**, Escape inside the thread, and leaving the conversation end it. The runtime gets a `WebSpeechSynthesisAdapter` only where `speechSynthesis` exists, so the control is absent rather than broken in a shell without it. Speech is never persisted and a streaming reply is never spoken. |
+| **Voice** | Dictation is still deliberately not wired: the seam is `adapters.dictation` plus `ComposerPrimitive.Dictate`, and Tauri's WebKit webview support for speech recognition is uneven. No microphone is offered in only one shell. Realtime voice remains out of scope. |
 
 #### Where the bridge lives
 
