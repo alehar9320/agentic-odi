@@ -44,6 +44,10 @@ counted as done.
 - [ ] **MCP `/health` store probe** — the server reports whether its SQLite store is reachable ([PR #286](https://github.com/alehar9320/agentic-odi/pull/286)).
 - [ ] **Durable sessions and a real memory** — the conversation survives a reload ([PR #285](https://github.com/alehar9320/agentic-odi/pull/285)).
 - [ ] **Accept or reject a candidate without losing evidence** — the review half of candidate extraction ([PR #284](https://github.com/alehar9320/agentic-odi/pull/284)).
+- [ ] **Store version and migration guard** — the SQLite event log carries a `schema_meta` version, migrates in one transaction, and refuses a database newer than the build with both versions named ([PR #283](https://github.com/alehar9320/agentic-odi/pull/283)).
+- [ ] **The ODI spine, end to end** — quote → candidate → outcome → score → brief → decision → bet → measure runs on the real store, with a person's acceptance the only path from a proposal to an outcome ([PR #283](https://github.com/alehar9320/agentic-odi/pull/283)).
+- [ ] **A labelled demo workspace** — `agentic-odi demo load` fills a store with a typed, `origin="demo"` corpus; a second load is a no-op ([PR #283](https://github.com/alehar9320/agentic-odi/pull/283)).
+- [ ] **Pin the contract, fail on drift** — the MCP tool contract is snapshotted against the live registry, so a rename, a requiredness change, or a missing tool fails CI ([PR #283](https://github.com/alehar9320/agentic-odi/pull/283)).
 
 ## Next
 

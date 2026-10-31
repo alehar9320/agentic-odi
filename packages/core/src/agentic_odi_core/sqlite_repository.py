@@ -13,10 +13,15 @@ from pydantic import BaseModel, ValidationError
 from agentic_odi_core.events import DEFAULT_DEVICE, DEFAULT_WORKSPACE, Event
 from agentic_odi_core.intent_store import IntentStore
 from agentic_odi_core.models import (
+    BetRecord,
+    CandidateStatus,
     CustomerOutcome,
+    DecisionRecord,
     Evidence,
     Job,
+    MeasurementRecord,
     Outcome,
+    OutcomeCandidate,
     ScheduledWork,
     Signal,
     Step,
@@ -30,6 +35,19 @@ from agentic_odi_core.repository import (
     unread_signals,
 )
 
+DEFAULT_DB_PATH = os.path.expanduser("~/.agentic-odi/odi.db")
+
+
+def resolve_db_path(db_path: str | None = None) -> str:
+    """The store path a command will actually open.
+
+    One place resolves the default so every surface — a write, a read, and the
+    ``store`` report — names the same file rather than each guessing.
+    """
+    if db_path:
+        return db_path
+    return os.environ.get("AGENTIC_ODI_DB") or DEFAULT_DB_PATH
+
 
 class SQLiteRepository(Repository):
     def __init__(
@@ -38,8 +56,7 @@ class SQLiteRepository(Repository):
         workspace_id: str | None = None,
         device_id: str | None = None,
     ) -> None:
-        if db_path is None:
-            db_path = os.environ.get("AGENTIC_ODI_DB", os.path.expanduser("~/.agentic-odi/odi.db"))
+        db_path = resolve_db_path(db_path)
         os.makedirs(os.path.dirname(db_path) or ".", exist_ok=True)
         self._lock = threading.RLock()
         self._workspace_id = workspace_id or os.environ.get(
@@ -58,6 +75,10 @@ class SQLiteRepository(Repository):
         self.outcomes: dict[str, Outcome] = {}
         self.customer_outcomes: dict[str, CustomerOutcome] = {}
         self.evidence: dict[str, Evidence] = {}
+        self.candidates: dict[str, OutcomeCandidate] = {}
+        self.decisions: dict[str, DecisionRecord] = {}
+        self.bets: dict[str, BetRecord] = {}
+        self.measurements: dict[str, MeasurementRecord] = {}
         self.signals: dict[str, Signal] = {}
         self.scheduled_work: dict[str, ScheduledWork] = {}
         self._last_event_id = 0
@@ -120,6 +141,14 @@ class SQLiteRepository(Repository):
             self.customer_outcomes[p["id"]] = CustomerOutcome.model_validate(p)
         elif et == "EVIDENCE_CREATED":
             self.evidence[p["id"]] = Evidence.model_validate(p)
+        elif et == "CANDIDATE_CREATED":
+            self.candidates[p["id"]] = OutcomeCandidate.model_validate(p)
+        elif et == "DECISION_CREATED":
+            self.decisions[p["id"]] = DecisionRecord.model_validate(p)
+        elif et == "BET_CREATED":
+            self.bets[p["id"]] = BetRecord.model_validate(p)
+        elif et == "MEASUREMENT_CREATED":
+            self.measurements[p["id"]] = MeasurementRecord.model_validate(p)
         elif et == "JOB_UPDATED":
             self._merge_updates(self.jobs, p, Job)
         elif et == "STEP_UPDATED":
@@ -137,6 +166,9 @@ class SQLiteRepository(Repository):
                 del self.outcomes[key]
             for key in [k for k, v in self.customer_outcomes.items() if v.job_id == job_id]:
                 del self.customer_outcomes[key]
+            for key in [k for k, v in self.candidates.items() if v.job_id == job_id]:
+                del self.candidates[key]
+            self._cascade_decisions()
             for key in [
                 k
                 for k, v in self.evidence.items()
@@ -152,6 +184,9 @@ class SQLiteRepository(Repository):
                 del self.outcomes[key]
             for key in [k for k, v in self.customer_outcomes.items() if v.step_id == step_id]:
                 del self.customer_outcomes[key]
+            for key in [k for k, v in self.candidates.items() if v.step_id == step_id]:
+                del self.candidates[key]
+            self._cascade_decisions()
             for key in [
                 k
                 for k, v in self.evidence.items()
@@ -164,8 +199,27 @@ class SQLiteRepository(Repository):
             self.outcomes.pop(outcome_id, None)
             for key in [k for k, v in self.evidence.items() if v.outcome_id == outcome_id]:
                 del self.evidence[key]
+            for key in [k for k, v in self.candidates.items() if v.outcome_id == outcome_id]:
+                del self.candidates[key]
+            self._cascade_decisions()
         elif et == "EVIDENCE_DELETED":
             self.evidence.pop(p["id"], None)
+        elif et == "CANDIDATE_UPDATED":
+            self._merge_updates(self.candidates, p, OutcomeCandidate)
+        elif et == "CANDIDATE_DELETED":
+            self.candidates.pop(p["id"], None)
+        elif et == "DECISION_DELETED":
+            decision_id = p["id"]
+            self.decisions.pop(decision_id, None)
+            for key in [k for k, v in self.bets.items() if v.decision_id == decision_id]:
+                del self.bets[key]
+        elif et == "BET_DELETED":
+            bet_id = p["id"]
+            self.bets.pop(bet_id, None)
+            for key in [k for k, v in self.measurements.items() if v.bet_id == bet_id]:
+                del self.measurements[key]
+        elif et == "MEASUREMENT_DELETED":
+            self.measurements.pop(p["id"], None)
         elif et == "SCHEDULED_WORK_CREATED":
             self.scheduled_work[p["id"]] = ScheduledWork.model_validate(p)
         elif et == "SCHEDULED_WORK_UPDATED":
@@ -182,6 +236,21 @@ class SQLiteRepository(Repository):
         elif et == "SIGNAL_DISMISSED":
             self._merge_updates(self.signals, p, Signal)
         self._last_event_id = max(self._last_event_id, ev["id"])
+
+    def _cascade_decisions(self) -> None:
+        """Drop decisions whose subject is gone, and their bets and measurements.
+
+        A decision names an outcome as its subject; when that outcome is deleted
+        the decision (and everything measured against it) no longer has a
+        referent, so it is removed with it rather than left dangling.
+        """
+        orphaned = [k for k, d in self.decisions.items() if d.subject_id not in self.outcomes]
+        for decision_id in orphaned:
+            del self.decisions[decision_id]
+        for key in [k for k, b in self.bets.items() if b.decision_id not in self.decisions]:
+            del self.bets[key]
+        for key in [k for k, m in self.measurements.items() if m.bet_id not in self.bets]:
+            del self.measurements[key]
 
     @staticmethod
     def _merge_updates(entities: dict[str, Any], p: dict, model: type[BaseModel]) -> None:
@@ -482,6 +551,138 @@ class SQLiteRepository(Repository):
                 self._sync()
                 return True
             return False
+
+    def add_candidate(self, candidate: OutcomeCandidate) -> OutcomeCandidate:
+        with self._lock:
+            self.store.append(
+                "CANDIDATE_CREATED",
+                candidate.model_dump(mode="json"),
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return candidate
+
+    def get_candidate(self, candidate_id: str) -> OutcomeCandidate | None:
+        with self._lock:
+            self._sync()
+            return self.candidates.get(candidate_id)
+
+    def list_candidates(
+        self,
+        quote_id: str | None = None,
+        job_id: str | None = None,
+        status: CandidateStatus | None = None,
+        limit: int | None = None,
+        offset: int = 0,
+    ) -> list[OutcomeCandidate]:
+        with self._lock:
+            self._sync()
+            items = list(self.candidates.values())
+            if quote_id is not None:
+                items = [c for c in items if c.quote_id == quote_id]
+            if job_id is not None:
+                items = [c for c in items if c.job_id == job_id]
+            if status is not None:
+                items = [c for c in items if c.status is status]
+            return page(items, limit, offset)
+
+    def update_candidate(self, candidate_id: str, updates: dict) -> OutcomeCandidate | None:
+        with self._lock:
+            self._sync()
+            candidate = self.candidates.get(candidate_id)
+            if not candidate:
+                return None
+            # Full dump so the generated id is preserved, never regenerated.
+            current = candidate.model_dump()
+            current.update(updates)
+            new_candidate = candidate.model_validate(current)
+            self.store.append(
+                "CANDIDATE_UPDATED",
+                {"id": candidate_id, "updates": updates},
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return new_candidate
+
+    def add_decision(self, decision: DecisionRecord) -> DecisionRecord:
+        with self._lock:
+            self.store.append(
+                "DECISION_CREATED",
+                decision.model_dump(mode="json"),
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return decision
+
+    def get_decision(self, decision_id: str) -> DecisionRecord | None:
+        with self._lock:
+            self._sync()
+            return self.decisions.get(decision_id)
+
+    def list_decisions(
+        self, subject_id: str | None = None, limit: int | None = None, offset: int = 0
+    ) -> list[DecisionRecord]:
+        with self._lock:
+            self._sync()
+            items = list(self.decisions.values())
+            if subject_id is not None:
+                items = [d for d in items if d.subject_id == subject_id]
+            return page(items, limit, offset)
+
+    def add_bet(self, bet: BetRecord) -> BetRecord:
+        with self._lock:
+            self.store.append(
+                "BET_CREATED",
+                bet.model_dump(mode="json"),
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return bet
+
+    def get_bet(self, bet_id: str) -> BetRecord | None:
+        with self._lock:
+            self._sync()
+            return self.bets.get(bet_id)
+
+    def list_bets(
+        self, decision_id: str | None = None, limit: int | None = None, offset: int = 0
+    ) -> list[BetRecord]:
+        with self._lock:
+            self._sync()
+            items = list(self.bets.values())
+            if decision_id is not None:
+                items = [b for b in items if b.decision_id == decision_id]
+            return page(items, limit, offset)
+
+    def add_measurement(self, measurement: MeasurementRecord) -> MeasurementRecord:
+        with self._lock:
+            self.store.append(
+                "MEASUREMENT_CREATED",
+                measurement.model_dump(mode="json"),
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return measurement
+
+    def get_measurement(self, measurement_id: str) -> MeasurementRecord | None:
+        with self._lock:
+            self._sync()
+            return self.measurements.get(measurement_id)
+
+    def list_measurements(
+        self, bet_id: str | None = None, limit: int | None = None, offset: int = 0
+    ) -> list[MeasurementRecord]:
+        with self._lock:
+            self._sync()
+            items = list(self.measurements.values())
+            if bet_id is not None:
+                items = [m for m in items if m.bet_id == bet_id]
+            return page(items, limit, offset)
 
     def add_signal(self, signal: Signal) -> Signal:
         with self._lock:

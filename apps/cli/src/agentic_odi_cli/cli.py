@@ -15,8 +15,10 @@ import typer
 
 from agentic_odi_cli import context, paths, update, version
 from agentic_odi_cli.backend import run_tool
+from agentic_odi_cli.candidates import candidates_app
 from agentic_odi_cli.connectors import connectors_app
 from agentic_odi_cli.customer_outcomes import customer_outcomes_app, score
+from agentic_odi_cli.demo import demo_app
 from agentic_odi_cli.desired_outcomes import desired_outcomes_app
 from agentic_odi_cli.evidence import evidence_app
 from agentic_odi_cli.jobs import jobs_app
@@ -44,6 +46,12 @@ app.add_typer(steps_app, name="steps", help="Manage Job-map Steps.")
 app.add_typer(desired_outcomes_app, name="desired-outcomes", help="Manage desired Outcomes.")
 app.add_typer(evidence_app, name="evidence", help="Manage evidence captured from connectors.")
 app.add_typer(customer_outcomes_app, name="customer-outcomes", help="Manage Customer Outcomes")
+app.add_typer(
+    candidates_app,
+    name="candidates",
+    help="Review proposed outcomes extracted from quotes.",
+)
+app.add_typer(demo_app, name="demo", help="Load a labelled sample workspace on purpose.")
 app.add_typer(
     signals_app,
     name="signals",
@@ -294,6 +302,117 @@ def capabilities_cmd(
 
 
 app.add_typer(capabilities_app, name="capabilities")
+
+
+@app.command(name="spine")
+def spine_cmd(
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
+) -> None:
+    """Report which stages of the quote-to-measurement spine are implemented.
+
+    Reports the build's actual capability: every stage wired to the local store
+    shows as available, and any seam without an implementation still names the
+    issue that owns it rather than a fabricated number.
+    """
+    from agentic_odi_core import build_spine, seam_inventory, spine_summary
+    from agentic_odi_core.demo import StoreDemoLoader
+    from agentic_odi_core.sqlite_repository import SQLiteRepository
+
+    repo = SQLiteRepository(db_path=context.config().db_path)
+    try:
+        spine = build_spine(repo)
+        demo = StoreDemoLoader(repo)
+        inventory = seam_inventory(spine, demo=demo)
+        rendered = spine_summary(spine, demo=demo)
+    finally:
+        repo.close()
+
+    if json_output:
+        payload = [
+            {
+                "id": status.id,
+                "available": status.available,
+                "owner": {
+                    "issue": status.owner.issue,
+                    "title": status.owner.title,
+                    "issue_title": status.owner.issue_title,
+                    "module": status.owner.module,
+                },
+            }
+            for status in inventory
+        ]
+        typer.echo(json.dumps({"seams": payload}, indent=2))
+    else:
+        typer.echo(rendered)
+
+
+@app.command(name="brief")
+def brief_cmd(
+    subject_id: str = typer.Argument(..., help="Outcome ID to render the brief for."),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
+) -> None:
+    """Render the decision brief for one outcome, with each figure's basis.
+
+    Every numeral in the brief is interpolated from the stored outcome; the
+    ``basis`` line says where it came from, so a figure with no data reads
+    "0 decisions recorded" rather than a placeholder.
+    """
+    brief = run_tool("get_brief", {"subject_id": subject_id})
+    if json_output:
+        typer.echo(json.dumps(brief, indent=2))
+        return
+    if not isinstance(brief, dict):
+        typer.echo(str(brief))
+        return
+    typer.echo(brief.get("headline", ""))
+    typer.echo("")
+    rows = [(figure["name"], figure.get("value")) for figure in brief.get("figures", [])]
+    width = max((len(name) for name, _ in rows), default=0)
+    for figure in brief.get("figures", []):
+        value = figure.get("value")
+        shown = f"{value:.2f}" if isinstance(value, (int, float)) else "—"
+        typer.echo(f"{figure['name'].ljust(width)}  {shown}")
+        typer.echo(f"{' '.ljust(width)}  {figure.get('basis', '')}")
+
+
+@app.command(name="store")
+def store_cmd(
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
+) -> None:
+    """Report the local store's schema version and whether it is openable.
+
+    Opens the store through the same path every command uses, so a refusal here
+    is the refusal a user would hit elsewhere — not a second, softer check.
+    """
+    from agentic_odi_core.intent_store import CURRENT_SCHEMA_VERSION
+    from agentic_odi_core.sqlite_repository import SQLiteRepository, resolve_db_path
+
+    db_path = resolve_db_path(context.config().db_path)
+    try:
+        repo = SQLiteRepository(db_path=db_path)
+    except Exception as exc:  # noqa: BLE001 - surfaced verbatim, it is the point
+        typer.secho(f"Error: {exc}", fg="red", err=True)
+        raise typer.Exit(code=1) from exc
+    try:
+        version = repo.store.schema_version()
+    finally:
+        repo.close()
+    if json_output:
+        typer.echo(
+            json.dumps(
+                {
+                    "db_path": db_path,
+                    "schema_version": version,
+                    "supported_version": CURRENT_SCHEMA_VERSION,
+                },
+                indent=2,
+            )
+        )
+    else:
+        typer.echo(f"store: {db_path}")
+        typer.echo(f"schema version: {version} (this build supports {CURRENT_SCHEMA_VERSION})")
+
+
 app.add_typer(settings_app, name="settings")
 app.add_typer(profile_app, name="profile")
 app.command(name="setup", help="Configure product baseline interactively.")(setup_wizard)

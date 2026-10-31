@@ -10,10 +10,19 @@
       ]
     },
     {
+      "title": "The loop",
+      "guides": [
+        { "slug": "interviews", "title": "Interviews", "source": "docs/interviews.md", "blurb": "Quote → candidate → outcome: propose, review, accept." },
+        { "slug": "scoring", "title": "Scoring", "source": "docs/scoring.md", "blurb": "The opportunity score, its basis, bands, and the landscape." },
+        { "slug": "decision", "title": "Decisions", "source": "docs/decision.md", "blurb": "Brief → decision → bet → measure, and the honest empty states." }
+      ]
+    },
+    {
       "title": "Build",
       "guides": [
         { "slug": "cli", "title": "CLI reference", "source": "docs/cli.md", "blurb": "Backends, chat, entities, and scoring." },
         { "slug": "connectors", "title": "Connectors", "source": "docs/connectors.md", "blurb": "The registry, the presets, and the protocol." },
+        { "slug": "integration", "title": "Integrate an agent", "source": "docs/integration.md", "blurb": "Connect an external agent over MCP: read, write under consent, and errors." },
         { "slug": "mcp", "title": "MCP tool reference", "source": null, "blurb": "Every tool the server exposes." },
         { "slug": "architecture", "title": "Architecture", "source": "docs/architecture/README.md", "blurb": "The workspace, the data flow, and the testing strategy." }
       ]

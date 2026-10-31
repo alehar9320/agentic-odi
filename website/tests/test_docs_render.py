@@ -106,3 +106,24 @@ def test_unpublished_guides_link_back_to_the_repository():
     assert (
         "https://github.com/alehar9320/agentic-odi/blob/main/docs/architecture/data-flow.md" in html
     )
+
+
+def test_html_comments_are_dropped_from_a_guide():
+    """A tool's generation marker is a comment, so it must not render as text."""
+    html = markdown_render.render(
+        "Before.\n\n<!-- BEGIN GENERATED -->\n\n| a |\n|---|\n| 1 |\n\n<!-- END GENERATED -->\n",
+        source_path="docs/integration.md",
+    )
+    assert "BEGIN GENERATED" not in html
+    assert "END GENERATED" not in html
+    assert "Before." in html
+    assert "<table>" in html
+
+
+def test_a_comment_shown_inside_a_code_fence_is_kept():
+    """A comment is only stripped as prose; an example in a fence is content."""
+    html = markdown_render.render(
+        "```html\n<!-- example -->\n```\n",
+        source_path="docs/integration.md",
+    )
+    assert "&lt;!-- example --&gt;" in html or "<!-- example -->" in html

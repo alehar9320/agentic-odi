@@ -7,13 +7,22 @@ Run from the repo root:
 Output is deterministic - fixed palette, fixed positions, no timestamps, PNG
 encoded with compress_level=9 and optimize=True - so website/tests/test_make_og.py
 can assert the committed PNGs are pixel-identical to a fresh render.
+
+This module also renders a per-page card for every page the site builds
+(:func:`render_site`). The site build calls it, so a page cannot be published
+without a card. A card carries the page's own title, its section, and - when the
+page states one - a single figure taken from that page's own rendered text. A
+page that states no figure gets a card with no number rather than a `0`.
 """
 
 from __future__ import annotations
 
 import argparse
+import html as html_module
 import io
+import re
 from pathlib import Path
+from typing import NamedTuple
 
 from PIL import Image, ImageDraw, ImageFont
 
@@ -152,8 +161,16 @@ def render(
     headline: str = DEFAULT_HEADLINE,
     subhead: str = DEFAULT_SUBHEAD,
     url: str = DEFAULT_URL,
+    *,
+    pill: str = PILL_LABEL,
+    figure: str | None = None,
 ) -> bytes:
-    """Render the 1200x630 social card and return its PNG bytes."""
+    """Render the 1200x630 social card and return its PNG bytes.
+
+    ``pill`` is the label in the top-right chip; ``figure`` is an optional
+    accent line under the headline. The defaults reproduce the committed
+    ``website/assets/og.png`` byte for byte.
+    """
     width, height = OG_SIZE
     image = Image.new("RGB", OG_SIZE, CANVAS)
 
@@ -179,7 +196,7 @@ def render(
         fill=TEXT,
         anchor="lm",
     )
-    _draw_pill(draw, PILL_LABEL, right=width - MARGIN, cy=middle_y)
+    _draw_pill(draw, pill, right=width - MARGIN, cy=middle_y)
 
     text_width = width - 2 * MARGIN
     size = HEADLINE_SIZES[0]
@@ -195,6 +212,12 @@ def render(
     for line in headline_lines[:2]:
         draw.text((MARGIN, y), line, font=font, fill=TEXT)
         y += round(size * 1.25)
+
+    if figure is not None:
+        figure_font = ImageFont.load_default(size=44)
+        y += 18
+        draw.text((MARGIN, y), figure, font=figure_font, fill=ACCENT)
+        y += round(44 * 1.25)
 
     subhead_font = ImageFont.load_default(size=28)
     y += 26
@@ -218,6 +241,162 @@ def render_favicon() -> bytes:
     draw = ImageDraw.Draw(image)
     _draw_mark(draw, (2, 2, 29, 29), 2)
     return _to_png(image)
+
+
+# --------------------------------------------------------------------------
+# Per-page cards.
+#
+# A page's card carries three things: its own title, its section, and - only
+# when the page states one in its own rendered text - a single figure. The
+# figure is read back out of the page rather than passed in, so the number on
+# the card is always a number the page itself makes.
+
+# The count nouns a page may state, in the order a card prefers them. A page
+# that states none of these gets a card with no figure rather than a "0".
+FIGURE_NOUNS = ("tools", "commands", "connectors", "presets", "guides")
+
+# A count above this is not a count of things on a page; it is a year, a price,
+# or an example. Reading one as a figure would be a claim the page never made.
+MAX_FIGURE = 999
+
+
+class PageCard(NamedTuple):
+    """The inputs a page's card is rendered from."""
+
+    path: str
+    name: str  # file name inside assets/og/, e.g. "docs-mcp.png"
+    title: str
+    section: str
+    description: str
+    figure: str | None
+
+
+def _visible_text(html: str) -> str:
+    """A page's rendered text with tags, scripts, styles, and SVG removed.
+
+    A figure must come from what the page says, not from markup that merely
+    contains a number (an SVG path, an inline script, a data attribute).
+    """
+    text = re.sub(r"<script.*?</script>", " ", html, flags=re.S | re.I)
+    text = re.sub(r"<style.*?</style>", " ", text, flags=re.S | re.I)
+    text = re.sub(r"<svg.*?</svg>", " ", text, flags=re.S | re.I)
+    text = re.sub(r"<[^>]+>", " ", text)
+    return re.sub(r"\s+", " ", html_module.unescape(text))
+
+
+def _card_text(value: str) -> str:
+    """Text safe to draw: no control characters, single-spaced, trimmed."""
+    value = re.sub(r"[\x00-\x08\x0b-\x1f\x7f]", " ", value)
+    return re.sub(r"\s+", " ", value).strip()
+
+
+def figure_for(html: str) -> str | None:
+    """The one figure a page states about itself, or ``None``.
+
+    Reads the page's own visible text for ``<count> <noun>``, preferring the
+    nouns in :data:`FIGURE_NOUNS` order. A count above :data:`MAX_FIGURE` is
+    ignored, so a year or an example number never becomes a claimed figure. A
+    stated ``0`` is a real figure and is kept, so a page that genuinely has none
+    of a thing is distinguishable from a page that states no figure at all.
+    """
+    text = _visible_text(html)
+    for noun in FIGURE_NOUNS:
+        for raw in re.findall(rf"\b(\d[\d,]*)\s+{noun}\b", text):
+            value = int(raw.replace(",", ""))
+            if 0 <= value <= MAX_FIGURE:
+                return f"{value} {noun}"
+    return None
+
+
+def og_name(path: str) -> str:
+    """The card's file name inside ``assets/og/`` for a page path.
+
+    ``index.html`` -> ``index.png``, ``docs/mcp/index.html`` -> ``docs-mcp.png``.
+    Only ``[a-z0-9-]`` survives, so a nested or duplicated slug can never
+    escape the output directory or collide by case.
+    """
+    stem = path[: -len("index.html")] if path.endswith("index.html") else path
+    stem = stem.strip("/")
+    if not stem:
+        return "index.png"
+    return re.sub(r"[^a-z0-9]+", "-", stem.lower()).strip("-") + ".png"
+
+
+def _meta(html: str, name: str) -> str:
+    match = re.search(rf'<meta\s+name="{re.escape(name)}"\s+content="([^"]*)"', html)
+    return html_module.unescape(match.group(1)) if match else ""
+
+
+def _heading(html: str) -> str:
+    match = re.search(r"<h1[^>]*>(.*?)</h1>", html, re.DOTALL)
+    if match:
+        # Strip tags, then resolve entities, so a title like "Roadmap &amp;
+        # Next Steps" draws as "Roadmap & Next Steps" rather than the escape.
+        text = re.sub(r"<[^>]+>", " ", match.group(1))
+        return _card_text(html_module.unescape(text))
+    return _card_text(_meta(html, "description"))
+
+
+def _display_url(pages_url: str) -> str:
+    """The URL as a card prints it: host and path, no scheme, no trailing slash."""
+    return re.sub(r"^https?://", "", pages_url).rstrip("/")
+
+
+def page_card(path: str, html: str, section: str) -> PageCard:
+    """The card inputs for one built page."""
+    title = _heading(html) or WORDMARK
+    return PageCard(
+        path=path,
+        name=og_name(path),
+        title=title,
+        section=section,
+        description=_meta(html, "description"),
+        figure=figure_for(html),
+    )
+
+
+def render_page(card: PageCard, pages_url: str) -> bytes:
+    """Render one page's card. A card with no figure draws no number."""
+    return render(
+        headline=card.title,
+        subhead=card.description or DEFAULT_SUBHEAD,
+        url=_display_url(pages_url),
+        pill=card.section,
+        figure=card.figure,
+    )
+
+
+def render_site(
+    pages: dict[str, str],
+    pages_url: str,
+    sections: dict[str, str] | None = None,
+) -> dict[str, bytes]:
+    """One card per built page, keyed by its path under ``assets/``.
+
+    ``pages`` maps a page path (``docs/mcp/index.html``) to its rendered HTML.
+    ``sections`` optionally maps a page path to its section label; a page with
+    no entry falls back to the first path segment.
+    """
+    sections = sections or {}
+    cards: dict[str, bytes] = {}
+    owners: dict[str, str] = {}
+    for path, html in sorted(pages.items()):
+        section = sections.get(path) or _section_from_path(path)
+        card = page_card(path, html, section)
+        key = f"assets/og/{card.name}"
+        if key in owners:
+            raise ValueError(f"two pages share one card path {key}: {owners[key]} and {path}")
+        owners[key] = path
+        cards[key] = render_page(card, pages_url)
+    return cards
+
+
+def _section_from_path(path: str) -> str:
+    """A page's section when the build did not supply one."""
+    if path == "index.html":
+        return "Overview"
+    parts = path.split("/")
+    return parts[0].capitalize() if parts else WORDMARK
 
 
 def write(out_dir: Path) -> list[Path]:

@@ -617,6 +617,230 @@ class LocalBackend(Backend):
             raise BackendError(_VALUE_RANGE_ERROR)
         return compute_opportunity_score(importance, satisfaction)
 
+    def _extract_candidates(self, args: dict[str, Any]) -> list[dict[str, Any]]:
+        import asyncio
+
+        from agentic_odi_core import (
+            ExtractionError,
+            FixtureStatementExtractor,
+            job_not_found,
+        )
+        from agentic_odi_core.extraction import extract_candidates
+
+        job_id = args["job_id"]
+        if self.service.get_job(job_id) is None:
+            raise BackendError(job_not_found(job_id)) from None
+        try:
+            candidates = asyncio.run(
+                extract_candidates(
+                    self.service.repo,
+                    FixtureStatementExtractor(),
+                    quote_id=args["quote_id"],
+                    quote=args["quote"],
+                    job_id=job_id,
+                    job_name=args.get("job_name"),
+                    stage_hint=args.get("stage_hint"),
+                )
+            )
+        except ExtractionError as exc:
+            raise BackendError(str(exc)) from exc
+        except ValueError as exc:
+            raise BackendError(str(exc)) from exc
+        return [candidate.model_dump(mode="json") for candidate in candidates]
+
+    def _list_candidates(self, args: dict[str, Any]) -> list[dict[str, Any]]:
+        from agentic_odi_core import CandidateStatus
+
+        status_arg = args.get("status")
+        try:
+            resolved = CandidateStatus(status_arg) if status_arg is not None else None
+        except ValueError:
+            raise BackendError(f"unknown candidate status: {status_arg}") from None
+        candidates = self.service.repo.list_candidates(
+            quote_id=args.get("quote_id"),
+            job_id=args.get("job_id"),
+            status=resolved,
+            limit=args.get("limit"),
+            offset=args.get("offset", 0),
+        )
+        return [candidate.model_dump(mode="json") for candidate in candidates]
+
+    def _get_candidate(self, args: dict[str, Any]) -> dict[str, Any]:
+        candidate = self.service.repo.get_candidate(args["candidate_id"])
+        if candidate is None:
+            raise BackendError(f"Candidate with ID {args['candidate_id']} not found.")
+        return candidate.model_dump(mode="json")
+
+    def _accept_candidate(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import (
+            CandidateAlreadyDecidedError,
+            CandidateNotFoundError,
+            JobNotFoundError,
+            StepNotFoundError,
+            ValueOutOfRangeError,
+            job_not_found,
+            step_not_found,
+        )
+        from agentic_odi_core.review import accept_candidate
+
+        candidate_id = args["candidate_id"]
+        step_id = args.get("step_id")
+        try:
+            outcome = accept_candidate(
+                self.service,
+                self.service.repo,
+                candidate_id,
+                statement=args.get("statement"),
+                importance=float(args["importance"]),
+                satisfaction=float(args["satisfaction"]),
+                step_id=step_id,
+            )
+        except CandidateNotFoundError:
+            raise BackendError(f"Candidate with ID {candidate_id} not found.") from None
+        except CandidateAlreadyDecidedError as exc:
+            raise BackendError(str(exc)) from exc
+        except JobNotFoundError:
+            raise BackendError(job_not_found("")) from None
+        except StepNotFoundError:
+            raise BackendError(step_not_found(step_id)) from None
+        except ValueOutOfRangeError as exc:
+            raise BackendError(_VALUE_RANGE_ERROR) from exc
+        return outcome.model_dump()
+
+    def _reject_candidate(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import (
+            CandidateAlreadyDecidedError,
+            CandidateNotFoundError,
+        )
+        from agentic_odi_core.errors import ValidationError
+        from agentic_odi_core.review import reject_candidate
+
+        candidate_id = args["candidate_id"]
+        try:
+            candidate = reject_candidate(self.service.repo, candidate_id, reason=args["reason"])
+        except CandidateNotFoundError:
+            raise BackendError(f"Candidate with ID {candidate_id} not found.") from None
+        except CandidateAlreadyDecidedError as exc:
+            raise BackendError(str(exc)) from exc
+        except ValidationError as exc:
+            raise BackendError(str(exc)) from exc
+        return candidate.model_dump(mode="json")
+
+    def _merge_candidate(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import (
+            CandidateAlreadyDecidedError,
+            CandidateNotFoundError,
+            OutcomeNotFoundError,
+            outcome_not_found,
+        )
+        from agentic_odi_core.errors import ValidationError
+        from agentic_odi_core.review import merge_candidate
+
+        candidate_id = args["candidate_id"]
+        merged_into = args["merged_into"]
+        try:
+            candidate = merge_candidate(self.service.repo, candidate_id, merged_into=merged_into)
+        except CandidateNotFoundError:
+            raise BackendError(f"Candidate with ID {candidate_id} not found.") from None
+        except CandidateAlreadyDecidedError as exc:
+            raise BackendError(str(exc)) from exc
+        except OutcomeNotFoundError:
+            raise BackendError(outcome_not_found(merged_into)) from None
+        except ValidationError as exc:
+            raise BackendError(str(exc)) from exc
+        return candidate.model_dump(mode="json")
+
+    def _get_outcome_score(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import outcome_not_found
+        from agentic_odi_core.spine_stages import SpineStageError, StoreScoreSampler
+
+        outcome_id = args["outcome_id"]
+        try:
+            sample = StoreScoreSampler(self.service.repo).sample(outcome_id)
+        except SpineStageError:
+            raise BackendError(outcome_not_found(outcome_id)) from None
+        return {
+            "outcome_id": sample.outcome_id,
+            "importance": sample.importance,
+            "satisfaction": sample.satisfaction,
+            "opportunity_score": sample.opportunity_score,
+            "sample_size": sample.sample_size,
+        }
+
+    def _get_brief(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import outcome_not_found
+        from agentic_odi_core.spine_stages import SpineStageError, StoreBriefRenderer
+
+        subject_id = args["subject_id"]
+        try:
+            brief = StoreBriefRenderer(self.service.repo).render(subject_id)
+        except SpineStageError:
+            raise BackendError(outcome_not_found(subject_id)) from None
+        return {
+            "subject_id": brief.subject_id,
+            "headline": brief.headline,
+            "figures": [
+                {"name": figure.name, "value": figure.value, "basis": figure.basis}
+                for figure in brief.figures
+            ],
+        }
+
+    def _record_decision(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import outcome_not_found
+        from agentic_odi_core.spine_stages import SpineStageError, StoreDecisionRecorder
+
+        subject_id = args["subject_id"]
+        try:
+            decision = StoreDecisionRecorder(self.service.repo).record(
+                subject_id=subject_id,
+                choice=args["choice"],
+                rationale=args["rationale"],
+            )
+        except SpineStageError:
+            raise BackendError(outcome_not_found(subject_id)) from None
+        return {
+            "id": decision.id,
+            "subject_id": decision.subject_id,
+            "choice": decision.choice,
+            "rationale": decision.rationale,
+            "decided_at": decision.decided_at,
+        }
+
+    def _track_bet(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core.spine_stages import SpineStageError, StoreBetTracker
+
+        decision_id = args["decision_id"]
+        try:
+            bet = StoreBetTracker(self.service.repo).track(
+                decision_id=decision_id,
+                statement=args["statement"],
+                metric=args["metric"],
+            )
+        except SpineStageError:
+            raise BackendError(f"Decision with ID {decision_id} not found.") from None
+        return {
+            "id": bet.id,
+            "decision_id": bet.decision_id,
+            "statement": bet.statement,
+            "metric": bet.metric,
+            "baseline": bet.baseline,
+        }
+
+    def _get_measurement(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core.spine_stages import SpineStageError, StoreMeasurementReader
+
+        bet_id = args["bet_id"]
+        try:
+            measurement = StoreMeasurementReader(self.service.repo).measure(bet_id)
+        except SpineStageError:
+            raise BackendError(f"Bet with ID {bet_id} not found.") from None
+        return {
+            "bet_id": measurement.bet_id,
+            "metric": measurement.metric,
+            "value": measurement.value,
+            "observed_at": measurement.observed_at,
+        }
+
     def _list_signals(self, args: dict[str, Any]) -> list[dict[str, Any]]:
         signals = self.service.list_signals(
             unread_only=bool(args.get("unread_only", False)),
@@ -682,6 +906,17 @@ _LOCAL_HANDLERS = {
     "get_odi_framework_guidelines": LocalBackend._get_odi_framework_guidelines,
     "get_capabilities": LocalBackend._get_capabilities,
     "get_capabilities_manifest": LocalBackend._get_capabilities_manifest,
+    "extract_candidates": LocalBackend._extract_candidates,
+    "list_candidates": LocalBackend._list_candidates,
+    "get_candidate": LocalBackend._get_candidate,
+    "accept_candidate": LocalBackend._accept_candidate,
+    "reject_candidate": LocalBackend._reject_candidate,
+    "merge_candidate": LocalBackend._merge_candidate,
+    "get_outcome_score": LocalBackend._get_outcome_score,
+    "get_brief": LocalBackend._get_brief,
+    "record_decision": LocalBackend._record_decision,
+    "track_bet": LocalBackend._track_bet,
+    "get_measurement": LocalBackend._get_measurement,
     "list_signals": LocalBackend._list_signals,
     "mark_signal_read": LocalBackend._mark_signal_read,
     "dismiss_signal": LocalBackend._dismiss_signal,

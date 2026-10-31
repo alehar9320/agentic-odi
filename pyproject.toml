@@ -29,6 +29,7 @@ dev = [
     "pytest-cov==7.1.0",
     "ruff==0.17.1",
     "pillow==12.3.0",
+    "inline-snapshot==0.36.1",
 ]
 
 [tool.bandit]
@@ -60,6 +61,13 @@ disable_error_code = ["prop-decorator"]
 asyncio_mode = "strict"
 pythonpath = [".", "brand/src"]
 testpaths = ["apps", "brand", "packages", "tests", "website"]
+
+[tool.inline-snapshot]
+# Reformat an accepted snapshot with the project's formatter so a drift diff
+# stays readable in a PR, and show the full diff (not a truncated summary) when
+# a snapshot test fails. CI never accepts snapshots automatically.
+format-command = "ruff format --stdin-filename {filename} -"
+default-flags = ["report"]
 
 [tool.coverage.run]
 source = [

@@ -31,6 +31,29 @@ def test_site_tool_list_matches_the_contract():
         assert f'id="tool-{tool["name"]}"' in html, f"{tool['name']} is missing from the site"
 
 
+def test_every_tool_has_a_written_purpose():
+    """No tool falls back to "See the MCP server source for details." on the site."""
+    tools = extract.read_tools(MCP_SERVER_PY, CONTRACT_PY)
+    undescribed = [tool["name"] for tool in tools if "See the MCP server source" in tool["purpose"]]
+    assert not undescribed, f"tools without a one-line purpose: {undescribed}"
+
+
+def test_the_integration_guide_lists_every_tool():
+    tools = extract.read_tools(MCP_SERVER_PY, CONTRACT_PY)
+    html = read_page("docs/integration/index.html")
+    for tool in tools:
+        assert f"<code>{tool['name']}</code>" in html, (
+            f"{tool['name']} is missing from the integration guide"
+        )
+
+
+def test_the_integration_guide_hides_its_generation_markers():
+    """The markers a tool writes into the guide are comments, not visible text."""
+    html = read_page("docs/integration/index.html")
+    assert "BEGIN GENERATED" not in html
+    assert "END GENERATED" not in html
+
+
 def test_every_tool_signature_on_the_site_is_the_real_one():
     tools = extract.read_tools(MCP_SERVER_PY, CONTRACT_PY)
     html = read_page("docs/mcp/index.html")
