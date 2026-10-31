@@ -782,8 +782,8 @@ export function SegmentProfile({ node }: NodeProps) {
   const title = str(node.props, "title");
   const strategy = str(node.props, "strategy");
   const gaps = stringList(node.props.gaps);
-  const total = num(node.props, "total_members") ?? 0;
-  const measured = num(node.props, "measured_count") ?? 0;
+  const total = num(node.props, "total_members", 0);
+  const measured = num(node.props, "measured_count", 0);
   const ratio = typeof node.props.measured_ratio === "number" ? node.props.measured_ratio : null;
 
   return (
@@ -807,11 +807,11 @@ export function SegmentProfile({ node }: NodeProps) {
         </div>
         <div className="ui-field">
           <dt>Underserved</dt>
-          <dd>{num(node.props, "underserved_count") ?? 0}</dd>
+          <dd>{num(node.props, "underserved_count", 0)}</dd>
         </div>
         <div className="ui-field">
           <dt>Overserved</dt>
-          <dd>{num(node.props, "overserved_count") ?? 0}</dd>
+          <dd>{num(node.props, "overserved_count", 0)}</dd>
         </div>
       </dl>
 
