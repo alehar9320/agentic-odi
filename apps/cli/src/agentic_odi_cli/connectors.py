@@ -196,6 +196,23 @@ def catalog_presets(
     typer.echo("\nAdd one with: agentic-odi connectors add mcp --preset <id>")
 
 
+@connectors_app.command("list-presets")
+def list_presets_command() -> None:
+    """Print every built-in connector preset as a markdown table."""
+    from agentic_odi_connectors.catalog import AREA_LABELS, list_presets
+
+    typer.echo("| Preset | Area | Kind | Auth | URL |")
+    typer.echo("|--------|------|------|------|-----|")
+    for preset in list_presets():
+        if preset.auth == "oauth":
+            auth = "oauth"
+        elif preset.env_vars:
+            auth = "api key"
+        else:
+            auth = "none"
+        typer.echo(f"| {preset.id} | {AREA_LABELS[preset.area]} | mcp | {auth} | {preset.url} |")
+
+
 def _mcp_connector_config(
     *,
     name: str | None,
@@ -401,6 +418,7 @@ def ingest_connector(
             err=True,
         )
         raise typer.Exit(code=1)
+    from agentic_odi_connectors.models import RateLimitExceededError
     from agentic_odi_connectors.registry import ConnectorNotFoundError, UnknownConnectorKindError
 
     try:
@@ -424,7 +442,11 @@ def ingest_connector(
             preview["evidence_drafts"] = len(drafts)
         typer.echo(json.dumps(preview, indent=2))
         return
-    get_default_sink().append(batch)
+    try:
+        get_default_sink().append(batch)
+    except RateLimitExceededError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
     typer.echo(batch.model_dump_json())
     if drafts is None:
         return

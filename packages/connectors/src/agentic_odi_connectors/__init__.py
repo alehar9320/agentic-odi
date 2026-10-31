@@ -14,6 +14,7 @@ from agentic_odi_connectors.catalog import (
     list_presets,
 )
 from agentic_odi_connectors.factory import build_connector, known_kinds, register_kind
+from agentic_odi_connectors.http import ConnectorHTTPClient, get_http_client
 from agentic_odi_connectors.mapping import (
     EvidenceDraft,
     drafts_from_batch,
@@ -35,10 +36,12 @@ from agentic_odi_connectors.models import (
     IngestBatch,
     IngestRecord,
     McpConnectorSettings,
+    RateLimitExceededError,
     RestConnectorSettings,
 )
 from agentic_odi_connectors.paths import config_path
 from agentic_odi_connectors.protocol import Connector
+from agentic_odi_connectors.rate_limit import DEFAULT_INGEST_RATE, RateLimiter
 from agentic_odi_connectors.registry import (
     ConnectorNotFoundError,
     ConnectorRegistry,
@@ -115,12 +118,14 @@ _load_and_validate_presets()
 __all__ = [
     "AREA_LABELS",
     "ConfigurationError",
+    "DEFAULT_INGEST_RATE",
     "PRESETS",
     "KNOWN_KINDS",
     "REQUIRED_KEYS",
     "validate_connector_config",
     "Connector",
     "ConnectorConfig",
+    "ConnectorHTTPClient",
     "ConnectorNotFoundError",
     "ConnectorPreset",
     "ConnectorRegistry",
@@ -134,6 +139,8 @@ __all__ = [
     "MarketplaceListing",
     "MarketplaceService",
     "McpConnectorSettings",
+    "RateLimitExceededError",
+    "RateLimiter",
     "UnknownAreaError",
     "RestConnectorSettings",
     "UnknownConnectorKindError",
@@ -145,6 +152,7 @@ __all__ = [
     "drafts_from_batch",
     "env_vars_in_listing",
     "get_default_sink",
+    "get_http_client",
     "get_preset",
     "known_kinds",
     "list_presets",

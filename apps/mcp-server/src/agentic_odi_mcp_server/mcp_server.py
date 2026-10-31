@@ -38,6 +38,7 @@ from agentic_odi_core import (
     capability_summary,
     compute_opportunity_score,
     evaluate_outcome_statement,
+    invalid_strategy_request,
     job_not_found,
     odi_schema,
     scheduled_work_not_found,
@@ -82,6 +83,8 @@ outcomes_db = _repo.outcomes
 customer_outcomes_db = _repo.customer_outcomes
 evidence_db = _repo.evidence
 signals_db = _repo.signals
+segments_db = _repo.segments
+strategies_db = _repo.strategies
 
 
 def _step_not_found(step_id: str | None) -> str:
@@ -991,6 +994,58 @@ def dismiss_signal(signal_id: str) -> str:
     except SignalNotFoundError:
         return f"Error: Signal with ID {signal_id} not found."
     return f"Signal dismissed: {signal.model_dump_json()}"
+
+
+@mcp.tool
+def segment_market(job_id: str | None = None, people: str | None = None) -> str:
+    """Cluster scored outcomes into outcome-based segments (Stage 5).
+
+    Segmentation is by job and job-map step, never by who the customer is:
+    ``people`` is a label in the customer's own words when they have supplied
+    one, and a group derived from the outcomes alone is marked inferred.
+    Re-running updates the same segment rather than adding a second copy.
+    """
+    try:
+        segments = service.segment_market(job_id=job_id, people=people)
+    except JobNotFoundError:
+        return job_not_found(job_id or "")
+    return json.dumps([segment.model_dump(mode="json") for segment in segments])
+
+
+@mcp.tool
+def get_segments(job_id: str | None = None) -> str:
+    """List stored segments, optionally scoped to one job.
+
+    Empty until ``segment_market`` has run: a segment is derived from evidence,
+    never typed in.
+    """
+    segments = service.list_segments(job_id=job_id)
+    return json.dumps([segment.model_dump(mode="json") for segment in segments])
+
+
+@mcp.tool
+def get_strategy() -> str:
+    """The latest recorded strategy, or ``null`` when Stage 6 has not run."""
+    strategy = service.get_strategy()
+    if strategy is None:
+        return "null"
+    return json.dumps(strategy.model_dump(mode="json"))
+
+
+@mcp.tool
+def propose_strategy(job_id: str | None = None) -> str:
+    """Recommend the one innovation path the evidence supports (Stage 6).
+
+    Returns the chosen path with every path it beat and why. When no path has
+    evidence behind it this refuses rather than inventing a bet.
+    """
+    try:
+        strategy = service.propose_strategy(job_id=job_id)
+    except JobNotFoundError:
+        return job_not_found(job_id or "")
+    except OdiError as exc:
+        return f"Error: {invalid_strategy_request(str(exc))}"
+    return json.dumps(strategy.model_dump(mode="json"))
 
 
 DEFAULT_PORT = 8000

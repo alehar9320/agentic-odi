@@ -64,13 +64,20 @@ per-platform archives with SHA-256 checksums for a manual download. See
 
 - **A brain for customer needs.** Jobs, desired outcomes, evidence, and
   opportunity scores in one store — queryable by any MCP client.
+- **The other half of ODI.** Stage 5 clusters the scored outcomes into segments —
+  a group of people plus a functional job, never a demographic — and Stage 6
+  recommends the one innovation path those segments support, with every path it
+  rejected and why.
 - **A conversation, not a form.** The Living Studio opens on one question —
-  **What do you want to win?** — with the composer focused. Its optional
-  four-step tour stays out of the way, and in-place guidance appears only after
-  the first exchange. It turns "a customer still reconciles invoices by hand"
-  into a scored outcome, a job map, and a ranked opportunity board — inline in
-  the thread. Every claim in a reply names the record behind it, or says it is a
-  hypothesis.
+  **What do you want to win?** — with the composer focused. When you ask for
+  context, the agent speaks first: who you are and your team, who feels the
+  problem, what they are trying to win, where it breaks, and what you already
+  have. The answers come back as a brief you can edit line by line, not a
+  settings dialog. Its optional four-step tour stays out of the way, and
+  in-place guidance appears only after the first exchange. It turns "a customer
+  still reconciles invoices by hand" into a scored outcome, a job map, and a
+  ranked opportunity board — inline in the thread. Every claim in a reply names
+  the record behind it, or says it is a hypothesis.
 - **Local-first by default.** The CLI and server work with no network and no
   account. Point them at a remote MCP server with one flag.
 - **A catch-up that means something.** Writes emit signals — an outcome
@@ -92,6 +99,13 @@ Opportunity Score = Importance + max(Importance − Satisfaction, 0)
 Score **> 10** → underserved, innovate. **= 10** → served, maintain.
 **< 10** → overserved, disrupt. ODI reports an **86% innovation success rate**
 (as reported in the [Strategyn](https://strategyn.com/outcome-driven-innovation/) literature).
+
+A score says *which outcome* to chase; the job map says *who* is underserved.
+Stage 5 clusters a job's scored outcomes by the step they attach to, and Stage 6
+recommends one of three paths — differentiated for an underserved segment,
+disruptive for an overserved one, new-market for outcomes that map to no job in
+the store — recording the two it rejected. An outcome that joins no cluster is
+reported as unclustered, never inflated into a market.
 
 ## Quick Start
 
@@ -129,6 +143,8 @@ or `AGENTIC_ODI_MCP_PORT=8010`. The flag wins over the environment variable.
 ```bash
 odi jobs list
 odi desired-outcomes list --job-id <id>
+odi segments run --job <id>          # Stage 5: who the scored outcomes point at
+odi strategy propose                 # Stage 6: the bet, and the paths it beat
 odi signals unread                    # what changed while you were away
 odi score 8 2                        # → 14.00
 odi                                  # interactive chat in a terminal
@@ -184,12 +200,12 @@ together and where each contract is enforced:
 
 | Path | Distribution | Description |
 |---|---|---|
-| **`packages/core/`** | `agentic-odi-core` | Domain models, the `ODIService` layer, in-memory and SQLite repositories, the shared MCP tool contract, and opportunity-score computation. |
+| **`packages/core/`** | `agentic-odi-core` | Domain models, the `ODIService` layer, in-memory and SQLite repositories, the shared MCP tool contract, opportunity-score computation, outcome-based segmentation (Stage 5), and the innovation strategy (Stage 6). |
 | **`packages/connectors/`** | `agentic-odi-connectors` | Pluggable MCP and REST connectors with presets and an ingest sink. |
-| **`apps/mcp-server/`** | `agentic-odi-mcp-server` | FastMCP server exposing Jobs, Steps, Desired Outcomes, Customer Outcomes, Evidence, and context tools over HTTP. SQLite by default. |
+| **`apps/mcp-server/`** | `agentic-odi-mcp-server` | FastMCP server exposing Jobs, Steps, Desired Outcomes, Customer Outcomes, Evidence, Segments, Strategy, and context tools over HTTP. SQLite by default. |
 | **`apps/studio-api/`** | `agentic-odi-studio-api` | FastAPI **Living Studio sidecar**: config, health, metadata-only diagnostics, canvas, local mutations, MCP passthrough, SSE chat, conversations, and PM memory. |
 | **`apps/cli/`** | `agentic-odi-cli` | Typer CLI with interactive chat, full entity CRUD, `schema`, `connectors`, and local or remote data access. |
-| **`apps/studio/`** | React + TypeScript + Vite | **The Living Studio** SPA and Tauri 2 desktop shell, built on [assistant-ui](https://www.assistant-ui.com). Keyboard- and screen-reader-operable, gated by an [axe-core](https://github.com/dequelabs/axe-core) WCAG 2.1 AA sweep in the frontend suite. Its browser-level suite lives in `apps/studio/e2e/`. Installed desktop builds **update themselves** in the background and apply on restart. |
+| **`apps/studio/`** | React + TypeScript + Vite | **The Living Studio** SPA and Tauri 2 desktop shell, built on [assistant-ui](https://www.assistant-ui.com). Keyboard- and screen-reader-operable, gated by an [axe-core](https://github.com/dequelabs/axe-core) WCAG 2.1 AA sweep in the frontend suite. Its browser-level suite lives in `apps/studio/e2e/`. Copied UI components land under `src/vendor/`, which is the only place Tailwind styles. Installed desktop builds **update themselves** in the background and apply on restart. |
 | **`infra/cloudflare/`** | Worker | Free-plan Workers Static Assets deployment and sidecar tunnel. |
 | **`scripts/`** | — | Dev launcher, binary build, installer tests. |
 | **`tests/contract/`** | — | Cross-package MCP contract tests. |

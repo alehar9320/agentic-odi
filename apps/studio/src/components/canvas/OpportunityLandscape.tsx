@@ -11,10 +11,20 @@ import { OutcomeCard } from "./OutcomeCard";
 type ViewMode = "matrix" | "cards" | "table";
 
 export function OpportunityLandscape() {
-  const { canvasState, deleteThesis, openPanel, refreshCanvas, theses } = useStudio();
+  const {
+    canvasState,
+    deleteThesis,
+    openPanel,
+    refreshCanvas,
+    theses,
+    focusedSubject,
+    focusSubject,
+  } = useStudio();
   const [underservedOnly, setUnderservedOnly] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedOutcomeId, setSelectedOutcomeId] = useState<string | null>(null);
+  const [selectedOutcomeId, setSelectedOutcomeId] = useState<string | null>(
+    focusedSubject?.kind === "outcome" ? focusedSubject.id : null,
+  );
   const [viewMode, setViewMode] = useState<ViewMode>("matrix");
   const [hoveredOutcome, setHoveredOutcome] = useState<Outcome | null>(null);
 
@@ -22,6 +32,7 @@ export function OpportunityLandscape() {
   const sample = canvas?.source === "seed";
   const jobs = useMemo(() => canvas?.jobs ?? [], [canvas]);
   const outcomes = useMemo(() => canvas?.outcomes ?? [], [canvas]);
+  const evidence = useMemo(() => canvas?.evidence ?? [], [canvas]);
   const isLoading = canvasState.kind === "loading";
   const isEmpty = canvasState.kind === "empty";
   const provenance = canvasStatus(canvas);
@@ -29,6 +40,19 @@ export function OpportunityLandscape() {
   const underservedCount = outcomes.filter((outcome) =>
     isUnderserved(outcome.opportunity_score),
   ).length;
+
+  // Deduplicated demand: distinct customer quotes linked to an outcome. Because
+  // repeat imports of the same quote collapse to a single evidence record,
+  // counting distinct linked evidence never double-counts demand.
+  const linkedQuotes = useMemo(() => {
+    const ids = new Set<string>();
+    for (const item of evidence) {
+      if (item.outcome_id) {
+        ids.add(item.id);
+      }
+    }
+    return ids.size;
+  }, [evidence]);
 
   const avgOpportunity = useMemo(() => {
     if (!outcomes.length) return 0;
@@ -56,6 +80,14 @@ export function OpportunityLandscape() {
       (a, b) => (b.opportunity_score ?? -Infinity) - (a.opportunity_score ?? -Infinity),
     );
   }, [filteredOutcomes]);
+
+  function toggleOutcome(id: string) {
+    const next = selectedOutcomeId === id ? null : id;
+    setSelectedOutcomeId(next);
+    if (next) {
+      focusSubject("outcome", next);
+    }
+  }
 
   const activeOutcome = useMemo(() => {
     if (selectedOutcomeId) {
@@ -158,6 +190,11 @@ export function OpportunityLandscape() {
             <div className="studio-metric__label">Avg Opportunity Score</div>
             <div className="studio-metric__value">{avgOpportunity}</div>
           </div>
+          <div className="studio-metric">
+            <div className="studio-metric__label">Unique Customer Quotes</div>
+            <div className="studio-metric__value">{linkedQuotes}</div>
+            <div className="studio-metric__delta">Deduplicated demand</div>
+          </div>
         </div>
       )}
 
@@ -216,7 +253,7 @@ export function OpportunityLandscape() {
         <OpportunityMatrixView
           outcomes={filteredOutcomes}
           selectedOutcomeId={selectedOutcomeId}
-          onSelectOutcome={(id) => setSelectedOutcomeId(selectedOutcomeId === id ? null : id)}
+          onSelectOutcome={toggleOutcome}
           onHoverOutcome={setHoveredOutcome}
           activeOutcome={activeOutcome}
           sample={sample}
@@ -225,7 +262,7 @@ export function OpportunityLandscape() {
         <OpportunityTableView
           outcomes={sortedOutcomes}
           selectedOutcomeId={selectedOutcomeId}
-          onSelectOutcome={(id) => setSelectedOutcomeId(selectedOutcomeId === id ? null : id)}
+          onSelectOutcome={toggleOutcome}
         />
       ) : sortedOutcomes.length ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
