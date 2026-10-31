@@ -26,6 +26,7 @@ it is merged; the link is the proof.
 - [x] **Tool spec validation on MCP startup** — the server refuses to serve a malformed registry ([PR #288](https://github.com/alehar9320/agentic-odi/pull/288)).
 - [x] **Keyboard navigation for the feed and job map** — phase cards, step rows, and both dialogs are operable without a mouse ([PR #297](https://github.com/alehar9320/agentic-odi/pull/297)).
 - [x] **`odi data export`** — back the ODI state up as JSON ([PR #293](https://github.com/alehar9320/agentic-odi/pull/293)).
+- [x] **Agent autopilot** — `odi orchestrate` queues work, runs OpenHands Cloud conversations under a deterministic policy, and reports terminal outcomes as signals ([PR #363](https://github.com/alehar9320/agentic-odi/pull/363)).
 
 ## In flight
 
