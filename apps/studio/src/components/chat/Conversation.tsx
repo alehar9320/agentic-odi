@@ -7,6 +7,8 @@
  * added in exactly two files.
  */
 
+import { useMemo } from "react";
+
 import {
   ActionBarPrimitive,
   AuiIf,
@@ -18,9 +20,10 @@ import {
 } from "@assistant-ui/react";
 
 import { formatFileSize, preparedAttachmentById } from "../../assistant/attachments";
-import { SURFACE_PART } from "../../assistant/convert";
+import { CLAIMS_PART, SURFACE_PART } from "../../assistant/convert";
 import {
   AssistantAvatar,
+  ClaimsPart,
   FilePart,
   ReasoningPart,
   SourcePart,
@@ -77,7 +80,7 @@ function AssistantMessage() {
             Reasoning: ReasoningPart,
             Source: SourcePart,
             File: FilePart,
-            data: { by_name: { [SURFACE_PART]: SurfacePart } },
+            data: { by_name: { [SURFACE_PART]: SurfacePart, [CLAIMS_PART]: ClaimsPart } },
             tools: { Fallback: ToolPart },
           }}
         />
@@ -221,7 +224,23 @@ function EditComposer() {
 }
 
 export function Conversation() {
-  const { sendMessage, streaming, thinkingPhase } = useStudio();
+  const { sendMessage, streaming, thinkingPhase, messages } = useStudio();
+
+  // Only the newest reply is announcement-worthy. Keeping it out of the log
+  // means a reader can move through history without every delta replaying it.
+  const latestReply = useMemo(() => {
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+      const message = messages[index];
+      if (message.role !== "assistant") {
+        continue;
+      }
+      const prose = (message.parts ?? [])
+        .flatMap((part) => (part.kind === "text" ? [part.text] : []))
+        .join(" ");
+      return prose || message.content;
+    }
+    return "";
+  }, [messages]);
 
   return (
     <UiActionContext.Provider
@@ -229,11 +248,12 @@ export function Conversation() {
     >
       {/* The phase lives outside the log: the streaming reply is `aria-busy`,
           and a status message inside it would not be announced until the
-          answer finished — the one moment it is no longer useful. */}
-      <p className="sr-only" role="status" aria-live="polite">
-        {streaming ? phaseLabel(thinkingPhase) : ""}
+          answer finished — the one moment it is no longer useful. The region
+          holds the newest reply while it streams, then settles on it. */}
+      <p className="sr-only" role="status" aria-live="polite" aria-busy={streaming}>
+        {streaming ? phaseLabel(thinkingPhase) : latestReply}
       </p>
-      <div className="conversation" role="log" aria-live="polite" aria-label="Conversation">
+      <div className="conversation" role="log" aria-label="Conversation">
         <ThreadPrimitive.Messages
           components={{
             UserMessage,

@@ -109,6 +109,7 @@ export function CommandPalette({
             key={command.id}
             type="button"
             role="option"
+            id={`${id}-option-${index}`}
             aria-selected={index === activeIndex}
             className={`palette__item${index === activeIndex ? " is-active" : ""}`}
             onMouseEnter={() => onHover(index)}

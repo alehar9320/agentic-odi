@@ -429,7 +429,7 @@ def test_concurrent_writers_both_land_even_when_the_lock_is_contended(tmp_path):
         try:
             start.wait()
             for attempt in range(10):
-                repo.add_job(Job(id=f"j{index}-{attempt}", name=f"Job {index}.{attempt}"))
+                repo.add_job(Job(id=f"j{index}-{attempt}", name=f"Job {index}-{attempt}"))
         except BaseException as error:  # noqa: BLE001 - the assertion reports it
             failures.append(error)
 
