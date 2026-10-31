@@ -425,3 +425,41 @@ class PromoteEvidenceRequest(BaseModel):
     importance: float | None = None
     satisfaction: float | None = None
     mcp_url: str = ""
+
+
+class V2MOMRequest(BaseModel):
+    vision: str = ""
+    values: list[str] = []
+    methods: list[str] = []
+    obstacles: list[str] = []
+    measures: list[str] = []
+
+
+class ThesisRequest(BaseModel):
+    outcome_id: str
+    job_id: str
+    statement: str
+    rationale: str = ""
+    importance: float = 5.0
+    satisfaction: float = 5.0
+
+
+class ThesisResponse(BaseModel):
+    id: str
+    outcome_id: str
+    job_id: str
+    statement: str
+    rationale: str
+    importance: float
+    satisfaction: float
+    opportunity_score: float
+    created_at: str
+    updated_at: str
+
+
+class V2MOMResponse(BaseModel):
+    vision: str
+    values: list[str]
+    methods: list[str]
+    obstacles: list[str]
+    measures: list[str]

@@ -170,6 +170,34 @@ class Observation:
         }
 
 
+@dataclass
+class Thesis:
+    id: str
+    outcome_id: str
+    job_id: str
+    statement: str
+    rationale: str = ""
+    importance: float = 5.0
+    satisfaction: float = 5.0
+    opportunity_score: float = 5.0
+    created_at: str = ""
+    updated_at: str = ""
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "outcome_id": self.outcome_id,
+            "job_id": self.job_id,
+            "statement": self.statement,
+            "rationale": self.rationale,
+            "importance": self.importance,
+            "satisfaction": self.satisfaction,
+            "opportunity_score": self.opportunity_score,
+            "created_at": self.created_at,
+            "updated_at": self.updated_at,
+        }
+
+
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS conversations (
     id TEXT PRIMARY KEY,
@@ -214,6 +242,21 @@ CREATE TABLE IF NOT EXISTS observations (
     updated_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS theses (
+    id TEXT PRIMARY KEY,
+    outcome_id TEXT,
+    job_id TEXT,
+    statement TEXT NOT NULL,
+    rationale TEXT NOT NULL DEFAULT '',
+    importance REAL NOT NULL DEFAULT 5.0,
+    satisfaction REAL NOT NULL DEFAULT 5.0,
+    opportunity_score REAL NOT NULL DEFAULT 5.0,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS theses_by_outcome ON theses(outcome_id);
+CREATE INDEX IF NOT EXISTS theses_by_job ON theses(job_id);
 CREATE INDEX IF NOT EXISTS observations_by_status ON observations(status);
 """
 
@@ -623,11 +666,81 @@ class StudioMemory:
             if cursor.rowcount == 0:
                 raise ObservationNotFoundError(observation_id)
 
+    def list_theses(self) -> list[Thesis]:
+        with self._lock:
+            rows = self._connection.execute(
+                "SELECT * FROM theses ORDER BY created_at DESC"
+            ).fetchall()
+        return [self._thesis_from_row(row) for row in rows]
+
+    def add_thesis(
+        self,
+        outcome_id: str,
+        job_id: str,
+        statement: str,
+        rationale: str = "",
+        importance: float = 5.0,
+        satisfaction: float = 5.0,
+    ) -> Thesis:
+        import json
+
+        now = _now()
+        # Look up the outcome to get its current score
+        outcome_score = 5.0
+        with self._lock:
+            row = self._connection.execute(
+                "SELECT * FROM outcomes WHERE id = ?", (outcome_id,)
+            ).fetchone()
+            if row is None:
+                raise ValueError(f"Outcome {outcome_id} not found")
+            outcome_score = row["opportunity_score"] if row["opportunity_score"] else 5.0
+
+        thesis = Thesis(
+            id=uuid.uuid4().hex,
+            outcome_id=outcome_id,
+            job_id=job_id,
+            statement=statement[:2000],
+            rationale=rationale[:1000],
+            importance=max(1.0, min(10.0, float(importance))),
+            satisfaction=max(1.0, min(10.0, float(satisfaction))),
+            opportunity_score=float(outcome_score),
+            created_at=now,
+            updated_at=now,
+        )
+        with self._lock, self._connection:
+            self._connection.execute(
+                "INSERT INTO theses "
+                "(id, outcome_id, job_id, statement, rationale, importance, satisfaction, opportunity_score, created_at, updated_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    thesis.id,
+                    thesis.outcome_id,
+                    thesis.job_id,
+                    thesis.statement,
+                    thesis.rationale,
+                    thesis.importance,
+                    thesis.satisfaction,
+                    thesis.opportunity_score,
+                    thesis.created_at,
+                    thesis.updated_at,
+                ),
+            )
+        return thesis
+
+    def delete_thesis(self, thesis_id: str) -> None:
+        with self._lock, self._connection:
+            cursor = self._connection.execute(
+                "DELETE FROM theses WHERE id = ?", (thesis_id,)
+            )
+            if cursor.rowcount == 0:
+                raise MemoryError(f"Thesis {thesis_id} not found")
+
     def clear_memory(self) -> None:
         with self._lock, self._connection:
             self._connection.execute("DELETE FROM turn_citations")
             self._connection.execute("DELETE FROM turns")
             self._connection.execute("DELETE FROM observations")
+            self._connection.execute("DELETE FROM theses")
             self._connection.execute("DELETE FROM conversations")
 
     # -- prompt context ----------------------------------------------------
@@ -722,6 +835,20 @@ class StudioMemory:
             updated_at=row["updated_at"],
         )
 
+    def _thesis_from_row(row: sqlite3.Row) -> Thesis:
+        return Thesis(
+            id=row["id"],
+            outcome_id=row["outcome_id"],
+            job_id=row["job_id"],
+            statement=row["statement"],
+            rationale=row["rationale"],
+            importance=row["importance"],
+            satisfaction=row["satisfaction"],
+            opportunity_score=row["opportunity_score"],
+            created_at=row["created_at"],
+            updated_at=row["updated_at"],
+        )
+
 
 __all__ = [
     "MAX_CONTEXT_CHARS",
@@ -734,6 +861,7 @@ __all__ = [
     "Observation",
     "ObservationNotFoundError",
     "StudioMemory",
+    "Thesis",
     "Turn",
     "TurnCitation",
     "default_db_path",

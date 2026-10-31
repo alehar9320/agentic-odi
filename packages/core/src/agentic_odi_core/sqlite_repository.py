@@ -84,6 +84,7 @@ class SQLiteRepository(Repository):
         self.scheduled_work: dict[str, ScheduledWork] = {}
         self.segments: dict[str, Segment] = {}
         self.strategies: dict[str, Strategy] = {}
+        self.v2mom: dict[str, V2MOM] = {}
         self._last_event_id = 0
         for ev in self.store.get_stream(workspace_id=self._workspace_id, replay_order=True):
             self._apply_event(ev)
@@ -227,6 +228,8 @@ class SQLiteRepository(Repository):
             self.strategies[p["id"]] = Strategy.model_validate(p)
         elif et == "STRATEGY_UPDATED":
             self._merge_updates(self.strategies, p, Strategy)
+        elif et == "V2MOM_SAVED":
+            self.v2mom[p["id"]] = V2MOM.model_validate(p)
         self._last_event_id = max(self._last_event_id, ev["id"])
 
     @staticmethod
@@ -786,10 +789,27 @@ class SQLiteRepository(Repository):
             self._sync()
             return new_strategy
 
+    def add_v2mom(self, v2mom: V2MOM) -> V2MOM:
+        with self._lock:
+            self.store.append(
+                "V2MOM_SAVED",
+                v2mom.model_dump(mode="json"),
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return v2mom
+
+    def get_v2mom(self) -> V2MOM | None:
+        with self._lock:
+            self._sync()
+            return next(iter(self.v2mom.values()), None)
+
     def clear(self) -> None:
         with self._lock:
             self.store.clear()
             self._checkpoint("PASSIVE")
+            self.v2mom.clear()
             self._load_snapshot()
 
     def reload(self) -> None:
