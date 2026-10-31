@@ -54,6 +54,13 @@ ALLOWED_EXTERNAL_PREFIXES = (
     "https://playwright.dev",
     "https://freebuff.com",
     "https://pi.dev",
+    # The agent vendors whose docs the assignment guide cites as sources.
+    "https://docs.openhands.dev",
+    "https://kiro.dev",
+    "https://kilo.ai",
+    "https://docs.qoder.com",
+    "https://docs.github.com",
+    "https://www.theverge.com",
     # A placeholder in the connector documentation. It is not routable, and
     # it is shown as an example of what a connector URL looks like.
     "https://mcp.internal.example",
@@ -90,6 +97,7 @@ EMOJI = re.compile("[\u2600-\u27bf\U0001f300-\U0001faff]")
 # The pages rendered verbatim from the repository's guides. Their prose is
 # the maintainers', so the site's own copy rules do not apply to them.
 MIRRORED_GUIDES = {
+    "docs/agents/index.html",
     "docs/architecture/index.html",
     "docs/cli/index.html",
     "docs/connectors/index.html",
