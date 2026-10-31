@@ -502,3 +502,99 @@ def render_strategy(strategy: Any, *, as_json: bool) -> str:
         lines.append("")
         lines.append("No rejected paths recorded — this is a conclusion, not a recommendation.")
     return "\n".join(lines)
+
+
+def _score(value: Any) -> str:
+    """A missing score is rendered as an em dash, never as zero."""
+    return "—" if value is None else _num(value)
+
+
+def render_study_list(studies: Any, *, as_json: bool) -> str:
+    """Render study waves with their lineage and wave number."""
+    if not isinstance(studies, list):
+        return _json(studies) if as_json else str(studies)
+    if as_json:
+        return _json(studies)
+    return _table(
+        ("id", "name", "job_id", "wave", "status", "statements"),
+        [
+            (
+                _cell(item, "id"),
+                _truncate(_cell(item, "name")),
+                _cell(item, "job_id"),
+                _cell(item, "wave"),
+                _cell(item, "status"),
+                str(len((item.get("frame") or {}).get("outcome_statements") or [])),
+            )
+            for item in studies
+        ],
+        empty="No studies yet — run `odi studies open` to start wave 1.",
+    )
+
+
+def render_study(study: Any, *, as_json: bool) -> str:
+    """Render one wave, naming its frame without inventing measurements."""
+    if not isinstance(study, dict):
+        return _json(study) if as_json else str(study)
+    if as_json:
+        return _json(study)
+    frame = study.get("frame") or {}
+    guide = frame.get("guide") or {}
+    return "\n".join(
+        [
+            _block(
+                [
+                    ("id", _cell(study, "id")),
+                    ("name", _cell(study, "name")),
+                    ("job", _cell(study, "job_id")),
+                    ("wave", _cell(study, "wave")),
+                    ("status", _cell(study, "status")),
+                    ("guide", guide.get("name") or "—"),
+                    ("guide version", guide.get("version") or "—"),
+                    ("statements", str(len(frame.get("outcome_statements") or []))),
+                    ("themes", str(len(frame.get("themes") or []))),
+                ]
+            ),
+        ]
+    )
+
+
+def render_wave_comparison(comparison: Any, *, as_json: bool) -> str:
+    """Render two waves side by side, statement by statement.
+
+    An absent score prints as an em dash, never ``0``: the point of the
+    comparison is to tell a statement that was not measured apart from one that
+    scored nothing.
+    """
+    if not isinstance(comparison, dict):
+        return _json(comparison) if as_json else str(comparison)
+    if as_json:
+        return _json(comparison)
+    rows: list[tuple[str, ...]] = [
+        (
+            _truncate(_cell(item, "statement")),
+            _score(item.get("score_a")),
+            _score(item.get("score_b")),
+            _score(item.get("delta")),
+            f"{item.get('n_a', 0)}/{item.get('n_b', 0)}",
+            _cell(item, "status"),
+        )
+        for item in comparison.get("per_outcome") or []
+    ]
+    lines = [
+        f"Wave A: {_cell(comparison, 'study_a')}",
+        f"Wave B: {_cell(comparison, 'study_b')}",
+        "",
+        _table(
+            ("statement", "wave a", "wave b", "delta", "n a/b", "status"),
+            rows,
+            empty="No statements measured in either wave.",
+        ),
+    ]
+    for label, key in (("Added", "added"), ("Dropped", "dropped"), ("Stable", "stable")):
+        items = comparison.get(key) or []
+        if items:
+            lines.append("")
+            lines.append(f"{label}:")
+            lines.extend(f"- {statement}" for statement in items)
+    return "\n".join(lines)

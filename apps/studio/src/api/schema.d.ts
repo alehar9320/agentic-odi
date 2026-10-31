@@ -55,6 +55,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/diagnostics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Diagnostics
+         * @description Return diagnostic metadata only; never return database paths or records.
+         */
+        get: operations["get_diagnostics_api_diagnostics_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/changelog": {
         parameters: {
             query?: never;
@@ -492,6 +512,75 @@ export interface paths {
          *     path has support: the tool refuses rather than inventing a bet.
          */
         post: operations["post_strategy_propose_api_strategy_propose_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/studies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Studies
+         * @description The study waves, grouped by lineage and wave number.
+         *
+         *     Empty until a study is opened: a wave is opened, never invented.
+         */
+        get: operations["get_studies_api_studies_get"];
+        put?: never;
+        /**
+         * Post Study
+         * @description Open wave 1 of a study, with the frame it will measure against.
+         */
+        post: operations["post_study_api_studies_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/studies/{study_id}/next-wave": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Next Wave
+         * @description Open the next wave: same frame by value, no measurements carried over.
+         */
+        post: operations["post_next_wave_api_studies__study_id__next_wave_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/studies/{study_a}/compare/{study_b}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Compare Waves
+         * @description Compare two waves of one job, statement by statement.
+         *
+         *     A statement measured in only one wave is reported added or dropped, and its
+         *     absent score stays ``null`` — never ``0``.
+         */
+        get: operations["get_compare_waves_api_studies__study_a__compare__study_b__get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -944,6 +1033,8 @@ export interface components {
             importance: number;
             /** Satisfaction */
             satisfaction: number;
+            /** Study Id */
+            study_id?: string | null;
         };
         /** AddStepRequest */
         AddStepRequest: {
@@ -1090,6 +1181,40 @@ export interface components {
             approvals: boolean;
             /** Assistant Id */
             assistant_id?: string | null;
+        };
+        /**
+         * ClaimCitationOut
+         * @description The record label a claim carries, snapshotted when the turn was stored.
+         */
+        ClaimCitationOut: {
+            /** Id */
+            id: string;
+            /**
+             * Name
+             * @default
+             */
+            name: string;
+            /**
+             * Source Name
+             * @default
+             */
+            source_name: string;
+        };
+        /**
+         * ClaimOut
+         * @description One declarative sentence and what stands behind it.
+         */
+        ClaimOut: {
+            /** Index */
+            index: number;
+            /** Text */
+            text: string;
+            /** Status */
+            status: string;
+            /** Evidence */
+            evidence?: components["schemas"]["ClaimCitationOut"][];
+            /** Reason */
+            reason?: string | null;
         };
         /** ConnectorListItem */
         ConnectorListItem: {
@@ -1429,6 +1554,32 @@ export interface components {
             confidence?: number | null;
         };
         /**
+         * OpenStudyRequest
+         * @description Body for ``POST /api/studies``.
+         *
+         *     ``guide``, ``outcome_statements`` and ``themes`` are the frame: copied by
+         *     value onto wave 1, so the wave is reproducible without the job-level record.
+         */
+        OpenStudyRequest: {
+            /** Job Id */
+            job_id: string;
+            /** Name */
+            name: string;
+            /** Guide */
+            guide?: {
+                [key: string]: unknown;
+            } | null;
+            /** Outcome Statements */
+            outcome_statements?: string[];
+            /** Themes */
+            themes?: string[];
+            /**
+             * Mcp Url
+             * @default
+             */
+            mcp_url: string;
+        };
+        /**
          * PromoteEvidenceRequest
          * @description Turn a captured record into a Job or a Desired Outcome.
          */
@@ -1557,6 +1708,8 @@ export interface components {
             message_id?: string | null;
             /** Parent Id */
             parent_id?: string | null;
+            /** Claims */
+            claims?: components["schemas"]["ClaimOut"][];
         };
         /**
          * TurnNode
@@ -1573,6 +1726,8 @@ export interface components {
             content: string;
             /** Created At */
             created_at: string;
+            /** Claims */
+            claims?: components["schemas"]["ClaimOut"][];
         };
         /**
          * UiCatalogRequest
@@ -1750,6 +1905,28 @@ export interface operations {
         };
     };
     get_config_api_config_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    get_diagnostics_api_diagnostics_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -2813,6 +2990,146 @@ export interface operations {
                 "application/json": components["schemas"]["ProposeStrategyRequest"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_studies_api_studies_get: {
+        parameters: {
+            query?: {
+                job_id?: string | null;
+                mcp_url?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    }[];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_study_api_studies_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OpenStudyRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_next_wave_api_studies__study_id__next_wave_post: {
+        parameters: {
+            query?: {
+                mcp_url?: string | null;
+            };
+            header?: never;
+            path: {
+                study_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_compare_waves_api_studies__study_a__compare__study_b__get: {
+        parameters: {
+            query?: {
+                mcp_url?: string | null;
+            };
+            header?: never;
+            path: {
+                study_a: string;
+                study_b: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {

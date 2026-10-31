@@ -142,6 +142,7 @@ only when you intentionally need to stage a map before capturing outcomes.
 
 # Desired Outcomes
 agentic-odi desired-outcomes add --job-id <job-id> --statement "Minimize the time it takes to get a working environment" --importance 8 --satisfaction 4
+agentic-odi desired-outcomes add --job-id <job-id> --statement "Minimize the time it takes to harvest" --importance 8 --satisfaction 4 --study-id <wave-id>
 agentic-odi desired-outcomes list --job-id <job-id>
 agentic-odi desired-outcomes get <outcome-id>
 agentic-odi desired-outcomes update <outcome-id> --satisfaction 6
@@ -266,6 +267,39 @@ agentic-odi strategy show --json
 When no path has evidence, `strategy propose` exits non-zero and says what is
 missing rather than inventing a bet. Until one exists, `strategy show` prints
 "No strategy recorded" and points at `strategy propose`.
+
+## Studies and waves (M2-05)
+
+A study measures one job at one point in time. The frame — the interview guide,
+the outcome statements, the themes — carries between waves; the measurements do
+not, because a wave starts unmeasured. `studies next` clones the frame by value,
+so editing the new wave cannot change the one it came from.
+
+```bash
+agentic-odi studies open --job <job-id> --name "Corn growers, quarterly pulse"
+agentic-odi studies open --job <job-id> --name "Autumn pulse" --guide-name "Core interview" \
+  --question "Walk me through harvest" --statement "Minimize the time it takes to harvest" \
+  --theme yield
+agentic-odi studies list
+agentic-odi studies list --job <job-id> --json
+agentic-odi studies show <study-id>
+agentic-odi studies next <study-id>
+```
+
+`studies compare` reports, per statement, what moved, what was added, and what
+dropped. Matching is by statement, not by outcome id, so an outcome re-created in
+the second wave still lines up with its twin in the first. A statement measured
+in only one wave is reported `added` or `dropped`, and its absent score prints as
+an em dash — never as `0`, because a wave that was not measured is not a wave
+that scored nothing.
+
+```bash
+agentic-odi studies compare <wave-a-id> <wave-b-id>
+agentic-odi studies compare <wave-a-id> <wave-b-id> --json
+```
+
+Comparing two waves from different jobs is refused by id: the difference would
+be meaningless rather than merely wrong.
 
 ## Schema, scoring, and guidance
 

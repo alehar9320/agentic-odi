@@ -7,6 +7,7 @@ import {
   addStep,
   checkConnectorHealth,
   clearMemory,
+  compareWaves,
   createConversation,
   deleteConnector,
   deleteObservation,
@@ -14,8 +15,11 @@ import {
   fetchLatestConversation,
   fetchMemory,
   fetchSignals,
+  fetchStudies,
   fetchUnreadSignalCount,
   markSignalRead,
+  nextWave,
+  openStudy,
   updateObservation,
   fetchCanvas,
   fetchChangelog,
@@ -551,3 +555,70 @@ describe("signal inbox", () => {
     expect(JSON.parse(calls[0]!.body)).toEqual({ mcp_url: "http://mcp" });
   });
 });
+
+describe("studies and waves", () => {
+  function mockStore(body: unknown): { url: string; method: string; body: string }[] {
+    const calls: { url: string; method: string; body: string }[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        calls.push({
+          url: String(input),
+          method: init?.method ?? "GET",
+          body: String(init?.body ?? ""),
+        });
+        return new Response(JSON.stringify(body), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }),
+    );
+    return calls;
+  }
+
+  it("lists waves for one job by store", async () => {
+    const calls = mockStore([]);
+
+    await expect(fetchStudies("http://mcp", "JOB-1")).resolves.toEqual([]);
+
+    expect(calls[0]?.url).toBe("/api/studies?mcp_url=http%3A%2F%2Fmcp&job_id=JOB-1");
+  });
+
+  it("opens wave 1 with the frame it will measure against", async () => {
+    const calls = mockStore({ id: "S-1", wave: 1 });
+
+    await expect(
+      openStudy({
+        mcp_url: "http://mcp",
+        job_id: "JOB-1",
+        name: "Autumn pulse",
+        outcome_statements: ["Minimize time"],
+      }),
+    ).resolves.toMatchObject({ id: "S-1" });
+
+    expect(calls[0]?.url).toBe("/api/studies");
+    expect(JSON.parse(calls[0]!.body)).toMatchObject({
+      mcp_url: "http://mcp",
+      job_id: "JOB-1",
+      name: "Autumn pulse",
+    });
+  });
+
+  it("opens the next wave from a study id", async () => {
+    const calls = mockStore({ id: "S-2", wave: 2 });
+
+    await nextWave("S-1", "http://mcp");
+
+    expect(calls[0]?.url).toBe("/api/studies/S-1/next-wave?mcp_url=http%3A%2F%2Fmcp");
+    expect(calls[0]?.method).toBe("POST");
+  });
+
+  it("compares two waves by store", async () => {
+    const calls = mockStore({ per_outcome: [], added: [], dropped: [], stable: [] });
+
+    await compareWaves("S-1", "S-2", "http://mcp");
+
+    expect(calls[0]?.url).toBe("/api/studies/S-1/compare/S-2?mcp_url=http%3A%2F%2Fmcp");
+  });
+});
+

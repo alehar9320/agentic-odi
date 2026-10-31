@@ -371,3 +371,139 @@ def test_get_outcomes_on_mcp_requires_a_job(monkeypatch) -> None:
     response = _client().get("/api/outcomes", params={"mcp_url": "http://mcp"})
 
     assert response.status_code == 400
+
+
+_STUDY_STATEMENT = "Minimize the time it takes to harvest the field when the weather turns"
+
+
+def _open_study(client: TestClient, job_id: str) -> dict:
+    created = client.post(
+        "/api/studies",
+        json={
+            "job_id": job_id,
+            "name": "Corn growers, quarterly pulse",
+            "guide": {"name": "Core interview", "version": "1", "questions": ["Walk me through"]},
+            "outcome_statements": [_STUDY_STATEMENT],
+            "themes": ["yield"],
+        },
+    )
+    assert created.status_code == 200, created.text
+    return created.json()
+
+
+def test_open_study_returns_wave_one_unmeasured() -> None:
+    client = _client("local")
+    job = client.post("/api/jobs", json={"name": "Corn growers"}).json()
+
+    wave = _open_study(client, job["id"])
+
+    assert wave["wave"] == 1
+    assert wave["lineage_id"] == wave["id"]
+    assert wave["frame"]["outcome_statements"] == [_STUDY_STATEMENT]
+    assert client.get("/api/studies", params={"job_id": job["id"]}).json() == [wave]
+
+
+def test_next_wave_copies_the_frame_and_carries_no_measurement() -> None:
+    client = _client("local")
+    job = client.post("/api/jobs", json={"name": "Corn growers"}).json()
+    wave_one = _open_study(client, job["id"])
+    client.post(
+        "/api/outcomes",
+        json={
+            "mcp_url": "",
+            "job_id": job["id"],
+            "statement": _STUDY_STATEMENT,
+            "importance": 8.0,
+            "satisfaction": 4.0,
+            "study_id": wave_one["id"],
+        },
+    )
+
+    created = client.post(f"/api/studies/{wave_one['id']}/next-wave", params={"mcp_url": ""})
+
+    assert created.status_code == 200, created.text
+    wave_two = created.json()
+    assert wave_two["wave"] == 2
+    assert wave_two["lineage_id"] == wave_one["lineage_id"]
+    assert wave_two["frame"] == wave_one["frame"]
+    measured = client.get("/api/outcomes", params={"job_id": job["id"]}).json()["result"]
+    assert [item["study_id"] for item in measured] == [wave_one["id"]]
+
+
+def test_compare_waves_reports_added_with_a_null_score() -> None:
+    client = _client("local")
+    job = client.post("/api/jobs", json={"name": "Corn growers"}).json()
+    wave_one = _open_study(client, job["id"])
+    wave_two = client.post(
+        f"/api/studies/{wave_one['id']}/next-wave", params={"mcp_url": ""}
+    ).json()
+    added = "Minimize the cost of the fuel burned while the tractor is idling"
+    client.post(
+        "/api/outcomes",
+        json={
+            "mcp_url": "",
+            "job_id": job["id"],
+            "statement": added,
+            "importance": 6.0,
+            "satisfaction": 3.0,
+            "study_id": wave_two["id"],
+        },
+    )
+
+    response = client.get(
+        f"/api/studies/{wave_one['id']}/compare/{wave_two['id']}", params={"mcp_url": ""}
+    )
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    item = next(row for row in body["per_outcome"] if row["statement"] == added)
+    assert item["status"] == "added"
+    assert item["score_a"] is None
+    assert item["delta"] is None
+    assert body["added"] == [added]
+
+
+def test_compare_waves_refuses_different_jobs() -> None:
+    client = _client("local")
+    first = client.post("/api/jobs", json={"name": "Corn growers"}).json()
+    second = client.post("/api/jobs", json={"name": "Wheat growers"}).json()
+    wave_one = _open_study(client, first["id"])
+    wave_other = _open_study(client, second["id"])
+
+    response = client.get(
+        f"/api/studies/{wave_one['id']}/compare/{wave_other['id']}", params={"mcp_url": ""}
+    )
+
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "validation"
+
+
+def test_open_study_on_mcp_returns_the_parsed_payload(monkeypatch) -> None:
+    calls: list[tuple[str, str, dict]] = []
+
+    async def _call(mcp_url: str, tool: str, arguments: dict) -> str:
+        calls.append((mcp_url, tool, arguments))
+        return '{"id": "study-1", "wave": 1}'
+
+    monkeypatch.setattr(router_module, "call_mcp_tool", _call)
+
+    response = _client().post(
+        "/api/studies",
+        json={"mcp_url": "http://mcp", "job_id": "job-1", "name": "Pulse"},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"id": "study-1", "wave": 1}
+    assert calls == [
+        (
+            "http://mcp",
+            "open_study",
+            {
+                "job_id": "job-1",
+                "name": "Pulse",
+                "guide": None,
+                "outcome_statements": [],
+                "themes": [],
+            },
+        )
+    ]

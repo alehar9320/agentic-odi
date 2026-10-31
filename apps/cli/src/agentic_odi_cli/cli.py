@@ -30,6 +30,7 @@ from agentic_odi_cli.settings import settings_app
 from agentic_odi_cli.signals import signals_app
 from agentic_odi_cli.steps import steps_app
 from agentic_odi_cli.strategy import strategy_app
+from agentic_odi_cli.studies import studies_app
 from agentic_odi_cli.version import __version__  # noqa: F401  (re-exported for tests)
 
 app = typer.Typer(
@@ -60,6 +61,11 @@ app.add_typer(
     strategy_app,
     name="strategy",
     help="Stage 6: the innovation path the segments support, with the paths it beat.",
+)
+app.add_typer(
+    studies_app,
+    name="studies",
+    help="Studies and the waves inside them: measure the same job again, then compare.",
 )
 app.add_typer(
     customer_outcomes_app,

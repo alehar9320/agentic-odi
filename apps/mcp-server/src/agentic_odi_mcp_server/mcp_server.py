@@ -26,6 +26,8 @@ from agentic_odi_core import (
     ScheduledWorkNotFoundError,
     SignalNotFoundError,
     StepNotFoundError,
+    StudyJobMismatchError,
+    StudyNotFoundError,
     ToolName,
     ValueOutOfRangeError,
     build_repository,
@@ -80,6 +82,7 @@ evidence_db = _repo.evidence
 signals_db = _repo.signals
 segments_db = _repo.segments
 strategies_db = _repo.strategies
+studies_db = _repo.studies
 
 
 def _step_not_found(step_id: str | None) -> str:
@@ -168,6 +171,7 @@ def add_outcome(
     importance: float,
     satisfaction: float,
     step_id: str | None = None,
+    study_id: str | None = None,
 ) -> str:
     try:
         outcome = service.add_outcome(
@@ -176,11 +180,14 @@ def add_outcome(
             importance=importance,
             satisfaction=satisfaction,
             step_id=step_id,
+            study_id=study_id,
         )
     except JobNotFoundError:
         return f"Error: Job with ID {job_id} not found."
     except StepNotFoundError:
         return _step_not_found(step_id)
+    except StudyNotFoundError:
+        return f"Error: Study with ID {study_id} not found."
     except ValueOutOfRangeError:
         return "Error: importance and satisfaction must be between 1.0 and 10.0"
     except OutcomeStatementError as exc:
@@ -721,6 +728,77 @@ def propose_strategy(job_id: str | None = None) -> str:
     except OdiError as exc:
         return f"Error: {invalid_strategy_request(str(exc))}"
     return json.dumps(strategy.model_dump(mode="json"))
+
+
+@mcp.tool
+def open_study(
+    job_id: str,
+    name: str,
+    guide: dict[str, Any] | None = None,
+    outcome_statements: list[str] | None = None,
+    themes: list[str] | None = None,
+) -> str:
+    """Open wave 1 of a study against a job (M2-05).
+
+    The frame — the interview guide, the outcome statements, the themes — is
+    copied by value onto the wave. Nothing is measured yet: a wave starts
+    unmeasured, and outcomes are added to it as the research happens.
+    """
+    try:
+        study = service.open_study(
+            job_id=job_id,
+            name=name,
+            guide=guide,
+            outcome_statements=outcome_statements,
+            themes=themes,
+        )
+    except JobNotFoundError:
+        return job_not_found(job_id)
+    return json.dumps(study.model_dump(mode="json"))
+
+
+@mcp.tool
+def get_studies(job_id: str | None = None) -> str:
+    """List the study waves, optionally scoped to one job.
+
+    Empty until ``open_study`` has run: a wave is opened, never invented.
+    """
+    studies = service.list_studies(job_id=job_id)
+    return json.dumps([study.model_dump(mode="json") for study in studies])
+
+
+@mcp.tool
+def next_wave(study_id: str) -> str:
+    """Clone a study's frame into a new, unmeasured wave (M2-05.2a).
+
+    The frame is copied by value, so editing the new wave cannot mutate its
+    source. Scores, interviews and sample sizes are deliberately not carried
+    over: a wave starts unmeasured, and copying last quarter's scores is the
+    one mistake that would make every comparison look flat.
+    """
+    try:
+        wave = service.next_wave(study_id)
+    except StudyNotFoundError:
+        return f"Error: Study with ID {study_id} not found."
+    return json.dumps(wave.model_dump(mode="json"))
+
+
+@mcp.tool
+def compare_waves(study_a: str, study_b: str) -> str:
+    """Compare two waves of one job, statement by statement (M2-05.2b).
+
+    Matching is by statement, not by outcome id or list position, so an outcome
+    re-created in the second wave still lines up with its twin in the first. A
+    statement measured in only one wave is reported ``added`` or ``dropped``,
+    and its absent score stays ``null`` — an absent measurement is not a zero.
+    """
+    try:
+        comparison = service.compare_waves(study_a, study_b)
+    except StudyNotFoundError as exc:
+        return f"Error: Study with ID {exc.study_id} not found."
+    except StudyJobMismatchError as exc:
+        return f"Error: {exc}"
+    return json.dumps(comparison.model_dump(mode="json"))
 
 
 DEFAULT_PORT = 8000

@@ -11,6 +11,7 @@ from agentic_odi_mcp_server.mcp_server import (
     signals_db,
     steps_db,
     strategies_db,
+    studies_db,
 )
 
 __all__ = [
@@ -24,4 +25,5 @@ __all__ = [
     "signals_db",
     "steps_db",
     "strategies_db",
+    "studies_db",
 ]

@@ -57,6 +57,10 @@ class ToolName(str, Enum):
     GET_SEGMENTS = "get_segments"
     GET_STRATEGY = "get_strategy"
     PROPOSE_STRATEGY = "propose_strategy"
+    OPEN_STUDY = "open_study"
+    GET_STUDIES = "get_studies"
+    NEXT_WAVE = "next_wave"
+    COMPARE_WAVES = "compare_waves"
 
 
 class ToolEffect(str, Enum):
@@ -186,7 +190,7 @@ TOOL_SPECS: dict[str, ToolSpec] = {
         name="add_outcome",
         summary="Add a desired Outcome to a Job.",
         effect=_derive_effect("add_outcome"),
-        arguments=("job_id", "statement", "importance", "satisfaction", "step_id"),
+        arguments=("job_id", "statement", "importance", "satisfaction", "step_id", "study_id"),
         required=("job_id", "statement", "importance", "satisfaction"),
         returns="The created Outcome.",
         stage="2",
@@ -491,6 +495,41 @@ TOOL_SPECS: dict[str, ToolSpec] = {
         arguments=("job_id",),
         returns="The Strategy, including every path it beat and why.",
         stage="6",
+    ),
+    ToolName.OPEN_STUDY.value: ToolSpec(
+        name="open_study",
+        summary="Open wave 1 of a study against a job, with its interview frame.",
+        effect=_derive_effect("open_study"),
+        arguments=("job_id", "name", "guide", "outcome_statements", "themes"),
+        required=("job_id", "name"),
+        returns="The new Study wave, unmeasured.",
+        stage=None,
+    ),
+    ToolName.GET_STUDIES.value: ToolSpec(
+        name="get_studies",
+        summary="List the study waves, optionally scoped to one job.",
+        effect=_derive_effect("get_studies"),
+        arguments=("job_id",),
+        returns="A list of Studies. Empty until open_study has run.",
+        stage=None,
+    ),
+    ToolName.NEXT_WAVE.value: ToolSpec(
+        name="next_wave",
+        summary="Clone a study's frame into a new, unmeasured wave.",
+        effect=_derive_effect("next_wave"),
+        arguments=("study_id",),
+        required=("study_id",),
+        returns="The new wave: same frame by value, no measurements carried over.",
+        stage=None,
+    ),
+    ToolName.COMPARE_WAVES.value: ToolSpec(
+        name="compare_waves",
+        summary="Compare two waves of one job, statement by statement.",
+        effect=_derive_effect("compare_waves"),
+        arguments=("study_a", "study_b"),
+        required=("study_a", "study_b"),
+        returns="Per-statement scores and deltas, plus added, dropped and stable statements.",
+        stage=None,
     ),
 }
 
