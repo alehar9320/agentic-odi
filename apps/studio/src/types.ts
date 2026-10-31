@@ -597,3 +597,24 @@ export interface ScheduledWork {
   last_run_at?: string | null;
   result_summary?: string | null;
 }
+
+export interface Thesis {
+  id: string;
+  outcome_id: string;
+  job_id: string;
+  statement: string;
+  rationale: string;
+  importance: number;
+  satisfaction: number;
+  opportunity_score: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface V2MOM {
+  vision: string;
+  values: string[];
+  methods: string[];
+  obstacles: string[];
+  measures: string[];
+}

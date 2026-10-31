@@ -57,6 +57,7 @@ import {
 import type { RawSseEvent } from "../api/sse";
 import { capabilityRegistry, type Capability } from "../bff/capabilities/registry";
 import { loadSession, saveSession, type StudioSession } from "../lib/session";
+import { parseRoute, routeToPath, type Route, withSearch } from "../lib/routes";
 import type {
   AddConnectorPayload,
   AddOutcomePayload,
@@ -219,6 +220,17 @@ const DISPLAY_NAME_KEY = "studio.displayName";
 const BRIEF_KEY = "studio.brief";
 const SIDECAR_NOTICE_DISMISSED_KEY = "studio.sidecarNoticeDismissed";
 const THESES_KEY = "studio.theses";
+
+/**
+ * The current browser path, honoring the file/protocol split: http(s) uses
+ * the pathname; anything else (Tauri's asset protocol) uses the hash.
+ */
+function currentPath(): string {
+  if (window.location.protocol === "http:" || window.location.protocol === "https:") {
+    return window.location.pathname;
+  }
+  return window.location.hash.replace(/^#/, "") || "/";
+}
 
 /** How often the studio re-probes the model and the MCP server. */
 const HEALTH_POLL_INTERVAL_MS = 30_000;
@@ -552,8 +564,21 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [mcpReachable, setMcpReachable] = useState(false);
   const [sidecarReachable, setSidecarReachable] = useState<boolean | null>(null);
   const [dismissedSidecarNotice, setDismissedSidecarNotice] = useState<boolean>(loadSidecarNoticeDismissed);
+
+  // The URL is the single source of truth for what is on screen. The route is
+  // parsed from the address bar on boot and updated on every navigation; the
+  // conversation, active panel, and customize-open state are derived from it.
+  const initialRoute = parseRoute(currentPath(), window.location.search);
+  const [currentRoute, setCurrentRoute] = useState<Route>(initialRoute);
+
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [conversationId, setConversationId] = useState<string | null>(
+    currentRoute.name === "thread" ||
+    currentRoute.name === "threadPanel" ||
+    currentRoute.name === "threadPanelSubject"
+      ? currentRoute.threadId
+      : null
+  );
   const [memory, setMemory] = useState<Observation[]>([]);
   const [memoryLoading, setMemoryLoading] = useState(false);
   const [streaming, setStreaming] = useState(false);
@@ -590,6 +615,68 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [theses, setTheses] = useState<Thesis[]>(loadTheses);
   const toastId = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
+
+  /**
+   * Navigate to a route: update the browser URL and the derived studio state
+   * (conversation, active panel, customize-open). `replace` controls whether
+   * the navigation pushes a new history entry or replaces the current one.
+   */
+  const navigateTo = useCallback(
+    (route: Route, replace = false) => {
+      const path = withSearch(routeToPath(route), route.search);
+      setCurrentRoute(route);
+
+      const threadId =
+        route.name === "thread" ||
+        route.name === "threadPanel" ||
+        route.name === "threadPanelSubject"
+          ? route.threadId
+          : null;
+      const panel =
+        route.name === "threadPanel" || route.name === "threadPanelSubject"
+          ? route.panel
+          : null;
+      const customize =
+        route.name === "customize" || route.name === "customizeListing";
+
+      setConversationId(threadId);
+      setActivePanel(panel);
+      setCustomizeOpen(customize);
+
+      if (replace) {
+        window.history.replaceState({}, "", path);
+      } else {
+        window.history.pushState({}, "", path);
+      }
+    },
+    []
+  );
+
+  /**
+   * Restore the route from the URL on boot: a non-home URL loads that thread
+   * through `fetchConversationTree`; "/" falls back to today's latest
+   * conversation behaviour. A popstate listener restores state on back/
+   * forward without starting any stream.
+   */
+  useEffect(() => {
+    function onPopState() {
+      const route = parseRoute(currentPath(), window.location.search);
+      setCurrentRoute(route);
+      setConversationId(
+        route.name === "thread" || route.name === "threadPanel" || route.name === "threadPanelSubject"
+          ? route.threadId
+          : null
+      );
+      setActivePanel(
+        route.name === "threadPanel" || route.name === "threadPanelSubject" ? route.panel : null
+      );
+      setCustomizeOpen(route.name === "customize" || route.name === "customizeListing");
+    }
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
+
+
 
   const signals = useMemo(
     () => [...serverSignals].sort((a, b) => (a.created_at < b.created_at ? 1 : -1)),
@@ -1138,16 +1225,25 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     },
     [settings.mcp_url, pushToast, refreshCanvas],
   );
-  const closePanel = useCallback(() => setActivePanel(null), []);
+  const closePanel = useCallback(() => {
+    setActivePanel(null);
+    if (conversationId) {
+      navigateTo({ name: "thread", threadId: conversationId }, false);
+    }
+  }, [conversationId, navigateTo]);
 
   const openPanel = useCallback(
     (panel: WorkspacePanelId) => {
       if (setupOpen) {
         closeSetup();
       }
-      setActivePanel(panel);
+      if (conversationId) {
+        navigateTo({ name: "threadPanel", threadId: conversationId, panel }, false);
+      } else {
+        setActivePanel(panel);
+      }
     },
-    [setupOpen, closeSetup],
+    [conversationId, navigateTo, setupOpen, closeSetup],
   );
 
   /**
@@ -1160,7 +1256,14 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       return;
     }
     saveSession(sessionForSubject(kind, id));
-  }, []);
+    const panel = PANEL_FOR_SUBJECT[kind];
+    if (conversationId && panel) {
+      navigateTo(
+        { name: "threadPanelSubject", threadId: conversationId, panel, subjectKind: kind, subjectId: id },
+        false
+      );
+    }
+  }, [conversationId, navigateTo]);
 
   /**
    * What a card does when activated: read the signal, then take the person to
@@ -1192,9 +1295,16 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const focusEvidence = useCallback(
     (evidenceId: string) => {
       setFocusedEvidenceId(evidenceId);
-      openPanel("evidence");
+      if (conversationId) {
+        navigateTo(
+          { name: "threadPanelSubject", threadId: conversationId, panel: "evidence", subjectKind: "evidence", subjectId: evidenceId },
+          false
+        );
+      } else {
+        openPanel("evidence");
+      }
     },
-    [openPanel],
+    [conversationId, navigateTo, openPanel],
   );
 
   /** The job owning the focused subject, so canvas panels can select it. */
@@ -1808,11 +1918,12 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     setOfflineReply(false);
     setConversationId(null);
     void apiCreateConversation()
-      .then((conversation) =>
-        setConversationId((current) => current ?? conversation.id),
-      )
+      .then((conversation) => {
+        setConversationId((current) => current ?? conversation.id);
+        navigateTo({ name: "thread", threadId: conversation.id }, true);
+      })
       .catch(() => undefined);
-  }, []);
+  }, [navigateTo]);
 
   // Initial hydration: env defaults, canvas, health probes.
   useEffect(() => {
@@ -2037,6 +2148,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       refreshSegments,
       focusedEvidenceId,
       focusEvidence,
+      navigateTo,
     }),
     [
       settings,
@@ -2149,6 +2261,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       refreshSegments,
       focusedEvidenceId,
       focusEvidence,
+      navigateTo,
     ],
   );
 

@@ -17,6 +17,8 @@ from agentic_odi_core.models import (
     Signal,
     Step,
     Strategy,
+    V2MOM,
+    compute_opportunity_score,
 )
 
 _Item = TypeVar("_Item")
@@ -120,6 +122,7 @@ class Repository(Protocol):
     scheduled_work: dict[str, ScheduledWork]
     segments: dict[str, Segment]
     strategies: dict[str, Strategy]
+    v2mom: dict[str, V2MOM]
 
     def add_job(self, job: Job) -> Job: ...
     def list_jobs(self, limit: int | None = None, offset: int = 0) -> list[Job]: ...
@@ -197,6 +200,8 @@ class Repository(Protocol):
     def get_strategy(self, strategy_id: str) -> Strategy | None: ...
     def list_strategies(self, segment_id: str | None = None) -> list[Strategy]: ...
     def update_strategy(self, strategy_id: str, updates: dict) -> Strategy | None: ...
+    def add_v2mom(self, v2mom: V2MOM) -> V2MOM: ...
+    def get_v2mom(self) -> V2MOM | None: ...
 
     def clear(self) -> None: ...
     def reload(self) -> None: ...
@@ -216,6 +221,7 @@ class InMemoryRepository:
         self.scheduled_work: dict[str, ScheduledWork] = {}
         self.segments: dict[str, Segment] = {}
         self.strategies: dict[str, Strategy] = {}
+        self.v2mom: dict[str, V2MOM] = {}
 
     def add_job(self, job: Job) -> Job:
         self.jobs[job.id] = job
@@ -562,6 +568,13 @@ class InMemoryRepository:
         self.strategies[strategy_id] = new_strategy
         return new_strategy
 
+    def add_v2mom(self, v2mom: V2MOM) -> V2MOM:
+        self.v2mom[v2mom.id] = v2mom
+        return v2mom
+
+    def get_v2mom(self) -> V2MOM | None:
+        return next(iter(self.v2mom.values()), None)
+
     def clear(self) -> None:
         self.jobs.clear()
         self.scheduled_work.clear()
@@ -572,6 +585,7 @@ class InMemoryRepository:
         self.signals.clear()
         self.segments.clear()
         self.strategies.clear()
+        self.v2mom.clear()
 
     def reload(self) -> None:
         """Reset in-memory state; there is no external store to re-read."""

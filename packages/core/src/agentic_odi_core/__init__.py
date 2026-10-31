@@ -164,6 +164,7 @@ __all__ = [
     "SerializationError",
     "Step",
     "StepNotFoundError",
+    "StoreCorrupt",
     "StoreError",
     "Signal",
     "SignalBudget",

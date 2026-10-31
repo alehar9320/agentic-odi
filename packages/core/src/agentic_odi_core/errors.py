@@ -63,6 +63,19 @@ class StoreError(OdiError):
     """The persistence layer could not complete the operation."""
 
 
+class StoreCorrupt(StoreError):
+    """The SQLite store is damaged and cannot be safely read.
+
+    ``path`` names the damaged file. ``rows`` holds up to 20 rows of
+    ``PRAGMA integrity_check`` output describing the corruption.
+    """
+
+    def __init__(self, message: str, path: str, rows: list[str]) -> None:
+        self.path = path
+        self.rows = rows
+        super().__init__(f"{message} (store: {path})")
+
+
 class SerializationError(OdiError):
     """A payload could not be converted to or from its wire format."""
 
