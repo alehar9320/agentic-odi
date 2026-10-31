@@ -271,15 +271,25 @@ describe("studio shell", () => {
     expect(await screen.findByText(/handled here/i, { selector: "p" })).toBeInTheDocument();
   });
 
-  it("shows manual work when the model is offline", async () => {
+  it("carries a browser-only first visit without apologising for what it never needed", async () => {
+    // #309. No sidecar, no model: the studio answers from the device and says
+    // nothing about what is missing until the person asks or something breaks.
+    const { fetchConfig } = await import("./api/studioApi");
+    vi.mocked(fetchConfig).mockRejectedValueOnce(new Error("no sidecar"));
     vi.mocked(healthLlm).mockResolvedValueOnce({ healthy: false, message: "offline" });
     render(<App />);
 
-    expect(await screen.findByText(/working by hand/i)).toBeInTheDocument();
+    const composer = await screen.findByRole("textbox", { name: /message the studio/i });
     expect(
-      screen.getAllByRole("button", { name: /capture an outcome/i }).length,
-    ).toBeGreaterThan(0);
-    expect(screen.getByText("Local guidance")).toBeInTheDocument();
+      screen.getByRole("button", { name: /turn 40 interview notes into one bet/i }),
+    ).toBeInTheDocument();
+
+    fireEvent.change(composer, { target: { value: "Where do I start?" } });
+    fireEvent.click(screen.getByRole("button", { name: /send message/i }));
+    expect(await screen.findByText(/Start with the/)).toBeInTheDocument();
+
+    expect(screen.queryByText(/working by hand/i)).toBeNull();
+    expect(screen.queryByText(/sidecar isn.t running/i)).toBeNull();
   });
 
   it("stops a running stream on Escape before closing the workspace", async () => {

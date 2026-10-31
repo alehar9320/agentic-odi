@@ -53,7 +53,8 @@ function phaseLabel(phase: string | null): string {
 }
 
 function AssistantMessage() {
-  const { thinkingPhase, offlineReply, sendMessage } = useStudio();
+  const { thinkingPhase, offlineReplyFor, sendMessage, openPanel } = useStudio();
+  const id = useAuiState((state) => state.message.id);
   const running = useAuiState((state) => state.message.status?.type === "running");
   const copied = useAuiState((state) => state.message.isCopied);
   const hasText = useAuiState((state) =>
@@ -72,7 +73,17 @@ function AssistantMessage() {
     <article className="message message--assistant" aria-busy={running}>
       <AssistantAvatar />
       <div className="message__body">
-        {offlineReply ? <span className="message__tag">Local guidance</span> : null}
+        {/* Named on the reply it describes, never on every reply on screen, and
+            said once instead of warned about in a strip above the work. */}
+        {offlineReplyFor === id ? (
+          <button
+            type="button"
+            className="message__tag"
+            onClick={() => openPanel("settings")}
+          >
+            Local draft, no model connected
+          </button>
+        ) : null}
 
         <MessagePrimitive.Parts
           components={{

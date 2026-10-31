@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { conversationToMarkdown, downloadMarkdown, exportFilename } from "../../lib/export";
+import { isEndpointConfiguredForSettings } from "../../lib/modelEndpoint";
 import { useStudio } from "../../state/StudioContext";
 import { useUpdateSnapshot } from "../../updater";
 import { BellIcon, MenuIcon, MoonIcon, PlugIcon, PlusIcon, SettingsIcon, SunIcon } from "../icons";
@@ -65,8 +66,25 @@ export function StudioBar({
     pushToast("success", "Conversation exported as Markdown.");
   }
 
-  const status =
-    llmHealth.healthy === null ? "Connecting" : llmHealth.healthy ? "Live" : "Local mode";
+  // Whether an endpoint is configured is knowable from the settings alone, so a
+  // browser-only visitor is told the truth — "Local" — instead of a spinner for a
+  // connection nobody is trying to make. "Connecting" is reserved for a configured
+  // endpoint whose answer has not arrived yet.
+  const endpointConfigured = isEndpointConfiguredForSettings({
+    base_url: settings.base_url,
+    api_key: settings.api_key,
+    model_name: settings.model_name,
+  });
+  const status = !endpointConfigured
+    ? "Local"
+    : llmHealth.healthy === null
+      ? "Connecting"
+      : llmHealth.healthy
+        ? "Live"
+        : "Local mode";
+  const statusDetail = !endpointConfigured
+    ? "Answering from your device. No model connected."
+    : llmHealth.message;
   const updateReady = update.phase === "ready";
   const versionLabel = updateReady
     ? "Update ready"
@@ -151,12 +169,12 @@ export function StudioBar({
           type="button"
           className="bar__health"
           onClick={() => openPanel("settings")}
-          aria-label={`Model status: ${status}. ${llmHealth.message}`}
-          title={llmHealth.message}
+          aria-label={`Model status: ${status}. ${statusDetail}`}
+          title={statusDetail}
         >
           <span
-            className={`status-dot${llmHealth.healthy === false ? " is-warn" : ""}${
-              llmHealth.healthy === null ? " is-unknown" : ""
+            className={`status-dot${status === "Local mode" ? " is-warn" : ""}${
+              status === "Connecting" ? " is-unknown" : ""
             }`}
           />
           {status}

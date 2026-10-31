@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { fetchDiagnostics } from "../api/studioApi";
 import type { SidecarDiagnostics } from "../api/studioApi";
@@ -157,9 +157,18 @@ export function SettingsPanel() {
     openCustomize,
     sidecarReachable,
     capabilities,
+    recheckConnections,
   } = useStudio();
   const { enabled: tourEnabled, restart: restartTour } = useOnboarding();
   const [showApiKey, setShowApiKey] = useState(false);
+
+  // Opening Settings is the person asking what is connected, which is the first
+  // moment a probe is owed to them — and the reason a warning may appear here and
+  // nowhere earlier. Once per open: typing a URL must not re-probe per keystroke.
+  useEffect(() => {
+    void recheckConnections();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function update<K extends keyof StudioConfig>(key: K, value: StudioConfig[K]): void {
     saveSettings({ ...settings, [key]: value });
@@ -298,7 +307,11 @@ export function SettingsPanel() {
           />
           <span>Model</span>
           <span className="connection-list__value">
-            {llmHealth.healthy === false ? "offline" : "reachable"}
+            {llmHealth.healthy === false
+              ? "offline"
+              : llmHealth.healthy === null
+                ? "not checked"
+                : "reachable"}
           </span>
         </li>
         <li>

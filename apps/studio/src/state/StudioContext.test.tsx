@@ -1,5 +1,7 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+// The browser BFF is the first-run answer path, and it lives in IndexedDB.
+import "fake-indexeddb/auto";
 
 import { SESSION_KEY } from "../lib/session";
 import { StudioProvider, useStudio } from "./StudioContext";
@@ -53,6 +55,7 @@ let chatFailure: Error | null = null;
 let connectorFetches = 0;
 let llmHealthFetches = 0;
 let signalFetches = 0;
+let configHangs = false;
 let approvalCalls: Record<string, unknown>[] = [];
 let headPatches: Record<string, unknown>[] = [];
 
@@ -60,7 +63,7 @@ function route(
   input: RequestInfo | URL,
   init?: RequestInit,
   configFails = false,
-): Response {
+): Response | Promise<Response> {
   const url = String(input);
 
   if (url === "/api/chat") {
@@ -77,6 +80,11 @@ function route(
     return sse(chatStream ?? DEFAULT_CHAT_STREAM);
   }
   if (url === "/api/config") {
+    if (configHangs) {
+      // A slow laptop, a cold sidecar: the request is in the air and nothing is
+      // known yet. This is the state a first-time visitor actually sits in.
+      return new Promise<Response>(() => undefined);
+    }
     if (configFails) {
       throw new TypeError("fetch failed");
     }
@@ -505,11 +513,12 @@ describe("StudioContext failures", () => {
   });
 });
 
-describe("StudioContext sidecar down", () => {
+describe("StudioContext first run in a browser with no server", () => {
   let configFails: boolean;
 
   beforeEach(() => {
     configFails = true;
+    configHangs = false;
     localStorage.clear();
     chatBody = null;
     chatStream = null;
@@ -526,21 +535,74 @@ describe("StudioContext sidecar down", () => {
   });
 
   afterEach(() => {
+    configHangs = false;
+    vi.useRealTimers();
     vi.unstubAllGlobals();
   });
 
-  it("does not hit /api/chat when the sidecar is known to be down", async () => {
+  it("paints the canvas while the sidecar has not answered", async () => {
+    // A cold laptop, a sidecar still starting: the request is in the air. The
+    // person's own work is on screen from local storage, not behind that answer.
+    configHangs = true;
     const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
 
-    await waitFor(() => expect(result.current.sidecarReachable).toBe(false));
+    await waitFor(() => expect(result.current.canvas).not.toBeNull());
+    expect(result.current.sidecarReachable).toBeNull();
+  });
+
+  it("answers the first message instead of refusing it", async () => {
+    chatFailure = new TypeError("fetch failed");
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.canvas).not.toBeNull());
 
     await act(async () => {
-      await result.current.sendMessage("list the jobs");
+      await result.current.sendMessage("what should I work on first?");
     });
 
-    expect(chatAttempts).toBe(0);
-    expect(result.current.streaming).toBe(false);
-    expect(result.current.messages.some((message) => message.role === "notice")).toBe(true);
+    const last = result.current.messages.at(-1);
+    expect(last?.role).toBe("assistant");
+    expect(last?.error).toBeUndefined();
+    expect(last?.content.trim().length).toBeGreaterThan(0);
+    // The reply says where it came from, on the reply — not in a strip above.
+    expect(result.current.offlineReplyFor).toBe(last?.id);
+    expect(result.current.messages.some((message) => message.role === "notice")).toBe(false);
+  });
+
+  it("calls nothing broken until the person asks", async () => {
+    vi.useFakeTimers();
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2_500);
+    });
+
+    // The idle survey ran and found nothing — and a server that was never there
+    // is not an outage, so the banner bridge still has nothing to raise.
+    expect(llmHealthFetches).toBeGreaterThan(0);
+    expect(result.current.sidecarReachable).toBeNull();
+
+    await act(async () => {
+      await result.current.recheckConnections();
+    });
+    expect(result.current.sidecarReachable).toBe(false);
+  });
+
+  it("gives up the survey when the person starts talking", async () => {
+    vi.useFakeTimers();
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(500);
+    });
+    expect(llmHealthFetches).toBe(0);
+
+    await act(async () => {
+      await result.current.sendMessage("hello");
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10_000);
+    });
+
+    expect(chatAttempts).toBe(1);
+    expect(llmHealthFetches).toBe(0);
   });
 });
 

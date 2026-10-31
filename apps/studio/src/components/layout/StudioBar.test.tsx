@@ -58,6 +58,13 @@ describe("StudioBar", () => {
     vi.mocked(useStudio).mockReturnValue(
       stubContext({
         llmHealth: { healthy: false, message: "No model is reachable." },
+        settings: {
+          base_url: "https://model.example.com/v1",
+          api_key: "k",
+          model_name: "gpt-5",
+          mcp_url: "",
+          theme: "dark",
+        },
         openPanel: vi.fn(),
       }) as never,
     );
@@ -65,6 +72,21 @@ describe("StudioBar", () => {
 
     expect(
       screen.getByRole("button", { name: /model status: local mode\. no model is reachable\./i }),
+    ).toBeInTheDocument();
+  });
+
+  it("says the device is answering before any probe has run", () => {
+    // #309: an unconfigured browser is a fact about the settings, not a failure
+    // to be discovered. The bar tells it plainly with healthy still unknown.
+    vi.mocked(useStudio).mockReturnValue(
+      stubContext({ llmHealth: { healthy: null, message: "" } }) as never,
+    );
+    render(<StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />);
+
+    expect(
+      screen.getByRole("button", {
+        name: /model status: local\. answering from your device\. no model connected\./i,
+      }),
     ).toBeInTheDocument();
   });
 

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { MemoryLocalStore } from "../store/memoryStore";
 import { LocalDataService } from "../data/localDataService";
@@ -106,5 +106,46 @@ describe("ChatOrchestrator deterministic mode", () => {
     const conversation = events.find((e) => e.event === "conversation");
     expect(conversation).toBeDefined();
     expect(conversation!.data.id).toBeTruthy();
+  });
+});
+
+describe("ChatOrchestrator provider choice", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  const firstPhase = (events: RawSseEvent[]) =>
+    events.find((event) => event.event === "status")?.data.phase;
+
+  it("calls an answer no model produced by its real name", async () => {
+    const { events, onEvent } = collectEvents();
+    await makeBff().stream(streamRequest("how many jobs?"), onEvent);
+
+    expect(firstPhase(events)).toBe("offline");
+  });
+
+  it("routes a keyless model on the local network to the endpoint", async () => {
+    // Ollama and LM Studio answer with no key at all. Treating them as
+    // unconfigured made the browser write a local draft when a real model
+    // was sitting on the same laptop.
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new TypeError("fetch failed");
+      }),
+    );
+    const { events, onEvent } = collectEvents();
+    await makeBff().stream(
+      {
+        ...streamRequest("how many jobs?"),
+        base_url: "http://127.0.0.1:11434/v1",
+        api_key: "",
+        model: "qwen3:8b",
+      },
+      onEvent,
+    );
+
+    expect(firstPhase(events)).toBe("streaming");
+    expect(events.some((event) => event.event === "error")).toBe(true);
   });
 });

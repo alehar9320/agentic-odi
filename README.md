@@ -12,8 +12,9 @@ desired outcomes, and opportunity scores that rank them.
 [![Open the Living Studio](https://img.shields.io/badge/Open%20the%20Living%20Studio-F38020?style=for-the-badge&logo=cloudflare&logoColor=white)](https://agentic-odi.alehar.workers.dev/)
 [![Run it locally](https://img.shields.io/badge/Run%20it%20locally-1e293b?style=for-the-badge&logo=gnubash&logoColor=white)](#quick-start)
 
-**Try it now — nothing to install.** The Studio opens in your browser; live data
-and chat need the local sidecar below.
+**Try it now — nothing to install.** The Studio opens in your browser and works
+from the first minute: the canvas, the thread, and the assistant all run on your
+device. Add the local sidecar below for live MCP data and your own model.
 
 **Or install the CLI in one line** (Linux, macOS):
 

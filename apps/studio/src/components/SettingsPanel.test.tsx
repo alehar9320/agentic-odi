@@ -65,6 +65,7 @@ const stubContext = (overrides: Record<string, unknown> = {}) =>
     refreshConnectors: vi.fn().mockResolvedValue(undefined),
     refreshPresets: vi.fn().mockResolvedValue(undefined),
     refreshCapabilities: vi.fn().mockResolvedValue(undefined),
+    recheckConnections: vi.fn().mockResolvedValue(undefined),
     capabilities: [],
     ...overrides,
   }) as unknown as StudioContextValue;

@@ -7,6 +7,7 @@ import type {
   Outcome,
 } from "../../types";
 import { asStudioError } from "../../api/studioApi";
+import { isEndpointConfigured } from "../../lib/modelEndpoint";
 import { BffError, notFound } from "../errors";
 import type { LocalStore } from "../store/types";
 import { LocalDataService } from "../data/localDataService";
@@ -14,19 +15,6 @@ import { LocalMemoryService } from "../memory/localMemoryService";
 import { createSseParser, type RawSseEvent } from "../../api/sse";
 
 type Provider = "endpoint" | "deterministic";
-
-function isEndpointConfigured(request: {
-  base_url: string;
-  api_key: string;
-  model: string;
-}): boolean {
-  return Boolean(
-    request.base_url &&
-      request.api_key &&
-      request.model &&
-      request.base_url !== "http://localhost:8001/v1",
-  );
-}
 
 const TOOLS = [
   {
@@ -238,10 +226,12 @@ export class ChatOrchestrator {
     const provider: Provider = isEndpointConfigured(request)
       ? "endpoint"
       : "deterministic";
+    // "offline" is the sidecar's own word for an answer no model produced, so a
+    // browser-only turn and a local turn are labeled the same way in the transcript.
     emit(
       {
         event: "status",
-        data: { phase: provider === "endpoint" ? "streaming" : "thinking" },
+        data: { phase: provider === "endpoint" ? "streaming" : "offline" },
       },
       onEvent,
     );
@@ -623,7 +613,9 @@ export class ChatOrchestrator {
       headers: {
         "Content-Type": "application/json",
         Accept: "text/event-stream",
-        Authorization: `Bearer ${request.api_key}`,
+        // A private server with no key needs no header; "Bearer " alone makes
+        // some local runtimes reject the request.
+        ...(request.api_key ? { Authorization: `Bearer ${request.api_key}` } : {}),
       },
       body: JSON.stringify(body),
       signal,
