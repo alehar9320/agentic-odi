@@ -18,6 +18,12 @@ from agentic_odi_core.contract import (
     capability_manifest,
     capability_summary,
 )
+from agentic_odi_core.coverage import (
+    CoverageReport,
+    CoverageTotals,
+    StageCoverage,
+    build_coverage_report,
+)
 from agentic_odi_core.errors import (
     ConflictError,
     NotFoundError,
@@ -138,6 +144,10 @@ __all__ = [
     "Evidence",
     "EvidenceItemType",
     "EvidenceNotFoundError",
+    "CoverageReport",
+    "CoverageTotals",
+    "StageCoverage",
+    "build_coverage_report",
     "Interview",
     "InterviewNotFoundError",
     "InterviewQuote",

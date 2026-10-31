@@ -30,9 +30,46 @@ export type StagesState =
   | { kind: "ready"; data: JobStageDef[] }
   | { kind: "error"; error: StudioError; data: JobStageDef[] | null };
 
+export type CoverageState =
+  | { kind: "loading"; data: CoverageReport | null }
+  | { kind: "ready"; data: CoverageReport }
+  | { kind: "error"; error: StudioError; data: CoverageReport | null };
+
+/**
+ * One stage's coverage: how many outcomes land here, how many of them carry
+ * both scores, and how much evidence stands behind them. An empty stage is a
+ * row of zeros, not a missing row, so a gap is visible rather than implied.
+ */
+export interface StageCoverage {
+  stage: string;
+  outcomes: number;
+  measured: number;
+  quotes: number;
+}
+
+/**
+ * What a job's research covers. ``totals`` counts the whole job, including
+ * outcomes with no stage, which land in the explicit ``unassigned_*`` buckets
+ * instead of being dropped. ``gaps`` names the stages with no outcomes.
+ */
+export interface CoverageReport {
+  job_id: string;
+  per_stage: StageCoverage[];
+  totals: {
+    outcomes: number;
+    measured: number;
+    quotes: number;
+    unassigned_outcomes: number;
+    unassigned_measured: number;
+    unassigned_quotes: number;
+  };
+  gaps: string[];
+}
+
 export interface Outcome {
   id?: string;
   job_id?: string;
+  step_id?: string | null;
   statement?: string;
   importance?: number | null;
   satisfaction?: number | null;
@@ -281,6 +318,7 @@ export interface StudioBrief {
 export type WorkspacePanelId =
   | "landscape"
   | "jobmap"
+  | "coverage"
   | "evidence"
   | "capture"
   | "memory"
