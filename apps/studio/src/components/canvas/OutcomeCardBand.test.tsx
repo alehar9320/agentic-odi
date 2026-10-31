@@ -7,6 +7,9 @@ import { OutcomeCard } from "./OutcomeCard";
 vi.mock("../../api/studioApi", () => ({
   fetchOutcomeHistory: vi.fn().mockResolvedValue([]),
   fetchOutcomeInterval: vi.fn(),
+  fetchOutcomeAlternatives: vi.fn().mockResolvedValue([]),
+  fetchExistingSolution: vi.fn().mockResolvedValue("no_link_at_all"),
+  fetchAlternativeLinks: vi.fn().mockResolvedValue([]),
 }));
 
 vi.mock("../../state/StudioContext", () => ({

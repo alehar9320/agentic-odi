@@ -761,6 +761,37 @@ is pinned rather than left implicit:
 - The read side returns `null` for an estimate and the pairs for an imported
   outcome, over MCP, the Studio API and the CLI local backend.
 
+## M2-07.2 alternatives presentation (implemented)
+
+M2-07.2 adds no new convention: the inventory and the three-state solution rule
+already exist in M2-07. It only presents them, so every choice it makes is pinned
+rather than left implicit:
+
+- An un-inventoried outcome renders one line — *not yet inventoried* — and never
+  the words "no solution" — `test_an_empty_inventory_renders_not_yet_inventoried`.
+- A recorded `nothing` row renders as a row, distinct from the un-inventoried
+  case — `test_the_nothing_row_is_rendered_as_evidence_not_absence` and
+  `OutcomeCardAlternatives.test.tsx` "distinguishes a recorded nothing row".
+- Several alternatives stay several; no primary is invented —
+  `test_multiple_alternatives_keep_input_order_and_pick_no_winner`.
+- An unrecorded usage count is silent, never `n=0` —
+  `test_an_unknown_usage_count_is_silent_not_zero`.
+- Customer text renders as characters, never as markup —
+  `test_customer_text_is_escaped_for_markup`.
+- The bulk read is one call per job and never leaks another job's links —
+  `test_job_read_returns_every_link_with_its_alternative`,
+  `test_job_read_does_not_leak_another_jobs_links`.
+- The landscape **Only workaround** facet selects an outcome whose only recorded
+  solution is a workaround, excludes a mixed outcome, never treats `nothing` or an
+  un-inventoried outcome as a workaround, and disables itself (rather than
+  filtering everything away) when the read fails —
+  `OpportunityLandscapeFacet.test.tsx`.
+
+The brief's *Underserved outcomes* line is the one remaining seam: the C1
+renderer lives on the Pillar 3 branch, so `render_alternative_lines` is exposed
+as the shared, pure entry point and wired when C1 lands. Nothing in the brief
+path fabricates a solution state in the meantime.
+
 ## Seams added ahead of the gates
 
 `packages/core/src/agentic_odi_core/trust.py` names the contract each blocked

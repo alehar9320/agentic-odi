@@ -8,6 +8,13 @@ Pydantic's identically named class. Import it from
 ``agentic_odi_core.errors`` instead.
 """
 
+from agentic_odi_core.alternatives import (
+    NOT_YET_INVENTORIED,
+    AlternativeObservation,
+    format_alternative_line,
+    render_alternative_lines,
+    solution_label,
+)
 from agentic_odi_core.connection import MCPConnectionConfig
 from agentic_odi_core.contract import (
     TOOL_NAMES,
@@ -148,6 +155,11 @@ __all__ = [
     "AlternativeKind",
     "AlternativeLink",
     "AlternativeNotFoundError",
+    "AlternativeObservation",
+    "NOT_YET_INVENTORIED",
+    "format_alternative_line",
+    "render_alternative_lines",
+    "solution_label",
     "CustomerOutcomeNotFoundError",
     "CustomerValue",
     "DeltaDirection",

@@ -452,6 +452,30 @@ def get_has_existing_solution(outcome_id: str) -> str:
 
 
 @mcp.tool
+def list_alternative_links(job_id: str) -> str:
+    """Every recorded alternative for one Job, each with its outcome and adequacy (M2-07.2).
+
+    One call reads the whole job's inventory so a facet can compute a solution
+    state per outcome without a request per row. An unknown job is refused
+    rather than reported as an empty inventory.
+    """
+    try:
+        triples = service.job_outcome_alternatives(job_id)
+    except JobNotFoundError:
+        return job_not_found(job_id)
+    return json.dumps(
+        [
+            {
+                "outcome_id": outcome_id,
+                "alternative": alternative.model_dump(),
+                "link": link.model_dump(),
+            }
+            for outcome_id, alternative, link in triples
+        ]
+    )
+
+
+@mcp.tool
 def compute_opportunity(importance: float, satisfaction: float) -> str:
     if not (1.0 <= importance <= 10.0) or not (1.0 <= satisfaction <= 10.0):
         return "Error: importance and satisfaction must be between 1.0 and 10.0"

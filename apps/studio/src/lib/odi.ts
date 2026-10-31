@@ -1,4 +1,4 @@
-import type { OutcomeInterval } from "../types";
+import type { ExistingSolution, OutcomeAlternativeLink, OutcomeInterval } from "../types";
 
 export interface PillDescriptor {
   label: string;
@@ -100,6 +100,41 @@ export function formatBandProvenance(interval: OutcomeInterval | null): string {
 }
 
 export type ConfidenceClass = "measured" | "thin" | "none";
+
+/**
+ * Whether an outcome's only recorded solution is a workaround (M2-07.2).
+ *
+ * True only when at least one linked alternative is a workaround and no linked
+ * alternative is any other non-`nothing` kind. A `nothing` row never makes this
+ * true, and an un-inventoried outcome is not "only a workaround" — it is
+ * unknown, and the facet must not turn missing inventory into evidence.
+ */
+export function isOnlyWorkaround(links: OutcomeAlternativeLink[]): boolean {
+  if (!links.length) {
+    return false;
+  }
+  const kinds = links.map((entry) => entry.alternative.kind);
+  const hasWorkaround = kinds.includes("workaround");
+  const hasOtherSolution = kinds.some((kind) => kind !== "workaround" && kind !== "nothing");
+  return hasWorkaround && !hasOtherSolution;
+}
+
+/**
+ * The one sentence every surface renders for a solution state. Mirrors the core's
+ * `EXISTING_SOLUTION_LABELS` so the Studio, the CLI and the brief cannot disagree:
+ * `no_linked_nothing` and `no_link_at_all` are deliberately different sentences,
+ * and only `yes` records a solution.
+ */
+export function existingSolutionLabel(state: ExistingSolution): string {
+  switch (state) {
+    case "yes":
+      return "Existing solution: yes — a solution is recorded.";
+    case "no_linked_nothing":
+      return "Existing solution: no — the customer uses nothing today.";
+    case "no_link_at_all":
+      return "Existing solution: not yet inventoried — we have not asked.";
+  }
+}
 
 /**
  * Classify how much evidence stands behind a score, matching the core's

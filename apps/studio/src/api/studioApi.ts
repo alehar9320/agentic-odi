@@ -28,6 +28,7 @@ import type {
   ObservationStatus,
   Outcome,
   OutcomeAlternative,
+  OutcomeAlternativeLink,
   OutcomeInterval,
   OutcomeInputs,
   ScoreSnapshot,
@@ -472,6 +473,16 @@ export function fetchExistingSolution(
   return getJson<{ result: { outcome_id: string; existing_solution: ExistingSolution } }>(
     `/api/outcomes/${encodeURIComponent(outcomeId)}/existing-solution?mcp_url=${encodeURIComponent(mcpUrl)}`,
   ).then((body) => body.result.existing_solution);
+}
+
+/** Every recorded alternative for one job, with its outcome and link (M2-07.2). */
+export function fetchAlternativeLinks(
+  jobId: string,
+  mcpUrl: string,
+): Promise<OutcomeAlternativeLink[]> {
+  return getJson<{ result: OutcomeAlternativeLink[] }>(
+    `/api/alternative-links?job_id=${encodeURIComponent(jobId)}&mcp_url=${encodeURIComponent(mcpUrl)}`,
+  ).then((body) => body.result);
 }
 
 export function deleteOutcome(outcomeId: string, mcpUrl: string): Promise<{ deleted: string }> {

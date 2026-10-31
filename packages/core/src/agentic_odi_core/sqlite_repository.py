@@ -691,7 +691,10 @@ class SQLiteRepository(Repository):
             return self.alternative_links.get((outcome_id, alternative_id))
 
     def list_alternative_links(
-        self, outcome_id: str | None = None, alternative_id: str | None = None
+        self,
+        outcome_id: str | None = None,
+        alternative_id: str | None = None,
+        job_id: str | None = None,
     ) -> list[AlternativeLink]:
         with self._lock:
             self._sync()
@@ -700,6 +703,13 @@ class SQLiteRepository(Repository):
                 items = [link for link in items if link.outcome_id == outcome_id]
             if alternative_id is not None:
                 items = [link for link in items if link.alternative_id == alternative_id]
+            if job_id is not None:
+                items = [
+                    link
+                    for link in items
+                    if (alternative := self.alternatives.get(link.alternative_id)) is not None
+                    and alternative.job_id == job_id
+                ]
             return items
 
     def unlink_alternative(self, outcome_id: str, alternative_id: str) -> bool:

@@ -49,6 +49,7 @@ class ToolName(str, Enum):
     UNLINK_ALTERNATIVE = "unlink_alternative"
     GET_OUTCOME_ALTERNATIVES = "get_outcome_alternatives"
     GET_HAS_EXISTING_SOLUTION = "get_has_existing_solution"
+    LIST_ALTERNATIVE_LINKS = "list_alternative_links"
     ADD_EVIDENCE = "add_evidence"
     GET_EVIDENCE = "get_evidence"
     LIST_EVIDENCE = "list_evidence"
@@ -460,6 +461,15 @@ TOOL_SPECS: dict[str, ToolSpec] = {
         arguments=("outcome_id",),
         required=("outcome_id",),
         returns="One of yes, no_linked_nothing, no_link_at_all.",
+        stage="2",
+    ),
+    ToolName.LIST_ALTERNATIVE_LINKS.value: ToolSpec(
+        name="list_alternative_links",
+        summary="Every recorded alternative for one Job, each with its outcome and adequacy.",
+        effect=ToolEffect.READ,
+        arguments=("job_id",),
+        required=("job_id",),
+        returns="A list of outcome/alternative/link triples for the whole Job.",
         stage="2",
     ),
     ToolName.ADD_EVIDENCE.value: ToolSpec(

@@ -2409,6 +2409,64 @@
         }
       }
     },
+    "/api/alternative-links": {
+      "get": {
+        "summary": "Get Alternative Links",
+        "description": "Every recorded alternative for one Job, with its outcome and link (M2-07.2).\n\nOne read for the whole Job so the landscape facet can compute a solution\nstate per outcome without a request per row.",
+        "operationId": "get_alternative_links_api_alternative_links_get",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Job Id"
+            }
+          },
+          {
+            "name": "mcp_url",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Mcp Url"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Get Alternative Links Api Alternative Links Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/evidence": {
       "get": {
         "summary": "Get Evidence Records",

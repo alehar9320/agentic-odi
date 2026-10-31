@@ -96,6 +96,26 @@ def link(
     typer.echo(render_saved("linked", result, as_json=json_output, noun="Alternative link"))
 
 
+@alternatives_app.command("links")
+def links(
+    job_id: str = typer.Argument(..., help="Job ID to read every recorded alternative for"),
+    json_output: bool = JSON_OPTION,
+) -> None:
+    """Read every recorded alternative for a Job in one call (M2-07.2).
+
+    The bulk read a facet or a brief uses, so a reader sees the whole job's
+    inventory without one request per outcome.
+    """
+    result = run_tool("list_alternative_links", {"job_id": job_id})
+    typer.echo(
+        render_alternative_list(
+            result,
+            as_json=json_output,
+            empty="Not yet inventoried — no alternatives recorded for this job.",
+        )
+    )
+
+
 @alternatives_app.command("show")
 def show(
     outcome_id: str = typer.Argument(...),

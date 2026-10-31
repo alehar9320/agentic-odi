@@ -91,6 +91,7 @@ implementation starts — they are recorded in the issues, not invented here.
 | Issue | Owns | Depends on | Children |
 |---|---|---|---|
 | **M2-07** ALH-71 | `Alternative`, `AlternativeLink`; `has_existing_solution` | — | M2-07.2 ALH-166 |
+| **M2-07.2** ALH-166 | Outcome-detail alternatives row; landscape *only workaround* facet; brief line | M2-07 | — |
 | **M2-08** ALH-72 | `SuccessCriterion`; `criteria_gaps` | M2-07 | M2-08.1 ALH-204 |
 | **M2-13** ALH-77 | `weight` column, `aggregate_weighted` (Kish `effective_n`) | M2-05 | M2-13.1 ALH-213, M2-13.2 ALH-215 |
 | **M2-14** ALH-78 | `MIN_MEANINGFUL_N=20`, `n_advisory` | B1, B4.1 | — |

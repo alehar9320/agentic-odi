@@ -164,6 +164,24 @@ class SnapshotNoteError(ValueOutOfRangeError):
     """
 
 
+def _solution_state(
+    pairs: list[tuple[Alternative, AlternativeLink]],
+) -> Literal["yes", "no_linked_nothing", "no_link_at_all"]:
+    """The one solution-state rule every surface reads (M2-07 / M2-07.2).
+
+    Only ``yes`` records a solution: any linked alternative whose kind is not
+    ``nothing``. ``no_linked_nothing`` means we asked and the customer uses
+    nothing today; ``no_link_at_all`` means we have not asked. The rule lives in
+    one place so the brief, the CLI and the Studio facet cannot disagree, and so
+    an empty inventory is never read as evidence of no solution.
+    """
+    if not pairs:
+        return "no_link_at_all"
+    if any(alternative.kind != "nothing" for alternative, _ in pairs):
+        return "yes"
+    return "no_linked_nothing"
+
+
 def _validate_snapshot_note(note: str | None) -> str | None:
     """Reject an over-long note before any score mutation is attempted."""
     if note is not None and len(note) > SCORE_SNAPSHOT_NOTE_MAX:
@@ -1009,12 +1027,27 @@ class ODIService:
         asked" (``no_link_at_all``). Only ``yes`` means a solution is recorded;
         an empty inventory is never evidence that no solution exists.
         """
-        pairs = self.outcome_alternatives(outcome_id)
-        if not pairs:
-            return "no_link_at_all"
-        if any(alternative.kind != "nothing" for alternative, _ in pairs):
-            return "yes"
-        return "no_linked_nothing"
+        return _solution_state(self.outcome_alternatives(outcome_id))
+
+    def job_outcome_alternatives(
+        self, job_id: str
+    ) -> list[tuple[str, Alternative, AlternativeLink]]:
+        """Every recorded alternative for one Job, each with its outcome and link.
+
+        A bulk read of the inventory so the landscape facet can compute a
+        solution state and a kind filter per outcome without a request per row.
+        It reuses :func:`_solution_state`, so the facet, the detail row and the
+        brief cannot disagree. An unknown job is refused rather than reported as
+        an empty inventory.
+        """
+        if self.repo.get_job(job_id) is None:
+            raise JobNotFoundError(job_id)
+        result: list[tuple[str, Alternative, AlternativeLink]] = []
+        for link in self.repo.list_alternative_links(job_id=job_id):
+            alternative = self.repo.get_alternative(link.alternative_id)
+            if alternative is not None:
+                result.append((link.outcome_id, alternative, link))
+        return result
 
     def add_evidence(
         self,

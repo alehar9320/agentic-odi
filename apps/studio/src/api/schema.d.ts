@@ -676,6 +676,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/alternative-links": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Alternative Links
+         * @description Every recorded alternative for one Job, with its outcome and link (M2-07.2).
+         *
+         *     One read for the whole Job so the landscape facet can compute a solution
+         *     state per outcome without a request per row.
+         */
+        get: operations["get_alternative_links_api_alternative_links_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/evidence": {
         parameters: {
             query?: never;
@@ -3549,6 +3572,40 @@ export interface operations {
             path: {
                 outcome_id: string;
             };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_alternative_links_api_alternative_links_get: {
+        parameters: {
+            query: {
+                job_id: string;
+                mcp_url?: string | null;
+            };
+            header?: never;
+            path?: never;
             cookie?: never;
         };
         requestBody?: never;

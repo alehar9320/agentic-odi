@@ -155,7 +155,10 @@ class Repository(Protocol):
         self, outcome_id: str, alternative_id: str
     ) -> AlternativeLink | None: ...
     def list_alternative_links(
-        self, outcome_id: str | None = None, alternative_id: str | None = None
+        self,
+        outcome_id: str | None = None,
+        alternative_id: str | None = None,
+        job_id: str | None = None,
     ) -> list[AlternativeLink]: ...
     def unlink_alternative(self, outcome_id: str, alternative_id: str) -> bool: ...
     def add_evidence(self, evidence: Evidence) -> Evidence: ...
@@ -401,13 +404,26 @@ class InMemoryRepository:
         return self.alternative_links.get((outcome_id, alternative_id))
 
     def list_alternative_links(
-        self, outcome_id: str | None = None, alternative_id: str | None = None
+        self,
+        outcome_id: str | None = None,
+        alternative_id: str | None = None,
+        job_id: str | None = None,
     ) -> list[AlternativeLink]:
         items = list(self.alternative_links.values())
         if outcome_id is not None:
             items = [link for link in items if link.outcome_id == outcome_id]
         if alternative_id is not None:
             items = [link for link in items if link.alternative_id == alternative_id]
+        if job_id is not None:
+            # A link carries no job of its own; it belongs to the job its
+            # alternative belongs to. Reading a whole job's links in one call is
+            # what lets a facet avoid one request per outcome.
+            items = [
+                link
+                for link in items
+                if (alternative := self.alternatives.get(link.alternative_id)) is not None
+                and alternative.job_id == job_id
+            ]
         return items
 
     def unlink_alternative(self, outcome_id: str, alternative_id: str) -> bool:

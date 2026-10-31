@@ -402,6 +402,19 @@ class Alternative(BaseModel):
     )
 
 
+#: M2-07.2 provisional convention. The one sentence every surface renders for
+#: the solution state of an outcome. ``no_linked_nothing`` and ``no_link_at_all``
+#: must never be worded the same way: "we asked and the customer uses nothing" is
+#: evidence for a new-market bet, "we have not asked" is an unknown. The exact
+#: wording is the M2-07.2 gate, so it is named here rather than inlined per
+#: surface (the brief, the CLI and the Studio row all read this map).
+EXISTING_SOLUTION_LABELS: dict[str, str] = {
+    "yes": "Existing solution: yes — a solution is recorded.",
+    "no_linked_nothing": "Existing solution: no — the customer uses nothing today.",
+    "no_link_at_all": "Existing solution: not yet inventoried — we have not asked.",
+}
+
+
 class AlternativeLink(BaseModel):
     """A customer's adequacy rating for one alternative against one outcome (M2-07).
 

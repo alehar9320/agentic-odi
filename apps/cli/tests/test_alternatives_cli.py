@@ -71,8 +71,51 @@ def test_help_lists_subcommands():
     result = runner.invoke(app, ["alternatives", "--help"])
     assert result.exit_code == 0
     output = _strip(result.output)
-    for command in ("add", "list", "link", "show"):
+    for command in ("add", "list", "link", "links", "show"):
         assert command in output
+
+
+def test_links_reads_a_whole_job_in_one_call(tmp_path):
+    db = str(tmp_path / "odi.db")
+    _seed(db)
+    alternative_id = _add_alternative(db, name="Spreadsheet", kind="manual")
+    outcome_id = _outcome_id(db)
+    runner.invoke(
+        app,
+        [
+            "--backend",
+            "local",
+            "--db",
+            db,
+            "alternatives",
+            "link",
+            outcome_id,
+            alternative_id,
+            "--adequacy",
+            "6",
+        ],
+    )
+
+    result = runner.invoke(
+        app, ["--backend", "local", "--db", db, "alternatives", "links", "job-1"]
+    )
+
+    assert result.exit_code == 0, result.output
+    output = _strip(result.output)
+    assert "Spreadsheet" in output
+    assert "manual" in output
+
+
+def test_links_on_an_un_inventoried_job_says_not_yet_inventoried(tmp_path):
+    db = str(tmp_path / "odi.db")
+    _seed(db)
+
+    result = runner.invoke(
+        app, ["--backend", "local", "--db", db, "alternatives", "links", "job-1"]
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "not yet inventoried" in _strip(result.output).lower()
 
 
 def test_add_then_list_round_trips(tmp_path):

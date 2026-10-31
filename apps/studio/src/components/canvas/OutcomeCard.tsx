@@ -1,7 +1,13 @@
 import { useEffect, useState } from "react";
 
-import { fetchOutcomeHistory, fetchOutcomeInterval } from "../../api/studioApi";
 import {
+  fetchExistingSolution,
+  fetchOutcomeAlternatives,
+  fetchOutcomeHistory,
+  fetchOutcomeInterval,
+} from "../../api/studioApi";
+import {
+  existingSolutionLabel,
   formatBandProvenance,
   formatOpportunityScore,
   formatSample,
@@ -10,7 +16,7 @@ import {
   opportunityScore,
 } from "../../lib/odi";
 import { useStudio } from "../../state/StudioContext";
-import type { Outcome, OutcomeInterval } from "../../types";
+import type { ExistingSolution, Outcome, OutcomeAlternative, OutcomeInterval } from "../../types";
 import { CopyIcon } from "../icons";
 
 export function OutcomeCard({
@@ -46,6 +52,15 @@ export function OutcomeCard({
   const [intervalFor, setIntervalFor] = useState<{
     id: string;
     interval: OutcomeInterval | null;
+  } | null>(null);
+  // The recorded alternatives and the solution state for the detail card
+  // (M2-07.2). A `null` read means it has not resolved, which is a distinct
+  // state from "asked and found nothing": a failed read leaves the row absent
+  // rather than claiming the outcome is un-inventoried.
+  const [alternativesFor, setAlternativesFor] = useState<{
+    id: string;
+    pairs: OutcomeAlternative[];
+    state: ExistingSolution;
   } | null>(null);
 
   const outcomeId = outcome.id ?? "O";
@@ -88,11 +103,35 @@ export function OutcomeCard({
     };
   }, [detail, outcome.id, sample, settings.mcp_url]);
 
+  useEffect(() => {
+    const id = outcome.id;
+    if (!detail || !id || sample) return;
+    let cancelled = false;
+    void Promise.all([
+      fetchOutcomeAlternatives(id, settings.mcp_url),
+      fetchExistingSolution(id, settings.mcp_url),
+    ])
+      .then(([pairs, state]) => {
+        if (!cancelled) setAlternativesFor({ id, pairs, state });
+      })
+      .catch(() => {
+        // A failed read leaves the row absent: rendering "not yet inventoried"
+        // would claim we asked and found nothing, which we did not.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [detail, outcome.id, sample, settings.mcp_url]);
+
   const latestNote =
     detail && !sample && noteFor && noteFor.id === outcome.id ? noteFor.note : null;
   const interval =
     detail && !sample && intervalFor && intervalFor.id === outcome.id
       ? intervalFor.interval
+      : null;
+  const alternatives =
+    detail && !sample && alternativesFor && alternativesFor.id === outcome.id
+      ? alternativesFor
       : null;
 
   const opp = outcome.opportunity_score;
@@ -143,6 +182,24 @@ export function OutcomeCard({
             Band <b>{formatBandProvenance(interval)}</b>
           </span>
         </p>
+      ) : null}
+
+      {alternatives ? (
+        <div className="card__meta" data-testid="outcome-alternatives">
+          <span title="What customers use today, and how well it serves them">
+            {existingSolutionLabel(alternatives.state)}
+          </span>
+          {alternatives.pairs.length > 0 ? (
+            <ul className="card__alternatives">
+              {alternatives.pairs.map(({ alternative, link }) => (
+                <li key={alternative.id ?? `${link.outcome_id}-${link.alternative_id}`}>
+                  {alternative.name} ({alternative.kind}, adequacy {link.adequacy})
+                  {link.usage_n != null ? `, n=${link.usage_n}` : ""}
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
       ) : null}
 
       {showEvidence &&

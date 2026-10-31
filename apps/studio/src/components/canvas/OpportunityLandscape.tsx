@@ -1,16 +1,18 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
+import { fetchAlternativeLinks } from "../../api/studioApi";
 import { canvasStatus } from "../../lib/canvasProvenance";
 import {
   confidenceClass,
   formatBand,
   formatOpportunityScore,
   formatSample,
+  isOnlyWorkaround,
   isUnderserved,
   nAdvisory,
 } from "../../lib/odi";
 import { useStudio } from "../../state/StudioContext";
-import type { Outcome } from "../../types";
+import type { Outcome, OutcomeAlternativeLink } from "../../types";
 import { FailurePanel } from "../FailurePanel";
 import { GhostMetrics, GhostOpportunityCards } from "../Skeletons";
 import { OutcomeCard } from "./OutcomeCard";
@@ -26,14 +28,25 @@ export function OpportunityLandscape() {
     theses,
     focusedSubject,
     focusSubject,
+    settings,
   } = useStudio();
   const [underservedOnly, setUnderservedOnly] = useState(false);
+  const [workaroundOnly, setWorkaroundOnly] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedOutcomeId, setSelectedOutcomeId] = useState<string | null>(
     focusedSubject?.kind === "outcome" ? focusedSubject.id : null,
   );
   const [viewMode, setViewMode] = useState<ViewMode>("matrix");
   const [hoveredOutcome, setHoveredOutcome] = useState<Outcome | null>(null);
+  // Every alternative recorded for the job(s) on screen, read once per job so
+  // the facet never issues a request per row. Both the links and the failure are
+  // keyed by the job set they were read for, so a stale page is ignored and a
+  // failed read is never confused with an empty inventory.
+  const [linksRead, setLinksRead] = useState<{
+    key: string;
+    links: OutcomeAlternativeLink[];
+  } | null>(null);
+  const [readFailureKey, setReadFailureKey] = useState<string | null>(null);
 
   const canvas = canvasState.data;
   const sample = canvas?.source === "seed";
@@ -42,6 +55,47 @@ export function OpportunityLandscape() {
   const isLoading = canvasState.kind === "loading";
   const isEmpty = canvasState.kind === "empty";
   const provenance = canvasStatus(canvas);
+
+  const jobIds = useMemo(
+    () => [...new Set(outcomes.map((outcome) => outcome.job_id).filter(Boolean))].sort(),
+    [outcomes],
+  );
+  const jobKey = jobIds.join(",");
+  const readyToRead = canvasState.kind === "ready" && jobIds.length > 0;
+  const links = useMemo(
+    () => (readyToRead && linksRead?.key === jobKey ? linksRead.links : []),
+    [readyToRead, linksRead, jobKey],
+  );
+  const alternativesReadFailed = readyToRead && readFailureKey === jobKey;
+
+  useEffect(() => {
+    if (!readyToRead) return;
+    let cancelled = false;
+    void Promise.all(jobIds.map((jobId) => fetchAlternativeLinks(jobId, settings.mcp_url)))
+      .then((pages) => {
+        if (cancelled) return;
+        setLinksRead({ key: jobKey, links: pages.flat() });
+        setReadFailureKey(null);
+      })
+      .catch(() => {
+        // The facet is supporting context: a failure disables it with a notice
+        // rather than filtering every outcome away as "not a workaround".
+        if (!cancelled) setReadFailureKey(jobKey);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [readyToRead, jobKey, jobIds, settings.mcp_url]);
+
+  const linksByOutcome = useMemo(() => {
+    const grouped = new Map<string, OutcomeAlternativeLink[]>();
+    for (const entry of links) {
+      const bucket = grouped.get(entry.outcome_id) ?? [];
+      bucket.push(entry);
+      grouped.set(entry.outcome_id, bucket);
+    }
+    return grouped;
+  }, [links]);
 
   const underservedCount = outcomes.filter((outcome) =>
     isUnderserved(outcome.opportunity_score),
@@ -58,6 +112,12 @@ export function OpportunityLandscape() {
       if (underservedOnly && !isUnderserved(outcome.opportunity_score)) {
         return false;
       }
+      if (
+        workaroundOnly &&
+        !isOnlyWorkaround(outcome.id ? (linksByOutcome.get(outcome.id) ?? []) : [])
+      ) {
+        return false;
+      }
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase();
         const stmt = outcome.statement?.toLowerCase() ?? "";
@@ -66,7 +126,7 @@ export function OpportunityLandscape() {
       }
       return true;
     });
-  }, [outcomes, underservedOnly, searchQuery]);
+  }, [outcomes, underservedOnly, workaroundOnly, linksByOutcome, searchQuery]);
 
   const sortedOutcomes = useMemo(() => {
     // Group by confidence class (measured, then thin, then none) and order
@@ -227,7 +287,25 @@ export function OpportunityLandscape() {
             />
             Show Underserved Only (&gt;10)
           </label>
-          {searchQuery || underservedOnly ? (
+          <label
+            style={{ fontSize: "0.85rem", color: "var(--studio-text)", display: "flex", alignItems: "center", gap: 6, cursor: "pointer", userSelect: "none" }}
+            title={
+              alternativesReadFailed
+                ? "The alternatives inventory could not be read; the facet is unavailable rather than treating every outcome as not a workaround."
+                : "Outcomes whose only recorded solution is a workaround."
+            }
+          >
+            <input
+              type="checkbox"
+              data-testid="facet-only-workaround"
+              checked={workaroundOnly}
+              disabled={isLoading || alternativesReadFailed}
+              onChange={(event) => setWorkaroundOnly(event.target.checked)}
+              style={{ accentColor: "var(--studio-indigo)" }}
+            />
+            Only Workaround
+          </label>
+          {searchQuery || underservedOnly || workaroundOnly ? (
             <button
               type="button"
               className="studio-button"
@@ -236,6 +314,7 @@ export function OpportunityLandscape() {
               onClick={() => {
                 setSearchQuery("");
                 setUnderservedOnly(false);
+                setWorkaroundOnly(false);
               }}
             >
               Clear Filters

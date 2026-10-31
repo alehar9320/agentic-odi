@@ -40,6 +40,9 @@ vi.mock("./api/studioApi", () => ({
   fetchMemory: vi.fn(async () => []),
   fetchOutcomeHistory: vi.fn(async () => []),
   fetchOutcomeInterval: vi.fn(async () => ({ outcome_id: "O-1", band: null })),
+  fetchOutcomeAlternatives: vi.fn(async () => []),
+  fetchExistingSolution: vi.fn(async () => "no_link_at_all"),
+  fetchAlternativeLinks: vi.fn(async () => []),
   fetchSignals: vi.fn(async () => [
     {
       id: "sig-1",

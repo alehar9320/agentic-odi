@@ -525,16 +525,15 @@ def render_existing_solution(verdict: Any, *, as_json: bool) -> str:
 
     ``yes`` means a solution is recorded; ``no_linked_nothing`` means we asked
     and the customer uses nothing today; ``no_link_at_all`` means we have not
-    asked. Only ``yes`` means a solution exists.
+    asked. Only ``yes`` means a solution exists. The wording comes from the one
+    core map so the CLI, the Studio and the brief cannot disagree.
     """
     if as_json:
         return _json(verdict)
+    from agentic_odi_core import solution_label
+
     state = verdict.get("existing_solution") if isinstance(verdict, dict) else verdict
-    if state == "yes":
-        return "Existing solution: yes — a solution is recorded."
-    if state == "no_linked_nothing":
-        return "Existing solution: no — the customer uses nothing today."
-    return "Existing solution: not yet inventoried — we have not asked."
+    return solution_label(str(state))
 
 
 def render_saved(verb: str, outcome: Any, *, as_json: bool, noun: str = "Customer outcome") -> str:

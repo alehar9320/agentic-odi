@@ -99,6 +99,16 @@ export interface OutcomeAlternative {
 }
 
 /**
+ * One recorded alternative with the outcome it rates (M2-07.2). The landscape
+ * facet reads a whole job in one call rather than one request per outcome.
+ */
+export interface OutcomeAlternativeLink {
+  outcome_id: string;
+  alternative: Alternative;
+  link: AlternativeLink;
+}
+
+/**
  * Whether an existing solution is recorded for an outcome (M2-07). `yes` means
  * a solution is recorded; `no_linked_nothing` means we asked and the customer
  * uses nothing today; `no_link_at_all` means we have not asked. Only `yes`

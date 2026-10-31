@@ -3,10 +3,12 @@ import { describe, expect, it } from "vitest";
 import {
   MIN_MEANINGFUL_N,
   confidenceClass,
+  existingSolutionLabel,
   formatBand,
   formatBandProvenance,
   formatOpportunityScore,
   formatSample,
+  isOnlyWorkaround,
   isUnderserved,
   nAdvisory,
   opportunityPill,
@@ -249,5 +251,40 @@ describe("nAdvisory (M2-14)", () => {
     expect(
       nAdvisory({ score_method: "survey", importance_n: 3, satisfaction_n: 3, opportunity_score: null }),
     ).toBeNull();
+  });
+});
+
+describe("isOnlyWorkaround", () => {
+  const link = (kind: string) => ({
+    outcome_id: "O-1",
+    alternative: { id: "A-1", job_id: "JOB-1", name: "Thing", kind },
+    link: { outcome_id: "O-1", alternative_id: "A-1", adequacy: 5, usage_n: null, note: null },
+  });
+
+  it("is true when the only recorded solution is a workaround", () => {
+    expect(isOnlyWorkaround([link("workaround")] as never)).toBe(true);
+  });
+
+  it("is false when a non-workaround solution is also recorded", () => {
+    expect(isOnlyWorkaround([link("workaround"), link("product")] as never)).toBe(false);
+  });
+
+  it("is false for a nothing row", () => {
+    expect(isOnlyWorkaround([link("nothing")] as never)).toBe(false);
+  });
+
+  it("is false for an un-inventoried outcome", () => {
+    expect(isOnlyWorkaround([])).toBe(false);
+  });
+});
+
+describe("existingSolutionLabel", () => {
+  it("words the two no states differently and records a solution only for yes", () => {
+    const yes = existingSolutionLabel("yes");
+    const nothing = existingSolutionLabel("no_linked_nothing");
+    const unknown = existingSolutionLabel("no_link_at_all");
+
+    expect(new Set([yes, nothing, unknown]).size).toBe(3);
+    expect(unknown).toContain("not yet inventoried");
   });
 });

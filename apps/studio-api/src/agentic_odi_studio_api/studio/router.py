@@ -1160,6 +1160,41 @@ async def get_has_existing_solution(
     return {"ok": True, "result": {"outcome_id": outcome_id, "existing_solution": verdict}}
 
 
+@router.get("/alternative-links")
+async def get_alternative_links(
+    request: Request,
+    job_id: str = Query(...),
+    mcp_url: str | None = Query(None),
+) -> dict:
+    """Every recorded alternative for one Job, with its outcome and link (M2-07.2).
+
+    One read for the whole Job so the landscape facet can compute a solution
+    state per outcome without a request per row.
+    """
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(mcp_url or ""),
+            ToolName.LIST_ALTERNATIVE_LINKS.value,
+            {"job_id": job_id},
+        )
+        return {"ok": True, "result": _json_or_raw(result)}
+    try:
+        triples = _service(request).job_outcome_alternatives(job_id)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return {
+        "ok": True,
+        "result": [
+            {
+                "outcome_id": outcome_id,
+                "alternative": alternative.model_dump(mode="json"),
+                "link": link.model_dump(mode="json"),
+            }
+            for outcome_id, alternative, link in triples
+        ],
+    }
+
+
 @router.get("/evidence")
 async def get_evidence_records(
     request: Request,

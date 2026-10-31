@@ -112,3 +112,85 @@ def test_unlink_removes_only_the_link() -> None:
 def test_an_unknown_alternative_is_404() -> None:
     client = _client()
     assert client.get("/api/alternatives/missing").status_code == 404
+
+
+def test_alternative_links_read_a_whole_job_in_one_call() -> None:
+    """The facet read: every alternative for the job with its outcome and link."""
+    client = _client()
+    job_id, outcome_id = _job_and_outcome(client)
+    alternative = _alternative(client, job_id, name="Spreadsheet", kind="manual")
+    client.post(
+        f"/api/outcomes/{outcome_id}/alternatives",
+        json={"alternative_id": alternative["id"], "adequacy": 6.0, "usage_n": 12},
+    )
+
+    links = client.get("/api/alternative-links", params={"job_id": job_id}).json()["result"]
+
+    assert len(links) == 1
+    assert links[0]["outcome_id"] == outcome_id
+    assert links[0]["alternative"]["kind"] == "manual"
+    assert links[0]["link"]["adequacy"] == 6.0
+    assert links[0]["link"]["usage_n"] == 12
+
+
+def test_alternative_links_is_empty_for_an_un_inventoried_job() -> None:
+    """An empty inventory is an empty list, not a claim that no solution exists."""
+    client = _client()
+    job_id, _ = _job_and_outcome(client)
+
+    links = client.get("/api/alternative-links", params={"job_id": job_id}).json()["result"]
+
+    assert links == []
+
+
+def test_alternative_links_refuses_an_unknown_job() -> None:
+    """An unknown job is a distinct state from an empty inventory."""
+    client = _client()
+    assert client.get("/api/alternative-links", params={"job_id": "missing"}).status_code == 404
+
+
+def test_alternative_links_does_not_leak_another_jobs_records() -> None:
+    client = _client()
+    job_id, outcome_id = _job_and_outcome(client)
+    other_job = client.post("/api/jobs", json={"name": "Another job"}).json()["id"]
+    other_outcome = client.post(
+        "/api/outcomes",
+        json={
+            "mcp_url": "",
+            "job_id": other_job,
+            "statement": "Minimize the time it takes to review when a change lands",
+            "importance": 7.0,
+            "satisfaction": 3.0,
+        },
+    ).json()
+    mine = _alternative(client, job_id, name="Mine", kind="product")
+    theirs = _alternative(client, other_job, name="Theirs", kind="product")
+    client.post(
+        f"/api/outcomes/{outcome_id}/alternatives",
+        json={"alternative_id": mine["id"], "adequacy": 7.0},
+    )
+    client.post(
+        f"/api/outcomes/{other_outcome['id']}/alternatives",
+        json={"alternative_id": theirs["id"], "adequacy": 2.0},
+    )
+
+    links = client.get("/api/alternative-links", params={"job_id": job_id}).json()["result"]
+
+    assert [entry["alternative"]["name"] for entry in links] == ["Mine"]
+
+
+def test_unlinking_updates_the_bulk_read() -> None:
+    client = _client()
+    job_id, outcome_id = _job_and_outcome(client)
+    alternative = _alternative(client, job_id)
+    client.post(
+        f"/api/outcomes/{outcome_id}/alternatives",
+        json={"alternative_id": alternative["id"], "adequacy": 7.0},
+    )
+    assert (
+        len(client.get("/api/alternative-links", params={"job_id": job_id}).json()["result"]) == 1
+    )
+
+    client.delete(f"/api/outcomes/{outcome_id}/alternatives/{alternative['id']}")
+
+    assert client.get("/api/alternative-links", params={"job_id": job_id}).json()["result"] == []

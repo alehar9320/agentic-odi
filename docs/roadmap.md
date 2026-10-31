@@ -170,3 +170,14 @@ The open issues this milestone still has to answer, grouped by what they change.
   the Studio API. Deleting an alternative leaves its outcomes intact with no
   orphan link; cross-job links and nonfinite or out-of-range adequacy are refused
   before any event is written.
+- [x] **Alternatives presentation (M2-07.2)**: the inventory reaches the reader
+  without turning unknowns into facts. The outcome detail shows the recorded
+  alternatives with their adequacy and usage count and the three-state solution
+  sentence; the landscape gains an **Only workaround** facet that selects
+  outcomes whose only recorded solution is a workaround and never treats a
+  `nothing` row or an un-inventoried outcome as one. A whole Job's inventory is
+  one call — `list_alternative_links` / `GET /api/alternative-links` — so the
+  facet never issues a request per row, and a failed read disables the facet
+  rather than filtering every outcome away. The brief's *Underserved outcomes*
+  line consumes the shared `render_alternative_lines` entry point; the C1
+  renderer lives on the Pillar 3 branch, so that one line is the remaining seam.

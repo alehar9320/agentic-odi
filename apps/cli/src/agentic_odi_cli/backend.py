@@ -684,6 +684,23 @@ class LocalBackend(Backend):
             raise BackendError(outcome_not_found(outcome_id)) from None
         return {"outcome_id": outcome_id, "existing_solution": verdict}
 
+    def _list_alternative_links(self, args: dict[str, Any]) -> list[dict[str, Any]]:
+        from agentic_odi_core import JobNotFoundError, job_not_found
+
+        job_id = args["job_id"]
+        try:
+            triples = self.service.job_outcome_alternatives(job_id)
+        except JobNotFoundError:
+            raise BackendError(job_not_found(job_id)) from None
+        return [
+            {
+                "outcome_id": outcome_id,
+                "alternative": alternative.model_dump(),
+                "link": link.model_dump(),
+            }
+            for outcome_id, alternative, link in triples
+        ]
+
     def _add_evidence(self, args: dict[str, Any]) -> dict[str, Any]:
         from agentic_odi_core import (
             JobNotFoundError,
@@ -969,6 +986,7 @@ _LOCAL_HANDLERS = {
     "unlink_alternative": LocalBackend._unlink_alternative,
     "get_outcome_alternatives": LocalBackend._get_outcome_alternatives,
     "get_has_existing_solution": LocalBackend._get_has_existing_solution,
+    "list_alternative_links": LocalBackend._list_alternative_links,
     "add_evidence": LocalBackend._add_evidence,
     "get_evidence": LocalBackend._get_evidence,
     "list_evidence": LocalBackend._list_evidence,

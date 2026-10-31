@@ -129,7 +129,14 @@ today for each Job — a product, a service, a workaround, a manual process, or
 nothing" from "we have not asked", so an un-inventoried outcome is never rendered
 as "no solution". Record it with `odi alternatives add|list|link|show`, the
 `add_alternative` / `link_alternative` / `get_outcome_alternatives` tools, or the
-Studio API.
+Studio API. Read a whole Job's inventory in one call with `odi alternatives
+links`, the `list_alternative_links` tool, or `GET /api/alternative-links`, and
+one outcome's solution state with `get_has_existing_solution` or `GET
+/api/outcomes/{id}/existing-solution`. The Studio shows the recorded
+alternatives on the outcome detail and offers an **Only workaround** facet on the
+landscape, so an outcome whose only recorded solution is a workaround can be
+pulled out of the ranking without turning an un-inventoried outcome into a
+workaround.
 
 `odi top` answers "what should we build next?" from the measured section only —
 highest low end of the band first — naming the thin and unscored outcomes it
