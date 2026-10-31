@@ -62,6 +62,10 @@ class McpConnectorSettings(BaseModel):
     auth: McpAuthMode = "none"
     headers: dict[str, str] = Field(default_factory=dict)
     env_vars: list[str] = Field(default_factory=list)
+    tool_args: dict[str, dict] = Field(
+        default_factory=dict,
+        description="Per-tool argument overrides passed to call_tool.",
+    )
 
 
 class PaginationSettings(BaseModel):
