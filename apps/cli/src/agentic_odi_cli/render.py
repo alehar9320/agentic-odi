@@ -528,6 +528,45 @@ def render_candidate_acceptance(result: Any, *, as_json: bool) -> str:
     )
 
 
+def render_review_prompt(
+    position: int,
+    total: int,
+    candidate: dict[str, Any],
+    quote: dict[str, Any] | None,
+) -> str:
+    """One review step: the progress line, the statement, and its source quote.
+
+    The candidate statement and the verbatim quote stay paired so a person
+    decides with the evidence in view.
+    """
+    lines = [f"[{position}/{total}] {candidate.get('id', '')}"]
+    statement = str(candidate.get("statement", "")).strip()
+    lines.append(f"  statement  {statement}")
+    if quote is not None:
+        speaker = quote.get("speaker")
+        prefix = f"{speaker}: " if speaker else ""
+        lines.append(f"  quote      {prefix}{quote.get('text', '')}")
+    else:
+        lines.append("  quote      (the source quote is missing)")
+    if candidate.get("confidence") is not None:
+        lines.append(f"  confidence {_num(candidate.get('confidence'))}")
+    return "\n".join(lines)
+
+
+def render_review_summary(result: dict[str, Any]) -> str:
+    """The end-of-pass tally: what was accepted, merged, rejected, or skipped."""
+    parts = [
+        f"accepted {result.get('accepted', 0)}",
+        f"merged {result.get('merged', 0)}",
+        f"rejected {result.get('rejected', 0)}",
+        f"skipped {result.get('skipped', 0)}",
+    ]
+    failed = result.get("failed", 0)
+    if failed:
+        parts.append(f"failed {failed}")
+    return "Review complete: " + ", ".join(parts) + "."
+
+
 def render_duplicate_groups(result: Any, *, as_json: bool) -> str:
     """Render suggested duplicate groups as one line of candidate ids per group."""
     if not isinstance(result, dict):
