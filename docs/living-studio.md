@@ -187,8 +187,8 @@ The studio repeats that label where a person can see it: the rail shows a
 **DEMO** or **OFFLINE** chip, the Opportunity Landscape shows a sample-data
 notice, and an impact simulation must carry `provenance: live | simulated` before
 it renders. The catch-up feed starts empty rather than inventing activity, and
-every event produced by **Simulate update** is marked **Simulated** and excluded
-from the unread count. Its real content is the store's signal inbox
+no surface can fabricate a signal: the three example signals live only in test
+fixtures. Its real content is the store's signal inbox
 ([The Signal Inbox](architecture/notifications.md)): the bell count comes from
 `/api/signals/unread-count`, the feed loads on boot, re-reads after every canvas
 refresh, and polls once a minute while the window is visible. Connector rows in Settings come from the real connector
