@@ -470,9 +470,46 @@ remain deferred by the plan; this fix is confined to C4's exported-case parity.
 - W1: the estimate is a caller judgement, never score-derived, never summed;
   `market`/`pilot` requires a named source; unsized ≠ 0.
 
-**Deferred (own specs, sequenced after M1)** — not implemented here: M3
-narrative/memo/challenge/portfolio, M4 collaboration and role-policy rollout,
-and W1's split capture/display/ordering children (ALH-186/188/189).
+**Deferred (own specs, sequenced after M1)** — not implemented here: the M3
+challenge/portfolio increments, M4 collaboration and role-policy rollout, and
+W1's split capture/display/ordering children (ALH-186/188/189). The M3
+narrative/memo increments *did* land on
+`alexanderharenstam/alh-90-narrate-the-brief`; see "M3 increments" below.
+
+## M3 increments — narration, the memo and the message (ALH-90/169, 97/171, 98)
+
+Landed on `alexanderharenstam/alh-90-narrate-the-brief`, stacked on this branch
+because each is a thin adapter over the factual spine the M1 increments built.
+
+| Increment | Slice | Surface |
+|---|---|---|
+| M3-04 · ALH-90 / ALH-169 | optional narration, labelled, numeral-checked | core `render_narrative`, CLI `brief export --narrate` |
+| M3-11 · ALH-97 | `build_memo` + `render_memo` — the one-page case, on read | core, MCP `render_memo`, CLI `decide memo`, `POST /api/decisions/memo` |
+| M3-11.2 · ALH-171 | `render_memo_markdown`/`render_memo_html`, `narrate_memo`, `SCHEMA_VERSION` | core, CLI `decide memo --format md\|html --out --generated-at --narrate`, studio `decision-memo` card |
+| M3-12 · ALH-98 | `render_stakeholder_message` | core, MCP `render_stakeholder_message`, CLI `decide message`, `GET /api/decisions/{id}/message` |
+
+Readiness choices pinned (recorded, not inferred):
+
+- **One narrator, not two.** `narrate_memo` adapts the memo's chosen claims into
+  a `BriefInput` and reuses M3-04's `render_narrative`, so there is no second
+  model policy and no second label string. `brief.render_narrative_block` is the
+  one seam onto the labelled drafted block.
+- **Numeral membership is a safeguard, not proof.** A surviving sentence's
+  numerals must exist in the input and belong to an outcome the sentence links;
+  a failing sentence is dropped with a recorded reason, never printed.
+- **The default stays byte-identical.** `--no-narrate` (the memo and brief
+  default) renders the same bytes as the factual projection; a missing provider
+  still renders the facts.
+- **The HTML export is the same facts.** `render_memo_html` wraps
+  `render_memo_markdown`, escapes hostile text, inlines its own paper CSS and
+  carries only caller-supplied metadata (export time, schema version) — no
+  network asset, no research claim.
+- **The message has a budget, and the unknowns survive it.** `slack` is 120
+  words, `email` 200; the largest unknown and a supplied link are never dropped
+  for length, and a budget that cannot fit them fails loudly rather than
+  silently omitting one.
+- **The memo is generated on read, never stored.** `POST /api/decisions/memo`
+  writes nothing, pinned by a before/after row-count assertion.
 
 ## D increments — segments and strategy (ALH-40/41/161/42/43)
 
