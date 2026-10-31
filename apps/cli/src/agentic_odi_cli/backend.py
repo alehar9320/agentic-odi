@@ -26,6 +26,7 @@ import typer
 
 if TYPE_CHECKING:
     from agentic_odi_core import ODIService
+    from agentic_odi_integrations_openhands import OrchestratorService
 
 # Kept as literals so importing the CLI does not pull in the core package
 # (``agentic-odi --version`` must stay lightweight). ``tests/contract`` asserts
@@ -115,6 +116,7 @@ class LocalBackend(Backend):
     def __init__(self, db_path: str | None = None) -> None:
         self._db_path = db_path
         self._service: ODIService | None = None
+        self._orchestrator: OrchestratorService | None = None
 
     @property
     def service(self) -> ODIService:
@@ -124,6 +126,14 @@ class LocalBackend(Backend):
 
             self._service = ODIService(SQLiteRepository(db_path=self._db_path))
         return self._service
+
+    @property
+    def orchestrator(self) -> OrchestratorService:
+        if self._orchestrator is None:
+            from agentic_odi_integrations_openhands import OrchestratorService
+
+            self._orchestrator = OrchestratorService()
+        return self._orchestrator
 
     def call(self, tool_name: str, args: dict[str, Any]) -> Any:
         from agentic_odi_core import OdiError
@@ -644,6 +654,94 @@ class LocalBackend(Backend):
             raise BackendError(f"signal not found: {signal_id}") from None
         return signal.model_dump(mode="json")
 
+    def _add_work_item(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_integrations_openhands import OrchestratorError
+
+        try:
+            work, created = self.orchestrator.add_work_item(
+                title=args["title"],
+                prompt=args["prompt"],
+                target_alias=args.get("target"),
+                repository=args.get("repository"),
+                branch=args.get("branch"),
+                priority=int(args.get("priority") or 0),
+                job_id=args.get("job_id"),
+                work_key=args.get("work_key"),
+            )
+        except (OrchestratorError, ValueError) as exc:
+            raise BackendError(str(exc)) from exc
+        return {"created": created, "work_item": work.model_dump(mode="json")}
+
+    def _list_work_items(self, args: dict[str, Any]) -> list[dict[str, Any]]:
+        from agentic_odi_integrations_openhands import OrchestratorError
+
+        try:
+            items = self.orchestrator.list_work_items(
+                status=args.get("status"), source_kind=args.get("source")
+            )
+        except (OrchestratorError, ValueError) as exc:
+            raise BackendError(str(exc)) from exc
+        return [item.model_dump(mode="json") for item in items]
+
+    def _get_work_item(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_integrations_openhands import OrchestratorError
+
+        try:
+            work = self.orchestrator.get_work_item(args["work_id"])
+            run = self.orchestrator.latest_run(work.id)
+        except OrchestratorError as exc:
+            raise BackendError(str(exc)) from exc
+        return {
+            "work_item": work.model_dump(mode="json"),
+            "latest_run": run.public_view() if run is not None else None,
+        }
+
+    def _cancel_work_item(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_integrations_openhands import OrchestratorError
+
+        try:
+            work = self.orchestrator.cancel_work_item(args["work_id"])
+        except OrchestratorError as exc:
+            raise BackendError(str(exc)) from exc
+        return work.model_dump(mode="json")
+
+    def _retry_work_item(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_integrations_openhands import OrchestratorError
+
+        try:
+            work = self.orchestrator.retry_work_item(args["work_id"])
+        except OrchestratorError as exc:
+            raise BackendError(str(exc)) from exc
+        return work.model_dump(mode="json")
+
+    def _list_agent_targets(self, args: dict[str, Any]) -> list[dict[str, Any]]:
+        return [target.public_view() for target in self.orchestrator.targets()]
+
+    def _list_agent_runs(self, args: dict[str, Any]) -> list[dict[str, Any]]:
+        from agentic_odi_integrations_openhands import OrchestratorError
+
+        try:
+            runs = self.orchestrator.list_runs(args.get("work_id"))
+        except OrchestratorError as exc:
+            raise BackendError(str(exc)) from exc
+        return [run.public_view() for run in runs]
+
+    def _get_agent_run(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_integrations_openhands import OrchestratorError
+
+        try:
+            run = self.orchestrator.get_run(args["run_id"])
+            approvals = self.orchestrator.approvals(run.id)
+        except OrchestratorError as exc:
+            raise BackendError(str(exc)) from exc
+        return {
+            "run": run.public_view(),
+            "approvals": [record.model_dump(mode="json") for record in approvals],
+        }
+
+    def _get_orchestrator_status(self, args: dict[str, Any]) -> dict[str, Any]:
+        return self.orchestrator.status().model_dump(mode="json")
+
 
 _LOCAL_HANDLERS = {
     "add_job": LocalBackend._add_job,
@@ -685,6 +783,15 @@ _LOCAL_HANDLERS = {
     "list_signals": LocalBackend._list_signals,
     "mark_signal_read": LocalBackend._mark_signal_read,
     "dismiss_signal": LocalBackend._dismiss_signal,
+    "add_work_item": LocalBackend._add_work_item,
+    "list_work_items": LocalBackend._list_work_items,
+    "get_work_item": LocalBackend._get_work_item,
+    "cancel_work_item": LocalBackend._cancel_work_item,
+    "retry_work_item": LocalBackend._retry_work_item,
+    "list_agent_targets": LocalBackend._list_agent_targets,
+    "list_agent_runs": LocalBackend._list_agent_runs,
+    "get_agent_run": LocalBackend._get_agent_run,
+    "get_orchestrator_status": LocalBackend._get_orchestrator_status,
     "get_health": LocalBackend._get_health,
 }
 
@@ -752,6 +859,9 @@ _LIST_TOOLS = frozenset(
         "list_evidence",
         "list_signals",
         "list_scheduled_work",
+        "list_work_items",
+        "list_agent_targets",
+        "list_agent_runs",
     }
 )
 

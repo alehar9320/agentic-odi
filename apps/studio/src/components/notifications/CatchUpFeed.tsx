@@ -12,7 +12,7 @@ import {
   SparkIcon,
 } from "../icons";
 
-type FilterType = "all" | "unread" | "urgent" | "outcome" | "evidence";
+type FilterType = "all" | "unread" | "urgent" | "outcome" | "evidence" | "agent";
 
 const KIND_LABEL: Record<SignalKind, string> = {
   job_added: "Job",
@@ -21,6 +21,9 @@ const KIND_LABEL: Record<SignalKind, string> = {
   evidence_ingested: "Evidence",
   evidence_promoted: "Evidence",
   job_map_completed: "Job map",
+  agent_work_completed: "Agent work",
+  agent_work_failed: "Agent work",
+  agent_work_blocked: "Agent work",
 };
 
 const SEVERITY_BADGE: Record<SignalSeverity, string> = {
@@ -51,7 +54,12 @@ function kindIcon(kind: SignalKind) {
   if (kind === "job_added" || kind === "job_map_completed") return <RouteIcon size={16} />;
   if (kind === "outcome_scored" || kind === "opportunity_crossed") return <CompassIcon size={16} />;
   if (kind === "evidence_promoted") return <SparkIcon size={16} />;
+  if (kind.startsWith("agent_work_")) return <BoltIcon size={16} />;
   return <SignalIcon size={16} />;
+}
+
+function isAgentWorkSignal(signal: Signal): boolean {
+  return signal.kind.startsWith("agent_work_");
 }
 
 function isOutcomeSignal(signal: Signal): boolean {
@@ -85,12 +93,14 @@ export function CatchUpFeed() {
   const urgentCount = unread.filter((signal) => signal.severity === "urgent").length;
   const outcomeCount = signals.filter(isOutcomeSignal).length;
   const evidenceCount = signals.filter(isEvidenceSignal).length;
+  const agentCount = signals.filter(isAgentWorkSignal).length;
 
   const visible = signals.filter((signal) => {
     if (activeFilter === "unread") return !signal.read_at;
     if (activeFilter === "urgent") return signal.severity === "urgent";
     if (activeFilter === "outcome") return isOutcomeSignal(signal);
     if (activeFilter === "evidence") return isEvidenceSignal(signal);
+    if (activeFilter === "agent") return isAgentWorkSignal(signal);
     return true;
   });
 
@@ -104,6 +114,7 @@ export function CatchUpFeed() {
     { id: "urgent", label: "Urgent", count: urgentCount },
     { id: "outcome", label: "Outcome shifts", count: outcomeCount },
     { id: "evidence", label: "Evidence", count: evidenceCount },
+    { id: "agent", label: "Agent work", count: agentCount },
   ];
 
   return (
@@ -170,7 +181,7 @@ export function CatchUpFeed() {
           </p>
           <p className="catchup-empty__hint">
             {signals.length === 0
-              ? "This inbox only fills from real changes: an outcome re-scored, evidence captured, a job map completed."
+              ? "This inbox only fills from real changes: an outcome re-scored, evidence captured, a job map completed, or an agent finishing work."
               : "Try another filter."}
           </p>
           {signals.length === 0 ? (
@@ -264,7 +275,9 @@ export function CatchUpFeed() {
                         ? "View outcome"
                         : item.subject_kind === "evidence"
                           ? "Open the evidence"
-                          : `Open the ${item.subject_kind ?? "record"}`} →
+                          : item.subject_kind === "agent_work"
+                            ? "Open the work item"
+                            : `Open the ${item.subject_kind ?? "record"}`} →
                     </button>
                   ) : (
                     <button

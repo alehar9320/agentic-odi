@@ -4,6 +4,9 @@ import type {
   AddConnectorPayload,
   AddOutcomePayload,
   AddStepPayload,
+  AgentRun,
+  AgentTarget,
+  AgentWorkEntry,
   CanvasData,
   ChangelogData,
   ChatStreamRequest,
@@ -23,6 +26,7 @@ import type {
   Observation,
   ObservationKind,
   ObservationStatus,
+  OrchestratorStatus,
   Outcome,
   Signal,
   Step,
@@ -700,6 +704,31 @@ export function cancelScheduledWork(
   mcpUrl: string,
 ): Promise<{ ok: boolean; result: unknown }> {
   return postJson(`/api/schedule/${encodeURIComponent(workId)}/cancel?mcp_url=${encodeURIComponent(mcpUrl)}`, {});
+}
+
+export function listWorkItems(): Promise<{ work_items: AgentWorkEntry[] }> {
+  return getJson<{ work_items: AgentWorkEntry[] }>("/api/work-items");
+}
+
+export function cancelWorkItem(workId: string): Promise<{ work_item: AgentWorkEntry["work_item"] }> {
+  return postJson(`/api/work-items/${encodeURIComponent(workId)}/cancel`, {});
+}
+
+export function retryWorkItem(workId: string): Promise<{ work_item: AgentWorkEntry["work_item"] }> {
+  return postJson(`/api/work-items/${encodeURIComponent(workId)}/retry`, {});
+}
+
+export function listAgentTargets(): Promise<{ targets: AgentTarget[] }> {
+  return getJson<{ targets: AgentTarget[] }>("/api/agent-targets");
+}
+
+export function listAgentRuns(workId?: string): Promise<{ runs: AgentRun[] }> {
+  const query = workId ? `?work_id=${encodeURIComponent(workId)}` : "";
+  return getJson<{ runs: AgentRun[] }>(`/api/agent-runs${query}`);
+}
+
+export function getOrchestratorStatus(): Promise<{ status: OrchestratorStatus }> {
+  return getJson<{ status: OrchestratorStatus }>("/api/orchestrator/status");
 }
 
 export function addEvidence(payload: {

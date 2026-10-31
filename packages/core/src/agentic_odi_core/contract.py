@@ -53,6 +53,15 @@ class ToolName(str, Enum):
     LIST_SCHEDULED_WORK = "list_scheduled_work"
     CANCEL_SCHEDULED_WORK = "cancel_scheduled_work"
     TRIGGER_SCHEDULED_WORK = "trigger_scheduled_work"
+    ADD_WORK_ITEM = "add_work_item"
+    LIST_WORK_ITEMS = "list_work_items"
+    GET_WORK_ITEM = "get_work_item"
+    CANCEL_WORK_ITEM = "cancel_work_item"
+    RETRY_WORK_ITEM = "retry_work_item"
+    LIST_AGENT_TARGETS = "list_agent_targets"
+    LIST_AGENT_RUNS = "list_agent_runs"
+    GET_AGENT_RUN = "get_agent_run"
+    GET_ORCHESTRATOR_STATUS = "get_orchestrator_status"
 
 
 class ToolEffect(str, Enum):
@@ -455,6 +464,83 @@ TOOL_SPECS: dict[str, ToolSpec] = {
         arguments=("work_id",),
         required=("work_id",),
         returns="The dispatched scheduled work item.",
+    ),
+    ToolName.ADD_WORK_ITEM.value: ToolSpec(
+        name="add_work_item",
+        summary="Queue work for an OpenHands Cloud agent to run autonomously.",
+        effect=_derive_effect("add_work_item"),
+        arguments=(
+            "title",
+            "prompt",
+            "target",
+            "repository",
+            "branch",
+            "priority",
+            "job_id",
+            "work_key",
+        ),
+        required=("title", "prompt"),
+        returns="The queued work item, or the existing item with the same work key.",
+    ),
+    ToolName.LIST_WORK_ITEMS.value: ToolSpec(
+        name="list_work_items",
+        summary="List queued and finished agent work items.",
+        effect=_derive_effect("list_work_items"),
+        arguments=("status", "source"),
+        returns="A list of work items.",
+    ),
+    ToolName.GET_WORK_ITEM.value: ToolSpec(
+        name="get_work_item",
+        summary="Get one agent work item and its latest run.",
+        effect=_derive_effect("get_work_item"),
+        arguments=("work_id",),
+        required=("work_id",),
+        returns="The work item with its latest run, or an error string if not found.",
+    ),
+    ToolName.CANCEL_WORK_ITEM.value: ToolSpec(
+        name="cancel_work_item",
+        summary="Cancel queued or running agent work.",
+        effect=_derive_effect("cancel_work_item"),
+        arguments=("work_id",),
+        required=("work_id",),
+        returns="The cancelled work item.",
+    ),
+    ToolName.RETRY_WORK_ITEM.value: ToolSpec(
+        name="retry_work_item",
+        summary="Requeue a finished agent work item.",
+        effect=_derive_effect("retry_work_item"),
+        arguments=("work_id",),
+        required=("work_id",),
+        returns="The requeued work item.",
+    ),
+    ToolName.LIST_AGENT_TARGETS.value: ToolSpec(
+        name="list_agent_targets",
+        summary="List configured OpenHands agent targets.",
+        effect=_derive_effect("list_agent_targets"),
+        arguments=(),
+        returns="A list of targets with their repositories and concurrency limits.",
+    ),
+    ToolName.LIST_AGENT_RUNS.value: ToolSpec(
+        name="list_agent_runs",
+        summary="List agent runs, optionally for one work item.",
+        effect=_derive_effect("list_agent_runs"),
+        arguments=("work_id",),
+        returns="A list of agent runs.",
+    ),
+    ToolName.GET_AGENT_RUN.value: ToolSpec(
+        name="get_agent_run",
+        summary="Get one agent run with its approval decisions.",
+        effect=_derive_effect("get_agent_run"),
+        arguments=("run_id",),
+        required=("run_id",),
+        returns="The run and its approvals, or an error string if not found.",
+    ),
+    ToolName.GET_ORCHESTRATOR_STATUS.value: ToolSpec(
+        name="get_orchestrator_status",
+        summary="Report whether the orchestrator daemon is running and what it is doing.",
+        effect=_derive_effect("get_orchestrator_status"),
+        arguments=(),
+        returns="Daemon heartbeat, queue counts, and configured targets.",
     ),
 }
 

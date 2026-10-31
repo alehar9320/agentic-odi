@@ -35,6 +35,7 @@ from agentic_odi_core.models import (
     compute_opportunity_score,
 )
 from agentic_odi_core.repository import Repository, page
+from agentic_odi_core.schedule_expr import parse_schedule
 
 
 class JobNotFoundError(NotFoundError):
@@ -639,15 +640,17 @@ class ODIService:
             raise JobNotFoundError(job_id)
         if isinstance(trigger_type, str):
             trigger_type = ScheduledWorkTriggerType(trigger_type)
+        parsed = parse_schedule(schedule_expression)
         work = ScheduledWork(
             id=str(uuid.uuid4()),
             name=name,
             agent_id=agent_id,
-            trigger_type=trigger_type,
+            trigger_type=parsed.trigger_type,
             schedule_expression=schedule_expression,
             payload=payload or {},
             status=ScheduledWorkStatus.SCHEDULED,
             job_id=job_id,
+            next_run_at=parsed.next_run_at.isoformat(),
         )
         return self.repo.add_scheduled_work(work)
 
@@ -674,20 +677,21 @@ class ODIService:
         return updated
 
     def trigger_scheduled_work(self, work_id: str) -> ScheduledWork:
-        from datetime import datetime, timezone
-
         work = self.repo.get_scheduled_work(work_id)
         if work is None:
             raise ScheduledWorkNotFoundError(work_id)
+        if work.status == ScheduledWorkStatus.CANCELLED:
+            raise ValidationError(
+                f"Scheduled work {work_id} is cancelled; schedule a new one instead."
+            )
         now_str = datetime.now(timezone.utc).isoformat()
-        # No executor exists yet (#95): the work is dispatched and this is the
-        # record of it. Claiming a result would be inventing one.
+        # Mark the occurrence due. The orchestrator daemon claims due work and
+        # reports the real outcome; this method must never claim a result.
         updates = {
-            "status": ScheduledWorkStatus.RUNNING,
-            "last_run_at": now_str,
-            "result_summary": (
-                f"Dispatched at {now_str}; no executor is installed, so nothing has run."
-            ),
+            "status": ScheduledWorkStatus.SCHEDULED,
+            "trigger_requested_at": now_str,
+            "next_run_at": now_str,
+            "result_summary": f"Queued for the orchestrator at {now_str}; not run yet.",
         }
         updated = self.repo.update_scheduled_work(work_id, updates)
         if updated is None:

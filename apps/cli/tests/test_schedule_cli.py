@@ -45,7 +45,7 @@ def test_schedule_cli_crud(tmp_path, monkeypatch):
     # Trigger task
     res_trig = runner.invoke(app, ["schedule", "trigger", work_id])
     assert res_trig.exit_code == 0
-    assert "Triggered task 'Test Task'" in res_trig.stdout
+    assert "Queued task 'Test Task' for the orchestrator" in res_trig.stdout
 
     # Cancel task
     res_canc = runner.invoke(app, ["schedule", "cancel", work_id])

@@ -21,6 +21,7 @@ from agentic_odi_cli.desired_outcomes import desired_outcomes_app
 from agentic_odi_cli.evidence import evidence_app
 from agentic_odi_cli.jobs import jobs_app
 from agentic_odi_cli.onboard import maybe_run_first_launch
+from agentic_odi_cli.orchestrate import orchestrate_app
 from agentic_odi_cli.profile import app as profile_app
 from agentic_odi_cli.profile import setup_wizard
 from agentic_odi_cli.render import render_job_summary
@@ -39,6 +40,11 @@ app.add_typer(connectors_app, name="connectors")
 app.add_typer(jobs_app, name="jobs", help="Manage Jobs-to-be-Done.")
 app.add_typer(
     schedule_app, name="schedule", help="Schedule and manage background cloud agent tasks."
+)
+app.add_typer(
+    orchestrate_app,
+    name="orchestrate",
+    help="Queue work for OpenHands Cloud agents and run the autopilot daemon.",
 )
 app.add_typer(steps_app, name="steps", help="Manage Job-map Steps.")
 app.add_typer(desired_outcomes_app, name="desired-outcomes", help="Manage desired Outcomes.")

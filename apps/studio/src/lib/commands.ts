@@ -119,6 +119,22 @@ export const STUDIO_COMMANDS: StudioCommand[] = [
     keywords: ["add", "outcome", "manual"],
   },
   {
+    id: "work",
+    name: "/work",
+    label: "Agent work",
+    description: "What the orchestrator queued, what is running, and what finished.",
+    category: "Studio",
+    keywords: ["orchestrator", "agents", "queue", "runs"],
+  },
+  {
+    id: "schedule",
+    name: "/schedule",
+    label: "Scheduled work",
+    description: "Recurring and one-shot work the orchestrator will run.",
+    category: "Studio",
+    keywords: ["cron", "timer", "background"],
+  },
+  {
     id: "settings",
     name: "/settings",
     label: "Settings",

@@ -335,19 +335,72 @@ using `--backend mcp` (default: `http://localhost:8000/mcp`).
 
 ## Schedule Work
 
-Schedule, inspect, cancel, and trigger background cloud agent work tasks:
+Schedule, inspect, cancel, and queue background agent work. The expression is
+parsed when the schedule is created and accepts an ISO timestamp
+(`2026-11-01T09:00Z`), a relative delay (`+1h`, `+90m`, `+2d`), or a cron
+expression (`0 9 * * *`). The schedule's trigger type is derived from the
+expression; the legacy `--trigger-type` flag is accepted but no longer decides
+recurrence.
 
 ```bash
 # Schedule a task
-agentic-odi schedule create --name "Nightly ODI Audit" --expression "0 0 * * *" --trigger-type cron
+agentic-odi schedule create --name "Nightly ODI Audit" --expression "0 0 * * *"
 
-# List, inspect, trigger, and cancel
+# List, inspect, queue an occurrence, and cancel
 agentic-odi schedule list
 agentic-odi schedule list --json
 agentic-odi schedule show <work-id>
-agentic-odi schedule trigger <work-id>
+agentic-odi schedule trigger <work-id>   # queues for the orchestrator daemon
 agentic-odi schedule cancel <work-id>
 ```
+
+`schedule trigger` marks the occurrence due and reports "queued for the
+orchestrator". It does not run the work and never claims a result; the daemon
+turns due schedules into work items, one per occurrence, and mirrors the real
+terminal outcome back onto the record.
+
+## Orchestrate Agent Work
+
+The `orchestrate` group owns the OpenHands Cloud queue. Configuration lives in
+`~/.config/agentic-odi/openhands.json` (override with
+`AGENTIC_ODI_OPENHANDS_CONFIG`); state lives in
+`~/.agentic-odi/orchestrator.db` (override with
+`AGENTIC_ODI_ORCHESTRATOR_DB`). See the README for a target example.
+
+```bash
+agentic-odi orchestrate status                 # daemon heartbeat and queue counts
+agentic-odi orchestrate status --json
+
+agentic-odi orchestrate add \
+  --title "Fix the README typo" \
+  --prompt "Correct the install command and run the docs checks." \
+  --target cloud-main \
+  --repo owner/repo \
+  --branch main
+agentic-odi orchestrate add --title "..." --prompt "..." --work-key manual:daily-audit
+
+agentic-odi orchestrate start                  # foreground daemon
+agentic-odi orchestrate start --once           # one tick
+agentic-odi orchestrate start --interval 30 --max-concurrency 2
+
+agentic-odi orchestrate list --status queued
+agentic-odi orchestrate show <work-id>         # latest run, cost, PR, error
+agentic-odi orchestrate runs <work-id>
+agentic-odi orchestrate cancel <work-id>
+agentic-odi orchestrate retry <work-id>
+agentic-odi orchestrate agents                 # aliases; keys are never printed
+```
+
+The daemon is foreground by default and takes a single-instance lock; SIGINT or
+SIGTERM stops after the current tick and leaves work resumable. A stopped
+daemon never fabricates progress: `status` says it is not running, and queued
+work stays readable. Terminal runs emit one `agent_work_completed`,
+`agent_work_failed`, or `agent_work_blocked` signal into the same inbox as every
+other change.
+
+`--max-concurrency` caps total active runs. Per-target concurrency, attempts,
+wall clock, per-run cost, and optional UTC-day cost caps come from the target in
+the config file.
 
 ## Connectors
 

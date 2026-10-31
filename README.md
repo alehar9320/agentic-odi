@@ -78,6 +78,11 @@ per-platform archives with SHA-256 checksums for a manual download. See
   event log and read by the CLI, any MCP client, and the Studio's bell.
   Nothing is invented, and the feed is deduped and budgeted so it stays
   worth opening.
+- **An autopilot for your Agent Canvas.** `odi orchestrate` queues work,
+  starts OpenHands Cloud conversations, supervises them, answers routine
+  confirmations inside a deterministic policy, retries transient failures,
+  and reports the real outcome to Catch up. Agents open a pull request; they
+  never merge.
 
 ## How it works
 
@@ -153,6 +158,92 @@ A listing that needs a token names the environment variable to set; no credentia
 is stored in the app. MCP servers install today; A2A agents are marked "coming
 soon". See [External Connectors](docs/connectors.md).
 
+## Run your Agent Canvas
+
+`agentic-odi orchestrate` is a custom integration against **OpenHands Cloud**.
+It is a local daemon with its own append-only store
+(`~/.agentic-odi/orchestrator.db`); work enters from the CLI, GitHub labels,
+existing schedules, or Studio chat. The daemon starts a Cloud conversation,
+parses pending actions with the same rule the OpenHands SDK uses, answers them
+through a deterministic allowlist, and reports only terminal outcomes to Catch
+up. It never merges a pull request, force-pushes, or leaves the selected
+repository.
+
+Targets are configuration, not queued entities. Create
+`~/.config/agentic-odi/openhands.json` (mode `0600`):
+
+```json
+{
+  "targets": [
+    {
+      "alias": "cloud-main",
+      "base_url": "https://app.all-hands.dev",
+      "api_key_env": "OPENHANDS_API_KEY",
+      "repository": "owner/repo",
+      "branch": "main",
+      "max_concurrency": 1,
+      "max_cost_usd": 5.0,
+      "daily_cost_limit_usd": 20.0,
+      "max_runtime_s": 1800,
+      "max_attempts": 2
+    }
+  ],
+  "default_target": "cloud-main"
+}
+```
+
+Set `OPENHANDS_API_KEY` (and `GITHUB_TOKEN` if GitHub intake is enabled), then:
+
+```bash
+odi orchestrate status
+odi orchestrate add --title "Fix the README typo" --prompt "Correct the install command."
+odi orchestrate start                 # foreground daemon; Ctrl-C stops after the tick
+odi orchestrate start --once          # one tick, for a first run or a test
+odi orchestrate list                  # queue and history
+odi orchestrate show <work-id>        # latest run, cost, PR, error
+odi orchestrate runs <work-id>        # every attempt
+odi orchestrate agents                # configured targets, keys never printed
+```
+
+A typical run is `queued → dispatching → running → completed | failed |
+blocked`. Transient network, 429/5xx, and sandbox failures retry with backoff up
+to `max_attempts`; authentication, invalid repositories, policy denials, and
+cancellations do not. Each terminal run emits exactly one
+`agent_work_completed`, `agent_work_failed`, or `agent_work_blocked` signal, so
+the inbox stays the only place you have to read. The Studio's **Work** lens
+shows the same state and can cancel or retry.
+
+GitHub intake is opt-in per repository in the same config file:
+
+```json
+{
+  "github": {
+    "enabled": true,
+    "repos": ["owner/repo"],
+    "label": "odi:autopilot",
+    "token_env": "GITHUB_TOKEN"
+  }
+}
+```
+
+Labeled issues become work items keyed by `github:owner/repo#number`; the
+orchestrator adds `odi:running`, then `odi:done`/`odi:failed`/`odi:blocked`
+and posts one comment with the result and PR link. Pull requests are never
+treated as intake.
+
+Schedules use ISO timestamps, relative delays (`+1h`, `+90m`, `+2d`), or cron
+expressions. The expression is parsed when the schedule is created, and the
+daemon creates a new work item for each due occurrence. `odi schedule trigger`
+queues an occurrence immediately; it never claims the work ran.
+
+**Boundaries.** Full autopilot auto-accepts LOW/MEDIUM in-repo reads, edits,
+tests, commits, feature-branch pushes, and PR creation. It rejects anything
+outside that allowlist and blocks dangerous actions (`rm -rf`, `sudo`,
+force-push, default-branch pushes, credential or `.env` access, pipe-to-shell,
+PR merge) with an urgent signal. Per-run wall clock and cost limits, optional
+UTC-day caps, per-target concurrency, and a stable title/observability tag make
+a crash recoverable without silently starting duplicate cloud work.
+
 ## Documentation
 
 | Guide | Contents |
@@ -186,6 +277,8 @@ together and where each contract is enforced:
 |---|---|---|
 | **`packages/core/`** | `agentic-odi-core` | Domain models, the `ODIService` layer, in-memory and SQLite repositories, the shared MCP tool contract, and opportunity-score computation. |
 | **`packages/connectors/`** | `agentic-odi-connectors` | Pluggable MCP and REST connectors with presets and an ingest sink. |
+| **`packages/openhands/`** | `agentic-odi-openhands` | Thin OpenHands Cloud and Agent Server HTTP client with wire models; no ODI imports. |
+| **`packages/integrations/openhands/`** | `agentic-odi-integrations-openhands` | Work queue, run state machine, daemon, approval policy, schedule and GitHub sources. |
 | **`apps/mcp-server/`** | `agentic-odi-mcp-server` | FastMCP server exposing Jobs, Steps, Desired Outcomes, Customer Outcomes, Evidence, and context tools over HTTP. SQLite by default. |
 | **`apps/studio-api/`** | `agentic-odi-studio-api` | FastAPI **Living Studio sidecar**: config, health, metadata-only diagnostics, canvas, local mutations, MCP passthrough, SSE chat, conversations, and PM memory. |
 | **`apps/cli/`** | `agentic-odi-cli` | Typer CLI with interactive chat, full entity CRUD, `schema`, `connectors`, and local or remote data access. |
