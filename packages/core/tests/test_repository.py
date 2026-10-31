@@ -237,22 +237,29 @@ def test_evidence_crud_and_filters():
     assert repo.get_evidence("e1") is None
 
 
-def test_delete_job_cascades_evidence():
+def test_delete_job_unlinks_evidence():
     repo = _repo_with_graph()
     repo.add_evidence(_evidence("e1", job_id="j1", step_id="s1", outcome_id="o1"))
     repo.add_evidence(_evidence("e2", job_id="j1"))
     repo.add_evidence(_evidence("e3", job_id="other"))
     assert repo.delete_job("j1") is True
-    assert repo.get_evidence("e1") is None
-    assert repo.get_evidence("e2") is None
+    #: Research evidence survives: references to the removed job, step, and
+    #: outcome are nulled rather than the rows being destroyed.
+    e1 = repo.get_evidence("e1")
+    assert e1 is not None
+    assert (e1.job_id, e1.step_id, e1.outcome_id) == (None, None, None)
+    e2 = repo.get_evidence("e2")
+    assert e2 is not None and e2.job_id is None
     assert repo.get_evidence("e3") is not None
 
 
-def test_delete_outcome_cascades_evidence():
+def test_delete_outcome_unlinks_evidence():
     repo = _repo_with_graph()
     repo.add_evidence(_evidence("e1", job_id="j1", outcome_id="o1"))
     assert repo.delete_outcome("o1") is True
-    assert repo.get_evidence("e1") is None
+    e1 = repo.get_evidence("e1")
+    assert e1 is not None
+    assert e1.outcome_id is None
 
 
 def test_reload_empties_in_memory_state() -> None:

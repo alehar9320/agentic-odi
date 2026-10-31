@@ -59,6 +59,10 @@ class ToolName(str, Enum):
     LIST_SCHEDULED_WORK = "list_scheduled_work"
     CANCEL_SCHEDULED_WORK = "cancel_scheduled_work"
     TRIGGER_SCHEDULED_WORK = "trigger_scheduled_work"
+    SEGMENT_MARKET = "segment_market"
+    GET_SEGMENTS = "get_segments"
+    GET_STRATEGY = "get_strategy"
+    PROPOSE_STRATEGY = "propose_strategy"
 
 
 class ToolEffect(str, Enum):
@@ -517,6 +521,38 @@ TOOL_SPECS: dict[str, ToolSpec] = {
         required=("work_id",),
         returns="The dispatched scheduled work item.",
     ),
+    ToolName.SEGMENT_MARKET.value: ToolSpec(
+        name="segment_market",
+        summary="Cluster the scored outcomes into outcome-based segments.",
+        effect=_derive_effect("segment_market"),
+        arguments=("job_id", "people"),
+        returns="The segments the outcomes clustered into, with verdict and confidence.",
+        stage="5",
+    ),
+    ToolName.GET_SEGMENTS.value: ToolSpec(
+        name="get_segments",
+        summary="List the segments the market was divided into.",
+        effect=_derive_effect("get_segments"),
+        arguments=("job_id",),
+        returns="A list of Segments. Empty until segment_market has run.",
+        stage="5",
+    ),
+    ToolName.GET_STRATEGY.value: ToolSpec(
+        name="get_strategy",
+        summary="Get the most recently recorded innovation strategy.",
+        effect=_derive_effect("get_strategy"),
+        arguments=(),
+        returns="The Strategy with its rejected alternatives, or null if none was recorded.",
+        stage="6",
+    ),
+    ToolName.PROPOSE_STRATEGY.value: ToolSpec(
+        name="propose_strategy",
+        summary="Recommend the one innovation path the segments support.",
+        effect=_derive_effect("propose_strategy"),
+        arguments=("job_id",),
+        returns="The Strategy, including every path it beat and why.",
+        stage="6",
+    ),
 }
 
 TOOL_NAMES: tuple[str, ...] = tuple(TOOL_SPECS)
@@ -526,6 +562,8 @@ _STAGE_NAMES: dict[str | None, str] = {
     "2": "Stage 2: Capture Desired Outcomes",
     "3": "Stage 3: Build the Job Map",
     "4": "Stage 4: Calculate Opportunity Scores",
+    "5": "Stage 5: Segment by Underserved Outcomes",
+    "6": "Stage 6: Formulate the Innovation Strategy",
     None: "Supporting Tools",
 }
 
@@ -535,7 +573,7 @@ _EFFECT_ORDER: tuple[ToolEffect, ...] = (
     ToolEffect.DESTRUCTIVE,
 )
 
-_STAGE_ORDER: tuple[str | None, ...] = ("1", "2", "3", "4", None)
+_STAGE_ORDER: tuple[str | None, ...] = ("1", "2", "3", "4", "5", "6", None)
 
 
 def capability_manifest() -> dict:
