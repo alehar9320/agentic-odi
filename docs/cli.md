@@ -292,6 +292,31 @@ non-zero when the store is degraded, so it can gate a deployment.
 stage. `capabilities --json` emits the full machine-readable manifest.
 `capabilities tools` lists tool names only.
 
+## Load the demo workspace
+
+```bash
+agentic-odi demo load                # the study that ships with the product
+agentic-odi demo load --job JOB-7    # attach it to a job you already have
+agentic-odi demo load --json
+```
+
+`demo load` writes one job, its eight job-map steps, forty scored outcomes, and
+twelve evidence records — a complete study with underserved and overserved
+segments, so the landscape, `segments run`, and `strategy propose` have
+something to work on before you have any research of your own. Every row
+carries `origin: "demo"`, so a surface can label it and no reader mistakes a
+fixture for a customer's own words.
+
+Row ids are fixed (`JOB-402`, `STP-1`…`STP-8`, `O-1`…`O-40`, `EVD-101`…`EVD-112`)
+and every write goes through the same validating service paths as any other
+command, so running it twice changes nothing — not the row counts, not the
+append-only event log. `--job` re-parents the study onto an existing job and
+leaves that job's name and description alone; an unknown id is refused rather
+than created. Rows you wrote are never touched.
+
+The command writes to the local store, so it refuses `--backend mcp` with a note
+to rerun with `--backend local` instead of reporting writes it did not make.
+
 ## Back up and export
 
 ```bash

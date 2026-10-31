@@ -35,6 +35,7 @@ Open pull requests that change a capability this milestone cares about. Each
 links to the pull request; a red or draft entry is stated as such rather than
 counted as done.
 
+- [ ] **A demo workspace you can load on purpose** — `odi demo load` writes one labeled study (job, eight steps, forty scored outcomes, twelve evidence rows) through the validating service paths, idempotent on fixed ids, with `origin` on every row and a persistence-parity test behind it ([PR #480](https://github.com/alehar9320/agentic-odi/pull/480)).
 - [ ] **A cold open under a second** — a deterministic 1,500-outcome study corpus, per-segment measurement, an incremental event replay instead of a full rescan, and a deferred landscape render; before/after recorded in `docs/development.md` (this change).
 - [ ] **The landing page points at the sample** — the site's primary call to action opens a committed, read-only sample workspace generated from a fixture, labelled a sample on every row and rendering with no network ([PR #469](https://github.com/alehar9320/agentic-odi/pull/469)).
 - [ ] **Rate-limit the ingest sink** — a token bucket sheds a high-volume batch instead of exhausting memory ([PR #298](https://github.com/alehar9320/agentic-odi/pull/298)).

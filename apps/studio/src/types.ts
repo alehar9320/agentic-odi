@@ -1,9 +1,17 @@
 import type { UiCatalogManifest, UiNode } from "./ui/protocol";
 
+/**
+ * Where a row came from. `user` is typed by the customer, `demo` is loaded on
+ * purpose by `odi demo load`, `sample` arrives with the product, `imported`
+ * comes from a connector. Storage records the fact; presentation marks it.
+ */
+export type Origin = "user" | "demo" | "sample" | "imported";
+
 export interface Job {
   id: string;
   name?: string;
   description?: string;
+  origin?: Origin;
 }
 
 export interface Step {
@@ -11,6 +19,7 @@ export interface Step {
   job_id?: string;
   name?: string;
   order?: number;
+  origin?: Origin;
 }
 
 export interface Outcome {
@@ -22,6 +31,7 @@ export interface Outcome {
   opportunity_score?: number | null;
   evidence?: string;
   telemetry?: string;
+  origin?: Origin;
 }
 
 export interface Evidence {
@@ -36,6 +46,7 @@ export interface Evidence {
   job_id?: string | null;
   step_id?: string | null;
   outcome_id?: string | null;
+  origin?: Origin;
 }
 
 export interface Thesis {

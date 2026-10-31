@@ -21,6 +21,7 @@ from agentic_odi_core import (
     JobStage,
     OdiError,
     ODIService,
+    Origin,
     OutcomeNotFoundError,
     OutcomeStatementError,
     ScheduledWorkNotFoundError,
@@ -103,8 +104,8 @@ def odi_assistant_prompt() -> str:
 
 
 @mcp.tool
-def add_job(name: str, description: str | None = None) -> str:
-    job = service.add_job(name=name, description=description)
+def add_job(name: str, description: str | None = None, origin: Origin = "user") -> str:
+    job = service.add_job(name=name, description=description, origin=origin)
     return f"Job created successfully: {job.model_dump_json()}"
 
 
@@ -134,6 +135,7 @@ def add_step(
     order: int,
     stage: JobStage | None = None,
     allow_empty_job_map: bool = False,
+    origin: Origin = "user",
 ) -> str:
     try:
         step = service.add_step(
@@ -142,6 +144,7 @@ def add_step(
             order=order,
             stage=stage,
             allow_empty_job_map=allow_empty_job_map,
+            origin=origin,
         )
     except JobNotFoundError:
         return job_not_found(job_id)
@@ -168,6 +171,7 @@ def add_outcome(
     importance: float,
     satisfaction: float,
     step_id: str | None = None,
+    origin: Origin = "user",
 ) -> str:
     try:
         outcome = service.add_outcome(
@@ -176,6 +180,7 @@ def add_outcome(
             importance=importance,
             satisfaction=satisfaction,
             step_id=step_id,
+            origin=origin,
         )
     except JobNotFoundError:
         return f"Error: Job with ID {job_id} not found."
@@ -462,6 +467,7 @@ async def add_evidence(
     job_id: str | None = None,
     step_id: str | None = None,
     outcome_id: str | None = None,
+    origin: Origin = "user",
 ) -> str:
     await ctx.report_progress(0, 2, "Validating the evidence links")
     try:
@@ -476,6 +482,7 @@ async def add_evidence(
             job_id=job_id,
             step_id=step_id,
             outcome_id=outcome_id,
+            origin=origin,
         )
     except JobNotFoundError:
         return job_not_found(job_id or "")

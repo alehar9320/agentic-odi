@@ -142,8 +142,12 @@ or `AGENTIC_ODI_MCP_PORT=8010`. The flag wins over the environment variable.
   opt-in, redacted local diagnostics preview; no report is uploaded. See
   [The Living Studio](docs/living-studio.md).
 - **Just the CLI:** it is local-first, so data commands need no server at all.
+  `odi demo load` fills the store with a complete study — eight job-map steps,
+  forty scored outcomes, twelve evidence rows — every one labeled `origin:
+  "demo"`, so a fixture never reads as your own research.
 
 ```bash
+odi demo load                        # the study that ships with the product
 odi jobs list
 odi desired-outcomes list --job-id <id>
 odi segments run --job <id>          # Stage 5: who the scored outcomes point at

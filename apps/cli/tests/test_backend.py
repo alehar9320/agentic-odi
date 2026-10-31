@@ -465,3 +465,69 @@ def test_evaluate_outcome_job_error_surfaces_as_a_backend_error():
 
     with pytest.raises(BackendError, match="Job not found: missing"):
         _parse_remote("evaluate_outcome", "Job not found: missing")
+
+
+def test_local_backend_honours_the_origin_argument(tmp_path):
+    """``origin`` is in the write contract, so the local path must apply it."""
+    backend = LocalBackend(db_path=str(tmp_path / "origin.db"))
+
+    job = backend.call("add_job", {"name": "Onboard customers", "origin": "sample"})
+    step = backend.call(
+        "add_step",
+        {
+            "job_id": job["id"],
+            "name": "Sign up",
+            "order": 1,
+            "allow_empty_job_map": True,
+            "origin": "sample",
+        },
+    )
+    outcome = backend.call(
+        "add_outcome",
+        {
+            "job_id": job["id"],
+            "statement": "Minimize the time it takes to finish setup when signing up",
+            "importance": 8.0,
+            "satisfaction": 3.0,
+            "origin": "sample",
+        },
+    )
+    evidence = backend.call(
+        "add_evidence",
+        {
+            "source_name": "gong",
+            "source_kind": "mcp",
+            "name": "Call 1",
+            "content": "Setup took an hour.",
+            "job_id": job["id"],
+            "origin": "imported",
+        },
+    )
+
+    assert [job["origin"], step["origin"], outcome["origin"], evidence["origin"]] == [
+        "sample",
+        "sample",
+        "sample",
+        "imported",
+    ]
+
+
+def test_local_writes_default_to_user_provenance(tmp_path):
+    backend = LocalBackend(db_path=str(tmp_path / "user.db"))
+
+    job = backend.call("add_job", {"name": "Onboard customers"})
+
+    assert job["origin"] == "user"
+
+
+def test_remote_backend_refuses_a_local_only_command():
+    with pytest.raises(BackendError, match="local store"):
+        assert MCPBackend().service
+
+
+def test_auto_backend_writes_through_the_local_service(tmp_path):
+    auto = AutoBackend(db_path=str(tmp_path / "auto.db"))
+
+    job = auto.service.add_job("Onboard customers")
+
+    assert auto.service.get_job(job.id).origin == "user"

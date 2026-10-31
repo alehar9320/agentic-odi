@@ -8,7 +8,12 @@ export function computeOpportunityScore(importance: number, satisfaction: number
 }
 
 function stripJob(job: StoredJob): Job {
-  return { id: job.id, name: job.name, description: job.description };
+  return {
+    id: job.id,
+    name: job.name,
+    description: job.description,
+    origin: job.origin ?? "user",
+  };
 }
 
 function stripStep(step: StoredStep): Step {
@@ -17,6 +22,7 @@ function stripStep(step: StoredStep): Step {
     job_id: step.job_id,
     name: step.name,
     order: step.order,
+    origin: step.origin ?? "user",
   };
 }
 
@@ -28,6 +34,7 @@ function stripOutcome(outcome: StoredOutcome): Outcome {
     importance: outcome.importance,
     satisfaction: outcome.satisfaction,
     opportunity_score: outcome.opportunity_score,
+    origin: outcome.origin ?? "user",
   };
 }
 
@@ -91,6 +98,7 @@ export class LocalDataService {
       id: newId(),
       name: validateName(input.name, "Job name"),
       description: (input.description ?? "").trim(),
+      origin: "user",
       seq: await this.store.nextSeq(),
       created_at: now,
       updated_at: now,
@@ -144,6 +152,7 @@ export class LocalDataService {
       job_id: input.job_id,
       name: validateName(input.name, "Step name"),
       order: validateOrder(input.order),
+      origin: "user",
       seq: await this.store.nextSeq(),
       created_at: now,
       updated_at: now,
@@ -211,6 +220,7 @@ export class LocalDataService {
       statement: validateName(input.statement, "Outcome statement"),
       importance,
       satisfaction,
+      origin: "user",
       opportunity_score:
         importance !== null && satisfaction !== null
           ? computeOpportunityScore(importance, satisfaction)

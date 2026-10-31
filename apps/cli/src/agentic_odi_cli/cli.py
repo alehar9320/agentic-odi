@@ -17,6 +17,7 @@ from agentic_odi_cli import context, paths, update, version
 from agentic_odi_cli.backend import run_tool
 from agentic_odi_cli.connectors import connectors_app
 from agentic_odi_cli.customer_outcomes import customer_outcomes_app, score
+from agentic_odi_cli.demo import demo_app
 from agentic_odi_cli.desired_outcomes import desired_outcomes_app
 from agentic_odi_cli.evidence import evidence_app
 from agentic_odi_cli.jobs import jobs_app
@@ -46,6 +47,11 @@ app.add_typer(steps_app, name="steps", help="Manage Job-map Steps.")
 app.add_typer(desired_outcomes_app, name="desired-outcomes", help="Manage desired Outcomes.")
 app.add_typer(evidence_app, name="evidence", help="Manage evidence captured from connectors.")
 app.add_typer(customer_outcomes_app, name="customer-outcomes", help="Manage Customer Outcomes")
+app.add_typer(
+    demo_app,
+    name="demo",
+    help="Load the study that ships with the product, labeled and safe to re-run.",
+)
 app.add_typer(
     signals_app,
     name="signals",
