@@ -195,6 +195,11 @@ agentic-odi bets show <bet-id>
 agentic-odi bets measure <bet-id>
 agentic-odi bets status <bet-id> running
 
+# Disproof: commit how the bet could be wrong, before it runs
+agentic-odi bets disprove <bet-id> --metric opportunity --op at_or_below \
+  --threshold 11 --by 2026-06-30 --rationale "no movement means the bet is wrong"
+agentic-odi bets verdict <bet-id>
+
 # Signals, the digest, and where the spine stops
 agentic-odi signals list --unread
 agentic-odi digest --since 7d --out digest.md
@@ -213,6 +218,19 @@ digest` and `odi know spine` are kept as aliases.
   a score at or after `measure_by`, and never treats a missing score as zero.
   Only legal status transitions are accepted (`planned → running → measured`,
   plus `abandoned`); an illegal jump is refused.
+- A bet cannot move to `running` without at least one **disproof condition**
+  committed first: a bet that can run without a falsifier is a wish. A condition
+  is typed, not prose — `metric` (`opportunity`, `importance` or `satisfaction`),
+  `operator` (`below`, `above`, `at_or_below`, `at_or_above`), `threshold`, the
+  `by` date it must be judged by, and a `rationale`. `bets disprove` adds one;
+  pass `--index N` to replace an existing condition. Conditions may be edited or
+  removed while the bet is `planned` or `running`, but are locked once it is
+  `measured` — the goalposts cannot move after the result is in. `bets verdict`
+  judges each condition against the latest accepted score in the bet's window:
+  `disproved` when the comparison crosses, `holding` when it does not, and
+  `no_data` when there is no observation yet. `no_data` is never reported as
+  `holding`, because conflating the two is how a dead bet looks alive. The same
+  verdicts are folded into `bets measure` under `disproof`.
 - **Signals** are recorded by the store as it changes — a due bet, a moved
   score, a superseded decision, a stage with no outcomes — never re-derived on
   read, so an empty store gives an empty feed. Each has a stable fingerprint, so

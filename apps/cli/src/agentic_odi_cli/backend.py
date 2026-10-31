@@ -714,6 +714,37 @@ class LocalBackend(Backend):
     def _measure_bet(self, args: dict[str, Any]) -> dict[str, Any]:
         return self.service.measure_bet(args["bet_id"])
 
+    def _add_disproof(self, args: dict[str, Any]) -> dict[str, Any]:
+        from datetime import date
+
+        from agentic_odi_core.models import DisproofCondition
+
+        try:
+            by_date = date.fromisoformat(args["by_date"])
+        except ValueError as exc:
+            raise BackendError(
+                f"--by must be an ISO date (YYYY-MM-DD), got '{args['by_date']}'"
+            ) from exc
+        try:
+            condition = DisproofCondition(
+                metric=args["metric"],
+                operator=args["operator"],
+                threshold=args["threshold"],
+                by_date=by_date,
+                rationale=args["rationale"],
+            )
+        except ValueError as exc:
+            raise BackendError(str(exc)) from exc
+        bet = self.service.add_disproof(args["bet_id"], condition, index=args.get("index"))
+        return bet.model_dump(mode="json")
+
+    def _remove_disproof(self, args: dict[str, Any]) -> dict[str, Any]:
+        bet = self.service.remove_disproof(args["bet_id"], int(args["index"]))
+        return bet.model_dump(mode="json")
+
+    def _evaluate_disproof(self, args: dict[str, Any]) -> dict[str, Any]:
+        return self.service.evaluate_disproof(args["bet_id"])
+
     def _set_notification_rule(self, args: dict[str, Any]) -> dict[str, Any]:
         rule = self.service.set_notification_rule(
             args["kind"],
@@ -777,6 +808,9 @@ _LOCAL_HANDLERS = {
     "list_bets": LocalBackend._list_bets,
     "update_bet_status": LocalBackend._update_bet_status,
     "measure_bet": LocalBackend._measure_bet,
+    "add_disproof": LocalBackend._add_disproof,
+    "remove_disproof": LocalBackend._remove_disproof,
+    "evaluate_disproof": LocalBackend._evaluate_disproof,
     "set_notification_rule": LocalBackend._set_notification_rule,
     "list_notification_rules": LocalBackend._list_notification_rules,
 }

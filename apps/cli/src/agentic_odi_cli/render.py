@@ -469,10 +469,11 @@ def render_measurement(result: Any, *, as_json: bool) -> str:
         return _json(result)
     outcome = str(result.get("result", ""))
     if outcome == "no_data":
-        return (
+        body = (
             f"No data yet: no score at or after {result.get('measure_by', '')} "
             f"(looked {result.get('looked_at', '')})."
         )
+        return _with_disproof_lines(body, result)
     parts = [
         f"{outcome.upper()}: observed {_num(result.get('observed', ''))} "
         f"vs target {_num(result.get('target', ''))} "
@@ -487,7 +488,60 @@ def render_measurement(result: Any, *, as_json: bool) -> str:
         value = result.get(key)
         if value is not None:
             parts.append(f"{label} {_num(value)}")
-    return "; ".join(parts)
+    return _with_disproof_lines("; ".join(parts), result)
+
+
+def _with_disproof_lines(body: str, result: dict[str, Any]) -> str:
+    """Append one line per committed disproof condition, if any are committed."""
+    lines = result.get("disproof") or []
+    if not lines:
+        return body
+    rendered = [
+        (
+            f"  #{line.get('index')} {line.get('verdict')}: "
+            f"{line['condition'].get('metric')} {line['condition'].get('operator')} "
+            f"{_num(line['condition'].get('threshold'))} → "
+            f"{_num(line['observed']) if line.get('observed') is not None else 'not measured'}"
+        )
+        for line in lines
+    ]
+    return "\n".join([body, "Disproof conditions:", *rendered])
+
+
+def render_disproof_report(result: Any, *, as_json: bool) -> str:
+    """Render per-condition disproof verdicts, keeping no_data distinct from holding."""
+    if not isinstance(result, dict):
+        return _json(result) if as_json else str(result)
+    if as_json:
+        return _json(result)
+    lines = result.get("conditions") or []
+    if not lines:
+        return "No disproof conditions committed yet."
+    rows: list[tuple[str, ...]] = []
+    for line in lines:
+        condition = line.get("condition", {})
+        observed = line.get("observed")
+        rows.append(
+            (
+                str(line.get("index", "")),
+                str(line.get("verdict", "")),
+                str(condition.get("metric", "")),
+                str(condition.get("operator", "")),
+                _num(condition.get("threshold", "")),
+                _num(observed) if observed is not None else "not measured",
+                str(condition.get("by_date", "")),
+            )
+        )
+    table = _table(
+        ("#", "verdict", "metric", "op", "threshold", "observed", "by"),
+        rows,
+        empty="No disproof conditions committed yet.",
+    )
+    summary = result.get("summary") or {}
+    if summary:
+        counts = ", ".join(f"{key} {value}" for key, value in summary.items())
+        return f"{table}\n\n{counts}"
+    return table
 
 
 def render_decision_list(decisions: Any, *, as_json: bool) -> str:

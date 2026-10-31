@@ -18,6 +18,7 @@ from agentic_odi_core.models import (
     CustomerOutcome,
     CustomerValue,
     Decision,
+    DisproofCondition,
     Evidence,
     Job,
     NotificationRule,
@@ -43,6 +44,7 @@ _SCHEMA_MODELS: dict[str, type[BaseModel]] = {
     "Decision": Decision,
     "ScoreSnapshot": ScoreSnapshot,
     "Bet": Bet,
+    "DisproofCondition": DisproofCondition,
     "Signal": Signal,
     "NotificationRule": NotificationRule,
 }
