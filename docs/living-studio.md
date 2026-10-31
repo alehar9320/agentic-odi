@@ -378,6 +378,13 @@ selected outcome's detail card reads this history and shows the most recent
 reason as a `note` line; the list cards do not, so a board does not issue one
 request per outcome.
 
+The signed change across that history is exposed separately at
+`GET /api/outcomes/{outcome_id}/delta` (`since` optional), so the history list
+keeps one shape across the local and MCP backends. The response carries the
+per-dimension and opportunity differences plus a `direction` (`up`/`down`/
+`flat`) taken from the opportunity sign — a consumer never infers an
+"improvement" from a bare number. A missing dimension stays `null`, not `0`.
+
 The conversation keeps the order the agent produced: a `delta` appends to the
 open prose part, a `ui` event opens a card, and the next `delta` opens a new
 paragraph after it. The opportunity score is computed from importance and

@@ -182,6 +182,29 @@ def test_outcome_history_records_each_accepted_change() -> None:
     assert all(row["outcome_id"] == outcome["id"] for row in history)
 
 
+def test_outcome_delta_is_signed_from_the_baseline_snapshot() -> None:
+    client = _client()
+    job = client.post("/api/jobs", json={"name": "Ship a service"}).json()
+    outcome = client.post(
+        "/api/outcomes",
+        json={
+            "mcp_url": "",
+            "job_id": job["id"],
+            "statement": "Minimize the time to ship a release when the build is green",
+            "importance": 8.0,
+            "satisfaction": 4.0,
+        },
+    ).json()
+    client.patch(f"/api/outcomes/{outcome['id']}", json={"satisfaction": 6.0})
+
+    delta = client.get(f"/api/outcomes/{outcome['id']}/delta").json()["result"]
+
+    # Satisfaction rose by 2, so the opportunity score fell: the direction
+    # follows the opportunity sign, not the dimension that moved.
+    assert delta["satisfaction"] == 2.0
+    assert delta["direction"] == "down"
+
+
 def test_outcome_history_for_a_missing_outcome_is_404() -> None:
     response = _client().get("/api/outcomes/does-not-exist/history")
     assert response.status_code == 404

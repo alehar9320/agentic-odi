@@ -610,8 +610,9 @@ async def get_outcome_history(
 ) -> dict:
     """Return an outcome's accepted score snapshots, oldest first.
 
-    Snapshots carry the score and its sample/method companions. Signed deltas
-    are not computed here: the baseline/sign policy is a pending decision.
+    Snapshots carry the score and its sample/method companions. The signed delta
+    is served separately at ``/outcomes/{id}/delta`` so this list shape stays
+    identical across the local and MCP backends.
     """
     if _uses_mcp(request):
         result = await call_mcp_tool(
@@ -625,6 +626,42 @@ async def get_outcome_history(
     except Exception as exc:  # noqa: BLE001
         raise _as_http_error(exc) from exc
     return {"ok": True, "result": [snapshot.model_dump(mode="json") for snapshot in snapshots]}
+
+
+@router.get("/outcomes/{outcome_id}/delta")
+async def get_outcome_delta(
+    outcome_id: str,
+    request: Request,
+    since: str | None = Query(None),
+    mcp_url: str | None = Query(None),
+) -> dict:
+    """Return the signed change across an outcome's snapshots (B6.1).
+
+    ``since`` chooses the baseline (the last snapshot at or before it; the
+    earliest when omitted). ``direction`` is the product's sign rule, so a
+    consumer never invents an "improvement" from a bare number.
+    """
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(mcp_url or ""),
+            ToolName.GET_OUTCOME_DELTA.value,
+            {"outcome_id": outcome_id, **({"since": since} if since else {})},
+        )
+        return {"ok": True, "result": _json_or_raw(result)}
+    try:
+        delta = _service(request).get_outcome_delta(outcome_id, since)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return {
+        "ok": True,
+        "result": {
+            "outcome_id": delta.outcome_id,
+            "importance": delta.importance,
+            "satisfaction": delta.satisfaction,
+            "opportunity": delta.opportunity,
+            "direction": delta.direction,
+        },
+    }
 
 
 @router.delete("/outcomes/{outcome_id}")
