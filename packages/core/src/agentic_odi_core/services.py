@@ -36,8 +36,12 @@ from agentic_odi_core.models import (
     SignalKind,
     Step,
     compute_opportunity_score,
+    utc_now_iso,
 )
 from agentic_odi_core.repository import Repository, page
+from agentic_odi_core.stats import DEFAULT_SEED
+from agentic_odi_core.survey import aggregate_survey, parse_survey
+from agentic_odi_core.trust import OutcomeDelta, outcome_delta
 
 
 class JobNotFoundError(NotFoundError):
@@ -374,6 +378,102 @@ class ODIService:
         self._emit_outcome_updates(existing, res)
         self._record_score_snapshot(res, note)
         return res
+
+    def get_outcome_delta(self, outcome_id: str, since: str | None = None) -> OutcomeDelta:
+        """The signed change across an outcome's recorded snapshots (B6.1).
+
+        Reads the recorded snapshots rather than regenerating a series, so the
+        delta is a subtraction over the same history a reviewer can see.
+        """
+        history = self.get_score_history(outcome_id)
+        return outcome_delta(history, since)
+
+    def import_survey(
+        self,
+        rows: list[dict[str, Any]],
+    ) -> dict[str, Outcome]:
+        """Land a survey's per-outcome means on the matching outcomes (B2).
+
+        Parses and aggregates first, so a malformed file or an unresolved
+        reference fails before any outcome is written; then updates each outcome
+        through :meth:`update_outcome` so all score validation still applies and
+        the write records ``method='survey'`` with its per-dimension ``n`` and a
+        band bootstrapped from the real paired responses. Nothing is written for
+        a reference that does not resolve.
+        """
+        responses = parse_survey(rows)
+        outcomes = [
+            outcome for job in self.repo.list_jobs() for outcome in self.repo.get_outcomes(job.id)
+        ]
+        known_ids = {outcome.id for outcome in outcomes}
+        id_by_statement: dict[str, str | None] = {}
+        for outcome in outcomes:
+            if outcome.statement in id_by_statement:
+                id_by_statement[outcome.statement] = None  # ambiguous
+            else:
+                id_by_statement[outcome.statement] = outcome.id
+        result = aggregate_survey(responses, id_by_statement=id_by_statement, known_ids=known_ids)
+
+        # The band is bootstrapped from the paired responses, not from the mean,
+        # so the correlation between the two dimensions survives.
+        observations: dict[str, list[tuple[float, float]]] = {}
+        for response in responses:
+            outcome_id = (
+                response.outcome_ref
+                if response.outcome_ref_kind == "outcome_id"
+                else id_by_statement[response.outcome_ref]
+            )
+            if outcome_id is None:
+                continue
+            observations.setdefault(outcome_id, []).append(
+                (response.importance, response.satisfaction)
+            )
+
+        updated: dict[str, Outcome] = {}
+        for outcome_id, aggregate in result.aggregates.items():
+            existing = self.get_outcome(outcome_id)
+            if existing is None:
+                raise OutcomeNotFoundError(outcome_id)
+            updates: dict[str, Any] = {
+                "importance": round(aggregate.importance_mean, 6),
+                "satisfaction": round(aggregate.satisfaction_mean, 6),
+                "importance_n": aggregate.n,
+                "satisfaction_n": aggregate.n,
+                "score_method": "survey",
+            }
+            updates.update(self._band_for(observations.get(outcome_id, [])))
+            updated[outcome_id] = self.update_outcome(outcome_id, updates)
+        return updated
+
+    def _band_for(self, observations: list[tuple[float, float]]) -> dict[str, Any]:
+        """Compute the stored band and provenance from paired responses (B3/B3.2)."""
+        from agentic_odi_core.trust import opportunity_interval
+
+        if not observations:
+            return {}
+        importance = [pair[0] for pair in observations]
+        satisfaction = [pair[1] for pair in observations]
+        provisional = Outcome(
+            job_id="band",
+            statement="Minimize the time it takes to band when a survey lands.",
+            importance=sum(importance) / len(importance),
+            satisfaction=sum(satisfaction) / len(satisfaction),
+            opportunity_score=compute_opportunity_score(
+                sum(importance) / len(importance), sum(satisfaction) / len(satisfaction)
+            ),
+            score_method="survey",
+            importance_n=len(observations),
+            satisfaction_n=len(observations),
+        )
+        interval = opportunity_interval(provisional)
+        return {
+            "opportunity_low": interval.low,
+            "opportunity_high": interval.high,
+            "interval_n": interval.n,
+            "interval_seed": DEFAULT_SEED,
+            "interval_confidence_level": interval.confidence_level,
+            "interval_computed_at": utc_now_iso(),
+        }
 
     def _emit_outcome_updates(self, before: Outcome, after: Outcome) -> None:
         if before.importance != after.importance or before.satisfaction != after.satisfaction:

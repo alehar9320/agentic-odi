@@ -24,8 +24,9 @@ here and pinned by tests rather than scattered through the command.
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
-from typing import Any, Iterable, Mapping
+from typing import Any
 
 from agentic_odi_core.errors import ValidationError
 from agentic_odi_core.stats import percentile
@@ -78,8 +79,8 @@ class SurveyImportResult:
 def _number(value: Any, *, field_name: str, row: int) -> float:
     try:
         number = float(value)
-    except (TypeError, ValueError):
-        raise ValidationError(f"row {row}: {field_name} must be a number, got {value!r}")
+    except (TypeError, ValueError) as err:
+        raise ValidationError(f"row {row}: {field_name} must be a number, got {value!r}") from err
     if number != number or number in (float("inf"), float("-inf")):
         raise ValidationError(f"row {row}: {field_name} must be finite, got {value!r}")
     if not (1.0 <= number <= 10.0):

@@ -475,3 +475,28 @@ def render_score_history(snapshots: Any, *, as_json: bool) -> str:
         ],
         empty="No score history recorded yet.",
     )
+
+
+def render_outcome_delta(delta: Any, *, as_json: bool = False) -> str:
+    """Render the signed change across an outcome's snapshots (B6.1).
+
+    The sign is the product's direction rule, so it is rendered from the delta
+    the service computed, never recomputed here.
+    """
+    if not isinstance(delta, dict):
+        return _json(delta) if as_json else str(delta)
+    if as_json:
+        return _json(delta)
+    direction = str(delta.get("direction", "flat"))
+    arrow = {"up": "^", "down": "v", "flat": "="}.get(direction, "?")
+    return (
+        f"Change: importance {_signed(delta.get('importance'))}, "
+        f"satisfaction {_signed(delta.get('satisfaction'))}, "
+        f"opportunity {_signed(delta.get('opportunity'))} ({arrow} {direction})"
+    )
+
+
+def _signed(value: Any) -> str:
+    if value is None:
+        return "unknown"
+    return f"{float(value):+g}"

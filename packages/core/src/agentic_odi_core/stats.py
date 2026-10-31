@@ -22,8 +22,8 @@ band the product shows, which is exactly why it is not spread across call sites.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Sequence
 
 from agentic_odi_core.errors import ValidationError
 from agentic_odi_core.models import compute_opportunity_score

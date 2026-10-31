@@ -316,6 +316,36 @@ class LocalBackend(Backend):
             raise BackendError(outcome_not_found(args["outcome_id"])) from None
         return [snapshot.model_dump() for snapshot in snapshots]
 
+    def _get_outcome_delta(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import OutcomeNotFoundError, outcome_not_found
+        from agentic_odi_core.errors import ValidationError
+
+        try:
+            delta = self.service.get_outcome_delta(args["outcome_id"], args.get("since"))
+        except OutcomeNotFoundError:
+            raise BackendError(outcome_not_found(args["outcome_id"])) from None
+        except ValidationError as exc:
+            raise BackendError(str(exc)) from None
+        return {
+            "outcome_id": delta.outcome_id,
+            "importance": delta.importance,
+            "satisfaction": delta.satisfaction,
+            "opportunity": delta.opportunity,
+            "direction": delta.direction,
+        }
+
+    def _import_survey(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import OutcomeNotFoundError, outcome_not_found
+        from agentic_odi_core.errors import ValidationError
+
+        try:
+            updated = self.service.import_survey(args["rows"])
+        except OutcomeNotFoundError as exc:
+            raise BackendError(outcome_not_found(exc.resource_id)) from None
+        except ValidationError as exc:
+            raise BackendError(str(exc)) from None
+        return {outcome_id: outcome.model_dump() for outcome_id, outcome in updated.items()}
+
     def _update_outcome(self, args: dict[str, Any]) -> dict[str, Any]:
         from agentic_odi_core import (
             OutcomeNotFoundError,
@@ -716,6 +746,8 @@ _LOCAL_HANDLERS = {
     "get_outcomes": LocalBackend._get_outcomes,
     "get_outcome": LocalBackend._get_outcome,
     "get_outcome_history": LocalBackend._get_outcome_history,
+    "get_outcome_delta": LocalBackend._get_outcome_delta,
+    "import_survey": LocalBackend._import_survey,
     "update_outcome": LocalBackend._update_outcome,
     "delete_outcome": LocalBackend._delete_outcome,
     "add_customer_outcome": LocalBackend._add_customer_outcome,

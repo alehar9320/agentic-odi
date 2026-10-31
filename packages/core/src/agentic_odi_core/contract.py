@@ -28,6 +28,8 @@ class ToolName(str, Enum):
     GET_OUTCOME = "get_outcome"
     UPDATE_OUTCOME = "update_outcome"
     GET_OUTCOME_HISTORY = "get_outcome_history"
+    GET_OUTCOME_DELTA = "get_outcome_delta"
+    IMPORT_SURVEY = "import_survey"
     DELETE_OUTCOME = "delete_outcome"
     ADD_CUSTOMER_OUTCOME = "add_customer_outcome"
     GET_CUSTOMER_OUTCOME = "get_customer_outcome"
@@ -242,6 +244,24 @@ TOOL_SPECS: dict[str, ToolSpec] = {
         arguments=("outcome_id",),
         required=("outcome_id",),
         returns="A list of score snapshots, oldest first.",
+        stage="4",
+    ),
+    ToolName.GET_OUTCOME_DELTA.value: ToolSpec(
+        name="get_outcome_delta",
+        summary="The signed score change across an Outcome's recorded snapshots.",
+        effect=_derive_effect("get_outcome_delta"),
+        arguments=("outcome_id", "since"),
+        required=("outcome_id",),
+        returns="The signed importance/satisfaction/opportunity deltas and a direction.",
+        stage="4",
+    ),
+    ToolName.IMPORT_SURVEY.value: ToolSpec(
+        name="import_survey",
+        summary="Land a survey's per-outcome means, sample and band on matching Outcomes.",
+        effect=_derive_effect("import_survey"),
+        arguments=("rows",),
+        required=("rows",),
+        returns="The updated Outcomes keyed by id.",
         stage="4",
     ),
     ToolName.DELETE_OUTCOME.value: ToolSpec(

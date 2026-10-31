@@ -487,14 +487,55 @@ def get_outcome_history(outcome_id: str) -> str:
     """List the accepted score snapshots for an Outcome, oldest first.
 
     A snapshot records the score and its sample/method companions, so "did it
-    move?" is a subtraction. Reads of history/deltas beyond the raw snapshots
-    are gated on the approved delta-semantics decision and are not exposed here.
+    move?" is a subtraction.
     """
     try:
         snapshots = service.get_score_history(outcome_id)
     except OutcomeNotFoundError:
         return _outcome_not_found(outcome_id)
     return json.dumps([snapshot.model_dump() for snapshot in snapshots])
+
+
+@mcp.tool
+def get_outcome_delta(outcome_id: str, since: str | None = None) -> str:
+    """The signed score change across an Outcome's recorded snapshots.
+
+    ``since`` selects the baseline: the last snapshot at or before that ISO-8601
+    timestamp. A ``since`` before the first snapshot is an explicit error, not a
+    zero baseline. Without ``since`` the baseline is the earliest snapshot.
+    """
+    try:
+        delta = service.get_outcome_delta(outcome_id, since)
+    except OutcomeNotFoundError:
+        return _outcome_not_found(outcome_id)
+    except ValidationError as exc:
+        return f"Error: {exc}"
+    return json.dumps(
+        {
+            "outcome_id": delta.outcome_id,
+            "importance": delta.importance,
+            "satisfaction": delta.satisfaction,
+            "opportunity": delta.opportunity,
+            "direction": delta.direction,
+        }
+    )
+
+
+@mcp.tool
+def import_survey(rows: list[dict[str, Any]]) -> str:
+    """Land a survey's per-outcome means, sample and band on matching Outcomes.
+
+    References are exact: an ``outcome_id`` must exist and an
+    ``outcome_statement`` must match exactly one outcome. A malformed row or an
+    unresolved reference fails the whole import without a partial write.
+    """
+    try:
+        updated = service.import_survey(rows)
+    except OutcomeNotFoundError as exc:
+        return f"Error: {exc}"
+    except ValidationError as exc:
+        return f"Error: {exc}"
+    return json.dumps({outcome_id: outcome.model_dump() for outcome_id, outcome in updated.items()})
 
 
 @mcp.tool

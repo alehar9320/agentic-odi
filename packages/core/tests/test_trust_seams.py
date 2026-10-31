@@ -14,10 +14,7 @@ from agentic_odi_core.errors import OdiError, ValidationError
 from agentic_odi_core.models import Outcome, ScoreSnapshot
 from agentic_odi_core.trust import (
     BootstrapConvention,
-    ConfidenceClass,
-    DeltaDirection,
     IntervalProvenancePolicy,
-    OutcomeDelta,
     TrustContractPendingError,
     classify_confidence,
     opportunity_delta_from_scores,

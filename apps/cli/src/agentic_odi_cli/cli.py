@@ -27,6 +27,7 @@ from agentic_odi_cli.schedule import schedule_app
 from agentic_odi_cli.settings import settings_app
 from agentic_odi_cli.signals import signals_app
 from agentic_odi_cli.steps import steps_app
+from agentic_odi_cli.survey import survey_app
 from agentic_odi_cli.version import __version__  # noqa: F401  (re-exported for tests)
 
 app = typer.Typer(
@@ -41,6 +42,7 @@ app.add_typer(
 )
 app.add_typer(steps_app, name="steps", help="Manage Job-map Steps.")
 app.add_typer(desired_outcomes_app, name="desired-outcomes", help="Manage desired Outcomes.")
+app.add_typer(survey_app, name="survey", help="Import survey responses as measured scores.")
 app.add_typer(evidence_app, name="evidence", help="Manage evidence captured from connectors.")
 app.add_typer(customer_outcomes_app, name="customer-outcomes", help="Manage Customer Outcomes")
 app.add_typer(

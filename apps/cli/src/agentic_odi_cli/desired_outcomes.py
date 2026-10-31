@@ -19,6 +19,7 @@ from agentic_odi_cli.backend import run_tool
 from agentic_odi_cli.render import (
     render_deleted,
     render_outcome,
+    render_outcome_delta,
     render_outcome_list,
     render_saved,
     render_score_history,
@@ -196,14 +197,27 @@ def update(
 @desired_outcomes_app.command("history")
 def history(
     outcome_id: str = typer.Argument(..., help="Outcome ID"),
+    since: str | None = typer.Option(
+        None, "--since", help="Baseline timestamp; the last snapshot at or before it"
+    ),
+    why: bool = typer.Option(
+        False, "--why", help="Show the signed change from the baseline, not just the states"
+    ),
     json_output: bool = JSON_OPTION,
 ) -> None:
     """Show an Outcome's accepted score snapshots, oldest first."""
-    typer.echo(
-        render_score_history(
-            run_tool("get_outcome_history", {"outcome_id": outcome_id}), as_json=json_output
-        )
-    )
+    snapshots = run_tool("get_outcome_history", {"outcome_id": outcome_id})
+    typer.echo(render_score_history(snapshots, as_json=json_output))
+    if not why:
+        return
+    args: dict[str, Any] = {"outcome_id": outcome_id}
+    if since is not None:
+        args["since"] = since
+    delta = run_tool("get_outcome_delta", args)
+    if json_output:
+        typer.echo(json.dumps(delta, indent=2, sort_keys=True))
+        return
+    typer.echo(render_outcome_delta(delta))
 
 
 @desired_outcomes_app.command("evaluate")
