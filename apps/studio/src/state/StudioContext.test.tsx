@@ -810,3 +810,60 @@ describe("StudioContext write approval and branches", () => {
     await waitFor(() => expect(headPatches).toEqual([{ head_id: "b-2" }]));
   });
 });
+
+describe("StudioContext subject reveal", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    chatBody = null;
+    chatStream = null;
+    chatFailure = null;
+    chatAttempts = 0;
+    chatAborts = false;
+    canvasFails = false;
+    connectorFetches = 0;
+    llmHealthFetches = 0;
+    approvalCalls = [];
+    headPatches = [];
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("opens the lens that holds the record it names", () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+
+    act(() => {
+      result.current.revealSubject("outcome", "O-101");
+    });
+
+    expect(result.current.focusedSubject).toEqual({ kind: "outcome", id: "O-101" });
+    expect(result.current.activePanel).toBe("landscape");
+  });
+
+  it("opens the evidence lens on the record it names", () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+
+    act(() => {
+      result.current.revealSubject("evidence", "E-9");
+    });
+
+    expect(result.current.focusedEvidenceId).toBe("E-9");
+    expect(result.current.activePanel).toBe("evidence");
+  });
+
+  it("remembers the subject a lens was opened for", () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+
+    act(() => {
+      result.current.revealSubject("step", "S-3");
+    });
+
+    expect(JSON.parse(localStorage.getItem(SESSION_KEY) ?? "{}")).toEqual({
+      job_id: null,
+      step_id: "S-3",
+      outcome_id: null,
+    });
+  });
+});

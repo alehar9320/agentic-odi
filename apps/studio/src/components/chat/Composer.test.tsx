@@ -209,3 +209,29 @@ describe("Composer keyboard focus", () => {
     expect(document.activeElement).toBe(stop);
   });
 });
+
+describe("ThreadComposer agent context", () => {
+  const board = {
+    jobs: [{ id: "JOB-7", name: "Faster onboarding" }],
+    steps: [],
+    outcomes: [],
+    source: "mcp",
+  };
+
+  it("shows which record the agent is pointed at", async () => {
+    await renderThreadComposer({
+      canvas: board,
+      focusedSubject: { kind: "job", id: "JOB-7" },
+    });
+
+    expect(
+      await screen.findByRole("button", { name: /agent context: job faster onboarding/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("stays out of the composer while nothing is focused", async () => {
+    await renderThreadComposer({ canvas: board, focusedSubject: null });
+
+    expect(screen.queryByRole("button", { name: /agent context/i })).toBeNull();
+  });
+});

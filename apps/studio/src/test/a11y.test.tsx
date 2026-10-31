@@ -49,6 +49,8 @@ const state = vi.hoisted(() => ({
   markSignalAsRead: vi.fn(),
   dismissSignal: vi.fn(),
   focusSignalSubject: vi.fn(),
+  focusedSubject: null as { kind: string; id: string } | null,
+  revealSubject: vi.fn(),
   // Settings and connectors
   settings: {
     base_url: "http://localhost:8001/v1",
@@ -187,6 +189,8 @@ beforeEach(() => {
   state.canvasState = { kind: "ready", data: canvasData };
   state.signals = [signal];
   state.unreadSignalCount = 1;
+  state.canvas = null;
+  state.focusedSubject = null;
 });
 
 describe("axe sweep", () => {
@@ -273,6 +277,8 @@ describe("axe sweep", () => {
   });
 
   it("passes the chat stage", async () => {
+    state.canvas = canvasData;
+    state.focusedSubject = { kind: "outcome", id: "O-101" };
     const { container } = renderWithUpdates(
       <Surface>
         <StudioRuntimeProvider>
@@ -280,6 +286,8 @@ describe("axe sweep", () => {
         </StudioRuntimeProvider>
       </Surface>,
     );
+
+    expect(screen.getByRole("button", { name: /agent context: outcome/i })).toBeInTheDocument();
 
     await expectAccessible(container);
   });
