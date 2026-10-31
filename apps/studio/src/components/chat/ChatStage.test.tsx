@@ -34,6 +34,7 @@ const harness = vi.hoisted(() => ({
     dismissConnectorSuggestion: vi.fn(),
     refreshConnectors: vi.fn(),
     pushToast: vi.fn(),
+    importInterview: vi.fn<(payload: unknown) => Promise<unknown>>(),
   },
 }));
 
@@ -238,5 +239,112 @@ describe("ChatStage", () => {
     expect(screen.getByRole("button", { name: /retry/i })).toBeInTheDocument();
     expect(screen.getByRole("textbox")).toBeInTheDocument();
     expect(errorLog).not.toHaveBeenCalled();
+  });
+});
+
+describe("ChatStage /interview", () => {
+  afterEach(() => {
+    harness.state.messages = [];
+    vi.mocked(harness.state.importInterview).mockReset();
+    vi.mocked(harness.state.pushNotice).mockReset();
+    vi.mocked(harness.state.sendMessage).mockClear();
+  });
+
+  function noticeText(): string {
+    return vi
+      .mocked(harness.state.pushNotice)
+      .mock.calls.map((call) => call[0])
+      .join("\n");
+  }
+
+  it("refuses with a reason when no transcript is attached", async () => {
+    harness.state.messages = [
+      { id: "u-1", parentId: null, role: "user", content: "An earlier question" },
+    ];
+    render(
+      <StudioRuntimeProvider>
+        <ChatStage />
+      </StudioRuntimeProvider>,
+    );
+
+    const composer = screen.getByRole("textbox", { name: /message the studio/i });
+    fireEvent.change(composer, { target: { value: "/interview" } });
+    fireEvent.keyDown(composer, { key: "Enter" });
+
+    await waitFor(() =>
+      expect(noticeText()).toMatch(/Attach a transcript first, then run `\/interview`/i),
+    );
+    expect(harness.state.importInterview).not.toHaveBeenCalled();
+  });
+
+  it("hands the attached transcript to the importer, not to the model", async () => {
+    harness.state.messages = [
+      { id: "u-1", parentId: null, role: "user", content: "An earlier question" },
+    ];
+    vi.mocked(harness.state.importInterview).mockResolvedValue({
+      interview: { id: "iv-1", title: "notes", participant_label: "Participant" },
+      quote_count: 2,
+    });
+    const { container } = render(
+      <StudioRuntimeProvider>
+        <ChatStage />
+      </StudioRuntimeProvider>,
+    );
+
+    const file = new File(["**Ana:** hello there."], "notes.md", { type: "text/markdown" });
+    fireEvent.drop(container.querySelector(".composer") as HTMLElement, {
+      dataTransfer: { types: ["Files"], files: [file] },
+    });
+    expect(await screen.findByText("notes.md")).toBeInTheDocument();
+
+    const composer = screen.getByRole("textbox", { name: /message the studio/i });
+    fireEvent.change(composer, { target: { value: "/interview" } });
+    fireEvent.keyDown(composer, { key: "Enter" });
+
+    await waitFor(() => expect(harness.state.importInterview).toHaveBeenCalledTimes(1));
+    expect(harness.state.importInterview).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "notes",
+        filename: "notes.md",
+        format: "md",
+        participant: "Participant",
+      }),
+    );
+    expect(noticeText()).toMatch(/Imported \*\*notes\*\* as an interview with 2 quotes/i);
+    // The attachment is imported, not also sent to the model as a chat turn.
+    expect(harness.state.sendMessage).not.toHaveBeenCalled();
+  });
+
+  it("shows the importer's refusal in the thread with the filename", async () => {
+    harness.state.messages = [
+      { id: "u-1", parentId: null, role: "user", content: "An earlier question" },
+    ];
+    vi.mocked(harness.state.importInterview).mockRejectedValue(
+      Object.assign(new Error("broken.vtt: line 3: malformed cue timing"), {
+        error: { code: "validation", message: "broken.vtt: line 3: malformed cue timing" },
+        status: 422,
+      }),
+    );
+    const { container } = render(
+      <StudioRuntimeProvider>
+        <ChatStage />
+      </StudioRuntimeProvider>,
+    );
+
+    const file = new File(["WEBVTT"], "broken.vtt", { type: "text/vtt" });
+    fireEvent.drop(container.querySelector(".composer") as HTMLElement, {
+      dataTransfer: { types: ["Files"], files: [file] },
+    });
+    await screen.findByText("broken.vtt");
+
+    const composer = screen.getByRole("textbox", { name: /message the studio/i });
+    fireEvent.change(composer, { target: { value: "/interview" } });
+    fireEvent.keyDown(composer, { key: "Enter" });
+
+    await waitFor(() =>
+      expect(noticeText()).toMatch(
+        /Could not import \*\*broken\.vtt\*\*: broken\.vtt: line 3: malformed cue timing/i,
+      ),
+    );
   });
 });

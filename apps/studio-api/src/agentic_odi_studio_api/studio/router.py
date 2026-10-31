@@ -83,6 +83,7 @@ from agentic_odi_studio_api.studio.schemas import (
     ConversationTreeResponse,
     CreateJobRequest,
     DecideCandidateRequest,
+    ImportInterviewRequest,
     LatestConversationResponse,
     LlmHealthRequest,
     LlmProxyRequest,
@@ -177,6 +178,27 @@ def _as_http_error(exc: Exception) -> StudioHTTPError:
             status_code=status,
         )
     return StudioHTTPError(StudioError(code=StudioErrorCode.INTERNAL, message=str(exc)))
+
+
+def _as_import_error(exc: Exception, display: str) -> StudioHTTPError:
+    """Name the file and the parser's reason for a refused transcript.
+
+    A malformed transcript is the user's input, not a server fault, so it maps
+    to a 422 the thread can render verbatim. Every refusal carries the supplied
+    filename (or ``stdin``) so the message points at the thing that failed.
+    """
+    from agentic_odi_core.transcript import TranscriptFormatError
+
+    if isinstance(exc, TranscriptFormatError):
+        return StudioHTTPError(
+            StudioError(
+                code=StudioErrorCode.VALIDATION,
+                message=f"{display}: {exc}",
+                suggestion="Check the transcript's format, then attach it again.",
+            ),
+            status_code=422,
+        )
+    return _as_http_error(exc)
 
 
 def _payload_from_text(text: str) -> dict[str, Any]:
@@ -1217,6 +1239,57 @@ async def get_duplicate_candidates(
     service = _service(request)
     groups = service.suggest_duplicate_groups(interview_id, threshold or DUPLICATE_THRESHOLD)
     return {"ok": True, "result": {"groups": groups}}
+
+
+@router.post("/interviews/import")
+async def import_interview(body: ImportInterviewRequest, request: Request) -> dict:
+    """Import a transcript the thread handed over as one interview.
+
+    This is the same shared importer ``odi interviews import`` calls — the
+    browser never re-sniffs the format. A refusal names the file and the reason
+    the parser gave, and because the parse runs before any write, a refusal
+    leaves no partial interview. The route returns the created interview and its
+    quote count so the thread can show what landed.
+    """
+    display = body.filename or "stdin"
+    arguments: dict[str, Any] = {
+        "text": body.text,
+        "title": body.title,
+        "participant_label": body.participant,
+        "display_name": display,
+    }
+    if body.filename is not None:
+        arguments["filename"] = body.filename
+    if body.format is not None:
+        arguments["format"] = body.format
+    if body.job_id is not None:
+        arguments["job_id"] = body.job_id
+    if body.role is not None:
+        arguments["participant_role"] = body.role
+    if body.conducted_at is not None:
+        arguments["conducted_at"] = body.conducted_at
+
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(body.mcp_url), ToolName.IMPORT_TRANSCRIPT.value, arguments
+        )
+        return _payload_from_text(result)
+
+    service = _service(request)
+    try:
+        interview, quotes = service.import_transcript(
+            body.text,
+            title=body.title,
+            participant_label=body.participant,
+            filename=body.filename,
+            fmt=body.format,
+            job_id=body.job_id,
+            participant_role=body.role,
+            conducted_at=body.conducted_at,
+        )
+    except Exception as exc:  # noqa: BLE001
+        raise _as_import_error(exc, display) from exc
+    return {"interview": interview.model_dump(mode="json"), "quote_count": len(quotes)}
 
 
 @router.get("/memory/observations", response_model=ObservationListResponse)
