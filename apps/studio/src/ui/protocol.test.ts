@@ -12,6 +12,7 @@ const DOMAIN_CARDS = [
   "evidence-quote",
   "job-map",
   "decision-record",
+  "candidate-queue",
 ];
 
 function expectOk(spec: unknown) {

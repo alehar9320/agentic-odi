@@ -1,5 +1,5 @@
 {#
-  The seven ODI cards the agent may compose, rendered as the shipped catalog
+  The eight ODI cards the agent may compose, rendered as the shipped catalog
   renders them. These are the agent's closed catalog — a stable contract —
   not the Studio's canvas view names, which are in flux.
 #}
@@ -127,6 +127,25 @@
 </article>
 {% endmacro %}
 
+{% macro candidate_queue(data) %}
+<article class="surface" data-surface="candidate-queue">
+  <div class="surface__head">
+    <span class="surface__id">Review queue</span>
+    <span class="pill pill--accent">{{ data.candidates | length }} candidates</span>
+  </div>
+  <ol class="queue">
+    {% for candidate in data.candidates %}
+    <li class="queue__item">
+      <p class="surface__statement">{{ candidate.statement }}</p>
+      <blockquote class="evidence__quote">{{ candidate.quote }}</blockquote>
+      <p class="evidence__meta">From {{ candidate.source }}</p>
+    </li>
+    {% endfor %}
+  </ol>
+  <p class="evidence__meta">Decisions stay in the store; the card never removes a row on a click.</p>
+</article>
+{% endmacro %}
+
 {#
   Dispatch a card by its catalog type. Every type the catalog can produce
   has a macro above; anything unknown falls back to nothing rather than
@@ -140,5 +159,6 @@
   {% elif card.type == "evidence-quote" %}{{ evidence_quote(card.data) }}
   {% elif card.type == "opportunity-thesis" %}{{ opportunity_thesis(card.data) }}
   {% elif card.type == "decision-record" %}{{ decision_record(card.data) }}
+  {% elif card.type == "candidate-queue" %}{{ candidate_queue(card.data) }}
   {% endif %}
 {% endmacro %}
