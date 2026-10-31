@@ -42,6 +42,7 @@ from agentic_odi_core.messages import (
     customer_outcome_not_found,
     evidence_not_found,
     interview_not_found,
+    invalid_strategy_request,
     job_not_found,
     outcome_not_found,
     quote_not_found,
@@ -69,9 +70,13 @@ from agentic_odi_core.models import (
     ScheduledWork,
     ScheduledWorkStatus,
     ScheduledWorkTriggerType,
+    Segment,
+    SegmentVerdict,
     Signal,
     SignalKind,
     Step,
+    Strategy,
+    StrategyKind,
     ValueMetric,
     compute_opportunity_score,
     create_job,
@@ -86,6 +91,13 @@ from agentic_odi_core.remote import (
 from agentic_odi_core.repository import InMemoryRepository, Repository
 from agentic_odi_core.router import ModelRouter, ModelTier, OnDeviceLLMEngine, RoutingMode
 from agentic_odi_core.schema import odi_schema
+from agentic_odi_core.segmentation import (
+    MIN_OUTCOMES_PER_SEGMENT,
+    OutcomeClusterStrategy,
+    SegmentationStrategy,
+    segment_verdict,
+    unclustered_outcomes,
+)
 from agentic_odi_core.services import (
     CandidateNotFoundError,
     CustomerOutcomeNotFoundError,
@@ -93,26 +105,43 @@ from agentic_odi_core.services import (
     InterviewNotFoundError,
     InvalidOutcomeStatementError,
     JobNotFoundError,
+    NoStrategyEvidenceError,
     ODIService,
     OutcomeNotFoundError,
     QuoteNotFoundError,
     ScheduledWorkNotFoundError,
+    SegmentNotFoundError,
     SignalBudget,
     SignalNotFoundError,
     StepNotFoundError,
+    StrategyNotFoundError,
     ValueOutOfRangeError,
 )
 from agentic_odi_core.steve_jobs import (
     format_opportunity_score_insight,
     generate_steve_jobs_response,
 )
+from agentic_odi_core.strategy import propose_strategy
 
 __all__ = [
     "ScheduledWork",
     "ScheduledWorkNotFoundError",
     "ScheduledWorkStatus",
     "ScheduledWorkTriggerType",
+    "Segment",
+    "SegmentVerdict",
+    "SegmentationStrategy",
+    "SegmentNotFoundError",
+    "StrategyNotFoundError",
+    "NoStrategyEvidenceError",
+    "OutcomeClusterStrategy",
+    "MIN_OUTCOMES_PER_SEGMENT",
+    "Strategy",
+    "StrategyKind",
     "scheduled_work_not_found",
+    "segment_verdict",
+    "unclustered_outcomes",
+    "propose_strategy",
     "BusinessImpactCategory",
     "BusinessValue",
     "CAPABILITIES",
@@ -185,6 +214,7 @@ __all__ = [
     "format_opportunity_score_insight",
     "generate_steve_jobs_response",
     "interview_not_found",
+    "invalid_strategy_request",
     "job_not_found",
     "job_stage_catalog",
     "odi_schema",

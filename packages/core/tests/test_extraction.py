@@ -68,8 +68,9 @@ def test_extract_creates_no_outcome(service: ODIService) -> None:
     interview_id, quote_id = _interview_with_quote(service)
     interview = service.get_interview(interview_id)
     assert interview is not None and interview.job_id is not None
+    job_id = interview.job_id
     service.extract_candidates(quote_id, ScriptedExtractor([Proposal(VALID)]))
-    assert service.get_outcomes(interview.job_id) == []
+    assert service.get_outcomes(job_id) == []
 
 
 def test_extract_is_idempotent_and_does_not_reset_decisions(service: ODIService) -> None:

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEven
 
 import { asStudioError } from "../../api/studioApi";
 import { focusLastClaimChip } from "../../assistant/claims";
+import { formatOpportunityScore, opportunityPill } from "../../lib/odi";
 import { useStudio } from "../../state/StudioContext";
 import type { Evidence, StudioError } from "../../types";
 import { FailurePanel } from "../FailurePanel";
@@ -53,6 +54,12 @@ export function EvidenceStream() {
   const jobNames = useMemo(
     () => new Map(jobs.map((job) => [job.id, job.name || job.id])),
     [jobs],
+  );
+
+  const outcomes = useMemo(() => canvasState.data?.outcomes ?? [], [canvasState.data]);
+  const outcomeMap = useMemo(
+    () => new Map(outcomes.map((o) => [o.id, o])),
+    [outcomes],
   );
 
   // A citation chip asked for this row: bring it into view, mark it briefly,
@@ -236,6 +243,26 @@ export function EvidenceStream() {
                 {linkedJob ? `Linked to ${linkedJob}` : "Not linked to a job"}
                 {item.source_name ? ` · ${item.source_name}` : ""}
                 {item.item_type ? ` · ${item.item_type}` : ""}
+                {item.outcome_id ? (
+                  <>
+                    {" · "}
+                    Supports <b>{item.outcome_id}</b>
+                    {outcomeMap.has(item.outcome_id) ? (
+                      <>
+                        {" "}
+                        <span
+                          className={`badge badge--${opportunityPill(
+                            outcomeMap.get(item.outcome_id)?.opportunity_score,
+                          ).variant}`}
+                        >
+                          {formatOpportunityScore(
+                            outcomeMap.get(item.outcome_id)?.opportunity_score,
+                          )}
+                        </span>
+                      </>
+                    ) : null}
+                  </>
+                ) : null}
               </span>
 
               {promotingId === item.id ? (

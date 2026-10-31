@@ -24,6 +24,7 @@ export function JobMap() {
     updateJob,
     deleteJob,
     focusedJobId,
+    focusSubject,
   } = useStudio();
   const canvas = canvasState.data;
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
@@ -167,6 +168,7 @@ export function JobMap() {
             value={activeJobId}
             onChange={(event) => {
               setSelectedJobId(event.target.value);
+              focusSubject("job", event.target.value);
               setFollowedJobId(focusedJobId);
               setEditingStepId(null);
             }}

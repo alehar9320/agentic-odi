@@ -22,12 +22,15 @@ from agentic_odi_core.models import (
     Outcome,
     OutcomeCandidate,
     ScheduledWork,
+    Segment,
     Signal,
     Step,
+    Strategy,
     compute_opportunity_score,
 )
 from agentic_odi_core.repository import (
     Repository,
+    compute_evidence_fingerprint,
     page,
     rank_signals,
     sort_outcomes,
@@ -67,6 +70,8 @@ class SQLiteRepository(Repository):
         self.interviews: dict[str, Interview] = {}
         self.quotes: dict[str, InterviewQuote] = {}
         self.candidates: dict[str, OutcomeCandidate] = {}
+        self.segments: dict[str, Segment] = {}
+        self.strategies: dict[str, Strategy] = {}
         self._last_event_id = 0
         for ev in self.store.get_stream(workspace_id=self._workspace_id, replay_order=True):
             self._apply_event(ev)
@@ -148,20 +153,28 @@ class SQLiteRepository(Repository):
         elif et == "JOB_DELETED":
             job_id = p["id"]
             self.jobs.pop(job_id, None)
-            for key in [k for k, v in self.steps.items() if v.job_id == job_id]:
+            deleted_steps = {k for k, v in self.steps.items() if v.job_id == job_id}
+            for key in deleted_steps:
                 del self.steps[key]
-            for key in [k for k, v in self.outcomes.items() if v.job_id == job_id]:
+            deleted_outcomes = {k for k, v in self.outcomes.items() if v.job_id == job_id}
+            for key in deleted_outcomes:
                 del self.outcomes[key]
             for key in [k for k, v in self.customer_outcomes.items() if v.job_id == job_id]:
                 del self.customer_outcomes[key]
-            for key in [
-                k
-                for k, v in self.evidence.items()
-                if v.job_id == job_id
-                or (v.step_id is not None and v.step_id not in self.steps)
-                or (v.outcome_id is not None and v.outcome_id not in self.outcomes)
-            ]:
-                del self.evidence[key]
+            #: Do not destroy research evidence: unlink references to the removed
+            #: job, its steps and its outcomes instead of deleting the rows.
+            for key, record in list(self.evidence.items()):
+                updates: dict[str, Any] = {}
+                if record.job_id == job_id:
+                    updates["job_id"] = None
+                if record.step_id in deleted_steps:
+                    updates["step_id"] = None
+                if record.outcome_id in deleted_outcomes:
+                    updates["outcome_id"] = None
+                if updates:
+                    current = record.model_dump(exclude_unset=True)
+                    current.update(updates)
+                    self.evidence[key] = Evidence.model_validate(current)
             for key in [k for k, v in self.interviews.items() if v.job_id == job_id]:
                 del self.interviews[key]
                 for quote_key in [q for q, v in self.quotes.items() if v.interview_id == key]:
@@ -177,20 +190,26 @@ class SQLiteRepository(Repository):
                 del self.outcomes[key]
             for key in [k for k, v in self.customer_outcomes.items() if v.step_id == step_id]:
                 del self.customer_outcomes[key]
-            for key in [
-                k
-                for k, v in self.evidence.items()
-                if v.step_id == step_id
-                or (v.outcome_id is not None and v.outcome_id not in self.outcomes)
-            ]:
-                del self.evidence[key]
+            #: Unlink evidence instead of destroying it.
+            for key, record in list(self.evidence.items()):
+                if record.step_id == step_id:
+                    current = record.model_dump(exclude_unset=True)
+                    current["step_id"] = None
+                    self.evidence[key] = Evidence.model_validate(current)
         elif et == "OUTCOME_DELETED":
             outcome_id = p["id"]
             self.outcomes.pop(outcome_id, None)
-            for key in [k for k, v in self.evidence.items() if v.outcome_id == outcome_id]:
-                del self.evidence[key]
+            #: Unlink evidence instead of destroying it: point outcome_id to NULL
+            #: so the quote survives the outcome's removal.
+            for key, record in list(self.evidence.items()):
+                if record.outcome_id == outcome_id:
+                    current = record.model_dump(exclude_unset=True)
+                    current["outcome_id"] = None
+                    self.evidence[key] = Evidence.model_validate(current)
         elif et == "EVIDENCE_DELETED":
             self.evidence.pop(p["id"], None)
+        elif et == "EVIDENCE_UPDATED":
+            self._merge_updates(self.evidence, p, Evidence)
         elif et == "SCHEDULED_WORK_CREATED":
             self.scheduled_work[p["id"]] = ScheduledWork.model_validate(p)
         elif et == "SCHEDULED_WORK_UPDATED":
@@ -226,6 +245,14 @@ class SQLiteRepository(Repository):
             self._merge_updates(self.signals, p, Signal)
         elif et == "SIGNAL_DISMISSED":
             self._merge_updates(self.signals, p, Signal)
+        elif et == "SEGMENT_CREATED":
+            self.segments[p["id"]] = Segment.model_validate(p)
+        elif et == "SEGMENT_UPDATED":
+            self._merge_updates(self.segments, p, Segment)
+        elif et == "STRATEGY_CREATED":
+            self.strategies[p["id"]] = Strategy.model_validate(p)
+        elif et == "STRATEGY_UPDATED":
+            self._merge_updates(self.strategies, p, Strategy)
         self._last_event_id = max(self._last_event_id, ev["id"])
 
     @staticmethod
@@ -514,6 +541,56 @@ class SQLiteRepository(Repository):
             self._sync()
             return True
 
+    def get_evidence_by_fingerprint(
+        self,
+        source_kind: str,
+        source_name: str,
+        name: str,
+        content: str,
+        url: str | None,
+        raw: dict[str, Any] | None,
+    ) -> Evidence | None:
+        with self._lock:
+            self._sync()
+            fingerprint = compute_evidence_fingerprint(
+                source_kind, source_name, name, content, url, raw
+            )
+            for existing in self.evidence.values():
+                if (
+                    compute_evidence_fingerprint(
+                        existing.source_kind,
+                        existing.source_name,
+                        existing.name,
+                        existing.content,
+                        existing.url,
+                        existing.raw,
+                    )
+                    == fingerprint
+                ):
+                    return existing
+            return None
+
+    def update_evidence(self, evidence_id: str, updates: dict[str, Any]) -> Evidence | None:
+        with self._lock:
+            self._sync()
+            evidence = self.evidence.get(evidence_id)
+            if not evidence:
+                return None
+            current = evidence.model_dump(exclude_unset=True)
+            current.update(updates)
+            try:
+                new_evidence = evidence.model_validate(current)
+            except ValidationError:
+                return None
+            self.store.append(
+                "EVIDENCE_UPDATED",
+                {"id": evidence_id, "updates": updates},
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return new_evidence
+
     def delete_customer_outcome(self, outcome_id: str) -> bool:
         with self._lock:
             self._sync()
@@ -644,6 +721,96 @@ class SQLiteRepository(Repository):
                 self._sync()
                 return True
             return False
+
+    def add_segment(self, segment: Segment) -> Segment:
+        with self._lock:
+            self.store.append(
+                "SEGMENT_CREATED",
+                segment.model_dump(mode="json"),
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return segment
+
+    def get_segment(self, segment_id: str) -> Segment | None:
+        with self._lock:
+            self._sync()
+            return self.segments.get(segment_id)
+
+    def list_segments(self, job_id: str | None = None) -> list[Segment]:
+        with self._lock:
+            self._sync()
+            items = list(self.segments.values())
+            if job_id is not None:
+                items = [segment for segment in items if segment.job_id == job_id]
+            return items
+
+    def update_segment(self, segment_id: str, updates: dict[str, Any]) -> Segment | None:
+        with self._lock:
+            self._sync()
+            segment = self.segments.get(segment_id)
+            if segment is None:
+                return None
+            current = segment.model_dump(exclude_unset=True)
+            current.update(updates)
+            try:
+                new_segment = segment.model_validate(current)
+            except ValidationError:
+                return None
+            self.store.append(
+                "SEGMENT_UPDATED",
+                {"id": segment_id, "updates": updates},
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return new_segment
+
+    def add_strategy(self, strategy: Strategy) -> Strategy:
+        with self._lock:
+            self.store.append(
+                "STRATEGY_CREATED",
+                strategy.model_dump(mode="json"),
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return strategy
+
+    def get_strategy(self, strategy_id: str) -> Strategy | None:
+        with self._lock:
+            self._sync()
+            return self.strategies.get(strategy_id)
+
+    def list_strategies(self, segment_id: str | None = None) -> list[Strategy]:
+        with self._lock:
+            self._sync()
+            items = list(self.strategies.values())
+            if segment_id is not None:
+                items = [strategy for strategy in items if strategy.segment_id == segment_id]
+            return items
+
+    def update_strategy(self, strategy_id: str, updates: dict[str, Any]) -> Strategy | None:
+        with self._lock:
+            self._sync()
+            strategy = self.strategies.get(strategy_id)
+            if strategy is None:
+                return None
+            current = strategy.model_dump(exclude_unset=True)
+            current.update(updates)
+            try:
+                new_strategy = strategy.model_validate(current)
+            except ValidationError:
+                return None
+            self.store.append(
+                "STRATEGY_UPDATED",
+                {"id": strategy_id, "updates": updates},
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return new_strategy
 
     def add_interview(self, interview: Interview) -> Interview:
         with self._lock:
