@@ -130,3 +130,64 @@ def test_memo_unknown_decision_exits_nonzero(tmp_path) -> None:
     result = runner.invoke(app, ["--db", db, "decide", "memo", "--decision-id", "no-such-decision"])
     assert result.exit_code != 0
     assert "not found" in result.output.lower()
+
+
+def test_message_renders_within_budget_and_no_heading(tmp_path) -> None:
+    db = str(tmp_path / "studio.db")
+    job_id, ids = _seed(db)
+    decision_id = _decide(db, job_id, ids[0], ids[1])
+
+    result = runner.invoke(
+        app,
+        [
+            "--db",
+            db,
+            "decide",
+            "message",
+            "--decision-id",
+            decision_id,
+            "--channel",
+            "slack",
+            "--link",
+            "https://example.test/memo",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert "https://example.test/memo" in result.output
+    assert not any(line.startswith("#") for line in result.output.splitlines())
+
+
+def test_message_json_carries_the_subject_and_word_count(tmp_path) -> None:
+    db = str(tmp_path / "studio.db")
+    job_id, ids = _seed(db)
+    decision_id = _decide(db, job_id, ids[0], ids[1])
+
+    result = runner.invoke(
+        app,
+        [
+            "--db",
+            db,
+            "decide",
+            "message",
+            "--decision-id",
+            decision_id,
+            "--channel",
+            "email",
+            "--json",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["subject"].startswith("Decision:")
+    assert payload["word_count"] <= 200
+
+
+def test_message_unknown_decision_exits_nonzero(tmp_path) -> None:
+    db = str(tmp_path / "studio.db")
+    _seed(db)
+    result = runner.invoke(
+        app,
+        ["--db", db, "decide", "message", "--decision-id", "no-such-decision"],
+    )
+    assert result.exit_code != 0
+    assert "not found" in result.output.lower()

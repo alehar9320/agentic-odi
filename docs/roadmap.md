@@ -27,6 +27,13 @@ it is merged; the link is the proof.
   bytes; a missing section is omitted with a one-line reason, never a zero. The
   same projection backs `POST /api/decisions/memo` and the MCP `render_memo`
   tool.
+- [x] **The stakeholder message writes itself**: `odi decide message` cuts the
+  memo to a short, pasteable message within a channel's word budget (`slack` 120,
+  `email` 200) — what we found, what we are doing, what it is worth, the largest
+  unknown, and a link. The largest unknown and a supplied link are never dropped
+  for length; a budget that cannot fit them fails loudly. It reads and writes
+  nothing, and the same projection backs `POST /api/decisions/message` and the
+  MCP `render_stakeholder_message` tool.
 - [x] **Segments and strategy**: Define a segment by the outcomes it cares about,
   derive candidate groups deterministically from the scores, profile a segment's
   underserved and overserved halves separately, and record a strategy only when

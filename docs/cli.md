@@ -343,6 +343,24 @@ placeholder prose and never a zero; a value's unit and source travel with the
 number. The same projection backs `POST /api/decisions/memo` and the MCP
 `render_memo` tool.
 
+## Draft the stakeholder message
+
+```bash
+agentic-odi decide message --decision-id DEC-1
+agentic-odi decide message --decision-id DEC-1 --channel email --link "$MEMO_URL"
+agentic-odi decide message --decision-id DEC-1 --json
+```
+
+`decide message` cuts the memo to a short, pasteable message: what we found,
+what we are doing, what it is worth, the largest unknown, and a link. `--channel`
+sets a hard word budget (`slack` 120, `email` 200). The largest unknown and a
+supplied `--link` are never dropped for length — a budget that cannot fit them
+fails loudly rather than sending a message with its caveat removed. The `slack`
+variant carries no markdown heading, because a heading renders as a literal `#`
+there; the `email` variant adds a `Subject:`. `--verbose` reports which optional
+sentences were dropped to fit. It reads and writes nothing: the same projection
+backs `POST /api/decisions/message` and the MCP `render_stakeholder_message` tool.
+
 ## Track a bet
 
 ```bash

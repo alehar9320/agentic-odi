@@ -46,6 +46,7 @@ class ToolName(str, Enum):
     LIST_DECISIONS = "list_decisions"
     REVIEW_DECISION = "review_decision"
     RENDER_MEMO = "render_memo"
+    RENDER_STAKEHOLDER_MESSAGE = "render_stakeholder_message"
     GET_OUTCOME_HISTORY = "get_outcome_history"
     GET_OUTCOME_DELTA = "get_outcome_delta"
     RECORD_BET = "record_bet"
@@ -513,6 +514,22 @@ TOOL_SPECS: dict[str, ToolSpec] = {
         returns=(
             "The rendered memo markdown. A missing section is omitted with a "
             "one-line reason; no number is invented and none is rendered as zero."
+        ),
+        stage="6",
+    ),
+    ToolName.RENDER_STAKEHOLDER_MESSAGE.value: ToolSpec(
+        name="render_stakeholder_message",
+        summary=(
+            "Cut a decision's memo to a short, pasteable stakeholder message "
+            "within a channel's word budget: what we found, what we are doing, "
+            "what it is worth, the largest unknown, and a link."
+        ),
+        effect=ToolEffect.READ,
+        arguments=("decision_id", "channel", "link"),
+        required=("decision_id",),
+        returns=(
+            "The message body and word count. The largest unknown is never "
+            "dropped; a budget that cannot fit it fails rather than omitting it."
         ),
         stage="6",
     ),

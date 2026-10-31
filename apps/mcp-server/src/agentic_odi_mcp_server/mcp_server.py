@@ -23,6 +23,7 @@ from agentic_odi_core import (
     JobNotFoundError,
     JobStage,
     MemoDecisionNotFoundError,
+    MessageBudgetError,
     OdiError,
     ODIService,
     OutcomeNotFoundError,
@@ -830,6 +831,31 @@ def render_memo(decision_id: str) -> str:
     except MemoDecisionNotFoundError:
         return f"Error: decision not found: {decision_id}"
     return render_memo_text(memo)
+
+
+@mcp.tool
+def render_stakeholder_message(
+    decision_id: str, channel: str = "slack", link: str | None = None
+) -> str:
+    """Cut a decision's memo to a short, pasteable stakeholder message."""
+    try:
+        message = service.build_stakeholder_message(decision_id, channel=channel, link=link)
+    except MemoDecisionNotFoundError:
+        return f"Error: decision not found: {decision_id}"
+    except MessageBudgetError as exc:
+        return f"Error: {exc}"
+    except (OdiError, ValueError) as exc:
+        return f"Error: {exc}"
+    return json.dumps(
+        {
+            "decision_id": decision_id,
+            "channel": message.channel,
+            "subject": message.subject,
+            "body": message.body,
+            "word_count": message.word_count,
+            "dropped": list(message.dropped),
+        }
+    )
 
 
 @mcp.tool

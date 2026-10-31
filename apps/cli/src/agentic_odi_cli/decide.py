@@ -36,6 +36,9 @@ DECIDED_AT_OPTION = typer.Option(
 )
 SUPERSEDES_OPTION = typer.Option(None, "--supersedes", help="Decision ID this one replaces")
 DECISION_ID_OPTION = typer.Option(..., "--decision-id", help="Decision to assemble a memo for")
+CHANNEL_OPTION = typer.Option("slack", "--channel", help="slack or email")
+LINK_OPTION = typer.Option(None, "--link", help="Canonical link to the full memo")
+VERBOSE_OPTION = typer.Option(False, "--verbose", help="Report dropped sentences")
 
 
 def parse_rejection(raw: str) -> dict[str, str]:
@@ -109,3 +112,27 @@ def memo(
         return
     markdown = payload["markdown"] if isinstance(payload, dict) else payload
     typer.echo(markdown, nl=False)
+
+
+@decide_app.command("message")
+def message(
+    decision_id: str = DECISION_ID_OPTION,
+    channel: str = CHANNEL_OPTION,
+    link: str | None = LINK_OPTION,
+    verbose: bool = VERBOSE_OPTION,
+    json_output: bool = JSON_OPTION,
+) -> None:
+    """Draft a short, pasteable stakeholder message from the memo."""
+    args: dict[str, Any] = {"decision_id": decision_id, "channel": channel}
+    if link is not None:
+        args["link"] = link
+    payload = run_tool("render_stakeholder_message", args)
+    if json_output:
+        typer.echo(json.dumps(payload, indent=2, ensure_ascii=False))
+        return
+    subject = payload.get("subject")
+    if subject:
+        typer.echo(f"Subject: {subject}")
+    typer.echo(payload["body"])
+    if verbose and payload.get("dropped"):
+        typer.echo(f"(dropped for length: {', '.join(payload['dropped'])})", err=True)

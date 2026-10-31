@@ -28,7 +28,7 @@ from dataclasses import dataclass, field
 from typing import Protocol, runtime_checkable
 
 from agentic_odi_core.brief import NOT_MEASURED
-from agentic_odi_core.errors import NotFoundError
+from agentic_odi_core.errors import NotFoundError, ValidationError
 from agentic_odi_core.evaluation import classify_opportunity, classify_value
 from agentic_odi_core.models import Bet, Decision, Evidence, Outcome
 
@@ -122,6 +122,164 @@ class MemoDecisionNotFoundError(NotFoundError):
     def __init__(self, decision_id: str) -> None:
         self.decision_id = decision_id
         super().__init__(decision_id, "Decision")
+
+
+#: The hard word budgets for the stakeholder message (M3-12/ALH-98). A message
+#: is read on a phone; the memo stays the record.
+SLACK_WORD_BUDGET = 120
+EMAIL_WORD_BUDGET = 200
+CHANNEL_BUDGETS: dict[str, int] = {"slack": SLACK_WORD_BUDGET, "email": EMAIL_WORD_BUDGET}
+
+#: Sentence kinds in the order they are *written*, and the order they are
+#: *included* under budget pressure. ``unknown`` and a supplied ``link`` are
+#: mandatory — they are included first and a message that cannot fit them fails
+#: loudly rather than silently dropping the caveat. The optional sentences are
+#: dropped lowest-priority first: action, then finding, then value (a value with
+#: its basis is the number a stakeholder is most likely to act on).
+_MESSAGE_WRITE_ORDER = ("finding", "action", "value", "unknown", "link")
+_MESSAGE_INCLUDE_ORDER = ("link", "unknown", "value", "finding", "action")
+_MANDATORY_SENTENCES = frozenset({"unknown", "link"})
+
+
+class MessageBudgetError(ValidationError):
+    """A mandatory sentence does not fit the channel's word budget.
+
+    Raised instead of truncating a source, dropping the caveat, or pretending a
+    too-long message is fine. The caller shortens the input or uses the memo.
+    """
+
+    def __init__(self, channel: str, budget: int, required: int) -> None:
+        self.channel = channel
+        self.budget = budget
+        self.required = required
+        super().__init__(
+            f"The {channel} message needs {required} words for its caveat and link, "
+            f"over the {budget}-word budget. Shorten the input or send the memo."
+        )
+
+
+@dataclass(frozen=True)
+class StakeholderMessage:
+    """A short, pasteable message: the same facts as the memo, cut to a budget.
+
+    ``subject`` is set only for ``email``. ``dropped`` names the sentence kinds
+    removed to fit the budget, so a caller can report them under ``--verbose``;
+    they never appear in the pasteable body.
+    """
+
+    channel: str
+    body: str
+    word_count: int
+    subject: str | None = None
+    dropped: tuple[str, ...] = ()
+    link: str | None = None
+
+
+def _message_subject(memo: Memo) -> str:
+    """The email subject: what was decided, then the promise of evidence.
+
+    Derived from the decision's own chosen statement, never invented; with no
+    statement it falls back to a fixed phrase rather than a fabricated headline.
+    """
+    what = next(
+        (claim.statement for claim in memo.chosen if claim.statement),
+        "a recorded choice",
+    )
+    return f"Decision: {_escape(what)} — here is the evidence"
+
+
+def _message_sentences(memo: Memo, *, link: str | None) -> dict[str, str]:
+    """One sentence per kind, from the memo. A kind with nothing to say is absent."""
+    sentences: dict[str, str] = {}
+
+    finding = next((claim for claim in memo.chosen if claim.statement), None)
+    if finding is not None and finding.statement is not None:
+        score = (
+            f"opportunity {_fmt(finding.score)} ({finding.band or NOT_MEASURED}"
+            f"{', n=' + str(finding.n) if finding.n is not None else ''})"
+            if finding.score is not None
+            else f"score {NOT_MEASURED}"
+        )
+        sentences["finding"] = f"We found an unmet need: {_escape(finding.statement)} ({score})."
+
+    if memo.chosen:
+        names = [claim.statement for claim in memo.chosen if claim.statement]
+        chosen = "; ".join(_escape(name) for name in names) if names else "the recorded outcome"
+        sentences["action"] = f"We are choosing: {chosen} because {_escape(memo.rationale)}"
+
+    if memo.value_estimate is not None:
+        unit = memo.value_unit or NOT_MEASURED
+        value = (
+            f"It is worth {_fmt(memo.value_estimate)} {unit} ({memo.value_basis}"
+            f"{', source: ' + _escape(memo.value_source) if memo.value_source else ''})."
+        )
+    else:
+        value = "Worth is not yet estimated."
+    sentences["value"] = value
+
+    if memo.holes:
+        sentences["unknown"] = f"What we still do not know: {_escape(memo.holes[0])}."
+    else:
+        sentences["unknown"] = "We have not recorded what we still do not know."
+
+    if link:
+        sentences["link"] = f"Full memo: {link}"
+    return sentences
+
+
+def render_stakeholder_message(
+    memo: Memo,
+    *,
+    channel: str = "slack",
+    link: str | None = None,
+) -> StakeholderMessage:
+    """Cut the memo to a pasteable message within the channel's word budget.
+
+    Deterministic assembly, no model: the same memo and link yield the same
+    message. Sentences are included highest-priority first — the largest unknown
+    and the memo link are mandatory, so a too-long message fails loudly instead
+    of silently dropping its caveat. The lowest-priority sentences (action, then
+    finding, then value) are dropped to fit and reported in ``dropped``.
+    """
+    if channel not in CHANNEL_BUDGETS:
+        raise ValidationError(
+            f"Unknown channel: {channel!r}. Use one of {sorted(CHANNEL_BUDGETS)}."
+        )
+    budget = CHANNEL_BUDGETS[channel]
+    sentences = _message_sentences(memo, link=link)
+    subject = _message_subject(memo) if channel == "email" else None
+
+    def total(words: list[str]) -> int:
+        count = sum(len(sentence.split()) for sentence in words)
+        return count + (len(subject.split()) if subject else 0)
+
+    included: list[str] = []
+    included_kinds: list[str] = []
+    dropped: list[str] = []
+    for kind in _MESSAGE_INCLUDE_ORDER:
+        sentence = sentences.get(kind)
+        if sentence is None:
+            continue
+        if total([*included, sentence]) <= budget:
+            included.append(sentence)
+            included_kinds.append(kind)
+        else:
+            dropped.append(kind)
+
+    provided_mandatory = _MANDATORY_SENTENCES & set(sentences)
+    blocking = provided_mandatory & set(dropped)
+    if blocking:
+        raise MessageBudgetError(channel, budget, total([sentences[k] for k in blocking]))
+
+    body = " ".join(sentences[kind] for kind in _MESSAGE_WRITE_ORDER if kind in included_kinds)
+    return StakeholderMessage(
+        channel=channel,
+        body=body,
+        word_count=total(included),
+        subject=subject,
+        dropped=tuple(dropped),
+        link=link,
+    )
 
 
 def _escape(text: str) -> str:

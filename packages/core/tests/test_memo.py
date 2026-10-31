@@ -22,12 +22,18 @@ from pathlib import Path
 
 import pytest
 from agentic_odi_core.memo import (
+    EMAIL_WORD_BUDGET,
     NO_CRITERIA_NOTE,
     NO_HOLES_NOTE,
     NO_VALUE_NOTE,
+    SLACK_WORD_BUDGET,
+    Memo,
+    MemoClaim,
     MemoDecisionNotFoundError,
+    MessageBudgetError,
     build_memo,
     render_memo,
+    render_stakeholder_message,
 )
 from agentic_odi_core.models import Decision, Evidence, Outcome, Rejection
 from agentic_odi_core.repository import InMemoryRepository
@@ -363,3 +369,164 @@ def test_a_chosen_outcome_that_no_longer_exists_is_still_named() -> None:
     text = render_memo(memo)
     assert "`out-gone`" in text
     assert "score not measured" in text
+
+
+# --- Stakeholder message (M3-12/ALH-98) -----------------------------------
+#
+# Readiness choices pinned here:
+# * One assembly function with a ``channel`` parameter; the budget is a hard
+#   word cap (120 Slack, 200 email).
+# * The largest unknown and a supplied link are never dropped; a budget that
+#   cannot fit them raises rather than silently omitting the caveat.
+# * The Slack variant carries no markdown heading, because a heading renders as
+#   a literal ``#`` there.
+# * Every number in the message exists in the memo's inputs.
+
+
+def _full_memo_with_hole():
+    return build_memo(
+        _FIXTURE_DECISION,
+        outcomes=_FIXTURE_OUTCOMES,
+        evidence=_FIXTURE_EVIDENCE,
+        bets=(_FixedBet(),),
+        holes=("No interviews with enterprise admins yet",),
+    )
+
+
+def test_a_fully_populated_decision_fits_both_budgets() -> None:
+    memo = _full_memo_with_hole()
+    for channel, budget in (("slack", SLACK_WORD_BUDGET), ("email", EMAIL_WORD_BUDGET)):
+        message = render_stakeholder_message(memo, channel=channel, link="https://x/memo")
+        assert message.word_count <= budget
+        assert message.body
+
+
+def test_the_slack_variant_has_no_markdown_heading() -> None:
+    message = render_stakeholder_message(_full_memo_with_hole(), channel="slack")
+    assert not any(line.startswith("#") for line in message.body.splitlines())
+
+
+def test_the_email_variant_carries_a_subject() -> None:
+    message = render_stakeholder_message(_full_memo_with_hole(), channel="email")
+    assert message.subject is not None
+    assert message.subject.startswith("Decision:")
+
+
+def test_the_unknown_is_never_dropped_for_length() -> None:
+    memo = build_memo(
+        _FIXTURE_DECISION,
+        outcomes=_FIXTURE_OUTCOMES,
+        evidence=_FIXTURE_EVIDENCE,
+        holes=(" ".join(f"detail{i}" for i in range(90)),),
+    )
+    message = render_stakeholder_message(memo, channel="slack")
+    assert "What we still do not know" in message.body
+    assert "unknown" not in message.dropped
+
+
+def test_a_budget_that_cannot_fit_the_caveat_raises_rather_than_truncating() -> None:
+    memo = build_memo(
+        _FIXTURE_DECISION,
+        outcomes=_FIXTURE_OUTCOMES,
+        evidence=_FIXTURE_EVIDENCE,
+        holes=(" ".join(f"word{i}" for i in range(400)),),
+    )
+    with pytest.raises(MessageBudgetError):
+        render_stakeholder_message(memo, channel="slack")
+
+
+def test_dropping_the_action_is_reported_and_keeps_the_unknown() -> None:
+    # A value sentence with a long basis pushes the message over budget, so the
+    # lowest-priority sentence (action) is dropped and reported, not the caveat.
+    long_basis = " ".join(f"basis{i}" for i in range(90))
+    memo = Memo(
+        decision_id="dec-1",
+        job_id="job-1",
+        decided_at="2026-01-02T00:00:00Z",
+        decided_by="alex",
+        rationale="Publishing speed blocks every release.",
+        confidence="medium",
+        superseded_by=None,
+        superseded_at=None,
+        why_now="This decision was recorded on 2026-01-02.",
+        chosen=(
+            MemoClaim(
+                outcome_id="out-1",
+                statement="Minimize the time it takes to publish a plugin when a release is ready",
+                score=15.0,
+                band="very high",
+                n=1,
+            ),
+        ),
+        value_estimate=250000.0,
+        value_unit="currency",
+        value_basis="market",
+        value_source=long_basis,
+        holes=("No interviews with enterprise admins yet",),
+    )
+    message = render_stakeholder_message(memo, channel="slack")
+    assert "action" in message.dropped
+    assert "What we still do not know" in message.body
+
+
+def test_an_unknown_channel_is_refused() -> None:
+    with pytest.raises(ValueError):
+        render_stakeholder_message(_full_memo_with_hole(), channel="carrier-pigeon")
+
+
+def test_every_numeral_in_the_message_exists_in_the_records() -> None:
+    memo = _full_memo_with_hole()
+    message = render_stakeholder_message(memo, channel="email", link="https://x/memo-1")
+    allowed: set[str] = set(_all_numerals(message.link or ""))
+    for claim in memo.chosen:
+        if claim.score is not None:
+            allowed.add(f"{claim.score:g}")
+        if claim.n is not None:
+            allowed.add(str(claim.n))
+    if memo.value_estimate is not None:
+        allowed.add(f"{memo.value_estimate:g}")
+    allowed |= set(_all_numerals(memo.value_source or ""))
+    for hole in memo.holes:
+        allowed |= set(_all_numerals(hole))
+    allowed |= set(_all_numerals(memo.rationale))
+    allowed |= set(_all_numerals(memo.why_now))
+    for numeral in _all_numerals(message.body):
+        assert numeral in allowed, f"numeral {numeral!r} in message is not in the records"
+
+
+def test_an_unknown_decision_raises_for_the_message() -> None:
+    service = ODIService(InMemoryRepository())
+    with pytest.raises(MemoDecisionNotFoundError):
+        service.build_stakeholder_message("no-such-decision")
+
+
+def test_building_a_message_writes_nothing() -> None:
+    service = ODIService(InMemoryRepository())
+    job = service.add_job("Publish a plugin")
+    outcome = service.add_outcome(
+        job.id,
+        "Minimize the time it takes to publish a plugin when a release is ready",
+        9.0,
+        3.0,
+        at="2026-01-01T00:00:00Z",
+    )
+    decision = service.record_decision(
+        job.id,
+        [outcome.id],
+        rationale="Publishing speed blocks every release.",
+        decided_by="alex",
+        decided_at="2026-01-02T00:00:00Z",
+    )
+
+    def snapshot() -> str:
+        repo = service.repo
+        return repr(
+            {
+                "decisions": [d.model_dump(mode="json") for d in repo.decisions.values()],
+                "outcomes": [o.model_dump(mode="json") for o in repo.outcomes.values()],
+            }
+        )
+
+    before = snapshot()
+    service.build_stakeholder_message(decision.id, channel="slack")
+    assert snapshot() == before

@@ -74,12 +74,18 @@ from agentic_odi_core.history import (
     outcome_history,
 )
 from agentic_odi_core.memo import (
+    CHANNEL_BUDGETS,
+    EMAIL_WORD_BUDGET,
+    SLACK_WORD_BUDGET,
     Memo,
     MemoBet,
     MemoDecisionNotFoundError,
     MemoRejection,
+    MessageBudgetError,
+    StakeholderMessage,
     build_memo,
     render_memo,
+    render_stakeholder_message,
 )
 from agentic_odi_core.messages import (
     CAPABILITIES,
@@ -248,8 +254,14 @@ __all__ = [
     "MemoBet",
     "MemoRejection",
     "MemoDecisionNotFoundError",
+    "MessageBudgetError",
+    "StakeholderMessage",
+    "SLACK_WORD_BUDGET",
+    "EMAIL_WORD_BUDGET",
+    "CHANNEL_BUDGETS",
     "build_memo",
     "render_memo",
+    "render_stakeholder_message",
     "Roadmap",
     "RoadmapEntry",
     "build_roadmap",

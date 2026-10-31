@@ -102,6 +102,7 @@ from agentic_odi_studio_api.studio.schemas import (
     RecordBetRequest,
     RecordDecisionRequest,
     RenderMemoRequest,
+    RenderStakeholderMessageRequest,
     ReviewDecisionRequest,
     ScheduleWorkRequest,
     SetOutcomeValueRequest,
@@ -723,6 +724,43 @@ async def post_decision_memo(body: RenderMemoRequest, request: Request) -> dict:
     except Exception as exc:  # noqa: BLE001
         raise _as_http_error(exc) from exc
     return {"decision_id": memo.decision_id, "markdown": render_memo(memo)}
+
+
+@router.post("/decisions/message")
+async def post_decision_message(
+    body: RenderStakeholderMessageRequest, request: Request
+) -> dict:
+    """Cut the decision's memo to a short, pasteable stakeholder message.
+
+    A read-only projection: it writes nothing and sends nothing. The largest
+    unknown is never dropped for length; a budget that cannot fit it is a 422,
+    not a silently caveat-free message.
+    """
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(body.mcp_url),
+            ToolName.RENDER_STAKEHOLDER_MESSAGE.value,
+            {
+                "decision_id": body.decision_id,
+                "channel": body.channel,
+                "link": body.link,
+            },
+        )
+        return _payload_from_text(result)
+    try:
+        message = _service(request).build_stakeholder_message(
+            body.decision_id, channel=body.channel, link=body.link
+        )
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return {
+        "decision_id": body.decision_id,
+        "channel": message.channel,
+        "subject": message.subject,
+        "body": message.body,
+        "word_count": message.word_count,
+        "dropped": list(message.dropped),
+    }
 
 
 @router.get("/outcomes/{outcome_id}/history")

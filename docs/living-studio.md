@@ -392,6 +392,12 @@ with nothing to say is omitted with a one-line reason, never placeholder prose
 and never a zero. It is the same projection `odi decide memo` renders and the
 MCP `render_memo` tool returns.
 
+The stakeholder message is that memo cut to a pasteable length: what we found,
+what we are doing, what it is worth, the largest unknown, and a link, within a
+channel's word budget. The largest unknown is never dropped for length, and
+nothing is sent — it is the same projection `odi decide message` renders and the
+MCP `render_stakeholder_message` tool returns.
+
 The bet card is a recorded expectation: the hypothesis, the outcome it targets,
 the baseline captured at creation, the target, and the date to look. The baseline
 is stored at creation and never recomputed from the live score, so the starting

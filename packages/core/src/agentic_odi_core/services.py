@@ -33,7 +33,13 @@ from agentic_odi_core.evaluation import (
     evaluate_outcome_statement,
     require_outcome_statement,
 )
-from agentic_odi_core.memo import Memo, MemoDecisionNotFoundError, build_memo
+from agentic_odi_core.memo import (
+    Memo,
+    MemoDecisionNotFoundError,
+    StakeholderMessage,
+    build_memo,
+    render_stakeholder_message,
+)
 from agentic_odi_core.models import (
     JOB_STAGE_INDEX,
     JOB_STAGE_ORDER,
@@ -1445,6 +1451,22 @@ class ODIService:
         evidence = self.repo.list_evidence(job_id=decision.job_id, limit=None)
         bets = self.repo.list_bets(decision_id=decision.id, limit=None)
         return build_memo(decision, outcomes=outcomes, evidence=evidence, bets=bets)
+
+    def build_stakeholder_message(
+        self,
+        decision_id: str,
+        *,
+        channel: str = "slack",
+        link: str | None = None,
+    ) -> StakeholderMessage:
+        """Cut the decision's memo to a pasteable stakeholder message (M3-12/ALH-98).
+
+        Reads only: the memo is assembled from the records, then reduced to the
+        channel's word budget. Nothing is written and nothing is sent — this
+        produces the text; delivery is a later connector increment.
+        """
+        memo = self.build_memo(decision_id)
+        return render_stakeholder_message(memo, channel=channel, link=link)
 
     def _brief_strategy(self, job_id: str, decision: Decision | None) -> BriefStrategy | None:
         """The recorded strategy to show in the brief, or ``None``.

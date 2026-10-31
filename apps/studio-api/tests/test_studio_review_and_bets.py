@@ -291,3 +291,36 @@ def test_memo_of_an_unknown_decision_is_404() -> None:
     client, _ = _client()
     response = client.post("/api/decisions/memo", json={"decision_id": "nope"})
     assert response.status_code == 404
+
+
+def test_message_projects_the_memo_read_only() -> None:
+    """POST /api/decisions/message is a read-only projection, nothing sent."""
+    client, repo = _client()
+    _, _, _, _, decision = _seed(repo)
+    before = {name: len(getattr(repo, name)) for name in ("decisions", "outcomes", "evidence")}
+    body = client.post(
+        "/api/decisions/message",
+        json={"decision_id": decision.id, "channel": "slack", "link": "https://x/memo"},
+    ).json()
+    after = {name: len(getattr(repo, name)) for name in ("decisions", "outcomes", "evidence")}
+    assert before == after
+    assert body["channel"] == "slack"
+    assert body["subject"] is None
+    assert body["word_count"] <= 120
+    assert "https://x/memo" in body["body"]
+
+
+def test_message_email_carries_a_subject() -> None:
+    client, repo = _client()
+    _, _, _, _, decision = _seed(repo)
+    body = client.post(
+        "/api/decisions/message",
+        json={"decision_id": decision.id, "channel": "email"},
+    ).json()
+    assert body["subject"].startswith("Decision:")
+
+
+def test_message_of_an_unknown_decision_is_404() -> None:
+    client, _ = _client()
+    response = client.post("/api/decisions/message", json={"decision_id": "nope"})
+    assert response.status_code == 404
