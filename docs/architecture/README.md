@@ -71,6 +71,11 @@ apps/studio-api ───────▶ packages/integrations/openhands
 - `build_repository()` chooses SQLite by default and `InMemoryRepository` when `AGENTIC_ODI_DB=:memory:`, which is what tests use.
 - The CLI selects its backend with `--backend local|mcp` or `AGENTIC_ODI_BACKEND`.
 - The Studio API selects `local` (direct service calls) or `mcp` (passthrough) with `AGENTIC_ODI_BACKEND` or `create_app(backend=...)`.
+- The Studio keeps the last focused subject in `localStorage` under
+  `studio.session` (`job_id`, `step_id`, `outcome_id`), so a reload reopens the
+  same job, step, or outcome. This is browser state, not sidecar state: there is
+  no server session and nothing is shared between browsers. Evidence has no
+  session slot, so focusing evidence leaves the stored context untouched.
 
 ## MCP Contract
 
