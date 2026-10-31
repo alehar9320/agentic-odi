@@ -511,6 +511,34 @@ export interface ScoreBatchResponse {
   results: ScoreBatchItemResult[];
 }
 
+/** The metadata the thread hands the shared importer for one attachment. */
+export interface ImportInterviewPayload {
+  text: string;
+  title: string;
+  participant: string;
+  role?: string;
+  job_id?: string;
+  /** Drives extension-based format detection and names any refusal. */
+  filename?: string;
+  /** Overrides detection for an extensionless file. */
+  format?: string;
+  conducted_at?: string;
+}
+
+/** The created interview and its quote count, as the importer returns it. */
+export interface ImportInterviewResult {
+  interview: {
+    id: string;
+    title: string;
+    participant_label: string;
+    job_id?: string | null;
+    participant_role?: string | null;
+    conducted_at?: string | null;
+    source_kind?: string;
+  };
+  quote_count: number;
+}
+
 export interface ConnectorPreset {
   id: string;
   label: string;
