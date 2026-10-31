@@ -109,6 +109,17 @@ computed-at, plus whether a later snapshot moved the score — through
 `odi desired-outcomes get`, the `get_outcome_interval` tool and
 `GET /api/outcomes/{id}/interval`. A score with no band reads as `no band`, not
 as a zero-width range, and a stale band says so.
+
+A band is not just reproducible in principle: the accepted survey import keeps
+the exact paired responses behind it, de-identified (an opaque per-pair token and
+the two numbers), in the append-only log behind a named provisional retention
+convention. So a stored band names the input set it came from and can be
+reproduced bit for bit after a restart, and the inputs are dropped in the same
+write that clears a stale band — a later reader can never reproduce a band for a
+score that no longer exists. Read them with `get_outcome_inputs`,
+`GET /api/outcomes/{id}/inputs`, or the CLI local backend; `null` means nothing
+is retained, a distinct state from a retained set and never an empty list that
+would read as zero responses.
 `odi top` answers "what should we build next?" from the measured section only —
 highest low end of the band first — naming the thin and unscored outcomes it
 left out, and `odi coverage` reports that split. An estimate can no longer

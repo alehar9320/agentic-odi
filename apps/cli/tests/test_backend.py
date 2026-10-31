@@ -550,3 +550,52 @@ def test_local_backend_get_outcome_interval_reports_a_stored_band(tmp_path):
     assert band is not None
     assert band["n"] == 40
     assert band["stale"] is False
+
+
+def test_local_backend_get_outcome_inputs_reports_a_no_inputs(tmp_path):
+    backend = LocalBackend(db_path=str(tmp_path / "odi.db"))
+    job_id = backend.call("add_job", {"name": "Job J"})["id"]
+    outcome_id = backend.call(
+        "add_outcome",
+        {
+            "job_id": job_id,
+            "statement": "Minimize the time to publish when a plugin is ready.",
+            "importance": 8.0,
+            "satisfaction": 5.0,
+        },
+    )["id"]
+
+    result = backend.call("get_outcome_inputs", {"outcome_id": outcome_id})
+
+    assert result == {"outcome_id": outcome_id, "inputs": None}
+
+
+def test_local_backend_get_outcome_inputs_reports_the_retained_pairs(tmp_path):
+    backend = LocalBackend(db_path=str(tmp_path / "odi.db"))
+    job_id = backend.call("add_job", {"name": "Job J"})["id"]
+    outcome_id = backend.call(
+        "add_outcome",
+        {
+            "job_id": job_id,
+            "statement": "Minimize the time to publish when a plugin is ready.",
+            "importance": 8.0,
+            "satisfaction": 5.0,
+        },
+    )["id"]
+    rows = [
+        {
+            "outcome_id": outcome_id,
+            "importance": 8.0,
+            "satisfaction": 4.0,
+            "respondent_id": f"r{i}",
+        }
+        for i in range(3)
+    ]
+    backend.call("import_survey", {"rows": rows})
+
+    result = backend.call("get_outcome_inputs", {"outcome_id": outcome_id})
+
+    assert result["outcome_id"] == outcome_id
+    assert [i["importance"] for i in result["inputs"]] == [8.0, 8.0, 8.0]
+    assert [i["satisfaction"] for i in result["inputs"]] == [4.0, 4.0, 4.0]
+    assert [i["respondent_id"] for i in result["inputs"]] == ["r0", "r1", "r2"]

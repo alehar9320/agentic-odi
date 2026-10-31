@@ -101,6 +101,23 @@ The open issues this milestone still has to answer, grouped by what they change.
   `GET /api/outcomes/{id}/interval`; a no-band score reads as `no band` rather
   than a zero-width range, and a band whose score a later snapshot moved is
   marked `stale`.
+- [x] **Retained paired inputs (B3.1)**: an accepted survey import persists the
+  exact paired responses its band was bootstrapped from, in the append-only
+  event log behind a named provisional retention convention
+  (`survey-inputs-v1`). The set is de-identified — an opaque per-pair token and
+  the two numbers, never a name or an email — and carries a versioned
+  `input_ref` derived from its contents, so a stored band can name the exact
+  inputs it came from and the band can be reproduced bit for bit after a
+  restart. A dry run or a refused import retains nothing; a score or method edit
+  that clears a stale band deletes the inputs that described it in the same
+  write, so a later reader cannot reproduce a band for a score that no longer
+  exists. The read side, `get_outcome_inputs`, returns `null` when no set is
+  retained — a legacy or aggregate-only outcome — a distinct state from a
+  retained set and never an empty list that would read as "zero responses". It
+  is reachable through the tool, `GET /api/outcomes/{id}/inputs` and the CLI
+  local backend. The retention/deletion and study-lineage policy itself is still
+  not approved; the convention is named in one place and pinned by tests so it
+  stays swappable.
 - [x] **Honest ranking**: `classify_confidence` labels each outcome
   `measured`/`thin`/`none` from its weakest dimension, and
   `rank_outcomes_for_job` ranks within a section by the band's low end, so an
@@ -125,15 +142,18 @@ The open issues this milestone still has to answer, grouped by what they change.
   than a fabricated `n=0`.
 - [x] **Trust seams for the gated increments**: The remaining Pillar-2
   increments wait on decisions that are not yet approved, so `agentic_odi_core.trust`
-  exposes their shapes and refuses to answer: `retain_survey_inputs` (retention
-  policy) and `persisted_interval` when no band is stored (interval provenance).
-  Each raises `TrustContractPendingError` naming the blocking decision instead of
-  returning a fabricated band, class or direction. The retention read side,
-  `retained_survey_inputs`, refuses when nothing was retained for an outcome
-  rather than returning an empty list that would read as "zero responses".
+  exposes their shapes and refuses when its inputs are absent: `retained_survey_inputs`
+  refuses when nothing was retained for an outcome rather than returning an empty
+  list that would read as "zero responses", and `persisted_interval` refuses when
+  no band is stored. Each raises `TrustContractPendingError` naming the blocking
+  decision instead of returning a fabricated band, class or direction. Where a
+  decision is still open, the increment runs on a named provisional convention
+  (see the B3.1 retention bullet above) rather than a fabricated default.
 - [x] **Pillar integration contract**: one fixture is imported with per-outcome
   counts, persisted and replayed through SQLite, ranked without mixing absent
   scores into zeroes, explained with recorded arithmetic/method, and shown with
   its band and confidence class — while an invalid import leaves the prior state
-  unchanged and a score edit clears the stale band. Pinned end to end by
-  `test_trust_pillar.py`.
+  unchanged and a score edit clears the stale band and the retained inputs that
+  described it. Pinned end to end by `test_trust_pillar.py`, which also
+  re-bootstraps the stored band from the retained inputs after a reopen and
+  asserts it matches bit for bit.

@@ -25,6 +25,7 @@ import type {
   ObservationStatus,
   Outcome,
   OutcomeInterval,
+  OutcomeInputs,
   ScoreSnapshot,
   Signal,
   Step,
@@ -382,6 +383,21 @@ export function fetchOutcomeInterval(
 ): Promise<OutcomeInterval> {
   return getJson<{ result: OutcomeInterval }>(
     `/api/outcomes/${encodeURIComponent(outcomeId)}/interval?mcp_url=${encodeURIComponent(mcpUrl)}`,
+  ).then((body) => body.result);
+}
+
+/**
+ * Fetch the paired survey inputs a stored band was reproduced from (B3.1).
+ * `inputs` is null when no input set is retained — a legacy or aggregate-only
+ * outcome — which is a distinct state from a retained set, so the caller must
+ * not treat null as an empty response set.
+ */
+export function fetchOutcomeInputs(
+  outcomeId: string,
+  mcpUrl: string,
+): Promise<OutcomeInputs> {
+  return getJson<{ result: OutcomeInputs }>(
+    `/api/outcomes/${encodeURIComponent(outcomeId)}/inputs?mcp_url=${encodeURIComponent(mcpUrl)}`,
   ).then((body) => body.result);
 }
 

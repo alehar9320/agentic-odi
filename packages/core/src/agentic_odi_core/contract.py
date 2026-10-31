@@ -30,6 +30,7 @@ class ToolName(str, Enum):
     GET_OUTCOME_HISTORY = "get_outcome_history"
     GET_OUTCOME_DELTA = "get_outcome_delta"
     GET_OUTCOME_INTERVAL = "get_outcome_interval"
+    GET_OUTCOME_INPUTS = "get_outcome_inputs"
     IMPORT_SURVEY = "import_survey"
     GET_SURVEY_IMPORT_PLAN = "get_survey_import_plan"
     COMMIT_SURVEY_IMPORT = "commit_survey_import"
@@ -266,6 +267,15 @@ TOOL_SPECS: dict[str, ToolSpec] = {
         arguments=("outcome_id",),
         required=("outcome_id",),
         returns="The band's bounds, sample, seed, confidence, method, computed-at and staleness.",
+        stage="4",
+    ),
+    ToolName.GET_OUTCOME_INPUTS.value: ToolSpec(
+        name="get_outcome_inputs",
+        summary="The paired survey inputs a stored band was reproduced from, or a no-inputs result.",
+        effect=_derive_effect("get_outcome_inputs"),
+        arguments=("outcome_id",),
+        required=("outcome_id",),
+        returns="The de-identified paired inputs and their versioned input ref, or null.",
         stage="4",
     ),
     ToolName.IMPORT_SURVEY.value: ToolSpec(

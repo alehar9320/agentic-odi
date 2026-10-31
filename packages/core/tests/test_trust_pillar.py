@@ -19,6 +19,7 @@ from agentic_odi_core.errors import ValidationError
 from agentic_odi_core.repository import Repository
 from agentic_odi_core.services import ODIService
 from agentic_odi_core.sqlite_repository import SQLiteRepository
+from agentic_odi_core.stats import opportunity_interval
 
 _STATEMENT = "Minimize the time to publish when a plugin is ready."
 
@@ -115,6 +116,16 @@ def test_one_fixture_imports_ranks_explains_and_caves_over_a_replay(
     assert landed.interval_confidence_level is not None
     assert landed.interval_computed_at
 
+    # 5b. Reproducible: the retained paired inputs survived the reload, and
+    #     bootstrapping from them reproduces the stored band exactly.
+    inputs = replayed.get_outcome_inputs(estimate.id)
+    assert inputs is not None
+    assert len(inputs) == 40
+    recomputed = opportunity_interval(
+        [item.importance for item in inputs], [item.satisfaction for item in inputs]
+    )
+    assert (recomputed.low, recomputed.high) == (landed.opportunity_low, landed.opportunity_high)
+
     # 6. An invalid import leaves the prior state unchanged.
     with pytest.raises(ValidationError):
         replayed.import_survey(_rows("no-such-outcome", 40, 8.0, 4.0))
@@ -132,3 +143,5 @@ def test_one_fixture_imports_ranks_explains_and_caves_over_a_replay(
     assert edited.interval_seed is None
     assert edited.interval_confidence_level is None
     assert edited.interval_computed_at is None
+    # The retained inputs described the band just invalidated, so they go too.
+    assert _reopen(repo).get_outcome_inputs(estimate.id) is None

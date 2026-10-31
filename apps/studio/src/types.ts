@@ -53,6 +53,22 @@ export interface OutcomeInterval {
   } | null;
 }
 
+/**
+ * The paired survey inputs a stored band was reproduced from (B3.1). `inputs`
+ * is null when no input set is retained — a legacy or aggregate-only outcome —
+ * which is a distinct state from a retained set and never an empty list that
+ * would read as zero responses. Each entry carries only an opaque per-pair
+ * token and the two numbers, so the shape is de-identified.
+ */
+export interface OutcomeInputs {
+  outcome_id: string;
+  inputs: {
+    respondent_id: string;
+    importance: number;
+    satisfaction: number;
+  }[] | null;
+}
+
 export interface Evidence {
   id: string;
   source_name?: string;

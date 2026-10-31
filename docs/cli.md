@@ -239,6 +239,20 @@ snapshot moved the score the band was computed from, so a band is never read as
 current when it is not. The same shape is available as a tool
 (`get_outcome_interval`) and over HTTP at `GET /api/outcomes/{id}/interval`.
 
+An accepted `survey import` also keeps the exact paired responses its band was
+bootstrapped from, de-identified — an opaque per-pair token and the two numbers,
+never a name or an email — behind a named provisional retention convention
+(`survey-inputs-v1`). The read side is `get_outcome_inputs`, reachable over HTTP
+at `GET /api/outcomes/{id}/inputs` and from the CLI local backend. It returns
+`null` when no input set is retained (a legacy or aggregate-only outcome) rather
+than an empty list, because an empty list would read as "zero responses". A dry
+run or a refused import retains nothing, and a score or method edit that clears a
+stale band deletes the inputs that described it in the same write, so a later
+reader cannot reproduce a band for a score that no longer exists. The
+retention/deletion and study-lineage policy itself is still not approved; the
+convention is named in one place (`RETAINED_INPUT_REF_VERSION`) and pinned by
+tests so it stays swappable.
+
 # One-screen report: job header, phase coverage, biggest opportunities
 agentic-odi summary <job-id>
 agentic-odi summary <job-id> --top 3 --json

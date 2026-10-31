@@ -13,17 +13,18 @@ import pytest
 from agentic_odi_core.errors import OdiError, ValidationError
 from agentic_odi_core.models import Outcome, ScoreSnapshot
 from agentic_odi_core.trust import (
+    RETAINED_INPUT_REF_VERSION,
     BootstrapConvention,
     IntervalProvenancePolicy,
     RetentionPolicy,
     TrustContractPendingError,
+    build_survey_input_set,
     classify_confidence,
     opportunity_delta_from_scores,
     opportunity_interval,
     outcome_delta,
     persisted_interval,
     rank_outcomes_honestly,
-    retain_survey_inputs,
     retained_survey_inputs,
 )
 
@@ -149,30 +150,62 @@ def test_ranking_is_stable_for_ties_by_id() -> None:
     assert [o.id for o in rank_outcomes_honestly([b, a])] == ["a", "b"]
 
 
-# --- B3.1: retention stub ----------------------------------------------------
+# --- B3.1: retained paired inputs --------------------------------------------
 
 
-def test_retain_survey_inputs_keeps_inputs_without_deleting() -> None:
-    from agentic_odi_core.trust import RetainedSurveyInput
+def test_retained_inputs_read_back_in_canonical_order() -> None:
+    outcome = _outcome(id="o-1")
+    pairs = [(8.0, 6.0), (3.0, 9.0), (7.5, 7.5)]
 
-    item = RetainedSurveyInput(
-        outcome_id="o-1", respondent_id="r-1", importance=8.0, satisfaction=6.0
-    )
+    input_set = build_survey_input_set(outcome, pairs, respondent_refs=["r-1", "r-2", "r-3"])
+    items = retained_survey_inputs(input_set)
 
-    retain_survey_inputs([item])
-    retain_survey_inputs([item])  # a repeat does not duplicate
+    assert [(i.importance, i.satisfaction) for i in items] == pairs
+    assert [i.respondent_id for i in items] == ["r-1", "r-2", "r-3"]
+    assert all(i.outcome_id == "o-1" for i in items)
 
-    assert retained_survey_inputs("o-1") == [item]
+
+def test_the_input_ref_is_versioned_and_content_derived() -> None:
+    outcome = _outcome(id="o-1")
+
+    first = build_survey_input_set(outcome, [(8.0, 6.0), (3.0, 9.0)])
+    repeat = build_survey_input_set(outcome, [(8.0, 6.0), (3.0, 9.0)])
+    changed = build_survey_input_set(outcome, [(8.0, 6.0), (3.0, 9.5)])
+
+    assert first.input_ref.startswith(f"{RETAINED_INPUT_REF_VERSION}:")
+    assert first.input_ref == repeat.input_ref  # same set, same ref
+    assert first.input_ref != changed.input_ref  # any change moves the ref
+
+
+def test_order_changes_the_ref_because_order_is_canonical() -> None:
+    outcome = _outcome(id="o-1")
+
+    a = build_survey_input_set(outcome, [(8.0, 6.0), (3.0, 9.0)])
+    b = build_survey_input_set(outcome, [(3.0, 9.0), (8.0, 6.0)])
+
+    assert a.input_ref != b.input_ref
+
+
+def test_an_empty_input_set_is_refused_at_build() -> None:
+    with pytest.raises(ValidationError):
+        build_survey_input_set(_outcome(id="o-1"), [])
 
 
 def test_retained_survey_inputs_refuses_when_nothing_was_retained() -> None:
     # An empty list would read as "zero responses" and let a caller bootstrap
     # from no data; the read side must name the unapproved retention decision.
     with pytest.raises(TrustContractPendingError) as caught:
-        retained_survey_inputs("never-imported")
+        retained_survey_inputs(None)
 
     assert caught.value.decision == RetentionPolicy
     assert caught.value.capability == "retained_survey_inputs"
+
+
+def test_a_respondent_token_per_pair_is_enforced() -> None:
+    outcome = _outcome(id="o-1")
+
+    with pytest.raises(ValidationError):
+        build_survey_input_set(outcome, [(8.0, 6.0), (3.0, 9.0)], respondent_refs=["only-one"])
 
 
 # --- B3.2: persisted interval provenance -------------------------------------
@@ -325,8 +358,9 @@ def test_the_surfaces_are_exported_from_the_package_root() -> None:
         "outcome_delta",
         "parse_survey",
         "aggregate_survey",
-        "retain_survey_inputs",
+        "build_survey_input_set",
         "retained_survey_inputs",
+        "survey_input_ref",
         "persisted_interval",
         "rank_outcomes_honestly",
     ):

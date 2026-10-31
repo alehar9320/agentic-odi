@@ -555,6 +555,36 @@ def get_outcome_interval(outcome_id: str) -> str:
 
 
 @mcp.tool
+def get_outcome_inputs(outcome_id: str) -> str:
+    """The paired survey inputs a stored band was reproduced from (B3.1).
+
+    Returns the de-identified paired ``(importance, satisfaction)`` values and
+    the versioned input ref, so a stored band can be reproduced after a reload.
+    ``inputs: null`` means no input set is retained — a legacy or aggregate-only
+    outcome — which is never an empty list that would read as zero responses.
+    """
+    try:
+        inputs = service.get_outcome_inputs(outcome_id)
+    except OutcomeNotFoundError:
+        return _outcome_not_found(outcome_id)
+    if inputs is None:
+        return json.dumps({"outcome_id": outcome_id, "inputs": None})
+    return json.dumps(
+        {
+            "outcome_id": outcome_id,
+            "inputs": [
+                {
+                    "respondent_id": item.respondent_id,
+                    "importance": item.importance,
+                    "satisfaction": item.satisfaction,
+                }
+                for item in inputs
+            ],
+        }
+    )
+
+
+@mcp.tool
 def import_survey(rows: list[dict[str, Any]]) -> str:
     """Land a survey's per-outcome means, sample and band on matching Outcomes.
 

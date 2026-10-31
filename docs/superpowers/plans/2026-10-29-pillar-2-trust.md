@@ -735,6 +735,32 @@ implicit:
 - A run with any unresolved row is refused whole, leaving the store unchanged —
   `test_commit_survey_import_refuses_an_unresolved_row`.
 
+## B3.1 retention behaviour (implemented behind a named provisional convention)
+
+The retention/deletion and study-lineage *policy* is still not approved, so B3.1
+runs on the named provisional convention in `trust.py` and every choice it makes
+is pinned rather than left implicit:
+
+- An accepted import persists the exact paired responses its band was
+  bootstrapped from — `test_a_reloaded_input_set_reproduces_the_stored_band`.
+- The set is de-identified: an opaque per-pair token and the two numbers, never a
+  name or an email — `test_the_read_shape_carries_no_personal_identifier`.
+- The set survives a process restart in canonical order —
+  `test_retained_inputs_survive_a_reload_in_canonical_order`.
+- A dry run retains nothing — `test_a_dry_run_plan_retains_nothing`.
+- An import refused for an invalid row retains nothing —
+  `test_a_rejected_import_retains_nothing`.
+- An aggregate-only outcome reads as absent, not as an empty list —
+  `test_a_legacy_aggregate_only_outcome_reports_no_input_set`.
+- A cross-job input set is rejected on write —
+  `test_a_cross_job_input_set_is_rejected`.
+- A score edit clears a stale band and deletes the inputs that described it in
+  the same write — `test_a_score_edit_invalidates_and_drops_the_retained_inputs`.
+- Deleting the outcome drops the retained inputs —
+  `test_deleting_the_outcome_drops_the_retained_inputs`.
+- The read side returns `null` for an estimate and the pairs for an imported
+  outcome, over MCP, the Studio API and the CLI local backend.
+
 ## Seams added ahead of the gates
 
 `packages/core/src/agentic_odi_core/trust.py` names the contract each blocked
@@ -742,7 +768,9 @@ increment must satisfy, without encoding an unapproved convention:
 
 - `OpportunityInterval` and `opportunity_interval` (B3 — bootstrap convention).
 - `parse_survey` / `aggregate_survey` and `SurveyAggregate` (B2 — import policy).
-- `RetainedSurveyInput` and `retain_survey_inputs` (B3.1 — retention policy).
+- `RetainedSurveyInput` and `build_survey_input_set` (B3.1 — implemented behind
+  the named provisional `survey-inputs-v1` retention convention; see the B3.1
+  retention behaviour section above).
 - `IntervalProvenance` and `persisted_interval` (B3.2 — interval provenance).
 - `classify_confidence` and `rank_outcomes_honestly` (B4 / B4.1 — confidence table).
 - `OutcomeDelta` / `DeltaDirection` and `outcome_delta` (B6.1 — delta semantics).

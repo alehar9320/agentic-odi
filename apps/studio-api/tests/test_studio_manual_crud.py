@@ -283,3 +283,55 @@ def test_outcome_interval_reports_a_stored_band_and_provenance() -> None:
     assert band["n"] == 40
     assert band["stale"] is False
     assert band["seed"] == 0
+
+
+def test_outcome_inputs_reports_no_inputs_for_an_estimate() -> None:
+    client = _client()
+    job = client.post("/api/jobs", json={"name": "Ship a service"}).json()
+    outcome = client.post(
+        "/api/outcomes",
+        json={
+            "mcp_url": "",
+            "job_id": job["id"],
+            "statement": "Minimize the time to ship a release when the build is green",
+            "importance": 8.0,
+            "satisfaction": 4.0,
+        },
+    ).json()
+
+    inputs = client.get(f"/api/outcomes/{outcome['id']}/inputs").json()["result"]
+
+    assert inputs == {"outcome_id": outcome["id"], "inputs": None}
+
+
+def test_outcome_inputs_reports_the_retained_pairs_after_import() -> None:
+    repo = InMemoryRepository()
+    client = TestClient(create_app(repo, backend="local"))
+    job = client.post("/api/jobs", json={"name": "Ship a service"}).json()
+    outcome = client.post(
+        "/api/outcomes",
+        json={
+            "mcp_url": "",
+            "job_id": job["id"],
+            "statement": "Minimize the time to ship a release when the build is green",
+            "importance": 8.0,
+            "satisfaction": 4.0,
+        },
+    ).json()
+    from agentic_odi_core import ODIService
+
+    rows = [
+        {
+            "outcome_id": outcome["id"],
+            "importance": 8.0,
+            "satisfaction": 4.0,
+            "respondent_id": f"r{i}",
+        }
+        for i in range(3)
+    ]
+    ODIService(repo).import_survey(rows)
+
+    inputs = client.get(f"/api/outcomes/{outcome['id']}/inputs").json()["result"]["inputs"]
+
+    assert [item["importance"] for item in inputs] == [8.0, 8.0, 8.0]
+    assert [item["respondent_id"] for item in inputs] == ["r0", "r1", "r2"]

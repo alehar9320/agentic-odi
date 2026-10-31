@@ -16,12 +16,15 @@ Provisional conventions (each names the decision it stands in for):
 * B3 interval -- the percentile-bootstrap convention lives in
   :mod:`agentic_odi_core.stats`; :func:`opportunity_interval` adapts an outcome
   to it and returns a *no-band* placeholder for an estimate.
-* B3.1 retention -- :func:`retain_survey_inputs` is an in-memory stub: it keeps
-  the paired inputs for the process lifetime and performs no deletion, because
-  the retention/deletion and study-lineage policy is not yet approved. Its read
-  side, :func:`retained_survey_inputs`, refuses when nothing was retained for an
-  outcome rather than returning an empty list that would read as "zero
-  responses".
+* B3.1 retention -- the retention/deletion and study-lineage policy is still not
+  approved, so :func:`build_survey_input_set` persists the accepted paired inputs
+  in the append-only event log behind a **named provisional convention** rather
+  than an in-memory stub. It stores no personal identifier (only an opaque
+  per-pair token), assigns a versioned :func:`survey_input_ref` so a band can
+  name the exact set it came from, and never deletes except when its outcome is
+  deleted. Its read side, :func:`retained_survey_inputs`, refuses when nothing
+  was retained for an outcome rather than returning an empty list that would read
+  as "zero responses".
 * B3.2 provenance -- :func:`persisted_interval` reads the stored band and its
   provenance off the outcome, and reports a band stale when the score it was
   computed from has since moved.
@@ -38,11 +41,12 @@ fabricated band, class or direction.
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass
 from typing import Literal
 
 from agentic_odi_core.errors import OdiError, ValidationError
-from agentic_odi_core.models import Outcome, ScoreSnapshot
+from agentic_odi_core.models import Outcome, ScoreSnapshot, SurveyInputSet
 from agentic_odi_core.stats import (
     DEFAULT_CONFIDENCE_LEVEL,
     DEFAULT_SAMPLES,
@@ -137,7 +141,14 @@ class OutcomeDelta:
 
 @dataclass(frozen=True)
 class RetainedSurveyInput:
-    """The paired per-respondent inputs an interval is reproduced from (B3.1)."""
+    """The paired per-respondent inputs an interval is reproduced from (B3.1).
+
+    A de-identified view of one entry in a persisted
+    :class:`agentic_odi_core.models.SurveyInputSet`: the numeric pair plus the
+    opaque ``respondent_ref`` token, never a name or an email. Kept as a distinct
+    read shape so callers that only need the paired numbers do not reach into the
+    stored entity.
+    """
 
     outcome_id: str
     respondent_id: str
@@ -238,34 +249,63 @@ def aggregate_survey(
     return _aggregate_survey(inputs, id_by_statement=id_by_statement, known_ids=known_ids)
 
 
-#: B3.1 stub store. The retention/deletion and study-lineage policy is not yet
-#: approved, so this keeps paired inputs for the process lifetime and never
-#: deletes. It exists so the read side has a shape to call; a real store replaces
-#: the dict without changing the function signatures.
-_RETAINED_SURVEY_INPUTS: dict[str, list[RetainedSurveyInput]] = {}
+#: B3.1 provisional convention. The retention/deletion and study-lineage policy
+#: is not yet approved, so this is the named stand-in the product runs on:
+#: retained inputs live in the append-only event log (one set per outcome, the
+#: latest accepted import wins), carry a versioned ``input_ref`` derived from
+#: their contents, keep only an opaque per-pair token rather than a personal
+#: identifier, and are never deleted except when their outcome is deleted.
+#: Changing any of those choices changes every stored band's lineage, so they are
+#: named here in one place and pinned by tests.
+RETAINED_INPUT_REF_VERSION = "survey-inputs-v1"
 
 
-def retain_survey_inputs(inputs: list[RetainedSurveyInput]) -> list[RetainedSurveyInput]:
-    """Keep the paired inputs a band will later be recomputed from (B3.1).
+def survey_input_ref(pairs: list[tuple[float, float]]) -> str:
+    """The versioned reference for an exact paired input set (B3.1).
 
-    Stub: an in-memory, no-deletion store standing in for the unapproved
-    retention policy. It returns the inputs it retained so a caller can confirm
-    what is now reproducible.
+    Derived from the canonical order and the numeric values, so the same set
+    always yields the same ref and any change to the set yields a new one. A band
+    records this ref to name the inputs it was computed from.
     """
-    for item in inputs:
-        bucket = _RETAINED_SURVEY_INPUTS.setdefault(item.outcome_id, [])
-        if not any(
-            existing.respondent_id == item.respondent_id
-            and existing.importance == item.importance
-            and existing.satisfaction == item.satisfaction
-            for existing in bucket
-        ):
-            bucket.append(item)
-    return inputs
+    payload = "|".join(f"{importance!r},{satisfaction!r}" for importance, satisfaction in pairs)
+    digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
+    return f"{RETAINED_INPUT_REF_VERSION}:{digest}"
 
 
-def retained_survey_inputs(outcome_id: str) -> list[RetainedSurveyInput]:
-    """The paired inputs retained for an outcome (B3.1 stub read side).
+def build_survey_input_set(
+    outcome: Outcome,
+    pairs: list[tuple[float, float]],
+    *,
+    respondent_refs: list[str] | None = None,
+    study_id: str | None = None,
+    wave: str | None = None,
+) -> SurveyInputSet:
+    """Build the persisted, de-identified input set for an outcome (B3.1).
+
+    Takes the already-accepted pairs in canonical order and wraps them in a
+    :class:`SurveyInputSet` with a versioned ref. It does not decide whether an
+    import appends or replaces: the caller passes the exact accepted set, which
+    is the input the retention policy must approve. ``job_id`` is copied from the
+    outcome so a cross-job reference is detectable on read.
+    """
+    if not pairs:
+        raise ValidationError("a retained input set needs at least one paired observation")
+    refs = list(respondent_refs) if respondent_refs else []
+    if refs and len(refs) != len(pairs):
+        raise ValidationError("respondent_refs must be empty or one token per pair")
+    return SurveyInputSet(
+        outcome_id=outcome.id,
+        job_id=outcome.job_id,
+        input_ref=survey_input_ref(pairs),
+        pairs=list(pairs),
+        respondent_refs=refs,
+        study_id=study_id,
+        wave=wave,
+    )
+
+
+def retained_survey_inputs(input_set: SurveyInputSet | None) -> list[RetainedSurveyInput]:
+    """The paired inputs retained for an outcome, or refuse (B3.1).
 
     Refuses rather than returning an empty list when nothing was retained for
     the outcome: an empty list reads as "zero responses", which would let a
@@ -274,10 +314,18 @@ def retained_survey_inputs(outcome_id: str) -> list[RetainedSurveyInput]:
     retention decision must settle, so it stays a named refusal until the policy
     is approved.
     """
-    bucket = _RETAINED_SURVEY_INPUTS.get(outcome_id)
-    if not bucket:
+    if input_set is None or not input_set.pairs:
         raise TrustContractPendingError("retained_survey_inputs", RetentionPolicy)
-    return list(bucket)
+    refs = input_set.respondent_refs
+    return [
+        RetainedSurveyInput(
+            outcome_id=input_set.outcome_id,
+            respondent_id=refs[index] if index < len(refs) else f"pair-{index}",
+            importance=importance,
+            satisfaction=satisfaction,
+        )
+        for index, (importance, satisfaction) in enumerate(input_set.pairs)
+    ]
 
 
 def persisted_interval(
@@ -403,11 +451,13 @@ __all__ = [
     "MEASURED_SAMPLE_THRESHOLD",
     "OpportunityInterval",
     "OutcomeDelta",
+    "RETAINED_INPUT_REF_VERSION",
     "RetainedSurveyInput",
     "RetentionPolicy",
     "SurveyAggregate",
     "TrustContractPendingError",
     "aggregate_survey",
+    "build_survey_input_set",
     "classify_confidence",
     "opportunity_delta_from_scores",
     "opportunity_interval",
@@ -415,6 +465,6 @@ __all__ = [
     "parse_survey",
     "persisted_interval",
     "rank_outcomes_honestly",
-    "retain_survey_inputs",
     "retained_survey_inputs",
+    "survey_input_ref",
 ]

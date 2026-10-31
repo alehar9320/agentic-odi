@@ -1397,6 +1397,64 @@
         }
       }
     },
+    "/api/outcomes/{outcome_id}/inputs": {
+      "get": {
+        "summary": "Get Outcome Inputs",
+        "description": "Return the paired survey inputs a stored band was reproduced from (B3.1).\n\n``inputs: null`` means no input set is retained \u2014 a legacy or aggregate-only\noutcome \u2014 which is a distinct state from a retained set and never an empty\nlist that would read as zero responses. Each input carries only an opaque\nper-pair token and the two numbers, so the read shape is de-identified.",
+        "operationId": "get_outcome_inputs_api_outcomes__outcome_id__inputs_get",
+        "parameters": [
+          {
+            "name": "outcome_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Outcome Id"
+            }
+          },
+          {
+            "name": "mcp_url",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Mcp Url"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Get Outcome Inputs Api Outcomes  Outcome Id  Inputs Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/signals": {
       "get": {
         "summary": "Get Signals",

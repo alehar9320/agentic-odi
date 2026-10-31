@@ -432,6 +432,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/outcomes/{outcome_id}/inputs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Outcome Inputs
+         * @description Return the paired survey inputs a stored band was reproduced from (B3.1).
+         *
+         *     ``inputs: null`` means no input set is retained — a legacy or aggregate-only
+         *     outcome — which is a distinct state from a retained set and never an empty
+         *     list that would read as zero responses. Each input carries only an opaque
+         *     per-pair token and the two numbers, so the read shape is de-identified.
+         */
+        get: operations["get_outcome_inputs_api_outcomes__outcome_id__inputs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/signals": {
         parameters: {
             query?: never;
@@ -2676,6 +2701,41 @@ export interface operations {
         };
     };
     get_outcome_interval_api_outcomes__outcome_id__interval_get: {
+        parameters: {
+            query?: {
+                mcp_url?: string | null;
+            };
+            header?: never;
+            path: {
+                outcome_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_outcome_inputs_api_outcomes__outcome_id__inputs_get: {
         parameters: {
             query?: {
                 mcp_url?: string | null;

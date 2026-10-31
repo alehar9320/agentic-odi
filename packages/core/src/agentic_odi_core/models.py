@@ -246,6 +246,52 @@ class ScoreSnapshot(BaseModel):
     )
 
 
+class SurveyInputSet(BaseModel):
+    """The accepted paired survey inputs a band can be reproduced from (B3.1).
+
+    Persisted in the append-only event log so a stored band is reproducible
+    after a reload, not only for the process that imported it. Each entry is the
+    paired ``(importance, satisfaction)`` a respondent gave, in the canonical
+    order the import accepted them, plus a de-identified ``respondent_ref``.
+
+    No personal identifier is stored: ``respondent_ref`` is a caller-supplied
+    opaque token (the import's respondent id or a row label), never a name or an
+    email, and it is kept only so a repeated respondent stays one person under
+    the retention policy. It is not a public aggregate payload.
+
+    ``input_ref`` is the versioned reference the interval slice records: it is
+    derived from the inputs so a band can name the exact set it came from, and it
+    changes when the set changes. ``study_id``/``wave`` are the lineage links the
+    retention decision must define; both are optional here because the policy is
+    not yet approved, so a missing link stays ``None`` rather than a guessed
+    study.
+    """
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    outcome_id: str = Field(..., description="The outcome these paired inputs belong to")
+    job_id: str = Field(..., description="The owning job, so a cross-job link is detectable")
+    input_ref: str = Field(..., description="Versioned reference to this exact input set (B3.1)")
+    pairs: list[tuple[float, float]] = Field(
+        default_factory=list,
+        description="Accepted (importance, satisfaction) pairs in canonical import order",
+    )
+    respondent_refs: list[str] = Field(
+        default_factory=list,
+        description="De-identified per-pair respondent tokens, kept only to de-duplicate",
+    )
+    study_id: str | None = Field(None, description="Study lineage, when the policy defines it")
+    wave: str | None = Field(None, description="Study wave lineage, when the policy defines it")
+    method: str = Field("survey", description="How the inputs were obtained")
+
+    @model_validator(mode="after")
+    def _refs_match_pairs(self) -> SurveyInputSet:
+        # A respondent token per pair, or none at all: a partial list would let a
+        # caller pair the wrong token with the wrong answers.
+        if self.respondent_refs and len(self.respondent_refs) != len(self.pairs):
+            raise ValueError("respondent_refs must be empty or one token per pair")
+        return self
+
+
 class ValueMetric(BaseModel):
     name: str
     direction: Direction

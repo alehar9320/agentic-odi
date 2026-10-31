@@ -10,6 +10,7 @@ from typing import Any
 
 from pydantic import BaseModel, ValidationError
 
+from agentic_odi_core.errors import ValidationError as OdiValidationError
 from agentic_odi_core.events import DEFAULT_DEVICE, DEFAULT_WORKSPACE, Event
 from agentic_odi_core.intent_store import IntentStore
 from agentic_odi_core.models import (
@@ -21,6 +22,7 @@ from agentic_odi_core.models import (
     ScoreSnapshot,
     Signal,
     Step,
+    SurveyInputSet,
     compute_opportunity_score,
 )
 from agentic_odi_core.repository import (
@@ -65,6 +67,7 @@ class SQLiteRepository(Repository):
         self.signals: dict[str, Signal] = {}
         self.scheduled_work: dict[str, ScheduledWork] = {}
         self.score_snapshots: list[ScoreSnapshot] = []
+        self.survey_input_sets: dict[str, SurveyInputSet] = {}
         self._last_event_id = 0
         self._legacy_method_ids = set()
         self._method_backfilled_ids = set()
@@ -158,6 +161,11 @@ class SQLiteRepository(Repository):
             self.evidence[p["id"]] = Evidence.model_validate(p)
         elif et == "SCORE_SNAPSHOT_RECORDED":
             self.score_snapshots.append(ScoreSnapshot.model_validate(p))
+        elif et == "SURVEY_INPUTS_RETAINED":
+            input_set = SurveyInputSet.model_validate(p)
+            self.survey_input_sets[input_set.outcome_id] = input_set
+        elif et == "SURVEY_INPUTS_DELETED":
+            self.survey_input_sets.pop(p["outcome_id"], None)
         elif et == "JOB_UPDATED":
             self._merge_updates(self.jobs, p, Job)
         elif et == "STEP_UPDATED":
@@ -183,6 +191,7 @@ class SQLiteRepository(Repository):
                 or (v.outcome_id is not None and v.outcome_id not in self.outcomes)
             ]:
                 del self.evidence[key]
+            self._drop_orphan_survey_input_sets()
         elif et == "STEP_DELETED":
             step_id = p["id"]
             self.steps.pop(step_id, None)
@@ -197,12 +206,14 @@ class SQLiteRepository(Repository):
                 or (v.outcome_id is not None and v.outcome_id not in self.outcomes)
             ]:
                 del self.evidence[key]
+            self._drop_orphan_survey_input_sets()
         elif et == "OUTCOME_DELETED":
             outcome_id = p["id"]
             self.outcomes.pop(outcome_id, None)
             for key in [k for k, v in self.evidence.items() if v.outcome_id == outcome_id]:
                 del self.evidence[key]
             self.score_snapshots = [s for s in self.score_snapshots if s.outcome_id != outcome_id]
+            self.survey_input_sets.pop(outcome_id, None)
         elif et == "EVIDENCE_DELETED":
             self.evidence.pop(p["id"], None)
         elif et == "SCHEDULED_WORK_CREATED":
@@ -221,6 +232,16 @@ class SQLiteRepository(Repository):
         elif et == "SIGNAL_DISMISSED":
             self._merge_updates(self.signals, p, Signal)
         self._last_event_id = max(self._last_event_id, ev["id"])
+
+    def _drop_orphan_survey_input_sets(self) -> None:
+        """Drop retained inputs whose outcome no longer exists.
+
+        Deleting a job or step removes its outcomes; the paired inputs those
+        outcomes were bootstrapped from must go with them rather than outliving
+        their outcome as an orphan set.
+        """
+        for outcome_id in [k for k in self.survey_input_sets if k not in self.outcomes]:
+            del self.survey_input_sets[outcome_id]
 
     @staticmethod
     def _merge_updates(entities: dict[str, Any], p: dict, model: type[BaseModel]) -> None:
@@ -525,6 +546,47 @@ class SQLiteRepository(Repository):
             if outcome_id is None:
                 return list(self.score_snapshots)
             return [s for s in self.score_snapshots if s.outcome_id == outcome_id]
+
+    def add_survey_input_set(self, input_set: SurveyInputSet) -> SurveyInputSet:
+        with self._lock:
+            self._sync()
+            outcome = self.outcomes.get(input_set.outcome_id)
+            if outcome is None:
+                raise OdiValidationError(
+                    f"cannot retain inputs for unknown outcome {input_set.outcome_id!r}"
+                )
+            if outcome.job_id != input_set.job_id:
+                raise OdiValidationError(
+                    "a retained input set must belong to the outcome's own job; "
+                    f"outcome job {outcome.job_id!r} != input set job {input_set.job_id!r}"
+                )
+            self.store.append(
+                "SURVEY_INPUTS_RETAINED",
+                input_set.model_dump(),
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return input_set
+
+    def get_survey_input_set(self, outcome_id: str) -> SurveyInputSet | None:
+        with self._lock:
+            self._sync()
+            return self.survey_input_sets.get(outcome_id)
+
+    def delete_survey_input_set(self, outcome_id: str) -> bool:
+        with self._lock:
+            self._sync()
+            if outcome_id not in self.survey_input_sets:
+                return False
+            self.store.append(
+                "SURVEY_INPUTS_DELETED",
+                {"outcome_id": outcome_id},
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return True
 
     def delete_customer_outcome(self, outcome_id: str) -> bool:
         with self._lock:

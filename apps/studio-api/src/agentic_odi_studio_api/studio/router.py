@@ -765,6 +765,46 @@ async def get_outcome_interval(
     }
 
 
+@router.get("/outcomes/{outcome_id}/inputs")
+async def get_outcome_inputs(
+    outcome_id: str, request: Request, mcp_url: str | None = Query(None)
+) -> dict:
+    """Return the paired survey inputs a stored band was reproduced from (B3.1).
+
+    ``inputs: null`` means no input set is retained — a legacy or aggregate-only
+    outcome — which is a distinct state from a retained set and never an empty
+    list that would read as zero responses. Each input carries only an opaque
+    per-pair token and the two numbers, so the read shape is de-identified.
+    """
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(mcp_url or ""),
+            ToolName.GET_OUTCOME_INPUTS.value,
+            {"outcome_id": outcome_id},
+        )
+        return {"ok": True, "result": _json_or_raw(result)}
+    try:
+        inputs = _service(request).get_outcome_inputs(outcome_id)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    if inputs is None:
+        return {"ok": True, "result": {"outcome_id": outcome_id, "inputs": None}}
+    return {
+        "ok": True,
+        "result": {
+            "outcome_id": outcome_id,
+            "inputs": [
+                {
+                    "respondent_id": item.respondent_id,
+                    "importance": item.importance,
+                    "satisfaction": item.satisfaction,
+                }
+                for item in inputs
+            ],
+        },
+    }
+
+
 @router.delete("/outcomes/{outcome_id}")
 async def delete_outcome(
     outcome_id: str, request: Request, mcp_url: str | None = Query(None)

@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Protocol, TypeVar
 
+from agentic_odi_core.errors import ValidationError
 from agentic_odi_core.models import (
     CustomerOutcome,
     Evidence,
@@ -14,6 +15,7 @@ from agentic_odi_core.models import (
     ScoreSnapshot,
     Signal,
     Step,
+    SurveyInputSet,
 )
 
 _Item = TypeVar("_Item")
@@ -102,6 +104,7 @@ class Repository(Protocol):
     signals: dict[str, Signal]
     scheduled_work: dict[str, ScheduledWork]
     score_snapshots: list[ScoreSnapshot]
+    survey_input_sets: dict[str, SurveyInputSet]
 
     def add_job(self, job: Job) -> Job: ...
     def list_jobs(self, limit: int | None = None, offset: int = 0) -> list[Job]: ...
@@ -164,6 +167,9 @@ class Repository(Protocol):
 
     def add_score_snapshot(self, snapshot: ScoreSnapshot) -> ScoreSnapshot: ...
     def list_score_snapshots(self, outcome_id: str | None = None) -> list[ScoreSnapshot]: ...
+    def add_survey_input_set(self, input_set: SurveyInputSet) -> SurveyInputSet: ...
+    def get_survey_input_set(self, outcome_id: str) -> SurveyInputSet | None: ...
+    def delete_survey_input_set(self, outcome_id: str) -> bool: ...
     def clear(self) -> None: ...
     def reload(self) -> None: ...
     def commit(self) -> None: ...
@@ -181,6 +187,7 @@ class InMemoryRepository:
         self.signals: dict[str, Signal] = {}
         self.scheduled_work: dict[str, ScheduledWork] = {}
         self.score_snapshots: list[ScoreSnapshot] = []
+        self.survey_input_sets: dict[str, SurveyInputSet] = {}
 
     def add_job(self, job: Job) -> Job:
         self.jobs[job.id] = job
@@ -298,6 +305,7 @@ class InMemoryRepository:
             for key in [k for k, v in self.evidence.items() if v.outcome_id == outcome_id]:
                 del self.evidence[key]
             self.score_snapshots = [s for s in self.score_snapshots if s.outcome_id != outcome_id]
+            self.survey_input_sets.pop(outcome_id, None)
             return True
         return False
 
@@ -442,6 +450,26 @@ class InMemoryRepository:
             return list(self.score_snapshots)
         return [s for s in self.score_snapshots if s.outcome_id == outcome_id]
 
+    def add_survey_input_set(self, input_set: SurveyInputSet) -> SurveyInputSet:
+        outcome = self.outcomes.get(input_set.outcome_id)
+        if outcome is None:
+            raise ValidationError(
+                f"cannot retain inputs for unknown outcome {input_set.outcome_id!r}"
+            )
+        if outcome.job_id != input_set.job_id:
+            raise ValidationError(
+                "a retained input set must belong to the outcome's own job; "
+                f"outcome job {outcome.job_id!r} != input set job {input_set.job_id!r}"
+            )
+        self.survey_input_sets[input_set.outcome_id] = input_set
+        return input_set
+
+    def get_survey_input_set(self, outcome_id: str) -> SurveyInputSet | None:
+        return self.survey_input_sets.get(outcome_id)
+
+    def delete_survey_input_set(self, outcome_id: str) -> bool:
+        return self.survey_input_sets.pop(outcome_id, None) is not None
+
     def clear(self) -> None:
         self.jobs.clear()
         self.scheduled_work.clear()
@@ -451,6 +479,7 @@ class InMemoryRepository:
         self.evidence.clear()
         self.signals.clear()
         self.score_snapshots.clear()
+        self.survey_input_sets.clear()
 
     def reload(self) -> None:
         """Reset in-memory state; there is no external store to re-read."""

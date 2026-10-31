@@ -45,10 +45,12 @@ from agentic_odi_core.survey import SurveyPlan, aggregate_survey, parse_survey, 
 from agentic_odi_core.trust import (
     IntervalProvenance,
     OutcomeDelta,
+    build_survey_input_set,
     classify_confidence,
     outcome_delta,
     persisted_interval,
     rank_outcomes_honestly,
+    retained_survey_inputs,
 )
 
 
@@ -393,6 +395,10 @@ class ODIService:
                 updates["opportunity_low"] = None
                 updates["opportunity_high"] = None
                 updates["interval_n"] = None
+                # The retained paired inputs described the band that was just
+                # invalidated. Keeping them would let a later reader reproduce a
+                # band for a score that no longer exists, so they go with it.
+                self.repo.delete_survey_input_set(outcome_id)
         res = self.repo.update_outcome(outcome_id, updates)
         if not res:
             raise OutcomeNotFoundError(outcome_id)
@@ -548,10 +554,12 @@ class ODIService:
                 "resolve or confirm every row before writing"
             )
         observations: dict[str, list[tuple[float, float]]] = {}
+        respondent_refs: dict[str, list[str]] = {}
         for response in plan.accepted:
             observations.setdefault(response.outcome_ref, []).append(
                 (response.importance, response.satisfaction)
             )
+            respondent_refs.setdefault(response.outcome_ref, []).append(response.respondent)
         updated: dict[str, Outcome] = {}
         for outcome_id, aggregate in plan.aggregates.items():
             if self.get_outcome(outcome_id) is None:
@@ -565,6 +573,11 @@ class ODIService:
             }
             updates.update(self._band_for(observations.get(outcome_id, [])))
             updated[outcome_id] = self.update_outcome(outcome_id, updates)
+            self._retain_inputs(
+                updated[outcome_id],
+                observations.get(outcome_id, []),
+                respondent_refs.get(outcome_id, []),
+            )
         return updated
 
     def import_survey(
@@ -587,6 +600,7 @@ class ODIService:
         # The band is bootstrapped from the paired responses, not from the mean,
         # so the correlation between the two dimensions survives.
         observations: dict[str, list[tuple[float, float]]] = {}
+        respondent_refs: dict[str, list[str]] = {}
         for response in responses:
             outcome_id = (
                 response.outcome_ref
@@ -598,6 +612,7 @@ class ODIService:
             observations.setdefault(outcome_id, []).append(
                 (response.importance, response.satisfaction)
             )
+            respondent_refs.setdefault(outcome_id, []).append(response.respondent)
 
         updated: dict[str, Outcome] = {}
         for outcome_id, aggregate in result.aggregates.items():
@@ -613,7 +628,45 @@ class ODIService:
             }
             updates.update(self._band_for(observations.get(outcome_id, [])))
             updated[outcome_id] = self.update_outcome(outcome_id, updates)
+            self._retain_inputs(
+                updated[outcome_id],
+                observations.get(outcome_id, []),
+                respondent_refs.get(outcome_id, []),
+            )
         return updated
+
+    def _retain_inputs(
+        self,
+        outcome: Outcome,
+        pairs: list[tuple[float, float]],
+        respondent_refs: list[str],
+    ) -> None:
+        """Persist the accepted paired inputs a band is reproduced from (B3.1).
+
+        Called only after the outcome write succeeded, so a refused or dry-run
+        import retains nothing. The set is de-identified (opaque per-pair tokens,
+        no names) and carries a versioned ref so the band can name its inputs.
+        """
+        if not pairs:
+            return
+        input_set = build_survey_input_set(outcome, pairs, respondent_refs=respondent_refs)
+        self.repo.add_survey_input_set(input_set)
+
+    def get_outcome_inputs(self, outcome_id: str) -> list[Any] | None:
+        """The paired inputs a stored band was reproduced from (B3.1), or ``None``.
+
+        Reads the persisted input set for the outcome. ``None`` means no input
+        set is retained — a legacy or aggregate-only outcome — which is a
+        distinct state from a retained set, and never an empty list that would
+        read as "zero responses".
+        """
+        outcome = self.get_outcome(outcome_id)
+        if outcome is None:
+            raise OutcomeNotFoundError(outcome_id)
+        input_set = self.repo.get_survey_input_set(outcome_id)
+        if input_set is None:
+            return None
+        return retained_survey_inputs(input_set)
 
     def _band_for(self, observations: list[tuple[float, float]]) -> dict[str, Any]:
         """Compute the stored band and provenance from paired responses (B3/B3.2).

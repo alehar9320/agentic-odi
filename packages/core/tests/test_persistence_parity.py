@@ -152,3 +152,35 @@ def test_a_score_edit_clears_a_stale_band_on_every_repository(repo: Repository) 
     assert loaded.opportunity_low is None
     assert loaded.opportunity_high is None
     assert loaded.interval_n is None
+
+
+def test_retained_survey_inputs_survive_every_repository(repo: Repository) -> None:
+    from agentic_odi_core.models import SurveyInputSet
+
+    outcome = repo.add_outcome(
+        Outcome(
+            job_id="job-1",
+            statement=_STATEMENT,
+            importance=8.0,
+            satisfaction=6.0,
+            importance_n=2,
+            satisfaction_n=2,
+            score_method="survey",
+        )
+    )
+    pairs = [(8.0, 6.0), (3.0, 9.0)]
+    repo.add_survey_input_set(
+        SurveyInputSet(
+            outcome_id=outcome.id,
+            job_id=outcome.job_id,
+            input_ref="survey-inputs-v1:test",
+            pairs=pairs,
+            respondent_refs=["r-1", "r-2"],
+        )
+    )
+
+    loaded = _reopen(repo).get_survey_input_set(outcome.id)
+    assert loaded is not None
+    assert loaded.pairs == pairs
+    assert loaded.respondent_refs == ["r-1", "r-2"]
+    assert loaded.input_ref == "survey-inputs-v1:test"

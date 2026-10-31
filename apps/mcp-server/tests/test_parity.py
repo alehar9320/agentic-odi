@@ -230,3 +230,38 @@ async def test_get_outcome_interval_reports_a_no_band_and_a_stored_band():
         band = json.loads(stored.content[0].text)["band"]  # type: ignore[index]
         assert band["n"] == 40
         assert band["stale"] is False
+
+
+@pytest.mark.asyncio
+async def test_get_outcome_inputs_reports_a_no_inputs_and_the_retained_pairs():
+    async with Client(mcp) as client:
+        job_id = await _new_job(client)
+        added = await client.call_tool(
+            "add_outcome",
+            {
+                "job_id": job_id,
+                "statement": "Minimize the time to ship a release when the build is green",
+                "importance": 8,
+                "satisfaction": 4,
+            },
+        )
+        outcome_id = json.loads(added.content[0].text.split(": ", 1)[1])["id"]  # type: ignore[index]
+
+        no_inputs = await client.call_tool("get_outcome_inputs", {"outcome_id": outcome_id})
+        assert json.loads(no_inputs.content[0].text)["inputs"] is None  # type: ignore[index]
+
+        rows = [
+            {
+                "outcome_id": outcome_id,
+                "importance": 8.0,
+                "satisfaction": 4.0,
+                "respondent_id": f"r{i}",
+            }
+            for i in range(3)
+        ]
+        await client.call_tool("import_survey", {"rows": rows})
+
+        stored = await client.call_tool("get_outcome_inputs", {"outcome_id": outcome_id})
+        inputs = json.loads(stored.content[0].text)["inputs"]  # type: ignore[index]
+        assert [item["importance"] for item in inputs] == [8.0, 8.0, 8.0]
+        assert [item["respondent_id"] for item in inputs] == ["r0", "r1", "r2"]

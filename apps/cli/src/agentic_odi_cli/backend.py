@@ -377,6 +377,28 @@ class LocalBackend(Backend):
             },
         }
 
+    def _get_outcome_inputs(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import OutcomeNotFoundError, outcome_not_found
+
+        outcome_id = args["outcome_id"]
+        try:
+            inputs = self.service.get_outcome_inputs(outcome_id)
+        except OutcomeNotFoundError:
+            raise BackendError(outcome_not_found(outcome_id)) from None
+        if inputs is None:
+            return {"outcome_id": outcome_id, "inputs": None}
+        return {
+            "outcome_id": outcome_id,
+            "inputs": [
+                {
+                    "respondent_id": item.respondent_id,
+                    "importance": item.importance,
+                    "satisfaction": item.satisfaction,
+                }
+                for item in inputs
+            ],
+        }
+
     def _import_survey(self, args: dict[str, Any]) -> dict[str, Any]:
         from agentic_odi_core import OutcomeNotFoundError, outcome_not_found
         from agentic_odi_core.errors import ValidationError
@@ -824,6 +846,7 @@ _LOCAL_HANDLERS = {
     "get_outcome_history": LocalBackend._get_outcome_history,
     "get_outcome_delta": LocalBackend._get_outcome_delta,
     "get_outcome_interval": LocalBackend._get_outcome_interval,
+    "get_outcome_inputs": LocalBackend._get_outcome_inputs,
     "import_survey": LocalBackend._import_survey,
     "get_survey_import_plan": LocalBackend._get_survey_import_plan,
     "commit_survey_import": LocalBackend._commit_survey_import,
