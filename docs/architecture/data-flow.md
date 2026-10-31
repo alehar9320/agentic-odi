@@ -126,6 +126,11 @@ A conversation written before ids existed has none, so the tree endpoint
 synthesises a linear chain and old threads still open. `apps/studio` never
 invents a branch the sidecar cannot reproduce.
 
+The browser also remembers which thread it was sitting on, so a reload reopens
+that conversation instead of the newest one. The stored id is a hint, not an
+authority: when the sidecar no longer has the thread, the studio drops the key
+and resumes `/api/conversations/latest` quietly rather than reporting it.
+
 ## Read Paths
 
 ```text

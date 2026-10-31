@@ -56,7 +56,13 @@ import {
 } from "../api/studioApi";
 import type { RawSseEvent } from "../api/sse";
 import { capabilityRegistry, type Capability } from "../bff/capabilities/registry";
-import { loadSession, saveSession, type StudioSession } from "../lib/session";
+import {
+  loadConversationId,
+  loadSession,
+  saveConversationId,
+  saveSession,
+  type StudioSession,
+} from "../lib/session";
 import type {
   AddConnectorPayload,
   AddOutcomePayload,
@@ -553,7 +559,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [sidecarReachable, setSidecarReachable] = useState<boolean | null>(null);
   const [dismissedSidecarNotice, setDismissedSidecarNotice] = useState<boolean>(loadSidecarNoticeDismissed);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [conversationId, setConversationId] = useState<string | null>(() => loadConversationId());
   const [memory, setMemory] = useState<Observation[]>([]);
   const [memoryLoading, setMemoryLoading] = useState(false);
   const [streaming, setStreaming] = useState(false);
@@ -590,6 +596,17 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [theses, setTheses] = useState<Thesis[]>(loadTheses);
   const toastId = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
+  const persistedConversation = useRef<string | null>(conversationId);
+
+  // Whichever way the thread changes — a stream's answer, a new chat, a
+  // restore — the session keeps its id, so the next boot reopens this one.
+  useEffect(() => {
+    if (conversationId === persistedConversation.current) {
+      return;
+    }
+    persistedConversation.current = conversationId;
+    saveConversationId(conversationId);
+  }, [conversationId]);
 
   const signals = useMemo(
     () => [...serverSignals].sort((a, b) => (a.created_at < b.created_at ? 1 : -1)),
@@ -1841,8 +1858,26 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       void refreshPresets();
       void refreshFeatured();
       void refreshMemory();
-      void fetchLatestConversation()
-        .then(async ({ conversation }) => {
+      // Reopen what the person left. A stored thread this machine no longer has
+      // is not a failure worth a notice: fall back to the newest one quietly.
+      async function restoreThread(): Promise<void> {
+        const storedId = loadConversationId();
+        if (storedId) {
+          try {
+            const tree = await fetchConversationTree(storedId);
+            if (!cancelled) {
+              setConversationId(tree.conversation.id);
+              setMessages(turnsToMessages(tree.messages, tree.head_id));
+            }
+            return;
+          } catch {
+            if (!cancelled) {
+              setConversationId(null);
+            }
+          }
+        }
+        try {
+          const { conversation } = await fetchLatestConversation();
           if (cancelled || !conversation) {
             return;
           }
@@ -1854,8 +1889,12 @@ export function StudioProvider({ children }: { children: ReactNode }) {
             return;
           }
           setMessages(turnsToMessages(tree.messages, tree.head_id));
-        })
-        .catch(() => undefined);
+        } catch {
+          /* no sidecar, no thread: the composer starts empty */
+        }
+      }
+
+      void restoreThread();
       void healthMcp(settings.mcp_url)
         .then((result) => {
           if (!cancelled) {

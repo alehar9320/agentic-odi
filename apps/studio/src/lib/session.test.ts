@@ -1,6 +1,14 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { SESSION_KEY, clearSession, loadSession, saveSession } from "./session";
+import {
+  CONVERSATION_KEY,
+  SESSION_KEY,
+  clearSession,
+  loadConversationId,
+  loadSession,
+  saveConversationId,
+  saveSession,
+} from "./session";
 
 describe("studio session", () => {
   beforeEach(() => {
@@ -35,5 +43,38 @@ describe("studio session", () => {
     clearSession();
 
     expect(loadSession()).toBeNull();
+  });
+
+  it("round-trips the thread the person was last in", () => {
+    saveConversationId("C-7");
+
+    expect(loadConversationId()).toBe("C-7");
+  });
+
+  it("has no thread to restore on a first visit", () => {
+    expect(loadConversationId()).toBeNull();
+  });
+
+  it("writes off the thread when the active one goes away", () => {
+    saveConversationId("C-7");
+
+    saveConversationId(null);
+
+    expect(localStorage.getItem(CONVERSATION_KEY)).toBeNull();
+    expect(loadConversationId()).toBeNull();
+  });
+
+  it("ignores a stored thread that is blank", () => {
+    localStorage.setItem(CONVERSATION_KEY, "   ");
+
+    expect(loadConversationId()).toBeNull();
+  });
+
+  it("clears the thread with the rest of the session", () => {
+    saveConversationId("C-7");
+
+    clearSession();
+
+    expect(loadConversationId()).toBeNull();
   });
 });
