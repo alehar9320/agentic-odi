@@ -1,5 +1,55 @@
 # Changelog
 
+## [0.15.0](https://github.com/alehar9320/agentic-odi/compare/v0.14.0...v0.15.0) (2026-10-31)
+
+
+### Features
+
+* **brand:** elevate favicon quality and add PM smart attire ([#253](https://github.com/alehar9320/agentic-odi/issues/253)) ([d7c6044](https://github.com/alehar9320/agentic-odi/commit/d7c604449caacaeb7715bfbecaf13d930dc3ffa6))
+* **cli:** add --dry-run to connector ingest ([#188](https://github.com/alehar9320/agentic-odi/issues/188)) ([47a4291](https://github.com/alehar9320/agentic-odi/commit/47a42917fd7d2055260912575490e8c0a5a09f98))
+* **cli:** add data-export for backing up the ODI store ([#293](https://github.com/alehar9320/agentic-odi/issues/293)) ([2d92efb](https://github.com/alehar9320/agentic-odi/commit/2d92efbcece5c80ee1468aba459aba463ddf27cc))
+* **cli:** add odi summary for a one-screen job report ([#190](https://github.com/alehar9320/agentic-odi/issues/190)) ([9d20227](https://github.com/alehar9320/agentic-odi/commit/9d2022700528b69c08113f559091aeb04af776a4))
+* **cli:** check every connector's health in one table ([#289](https://github.com/alehar9320/agentic-odi/issues/289)) ([af8a4cf](https://github.com/alehar9320/agentic-odi/commit/af8a4cf70d6acf196262c767a966e90ac24082e9))
+* **cli:** export desired outcomes as CSV or JSON ([#189](https://github.com/alehar9320/agentic-odi/issues/189)) ([fe8f383](https://github.com/alehar9320/agentic-odi/commit/fe8f3837a70bca80f4a01a9ffac8e981ec3db24d))
+* **cli:** list built-in connector presets as a markdown table ([#290](https://github.com/alehar9320/agentic-odi/issues/290)) ([f24159f](https://github.com/alehar9320/agentic-odi/commit/f24159fb3abb1a75fb9874c7b2fa1356518358f5))
+* **connectors:** add a configurable shared HTTP client ([#292](https://github.com/alehar9320/agentic-odi/issues/292)) ([6046084](https://github.com/alehar9320/agentic-odi/commit/604608446596b2a335cc5e1b1fd9addc88d15446))
+* **connectors:** validate evidence drafts before they reach the store ([#287](https://github.com/alehar9320/agentic-odi/issues/287)) ([ca06646](https://github.com/alehar9320/agentic-odi/commit/ca066460ed31033442bf3cc4d9fcc6ab715711d5))
+* **core,cli,mcp-server,studio-api:** enforce ODI write contract on every path ([#270](https://github.com/alehar9320/agentic-odi/issues/270)) ([fbcc750](https://github.com/alehar9320/agentic-odi/commit/fbcc750562e6ed254312d21bf58539095ee85a0a))
+* **core,cli,studio:** record scheduled work and dispatch it honestly ([#265](https://github.com/alehar9320/agentic-odi/issues/265)) ([167e4c0](https://github.com/alehar9320/agentic-odi/commit/167e4c0caad6e5d36f7ebfe9c4bcc196c4922bce))
+* **core,cli:** configurable MCP connection limits ([#294](https://github.com/alehar9320/agentic-odi/issues/294)) ([2cea3a8](https://github.com/alehar9320/agentic-odi/commit/2cea3a8e26ac517b27aaf5f3f7dfd7f55bc0a900))
+* **core,cli:** make the tool contract one source of truth, and expose it ([#263](https://github.com/alehar9320/agentic-odi/issues/263)) ([fb296d8](https://github.com/alehar9320/agentic-odi/commit/fb296d8257f27c8afb3d417ac237597e72882ff6))
+* **core,studio:** add the V2MOM artifact and capture a vision in the context conversation ([#258](https://github.com/alehar9320/agentic-odi/issues/258)) ([838b721](https://github.com/alehar9320/agentic-odi/commit/838b7210b4f04daa040cc05bc46278ee756021aa))
+* **core:** rank outcomes by opportunity score by default ([#185](https://github.com/alehar9320/agentic-odi/issues/185)) ([e11b792](https://github.com/alehar9320/agentic-odi/commit/e11b792f01a05d6f37de20dbc355d9ddca221c82))
+* **core:** validate Job names and descriptions at the model level ([#296](https://github.com/alehar9320/agentic-odi/issues/296)) ([29f3bdc](https://github.com/alehar9320/agentic-odi/commit/29f3bdc8fe9e3b1a9e7ad614b200299eab370e5c)), closes [#116](https://github.com/alehar9320/agentic-odi/issues/116)
+* **evidence:** keep a link back to the record, and let a quote become an outcome ([#261](https://github.com/alehar9320/agentic-odi/issues/261)) ([8195615](https://github.com/alehar9320/agentic-odi/commit/81956154d818e873f87800e1ebe3da4274badc02))
+* **mcp:** add get_health store probe ([#286](https://github.com/alehar9320/agentic-odi/issues/286)) ([d206955](https://github.com/alehar9320/agentic-odi/commit/d206955d765d3500bf59c1ad32d66663edd5e2e0))
+* **mcp:** flush and close the event store on a graceful shutdown ([#130](https://github.com/alehar9320/agentic-odi/issues/130)) ([9741447](https://github.com/alehar9320/agentic-odi/commit/9741447570c9938e4a15aaeca4fbc37336925fa2)), closes [#122](https://github.com/alehar9320/agentic-odi/issues/122)
+* **mcp:** let the MCP server listen somewhere other than 8000 ([#155](https://github.com/alehar9320/agentic-odi/issues/155)) ([3354bb5](https://github.com/alehar9320/agentic-odi/commit/3354bb58dadedb4808b70848de2b63848703ee4f))
+* **mcp:** refuse to serve a registry that disagrees with the contract ([#288](https://github.com/alehar9320/agentic-odi/issues/288)) ([af6a980](https://github.com/alehar9320/agentic-odi/commit/af6a980894d13427b76150a4d87565e12661cbd1))
+* **signals:** make "catch up" mean something with a real signal inbox ([#277](https://github.com/alehar9320/agentic-odi/issues/277)) ([d1e3d20](https://github.com/alehar9320/agentic-odi/commit/d1e3d20c2126ded913fb331a07327ebf0ebad808))
+* **studio-api:** expose customer outcomes and evidence over /api ([#174](https://github.com/alehar9320/agentic-odi/issues/174)) ([4806c10](https://github.com/alehar9320/agentic-odi/commit/4806c1072bfcc64267e5513bdd609102da7bd081))
+* **studio,studio-api:** require evidence or a hypothesis on every claim ([#359](https://github.com/alehar9320/agentic-odi/issues/359)) ([7f7a463](https://github.com/alehar9320/agentic-odi/commit/7f7a46382dc36705a9c0a4d296586da2c0a99b61))
+* **studio:** make every shipping surface usable without a mouse ([#364](https://github.com/alehar9320/agentic-odi/issues/364)) ([283ab5b](https://github.com/alehar9320/agentic-odi/commit/283ab5b3fdb0442c23e54d798913ade2e482fad7)), closes [#92](https://github.com/alehar9320/agentic-odi/issues/92)
+* **studio:** make the catch-up feed and job map fully keyboard-operable ([#297](https://github.com/alehar9320/agentic-odi/issues/297)) ([2cc6f1a](https://github.com/alehar9320/agentic-odi/commit/2cc6f1ac4154bef982edbd8198c168065404adef)), closes [#115](https://github.com/alehar9320/agentic-odi/issues/115)
+* **studio:** mark bundled sample outcomes so they cannot pass as data ([#232](https://github.com/alehar9320/agentic-odi/issues/232)) ([709d2c5](https://github.com/alehar9320/agentic-odi/commit/709d2c5f931d0391b2b67051d33216cad1c74c32))
+* **studio:** max assistant-ui integration for the Living Studio ([#266](https://github.com/alehar9320/agentic-odi/issues/266)) ([d78005d](https://github.com/alehar9320/agentic-odi/commit/d78005d6b57ccbaa8154752431bc553b03a481e9))
+* **studio:** offer a local, redacted diagnostics bundle ([#346](https://github.com/alehar9320/agentic-odi/issues/346)) ([#358](https://github.com/alehar9320/agentic-odi/issues/358)) ([ece6529](https://github.com/alehar9320/agentic-odi/commit/ece6529884e76b41888804498abb72ef14f836c5))
+* **studio:** one banner system for every notice ([#264](https://github.com/alehar9320/agentic-odi/issues/264)) ([a90a708](https://github.com/alehar9320/agentic-odi/commit/a90a7080ac033a805bf070d1bdc48df621b41966))
+* **studio:** open on a guided conversation, not a modal ([#268](https://github.com/alehar9320/agentic-odi/issues/268)) ([3426823](https://github.com/alehar9320/agentic-odi/commit/3426823281598cc92a970cdf4dd439dd7c570d9f))
+* **studio:** resume the last job, step, or outcome after a reload ([#299](https://github.com/alehar9320/agentic-odi/issues/299)) ([bf1405d](https://github.com/alehar9320/agentic-odi/commit/bf1405d497d7f1312e3aab99fc3e7b77d6f1aa49)), closes [#109](https://github.com/alehar9320/agentic-odi/issues/109)
+* **studio:** rewrite starter copy around concrete scenarios ([#316](https://github.com/alehar9320/agentic-odi/issues/316)) ([#361](https://github.com/alehar9320/agentic-odi/issues/361)) ([bf0fcb2](https://github.com/alehar9320/agentic-odi/commit/bf0fcb23845606ab2869424a767772aabc5ea633))
+* **studio:** turn a quote into a scored outcome ([#236](https://github.com/alehar9320/agentic-odi/issues/236)) ([a95934b](https://github.com/alehar9320/agentic-odi/commit/a95934b468b441e46e5f974ff6ccc45d61e5b58e))
+
+
+### Bug Fixes
+
+* **ci:** label stacked pull requests, not only those targeting main ([#373](https://github.com/alehar9320/agentic-odi/issues/373)) ([51a7ad4](https://github.com/alehar9320/agentic-odi/commit/51a7ad4f1e6c1294d9766119138a1a310d5fa1b9))
+* **studio:** close setup when starting a new conversation ([#135](https://github.com/alehar9320/agentic-odi/issues/135)) ([e53c73e](https://github.com/alehar9320/agentic-odi/commit/e53c73eaa3531886eb4a671ec21ddce4809030d8))
+* **studio:** let Escape stop a running stream first ([#136](https://github.com/alehar9320/agentic-odi/issues/136)) ([2524f64](https://github.com/alehar9320/agentic-odi/commit/2524f642be81d8a8e1ada7cc24bec36997305caa))
+* **studio:** make landscape table rows keyboard-selectable ([#137](https://github.com/alehar9320/agentic-odi/issues/137)) ([a6cfd86](https://github.com/alehar9320/agentic-odi/commit/a6cfd86e912f6062044ecc947cae59db66aa376b))
+* **studio:** remove the + Simulate update affordance ([#322](https://github.com/alehar9320/agentic-odi/issues/322)) ([#372](https://github.com/alehar9320/agentic-odi/issues/372)) ([4be0071](https://github.com/alehar9320/agentic-odi/commit/4be00716e74d543c27da69f746f06c5269ddfcf8))
+* **studio:** tag every offline turn as local guidance ([#142](https://github.com/alehar9320/agentic-odi/issues/142)) ([ab193fd](https://github.com/alehar9320/agentic-odi/commit/ab193fd49285857cea202bebd8ecdfca912fdd8a))
+
 ## [0.14.0](https://github.com/alehar9320/agentic-odi/compare/v0.13.0...v0.14.0) (2026-10-29)
 
 
