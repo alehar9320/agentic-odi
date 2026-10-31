@@ -47,7 +47,7 @@ export function ConnectorSuggestionModal() {
   }
 
   function browseAll() {
-    openCustomize({ query: listing?.name ?? id });
+    openCustomize({ query: listing?.name ?? id, listingId: listing?.id, tab: "connectors" });
   }
 
   async function install() {

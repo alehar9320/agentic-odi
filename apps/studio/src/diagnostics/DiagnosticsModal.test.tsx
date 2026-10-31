@@ -41,6 +41,7 @@ function stubContext(): StudioContextValue {
     displayName: "",
     setDisplayName: vi.fn(),
     brief: null,
+    canvasState: { kind: "ready", data: null },
     openSetup: vi.fn(),
     closeSetup: vi.fn(),
     clearChat: vi.fn(),

@@ -33,6 +33,7 @@ const stubContext = (overrides: Record<string, unknown> = {}) =>
     displayName: "Ada",
     setDisplayName: vi.fn(),
     brief: null,
+    canvasState: { kind: "ready", data: { jobs: [], steps: [], outcomes: [], evidence: [], source: "local" } },
     openSetup: vi.fn(),
     closeSetup: vi.fn(),
     clearChat: vi.fn(),
@@ -87,9 +88,9 @@ describe("SettingsPanel model catalog", () => {
 
     renderPanel();
 
-    const model = screen.getByLabelText(/^model/i);
-    expect(model).toHaveAttribute("list", "studio-model-options");
-    expect(document.getElementById("studio-model-options")?.children).toHaveLength(2);
+    const model = document.getElementById("settings-model-name") as HTMLInputElement;
+    expect(model).toHaveAttribute("list", "settings-model-options");
+    expect(document.getElementById("settings-model-options")?.children).toHaveLength(2);
     expect(screen.getByText(/2 models available/i)).toBeInTheDocument();
   });
 
@@ -101,7 +102,7 @@ describe("SettingsPanel model catalog", () => {
 
     renderPanel();
 
-    expect(screen.getByLabelText(/^model/i)).not.toHaveAttribute("list");
+    expect(document.getElementById("settings-model-name")).not.toHaveAttribute("list");
     expect(screen.getByText(/connection refused/i)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /find models/i }));
@@ -121,29 +122,27 @@ describe("SettingsPanel connectors", () => {
     expect(del).toHaveBeenCalledWith("notion");
   });
 
-  it("groups presets by capability area with id, auth, and a connect control", () => {
-    vi.mocked(useStudio).mockReturnValue(stubContext({ connectors: [] }));
+  it("keeps connector management in Customize", () => {
+    const openCustomize = vi.fn();
+    vi.mocked(useStudio).mockReturnValue(stubContext({ openCustomize }));
 
     renderPanel();
 
-    expect(
-      screen.getByRole("region", { name: /voice of customer/i }),
-    ).toBeInTheDocument();
-    expect(screen.getByText("notion")).toBeInTheDocument();
-    expect(screen.getByText(/OAuth/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /connect notion/i })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Manage connectors" }));
+    expect(openCustomize).toHaveBeenCalledWith({ tab: "connectors" });
   });
 
-  it("adds a connector from its row", () => {
-    const add = vi.fn().mockResolvedValue({ ok: true, name: "notion" });
-    vi.mocked(useStudio).mockReturnValue(
-      stubContext({ addConnector: add, connectors: [] }),
-    );
+  it("navigates to Data from the section navigation", () => {
+    vi.mocked(useStudio).mockReturnValue(stubContext());
+    const scrollIntoView = vi.fn();
+    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", { value: scrollIntoView, configurable: true });
 
     renderPanel();
 
-    fireEvent.click(screen.getByRole("button", { name: /connect notion/i }));
-    expect(add).toHaveBeenCalledWith({ preset: "notion" });
+    fireEvent.click(screen.getByRole("button", { name: "Data" }));
+    expect(document.getElementById("settings-data")).toHaveFocus();
+    expect(scrollIntoView).toHaveBeenCalledWith({ block: "start", behavior: "smooth" });
+    delete (HTMLElement.prototype as Partial<HTMLElement>).scrollIntoView;
   });
 
   it("does not pretend unconnectable sources are connection rows", () => {
@@ -154,7 +153,7 @@ describe("SettingsPanel connectors", () => {
     expect(screen.queryByText(/gong transcripts/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/slack friction stream/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/product telemetry/i)).not.toBeInTheDocument();
-    expect(screen.getByText(/no data source is connected yet/i)).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Data" })).toBeInTheDocument();
   });
 
   it("toggles API key visibility", () => {
@@ -178,50 +177,6 @@ describe("SettingsPanel connectors", () => {
     renderPanel();
 
     expect(screen.getByText(/no connectors registered/i)).toBeInTheDocument();
-  });
-});
-
-describe("SettingsPanel connector catalog failures", () => {
-  it("shows the catalog failure with a retry instead of an empty select", () => {
-    const refresh = vi.fn().mockResolvedValue(undefined);
-    vi.mocked(useStudio).mockReturnValue(
-      stubContext({
-        presets: [],
-        presetError: {
-          code: "mcp_unreachable",
-          message: "The connector catalog is unreachable.",
-          suggestion: "Check that the sidecar is running, then try again.",
-          retryable: true,
-        },
-        refreshPresets: refresh,
-      }),
-    );
-
-    renderPanel();
-
-    expect(screen.getByRole("alert").textContent).toContain(
-      "The connector catalog is unreachable.",
-    );
-
-    fireEvent.click(screen.getByRole("button", { name: /retry/i }));
-    expect(refresh).toHaveBeenCalled();
-  });
-
-  it("offers no connect control while the catalog is in error", () => {
-    vi.mocked(useStudio).mockReturnValue(
-      stubContext({
-        presets: [],
-        presetError: {
-          code: "mcp_unreachable",
-          message: "The connector catalog is unreachable.",
-          retryable: true,
-        },
-      }),
-    );
-
-    renderPanel();
-
-    expect(screen.queryByRole("button", { name: /^connect /i })).toBeNull();
   });
 });
 
@@ -270,13 +225,14 @@ describe("SettingsPanel capabilities", () => {
 
     renderPanel();
 
-    const dataRow = screen.getByText(/local canvas data/i).closest("li");
+    const connectionsSection = screen.getByRole("region", { name: "Connections" });
+    const dataRow = within(connectionsSection).getByText(/local canvas data/i).closest(".settings__status-entry");
     expect(dataRow).toBeInTheDocument();
     expect(dataRow).toHaveTextContent("available");
 
-    const llmRow = screen.getByText(/sidecar model proxy/i).closest("li");
-    expect(llmRow).toBeInTheDocument();
-    expect(llmRow).toHaveTextContent(/unavailable/);
+    const sidecarRow = within(connectionsSection).getByText("Sidecar").closest(".settings__status-entry");
+    expect(sidecarRow).toBeInTheDocument();
+    expect(sidecarRow).toHaveTextContent(/unavailable/);
   });
 });
 

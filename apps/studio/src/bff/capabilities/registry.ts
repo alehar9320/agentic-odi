@@ -148,7 +148,7 @@ export class CapabilityRegistry {
       id: "sidecar-connectors",
       label: localStatuses["sidecar-connectors"].label,
       description: localStatuses["sidecar-connectors"].description,
-      check: async () => probeSidecar("/api/connectors"),
+      check: async () => probeSidecar("/api/capabilities", "sidecar-connectors"),
     },
     {
       id: "sidecar-mcp",
