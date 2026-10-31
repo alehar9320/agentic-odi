@@ -378,4 +378,17 @@ describe("SettingsPanel notification policy", () => {
     expect(await within(policy).findByText("sidecar is offline")).toBeInTheDocument();
     expect(coverage.checked).toBe(false);
   });
+
+  it("reads nothing and says so when the sidecar is known to be down", async () => {
+    const { fetchNotificationRules } = await import("../api/studioApi");
+    vi.mocked(fetchNotificationRules).mockClear();
+    vi.mocked(useStudio).mockReturnValue(stubContext({ sidecarReachable: false }));
+
+    renderPanel();
+
+    const policy = await screen.findByRole("region", { name: "Notifications" });
+    expect(within(policy).getByText(/connect one to read or change it/i)).toBeInTheDocument();
+    expect(within(policy).queryByText(/loading the shared policy/i)).not.toBeInTheDocument();
+    expect(fetchNotificationRules).not.toHaveBeenCalled();
+  });
 });

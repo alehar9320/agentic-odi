@@ -147,12 +147,16 @@ const AREA_LABELS: Record<ConnectorPreset["area"], string> = {
  * The shared interruption policy. It is stored on the sidecar, not in this
  * browser, so the bell, the digest and every other reader agree. A rule only
  * quiets the feed — it never changes which signals are real.
+ *
+ * The policy lives on the sidecar, so when the sidecar is known to be down
+ * there is nothing to read and no request is made; the panel says so instead.
  */
-function NotificationPolicySection() {
+function NotificationPolicySection({ sidecarReachable }: { sidecarReachable: boolean | null }) {
   const [rules, setRules] = useState<NotificationRule[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (sidecarReachable === false) return;
     let active = true;
     fetchNotificationRules()
       .then((loaded) => {
@@ -164,7 +168,7 @@ function NotificationPolicySection() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [sidecarReachable]);
 
   async function update(rule: NotificationRule, patch: Partial<NotificationRule>) {
     const next = { ...rule, ...patch };
@@ -186,7 +190,11 @@ function NotificationPolicySection() {
         asks for attention.
       </p>
       {error ? <p className="muted">{error}</p> : null}
-      {rules === null && !error ? (
+      {sidecarReachable === false ? (
+        <p className="muted">
+          The shared policy lives on the local sidecar. Connect one to read or change it.
+        </p>
+      ) : rules === null && !error ? (
         <p className="muted">Loading the shared policy…</p>
       ) : (
         <ul className="connection-list">
@@ -549,7 +557,7 @@ export function SettingsPanel() {
         </div>
       ) : null}
 
-      <NotificationPolicySection />
+      <NotificationPolicySection sidecarReachable={sidecarReachable} />
 
       <UpdateSettings />
 
