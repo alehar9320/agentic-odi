@@ -95,6 +95,14 @@ export const STUDIO_COMMANDS: StudioCommand[] = [
     keywords: ["steps", "phases"],
   },
   {
+    id: "coverage",
+    name: "/coverage",
+    label: "Coverage",
+    description: "What the research covers, stage by stage, and the gaps it leaves.",
+    category: "Explore",
+    keywords: ["gaps", "stages", "measured"],
+  },
+  {
     id: "impact",
     name: "/impact",
     label: "Simulate a bet",

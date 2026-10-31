@@ -5804,3 +5804,53 @@ details[open] summary {
   color: var(--muted);
   font-size: 0.72rem;
 }
+
+/* Coverage: one row per stage, empty stages included, so a gap is visible. */
+.cov-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 12px 0 8px;
+  font-size: 0.85rem;
+}
+
+.cov-table th,
+.cov-table td {
+  text-align: left;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--studio-border);
+}
+
+.cov-table thead th {
+  color: var(--studio-muted);
+  font-weight: 600;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.cov-table tbody th {
+  font-weight: 600;
+  color: var(--studio-text);
+}
+
+.cov-table tbody tr[data-covered="no"] th {
+  color: var(--studio-muted);
+  font-weight: 500;
+}
+
+.cov-table td {
+  font-variant-numeric: tabular-nums;
+  color: var(--studio-text);
+}
+
+.cov-totals,
+.cov-unassigned,
+.cov-gaps {
+  margin: 4px 0;
+  font-size: 0.82rem;
+  color: var(--studio-muted);
+}
+
+.cov-gaps {
+  color: var(--studio-text);
+}

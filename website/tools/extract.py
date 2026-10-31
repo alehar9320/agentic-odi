@@ -428,6 +428,7 @@ TOOL_PURPOSES: dict[str, str] = {
     "promote_evidence": "Promote a record into a Job, outcome, or customer outcome.",
     "evaluate_outcome": "Check a statement against the ODI format before saving it.",
     "get_odi_schema": "Return the canonical JSON schema for every ODI entity.",
+    "get_coverage": "Read a job's stage coverage: outcomes, measured counts, quotes, and gaps.",
     "compute_opportunity": "Score an importance and satisfaction pair.",
     "get_odi_framework_guidelines": "Say which tool to use at each stage of ODI.",
     "get_capabilities": "Describe what the assistant can help with.",

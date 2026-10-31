@@ -387,6 +387,8 @@ agentic-odi score 8 2         # ODI opportunity score → 14.00
 agentic-odi evaluate "Minimize the time to ship when onboarding"  # outcome-format check
 agentic-odi evaluate --json "Minimize the time to ship when onboarding"
 agentic-odi guidelines        # the ODI stage-by-stage guide
+agentic-odi coverage JOB-1    # what the research covers, stage by stage, and the gaps
+agentic-odi coverage JOB-1 --json
 agentic-odi capabilities      # what the assistant can do
 agentic-odi capabilities --json   # machine-readable manifest
 agentic-odi capabilities tools  # tool names only
@@ -397,6 +399,12 @@ check works with or without a running server.
 
 `health` runs the `get_health` check against the configured backend and exits
 non-zero when the store is degraded, so it can gate a deployment.
+
+`coverage` reports one row per stage in canonical order — including the stages
+with no outcomes, which are the finding, not an omission. It names the totals,
+the explicit `unassigned` bucket for outcomes with no stage, and the empty
+stages as gaps. An unknown job is an error, distinct from a job with no
+outcomes, which returns a zeroed report.
 
 `capabilities` groups every tool by effect (read/write/destructive) and by ODI
 stage. `capabilities --json` emits the full machine-readable manifest.

@@ -40,6 +40,7 @@ import {
   fetchSignals,
   fetchStages,
   fetchUnreadSignalCount,
+  fetchCoverage,
   healthLlm,
   healthMcp,
   markSignalRead as apiMarkSignalRead,
@@ -84,6 +85,7 @@ import type {
   TurnNode,
   WorkspacePanelId,
   StagesState,
+  CoverageState,
 } from "../types";
 import { catalogManifest } from "../ui/catalog";
 import { parseUiSpec } from "../ui/protocol";
@@ -227,6 +229,9 @@ export interface StudioContextValue {
   /** The canonical job-map stages the server names, and how that fetch went. */
   stagesState: StagesState;
   refreshStages: () => Promise<void>;
+  /** What a job's research covers: per-stage counts, totals, and gaps. */
+  coverageState: CoverageState;
+  refreshCoverage: (jobId: string) => Promise<void>;
   llmHealth: { healthy: boolean | null; message: string };
   /** Model ids the configured endpoint publishes. Empty means "type one". */
   models: string[];
@@ -448,6 +453,10 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   });
   const [canvasCached, setCanvasCached] = useState(() => loadCanvasCache() !== null);
   const [stagesState, setStagesState] = useState<StagesState>({ kind: "loading", data: null });
+  const [coverageState, setCoverageState] = useState<CoverageState>({
+    kind: "loading",
+    data: null,
+  });
   const [llmHealth, setLlmHealth] = useState<{ healthy: boolean | null; message: string }>({
     healthy: null,
     message: "Health not checked yet.",
@@ -940,6 +949,25 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       setStagesState((prev) => ({ kind: "error", error: problem, data: prev.data }));
     }
   }, []);
+
+  const refreshCoverage = useCallback(
+    async (jobId: string) => {
+      if (!jobId) {
+        return;
+      }
+      setCoverageState((prev) => ({ kind: "loading", data: prev.data }));
+      try {
+        const response = await fetchCoverage(jobId, settings.mcp_url);
+        setCoverageState({ kind: "ready", data: response.result });
+      } catch (error) {
+        // A failed coverage read is a failure, not full coverage: the panel
+        // shows what went wrong instead of a reassuring row of zeros.
+        const problem = asStudioError(error);
+        setCoverageState((prev) => ({ kind: "error", error: problem, data: prev.data }));
+      }
+    },
+    [settings.mcp_url],
+  );
 
   const addStep = useCallback(
     async (payload: Omit<AddStepPayload, "mcp_url">) => {
@@ -1848,6 +1876,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       refreshCanvas,
       stagesState,
       refreshStages,
+      coverageState,
+      refreshCoverage,
       llmHealth,
       models,
       modelsLoading,
@@ -1957,6 +1987,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       refreshCanvas,
       stagesState,
       refreshStages,
+      coverageState,
+      refreshCoverage,
       llmHealth,
       models,
       modelsLoading,
