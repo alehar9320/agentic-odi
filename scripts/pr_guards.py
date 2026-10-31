@@ -271,7 +271,7 @@ def check_json_block(
     for key, actual in actuals.items():
         if key not in block:
             continue
-        claimed = int(block[key])  # type: ignore[arg-type]
+        claimed = int(block[key])  # type: ignore[call-overload]
         if key == "net_lines":
             slack = max(10, int(abs(actual) * tolerance))
             matches = abs(claimed - actual) <= slack
