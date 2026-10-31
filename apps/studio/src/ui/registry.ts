@@ -1,11 +1,17 @@
 import type { ComponentType } from "react";
 
 import {
+  Bet,
   DecisionRecord,
+  DecisionReview,
   EvidenceQuote,
   ImpactSimulation,
   JobMap,
   OpportunityBoard,
+  OpportunityBrief,
+  OutcomeCompare,
+  Roadmap,
+  SegmentProfile,
   OpportunityThesis,
   OutcomeCard,
 } from "./cards";
@@ -41,8 +47,14 @@ export const NODE_COMPONENTS: Record<string, ComponentType<NodeProps>> = {
   "outcome-card": OutcomeCard,
   "opportunity-board": OpportunityBoard,
   "opportunity-thesis": OpportunityThesis,
+  "opportunity-brief": OpportunityBrief,
+  "outcome-compare": OutcomeCompare,
+  roadmap: Roadmap,
   "impact-simulation": ImpactSimulation,
   "evidence-quote": EvidenceQuote,
   "job-map": JobMap,
   "decision-record": DecisionRecord,
+  "decision-review": DecisionReview,
+  bet: Bet,
+  "segment-profile": SegmentProfile,
 };

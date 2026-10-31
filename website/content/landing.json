@@ -54,7 +54,7 @@
     "id": "surfaces",
     "eyebrow": "The surfaces",
     "title": "The agent composes, it does not describe.",
-    "blurb": "The studio answers with a card from a closed catalog, rendered inline in the conversation. Seven shapes, each one a thing you can act on.",
+    "blurb": "The studio answers with a card from a closed catalog, rendered inline in the conversation. Thirteen shapes, each one a thing you can act on.",
     "cards": [
       {
         "type": "outcome-card",
@@ -162,6 +162,105 @@
           "decision": "Automate invoice matching before we build a refund flow",
           "status": "Decided",
           "rationale": "Opportunity 13.0 against 7.0, and two evidence quotes in the last quarter."
+        }
+      },
+      {
+        "type": "opportunity-brief",
+        "title": "Opportunity brief",
+        "blurb": "The factual case for one job: the decision, the underserved outcomes with their score, band, and sample size, and the sources.",
+        "data": {
+          "job": "Reconcile invoices",
+          "decision": "Automate invoice matching before we build a refund flow",
+          "outcomes": [
+            {
+              "statement": "Minimize the time it takes to reconcile invoices when a statement arrives",
+              "score": 13.0,
+              "band": "underserved",
+              "n": 12,
+              "method": "survey",
+              "source": "Q1 finance survey"
+            },
+            {
+              "statement": "Minimize the effort it takes to hand a refund back when a customer asks",
+              "score": 7.0,
+              "band": "appropriate",
+              "n": 12,
+              "method": "survey",
+              "source": "Q1 finance survey"
+            }
+          ],
+          "evidence_count": 2,
+          "generated_at": "2026-10-29T10:00:00Z"
+        }
+      },
+      {
+        "type": "decision-review",
+        "title": "Decision review",
+        "blurb": "A past decision re-examined against today's numbers: how long ago it was made, and per chosen outcome what moved. A missing measurement reads no evidence, never no change.",
+        "data": {
+          "title": "Is invoice automation still the right bet?",
+          "decided_at": "2026-01-15T00:00:00Z",
+          "days_elapsed": 76,
+          "summary": "1 improved, 1 with no evidence.",
+          "outcomes": [
+            {
+              "outcome_id": "OUT-1",
+              "statement": "Minimize the time it takes to reconcile invoices when a statement arrives",
+              "state": "improved",
+              "satisfaction_change": 2.1
+            },
+            {
+              "outcome_id": "OUT-2",
+              "state": "no_evidence"
+            }
+          ]
+        }
+      },
+      {
+        "type": "bet",
+        "title": "Bet",
+        "blurb": "A recorded expectation: the hypothesis, the outcome it targets, the baseline captured at creation, the target, and the date to look. The baseline is stored, never recomputed.",
+        "data": {
+          "title": "Reconcile in under five minutes",
+          "hypothesis": "Auto-matching receipts halves the weekly reconciliation time",
+          "outcome_id": "OUT-1",
+          "baseline": 13.0,
+          "target": 17.0,
+          "measure_by": "2026-04-01",
+          "status": "running"
+        }
+      },
+      {
+        "type": "segment-profile",
+        "title": "Segment",
+        "blurb": "A group of outcomes that share a service level, with the underserved and overserved counts kept apart. A ratio of nothing reads not measured, never zero.",
+        "data": {
+          "title": "Finance leads on small teams",
+          "total_members": 6,
+          "measured_count": 5,
+          "underserved_count": 2,
+          "overserved_count": 1,
+          "top_underserved": [
+            {
+              "outcome_id": "OUT-1",
+              "statement": "Reconcile invoices without manual effort",
+              "score": 13.0,
+              "band": "underserved"
+            }
+          ]
+        }
+      },
+      {
+        "type": "outcome-compare",
+        "title": "Comparison",
+        "blurb": "Two bets on the same axes, one row per metric and one column per bet, so the choice is visible instead of argued.",
+        "data": {
+          "columns": ["OUT-1", "OUT-2"],
+          "rows": [
+            {"metric": "score", "label": "Opportunity score", "cells": ["13", "7"]},
+            {"metric": "sample_size", "label": "Sample size", "cells": ["12", "not measured"]},
+            {"metric": "stage", "label": "Job stage", "cells": ["Execute", "Execute"]}
+          ]
         }
       }
     ]

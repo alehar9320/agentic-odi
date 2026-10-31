@@ -483,7 +483,10 @@ def test_every_page_resolves_its_own_assets(page: str):
 def test_page_weights_are_within_budget(page: str):
     size = _built_root(page).stat().st_size
     # The MCP reference is the long pole: every tool's argument table and the
-    # whole ODI schema live on that one page, so it grows with each paginated
-    # list tool and each entity we add. The V2MOM entity, the five
-    # scheduled-work tools, and the three signal tools bring the page to ~78 KB.
-    assert size <= 78 * 1024, f"{page}: {size} bytes"
+    # whole ODI entity schema live on that one page, so it grows with each tool
+    # and each entity we add. The budget is a tripwire, not a target. Raised for
+    # pillar 3, which added the decision-review, score-history and bet tools plus
+    # the ScoreSnapshot and Bet entities, on top of the scheduled-work and signal
+    # tools already on the page. Raised again for the segments/strategy tools and
+    # the Segment/Strategy entities the D increments added.
+    assert size <= 118 * 1024, f"{page}: {size} bytes"

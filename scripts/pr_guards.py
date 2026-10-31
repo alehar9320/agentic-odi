@@ -271,7 +271,7 @@ def check_json_block(
     for key, actual in actuals.items():
         if key not in block:
             continue
-        claimed = int(block[key])  # type: ignore[arg-type]
+        claimed = int(block[key])  # type: ignore[call-overload]
         if key == "net_lines":
             slack = max(10, int(abs(actual) * tolerance))
             matches = abs(claimed - actual) <= slack
@@ -403,7 +403,15 @@ def _is_prose_path(path: str) -> bool:
 def _is_test_path(path: str) -> bool:
     parts = path.replace("\\", "/").split("/")
     name = parts[-1]
-    return "tests" in parts or name.startswith("test_") or name.endswith("_test.py")
+    return (
+        "tests" in parts
+        or "__tests__" in parts
+        or name.startswith("test_")
+        or name.endswith("_test.py")
+        # Colocated JS/TS tests: ``Foo.test.tsx`` / ``foo.spec.ts``.
+        or ".test." in name
+        or ".spec." in name
+    )
 
 
 def check_fabrication(added_lines: Sequence[tuple[str, int, str]]) -> list[str]:

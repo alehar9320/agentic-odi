@@ -6,13 +6,18 @@ from datetime import datetime, timezone
 from typing import Protocol, TypeVar
 
 from agentic_odi_core.models import (
+    Bet,
     CustomerOutcome,
+    Decision,
     Evidence,
     Job,
     Outcome,
     ScheduledWork,
+    ScoreSnapshot,
+    Segment,
     Signal,
     Step,
+    Strategy,
 )
 
 _Item = TypeVar("_Item")
@@ -85,8 +90,13 @@ class Repository(Protocol):
     outcomes: dict[str, Outcome]
     customer_outcomes: dict[str, CustomerOutcome]
     evidence: dict[str, Evidence]
+    decisions: dict[str, Decision]
+    bets: dict[str, Bet]
+    score_snapshots: list[ScoreSnapshot]
     signals: dict[str, Signal]
     scheduled_work: dict[str, ScheduledWork]
+    segments: dict[str, Segment]
+    strategies: dict[str, Strategy]
 
     def add_job(self, job: Job) -> Job: ...
     def list_jobs(self, limit: int | None = None, offset: int = 0) -> list[Job]: ...
@@ -133,6 +143,35 @@ class Repository(Protocol):
         offset: int = 0,
     ) -> list[Evidence]: ...
     def delete_evidence(self, evidence_id: str) -> bool: ...
+    def add_decision(self, decision: Decision) -> Decision: ...
+    def get_decision(self, decision_id: str) -> Decision | None: ...
+    def list_decisions(
+        self, job_id: str, limit: int | None = None, offset: int = 0
+    ) -> list[Decision]: ...
+    def update_decision(self, decision_id: str, updates: dict) -> Decision | None: ...
+    def add_bet(self, bet: Bet) -> Bet: ...
+    def get_bet(self, bet_id: str) -> Bet | None: ...
+    def list_bets(
+        self,
+        job_id: str | None = None,
+        decision_id: str | None = None,
+        limit: int | None = None,
+        offset: int = 0,
+    ) -> list[Bet]: ...
+    def update_bet(self, bet_id: str, updates: dict) -> Bet | None: ...
+    def add_segment(self, segment: Segment) -> Segment: ...
+    def get_segment(self, segment_id: str) -> Segment | None: ...
+    def list_segments(
+        self, job_id: str | None = None, limit: int | None = None, offset: int = 0
+    ) -> list[Segment]: ...
+    def delete_segment(self, segment_id: str) -> bool: ...
+    def add_strategy(self, strategy: Strategy) -> Strategy: ...
+    def get_strategy(self, strategy_id: str) -> Strategy | None: ...
+    def list_strategies(
+        self, segment_id: str | None = None, limit: int | None = None, offset: int = 0
+    ) -> list[Strategy]: ...
+    def add_score_snapshot(self, snapshot: ScoreSnapshot) -> ScoreSnapshot: ...
+    def list_score_snapshots(self, outcome_id: str | None = None) -> list[ScoreSnapshot]: ...
     def add_signal(self, signal: Signal) -> Signal: ...
     def get_signal(self, signal_id: str) -> Signal | None: ...
     def list_signals(self, unread_only: bool = False, limit: int = 50) -> list[Signal]: ...
@@ -161,8 +200,13 @@ class InMemoryRepository:
         self.outcomes: dict[str, Outcome] = {}
         self.customer_outcomes: dict[str, CustomerOutcome] = {}
         self.evidence: dict[str, Evidence] = {}
+        self.decisions: dict[str, Decision] = {}
+        self.bets: dict[str, Bet] = {}
+        self.score_snapshots: list[ScoreSnapshot] = []
         self.signals: dict[str, Signal] = {}
         self.scheduled_work: dict[str, ScheduledWork] = {}
+        self.segments: dict[str, Segment] = {}
+        self.strategies: dict[str, Strategy] = {}
 
     def add_job(self, job: Job) -> Job:
         self.jobs[job.id] = job
@@ -178,8 +222,11 @@ class InMemoryRepository:
         job = self.jobs.get(job_id)
         if not job:
             return None
+        # ``exclude_unset`` omits an id that was never passed explicitly, and
+        # ``model_validate`` would then mint a fresh one. Pin it from the key.
         current = job.model_dump(exclude_unset=True)
         current.update(updates)
+        current["id"] = job_id
         new_job = job.model_validate(current)
         self.jobs[job_id] = new_job
         return new_job
@@ -194,6 +241,15 @@ class InMemoryRepository:
             del self.outcomes[key]
         for key in [k for k, v in self.customer_outcomes.items() if v.job_id == job_id]:
             del self.customer_outcomes[key]
+        for key in [k for k, v in self.decisions.items() if v.job_id == job_id]:
+            del self.decisions[key]
+        for key in [
+            k
+            for k, v in self.bets.items()
+            if v.decision_id not in self.decisions or v.outcome_id not in self.outcomes
+        ]:
+            del self.bets[key]
+        self.score_snapshots = [s for s in self.score_snapshots if s.outcome_id in self.outcomes]
         for key in [
             k
             for k, v in self.evidence.items()
@@ -202,6 +258,10 @@ class InMemoryRepository:
             or (v.outcome_id is not None and v.outcome_id not in self.outcomes)
         ]:
             del self.evidence[key]
+        for key in [k for k, v in self.segments.items() if v.job_id == job_id]:
+            del self.segments[key]
+        for key in [k for k, v in self.strategies.items() if v.segment_id not in self.segments]:
+            del self.strategies[key]
         return True
 
     def add_step(self, step: Step) -> Step:
@@ -221,8 +281,11 @@ class InMemoryRepository:
         step = self.steps.get(step_id)
         if not step:
             return None
+        # ``exclude_unset`` omits an id that was never passed explicitly, and
+        # ``model_validate`` would then mint a fresh one. Pin it from the key.
         current = step.model_dump(exclude_unset=True)
         current.update(updates)
+        current["id"] = step_id
         new_step = step.model_validate(current)
         self.steps[step_id] = new_step
         return new_step
@@ -235,6 +298,13 @@ class InMemoryRepository:
             del self.outcomes[key]
         for key in [k for k, v in self.customer_outcomes.items() if v.step_id == step_id]:
             del self.customer_outcomes[key]
+        for key in [
+            k
+            for k, v in self.bets.items()
+            if v.decision_id not in self.decisions or v.outcome_id not in self.outcomes
+        ]:
+            del self.bets[key]
+        self.score_snapshots = [s for s in self.score_snapshots if s.outcome_id in self.outcomes]
         for key in [
             k
             for k, v in self.evidence.items()
@@ -268,8 +338,11 @@ class InMemoryRepository:
         outcome = self.outcomes.get(outcome_id)
         if not outcome:
             return None
+        # ``exclude_unset`` omits an id that was never passed explicitly, and
+        # ``model_validate`` would then mint a fresh one. Pin it from the key.
         current = outcome.model_dump(exclude_unset=True)
         current.update(updates)
+        current["id"] = outcome_id
         new_outcome = outcome.model_validate(current)
         self.outcomes[outcome_id] = new_outcome
         return new_outcome
@@ -279,6 +352,13 @@ class InMemoryRepository:
             del self.outcomes[outcome_id]
             for key in [k for k, v in self.evidence.items() if v.outcome_id == outcome_id]:
                 del self.evidence[key]
+            for key in [k for k, v in self.bets.items() if v.outcome_id == outcome_id]:
+                del self.bets[key]
+            self.score_snapshots = [s for s in self.score_snapshots if s.outcome_id != outcome_id]
+            # A segment's stored membership is left as-is: a member that no
+            # longer resolves is a visible gap the profile reports (D3), not a
+            # silent edit to what the person approved. Deleting an outcome never
+            # rewrites a segment.
             return True
         return False
 
@@ -305,8 +385,11 @@ class InMemoryRepository:
         co = self.customer_outcomes.get(outcome_id)
         if not co:
             return None
+        # ``exclude_unset`` omits an id that was never passed explicitly, and
+        # ``model_validate`` would then mint a fresh one. Pin it from the key.
         current = co.model_dump(exclude_unset=True)
         current.update(updates)
+        current["id"] = outcome_id
         new_co = co.model_validate(current)
         self.customer_outcomes[outcome_id] = new_co
         return new_co
@@ -346,6 +429,122 @@ class InMemoryRepository:
             del self.evidence[evidence_id]
             return True
         return False
+
+    def add_decision(self, decision: Decision) -> Decision:
+        self.decisions[decision.id] = decision
+        return decision
+
+    def get_decision(self, decision_id: str) -> Decision | None:
+        return self.decisions.get(decision_id)
+
+    def list_decisions(
+        self, job_id: str, limit: int | None = None, offset: int = 0
+    ) -> list[Decision]:
+        items = [d for d in self.decisions.values() if d.job_id == job_id]
+        # Ordered by decision time, then insertion id, so history is stable.
+        items.sort(key=lambda d: (d.decided_at, d.id))
+        return page(items, limit, offset)
+
+    def update_decision(self, decision_id: str, updates: dict) -> Decision | None:
+        decision = self.decisions.get(decision_id)
+        if not decision:
+            return None
+        # ``exclude_unset`` omits an id that was never passed explicitly, and
+        # ``model_validate`` would then mint a fresh one. Pin it from the key.
+        current = decision.model_dump(exclude_unset=True)
+        current.update(updates)
+        current["id"] = decision_id
+        new_decision = decision.model_validate(current)
+        self.decisions[decision_id] = new_decision
+        return new_decision
+
+    def add_bet(self, bet: Bet) -> Bet:
+        self.bets[bet.id] = bet
+        return bet
+
+    def get_bet(self, bet_id: str) -> Bet | None:
+        return self.bets.get(bet_id)
+
+    def list_bets(
+        self,
+        job_id: str | None = None,
+        decision_id: str | None = None,
+        limit: int | None = None,
+        offset: int = 0,
+    ) -> list[Bet]:
+        items = list(self.bets.values())
+        if job_id is not None:
+            decision_ids = {d.id for d in self.decisions.values() if d.job_id == job_id}
+            items = [b for b in items if b.decision_id in decision_ids]
+        if decision_id is not None:
+            items = [b for b in items if b.decision_id == decision_id]
+        # Insertion order, so a bet's history is stable across a reload.
+        return page(items, limit, offset)
+
+    def update_bet(self, bet_id: str, updates: dict) -> Bet | None:
+        bet = self.bets.get(bet_id)
+        if not bet:
+            return None
+        # ``exclude_unset`` omits an id that was never passed explicitly, and
+        # ``model_validate`` would then mint a fresh one. Pin it from the key.
+        current = bet.model_dump(exclude_unset=True)
+        current.update(updates)
+        current["id"] = bet_id
+        new_bet = bet.model_validate(current)
+        self.bets[bet_id] = new_bet
+        return new_bet
+
+    def add_segment(self, segment: Segment) -> Segment:
+        self.segments[segment.id] = segment
+        return segment
+
+    def get_segment(self, segment_id: str) -> Segment | None:
+        return self.segments.get(segment_id)
+
+    def list_segments(
+        self, job_id: str | None = None, limit: int | None = None, offset: int = 0
+    ) -> list[Segment]:
+        items = list(self.segments.values())
+        if job_id is not None:
+            items = [s for s in items if s.job_id == job_id]
+        # Insertion order, so a segment list is stable across a reload.
+        return page(items, limit, offset)
+
+    def delete_segment(self, segment_id: str) -> bool:
+        # Deleting a segment never touches an outcome: the segment was a lens on
+        # the outcomes, not their owner. Its strategies go with it.
+        if segment_id not in self.segments:
+            return False
+        del self.segments[segment_id]
+        for key in [k for k, v in self.strategies.items() if v.segment_id == segment_id]:
+            del self.strategies[key]
+        return True
+
+    def add_strategy(self, strategy: Strategy) -> Strategy:
+        self.strategies[strategy.id] = strategy
+        return strategy
+
+    def get_strategy(self, strategy_id: str) -> Strategy | None:
+        return self.strategies.get(strategy_id)
+
+    def list_strategies(
+        self, segment_id: str | None = None, limit: int | None = None, offset: int = 0
+    ) -> list[Strategy]:
+        items = list(self.strategies.values())
+        if segment_id is not None:
+            items = [s for s in items if s.segment_id == segment_id]
+        return page(items, limit, offset)
+
+    def add_score_snapshot(self, snapshot: ScoreSnapshot) -> ScoreSnapshot:
+        self.score_snapshots.append(snapshot)
+        return snapshot
+
+    def list_score_snapshots(self, outcome_id: str | None = None) -> list[ScoreSnapshot]:
+        items = self.score_snapshots
+        if outcome_id is not None:
+            items = [s for s in items if s.outcome_id == outcome_id]
+        # Append-only, so the stored order is the chronological order.
+        return list(items)
 
     def add_signal(self, signal: Signal) -> Signal:
         self.signals[signal.id] = signal
@@ -421,6 +620,9 @@ class InMemoryRepository:
         self.outcomes.clear()
         self.customer_outcomes.clear()
         self.evidence.clear()
+        self.decisions.clear()
+        self.bets.clear()
+        self.score_snapshots.clear()
         self.signals.clear()
 
     def reload(self) -> None:

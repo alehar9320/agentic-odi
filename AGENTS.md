@@ -207,3 +207,48 @@ For the full Kiro tool reference including subagent dispatch patterns and git wo
 - Architecture and data-flow details live in `docs/architecture/`; update them when the package graph or runtime boundaries change.
 - Superpowers artifacts belong under `docs/superpowers/`: designs in `docs/superpowers/specs/YYYY-MM-DD-<topic>-design.md`, plans in `docs/superpowers/plans/YYYY-MM-DD-<topic>.md`.
 - Run `uv run pytest` from the root; see `.agents/workflows/test.md` and `docs/architecture/testing.md` for focused commands.
+
+## Surface parity (learned the hard way)
+
+- Every user-facing surface is a **thin adapter over one `ODIService` call**. A new outcome
+  field must be threaded through *all* adapters in the same change — core renderer, MCP tool,
+  CLI, Studio API, Studio card. A field added to the core model but omitted by an adapter is a
+  silent defect (the CLI `brief export` once dropped the W1 value fields and always said "worth
+  is unknown").
+- After adding a field or section, exercise each surface end to end, not just the unit that owns
+  it. The real CLI entry point is `agentic-odi` (`agentic_odi_cli.cli:app`); the Studio sidecar
+  is `agentic-odi-studio-api` and reads `AGENTIC_ODI_DB` (default `~/.agentic-odi/odi.db`).
+- "No fabricated numeral" tests must derive their allow-list **deterministically** from recorded
+  inputs, computed scores, and structural positions. Pulling numerals out of a random UUID (as
+  one pillar test did) makes the assertion pass by luck.
+- A **second assembly path is a second place to forget a section**. `render_brief` gained a
+  `strategy` field and `build_brief` supplied it, but the CLI's `brief export` builds its own
+  `BriefInput` from `run_tool` records and dropped it — the section vanished from the exported
+  file while the core brief still rendered it. When two callers assemble the same input, extract
+  the *selection* rule into a pure function in the core module and have both call it; do not
+  copy the rule.
+
+
+## Merging `origin/main` into a long-lived feature branch
+
+- Resolve by **union, not by picking a side**, when both branches added to the same region
+  (entities, service methods, MCP tools, router handlers). Verify the union mechanically: parse
+  each side and the merged file with `ast` and assert `ours - merged == []` and
+  `theirs - merged == []` for top-level names, and scan for duplicate method names inside a class
+  (a set-based check hides a duplicated method).
+- A `git checkout -m -- <file>` or a partially-staged resolution makes a later `git merge-file`
+  treat the *staged* content as "ours". If a resolution looks wrong, regenerate the three stages
+  with `git show :1:/:2:/:3:<path>` and re-run `git merge-file` on the true stages.
+- Splices leave duplicate imports and stray blank lines. After resolving, run
+  `uv run ruff check . --fix && uv run ruff format .` before trusting the diff — `I001`/`F811`
+  catch the leftover union imports.
+- **Semantic merge bugs hide where both sides changed one function.** A function that main
+  rewrote and the branch extended can silently lose one side's behavior. Re-read the merged body
+  of any function both sides touched (`update_outcome` dropped main's signal emission this way);
+  the full suite's behavior tests, not the import check, catch it.
+- Raise a size/budget tripwire to the measured merged size, never to the larger of the two old
+  constants, and say in the comment what grew. The website page budget is a build-from-source
+  test, so the real byte count is what matters.
+- CI (`npm run lint`) can fail on branch code that predates a plugin bump from main (the
+  `react-hooks` immutability rule). Fix the branch code (precompute instead of mutating during
+  render) rather than loosening the config.

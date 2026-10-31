@@ -8,6 +8,7 @@ from agentic_odi_core.models import (
     BusinessValue,
     CustomerOutcome,
     CustomerValue,
+    Decision,
     Direction,
     Evidence,
     Job,
@@ -171,6 +172,37 @@ def test_delete_step_cascades_its_outcomes():
     assert repo.get_step("s1") is None
     assert repo.get_outcome("o1") is None
     assert repo.get_outcome("o2") is not None
+
+
+def test_update_keeps_the_entity_id():
+    """An update must not re-mint the id.
+
+    ``model_dump(exclude_unset=True)`` omits an id the caller never passed, so
+    re-validating the merged dump would mint a fresh uuid and silently orphan
+    every reference to the entity (a superseded decision, a job's steps).
+    """
+    repo = _repo_with_graph()
+    assert repo.update_job("j1", {"name": "Renamed"}).id == "j1"  # type: ignore[union-attr]
+    assert repo.update_step("s1", {"name": "Renamed"}).id == "s1"  # type: ignore[union-attr]
+    assert repo.update_outcome("o1", {"statement": "Max y"}).id == "o1"  # type: ignore[union-attr]
+
+    co = _customer_outcome("co1", job_id="j1")
+    repo.add_customer_outcome(co)
+    updated_co = repo.update_customer_outcome("co1", {"step_id": "s1"})
+    assert updated_co is not None and updated_co.id == "co1"
+
+    decision = Decision(
+        id="d1",
+        job_id="j1",
+        chosen_outcome_ids=["o1"],
+        rationale="Chosen.",
+        decided_by="alex",
+        decided_at="2026-01-01T00:00:00Z",
+    )
+    repo.add_decision(decision)
+    updated = repo.update_decision("d1", {"superseded_by": "d2"})
+    assert updated is not None and updated.id == "d1"
+    assert repo.get_decision("d1").superseded_by == "d2"  # type: ignore[union-attr]
 
 
 def test_update_step_and_update_outcome_merge_or_return_none():

@@ -86,6 +86,82 @@ describe("UiRenderer", () => {
     expect(meters[0]).toHaveAttribute("aria-valuenow", "9");
     expect(meters[0]).toHaveAttribute("aria-valuemax", "10");
   });
+  it("renders the factual brief with its outcomes and provenance", () => {
+    renderSpec({
+      type: "opportunity-brief",
+      props: {
+        title: "The case for publishing speed",
+        job: "Publish a plugin",
+        decision: "Onboarding or publishing speed?",
+        evidence_count: 4,
+        generated_at: "2026-10-29T00:00:00Z",
+        outcomes: [
+          {
+            statement: "Minimize the time to publish a plugin",
+            score: 15,
+            band: "underserved",
+            n: 12,
+            method: "survey",
+            quote: "Publishing is the slowest step in my week",
+            source: "interview-7",
+          },
+        ],
+      },
+    });
+
+    expect(screen.getByLabelText("The case for publishing speed")).toBeInTheDocument();
+    expect(screen.getByText("Minimize the time to publish a plugin")).toBeInTheDocument();
+    expect(screen.getByText("underserved · 15.0")).toBeInTheDocument();
+    expect(screen.getByText("Sample: 12")).toBeInTheDocument();
+    expect(screen.getByText("4 evidence records")).toBeInTheDocument();
+    expect(screen.getByText("Generated 2026-10-29T00:00:00Z")).toBeInTheDocument();
+  });
+
+  it("renders a missing measurement as not measured, never as zero", () => {
+    renderSpec({
+      type: "opportunity-brief",
+      props: {
+        title: "Sparse case",
+        job: "Publish a plugin",
+        outcomes: [{ statement: "Minimize the time to publish a plugin" }],
+      },
+    });
+
+    expect(screen.getByText("not measured")).toBeInTheDocument();
+    expect(screen.queryByText("0.0")).not.toBeInTheDocument();
+  });
+
+  it("renders the empty state rather than a placeholder row", () => {
+    renderSpec({
+      type: "opportunity-brief",
+      props: { title: "Empty case", job: "Publish a plugin", outcomes: [] },
+    });
+
+    expect(screen.getByText(/No scored outcomes yet/)).toBeInTheDocument();
+  });
+
+  it("rejects an unknown prop on the brief and names the card", () => {
+    const result = parseUiSpec(
+      { type: "opportunity-brief", props: { title: "x", job: "y", outcomes: [], hostile: true } },
+      catalogManifest(),
+    );
+    // An undeclared prop is stripped, not fatal; the brief still renders.
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.node.props).not.toHaveProperty("hostile");
+    }
+  });
+
+  it("rejects a brief whose required prop is missing, naming the card", () => {
+    const result = parseUiSpec(
+      { type: "opportunity-brief", props: { title: "x" } },
+      catalogManifest(),
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.reason).toContain("opportunity-brief");
+    }
+  });
 
   it("renders an opportunity thesis in plain language", () => {
     renderSpec({
@@ -250,6 +326,218 @@ describe("impact simulation provenance", () => {
         catalogManifest(),
       );
       expect(result.ok).toBe(false);
+    }
+  });
+});
+
+describe("outcome compare", () => {
+  it("renders a comparison with aligned rows and keyboard-readable headers", () => {
+    renderSpec({
+      type: "outcome-compare",
+      props: {
+        title: "Publishing speed vs support cost",
+        columns: ["O-1", "O-2"],
+        rows: [
+          { metric: "score", label: "Opportunity score", cells: ["13", "12"] },
+          { metric: "sample_size", label: "Sample size", cells: ["not measured", "12"] },
+        ],
+      },
+    });
+
+    expect(screen.getByLabelText("Publishing speed vs support cost")).toBeInTheDocument();
+    // Header cells are real table headers, so a screen reader can read across.
+    expect(screen.getByRole("columnheader", { name: "O-1" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "O-2" })).toBeInTheDocument();
+    expect(screen.getByRole("rowheader", { name: "Sample size" })).toBeInTheDocument();
+  });
+
+  it("renders a missing comparison cell as not measured, never zero", () => {
+    renderSpec({
+      type: "outcome-compare",
+      props: {
+        columns: ["O-1", "O-2"],
+        rows: [{ metric: "score", label: "Opportunity score", cells: ["not measured", "0"] }],
+      },
+    });
+
+    expect(screen.getByText("not measured")).toBeInTheDocument();
+    expect(screen.getByText("0")).toBeInTheDocument();
+  });
+
+  it("refuses a comparison with fewer than two columns", () => {
+    const result = parseUiSpec(
+      {
+        type: "outcome-compare",
+        props: {
+          columns: ["O-1"],
+          rows: [{ label: "Opportunity score", cells: ["13"] }],
+        },
+      },
+      catalogManifest(),
+    );
+
+    expect(result.ok).toBe(false);
+  });
+});
+
+describe("roadmap", () => {
+  const fullProps = {
+    title: "Outcome roadmap",
+    entries: [
+      {
+        period: "2026-Q4",
+        outcome_id: "out-1",
+        statement: "Minimize the time to publish a plugin",
+        decision_id: "dec-1",
+        baseline: 3,
+        target: 7.5,
+      },
+      {
+        period: "2026-Q4",
+        outcome_id: "out-2",
+        statement: "Minimize the likelihood of a failed install",
+        decision_id: "dec-2",
+      },
+    ],
+    undecided_count: 1,
+    exclusion_note: "1 outcome(s) have no decision and were excluded.",
+  };
+
+  it("renders the entries, periods and provenance from the same fixture", () => {
+    renderSpec({ type: "roadmap", props: fullProps });
+
+    expect(screen.getByLabelText("Outcome roadmap")).toBeInTheDocument();
+    expect(screen.getByText("Minimize the time to publish a plugin")).toBeInTheDocument();
+    expect(screen.getAllByText("2026-Q4").length).toBeGreaterThan(0);
+    expect(screen.getByText("Decision: dec-1")).toBeInTheDocument();
+    expect(screen.getByText("Baseline: 3.0")).toBeInTheDocument();
+    expect(screen.getByText("Target: 7.5")).toBeInTheDocument();
+  });
+
+  it("renders a missing baseline as not measured, never as zero", () => {
+    renderSpec({ type: "roadmap", props: fullProps });
+
+    // The second entry has no baseline/target: both read "not measured".
+    expect(screen.getAllByText(/not measured/).length).toBe(2);
+    expect(screen.queryByText("Baseline: 0.0")).not.toBeInTheDocument();
+  });
+
+  it("renders the excluded count and its reason", () => {
+    renderSpec({ type: "roadmap", props: fullProps });
+
+    expect(
+      screen.getByText(/1 outcome\(s\) have no decision and were excluded/),
+    ).toBeInTheDocument();
+  });
+
+  it("renders the one-line empty state", () => {
+    renderSpec({
+      type: "roadmap",
+      props: { entries: [], exclusion_note: "No outcomes were excluded." },
+    });
+
+    expect(screen.getByText("No decisions yet.")).toBeInTheDocument();
+  });
+
+  it("rejects a roadmap missing its required entries prop", () => {
+    const result = parseUiSpec(
+      { type: "roadmap", props: { title: "x" } },
+      catalogManifest(),
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.reason).toContain("roadmap");
+    }
+  });
+});
+
+describe("decision-review", () => {
+  const fullProps = {
+    title: "Is publishing still the right bet?",
+    decided_at: "2026-01-15T00:00:00Z",
+    days_elapsed: 76,
+    stale: false,
+    summary: "1 moved, 1 without evidence.",
+    outcomes: [
+      {
+        outcome_id: "out-1",
+        statement: "Minimize the time to publish a plugin",
+        state: "improved",
+        satisfaction_change: 2.1,
+        importance_change: 0,
+        opportunity_change: -2.1,
+      },
+      { outcome_id: "out-2", state: "orphaned" },
+    ],
+  };
+
+  it("renders each outcome with its state and signed change", () => {
+    renderSpec({ type: "decision-review", props: fullProps });
+
+    expect(screen.getByLabelText("Is publishing still the right bet?")).toBeInTheDocument();
+    expect(screen.getByText("Minimize the time to publish a plugin")).toBeInTheDocument();
+    expect(screen.getByText("improved")).toBeInTheDocument();
+    expect(screen.getByText("Satisfaction: +2.1")).toBeInTheDocument();
+    expect(screen.getByText("76 days ago")).toBeInTheDocument();
+  });
+
+  it("shows an orphaned outcome by id and never as a change", () => {
+    renderSpec({ type: "decision-review", props: fullProps });
+
+    expect(screen.getByText("out-2")).toBeInTheDocument();
+    expect(screen.getByText("orphaned")).toBeInTheDocument();
+  });
+
+  it("renders a missing change as not measured, never as zero", () => {
+    renderSpec({ type: "decision-review", props: fullProps });
+
+    // The orphaned outcome has no deltas: three axes read "not measured".
+    expect(screen.getAllByText(/not measured/).length).toBe(3);
+    expect(screen.queryByText("Satisfaction: 0.0")).not.toBeInTheDocument();
+  });
+
+  it("rejects a review missing its required outcomes prop", () => {
+    const result = parseUiSpec(
+      { type: "decision-review", props: { title: "x" } },
+      catalogManifest(),
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.reason).toContain("decision-review");
+    }
+  });
+});
+
+describe("bet", () => {
+  const fullProps = {
+    title: "Publishing gets under five minutes",
+    hypothesis: "Cutting the release checklist halves publish time",
+    outcome_id: "out-1",
+    baseline: 3,
+    target: 7.5,
+    measure_by: "2026-04-01",
+    status: "running",
+  };
+
+  it("renders the hypothesis, baseline, target and date", () => {
+    renderSpec({ type: "bet", props: fullProps });
+
+    expect(screen.getByLabelText("Publishing gets under five minutes")).toBeInTheDocument();
+    expect(screen.getByText("Cutting the release checklist halves publish time")).toBeInTheDocument();
+    expect(screen.getByText("3.0")).toBeInTheDocument();
+    expect(screen.getByText("7.5")).toBeInTheDocument();
+    expect(screen.getByText("2026-04-01")).toBeInTheDocument();
+    expect(screen.getByText("running")).toBeInTheDocument();
+  });
+
+  it("rejects a bet missing its required baseline prop", () => {
+    const result = parseUiSpec(
+      { type: "bet", props: { hypothesis: "h", target: 7, measure_by: "2026-04-01", status: "planned" } },
+      catalogManifest(),
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.reason).toContain("bet");
     }
   });
 });

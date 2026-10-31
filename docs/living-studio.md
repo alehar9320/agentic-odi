@@ -344,12 +344,14 @@ below the thread instead of being clipped off-screen.
 
 The copilot does not only talk. When a surface carries the evidence better than a
 paragraph, the agent renders one **inline in the conversation**: a scored
-outcome, a ranked opportunity board, a before/after simulation of a bet, a
-customer quote with its lineage, the eight-stage job map, an opportunity thesis, or a decision record.
+outcome, a ranked opportunity board, the factual review case for a job, a
+two-outcome comparison, the outcome roadmap derived from recorded decisions, a
+before/after simulation of a bet, a customer quote with its lineage, the
+eight-stage job map, an opportunity thesis, a decision record, the review of a past decision, a tracked bet, or a segment profile.
 Three properties keep this safe and cheap to extend:
 
 - **The catalog is closed and owned by the SPA.**
-  `apps/studio/src/ui/catalog.ts` declares nine primitives and seven cards, their
+  `apps/studio/src/ui/catalog.ts` declares nine primitives and thirteen cards, their
   JSON Schema props, and the description the model reads. There is no HTML, no
   eval, and no third-party component in the path. Prose is rendered by the same
   `Markdown` component the transcript already used.
@@ -375,6 +377,30 @@ A surface is one node tree, streamed as one event:
   }
 }
 ```
+
+The decision-review card closes the loop: a recorded decision re-examined against
+today's numbers, one row per chosen outcome, each reading improved, degraded, no
+change, no evidence, or orphaned. A missing measurement is `no evidence`, never
+`no change`; an outcome that no longer exists is `orphaned`, never a crash. It is
+the same projection `odi review show` renders.
+
+The bet card is a recorded expectation: the hypothesis, the outcome it targets,
+the baseline captured at creation, the target, and the date to look. The baseline
+is stored at creation and never recomputed from the live score, so the starting
+point cannot drift.
+
+The segment-profile card is the strategy view: a segment's members, how many are
+measured, and the underserved and overserved halves kept separate. An empty
+segment reports zeroed counts; a segment with no scored outcome reports its ratio
+as `not measured`, never `0`, and says why. It is the same projection
+`odi segments profile` renders.
+
+The roadmap card is the decision artifact, drawn: one row per outcome a
+recorded decision chose, grouped by the quarter of its decision date, each row
+naming its statement, baseline, target, and decision id. It is the same
+derivation `odi roadmap show` renders, so the doc and the card cannot disagree
+about a period. It always shows how many outcomes it left out and why — a
+baseline nobody measured reads `not measured`, never `0`.
 
 The opportunity thesis is the intent-first card: one opportunity with its
 importance, satisfaction, the gap in plain words, the thesis itself, and the

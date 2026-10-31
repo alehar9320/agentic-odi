@@ -5,6 +5,13 @@ things: what has shipped (and where to verify it), what is open in review, and
 what is queued next. An entry is only "Shipped" when the pull request that built
 it is merged; the link is the proof.
 
+# Roadmap
+
+A roadmap that says everything is done is not a roadmap. This page tracks three
+things: what has shipped (and where to verify it), what is open in review, and
+what is queued next. An entry is only "Shipped" when the pull request that built
+it is merged; the link is the proof.
+
 ## Shipped
 
 - [x] **One tool contract, exposed** — `ToolName` / `TOOL_SPECS` in `packages/core` are the single source of truth, and `get_capabilities` describes the surface from it ([PR #263](https://github.com/alehar9320/agentic-odi/pull/263)).
@@ -26,6 +33,8 @@ it is merged; the link is the proof.
 - [x] **Tool spec validation on MCP startup** — the server refuses to serve a malformed registry ([PR #288](https://github.com/alehar9320/agentic-odi/pull/288)).
 - [x] **Keyboard navigation for the feed and job map** — phase cards, step rows, and both dialogs are operable without a mouse ([PR #297](https://github.com/alehar9320/agentic-odi/pull/297)).
 - [x] **`odi data export`** — back the ODI state up as JSON ([PR #293](https://github.com/alehar9320/agentic-odi/pull/293)).
+- [x] **Decide, then close the loop** — record a decision with its rejected options, derive and render the outcome roadmap, review a past decision against today's numbers, and track a bet from its captured baseline to measured ([PR #357](https://github.com/alehar9320/agentic-odi/pull/357)).
+- [x] **Segments and strategy** — define a segment by the outcomes it cares about, derive candidate groups deterministically, profile a segment's underserved and overserved halves, and record a strategy only when its evidence precondition holds ([PR #357](https://github.com/alehar9320/agentic-odi/pull/357)).
 - [x] **`odi connectors list-presets`** — discover and copy a preset from the terminal ([PR #290](https://github.com/alehar9320/agentic-odi/pull/290)).
 
 ## In flight

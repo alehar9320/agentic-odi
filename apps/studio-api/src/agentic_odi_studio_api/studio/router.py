@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import sys
+from datetime import date, datetime, timezone
 from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as package_version
 from pathlib import Path
@@ -18,19 +19,23 @@ from agentic_odi_connectors.registry import (
     DuplicateConnectorError,
 )
 from agentic_odi_core import (
+    DecisionNotFoundError,
     EvidenceNotFoundError,
     JobNotFoundError,
     OdiError,
     ODIService,
     OutcomeNotFoundError,
     OutcomeStatementError,
+    Rejection,
+    SegmentNotFoundError,
     StepNotFoundError,
     ToolName,
     ValueOutOfRangeError,
     error_status,
+    outcome_delta,
 )
 from agentic_odi_core.remote import StudioError, StudioErrorCode
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 from pydantic import ValidationError
 
@@ -61,16 +66,20 @@ from agentic_odi_studio_api.studio.probes import (
     list_models,
 )
 from agentic_odi_studio_api.studio.schemas import (
+    AcceptSegmentCandidateRequest,
     AddConnectorRequest,
     AddCustomerOutcomeRequest,
     AddEvidenceRequest,
     AddOutcomeRequest,
+    AddSegmentRequest,
     AddStepRequest,
+    AdvanceBetRequest,
     ApprovalDecisionRequest,
     ApprovalDecisionResponse,
     CapabilitiesResponse,
     CapabilityItem,
     ChatRequest,
+    ChooseStrategyRequest,
     ClaimOut,
     ConnectorListItem,
     ConnectorOperationResponse,
@@ -89,7 +98,11 @@ from agentic_odi_studio_api.studio.schemas import (
     ObservationResponse,
     ObservationUpdateRequest,
     PromoteEvidenceRequest,
+    RecordBetRequest,
+    RecordDecisionRequest,
+    ReviewDecisionRequest,
     ScheduleWorkRequest,
+    SetOutcomeValueRequest,
     SignalActionRequest,
     TurnNode,
     UpdateConversationRequest,
@@ -156,7 +169,13 @@ def _as_http_error(exc: Exception) -> StudioHTTPError:
         )
     if isinstance(
         exc,
-        (JobNotFoundError, StepNotFoundError, OutcomeNotFoundError, EvidenceNotFoundError),
+        (
+            JobNotFoundError,
+            StepNotFoundError,
+            OutcomeNotFoundError,
+            DecisionNotFoundError,
+            EvidenceNotFoundError,
+        ),
     ):
         return StudioHTTPError(StudioError(code=StudioErrorCode.NOT_FOUND, message=str(exc)))
     if isinstance(exc, ValueOutOfRangeError):
@@ -502,6 +521,469 @@ async def get_outcomes(
     return {"ok": True, "result": [item.model_dump(mode="json") for item in outcomes]}
 
 
+@router.get("/compare")
+async def get_compare(
+    request: Request,
+    outcome_ids: str = Query(""),
+) -> dict:
+    """Align two or three outcomes on shared axes, one row per metric.
+
+    The ids are taken explicitly and in order, so the surface cannot compare a
+    different set than the one the user saw. A missing metric renders the
+    literal ``not measured``; a real recorded ``0`` stays ``0``.
+    """
+    ids = [item.strip() for item in outcome_ids.split(",") if item.strip()]
+    try:
+        comparison = _service(request).compare_outcomes(ids)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return {
+        "columns": list(comparison.columns),
+        "statements": list(comparison.statements),
+        "rows": [
+            {"metric": row.metric, "label": row.label, "cells": list(row.cells)}
+            for row in comparison.rows
+        ],
+    }
+
+
+@router.post("/decisions")
+async def post_decision(body: RecordDecisionRequest, request: Request) -> dict:
+    """Record a decision, optionally superseding an earlier one.
+
+    The transport is all this adds: the service validates the rationale, the
+    chosen and rejected ids, and the supersession, so the CLI and this route
+    cannot disagree about what a valid decision is.
+    """
+    decided_at = body.decided_at or datetime.now(timezone.utc).isoformat()
+    rejected = [{"outcome_id": item.outcome_id, "reason": item.reason} for item in body.rejected]
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(body.mcp_url),
+            ToolName.RECORD_DECISION.value,
+            {
+                "job_id": body.job_id,
+                "chosen_outcome_ids": body.chosen_outcome_ids,
+                "rationale": body.rationale,
+                "decided_by": body.decided_by,
+                "decided_at": decided_at,
+                "rejected": rejected,
+                "confidence": body.confidence.value,
+                "supersedes": body.supersedes,
+            },
+        )
+        return _payload_from_text(result)
+    try:
+        decision = _service(request).record_decision(
+            job_id=body.job_id,
+            chosen_outcome_ids=body.chosen_outcome_ids,
+            rationale=body.rationale,
+            decided_by=body.decided_by,
+            decided_at=decided_at,
+            rejected=[Rejection(**item) for item in rejected],
+            confidence=body.confidence,
+            supersedes=body.supersedes,
+        )
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return decision.model_dump(mode="json")
+
+
+@router.get("/decisions")
+async def get_decisions(request: Request, job_id: str = Query(...)) -> list[dict]:
+    """The decision history for a job, oldest first, superseded entries kept."""
+    try:
+        decisions = _service(request).list_decisions(job_id)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return [decision.model_dump(mode="json") for decision in decisions]
+
+
+@router.get("/roadmap")
+async def get_roadmap(
+    request: Request,
+    job_id: str = Query(...),
+    horizon: int = Query(4),
+    today: str | None = Query(None),
+) -> dict:
+    """The derived outcome roadmap for a job, from its recorded decisions.
+
+    A view over the decision log, not a store: entries are grouped by the
+    quarter of the decision date in UTC. Undecided outcomes are excluded and
+    counted, and a baseline nobody measured renders ``not measured`` — never
+    ``0``. ``today`` pins the window so a caller's view is reproducible.
+    """
+    pinned: date | None = None
+    if today:
+        try:
+            pinned = date.fromisoformat(today)
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=422,
+                detail={
+                    "error": "validation_error",
+                    "message": "today must be an ISO-8601 date",
+                },
+            ) from exc
+    try:
+        roadmap = _service(request).build_roadmap(job_id, horizon=horizon, today=pinned)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return {
+        "entries": [
+            {
+                "period": entry.period,
+                "outcome_id": entry.outcome_id,
+                "statement": entry.statement,
+                "decision_id": entry.decision_id,
+                "baseline": entry.baseline,
+                "target": entry.target,
+            }
+            for entry in roadmap.entries
+        ],
+        "undecided_count": roadmap.undecided_count,
+        "horizon_excluded_count": roadmap.horizon_excluded_count,
+        "superseded_excluded_count": roadmap.superseded_excluded_count,
+        "horizon": roadmap.horizon,
+        "exclusion_note": roadmap.exclusion_note(),
+    }
+
+
+@router.post("/decisions/review")
+async def post_decision_review(body: ReviewDecisionRequest, request: Request) -> dict:
+    """Re-examine a past decision against today's numbers.
+
+    A read-only projection: it writes nothing, not even a review record. Each
+    chosen outcome is improved, degraded, no change, no evidence, or orphaned.
+    ``today`` is supplied so the elapsed-days figure is reproducible.
+    """
+    if body.today:
+        try:
+            today = date.fromisoformat(body.today)
+        except ValueError as exc:
+            raise StudioHTTPError(
+                StudioError(
+                    code=StudioErrorCode.VALIDATION, message="today must be an ISO-8601 date"
+                ),
+                status_code=422,
+            ) from exc
+    else:
+        today = datetime.now(timezone.utc).date()
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(body.mcp_url),
+            ToolName.REVIEW_DECISION.value,
+            {"decision_id": body.decision_id, "today": today.isoformat()},
+        )
+        return _payload_from_text(result)
+    try:
+        review = _service(request).review_decision(body.decision_id, today=today)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return {
+        "decision_id": review.decision_id,
+        "job_id": review.job_id,
+        "decided_at": review.decided_at,
+        "days_elapsed": review.days_elapsed,
+        "stale": review.stale,
+        "summary": review.summary(),
+        "outcomes": [
+            {
+                "outcome_id": o.outcome_id,
+                "statement": o.statement,
+                "state": o.state,
+                "satisfaction_change": o.satisfaction_change,
+                "importance_change": o.importance_change,
+                "opportunity_change": o.opportunity_change,
+            }
+            for o in review.outcomes
+        ],
+    }
+
+
+@router.get("/outcomes/{outcome_id}/history")
+async def get_outcome_history(outcome_id: str, request: Request) -> list[dict]:
+    """Every recorded score snapshot for an outcome, oldest first."""
+    try:
+        snapshots = _service(request).list_score_snapshots(outcome_id)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return [s.model_dump(mode="json") for s in snapshots]
+
+
+@router.get("/outcomes/{outcome_id}/delta")
+async def get_outcome_delta(
+    outcome_id: str, request: Request, since: str | None = Query(None)
+) -> dict | None:
+    """The signed change for an outcome, per metric. Missing is null, never 0."""
+    try:
+        service = _service(request)
+        delta = outcome_delta(service.list_score_snapshots(), outcome_id, since=since)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    if delta is None:
+        return None
+    return {
+        "importance": delta.importance,
+        "satisfaction": delta.satisfaction,
+        "opportunity": delta.opportunity,
+        "direction": delta.direction,
+    }
+
+
+@router.post("/bets")
+async def post_bet(body: RecordBetRequest, request: Request) -> dict:
+    """Record a bet, capturing its baseline at creation."""
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(body.mcp_url),
+            ToolName.RECORD_BET.value,
+            {
+                "decision_id": body.decision_id,
+                "outcome_id": body.outcome_id,
+                "hypothesis": body.hypothesis,
+                "target": body.target,
+                "measure_by": body.measure_by,
+                "baseline": body.baseline,
+            },
+        )
+        return _payload_from_text(result)
+    try:
+        bet = _service(request).record_bet(
+            decision_id=body.decision_id,
+            outcome_id=body.outcome_id,
+            hypothesis=body.hypothesis,
+            target=body.target,
+            measure_by=body.measure_by,
+            baseline=body.baseline,
+        )
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return bet.model_dump(mode="json")
+
+
+@router.get("/bets")
+async def get_bets(
+    request: Request,
+    job_id: str | None = Query(None),
+    decision_id: str | None = Query(None),
+) -> list[dict]:
+    try:
+        bets = _service(request).list_bets(job_id=job_id, decision_id=decision_id)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return [b.model_dump(mode="json") for b in bets]
+
+
+@router.post("/bets/{bet_id}/advance")
+async def post_bet_advance(bet_id: str, body: AdvanceBetRequest, request: Request) -> dict:
+    """Move a bet to a new status, refusing an illegal transition."""
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(body.mcp_url),
+            ToolName.ADVANCE_BET.value,
+            {"bet_id": bet_id, "status": body.status.value, "at": body.at},
+        )
+        return _payload_from_text(result)
+    try:
+        bet = _service(request).advance_bet(bet_id, body.status, at=body.at)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return bet.model_dump(mode="json")
+
+
+@router.post("/segments")
+async def post_segment(body: AddSegmentRequest, request: Request) -> dict:
+    """Create a segment from its member outcomes."""
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(body.mcp_url),
+            ToolName.ADD_SEGMENT.value,
+            {
+                "job_id": body.job_id,
+                "name": body.name,
+                "criterion": body.criterion,
+                "outcome_ids": body.outcome_ids,
+                "notes": body.notes,
+                "origin": body.origin.value,
+            },
+        )
+        return _payload_from_text(result)
+    try:
+        segment = _service(request).add_segment(
+            job_id=body.job_id,
+            name=body.name,
+            criterion=body.criterion,
+            outcome_ids=body.outcome_ids,
+            notes=body.notes,
+            origin=body.origin,
+        )
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return segment.model_dump(mode="json")
+
+
+@router.get("/segments")
+async def get_segments(
+    request: Request,
+    job_id: str | None = Query(None),
+) -> list[dict]:
+    try:
+        segments = _service(request).list_segments(job_id)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return [s.model_dump(mode="json") for s in segments]
+
+
+@router.get("/segments/{segment_id}")
+async def get_segment(segment_id: str, request: Request) -> dict:
+    try:
+        segment = _service(request).get_segment(segment_id)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    if segment is None:
+        raise _as_http_error(SegmentNotFoundError(segment_id))
+    return segment.model_dump(mode="json")
+
+
+@router.delete("/segments/{segment_id}")
+async def delete_segment(segment_id: str, request: Request) -> dict:
+    """Delete a segment. Outcomes are never touched."""
+    try:
+        _service(request).delete_segment(segment_id)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return {"deleted": segment_id}
+
+
+@router.get("/segments/{segment_id}/profile")
+async def get_segment_profile(segment_id: str, request: Request) -> dict:
+    """Read a segment's servability: underserved vs overserved, kept separate."""
+    try:
+        profile = _service(request).segment_profile(segment_id)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return {
+        "segment_id": profile.segment_id,
+        "segment_name": profile.segment_name,
+        "total_members": profile.total_members,
+        "measured_count": profile.measured_count,
+        "unscored_count": profile.unscored_count,
+        "missing_count": profile.missing_count,
+        "underserved_count": profile.underserved_count,
+        "appropriate_count": profile.appropriate_count,
+        "overserved_count": profile.overserved_count,
+        "top_underserved": [
+            {"outcome_id": e.outcome_id, "statement": e.statement, "score": e.score, "band": e.band}
+            for e in profile.top_underserved
+        ],
+        "top_overserved": [
+            {"outcome_id": e.outcome_id, "statement": e.statement, "score": e.score, "band": e.band}
+            for e in profile.top_overserved
+        ],
+        "measured_ratio": profile.measured_ratio,
+        "gaps": list(profile.gaps),
+    }
+
+
+@router.get("/jobs/{job_id}/segment-candidates")
+async def get_segment_candidates(job_id: str, request: Request) -> dict:
+    """Propose segment candidates from the scores. Writes nothing."""
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(request.query_params.get("mcp_url", "")),
+            ToolName.SUGGEST_SEGMENTS.value,
+            {"job_id": job_id},
+        )
+        return _payload_from_text(result)
+    try:
+        candidates = _service(request).suggest_segments(job_id)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return {
+        "candidates": [
+            {
+                "name": c.name,
+                "members": list(c.members),
+                "rationale": c.rationale,
+                "evidence_count": c.evidence_count,
+                "segment": c.segment,
+                "decile": c.decile,
+                "fingerprint": c.fingerprint,
+            }
+            for c in candidates.candidates
+        ],
+        "reason": candidates.reason,
+    }
+
+
+@router.post("/segment-candidates/accept")
+async def post_accept_segment_candidate(
+    body: AcceptSegmentCandidateRequest, request: Request
+) -> dict:
+    """Accept a suggested candidate into a segment."""
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(body.mcp_url),
+            ToolName.ACCEPT_SEGMENT_CANDIDATE.value,
+            {
+                "job_id": body.job_id,
+                "fingerprint": body.fingerprint,
+                "name": body.name,
+                "criterion": body.criterion,
+            },
+        )
+        return _payload_from_text(result)
+    try:
+        segment = _service(request).accept_segment_candidate(
+            job_id=body.job_id,
+            fingerprint=body.fingerprint,
+            name=body.name,
+            criterion=body.criterion,
+        )
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return segment.model_dump(mode="json")
+
+
+@router.post("/segments/{segment_id}/strategy")
+async def post_strategy(segment_id: str, body: ChooseStrategyRequest, request: Request) -> dict:
+    """Record a strategy for a segment, refusing one its data does not support."""
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(body.mcp_url),
+            ToolName.CHOOSE_STRATEGY.value,
+            {
+                "segment_id": segment_id,
+                "kind": body.kind.value,
+                "rationale": body.rationale,
+                "expected_effect": body.expected_effect,
+                "chosen_at": body.chosen_at,
+            },
+        )
+        return _payload_from_text(result)
+    try:
+        strategy = _service(request).choose_strategy(
+            segment_id=segment_id,
+            kind=body.kind,
+            rationale=body.rationale,
+            expected_effect=body.expected_effect,
+            chosen_at=body.chosen_at,
+        )
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return strategy.model_dump(mode="json")
+
+
+@router.get("/strategies")
+async def get_strategies(request: Request, segment_id: str | None = Query(None)) -> list[dict]:
+    try:
+        strategies = _service(request).list_strategies(segment_id)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return [s.model_dump(mode="json") for s in strategies]
+
+
 @router.post("/jobs")
 async def post_job(body: CreateJobRequest, request: Request) -> dict:
     """Create a Job — works with the model offline because it is manual."""
@@ -611,15 +1093,21 @@ async def delete_step(step_id: str, request: Request, mcp_url: str | None = Quer
 @router.post("/outcomes")
 async def post_outcome(body: AddOutcomeRequest, request: Request) -> dict:
     if _uses_mcp(request):
+        payload = {
+            "job_id": body.job_id,
+            "statement": body.statement,
+            "importance": body.importance,
+            "satisfaction": body.satisfaction,
+        }
+        for key in ("importance_n", "satisfaction_n"):
+            if getattr(body, key) is not None:
+                payload[key] = getattr(body, key)
+        if body.score_method != "estimate":
+            payload["score_method"] = body.score_method
         result = await call_mcp_tool(
             _require_mcp_url(body.mcp_url),
             ToolName.ADD_OUTCOME.value,
-            {
-                "job_id": body.job_id,
-                "statement": body.statement,
-                "importance": body.importance,
-                "satisfaction": body.satisfaction,
-            },
+            payload,
         )
         return _payload_from_text(result)
     try:
@@ -628,6 +1116,9 @@ async def post_outcome(body: AddOutcomeRequest, request: Request) -> dict:
             statement=body.statement,
             importance=body.importance,
             satisfaction=body.satisfaction,
+            importance_n=body.importance_n,
+            satisfaction_n=body.satisfaction_n,
+            score_method=body.score_method,
         )
     except Exception as exc:  # noqa: BLE001
         raise _as_http_error(exc) from exc
@@ -636,16 +1127,41 @@ async def post_outcome(body: AddOutcomeRequest, request: Request) -> dict:
 
 @router.patch("/outcomes/{outcome_id}")
 async def patch_outcome(outcome_id: str, body: UpdateOutcomeRequest, request: Request) -> dict:
-    updates = body.model_dump(exclude_none=True, exclude={"mcp_url"})
+    updates = body.model_dump(exclude_none=True, exclude={"mcp_url", "at", "note"})
     if _uses_mcp(request):
         result = await call_mcp_tool(
             _require_mcp_url(body.mcp_url),
             ToolName.UPDATE_OUTCOME.value,
-            {"outcome_id": outcome_id, **updates},
+            {"outcome_id": outcome_id, "at": body.at, "note": body.note, **updates},
         )
         return _payload_from_text(result)
     try:
-        outcome = _service(request).update_outcome(outcome_id, updates)
+        outcome = _service(request).update_outcome(outcome_id, updates, at=body.at, note=body.note)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return outcome.model_dump(mode="json")
+
+
+@router.patch("/outcomes/{outcome_id}/value")
+async def set_outcome_value(
+    outcome_id: str, body: SetOutcomeValueRequest, request: Request
+) -> dict:
+    """Record what an opportunity is worth, with its unit and its basis (W1).
+
+    A separate route, not a patch field, because setting a value is a distinct
+    act from editing a statement and the basis rules differ. A market or pilot
+    basis without a source is refused by the service, so the API and CLI agree.
+    """
+    payload = body.model_dump(exclude={"mcp_url"})
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(body.mcp_url),
+            ToolName.SET_OUTCOME_VALUE.value,
+            {"outcome_id": outcome_id, **payload},
+        )
+        return _payload_from_text(result)
+    try:
+        outcome = _service(request).set_outcome_value(outcome_id, **payload)
     except Exception as exc:  # noqa: BLE001
         raise _as_http_error(exc) from exc
     return outcome.model_dump(mode="json")

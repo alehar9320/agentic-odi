@@ -424,3 +424,432 @@ export function DecisionRecord({ node }: NodeProps) {
     </article>
   );
 }
+
+/* ------------------------------------------------------------------ */
+/* outcome-compare                                                     */
+/* ------------------------------------------------------------------ */
+
+function compareCell(value: unknown): { text: string; measured: boolean } {
+  const text = typeof value === "string" ? value : value == null ? "" : String(value);
+  return { text, measured: text !== "not measured" };
+}
+
+export function OutcomeCompare({ node }: NodeProps) {
+  const title = str(node.props, "title");
+  const columns = stringList(node.props.columns);
+  const rows = recordList(node.props.rows).map((row) => ({
+    label: str(row, "label"),
+    cells: (Array.isArray(row.cells) ? row.cells : []).map(compareCell),
+  }));
+
+  return (
+    <article className="ui-card ui-card--compare" aria-label={title || "Comparison"}>
+      {title ? <h4 className="ui-card__title">{title}</h4> : null}
+
+      {rows.length > 0 && columns.length > 0 ? (
+        <div className="ui-table-wrap">
+          <table className="ui-table ui-table--compare">
+            <thead>
+              <tr>
+                <th scope="col">Axis</th>
+                {columns.map((column, index) => (
+                  <th scope="col" key={`${column}-${index}`}>
+                    {column}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row, index) => (
+                <tr key={`${row.label}-${index}`}>
+                  <th scope="row">{row.label}</th>
+                  {row.cells.map((cell, cellIndex) => (
+                    <td key={cellIndex} className={cell.measured ? undefined : "ui-table__missing"}>
+                      {cell.text || "—"}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <p className="ui-brief__empty">Nothing to compare yet — pick two outcomes.</p>
+      )}
+
+      <ActionRow actions={readActions(node.props)} />
+    </article>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* opportunity-brief                                                   */
+/* ------------------------------------------------------------------ */
+
+const NOT_MEASURED = "not measured";
+
+/** A band label for a score, or `not measured` when none was supplied. */
+function briefBand(band: string, score: number | null): string {
+  if (score == null) {
+    return NOT_MEASURED;
+  }
+  const label = band || (isUnderserved(score) ? "underserved" : "overserved");
+  return `${label} · ${formatOpportunityScore(score)}`;
+}
+
+function BriefOutcomeRow({ item }: { item: Record<string, unknown> }) {
+  const statement = str(item, "statement");
+  const band = str(item, "band");
+  const score = typeof item.score === "number" && Number.isFinite(item.score) ? item.score : null;
+  const n = typeof item.n === "number" && Number.isFinite(item.n) ? item.n : null;
+  const method = str(item, "method");
+  const quote = str(item, "quote");
+  const source = str(item, "source");
+
+  return (
+    <li className="ui-brief__outcome">
+      <p className="ui-brief__statement">{statement}</p>
+      <div className="ui-brief__meta">
+        <ScorePill tone={score == null ? "neutral" : isUnderserved(score) ? "warning" : "positive"}>
+          {briefBand(band, score)}
+        </ScorePill>
+        <span className="ui-brief__sample">Sample: {n == null ? NOT_MEASURED : n}</span>
+        {method ? <span className="ui-brief__method">Method: {method}</span> : null}
+      </div>
+      {quote ? <blockquote className="ui-brief__quote">“{quote}”</blockquote> : null}
+      {source ? <p className="ui-brief__source">Source: {source}</p> : null}
+    </li>
+  );
+}
+
+export function OpportunityBrief({ node }: NodeProps) {
+  const title = str(node.props, "title");
+  const job = str(node.props, "job");
+  const decision = str(node.props, "decision");
+  const generatedAt = str(node.props, "generated_at");
+  const evidenceCount =
+    typeof node.props.evidence_count === "number" ? node.props.evidence_count : null;
+  const outcomes = recordList(node.props.outcomes);
+
+  return (
+    <article className="ui-card ui-card--brief" aria-label={title || "Opportunity brief"}>
+      <header className="ui-card__head">
+        <span className="ui-card__id">The case</span>
+        {evidenceCount != null ? (
+          <span className="ui-brief__evidence">{evidenceCount} evidence records</span>
+        ) : null}
+      </header>
+
+      <h4 className="ui-card__title">{title}</h4>
+      <p className="ui-brief__job">{job}</p>
+
+      {decision ? (
+        <div className="ui-brief__decision">
+          <span className="ui-brief__decision-label">The decision we are considering</span>
+          <p>{decision}</p>
+        </div>
+      ) : null}
+
+      {outcomes.length > 0 ? (
+        <ul className="ui-brief__outcomes">
+          {outcomes.map((item, index) => (
+            <BriefOutcomeRow key={`${str(item, "statement")}-${index}`} item={item} />
+          ))}
+        </ul>
+      ) : (
+        <p className="ui-brief__empty">No scored outcomes yet — nothing to show here.</p>
+      )}
+
+      {generatedAt ? <p className="ui-brief__generated">Generated {generatedAt}</p> : null}
+
+      <ActionRow actions={readActions(node.props)} />
+    </article>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* roadmap                                                             */
+/* ------------------------------------------------------------------ */
+
+function RoadmapMeasurement({ label, value }: { label: string; value: unknown }) {
+  const measured = typeof value === "number" && Number.isFinite(value);
+  return (
+    <span className="ui-roadmap__measure">
+      {label}: {measured ? formatOpportunityScore(value) : NOT_MEASURED}
+    </span>
+  );
+}
+
+export function Roadmap({ node }: NodeProps) {
+  const title = str(node.props, "title");
+  const entries = recordList(node.props.entries);
+  const exclusionNote = str(node.props, "exclusion_note");
+  const undecidedCount =
+    typeof node.props.undecided_count === "number" ? node.props.undecided_count : null;
+
+  const rows = entries.map((entry, index) => {
+    const period = str(entry, "period");
+    return {
+      entry,
+      index,
+      period,
+      showPeriod: period !== (index > 0 ? str(entries[index - 1], "period") : null),
+    };
+  });
+
+  return (
+    <article className="ui-card ui-card--roadmap" aria-label={title || "Outcome roadmap"}>
+      {title ? <h4 className="ui-card__title">{title}</h4> : null}
+
+      {entries.length > 0 ? (
+        <ol className="ui-roadmap" aria-label="Roadmap entries">
+          {rows.map(({ entry, index, period, showPeriod }) => {
+            const statement = str(entry, "statement");
+            const decisionId = str(entry, "decision_id");
+            return (
+              <li className="ui-roadmap__entry" key={`${decisionId}-${statement}-${index}`}>
+                {showPeriod ? <span className="ui-roadmap__period">{period}</span> : null}
+                <p className="ui-roadmap__statement">{statement}</p>
+                <div className="ui-roadmap__meta">
+                  <RoadmapMeasurement label="Baseline" value={entry.baseline} />
+                  <RoadmapMeasurement label="Target" value={entry.target} />
+                  <span className="ui-roadmap__decision">Decision: {decisionId}</span>
+                </div>
+              </li>
+            );
+          })}
+        </ol>
+      ) : (
+        <p className="ui-brief__empty">No decisions yet.</p>
+      )}
+
+      {exclusionNote ? (
+        <p className="ui-roadmap__exclusions">
+          {undecidedCount != null ? `${undecidedCount} undecided · ` : ""}
+          {exclusionNote}
+        </p>
+      ) : null}
+
+      <ActionRow actions={readActions(node.props)} />
+    </article>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* decision-review                                                     */
+/* ------------------------------------------------------------------ */
+
+const REVIEW_TONE: Record<string, Tone> = {
+  improved: "positive",
+  degraded: "warning",
+  "no change": "neutral",
+  no_evidence: "neutral",
+  orphaned: "critical",
+};
+
+/** A signed change with its sign, or `not measured` when a snapshot lacked it. */
+function reviewChange(value: unknown): string {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return NOT_MEASURED;
+  }
+  const sign = value > 0 ? "+" : "";
+  return `${sign}${formatOpportunityScore(value)}`;
+}
+
+function ReviewOutcomeRow({ item }: { item: Record<string, unknown> }) {
+  const statement = str(item, "statement");
+  const state = str(item, "state");
+  return (
+    <li className="ui-review__outcome">
+      <div className="ui-review__head">
+        <p className="ui-review__statement">{statement || str(item, "outcome_id")}</p>
+        <ScorePill tone={REVIEW_TONE[state] ?? "neutral"}>{state || "no_evidence"}</ScorePill>
+      </div>
+      <div className="ui-review__meta">
+        <span>Satisfaction: {reviewChange(item.satisfaction_change)}</span>
+        <span>Importance: {reviewChange(item.importance_change)}</span>
+        <span>Opportunity: {reviewChange(item.opportunity_change)}</span>
+      </div>
+    </li>
+  );
+}
+
+export function DecisionReview({ node }: NodeProps) {
+  const title = str(node.props, "title");
+  const summary = str(node.props, "summary");
+  const decidedAt = str(node.props, "decided_at");
+  const daysElapsed =
+    typeof node.props.days_elapsed === "number" ? node.props.days_elapsed : null;
+  const outcomes = recordList(node.props.outcomes);
+
+  return (
+    <article className="ui-card ui-card--review" aria-label={title || "Decision review"}>
+      <header className="ui-card__head">
+        <span className="ui-card__id">Decision review</span>
+        {daysElapsed != null ? (
+          <span className="ui-review__elapsed">{daysElapsed} days ago</span>
+        ) : null}
+      </header>
+
+      {title ? <h4 className="ui-card__title">{title}</h4> : null}
+      {decidedAt ? <p className="ui-review__decided">Decided {decidedAt}</p> : null}
+      {summary ? <p className="ui-review__summary">{summary}</p> : null}
+
+      {outcomes.length > 0 ? (
+        <ul className="ui-review__outcomes">
+          {outcomes.map((item, index) => (
+            <ReviewOutcomeRow key={`${str(item, "outcome_id")}-${index}`} item={item} />
+          ))}
+        </ul>
+      ) : (
+        <p className="ui-brief__empty">This decision chose no outcomes yet.</p>
+      )}
+
+      <ActionRow actions={readActions(node.props)} />
+    </article>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* bet                                                                 */
+/* ------------------------------------------------------------------ */
+
+const BET_TONE: Record<string, Tone> = {
+  planned: "neutral",
+  running: "info",
+  measured: "positive",
+  abandoned: "critical",
+};
+
+/** A measurement with no sign, or `not measured` when none was supplied. */
+function measurement(value: unknown): string {
+  return typeof value === "number" && Number.isFinite(value)
+    ? formatOpportunityScore(value)
+    : NOT_MEASURED;
+}
+
+export function Bet({ node }: NodeProps) {
+  const title = str(node.props, "title");
+  const hypothesis = str(node.props, "hypothesis");
+  const outcomeId = str(node.props, "outcome_id");
+  const measureBy = str(node.props, "measure_by");
+  const status = str(node.props, "status");
+
+  return (
+    <article className="ui-card ui-card--bet" aria-label={title || "Bet"}>
+      <header className="ui-card__head">
+        <span className="ui-card__id">Bet</span>
+        {status ? <ScorePill tone={BET_TONE[status] ?? "neutral"}>{status}</ScorePill> : null}
+      </header>
+
+      {title ? <h4 className="ui-card__title">{title}</h4> : null}
+      <p className="ui-bet__hypothesis">{hypothesis}</p>
+
+      <dl className="ui-fields">
+        <div className="ui-field">
+          <dt>Baseline</dt>
+          <dd>{measurement(node.props.baseline)}</dd>
+        </div>
+        <div className="ui-field">
+          <dt>Target</dt>
+          <dd>{measurement(node.props.target)}</dd>
+        </div>
+        <div className="ui-field">
+          <dt>Measure by</dt>
+          <dd>{measureBy || NOT_MEASURED}</dd>
+        </div>
+        {outcomeId ? (
+          <div className="ui-field">
+            <dt>Serves</dt>
+            <dd>{outcomeId}</dd>
+          </div>
+        ) : null}
+      </dl>
+
+      <ActionRow actions={readActions(node.props)} />
+    </article>
+  );
+}
+
+const BAND_TONE: Record<string, Tone> = {
+  underserved: "warning",
+  appropriate: "positive",
+  overserved: "critical",
+  unscored: "neutral",
+};
+
+export function SegmentProfile({ node }: NodeProps) {
+  const title = str(node.props, "title");
+  const strategy = str(node.props, "strategy");
+  const gaps = stringList(node.props.gaps);
+  const total = num(node.props, "total_members", 0);
+  const measured = num(node.props, "measured_count", 0);
+  const ratio = typeof node.props.measured_ratio === "number" ? node.props.measured_ratio : null;
+
+  return (
+    <article className="ui-card ui-card--segment-profile" aria-label={title || "Segment profile"}>
+      <header className="ui-card__head">
+        <span className="ui-card__id">Segment</span>
+        {title ? <h4 className="ui-card__title">{title}</h4> : null}
+      </header>
+
+      <dl className="ui-fields">
+        <div className="ui-field">
+          <dt>Members</dt>
+          <dd>{total}</dd>
+        </div>
+        <div className="ui-field">
+          <dt>Measured</dt>
+          <dd>
+            {measured}
+            {ratio == null ? ` · ${NOT_MEASURED}` : ` · ${Math.round(ratio * 100)}%`}
+          </dd>
+        </div>
+        <div className="ui-field">
+          <dt>Underserved</dt>
+          <dd>{num(node.props, "underserved_count", 0)}</dd>
+        </div>
+        <div className="ui-field">
+          <dt>Overserved</dt>
+          <dd>{num(node.props, "overserved_count", 0)}</dd>
+        </div>
+      </dl>
+
+      {(["top_underserved", "top_overserved"] as const).map((key) => {
+        const entries = recordList(node.props[key]);
+        if (entries.length === 0) {
+          return null;
+        }
+        return (
+          <div className="ui-segment__group" key={key}>
+            <h5 className="ui-segment__legend">
+              {key === "top_underserved" ? "Most underserved" : "Most overserved"}
+            </h5>
+            <ul className="ui-segment__list">
+              {entries.map((entry, index) => (
+                <li key={`${key}-${index}`}>
+                  <span>{str(entry, "statement") || str(entry, "outcome_id")}</span>
+                  <ScorePill tone={BAND_TONE[str(entry, "band")] ?? "neutral"}>
+                    {measurement(entry.score)}
+                  </ScorePill>
+                </li>
+              ))}
+            </ul>
+          </div>
+        );
+      })}
+
+      {strategy ? <p className="ui-segment__strategy">{strategy}</p> : null}
+
+      {gaps.length > 0 ? (
+        <ul className="ui-segment__gaps">
+          {gaps.map((gap, index) => (
+            <li key={`gap-${index}`}>{gap}</li>
+          ))}
+        </ul>
+      ) : null}
+
+      <ActionRow actions={readActions(node.props)} />
+    </article>
+  );
+}

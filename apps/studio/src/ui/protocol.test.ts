@@ -8,10 +8,16 @@ const manifest: UiCatalogManifest = catalogManifest();
 const DOMAIN_CARDS = [
   "outcome-card",
   "opportunity-board",
+  "opportunity-brief",
+  "outcome-compare",
+  "roadmap",
   "impact-simulation",
   "evidence-quote",
   "job-map",
   "decision-record",
+  "decision-review",
+  "bet",
+  "segment-profile",
 ];
 
 function expectOk(spec: unknown) {

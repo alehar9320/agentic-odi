@@ -1,5 +1,5 @@
 {#
-  The seven ODI cards the agent may compose, rendered as the shipped catalog
+  The thirteen ODI cards the agent may compose, rendered as the shipped catalog
   renders them. These are the agent's closed catalog — a stable contract —
   not the Studio's canvas view names, which are in flux.
 #}
@@ -127,6 +127,126 @@
 </article>
 {% endmacro %}
 
+{% macro decision_review(data) %}
+<article class="surface" data-surface="decision-review">
+  <div class="surface__head">
+    <span class="surface__id">Decision review</span>
+    <span class="pill">{{ data.days_elapsed }} days ago</span>
+  </div>
+  <p class="surface__statement">{{ data.title }}</p>
+  <div class="stack">
+    {% for row in data.outcomes %}
+    <div class="surface__row">
+      <p class="surface__statement">{{ row.statement | default(row.outcome_id) }}</p>
+      <div class="surface__scores">
+        <span>{{ row.state }}</span>
+        <span aria-hidden="true">·</span>
+        <span>Satisfaction {{ row.satisfaction_change if row.satisfaction_change is defined else "not measured" }}</span>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</article>
+{% endmacro %}
+
+{% macro bet(data) %}
+<article class="surface" data-surface="bet">
+  <div class="surface__head">
+    <span class="surface__id">Bet</span>
+    <span class="pill pill--accent">{{ data.status }}</span>
+  </div>
+  <p class="surface__statement">{{ data.hypothesis }}</p>
+  <div class="surface__scores">
+    <span>Baseline {{ data.baseline }}</span>
+    <span aria-hidden="true">·</span>
+    <span>Target {{ data.target }}</span>
+    <span aria-hidden="true">·</span>
+    <span>By {{ data.measure_by }}</span>
+  </div>
+</article>
+{% endmacro %}
+
+{% macro outcome_compare(data) %}
+<article class="surface" data-surface="outcome-compare">
+  <div class="surface__head">
+    <span class="surface__id">Comparison</span>
+    <span class="pill">{{ data.columns | length }} outcomes</span>
+  </div>
+  <div class="ui-table-wrap">
+    <table class="surface__compare">
+      <thead>
+        <tr>
+          <th scope="col">Axis</th>
+          {% for column in data.columns %}<th scope="col">{{ column }}</th>{% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in data.rows %}
+        <tr>
+          <th scope="row">{{ row.label }}</th>
+          {% for cell in row.cells %}<td>{{ cell }}</td>{% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</article>
+{% endmacro %}
+
+{% macro opportunity_brief(data) %}
+<article class="surface" data-surface="opportunity-brief">
+  <div class="surface__head">
+    <span class="surface__id">Opportunity brief</span>
+    <span class="pill">{{ data.job }}</span>
+  </div>
+  {% if data.decision %}<p class="surface__statement">{{ data.decision }}</p>{% endif %}
+  <div class="stack">
+    {% for row in data.outcomes %}
+    <div class="surface__row">
+      <p class="surface__statement">{{ row.statement }}</p>
+      <div class="surface__scores">
+        <span>Score {{ row.score }}</span>
+        <span aria-hidden="true">·</span>
+        <span>{{ row.band }}</span>
+        {% if row.n is defined %}<span aria-hidden="true">·</span><span>n {{ row.n }}</span>{% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</article>
+{% endmacro %}
+
+{% macro segment_profile(data) %}
+<article class="surface" data-surface="segment-profile">
+  <div class="surface__head">
+    <span class="surface__id">Segment</span>
+    <span class="pill">{{ data.total_members }} members</span>
+  </div>
+  <p class="surface__statement">{{ data.title }}</p>
+  <div class="surface__scores">
+    <span>Measured {{ data.measured_count }}</span>
+    <span aria-hidden="true">·</span>
+    <span>Underserved {{ data.underserved_count }}</span>
+    <span aria-hidden="true">·</span>
+    <span>Overserved {{ data.overserved_count }}</span>
+  </div>
+  {% if data.top_underserved %}
+  <div class="stack">
+    {% for row in data.top_underserved %}
+    <div class="surface__row">
+      <p class="surface__statement">{{ row.statement | default(row.outcome_id) }}</p>
+      <div class="surface__scores">
+        <span>{{ row.band }}</span>
+        <span aria-hidden="true">·</span>
+        <span>{{ row.score if row.score is defined else "not measured" }}</span>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+</article>
+{% endmacro %}
+
 {#
   Dispatch a card by its catalog type. Every type the catalog can produce
   has a macro above; anything unknown falls back to nothing rather than
@@ -140,5 +260,10 @@
   {% elif card.type == "evidence-quote" %}{{ evidence_quote(card.data) }}
   {% elif card.type == "opportunity-thesis" %}{{ opportunity_thesis(card.data) }}
   {% elif card.type == "decision-record" %}{{ decision_record(card.data) }}
+  {% elif card.type == "decision-review" %}{{ decision_review(card.data) }}
+  {% elif card.type == "bet" %}{{ bet(card.data) }}
+  {% elif card.type == "segment-profile" %}{{ segment_profile(card.data) }}
+  {% elif card.type == "opportunity-brief" %}{{ opportunity_brief(card.data) }}
+  {% elif card.type == "outcome-compare" %}{{ outcome_compare(card.data) }}
   {% endif %}
 {% endmacro %}

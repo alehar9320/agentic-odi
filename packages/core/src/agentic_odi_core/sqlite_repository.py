@@ -13,13 +13,18 @@ from pydantic import BaseModel, ValidationError
 from agentic_odi_core.events import DEFAULT_DEVICE, DEFAULT_WORKSPACE, Event
 from agentic_odi_core.intent_store import IntentStore
 from agentic_odi_core.models import (
+    Bet,
     CustomerOutcome,
+    Decision,
     Evidence,
     Job,
     Outcome,
     ScheduledWork,
+    ScoreSnapshot,
+    Segment,
     Signal,
     Step,
+    Strategy,
     compute_opportunity_score,
 )
 from agentic_odi_core.repository import (
@@ -58,8 +63,13 @@ class SQLiteRepository(Repository):
         self.outcomes: dict[str, Outcome] = {}
         self.customer_outcomes: dict[str, CustomerOutcome] = {}
         self.evidence: dict[str, Evidence] = {}
+        self.decisions: dict[str, Decision] = {}
+        self.bets: dict[str, Bet] = {}
+        self.score_snapshots: list[ScoreSnapshot] = []
         self.signals: dict[str, Signal] = {}
         self.scheduled_work: dict[str, ScheduledWork] = {}
+        self.segments: dict[str, Segment] = {}
+        self.strategies: dict[str, Strategy] = {}
         self._last_event_id = 0
         for ev in self.store.get_stream(workspace_id=self._workspace_id, replay_order=True):
             self._apply_event(ev)
@@ -118,6 +128,25 @@ class SQLiteRepository(Repository):
             self.outcomes[p["id"]] = Outcome.model_validate(p)
         elif et == "CUSTOMER_OUTCOME_CREATED":
             self.customer_outcomes[p["id"]] = CustomerOutcome.model_validate(p)
+        elif et == "DECISION_RECORDED":
+            self.decisions[p["id"]] = Decision.model_validate(p)
+        elif et == "DECISION_UPDATED":
+            self._merge_updates(self.decisions, p, Decision)
+        elif et == "BET_CREATED":
+            self.bets[p["id"]] = Bet.model_validate(p)
+        elif et == "BET_UPDATED":
+            self._merge_updates(self.bets, p, Bet)
+        elif et == "SEGMENT_CREATED":
+            self.segments[p["id"]] = Segment.model_validate(p)
+        elif et == "SEGMENT_DELETED":
+            segment_id = p["id"]
+            self.segments.pop(segment_id, None)
+            for key in [k for k, v in self.strategies.items() if v.segment_id == segment_id]:
+                del self.strategies[key]
+        elif et == "STRATEGY_RECORDED":
+            self.strategies[p["id"]] = Strategy.model_validate(p)
+        elif et == "SCORE_SNAPSHOT_RECORDED":
+            self.score_snapshots.append(ScoreSnapshot.model_validate(p))
         elif et == "EVIDENCE_CREATED":
             self.evidence[p["id"]] = Evidence.model_validate(p)
         elif et == "JOB_UPDATED":
@@ -131,12 +160,25 @@ class SQLiteRepository(Repository):
         elif et == "JOB_DELETED":
             job_id = p["id"]
             self.jobs.pop(job_id, None)
+            job_outcome_ids = {k for k, v in self.outcomes.items() if v.job_id == job_id}
+            job_decision_ids = {k for k, v in self.decisions.items() if v.job_id == job_id}
             for key in [k for k, v in self.steps.items() if v.job_id == job_id]:
                 del self.steps[key]
-            for key in [k for k, v in self.outcomes.items() if v.job_id == job_id]:
-                del self.outcomes[key]
+            for key in job_outcome_ids:
+                self.outcomes.pop(key, None)
             for key in [k for k, v in self.customer_outcomes.items() if v.job_id == job_id]:
                 del self.customer_outcomes[key]
+            for key in job_decision_ids:
+                self.decisions.pop(key, None)
+            for key in [
+                k
+                for k, v in self.bets.items()
+                if v.decision_id in job_decision_ids or v.outcome_id in job_outcome_ids
+            ]:
+                del self.bets[key]
+            self.score_snapshots = [
+                s for s in self.score_snapshots if s.outcome_id not in job_outcome_ids
+            ]
             for key in [
                 k
                 for k, v in self.evidence.items()
@@ -145,13 +187,23 @@ class SQLiteRepository(Repository):
                 or (v.outcome_id is not None and v.outcome_id not in self.outcomes)
             ]:
                 del self.evidence[key]
+            for key in [k for k, v in self.segments.items() if v.job_id == job_id]:
+                del self.segments[key]
+            for key in [k for k, v in self.strategies.items() if v.segment_id not in self.segments]:
+                del self.strategies[key]
         elif et == "STEP_DELETED":
             step_id = p["id"]
             self.steps.pop(step_id, None)
-            for key in [k for k, v in self.outcomes.items() if v.step_id == step_id]:
-                del self.outcomes[key]
+            step_outcome_ids = {k for k, v in self.outcomes.items() if v.step_id == step_id}
+            for key in step_outcome_ids:
+                self.outcomes.pop(key, None)
             for key in [k for k, v in self.customer_outcomes.items() if v.step_id == step_id]:
                 del self.customer_outcomes[key]
+            for key in [k for k, v in self.bets.items() if v.outcome_id in step_outcome_ids]:
+                del self.bets[key]
+            self.score_snapshots = [
+                s for s in self.score_snapshots if s.outcome_id not in step_outcome_ids
+            ]
             for key in [
                 k
                 for k, v in self.evidence.items()
@@ -164,6 +216,9 @@ class SQLiteRepository(Repository):
             self.outcomes.pop(outcome_id, None)
             for key in [k for k, v in self.evidence.items() if v.outcome_id == outcome_id]:
                 del self.evidence[key]
+            for key in [k for k, v in self.bets.items() if v.outcome_id == outcome_id]:
+                del self.bets[key]
+            self.score_snapshots = [s for s in self.score_snapshots if s.outcome_id != outcome_id]
         elif et == "EVIDENCE_DELETED":
             self.evidence.pop(p["id"], None)
         elif et == "SCHEDULED_WORK_CREATED":
@@ -482,6 +537,178 @@ class SQLiteRepository(Repository):
                 self._sync()
                 return True
             return False
+
+    def add_decision(self, decision: Decision) -> Decision:
+        with self._lock:
+            self.store.append(
+                "DECISION_RECORDED",
+                decision.model_dump(mode="json"),
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return decision
+
+    def get_decision(self, decision_id: str) -> Decision | None:
+        with self._lock:
+            self._sync()
+            return self.decisions.get(decision_id)
+
+    def list_decisions(
+        self, job_id: str, limit: int | None = None, offset: int = 0
+    ) -> list[Decision]:
+        with self._lock:
+            self._sync()
+            items = [d for d in self.decisions.values() if d.job_id == job_id]
+            items.sort(key=lambda d: (d.decided_at, d.id))
+            return page(items, limit, offset)
+
+    def update_decision(self, decision_id: str, updates: dict) -> Decision | None:
+        with self._lock:
+            self._sync()
+            if decision_id not in self.decisions:
+                return None
+            payload = {"id": decision_id, "updates": updates}
+            self.store.append(
+                "DECISION_UPDATED",
+                payload,
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return self.decisions.get(decision_id)
+
+    def add_bet(self, bet: Bet) -> Bet:
+        with self._lock:
+            self.store.append(
+                "BET_CREATED",
+                bet.model_dump(mode="json"),
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return bet
+
+    def get_bet(self, bet_id: str) -> Bet | None:
+        with self._lock:
+            self._sync()
+            return self.bets.get(bet_id)
+
+    def list_bets(
+        self,
+        job_id: str | None = None,
+        decision_id: str | None = None,
+        limit: int | None = None,
+        offset: int = 0,
+    ) -> list[Bet]:
+        with self._lock:
+            self._sync()
+            items = list(self.bets.values())
+            if job_id is not None:
+                decision_ids = {d.id for d in self.decisions.values() if d.job_id == job_id}
+                items = [b for b in items if b.decision_id in decision_ids]
+            if decision_id is not None:
+                items = [b for b in items if b.decision_id == decision_id]
+            return page(items, limit, offset)
+
+    def update_bet(self, bet_id: str, updates: dict) -> Bet | None:
+        with self._lock:
+            self._sync()
+            if bet_id not in self.bets:
+                return None
+            self.store.append(
+                "BET_UPDATED",
+                {"id": bet_id, "updates": updates},
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return self.bets.get(bet_id)
+
+    def add_segment(self, segment: Segment) -> Segment:
+        with self._lock:
+            self.store.append(
+                "SEGMENT_CREATED",
+                segment.model_dump(mode="json"),
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return segment
+
+    def get_segment(self, segment_id: str) -> Segment | None:
+        with self._lock:
+            self._sync()
+            return self.segments.get(segment_id)
+
+    def list_segments(
+        self, job_id: str | None = None, limit: int | None = None, offset: int = 0
+    ) -> list[Segment]:
+        with self._lock:
+            self._sync()
+            items = list(self.segments.values())
+            if job_id is not None:
+                items = [s for s in items if s.job_id == job_id]
+            return page(items, limit, offset)
+
+    def delete_segment(self, segment_id: str) -> bool:
+        with self._lock:
+            self._sync()
+            if segment_id not in self.segments:
+                return False
+            self.store.append(
+                "SEGMENT_DELETED",
+                {"id": segment_id},
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return True
+
+    def add_strategy(self, strategy: Strategy) -> Strategy:
+        with self._lock:
+            self.store.append(
+                "STRATEGY_RECORDED",
+                strategy.model_dump(mode="json"),
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return strategy
+
+    def get_strategy(self, strategy_id: str) -> Strategy | None:
+        with self._lock:
+            self._sync()
+            return self.strategies.get(strategy_id)
+
+    def list_strategies(
+        self, segment_id: str | None = None, limit: int | None = None, offset: int = 0
+    ) -> list[Strategy]:
+        with self._lock:
+            self._sync()
+            items = list(self.strategies.values())
+            if segment_id is not None:
+                items = [s for s in items if s.segment_id == segment_id]
+            return page(items, limit, offset)
+
+    def add_score_snapshot(self, snapshot: ScoreSnapshot) -> ScoreSnapshot:
+        with self._lock:
+            self.store.append(
+                "SCORE_SNAPSHOT_RECORDED",
+                snapshot.model_dump(mode="json"),
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return snapshot
+
+    def list_score_snapshots(self, outcome_id: str | None = None) -> list[ScoreSnapshot]:
+        with self._lock:
+            self._sync()
+            items = self.score_snapshots
+            if outcome_id is not None:
+                items = [s for s in items if s.outcome_id == outcome_id]
+            return list(items)
 
     def add_signal(self, signal: Signal) -> Signal:
         with self._lock:
