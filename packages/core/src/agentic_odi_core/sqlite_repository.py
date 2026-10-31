@@ -110,9 +110,14 @@ class SQLiteRepository(Repository):
         self._backfilled = True
 
     def _sync(self) -> None:
-        for ev in self.store.get_stream(workspace_id=self._workspace_id):
-            if ev["id"] > self._last_event_id:
-                self._apply_event(ev)
+        # Only the events appended since the last apply. Reading the whole log
+        # here made every repository read O(all events): a canvas assembly over
+        # a 1,500-outcome store re-parsed 200k rows instead of 3k. ``after_id``
+        # is a covering range scan on the rowid, which is the append order.
+        for ev in self.store.get_stream(
+            workspace_id=self._workspace_id, after_id=self._last_event_id
+        ):
+            self._apply_event(ev)
 
     def _apply_event(self, ev: Event) -> None:
         et = ev["type"]

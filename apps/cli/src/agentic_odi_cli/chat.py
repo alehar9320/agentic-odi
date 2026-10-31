@@ -18,7 +18,12 @@ from dataclasses import dataclass
 from typing import Any, Literal, Protocol
 
 import typer
-from agentic_odi_core import ODI_ASSISTANT_PROMPT
+from agentic_odi_core import (
+    ODI_ASSISTANT_PROMPT,
+    LocalOpenAIEngine,
+    ModelRouter,
+    RoutingMode,
+)
 from fastmcp import Client
 from openai import AsyncOpenAI
 
@@ -61,6 +66,7 @@ class ChatConfig:
     api_key: str
     model: str
     mcp_url: str
+    routing_mode: str = "auto"
 
     @classmethod
     def from_env(
@@ -70,6 +76,7 @@ class ChatConfig:
         api_key: str | None = None,
         model: str | None = None,
         mcp_url: str | None = None,
+        routing_mode: str | None = None,
     ) -> ChatConfig:
         """Resolve settings in priority order: explicit arg > env var > LLM profile > default."""
         # Lazy import to avoid circular imports between chat and profile.
@@ -105,6 +112,7 @@ class ChatConfig:
                 or (llm_profile.mcp_url if llm_profile else None)
                 or DEFAULT_MCP_URL
             ),
+            routing_mode=routing_mode or "auto",
         )
 
 
@@ -125,6 +133,7 @@ class ChatSessionLike(Protocol):
     tool_names: list[str]
     config: ChatConfig
     connection_state: ConnectionState
+    router: ModelRouter
 
     def clear(self) -> None: ...
 
@@ -206,9 +215,18 @@ def handle_command(
         mcp_status = (
             f"connected ({state.mcp_tool_count} tools)" if state.mcp_ok else "not connected"
         )
-        typer.echo(f"model  : {session.config.model}  [{llm_status}]")
+        try:
+            tier = session.router.resolve_tier(
+                remote_available=state.llm_ok,
+                local_available=session.router.local_engine.is_available(),
+            )
+            tier_info = f"  [{tier.value}]"
+        except Exception:  # noqa: BLE001
+            tier_info = ""
+        typer.echo(f"model  : {session.config.model}  [{llm_status}]{tier_info}")
         typer.echo(f"url    : {session.config.base_url}")
         typer.echo(f"mcp    : {session.config.mcp_url}  [{mcp_status}]")
+        typer.echo(f"mode   : {session.config.routing_mode}")
         return "handled"
     if command.startswith("/model"):
         parts = line.strip().split(None, 1)
@@ -221,6 +239,7 @@ def handle_command(
                 api_key=session.config.api_key,
                 model=new_model,
                 mcp_url=session.config.mcp_url,
+                routing_mode=session.config.routing_mode,
             )
             session.update_config(new_config)
             typer.echo(f"Model set to: {new_model}")
@@ -294,6 +313,10 @@ class ChatSession:
         self.messages: list[dict[str, Any]] = [{"role": "system", "content": SYSTEM_PROMPT}]
         self.tools: list[dict[str, Any]] = []
         self.tool_names: list[str] = []
+        self.router = ModelRouter(
+            mode=RoutingMode(config.routing_mode),
+            local_engine=LocalOpenAIEngine(base_url=config.base_url),
+        )
 
     async def initialize(self) -> None:
         """Discover the MCP tools once and expose them to the model."""

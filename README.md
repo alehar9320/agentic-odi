@@ -212,7 +212,7 @@ together and where each contract is enforced:
 | **`apps/cli/`** | `agentic-odi-cli` | Typer CLI with interactive chat, full entity CRUD, `schema`, `connectors`, and local or remote data access. |
 | **`apps/studio/`** | React + TypeScript + Vite | **The Living Studio** SPA and Tauri 2 desktop shell, built on [assistant-ui](https://www.assistant-ui.com). Keyboard- and screen-reader-operable, gated by an [axe-core](https://github.com/dequelabs/axe-core) WCAG 2.1 AA sweep in the frontend suite. Its browser-level suite lives in `apps/studio/e2e/`. Copied UI components land under `src/vendor/`, which is the only place Tailwind styles. Installed desktop builds **update themselves** in the background and apply on restart. |
 | **`infra/cloudflare/`** | Worker | Free-plan Workers Static Assets deployment and sidecar tunnel. |
-| **`scripts/`** | — | Dev launcher, binary build, installer tests. |
+| **`scripts/`** | — | Dev launcher, binary build, installer tests, and the deterministic study-corpus generator (`gen_corpus.py`). |
 | **`tests/contract/`** | — | Cross-package MCP contract tests. |
 
 ## Contributing

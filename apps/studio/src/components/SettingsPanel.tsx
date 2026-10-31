@@ -8,6 +8,7 @@ import {
   startDiagnosticsCapture,
 } from "../diagnostics/bundle";
 import { DiagnosticsModal } from "../diagnostics/DiagnosticsModal";
+import { PRODUCT_NAME } from "../lib/brand";
 import { useOnboarding } from "../onboarding/context";
 import { useStudio } from "../state/StudioContext";
 import type { ConnectorPreset, StudioConfig } from "../types";
@@ -76,6 +77,7 @@ function AboutSection({
       <h3 className="settings__title" id="settings-about-heading">
         About
       </h3>
+      <p className="muted">{PRODUCT_NAME} is a local-first workspace for outcome-driven work.</p>
       <dl>
         <dt>Version</dt>
         <dd>{snapshot.currentVersion ? `v${snapshot.currentVersion}` : "—"}</dd>
@@ -462,9 +464,9 @@ export function SettingsPanel() {
       <details className="disclosure">
         <summary>How the studio works</summary>
         <p>
-          The Living Studio replaces backlogs and ticket accounting with a canvas of human intent.
-          Point at an outcome, then talk about it: every bet traces back to evidence, and impact is
-          simulated before code gets written.
+          Backlogs and ticket accounting give way to a canvas of human intent. Point at an outcome,
+          then talk about it: every bet traces back to evidence, and impact is simulated before code
+          gets written.
         </p>
       </details>
     </div>

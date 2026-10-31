@@ -87,7 +87,7 @@ from agentic_odi_core.remote import (
     tool_result_text,
 )
 from agentic_odi_core.repository import InMemoryRepository, Repository
-from agentic_odi_core.router import ModelRouter, ModelTier, OnDeviceLLMEngine, RoutingMode
+from agentic_odi_core.router import LocalOpenAIEngine, ModelRouter, ModelTier, RoutingMode
 from agentic_odi_core.schema import odi_schema
 from agentic_odi_core.segmentation import (
     MIN_OUTCOMES_PER_SEGMENT,
@@ -169,6 +169,7 @@ __all__ = [
     "ProposalStatus",
     "ProposalStrategy",
     "HeuristicProposalStrategy",
+    "LocalOpenAIEngine",
     "RateLimitError",
     "RoutingMode",
     "SerializationError",
