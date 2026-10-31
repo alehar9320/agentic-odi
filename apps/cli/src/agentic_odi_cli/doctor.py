@@ -39,7 +39,7 @@ STUDIO_START_COMMAND = "uv run python -m agentic_odi_studio_api.main"
 MCP_START_COMMAND = "uv run python -m agentic_odi_mcp_server"
 
 STATUSES = ("pass", "warn", "fail", "skip")
-_SECRET_ENV = "AGENTIC_ODI_API_KEY"
+_API_ENV_VAR = "AGENTIC_ODI_API_KEY"
 
 
 @dataclass(frozen=True)
@@ -100,7 +100,7 @@ def _redact(text: str) -> str:
     if not text:
         return text
     cleaned = _redact_userinfo(text)
-    secret = os.environ.get(_SECRET_ENV)
+    secret = os.environ.get(_API_ENV_VAR)
     if secret:
         cleaned = cleaned.replace(secret, "***")
     return cleaned
