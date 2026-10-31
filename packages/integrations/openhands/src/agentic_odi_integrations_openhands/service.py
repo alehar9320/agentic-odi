@@ -36,6 +36,7 @@ from agentic_odi_integrations_openhands.adapters.odi import (
     OdiScheduleAdapter,
     OdiSignalAdapter,
 )
+from agentic_odi_integrations_openhands.issue_tracker.github import GitHubIssueTracker
 from agentic_odi_integrations_openhands.models import (
     AgentRun,
     AgentRunStatus,
@@ -56,7 +57,7 @@ from agentic_odi_integrations_openhands.policy import (
     PolicyDecision,
     args_digest,
 )
-from agentic_odi_integrations_openhands.ports import SchedulePort
+from agentic_odi_integrations_openhands.ports import IssueTrackerPort, SchedulePort
 from agentic_odi_integrations_openhands.signals import SignalSink, terminal_signal
 from agentic_odi_integrations_openhands.store import OrchestratorStore
 
@@ -136,6 +137,7 @@ class ConversationAgent(Protocol):
 class TickReport:
     enqueued_schedules: int = 0
     github_created: int = 0
+    issues_created: int = 0
     dispatched: int = 0
     supervised: int = 0
     terminal: int = 0
@@ -210,6 +212,7 @@ class OrchestratorService:
         *,
         signals: SignalSink | None = None,
         schedule: SchedulePort | None = None,
+        issue_tracker: IssueTrackerPort | None = None,
         cloud_factory: Callable[[AgentTarget], CloudClient] | None = None,
         agent_factory: Callable[[str, str | None], ConversationAgent] | None = None,
         workspace_root: str | None = None,
@@ -222,6 +225,7 @@ class OrchestratorService:
         self.store = store or OrchestratorStore()
         self._signals = signals
         self._schedule_port = schedule
+        self._issue_tracker_port = issue_tracker
         self._cloud_factory = cloud_factory or _default_cloud
         self._agent_factory = agent_factory or _default_agent
         self.workspace = str(
@@ -249,6 +253,14 @@ class OrchestratorService:
         if self._schedule_port is None:
             self._schedule_port = OdiScheduleAdapter()
         return self._schedule_port
+
+    def _issue_tracker(self) -> IssueTrackerPort:
+        if self._issue_tracker_port is None:
+            from agentic_odi_integrations_openhands.config import load_settings
+
+            settings = load_settings()
+            self._issue_tracker_port = GitHubIssueTracker(settings.github)
+        return self._issue_tracker_port
 
     def _now(self) -> datetime:
         return self.clock().astimezone(timezone.utc)
@@ -442,6 +454,7 @@ class OrchestratorService:
         self.store.refresh()
         report.enqueued_schedules = self._enqueue_due_schedules(now)
         self._poll_github(now, report)
+        report.issues_created = self._poll_issues(now, report)
         self._supervise_active(now, report)
         self._dispatch_queued(now, report)
         return report
@@ -466,6 +479,46 @@ class OrchestratorService:
             report.github_created = self._github_source().poll(self, now.timestamp())
         except Exception as exc:  # noqa: BLE001 - intake failure must not stop the daemon
             report.errors.append(f"github: {exc}")
+
+    def _poll_issues(self, now: datetime, report: TickReport) -> int:
+        """Poll issue trackers for new ODI-labelled issues and queue them as work."""
+        if not self.settings.github.enabled or not self.settings.github.repos:
+            return 0
+        created = 0
+        try:
+            tracker = self._issue_tracker()
+            issues = tracker.due_issues()
+        except Exception as exc:  # noqa: BLE001 - intake failure must not stop the daemon
+            report.errors.append(f"issues: {exc}")
+            return 0
+        for issue in issues:
+            work_key = f"issue:{issue.id}"
+            existing = self.store.get_work_item_by_key(work_key)
+            if existing is not None:
+                continue
+            try:
+                _, was_created = self.add_work_item(
+                    title=issue.title,
+                    prompt=issue.body or issue.title,
+                    target_alias=self.settings.default_target,
+                    repository=issue.repository,
+                    branch=None,
+                    work_key=work_key,
+                    source_kind=SourceKind.GITHUB,
+                    source_ref=str(issue.number),
+                    metadata={
+                        "issue_number": issue.number,
+                        "issue_url": issue.url,
+                        "issue_state": issue.state,
+                        "issue_labels": issue.labels,
+                    },
+                )
+                created += int(was_created)
+            except (OrchestratorError, ValueError) as exc:
+                report.errors.append(f"issue {issue.id}: {exc}")
+                continue
+        report.issues_created = created
+        return created
 
     # -- schedules -------------------------------------------------------
 

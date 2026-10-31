@@ -100,6 +100,9 @@ def add_cmd(
     target: str | None = typer.Option(None, "--target", "-a", help="Agent target alias."),
     repo: str | None = typer.Option(None, "--repo", "-r", help="Repository as owner/name."),
     branch: str | None = typer.Option(None, "--branch", "-b", help="Base branch."),
+    issue: str | None = typer.Option(
+        None, "--issue", help="GitHub issue as owner/repo#number; used as dedupe key."
+    ),
     priority: int = typer.Option(0, "--priority", help="Higher numbers dispatch first."),
     job_id: str | None = typer.Option(None, "--job-id", help="Link to an ODI Job."),
     work_key: str | None = typer.Option(
@@ -107,6 +110,7 @@ def add_cmd(
     ),
 ) -> None:
     """Queue work for an agent. The daemon dispatches it on its next tick."""
+    final_work_key = work_key or (f"issue:{issue}" if issue else None)
     result = run_tool(
         "add_work_item",
         {
@@ -117,7 +121,8 @@ def add_cmd(
             "branch": branch,
             "priority": priority,
             "job_id": job_id,
-            "work_key": work_key,
+            "work_key": final_work_key,
+            "source_kind": "github" if issue else None,
         },
     )
     work = result.get("work_item", result)
