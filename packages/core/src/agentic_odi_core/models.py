@@ -213,6 +213,9 @@ class CustomerOutcome(BaseModel):
     step_id: str | None = Field(
         default=None, description="The ID of the specific Step, if applicable"
     )
+    quote_id: str | None = Field(
+        default=None, description="The Evidence record this outcome was promoted from"
+    )
     customer_value: CustomerValue
     business_value: BusinessValue
 
@@ -220,6 +223,69 @@ class CustomerOutcome(BaseModel):
     @property
     def opportunity_score(self) -> float:
         return self.customer_value.opportunity_score
+
+
+class SegmentVerdict(str, Enum):
+    """Stage 5's verdict on a group of people, computed from their outcomes."""
+
+    UNDERSERVED = "underserved"
+    OVERSERVED = "overserved"
+    APPROPRIATELY_SERVED = "appropriately_served"
+
+
+class StrategyKind(str, Enum):
+    """Stage 6's three strategic paths."""
+
+    DIFFERENTIATED = "differentiated"
+    DISRUPTIVE = "disruptive"
+    NEW_MARKET = "new_market"
+
+
+class Segment(BaseModel):
+    """A group of people plus the functional job they are trying to do.
+
+    The unit of analysis is the outcome: ``outcome_ids`` is the evidence, and
+    ``verdict`` is derived from it, never typed in. ``verdict`` is ``None`` when
+    an outcome in the group has no score, because a segment cannot be classified
+    from partial evidence. No demographic attribute appears here by design.
+    """
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    job_id: str | None = Field(None, description="The Job this segment is scoped to")
+    name: str = Field(..., description='Human label, e.g. "Platform engineers, secrets rotation"')
+    people: str = Field(..., description="The group, in the person's words when they are recorded")
+    people_inferred: bool = Field(
+        False,
+        description="True when `people` was derived from the outcomes, not supplied",
+    )
+    job_statement: str = Field(..., description="The functional job in their words")
+    outcome_ids: list[str] = Field(
+        default_factory=list, description="The evidence for this segment"
+    )
+    verdict: SegmentVerdict | None = Field(
+        None, description="Derived from the outcomes; None means not enough signal"
+    )
+    rationale: str = Field(..., description="Why this verdict, naming the outcomes behind it")
+    confidence: float = Field(..., ge=0.0, le=1.0, description="How much evidence supports this")
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class Strategy(BaseModel):
+    """One recommended innovation path, with the paths it beat recorded.
+
+    A strategy without its rejections is a conclusion, not a recommendation, so
+    ``rejected`` carries one entry for every kind that was not chosen.
+    """
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    kind: StrategyKind
+    segment_id: str | None = Field(None, description="The segment this bet is aimed at")
+    thesis: str = Field(..., description="One paragraph: why this path, from the evidence")
+    bets: list[str] = Field(default_factory=list, description="The proposed moves")
+    rejected: list[dict[str, Any]] = Field(
+        default_factory=list, description='[{"kind": "disruptive", "why": "..."}]'
+    )
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class SignalKind(str, Enum):
@@ -231,6 +297,8 @@ class SignalKind(str, Enum):
     EVIDENCE_PROMOTED = "evidence_promoted"
     JOB_ADDED = "job_added"
     JOB_MAP_COMPLETED = "job_map_completed"
+    SEGMENT_IDENTIFIED = "segment_identified"
+    STRATEGY_PROPOSED = "strategy_proposed"
 
 
 SignalSeverity = Literal["info", "notice", "urgent"]
@@ -244,7 +312,10 @@ class Signal(BaseModel):
     title: str = Field(..., max_length=120, description="One line, at most 120 characters")
     detail: str | None = None
     subject_kind: (
-        Literal["job", "step", "outcome", "evidence", "connector", "agent_work"] | None
+        Literal[
+            "job", "step", "outcome", "evidence", "connector", "agent_work", "segment", "strategy"
+        ]
+        | None
     ) = None
     subject_id: str | None = None
     severity: SignalSeverity = "info"

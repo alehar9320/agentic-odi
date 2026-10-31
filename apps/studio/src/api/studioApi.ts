@@ -24,8 +24,10 @@ import type {
   ObservationKind,
   ObservationStatus,
   Outcome,
+  Segment,
   Signal,
   Step,
+  Strategy,
   StudioConfig,
   StudioError,
 } from "../types";
@@ -532,6 +534,27 @@ export async function markSignalRead(signalId: string, mcpUrl: string): Promise<
 export async function dismissSignal(signalId: string, mcpUrl: string): Promise<Signal> {
   return sendJson<Signal>("POST", `/api/signals/${encodeURIComponent(signalId)}/dismiss`, {
     mcp_url: mcpUrl,
+  });
+}
+
+export async function fetchSegments(mcpUrl: string, jobId?: string): Promise<Segment[]> {
+  const params = new URLSearchParams({ mcp_url: mcpUrl });
+  if (jobId) {
+    params.set("job_id", jobId);
+  }
+  return getJson<Segment[]>(`/api/segments?${params.toString()}`);
+}
+
+/** The recorded Stage 6 path, or null when no strategy has been proposed yet. */
+export async function fetchStrategy(mcpUrl: string): Promise<Strategy | null> {
+  const params = new URLSearchParams({ mcp_url: mcpUrl });
+  return getJson<Strategy | null>(`/api/strategy?${params.toString()}`);
+}
+
+export async function proposeStrategy(mcpUrl: string, jobId?: string): Promise<Strategy> {
+  return sendJson<Strategy>("POST", "/api/strategy/propose", {
+    mcp_url: mcpUrl,
+    job_id: jobId ?? null,
   });
 }
 

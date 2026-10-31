@@ -23,6 +23,7 @@ Tests live next to their package (`packages/*/tests`, `apps/*/tests`). `testpath
 
 - `test_models.py` — domain models and their validation rules.
 - `test_job_validation.py` — Job name and description constraints and `create_job()`.
+- `test_opportunity_score.py` — the ODI opportunity formula, its clamp, and its monotonicity.
 - `test_service.py` — `ODIService` CRUD, Opportunity Score, and thesis rendering.
 - `test_repository.py` — `InMemoryRepository` behavior.
 - `test_sqlite_repository.py` — SQLite persistence and round-trips.
@@ -100,7 +101,8 @@ Tests live next to their package (`packages/*/tests`, `apps/*/tests`). `testpath
 - `test_mcp_connector.py`, `test_rest_connector.py` — MCP and REST ingest.
 - `test_mapping.py` — connector records mapped to evidence drafts.
 - `test_http_client.py` — the shared HTTP client reads its pool, timeout, and retry settings from the environment.
-- `test_sink.py` — the in-process ingest sink.
+- `test_rate_limit.py` — token-bucket ingest limits and environment configuration.
+- `test_sink.py` — the in-process ingest sink and its rate gate.
 
 ### Root `tests/`
 
