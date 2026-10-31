@@ -40,7 +40,8 @@ Uncovered inputs/conditions most likely to bite, each with a test in the owning 
 - **Task 9 (A7 — stages become data)** — done in this branch: `order`↔`stage` agreement on the model and service, `STEP_STAGE_BACKFILLED` on open, schema enum, CLI/MCP/API stage updates, docs, and `packages/core/tests/test_stages.py`.
 - **Task 10 (A7.2 — the map draws the stages it is given)** — done in this branch: `stage_catalog()` + `GET /api/schema`, the Studio fetches the stages at boot and `JobMap` renders exactly that list.
 - **Task 11 (A8 — coverage)** — done in this branch: `build_coverage_report` + `coverage_report(job_id)`, `get_coverage` MCP tool, `GET /api/jobs/{id}/coverage`, the CLI's `coverage`, the Studio's **Coverage** lens, docs, and tests in `packages/core/tests/test_coverage.py`, `apps/cli/tests/test_coverage_cli.py`, `apps/mcp-server/tests/test_coverage_tool.py`, `apps/studio-api/tests/test_studio_coverage.py`.
-- **Tasks 2–14 and Phases 2–4** — not started; each is its own issue and PR.
+- **Task 14 (A2.2 — import from the thread)** — done in this branch: `POST /api/interviews/import` + `ImportInterviewRequest`, the `/interview` command, the thread's import/refusal path, and tests in `apps/studio-api/tests/test_interview_import.py` (incl. CLI/HTTP parity), `apps/studio/src/lib/commands.test.ts`, and `apps/studio/src/components/chat/ChatStage.test.tsx`.
+- **Tasks 2–13 and Phases 2–4** — not started; each is its own issue and PR.
 
 ---
 
@@ -225,10 +226,10 @@ The **Persistence checklist** in every child points at `packages/core/tests/test
 
 **Files:** `apps/studio-api` `POST /api/interviews/import` + schema, `apps/studio/src/lib/commands.ts` (`/interview`); tests `apps/studio-api/tests/test_interview_import.py`, `apps/studio/src/lib/commands.test.ts`.
 
-- [ ] **Step 1:** Route takes `{text, title, job_id, participant, role}` (+ the agreed filename/format metadata from the readiness blocker) and returns the interview id + quote count; it calls Task 2's shared importer, never a second browser parser.
-- [ ] **Step 2:** `/interview` hands the composer's attachment to the route and **not** to the chat turn; a refusal renders in the thread with filename + reason; CLI and HTTP fixture imports yield identical ordered quote text/speaker/times; retries do not submit twice; loading/completion visible.
+- [x] **Step 1:** Route takes `{text, title, job_id, participant, role}` (+ the agreed filename/format metadata from the readiness blocker) and returns the interview id + quote count; it calls Task 2's shared importer, never a second browser parser.
+- [x] **Step 2:** `/interview` hands the composer's attachment to the route and **not** to the chat turn; a refusal renders in the thread with filename + reason; CLI and HTTP fixture imports yield identical ordered quote text/speaker/times; retries do not submit twice; loading/completion visible.
 
-**Readiness blocker:** agree how attachment metadata carries filename/format to the shared importer (including extensionless text) before extending the request.
+**Readiness blocker resolved:** the composer already holds the attachment's text, so the request carries text plus the metadata the shared importer already accepts — `filename` drives extension detection and names the refusal, and `format` overrides detection for an extensionless paste. No second upload path, and the browser never re-sniffs the format.
 
 ---
 
