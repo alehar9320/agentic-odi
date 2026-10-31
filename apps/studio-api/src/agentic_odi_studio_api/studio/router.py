@@ -3,6 +3,10 @@
 from __future__ import annotations
 
 import json
+import sys
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as package_version
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -195,6 +199,59 @@ def _approvals(request: Request) -> ApprovalRegistry:
 @router.get("/config")
 def get_config() -> dict:
     return {"defaults": defaults()}
+
+
+@router.get("/diagnostics")
+def get_diagnostics(request: Request) -> dict[str, Any]:
+    """Return diagnostic metadata only; never return database paths or records."""
+    service = _service(request)
+    repository = service.repo
+    connection = getattr(getattr(repository, "store", None), "conn", None)
+    db_name = "odi.db"
+    size_bytes = 0
+    if connection is not None:
+        try:
+            database = next(
+                (row for row in connection.execute("PRAGMA database_list") if row[1] == "main"),
+                None,
+            )
+            filename = str(database[2]) if database else ""
+            if filename:
+                db_name = Path(filename).name
+                try:
+                    size_bytes = Path(filename).stat().st_size
+                except OSError:
+                    size_bytes = 0
+            else:
+                db_name = ":memory:"
+        except Exception:  # noqa: BLE001
+            # A missing/closed local store must not make diagnostics unavailable.
+            db_name = "odi.db"
+
+    try:
+        studio_version = package_version("agentic-odi-studio-api")
+    except PackageNotFoundError:
+        studio_version = "unknown"
+
+    counts = {
+        "jobs": len(getattr(repository, "jobs", {})),
+        "outcomes": len(getattr(repository, "outcomes", {})),
+        "evidence": len(getattr(repository, "evidence", {})),
+        "observations": len(_memory(request).list_observations(include_dismissed=True)),
+    }
+    capabilities = get_capabilities(request).capabilities
+    return {
+        "version": studio_version,
+        "python": sys.version.split()[0],
+        "db": {
+            "name": db_name,
+            "size_bytes": size_bytes,
+            "integrity": getattr(request.app.state, "db_integrity", "unknown"),
+            "counts": counts,
+        },
+        "migrations": {"events": "current"},
+        "capabilities": [capability.model_dump(mode="json") for capability in capabilities],
+    }
 
 
 @router.get("/changelog")
