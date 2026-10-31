@@ -164,6 +164,22 @@ class Outcome(BaseModel):
         default="estimate",
         description="How the score was obtained: a one-person estimate, a survey, or an import",
     )
+    opportunity_low: float | None = Field(
+        None, description="Low end of the score band, when a band was computed (B3)"
+    )
+    opportunity_high: float | None = Field(
+        None, description="High end of the score band, when a band was computed (B3)"
+    )
+    interval_n: int | None = Field(
+        None, ge=1, description="Observations the band was computed from (B3)"
+    )
+    interval_seed: int | None = Field(None, description="Seed that reproduces the band (B3)")
+    interval_confidence_level: float | None = Field(
+        None, description="Confidence level of the band, e.g. 0.95 (B3)"
+    )
+    interval_computed_at: str | None = Field(
+        None, description="When the band was computed, for staleness (B3.2)"
+    )
 
     @model_validator(mode="after")
     def _count_requires_a_sample(self) -> Outcome:
@@ -175,6 +191,14 @@ class Outcome(BaseModel):
                 "score_method 'estimate' cannot carry a sample count above 1; "
                 "use 'survey' or 'import' when people were asked"
             )
+        if (self.opportunity_low is None) != (self.opportunity_high is None):
+            raise ValueError("a band needs both opportunity_low and opportunity_high")
+        if (
+            self.opportunity_low is not None
+            and self.opportunity_high is not None
+            and self.opportunity_low > self.opportunity_high
+        ):
+            raise ValueError("opportunity_low cannot exceed opportunity_high")
         return self
 
 
