@@ -32,6 +32,19 @@ def _decision_for(service: ODIService, job, outcome):
     return service.record_decision(job.id, [outcome.id], "The gap is largest", "alex")
 
 
+def _commit_disproof(service: ODIService, bet_id: str, **overrides) -> None:
+    """Commit one valid disproof condition, so a bet may move to running."""
+    fields = {
+        "metric": "opportunity",
+        "operator": "at_or_below",
+        "threshold": 11.0,
+        "by_date": date(2026, 6, 1),
+        "rationale": "no movement would disprove it",
+    }
+    fields.update(overrides)
+    service.add_disproof(bet_id, fields)
+
+
 # -- Decisions --------------------------------------------------------------
 
 
@@ -180,12 +193,181 @@ def test_bet_transitions(service: ODIService, start, target, legal) -> None:
     decision = _decision_for(service, job, outcome)
     bet = service.create_bet(decision.id, outcome.id, "h", 12.0, date(2026, 6, 1))
     if start is BetStatus.RUNNING:
+        _commit_disproof(service, bet.id)
         service.transition_bet(bet.id, BetStatus.RUNNING)
+    if target is BetStatus.RUNNING:
+        _commit_disproof(service, bet.id)
     if legal:
         assert service.transition_bet(bet.id, target).status is target
     else:
         with pytest.raises(ConflictError):
             service.transition_bet(bet.id, target)
+
+
+def test_a_bet_cannot_run_without_a_disproof_condition(service: ODIService) -> None:
+    job, outcome = _job_with_outcome(service)
+    decision = _decision_for(service, job, outcome)
+    bet = service.create_bet(decision.id, outcome.id, "h", 12.0, date(2026, 6, 1))
+    with pytest.raises(ValidationError, match="disproof"):
+        service.transition_bet(bet.id, BetStatus.RUNNING)
+    # The refusal wrote nothing: the bet is still planned and has no condition.
+    assert service.get_bet(bet.id).status is BetStatus.PLANNED
+    assert service.get_bet(bet.id).disproof == []
+
+
+def test_refused_running_transition_writes_no_event(tmp_path) -> None:
+    from agentic_odi_core.sqlite_repository import SQLiteRepository
+
+    repo = SQLiteRepository(str(tmp_path / "odi.db"))
+    service = ODIService(repo)
+    job, outcome = _job_with_outcome(service)
+    decision = _decision_for(service, job, outcome)
+    bet = service.create_bet(decision.id, outcome.id, "h", 12.0, date(2026, 6, 1))
+    before = len(repo.store.get_stream())
+    with pytest.raises(ValidationError, match="disproof"):
+        service.transition_bet(bet.id, BetStatus.RUNNING)
+    assert len(repo.store.get_stream()) == before
+
+
+@pytest.mark.parametrize(
+    ("operator", "observed", "expected"),
+    [
+        # Equality is the boundary the contract pins explicitly.
+        ("below", 5.0, "holding"),
+        ("below", 4.0, "disproved"),
+        ("at_or_below", 5.0, "disproved"),
+        ("at_or_below", 6.0, "holding"),
+        ("above", 5.0, "holding"),
+        ("above", 6.0, "disproved"),
+        ("at_or_above", 5.0, "disproved"),
+        ("at_or_above", 4.0, "holding"),
+    ],
+)
+def test_every_operator_boundary_including_equality(
+    service: ODIService, operator, observed, expected
+) -> None:
+    job, outcome = _job_with_outcome(service)
+    decision = _decision_for(service, job, outcome)
+    bet = service.create_bet(decision.id, outcome.id, "h", 20.0, date(2026, 6, 1))
+    # The metric is importance directly, so the observed value is unambiguous.
+    _commit_disproof(service, bet.id, metric="importance", operator=operator, threshold=5.0)
+    service.update_outcome(outcome.id, {"importance": observed, "satisfaction": observed})
+    service.record_score_snapshot(outcome.id, at=datetime(2026, 6, 2, tzinfo=timezone.utc))
+    report = service.evaluate_disproof(bet.id, looked_at=datetime(2026, 6, 3, tzinfo=timezone.utc))
+    line = report["conditions"][0]
+    assert line["observed"] == observed
+    assert line["verdict"] == expected
+    assert line["snapshot_id"]
+    assert line["condition"]["operator"] == operator
+
+
+def test_multiple_conditions_keep_their_own_identities(service: ODIService) -> None:
+    job, outcome = _job_with_outcome(service)  # opportunity 12, importance 8
+    decision = _decision_for(service, job, outcome)
+    bet = service.create_bet(decision.id, outcome.id, "h", 20.0, date(2026, 6, 1))
+    _commit_disproof(service, bet.id, metric="opportunity", operator="at_or_below", threshold=11.0)
+    _commit_disproof(service, bet.id, metric="importance", operator="below", threshold=9.0)
+    service.update_outcome(outcome.id, {"importance": 6.0, "satisfaction": 6.0})  # opp 6
+    service.record_score_snapshot(outcome.id, at=datetime(2026, 6, 2, tzinfo=timezone.utc))
+    report = service.evaluate_disproof(bet.id, looked_at=datetime(2026, 6, 3, tzinfo=timezone.utc))
+    lines = report["conditions"]
+    assert [line["index"] for line in lines] == [0, 1]
+    assert lines[0]["verdict"] == "disproved"  # opportunity 6 <= 11
+    assert lines[1]["verdict"] == "disproved"  # importance 6 < 9
+    assert lines[0]["observed"] == 6.0
+    assert lines[1]["observed"] == 6.0
+    assert report["summary"] == {"disproved": 2, "holding": 0, "no_data": 0}
+
+
+def test_evaluate_disproof_unknown_bet_id_is_not_a_verdict(service: ODIService) -> None:
+    with pytest.raises(NotFoundError):
+        service.evaluate_disproof("does-not-exist")
+
+
+def test_disproof_conditions_are_locked_once_measured(service: ODIService) -> None:
+    job, outcome = _job_with_outcome(service)
+    decision = _decision_for(service, job, outcome)
+    bet = service.create_bet(decision.id, outcome.id, "h", 12.0, date(2026, 6, 1))
+    _commit_disproof(service, bet.id)
+    service.transition_bet(bet.id, BetStatus.RUNNING)
+    service.transition_bet(bet.id, BetStatus.MEASURED)
+    with pytest.raises(ConflictError):
+        _commit_disproof(service, bet.id)
+    with pytest.raises(ConflictError):
+        service.remove_disproof(bet.id, 0)
+
+
+def test_disproof_condition_validates_metric_operator_and_rationale(service: ODIService) -> None:
+    job, outcome = _job_with_outcome(service)
+    decision = _decision_for(service, job, outcome)
+    bet = service.create_bet(decision.id, outcome.id, "h", 12.0, date(2026, 6, 1))
+    with pytest.raises(ValidationError):
+        service.add_disproof(
+            bet.id,
+            {
+                "metric": "revenue",
+                "operator": "above",
+                "threshold": 1.0,
+                "by_date": date(2026, 6, 1),
+                "rationale": "unsupported metric",
+            },
+        )
+    with pytest.raises(ValidationError):
+        service.add_disproof(
+            bet.id,
+            {
+                "metric": "opportunity",
+                "operator": "sideways",
+                "threshold": 1.0,
+                "by_date": date(2026, 6, 1),
+                "rationale": "unsupported operator",
+            },
+        )
+    with pytest.raises(ValidationError):
+        service.add_disproof(
+            bet.id,
+            {
+                "metric": "opportunity",
+                "operator": "above",
+                "threshold": 1.0,
+                "by_date": date(2026, 6, 1),
+                "rationale": "   ",
+            },
+        )
+    with pytest.raises(ValidationError):
+        service.add_disproof(
+            bet.id,
+            {
+                "metric": "opportunity",
+                "operator": "above",
+                "threshold": float("inf"),
+                "by_date": date(2026, 6, 1),
+                "rationale": "nonfinite threshold",
+            },
+        )
+    assert service.get_bet(bet.id).disproof == []
+
+
+def test_disproof_can_be_edited_while_running(service: ODIService) -> None:
+    job, outcome = _job_with_outcome(service)
+    decision = _decision_for(service, job, outcome)
+    bet = service.create_bet(decision.id, outcome.id, "h", 12.0, date(2026, 6, 1))
+    _commit_disproof(service, bet.id, threshold=11.0)
+    service.transition_bet(bet.id, BetStatus.RUNNING)
+    edited = service.add_disproof(
+        bet.id,
+        {
+            "metric": "opportunity",
+            "operator": "at_or_below",
+            "threshold": 9.0,
+            "by_date": date(2026, 6, 1),
+            "rationale": "sharpened before judging",
+        },
+        index=0,
+    )
+    assert edited.disproof[0].threshold == 9.0
+    removed = service.remove_disproof(bet.id, 0)
+    assert removed.disproof == []
 
 
 def test_terminal_transition_names_legal_successors(service: ODIService) -> None:
@@ -198,6 +380,78 @@ def test_terminal_transition_names_legal_successors(service: ODIService) -> None
 
 
 # -- Measurement ------------------------------------------------------------
+
+
+def test_evaluate_disproof_is_no_data_without_an_observation(service: ODIService) -> None:
+    job, outcome = _job_with_outcome(service)
+    decision = _decision_for(service, job, outcome)
+    bet = service.create_bet(decision.id, outcome.id, "h", 20.0, date(2026, 6, 1))
+    _commit_disproof(service, bet.id)
+    report = service.evaluate_disproof(bet.id, looked_at=datetime(2026, 6, 2, tzinfo=timezone.utc))
+    assert report["summary"] == {"disproved": 0, "holding": 0, "no_data": 1}
+    line = report["conditions"][0]
+    assert line["verdict"] == "no_data"
+    assert line["observed"] is None
+    # no_data is never rendered as holding.
+    assert "holding" not in line["verdict"]
+
+
+def test_evaluate_disproof_disproves_when_the_condition_holds(service: ODIService) -> None:
+    job, outcome = _job_with_outcome(service)  # opportunity 12
+    decision = _decision_for(service, job, outcome)
+    bet = service.create_bet(decision.id, outcome.id, "h", 20.0, date(2026, 6, 1))
+    _commit_disproof(service, bet.id, operator="at_or_below", threshold=11.0)
+    # Opportunity stays at 12: the "no movement" condition never crosses.
+    service.record_score_snapshot(outcome.id, at=datetime(2026, 6, 2, tzinfo=timezone.utc))
+    report = service.evaluate_disproof(bet.id, looked_at=datetime(2026, 6, 3, tzinfo=timezone.utc))
+    assert report["summary"]["holding"] == 1
+    assert report["conditions"][0]["verdict"] == "holding"
+    assert report["conditions"][0]["observed"] == 12.0
+
+    # A later snapshot that drops the opportunity below the threshold disproves it.
+    service.update_outcome(outcome.id, {"importance": 4.0, "satisfaction": 3.0})  # 5
+    service.record_score_snapshot(outcome.id, at=datetime(2026, 6, 4, tzinfo=timezone.utc))
+    report = service.evaluate_disproof(bet.id, looked_at=datetime(2026, 6, 5, tzinfo=timezone.utc))
+    assert report["summary"]["disproved"] == 1
+    assert report["conditions"][0]["observed"] == 5.0
+
+
+def test_evaluate_disproof_reads_the_bets_own_outcome_and_window(service: ODIService) -> None:
+    job, outcome = _job_with_outcome(service)
+    decision = _decision_for(service, job, outcome)
+    bet = service.create_bet(decision.id, outcome.id, "h", 20.0, date(2026, 6, 10))
+    _commit_disproof(service, bet.id, by_date=date(2026, 6, 10))
+    # A snapshot before measure_by is outside the window and cannot be used.
+    service.update_outcome(outcome.id, {"importance": 2.0, "satisfaction": 2.0})
+    service.record_score_snapshot(outcome.id, at=datetime(2026, 6, 1, tzinfo=timezone.utc))
+    report = service.evaluate_disproof(bet.id, looked_at=datetime(2026, 6, 11, tzinfo=timezone.utc))
+    assert report["summary"] == {"disproved": 0, "holding": 0, "no_data": 1}
+
+
+def test_evaluate_disproof_writes_nothing(service: ODIService) -> None:
+    job, outcome = _job_with_outcome(service)
+    decision = _decision_for(service, job, outcome)
+    bet = service.create_bet(decision.id, outcome.id, "h", 20.0, date(2026, 6, 1))
+    _commit_disproof(service, bet.id)
+    service.record_score_snapshot(outcome.id, at=datetime(2026, 6, 2, tzinfo=timezone.utc))
+    before = len(service.repo.score_snapshots)
+    first = service.evaluate_disproof(bet.id, looked_at=datetime(2026, 6, 3, tzinfo=timezone.utc))
+    second = service.evaluate_disproof(bet.id, looked_at=datetime(2026, 6, 3, tzinfo=timezone.utc))
+    assert first == second
+    assert len(service.repo.score_snapshots) == before
+    assert service.get_bet(bet.id).status is BetStatus.PLANNED
+
+
+def test_measure_bet_folds_in_disproof_verdicts(service: ODIService) -> None:
+    job, outcome = _job_with_outcome(service)
+    decision = _decision_for(service, job, outcome)
+    bet = service.create_bet(decision.id, outcome.id, "h", 12.0, date(2026, 6, 1))
+    _commit_disproof(service, bet.id, operator="at_or_below", threshold=11.0)
+    service.update_outcome(outcome.id, {"importance": 4.0, "satisfaction": 3.0})  # 7
+    service.record_score_snapshot(outcome.id, at=datetime(2026, 6, 2, tzinfo=timezone.utc))
+    result = service.measure_bet(bet.id, looked_at=datetime(2026, 6, 3, tzinfo=timezone.utc))
+    assert result["result"] == "missed"
+    assert result["disproof"][0]["verdict"] == "disproved"
 
 
 def test_measure_bet_is_no_data_without_an_eligible_snapshot(service: ODIService) -> None:

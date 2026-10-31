@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+import math
 import uuid
 from datetime import date, datetime, timezone
 from enum import Enum
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, computed_field
+from pydantic import BaseModel, Field, computed_field, model_validator
 
 
 class Direction(str, Enum):
@@ -441,6 +442,53 @@ BET_TRANSITIONS: dict[BetStatus, tuple[BetStatus, ...]] = {
 }
 
 
+#: The metrics a disproof condition may observe. These are the proven numbers
+#: a bet's own outcome already carries, so a condition never invents a scale.
+DISPROOF_METRICS: tuple[str, ...] = (
+    "opportunity",
+    "importance",
+    "satisfaction",
+)
+
+
+class DisproofOperator(str, Enum):
+    """How an observed value is compared against a condition's threshold."""
+
+    BELOW = "below"
+    ABOVE = "above"
+    AT_OR_BELOW = "at_or_below"
+    AT_OR_ABOVE = "at_or_above"
+
+
+class DisproofCondition(BaseModel):
+    """A falsification condition committed before a bet runs.
+
+    A condition names the metric, the comparison and the value that would
+    prove the bet wrong, plus the day by which it must be judged. Storing it as
+    typed fields (not prose) is what lets ``evaluate_disproof`` return a verdict
+    instead of an opinion.
+    """
+
+    metric: str = Field(..., description="opportunity, importance or satisfaction")
+    operator: DisproofOperator = Field(..., description="How the metric is compared")
+    threshold: float = Field(..., description="The value the metric is compared against")
+    by_date: date = Field(..., description="The day by which this must be judged")
+    rationale: str = Field(..., min_length=1, description="Why this would disprove the bet")
+
+    @model_validator(mode="after")
+    def _validate(self) -> DisproofCondition:
+        if self.metric not in DISPROOF_METRICS:
+            allowed = ", ".join(DISPROOF_METRICS)
+            raise ValueError(
+                f"unsupported disproof metric '{self.metric}'; choose one of {allowed}"
+            )
+        if not math.isfinite(self.threshold):
+            raise ValueError("disproof threshold must be a finite number")
+        if not self.rationale.strip():
+            raise ValueError("disproof condition needs a rationale")
+        return self
+
+
 class Bet(BaseModel):
     """A decision-linked expectation with a frozen baseline.
 
@@ -448,6 +496,10 @@ class Bet(BaseModel):
     stored, never recomputed: the whole point of a bet is that its starting
     point cannot drift with later scores. ``direction`` names which way the
     canonical metric must move for the bet to be met.
+
+    ``disproof`` holds the conditions committed before the bet runs. A bet may
+    be created ``planned`` with none, but it cannot move to ``running`` without
+    at least one — a bet that can run without a falsifier is a wish.
     """
 
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -465,6 +517,10 @@ class Bet(BaseModel):
     status: BetStatus = Field(BetStatus.PLANNED, description="Lifecycle state")
     measured_at: datetime | None = Field(None, description="When the bet was measured")
     created_at: datetime = Field(..., description="When the bet was created")
+    disproof: list[DisproofCondition] = Field(
+        default_factory=list,
+        description="Conditions committed before the bet runs; required to start it",
+    )
     baseline_snapshot_id: str | None = Field(
         None, description="The ScoreSnapshot the baseline was read from, for provenance"
     )

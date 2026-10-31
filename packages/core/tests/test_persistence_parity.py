@@ -53,6 +53,16 @@ def _seed(service: ODIService) -> dict[str, str]:
         confidence=DecisionConfidence.HIGH,
     )
     bet = service.create_bet(decision.id, outcome.id, "Time drops", 12.0, date(2026, 7, 1))
+    service.add_disproof(
+        bet.id,
+        {
+            "metric": "opportunity",
+            "operator": "at_or_below",
+            "threshold": 11.0,
+            "by_date": date(2026, 7, 1),
+            "rationale": "no movement would disprove it",
+        },
+    )
     service.transition_bet(bet.id, BetStatus.RUNNING)
     service.set_notification_rule(SignalKind.SCORE_MOVED, threshold=0.75)
     return {
@@ -70,6 +80,9 @@ def _assert_state(service: ODIService, ids: dict[str, str]) -> None:
     assert bet.baseline == 12.0
     assert bet.status is BetStatus.RUNNING
     assert bet.measure_by == date(2026, 7, 1)
+    assert len(bet.disproof) == 1
+    assert bet.disproof[0].metric == "opportunity"
+    assert bet.disproof[0].threshold == 11.0
 
     decision = service.get_decision(ids["decision"])
     assert decision.chosen_outcome_ids == [ids["outcome"]]
@@ -161,6 +174,16 @@ def test_bet_status_round_trips_through_sqlite(tmp_path, bet_status) -> None:
     decision = writer.record_decision(job.id, [outcome.id], "why", "alex")
     bet = writer.create_bet(decision.id, outcome.id, "h", 12.0, date(2026, 7, 1))
     if bet_status is BetStatus.RUNNING:
+        writer.add_disproof(
+            bet.id,
+            {
+                "metric": "opportunity",
+                "operator": "at_or_below",
+                "threshold": 11.0,
+                "by_date": date(2026, 7, 1),
+                "rationale": "no movement would disprove it",
+            },
+        )
         writer.transition_bet(bet.id, BetStatus.RUNNING)
 
     reader = ODIService(SQLiteRepository(db))

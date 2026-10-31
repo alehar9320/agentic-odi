@@ -9,6 +9,8 @@ from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from typing import Any
 
+from pydantic import ValidationError as PydanticValidationError
+
 from agentic_odi_core.errors import ConflictError, NotFoundError, ValidationError
 from agentic_odi_core.evaluation import (
     OutcomeStatementError,
@@ -28,6 +30,8 @@ from agentic_odi_core.models import (
     Decision,
     DecisionConfidence,
     Direction,
+    DisproofCondition,
+    DisproofOperator,
     Evidence,
     EvidenceItemType,
     Job,
@@ -50,6 +54,17 @@ from agentic_odi_core.signals import DEFAULT_SCORE_MOVE_THRESHOLD
 
 def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def _first_pydantic_message(exc: PydanticValidationError) -> str:
+    """The first human-readable line of a pydantic error, without the URL noise."""
+    errors = exc.errors()
+    if not errors:
+        return str(exc)
+    first = errors[0]
+    location = ".".join(str(part) for part in first.get("loc", ()))
+    message = first.get("msg", "invalid value")
+    return f"{location}: {message}" if location else message
 
 
 class JobNotFoundError(NotFoundError):
@@ -1094,17 +1109,132 @@ class ODIService:
         *,
         measured_at: datetime | None = None,
     ) -> Bet:
-        """Move a bet through a legal transition, or refuse naming the legal ones."""
+        """Move a bet through a legal transition, or refuse naming the legal ones.
+
+        A bet cannot move to ``running`` without at least one committed disproof
+        condition: a bet that can run without a falsifier is a wish. The refusal
+        names the missing field and writes no event.
+        """
         bet = self.get_bet(bet_id)
         if isinstance(status, str):
             status = BetStatus(status)
         legal = BET_TRANSITIONS.get(bet.status, ())
         if status not in legal:
             raise InvalidBetTransitionError(bet.status, status)
+        if status is BetStatus.RUNNING and not bet.disproof:
+            raise ValidationError(
+                "a bet cannot start running without a disproof condition; "
+                "add one with `bets disprove <id> --metric ... --op ... --threshold ... --by ...` "
+                "(the missing field is `disproof`)"
+            )
         updates: dict[str, Any] = {"status": status}
         if status is BetStatus.MEASURED:
             updates["measured_at"] = measured_at or _utcnow()
         return self.repo.update_bet(bet_id, updates) or bet
+
+    def add_disproof(
+        self,
+        bet_id: str,
+        condition: DisproofCondition | dict[str, Any],
+        *,
+        index: int | None = None,
+    ) -> Bet:
+        """Append a disproof condition, or replace the one at ``index``.
+
+        Conditions are locked once the bet is ``measured``: adding, editing or
+        removing one after the fact would let the goalposts move. Editing while
+        ``planned`` or ``running`` is allowed, so a condition can be sharpened
+        before it is judged.
+        """
+        bet = self.get_bet(bet_id)
+        conditions = self._writable_disproof(bet)
+        if not isinstance(condition, DisproofCondition):
+            try:
+                condition = DisproofCondition.model_validate(condition)
+            except PydanticValidationError as exc:
+                raise ValidationError(_first_pydantic_message(exc)) from exc
+        if index is None:
+            conditions.append(condition)
+        else:
+            if index < 0 or index >= len(conditions):
+                raise ValidationError(f"no disproof condition at index {index}")
+            conditions[index] = condition
+        return self._store_disproof(bet, conditions)
+
+    def remove_disproof(self, bet_id: str, index: int) -> Bet:
+        """Remove the disproof condition at ``index``; refused once measured."""
+        bet = self.get_bet(bet_id)
+        conditions = self._writable_disproof(bet)
+        if index < 0 or index >= len(conditions):
+            raise ValidationError(f"no disproof condition at index {index}")
+        del conditions[index]
+        return self._store_disproof(bet, conditions)
+
+    def _writable_disproof(self, bet: Bet) -> list[DisproofCondition]:
+        """A mutable copy of the conditions, refused once the bet is measured."""
+        if bet.status is BetStatus.MEASURED:
+            raise ConflictError(
+                "a measured bet's disproof conditions are locked; "
+                "they cannot be added, edited or removed"
+            )
+        return list(bet.disproof)
+
+    def _store_disproof(self, bet: Bet, conditions: list[DisproofCondition]) -> Bet:
+        return (
+            self.repo.update_bet(
+                bet.id, {"disproof": [c.model_dump(mode="json") for c in conditions]}
+            )
+            or bet
+        )
+
+    def evaluate_disproof(
+        self, bet_id: str, *, looked_at: datetime | None = None
+    ) -> dict[str, Any]:
+        """Judge each committed disproof condition against the bet's own evidence.
+
+        Each condition is evaluated independently against the latest accepted
+        snapshot in the bet's measurement window (the same window ``measure_bet``
+        reads, so the two surfaces agree). A condition whose comparison holds is
+        ``disproved``; one that does not is ``holding`` with the temporal caveat
+        of the deadline; one with no eligible observation is ``no_data`` — never
+        ``holding``, because conflating the two is how a dead bet looks alive.
+
+        This is a read: it writes no snapshot, condition or status, and the same
+        fixed store and time give the same report.
+        """
+        bet = self.get_bet(bet_id)
+        when = looked_at or _utcnow()
+        snapshot = self._disproof_observation(bet, when)
+        lines: list[dict[str, Any]] = [
+            _evaluate_condition(condition, index, snapshot, when)
+            for index, condition in enumerate(bet.disproof)
+        ]
+        summary = {
+            "disproved": sum(1 for line in lines if line["verdict"] == "disproved"),
+            "holding": sum(1 for line in lines if line["verdict"] == "holding"),
+            "no_data": sum(1 for line in lines if line["verdict"] == "no_data"),
+        }
+        return {
+            "bet_id": bet.id,
+            "status": bet.status.value,
+            "looked_at": when.isoformat(),
+            "measure_by": bet.measure_by.isoformat(),
+            "conditions": lines,
+            "summary": summary,
+        }
+
+    def disproof_report(self, bet_id: str, *, looked_at: datetime | None = None) -> dict[str, Any]:
+        """The review rendering of :meth:`evaluate_disproof`, one line per condition."""
+        return self.evaluate_disproof(bet_id, looked_at=looked_at)
+
+    def _disproof_observation(self, bet: Bet, when: datetime) -> ScoreSnapshot | None:
+        """The latest accepted snapshot in the bet's measurement window, if any."""
+        eligible = [
+            s
+            for s in self.repo.list_score_snapshots(bet.outcome_id)
+            if s.at.date() >= bet.measure_by and s.at <= when
+        ]
+        return eligible[-1] if eligible else None
 
     def measure_bet(self, bet_id: str, *, looked_at: datetime | None = None) -> dict[str, Any]:
         """Compare the latest eligible snapshot against the bet's stored baseline.
@@ -1141,6 +1271,10 @@ class ODIService:
                 "target": bet.target,
                 "direction": bet.direction.value,
                 "baseline_snapshot_id": bet.baseline_snapshot_id,
+                "disproof": [
+                    _evaluate_condition(condition, index, None, when)
+                    for index, condition in enumerate(bet.disproof)
+                ],
             }
 
         if bet.baseline_importance is None or bet.baseline_satisfaction is None:
@@ -1158,6 +1292,10 @@ class ODIService:
                 "target": bet.target,
                 "direction": bet.direction.value,
                 "baseline_snapshot_id": bet.baseline_snapshot_id,
+                "disproof": [
+                    _evaluate_condition(condition, index, None, when)
+                    for index, condition in enumerate(bet.disproof)
+                ],
             }
 
         latest = eligible[-1]
@@ -1189,6 +1327,10 @@ class ODIService:
             "snapshot_at": latest.at.isoformat(),
             "snapshot_method": latest.method,
             "baseline_snapshot_id": bet.baseline_snapshot_id,
+            "disproof": [
+                _evaluate_condition(condition, index, latest, when)
+                for index, condition in enumerate(bet.disproof)
+            ],
         }
 
     # -- Signals (E3) ------------------------------------------------------
@@ -1236,3 +1378,64 @@ def _finite_float(value: Any, field: str) -> float:
     if number != number or number in (float("inf"), float("-inf")):
         raise ValidationError(f"{field} must be a finite number")
     return number
+
+
+def _metric_value(condition: DisproofCondition, snapshot: ScoreSnapshot) -> float:
+    """The observed value of a condition's metric on one snapshot."""
+    if condition.metric == "importance":
+        return snapshot.importance
+    if condition.metric == "satisfaction":
+        return snapshot.satisfaction
+    return snapshot.opportunity_score
+
+
+def _evaluate_condition(
+    condition: DisproofCondition,
+    index: int,
+    snapshot: ScoreSnapshot | None,
+    when: datetime,
+) -> dict[str, Any]:
+    """One condition's verdict, with the observed value and source when available."""
+    base: dict[str, Any] = {
+        "index": index,
+        "condition": condition.model_dump(mode="json"),
+    }
+    if snapshot is None:
+        base.update(
+            {
+                "verdict": "no_data",
+                "observed": None,
+                "reason": (
+                    f"no accepted score in the measurement window for this bet "
+                    f"(looked {when.date().isoformat()})"
+                ),
+            }
+        )
+        return base
+    observed = _metric_value(condition, snapshot)
+    base.update(
+        {
+            "observed": observed,
+            "snapshot_id": snapshot.id,
+            "snapshot_at": snapshot.at.isoformat(),
+            "verdict": "disproved" if _condition_holds(condition, observed) else "holding",
+        }
+    )
+    if base["verdict"] == "holding":
+        base["reason"] = (
+            f"the observed {condition.metric} {observed:g} did not cross the "
+            f"{condition.operator.value} {condition.threshold:g} condition by "
+            f"{condition.by_date.isoformat()}"
+        )
+    return base
+
+
+def _condition_holds(condition: DisproofCondition, observed: float) -> bool:
+    """Whether the observation crosses the condition's threshold, equality included."""
+    if condition.operator is DisproofOperator.BELOW:
+        return observed < condition.threshold
+    if condition.operator is DisproofOperator.AT_OR_BELOW:
+        return observed <= condition.threshold
+    if condition.operator is DisproofOperator.ABOVE:
+        return observed > condition.threshold
+    return observed >= condition.threshold

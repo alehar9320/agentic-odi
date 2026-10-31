@@ -17,6 +17,7 @@ from agentic_odi_cli.render import (
     render_bet,
     render_bet_list,
     render_decision_list,
+    render_disproof_report,
     render_measurement,
     render_saved,
 )
@@ -95,6 +96,47 @@ def status(
     """Move a bet through a legal status transition."""
     result = run_tool("update_bet_status", {"bet_id": bet_id, "status": new_status})
     typer.echo(render_saved("updated", result, as_json=json_output, noun="Bet"))
+
+
+@bets_app.command("disprove")
+def disprove(
+    bet_id: str = typer.Argument(..., help="Bet ID"),
+    metric: str = typer.Option(..., help="opportunity, importance or satisfaction"),
+    op: str = typer.Option(..., "--op", help="below, above, at_or_below or at_or_above"),
+    threshold: float = typer.Option(..., help="Value the metric is compared against"),
+    by: str = typer.Option(..., "--by", help="Day by which this must be judged (YYYY-MM-DD)"),
+    rationale: str = typer.Option(..., help="Why this would disprove the bet"),
+    index: int | None = typer.Option(None, help="Replace the condition at this index"),
+    json_output: bool = JSON_OPTION,
+) -> None:
+    """Commit a typed disproof condition before the bet runs."""
+    try:
+        date.fromisoformat(by)
+    except ValueError as exc:
+        raise typer.BadParameter("--by must be an ISO date (YYYY-MM-DD)") from exc
+    args: dict[str, Any] = {
+        "bet_id": bet_id,
+        "metric": metric,
+        "operator": op,
+        "threshold": threshold,
+        "by_date": by,
+        "rationale": rationale,
+    }
+    if index is not None:
+        args["index"] = index
+    typer.echo(
+        render_saved("committed", run_tool("add_disproof", args), as_json=json_output, noun="Bet")
+    )
+
+
+@bets_app.command("verdict")
+def verdict(
+    bet_id: str = typer.Argument(..., help="Bet ID"),
+    json_output: bool = JSON_OPTION,
+) -> None:
+    """Judge each committed disproof condition: disproved, holding or no_data."""
+    result = run_tool("evaluate_disproof", {"bet_id": bet_id})
+    typer.echo(render_disproof_report(result, as_json=json_output))
 
 
 @decisions_app.command("record")

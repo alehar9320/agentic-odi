@@ -503,6 +503,6 @@ def test_page_weights_are_within_budget(page: str):
     # The MCP reference is the long pole: every tool's argument table and the
     # whole ODI schema live on that one page, so it grows with each paginated
     # list tool and each entity we add. The V2MOM entity, the scheduled-work
-    # tools, and Pillar 4's decision/snapshot/bet/signal tools bring the page
-    # to ~100 KB.
-    assert size <= 104 * 1024, f"{page}: {size} bytes"
+    # tools, Pillar 4's decision/snapshot/bet/signal tools, and the disproof
+    # chain's add/remove/evaluate tools bring the page to ~108 KB.
+    assert size <= 112 * 1024, f"{page}: {size} bytes"

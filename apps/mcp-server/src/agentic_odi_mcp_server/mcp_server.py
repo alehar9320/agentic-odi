@@ -781,6 +781,58 @@ def measure_bet(bet_id: str) -> str:
 
 
 @mcp.tool
+def add_disproof(
+    bet_id: str,
+    metric: str,
+    operator: str,
+    threshold: float,
+    by_date: str,
+    rationale: str,
+    index: int | None = None,
+) -> str:
+    """Commit a typed disproof condition before a bet runs."""
+    from datetime import date
+
+    from agentic_odi_core.models import DisproofCondition
+
+    try:
+        parsed = date.fromisoformat(by_date)
+    except ValueError:
+        return f"Error: by_date must be an ISO date (YYYY-MM-DD), got '{by_date}'"
+    try:
+        condition = DisproofCondition(
+            metric=metric,
+            operator=operator,
+            threshold=threshold,
+            by_date=parsed,
+            rationale=rationale,
+        )
+        bet = service.add_disproof(bet_id, condition, index=index)
+    except (OdiError, ValueError) as exc:
+        return f"Error: {exc}"
+    return bet.model_dump_json()
+
+
+@mcp.tool
+def remove_disproof(bet_id: str, index: int) -> str:
+    """Remove a disproof condition from a bet that is not yet measured."""
+    try:
+        bet = service.remove_disproof(bet_id, index)
+    except (OdiError, ValueError) as exc:
+        return f"Error: {exc}"
+    return bet.model_dump_json()
+
+
+@mcp.tool
+def evaluate_disproof(bet_id: str) -> str:
+    """Judge each committed disproof condition: disproved, holding or no_data."""
+    try:
+        return json.dumps(service.evaluate_disproof(bet_id))
+    except OdiError as exc:
+        return f"Error: {exc}"
+
+
+@mcp.tool
 def emit_know_signals(job_id: str | None = None) -> str:
     """Record the "know" signals the store can prove (bets due, superseded decisions, gaps)."""
     try:

@@ -178,6 +178,164 @@ def test_illegal_transition_is_refused(tmp_path):
     assert "legal next states" in _flat(result.output)
 
 
+def test_a_bet_needs_a_disproof_condition_before_it_can_run(tmp_path):
+    db = str(tmp_path / "odi.db")
+    runner = CliRunner()
+    job_id = _job(runner, db)
+    outcome_id = _outcome(runner, db, job_id)
+    decision_id = _decision(runner, db, job_id, outcome_id)
+    bet = _bet(runner, db, decision_id, outcome_id)
+
+    refused = runner.invoke(app, ["--db", db, "bets", "status", bet["id"], "running"])
+    assert refused.exit_code != 0
+    assert "disproof" in _flat(refused.output)
+
+    _invoke(
+        runner,
+        db,
+        "bets",
+        "disprove",
+        bet["id"],
+        "--metric",
+        "opportunity",
+        "--op",
+        "at_or_below",
+        "--threshold",
+        "11",
+        "--by",
+        "2020-01-02",
+        "--rationale",
+        "no movement would disprove it",
+    )
+    moved = json.loads(_invoke(runner, db, "bets", "status", bet["id"], "running", "--json").output)
+    assert moved["status"] == "running"
+    assert len(moved["disproof"]) == 1
+
+
+def test_bets_verdict_reports_no_data_without_an_observation(tmp_path):
+    db = str(tmp_path / "odi.db")
+    runner = CliRunner()
+    job_id = _job(runner, db)
+    outcome_id = _outcome(runner, db, job_id)
+    decision_id = _decision(runner, db, job_id, outcome_id)
+    bet = _bet(runner, db, decision_id, outcome_id)
+    _invoke(
+        runner,
+        db,
+        "bets",
+        "disprove",
+        bet["id"],
+        "--metric",
+        "opportunity",
+        "--op",
+        "below",
+        "--threshold",
+        "5",
+        "--by",
+        "2020-01-02",
+        "--rationale",
+        "a real drop would disprove it",
+    )
+    report = json.loads(_invoke(runner, db, "bets", "verdict", bet["id"], "--json").output)
+    assert report["summary"] == {"disproved": 0, "holding": 0, "no_data": 1}
+    assert report["conditions"][0]["observed"] is None
+    assert "no_data" in _flat(_invoke(runner, db, "bets", "verdict", bet["id"]).output)
+
+
+def test_bets_disprove_rejects_a_malformed_date(tmp_path):
+    db = str(tmp_path / "odi.db")
+    runner = CliRunner()
+    job_id = _job(runner, db)
+    outcome_id = _outcome(runner, db, job_id)
+    decision_id = _decision(runner, db, job_id, outcome_id)
+    bet = _bet(runner, db, decision_id, outcome_id)
+    result = runner.invoke(
+        app,
+        [
+            "--db",
+            db,
+            "bets",
+            "disprove",
+            bet["id"],
+            "--metric",
+            "opportunity",
+            "--op",
+            "below",
+            "--threshold",
+            "5",
+            "--by",
+            "not-a-date",
+            "--rationale",
+            "why",
+        ],
+    )
+    assert result.exit_code != 0
+    assert "ISO date" in _flat(result.output)
+
+
+def test_bets_disprove_rejects_an_unsupported_metric(tmp_path):
+    db = str(tmp_path / "odi.db")
+    runner = CliRunner()
+    job_id = _job(runner, db)
+    outcome_id = _outcome(runner, db, job_id)
+    decision_id = _decision(runner, db, job_id, outcome_id)
+    bet = _bet(runner, db, decision_id, outcome_id)
+    result = runner.invoke(
+        app,
+        [
+            "--db",
+            db,
+            "bets",
+            "disprove",
+            bet["id"],
+            "--metric",
+            "revenue",
+            "--op",
+            "below",
+            "--threshold",
+            "5",
+            "--by",
+            "2020-01-02",
+            "--rationale",
+            "why",
+        ],
+    )
+    assert result.exit_code != 0
+    assert "unsupported disproof metric" in _flat(result.output)
+
+
+def test_bets_measure_folds_in_disproof_lines(tmp_path):
+    db = str(tmp_path / "odi.db")
+    runner = CliRunner()
+    job_id = _job(runner, db)
+    outcome_id = _outcome(runner, db, job_id)
+    decision_id = _decision(runner, db, job_id, outcome_id)
+    bet = _bet(runner, db, decision_id, outcome_id)
+    _invoke(
+        runner,
+        db,
+        "bets",
+        "disprove",
+        bet["id"],
+        "--metric",
+        "opportunity",
+        "--op",
+        "at_or_below",
+        "--threshold",
+        "11",
+        "--by",
+        "2020-01-02",
+        "--rationale",
+        "no movement would disprove it",
+    )
+    measured = json.loads(_invoke(runner, db, "bets", "measure", bet["id"], "--json").output)
+    assert measured["result"] == "no_data"
+    assert measured["disproof"][0]["verdict"] == "no_data"
+    rendered = _invoke(runner, db, "bets", "measure", bet["id"]).output
+    assert "Disproof conditions" in rendered
+    assert "no_data" in rendered
+
+
 def test_know_list_and_digest(tmp_path):
     db = str(tmp_path / "odi.db")
     runner = CliRunner()

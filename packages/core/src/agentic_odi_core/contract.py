@@ -64,6 +64,9 @@ class ToolName(str, Enum):
     LIST_BETS = "list_bets"
     UPDATE_BET_STATUS = "update_bet_status"
     MEASURE_BET = "measure_bet"
+    ADD_DISPROOF = "add_disproof"
+    REMOVE_DISPROOF = "remove_disproof"
+    EVALUATE_DISPROOF = "evaluate_disproof"
     SET_NOTIFICATION_RULE = "set_notification_rule"
     LIST_NOTIFICATION_RULES = "list_notification_rules"
 
@@ -572,6 +575,33 @@ TOOL_SPECS: dict[str, ToolSpec] = {
         arguments=("bet_id",),
         required=("bet_id",),
         returns="A result with the date it looked; no_data invents no numbers.",
+        stage="6",
+    ),
+    ToolName.ADD_DISPROOF.value: ToolSpec(
+        name="add_disproof",
+        summary="Commit a typed disproof condition before a bet runs.",
+        effect=_derive_effect("add_disproof"),
+        arguments=("bet_id", "metric", "operator", "threshold", "by_date", "rationale", "index"),
+        required=("bet_id", "metric", "operator", "threshold", "by_date", "rationale"),
+        returns="The Bet with its committed disproof conditions.",
+        stage="6",
+    ),
+    ToolName.REMOVE_DISPROOF.value: ToolSpec(
+        name="remove_disproof",
+        summary="Remove a disproof condition from a bet that is not yet measured.",
+        effect=_derive_effect("remove_disproof"),
+        arguments=("bet_id", "index"),
+        required=("bet_id", "index"),
+        returns="The Bet with its remaining disproof conditions.",
+        stage="6",
+    ),
+    ToolName.EVALUATE_DISPROOF.value: ToolSpec(
+        name="evaluate_disproof",
+        summary="Judge each committed disproof condition: disproved, holding or no_data.",
+        effect=_derive_effect("evaluate_disproof"),
+        arguments=("bet_id",),
+        required=("bet_id",),
+        returns="One verdict per condition; no_data stays distinct from holding.",
         stage="6",
     ),
     ToolName.SET_NOTIFICATION_RULE.value: ToolSpec(
