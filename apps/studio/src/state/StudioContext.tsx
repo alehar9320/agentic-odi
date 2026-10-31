@@ -36,7 +36,9 @@ import {
   fetchMarketplace,
   fetchMemory,
   fetchModels,
+  fetchSegments,
   fetchSignals,
+  fetchStrategy,
   fetchUnreadSignalCount,
   healthLlm,
   healthMcp,
@@ -54,6 +56,7 @@ import {
 } from "../api/studioApi";
 import type { RawSseEvent } from "../api/sse";
 import { capabilityRegistry, type Capability } from "../bff/capabilities/registry";
+import { loadSession, saveSession, type StudioSession } from "../lib/session";
 import type {
   AddConnectorPayload,
   AddOutcomePayload,
@@ -73,8 +76,10 @@ import type {
   MarketplaceListing,
   MarketplaceSearch,
   Observation,
+  Segment,
   Signal,
   SignalSubjectKind,
+  Strategy,
   StudioBrief,
   StudioConfig,
   StudioError,
@@ -227,10 +232,9 @@ const PANEL_FOR_SUBJECT: Partial<Record<SignalSubjectKind, WorkspacePanelId>> = 
   step: "jobmap",
   outcome: "landscape",
   evidence: "evidence",
+  segment: "segments",
+  strategy: "segments",
 };
-
-/** The developer simulator's events never reach the store, so they carry this id prefix. */
-const SIMULATED_SIGNAL_PREFIX = "sim-";
 
 export const EMPTY_CONFIG: StudioConfig = {
   base_url: "http://localhost:8001/v1",
@@ -402,13 +406,20 @@ export interface StudioContextValue {
   dismissSignal: (id: string) => void;
   /** Mark read, then open the lens on whatever the signal is about. */
   focusSignalSubject: (signal: Signal) => void;
+  /** Point the studio at a subject and remember it for the next visit. */
+  focusSubject: (kind: SignalSubjectKind, id: string) => void;
   focusedSubject: { kind: SignalSubjectKind; id: string } | null;
   /** The job that owns the focused subject, so canvas panels can select it. */
   focusedJobId: string | null;
+  /** Stage 5: the segments the scored outcomes support, read from the store. */
+  segments: Segment[];
+  /** Stage 6: the recorded path, or null when none has evidence yet. */
+  strategy: Strategy | null;
+  segmentsError: StudioError | null;
+  refreshSegments: () => Promise<void>;
   /** The evidence record a citation chip asked the Evidence lens to show. */
   focusedEvidenceId: string | null;
   focusEvidence: (evidenceId: string) => void;
-  simulateBackgroundEvent: () => void;
 }
 
 const StudioContext = createContext<StudioContextValue | null>(null);
@@ -423,6 +434,31 @@ function loadSettings(): StudioConfig {
     /* ignore malformed cache */
   }
   return EMPTY_CONFIG;
+}
+
+function loadFocusedSubject(): { kind: SignalSubjectKind; id: string } | null {
+  const session = loadSession();
+  if (!session) {
+    return null;
+  }
+  if (session.job_id) {
+    return { kind: "job", id: session.job_id };
+  }
+  if (session.step_id) {
+    return { kind: "step", id: session.step_id };
+  }
+  if (session.outcome_id) {
+    return { kind: "outcome", id: session.outcome_id };
+  }
+  return null;
+}
+
+function sessionForSubject(kind: SignalSubjectKind, id: string): StudioSession {
+  return {
+    job_id: kind === "job" ? id : null,
+    step_id: kind === "step" ? id : null,
+    outcome_id: kind === "outcome" ? id : null,
+  };
 }
 
 function loadCanvasCache(): CanvasData | null {
@@ -466,9 +502,15 @@ function loadBrief(): StudioBrief | null {
       target_user: String(parsed.target_user ?? ""),
       job_statement: String(parsed.job_statement ?? ""),
       core_problem: String(parsed.core_problem ?? ""),
+      role: parsed.role ? String(parsed.role) : undefined,
+      team: parsed.team ? String(parsed.team) : undefined,
+      evidence_at_hand: Array.isArray(parsed.evidence_at_hand)
+        ? parsed.evidence_at_hand.map(String)
+        : undefined,
       job_id: parsed.job_id ? String(parsed.job_id) : undefined,
+      v2mom: parsed.v2mom,
     };
-    return brief.product_name || brief.job_statement ? brief : null;
+    return brief.product_name || brief.job_statement || brief.role ? brief : null;
   } catch {
     return null;
   }
@@ -526,13 +568,15 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [capabilities, setCapabilities] = useState<Capability[]>([]);
   const [connectorSuggestions, setConnectorSuggestions] = useState<string[]>([]);
   const [serverSignals, setServerSignals] = useState<Signal[]>([]);
-  const [simulatedSignals, setSimulatedSignals] = useState<Signal[]>([]);
   const [unreadSignalCount, setUnreadSignalCount] = useState(0);
   const [signalsError, setSignalsError] = useState<StudioError | null>(null);
+  const [segments, setSegments] = useState<Segment[]>([]);
+  const [strategy, setStrategy] = useState<Strategy | null>(null);
+  const [segmentsError, setSegmentsError] = useState<StudioError | null>(null);
   const [focusedSubject, setFocusedSubject] = useState<{
     kind: SignalSubjectKind;
     id: string;
-  } | null>(null);
+  } | null>(loadFocusedSubject);
   const [focusedEvidenceId, setFocusedEvidenceId] = useState<string | null>(null);
   const [customizeOpen, setCustomizeOpen] = useState(false);
   const [customizeTarget, setCustomizeTarget] = useState<CustomizeTarget | null>(null);
@@ -547,11 +591,9 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const toastId = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
 
-  /** Simulated events sit on top; they are labelled and never counted as unread. */
   const signals = useMemo(
-    () =>
-      [...simulatedSignals, ...serverSignals].sort((a, b) => (a.created_at < b.created_at ? 1 : -1)),
-    [simulatedSignals, serverSignals],
+    () => [...serverSignals].sort((a, b) => (a.created_at < b.created_at ? 1 : -1)),
+    [serverSignals],
   );
 
   const refreshSignals = useCallback(async () => {
@@ -566,6 +608,25 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       // Keep the last feed on screen: a failed read is not an empty inbox.
       setSignalsError(asStudioError(error));
+    }
+  }, [settings.mcp_url]);
+
+  /**
+   * Stages 5 and 6 read as one lens: the segments and the bet they imply. A
+   * failed read keeps the last answer on screen rather than showing an empty
+   * board, which would read as "the evidence says nothing".
+   */
+  const refreshSegments = useCallback(async () => {
+    try {
+      const [nextSegments, nextStrategy] = await Promise.all([
+        fetchSegments(settings.mcp_url),
+        fetchStrategy(settings.mcp_url),
+      ]);
+      setSegments(nextSegments);
+      setStrategy(nextStrategy);
+      setSegmentsError(null);
+    } catch (error) {
+      setSegmentsError(asStudioError(error));
     }
   }, [settings.mcp_url]);
 
@@ -594,14 +655,6 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 
   const markSignalAsRead = useCallback(
     (id: string) => {
-      if (id.startsWith(SIMULATED_SIGNAL_PREFIX)) {
-        setSimulatedSignals((prev) =>
-          prev.map((item) =>
-            item.id === id ? { ...item, read_at: new Date().toISOString() } : item,
-          ),
-        );
-        return;
-      }
       apiMarkSignalRead(id, settings.mcp_url)
         .then(refreshSignals)
         .catch((error) => setSignalsError(asStudioError(error)));
@@ -611,10 +664,6 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 
   const dismissSignal = useCallback(
     (id: string) => {
-      if (id.startsWith(SIMULATED_SIGNAL_PREFIX)) {
-        setSimulatedSignals((prev) => prev.filter((item) => item.id !== id));
-        return;
-      }
       apiDismissSignal(id, settings.mcp_url)
         .then(refreshSignals)
         .catch((error) => setSignalsError(asStudioError(error)));
@@ -810,48 +859,6 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  /**
-   * The developer affordance #78 kept, re-shaped as a Signal. It demonstrates
-   * what a full inbox looks like; nothing it produces reaches the store, and
-   * the feed labels it so nobody mistakes it for something that happened.
-   */
-  const simulateBackgroundEvent = useCallback(() => {
-    const drafts: Array<Pick<Signal, "kind" | "title" | "severity" | "detail">> = [
-      {
-        kind: "evidence_ingested",
-        title: 'Evidence from "telemetry": cluster config friction',
-        detail: "Analyzed workflow traces: 82% of users report friction during cluster config.",
-        severity: "info",
-      },
-      {
-        kind: "opportunity_crossed",
-        title: "Opportunity score crossed 10 (up): validation rules",
-        detail: "Satisfaction fell to 3 while importance held at 9.",
-        severity: "urgent",
-      },
-      {
-        kind: "job_map_completed",
-        title: "Job map complete: Deploy a release covers all 8 stages",
-        severity: "notice",
-      },
-    ];
-
-    const chosen = drafts[Math.floor(Math.random() * drafts.length)];
-    const stamp = new Date().toISOString();
-    setSimulatedSignals((prev) => [
-      {
-        ...chosen,
-        id: `${SIMULATED_SIGNAL_PREFIX}${Date.now()}`,
-        created_at: stamp,
-        suppressed: false,
-        fingerprint: `simulated-${stamp}`,
-        simulated: true,
-      },
-      ...prev,
-    ]);
-    pushToast("info", `Simulated: ${chosen.title}`);
-  }, [pushToast]);
-
   // The theme lives on <html> so every surface, portal, and native control
   // follows one class instead of each component tracking its own copy.
   useEffect(() => {
@@ -962,6 +969,9 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     // function either just changed the store or is checking what changed, and
     // a canvas that fails to load must not leave the bell showing stale counts.
     void refreshSignals();
+    // Segments and the strategy are the other things a turn can create, and the
+    // rail counts them, so they are re-read on the same beat.
+    void refreshSegments();
     setCanvasState((prev) => ({ kind: "loading", data: prev.data }));
     try {
       const data = await fetchCanvas(settings.mcp_url);
@@ -979,7 +989,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       const problem = asStudioError(error);
       setCanvasState((prev) => ({ kind: "error", error: problem, data: prev.data }));
     }
-  }, [settings.mcp_url, refreshSignals]);
+  }, [settings.mcp_url, refreshSignals, refreshSegments]);
 
   const addStep = useCallback(
     async (payload: Omit<AddStepPayload, "mcp_url">) => {
@@ -1141,12 +1151,24 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   );
 
   /**
+   * Point the studio at a subject and persist it, so a reload can resume on
+   * the same job, step, or outcome. Evidence has no session slot.
+   */
+  const focusSubject = useCallback((kind: SignalSubjectKind, id: string) => {
+    setFocusedSubject({ kind, id });
+    if (kind === "evidence") {
+      return;
+    }
+    saveSession(sessionForSubject(kind, id));
+  }, []);
+
+  /**
    * What a card does when activated: read the signal, then take the person to
    * the record it names. This is the job `targetId` never did.
    */
   const focusSignalSubject = useCallback(
     (signal: Signal) => {
-      if (!signal.simulated && !signal.read_at) {
+      if (!signal.read_at) {
         markSignalAsRead(signal.id);
       }
       const kind = signal.subject_kind;
@@ -1154,13 +1176,13 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       if (!kind || !id) {
         return;
       }
-      setFocusedSubject({ kind, id });
+      focusSubject(kind, id);
       const panel = PANEL_FOR_SUBJECT[kind];
       if (panel) {
         openPanel(panel);
       }
     },
-    [markSignalAsRead, openPanel],
+    [markSignalAsRead, openPanel, focusSubject],
   );
 
   /**
@@ -2006,11 +2028,15 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       markSignalAsRead,
       dismissSignal,
       focusSignalSubject,
+      focusSubject,
       focusedSubject,
       focusedJobId,
+      segments,
+      strategy,
+      segmentsError,
+      refreshSegments,
       focusedEvidenceId,
       focusEvidence,
-      simulateBackgroundEvent,
     }),
     [
       settings,
@@ -2114,11 +2140,15 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       markSignalAsRead,
       dismissSignal,
       focusSignalSubject,
+      focusSubject,
       focusedSubject,
       focusedJobId,
+      segments,
+      strategy,
+      segmentsError,
+      refreshSegments,
       focusedEvidenceId,
       focusEvidence,
-      simulateBackgroundEvent,
     ],
   );
 

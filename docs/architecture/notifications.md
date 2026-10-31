@@ -64,9 +64,10 @@ kept only in `localStorage`.
 ## The catch-up lens
 
 - **First run is empty.** The feed only contains signals the store recorded.
-- **Simulated events are labelled.** `+ Simulate update` adds a demo signal with
-  `simulated: true`. It shows a **Simulated** badge, is excluded from the unread
-  count and every counter, and never contributes to the bell badge.
+  Nothing in the Studio can fabricate a signal: the three example signals live
+  only in `apps/studio/src/components/notifications/__fixtures__/signals.ts`,
+  imported by tests, never by the app. When the feed is empty it names the three
+  real triggers and offers **Capture evidence**, which opens the capture panel.
 - Cards are reachable and activatable by keyboard alone; activating one marks the
   signal read and opens the lens on the record it names. Filters are toggle
   buttons with `aria-pressed`, not tabs. The feed itself is a named `region`

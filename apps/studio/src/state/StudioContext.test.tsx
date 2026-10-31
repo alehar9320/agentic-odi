@@ -1,6 +1,7 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { SESSION_KEY } from "../lib/session";
 import { StudioProvider, useStudio } from "./StudioContext";
 
 const CONVERSATION = {
@@ -207,6 +208,40 @@ describe("StudioContext memory and resume", () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+  });
+
+  it("restores the focused subject from the previous session", () => {
+    localStorage.setItem(
+      SESSION_KEY,
+      JSON.stringify({ job_id: null, step_id: null, outcome_id: "O-9" }),
+    );
+
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+
+    expect(result.current.focusedSubject).toEqual({ kind: "outcome", id: "O-9" });
+  });
+
+  it("remembers the subject the user navigates to", () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+
+    act(() => {
+      result.current.focusSubject("job", "JOB-7");
+    });
+
+    expect(result.current.focusedSubject).toEqual({ kind: "job", id: "JOB-7" });
+    expect(JSON.parse(localStorage.getItem(SESSION_KEY) ?? "{}")).toEqual({
+      job_id: "JOB-7",
+      step_id: null,
+      outcome_id: null,
+    });
+  });
+
+  it("starts clean when the stored session is unreadable", () => {
+    localStorage.setItem(SESSION_KEY, "broken");
+
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+
+    expect(result.current.focusedSubject).toBeNull();
   });
 
   it("sends the visible conversation path as model context", async () => {

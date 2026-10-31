@@ -9,6 +9,7 @@ import {
   markSignalRead,
 } from "../../api/studioApi";
 import type { Signal } from "../../types";
+import { DEMO_SIGNALS } from "./__fixtures__/signals";
 
 const api = vi.hoisted(() => ({
   fetchConfig: vi.fn(async () => ({
@@ -215,15 +216,25 @@ describe("Catch Up reads the signal inbox", () => {
     expect(dismissSignal).toHaveBeenCalledWith("sig-1", MCP_URL);
   });
 
-  it("labels a simulated event and keeps it out of every count", async () => {
+  it("has no simulate control and offers a real next step when empty", async () => {
     render(<App />);
     fireEvent.click(await screen.findByRole("button", { name: "Signal inbox: no unread signals" }));
     await screen.findByText(/nothing happened while you were away/i);
 
-    fireEvent.click(screen.getByRole("button", { name: /\+ simulate update/i }));
+    expect(screen.queryByRole("button", { name: /simulate/i })).toBeNull();
+    expect(screen.getByRole("button", { name: /capture evidence/i })).toBeInTheDocument();
+  });
 
-    expect(await screen.findByText(/^Simulated$/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "All (0)" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Unread (0)" })).toBeInTheDocument();
+  it("renders the demo fixture like any other signal", async () => {
+    serveFeed(DEMO_SIGNALS);
+
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: "Signal inbox: 3 unread" }));
+
+    expect(
+      await screen.findByText("Opportunity score crossed 10 (up): validation rules"),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/^Simulated$/i)).toBeNull();
+    expect(screen.getByRole("button", { name: "All (3)" })).toBeInTheDocument();
   });
 });
