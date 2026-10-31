@@ -39,7 +39,7 @@ from agentic_odi_core.models import (
     utc_now_iso,
 )
 from agentic_odi_core.repository import Repository, page
-from agentic_odi_core.stats import DEFAULT_SEED
+from agentic_odi_core.stats import DEFAULT_SEED, opportunity_interval
 from agentic_odi_core.survey import aggregate_survey, parse_survey
 from agentic_odi_core.trust import (
     OutcomeDelta,
@@ -505,26 +505,16 @@ class ODIService:
         return updated
 
     def _band_for(self, observations: list[tuple[float, float]]) -> dict[str, Any]:
-        """Compute the stored band and provenance from paired responses (B3/B3.2)."""
-        from agentic_odi_core.trust import opportunity_interval
+        """Compute the stored band and provenance from paired responses (B3/B3.2).
 
+        Uses the real per-respondent pairs, not the aggregated mean: a bootstrap
+        over the means would report a zero-width band for a spread-out sample.
+        """
         if not observations:
             return {}
         importance = [pair[0] for pair in observations]
         satisfaction = [pair[1] for pair in observations]
-        provisional = Outcome(
-            job_id="band",
-            statement="Minimize the time it takes to band when a survey lands.",
-            importance=sum(importance) / len(importance),
-            satisfaction=sum(satisfaction) / len(satisfaction),
-            opportunity_score=compute_opportunity_score(
-                sum(importance) / len(importance), sum(satisfaction) / len(satisfaction)
-            ),
-            score_method="survey",
-            importance_n=len(observations),
-            satisfaction_n=len(observations),
-        )
-        interval = opportunity_interval(provisional)
+        interval = opportunity_interval(importance, satisfaction)
         return {
             "opportunity_low": interval.low,
             "opportunity_high": interval.high,

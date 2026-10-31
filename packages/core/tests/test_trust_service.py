@@ -48,6 +48,31 @@ def test_import_survey_lands_a_mean_sample_and_band() -> None:
     assert landed.opportunity_low <= landed.opportunity_score <= landed.opportunity_high
 
 
+def test_import_survey_band_reflects_the_real_spread() -> None:
+    service, job_id = _service_with_job()
+    outcome = service.add_outcome(
+        job_id,
+        "Minimize the time to publish when a plugin is ready.",
+        7.0,
+        3.0,
+    )
+    rows = [
+        {
+            "outcome_id": outcome.id,
+            "importance": 10.0 if i % 2 else 6.0,
+            "satisfaction": 2.0 if i % 2 else 8.0,
+            "respondent_id": f"r{i}",
+        }
+        for i in range(40)
+    ]
+
+    landed = service.import_survey(rows)[outcome.id]
+
+    # A spread-out sample must not collapse to a zero-width band.
+    assert landed.opportunity_low is not None and landed.opportunity_high is not None
+    assert landed.opportunity_high > landed.opportunity_low
+
+
 def test_import_survey_leaves_the_store_unchanged_when_a_reference_is_unknown() -> None:
     service, job_id = _service_with_job()
     outcome = service.add_outcome(
