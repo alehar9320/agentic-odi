@@ -50,6 +50,18 @@ def test_local_backend_unread_count_tracks_reads_and_dismissals() -> None:
     assert client.get("/api/signals").json() == []
 
 
+def test_local_backend_repeated_reads_write_nothing() -> None:
+    client = _client()
+    _make_signal(client)
+    first = client.get("/api/signals").json()
+    second = client.get("/api/signals").json()
+    # Derivation is read-only: two reads return identical, stable rows and the
+    # unread count does not drift, so a feed read never invents state.
+    assert first == second
+    assert [signal["id"] for signal in first] == [signal["id"] for signal in second]
+    assert client.get("/api/signals/unread-count").json() == {"count": 1}
+
+
 def test_local_backend_returns_404_for_an_unknown_signal_id() -> None:
     client = _client()
     for path in ("/api/signals/nope/read", "/api/signals/nope/dismiss"):

@@ -8,7 +8,7 @@ import {
   fetchUnreadSignalCount,
   markSignalRead,
 } from "../../api/studioApi";
-import type { Signal } from "../../types";
+import type { Signal, SignalKind } from "../../types";
 import { DEMO_SIGNALS } from "./__fixtures__/signals";
 
 const api = vi.hoisted(() => ({
@@ -236,6 +236,46 @@ describe("Catch Up reads the signal inbox", () => {
     ).toBeInTheDocument();
     expect(screen.queryByText(/^Simulated$/i)).toBeNull();
     expect(screen.getByRole("button", { name: "All (3)" })).toBeInTheDocument();
+  });
+
+  it("renders one labelled row per E3 signal kind", async () => {
+    // The four kinds E3 derives on read. Each must render with its own label
+    // rather than being folded into a generic row.
+    const rows: Array<{ kind: SignalKind; label: string; title: string }> = [
+      { kind: "bet_due", label: "BET DUE", title: "Bet due: measure deploy time" },
+      { kind: "score_moved", label: "SCORE MOVED", title: "Score moved on minimize deploy time" },
+      {
+        kind: "decision_superseded",
+        label: "DECISION SUPERSEDED",
+        title: "Decision superseded: use a queue",
+      },
+      { kind: "coverage_gap", label: "COVERAGE GAP", title: "Coverage gap: Analyze stage" },
+    ];
+    serveFeed(
+      rows.map((row, index) =>
+        signal({
+          id: `sig-${index}`,
+          kind: row.kind,
+          title: row.title,
+          subject_kind: undefined,
+          subject_id: undefined,
+        }),
+      ),
+    );
+
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: "Signal inbox: 4 unread" }));
+
+    for (const row of rows) {
+      const title = await screen.findByText(row.title);
+      const card = title.closest("article");
+      expect(card).not.toBeNull();
+      // The badge is the kind label plus severity, so match the whole thing to
+      // avoid also matching the title that repeats the kind in prose.
+      expect(
+        within(card as HTMLElement).getByText(`${row.label} · notice`),
+      ).toBeInTheDocument();
+    }
   });
 
   it("does not claim no changes when the read failed", async () => {
