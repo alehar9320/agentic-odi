@@ -7,6 +7,12 @@ it is merged; the link is the proof.
 
 ## Shipped
 
+- [x] **A drafted argument that cannot invent a number**: `odi brief export
+  --narrate` asks the model to draft the brief's argument, and every numeral in
+  a surviving sentence is checked to exist in the brief and to belong to an
+  outcome the sentence links; a failing sentence is dropped with its reason. The
+  drafted block is always labelled, `--no-narrate` is byte-identical to the
+  factual brief, and a missing provider still renders the facts.
 - [x] **Decide, then close the loop**: Record a decision with its rejected
   options, derive and render the outcome roadmap, review a past decision against
   today's numbers, and track a bet from its captured baseline to measured — the

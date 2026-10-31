@@ -252,6 +252,7 @@ stage. `capabilities --json` emits the full machine-readable manifest.
 agentic-odi brief export --job-id JOB-1                # markdown to stdout
 agentic-odi brief export --job-id JOB-1 --format html  # standalone HTML document
 agentic-odi brief export --job-id JOB-1 --out case.md  # write a file, print its path
+agentic-odi brief export --job-id JOB-1 --narrate      # add a drafted, labelled argument
 ```
 
 `brief export` renders the same deterministic case the Studio shows: the job,
@@ -261,6 +262,16 @@ measurement; a field nobody supplied renders `not measured`, never `0`. The
 `--format html` document inlines its own print styles, so it opens and prints
 with no app CSS and no network access. `--generated-at` stamps a fixed
 timestamp when you need byte-identical output.
+
+`--narrate` asks the configured model to draft the brief's argument and adds it
+in a block headed *Drafted — numbers from the table above*. The draft is only a
+proposal: every numeral in a surviving sentence is checked to exist in the
+brief and to belong to an outcome the sentence links, and a sentence that fails
+is dropped with its reason shown in the same block — so a draft that survives
+nothing still states why. `--no-narrate` — the default — invokes no model and is
+byte-identical to the factual brief. With no provider configured, `--narrate`
+still renders the factual brief and records in that block why nothing was
+drafted.
 
 ## Record a decision
 
