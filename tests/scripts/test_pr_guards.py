@@ -405,6 +405,17 @@ def test_a_hardcoded_measurement_string_warns() -> None:
     assert "measurement" in warnings[0].lower()
 
 
+def test_a_colocated_js_test_is_excluded_from_the_fabrication_guard() -> None:
+    # ``*.test.tsx`` / ``*.spec.ts`` are tests even without a ``tests/`` folder,
+    # so a fixture string like "76 days ago" is not a fabricated measurement.
+    lines = [
+        ("apps/studio/src/ui/UiRenderer.test.tsx", 481, 'expect(getByText("76 days ago"))'),
+        ("apps/studio/src/ui/UiRenderer.spec.ts", 12, 'expect(getByText("3 users"))'),
+    ]
+
+    assert check_fabrication(lines) == []
+
+
 def test_a_new_todo_warns() -> None:
     warnings = check_fabrication([("apps/core/x.py", 1, "# TODO: wire this up")])
 
