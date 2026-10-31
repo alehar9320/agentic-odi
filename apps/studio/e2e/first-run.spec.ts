@@ -9,6 +9,13 @@ const COMPOSER = "Message the studio";
  * introduction finishes without one.
  */
 test.describe("the first-run introduction", () => {
+  test.beforeEach(async ({ request }) => {
+    // The sidecar is shared by the whole run, and the Studio restores its most
+    // recent conversation on boot. A previous spec's thread would open in place
+    // of the first-run hero, so the memory is emptied the way a first visit is.
+    await request.delete("/api/memory");
+  });
+
   test("asks five questions and saves the brief in the person's words", async ({ page }) => {
     await page.goto("/?flags=firstRunWizard:off");
 
