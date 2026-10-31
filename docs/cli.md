@@ -318,6 +318,21 @@ is the refusal you would hit elsewhere — a database newer than this build is
 refused naming both versions and the upgrade command, not a bare
 "incompatible".
 
+## Back up and export
+
+```bash
+agentic-odi data-export                        # ./odi-export-<timestamp>.json
+agentic-odi data-export --output backup.json   # explicit path
+agentic-odi data-export --job-id JOB-1         # one job and its children
+```
+
+`data-export` writes jobs, steps, desired outcomes, customer outcomes, and
+evidence to one JSON file (`format: agentic-odi-export`, `version: 1`). Every
+record is the same `model_dump()` shape the MCP tools return, so each entry can
+be re-validated with the corresponding core Pydantic model. The default
+filename carries a UTC ISO 8601 timestamp (`YYYYMMDDTHHMMSSZ`).
+
+
 ## Inspect settings and feature flags
 
 ```bash
