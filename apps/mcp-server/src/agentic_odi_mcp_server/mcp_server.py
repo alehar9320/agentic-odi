@@ -539,6 +539,21 @@ def import_survey(rows: list[dict[str, Any]]) -> str:
 
 
 @mcp.tool
+def rank_outcomes(job_id: str) -> str:
+    """Rank a Job's Outcomes by evidence strength into measured/thin/none sections.
+
+    The same read the landscape uses, so the terminal and the SPA cannot
+    disagree. Unscored outcomes stay in the ``none`` section, never sorted as a
+    zero.
+    """
+    try:
+        ranking = service.rank_outcomes_for_job(job_id)
+    except JobNotFoundError:
+        return f"Error: job not found: {job_id}"
+    return json.dumps(ranking)
+
+
+@mcp.tool
 def delete_outcome(outcome_id: str) -> str:
     try:
         service.delete_outcome(outcome_id)

@@ -329,4 +329,73 @@ describe("OpportunityLandscape canvas states", () => {
 
     expect(container.textContent).not.toContain("Active Job Map Contexts");
   });
+
+  it("renders the Band and Sample columns in the table view", () => {
+    harness.state.canvasState = {
+      kind: "ready",
+      data: {
+        ...mockCanvasData,
+        outcomes: [
+          {
+            id: "O-201",
+            statement: "Minimize time spent syncing secrets",
+            importance: 8,
+            satisfaction: 4,
+            opportunity_score: 12,
+            score_method: "survey",
+            importance_n: 40,
+            satisfaction_n: 40,
+            opportunity_low: 10.5,
+            opportunity_high: 13.5,
+          },
+        ],
+      },
+    } as unknown as CanvasState;
+
+    render(<OpportunityLandscape />);
+    fireEvent.click(screen.getByText("📋 Table View"));
+
+    expect(screen.getByText("Band")).toBeInTheDocument();
+    expect(screen.getByText("10.5–13.5")).toBeInTheDocument();
+    expect(screen.getByText("n=40 (survey)")).toBeInTheDocument();
+  });
+
+  it("ranks a measured need above a thin higher point estimate", () => {
+    harness.state.canvasState = {
+      kind: "ready",
+      data: {
+        ...mockCanvasData,
+        outcomes: [
+          {
+            id: "O-THIN",
+            statement: "Minimize the risk of a thin high guess",
+            importance: 9,
+            satisfaction: 3,
+            opportunity_score: 15,
+            score_method: "estimate",
+          },
+          {
+            id: "O-MEASURED",
+            statement: "Minimize the risk of a measured need",
+            importance: 8,
+            satisfaction: 5,
+            opportunity_score: 11,
+            score_method: "survey",
+            importance_n: 40,
+            satisfaction_n: 40,
+            opportunity_low: 10,
+            opportunity_high: 12,
+          },
+        ],
+      },
+    } as unknown as CanvasState;
+
+    render(<OpportunityLandscape />);
+    fireEvent.click(screen.getByText("📋 Table View"));
+
+    const rows = screen.getAllByRole("row");
+    // Row 0 is the header; the measured need must come before the thin guess.
+    expect(rows[1]).toHaveTextContent("Minimize the risk of a measured need");
+    expect(rows[2]).toHaveTextContent("Minimize the risk of a thin high guess");
+  });
 });

@@ -30,6 +30,7 @@ class ToolName(str, Enum):
     GET_OUTCOME_HISTORY = "get_outcome_history"
     GET_OUTCOME_DELTA = "get_outcome_delta"
     IMPORT_SURVEY = "import_survey"
+    RANK_OUTCOMES = "rank_outcomes"
     DELETE_OUTCOME = "delete_outcome"
     ADD_CUSTOMER_OUTCOME = "add_customer_outcome"
     GET_CUSTOMER_OUTCOME = "get_customer_outcome"
@@ -262,6 +263,15 @@ TOOL_SPECS: dict[str, ToolSpec] = {
         arguments=("rows",),
         required=("rows",),
         returns="The updated Outcomes keyed by id.",
+        stage="4",
+    ),
+    ToolName.RANK_OUTCOMES.value: ToolSpec(
+        name="rank_outcomes",
+        summary="Rank a Job's Outcomes by evidence strength into measured/thin/none sections.",
+        effect=_derive_effect("rank_outcomes"),
+        arguments=("job_id",),
+        required=("job_id",),
+        returns="The measured/thin/none sections with per-outcome score, band, sample and method.",
         stage="4",
     ),
     ToolName.DELETE_OUTCOME.value: ToolSpec(

@@ -28,6 +28,7 @@ from agentic_odi_cli.settings import settings_app
 from agentic_odi_cli.signals import signals_app
 from agentic_odi_cli.steps import steps_app
 from agentic_odi_cli.survey import survey_app
+from agentic_odi_cli.top import register as register_top
 from agentic_odi_cli.version import __version__  # noqa: F401  (re-exported for tests)
 
 app = typer.Typer(
@@ -250,6 +251,7 @@ def capabilities_cmd(
         typer.echo(capability_summary())
 
 
+register_top(app)
 app.add_typer(capabilities_app, name="capabilities")
 app.add_typer(settings_app, name="settings")
 app.add_typer(profile_app, name="profile")

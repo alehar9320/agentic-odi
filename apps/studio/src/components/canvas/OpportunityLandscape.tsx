@@ -1,7 +1,13 @@
 import { useMemo, useRef, useState } from "react";
 
 import { canvasStatus } from "../../lib/canvasProvenance";
-import { formatOpportunityScore, formatSample, isUnderserved } from "../../lib/odi";
+import {
+  confidenceClass,
+  formatBand,
+  formatOpportunityScore,
+  formatSample,
+  isUnderserved,
+} from "../../lib/odi";
 import { useStudio } from "../../state/StudioContext";
 import type { Outcome } from "../../types";
 import { FailurePanel } from "../FailurePanel";
@@ -52,9 +58,22 @@ export function OpportunityLandscape() {
   }, [outcomes, underservedOnly, searchQuery]);
 
   const sortedOutcomes = useMemo(() => {
-    return [...filteredOutcomes].sort(
-      (a, b) => (b.opportunity_score ?? -Infinity) - (a.opportunity_score ?? -Infinity),
-    );
+    // Group by confidence class (measured, then thin, then none) and order
+    // within a group by the low end of the band, matching the core's honest
+    // ranking. This keeps a thin high-variance guess below a measured need and
+    // never sorts an unscored outcome as a zero.
+    const order: Record<string, number> = { measured: 0, thin: 1, none: 2 };
+    return [...filteredOutcomes].sort((a, b) => {
+      const classA = order[confidenceClass(a)];
+      const classB = order[confidenceClass(b)];
+      if (classA !== classB) return classA - classB;
+      const lowA = a.opportunity_low ?? a.opportunity_score ?? null;
+      const lowB = b.opportunity_low ?? b.opportunity_score ?? null;
+      if (lowA === null && lowB === null) return 0;
+      if (lowA === null) return 1;
+      if (lowB === null) return -1;
+      return lowB - lowA;
+    });
   }, [filteredOutcomes]);
 
   const activeOutcome = useMemo(() => {
@@ -633,6 +652,7 @@ function OpportunityTableView({
             <th style={{ padding: "10px 14px", textAlign: "right" }}>Importance</th>
             <th style={{ padding: "10px 14px", textAlign: "right" }}>Satisfaction</th>
             <th style={{ padding: "10px 14px", textAlign: "right" }}>Opp. Score</th>
+            <th style={{ padding: "10px 14px" }}>Band</th>
             <th style={{ padding: "10px 14px" }}>Sample</th>
             <th style={{ padding: "10px 14px", textAlign: "center" }}>Status</th>
           </tr>
@@ -688,6 +708,16 @@ function OpportunityTableView({
                   }}
                 >
                   {opp.toFixed(1)}
+                </td>
+                <td
+                  style={{
+                    padding: "10px 14px",
+                    color: "var(--studio-muted)",
+                    whiteSpace: "nowrap",
+                  }}
+                  title="The band around the score; an estimate has no band"
+                >
+                  {formatBand(outcome)}
                 </td>
                 <td
                   style={{

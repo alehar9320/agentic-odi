@@ -346,6 +346,14 @@ class LocalBackend(Backend):
             raise BackendError(str(exc)) from None
         return {outcome_id: outcome.model_dump() for outcome_id, outcome in updated.items()}
 
+    def _rank_outcomes(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import JobNotFoundError, job_not_found
+
+        try:
+            return self.service.rank_outcomes_for_job(args["job_id"])
+        except JobNotFoundError:
+            raise BackendError(job_not_found(args["job_id"])) from None
+
     def _update_outcome(self, args: dict[str, Any]) -> dict[str, Any]:
         from agentic_odi_core import (
             OutcomeNotFoundError,
@@ -748,6 +756,7 @@ _LOCAL_HANDLERS = {
     "get_outcome_history": LocalBackend._get_outcome_history,
     "get_outcome_delta": LocalBackend._get_outcome_delta,
     "import_survey": LocalBackend._import_survey,
+    "rank_outcomes": LocalBackend._rank_outcomes,
     "update_outcome": LocalBackend._update_outcome,
     "delete_outcome": LocalBackend._delete_outcome,
     "add_customer_outcome": LocalBackend._add_customer_outcome,

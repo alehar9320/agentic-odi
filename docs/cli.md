@@ -148,6 +148,7 @@ agentic-odi desired-outcomes get <outcome-id>
 agentic-odi desired-outcomes update <outcome-id> --satisfaction 6
 agentic-odi desired-outcomes update <outcome-id> --satisfaction 6 --why "after the review"
 agentic-odi desired-outcomes history <outcome-id>
+agentic-odi desired-outcomes history <outcome-id> --why --since 2026-01-01T00:00:00Z
 agentic-odi desired-outcomes delete <outcome-id> --yes
 agentic-odi desired-outcomes export --job-id <job-id> --format csv > outcomes.csv
 agentic-odi desired-outcomes export --job-id <job-id> --format json | jq '.[].opportunity_score'
@@ -164,9 +165,37 @@ differ, `get` shows both (`n=40/12 (survey)`) so a thin dimension stays visible.
 Every accepted score change is written to an append-only history. Add `--why`
 to `add` or `update` to record *why* the number was given, then read the trail
 with `history`: one row per accepted change, oldest first, each row carrying the
-score and its sample/method companions. A change that fails validation writes
-neither a score change nor a row, so the history never records a rejected edit.
-The reason is history metadata, not part of the outcome record.
+score and its sample/method companions. Add `--why` to `history` to show the
+signed change from a baseline, with `--since <timestamp>` choosing the baseline
+(the last snapshot at or before it; the earliest when omitted). A change that
+fails validation writes neither a score change nor a row, so the history never
+records a rejected edit. The reason is history metadata, not part of the outcome
+record.
+
+# Survey import
+agentic-odi survey import responses.csv
+agentic-odi survey import responses.csv --json
+
+`survey import` reads a CSV of responses (one row per respondent, columns named
+for the outcome) and lands each outcome's accepted mean, sample size (`n`) and
+band on the matching outcome. A row that matches no outcome is reported, not
+silently dropped. The import is all-or-nothing: a malformed file fails without a
+partial write.
+
+# Evidence-aware ranking
+agentic-odi top
+agentic-odi top --job <job-id> --limit 5
+agentic-odi top --include-thin --json
+agentic-odi coverage --job <job-id>
+
+`top` lists a Job's measured outcomes, highest low end of the band first. By
+default it shows measured outcomes only and names the thin and unscored counts
+it excluded; `--include-thin` adds the thin section, while unscored outcomes stay
+counted but never listed as zero. Each row shows the score, its band or the
+reason it has none, and the per-dimension sample and method. `coverage` reports
+the measured/thin/unscored split for a Job. The `--json` shape for `top` is
+`{"measured": [...], "thin": [...], "excluded": {"thin": n, "none": n}}`, where
+each entry shares keys and semantics with the landscape's outcome entries.
 
 `get` shows the reason from the most recent accepted change as a `note` line, so
 the detail view carries the same "why" as the history. When no reason was

@@ -19,15 +19,28 @@ from agentic_odi_core.models import (
 _Item = TypeVar("_Item")
 
 
-def rank_outcomes(outcomes: list[Outcome]) -> list[Outcome]:
-    """Rank outcomes by opportunity score, highest first, unscored last."""
-    return sorted(
-        outcomes,
-        key=lambda outcome: (
-            outcome.opportunity_score is None,
-            -(outcome.opportunity_score or 0.0),
-        ),
-    )
+def rank_outcomes(outcomes: list[Outcome], by: str = "opportunity_score") -> list[Outcome]:
+    """Rank outcomes, highest first, unscored last.
+
+    ``by`` keeps ``opportunity_score`` as the default so no existing caller
+    changes silently. ``by="opportunity_low"`` ranks by the low end of the band
+    — the honest ordering — falling back to the point score when no band is
+    stored, and keeps unscored outcomes last rather than sorting them as zero.
+    An unknown ``by`` is rejected rather than silently ignored.
+    """
+    if by not in ("opportunity_score", "opportunity_low"):
+        raise ValueError(f"unknown ranking key {by!r}")
+
+    def key(outcome: Outcome) -> tuple[bool, float]:
+        if by == "opportunity_low":
+            basis = outcome.opportunity_low
+            if basis is None:
+                basis = outcome.opportunity_score
+        else:
+            basis = outcome.opportunity_score
+        return (basis is None, -(basis or 0.0))
+
+    return sorted(outcomes, key=key)
 
 
 def page(items: list[_Item], limit: int | None = None, offset: int = 0) -> list[_Item]:

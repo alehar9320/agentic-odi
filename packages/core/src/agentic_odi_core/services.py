@@ -41,7 +41,12 @@ from agentic_odi_core.models import (
 from agentic_odi_core.repository import Repository, page
 from agentic_odi_core.stats import DEFAULT_SEED
 from agentic_odi_core.survey import aggregate_survey, parse_survey
-from agentic_odi_core.trust import OutcomeDelta, outcome_delta
+from agentic_odi_core.trust import (
+    OutcomeDelta,
+    classify_confidence,
+    outcome_delta,
+    rank_outcomes_honestly,
+)
 
 
 class JobNotFoundError(NotFoundError):
@@ -387,6 +392,47 @@ class ODIService:
         """
         history = self.get_score_history(outcome_id)
         return outcome_delta(history, since)
+
+    def rank_outcomes_for_job(self, job_id: str) -> dict[str, Any]:
+        """Partition and rank a job's outcomes by evidence strength (B4/B4.1).
+
+        One shared read for the landscape, ``odi top`` and ``odi coverage``, so
+        the CLI, the API and the SPA cannot disagree. Returns measured, thin and
+        none sections whose union is the input set; within a section, outcomes
+        are ordered by the low end of the band (falling back to the point score)
+        descending. Unscored outcomes stay in the ``none`` section, never sorted
+        as a zero.
+        """
+        if self.repo.get_job(job_id) is None:
+            raise JobNotFoundError(job_id)
+        outcomes = self.repo.get_outcomes(job_id)
+        sections: dict[str, list[dict[str, Any]]] = {"measured": [], "thin": [], "none": []}
+        for outcome in rank_outcomes_honestly(outcomes):
+            sections[classify_confidence(outcome)].append(self._ranking_entry(outcome))
+        return {
+            "job_id": job_id,
+            "sections": sections,
+            "counts": {
+                "measured": len(sections["measured"]),
+                "thin": len(sections["thin"]),
+                "none": len(sections["none"]),
+                "total": len(outcomes),
+            },
+        }
+
+    def _ranking_entry(self, outcome: Outcome) -> dict[str, Any]:
+        """The shared ranking entry: score, band, sample and method (B4)."""
+        return {
+            "id": outcome.id,
+            "statement": outcome.statement,
+            "opportunity_score": outcome.opportunity_score,
+            "opportunity_low": outcome.opportunity_low,
+            "opportunity_high": outcome.opportunity_high,
+            "importance_n": outcome.importance_n,
+            "satisfaction_n": outcome.satisfaction_n,
+            "score_method": outcome.score_method,
+            "confidence": classify_confidence(outcome),
+        }
 
     def import_survey(
         self,

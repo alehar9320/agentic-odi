@@ -207,16 +207,17 @@ def history(
 ) -> None:
     """Show an Outcome's accepted score snapshots, oldest first."""
     snapshots = run_tool("get_outcome_history", {"outcome_id": outcome_id})
-    typer.echo(render_score_history(snapshots, as_json=json_output))
     if not why:
+        typer.echo(render_score_history(snapshots, as_json=json_output))
         return
     args: dict[str, Any] = {"outcome_id": outcome_id}
     if since is not None:
         args["since"] = since
     delta = run_tool("get_outcome_delta", args)
     if json_output:
-        typer.echo(json.dumps(delta, indent=2, sort_keys=True))
+        typer.echo(json.dumps({"history": snapshots, "delta": delta}, indent=2, sort_keys=True))
         return
+    typer.echo(render_score_history(snapshots, as_json=False))
     typer.echo(render_outcome_delta(delta))
 
 

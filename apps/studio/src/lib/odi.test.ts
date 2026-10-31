@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  confidenceClass,
+  formatBand,
   formatOpportunityScore,
   formatSample,
   isUnderserved,
@@ -92,5 +94,51 @@ describe("formatSample", () => {
 
   it("falls back to est. when the method is absent but no counts exist", () => {
     expect(formatSample({ importance_n: null, satisfaction_n: null })).toBe("est.");
+  });
+});
+
+describe("formatBand", () => {
+  it("reads an estimate as no band, never a tight one", () => {
+    expect(formatBand({ score_method: "estimate" })).toBe("no band");
+  });
+
+  it("renders a survey band as a range", () => {
+    expect(
+      formatBand({ score_method: "survey", opportunity_low: 8.5, opportunity_high: 10.5 }),
+    ).toBe("8.5–10.5");
+  });
+
+  it("marks a zero-width survey band so it is not read as certainty", () => {
+    expect(
+      formatBand({ score_method: "survey", opportunity_low: 10, opportunity_high: 10 }),
+    ).toBe("±0 (n=1)");
+  });
+
+  it("reads a missing band as no band", () => {
+    expect(formatBand({ score_method: "survey" })).toBe("no band");
+  });
+});
+
+describe("confidenceClass", () => {
+  it("calls a large survey measured", () => {
+    expect(confidenceClass({ score_method: "survey", importance_n: 40, satisfaction_n: 40 })).toBe(
+      "measured",
+    );
+  });
+
+  it("calls a small survey thin", () => {
+    expect(confidenceClass({ score_method: "survey", importance_n: 3, satisfaction_n: 3 })).toBe(
+      "thin",
+    );
+  });
+
+  it("never treats a method label alone as evidence", () => {
+    expect(confidenceClass({ score_method: "survey" })).toBe("none");
+  });
+
+  it("lets the weakest dimension bound the class", () => {
+    expect(confidenceClass({ score_method: "survey", importance_n: 40, satisfaction_n: 2 })).toBe(
+      "thin",
+    );
   });
 });

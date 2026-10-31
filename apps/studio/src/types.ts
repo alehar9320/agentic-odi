@@ -23,6 +23,9 @@ export interface Outcome {
   importance_n?: number | null;
   satisfaction_n?: number | null;
   score_method?: "estimate" | "survey" | "import";
+  opportunity_low?: number | null;
+  opportunity_high?: number | null;
+  interval_n?: number | null;
   evidence?: string;
   telemetry?: string;
 }

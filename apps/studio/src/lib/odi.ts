@@ -54,3 +54,50 @@ export function formatSample(outcome: SampleMetadata): string {
   }
   return `n=${importanceN ?? "?"}/${satisfactionN ?? "?"} (${method})`;
 }
+
+export interface BandMetadata {
+  score_method?: "estimate" | "survey" | "import" | null;
+  opportunity_low?: number | null;
+  opportunity_high?: number | null;
+}
+
+/**
+ * Format a score's band, distinguishing a no-band estimate from a zero-width
+ * survey band. An estimate reads as `no band` — never as a tight band — and a
+ * survey whose band is zero-width reads `±0` so it is never read as proof of
+ * certainty. Mirrors the CLI so both surfaces say the same thing.
+ */
+export function formatBand(outcome: BandMetadata): string {
+  const low = outcome.opportunity_low ?? null;
+  const high = outcome.opportunity_high ?? null;
+  const method = outcome.score_method ?? "estimate";
+  if (low == null || high == null) {
+    return "no band";
+  }
+  if (low === high) {
+    return method === "estimate" ? "no band" : `±0 (n=1)`;
+  }
+  return `${low.toFixed(1)}–${high.toFixed(1)}`;
+}
+
+export type ConfidenceClass = "measured" | "thin" | "none";
+
+/**
+ * Classify how much evidence stands behind a score, matching the core's
+ * provisional table: measured at a sample of at least 30 from a survey or
+ * import; thin for a smaller survey/import sample; none for an estimate, an
+ * unknown count or no score. A method label alone is never sufficient evidence.
+ */
+export function confidenceClass(outcome: SampleMetadata): ConfidenceClass {
+  const method = outcome.score_method ?? "estimate";
+  if (method === "estimate") {
+    return "none";
+  }
+  const counts = [outcome.importance_n, outcome.satisfaction_n].filter(
+    (value): value is number => value != null,
+  );
+  if (!counts.length) {
+    return "none";
+  }
+  return Math.min(...counts) >= 30 ? "measured" : "thin";
+}
