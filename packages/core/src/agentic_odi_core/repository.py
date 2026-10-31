@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 from datetime import datetime, timezone
-from typing import Protocol, TypeVar
+from typing import Any, Protocol, TypeVar
 
 from agentic_odi_core.models import (
     CustomerOutcome,
@@ -79,6 +81,33 @@ def sort_outcomes(items: list[Outcome], sort: str = "opportunity_score") -> list
     return rank_outcomes(items)
 
 
+def compute_evidence_fingerprint(
+    source_kind: str,
+    source_name: str,
+    name: str,
+    content: str,
+    url: str | None,
+    raw: dict[str, Any] | None,
+) -> str:
+    """Fingerprint for an evidence record: sha256 over its content-defining fields.
+
+    Records that share ``source_kind``, ``source_name``, ``name``, ``content``,
+    ``url`` and ``raw`` describe the same customer quote / observation, so a
+    repeat import or promotion must not create a duplicate evidence row.
+    """
+    payload = "|".join(
+        [
+            source_kind,
+            source_name,
+            name,
+            content,
+            url or "",
+            json.dumps(raw or {}, sort_keys=True),
+        ]
+    )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
 class Repository(Protocol):
     jobs: dict[str, Job]
     steps: dict[str, Step]
@@ -124,6 +153,16 @@ class Repository(Protocol):
     def delete_customer_outcome(self, outcome_id: str) -> bool: ...
     def add_evidence(self, evidence: Evidence) -> Evidence: ...
     def get_evidence(self, evidence_id: str) -> Evidence | None: ...
+    def get_evidence_by_fingerprint(
+        self,
+        source_kind: str,
+        source_name: str,
+        name: str,
+        content: str,
+        url: str | None,
+        raw: dict[str, Any] | None,
+    ) -> Evidence | None: ...
+    def update_evidence(self, evidence_id: str, updates: dict[str, Any]) -> Evidence | None: ...
     def list_evidence(
         self,
         job_id: str | None = None,
@@ -188,20 +227,28 @@ class InMemoryRepository:
         if job_id not in self.jobs:
             return False
         del self.jobs[job_id]
-        for key in [k for k, v in self.steps.items() if v.job_id == job_id]:
+        deleted_steps = {k for k, v in self.steps.items() if v.job_id == job_id}
+        for key in deleted_steps:
             del self.steps[key]
-        for key in [k for k, v in self.outcomes.items() if v.job_id == job_id]:
+        deleted_outcomes = {k for k, v in self.outcomes.items() if v.job_id == job_id}
+        for key in deleted_outcomes:
             del self.outcomes[key]
         for key in [k for k, v in self.customer_outcomes.items() if v.job_id == job_id]:
             del self.customer_outcomes[key]
-        for key in [
-            k
-            for k, v in self.evidence.items()
-            if v.job_id == job_id
-            or (v.step_id is not None and v.step_id not in self.steps)
-            or (v.outcome_id is not None and v.outcome_id not in self.outcomes)
-        ]:
-            del self.evidence[key]
+        #: Do not destroy research evidence: unlink references to the removed
+        #: job, its steps and its outcomes instead of deleting the rows.
+        for key, ev in list(self.evidence.items()):
+            updates: dict[str, Any] = {}
+            if ev.job_id == job_id:
+                updates["job_id"] = None
+            if ev.step_id in deleted_steps:
+                updates["step_id"] = None
+            if ev.outcome_id in deleted_outcomes:
+                updates["outcome_id"] = None
+            if updates:
+                current = ev.model_dump(exclude_unset=True)
+                current.update(updates)
+                self.evidence[key] = Evidence.model_validate(current)
         return True
 
     def add_step(self, step: Step) -> Step:
@@ -235,13 +282,12 @@ class InMemoryRepository:
             del self.outcomes[key]
         for key in [k for k, v in self.customer_outcomes.items() if v.step_id == step_id]:
             del self.customer_outcomes[key]
-        for key in [
-            k
-            for k, v in self.evidence.items()
-            if v.step_id == step_id
-            or (v.outcome_id is not None and v.outcome_id not in self.outcomes)
-        ]:
-            del self.evidence[key]
+        #: Unlink evidence instead of destroying it.
+        for key, ev in list(self.evidence.items()):
+            if ev.step_id == step_id:
+                current = ev.model_dump(exclude_unset=True)
+                current["step_id"] = None
+                self.evidence[key] = Evidence.model_validate(current)
         return True
 
     def add_outcome(self, outcome: Outcome) -> Outcome:
@@ -277,8 +323,13 @@ class InMemoryRepository:
     def delete_outcome(self, outcome_id: str) -> bool:
         if outcome_id in self.outcomes:
             del self.outcomes[outcome_id]
-            for key in [k for k, v in self.evidence.items() if v.outcome_id == outcome_id]:
-                del self.evidence[key]
+            #: Unlink evidence instead of destroying it: point outcome_id to NULL
+            #: so the quote survives the outcome's removal.
+            for key, ev in list(self.evidence.items()):
+                if ev.outcome_id == outcome_id:
+                    current = ev.model_dump(exclude_unset=True)
+                    current["outcome_id"] = None
+                    self.evidence[key] = Evidence.model_validate(current)
             return True
         return False
 
@@ -346,6 +397,43 @@ class InMemoryRepository:
             del self.evidence[evidence_id]
             return True
         return False
+
+    def get_evidence_by_fingerprint(
+        self,
+        source_kind: str,
+        source_name: str,
+        name: str,
+        content: str,
+        url: str | None,
+        raw: dict[str, Any] | None,
+    ) -> Evidence | None:
+        fingerprint = compute_evidence_fingerprint(
+            source_kind, source_name, name, content, url, raw
+        )
+        for existing in self.evidence.values():
+            if (
+                compute_evidence_fingerprint(
+                    existing.source_kind,
+                    existing.source_name,
+                    existing.name,
+                    existing.content,
+                    existing.url,
+                    existing.raw,
+                )
+                == fingerprint
+            ):
+                return existing
+        return None
+
+    def update_evidence(self, evidence_id: str, updates: dict[str, Any]) -> Evidence | None:
+        evidence = self.evidence.get(evidence_id)
+        if not evidence:
+            return None
+        current = evidence.model_dump(exclude_unset=True)
+        current.update(updates)
+        new_evidence = evidence.model_validate(current)
+        self.evidence[evidence_id] = new_evidence
+        return new_evidence
 
     def add_signal(self, signal: Signal) -> Signal:
         self.signals[signal.id] = signal

@@ -22,6 +22,7 @@ export function OpportunityLandscape() {
   const sample = canvas?.source === "seed";
   const jobs = useMemo(() => canvas?.jobs ?? [], [canvas]);
   const outcomes = useMemo(() => canvas?.outcomes ?? [], [canvas]);
+  const evidence = useMemo(() => canvas?.evidence ?? [], [canvas]);
   const isLoading = canvasState.kind === "loading";
   const isEmpty = canvasState.kind === "empty";
   const provenance = canvasStatus(canvas);
@@ -29,6 +30,19 @@ export function OpportunityLandscape() {
   const underservedCount = outcomes.filter((outcome) =>
     isUnderserved(outcome.opportunity_score),
   ).length;
+
+  // Deduplicated demand: distinct customer quotes linked to an outcome. Because
+  // repeat imports of the same quote collapse to a single evidence record,
+  // counting distinct linked evidence never double-counts demand.
+  const linkedQuotes = useMemo(() => {
+    const ids = new Set<string>();
+    for (const item of evidence) {
+      if (item.outcome_id) {
+        ids.add(item.id);
+      }
+    }
+    return ids.size;
+  }, [evidence]);
 
   const avgOpportunity = useMemo(() => {
     if (!outcomes.length) return 0;
@@ -157,6 +171,11 @@ export function OpportunityLandscape() {
           <div className="studio-metric">
             <div className="studio-metric__label">Avg Opportunity Score</div>
             <div className="studio-metric__value">{avgOpportunity}</div>
+          </div>
+          <div className="studio-metric">
+            <div className="studio-metric__label">Unique Customer Quotes</div>
+            <div className="studio-metric__value">{linkedQuotes}</div>
+            <div className="studio-metric__delta">Deduplicated demand</div>
           </div>
         </div>
       )}
