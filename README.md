@@ -13,7 +13,10 @@ desired outcomes, and opportunity scores that rank them.
 [![Run it locally](https://img.shields.io/badge/Run%20it%20locally-1e293b?style=for-the-badge&logo=gnubash&logoColor=white)](#quick-start)
 
 **Try it now — nothing to install.** The Studio opens in your browser; live data
-and chat need the local sidecar below.
+and chat need the local sidecar below. Want to see what it produces first?
+[Open the sample workspace](https://alehar9320.github.io/agentic-odi/sample/) —
+a read-only job, its scored outcomes, and the evidence behind them, generated
+from a committed fixture and labelled a sample on every row.
 
 **Or install the CLI in one line** (Linux, macOS):
 
@@ -207,6 +210,7 @@ together and where each contract is enforced:
 | **`apps/cli/`** | `agentic-odi-cli` | Typer CLI with interactive chat, full entity CRUD, `schema`, `connectors`, and local or remote data access. |
 | **`apps/studio/`** | React + TypeScript + Vite | **The Living Studio** SPA and Tauri 2 desktop shell, built on [assistant-ui](https://www.assistant-ui.com). Keyboard- and screen-reader-operable, gated by an [axe-core](https://github.com/dequelabs/axe-core) WCAG 2.1 AA sweep in the frontend suite. Its browser-level suite lives in `apps/studio/e2e/`. Copied UI components land under `src/vendor/`, which is the only place Tailwind styles. Installed desktop builds **update themselves** in the background and apply on restart. |
 | **`infra/cloudflare/`** | Worker | Free-plan Workers Static Assets deployment and sidecar tunnel. |
+| **`website/`** | — | The static project site: a generator over the repository's own sources, plus the committed read-only sample workspace at `website/sample/`. |
 | **`scripts/`** | — | Dev launcher, binary build, installer tests, and the deterministic study-corpus generator (`gen_corpus.py`). |
 | **`tests/contract/`** | — | Cross-package MCP contract tests. |
 
