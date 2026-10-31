@@ -484,7 +484,13 @@ class InMemoryRepository:
         return new_interview
 
     def delete_interview(self, interview_id: str) -> list[str]:
-        """Delete an interview and cascade its quotes; return the removed quote ids."""
+        """Delete an interview and cascade its quotes; return the removed quote ids.
+
+        Evidence written from a quote **survives** the interview: the verbatim
+        content and the interview title stay readable, and only the
+        ``raw['quote_id']`` pointer is nulled, because the quote it named is
+        gone. A decision made from that evidence must outlive the file.
+        """
         if interview_id not in self.interviews:
             return []
         del self.interviews[interview_id]
@@ -495,6 +501,9 @@ class InMemoryRepository:
             c for c, v in self.candidates.items() if v.interview_id == interview_id
         ]:
             del self.candidates[candidate_id]
+        for evidence in self.evidence.values():
+            if evidence.raw.get("interview_id") == interview_id:
+                evidence.raw["quote_id"] = None
         return removed
 
     def add_quote(self, quote: InterviewQuote) -> InterviewQuote:

@@ -13,6 +13,7 @@ import {
   dismissSignal,
   fetchLatestConversation,
   fetchMemory,
+  fetchOutcomeEvidence,
   fetchSignals,
   fetchUnreadSignalCount,
   markSignalRead,
@@ -549,5 +550,27 @@ describe("signal inbox", () => {
 
     expect(calls[0]?.url).toBe("/api/signals/sig-1/dismiss");
     expect(JSON.parse(calls[0]!.body)).toEqual({ mcp_url: "http://mcp" });
+  });
+});
+
+describe("fetchOutcomeEvidence", () => {
+  it("reads the evidence behind one outcome", async () => {
+    const fetchMock = vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>(
+      async () =>
+        new Response(
+          JSON.stringify({
+            ok: true,
+            result: [{ id: "ev-1", source_name: "Ana", content: "Setup takes forever." }],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await fetchOutcomeEvidence("O-101");
+
+    expect(response.result).toHaveLength(1);
+    expect(response.result[0].content).toBe("Setup takes forever.");
+    expect(String(fetchMock.mock.calls[0][0])).toContain("/api/outcomes/O-101/evidence");
   });
 });

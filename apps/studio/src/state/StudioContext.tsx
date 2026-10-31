@@ -36,6 +36,7 @@ import {
   fetchMarketplace,
   fetchMemory,
   fetchModels,
+  fetchOutcomeEvidence as apiFetchOutcomeEvidence,
   fetchSignals,
   fetchUnreadSignalCount,
   healthLlm,
@@ -67,6 +68,7 @@ import type {
   ConnectorPreset,
   ConnectorSuggestion,
   CustomizeTarget,
+  Evidence,
   MarketplaceListing,
   MarketplaceSearch,
   Observation,
@@ -287,6 +289,8 @@ export interface StudioContextValue {
       satisfaction?: number;
     },
   ) => Promise<void>;
+  /** The verbatim evidence behind one outcome, read live from the store. */
+  fetchOutcomeEvidence: (outcomeId: string) => Promise<Evidence[]>;
   activePanel: WorkspacePanelId | null;
   openPanel: (panel: WorkspacePanelId) => void;
   closePanel: () => void;
@@ -1065,6 +1069,15 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     },
     [settings.mcp_url, pushToast, refreshCanvas],
   );
+
+  const fetchOutcomeEvidence = useCallback(
+    async (outcomeId: string): Promise<Evidence[]> => {
+      const response = await apiFetchOutcomeEvidence(outcomeId, settings.mcp_url);
+      return response.result;
+    },
+    [settings.mcp_url],
+  );
+
   const closePanel = useCallback(() => setActivePanel(null), []);
 
   const openPanel = useCallback(
@@ -1856,6 +1869,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       updateOutcome,
       deleteOutcome,
       deleteEvidence,
+      fetchOutcomeEvidence,
       activePanel,
       openPanel,
       closePanel,
@@ -1962,6 +1976,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       updateOutcome,
       deleteOutcome,
       deleteEvidence,
+      fetchOutcomeEvidence,
       activePanel,
       openPanel,
       closePanel,
