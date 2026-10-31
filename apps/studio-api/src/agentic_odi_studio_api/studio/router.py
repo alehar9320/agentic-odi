@@ -102,7 +102,6 @@ from agentic_odi_studio_api.studio.schemas import (
     RecordBetRequest,
     RecordDecisionRequest,
     RenderMemoRequest,
-    RenderStakeholderMessageRequest,
     ReviewDecisionRequest,
     ScheduleWorkRequest,
     SetOutcomeValueRequest,
@@ -726,9 +725,13 @@ async def post_decision_memo(body: RenderMemoRequest, request: Request) -> dict:
     return {"decision_id": memo.decision_id, "markdown": render_memo(memo)}
 
 
-@router.post("/decisions/message")
-async def post_decision_message(
-    body: RenderStakeholderMessageRequest, request: Request
+@router.get("/decisions/{decision_id}/message")
+async def get_decision_message(
+    decision_id: str,
+    request: Request,
+    channel: str = Query("slack"),
+    link: str | None = Query(None),
+    mcp_url: str = Query(""),
 ) -> dict:
     """Cut the decision's memo to a short, pasteable stakeholder message.
 
@@ -738,23 +741,19 @@ async def post_decision_message(
     """
     if _uses_mcp(request):
         result = await call_mcp_tool(
-            _require_mcp_url(body.mcp_url),
+            _require_mcp_url(mcp_url),
             ToolName.RENDER_STAKEHOLDER_MESSAGE.value,
-            {
-                "decision_id": body.decision_id,
-                "channel": body.channel,
-                "link": body.link,
-            },
+            {"decision_id": decision_id, "channel": channel, "link": link},
         )
         return _payload_from_text(result)
     try:
         message = _service(request).build_stakeholder_message(
-            body.decision_id, channel=body.channel, link=body.link
+            decision_id, channel=channel, link=link
         )
     except Exception as exc:  # noqa: BLE001
         raise _as_http_error(exc) from exc
     return {
-        "decision_id": body.decision_id,
+        "decision_id": decision_id,
         "channel": message.channel,
         "subject": message.subject,
         "body": message.body,

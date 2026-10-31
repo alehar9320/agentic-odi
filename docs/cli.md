@@ -357,9 +357,12 @@ sets a hard word budget (`slack` 120, `email` 200). The largest unknown and a
 supplied `--link` are never dropped for length — a budget that cannot fit them
 fails loudly rather than sending a message with its caveat removed. The `slack`
 variant carries no markdown heading, because a heading renders as a literal `#`
-there; the `email` variant adds a `Subject:`. `--verbose` reports which optional
-sentences were dropped to fit. It reads and writes nothing: the same projection
-backs `POST /api/decisions/message` and the MCP `render_stakeholder_message` tool.
+there; the `email` variant adds a `Subject:`. `--copy` copies the body when a
+clipboard tool (`pbcopy`, `wl-copy`, `xclip`, `clip`) is present and prints it
+otherwise, so it never fails on a machine without one. `--verbose` reports which
+optional sentences were dropped to fit. It reads and writes nothing: the same
+projection backs `GET /api/decisions/{id}/message` and the MCP
+`render_stakeholder_message` tool.
 
 ## Track a bet
 

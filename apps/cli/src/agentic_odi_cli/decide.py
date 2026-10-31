@@ -13,6 +13,8 @@ cannot be confused for each other.
 from __future__ import annotations
 
 import json
+import shutil
+import subprocess
 from datetime import datetime, timezone
 from typing import Any
 
@@ -39,6 +41,35 @@ DECISION_ID_OPTION = typer.Option(..., "--decision-id", help="Decision to assemb
 CHANNEL_OPTION = typer.Option("slack", "--channel", help="slack or email")
 LINK_OPTION = typer.Option(None, "--link", help="Canonical link to the full memo")
 VERBOSE_OPTION = typer.Option(False, "--verbose", help="Report dropped sentences")
+COPY_OPTION = typer.Option(False, "--copy", help="Copy the body to the clipboard if a tool exists")
+
+
+def copy_to_clipboard(text: str) -> bool:
+    """Best-effort clipboard copy using a platform tool already on the machine.
+
+    No dependency is added: when none of the known tools is present this returns
+    ``False`` and the caller prints the body instead, so ``--copy`` never fails
+    the command on a machine without clipboard support.
+    """
+    candidates: tuple[tuple[str, list[str]], ...] = (
+        ("pbcopy", []),
+        ("wl-copy", []),
+        ("xclip", ["-selection", "clipboard"]),
+        ("clip", []),
+    )
+    for name, args in candidates:
+        executable = shutil.which(name)
+        if executable is None:
+            continue
+        try:
+            completed = subprocess.run(
+                [executable, *args], input=text.encode(), check=False
+            )
+        except OSError:
+            continue
+        if completed.returncode == 0:
+            return True
+    return False
 
 
 def parse_rejection(raw: str) -> dict[str, str]:
@@ -120,6 +151,7 @@ def message(
     channel: str = CHANNEL_OPTION,
     link: str | None = LINK_OPTION,
     verbose: bool = VERBOSE_OPTION,
+    copy: bool = COPY_OPTION,
     json_output: bool = JSON_OPTION,
 ) -> None:
     """Draft a short, pasteable stakeholder message from the memo."""
@@ -133,6 +165,12 @@ def message(
     subject = payload.get("subject")
     if subject:
         typer.echo(f"Subject: {subject}")
-    typer.echo(payload["body"])
+    body = payload["body"]
+    if copy:
+        if copy_to_clipboard(body):
+            typer.echo("Copied to clipboard.")
+        else:
+            typer.echo("No clipboard tool found; printing the message instead.", err=True)
+    typer.echo(body)
     if verbose and payload.get("dropped"):
         typer.echo(f"(dropped for length: {', '.join(payload['dropped'])})", err=True)

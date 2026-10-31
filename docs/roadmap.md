@@ -32,7 +32,7 @@ it is merged; the link is the proof.
   `email` 200) — what we found, what we are doing, what it is worth, the largest
   unknown, and a link. The largest unknown and a supplied link are never dropped
   for length; a budget that cannot fit them fails loudly. It reads and writes
-  nothing, and the same projection backs `POST /api/decisions/message` and the
+  nothing, and the same projection backs `GET /api/decisions/{id}/message` and the
   MCP `render_stakeholder_message` tool.
 - [x] **Segments and strategy**: Define a segment by the outcomes it cares about,
   derive candidate groups deterministically from the scores, profile a segment's

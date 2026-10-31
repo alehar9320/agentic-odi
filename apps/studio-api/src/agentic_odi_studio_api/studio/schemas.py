@@ -152,15 +152,6 @@ class RenderMemoRequest(BaseModel):
     mcp_url: str = ""
 
 
-class RenderStakeholderMessageRequest(BaseModel):
-    """Cut the memo to a short, pasteable stakeholder message."""
-
-    decision_id: str = Field(min_length=1)
-    channel: str = "slack"
-    link: str | None = None
-    mcp_url: str = ""
-
-
 class RecordBetRequest(BaseModel):
     """Record a bet: a hypothesis with its baseline captured at creation."""
 

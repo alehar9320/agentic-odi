@@ -191,3 +191,60 @@ def test_message_unknown_decision_exits_nonzero(tmp_path) -> None:
     )
     assert result.exit_code != 0
     assert "not found" in result.output.lower()
+
+
+def test_message_copy_falls_back_to_printing_when_no_clipboard(tmp_path, monkeypatch) -> None:
+    """--copy never fails the command: with no clipboard tool it prints instead."""
+    from agentic_odi_cli import decide
+
+    monkeypatch.setattr(decide.shutil, "which", lambda _name: None)
+    db = str(tmp_path / "studio.db")
+    job_id, ids = _seed(db)
+    decision_id = _decide(db, job_id, ids[0], ids[1])
+
+    result = runner.invoke(
+        app,
+        ["--db", db, "decide", "message", "--decision-id", decision_id, "--copy"],
+    )
+    assert result.exit_code == 0, result.output
+    assert "No clipboard tool found" in result.output
+    assert "We found an unmet need" in result.output
+
+
+def test_message_verbose_reports_a_dropped_sentence(tmp_path) -> None:
+    """A long rationale drops the action sentence and reports it under --verbose."""
+    db = str(tmp_path / "studio.db")
+    job_id, ids = _seed(db)
+    long_rationale = " ".join(f"reason{i}" for i in range(130))
+    result = runner.invoke(
+        app,
+        [
+            "--db",
+            db,
+            "decide",
+            "record",
+            "--job-id",
+            job_id,
+            "--choose",
+            ids[0],
+            "--reject",
+            f"{ids[1]}=Support cost is already low.",
+            "--rationale",
+            long_rationale,
+            "--decided-by",
+            "dana",
+            "--decided-at",
+            "2026-01-02T00:00:00Z",
+            "--json",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    decision_id = json.loads(result.output)["id"]
+
+    message = runner.invoke(
+        app,
+        ["--db", db, "decide", "message", "--decision-id", decision_id, "--verbose"],
+    )
+    assert message.exit_code == 0, message.output
+    assert "dropped for length" in message.output
+    assert "action" in message.output
