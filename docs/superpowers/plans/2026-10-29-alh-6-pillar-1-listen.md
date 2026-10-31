@@ -208,11 +208,11 @@ The **Persistence checklist** in every child points at `packages/core/tests/test
 
 **Files:** `apps/studio-api` `POST /api/outcomes/score-batch` + schema, `apps/cli/.../score_pass.py` + `docs/cli.md`; tests `apps/cli/tests/test_score_pass.py`, `apps/studio-api/tests/test_score_batch.py`.
 
-- [ ] **Step 1:** Batch endpoint takes `[{outcome_id, importance, satisfaction, why?}]` and returns a **per-item** result so one bad row cannot abort the batch; every write goes through `ODIService.update_outcome` (1–10 bounds + recompute).
-- [ ] **Step 2:** CLI `odi score [--job] [--unscored] [--limit]`: `1-10`, `s`, `q`, `u` (undo the last, replayed through the same endpoint), progress `3/20`, summary.
-- [ ] **Step 3:** Tests: scoring three of five leaves two unscored; `11` rejected for that item only with the rest applied; `u` restores the previous value; scripted stdin covers skip/invalid/undo/quit; empty selection renders an honest completion state; API failure never appears as success.
+- [x] **Step 1:** Batch endpoint takes `[{outcome_id, importance, satisfaction, why?}]` and returns a **per-item** result so one bad row cannot abort the batch; every write goes through `ODIService.update_outcome` (1–10 bounds + recompute).
+- [x] **Step 2:** CLI `odi score [--job] [--unscored] [--limit]`: `1-10`, `s`, `q`, `u` (undo the last, replayed through the same endpoint), progress `3/20`, summary.
+- [x] **Step 3:** Tests: scoring three of five leaves two unscored; `11` rejected for that item only with the rest applied; `u` restores the previous value; scripted stdin covers skip/invalid/undo/quit; empty selection renders an honest completion state; API failure never appears as success.
 
-**Readiness blocker:** define how truly unscored outcomes are represented/restored when the prior score pair is absent, and whether `1-10` means two sequential prompts or a pair; do not invent a zero score or hidden default.
+**Readiness blocker resolved:** a truly unscored outcome stores an absent pair (`importance`/`satisfaction` are `None`), never a fabricated zero. `ScoreItem` accepts an optional pair so undo replays the previous pair through the same endpoint; a prior `None`/`None` restores the unscored state. `1-10` is two sequential prompts (importance, then satisfaction) on one outcome, and undo re-prompts the restored outcome.
 
 ### Task 13: A9.2 — The same pass in the Studio ([ALH-154])
 

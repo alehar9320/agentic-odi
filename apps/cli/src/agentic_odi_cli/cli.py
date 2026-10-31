@@ -25,6 +25,7 @@ from agentic_odi_cli.profile import app as profile_app
 from agentic_odi_cli.profile import setup_wizard
 from agentic_odi_cli.render import render_job_summary
 from agentic_odi_cli.schedule import schedule_app
+from agentic_odi_cli.score_pass import score_pass
 from agentic_odi_cli.settings import settings_app
 from agentic_odi_cli.signals import signals_app
 from agentic_odi_cli.steps import steps_app
@@ -65,7 +66,38 @@ app.add_typer(
     help="Alias for customer-outcomes.",
     hidden=True,
 )
-app.command(name="score")(score)
+
+
+@app.command(name="score")
+def score_command(
+    importance: float | None = typer.Argument(
+        None, min=1.0, max=10.0, help="Importance (with satisfaction) to compute a score"
+    ),
+    satisfaction: float | None = typer.Argument(
+        None, min=1.0, max=10.0, help="Satisfaction (with importance) to compute a score"
+    ),
+    job: str | None = typer.Option(None, "--job", help="Only outcomes of this Job"),
+    unscored: bool = typer.Option(False, "--unscored", help="Only outcomes with no score yet"),
+    limit: int | None = typer.Option(None, "--limit", help="Score at most this many outcomes"),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
+) -> None:
+    """Compute an ODI Opportunity Score, or walk many outcomes at the keyboard.
+
+    With two numbers, ``score 8 2`` prints the ODI opportunity score. With no
+    numbers, ``score`` opens the scoring pass: one outcome at a time, ``1-10``
+    for importance then satisfaction, ``s`` skip, ``u`` undo, ``q`` quit.
+    """
+    if (importance is None) != (satisfaction is None):
+        typer.secho(
+            "Error: pass both importance and satisfaction, or neither to open the pass.",
+            fg="red",
+            err=True,
+        )
+        raise typer.Exit(code=2)
+    if importance is not None and satisfaction is not None:
+        score(importance, satisfaction, json_output)
+        return
+    score_pass(job=job, unscored=unscored, limit=limit, json_output=json_output)
 
 
 def _version_callback(ctx: typer.Context, value: bool) -> None:
