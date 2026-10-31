@@ -1,22 +1,39 @@
 import { useState } from "react";
 
-import { JOB_STAGES, type JobStage } from "../../domain/jobStages";
 import { useStudio } from "../../state/StudioContext";
+import type { JobStageDef } from "../../types";
 import { FailurePanel } from "../FailurePanel";
 import { GhostJobSteps } from "../Skeletons";
 
-/** Spread any number of steps across the eight phases, wrapping by order. */
-function phaseIndexFor(order: number, stepCount: number): number {
-  const stages = JOB_STAGES.length;
+/** The stage a step belongs to, by its id, or null when it names none. */
+function stageIndexOf(stepStage: string | null | undefined, stages: JobStageDef[]): number | null {
+  if (!stepStage) {
+    return null;
+  }
+  const index = stages.findIndex((stage) => stage.id === stepStage);
+  return index === -1 ? null : index;
+}
+
+/**
+ * Spread a stage-less step across the given stages by order. Legacy steps
+ * predate the stage field, so their position is the only honest signal; a step
+ * that names a stage is placed by that stage instead.
+ */
+function phaseIndexFor(order: number, stepCount: number, stageCount: number): number {
+  if (stageCount <= 0) {
+    return 0;
+  }
   return Math.min(
-    Math.max(Math.floor(((order - 1) / Math.max(stepCount, stages)) * stages), 0),
-    stages - 1,
+    Math.max(Math.floor(((order - 1) / Math.max(stepCount, stageCount)) * stageCount), 0),
+    stageCount - 1,
   );
 }
 
 export function JobMap() {
   const {
     canvasState,
+    stagesState,
+    refreshStages,
     refreshCanvas,
     addStep,
     updateStep,
@@ -26,8 +43,8 @@ export function JobMap() {
     focusedJobId,
   } = useStudio();
   const canvas = canvasState.data;
+  const stages = stagesState.data ?? [];
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
-  const [followedJobId, setFollowedJobId] = useState<string | null>(null);
   const [editingStepId, setEditingStepId] = useState<string | null>(null);
   const [focusedStepId, setFocusedStepId] = useState<string | null>(null);
   const [editStepName, setEditStepName] = useState("");
@@ -38,9 +55,9 @@ export function JobMap() {
   const [selectedPhaseIndex, setSelectedPhaseIndex] = useState<number | null>(null);
   const [addStepOpen, setAddStepOpen] = useState(false);
   const [newStepName, setNewStepName] = useState("");
+  const [followedJobId, setFollowedJobId] = useState<string | null>(null);
 
   const jobs = canvas?.jobs ?? [];
-
   // A signal names the job it is about. Follow it until the person picks a job
   // themselves, so the map never fights with an explicit choice.
   const focusedJob =
@@ -113,34 +130,49 @@ export function JobMap() {
     }
   }
 
-  // Map steps to 8 phases evenly or by order
-  const stepPhaseMapping = (() => {
-    const buckets: Array<{ phase: JobStage; steps: typeof steps }> = JOB_STAGES.map((phase) => ({
-      phase,
-      steps: [],
-    }));
-
-    steps.forEach((step, idx) => {
-      const order = step.order ?? idx + 1;
-      buckets[phaseIndexFor(order, steps.length)].steps.push(step);
-    });
-
-    return buckets;
-  })();
+  // Bucket steps under the stages the server named: a step's own stage when it
+  // has one, its order otherwise. Nothing is invented here.
+  const stepPhaseMapping = stages.map((stage) => ({ stage, steps: [] as typeof steps }));
+  const stepStageIndex = (step: (typeof steps)[number], idx: number): number => {
+    const named = stageIndexOf(step.stage, stages);
+    if (named !== null) {
+      return named;
+    }
+    const order = step.order ?? idx + 1;
+    return phaseIndexFor(order, steps.length, stages.length);
+  };
+  steps.forEach((step, idx) => {
+    const bucket = stepPhaseMapping[stepStageIndex(step, idx)];
+    if (bucket) {
+      bucket.steps.push(step);
+    }
+  });
 
   const visibleSteps =
     selectedPhaseIndex === null
       ? steps
-      : steps.filter((step, idx) => {
-          const order = step.order ?? idx + 1;
-          return phaseIndexFor(order, steps.length) === selectedPhaseIndex;
-        });
+      : steps.filter((step, idx) => stepStageIndex(step, idx) === selectedPhaseIndex);
 
-  if (canvasState.kind === "error") {
-    // A failed canvas must not render as eight empty phases.
+  if (stagesState.kind === "error") {
+    // A failed schema must not render as an empty map: the stages are unknown,
+    // so the map names the request that failed instead of inventing eight.
     return (
       <section className="fade-in">
-        <p className="section-title">Universal Job Map (8 Process Phases)</p>
+        <p className="section-title">Universal Job Map</p>
+        <FailurePanel
+          error={stagesState.error}
+          onRetry={() => void refreshStages()}
+          retryText="reload"
+        />
+      </section>
+    );
+  }
+
+  if (canvasState.kind === "error") {
+    // A failed canvas must not render as an empty map either.
+    return (
+      <section className="fade-in">
+        <p className="section-title">Universal Job Map</p>
         <FailurePanel
           error={canvasState.error}
           onRetry={() => void refreshCanvas()}
@@ -150,12 +182,21 @@ export function JobMap() {
     );
   }
 
+  if (stagesState.kind === "loading" && stages.length === 0) {
+    return (
+      <section className="fade-in">
+        <p className="section-title">Universal Job Map</p>
+        <p className="caption">Loading the job-map stages…</p>
+      </section>
+    );
+  }
+
   return (
     <section className="fade-in">
-      <p className="section-title">Universal Job Map (8 Process Phases)</p>
+      <p className="section-title">Universal Job Map</p>
       <p className="caption">
-        Ulwick Universal Job Steps: Define ➔ Locate ➔ Prepare ➔ Confirm ➔ Execute ➔ Monitor ➔ Modify
-        ➔ Conclude
+        Ulwick Universal Job Steps: deconstruct human execution into the stages of the job to uncover
+        latent friction.
       </p>
 
       {jobs.length > 1 && (
@@ -190,17 +231,17 @@ export function JobMap() {
           marginBottom: 20,
         }}
       >
-        {JOB_STAGES.map((phase, idx) => {
-          const bucket = stepPhaseMapping[idx];
+        {stepPhaseMapping.map((bucket, idx) => {
+          const { stage } = bucket;
           const hasSteps = bucket.steps.length > 0;
           const isSelected = selectedPhaseIndex === idx;
 
           return (
             <button
-              key={phase.id}
+              key={stage.id}
               type="button"
               aria-pressed={isSelected}
-              aria-label={`Filter steps by ${phase.name}`}
+              aria-label={`Filter steps by ${stage.name}`}
               onClick={() => setSelectedPhaseIndex(isSelected ? null : idx)}
               style={{
                 display: "block",
@@ -226,6 +267,7 @@ export function JobMap() {
               }}
             >
               <span
+                className="jm-stage__name"
                 style={{
                   display: "block",
                   fontSize: "0.78rem",
@@ -233,7 +275,7 @@ export function JobMap() {
                   color: hasSteps ? "var(--studio-text)" : "var(--studio-muted)",
                 }}
               >
-                {phase.name}
+                {stage.name}
               </span>
               <span
                 style={{
@@ -245,7 +287,7 @@ export function JobMap() {
                   overflow: "hidden",
                 }}
               >
-                {phase.desc}
+                {stage.description}
               </span>
               <span
                 style={{
@@ -272,8 +314,8 @@ export function JobMap() {
         })}
       </div>
 
-      {/* A job has one step per phase: the domain refuses an order past 8. */}
-      {activeJobId && steps.length < JOB_STAGES.length && (
+      {/* A job has one step per stage: the domain refuses an order past the map. */}
+      {activeJobId && stages.length > 0 && steps.length < stages.length && (
         <div className="jm-add">
           {addStepOpen ? (
             <form
@@ -419,7 +461,7 @@ export function JobMap() {
                           fontStyle: "italic",
                         }}
                       >
-                        {JOB_STAGES[phaseIndexFor(order, steps.length)].name}
+                        {stepPhaseMapping[stepStageIndex(step, index)]?.stage.name ?? ""}
                       </span>
                       {step.id && (
                         <span className="step__actions">

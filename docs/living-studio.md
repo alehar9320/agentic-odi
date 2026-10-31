@@ -225,6 +225,18 @@ and a failed fetch — are distinct: an empty outcome says *nothing yet*, an
 unknown id is a not-found error, and a failed read says so without rendering as
 empty.
 
+#### The stages the map draws
+
+The Universal Job Map names its stages from the server, not from a literal in
+the component. `GET /api/schema` returns the eight canonical stages — id,
+display name, and one-line description — in `JOB_STAGE_ORDER`, and the map
+renders exactly that list in that order. A ninth stage would appear without a
+component change, and a stage the server drops cannot linger in a stale copy.
+The map holds no fallback array: if the request fails it shows the failure panel
+and a **Retry** rather than an empty map, because a broken request and an empty
+job look identical otherwise. A step that names a stage is placed by that stage;
+a legacy step with none is placed by its `order`.
+
 ### The thread is the room
 
 Capture, scoring, simulation, and decisions are conversations. The storefront
