@@ -8,6 +8,7 @@ import signal
 import sys
 from collections.abc import AsyncIterator, Mapping, Sequence
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from typing import Any
 
 from agentic_odi_core import (
@@ -17,10 +18,12 @@ from agentic_odi_core import (
     CustomerOutcomeNotFoundError,
     EvidenceItemType,
     EvidenceNotFoundError,
+    Job,
     JobNotFoundError,
     JobStage,
     OdiError,
     ODIService,
+    Outcome,
     OutcomeNotFoundError,
     OutcomeStatementError,
     ScheduledWorkNotFoundError,
@@ -42,6 +45,7 @@ from agentic_odi_core import (
     customer_outcome_not_found as _cust_not_found,
 )
 from fastmcp import Context, FastMCP
+from fastmcp.exceptions import ResourceError
 from pydantic import ValidationError
 
 _repo = build_repository()
@@ -95,6 +99,192 @@ def _evidence_not_found(evidence_id: str, hint: str | None = None) -> str:
     if hint:
         message = f"{message} {hint}"
     return message
+
+
+# ---------------------------------------------------------------------------
+# Read-only resources. Every one has a read-tool twin and calls the same
+# ODIService method, so browsing clients and tool-only clients cannot disagree.
+# ---------------------------------------------------------------------------
+
+_RESOURCE_PAGE_DEFAULT = 25
+_RESOURCE_PAGE_MAX = 100
+
+
+def _resource_page(limit: int | None, offset: int) -> tuple[int, int]:
+    """Validate the body-level page window shared by every list resource."""
+    if offset < 0:
+        raise ResourceError(f"offset must be 0 or greater, got {offset}.")
+    page_limit = _RESOURCE_PAGE_DEFAULT if limit is None else limit
+    if not 1 <= page_limit <= _RESOURCE_PAGE_MAX:
+        raise ResourceError(f"limit must be between 1 and {_RESOURCE_PAGE_MAX}, got {page_limit}.")
+    return page_limit, offset
+
+
+def _envelope(
+    items: list[dict[str, Any]], *, limit: int, offset: int, total: int
+) -> dict[str, Any]:
+    next_offset = offset + len(items)
+    return {
+        "items": items,
+        "page": {
+            "limit": limit,
+            "offset": offset,
+            "total": total,
+            "next_offset": next_offset if next_offset < total else None,
+        },
+    }
+
+
+def _outcomes_by_score(outcomes: list[Outcome]) -> list[dict[str, Any]]:
+    ranked = sorted(
+        outcomes,
+        key=lambda item: (item.opportunity_score is None, -(item.opportunity_score or 0.0)),
+    )
+    return [item.model_dump(mode="json") for item in ranked]
+
+
+def _landscape_document(jobs: Sequence[Job]) -> dict[str, Any]:
+    rows: list[Outcome] = []
+    documents: list[dict[str, Any]] = []
+    for job in jobs:
+        outcomes = service.get_outcomes(job_id=job.id, limit=_RESOURCE_PAGE_MAX)
+        rows.extend(outcomes)
+        documents.append(job.model_dump(mode="json"))
+    return {
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "source": "local",
+        "jobs": documents,
+        "outcomes": _outcomes_by_score(rows),
+        "counts": {
+            "jobs": len(jobs),
+            "outcomes": len(rows),
+            "underserved": sum(
+                1
+                for item in rows
+                if item.opportunity_score is not None and item.opportunity_score > 10
+            ),
+        },
+    }
+
+
+@mcp.resource(
+    "odi://schema",
+    name="odi-schema",
+    description="The canonical JSON schema for every ODI entity.",
+    mime_type="application/schema+json",
+)
+def odi_schema_resource() -> dict[str, Any]:
+    return odi_schema()
+
+
+@mcp.resource(
+    "odi://capabilities",
+    description="The generated manifest of the MCP tool surface.",
+    mime_type="application/json",
+)
+def capabilities_resource() -> dict[str, Any]:
+    return capability_manifest()
+
+
+@mcp.resource(
+    "odi://framework",
+    description="The ODI framework guidelines as Markdown.",
+    mime_type="text/markdown",
+)
+def framework_resource() -> str:
+    return ODI_FRAMEWORK_GUIDELINES
+
+
+@mcp.resource(
+    "odi://landscape",
+    description="Every job and its ranked outcomes, with counts.",
+    mime_type="application/json",
+)
+def landscape_resource() -> dict[str, Any]:
+    return _landscape_document(service.get_jobs())
+
+
+@mcp.resource(
+    "odi://vision",
+    description="The Studio brief. Not stored on the MCP server yet.",
+    mime_type="application/json",
+)
+def vision_resource() -> dict[str, Any]:
+    # No server-side brief store exists. An empty 200 would read as "no vision".
+    raise ResourceError(
+        "Vision is not stored on the MCP server yet: no brief store exists. "
+        "Capture it in the Studio; this resource will return it once it persists."
+    )
+
+
+@mcp.resource(
+    "odi://jobs/{job_id}",
+    description="One Job-to-be-Done by id.",
+    mime_type="application/json",
+)
+def job_resource(job_id: str) -> dict[str, Any]:
+    job = service.get_job(job_id)
+    if job is None:
+        raise ResourceError(job_not_found(job_id))
+    return job.model_dump(mode="json")
+
+
+@mcp.resource(
+    "odi://jobs/{job_id}/landscape",
+    description="One job's outcomes, ranked, with counts.",
+    mime_type="application/json",
+)
+def job_landscape_resource(job_id: str) -> dict[str, Any]:
+    job = service.get_job(job_id)
+    if job is None:
+        raise ResourceError(job_not_found(job_id))
+    return _landscape_document([job])
+
+
+@mcp.resource(
+    "odi://outcomes/{outcome_id}",
+    description="One desired outcome by id.",
+    mime_type="application/json",
+)
+def outcome_resource(outcome_id: str) -> dict[str, Any]:
+    outcome = service.get_outcome(outcome_id)
+    if outcome is None:
+        raise ResourceError(_outcome_not_found(outcome_id))
+    return outcome.model_dump(mode="json")
+
+
+@mcp.resource(
+    "odi://evidence/{evidence_id}",
+    description="One captured evidence record by id.",
+    mime_type="application/json",
+)
+def evidence_resource(evidence_id: str) -> dict[str, Any]:
+    evidence = service.get_evidence(evidence_id)
+    if evidence is None:
+        raise ResourceError(_evidence_not_found(evidence_id))
+    return evidence.model_dump(mode="json")
+
+
+@mcp.resource(
+    "odi://evidence{?job_id,outcome_id,limit,offset}",
+    description="Evidence records, filtered and paged.",
+    mime_type="application/json",
+)
+def evidence_list_resource(
+    job_id: str | None = None,
+    outcome_id: str | None = None,
+    limit: int | None = None,
+    offset: int = 0,
+) -> dict[str, Any]:
+    page_limit, page_offset = _resource_page(limit, offset)
+    records = service.list_evidence(job_id=job_id, outcome_id=outcome_id)
+    window = records[page_offset : page_offset + page_limit]
+    return _envelope(
+        [record.model_dump(mode="json") for record in window],
+        limit=page_limit,
+        offset=page_offset,
+        total=len(records),
+    )
 
 
 @mcp.prompt
