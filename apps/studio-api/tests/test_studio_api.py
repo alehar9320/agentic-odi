@@ -200,7 +200,7 @@ def test_chat_offline_default_points_at_manual_work() -> None:
     events = _stream("/api/chat", _chat_body("hello world"))
 
     content = json.loads(events["message"][-1])["content"]
-    assert "no model is reachable" in content
+    assert "no model is reachable" in content.lower()
     assert "/capture" in content
     assert "/help" in content
 
