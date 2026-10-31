@@ -308,6 +308,20 @@ jobs:
       - name: Build
         run: npm run build
 
+      # ALH-162: the demo control and its seed rows fabricate numbers, so
+      # neither may reach a shipped bundle. The dev-only branches are dropped by
+      # the production build; this greps the artifact rather than the source.
+      - name: Assert the demo control and seed rows are not in the production bundle
+        run: |
+          status=0
+          for needle in "Simulate update" "82% of users" "Satisfaction fell to 3"; do
+            if grep -rIl -- "$needle" dist; then
+              echo "::error::The production bundle contains demo data: $needle"
+              status=1
+            fi
+          done
+          exit "$status"
+
       - name: Verify generated API types are up to date
         run: |
           npm run gen:api-types

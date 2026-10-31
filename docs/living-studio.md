@@ -313,7 +313,10 @@ thread, because the server deletes the conversations behind it.
 The **Catch up** feed shows what moved since you last looked, and every row is
 derived on read from your own store — bets, score snapshots, decisions, and
 job-map coverage. Nothing is simulated or invented: an empty store shows an
-empty feed, and a measurement that cannot be made says so instead of guessing.
+empty feed with a real next step, and a measurement that cannot be made says so
+instead of guessing. A failed read is never dressed up as an empty inbox: the
+feed says the store did not answer, so "no changes" is a claim only a
+successful read can make.
 
 | Kind | What it means |
 |---|---|
@@ -337,10 +340,6 @@ in the feed.
 | `POST` | `/api/signals/{id}/dismiss` | Dismiss one |
 | `GET` | `/api/notification-rules` | The effective interruption policy |
 | `PUT` | `/api/notification-rules` | Store one rule for a signal kind |
-
-The `+ Simulate update` button in the feed is a development-only affordance; it
-is hidden in production builds so a demonstration can never be mistaken for
-recorded activity.
 
 The **Notifications** section in Settings edits that shared policy. It reads and
 writes the same `/api/notification-rules` the digest and the bell consult, so a

@@ -237,4 +237,16 @@ describe("Catch Up reads the signal inbox", () => {
     expect(screen.queryByText(/^Simulated$/i)).toBeNull();
     expect(screen.getByRole("button", { name: "All (3)" })).toBeInTheDocument();
   });
+
+  it("does not claim no changes when the read failed", async () => {
+    vi.mocked(fetchSignals).mockRejectedValue(new Error("sidecar unreachable"));
+    vi.mocked(fetchUnreadSignalCount).mockRejectedValue(new Error("sidecar unreachable"));
+
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: "Signal inbox: no unread signals" }));
+
+    expect(await screen.findByText(/could not read the signal inbox/i)).toBeInTheDocument();
+    expect(screen.queryByText(/nothing happened while you were away/i)).toBeNull();
+    expect(screen.getByText(/sidecar unreachable/i)).toBeInTheDocument();
+  });
 });

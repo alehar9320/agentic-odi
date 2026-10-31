@@ -4,6 +4,7 @@ import { useStudio } from "../../state/StudioContext";
 import type { Signal, SignalKind, SignalSeverity } from "../../types";
 import { FailurePanel } from "../FailurePanel";
 import {
+  AlertIcon,
   BoltIcon,
   CheckIcon,
   CompassIcon,
@@ -165,30 +166,44 @@ export function CatchUpFeed() {
       </div>
 
       {visible.length === 0 ? (
-        <div className="card empty-note catchup-empty">
-          <span className="catchup-empty__icon" aria-hidden="true">
-            <BoltIcon size={18} />
-          </span>
-          <p className="catchup-empty__title">
-            {signals.length === 0 ? "Nothing happened while you were away." : "No signals match."}
-          </p>
-          <p className="catchup-empty__hint">
-            {signals.length === 0
-              ? "This inbox only fills from real changes: an outcome re-scored, evidence captured, a job map completed."
-              : "Try another filter."}
-          </p>
-          {signals.length === 0 ? (
-            <div className="catchup-empty__actions">
-              <button
-                type="button"
-                className="button button--ghost"
-                onClick={() => openPanel("capture")}
-              >
-                Capture evidence
-              </button>
-            </div>
-          ) : null}
-        </div>
+        signalsError && signals.length === 0 ? (
+          // A failed read is not an empty inbox. The failure panel above says
+          // what went wrong; this surface must not also claim nothing changed.
+          <div className="card empty-note catchup-empty">
+            <span className="catchup-empty__icon" aria-hidden="true">
+              <AlertIcon size={18} />
+            </span>
+            <p className="catchup-empty__title">Could not read the signal inbox.</p>
+            <p className="catchup-empty__hint">
+              The store did not answer, so this is not a report of no changes. Retry above.
+            </p>
+          </div>
+        ) : (
+          <div className="card empty-note catchup-empty">
+            <span className="catchup-empty__icon" aria-hidden="true">
+              <BoltIcon size={18} />
+            </span>
+            <p className="catchup-empty__title">
+              {signals.length === 0 ? "Nothing happened while you were away." : "No signals match."}
+            </p>
+            <p className="catchup-empty__hint">
+              {signals.length === 0
+                ? "This inbox only fills from real changes: an outcome re-scored, evidence captured, a job map completed."
+                : "Try another filter."}
+            </p>
+            {signals.length === 0 ? (
+              <div className="catchup-empty__actions">
+                <button
+                  type="button"
+                  className="button button--ghost"
+                  onClick={() => openPanel("capture")}
+                >
+                  Capture evidence
+                </button>
+              </div>
+            ) : null}
+          </div>
+        )
       ) : (
         <div className="cards">
           {visible.map((item) => {
