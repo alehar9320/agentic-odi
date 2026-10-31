@@ -128,6 +128,7 @@ odi jobs list
 odi desired-outcomes list --job-id <id>
 odi signals unread                    # what changed while you were away
 odi score 8 2                        # → 14.00
+odi score                            # score many outcomes at the keyboard
 odi                                  # interactive chat in a terminal
 ```
 

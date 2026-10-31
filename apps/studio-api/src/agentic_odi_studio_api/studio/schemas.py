@@ -121,6 +121,23 @@ class UpdateCustomerOutcomeRequest(BaseModel):
     step_id: str | None = None
 
 
+class ScoreItem(BaseModel):
+    """One outcome's scores in a batch pass.
+
+    ``importance`` and ``satisfaction`` are optional so a truly unscored
+    outcome — one whose pair is absent, not zero — can be restored to that
+    state. ``None`` means "no score", never a hidden default. ``why`` is the
+    optional note the scorer leaves with the number; it is not stored on the
+    outcome, but the endpoint echoes it back on the item result so a caller can
+    correlate a decision with the row that produced it.
+    """
+
+    outcome_id: str
+    importance: float | None = None
+    satisfaction: float | None = None
+    why: str | None = None
+
+
 class DecideCandidateRequest(BaseModel):
     """One reviewer decision on a candidate.
 
