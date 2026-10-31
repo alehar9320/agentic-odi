@@ -19,3 +19,12 @@
 - path: "apps/studio/src/components/notices/SidecarNotice.tsx"
   issue: 264
   reason: "Replaced by the unified banner bridge in PR #264."
+- path: "apps/studio/src/lib/guidance.ts"
+  issue: 343
+  reason: "Replaced by apps/studio/src/lib/nextMove.ts in #343; the issue deletes the old hint."
+- path: "apps/studio/src/lib/guidance.test.ts"
+  issue: 343
+  reason: "Replaced by apps/studio/src/lib/nextMove.test.ts in #343."
+- path: "apps/studio/src/components/chat/GuidanceHint.tsx"
+  issue: 343
+  reason: "Replaced by apps/studio/src/components/chat/NextMoveCard.tsx in #343."
