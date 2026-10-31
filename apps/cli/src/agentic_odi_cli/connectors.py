@@ -406,13 +406,19 @@ def ingest_connector(
         None, "--outcome-id", help="Link evidence to a desired Outcome."
     ),
     propose: bool = typer.Option(
-        True, "--propose/--no-propose", help="Create proposals instead of writing outcomes directly (default: on)."
+        True,
+        "--propose/--no-propose",
+        help="Create proposals instead of writing outcomes directly (default: on).",
     ),
     apply: bool = typer.Option(
-        False, "--apply", help="Write outcomes directly instead of creating proposals (opt-in, destructive)."
+        False,
+        "--apply",
+        help="Write outcomes directly instead of creating proposals (opt-in, destructive).",
     ),
     tool_args: str | None = typer.Option(
-        None, "--tool-args", help="Per-tool arguments as a JSON object, e.g. '{\"tool_name\": {\"arg\": \"val\"}}'."
+        None,
+        "--tool-args",
+        help='Per-tool arguments as a JSON object, e.g. \'{"tool_name": {"arg": "val"}}\'.',
     ),
     dry_run: bool = typer.Option(
         False, "--dry-run", help="Fetch and validate records without writing anything."
@@ -440,7 +446,7 @@ def ingest_connector(
                 raise typer.Exit(code=1)
         except json.JSONDecodeError as exc:
             typer.echo(f"Error: --tool-args is not valid JSON: {exc}", err=True)
-            raise typer.Exit(code=1)
+            raise typer.Exit(code=1) from exc
 
     try:
         from agentic_odi_connectors.models import ConnectorConfig

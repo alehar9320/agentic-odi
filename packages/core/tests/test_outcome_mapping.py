@@ -2,15 +2,12 @@
 
 from __future__ import annotations
 
-import pytest
-from pydantic import ValidationError
-
-from agentic_odi_core.models import Direction, Evidence, Job, JobStage, Step
 from agentic_odi_core.mapping import (
     HeuristicProposalStrategy,
     OutcomeProposal,
     ProposalStatus,
 )
+from agentic_odi_core.models import Direction, Evidence, Job, JobStage, Step
 
 
 def _evidence(**overrides) -> Evidence:
@@ -30,7 +27,9 @@ def _job(name: str, description: str | None = None, job_id: str = "j1") -> Job:
     return Job(id=job_id, name=name, description=description)
 
 
-def _step(name: str, step_id: str = "s1", job_id: str = "j1", stage: JobStage | None = None) -> Step:
+def _step(
+    name: str, step_id: str = "s1", job_id: str = "j1", stage: JobStage | None = None
+) -> Step:
     return Step(id=step_id, job_id=job_id, name=name, order=1, stage=stage)
 
 
@@ -66,6 +65,32 @@ def test_proposal_status_values():
     assert ProposalStatus.EDITED == "edited"
 
 
+def test_object_of_control_prefers_the_action_verb_phrase():
+    extract = HeuristicProposalStrategy._find_object_of_control
+    assert extract("rotate production secrets before the next deploy") == "production secrets"
+    assert (
+        extract("fix the invoice reconciliation when the batch fails") == "invoice reconciliation"
+    )
+
+
+def test_object_of_control_falls_back_to_the_noun_phrase():
+    extract = HeuristicProposalStrategy._find_object_of_control
+    assert extract("the quarterly report.") == "quarterly report"
+    assert extract("nothing recognizable here") is None
+
+
+def test_linked_evidence_routes_to_its_own_job():
+    strategy = HeuristicProposalStrategy()
+    jobs = [_job("Unrelated name", description="nothing shared")]
+    evidence = _evidence(
+        name="Ticket 41",
+        content="It takes too long to rotate production secrets before the next deploy.",
+        job_id="j1",
+    )
+
+    assert strategy._route_to_job(evidence, jobs) == ("j1", jobs[0])
+
+
 def test_routes_to_job_by_term_overlap():
     strategy = HeuristicProposalStrategy()
     jobs = [_job("Secret rotation", "How teams rotate production credentials")]
@@ -84,9 +109,7 @@ def test_routes_to_step_within_job():
     strategy = HeuristicProposalStrategy()
     jobs = [_job("Secret rotation")]
     steps = [_step("Confirm readiness", stage=JobStage.CONFIRM)]
-    evidence = _evidence(
-        content="The rotation of the secret is too slow before the next deploy."
-    )
+    evidence = _evidence(content="The rotation of the secret is too slow before the next deploy.")
     proposal = strategy.propose(evidence, jobs, steps)
     assert proposal is not None
     assert proposal.job_id == "j1"
@@ -118,6 +141,7 @@ def test_invalid_statement_not_created():
     # the statement must be valid ODI format
     if proposal is not None:
         from agentic_odi_core.evaluation import evaluate_outcome_statement
+
         verdict = evaluate_outcome_statement(proposal.statement)
         assert verdict["valid"]
 

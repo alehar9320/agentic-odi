@@ -11,16 +11,16 @@ import re
 import uuid
 from collections.abc import Sequence
 from datetime import datetime, timezone
-from enum import StrEnum
-from typing import Any, Protocol
+from enum import Enum
+from typing import Protocol
 
 from pydantic import BaseModel, Field
 
 from agentic_odi_core.evaluation import evaluate_outcome_statement
-from agentic_odi_core.models import Direction, Evidence, Job, JobStage, Step, compute_opportunity_score
+from agentic_odi_core.models import Direction, Evidence, Job, Step
 
 
-class ProposalStatus(StrEnum):
+class ProposalStatus(str, Enum):
     PROPOSED = "proposed"
     APPROVED = "approved"
     REJECTED = "rejected"
@@ -107,6 +107,13 @@ class HeuristicProposalStrategy:
         if not jobs:
             return None, None
 
+        # A record that already names its job is routed there; term overlap is
+        # only the fallback for unlinked evidence.
+        if evidence.job_id is not None:
+            for job in jobs:
+                if job.id == evidence.job_id:
+                    return job.id, job
+
         evidence_terms = self._terms(evidence.name + " " + evidence.content)
         if not evidence_terms:
             return None, None
@@ -165,7 +172,6 @@ class HeuristicProposalStrategy:
         text = evidence.content
         sentences = re.split(r"[.!?]+", text)
         complaint_sentence: str | None = None
-        matched_pattern: str | None = None
 
         for sentence in sentences:
             sentence = sentence.strip()
@@ -175,7 +181,6 @@ class HeuristicProposalStrategy:
             for pattern in _COMPLAINT_PATTERNS:
                 if re.search(pattern, lowered):
                     complaint_sentence = sentence
-                    matched_pattern = pattern
                     break
             if complaint_sentence:
                 break
@@ -200,7 +205,7 @@ class HeuristicProposalStrategy:
         if not verdict["valid"]:
             return None
 
-        importance, satisfaction, confidence = self._score_signals(evidence, complaint_sentence)
+        importance, satisfaction, confidence = self._score_signals(evidence)
         rationale = (
             f"Evidence '{evidence.name}' routed to job {job_id or 'unmatched'} "
             f"(step {step_id or 'unmatched'}); complaint phrase: "
@@ -238,9 +243,24 @@ class HeuristicProposalStrategy:
     @staticmethod
     def _find_unit_of_measure(text: str) -> str | None:
         units = (
-            "time", "hours", "minutes", "seconds", "days", "weeks", "months",
-            "years", "cost", "number", "frequency", "rate", "percentage",
-            "steps", "attempts", "likelihood", "duration", "errors",
+            "time",
+            "hours",
+            "minutes",
+            "seconds",
+            "days",
+            "weeks",
+            "months",
+            "years",
+            "cost",
+            "number",
+            "frequency",
+            "rate",
+            "percentage",
+            "steps",
+            "attempts",
+            "likelihood",
+            "duration",
+            "errors",
         )
         # Time-implying words map to the "time" unit.
         time_words = ("long", "slow", "quick", "fast", "rapid", "speed", "duration")
@@ -265,13 +285,29 @@ class HeuristicProposalStrategy:
         """
         # Pattern 1: <action verb> <object>
         action_verbs = (
-            "rotate", "fix", "resolve", "complete", "find", "locate",
-            "access", "retrieve", "update", "delete", "create", "deploy",
-            "copy", "paste", "enter", "submit", "approve", "review",
+            "rotate",
+            "fix",
+            "resolve",
+            "complete",
+            "find",
+            "locate",
+            "access",
+            "retrieve",
+            "update",
+            "delete",
+            "create",
+            "deploy",
+            "copy",
+            "paste",
+            "enter",
+            "submit",
+            "approve",
+            "review",
         )
         for verb in action_verbs:
             match = re.search(
-                rf"\b{re.escape(verb)}\s+([a-zA-Z][a-zA-Z\s]{2,40}?)(?:\s+when|\s+while|\s+before|\s+after|\s+during|\s+if|\s+as|\.|$)",
+                rf"\b{re.escape(verb)}\s+([a-zA-Z][a-zA-Z\s]{{2,40}}?)"
+                rf"(?:\s+when|\s+while|\s+before|\s+after|\s+during|\s+if|\s+as|\.|$)",
                 text,
             )
             if match:
@@ -341,20 +377,15 @@ class HeuristicProposalStrategy:
         return statement
 
     @classmethod
-    def _score_signals(
-        cls, evidence: Evidence, complaint_sentence: str
-    ) -> tuple[float | None, float | None, float]:
+    def _score_signals(cls, evidence: Evidence) -> tuple[float | None, float | None, float]:
         """Suggest importance and satisfaction from record signals.
 
         These are suggestions with stated confidence, never measurements.
         """
         lowered = evidence.content.lower()
-        complaint_lower = complaint_sentence.lower()
 
         # Frequency: how many times the complaint pattern appears
-        complaint_count = sum(
-            1 for pattern in _COMPLAINT_PATTERNS if re.search(pattern, lowered)
-        )
+        complaint_count = sum(1 for pattern in _COMPLAINT_PATTERNS if re.search(pattern, lowered))
         severity = any(w in lowered for w in ("cannot", "broken", "error", "fail", "stuck"))
         workaround = any(w in lowered for w in ("workaround", "manually", "copy-paste", "retry"))
         speakers = len(set(re.findall(r"\b[A-Z][a-z]+ [A-Z][a-z]+\b", evidence.content)))

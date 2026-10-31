@@ -74,6 +74,7 @@ from agentic_odi_studio_api.studio.schemas import (
     AddStepRequest,
     ApprovalDecisionRequest,
     ApprovalDecisionResponse,
+    ApproveProposalRequest,
     CapabilitiesResponse,
     CapabilityItem,
     ChatRequest,
@@ -95,10 +96,9 @@ from agentic_odi_studio_api.studio.schemas import (
     ObservationResponse,
     ObservationUpdateRequest,
     PromoteEvidenceRequest,
-    ProposeStrategyRequest,
     ProposalOut,
     ProposeOutcomeRequest,
-    ApproveProposalRequest,
+    ProposeStrategyRequest,
     RejectProposalRequest,
     ScheduleWorkRequest,
     SignalActionRequest,
@@ -1463,19 +1463,59 @@ async def promote_evidence(
     return {"ok": True, "result": artifact.model_dump(mode="json")}
 
 
+def _proposal_out(proposal: OutcomeProposal) -> ProposalOut:
+    """Serialize one proposal for the Studio."""
+    return ProposalOut(
+        id=proposal.id,
+        evidence_id=proposal.evidence_id,
+        job_id=proposal.job_id,
+        step_id=proposal.step_id,
+        statement=proposal.statement,
+        direction=proposal.direction.value,
+        unit_of_measure=proposal.unit_of_measure,
+        object_of_control=proposal.object_of_control,
+        contextual_clarifier=proposal.contextual_clarifier,
+        importance=proposal.importance,
+        satisfaction=proposal.satisfaction,
+        confidence=proposal.confidence,
+        rationale=proposal.rationale,
+        quote=proposal.quote,
+        source_name=proposal.source_name,
+        status=proposal.status.value,
+        created_at=proposal.created_at.isoformat(),
+    )
+
+
+@router.post("/proposals")
+async def propose_outcome_api(body: ProposeOutcomeRequest, request: Request) -> dict:
+    """Mine one evidence record into a scored, approvable outcome proposal."""
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(body.mcp_url),
+            ToolName.PROPOSE_OUTCOME.value,
+            {"evidence_id": body.evidence_id},
+        )
+        return {"ok": True, "result": result}
+    try:
+        proposal = _service(request).propose_outcome_from_evidence(body.evidence_id)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return {"ok": True, "result": _proposal_out(proposal).model_dump(mode="json")}
+
+
 @router.get("/proposals")
-async def list_proposals_api(status: str | None = None, request: Request = None) -> dict:
+async def list_proposals_api(request: Request, status: str | None = Query(None)) -> dict:
     """List outcome proposals, optionally filtered by status."""
     try:
         proposal_status = ProposalStatus(status) if status is not None else None
-    except ValueError:
+    except ValueError as exc:
         raise StudioHTTPError(
             StudioError(
                 code=StudioErrorCode.VALIDATION,
                 message=f"invalid status '{status}'. Use proposed, approved, rejected, or edited.",
             ),
             status_code=422,
-        )
+        ) from exc
     if _uses_mcp(request):
         result = await call_mcp_tool(
             _require_mcp_url(request.query_params.get("mcp_url", "")),
@@ -1489,28 +1529,7 @@ async def list_proposals_api(status: str | None = None, request: Request = None)
         raise _as_http_error(exc) from exc
     return {
         "ok": True,
-        "result": [
-            ProposalOut(
-                id=p.id,
-                evidence_id=p.evidence_id,
-                job_id=p.job_id,
-                step_id=p.step_id,
-                statement=p.statement,
-                direction=p.direction.value,
-                unit_of_measure=p.unit_of_measure,
-                object_of_control=p.object_of_control,
-                contextual_clarifier=p.contextual_clarifier,
-                importance=p.importance,
-                satisfaction=p.satisfaction,
-                confidence=p.confidence,
-                rationale=p.rationale,
-                quote=p.quote,
-                source_name=p.source_name,
-                status=p.status.value,
-                created_at=p.created_at.isoformat(),
-            )
-            for p in proposals
-        ],
+        "result": [_proposal_out(p) for p in proposals],
     }
 
 
@@ -1568,23 +1587,5 @@ async def reject_proposal_api(
         raise _as_http_error(exc) from exc
     return {
         "ok": True,
-        "result": ProposalOut(
-            id=proposal.id,
-            evidence_id=proposal.evidence_id,
-            job_id=proposal.job_id,
-            step_id=proposal.step_id,
-            statement=proposal.statement,
-            direction=proposal.direction.value,
-            unit_of_measure=proposal.unit_of_measure,
-            object_of_control=proposal.object_of_control,
-            contextual_clarifier=proposal.contextual_clarifier,
-            importance=proposal.importance,
-            satisfaction=proposal.satisfaction,
-            confidence=proposal.confidence,
-            rationale=proposal.rationale,
-            quote=proposal.quote,
-            source_name=proposal.source_name,
-            status=proposal.status.value,
-            created_at=proposal.created_at.isoformat(),
-        ).model_dump(mode="json"),
+        "result": _proposal_out(proposal).model_dump(mode="json"),
     }

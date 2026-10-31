@@ -741,9 +741,7 @@ class ODIService:
                 proposals.append(self.repo.add_proposal(proposal))
         return proposals
 
-    def list_proposals(
-        self, status: ProposalStatus | None = None
-    ) -> list[OutcomeProposal]:
+    def list_proposals(self, status: ProposalStatus | None = None) -> list[OutcomeProposal]:
         """List all proposals, optionally filtered by status."""
         return self.repo.list_proposals(status=status)
 
@@ -775,17 +773,16 @@ class ODIService:
         if not verdict["valid"]:
             raise InvalidOutcomeStatementError(verdict)
 
-        final_importance = (
-            proposal.importance if importance is None else importance
-        )
-        final_satisfaction = (
-            proposal.satisfaction if satisfaction is None else satisfaction
-        )
+        final_importance = proposal.importance if importance is None else importance
+        final_satisfaction = proposal.satisfaction if satisfaction is None else satisfaction
+        if final_importance is None or final_satisfaction is None:
+            raise ValidationError(
+                f"Proposal {proposal_id} has no scored importance or satisfaction; "
+                "approve it with explicit importance and satisfaction values."
+            )
 
         if proposal.job_id is None:
-            raise ValidationError(
-                f"Proposal {proposal_id} has no routed job; cannot approve."
-            )
+            raise ValidationError(f"Proposal {proposal_id} has no routed job; cannot approve.")
 
         outcome = self.add_outcome(
             proposal.job_id,
@@ -795,12 +792,8 @@ class ODIService:
             step_id=proposal.step_id,
         )
         # Mark the proposal as approved (or edited if statement changed).
-        new_status = (
-            ProposalStatus.EDITED if statement is not None else ProposalStatus.APPROVED
-        )
-        self.repo.update_proposal(
-            proposal_id, {"status": new_status, "outcome_id": outcome.id}
-        )
+        new_status = ProposalStatus.EDITED if statement is not None else ProposalStatus.APPROVED
+        self.repo.update_proposal(proposal_id, {"status": new_status, "outcome_id": outcome.id})
         return outcome
 
     def reject_proposal(self, proposal_id: str) -> OutcomeProposal:
@@ -813,8 +806,10 @@ class ODIService:
                 f"Proposal {proposal_id} is already {proposal.status.value}; "
                 "cannot reject a non-proposed proposal."
             )
-        self.repo.update_proposal(proposal_id, {"status": ProposalStatus.REJECTED})
-        return self.repo.get_proposal(proposal_id)
+        rejected = self.repo.update_proposal(proposal_id, {"status": ProposalStatus.REJECTED})
+        if rejected is None:
+            raise ValidationError(f"Proposal {proposal_id} not found.")
+        return rejected
 
     def compute_opportunity(self, importance: float, satisfaction: float) -> float:
         return compute_opportunity_score(importance, satisfaction)

@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import pytest
-
+from agentic_odi_core import EvidenceNotFoundError
+from agentic_odi_core.errors import ValidationError
 from agentic_odi_core.factory import build_repository
-from agentic_odi_core.models import Evidence, Job
+from agentic_odi_core.models import Evidence
 from agentic_odi_core.services import (
     InvalidOutcomeStatementError,
     ODIService,
@@ -26,7 +27,6 @@ def _evidence(**overrides) -> Evidence:
 
 
 def test_propose_approve_reject_cycle(tmp_path):
-
 
     repo = build_repository(str(tmp_path / "odi.db"))
     service = ODIService(repo)
@@ -64,8 +64,6 @@ def test_propose_approve_reject_cycle(tmp_path):
     assert outcome.statement == proposal.statement
 
     # Proposal is now approved
-    updated = service.get_proposal(proposal.id) if hasattr(service, "get_proposal") else None
-    # Check via repo
     assert repo.get_proposal(proposal.id).status.value == "approved"
 
     # The outcome exists in the store
@@ -75,7 +73,6 @@ def test_propose_approve_reject_cycle(tmp_path):
 
 
 def test_propose_reject_nothing_written(tmp_path):
-
 
     repo = build_repository(str(tmp_path / "odi.db"))
     service = ODIService(repo)
@@ -101,7 +98,6 @@ def test_propose_reject_nothing_written(tmp_path):
 
 
 def test_propose_edit_on_approve(tmp_path):
-
 
     repo = build_repository(str(tmp_path / "odi.db"))
     service = ODIService(repo)
@@ -131,7 +127,6 @@ def test_propose_edit_on_approve(tmp_path):
 
 def test_propose_invalid_statement_rejected(tmp_path):
 
-
     repo = build_repository(str(tmp_path / "odi.db"))
     service = ODIService(repo)
 
@@ -156,7 +151,6 @@ def test_propose_invalid_statement_rejected(tmp_path):
 
 
 def test_propose_batch_dedupes_on_reingest(tmp_path):
-
 
     repo = build_repository(str(tmp_path / "odi.db"))
     service = ODIService(repo)
@@ -195,26 +189,23 @@ def test_propose_batch_dedupes_on_reingest(tmp_path):
 
 def test_propose_nonexistent_evidence_raises(tmp_path):
 
-
     repo = build_repository(str(tmp_path / "odi.db"))
     service = ODIService(repo)
 
-    with pytest.raises(Exception):
+    with pytest.raises(EvidenceNotFoundError):
         service.propose_outcome_from_evidence("nonexistent-id")
 
 
 def test_approve_nonexistent_proposal_raises(tmp_path):
 
-
     repo = build_repository(str(tmp_path / "odi.db"))
     service = ODIService(repo)
 
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         service.approve_proposal("nonexistent-proposal-id")
 
 
 def test_reject_already_approved_proposal_raises(tmp_path):
-
 
     repo = build_repository(str(tmp_path / "odi.db"))
     service = ODIService(repo)
@@ -230,5 +221,5 @@ def test_reject_already_approved_proposal_raises(tmp_path):
     proposal = service.propose_outcome_from_evidence(ev.id)
     service.approve_proposal(proposal.id)
 
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         service.reject_proposal(proposal.id)

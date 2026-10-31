@@ -202,9 +202,7 @@ class Repository(Protocol):
     def update_strategy(self, strategy_id: str, updates: dict) -> Strategy | None: ...
     def add_proposal(self, proposal: OutcomeProposal) -> OutcomeProposal: ...
     def get_proposal(self, proposal_id: str) -> OutcomeProposal | None: ...
-    def list_proposals(
-        self, status: ProposalStatus | None = None
-    ) -> list[OutcomeProposal]: ...
+    def list_proposals(self, status: ProposalStatus | None = None) -> list[OutcomeProposal]: ...
     def update_proposal(self, proposal_id: str, updates: dict) -> OutcomeProposal | None: ...
 
     def clear(self) -> None: ...
@@ -324,17 +322,13 @@ class InMemoryRepository:
     def get_proposal(self, proposal_id: str) -> OutcomeProposal | None:
         return self.proposals.get(proposal_id)
 
-    def list_proposals(
-        self, status: ProposalStatus | None = None
-    ) -> list[OutcomeProposal]:
+    def list_proposals(self, status: ProposalStatus | None = None) -> list[OutcomeProposal]:
         props = list(self.proposals.values())
         if status is not None:
             props = [p for p in props if p.status == status]
         return props
 
-    def update_proposal(
-        self, proposal_id: str, updates: dict
-    ) -> OutcomeProposal | None:
+    def update_proposal(self, proposal_id: str, updates: dict) -> OutcomeProposal | None:
         proposal = self.proposals.get(proposal_id)
         if not proposal:
             return None

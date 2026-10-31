@@ -358,9 +358,7 @@ class SQLiteRepository(Repository):
             self._sync()
             return self.proposals.get(proposal_id)
 
-    def list_proposals(
-        self, status: ProposalStatus | None = None
-    ) -> list[OutcomeProposal]:
+    def list_proposals(self, status: ProposalStatus | None = None) -> list[OutcomeProposal]:
         with self._lock:
             self._sync()
             props = list(self.proposals.values())
@@ -368,9 +366,7 @@ class SQLiteRepository(Repository):
                 props = [p for p in props if p.status == status]
             return props
 
-    def update_proposal(
-        self, proposal_id: str, updates: dict
-    ) -> OutcomeProposal | None:
+    def update_proposal(self, proposal_id: str, updates: dict) -> OutcomeProposal | None:
         with self._lock:
             self._sync()
             proposal = self.proposals.get(proposal_id)

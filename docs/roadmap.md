@@ -45,6 +45,7 @@ counted as done.
 - [ ] **Durable sessions and a real memory** — the conversation survives a reload ([PR #285](https://github.com/alehar9320/agentic-odi/pull/285)).
 - [ ] **Accept or reject a candidate without losing evidence** — the review half of candidate extraction ([PR #284](https://github.com/alehar9320/agentic-odi/pull/284)).
 - [ ] **Outcome-based segments and the strategy they imply** — the scored outcomes group into segments, and the recorded path names the ones it beat ([PR #367](https://github.com/alehar9320/agentic-odi/pull/367)).
+- [ ] **Evidence becomes outcome proposals** — a stored record is mined into a scored, approvable desired outcome, and only a human approval writes it ([PR #438](https://github.com/alehar9320/agentic-odi/pull/438)).
 
 ## Next
 

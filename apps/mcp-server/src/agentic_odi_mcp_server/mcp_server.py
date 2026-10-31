@@ -23,7 +23,6 @@ from agentic_odi_core import (
     OdiError,
     ODIService,
     OutcomeNotFoundError,
-    OutcomeProposal,
     OutcomeStatementError,
     ProposalStatus,
     ScheduledWorkNotFoundError,
@@ -752,9 +751,7 @@ def list_proposals(status: str | None = None) -> str:
     all proposals.
     """
     try:
-        proposal_status = (
-            ProposalStatus(status) if status is not None else None
-        )
+        proposal_status = ProposalStatus(status) if status is not None else None
     except ValueError:
         return f"Error: invalid status '{status}'. Use proposed, approved, rejected, or edited."
     proposals = service.list_proposals(status=proposal_status)
