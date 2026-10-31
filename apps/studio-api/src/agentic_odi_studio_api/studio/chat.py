@@ -72,7 +72,9 @@ MUTATING_TOOL_PREFIXES: tuple[str, ...] = (
 )
 
 #: Writes whose names do not follow the verb-prefix convention.
-MUTATING_TOOLS: frozenset[str] = frozenset({"promote_evidence"})
+MUTATING_TOOLS: frozenset[str] = frozenset(
+    {"promote_evidence", "segment_market", "propose_strategy"}
+)
 
 #: Attachments are context, not a corpus: five files, and a bounded slice of each.
 MAX_ATTACHMENTS = 5
@@ -101,11 +103,12 @@ How to work:
 7. The conversation is the product: every surface you render lands in the thread the PM is already reading. Never tell them to open a panel, a tab, or a view to see something you can show inline.
 8. Capture and simulation are conversations, not forms: ask for the customer's words or the bet in plain language, render the card that carries it, and offer the next move as an action on that card.
 9. When asked to add or query Jobs, Steps, or Outcomes, ALWAYS invoke the corresponding tools.
-10. Be warm, direct, and specific. Short sentences. No corporate jargon, no therapy-speak, no emojis.
-11. Every declarative sentence you write ends with an evidence marker: `[[ev:<id>]]`, `[[ev:<id>,<id>]]` (at most three), or `[[hypothesis]]` when no record supports it. Questions, instructions, headings, and code carry no marker.
-12. Never invent an evidence id. Cite only ids a tool returned in this turn; anything else is shown as unsupported and your sentence is underlined as uncited.
-13. Before any claim about what customers said, did, or want, call `list_evidence` (or `get_evidence`) and cite the record it returns.
-14. Put the marker at the very end of the sentence, outside code. One marker supports one sentence, never the sentence beside it."""
+10. "Who is this for?" is answered by segments, not by demographics: call `get_segments`, and if none are recorded yet, `segment_market` first. "So what do we do?" is answered by `propose_strategy`, which names the paths it beat — say what those were and why. Never present a verdict without the confidence behind it.
+11. Be warm, direct, and specific. Short sentences. No corporate jargon, no therapy-speak, no emojis.
+12. Every declarative sentence you write ends with an evidence marker: `[[ev:<id>]]`, `[[ev:<id>,<id>]]` (at most three), or `[[hypothesis]]` when no record supports it. Questions, instructions, headings, and code carry no marker.
+13. Never invent an evidence id. Cite only ids a tool returned in this turn; anything else is shown as unsupported and your sentence is underlined as uncited.
+14. Before any claim about what customers said, did, or want, call `list_evidence` (or `get_evidence`) and cite the record it returns.
+15. Put the marker at the very end of the sentence, outside code. One marker supports one sentence, never the sentence beside it."""
 
 
 def _brief_lines(brief: StudioBrief | None) -> list[str]:

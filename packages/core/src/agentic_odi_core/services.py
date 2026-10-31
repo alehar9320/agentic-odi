@@ -33,13 +33,23 @@ from agentic_odi_core.models import (
     ScheduledWork,
     ScheduledWorkStatus,
     ScheduledWorkTriggerType,
+    Segment,
+    SegmentVerdict,
     Signal,
     SignalKind,
     Step,
+    Strategy,
     compute_opportunity_score,
 )
 from agentic_odi_core.repository import Repository, page
+from agentic_odi_core.segmentation import (
+    MIN_OUTCOMES_PER_SEGMENT,
+    OutcomeClusterStrategy,
+    SegmentationStrategy,
+    unclustered_outcomes,
+)
 from agentic_odi_core.similarity import normalize
+from agentic_odi_core.strategy import propose_strategy as build_strategy
 
 
 class JobNotFoundError(NotFoundError):
@@ -98,6 +108,34 @@ class SignalNotFoundError(NotFoundError):
     def __init__(self, signal_id: str) -> None:
         self.signal_id = signal_id
         super().__init__(signal_id, "signal")
+
+
+class SegmentNotFoundError(NotFoundError, ValueError):
+    """Raised when a segment id does not resolve.
+
+    Also a :class:`ValueError`, because the caller supplied an id that does not
+    resolve — an invalid argument value.
+    """
+
+    def __init__(self, segment_id: str, hint: str | None = None) -> None:
+        self.segment_id = segment_id
+        super().__init__(segment_id, "segment", hint)
+
+
+class StrategyNotFoundError(NotFoundError, ValueError):
+    """Raised when a strategy id does not resolve."""
+
+    def __init__(self, strategy_id: str, hint: str | None = None) -> None:
+        self.strategy_id = strategy_id
+        super().__init__(strategy_id, "strategy", hint)
+
+
+class NoStrategyEvidenceError(ValidationError):
+    """No strategic path has evidence behind it.
+
+    Raised instead of returning a strategy built on nothing: a bet the data does
+    not support is the fabrication Stage 6 exists to avoid.
+    """
 
 
 DEFAULT_SIGNAL_DAILY_CAP = 20
@@ -187,11 +225,19 @@ def _opportunity_crossing(before: float | None, after: float | None) -> tuple[st
 
 
 class ODIService:
-    def __init__(self, repo: Repository, budget: SignalBudget | None = None) -> None:
+    def __init__(
+        self,
+        repo: Repository,
+        budget: SignalBudget | None = None,
+        segmentation: SegmentationStrategy | None = None,
+    ) -> None:
         self.repo = repo
         #: ``None`` re-reads ``AGENTIC_ODI_SIGNAL_BUDGET`` per signal so a
         #: long-running sidecar picks up a changed cap without a restart.
         self.budget = budget
+        #: ``None`` uses the deterministic outcome-cluster strategy, rebuilt per
+        #: call so it sees the job map as it stands at that moment.
+        self.segmentation = segmentation
 
     def record_signal(
         self,
@@ -467,6 +513,7 @@ class ODIService:
         customer_value: CustomerValue | dict[str, Any],
         business_value: BusinessValue | dict[str, Any],
         step_id: str | None = None,
+        quote_id: str | None = None,
     ) -> CustomerOutcome:
         if self.repo.get_job(job_id) is None:
             raise JobNotFoundError(job_id)
@@ -484,6 +531,7 @@ class ODIService:
             id=str(uuid.uuid4()),
             job_id=job_id,
             step_id=step_id,
+            quote_id=quote_id,
             customer_value=cv,
             business_value=bv,
         )
@@ -561,6 +609,18 @@ class ODIService:
             step_id=step_id,
             outcome_id=outcome_id,
         )
+        #: Dedupe: the same quote imported twice must not become two evidence
+        #: records. Return the existing record instead of appending.
+        duplicate = self.repo.get_evidence_by_fingerprint(
+            evidence.source_kind,
+            evidence.source_name,
+            evidence.name,
+            evidence.content,
+            evidence.url,
+            evidence.raw,
+        )
+        if duplicate is not None:
+            return duplicate
         evidence = self.repo.add_evidence(evidence)
         self.record_signal(
             SignalKind.EVIDENCE_INGESTED,
@@ -833,6 +893,12 @@ class ODIService:
             )
             return self.add_job(label, description=evidence.content or None)
         if target == "outcome":
+            #: Idempotent promotion: if this evidence was already promoted to an
+            #: outcome, return the existing outcome instead of creating a copy.
+            if evidence.outcome_id is not None:
+                existing = self.repo.get_outcome(evidence.outcome_id)
+                if existing is not None:
+                    return existing
             target_job_id = job_id or evidence.job_id
             if target_job_id is None:
                 raise ValidationError("job_id is required to promote evidence to an outcome")
@@ -853,6 +919,8 @@ class ODIService:
                 satisfaction=satisfaction,
                 step_id=evidence.step_id,
             )
+            #: Record the bidirectional link: evidence → outcome.
+            self.repo.update_evidence(evidence.id, {"outcome_id": outcome.id})
             self.record_signal(
                 SignalKind.EVIDENCE_PROMOTED,
                 f'Evidence promoted to an outcome: "{outcome.statement[:60]}"',
@@ -934,3 +1002,152 @@ class ODIService:
         if updated is None:
             raise ScheduledWorkNotFoundError(work_id)
         return updated
+
+    # -- Stage 5: outcome-based segments -------------------------------------
+
+    def segment_market(self, job_id: str | None = None, people: str | None = None) -> list[Segment]:
+        """Cluster the outcomes into segments and persist what the clustering found.
+
+        ``people`` is the group described in the customer's own words when the
+        caller has them; a group derived from the outcomes is labelled inferred.
+        Re-running is safe: a cluster keeps the same id, so the stored segment is
+        updated with the new evidence instead of a second copy appearing.
+        """
+        jobs = [job for job in self.repo.list_jobs() if job_id is None or job.id == job_id]
+        if job_id is not None and not jobs:
+            raise JobNotFoundError(job_id)
+        outcomes = list(self.repo.outcomes.values())
+        strategy = self.segmentation or OutcomeClusterStrategy(
+            steps=list(self.repo.steps.values()), people=people
+        )
+        return [self.save_segment(item) for item in strategy.segment(jobs, outcomes)]
+
+    def list_segments(self, job_id: str | None = None) -> list[Segment]:
+        return self.repo.list_segments(job_id=job_id)
+
+    def get_segment(self, segment_id: str) -> Segment:
+        segment = self.repo.get_segment(segment_id)
+        if segment is None:
+            raise SegmentNotFoundError(segment_id, "run segment_market to produce segments")
+        return segment
+
+    def save_segment(self, segment: Segment) -> Segment:
+        """Persist one segment, rejecting one the store cannot vouch for."""
+        if segment.job_id is not None and self.repo.get_job(segment.job_id) is None:
+            raise JobNotFoundError(segment.job_id)
+        missing = [oid for oid in segment.outcome_ids if self.repo.get_outcome(oid) is None]
+        if missing:
+            raise ValidationError(f"Segment cites outcomes that do not exist: {', '.join(missing)}")
+        if len(segment.outcome_ids) < MIN_OUTCOMES_PER_SEGMENT:
+            raise ValidationError(
+                f"A segment needs at least {MIN_OUTCOMES_PER_SEGMENT} outcomes; "
+                f"{segment.name} has {len(segment.outcome_ids)}. "
+                "It is a hypothesis, and belongs in the unclustered group."
+            )
+        existing = self.repo.get_segment(segment.id)
+        saved = (
+            self.repo.update_segment(
+                segment.id, segment.model_dump(mode="json", exclude={"id", "created_at"})
+            )
+            if existing is not None
+            else self.repo.add_segment(segment)
+        )
+        if saved is None:
+            raise SegmentNotFoundError(segment.id)
+        self._emit_segment_signal(saved, is_new=existing is None)
+        return saved
+
+    def _emit_segment_signal(self, segment: Segment, *, is_new: bool) -> None:
+        severity = "notice" if segment.verdict is SegmentVerdict.UNDERSERVED else "info"
+        self.record_signal(
+            SignalKind.SEGMENT_IDENTIFIED,
+            f'{"Segment identified" if is_new else "Segment re-scored"}: "{segment.name}"',
+            subject_kind="segment",
+            subject_id=segment.id,
+            severity=severity,
+            detail=segment.rationale[:500],
+            discriminator=f"verdict={segment.verdict},confidence={segment.confidence}",
+        )
+
+    def unclustered_outcomes(self, job_id: str | None = None) -> list[Outcome]:
+        """Outcomes that joined no segment — reported, never dropped."""
+        outcomes = list(self.repo.outcomes.values())
+        if job_id is not None:
+            outcomes = [outcome for outcome in outcomes if outcome.job_id == job_id]
+        return unclustered_outcomes(self.repo.list_segments(), outcomes)
+
+    # -- Stage 6: the strategy they imply ------------------------------------
+
+    def propose_strategy(
+        self, segment_ids: list[str] | None = None, job_id: str | None = None
+    ) -> Strategy:
+        """Recommend the one path the evidence supports, and persist it.
+
+        ``job_id`` narrows the scope to that job's segments. Raises
+        :class:`NoStrategyEvidenceError` when no path has evidence: a bet built
+        on nothing is the fabrication this stage exists to avoid.
+        """
+        if job_id is not None and self.repo.get_job(job_id) is None:
+            raise JobNotFoundError(job_id)
+        segments = self._segments_in_scope(segment_ids, job_id)
+        jobs = self.repo.list_jobs()
+        outcomes = list(self.repo.outcomes.values())
+        strategy = build_strategy(segments, jobs, outcomes)
+        if strategy is None:
+            underserved = sum(1 for item in segments if item.verdict is SegmentVerdict.UNDERSERVED)
+            overserved = sum(1 for item in segments if item.verdict is SegmentVerdict.OVERSERVED)
+            known = {job.id for job in jobs}
+            orphans = [item for item in outcomes if item.job_id not in known]
+            leftover = len(unclustered_outcomes(segments, outcomes))
+            raise NoStrategyEvidenceError(
+                f"No path is supported yet: {len(segments)} segment(s) in scope, "
+                f"{underserved} underserved, {overserved} overserved, "
+                f"{len(orphans)} outcome(s) outside a stored job, {leftover} unclustered. "
+                "Score outcomes against a job map before asking for a strategy."
+            )
+        return self.save_strategy(strategy)
+
+    def _segments_in_scope(
+        self, segment_ids: list[str] | None, job_id: str | None = None
+    ) -> list[Segment]:
+        if segment_ids is None:
+            return self.repo.list_segments(job_id=job_id)
+        return [self.get_segment(segment_id) for segment_id in segment_ids]
+
+    def list_strategies(self, segment_id: str | None = None) -> list[Strategy]:
+        return self.repo.list_strategies(segment_id=segment_id)
+
+    def get_strategy(self) -> Strategy | None:
+        """The most recently recorded strategy, or ``None``."""
+        strategies = self.repo.list_strategies()
+        return strategies[-1] if strategies else None
+
+    def save_strategy(self, strategy: Strategy) -> Strategy:
+        """Persist a strategy, requiring the alternatives it beat."""
+        if not strategy.rejected:
+            raise ValidationError(
+                "A strategy without its rejected alternatives is a conclusion, "
+                "not a recommendation."
+            )
+        if strategy.segment_id is not None and self.repo.get_segment(strategy.segment_id) is None:
+            raise SegmentNotFoundError(strategy.segment_id, "propose_strategy from stored segments")
+        existing = self.repo.get_strategy(strategy.id)
+        saved = (
+            self.repo.update_strategy(
+                strategy.id, strategy.model_dump(mode="json", exclude={"id", "created_at"})
+            )
+            if existing is not None
+            else self.repo.add_strategy(strategy)
+        )
+        if saved is None:
+            raise StrategyNotFoundError(strategy.id)
+        self.record_signal(
+            SignalKind.STRATEGY_PROPOSED,
+            f"Strategy proposed: {saved.kind.value}",
+            subject_kind="strategy",
+            subject_id=saved.id,
+            severity="notice",
+            detail=saved.thesis[:500],
+            discriminator=f"kind={saved.kind.value},segment={saved.segment_id or ''}",
+        )
+        return saved
