@@ -9,7 +9,7 @@ from typer.testing import CliRunner
 
 
 def _job_id(runner: CliRunner, db: str) -> str:
-    result = runner.invoke(app, ["--db", db, "jobs", "add", "--name", "J", "--json"])
+    result = runner.invoke(app, ["--db", db, "jobs", "add", "--name", "Job", "--json"])
     assert result.exit_code == 0, result.output
     return json.loads(result.output)["id"]
 

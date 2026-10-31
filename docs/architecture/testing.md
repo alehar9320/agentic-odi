@@ -22,6 +22,7 @@ Tests live next to their package (`packages/*/tests`, `apps/*/tests`). `testpath
 ### `packages/core/tests/`
 
 - `test_models.py` — domain models and their validation rules.
+- `test_job_validation.py` — Job name and description constraints and `create_job()`.
 - `test_service.py` — `ODIService` CRUD, Opportunity Score, and thesis rendering.
 - `test_repository.py` — `InMemoryRepository` behavior.
 - `test_sqlite_repository.py` — SQLite persistence and round-trips.
@@ -107,6 +108,8 @@ Cross-package checks only:
 - `tests/contract/test_cli_contract.py` — the CLI local-handler keys are a subset of `TOOL_NAMES`.
 - `tests/test_worker_security_headers.py` — the Living Studio Worker sends its security headers.
 - `tests/scripts/test_dev.py`, `test_dev_main.py` — `scripts/dev.py` startup, ports, signals, and shutdown.
+- `tests/scripts/test_doc_check.py` — documentation drift: commands, paths, routes, env vars, and README layout.
+- `tests/scripts/test_roadmap_check.py` — the roadmap gate for new capabilities.
 - `tests/scripts/test_pr_body_gate.py` — CI refuses a branch without a described pull request.
 - `tests/scripts/test_release_instructions.py` — release-note section generation.
 - `tests/scripts/test_version_sync.py` — the declared version matches the release.

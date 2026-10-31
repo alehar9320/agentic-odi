@@ -485,6 +485,6 @@ def test_page_weights_are_within_budget(page: str):
     # The MCP reference is the long pole: every tool's argument table and the
     # whole ODI schema live on that one page, so it grows with each paginated
     # list tool and each entity we add. The V2MOM entity, the five scheduled-work
-    # tools, the three signal tools, and the interview/quote tools with their two
-    # schema entities bring the page to ~80 KB.
-    assert size <= 80 * 1024, f"{page}: {size} bytes"
+    # tools, the three signal tools, the interview/quote tools with their two
+    # schema entities, and the evidence-claim markers bring the page to ~83 KB.
+    assert size <= 88 * 1024, f"{page}: {size} bytes"

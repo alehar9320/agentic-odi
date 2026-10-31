@@ -158,6 +158,11 @@ agentic-odi summary <job-id> --top 3 --json
 `--importance` and `--satisfaction` (1–10) are now required on `add`. `evaluate`
 checks a statement against the ODI format rules before saving.
 
+Job names are validated by the core model: 3–64 characters drawn from letters,
+digits, spaces, underscores, and hyphens. Descriptions may be up to 500
+characters. The CLI prints the first validation message instead of a traceback,
+and the Studio API returns a 422 with the same message.
+
 `summary` shows how many of the eight job-map phases the Job covers, which are
 still missing, and the underserved outcomes (score above 10) in descending
 order. `--top` caps that list; `--json` returns the same data for a script.

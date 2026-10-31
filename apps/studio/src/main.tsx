@@ -2,7 +2,10 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
 import App from "./App";
+import { installDiagnosticsConsoleCapture } from "./diagnostics/bundle";
 import "./styles/theme.css";
+
+installDiagnosticsConsoleCapture();
 
 const rootElement = document.getElementById("root");
 if (!rootElement) {
