@@ -332,6 +332,58 @@ def test_should_notify_respects_threshold_and_enabled(service: ODIService) -> No
     assert should_notify(gap, rules) is True
 
 
+@pytest.mark.parametrize(
+    ("magnitude", "expected"),
+    [
+        (0.0, False),
+        (0.2, False),  # a wobble does not interrupt
+        (-0.2, False),
+        (0.5, True),  # the boundary is inclusive
+        (-0.5, True),
+        (1.2, True),
+        (-1.2, True),
+        (None, False),  # missing comparable value cannot be proven to cross
+    ],
+)
+def test_should_notify_score_move_boundaries(magnitude: float | None, expected: bool) -> None:
+    from agentic_odi_core.models import Signal
+    from agentic_odi_core.signals import should_notify
+
+    signal = Signal(
+        kind=SignalKind.SCORE_MOVED,
+        title="moved",
+        subject_kind="outcome",
+        subject_id="o",
+        magnitude=magnitude,
+        fingerprint="f-boundary",
+    )
+    assert should_notify(signal) is expected
+
+
+def test_should_notify_unsupported_kind_has_an_explicit_result() -> None:
+    from agentic_odi_core.models import Signal
+    from agentic_odi_core.signals import should_notify
+
+    # A kind with no rule of its own never interrupts: it stays in the feed
+    # rather than raising, so an unruled kind is an explicit "no".
+    signal = Signal(
+        kind=SignalKind.JOB_ADDED,
+        title="Job added",
+        subject_kind="job",
+        subject_id="j",
+        fingerprint="f-unsupported",
+    )
+    assert should_notify(signal) is False
+
+
+def test_invalid_rule_edit_leaves_the_previous_rule_effective(service: ODIService) -> None:
+    before = {rule.kind: rule for rule in service.list_notification_rules()}
+    with pytest.raises(ValidationError):
+        service.set_notification_rule(SignalKind.SCORE_MOVED, threshold=-1.0)
+    after = {rule.kind: rule for rule in service.list_notification_rules()}
+    assert after[SignalKind.SCORE_MOVED] == before[SignalKind.SCORE_MOVED]
+
+
 def test_notification_rules_have_documented_defaults(service: ODIService) -> None:
     rules = {rule.kind: rule for rule in service.list_notification_rules()}
     assert rules[SignalKind.SCORE_MOVED].threshold == 0.5

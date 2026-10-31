@@ -53,10 +53,14 @@ def should_notify(signal: Signal, rules: dict[SignalKind, NotificationRule] | No
     """Whether a signal is allowed to interrupt, under the shared policy.
 
     Pure: it reads no clock and mutates nothing. A score move must clear the
-    rule's threshold; the other kinds interrupt whenever they are enabled.
+    rule's threshold; the other kinds interrupt whenever they are enabled. A
+    kind with no rule of its own never interrupts — it stays feed-only, so an
+    unruled kind is an explicit "no" rather than an error.
     """
-    policy = rules or default_rules()
-    rule = policy.get(signal.kind) or default_rules()[signal.kind]
+    policy = rules if rules is not None else default_rules()
+    rule = policy.get(signal.kind)
+    if rule is None:
+        return False
     if not rule.enabled:
         return False
     if signal.kind is SignalKind.SCORE_MOVED:

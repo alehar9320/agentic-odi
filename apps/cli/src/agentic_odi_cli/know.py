@@ -55,10 +55,14 @@ def _parse_since(raw: str) -> datetime:
 
 
 def _should_notify(signal: dict[str, Any], rules: dict[str, dict[str, Any]]) -> bool:
-    """Mirror the shared policy from the rules the backend returned."""
+    """Mirror the shared policy from the rules the backend returned.
+
+    A kind with no rule never interrupts, matching the core's ``should_notify``
+    so the digest and the bell cannot disagree about an unruled kind.
+    """
     rule = rules.get(signal.get("kind", ""))
     if rule is None:
-        return True
+        return False
     if not rule.get("enabled", True):
         return False
     if signal.get("kind") == "score_moved":

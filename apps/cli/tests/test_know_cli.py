@@ -465,7 +465,7 @@ def test_digest_builder_ignores_unusable_timestamps():
             {"kind": "bet_due", "created_at": "", "title": "no time", "id": "a"},
             {"kind": "bet_due", "created_at": "2026-06-01T00:00:00", "title": "due", "id": "b"},
         ],
-        [],
+        [{"kind": "bet_due", "enabled": True}],
         since=since,
     )
     assert "due" in body
@@ -486,7 +486,7 @@ def test_digest_reads_the_utc_suffix_pydantic_writes():
     assert _within({"created_at": "2026-06-01T00:00:00Z"}, since) is True
     body = build_digest(
         [{"kind": "bet_due", "created_at": "2026-06-01T00:00:00Z", "title": "due", "id": "b"}],
-        [],
+        [{"kind": "bet_due", "enabled": True}],
         since=since,
     )
     assert "## Bets due" in body
@@ -510,3 +510,13 @@ def test_digest_policy_gates_a_small_score_move():
     big = {**small, "id": "b", "title": "moved a lot", "magnitude": 2.0}
     assert "moved a little" not in build_digest([small], rules, since=since)
     assert "moved a lot" in build_digest([big], rules, since=since)
+
+
+def test_digest_unruled_kind_never_interrupts():
+    from agentic_odi_cli.know import _should_notify
+
+    # A kind with no stored rule stays feed-only, matching the core's
+    # should_notify rather than defaulting to an interruption.
+    assert _should_notify({"kind": "job_added"}, {}) is False
+    assert _should_notify({"kind": "bet_due"}, {"bet_due": {"enabled": True}}) is True
+    assert _should_notify({"kind": "bet_due"}, {"bet_due": {"enabled": False}}) is False
