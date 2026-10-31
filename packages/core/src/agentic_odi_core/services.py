@@ -192,6 +192,34 @@ def _opportunity_crossing(before: float | None, after: float | None) -> tuple[st
     return None
 
 
+def _require_stage_matches_order(order: int, stage: JobStage | str | None) -> None:
+    """Reject a step whose stage contradicts its order, naming both.
+
+    Order and stage are two names for the same position in the job map
+    (1↔define … 8↔conclude). A caller that supplies both must agree, and one
+    that supplies neither is left alone. Checked here as well as on the model
+    so a service or adapter caller sees a domain error rather than a raw
+    Pydantic one. A plain string stage (as the CLI and MCP tools pass) is
+    coerced first, so a bad value is reported rather than assumed.
+    """
+    if stage is None:
+        return
+    try:
+        stage = JobStage(stage)
+    except ValueError:
+        raise ValidationError(
+            f"Unknown job stage '{stage}'. Valid stages: "
+            f"{', '.join(s.value for s in JOB_STAGE_ORDER)}."
+        ) from None
+    expected = JOB_STAGE_ORDER[order - 1] if 1 <= order <= 8 else None
+    if expected is not stage:
+        raise ValidationError(
+            f"Step order={order} disagrees with stage='{stage.value}': "
+            f"order {order} is stage '{expected.value if expected else 'none'}'. "
+            "They must agree (1=define … 8=conclude)."
+        )
+
+
 class ODIService:
     def __init__(self, repo: Repository, budget: SignalBudget | None = None) -> None:
         self.repo = repo
@@ -299,6 +327,15 @@ class ODIService:
             raise JobNotFoundError(job_id)
 
     def update_step(self, step_id: str, updates: dict[str, Any]) -> Step:
+        existing = self.repo.get_step(step_id)
+        if existing is None:
+            raise StepNotFoundError(step_id)
+        order = updates.get("order", existing.order)
+        stage = updates.get("stage", existing.stage)
+        _require_stage_matches_order(order, stage)
+        if "stage" in updates or "order" in updates:
+            updates = dict(updates)
+            updates["stage_index"] = JOB_STAGE_INDEX.get(stage) if stage is not None else None
         res = self.repo.update_step(step_id, updates)
         if not res:
             raise StepNotFoundError(step_id)
@@ -404,6 +441,7 @@ class ODIService:
                 "Use allow_empty_job_map=True to stage a map deliberately (audited)."
             )
         stage_index = JOB_STAGE_INDEX.get(stage) if stage is not None else None
+        _require_stage_matches_order(order, stage)
         step = Step(
             id=str(uuid.uuid4()),
             job_id=job_id,

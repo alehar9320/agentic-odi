@@ -221,3 +221,37 @@ async def test_add_step_rejects_an_order_outside_the_job_map():
 
         assert result.content[0].text.startswith("Error:")
         assert "between 1 and 8" in result.content[0].text
+
+
+@pytest.mark.asyncio
+async def test_update_step_moves_the_stage_and_rejects_a_disagreement():
+    async with Client(mcp) as client:
+        created = await client.call_tool("add_job", {"name": "Deploy a service"})
+        job_id = _extract_id(created.content[0].text)
+        assert job_id is not None
+        await client.call_tool(
+            "add_outcome",
+            {
+                "job_id": job_id,
+                "statement": "Minimize the time to deploy a service when the build is ready",
+                "importance": 8.0,
+                "satisfaction": 4.0,
+            },
+        )
+        step = await client.call_tool(
+            "add_step",
+            {"job_id": job_id, "name": "Prepare", "order": 3, "stage": "prepare"},
+        )
+        step_id = _extract_id(step.content[0].text)
+        assert step_id is not None
+
+        moved = await client.call_tool(
+            "update_step", {"step_id": step_id, "order": 5, "stage": "execute"}
+        )
+        assert "Step updated successfully" in moved.content[0].text
+        assert '"stage":"execute"' in moved.content[0].text
+
+        # Moving the order alone contradicts the stage and is refused, not lost.
+        refused = await client.call_tool("update_step", {"step_id": step_id, "order": 2})
+        assert refused.content[0].text.startswith("Error:")
+        assert "order=2" in refused.content[0].text
