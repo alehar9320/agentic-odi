@@ -196,6 +196,23 @@ def catalog_presets(
     typer.echo("\nAdd one with: agentic-odi connectors add mcp --preset <id>")
 
 
+@connectors_app.command("list-presets")
+def list_presets_command() -> None:
+    """Print every built-in connector preset as a markdown table."""
+    from agentic_odi_connectors.catalog import AREA_LABELS, list_presets
+
+    typer.echo("| Preset | Area | Kind | Auth | URL |")
+    typer.echo("|--------|------|------|------|-----|")
+    for preset in list_presets():
+        if preset.auth == "oauth":
+            auth = "oauth"
+        elif preset.env_vars:
+            auth = "api key"
+        else:
+            auth = "none"
+        typer.echo(f"| {preset.id} | {AREA_LABELS[preset.area]} | mcp | {auth} | {preset.url} |")
+
+
 def _mcp_connector_config(
     *,
     name: str | None,
