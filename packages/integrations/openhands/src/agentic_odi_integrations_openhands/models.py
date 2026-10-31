@@ -93,6 +93,7 @@ class SourceKind(str, Enum):
     GITHUB = "github"
     SCHEDULE = "schedule"
     STUDIO = "studio"
+    AUTOMATION = "automation"
 
 
 class Decision(str, Enum):
@@ -265,12 +266,30 @@ class GitHubSettings(BaseModel):
     poll_interval_s: int = 60
 
 
+class AutomationSettings(BaseModel):
+    """OpenHands Automation adoption settings (opt-in, fail-closed).
+
+    When enabled, the daemon discovers existing Automation conversations
+    whose repo/branch match configured patterns and adopts them as tracked
+    work items, never starting a second conversation for the same issue.
+    """
+
+    enabled: bool = False
+    repo_patterns: list[str] = Field(
+        default_factory=list,
+        description="Glob patterns for repos to adopt (e.g. ['acme/*', 'my-org/*']).",
+    )
+    label: str = "odi:automation"
+    discovery_interval_s: int = Field(3600, ge=60)
+
+
 class OrchestratorSettings(BaseModel):
     model_config = ConfigDict(extra="allow")
 
     targets: list[AgentTarget] = Field(default_factory=list)
     default_target: str | None = None
     github: GitHubSettings = Field(default_factory=GitHubSettings)
+    automation: AutomationSettings = Field(default_factory=AutomationSettings)
     workspace_root: str | None = None
     poll_interval_s: int = Field(15, ge=1)
     lease_seconds: int = Field(120, ge=30)

@@ -254,6 +254,8 @@ class ConversationInfo(BaseModel):
     sandbox_id: str | None = None
     conversation_url: str | None = None
     session_api_key: str | None = None
+    repo: str | None = None
+    branch: str | None = None
     execution_status: str | None = None
     sandbox_status: str | None = None
     blocked_actions: list[Any] = Field(default_factory=list)

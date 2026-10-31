@@ -8,6 +8,7 @@ readable, resumable record rather than an invisible agent.
 
 from __future__ import annotations
 
+import fnmatch
 import json
 import os
 import time
@@ -138,6 +139,7 @@ class TickReport:
     enqueued_schedules: int = 0
     github_created: int = 0
     issues_created: int = 0
+    automation_adopted: int = 0
     dispatched: int = 0
     supervised: int = 0
     terminal: int = 0
@@ -455,6 +457,7 @@ class OrchestratorService:
         report.enqueued_schedules = self._enqueue_due_schedules(now)
         self._poll_github(now, report)
         report.issues_created = self._poll_issues(now, report)
+        report.automation_adopted = self._poll_automation(now, report)
         self._supervise_active(now, report)
         self._dispatch_queued(now, report)
         return report
@@ -519,6 +522,75 @@ class OrchestratorService:
                 continue
         report.issues_created = created
         return created
+
+    def _poll_automation(self, now: datetime, report: TickReport) -> int:
+        """Adopt existing OpenHands Automation conversations as tracked work.
+
+        Fail-closed: only adopts conversations that already exist; never
+        starts a new conversation. Matches by repo pattern against the
+        conversation's repo field. Dedupe by automation:{conversation.id}.
+        """
+        if not self.settings.automation.enabled:
+            return 0
+        if not self.settings.automation.repo_patterns:
+            return 0
+
+        adopted = 0
+        for target in self.settings.targets:
+            conversations = self._search_automation_conversations(target)
+            for conv in conversations:
+                if not conv.repo:
+                    continue
+                if not any(
+                    fnmatch.fnmatch(conv.repo, pat)
+                    for pat in self.settings.automation.repo_patterns
+                ):
+                    continue
+                work_key = f"automation:{conv.id}"
+                existing = self.store.get_work_item_by_key(work_key)
+                if existing is not None:
+                    continue
+                try:
+                    _, was_created = self.add_work_item(
+                        title=conv.title or f"Automation: {conv.id}",
+                        prompt=(
+                            f"Adopted OpenHands Automation conversation {conv.id} "
+                            f"for repo {conv.repo}."
+                        ),
+                        target_alias=target.alias,
+                        repository=conv.repo,
+                        branch=conv.branch,
+                        work_key=work_key,
+                        source_kind=SourceKind.AUTOMATION,
+                        source_ref=conv.id,
+                        metadata={
+                            "automation_conversation_id": conv.id,
+                            "automation_conversation_url": conv.conversation_url,
+                            "automation_repo": conv.repo,
+                            "automation_branch": conv.branch,
+                        },
+                    )
+                    adopted += int(was_created)
+                except (OrchestratorError, ValueError) as exc:
+                    report.errors.append(f"automation {conv.id}: {exc}")
+                    continue
+        report.automation_adopted = adopted
+        return adopted
+
+    def _search_automation_conversations(
+        self, target: AgentTarget
+    ) -> list[ConversationInfo]:
+        """Search for Automation conversations for one target.
+
+        Returns an empty list on any error so one target never blocks another.
+        """
+        try:
+            client = self._cloud_factory(target)
+            return client.search_conversations(
+                title_contains=self.settings.automation.label
+            )
+        except Exception:  # noqa: BLE001 - one target must not block adoption
+            return []
 
     # -- schedules -------------------------------------------------------
 
