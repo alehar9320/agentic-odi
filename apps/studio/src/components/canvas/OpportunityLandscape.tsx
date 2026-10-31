@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 
 import { canvasStatus } from "../../lib/canvasProvenance";
 import { formatOpportunityScore, isUnderserved } from "../../lib/odi";
@@ -11,10 +11,20 @@ import { OutcomeCard } from "./OutcomeCard";
 type ViewMode = "matrix" | "cards" | "table";
 
 export function OpportunityLandscape() {
-  const { canvasState, deleteThesis, openPanel, refreshCanvas, theses } = useStudio();
+  const {
+    canvasState,
+    deleteThesis,
+    openPanel,
+    refreshCanvas,
+    theses,
+    focusedSubject,
+    focusSubject,
+  } = useStudio();
   const [underservedOnly, setUnderservedOnly] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedOutcomeId, setSelectedOutcomeId] = useState<string | null>(null);
+  const [selectedOutcomeId, setSelectedOutcomeId] = useState<string | null>(
+    focusedSubject?.kind === "outcome" ? focusedSubject.id : null,
+  );
   const [viewMode, setViewMode] = useState<ViewMode>("matrix");
   const [hoveredOutcome, setHoveredOutcome] = useState<Outcome | null>(null);
 
@@ -56,6 +66,14 @@ export function OpportunityLandscape() {
       (a, b) => (b.opportunity_score ?? -Infinity) - (a.opportunity_score ?? -Infinity),
     );
   }, [filteredOutcomes]);
+
+  function toggleOutcome(id: string) {
+    const next = selectedOutcomeId === id ? null : id;
+    setSelectedOutcomeId(next);
+    if (next) {
+      focusSubject("outcome", next);
+    }
+  }
 
   const activeOutcome = useMemo(() => {
     if (selectedOutcomeId) {
@@ -165,7 +183,11 @@ export function OpportunityLandscape() {
       {canvasState.kind === "error" ? null : (
         <div style={{ display: "flex", gap: 12, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
           <div style={{ flex: "1 1 240px" }}>
+            <label className="sr-only" htmlFor="opportunity-search">
+              Search outcomes
+            </label>
             <input
+              id="opportunity-search"
               type="text"
               className="studio-input"
               placeholder="Search opportunities / outcomes by statement or ID..."
@@ -212,7 +234,7 @@ export function OpportunityLandscape() {
         <OpportunityMatrixView
           outcomes={filteredOutcomes}
           selectedOutcomeId={selectedOutcomeId}
-          onSelectOutcome={(id) => setSelectedOutcomeId(selectedOutcomeId === id ? null : id)}
+          onSelectOutcome={toggleOutcome}
           onHoverOutcome={setHoveredOutcome}
           activeOutcome={activeOutcome}
           sample={sample}
@@ -221,7 +243,7 @@ export function OpportunityLandscape() {
         <OpportunityTableView
           outcomes={sortedOutcomes}
           selectedOutcomeId={selectedOutcomeId}
-          onSelectOutcome={(id) => setSelectedOutcomeId(selectedOutcomeId === id ? null : id)}
+          onSelectOutcome={toggleOutcome}
         />
       ) : sortedOutcomes.length ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -284,6 +306,16 @@ interface MatrixViewProps {
   sample: boolean;
 }
 
+interface PlottedOutcome {
+  outcome: Outcome;
+  importance: number;
+  satisfaction: number;
+  score: number;
+  underserved: boolean;
+  cx: number;
+  cy: number;
+}
+
 function OpportunityMatrixView({
   outcomes,
   selectedOutcomeId,
@@ -292,8 +324,95 @@ function OpportunityMatrixView({
   activeOutcome,
   sample,
 }: MatrixViewProps) {
+  const [focusedId, setFocusedId] = useState<string | null>(null);
+  const nodeRefs = useRef(new Map<string, HTMLButtonElement>());
+
+  const plotted: PlottedOutcome[] = outcomes.map((outcome) => {
+    const importance = Math.min(Math.max(outcome.importance ?? 5, 0), 10);
+    const satisfaction = Math.min(Math.max(outcome.satisfaction ?? 5, 0), 10);
+    const score = outcome.opportunity_score ?? importance + Math.max(importance - satisfaction, 0);
+    return {
+      outcome,
+      importance,
+      satisfaction,
+      score,
+      underserved: isUnderserved(score),
+      // Map (satisfaction, importance) into the 500x360 viewBox.
+      cx: (satisfaction / 10) * 440 + 40,
+      cy: 320 - (importance / 10) * 280,
+    };
+  });
+
+  const underservedCount = plotted.filter((plot) => plot.underserved).length;
+  const importances = plotted.map((plot) => plot.importance);
+  const minImportance = importances.length ? Math.min(...importances) : 0;
+  const maxImportance = importances.length ? Math.max(...importances) : 0;
+  const summary = `${plotted.length} outcomes, ${underservedCount} of them underserved, spanning importance ${minImportance} to ${maxImportance}.`;
+
+  // One tab stop for the whole plot; the arrow keys carry focus from there.
+  const rovingId =
+    focusedId && plotted.some((plot) => plot.outcome.id === focusedId)
+      ? focusedId
+      : (plotted[0]?.outcome.id ?? null);
+
+  function focusInDirection(from: PlottedOutcome, key: string) {
+    const step: Record<string, [number, number] | undefined> = {
+      ArrowRight: [1, 0],
+      ArrowLeft: [-1, 0],
+      ArrowUp: [0, -1],
+      ArrowDown: [0, 1],
+    };
+    const direction = step[key];
+    if (!direction) {
+      return;
+    }
+    let nearest: { id: string; distance: number } | null = null;
+    for (const candidate of plotted) {
+      const id = candidate.outcome.id;
+      if (!id || id === from.outcome.id) {
+        continue;
+      }
+      const dx = candidate.cx - from.cx;
+      const dy = candidate.cy - from.cy;
+      if (direction[0] !== 0 && Math.sign(dx) !== direction[0]) {
+        continue;
+      }
+      if (direction[1] !== 0 && Math.sign(dy) !== direction[1]) {
+        continue;
+      }
+      const distance = Math.hypot(dx, dy);
+      if (!nearest || distance < nearest.distance) {
+        nearest = { id, distance };
+      }
+    }
+    if (!nearest) {
+      return;
+    }
+    setFocusedId(nearest.id);
+    nodeRefs.current.get(nearest.id)?.focus();
+  }
+
+  function onNodeKeyDown(event: React.KeyboardEvent<HTMLButtonElement>, plot: PlottedOutcome) {
+    const id = plot.outcome.id;
+    if (!id) {
+      return;
+    }
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      onSelectOutcome(id);
+      return;
+    }
+    if (event.key.startsWith("Arrow")) {
+      event.preventDefault();
+      focusInDirection(plot, event.key);
+    }
+  }
+
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: 16 }}>
+    <div
+      className="opportunity-matrix"
+      style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: 16 }}
+    >
       {/* Interactive 2D Chart */}
       <div
         style={{
@@ -311,11 +430,19 @@ function OpportunityMatrixView({
           <span>X-Axis: Satisfaction (0 - 10)</span>
         </div>
 
-        <div style={{ position: "relative", width: "100%", aspectRatio: "1.4 / 1", minHeight: 320 }}>
+        <div
+          className="opportunity-matrix__plot"
+          style={{ position: "relative", width: "100%", aspectRatio: "500 / 360", minHeight: 320 }}
+        >
           <svg
+            role="img"
+            aria-labelledby="opportunity-map-title"
+            aria-describedby="opportunity-map-desc"
             viewBox="0 0 500 360"
             style={{ width: "100%", height: "100%", overflow: "visible" }}
           >
+            <title id="opportunity-map-title">Opportunity map</title>
+            <desc id="opportunity-map-desc">{summary}</desc>
             {/* Grid background lines */}
             <defs>
               <linearGradient id="underservedGlow" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -364,33 +491,20 @@ function OpportunityMatrixView({
               Overserved Zone
             </text>
 
-            {/* Render Outcome Points */}
-            {outcomes.map((outcome) => {
-              const imp = Math.min(Math.max(outcome.importance ?? 5, 0), 10);
-              const sat = Math.min(Math.max(outcome.satisfaction ?? 5, 0), 10);
-              const opp = outcome.opportunity_score ?? (imp + Math.max(imp - sat, 0));
-
-              // Map (sat, imp) to SVG space (x: 40..480, y: 320..20)
-              const cx = (sat / 10) * 440 + 40;
-              const cy = 320 - (imp / 10) * 280;
-
+            {/* Render Outcome Points. The SVG is one image with a summary; the
+                real controls are the overlay buttons rendered below it. */}
+            {plotted.map((plot) => {
+              const { outcome, cx, cy } = plot;
               const isSelected = selectedOutcomeId === outcome.id;
               const isHovered = activeOutcome?.id === outcome.id;
-              const underserved = isUnderserved(opp);
 
-              let nodeColor = underserved ? "#fbbf24" : "var(--studio-indigo)";
-              if (opp >= 15) nodeColor = "#f87171";
+              let nodeColor = plot.underserved ? "#fbbf24" : "var(--studio-indigo)";
+              if (plot.score >= 15) nodeColor = "#f87171";
 
               return (
-                <g
-                  key={outcome.id}
-                  style={{ cursor: "pointer" }}
-                  onClick={() => outcome.id && onSelectOutcome(outcome.id)}
-                  onMouseEnter={() => onHoverOutcome(outcome)}
-                  onMouseLeave={() => onHoverOutcome(null)}
-                >
+                <g key={outcome.id}>
                   {/* Pulse ring for underserved */}
-                  {underserved && (
+                  {plot.underserved && (
                     <circle
                       cx={cx}
                       cy={cy}
@@ -423,7 +537,7 @@ function OpportunityMatrixView({
                     fill={nodeColor}
                     stroke="#0b0d13"
                     strokeWidth="2"
-                    filter={underserved || isSelected ? "url(#glowEffect)" : undefined}
+                    filter={plot.underserved || isSelected ? "url(#glowEffect)" : undefined}
                   />
 
                   {/* Node ID Label */}
@@ -441,6 +555,53 @@ function OpportunityMatrixView({
               );
             })}
           </svg>
+
+          {plotted.map((plot) => {
+            const { outcome } = plot;
+            const id = outcome.id;
+            if (!id) {
+              return null;
+            }
+            const isSelected = selectedOutcomeId === id;
+            return (
+              <button
+                key={id}
+                ref={(element) => {
+                  if (element) {
+                    nodeRefs.current.set(id, element);
+                  } else {
+                    nodeRefs.current.delete(id);
+                  }
+                }}
+                type="button"
+                className={`matrix-node${isSelected ? " matrix-node--selected" : ""}`}
+                style={{ left: `${(plot.cx / 500) * 100}%`, top: `${(plot.cy / 360) * 100}%` }}
+                tabIndex={id === rovingId ? 0 : -1}
+                aria-pressed={isSelected}
+                aria-label={`${id}, ${outcome.statement ?? "Outcome"}, opportunity score ${formatOpportunityScore(plot.score)}, ${plot.underserved ? "underserved" : "served"}`}
+                onClick={() => onSelectOutcome(id)}
+                onFocus={() => {
+                  setFocusedId(id);
+                  onHoverOutcome(outcome);
+                }}
+                onBlur={() => onHoverOutcome(null)}
+                onMouseEnter={() => onHoverOutcome(outcome)}
+                onMouseLeave={() => onHoverOutcome(null)}
+                onKeyDown={(event) => onNodeKeyDown(event, plot)}
+              />
+            );
+          })}
+
+          <ul className="sr-only" aria-label="Opportunities on the map">
+            {plotted.map((plot) => (
+              <li key={plot.outcome.id}>
+                {plot.outcome.id} — {plot.outcome.statement ?? "Outcome"}: importance{" "}
+                {plot.importance}, satisfaction {plot.satisfaction}, opportunity score{" "}
+                {formatOpportunityScore(plot.score)}
+                {plot.underserved ? ", underserved" : ""}
+              </li>
+            ))}
+          </ul>
         </div>
       </div>
 

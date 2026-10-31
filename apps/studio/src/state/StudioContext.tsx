@@ -54,6 +54,7 @@ import {
 } from "../api/studioApi";
 import type { RawSseEvent } from "../api/sse";
 import { capabilityRegistry, type Capability } from "../bff/capabilities/registry";
+import { loadSession, saveSession, type StudioSession } from "../lib/session";
 import type {
   AddConnectorPayload,
   AddOutcomePayload,
@@ -63,6 +64,9 @@ import type {
   ChatAttachment,
   ChatMessage,
   ChatPart,
+  Claim,
+  ClaimCitation,
+  ClaimStatus,
   ConnectorListItem,
   ConnectorPreset,
   ConnectorSuggestion,
@@ -83,6 +87,7 @@ import type {
 } from "../types";
 import { catalogManifest } from "../ui/catalog";
 import { parseUiSpec } from "../ui/protocol";
+import { recordStream, recordStudioError } from "../diagnostics/bundle";
 
 /**
  * The visible path of a persisted conversation: from the head back to the root.
@@ -117,23 +122,74 @@ export function turnsToMessages(
       return [];
     }
     const content = node.content ?? "";
+    const claims = node.claims ?? [];
     return [
       {
         id: node.id,
         parentId: node.parent_id,
         role: node.role,
         content,
-        parts: content ? [{ kind: "text" as const, text: content }] : [],
+        parts: claims.length
+          ? [{ kind: "claims" as const, content, claims }]
+          : content
+            ? [{ kind: "text" as const, text: content }]
+            : [],
       },
     ];
   });
+}
+
+const CLAIM_STATUSES = new Set<ClaimStatus>(["cited", "hypothesis", "uncited"]);
+
+/** The claims a terminal frame carries, read defensively. */
+function readClaims(raw: unknown): Claim[] {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  const claims: Claim[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== "object") {
+      continue;
+    }
+    const candidate = item as Partial<Claim>;
+    if (typeof candidate.index !== "number" || typeof candidate.text !== "string") {
+      continue;
+    }
+    const evidence: ClaimCitation[] = [];
+    for (const rawCitation of Array.isArray(candidate.evidence) ? candidate.evidence : []) {
+      if (!rawCitation || typeof rawCitation !== "object") {
+        continue;
+      }
+      const citation = rawCitation as Partial<ClaimCitation>;
+      if (typeof citation.id !== "string" || !citation.id) {
+        continue;
+      }
+      evidence.push({
+        id: citation.id,
+        name: typeof citation.name === "string" ? citation.name : citation.id,
+        source_name: typeof citation.source_name === "string" ? citation.source_name : "",
+      });
+    }
+    const status =
+      typeof candidate.status === "string" && CLAIM_STATUSES.has(candidate.status as ClaimStatus)
+        ? (candidate.status as ClaimStatus)
+        : "uncited";
+    claims.push({
+      index: candidate.index,
+      text: candidate.text,
+      status,
+      evidence,
+      reason: typeof candidate.reason === "string" ? candidate.reason : null,
+    });
+  }
+  return claims;
 }
 
 /** Read the failure the sidecar reported on an SSE `error` event. */
 function readStudioError(raw: unknown): StudioError {
   if (raw && typeof raw === "object" && "code" in raw) {
     const error = raw as Partial<StudioError>;
-    return {
+    const parsed = {
       code: String(error.code ?? "internal"),
       message: String(error.message ?? "The assistant could not finish this turn."),
       detail: error.detail ?? null,
@@ -141,12 +197,16 @@ function readStudioError(raw: unknown): StudioError {
       retryable: Boolean(error.retryable),
       request_id: error.request_id ?? null,
     };
+    recordStudioError(parsed, "/api/chat");
+    return parsed;
   }
-  return {
+  const parsed: StudioError = {
     code: "internal",
     message: "The assistant could not finish this turn.",
     retryable: true,
   };
+  recordStudioError(parsed, "/api/chat");
+  return parsed;
 }
 
 const SETTINGS_KEY = "studio.settings";
@@ -169,9 +229,6 @@ const PANEL_FOR_SUBJECT: Partial<Record<SignalSubjectKind, WorkspacePanelId>> = 
   outcome: "landscape",
   evidence: "evidence",
 };
-
-/** The developer simulator's events never reach the store, so they carry this id prefix. */
-const SIMULATED_SIGNAL_PREFIX = "sim-";
 
 export const EMPTY_CONFIG: StudioConfig = {
   base_url: "http://localhost:8001/v1",
@@ -343,10 +400,14 @@ export interface StudioContextValue {
   dismissSignal: (id: string) => void;
   /** Mark read, then open the lens on whatever the signal is about. */
   focusSignalSubject: (signal: Signal) => void;
+  /** Point the studio at a subject and remember it for the next visit. */
+  focusSubject: (kind: SignalSubjectKind, id: string) => void;
   focusedSubject: { kind: SignalSubjectKind; id: string } | null;
   /** The job that owns the focused subject, so canvas panels can select it. */
   focusedJobId: string | null;
-  simulateBackgroundEvent: () => void;
+  /** The evidence record a citation chip asked the Evidence lens to show. */
+  focusedEvidenceId: string | null;
+  focusEvidence: (evidenceId: string) => void;
 }
 
 const StudioContext = createContext<StudioContextValue | null>(null);
@@ -361,6 +422,31 @@ function loadSettings(): StudioConfig {
     /* ignore malformed cache */
   }
   return EMPTY_CONFIG;
+}
+
+function loadFocusedSubject(): { kind: SignalSubjectKind; id: string } | null {
+  const session = loadSession();
+  if (!session) {
+    return null;
+  }
+  if (session.job_id) {
+    return { kind: "job", id: session.job_id };
+  }
+  if (session.step_id) {
+    return { kind: "step", id: session.step_id };
+  }
+  if (session.outcome_id) {
+    return { kind: "outcome", id: session.outcome_id };
+  }
+  return null;
+}
+
+function sessionForSubject(kind: SignalSubjectKind, id: string): StudioSession {
+  return {
+    job_id: kind === "job" ? id : null,
+    step_id: kind === "step" ? id : null,
+    outcome_id: kind === "outcome" ? id : null,
+  };
 }
 
 function loadCanvasCache(): CanvasData | null {
@@ -464,13 +550,13 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [capabilities, setCapabilities] = useState<Capability[]>([]);
   const [connectorSuggestions, setConnectorSuggestions] = useState<string[]>([]);
   const [serverSignals, setServerSignals] = useState<Signal[]>([]);
-  const [simulatedSignals, setSimulatedSignals] = useState<Signal[]>([]);
   const [unreadSignalCount, setUnreadSignalCount] = useState(0);
   const [signalsError, setSignalsError] = useState<StudioError | null>(null);
   const [focusedSubject, setFocusedSubject] = useState<{
     kind: SignalSubjectKind;
     id: string;
-  } | null>(null);
+  } | null>(loadFocusedSubject);
+  const [focusedEvidenceId, setFocusedEvidenceId] = useState<string | null>(null);
   const [customizeOpen, setCustomizeOpen] = useState(false);
   const [customizeTarget, setCustomizeTarget] = useState<CustomizeTarget | null>(null);
   const [marketplace, setMarketplace] = useState<MarketplaceSearch | null>(null);
@@ -484,11 +570,9 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const toastId = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
 
-  /** Simulated events sit on top; they are labelled and never counted as unread. */
   const signals = useMemo(
-    () =>
-      [...simulatedSignals, ...serverSignals].sort((a, b) => (a.created_at < b.created_at ? 1 : -1)),
-    [simulatedSignals, serverSignals],
+    () => [...serverSignals].sort((a, b) => (a.created_at < b.created_at ? 1 : -1)),
+    [serverSignals],
   );
 
   const refreshSignals = useCallback(async () => {
@@ -531,14 +615,6 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 
   const markSignalAsRead = useCallback(
     (id: string) => {
-      if (id.startsWith(SIMULATED_SIGNAL_PREFIX)) {
-        setSimulatedSignals((prev) =>
-          prev.map((item) =>
-            item.id === id ? { ...item, read_at: new Date().toISOString() } : item,
-          ),
-        );
-        return;
-      }
       apiMarkSignalRead(id, settings.mcp_url)
         .then(refreshSignals)
         .catch((error) => setSignalsError(asStudioError(error)));
@@ -548,10 +624,6 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 
   const dismissSignal = useCallback(
     (id: string) => {
-      if (id.startsWith(SIMULATED_SIGNAL_PREFIX)) {
-        setSimulatedSignals((prev) => prev.filter((item) => item.id !== id));
-        return;
-      }
       apiDismissSignal(id, settings.mcp_url)
         .then(refreshSignals)
         .catch((error) => setSignalsError(asStudioError(error)));
@@ -746,48 +818,6 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       return next;
     });
   }, []);
-
-  /**
-   * The developer affordance #78 kept, re-shaped as a Signal. It demonstrates
-   * what a full inbox looks like; nothing it produces reaches the store, and
-   * the feed labels it so nobody mistakes it for something that happened.
-   */
-  const simulateBackgroundEvent = useCallback(() => {
-    const drafts: Array<Pick<Signal, "kind" | "title" | "severity" | "detail">> = [
-      {
-        kind: "evidence_ingested",
-        title: 'Evidence from "telemetry": cluster config friction',
-        detail: "Analyzed workflow traces: 82% of users report friction during cluster config.",
-        severity: "info",
-      },
-      {
-        kind: "opportunity_crossed",
-        title: "Opportunity score crossed 10 (up): validation rules",
-        detail: "Satisfaction fell to 3 while importance held at 9.",
-        severity: "urgent",
-      },
-      {
-        kind: "job_map_completed",
-        title: "Job map complete: Deploy a release covers all 8 stages",
-        severity: "notice",
-      },
-    ];
-
-    const chosen = drafts[Math.floor(Math.random() * drafts.length)];
-    const stamp = new Date().toISOString();
-    setSimulatedSignals((prev) => [
-      {
-        ...chosen,
-        id: `${SIMULATED_SIGNAL_PREFIX}${Date.now()}`,
-        created_at: stamp,
-        suppressed: false,
-        fingerprint: `simulated-${stamp}`,
-        simulated: true,
-      },
-      ...prev,
-    ]);
-    pushToast("info", `Simulated: ${chosen.title}`);
-  }, [pushToast]);
 
   // The theme lives on <html> so every surface, portal, and native control
   // follows one class instead of each component tracking its own copy.
@@ -1078,12 +1108,24 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   );
 
   /**
+   * Point the studio at a subject and persist it, so a reload can resume on
+   * the same job, step, or outcome. Evidence has no session slot.
+   */
+  const focusSubject = useCallback((kind: SignalSubjectKind, id: string) => {
+    setFocusedSubject({ kind, id });
+    if (kind === "evidence") {
+      return;
+    }
+    saveSession(sessionForSubject(kind, id));
+  }, []);
+
+  /**
    * What a card does when activated: read the signal, then take the person to
    * the record it names. This is the job `targetId` never did.
    */
   const focusSignalSubject = useCallback(
     (signal: Signal) => {
-      if (!signal.simulated && !signal.read_at) {
+      if (!signal.read_at) {
         markSignalAsRead(signal.id);
       }
       const kind = signal.subject_kind;
@@ -1091,13 +1133,25 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       if (!kind || !id) {
         return;
       }
-      setFocusedSubject({ kind, id });
+      focusSubject(kind, id);
       const panel = PANEL_FOR_SUBJECT[kind];
       if (panel) {
         openPanel(panel);
       }
     },
-    [markSignalAsRead, openPanel],
+    [markSignalAsRead, openPanel, focusSubject],
+  );
+
+  /**
+   * A citation chip opens the record it names: the Evidence lens, focused on
+   * that row. The snapshot label stays even when the record is gone.
+   */
+  const focusEvidence = useCallback(
+    (evidenceId: string) => {
+      setFocusedEvidenceId(evidenceId);
+      openPanel("evidence");
+    },
+    [openPanel],
   );
 
   /** The job owning the focused subject, so canvas panels can select it. */
@@ -1165,6 +1219,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
         ...(attachments.length ? { attachments } : {}),
       };
       const assistantId = crypto.randomUUID();
+      const turnStartedAt = Date.now();
+      let streamFrames = 0;
       const history: ChatMessage[] =
         existingUserMessage && base.at(-1)?.id === existingUserMessage.id
           ? base
@@ -1282,6 +1338,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       };
 
       const handleEvent = (event: RawSseEvent) => {
+        streamFrames += 1;
         switch (event.event) {
           case "status": {
             const phase = String(event.data.phase ?? "");
@@ -1372,7 +1429,24 @@ export function StudioProvider({ children }: { children: ReactNode }) {
             // never erase structured parts: thinking, tool calls, citations,
             // and surfaces sit between the paragraphs that frame them.
             content = String(event.data.content ?? content);
-            if (content && !parts.some((part) => part.kind === "text")) {
+            const claims = readClaims(event.data.claims);
+            if (claims.length > 0) {
+              // The finished list replaces the streamed prose in place, so each
+              // sentence keeps its own chip.
+              let preceding = 0;
+              for (const part of parts) {
+                if (part.kind === "text") {
+                  break;
+                }
+                preceding += 1;
+              }
+              const structured = parts.filter((part) => part.kind !== "text");
+              parts = [
+                ...structured.slice(0, preceding),
+                { kind: "claims", content, claims },
+                ...structured.slice(preceding),
+              ];
+            } else if (content && !parts.some((part) => part.kind === "text")) {
               parts = [...parts, { kind: "text", text: content }];
             }
             publish();
@@ -1464,6 +1538,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
         } else {
           terminal = true;
           failure = asStudioError(error);
+          recordStudioError(failure, "/api/chat");
           publish();
         }
       } finally {
@@ -1476,8 +1551,15 @@ export function StudioProvider({ children }: { children: ReactNode }) {
             suggestion: "Try again — your question is still here.",
             retryable: true,
           };
+          recordStudioError(failure, "/api/chat");
           publish();
         }
+        recordStream({
+          assistant_id: assistantId,
+          frames: streamFrames,
+          terminal: failure ? "failed" : stopped ? "stopped" : "completed",
+          duration_ms: Math.max(0, Date.now() - turnStartedAt),
+        });
         setStreaming(false);
         setThinkingPhase(null);
         abortRef.current = null;
@@ -1650,7 +1732,9 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       try {
         await apiDeleteObservation(observationId);
         setMemory((prev) => prev.filter((item) => item.id !== observationId));
-      } catch {
+      } catch (error) {
+        const problem = asStudioError(error);
+        recordStudioError(problem, "/api/memory/observations");
         pushToast("error", "I couldn't forget that.");
       }
     },
@@ -1664,7 +1748,9 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       setConversationId(null);
       setMessages([]);
       setToolActivity([]);
-    } catch {
+    } catch (error) {
+      const problem = asStudioError(error);
+      recordStudioError(problem, "/api/memory");
       pushToast("error", "I couldn't clear what I've learned.");
     }
   }, [pushToast]);
@@ -1896,9 +1982,11 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       markSignalAsRead,
       dismissSignal,
       focusSignalSubject,
+      focusSubject,
       focusedSubject,
       focusedJobId,
-      simulateBackgroundEvent,
+      focusedEvidenceId,
+      focusEvidence,
     }),
     [
       settings,
@@ -2002,9 +2090,11 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       markSignalAsRead,
       dismissSignal,
       focusSignalSubject,
+      focusSubject,
       focusedSubject,
       focusedJobId,
-      simulateBackgroundEvent,
+      focusedEvidenceId,
+      focusEvidence,
     ],
   );
 

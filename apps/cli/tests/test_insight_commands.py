@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+
 from agentic_odi_cli.cli import app
 from typer.testing import CliRunner
 
@@ -47,3 +49,22 @@ def test_capabilities_and_guidelines_print_core_copy(tmp_path, monkeypatch):
     assert "Agentic ODI assistant" in capabilities.stdout
     assert guidelines.exit_code == 0
     assert "Outcome-Driven Innovation" in guidelines.stdout
+
+
+def test_health_reports_an_accessible_store(tmp_path, monkeypatch):
+    monkeypatch.setenv("AGENTIC_ODI_DB", str(tmp_path / "odi.db"))
+
+    result = CliRunner().invoke(app, ["health"])
+
+    assert result.exit_code == 0
+    assert "ok" in result.stdout
+    assert "accessible" in result.stdout
+
+
+def test_health_json_is_the_mcp_shape(tmp_path, monkeypatch):
+    monkeypatch.setenv("AGENTIC_ODI_DB", str(tmp_path / "odi.db"))
+
+    result = CliRunner().invoke(app, ["health", "--json"])
+
+    assert result.exit_code == 0
+    assert json.loads(result.stdout) == {"status": "ok", "store": "accessible"}

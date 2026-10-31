@@ -196,7 +196,7 @@ function ComposerBody({
               : "What do you want to make happen?")
           }
           aria-autocomplete="list"
-          aria-expanded={open}
+          aria-haspopup="listbox"
           aria-controls={open ? paletteId : undefined}
           onKeyDown={onKeyDown}
           onPaste={(event) => {

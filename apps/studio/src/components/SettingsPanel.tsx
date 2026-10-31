@@ -111,7 +111,7 @@ export function SettingsPanel() {
         settings={settings}
         saveSettings={saveSettings}
       />
-      <AdvancedSection sectionId="settings-advanced" />
+      <AdvancedSection sectionId="settings-advanced" settings={settings} capabilities={capabilities} />
     </div>
   );
 }

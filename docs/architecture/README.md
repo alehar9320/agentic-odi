@@ -52,6 +52,11 @@ apps/cli ──────────────▶ packages/connectors
 - `build_repository()` chooses SQLite by default and `InMemoryRepository` when `AGENTIC_ODI_DB=:memory:`, which is what tests use.
 - The CLI selects its backend with `--backend local|mcp` or `AGENTIC_ODI_BACKEND`.
 - The Studio API selects `local` (direct service calls) or `mcp` (passthrough) with `AGENTIC_ODI_BACKEND` or `create_app(backend=...)`.
+- The Studio keeps the last focused subject in `localStorage` under
+  `studio.session` (`job_id`, `step_id`, `outcome_id`), so a reload reopens the
+  same job, step, or outcome. This is browser state, not sidecar state: there is
+  no server session and nothing is shared between browsers. Evidence has no
+  session slot, so focusing evidence leaves the stored context untouched.
 
 ## MCP Contract
 
@@ -92,9 +97,34 @@ Repository ruleset `main-requires-ci-green` (id `25356329`) requires both
 for pull requests (`bypass_mode: pull_request`). Rulesets are repository
 settings, not files; change them with `gh api` and record it here.
 
+## Documents
+
+Start here, then take the one that answers your question.
+
+| Document | One line |
+|---|---|
+| [ODI contract](odi-contract.md) | The methodology rules — format, score, stages — and where each is enforced. |
+| [Data flow](data-flow.md) | How a write and a read travel from the CLI, MCP, and Studio to storage and back. |
+| [The signal inbox](notifications.md) | The operational surface of signals: kinds, dedupe, budget, and how each client reads them. |
+| [Signals](signals.md) | The design behind signals: why they are events, what they must describe, and what they do not do. |
+| [Evidence mapping](evidence-mapping.md) | How a connector record becomes an evidence draft, and how evidence is promoted. |
+| [Consent and approvals](consent.md) | What the conversational agent must ask before it writes, and what is not covered. |
+| [Trust boundaries](trust-boundaries.md) | What each process may reach, where credentials live, and what crosses the wire. |
+| [The generative UI protocol](ui-protocol.md) | The closed catalog, validation on both ends, limits, and the action model. |
+| [Studio banners](banners.md) | The Studio's unified notice system. |
+| [Testing](testing.md) | Test layout, commands, and what each suite is responsible for. |
+| [Decisions (ADRs)](adr/README.md) | Why the architecture looks the way it does. |
+
 ## Related
 
 - [Data flow](data-flow.md)
 - [Studio banners](banners.md)
 - [Testing](testing.md)
 - [Decisions (ADRs)](adr/README.md) — why the architecture looks the way it does
+
+## What this does not do
+
+This index describes the repository's architecture, not a deployment guide, an
+API reference, or a tutorial. It does not cover historical designs — those live
+under `docs/superpowers/` as a frozen record — and it does not promise
+capabilities that are still open issues; each document links its own gaps.

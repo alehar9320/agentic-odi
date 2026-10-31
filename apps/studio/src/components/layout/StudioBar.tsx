@@ -214,6 +214,13 @@ export function StudioBar({
           )}
         </div>
       </div>
+
+      {/* The bell's label carries the current count; this announces changes. */}
+      <p className="sr-only" role="status" aria-live="polite">
+        {unreadSignalCount > 0
+          ? `${unreadSignalCount} new ${unreadSignalCount === 1 ? "notification" : "notifications"}`
+          : ""}
+      </p>
     </header>
   );
 }

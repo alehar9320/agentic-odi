@@ -12,6 +12,7 @@ from agentic_odi_studio_api.studio.approvals import (
     ApprovalDecision,
     ApprovalRegistry,
 )
+from agentic_odi_studio_api.studio.memory import StudioMemory
 from agentic_odi_studio_api.studio.schemas import AttachmentRef, ChatMessage, ChatRequest
 
 
@@ -384,3 +385,95 @@ def test_attachment_text_is_truncated(monkeypatch) -> None:
 
     assert len(block) < 50_000
     assert chat.MAX_ATTACHMENT_TEXT < 50_000
+
+
+def test_a_cited_sentence_names_the_record_not_the_tool(monkeypatch) -> None:
+    _install(
+        monkeypatch,
+        [
+            _FakeStream([_chunk(tool_calls=[_tool_call("{}", "list_evidence")])]),
+            _FakeStream([_chunk(content="Three accounts stalled. [[ev:E-1]]")]),
+        ],
+    )
+    _Mcp.tool_result = '[{"id": "E-1", "name": "Call with Acme", "source_name": "Gong"}]'
+
+    events = _parse(_collect(_request()))
+
+    message = next(data for name, data in events if name == "message")
+    assert message["content"] == "Three accounts stalled. [[ev:E-1]]"
+    assert message["claims"] == [
+        {
+            "index": 0,
+            "text": "Three accounts stalled.",
+            "status": "cited",
+            "evidence": [{"id": "E-1", "name": "Call with Acme", "source_name": "Gong"}],
+            "reason": None,
+        }
+    ]
+
+
+def test_an_id_the_turn_never_received_is_downgraded(monkeypatch) -> None:
+    _install(
+        monkeypatch,
+        [
+            _FakeStream([_chunk(tool_calls=[_tool_call("{}", "list_evidence")])]),
+            _FakeStream([_chunk(content="They churned. [[ev:E-9]]")]),
+        ],
+    )
+    _Mcp.tool_result = "[]"
+
+    events = _parse(_collect(_request()))
+
+    claim = next(data for name, data in events if name == "message")["claims"][0]
+    assert claim["status"] == "uncited"
+    assert claim["reason"] == "unknown_evidence_id"
+    assert claim["evidence"] == []
+
+
+def test_a_hypothesis_and_an_unmarked_sentence_still_reach_the_reader(monkeypatch) -> None:
+    _install(
+        monkeypatch,
+        [_FakeStream([_chunk(content="Nobody said why. [[hypothesis]] It is a guess.")])],
+    )
+
+    events = _parse(_collect(_request()))
+
+    claims = next(data for name, data in events if name == "message")["claims"]
+    assert [claim["status"] for claim in claims] == ["hypothesis", "uncited"]
+    assert [name for name, _ in events if name in {"message", "error"}] == ["message"]
+
+
+def test_an_offline_reply_carries_no_claims(monkeypatch) -> None:
+    async def _unhealthy(*args: Any, **kwargs: Any) -> tuple[bool, str]:
+        return False, "down"
+
+    monkeypatch.setattr(chat, "check_llm_health", _unhealthy)
+    monkeypatch.setattr(chat, "is_endpoint_reachable", lambda url, timeout: True)
+
+    events = _parse(_collect(_request()))
+
+    message = next(data for name, data in events if name == "message")
+    assert "claims" not in message
+
+
+def test_claims_are_persisted_with_the_turn(monkeypatch) -> None:
+    _install(
+        monkeypatch,
+        [
+            _FakeStream([_chunk(tool_calls=[_tool_call("{}", "list_evidence")])]),
+            _FakeStream([_chunk(content="Three accounts stalled. [[ev:E-1]]")]),
+        ],
+    )
+    _Mcp.tool_result = '[{"id": "E-1", "name": "Call with Acme", "source_name": "Gong"}]'
+    memory = StudioMemory(":memory:")
+
+    async def _run() -> list[str]:
+        return [frame async for frame in chat.stream_chat(_request(), memory=memory)]
+
+    asyncio.run(_run())
+
+    conversation = memory.latest_conversation()
+    assert conversation is not None
+    assistant = memory.conversation_tree(conversation.id)[-1]
+    assert assistant.claims[0].status == "cited"
+    assert assistant.claims[0].evidence[0].name == "Call with Acme"

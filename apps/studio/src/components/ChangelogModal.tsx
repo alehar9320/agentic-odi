@@ -68,17 +68,22 @@ export function ChangelogModal({ isOpen, onClose }: ChangelogModalProps) {
   if (!isOpen) return null;
 
   return (
-    <div
-      ref={dialogRef}
-      className="changelog-overlay fade-in"
-      onClick={onClose}
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="changelog-modal-title"
-    >
+    <div className="changelog-overlay fade-in">
+      {/* A real control so a pointer can dismiss; Escape and the close button
+          are the keyboard paths. */}
+      <button
+        type="button"
+        className="changelog-scrim"
+        aria-label="Close release notes"
+        tabIndex={-1}
+        onClick={onClose}
+      />
       <div
+        ref={dialogRef}
         className="changelog-modal"
-        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="changelog-modal-title"
       >
         <header className="changelog-modal__header">
           <div>
