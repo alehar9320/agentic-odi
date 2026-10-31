@@ -73,7 +73,8 @@ per-platform archives with SHA-256 checksums for a manual download. See
   four-step tour stays out of the way, and in-place guidance appears only after
   the first exchange. It turns "a customer still reconciles invoices by hand"
   into a scored outcome, a job map, and a ranked opportunity board — inline in
-  the thread.
+  the thread. Every claim in a reply names the record behind it, or says it is a
+  hypothesis.
 - **Local-first by default.** The CLI and server work with no network and no
   account. Point them at a remote MCP server with one flag.
 - **A catch-up that means something.** Writes emit signals — an outcome
@@ -131,7 +132,9 @@ or `AGENTIC_ODI_MCP_PORT=8010`. The flag wins over the environment variable.
   and outcome stays editable by hand. See [Local LLM Backend](docs/local-llm.md).
 - **A real conversation runtime.** The Studio uses assistant-ui over its
   sidecar-owned transcript, with attachments, tool traces, approvals, and
-  branch-aware editing and regeneration. See [The Living Studio](docs/living-studio.md).
+  branch-aware editing and regeneration. Settings → About also offers an
+  opt-in, redacted local diagnostics preview; no report is uploaded. See
+  [The Living Studio](docs/living-studio.md).
 - **Just the CLI:** it is local-first, so data commands need no server at all.
 
 ```bash
@@ -188,16 +191,18 @@ connector catalog, and client-side search over every page (`Ctrl`/`Cmd`+`K`).
 
 A [uv workspace](https://docs.astral.sh/uv/concepts/projects/workspaces/) with
 shared tooling at the root. Packages live in `packages/`, runnable services in
-`apps/`, and deployment assets in `infra/`:
+`apps/`, and deployment assets in `infra/`. The
+[architecture index](docs/architecture/README.md) explains how the pieces fit
+together and where each contract is enforced:
 
 | Path | Distribution | Description |
 |---|---|---|
 | **`packages/core/`** | `agentic-odi-core` | Domain models, the `ODIService` layer, in-memory and SQLite repositories, the shared MCP tool contract, opportunity-score computation, outcome-based segmentation (Stage 5), and the innovation strategy (Stage 6). |
 | **`packages/connectors/`** | `agentic-odi-connectors` | Pluggable MCP and REST connectors with presets and an ingest sink. |
 | **`apps/mcp-server/`** | `agentic-odi-mcp-server` | FastMCP server exposing Jobs, Steps, Desired Outcomes, Customer Outcomes, Evidence, Segments, Strategy, and context tools over HTTP. SQLite by default. |
-| **`apps/studio-api/`** | `agentic-odi-studio-api` | FastAPI **Living Studio sidecar**: config, health, canvas, local mutations, MCP passthrough, SSE chat, conversations, and PM memory. |
+| **`apps/studio-api/`** | `agentic-odi-studio-api` | FastAPI **Living Studio sidecar**: config, health, metadata-only diagnostics, canvas, local mutations, MCP passthrough, SSE chat, conversations, and PM memory. |
 | **`apps/cli/`** | `agentic-odi-cli` | Typer CLI with interactive chat, full entity CRUD, `schema`, `connectors`, and local or remote data access. |
-| **`apps/studio/`** | React + TypeScript + Vite | **The Living Studio** SPA and Tauri 2 desktop shell, built on [assistant-ui](https://www.assistant-ui.com). Its browser-level suite lives in `apps/studio/e2e/`. Installed desktop builds **update themselves** in the background and apply on restart. |
+| **`apps/studio/`** | React + TypeScript + Vite | **The Living Studio** SPA and Tauri 2 desktop shell, built on [assistant-ui](https://www.assistant-ui.com). Keyboard- and screen-reader-operable, gated by an [axe-core](https://github.com/dequelabs/axe-core) WCAG 2.1 AA sweep in the frontend suite. Its browser-level suite lives in `apps/studio/e2e/`. Installed desktop builds **update themselves** in the background and apply on restart. |
 | **`infra/cloudflare/`** | Worker | Free-plan Workers Static Assets deployment and sidecar tunnel. |
 | **`scripts/`** | — | Dev launcher, binary build, installer tests. |
 | **`tests/contract/`** | — | Cross-package MCP contract tests. |
@@ -210,6 +215,7 @@ request:
 ```bash
 uv run ruff check . && uv run ruff format --check .
 uv run mypy apps packages && uv run pytest
+uv run python scripts/doc_check.py   # documented commands, paths, routes, and env vars exist
 ```
 
 See [Development](docs/development.md) for the frontend checks, the coverage

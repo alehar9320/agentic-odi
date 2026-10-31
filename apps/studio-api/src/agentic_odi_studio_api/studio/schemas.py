@@ -308,6 +308,24 @@ class ConversationResponse(BaseModel):
     conversation: ConversationModel
 
 
+class ClaimCitationOut(BaseModel):
+    """The record label a claim carries, snapshotted when the turn was stored."""
+
+    id: str
+    name: str = ""
+    source_name: str = ""
+
+
+class ClaimOut(BaseModel):
+    """One declarative sentence and what stands behind it."""
+
+    index: int
+    text: str
+    status: str
+    evidence: list[ClaimCitationOut] = Field(default_factory=list)
+    reason: str | None = None
+
+
 class TurnModel(BaseModel):
     id: int
     conversation_id: str
@@ -316,6 +334,7 @@ class TurnModel(BaseModel):
     created_at: str
     message_id: str | None = None
     parent_id: str | None = None
+    claims: list[ClaimOut] = Field(default_factory=list)
 
 
 class LatestConversationResponse(BaseModel):
@@ -331,6 +350,7 @@ class TurnNode(BaseModel):
     role: str
     content: str
     created_at: str
+    claims: list[ClaimOut] = Field(default_factory=list)
 
 
 class ConversationTreeResponse(BaseModel):

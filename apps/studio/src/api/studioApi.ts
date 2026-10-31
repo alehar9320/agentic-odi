@@ -32,6 +32,7 @@ import type {
   StudioError,
 } from "../types";
 import { createSseParser, type RawSseEvent } from "./sse";
+import { recordStudioError } from "../diagnostics/bundle";
 
 /** A failure the sidecar reported, kept whole so the UI can show it. */
 export class StudioApiError extends Error {
@@ -186,7 +187,9 @@ async function studioError(response: Response): Promise<StudioApiError> {
 async function getJson<T>(path: string): Promise<T> {
   const response = await fetch(apiUrl(path), { headers: { Accept: "application/json" } });
   if (!response.ok) {
-    throw await studioError(response);
+    const error = await studioError(response);
+    recordStudioError(error.error, path);
+    throw error;
   }
   return (await response.json()) as T;
 }
@@ -198,7 +201,9 @@ async function sendJson<T>(method: "POST" | "PATCH", path: string, body: unknown
     body: JSON.stringify(body),
   });
   if (!response.ok) {
-    throw await studioError(response);
+    const error = await studioError(response);
+    recordStudioError(error.error, path);
+    throw error;
   }
   return (await response.json()) as T;
 }
@@ -213,7 +218,9 @@ async function deleteJson<T>(path: string): Promise<T> {
     headers: { Accept: "application/json" },
   });
   if (!response.ok) {
-    throw await studioError(response);
+    const error = await studioError(response);
+    recordStudioError(error.error, path);
+    throw error;
   }
   return (await response.json()) as T;
 }
@@ -238,6 +245,23 @@ async function withLocal<T>(
 export async function fetchConfig(): Promise<StudioConfig> {
   const body = await getJson<{ defaults: StudioConfig }>("/api/config");
   return body.defaults;
+}
+
+export interface SidecarDiagnostics {
+  version: string;
+  python: string;
+  db: {
+    name: string;
+    size_bytes: number;
+    integrity: string;
+    counts: { jobs: number; outcomes: number; evidence: number; observations: number };
+  };
+  migrations: Record<string, string>;
+  capabilities: unknown[];
+}
+
+export function fetchDiagnostics(): Promise<SidecarDiagnostics> {
+  return getJson<SidecarDiagnostics>("/api/diagnostics");
 }
 
 export function fetchChangelog(): Promise<ChangelogData> {
@@ -393,7 +417,11 @@ export async function deleteConnector(name: string): Promise<ConnectorOperationR
     method: "DELETE",
     headers: { Accept: "application/json" },
   });
-  if (!response.ok) throw await studioError(response);
+  if (!response.ok) {
+    const error = await studioError(response);
+    recordStudioError(error.error, `/api/connectors/${encodeURIComponent(name)}`);
+    throw error;
+  }
   return (await response.json()) as ConnectorOperationResponse;
 }
 

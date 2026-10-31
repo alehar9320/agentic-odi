@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import time
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -309,11 +310,13 @@ def add_connector(
 
 @connectors_app.command("health")
 def health_connector(
-    name: str = typer.Option(..., "--name", help="Connector name."),
+    name: str | None = typer.Option(
+        None, "--name", help="Connector name. Omit to check every configured connector."
+    ),
     no_cache: bool = typer.Option(False, "--no-cache", help="Ignore a cached health result."),
     config: Path | None = ConfigOption,
 ) -> None:
-    """Check whether a connector can reach its external system."""
+    """Check whether a connector, or every configured connector, is reachable."""
     if not flags.is_enabled("experimental_connectors"):
         typer.echo(
             "Error: connector management requires the experimental_connectors flag. "
@@ -323,8 +326,12 @@ def health_connector(
         raise typer.Exit(code=1)
     from agentic_odi_connectors.registry import ConnectorNotFoundError, UnknownConnectorKindError
 
+    registry = _registry(config)
+    if name is None:
+        _health_table(registry, no_cache=no_cache)
+        return
     try:
-        connector_config = _registry(config).get(name)
+        connector_config = registry.get(name)
         connector = build_connector(connector_config)
     except (ConnectorNotFoundError, UnknownConnectorKindError) as exc:
         typer.echo(f"Error: {exc}", err=True)
@@ -336,6 +343,40 @@ def health_connector(
     status = _run(connector.health(), name)
     typer.echo(status.model_dump_json())
     if not status.ok:
+        raise typer.Exit(code=1)
+
+
+def _health_table(registry: ConnectorRegistry, *, no_cache: bool) -> None:
+    items = registry.list_all()
+    if not items:
+        typer.echo("No connectors configured.")
+        return
+    rows: list[tuple[str, str, str]] = []
+    all_ok = True
+    for item in items:
+        started = time.perf_counter()
+        try:
+            if no_cache:
+                from agentic_odi_connectors.rest.connector import clear_health_cache
+
+                clear_health_cache(item.name)
+            status = _run(build_connector(item).health(), item.name)
+        except typer.Exit:
+            state = "unreachable: timed out"
+            all_ok = False
+        except Exception as exc:  # noqa: BLE001 - one broken connector must not hide the rest
+            state = f"unreachable: {exc}"
+            all_ok = False
+        else:
+            state = "healthy" if status.ok else f"unreachable: {status.message}"
+            all_ok = all_ok and status.ok
+        latency = (time.perf_counter() - started) * 1000
+        rows.append((item.name, state, f"{latency:.0f}"))
+    typer.echo("| Connector | Status | Latency (ms) |")
+    typer.echo("|-----------|--------|--------------|")
+    for item_name, item_state, item_latency in rows:
+        typer.echo(f"| {item_name} | {item_state} | {item_latency} |")
+    if not all_ok:
         raise typer.Exit(code=1)
 
 

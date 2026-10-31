@@ -21,7 +21,7 @@ from collections.abc import AsyncIterator
 from contextlib import AsyncExitStack
 from typing import Any
 
-from agentic_odi_core import ModelRouter, ModelTier, RoutingMode
+from agentic_odi_core import ModelRouter, ModelTier, ODIService, RoutingMode
 from agentic_odi_core.remote import (
     StudioError,
     StudioErrorCode,
@@ -34,6 +34,12 @@ from openai import AsyncOpenAI
 from agentic_odi_studio_api.studio.approvals import (
     ApprovalRegistry,
     wait_for_decision,
+)
+from agentic_odi_studio_api.studio.claims import (
+    Claim,
+    EvidenceIndex,
+    EvidenceSnapshot,
+    split_claims,
 )
 from agentic_odi_studio_api.studio.connectors import ConnectorService
 from agentic_odi_studio_api.studio.memory import OBSERVATION_KINDS, StudioMemory
@@ -98,7 +104,11 @@ How to work:
 8. Capture and simulation are conversations, not forms: ask for the customer's words or the bet in plain language, render the card that carries it, and offer the next move as an action on that card.
 9. When asked to add or query Jobs, Steps, or Outcomes, ALWAYS invoke the corresponding tools.
 10. "Who is this for?" is answered by segments, not by demographics: call `get_segments`, and if none are recorded yet, `segment_market` first. "So what do we do?" is answered by `propose_strategy`, which names the paths it beat — say what those were and why. Never present a verdict without the confidence behind it.
-11. Be warm, direct, and specific. Short sentences. No corporate jargon, no therapy-speak, no emojis."""
+11. Be warm, direct, and specific. Short sentences. No corporate jargon, no therapy-speak, no emojis.
+12. Every declarative sentence you write ends with an evidence marker: `[[ev:<id>]]`, `[[ev:<id>,<id>]]` (at most three), or `[[hypothesis]]` when no record supports it. Questions, instructions, headings, and code carry no marker.
+13. Never invent an evidence id. Cite only ids a tool returned in this turn; anything else is shown as unsupported and your sentence is underlined as uncited.
+14. Before any claim about what customers said, did, or want, call `list_evidence` (or `get_evidence`) and cite the record it returns.
+15. Put the marker at the very end of the sentence, outside code. One marker supports one sentence, never the sentence beside it."""
 
 
 def _brief_lines(brief: StudioBrief | None) -> list[str]:
@@ -435,19 +445,33 @@ def _persist_turn(
     content: str,
     message_id: str | None = None,
     parent_id: str | None = None,
-) -> None:
-    """Record a turn, tolerating a duplicate retry and never breaking the reply."""
+    claims: list[Claim] | None = None,
+) -> int | None:
+    """Record a turn and its claims, tolerating a duplicate retry.
+
+    A retry that reuses a message id rewrites the same citation rows instead of
+    stacking new ones. A failure to remember never breaks the reply.
+    """
     if memory is None or conversation_id is None or not content.strip():
-        return
+        return None
     try:
         turns = memory.list_turns(conversation_id)
-        if message_id and any(turn.message_id == message_id for turn in turns):
-            return
+        if message_id:
+            existing = next((turn for turn in turns if turn.message_id == message_id), None)
+            if existing is not None:
+                if claims:
+                    memory.add_citations(existing.id, claims)
+                return existing.id
         if turns and turns[-1].role == role and turns[-1].content == content:
-            return
-        memory.append_turn(conversation_id, role, content, message_id, parent_id)
+            if claims:
+                memory.add_citations(turns[-1].id, claims)
+            return turns[-1].id
+        turn_id = memory.append_turn(conversation_id, role, content, message_id, parent_id)
+        if claims:
+            memory.add_citations(turn_id, claims)
+        return turn_id
     except Exception:  # noqa: BLE001
-        return
+        return None
 
 
 def _reasoning_text(delta: Any) -> str:
@@ -485,6 +509,33 @@ def _denial_result(name: str, decision: Any) -> str | None:
     )
 
 
+def _local_evidence_resolver(
+    service: ODIService | None,
+) -> Any:
+    """Resolve an id from the local store, so the local backend validates too."""
+    if service is None:
+        return None
+
+    def resolve(evidence_id: str) -> EvidenceSnapshot | None:
+        try:
+            record = service.get_evidence(evidence_id)
+        except Exception:  # noqa: BLE001 - the store is optional context
+            return None
+        if record is None:
+            return None
+        return EvidenceSnapshot(id=record.id, name=record.name, source_name=record.source_name)
+
+    return resolve
+
+
+def _message_payload(content: str, claims: list[Claim]) -> dict[str, Any]:
+    """The terminal frame: the prose, plus what each sentence stands behind."""
+    payload: dict[str, Any] = {"content": content}
+    if claims:
+        payload["claims"] = [claim.to_dict() for claim in claims]
+    return payload
+
+
 def _source_frame(counters: dict[str, int], name: str, result: str) -> dict[str, Any]:
     """One provenance entry per tool the turn actually read."""
     counters["sources"] += 1
@@ -516,6 +567,7 @@ async def _turn_frames(
     request_id: str,
     counters: dict[str, int],
     approvals: ApprovalRegistry | None = None,
+    local_service: ODIService | None = None,
 ) -> AsyncIterator[str]:
     """Yield the frames of one turn, raising ``_TurnFailure`` on a fatal error."""
 
@@ -608,6 +660,8 @@ async def _turn_frames(
     llm_client = AsyncOpenAI(base_url=request.base_url, api_key=request.api_key, timeout=15.0)
     connector_service = service if service is not None else ConnectorService()
     memory_context = memory.memory_context() if memory is not None else ""
+    # Every id the turn actually received, with the label that came with it.
+    evidence = EvidenceIndex(resolver=_local_evidence_resolver(local_service))
 
     async with AsyncExitStack() as stack:
         try:
@@ -685,7 +739,7 @@ async def _turn_frames(
 
             if not tool_calls:
                 final = "".join(spoken)
-                yield frame("message", {"content": final})
+                claims = split_claims(final, evidence)
                 _persist_turn(
                     memory,
                     conversation_id,
@@ -693,7 +747,9 @@ async def _turn_frames(
                     final,
                     assistant_message_id,
                     user_message_id,
+                    claims,
                 )
+                yield frame("message", _message_payload(final, claims))
                 return
 
             messages.append(
@@ -815,6 +871,7 @@ async def _turn_frames(
                                 )
                             else:
                                 canvas_dirty = True
+                                evidence.ingest(name, arguments, result_str)
                                 yield frame(
                                     "tool",
                                     {"name": name, "status": "ok", "preview": result_str[:280]},
@@ -842,7 +899,7 @@ async def _turn_frames(
             "Ask me to continue and I will pick up where I left off."
         )
         content = f"{final}\n\n{note}".strip() if final else note
-        yield frame("message", {"content": content})
+        claims = split_claims(content, evidence)
         _persist_turn(
             memory,
             conversation_id,
@@ -850,7 +907,9 @@ async def _turn_frames(
             content,
             assistant_message_id,
             user_message_id,
+            claims,
         )
+        yield frame("message", _message_payload(content, claims))
 
 
 async def stream_chat(
@@ -859,6 +918,7 @@ async def stream_chat(
     memory: StudioMemory | None = None,
     request_id: str | None = None,
     approvals: ApprovalRegistry | None = None,
+    local_service: ODIService | None = None,
 ) -> AsyncIterator[str]:
     """Yield SSE frames: status, conversation, reasoning, delta, tool, approval,
     source, ui, memory, connector, message, error.
@@ -879,7 +939,9 @@ async def stream_chat(
     outcome = "failed"
     error_code: str | None = None
     try:
-        async for chunk in _turn_frames(request, service, memory, rid, counters, approvals):
+        async for chunk in _turn_frames(
+            request, service, memory, rid, counters, approvals, local_service
+        ):
             yield chunk
         outcome = "completed"
         if counters["tool_errors"]:

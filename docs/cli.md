@@ -36,6 +36,19 @@ Data commands print readable tables and blocks by default; add `--json` for
 machine-readable output. Diagnostics go to stderr and failures exit non-zero
 (`0` success, `1` error, `2` usage error).
 
+## MCP connection limits
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `AGENTIC_ODI_MCP_TIMEOUT` | `30.0` | Seconds allowed for one MCP call and for the connection handshake. Invalid or non-positive values fall back to the default. |
+| `AGENTIC_ODI_MCP_KEEPALIVE` | `15.0` | Keepalive interval in seconds for MCP sessions; `0` disables keepalive. |
+
+Both values are parsed by `agentic_odi_core.MCPConnectionConfig.from_env()`.
+The CLI hands the timeout to the FastMCP client for every call, so a frozen
+server fails with a clear error instead of hanging. FastMCP has no
+keepalive-interval setting yet, so the interval is carried for transports that
+support session keepalive.
+
 ## Interactive chat
 
 `agentic-odi chat` (or simply `agentic-odi` in a terminal) starts an
@@ -145,6 +158,11 @@ agentic-odi summary <job-id> --top 3 --json
 `--importance` and `--satisfaction` (1–10) are now required on `add`. `evaluate`
 checks a statement against the ODI format rules before saving.
 
+Job names are validated by the core model: 3–64 characters drawn from letters,
+digits, spaces, underscores, and hyphens. Descriptions may be up to 500
+characters. The CLI prints the first validation message instead of a traceback,
+and the Studio API returns a 422 with the same message.
+
 `summary` shows how many of the eight job-map phases the Job covers, which are
 still missing, and the underserved outcomes (score above 10) in descending
 order. `--top` caps that list; `--json` returns the same data for a script.
@@ -241,6 +259,8 @@ missing rather than inventing a bet. Until one exists, `strategy show` prints
 
 ```bash
 agentic-odi schema            # canonical JSON schema for every ODI entity
+agentic-odi health            # check that the ODI store is reachable
+agentic-odi health --json     # {"status": "ok", "store": "accessible"}
 agentic-odi score 8 2         # ODI opportunity score → 14.00
 agentic-odi evaluate "Minimize the time to ship when onboarding"  # outcome-format check
 agentic-odi evaluate --json "Minimize the time to ship when onboarding"
@@ -253,9 +273,27 @@ agentic-odi capabilities tools  # tool names only
 `evaluate` returns the same verdict the `evaluate_outcome` MCP tool does, so the
 check works with or without a running server.
 
+`health` runs the `get_health` check against the configured backend and exits
+non-zero when the store is degraded, so it can gate a deployment.
+
 `capabilities` groups every tool by effect (read/write/destructive) and by ODI
 stage. `capabilities --json` emits the full machine-readable manifest.
 `capabilities tools` lists tool names only.
+
+## Back up and export
+
+```bash
+agentic-odi data-export                        # ./odi-export-<timestamp>.json
+agentic-odi data-export --output backup.json   # explicit path
+agentic-odi data-export --job-id JOB-1         # one job and its children
+```
+
+`data-export` writes jobs, steps, desired outcomes, customer outcomes, and
+evidence to one JSON file (`format: agentic-odi-export`, `version: 1`). Every
+record is the same `model_dump()` shape the MCP tools return, so each entry can
+be re-validated with the corresponding core Pydantic model. The default
+filename carries a UTC ISO 8601 timestamp (`YYYYMMDDTHHMMSSZ`).
+
 
 ## Inspect settings and feature flags
 

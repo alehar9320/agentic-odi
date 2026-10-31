@@ -6,17 +6,31 @@
   --bg-raised: #0e1014;
   --text: #f1f2f4;
   --muted: #a2a7b3;
-  --faint: #71767f;
+  --faint: #7d828c;
   --accent: #8b8cf8;
   --accent-strong: #6366f1;
   --green: #4ade80;
   --amber: #f0b34a;
+  --red: #f87171;
   --line: rgba(255, 255, 255, 0.07);
   --line-strong: rgba(255, 255, 255, 0.14);
   --surface: rgba(255, 255, 255, 0.03);
   --surface-hover: rgba(255, 255, 255, 0.06);
   --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+
+  /* Canvas components were written against the original palette; the aliases
+     keep them on the live tokens so both themes stay in step. */
+  --studio-text: var(--text);
+  --studio-muted: var(--muted);
+  --studio-indigo: var(--accent);
+  --studio-indigo-strong: var(--accent-strong);
+  --studio-green: var(--green);
+  --studio-amber: var(--amber);
+  --studio-red: var(--red);
+  --studio-surface: var(--surface);
+  --studio-border: var(--line);
+  --studio-radius: 12px;
 }
 
 html.theme-dark {
@@ -30,11 +44,12 @@ html.theme-light {
   --bg-raised: #ffffff;
   --text: #15171c;
   --muted: #565d6b;
-  --faint: #7c838f;
+  --faint: #687080;
   --accent: #5b5bd6;
   --accent-strong: #4f46e5;
   --green: #15803d;
   --amber: #b45309;
+  --red: #b91c1c;
   --line: rgba(15, 23, 42, 0.09);
   --line-strong: rgba(15, 23, 42, 0.18);
   --surface: rgba(15, 23, 42, 0.035);
@@ -94,6 +109,25 @@ a {
   border: 0;
 }
 
+/* The first Tab stop: a way past the chrome and into the conversation. */
+.skip-link {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 3000;
+  padding: 8px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  text-decoration: none;
+  transform: translateY(-200%);
+}
+
+.skip-link:focus-visible {
+  transform: none;
+}
+
 /* ------------------------------------------------------------------ */
 /* Shell                                                              */
 /* ------------------------------------------------------------------ */
@@ -101,7 +135,10 @@ a {
   height: 100dvh;
   display: flex;
   flex-direction: column;
-  background: var(--bg);
+  background:
+    radial-gradient(760px 420px at 50% 108%, rgba(99, 102, 241, 0.09), transparent 72%),
+    radial-gradient(900px 520px at 68% -12%, rgba(99, 102, 241, 0.08), transparent 68%),
+    var(--bg);
   overflow: hidden;
 }
 
@@ -125,9 +162,6 @@ a {
   flex: 1;
   min-width: 0;
   min-height: 0;
-  background:
-    radial-gradient(760px 420px at 50% 108%, rgba(99, 102, 241, 0.09), transparent 72%),
-    radial-gradient(900px 520px at 68% -12%, rgba(99, 102, 241, 0.08), transparent 68%);
 }
 
 .bar {
@@ -1915,6 +1949,38 @@ input[type="range"] {
   text-transform: uppercase;
 }
 
+.settings__about dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 5px 12px;
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+.settings__about dt {
+  color: var(--faint);
+}
+
+.settings__about dd {
+  margin: 0;
+  text-align: right;
+}
+
+.diagnostics-about {
+  display: grid;
+  justify-items: start;
+  gap: 6px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.diagnostics-about h4,
+.diagnostics-about p {
+  margin: 0;
+}
+
 .connection-list {
   display: flex;
   flex-direction: column;
@@ -2387,10 +2453,38 @@ input[type="range"] {
   color: var(--faint);
 }
 
+.catchup-empty__actions {
+  margin-top: 14px;
+}
+
 .catchup-card {
   position: relative;
   cursor: pointer;
   transition: all 0.2s ease-in-out;
+}
+
+/* Stretched over the card so the whole surface is one real button; the
+   card's own controls are lifted above it. */
+.catchup-card__hit {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  padding: 0;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  cursor: pointer;
+}
+
+.catchup-card__hit:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.catchup-card__controls,
+.catchup-card .card__actions {
+  position: relative;
+  z-index: 1;
 }
 
 .catchup-card__meta {
@@ -2551,6 +2645,27 @@ input[type="range"] {
   transform: translateY(-2px);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), 0 0 1px rgba(255, 255, 255, 0.2);
   border-color: rgba(255, 255, 255, 0.16);
+}
+
+/* The plot's real controls sit over the SVG dots: one tab stop, arrows roam. */
+.matrix-node {
+  position: absolute;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  transform: translate(-50%, -50%);
+  cursor: pointer;
+}
+
+.matrix-node:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.matrix-node--selected {
+  box-shadow: 0 0 0 1px rgba(129, 140, 248, 0.6);
 }
 
 .pulsing-card {
@@ -3404,7 +3519,16 @@ input[type="range"] {
   padding: 20px;
 }
 
+.changelog-scrim {
+  position: absolute;
+  inset: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
 .changelog-modal {
+  position: relative;
   width: 100%;
   max-width: 680px;
   max-height: 85vh;
@@ -3582,6 +3706,100 @@ input[type="range"] {
   color: var(--text-secondary, rgba(255, 255, 255, 0.62));
   font-size: 0.9rem;
   line-height: 1.5;
+}
+
+.diagnostics-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2100;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.64);
+  backdrop-filter: blur(8px);
+}
+
+.diagnostics-modal {
+  display: flex;
+  flex-direction: column;
+  width: min(760px, 100%);
+  max-height: min(90dvh, 900px);
+  padding: 18px;
+  overflow: hidden;
+  color: var(--text);
+  background: var(--bg-raised);
+  border: 1px solid var(--line-strong);
+  border-radius: 14px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.36);
+}
+
+.diagnostics-modal__header,
+.diagnostics-modal__actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.diagnostics-modal__summary {
+  margin: 10px 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.diagnostics-modal__lists {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  max-height: 24dvh;
+  overflow: auto;
+}
+
+.diagnostics-modal__lists section {
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.diagnostics-modal__lists h3 {
+  margin: 0 0 6px;
+  font-size: 0.78rem;
+}
+
+.diagnostics-modal__lists ul {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1.5;
+}
+
+.diagnostics-modal__preview {
+  min-height: 120px;
+  max-height: 40dvh;
+  margin: 12px 0;
+  padding: 12px;
+  overflow: auto;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font: 0.72rem/1.5 var(--mono);
+  white-space: pre;
+  tab-size: 2;
+}
+
+.diagnostics-modal__actions {
+  justify-content: flex-end;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+@media (max-width: 540px) {
+  .diagnostics-modal__lists {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* ================================================================== */
@@ -4332,6 +4550,120 @@ details[open] summary {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+}
+
+/* Claim contract: a chip, a tag, or an underline per sentence */
+.claim-text {
+  display: block;
+}
+
+.claim-text > p,
+.claim-text__heading,
+.claim-text__list {
+  margin: 0 0 0.7em;
+  line-height: 1.62;
+}
+
+.claim-text > *:last-child {
+  margin-bottom: 0;
+}
+
+.claim-text__heading {
+  font-weight: 600;
+}
+
+.claim-text__list {
+  padding-left: 1.2em;
+}
+
+.claim-text__code {
+  margin: 0 0 0.7em;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--surface);
+  overflow-x: auto;
+  font-size: 0.8rem;
+}
+
+.claim-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  max-width: 28ch;
+  margin: 0 3px;
+  padding: 1px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.72em;
+  line-height: 1.6;
+  vertical-align: baseline;
+  cursor: pointer;
+}
+
+.claim-chip:hover {
+  color: var(--text, currentColor);
+  border-color: var(--muted);
+}
+
+.claim-chip:focus-visible {
+  outline: 2px solid var(--muted);
+  outline-offset: 2px;
+}
+
+.claim-chip--missing {
+  cursor: default;
+  border-style: dashed;
+  color: var(--faint);
+}
+
+.claim-chip__label {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.claim-chip__order {
+  color: var(--faint);
+  font-size: 0.8em;
+}
+
+.claim-chip__sample {
+  color: var(--faint);
+  font-size: 0.8em;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.claim-tag {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 1px 7px;
+  border: 1px dashed var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 0.68em;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.claim--uncited {
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+}
+
+.claim-banner {
+  margin: 6px 0 0;
+  color: var(--faint);
+  font-size: 0.72rem;
+}
+
+.evidence.is-focused {
+  border-left-color: var(--amber);
+  box-shadow: 0 0 0 1px var(--line);
 }
 
 .tool-trace {
@@ -5674,11 +6006,6 @@ details[open] summary {
 
 .canvas-provenance strong {
   color: var(--text);
-}
-
-.catchup-card.is-simulated {
-  border-style: dashed;
-  opacity: 0.88;
 }
 
 .settings__preset-group {
