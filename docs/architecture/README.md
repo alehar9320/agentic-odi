@@ -57,6 +57,10 @@ apps/cli ──────────────▶ packages/connectors
   same job, step, or outcome. This is browser state, not sidecar state: there is
   no server session and nothing is shared between browsers. Evidence has no
   session slot, so focusing evidence leaves the stored context untouched.
+- The composer chip reads that same focus and names the record an answer will be
+  about; clicking it opens the lens that holds the record. The name comes from
+  the loaded board, so a record the board does not hold is shown by its id
+  instead of an invented title.
 
 ## MCP Contract
 

@@ -408,6 +408,8 @@ export interface StudioContextValue {
   focusSignalSubject: (signal: Signal) => void;
   /** Point the studio at a subject and remember it for the next visit. */
   focusSubject: (kind: SignalSubjectKind, id: string) => void;
+  /** Point the studio at a subject and open the lens that can show it. */
+  revealSubject: (kind: SignalSubjectKind, id: string) => void;
   focusedSubject: { kind: SignalSubjectKind; id: string } | null;
   /** The job that owns the focused subject, so canvas panels can select it. */
   focusedJobId: string | null;
@@ -1195,6 +1197,25 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       openPanel("evidence");
     },
     [openPanel],
+  );
+
+  /**
+   * What the composer chip does when it is clicked: take the person to the
+   * record it names, in the lens that can show it.
+   */
+  const revealSubject = useCallback(
+    (kind: SignalSubjectKind, id: string) => {
+      focusSubject(kind, id);
+      if (kind === "evidence") {
+        focusEvidence(id);
+        return;
+      }
+      const panel = PANEL_FOR_SUBJECT[kind];
+      if (panel) {
+        openPanel(panel);
+      }
+    },
+    [focusSubject, focusEvidence, openPanel],
   );
 
   /** The job owning the focused subject, so canvas panels can select it. */
@@ -2029,6 +2050,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       dismissSignal,
       focusSignalSubject,
       focusSubject,
+      revealSubject,
       focusedSubject,
       focusedJobId,
       segments,
@@ -2141,6 +2163,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       dismissSignal,
       focusSignalSubject,
       focusSubject,
+      revealSubject,
       focusedSubject,
       focusedJobId,
       segments,

@@ -23,6 +23,7 @@ import { isSlashCommand, matchCommands, type StudioCommand } from "../../lib/com
 import { useStudio } from "../../state/StudioContext";
 import { ArrowUpIcon, MicIcon, PaperclipIcon, StopIcon } from "../icons";
 import { CommandPalette, ComposerHint, ConnectorChips, SuggestionPills, paletteOpenFor } from "./composerParts";
+import { ContextChip } from "./ContextChip";
 import { ModelPicker } from "./ModelPicker";
 
 const acceptedAttachmentTypes = ATTACHMENT_ACCEPT.split(",");
@@ -170,6 +171,7 @@ function ComposerBody({
 
   return (
     <>
+      <ContextChip />
       <SuggestionPills />
       <CommandPalette
         id={paletteId}
