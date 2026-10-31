@@ -77,17 +77,25 @@ so it can gate a deployment.
 ## Ingest behavior
 
 Ingested records are normalized (`catalog`, `resource`, `tool_result`) and
-appended to the in-process ingest sink. They are **not** written into the ODI
-jobs/outcomes store — mapping ingested evidence onto ODI artifacts is still on
-the [roadmap](roadmap.md).
+appended to the in-process ingest sink. When `--job-id`, `--step-id`, or
+`--outcome-id` is supplied, each normalized record is **also** mapped to an
+evidence draft and written to the ODI store as an `Evidence` record, carrying
+the source name, source kind, item type, content, URL when one is present, the
+raw payload, and the link.
+
+Without a target id nothing enters the ODI store: the batch lives only in the
+in-process sink and is lost when the process exits. The mapping is
+field-for-field — it does not summarize, score, infer confidence, or dedupe.
+See [Evidence mapping](architecture/evidence-mapping.md) for the contract.
 
 Pass `--dry-run` to fetch and normalize without writing anything: it prints the
 record count, the first normalized record, and — when `--job-id`, `--step-id`,
 or `--outcome-id` is given — how many evidence drafts the ingest would create.
 
-Evidence drafts are checked against the `EvidenceDraft` contract with
-`validate_evidence_draft()` before they can be handed to the ODI store, so a
-record that crossed a process boundary cannot enter with a missing field.
+Every evidence draft is an `EvidenceDraft` model, so construction raises before
+a record that crossed a process boundary can reach the ODI store with a missing
+or mistyped field. `validate_evidence_draft()` applies the same check to a draft
+that arrives as a plain dict; the CLI path builds the model directly.
 
 Additional kinds (REST, webhooks, and so on) can register against the same
 `Connector` protocol later.

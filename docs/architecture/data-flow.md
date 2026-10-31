@@ -159,10 +159,12 @@ the demo seed only in `mcp` mode when MCP is unreachable or returns no jobs. `lo
 
 ## Trust Boundaries
 
-- The SPA runs in a browser or Tauri webview and only trusts the sidecar origin.
-- The sidecar may reach MCP and the LLM; CORS is restricted to known Studio origins.
-- MCP is an HTTP service with no authentication in local development. Do not expose it directly to the internet; the Cloudflare setup tunnels the sidecar, not MCP.
-- The Tauri desktop shell contacts the GitHub releases endpoint for `latest.json`, verifies the artifact signatures against the key pinned in `tauri.conf.json`, and only stages an update after verification. The updater cannot be reached from the browser build.
+Each process, the credentials it holds, and what crosses every wire are
+documented in [Trust boundaries](trust-boundaries.md). The short version: the
+SPA trusts only the sidecar; the sidecar reaches MCP and the LLM; MCP is an
+unauthenticated local HTTP service and must not be exposed; the hosted Worker
+tunnels the sidecar, not MCP; and the Tauri updater verifies signatures before
+staging an update.
 
 ## The Failure Path
 
